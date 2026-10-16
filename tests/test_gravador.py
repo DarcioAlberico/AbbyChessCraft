@@ -330,3 +330,17 @@ def test_salvar_pagina_nao_muda_a_pagina_que_a_interface_mostra(projeto):
     assert mostrada.boxes == antes                     # a da interface não mudou
     nova = projeto.carregar_modelo(0)
     assert nova is not mostrada and [b.entry.char for b in nova.boxes] == ["q"]
+
+
+def test_agendar_nao_calcula_a_foto_dos_glifos(projeto, monkeypatch):
+    from abbychess import projeto as projeto_mod
+
+    chamadas = []
+    original = projeto_mod.foto
+    monkeypatch.setattr(projeto_mod, "foto", lambda e: (chamadas.append(1), original(e))[1])
+    pagina = _pagina(projeto, 0, n=50)
+    for k in range(5):
+        projeto.agendar(pagina)
+        projeto.descarregar(5)                   # a gravação tira a foto; a edição não a refaz
+        ed.corrigir(pagina, pagina.boxes[k].gid, "z")
+    assert chamadas == []

@@ -106,3 +106,15 @@ Confirmou B1 e M1–M5 resolvidos e a ordem das travas sem ciclo. O que mudou de
 
 Ficam, de propósito: `gid_do_box` e o `gid=None` de `pagina.ensinar` (o `replay_fatia`
 ensina por listas de `BoxEntry`), e `Instantaneo.boxes` (o que os testes do desfazer leem).
+
+## Rodada 3
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Código e testes | Correção 8 · Simplicidade 8 · Testes 8 | **aceita** |
+
+Os menores dela entraram antes das medidas: fechar pergunta de novo depois de parar as
+tarefas, pelo que a tarefa em voo entregou (m14, teste); a docstring de `salvar_pagina` diz
+que a mudança no lugar não é vista numa página sem foto (m15); testes de que `agendar` não
+calcula a foto e de que uma tarefa pedida por quem ouve "livre" roda (m16). Os resíduos
+(m17) ficam como registrado na rodada 2.

@@ -697,7 +697,8 @@
     "Bxh7+"
    ],
    "fen_verificado": false,
-   "lado_verificado": false
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
   },
   {
    "id": "d1",
@@ -712,7 +713,8 @@
     "Kf8"
    ],
    "fen_verificado": false,
-   "lado_verificado": false
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
   },
   {
    "id": "d2",
@@ -728,7 +730,8 @@
     "Bxg4"
    ],
    "fen_verificado": false,
-   "lado_verificado": false
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
   }
  ],
  "linhas_corpo": [

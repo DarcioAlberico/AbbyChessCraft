@@ -51,6 +51,8 @@ do estado reconhecido ao gabarito. Ela tem duas partes.
 3. A linha de base é medida num bloco de páginas (índices 20–22) e o passo novo num bloco
    equivalente (23–25); numa segunda sessão, com pelo menos 7 dias de intervalo, os blocos
    se invertem, para descontar o aprendizado do texto.
-4. O número de erros do bloco é o das diferenças do snapshot contra o gabarito nessas páginas
-   (o replay as conta por página). O resultado é em segundos por erro e fica em
-   `docs/medidas/AAAA-MM-DD-fatia-humana.json`, com o nome de quem mediu, o passo e o bloco.
+4. O número de erros do bloco é o das diferenças do snapshot contra o gabarito nessas
+   páginas: a soma de `erros.texto` e `erros.diagramas` das páginas do bloco no JSON da
+   fatia (`paginas.iNNN.erros`), com o texto verificado. O resultado é em segundos por erro
+   e fica em `docs/medidas/AAAA-MM-DD-fatia-humana.json`, com o nome de quem mediu, o passo
+   e o bloco.

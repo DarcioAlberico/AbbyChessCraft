@@ -111,8 +111,11 @@ Paralelos, só com git e worktrees e com arquivos disjuntos:
      porque o assistente não transcreve o texto dos livros (direito autoral);
    - conferência cega de 1 página por livro, pelo usuário;
    - revisão pelo usuário (§18.3).
-   - Até o texto ser verificado, as medidas de texto ficam "pendentes de gabarito" e as de
-     estrutura (cabeçalhos, legendas, ordem, FEN) já valem.
+   - Até o texto ser verificado, as medidas de texto ficam "pendentes"; as de estrutura e
+     de diagrama ficam "provisórias" até a revisão e a conferência dos FEN (spec §15.2).
+     **Prazo**: as etapas do usuário não bloqueiam os passos 1a a A2; o texto e os FEN das
+     p. 21–27 do Xadrez Vitorioso têm de estar verificados antes do fechamento do A3, que é o
+     primeiro passo julgado pelo CA-F.1.
 7. **Medidas**:
    - `ferramentas/medir.py`, `tests/desempenho/` e `docs/medidas/maquina.json`;
    - o snapshot `tests/dados/fatia/xv-i020-026-inicial.zip`, `ferramentas/replay_fatia.py` e o
@@ -120,8 +123,10 @@ Paralelos, só com git e worktrees e com arquivos disjuntos:
    - a linha de base de §2, com o replay da fatia sobre a interface de hoje;
    - `docs/medidas/protocolo-fatia.md`.
 
-**Saída.** Primeiro commit, gabaritos revisados e
-`docs/medidas/<data>-linha-de-base.json`.
+**Saída.** O passo em git, com a tag `passo-0` no commit aprovado pelas revisões; os
+gabaritos com a estrutura rotulada pelo assistente (a revisão, o texto e a conferência cega
+são do usuário, no prazo da tarefa 6); `docs/medidas/<data>-linha-de-base.json`, as medidas
+de qualidade dos três livros e a da fatia, medidas com a árvore limpa.
 
 ## Passo 1a — Persistência, ainda no formato v1
 
@@ -433,6 +438,11 @@ aviso.
 - Declarar pronto sem a medição no livro de referência.
 
 ## Mudanças
+
+- **0.5 (2026-10-16)** (fechamento do passo 0, `docs/revisoes/passo-0.md`): a saída do
+  passo 0 deixa de esperar os gabaritos revisados pelo usuário, que têm prazo até o
+  fechamento do A3; a linha de base fica presa à tag `passo-0`; o catálogo do replay ganhou
+  `ensinar_da_fila` e `reler_pendentes`.
 
 - **0.2 (2026-10-15)**: fatia vertical, passo 1 dividido, desfazer unificado, passos I e L,
   dependências corrigidas (rodada 1, `docs/revisoes/rodada-1.md`).

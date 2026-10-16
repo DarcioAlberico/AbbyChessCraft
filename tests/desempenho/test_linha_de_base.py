@@ -17,7 +17,7 @@ import time
 
 import pytest
 
-from tests.desempenho.conftest import cronometrar, p95
+from tests.desempenho.conftest import cronometrar, p95, percentil
 from tests.livros import PASTA_DOS_PDFS
 from tests.test_janela import _esperar
 
@@ -219,7 +219,7 @@ def test_atraso_e_memoria_durante_o_lote(ambiente, medidas):
     _esperar(app, janela, limite=1500)
     temporizador.stop()
     medidas["atraso_durante_o_lote"] = {
-        "paginas": len(LOTE), "p99_ms": round(sorted(atrasos)[int(0.99 * (len(atrasos) - 1))], 1),
+        "paginas": len(LOTE), "p99_ms": round(percentil(atrasos, 0.99), 1),
         "p95_ms": round(p95(atrasos), 1), "max_ms": round(max(atrasos), 1),
         "disparos": len(atrasos), "duracao_s": round(time.perf_counter() - inicio, 1),
         "alvo_p99_ms": 50, "acoes_durante_o_lote": "desabilitadas ou ignoradas (executor ocupado)"}

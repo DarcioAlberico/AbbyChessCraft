@@ -67,6 +67,8 @@ def cenario(tmp_path):
         gabarito = {"blocos": [], "diagramas": [], "revisado_por": "Teste", "verdade_versao": 1,
                     "linhas_corpo": [{"id": f"l{k}", "caixa_rel": caixas[k], "texto": certos[k],
                                       "texto_verificado": True} for k in range(2)]}
+        if indice == 0:                     # a conferência cega de uma página da fatia
+            gabarito["conferencia_cega"] = {"texto": {"aprovada": True, "verdade_versao": 1}}
         (verdade / "sint" / f"i{indice:03d}.json").write_text(json.dumps(gabarito),
                                                               encoding="utf-8")
 
@@ -82,11 +84,12 @@ def test_passo_0_ensina_rele_na_pagina_seguinte_e_cobra_o_espaco_impossivel(cena
     snapshot, verdade = cenario
     resultado = rf.replay("sint", snapshot, "0", verdade=verdade)
     primeira, segunda = resultado["paginas"]["i000"], resultado["paginas"]["i001"]
-    assert primeira["comandos"] == {"ensinar_glifo": 3, "descartar_box": 1}
+    # Sem leitura, tudo empata na fila: o glifo a corrigir é sempre o que a janela mostra.
+    assert primeira["comandos"] == {"ensinar_da_fila": 3, "descartar_box": 1}
     # Os padrões da primeira página valem na segunda: Ctrl+R e nada de ensinar de novo.
     assert segunda["comandos"] == {"reler_pendentes": 1, "descartar_box": 1}
     assert resultado["gestos_navegacao"] == CUSTO["pagina_seguinte"]
-    possiveis = (3 * CUSTO["ensinar_glifo"] + 2 * CUSTO["descartar_box"]
+    possiveis = (3 * CUSTO["ensinar_da_fila"] + 2 * CUSTO["descartar_box"]
                  + CUSTO["reler_pendentes"] + CUSTO["pagina_seguinte"])
     assert resultado["gestos_sem_impossiveis"] == possiveis
     assert resultado["impossiveis"] == {"espaco": 2}
@@ -105,7 +108,7 @@ def test_passo_que_so_acrescenta_comandos_nao_piora_a_medida(cenario):
     snapshot, verdade = cenario
     no_0 = rf.replay("sint", snapshot, "0", verdade=verdade)
     no_d1 = rf.replay("sint", snapshot, "D1", verdade=verdade)
-    assert no_d1["paginas"]["i000"]["comandos"].get("ensinar_glifo") == 3
+    assert no_d1["paginas"]["i000"]["comandos"].get("ensinar_da_fila") == 3
     assert no_d1["gestos"] <= no_0["gestos"]
     assert rf.comparar(no_0, no_d1)["razao"] <= 1
 
@@ -260,3 +263,46 @@ def test_diagrama_nao_achado_e_impossivel():
     conta = _conferir([], {"fen": _INICIAL, "lado": "w"})
     assert conta.impossiveis == {"diagrama_nao_achado": 1} and conta.gestos == 0
     assert conta.custo_dos_impossiveis == IMPOSSIVEL["diagrama_nao_achado"]
+
+
+def _desfazer_verificacao(verdade, pagina, campo, valor):
+    arquivo = verdade / "sint" / f"{pagina}.json"
+    gabarito = json.loads(arquivo.read_text(encoding="utf-8"))
+    campo(gabarito, valor)
+    arquivo.write_text(json.dumps(gabarito), encoding="utf-8")
+
+
+def test_texto_verificado_em_parte_deixa_a_medida_provisoria(cenario):
+    snapshot, verdade = cenario
+    _desfazer_verificacao(verdade, "i001", lambda g, v: g["linhas_corpo"][1].update(
+        texto_verificado=v), False)
+    resultado = rf.replay("sint", snapshot, "0", verdade=verdade)
+    assert resultado["estado"] == "provisório: texto verificado em 3/4 linhas"
+
+
+def test_conferencia_cega_velha_deixa_a_medida_provisoria(cenario):
+    snapshot, verdade = cenario
+    _desfazer_verificacao(verdade, "i000", lambda g, v: g.update(verdade_versao=v), 2)
+    resultado = rf.replay("sint", snapshot, "0", verdade=verdade)
+    assert resultado["estado"] == "provisório: sem conferência cega do texto aprovada e em dia"
+
+
+def test_erros_iniciais_por_pagina_para_a_medida_humana(cenario):
+    snapshot, verdade = cenario
+    resultado = rf.replay("sint", snapshot, "0", verdade=verdade)
+    # 14 glifos sem leitura que o gabarito tem, 1 a sobrar e 1 espaço errado, por página.
+    assert resultado["paginas"]["i000"]["erros"] == {"texto": 16, "diagramas": 0}
+
+
+def test_glifo_fora_da_cabeca_da_fila_custa_o_clique():
+    """Só o primeiro da fila sai mais barato: os outros pedem o clique no box."""
+    from abbychess.projeto import Limiares
+
+    leitor = SimpleNamespace(limiares=Limiares())
+    boxes = [SimpleNamespace(char="x", source="net", confidence=0.95),     # não está na fila
+             SimpleNamespace(char="", source="none", confidence=0.0)]       # o primeiro da fila
+    dif = rf.Diferencas(acoes=[("substituicao", 0, "a"), ("substituicao", 1, "b")])
+    disponiveis = rf.comandos_do_passo(CATALOGO, "0", PASSOS)
+    assert rf._proxima_acao(dif, boxes, leitor, disponiveis) == (("substituicao", 1, "b"), True)
+    dif = rf.Diferencas(acoes=[("substituicao", 0, "a")])
+    assert rf._proxima_acao(dif, boxes, leitor, disponiveis) == (("substituicao", 0, "a"), False)

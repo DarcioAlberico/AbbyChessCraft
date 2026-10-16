@@ -394,7 +394,8 @@
    "legenda": "b04",
    "lances_seguintes": [],
    "fen_verificado": false,
-   "lado_verificado": false
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
   },
   {
    "id": "d1",
@@ -404,7 +405,8 @@
    "legenda": "b22",
    "lances_seguintes": [],
    "fen_verificado": false,
-   "lado_verificado": false
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
   },
   {
    "id": "d2",
@@ -414,7 +416,8 @@
    "legenda": "b24",
    "lances_seguintes": [],
    "fen_verificado": false,
-   "lado_verificado": false
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
   }
  ],
  "linhas_corpo": [

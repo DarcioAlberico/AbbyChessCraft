@@ -30,7 +30,7 @@ outras rodam com `-m`:
 ```text
 .venv\Scripts\python.exe -m pytest -q
 .venv\Scripts\python.exe -m pytest -q -m livro_real
-.venv\Scripts\python.exe -m pytest -q -m desempenho tests\desempenho
+$env:ABBY_ROTULO_DA_MEDIDA = "linha-de-base"; .venv\Scripts\python.exe -m pytest -q -m desempenho tests\desempenho
 ```
 
 `livro_real` usa os PDFs da pasta do PyBoxEditor e os modelos globais; com
@@ -394,10 +394,13 @@ cd ..\AbbyChessCraft_passo0
 ..\AbbyChessCraft\.venv\Scripts\python.exe ferramentas\replay_fatia.py rodar --livro xv --passo 0
 ```
 
-Os gabaritos do worktree têm de ser os mesmos da medida nova: copie `tests\verdade\` do
-checkout principal para o worktree antes de rodar (o `comparar` recusa medidas com
-gabaritos de versões diferentes). O JSON sai em `docs\medidas\` do worktree; traga-o
-para o checkout principal.
+Os gabaritos do worktree têm de ser os mesmos da medida nova (o `comparar` recusa medidas
+com gabaritos de versões diferentes); copie-os antes de rodar, e traga o JSON de volta:
+
+```text
+robocopy tests\verdade ..\AbbyChessCraft_passo0\tests\verdade /E
+copy ..\AbbyChessCraft_passo0\docs\medidas\*-fatia-xv-passo-0*.json docs\medidas\
+```
 
 ### Os gabaritos
 
@@ -419,10 +422,12 @@ que têm direito autoral.
 #### O que falta você fazer
 
 O passo 0 está fechado como código: as ferramentas, os gabaritos com a estrutura e as
-medidas de hoje. As etapas abaixo são suas e **não bloqueiam** o roadmap, porque a linha de
-base pode ser medida de novo a qualquer momento no worktree da tag `passo-0` (acima).
-Enquanto elas não forem feitas, as medidas de texto ficam "pendentes" e as de diagrama e
-estrutura, "provisórias", e o README diz isso em cada tabela.
+medidas de hoje. As etapas abaixo são suas. Elas **não bloqueiam os passos 1a a A2**,
+porque a linha de base pode ser medida de novo a qualquer momento no worktree da tag
+`passo-0` (acima). Mas o **texto e os FEN das p. 21–27 do Xadrez Vitorioso têm de estar
+verificados antes do fechamento do A3**, o primeiro passo julgado pelos gestos da fatia
+(sem eles, o número não existe). Enquanto isso, as medidas de texto ficam "pendentes" e as
+de diagrama e estrutura, "provisórias", e o README diz isso em cada tabela.
 
 1. **Revisar a estrutura** de cada gabarito (`tests\verdade\<livro>\iNNN.json`) olhando as
    faixas em `.rotulagem\<livro>\iNNN\`. Corrija no JSON o que estiver errado (função,
@@ -488,6 +493,9 @@ estrutura, "provisórias", e o README diz isso em cada tabela.
    .venv\Scripts\python.exe ferramentas\tempo_da_fatia.py sessao-base.jsonl --erros <N> --por "Seu nome" --passo 0 --bloco i020-i022
    ```
 
+   O N é a soma dos erros das páginas do bloco (`paginas.iNNN.erros` no JSON da fatia
+   medido com o texto verificado).
+
 `.rotulagem` fica fora do git. "p. N" nas seções mais acima é o número da página no
 programa (a do PDF, índice N − 1); os gabaritos dizem também a página impressa.
 
@@ -524,8 +532,10 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 - **O Del do treino não descarta o box com o foco no campo do caractere.** O campo fica com a
   tecla, mesmo vazio (achado da tabela de atalhos no passo 0). Por enquanto, use o botão
   "Não é caractere"; o passo A2 corrige pela regra 6 de §3.4 da spec.
-- **O repositório tem conteúdo de livros** (`tests/verdade/`, `tests/dados/fatia/`): é para
-  ficar local; não publique sem tirar essas pastas.
+- **O repositório tem conteúdo de livros** (`tests/verdade/`, `tests/dados/fatia/`): ele é
+  privado e fica local, por decisão do passo 0 (o texto dos gabaritos é a referência das
+  medidas e precisa estar versionado com elas). Não publique o repositório; para publicar,
+  tire essas pastas do histórico antes.
 
 - **Dividir corta numa coluna só.** O corte escolhido à mão é sempre vertical e reto; dois
   glifos empilhados ou encaixados em diagonal só se dividem pelo corte automático, que

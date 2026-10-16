@@ -2,11 +2,17 @@ r"""O tempo de uma sessão de correção, pelo registro de eventos (SPEC §15.4,
 
     $env:ABBY_REGISTRO_DE_EVENTOS = "sessao.jsonl"; .venv\Scripts\python.exe -m abbychess <projeto>
     .venv\Scripts\python.exe ferramentas\tempo_da_fatia.py sessao.jsonl --erros 87 --por <nome>
+        --passo 0 --bloco i020-i022
 
 Soma o tempo do primeiro ao último gesto, sem os intervalos ociosos de mais de 60 s, e
-divide pelo número de erros do bloco (as diferenças do snapshot contra o gabarito, que o
-protocolo manda contar antes). Grava `docs/medidas/AAAA-MM-DD-fatia-humana.json` (acrescenta
-a sessão às que já estiverem lá). É informativo: não reprova passo nenhum.
+divide pelo número de erros do bloco (as diferenças do snapshot contra o gabarito: a soma
+de `erros` das páginas do bloco no JSON da fatia). O registro acrescenta ao arquivo, e o
+relógio monotônico recomeça a cada vez que o computador liga: cada `inicio` abre uma
+sessão nova, e um intervalo entre duas sessões nunca entra na soma. Uma linha cortada (o
+programa fechado no meio da escrita) é ignorada.
+
+Grava `docs/medidas/AAAA-MM-DD-fatia-humana.json` (acrescenta a sessão às que já estiverem
+lá). É informativo: não reprova passo nenhum.
 """
 
 from __future__ import annotations
@@ -22,14 +28,37 @@ OCIOSO_S = 60.0
 GESTOS = {"clique", "tecla", "atalho"}
 
 
+def _sessoes(linhas):
+    """Os instantes dos gestos, uma lista por sessão (cada `inicio` abre uma)."""
+    sessoes = [[]]
+    for linha in linhas:
+        try:
+            dados = json.loads(linha)
+        except ValueError:
+            continue
+        if not isinstance(dados, dict):
+            continue
+        if dados.get("evento") == "inicio":
+            if sessoes[-1]:
+                sessoes.append([])
+        elif dados.get("evento") in GESTOS and isinstance(dados.get("t"), (int, float)):
+            sessoes[-1].append(float(dados["t"]))
+    return [s for s in sessoes if s]
+
+
 def tempo_ativo(linhas) -> dict:
-    """Segundos ativos e gestos de uma sessão, a partir das linhas do registro."""
-    instantes = [json.loads(ln)["t"] for ln in linhas
-                 if ln.strip() and json.loads(ln).get("evento") in GESTOS]
-    ativo = sum(b - a for a, b in zip(instantes, instantes[1:]) if b - a <= OCIOSO_S)
-    return {"gestos": len(instantes), "segundos_ativos": round(ativo, 1),
-            "pausas_descontadas": sum(1 for a, b in zip(instantes, instantes[1:])
-                                      if b - a > OCIOSO_S)}
+    """Segundos ativos e gestos das sessões do registro, sem pausa longa nem salto de relógio."""
+    gestos = ativo = pausas = 0
+    sessoes = _sessoes(linhas)
+    for instantes in sessoes:
+        gestos += len(instantes)
+        for a, b in zip(instantes, instantes[1:]):
+            if 0 <= b - a <= OCIOSO_S:
+                ativo += b - a
+            else:
+                pausas += 1
+    return {"gestos": gestos, "segundos_ativos": round(ativo, 1),
+            "pausas_descontadas": pausas, "sessoes": len(sessoes)}
 
 
 def main(argv=None) -> int:

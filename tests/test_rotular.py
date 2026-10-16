@@ -195,3 +195,35 @@ def test_conferencia_cega_do_fen_e_revisao(pastas):
         rotular.revisar("sint", "i000", "Revisor", lado=["d7"])
     g = rotular.revisar("sint", "i000", "Revisor", lado=["d0"])
     assert g["revisado_por"] == "Revisor" and g["diagramas"][0]["lado_verificado"] is True
+
+
+@pytest.mark.parametrize("marca", [
+    lambda g: g["diagramas"].append({"id": "d0", "fen_verificado": True}),
+    lambda g: g["diagramas"].append({"id": "d0", "lado_verificado": True}),
+    lambda g: g["diagramas"].append({"id": "d0", "conferencia_cega": {"igual": False}}),
+    lambda g: g.update(conferencia_cega={"texto": {"aprovada": False}}),
+])
+def test_conferencias_tambem_sao_trabalho_humano(marca):
+    g = {"verdade_versao": 0, "linhas_corpo": [], "diagramas": []}
+    assert not rotular.trabalho_humano(g)
+    marca(g)
+    assert rotular.trabalho_humano(g)
+
+
+def test_forcar_duas_vezes_guarda_os_dois_backups(pastas):
+    verdade, _ = pastas
+    pasta = verdade / "sint"
+    rotular._recusar_sobrescrever(pasta, [0], forcar=True)
+    rotular._recusar_sobrescrever(pasta, [0], forcar=True)
+    assert sorted(p.name for p in pasta.glob("i000.json.bak*")) == ["i000.json.bak",
+                                                                    "i000.json.bak1"]
+
+
+def test_conferencia_cega_abaixo_do_minimo_fica_reprovada(pastas):
+    verdade, _ = pastas
+    modelo = rotular.cego_modelo("sint", "i000")
+    modelo.write_text("l1\tlido um\nl2\tlido XXXX\n", encoding="utf-8")
+    valor = rotular.cego_texto("sint", "i000", modelo, "Outra pessoa")
+    assert valor < rotular.CONCORDANCIA_MINIMA
+    g = json.loads((verdade / "sint" / "i000.json").read_text(encoding="utf-8"))
+    assert g["conferencia_cega"]["texto"]["aprovada"] is False

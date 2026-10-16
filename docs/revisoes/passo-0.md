@@ -75,3 +75,32 @@ O que mudou depois dela:
 Ficou para o passo 2a, de propósito: mover as fixtures da janela para `tests/conftest.py`
 (o docstring do conftest diz isso). Elas mudam de qualquer jeito quando a janela passa a
 ser montada pelo controlador.
+
+## Rodada 3
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Código e testes | Correção 7 · Simplicidade 8 · Testes 7 | volta |
+| Produto e medição | Completude 8 · Fidelidade das medidas 7 · Clareza para o usuário 7 | volta |
+
+O que mudou depois dela:
+
+| Achado | Correção |
+|---|---|
+| O catálogo cobrava o clique no glifo que a janela já mostra | `ensinar_da_fila` (passo 0, 2 gestos: digitar e Enter, conferido por QTest); o replay corrige primeiro o glifo da cabeça da fila, como quem anda pelo Enter; catálogo versão 4 |
+| Custos de passos futuros sem conferência | `conferir_no_passo` em cada um; conferido o custo, a versão sobe e a linha de base se refaz na tag; `corrigir_no_documento` passou a 3 (clique, Backspace, caractere) |
+| "Não bloqueia" sem prazo; saída do roadmap pedia gabaritos revisados | o README e o roadmap (0.5) dizem: não bloqueia de 1a a A2; texto e FEN das p. 21–27 verificados antes do fechamento do A3; a saída do passo 0 foi reescrita |
+| A tag `passo-0` não existia | criada no commit aprovado por esta rodada (abaixo), e as medidas refeitas nele |
+| Estado do replay "medido" com o texto verificado em parte; conferência cega ignorada | o estado da fatia e o de `medir` contam as linhas verificadas, a conferência cega do texto aprovada **e na versão atual** do gabarito e a de FEN igual |
+| `tempo_ativo` somava o salto do relógio entre sessões | uma sessão por `inicio`; só intervalos entre 0 e 60 s; linha cortada ignorada; parse uma vez |
+| O README não lia a medida com hora no nome; gerador sem teste | `ferramentas/comum.py` (`ultima_medida`, `destino_da_medida`, `estado_do_git`, `PASTA_DOS_PDFS`, uma definição só); `tests/test_resumo_medidas.py` |
+| Medidas sobrescritas no mesmo dia; JSON só de pulo | `medir` e o replay usam `destino_da_medida` (hora no nome, salvo `ABBY_SOBRESCREVER_MEDIDA=1`); o desempenho sem todas as metas grava `-parcial`, com falha `-falhou`, e registra a ordem fixa dos testes |
+| `trabalho_humano` não via FEN, lado e conferência cega; `.bak` sobrescrito | vê; os backups se numeram |
+| O registro quebrava depois de fechado; o atalho sem teste; o contador do teste duplicava a regra | `fechar` idempotente; teste do `Shortcut`; `tipo_do_gesto` é uma função só, usada pelo registro e pelo teste dos custos |
+| A navegação perdia impossíveis | somados ao total |
+| Exceção incompleta virava `KeyError`; `da_acao` com `StopIteration`; modificador repetido aceito | problema de forma; erro claro; recusado |
+| "Linhas sem par" misturava a capa com o corpo; faltava a revocação de linhas | páginas `negativa` (xv i000 e i007) à parte; "perdidas" (linhas do gabarito não lidas) |
+| O provisório do FEN parecia tautológico | `fen_rotulado_por` em cada diagrama; a coluna "FEN = leitura" diz quantos são iguais ao que o programa leu |
+| A CA-F.2 sem de onde tirar o N | o replay grava `erros` (texto e diagramas) por página; o README e o protocolo dizem como somar |
+| Menores | `robocopy` e o rótulo da medida no README; nomes dos JSON na §15.3; "estimado de 60 ações em 3 páginas"; caracteres novos do Enter no README; a legenda diz o que a ordem não vê; `percentil` único para p95 e p99; `medir.casas` usa a regra de FEN do `rotular`; o uso do `tempo_da_fatia` no docstring |
+| O texto dos livros no git | decisão: o repositório é privado e local (README, "Limitações conhecidas", e o docstring do `rotular.py`) |

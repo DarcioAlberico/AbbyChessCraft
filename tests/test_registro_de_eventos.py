@@ -48,4 +48,50 @@ def test_tempo_ativo_desconta_as_pausas_longas():
         (0.0, "inicio"), (1.0, "tecla"), (3.0, "clique"), (100.0, "tecla"), (101.5, "atalho"),
         (200.0, "fim")]]
     assert tempo_da_fatia.tempo_ativo(linhas) == {"gestos": 4, "segundos_ativos": 3.5,
-                                                  "pausas_descontadas": 1}
+                                                  "pausas_descontadas": 1, "sessoes": 1}
+
+
+def test_duas_sessoes_no_mesmo_arquivo_nao_somam_o_salto_do_relogio():
+    """O monotônico recomeça depois de religar: a segunda sessão tem relógio menor."""
+    linhas = [json.dumps({"t": t, "evento": e}) for t, e in [
+        (1000.0, "inicio"), (1001.0, "tecla"), (1003.0, "tecla"),
+        (5.0, "inicio"), (6.0, "clique"), (8.0, "tecla")]]
+    linhas.append('{"t": 9.0, "eve')                    # a última linha cortada
+    assert tempo_da_fatia.tempo_ativo(linhas) == {"gestos": 4, "segundos_ativos": 4.0,
+                                                  "pausas_descontadas": 0, "sessoes": 2}
+
+
+def test_evento_depois_de_fechar_nao_derruba(tmp_path):
+    registro = re_.RegistroDeEventos(str(tmp_path / "s.jsonl"))
+    registro.fechar()
+    registro._escrever({"evento": "tecla"})              # um evento atrasado
+    registro.fechar()
+    eventos = [json.loads(ln)["evento"]
+               for ln in (tmp_path / "s.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert eventos == ["inicio", "fim"]
+
+
+def test_atalho_conta_uma_vez(tmp_path, monkeypatch):
+    from PySide6.QtGui import QKeySequence, QShortcut
+    from PySide6.QtWidgets import QWidget
+
+    app = QApplication.instance() or QApplication([])
+    destino = tmp_path / "sessao.jsonl"
+    monkeypatch.setenv(re_.VARIAVEL, str(destino))
+    janela = QWidget()
+    disparos = []
+    QShortcut(QKeySequence("Ctrl+K"), janela).activated.connect(lambda: disparos.append(1))
+    janela.show()
+    janela.activateWindow()
+    app.processEvents()
+    registro = re_.instalar(app)
+    try:
+        QTest.keyClick(janela, Qt.Key.Key_K, Qt.KeyboardModifier.ControlModifier)
+        app.processEvents()
+    finally:
+        app.removeEventFilter(registro)
+        registro.fechar()
+        janela.close()
+    eventos = [json.loads(ln)["evento"] for ln in destino.read_text(encoding="utf-8").splitlines()]
+    assert disparos == [1]
+    assert eventos == ["inicio", "atalho", "fim"]

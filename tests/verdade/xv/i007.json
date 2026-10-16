@@ -563,5 +563,6 @@
    "texto_verificado": false
   }
  ],
- "estrutura_por": "Claude (estrutura pelas faixas)"
+ "estrutura_por": "Claude (estrutura pelas faixas)",
+ "negativa": true
 }

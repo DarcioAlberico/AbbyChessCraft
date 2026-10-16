@@ -54,7 +54,8 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / "ferramentas"))
 
-from medir import casar, casas, estado_do_git  # noqa: E402
+from comum import destino_da_medida, estado_do_git  # noqa: E402
+from medir import casar, casas  # noqa: E402
 from rotular import PASTA_DOS_PDFS, VERDADE, _caixa_relativa, _indices, sha256_do_arquivo  # noqa: E402
 
 FATIA = RAIZ / "tests" / "dados" / "fatia"
@@ -258,12 +259,17 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
             pg.propagar_padroes(imagem, boxes, leitor)
             texto_conta.usar("reler")
 
-        _replay_dos_diagramas(projeto, fonte, indice, imagem, gabarito, diagramas_conta)
+        erros_diagramas = _replay_dos_diagramas(projeto, fonte, indice, imagem, gabarito,
+                                                diagramas_conta)
 
+        linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
+        inicial = diferencas(boxes, linhas, caixas, palavra, gabarito)
+        erros_iniciais = (len(inicial.acoes) + inicial.faltas + inicial.espacos
+                          + inicial.caracteres_sem_par)
         for _ in range(LIMITE_DE_PASSOS):
             linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
             dif = diferencas(boxes, linhas, caixas, palavra, gabarito)
-            acao = next((a for a in dif.acoes if a[0] in disponiveis), None)
+            acao, da_fila = _proxima_acao(dif, boxes, leitor, disponiveis)
             if acao is None:
                 break
             if acao[0] == "substituicao":
@@ -271,7 +277,12 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
                 if ensinar is not None and certo not in ensinados:
                     pg.ensinar(imagem, boxes, i, certo, leitor, projeto, indice)
                     ensinados.add(certo)
-                    texto_conta.usar_comando(ensinar)
+                    texto_conta.usar_comando(disponiveis["substituicao_da_fila"] if da_fila
+                                             else ensinar)
+                    continue
+                if da_fila:
+                    pg.ensinar(imagem, boxes, i, certo, leitor, projeto, indice)
+                    texto_conta.usar("substituicao_da_fila")
                     continue
                 if disponiveis["substituicao"]["id"] == "ensinar_glifo":
                     pg.ensinar(imagem, boxes, i, certo, leitor, projeto, indice)
@@ -307,7 +318,9 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
         resultado["paginas"][f"i{indice:03d}"] = {
             "gestos_texto": texto_conta.gestos, "gestos_diagramas": diagramas_conta.gestos,
             "comandos": {**diagramas_conta.comandos, **texto_conta.comandos},
-            "impossiveis": impossiveis, "linhas_verificadas": len(verificadas)}
+            "impossiveis": impossiveis, "linhas_verificadas": len(verificadas),
+            # As diferenças do snapshot contra o gabarito, antes de corrigir: o N da CA-F.2.
+            "erros": {"texto": erros_iniciais, "diagramas": erros_diagramas}}
         resultado["gestos_texto"] += texto_conta.gestos
         resultado["gestos_diagramas"] += diagramas_conta.gestos
         resultado["custo_dos_impossiveis"] += (texto_conta.custo_dos_impossiveis
@@ -316,6 +329,9 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
             resultado["impossiveis"][tipo] = resultado["impossiveis"].get(tipo, 0) + n
 
     resultado["gestos_navegacao"] = navegacao.gestos
+    resultado["custo_dos_impossiveis"] += navegacao.custo_dos_impossiveis
+    for tipo, n in navegacao.impossiveis.items():
+        resultado["impossiveis"][tipo] = resultado["impossiveis"].get(tipo, 0) + n
     resultado["estado"] = _estado(resultado, gabaritos.values())
     if resultado["linhas_usadas"]:
         sem = (resultado["gestos_texto"] + resultado["gestos_diagramas"]
@@ -325,6 +341,22 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
     else:
         resultado["gestos"] = resultado["gestos_sem_impossiveis"] = None
     return resultado
+
+
+def _proxima_acao(dif: Diferencas, boxes, leitor, disponiveis: dict):
+    """A próxima correção: a do glifo que a janela mostra (o primeiro da fila de revisão),
+    se ele tem uma substituição e o passo tem o comando da fila; senão, a primeira na ordem
+    de leitura. Devolve (ação, se é a da fila)."""
+    from abbychess import pagina as pg
+
+    if "substituicao_da_fila" in disponiveis:
+        fila = pg.fila_de_revisao(boxes, leitor)
+        if fila:
+            da_fila = next((a for a in dif.acoes if a[0] == "substituicao" and a[1] == fila[0]),
+                           None)
+            if da_fila is not None:
+                return da_fila, True
+    return next((a for a in dif.acoes if a[0] in disponiveis), None), False
 
 
 def _estado(resultado: dict, gabaritos) -> str:
@@ -338,14 +370,26 @@ def _estado(resultado: dict, gabaritos) -> str:
     conferidos = sum(1 for d in diagramas if d.get("fen_verificado"))
     if conferidos < len(diagramas):
         falta.append(f"FEN conferido em {conferidos}/{len(diagramas)} diagramas")
+    linhas = sum(len(g["linhas_corpo"]) for g in gabaritos)
+    if len(resultado["linhas_usadas"]) < linhas:
+        falta.append(f"texto verificado em {len(resultado['linhas_usadas'])}/{linhas} linhas")
+    if not any(g.get("conferencia_cega", {}).get("texto", {}).get("aprovada")
+               and g["conferencia_cega"]["texto"].get("verdade_versao") == g.get("verdade_versao")
+               for g in gabaritos):
+        falta.append("sem conferência cega do texto aprovada e em dia")
+    if diagramas and not any(d.get("conferencia_cega", {}).get("igual") for d in diagramas):
+        falta.append("sem conferência cega de FEN igual")
     if not resultado["linhas_usadas"]:
+        falta = [f for f in falta if not f.startswith("texto verificado")]
         return "pendente: nenhuma linha com texto verificado" + "".join(f"; {f}" for f in falta)
     return "provisório: " + "; ".join(falta) if falta else "medido"
 
 
-def _replay_dos_diagramas(projeto, fonte, indice, imagem, gabarito, conta: _Contas) -> None:
+def _replay_dos_diagramas(projeto, fonte, indice, imagem, gabarito, conta: _Contas) -> int:
     """Conferir um diagrama: abrir, corrigir casas e lado, fechar. O que não merece confiança
-    é conferido mesmo sem erro (o usuário tem de olhar)."""
+    é conferido mesmo sem erro (o usuário tem de olhar). Devolve os erros da página: casas
+    erradas, lados errados e diagramas não achados."""
+    erros = 0
     diagramas = projeto.carregar_diagramas(indice)
     angulo = fonte.inclinacao(indice)
     lidos = [_caixa_relativa(d.caixa, angulo, imagem.width, imagem.height) for d in diagramas]
@@ -358,11 +402,13 @@ def _replay_dos_diagramas(projeto, fonte, indice, imagem, gabarito, conta: _Cont
             raise SystemExit(f"i{indice:03d} {bloco['id']}: FEN do gabarito malformado")
         if jv not in casados:
             conta.usar("diagrama_nao_achado")
+            erros += 1
             continue
         lido = diagramas[casados[jv]]
         previsto = casas(lido.fen) or ["?"] * 64
         erradas = sum(a != b for a, b in zip(certo, previsto))
         lado_errado = verdade.get("lado") in ("w", "b") and lido.lado != verdade["lado"]
+        erros += erradas + int(lado_errado)
         if erradas or lado_errado or not lido.confiavel:
             conta.usar("abrir_diagrama")
             if erradas:
@@ -370,6 +416,7 @@ def _replay_dos_diagramas(projeto, fonte, indice, imagem, gabarito, conta: _Cont
             if lado_errado:
                 conta.usar("lado")
             conta.usar("fechar_diagrama")
+    return erros
 
 
 def comparar(base: dict, depois: dict) -> dict:
@@ -453,7 +500,7 @@ def main(argv=None) -> int:
     resultado["data"] = datetime.date.today().isoformat()
     resultado.update(estado_do_git())
     MEDIDAS.mkdir(parents=True, exist_ok=True)
-    destino = MEDIDAS / f"{resultado['data']}-fatia-{args.livro}-passo-{args.passo}.json"
+    destino = destino_da_medida(resultado["data"], f"fatia-{args.livro}-passo-{args.passo}")
     destino.write_text(json.dumps(resultado, ensure_ascii=False, indent=1) + "\n",
                        encoding="utf-8", newline="\n")
     print(json.dumps({k: resultado[k] for k in ("estado", "gestos", "gestos_diagramas",

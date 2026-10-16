@@ -434,7 +434,8 @@
     "Qxf6+"
    ],
    "fen_verificado": false,
-   "lado_verificado": false
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
   }
  ],
  "linhas_corpo": [

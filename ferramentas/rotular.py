@@ -23,8 +23,9 @@ da página (`.rotulagem/<livro>/iNNN/faixa_KK.png`, fora do git), e outra pessoa
 A caixa é relativa (0–1) à página **original**, antes de endireitar, para o gabarito
 não depender do endireitamento.
 
-O texto dos livros tem direito autoral: os gabaritos e as faixas ficam no computador
-do usuário e fora de qualquer publicação.
+O texto dos livros tem direito autoral: os gabaritos ficam no repositório, que é privado e
+local (decisão do passo 0, README "Limitações conhecidas"), e as faixas em `.rotulagem`,
+fora do git; nada disso vai para publicação.
 """
 
 from __future__ import annotations
@@ -32,19 +33,18 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import sys
 import tempfile
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
+sys.path.insert(0, str(RAIZ / "ferramentas"))
+
+from comum import PASTA_DOS_PDFS  # noqa: E402,F401 (as outras ferramentas a importam daqui)
 
 VERDADE = RAIZ / "tests" / "verdade"
 FAIXAS = RAIZ / ".rotulagem"
-#: Onde estão os PDFs dos livros de referência (os do PyBoxEditor, por padrão).
-PASTA_DOS_PDFS = Path(os.environ.get("ABBY_PASTA_DOS_PDFS",
-                                     "C:/Python-Chess2/PyBoxEditor_Tkinter/PDF"))
 LINHAS_POR_FAIXA = 7
 #: A concordância mínima da conferência cega do texto (SPEC §15.2).
 CONCORDANCIA_MINIMA = 0.995
@@ -87,10 +87,24 @@ def _caixa_relativa(caixa, angulo, largura, altura):
 
 
 def trabalho_humano(gabarito: dict) -> bool:
-    """Se o gabarito já tem trabalho de alguém, que um rascunho novo apagaria."""
+    """Se o gabarito já tem trabalho de alguém, que um rascunho novo apagaria: estrutura,
+    texto verificado, revisão, FEN ou lado conferido, conferência cega."""
+    diagramas = gabarito.get("diagramas", [])
     return bool(int(gabarito.get("verdade_versao", 0) or 0) > 0 or gabarito.get("estrutura_por")
                 or gabarito.get("rotulado_por") or gabarito.get("revisado_por")
-                or any(ln.get("texto_verificado") for ln in gabarito.get("linhas_corpo", [])))
+                or gabarito.get("conferencia_cega")
+                or any(ln.get("texto_verificado") for ln in gabarito.get("linhas_corpo", []))
+                or any(d.get("fen_verificado") or d.get("lado_verificado")
+                       or d.get("conferencia_cega") for d in diagramas))
+
+
+def _proximo_bak(arquivo: Path) -> Path:
+    """`iNNN.json.bak`, ou `.bak1`, `.bak2`…: um `--forcar` novo não apaga o backup antigo."""
+    bak, n = arquivo.with_name(arquivo.name + ".bak"), 0
+    while bak.exists():
+        n += 1
+        bak = arquivo.with_name(f"{arquivo.name}.bak{n}")
+    return bak
 
 
 def _recusar_sobrescrever(destino: Path, indices, forcar: bool) -> None:
@@ -105,7 +119,7 @@ def _recusar_sobrescrever(destino: Path, indices, forcar: bool) -> None:
             raise SystemExit(f"{arquivo.name} já tem trabalho (estrutura, texto ou revisão): "
                              "o rascunho o apagaria. Use --forcar para refazê-lo; o atual "
                              "fica em .bak")
-        arquivo.with_name(arquivo.name + ".bak").write_bytes(arquivo.read_bytes())
+        _proximo_bak(arquivo).write_bytes(arquivo.read_bytes())
 
 
 def rascunho(livro: str, pdf: Path, indices, *, com_modelos: bool = True,
@@ -189,8 +203,8 @@ def _rascunho(livro: str, pdf: Path, indices, pasta: Path, com_modelos: bool) ->
                            "fen_lido": lido.fen.split(" ")[0] if lido.fen else "",
                            "lado": lido.lado or "?", "legenda": next(
                                (b["id"] for b in blocos if b.get("diagrama") == f"d{d}"), None),
-                           "lances_seguintes": [], "fen_verificado": False,
-                           "lado_verificado": False}
+                           "lances_seguintes": [], "fen_rotulado_por": "",
+                           "fen_verificado": False, "lado_verificado": False}
                           for d, lido in enumerate(diagramas)],
             "linhas_corpo": linhas_corpo,
         }
@@ -542,9 +556,6 @@ def revisar(livro: str, pagina: str, por: str, *, fen=(), lado=()) -> dict:
     gabarito["revisado_por"] = por
     _gravar_gabarito(arquivo, gabarito)
     return gabarito
-
-
-
 
 
 def _lista(texto: str) -> list:

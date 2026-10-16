@@ -380,5 +380,6 @@
    "caixa_estimada": true
   }
  ],
- "estrutura_por": "Claude (estrutura pelas faixas)"
+ "estrutura_por": "Claude (estrutura pelas faixas)",
+ "negativa": true
 }

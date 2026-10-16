@@ -51,7 +51,7 @@ def n_de(gid: int) -> int:
 # O glifo
 # ----------------------------------------------------------------------
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Estilo:
     negrito: bool = False
     italico: bool = False
@@ -63,10 +63,17 @@ class Estilo:
     @classmethod
     def de_json(cls, bruto) -> "Estilo":
         negrito, italico, sublinhado = (list(bruto or []) + [0, 0, 0])[:3]
+        if not (negrito or italico or sublinhado):
+            return SEM_ESTILO
         return cls(bool(negrito), bool(italico), bool(sublinhado))
 
 
-@dataclass(frozen=True, eq=False)
+#: O estilo de quase todo glifo, um objeto só: uma página tem milhares de glifos, e cada
+#: objeto a mais pesa na coleta de lixo do Python (os picos do p95 da releitura no 1b).
+SEM_ESTILO = Estilo()
+
+
+@dataclass(frozen=True, eq=False, slots=True)
 class Box:
     """Um glifo da página: o `BoxEntry` do core mais a identidade e a procedência dele."""
 
@@ -75,7 +82,7 @@ class Box:
     #: O arquivo do padrão do livro que deu a leitura (procedência, §8.3), relativo à pasta
     #: dos padrões; `None` quando a leitura não veio de um padrão do livro.
     amostra: Optional[str] = None
-    estilo: Estilo = field(default_factory=Estilo)
+    estilo: Estilo = SEM_ESTILO
     #: O usuário viu e aceitou o glifo: sai da fila sem trocar a fonte da leitura.
     revisado: bool = False
 
@@ -90,7 +97,7 @@ class Box:
                    Estilo.de_json(estilo), bool(revisado))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GlifoVirtual:
     """O caractere que falta na página: não tem caixa, não ensina, não entra na leitura.
 

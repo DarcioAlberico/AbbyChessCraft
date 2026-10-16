@@ -413,12 +413,12 @@ Desempenho por passo, em ms ou MB (uma rodada cada; quanto o mesmo código varia
 
 | Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) |
 |---|---|---|---|
-| Troca de página, p95 | 194,22 | 190,06 | 194,8 |
-| Enter, p95 | 110,88 | 119,73 | 219,03 |
-| Releitura, p95 | 145,73 | 122,08 | 243,81 |
+| Troca de página, p95 | 194,22 | 190,06 | 187,08 |
+| Enter, p95 | 110,88 | 119,73 | 131,21 |
+| Releitura, p95 | 145,73 | 122,08 | 207,71 |
 | Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 |
-| Atraso no lote, p99 | 8,5 | 8,6 | 21 |
-| Memória com o lote (MB) | 1620 | 1661 | 1678 |
+| Atraso no lote, p99 | 8,5 | 8,6 | 9,1 |
+| Memória com o lote (MB) | 1620 | 1661 | 1677 |
 
 Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). O p95 do Enter tem duas faixas no mesmo código (perto de 110–130 e perto de 180–190), e o atraso no lote também (perto de 8 e de 21): compare pela mediana (p50), que varia bem menos (mas não é imune: uma rodada solta pode sair alta):
 
@@ -428,7 +428,7 @@ Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). O p9
 | passo 0 | 25e81b1 | só do lote, sem os padrões | — | — | — | — | — | 19,9; 7,7; 7,1 |
 | passo 1a | 315db35 | completa | 180,73; 183,85; 180,22 | 195,04; 198,16; 196,84 | 149,4; 114,34; 113,81 | 191,17; 190,97; 190,82 | 165,4; 150,71; 141,33 | 20,8; 21,3; 8,7 |
 | passo 1a | 3bf1ad3 | só do lote, sem os padrões | — | — | — | — | — | 7,5; 20,5; 7,7 |
-| passo 1b | bab6a1a | completa | 183,07; 182,43; 183,53 | 193,31; 193,09; 193,19 | 147,95; 132,88; 132,76 | 231,25; 216,4; 214,25 | 217,51; 220,01; 226,78 | 8,5; 8,9; 8,9 |
+| passo 1b | 80ede85 | completa | 177,61; 178,32; 177,3 | 185,67; 186,25; 187,27 | 121,46; 121,71; 145,77 | 200,23; 202,39; 235,51 | 209,45; 203,61; 222,07 | 8,9; 10; 21,9 |
 
 Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
 

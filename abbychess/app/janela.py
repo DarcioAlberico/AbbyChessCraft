@@ -352,14 +352,20 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
             self.pagina.escolher(gid)
 
     def _atual_resolvido(self) -> None:
-        """A propagação resolveu o glifo mostrado: vai ao próximo pendente, a não ser que o
-        usuário já esteja digitando nele (o que ele digitou não some)."""
-        if not self.treino.campo.isModified():
+        """A propagação resolveu o glifo mostrado: vai ao próximo pendente (ou, se o usuário
+        o escolheu, mostra a leitura nova dele), a não ser que ele já esteja digitando nele
+        (o que ele digitou não some)."""
+        if self.treino.campo.isModified():
+            return
+        if self.pagina.escolhido and self.pagina.box_atual() is not None:
+            self.pagina.escolher(self.pagina.atual)     # fica, com a leitura de agora
+        else:
             self.pagina.ir_ao_primeiro_pendente()
 
     def _recusa(self, refazer: bool, texto: str) -> None:
-        if dialogos.confirmar(self, "Desfazer", texto + "\n\nTirar esta ação do desfazer e "
-                              "continuar com as anteriores?"):
+        pilha = "refazer" if refazer else "desfazer"
+        if dialogos.confirmar(self, "Desfazer", texto + f"\n\nTirar esta ação do {pilha} e "
+                              "continuar com as outras?"):
             self.pagina.tirar_do_desfazer(refazer)
 
     def _aba_mudou(self, _indice: int) -> None:

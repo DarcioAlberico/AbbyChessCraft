@@ -6,6 +6,7 @@ janela que abre um diálogo antes. Os atalhos são os de `docs/atalhos.yaml`.
 
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QLabel, QSpinBox, QToolBar
 
@@ -13,10 +14,21 @@ from PySide6.QtWidgets import QLabel, QSpinBox, QToolBar
 def _acao(janela, texto, atalho, funcao, barra=None) -> QAction:
     acao = QAction(texto, janela)
     if atalho:
-        acao.setShortcut(QKeySequence(atalho))
+        if isinstance(atalho, (list, tuple)):
+            acao.setShortcuts([QKeySequence(a) for a in atalho])
+        else:
+            acao.setShortcut(QKeySequence(atalho))
     acao.triggered.connect(funcao)
     if barra is not None:
         barra.addAction(acao)
+    return acao
+
+
+def _da_imagem(janela, texto, atalho, funcao) -> QAction:
+    """Uma ação de escopo `imagem` (docs/atalhos.yaml): o atalho vale com o foco na Imagem."""
+    acao = _acao(janela, texto, atalho, funcao)
+    acao.setShortcutContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+    janela.visor.addAction(acao)
     return acao
 
 
@@ -31,7 +43,7 @@ def montar(janela) -> None:
     j.acao_novo = _acao(j, "Novo projeto…", "Ctrl+N", j.novo_projeto, barra)
     j.acao_abrir = _acao(j, "Abrir projeto…", "Ctrl+O", j.abrir_projeto, barra)
     barra.addSeparator()
-    j.acao_anterior = _acao(j, "◀", "Ctrl+PgUp", lambda: j.ir_para_pagina(p.indice - 1), barra)
+    j.acao_anterior = _acao(j, "◀", "Ctrl+PgUp", lambda: p.vizinha(-1), barra)
     j.seletor = QSpinBox()
     j.seletor.setMinimum(1)
     j.seletor.setKeyboardTracking(False)
@@ -39,7 +51,12 @@ def montar(janela) -> None:
     barra.addWidget(j.seletor)
     j.total_de_paginas = QLabel(" de 0 ")
     barra.addWidget(j.total_de_paginas)
-    j.acao_seguinte = _acao(j, "▶", "Ctrl+PgDown", lambda: j.ir_para_pagina(p.indice + 1), barra)
+    j.acao_seguinte = _acao(j, "▶", "Ctrl+PgDown", lambda: p.vizinha(+1), barra)
+    j.acao_primeira = _acao(j, "Primeira página", "Alt+Home", p.primeira)
+    j.acao_ultima = _acao(j, "Última página", "Alt+End", p.ultima)
+    j.acao_ir_para = _acao(j, "Ir para a página…", "Ctrl+G", j.ir_para_a_pagina_pedida)
+    j.acao_voltar_visita = _acao(j, "Página visitada antes", "Alt+Left", p.voltar_visita)
+    j.acao_avancar_visita = _acao(j, "Página visitada depois", "Alt+Right", p.avancar_visita)
     barra.addSeparator()
     j.acao_reconhecer = _acao(j, "Reconhecer página (F5)", "F5", j.reconhecer, barra)
     j.acao_reler = _acao(j, "Reler pendentes", "Ctrl+R", lambda: p.reler_pendentes(), barra)
@@ -47,7 +64,28 @@ def montar(janela) -> None:
     j.acao_refazer = _acao(j, "Refazer", "Ctrl+Y", p.refazer)
     j.acao_refazer.setShortcuts([QKeySequence("Ctrl+Y"), QKeySequence("Ctrl+Shift+Z")])
     barra.addSeparator()
-    j.acao_ajustar = _acao(j, "Ajustar à janela", "Ctrl+0", j.visor.ajustar, barra)
+    v = j.visor
+    j.acao_ajustar = _da_imagem(j, "Página inteira", "Ctrl+0", v.zoom_pagina)
+    barra.addAction(j.acao_ajustar)
+    j.acao_zoom_mais = _da_imagem(j, "Aproximar", ["Ctrl+=", "Ctrl++"], v.zoom_mais)
+    j.acao_zoom_menos = _da_imagem(j, "Afastar", "Ctrl+-", v.zoom_menos)
+    j.acao_zoom_largura = _da_imagem(j, "Largura da página", "Ctrl+9", v.zoom_largura)
+    j.acao_zoom_100 = _da_imagem(j, "100%", "Ctrl+8", v.zoom_100)
+    j.acao_zoom_item = _da_imagem(j, "Zoom no item atual", "Ctrl+7", v.zoom_item)
+    j.acao_origem = _da_imagem(j, "Mostrar a origem das leituras", "V", v.definir_origem)
+    j.acao_origem.setCheckable(True)
+    j.caixa_de_zoom = QSpinBox()
+    j.caixa_de_zoom.setRange(int(v.ESCALA_MINIMA * 100), int(v.ESCALA_MAXIMA * 100))
+    j.caixa_de_zoom.setSuffix("%")
+    j.caixa_de_zoom.setKeyboardTracking(False)
+    j.caixa_de_zoom.setFocusPolicy(Qt.FocusPolicy.ClickFocus)   # o Tab não para nela
+    j.caixa_de_zoom.setToolTip("Zoom da página (Ctrl+roda, Ctrl++ e Ctrl+−)")
+    j.caixa_de_zoom.setAccessibleName("Zoom da página")
+    j.caixa_de_zoom.valueChanged.connect(lambda valor: j.visor.definir_zoom(valor / 100))
+    barra.addWidget(j.caixa_de_zoom)
+    j.acao_seguir = _acao(j, "Seguir o item atual", "Ctrl+Shift+L", lambda: None)
+    j.acao_seguir.setCheckable(True)
+    j.acao_seguir.setChecked(True)
     barra.addSeparator()
     j.acao_modo_treino = _acao(j, "Modo de treino (Ctrl+T)", "Ctrl+T", j.modo_treino, barra)
     j.acao_modo_treino.setCheckable(True)
@@ -56,10 +94,10 @@ def montar(janela) -> None:
     j.acao_padroes = _acao(j, "Padrões do livro…", "Ctrl+Shift+P",
                            lambda: j.abas.setCurrentWidget(j.padroes))
     j.acao_opcoes = _acao(j, "Opções…", "Ctrl+,", j.opcoes)
-    j.acao_diagramas = _acao(j, "Conferir diagramas…", "Ctrl+G",
-                             lambda: j.conferencia.conferir())
-    j.acao_diagramas.setToolTip("A posição lida ao lado do diagrama impresso; "
-                                "também abre com um clique no diagrama.")
+    j.acao_diagramas = _acao(j, "Próximo diagrama por conferir", "F8",
+                             lambda: j.conferencia.proximo_do_livro())
+    j.acao_diagramas.setToolTip("O próximo diagrama do livro ainda não conferido (o desta "
+                                "página primeiro); também abre com um clique no diagrama.")
     j.acao_lote = _acao(j, "Reconhecer o livro…", "Ctrl+Shift+F5", j.reconhecer_livro)
     j.acao_cancelar_lote = _acao(j, "Cancelar o lote", None, livro.cancelar)
     j.acao_proximo_do_livro = _acao(j, "Próximo pendente do livro", "F6", livro.proximo_pendente)
@@ -82,9 +120,16 @@ def montar(janela) -> None:
     menu_editar.addAction(j.acao_desfazer)
     menu_editar.addAction(j.acao_refazer)
     menu_pagina = j.menuBar().addMenu("P&ágina")
-    for acao in (j.acao_anterior, j.acao_seguinte, j.acao_reconhecer, j.acao_reler,
-                 j.acao_ajustar):
-        menu_pagina.addAction(acao)
+    for grupo in ((j.acao_anterior, j.acao_seguinte, j.acao_primeira, j.acao_ultima,
+                   j.acao_ir_para, j.acao_voltar_visita, j.acao_avancar_visita),
+                  (j.acao_reconhecer, j.acao_reler)):
+        for acao in grupo:
+            menu_pagina.addAction(acao)
+        menu_pagina.addSeparator()
+    menu_exibir = j.menuBar().addMenu("E&xibir")
+    for acao in (j.acao_ajustar, j.acao_zoom_largura, j.acao_zoom_100, j.acao_zoom_item,
+                 j.acao_zoom_mais, j.acao_zoom_menos, j.acao_origem, j.acao_seguir):
+        menu_exibir.addAction(acao)
     j.menu_ferramentas = j.menuBar().addMenu("&Ferramentas")
     for grupo in ((j.acao_modo_treino, j.acao_padroes, j.acao_diagramas),
                   (j.acao_areas, j.acao_areas_auto, j.acao_verificar),
@@ -112,6 +157,11 @@ def atualizar(janela) -> None:
     j.acao_reler.setEnabled(editar and bool(p.boxes))
     j.acao_anterior.setEnabled(tem and p.indice > 0)
     j.acao_seguinte.setEnabled(tem and p.indice < total - 1)
+    j.acao_primeira.setEnabled(tem and p.indice > 0)
+    j.acao_ultima.setEnabled(tem and p.indice < total - 1)
+    j.acao_ir_para.setEnabled(tem)
+    j.acao_voltar_visita.setEnabled(tem and p.pode_voltar)
+    j.acao_avancar_visita.setEnabled(tem and p.pode_avancar)
     j.seletor.setEnabled(tem)
     j.acao_modo_treino.setEnabled(tem)
     j.acao_opcoes.setEnabled(editar)
@@ -122,7 +172,7 @@ def atualizar(janela) -> None:
     j.acao_areas.setEnabled(tem)
     j.acao_areas_auto.setEnabled(editar and j.acao_areas.isChecked())
     j.acao_verificar.setEnabled(tem and bool(p.boxes))
-    j.acao_diagramas.setEnabled(tem and bool(p.tabuleiros))
+    j.acao_diagramas.setEnabled(tem)
     desfazer = p.historico.proximo_a_desfazer
     refazer = p.historico.proximo_a_refazer
     j.acao_desfazer.setEnabled(editar and desfazer is not None)

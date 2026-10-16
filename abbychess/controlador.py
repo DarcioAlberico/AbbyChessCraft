@@ -219,6 +219,11 @@ class ControladorDePagina:
         self.geracao += 1
         self.lote_rodando = False               # o lote do projeto anterior não vale aqui
         self.projeto, self.fonte, self.leitor = projeto, fonte, leitor
+        #: As páginas renderizadas mais recentes e a pré-carga da seguinte (§14.1).
+        self.cache = pg.CacheDePaginas(fonte) if fonte is not None else None
+        #: As páginas visitadas, para Alt+← e Alt+→ (§3.3), e onde se está nelas.
+        self.visitas: List[int] = []
+        self._visita = -1
         self.historico = hs.HistoricoDoProjeto()
         self.modelo, self.atual, self.pulados, self.selecao = None, None, set(), set()
         self.imagem = self.matriz = None
@@ -226,18 +231,20 @@ class ControladorDePagina:
     def desligar(self) -> None:
         self.ligar(None, None, None)
 
-    def ir_para(self, indice: int) -> bool:
+    def ir_para(self, indice: int, *, visita: bool = True) -> bool:
         """Abre a página `indice` (0 = a primeira). Falso se não deu (fora do livro, ou a
-        fonte não renderizou; o motivo vai em `aviso`)."""
+        fonte não renderizou; o motivo vai em `aviso`). `visita=False` é o Alt+← e o Alt+→,
+        que andam no histórico de visitas sem mudá-lo."""
         if self.fonte is None or not 0 <= indice < self.fonte.total:
             return False
         try:
-            imagem = self.fonte.pagina(indice)
+            imagem, matriz = self.cache.pagina(indice)
         except OSError as erro:
             self.eventos.emitir("aviso", "Página", str(erro))
             return False
-        self.indice, self.imagem = indice, imagem
-        self.matriz = np.asarray(imagem.convert("L"))
+        self.indice, self.imagem, self.matriz = indice, imagem, matriz
+        if visita:
+            self._registrar_visita(indice)
         self.modelo = self.projeto.carregar_modelo(indice)
         self.atual, self.pulados, self.selecao = None, set(), set()
         self.eventos.emitir("pagina_trocou")
@@ -250,7 +257,50 @@ class ControladorDePagina:
         else:
             self.eventos.emitir("atual_mudou")
         self.eventos.emitir("acoes_mudaram")
+        self.cache.precarregar(indice + 1)      # a seguinte, que é a mais provável
         return True
+
+    # ------------------------------------------------------------------
+    # Navegação (§3.3)
+    # ------------------------------------------------------------------
+    def _registrar_visita(self, indice: int) -> None:
+        if 0 <= self._visita < len(self.visitas) and self.visitas[self._visita] == indice:
+            return
+        del self.visitas[self._visita + 1:]
+        self.visitas.append(indice)
+        self._visita = len(self.visitas) - 1
+
+    @property
+    def pode_voltar(self) -> bool:
+        return self._visita > 0
+
+    @property
+    def pode_avancar(self) -> bool:
+        return self._visita < len(self.visitas) - 1
+
+    def voltar_visita(self) -> bool:
+        """Alt+←: a página visitada antes desta."""
+        if self._visita <= 0:
+            return False
+        self._visita -= 1
+        return self.ir_para(self.visitas[self._visita], visita=False)
+
+    def avancar_visita(self) -> bool:
+        """Alt+→: a página visitada depois (depois de um Alt+←)."""
+        if self._visita >= len(self.visitas) - 1:
+            return False
+        self._visita += 1
+        return self.ir_para(self.visitas[self._visita], visita=False)
+
+    def primeira(self) -> bool:
+        return self.ir_para(0)
+
+    def ultima(self) -> bool:
+        return self.fonte is not None and self.ir_para(self.fonte.total - 1)
+
+    def vizinha(self, passo: int) -> bool:
+        """A página anterior (-1) ou a seguinte (+1), se houver."""
+        return self.ir_para(self.indice + passo)
 
     def recarregar(self) -> None:
         """Mostra de novo a página aberta (o lote acabou de gravá-la)."""

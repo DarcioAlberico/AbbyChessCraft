@@ -10,6 +10,9 @@ F1 da página, e com árbitro devolve 0,3 acima de não separar.
 from __future__ import annotations
 
 import json
+import logging
+import threading
+from collections import OrderedDict
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
@@ -27,6 +30,8 @@ from abbychess import procedencia
 from abbychess.leitor import (FONTE_MANUAL, LeitorDoLivro, nome_de_origem,
                               precisa_revisao)
 from abbychess.projeto import EXTENSOES_DE_IMAGEM, ProjetoDeLivro
+
+log = logging.getLogger(__name__)
 
 Progresso = Callable[[int, int], None]
 
@@ -120,6 +125,9 @@ class FonteDePaginas:
             bruto = json.loads(self._arquivo_das_inclinacoes.read_text(encoding="utf-8"))
             self._inclinacoes = {int(k): float(v) for k, v in bruto.items()}
         self._pdf = None
+        #: Uma página por vez: a janela, a pré-carga (`CacheDePaginas`) e o lote renderizam
+        #: da mesma fonte, de threads diferentes.
+        self._trava = threading.RLock()
         self.total = 1
         sufixo = self.caminho.suffix.lower()
         if sufixo == ".pdf":
@@ -135,6 +143,10 @@ class FonteDePaginas:
 
     def pagina(self, indice: int) -> Image.Image:
         """A página `indice`, endireitada quando a fonte foi aberta para isso."""
+        with self._trava:
+            return self._pagina(indice)
+
+    def _pagina(self, indice: int) -> Image.Image:
         imagem = self.original(indice)
         if not self.endireitar:
             return imagem
@@ -167,6 +179,75 @@ class FonteDePaginas:
                                {str(k): v for k, v in sorted(self._inclinacoes.items())})
         angulo = self._inclinacoes[indice]
         return angulo if abs(angulo) >= INCLINACAO_MINIMA else 0.0
+
+
+class CacheDePaginas:
+    """As últimas páginas renderizadas e endireitadas, com a pré-carga da seguinte (§14.1).
+
+    `pagina(i)` devolve `(imagem, matriz em cinza)`, do cache se ela está lá; `precarregar(i)`
+    renderiza numa thread de fundo, uma por vez (o pedido mais novo vence). Sem Qt.
+    """
+
+    TAMANHO = 5
+
+    def __init__(self, fonte: FonteDePaginas, tamanho: int = TAMANHO):
+        self.fonte = fonte
+        self.tamanho = tamanho
+        self._paginas: "OrderedDict[int, Tuple[Image.Image, np.ndarray]]" = OrderedDict()
+        self._trava = threading.Lock()
+        self._pedida: Optional[int] = None
+        self._thread: Optional[threading.Thread] = None
+
+    @property
+    def total(self) -> int:
+        return self.fonte.total
+
+    def tem(self, indice: int) -> bool:
+        with self._trava:
+            return indice in self._paginas
+
+    def pagina(self, indice: int) -> Tuple[Image.Image, np.ndarray]:
+        with self._trava:
+            if indice in self._paginas:
+                self._paginas.move_to_end(indice)
+                return self._paginas[indice]
+        imagem = self.fonte.pagina(indice)
+        par = (imagem, np.asarray(imagem.convert("L")))
+        with self._trava:
+            self._paginas[indice] = par
+            self._paginas.move_to_end(indice)
+            while len(self._paginas) > self.tamanho:
+                self._paginas.popitem(last=False)
+        return par
+
+    def precarregar(self, indice: int) -> None:
+        """Renderiza a página `indice` em segundo plano, se ela ainda não está no cache."""
+        if not 0 <= indice < self.total or self.tem(indice):
+            return
+        with self._trava:
+            self._pedida = indice
+            if self._thread is not None and self._thread.is_alive():
+                return                          # a thread que roda pega o pedido novo
+            self._thread = threading.Thread(target=self._pre_carga, daemon=True,
+                                             name="pre-carga")
+            self._thread.start()
+
+    def _pre_carga(self) -> None:
+        while True:
+            with self._trava:
+                indice, self._pedida = self._pedida, None
+            if indice is None:
+                return
+            try:
+                self.pagina(indice)
+            except Exception:                   # a página que não renderiza: avisa na vez dela
+                log.warning("a pré-carga da página %d falhou", indice + 1, exc_info=True)
+
+    def esperar(self, limite: float = 10.0) -> None:
+        """Espera a pré-carga em curso (os testes; fechar o projeto não precisa)."""
+        thread = self._thread
+        if thread is not None:
+            thread.join(limite)
 
 
 def fonte_do_projeto(projeto: ProjetoDeLivro) -> FonteDePaginas:

@@ -264,6 +264,7 @@ class ControladorDePagina:
         if gid is not None and self.indice_de(gid) is None:
             return
         self.atual = gid
+        self.escolhido = False                  # `escolher` o liga depois, se foi o usuário
         self.eventos.emitir("atual_mudou")
 
     def clicar(self, indice: int) -> None:
@@ -804,12 +805,6 @@ class ControladorDePagina:
                 if amostra.caminho.exists():
                     self.leitor.esquecer(amostra.caminho)
             h.refeita()
-            repropagar = transacao.invalidada and transacao.amostras_criadas
-            if repropagar and self.modelo is not None and self.modelo.pid in transacao.paginas:
-                # A propagação foi descartada quando ele foi desfeito: roda de novo, com os
-                # padrões de agora, e emenda a transação de novo.
-                transacao.invalidada = False
-                self._propagar(self.modelo, self.indice, transacao, None)
         else:
             for amostra in transacao.amostras_criadas:
                 if amostra.caminho.exists():
@@ -825,6 +820,12 @@ class ControladorDePagina:
             self.eventos.emitir("glifos_mudaram", None)
             self.eventos.emitir("selecao_mudou")
             self.ir_ao_primeiro_pendente()
+        repropagar = refazer and transacao.invalidada and transacao.amostras_criadas
+        if repropagar and self.modelo is not None and self.modelo.pid in transacao.paginas:
+            # Um Enter cuja propagação foi descartada quando ele foi desfeito: ela roda de
+            # novo (na página dele, já aberta), com os padrões de agora, e emenda a transação.
+            transacao.invalidada = False
+            self._propagar(self.modelo, self.indice, transacao, None)
         self.eventos.emitir("padroes_mudaram")
         self.eventos.emitir("acoes_mudaram")
         acao = "Refeito" if refazer else "Desfeito"

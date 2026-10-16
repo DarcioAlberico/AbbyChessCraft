@@ -607,3 +607,67 @@ def test_temporario_de_arquivo_do_usuario_nao_e_apagado(projeto):
     meu.write_text("meu", encoding="utf-8")
     ProjetoDeLivro.abrir(projeto.pasta)
     assert meu.exists()
+
+
+def test_livro_json_da_versao_1_e_refeito_com_a_faixa_100(projeto):
+    projeto.salvar_pagina(0, [_box(confianca=1.0)])
+    arquivo = projeto.pasta / ARQUIVO_DO_LIVRO
+    velho = json.loads(arquivo.read_text(encoding="utf-8"))
+    velho["versao"] = 1
+    velho["paginas"]["1"]["histograma"] = {"99": 1}          # a faixa da versão 1
+    arquivo.write_text(json.dumps(velho), encoding="utf-8")
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert reaberto.resumo_do_livro()[0]["histograma"] == {"100": 1}
+    assert json.loads(arquivo.read_text(encoding="utf-8"))["versao"] == 2
+
+
+def _copias_da_fonte(conteudo: bytes, pasta: Path, n: int, outro_tamanho: int):
+    """Na pasta: `n` arquivos do tamanho da fonte e conteúdo diferente, e `outro_tamanho`
+    arquivos de tamanho diferente, com nomes que vêm antes do dela."""
+    for k in range(n):
+        (pasta / f"a{k:03d}.png").write_bytes(bytes([k % 256]) + conteudo[1:])
+    for k in range(outro_tamanho):
+        (pasta / f"b{k:03d}.png").write_bytes(conteudo + b"x")
+
+
+def test_busca_da_fonte_desiste_depois_do_limite_de_arquivos_do_tamanho_certo(projeto, monkeypatch):
+    import abbychess.projeto as modulo
+
+    monkeypatch.setattr(modulo, "CANDIDATOS_DA_FONTE", 2)
+    pasta, conteudo = projeto.fonte.parent, projeto.fonte.read_bytes()
+    projeto.fonte.rename(pasta / "zz-renomeada.png")          # vem depois das cópias
+    _copias_da_fonte(conteudo, pasta, n=3, outro_tamanho=0)
+    assert ProjetoDeLivro.abrir(projeto.pasta).fonte_ausente
+
+
+def test_arquivos_de_outro_tamanho_nao_contam_no_limite(projeto, monkeypatch):
+    import abbychess.projeto as modulo
+
+    monkeypatch.setattr(modulo, "CANDIDATOS_DA_FONTE", 2)
+    pasta, conteudo = projeto.fonte.parent, projeto.fonte.read_bytes()
+    projeto.fonte.rename(pasta / "zz-renomeada.png")
+    _copias_da_fonte(conteudo, pasta, n=0, outro_tamanho=30)
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert reaberto.fonte == (pasta / "zz-renomeada.png").resolve()
+
+
+def test_relocalizacao_automatica_grava_o_tamanho(projeto):
+    tamanho = projeto.fonte.stat().st_size
+    _editar_projeto_json(projeto, fonte_tamanho=0)
+    projeto.fonte.rename(projeto.fonte.with_name("renomeada.png"))
+    ProjetoDeLivro.abrir(projeto.pasta)
+    gravado = json.loads((projeto.pasta / "projeto.json").read_text(encoding="utf-8"))
+    assert gravado["fonte_tamanho"] == tamanho
+
+
+def test_falha_ao_gravar_o_livro_nao_muda_o_cache(projeto, monkeypatch):
+    projeto.salvar_pagina(0, [_box()])
+    antes = projeto.resumo_do_livro()
+
+    def falhar(*_args):
+        raise PermissionError("disco")
+
+    monkeypatch.setattr(gv, "gravar_bytes", falhar)
+    with pytest.raises(PermissionError):
+        projeto._atualizar_livro(5, {"estado": "reconhecida"})
+    assert projeto.resumo_do_livro() == antes

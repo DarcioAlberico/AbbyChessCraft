@@ -509,9 +509,11 @@ class ProjetoDeLivro:
     def _atualizar_livro(self, indice: int, resumo: dict) -> None:
         with self._trava_do_livro:
             livro = self._carregar_livro()
-            livro["paginas"][str(indice + 1)] = resumo
-            livro["paginas"] = dict(sorted(livro["paginas"].items(), key=lambda kv: int(kv[0])))
-            gv.gravar_json(self.pasta / ARQUIVO_DO_LIVRO, livro)
+            paginas = {**livro["paginas"], str(indice + 1): resumo}
+            novo = {"versao": livro["versao"],
+                    "paginas": dict(sorted(paginas.items(), key=lambda kv: int(kv[0])))}
+            gv.gravar_json(self.pasta / ARQUIVO_DO_LIVRO, novo)
+            self._livro = novo                  # o cache só muda depois de gravado
 
     def _resumo_da_pagina(self, indice: int, boxes: Sequence[BoxEntry], tabuleiros: int,
                           conferidos: int) -> dict:
@@ -525,10 +527,9 @@ def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares) -> dict
     """Os boxes da página em `confirmados`, `sem_leitura` e o histograma do resto.
 
     O histograma tem faixas de 0,01 (a chave é o centésimo de baixo; 100 é a confiança
-    1,0) e conta só os
-    boxes lidos e não confirmados, os únicos que um limiar de revisão diferente
-    mudaria de lado: com ele, `pendentes_pelo_histograma` dá os pendentes de outro
-    limiar (de duas casas) sem abrir a página.
+    1,0) e conta só os boxes lidos e não confirmados, os únicos que um limiar de revisão
+    diferente mudaria de lado: com ele, `pendentes_pelo_histograma` dá os pendentes de
+    outro limiar (de duas casas) sem abrir a página.
     """
     from abbychess.leitor import FONTE_NENHUMA, FONTES_CONFIRMADAS, precisa_revisao
 
@@ -549,7 +550,8 @@ def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares) -> dict
 
 
 def pendentes_pelo_histograma(resumo: dict, revisao: float) -> int:
-    """Os pendentes da página com o limiar `revisao` (de duas casas, até 0,99), pelo histograma."""
+    """Os pendentes da página com o limiar `revisao` (de duas casas, de 0,00 a 1,00), pelo
+    histograma."""
     corte = math.floor(round(float(revisao) * 100, 6))
     return resumo["sem_leitura"] + sum(n for k, n in resumo["histograma"].items()
                                        if int(k) < corte)

@@ -853,20 +853,32 @@ class JanelaPrincipal(QMainWindow):
     def aplicar_limiares(self, limiares) -> None:
         """Grava os limiares no projeto e refaz a fila com eles."""
         self.projeto.dados.limiares = limiares
+        gravou = False
         if self._pode_gravar():
             try:
                 self.projeto.salvar()
-                self.projeto.reaplicar_limiar()
             except OSError as erro:
                 QMessageBox.warning(self, "Opções", "Os limiares valem nesta sessão, mas não "
                                     f"foram gravados no projeto:\n{erro}")
+            else:
+                gravou = True
+                try:
+                    self.projeto.reaplicar_limiar()
+                except OSError as erro:
+                    QMessageBox.warning(self, "Opções", "Os limiares foram gravados, mas o "
+                                        "resumo do livro (livro.json) não; ele é refeito na "
+                                        f"próxima gravação de página:\n{erro}")
         self.leitor.trocar_limiares(limiares)
         self._atualizar_tudo()
         if self.boxes:
             self._ir_para_o_primeiro_pendente()
-        self.statusBar().showMessage(
-            "Limiares aplicados nesta sessão (o projeto é só para leitura)."
-            if self.projeto.somente_leitura else "Limiares do livro gravados.", 5000)
+        if gravou:
+            mensagem = "Limiares do livro gravados."
+        elif self.projeto.somente_leitura:
+            mensagem = "Limiares aplicados nesta sessão (o projeto é só para leitura)."
+        else:
+            mensagem = "Limiares aplicados nesta sessão (não foram gravados)."
+        self.statusBar().showMessage(mensagem, 5000)
 
     def _esquecer(self, caminhos: list) -> None:
         if self.leitor is None:

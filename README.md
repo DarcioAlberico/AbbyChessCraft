@@ -100,10 +100,41 @@ letra solta em campo de texto, Ctrl+Alt e ligação nativa encoberta sem exceç�
 5. A aba **Padrões do livro** mostra cada amostra por caractere e permite esquecer as erradas.
 6. **Clicar num diagrama** abre a conferência (ver abaixo).
 
-Cor dos boxes: roxo é o que você confirmou, verde vem de um padrão do livro, azul da rede ou
-da base global, laranja vai para a revisão, vermelho ninguém leu e ciano está na seleção do
-modo de treino. O tracejado do diagrama segue a mesma ideia: cinza ainda não lido, laranja
-lido mas a conferir, azul lido com confiança, roxo conferido por você.
+Os boxes na página (desde o passo A1): **o que chama o olho é o que falta revisar.** Cada
+estado tem cor e traço próprios, para não depender só da cor (a paleta Okabe-Ito, legível
+para quem não distingue vermelho de verde):
+
+- laranja tracejado, com fundo claro: vai para a revisão;
+- vermelhão pontilhado, mais grosso, com fundo claro: ninguém leu;
+- cinza traço-ponto: aguardando leitura (reconhecido só em parte);
+- os aceitos ficam discretos, num cinza fino. **V** liga e desliga "mostrar a origem": roxo é
+  o que você confirmou, verde-azulado um padrão do livro, azul a rede ou a base global.
+
+O painel de treino tem a legenda, desenhada com o traço de cada estado. Ciano é a seleção do
+modo de treino. O tracejado do diagrama: cinza ainda não lido, laranja lido mas a conferir,
+azul lido com confiança, roxo conferido por você.
+
+### A página: zoom e navegação
+
+Desde o passo A1 o visor desenha os boxes num item só, e só o pedaço da tela que mudou: a
+página de 2.000 boxes pinta em ~12 ms em qualquer zoom (o alvo é 33).
+
+- **Zoom** de 5% a 800%: Ctrl+roda ou Ctrl++ e Ctrl+− (no limite, a barra diz "zoom máximo"
+  ou "zoom mínimo"); **Ctrl+0** página inteira, **Ctrl+9** largura da página, **Ctrl+8**
+  100%, **Ctrl+7** o glifo atual. A caixa de zoom da barra aceita o número; o Enter devolve
+  o teclado à página. Página inteira e largura continuam valendo ao redimensionar a janela.
+- **Rolar**: a roda rola, Shift+roda rola na horizontal; **espaço + arrastar** ou o **botão do
+  meio** arrastam a página, sem marcar nada, também no modo de treino.
+- **PgDn e PgUp** rolam uma tela; no fim da página, o PgDn abre a seguinte no topo, e no topo
+  o PgUp abre a anterior no fim.
+- **Alt+Home** e **Alt+End**: primeira e última página. **Ctrl+G**: ir para a página pedida.
+  **Alt+←** e **Alt+→** voltam e avançam pelas páginas visitadas, como num navegador.
+- **Seguir** (Ctrl+Shift+L, ligado): a página rola para manter o glifo do painel de treino à
+  vista, longe da borda. Desligado, a vista fica onde você a deixou. Religá-lo não leva a
+  vista ao glifo na hora, só no próximo, e ele volta ligado quando o programa abre.
+- **F8**: o próximo diagrama do livro ainda por conferir (na própria página, se houver).
+- As páginas vizinhas já ficam prontas: a seguinte é renderizada em segundo plano, e as 5
+  últimas vistas ficam na memória, então ir e voltar é imediato.
 
 ### Os diagramas
 
@@ -126,8 +157,8 @@ lado na hora, sem F5: os diagramas não conferidos da página tiram o lado de no
 boxes, sem reler o tabuleiro, e o Ctrl+Z da edição o desfaz junto. O conferido e o de lado
 informado na revisão não mudam.
 
-**Clicar no diagrama** (ou **Ferramentas › Conferir diagramas**, Ctrl+G, que abre o primeiro
-por conferir) mostra o recorte impresso e a posição lida lado a lado, na mesma escala, a
+**Clicar no diagrama** (ou **Ferramentas › Conferir diagramas**, F8, que abre o próximo
+por conferir do livro) mostra o recorte impresso e a posição lida lado a lado, na mesma escala, a
 posição desenhada pela fonte de diagrama do PyBoxEditor:
 
 - clique seleciona a casa; a letra da peça a põe (maiúscula branca, minúscula preta); Delete,
@@ -168,8 +199,9 @@ sempre com as pastas do projeto.
   ensina a seleção inteira com o mesmo caractere, uma amostra por box; Shift+Enter corrige
   todos sem gravar padrão; Esc esvazia a seleção.
 - **Padrões do livro** (Ctrl+Shift+P) abre a aba das amostras.
-- **Conferir diagramas** (Ctrl+G) abre a conferência no primeiro diagrama da página ainda não
-  conferido.
+- **Conferir diagramas** (F8, desde o passo A1; antes era o Ctrl+G, que agora vai para uma
+  página) abre a conferência no próximo diagrama do livro ainda não conferido, a começar
+  pela página aberta.
 - **Reconhecer o livro** (Ctrl+Shift+F5) lê um intervalo de páginas ("26-27, 30"; vazio é o
   livro inteiro) em segundo plano, com os padrões do livro, lê os diagramas em FEN como o F5
   e grava cada página no projeto assim que ela termina. O diagrama já conferido não é relido. A barra mostra a página em que o lote está. Enquanto ele roda, o painel de treino e as ações de reconhecer e reler ficam desligadas, e editar a página (dividir, juntar ou marcar pelo visor, desfazer, esquecer padrões, as opções) é recusado na hora, com aviso na barra: cancele o lote ou espere ele acabar. Ver as páginas continua valendo. Se o intervalo tem

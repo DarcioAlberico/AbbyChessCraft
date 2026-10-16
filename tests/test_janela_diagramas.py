@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import replace
 
 import pytest
 
@@ -13,6 +14,7 @@ from PySide6.QtCore import QPoint, Qt  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
+from abbychess import diagramas as dg  # noqa: E402
 from abbychess import pagina as pg  # noqa: E402
 from abbychess.app import dialogo_diagrama as dd  # noqa: E402
 from abbychess.app.janela import JanelaPrincipal  # noqa: E402
@@ -164,3 +166,81 @@ def test_pagina_antiga_le_o_diagrama_no_primeiro_clique(app, janela):
     dialogo = _clicar_no_diagrama(app, janela)
     assert dialogo.fen.text() == FEN + " w - - 0 1"
     assert janela.pagina.diagramas[0].lido
+
+
+def test_lote_le_o_diagrama_e_a_pagina_nao_fica_por_ler(app, janela, monkeypatch):
+    """O lote (Ctrl+Shift+F5) lê o diagrama como o F5: a página volta com o FEN."""
+    from PySide6.QtWidgets import QInputDialog
+
+    monkeypatch.setattr(QInputDialog, "getText", lambda *a, **k: ("1", True))
+    janela.reconhecer_livro()
+    _esperar(app, janela)
+    assert janela.projeto.paginas_lidas() == [0]
+    [d] = janela.pagina.diagramas
+    assert d.lido and d.fen == FEN + " w - - 0 1" and d.lado is None
+    texto = janela.texto.toPlainText()
+    assert "ainda não lido" not in texto
+    assert f"[Diagrama 1: {FEN} w - - 0 1 — brancas a jogar (assumido: a página não diz)" in texto
+
+
+@pytest.fixture
+def janela_com_legenda(app, tmp_path, monkeypatch):
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.Yes)
+    fonte = pagina_com_diagrama(tmp_path / "pagina.png", legenda="pretas jogam")
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Legenda", fonte)
+    j = JanelaPrincipal()
+    j.usar(projeto, pg.FonteDePaginas(projeto.fonte),
+          LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
+    yield j
+    j.close()
+
+
+def _corrigir(app, janela, gid: int, char: str) -> None:
+    janela.pagina.mostrar(gid)
+    janela.treino.campo.setText(char)
+    janela.treino._so_corrigir()
+    _esperar(app, janela)
+
+
+def test_corrigir_a_legenda_muda_o_lado_sem_f5_e_desfaz_junto(app, janela_com_legenda):
+    """O "g" corrigido em "pretas jo9am" faz o lado sair da legenda na hora, e o Ctrl+Z
+    da correção o leva de volta a assumido."""
+    janela = _reconhecida(app, janela_com_legenda)
+    p = janela.pagina
+    caixa = p.diagramas[0].caixa
+    legenda = sorted((b for b in p.modelo.boxes if caixa[3] < b.entry.y1 < caixa[3] + 120),
+                     key=lambda b: b.entry.x1)
+    assert len(legenda) == len("pretasjogam")
+    for b, c in zip(legenda, "pretasjo9am"):
+        _corrigir(app, janela, b.gid, c)
+    casas = p.diagramas[0].casas
+    assert p.diagramas[0].lado is None
+
+    _corrigir(app, janela, legenda[8].gid, "g")
+
+    d = p.diagramas[0]
+    assert (d.lado, d.lado_origem, d.titulo) == ("b", dg.LADO_DA_LEGENDA, "pretas jogam")
+    assert d.casas == casas and d.fen == FEN + " b - - 0 1"
+    assert "pretas a jogar (da legenda)" in janela.texto.toPlainText()
+
+    p.desfazer()
+    _esperar(app, janela)
+    assert p.diagramas[0].lado is None
+    assert "(assumido: a página não diz)" in janela.texto.toPlainText()
+    p.refazer()
+    _esperar(app, janela)
+    assert p.diagramas[0].lado == "b"
+
+
+def test_lado_informado_na_conferencia_nao_muda_com_a_legenda(app, janela_com_legenda):
+    janela = _reconhecida(app, janela_com_legenda)
+    p = janela.pagina
+    caixa = p.diagramas[0].caixa
+    legenda = sorted((b for b in p.modelo.boxes if caixa[3] < b.entry.y1 < caixa[3] + 120),
+                     key=lambda b: b.entry.x1)
+    p.modelo.diagramas = [replace(p.modelo.diagramas[0], lado="w",
+                                  lado_origem=dg.LADO_DO_USUARIO)]
+    for b, c in zip(legenda, "pretasjogam"):
+        _corrigir(app, janela, b.gid, c)
+    assert (p.diagramas[0].lado, p.diagramas[0].lado_origem) == ("w", dg.LADO_DO_USUARIO)

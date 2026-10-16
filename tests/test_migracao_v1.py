@@ -60,8 +60,11 @@ def _conferir(projeto: ProjetoDeLivro, verdade: dict) -> None:
         boxes = projeto.carregar_pagina(indice)
         assert [list(b.as_state()) for b in boxes] == pagina["boxes"], indice
         assert [list(t) for t in projeto.carregar_tabuleiros(indice)] == pagina["tabuleiros"]
-        gravados = [{k: v for k, v in d.para_json().items() if k != "id"}
-                    for d in projeto.carregar_diagramas(indice)]
+        # Os campos que o v1 não tinha (`titulo_do_core`, `lados_de_rotulo`) nascem do padrão.
+        gravados = [{k: v for k, v in d.para_json().items() if k in esperado}
+                    for d, esperado in zip(projeto.carregar_diagramas(indice),
+                                           pagina["diagramas"])]
+        assert len(gravados) == len(pagina["diagramas"]), indice
         assert gravados == pagina["diagramas"], indice
         assert projeto.pagina_reconhecida(indice) == (indice not in verdade["marcadas"])
         zonas = [(z.tipo, list(z.caixa)) for z in projeto.carregar_zonas(indice)]

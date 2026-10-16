@@ -164,7 +164,8 @@ def test_edicao_volta_com_o_que_foi_conferido():
 
 def test_json_vai_e_volta():
     d = _lido(lado="b", lado_origem=dg.LADO_DA_LEGENDA, lado_trecho="pretas jogam",
-              titulo="Diagrama 4", motivo="a peça na casa mais fraca ficou em 60%")
+              titulo="Diagrama 4", titulo_do_core="Di4", lados_de_rotulo=("abaixo",),
+              motivo="a peça na casa mais fraca ficou em 60%")
     bruto = json.loads(json.dumps(d.para_json()))
     volta = dg.DiagramaLido.de_json(bruto)
     assert volta.para_json() == d.para_json()
@@ -393,3 +394,50 @@ def test_legenda_sem_leitura_nos_boxes_continua_assumida(tmp_path):
     d = dg.ler_diagramas(imagem, segmentada.tabuleiros, escala=segmentada.escala,
                          boxes=segmentada.boxes)[0]
     assert d.lado is None and d.lado_origem == ""
+
+
+# ----------------------------------------------------------------------
+# O lado de novo quando a legenda muda (sem reler o tabuleiro)
+# ----------------------------------------------------------------------
+
+_CAIXA = (100, 100, 500, 500)
+
+
+def test_ensinar_a_legenda_diz_o_lado_sem_reler_o_tabuleiro():
+    antes = _legenda("Diagrama 5. Jo9am as pretas.", 110, 530)
+    depois = _legenda("Diagrama 5. Jogam as pretas.", 110, 530)
+    d = _lido(caixa=_CAIXA, titulo="Di5", titulo_do_core="Di5")
+
+    [novo] = dg.rederivar_lados([d], antes, depois)
+
+    assert (novo.lado, novo.lado_origem, novo.lado_trecho) == ("b", dg.LADO_DA_LEGENDA,
+                                                               "jogam as pretas")
+    assert novo.titulo == "Diagrama 5. Jogam as pretas."
+    assert novo.casas is d.casas and novo.fen.split()[1] == "b"
+    # Desfeita a correção, a legenda não diz mais nada: vale o título do core.
+    [volta] = dg.rederivar_lados([novo], depois, antes)
+    assert (volta.lado, volta.lado_origem, volta.lado_trecho, volta.titulo) == (None, "", "", "Di5")
+
+
+def test_titulo_do_core_vale_quando_a_legenda_dos_boxes_nao_diz():
+    antes = _legenda("Diagrama 5. Jogam as pretas.", 110, 530)
+    depois = _legenda("Diagrama 5. Jo9am as pretas.", 110, 530)
+    d = _lido(caixa=_CAIXA, lado="b", lado_origem=dg.LADO_DA_LEGENDA,
+              titulo="Diagrama 5. Jogam as pretas.", titulo_do_core="brancas jogam")
+    [novo] = dg.rederivar_lados([d], antes, depois)
+    assert (novo.lado, novo.lado_origem, novo.titulo) == ("w", dg.LADO_DA_LEGENDA, "brancas jogam")
+
+
+def test_conferido_informado_e_legenda_que_nao_mudou_ficam_como_estao():
+    antes = _legenda("Diagrama 5. Jo9am as pretas.", 110, 530)
+    depois = _legenda("Diagrama 5. Jogam as pretas.", 110, 530)
+    conferido = _lido(caixa=_CAIXA, conferido=True)
+    informado = _lido(caixa=_CAIXA, lado="w", lado_origem=dg.LADO_DO_USUARIO)
+    por_ler = dg.DiagramaLido(_CAIXA)
+    rotulos_abaixo = _lido(caixa=_CAIXA, lados_de_rotulo=("abaixo",))
+    diagramas = [conferido, informado, por_ler, rotulos_abaixo]
+
+    assert all(a is b for a, b in zip(dg.rederivar_lados(diagramas, antes, depois), diagramas))
+    # A mesma legenda antes e depois: nada é relido, mesmo o que diria outro lado.
+    assumido = _lido(caixa=_CAIXA)
+    assert dg.rederivar_lados([assumido], depois, list(depois))[0] is assumido

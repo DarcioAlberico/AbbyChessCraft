@@ -829,8 +829,16 @@ class ControladorDePagina:
 
     def _mudou(self, pagina: Pagina, indice: int, descricao: str, antes: hs.Instantaneo, *,
                juntar=None, evento: str = "editar") -> None:
-        """Depois de uma edição: o estado (§4.4), o passo do desfazer, a gravação e o aviso."""
+        """Depois de uma edição: o estado (§4.4), o lado dos diagramas, o passo do desfazer,
+        a gravação e o aviso.
+
+        Ensinar, corrigir, dividir ou juntar um box da legenda muda o que ela diz: o lado
+        dos diagramas não conferidos sai de novo dela aqui, sem reler os tabuleiros, e
+        entra no mesmo passo do desfazer (`diagramas.rederivar_lados`). O F5 já leu tudo."""
         pagina.estado = proximo_estado(pagina.estado, evento)
+        if evento != "reconhecer" and pagina.diagramas and antes.pagina is not None:
+            pagina.diagramas = dg.rederivar_lados(pagina.diagramas, antes.pagina.entries(),
+                                                  pagina.entries())
         depois = hs.Instantaneo(pagina.instantaneo(), self.padroes())
         criados = []
         if self.leitor is not None:

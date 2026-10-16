@@ -137,7 +137,7 @@ def test_rodadas_repetidas_e_historico_da_qualidade(pastas):
             {**rodada, "medidas": {"atraso_durante_o_lote": {"p99_ms": 21.0},
                                    "enter_ensinar": {"p95_ms": 110.0}}})
     texto = rm.gerar()
-    assert "| passo 0 | abc | só do lote, sem os padrões | — | — | — | 8,5; 9 |" in texto
-    assert "| passo 0 | abc | completa | — | 110 | — | 21 |" in texto
+    assert "| passo 0 | abc | só do lote, sem os padrões | — | — | — | — | — | 8,5; 9 |" in texto
+    assert "| passo 0 | abc | completa | — | — | — | 110 | — | 21 |" in texto
     historico = [ln for ln in texto.splitlines() if ln.startswith("| xv | c") and ln.endswith(" s |")]
     assert [ln.split(" | ")[1] for ln in historico] == ["c0", "c1"]

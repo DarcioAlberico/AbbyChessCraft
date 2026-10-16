@@ -400,14 +400,14 @@ Desempenho por passo, em ms ou MB (uma rodada cada; quanto o mesmo código varia
 | Atraso no lote, p99 | 8,5 | 8,6 |
 | Memória com o lote (MB) | 1620 | 1661 |
 
-Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou):
+Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). O p95 do Enter tem duas faixas no mesmo código (perto de 110–130 e perto de 180–190), e o atraso no lote também (perto de 8 e de 21): compare pela mediana (p50), que é estável:
 
-| Código | Commit | Rodada | Troca, p95 | Enter, p95 | Releitura, p95 | Atraso no lote, p99 |
-|---|---|---|---|---|---|---|
-| passo 0 | 25e81b1 | completa | 192,19; 190,98; 192,11 | 177,63; 179,72; 179,81 | 124,76; 129,43; 142,69 | 21,4; 8,7; 8,3 |
-| passo 0 | 25e81b1 | só do lote, sem os padrões | — | — | — | 19,9; 7,7; 7,1 |
-| passo 1a | 315db35 | completa | 195,04; 198,16; 196,84 | 191,17; 190,97; 190,82 | 165,4; 150,71; 141,33 | 20,8; 21,3; 8,7 |
-| passo 1a | 3bf1ad3 | só do lote, sem os padrões | — | — | — | 7,5; 20,5; 7,7 |
+| Código | Commit | Rodada | Troca, p50 | Troca, p95 | Enter, p50 | Enter, p95 | Releitura, p95 | Atraso no lote, p99 |
+|---|---|---|---|---|---|---|---|---|
+| passo 0 | 25e81b1 | completa | 169,76; 174,14; 171,68 | 192,19; 190,98; 192,11 | 104,33; 104,61; 104,66 | 177,63; 179,72; 179,81 | 124,76; 129,43; 142,69 | 21,4; 8,7; 8,3 |
+| passo 0 | 25e81b1 | só do lote, sem os padrões | — | — | — | — | — | 19,9; 7,7; 7,1 |
+| passo 1a | 315db35 | completa | 180,73; 183,85; 180,22 | 195,04; 198,16; 196,84 | 149,4; 114,34; 113,81 | 191,17; 190,97; 190,82 | 165,4; 150,71; 141,33 | 20,8; 21,3; 8,7 |
+| passo 1a | 3bf1ad3 | só do lote, sem os padrões | — | — | — | — | — | 7,5; 20,5; 7,7 |
 
 Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
 
@@ -607,10 +607,14 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 - **Gravar não é assíncrono ainda, e isso custa tempo desde o 1a.** Cada gravação de página
   faz dois `fsync` (a página e o `livro.json`) na thread de quem grava, inclusive a cada
   troca de página e a cada página do lote, e ensinar um glifo grava também o padrão e os
-  metadados. Nas rodadas repetidas (tabela acima), o Enter e a troca de página do 1a ficam
-  acima dos do passo 0 em todas as rodadas, e o atraso da interface durante o lote cai mais
-  vezes na faixa alta (continua abaixo do alvo de 50 ms). Num disco lento, de rede ou com
-  antivírus que examina cada gravação, a diferença cresce. O gravador assíncrono, com
+  metadados. Nas rodadas repetidas (tabela acima), a mediana do Enter e a da troca de página
+  do 1a ficam uns 10 ms acima das do passo 0 em todas as rodadas; o p95 do Enter tem duas
+  faixas no mesmo código, e o "111 ms" da linha de base é a faixa baixa (quase todas as
+  rodadas do passo 0 deram perto de 180). Duas das três rodadas repetidas do 1a passaram do
+  alvo da releitura (150 ms), o que pode ser variação. O atraso da interface durante o lote
+  também tem duas faixas, nos dois códigos, e com estas rodadas não dá para dizer se o 1a o
+  muda; ele fica abaixo do alvo de 50 ms. Num disco lento, de rede ou com antivírus que
+  examina cada gravação, a diferença cresce. O gravador assíncrono, com
   coalescência, é do passo 2a. O formato das páginas ainda é o v1 (o v2 nasce no passo 1b).
 - **A busca automática da fonte lê no máximo 200 arquivos do tamanho certo** por pasta
   procurada; numa pasta com mais que isso, ela desiste e pede para você mostrar a fonte.

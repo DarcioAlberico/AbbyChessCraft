@@ -636,6 +636,12 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 - **Um projeto aberto pelo passo 1b não abre mais nos programas de antes** (o formato é o
   2). Para voltar, copie `backup-v1/` por cima do projeto: as correções feitas depois da
   migração se perdem.
+- **O modelo v2 custa uns 10 ms na mediana da releitura e do Enter** (tabela "Rodadas
+  repetidas"): cada gravação reconcilia a lista da janela com o modelo. O mesmo passo
+  congelou os modelos globais para a coleta de lixo do Python (`gc.freeze`), o que tirou a
+  faixa alta do p95 do Enter e os picos da releitura, então os p95 do 1b ficaram iguais ou
+  melhores que os do passo 0 e do 1a. A reconciliação sai no passo 2a, e a cópia da página
+  inteira a cada passo do desfazer (que já existia) sai no 2b.
 - **A janela ainda edita por índice** (até o passo 2a): cada gravação reconcilia a lista de
   glifos com o modelo, pelo objeto e, depois do desfazer de hoje (que devolve cópias), pela
   caixa. Um glifo que o desfazer de hoje trouxe de volta depois de dividido ganha gid novo

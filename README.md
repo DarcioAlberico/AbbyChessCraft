@@ -412,16 +412,16 @@ Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (commit 76ba432; má
 | Buscar regex no livro | não existe | 1000 ms |
 | Montar o índice da busca | não existe | 2000 ms |
 
-Desempenho por passo, em ms ou MB (uma rodada cada; quanto o mesmo código varia de uma rodada para outra está nas rodadas repetidas, abaixo):
+Desempenho por passo, em ms ou MB (uma rodada cada, a do portão; quanto o mesmo código varia de uma rodada para outra, e o que se conclui, está nas rodadas repetidas, abaixo):
 
 | Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) |
 |---|---|---|---|
-| Troca de página, p95 | 194,22 | 190,06 | 184,91 |
-| Enter, p95 | 110,88 | 119,73 | 130,29 |
-| Releitura, p95 | 145,73 | 122,08 | 138,12 |
-| Desfazer (MB) | 4182,9 | 4182,9 | 4121 |
-| Atraso no lote, p99 | 8,5 | 8,6 | 8,7 |
-| Memória com o lote (MB) | 1620 | 1661 | 1677 |
+| Troca de página, p95 | 194,22 | 190,06 | 182,63 |
+| Enter, p95 | 110,88 | 119,73 | 132,39 |
+| Releitura, p95 | 145,73 | 122,08 | 141,48 |
+| Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 |
+| Atraso no lote, p99 | 8,5 | 8,6 | 8,9 |
+| Memória com o lote (MB) | 1620 | 1661 | 1678 |
 
 Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter tem duas faixas no mesmo código (perto de 110–130 e de 180–190); o atraso no lote tem duas faixas sempre (perto de 8 e de 21). Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
 
@@ -431,8 +431,8 @@ Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem 
 | passo 0 | 25e81b1 | só do lote, sem os padrões | — | — | — | — | — | — | 19,9; 7,7; 7,1 |
 | passo 1a | 315db35 | completa | 180,73; 183,85; 180,22 | 195,04; 198,16; 196,84 | 149,4; 114,34; 113,81 | 191,17; 190,97; 190,82 | 133,34; 111,81; 111,19 | 165,4; 150,71; 141,33 | 20,8; 21,3; 8,7 |
 | passo 1a | 3bf1ad3 | só do lote, sem os padrões | — | — | — | — | — | — | 7,5; 20,5; 7,7 |
-| passo 1b | 5f969c7 | completa | 163,94; 164,03; 163,46 | 188,56; 183,7; 186,58 | 121,81; 136,85; 120,96 | 134,57; 151,53; 133,6 | 128,23; 133,66; 119,32 | 152,14; 157,76; 157,11 | 22,3; 21,8; 9,9 |
-| passo 1b sem congelar | 5f969c7 | completa | 165,02; 172,67; 166,45 | 193,8; 181,22; 183,48 | 131,26; 121; 121,15 | 204,74; 199,5; 202,11 | 120,96; 123,9; 119,62 | 143,18; 133,72; 149,26 | 21,6; 8,9; 22,8 |
+| passo 1b | 1df8980 | completa | 165,96; 165,11; 167,75 | 183,37; 184; 187,56 | 121,39; 121,26; 122,86 | 131,26; 132,44; 136,11 | 127,12; 124; 123,44 | 143,87; 136,14; 140,73 | 21,2; 20,4; 15,1 |
+| passo 1b sem congelar | 1df8980 | completa | 165,88; 162,46; 169,07 | 185,45; 198,46; 195,84 | 121,85; 124,07; 125,64 | 199,5; 200,24; 204,13 | 121,68; 125,19; 137,77 | 147,04; 145,12; 165,86 | 21,8; 12,1; 11,3 |
 
 Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
 

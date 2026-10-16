@@ -134,3 +134,30 @@ A janela passou de 500 linhas com isso; o desenho foi para um mixin (`app/desenh
 Correção 8 · Simplicidade 8 · Testes 8 — **aceita**. Os dois furos que ela deixou entraram
 junto: o refazer que repropaga decide depois de abrir a página da transação (teste de refazer
 de outra página), e `mostrar` direto zera o "escolhido" (só `escolher` o liga).
+
+## Medidas finais (commit `6f863c3`)
+
+Refeitas depois das correções do produto, com a pasta limpa nas 6 rodadas e no portão
+(`arquivos_sujos` vazio nos JSON). O congelamento já estava desligado: as 6 rodadas rodam o
+mesmo programa (`repeticao-2b` e `repeticao-2b_sem_congelar` só diferem no rótulo do
+roteiro).
+
+- Portão: 9 passaram; `docs/medidas/2026-10-16-passo-2b.json`.
+- Enter até a cor mudar: mediana 20,6–21,5 ms, p95 24,0–27,1 (alvo de 100; o critério do 2b,
+  ≤ 100 em 2 de 3, passa nas 6).
+- Enter até o fim da propagação: mediana 70,9–73,8 ms (2a: 82,9–91,4; não sobe).
+- Releitura: mediana 13,3–15,3 ms, p95 15,7–19,2 (2a: 74,6–74,9 na mediana; não sobe). O
+  painel de texto, que saiu desse tempo, foi medido à parte: 22,1–22,2 ms na mediana, p95
+  22,4–28,7 (`texto_da_pagina`).
+- Com uma propagação lenta em curso: o segundo Enter, p95 19,0–29,9 ms.
+- Memória do desfazer (300 × 20): 8,0 MB pelo `tracemalloc` em 5 das 6 rodadas (numa, −9,6,
+  o ruído do coletor), 6,9 MB pela estimativa do histórico (≤ 50: passa).
+- Troca de página: mediana 153,2–157,6 ms. Atraso no lote: p99 9,1–22,3, máximo
+  127,5–154,4 ms; o lote de 20 páginas, 85,7–93,2 s.
+- Qualidade (`medir.py`) e fatia: iguais às do 2a. Essas quatro medidas rodaram com
+  `abbychess/verificacao.py` e `tests/test_verificacao.py` sujos, mudados por outra sessão
+  do usuário durante elas (a lista está nos JSON); a verificação de texto não entra na
+  leitura nem na fatia.
+
+As medidas de `b5c5142` (acima) ficaram fora do repositório: eram do código antes das
+correções do produto, com o congelamento ligado em metade das rodadas.

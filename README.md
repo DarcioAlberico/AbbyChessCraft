@@ -455,14 +455,14 @@ Desempenho por passo, em ms ou MB (uma rodada cada, a do portão, que roda no me
 
 | Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) | 2a (`2026-10-16-passo-2a.json`) | 2b (`2026-10-16-passo-2b.json`) |
 |---|---|---|---|---|---|
-| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 198,69 |
-| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 28,21 |
-| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 20,11 |
-| Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 | 164 | 8,1 |
-| Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 11,4 |
-| Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1652 |
+| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,48 |
+| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 22,65 |
+| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 14,27 |
+| Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 | 164 | 0,2 |
+| Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 9,1 |
+| Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1654 |
 
-Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter do passo 0 ao 1b tem duas faixas no mesmo código (perto de 110–130 e de 180–235; no 2a, uma só, perto de 90); o atraso no lote tem duas faixas sempre (perto de 8–10 e de 21). Desde o 2b o congelamento é desligado (`ABBY_CONGELAR=1` liga), e a coluna do Enter mede até a cor mudar (até o 2a, até o fim da propagação). Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
+Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter do passo 0 ao 1b tem duas faixas no mesmo código (perto de 110–130 e de 180–235; no 2a, uma só, perto de 90); o atraso no lote tem duas faixas sempre (perto de 8–10 e de 21). Desde o 2b o congelamento é desligado (`ABBY_CONGELAR=1` liga): as duas linhas do 2b rodam o mesmo programa (o rótulo `sem_congelar` é do roteiro de medida), e a coluna do Enter mede até a cor mudar (até o 2a, até o fim da propagação). Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
 
 | Código | Commit | Rodada | Troca, p50 | Troca, p95 | Enter, p50 | Enter, p95 | Releitura, p50 | Releitura, p95 | Atraso no lote, p99 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -474,16 +474,16 @@ Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem 
 | passo 1b sem congelar | 1519d8f | completa | 169,84; 175,66; 170,16 | 192,25; 202,72; 196,29 | 123,14; 126,27; 144,94 | 199,91; 203,93; 234,95 | 124,11; 123,85; 140,89 | 142,6; 150,72; 233,54 | 14,4; 15,5; 16,3 |
 | passo 2a | d19c858 | completa | 162,65; 167,54; 171,97 | 180,58; 191,56; 190,65 | 91,38; 82,94; 83,67 | 95,14; 115,58; 90,57 | 74,82; 74,92; 74,59 | 85,61; 90,63; 106,11 | 10,2; 10,1; 21,6 |
 | passo 2a sem congelar | d19c858 | completa | 174,66; 175,73; 178,05 | 188,01; 188,63; 188,4 | 82,23; 82,43; 82,52 | 91,7; 89,92; 92,03 | 73,15; 70,64; 75,29 | 88,33; 91,91; 92,78 | 11,7; 20,8; 21,5 |
-| passo 2b | b5c5142 | completa | 170,15; 153,89; 150,07 | 250,17; 178,8; 167 | 24,8; 24,75; 35,22 | 47,6; 31,82; 54,79 | 19,98; 15,13; 15,61 | 24,86; 21,02; 21,55 | 11,1; 9,3; 21,2 |
-| passo 2b sem congelar | b5c5142 | completa | 147,7; 153,64; 148,54 | 179,4; 167,58; 165,8 | 32,75; 21,47; 23,33 | 43,81; 47,12; 46,8 | 16,19; 14,57; 14,46 | 20,06; 19,58; 18,2 | 21,3; 20,9; 10,4 |
+| passo 2b | 6f863c3 | completa | 157,59; 153,58; 153,66 | 189,56; 171,05; 174,1 | 20,85; 21,1; 20,62 | 25,5; 26,13; 25,7 | 13,33; 13,59; 15,26 | 15,65; 16,1; 19,15 | 20,2; 22; 21,8 |
+| passo 2b sem congelar | 6f863c3 | completa | 153,56; 153,19; 157,37 | 173,65; 165,46; 168,14 | 20,55; 20,57; 21,47 | 24,01; 27,01; 27,08 | 14,4; 13,82; 14,5 | 16,9; 16,99; 18,83 | 22,3; 9,1; 9,8 |
 
 Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
 
 | Livro | Commit | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por diagrama | Lado certo | Ordem | CER do corpo | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| xv | b5c5142 | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 3 (+10 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-| yusupov | b5c5142 | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 13 | 3/3 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-| darcy | b5c5142 | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| xv | 6f863c3 | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 3 (+10 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| yusupov | 6f863c3 | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 13 | 3/3 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| darcy | 6f863c3 | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 
 Ainda não medido: a ligação da legenda ao diagrama, no passo H (a leitura de hoje não liga legenda a diagrama); precisão e revocação por função de bloco, no passo F (a leitura de hoje não classifica blocos); a validação do FEN pelos lances, no passo H.
 
@@ -499,6 +499,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | xv | 5f969c7 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 434,5 s |
 | xv | d19c858 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 459,6 s |
 | xv | b5c5142 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 447,3 s |
+| xv | 6f863c3 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 446,6 s |
 | yusupov | bb0b7e5 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23 s |
 | yusupov | 0ebbf9c | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,1 s |
 | yusupov | 3bf1ad3 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,4 s |
@@ -506,6 +507,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | yusupov | 5f969c7 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,3 s |
 | yusupov | d19c858 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 24,4 s |
 | yusupov | b5c5142 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,8 s |
+| yusupov | 6f863c3 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 25,8 s |
 | darcy | bb0b7e5 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,5 s |
 | darcy | 0ebbf9c | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,7 s |
 | darcy | 3bf1ad3 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,8 s |
@@ -513,6 +515,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | darcy | 5f969c7 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,7 s |
 | darcy | d19c858 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 25,5 s |
 | darcy | b5c5142 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 24,3 s |
+| darcy | 6f863c3 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 25,4 s |
 
 Fatia (`ferramentas\replay_fatia.py`; **erros** são as diferenças do snapshot contra o gabarito, o N da medida humana):
 
@@ -701,37 +704,39 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   (inclusive as lidas pela primeira vez depois, que ficam só em `paginas/p<pid>.json`),
   padrões ensinados (`padroes/`), palavras do léxico, amostras de diagrama e inclinações.
   Antes de abrir um projeto importante pela primeira vez no 1b, vale copiar a pasta inteira.
-- **O Enter e a releitura, desde o passo 2b** (tabela "Rodadas repetidas", 3 rodadas com e
-  3 sem o congelamento, commit `b5c5142`, sem o lote rodando). O Enter até a cor mudar ficou
-  em 21–35 ms na mediana e 32–55 ms no p95 (alvo de 100); até o fim da propagação, que é o
-  que o 2a media como Enter, em 73–88 ms na mediana (2a: 82–91). Com uma propagação lenta em
-  curso (1 s injetado), o segundo Enter muda de cor em 21–42 ms (p95). O ajuste de borda
-  (a releitura de um glifo) caiu de 71–75 ms (2a) para 15–20 ms na mediana, e 18–25 no p95
-  (alvo de 150): a janela passou a repintar só os glifos que mudaram e a refazer o texto da
-  página uma vez, depois da última mudança (o 2a já tinha tirado da interface a
-  gravação, a reconciliação e a cópia funda do desfazer). A troca de página ficou em
-  148–170 ms (alvo de 150, no passo A1). O alvo de §2 vale "com o lote rodando", o que só o
-  passo E permite medir.
-- **A memória do desfazer está no alvo.** O desfazer do projeto guarda só o que cada ação
-  mudou: a estimativa para 300 páginas × 20 ações ficou em 8,1 MB (alvo de 50), medida com
-  300 ações reais (com e sem o congelamento, `docs/medidas/2026-10-16-memoria-2b-*`), e o
-  próprio histórico estima 7,3 MB. O F5 é a ação mais cara (a página inteira); 50 MB cabem
+- **O Enter e a releitura, desde o passo 2b** (tabela "Rodadas repetidas": 6 rodadas do
+  commit `6f863c3`, com a pasta limpa e sem o congelamento, que saiu no 2b; sem o lote
+  rodando). O Enter até a cor mudar ficou em 21 ms na mediana e 24–27 ms no p95 (alvo de
+  100); até o fim da propagação, que é o que o 2a media como Enter, em 71–74 ms na mediana
+  (2a: 82–91). Com uma propagação lenta em curso (1 s injetado), o segundo Enter muda de
+  cor em 19–30 ms (p95). O ajuste de borda (a releitura de um glifo) ficou em 13–15 ms na
+  mediana e 16–19 no p95 (alvo de 150; 2a: 71–75 na mediana). **A medida mudou junto**:
+  desde o 2b o painel de texto da página é refeito 150 ms depois da última mudança, fora do
+  tempo do Enter e da releitura, e custa 22 ms (p95 22–29) na thread da interface, à parte
+  (`texto_da_pagina`); no 2a ele entrava nas duas medidas. Mesmo somando, a releitura fica
+  em ~37 ms. A troca de página ficou em 153–158 ms (alvo de 150, no passo A1). O alvo de §2
+  vale "com o lote rodando", o que só o passo E permite medir.
+- **A memória do desfazer está no alvo** para correções de um glifo (é o que a medida faz:
+  300 correções reais em 3 páginas): o `tracemalloc` deu 8,0 MB para 300 páginas × 20
+  ações em 5 das 6 rodadas (numa, −9,6: o ruído do coletor de lixo ainda passa o que o
+  histórico prende), e a estimativa do próprio histórico, a que o limite de 50 MB usa, dá
+  6,9 MB, uns 15% abaixo da medida. O F5 é a ação mais cara (a página inteira); 50 MB cabem
   umas 50 páginas reconhecidas de novo, e as ações mais antigas saem antes.
-- **O congelamento dos modelos para a coleta de lixo (`gc.freeze`) saiu no 2b.** Nas rodadas
-  do 2b ele não ajudou em nada (sem ele, as medianas do Enter, da releitura e da troca
-  ficaram iguais ou um pouco melhores) e prendia a memória do que estivesse vivo na hora.
+- **O congelamento dos modelos para a coleta de lixo (`gc.freeze`) saiu no 2b.** Nas 6
+  rodadas do commit `b5c5142` (3 com e 3 sem) ele não ajudou: sem ele, as medianas do Enter,
+  da releitura e da troca ficaram iguais ou um pouco melhores; no atraso durante o lote, 2
+  das 3 sem ele caíram na faixa de ~21 ms (com ele, 1 de 3), o que é a variação de sempre
+  dessa medida, e uma das rodadas com ele estava perturbada (um pico de 935 ms no lote).
   `ABBY_CONGELAR=1` o religa, para medir de novo.
-- **O atraso da interface durante o lote** tem duas faixas no p99 (perto de 10 e de 21 ms),
-  como em todos os passos, abaixo do alvo de 50 ms. O máximo ficou em 124–154 ms em 5 das 6
-  rodadas do 2b (até o 1b, 85–105; desde o 2a o lote do teste passa pelo controlador do
-  livro, que grava o pendente antes de começar e recarrega a página aberta no fim). Uma
-  rodada do 2b, com o congelamento, teve um pico de 935 ms, que não se repetiu e não foi
-  investigado. No 2a, uma rodada com o instante de cada atraso
-  (`docs/medidas/2026-10-16-pico-do-lote-2a-parcial.json`, árvore suja, máquina ocupada)
-  achou o maior no recarregar da página, 0,17 s depois do fim do lote, e outros de até
-  125 ms no meio dele. A origem dos picos fica para o passo E, que tira o lote do processo
-  da interface.
-- **O tempo do lote** de 20 páginas das rodadas de desempenho ficou em 89–105 s no 2b (2a:
+- **O atraso da interface durante o lote** tem duas faixas no p99 (perto de 9 e de 22 ms),
+  como em todos os passos, abaixo do alvo de 50 ms. O máximo ficou em 128–154 ms nas 6
+  rodadas (até o 1b, 85–105; desde o 2a o lote do teste passa pelo controlador do livro, que
+  grava o pendente antes de começar e recarrega a página aberta no fim). No 2a, uma rodada
+  com o instante de cada atraso (`docs/medidas/2026-10-16-pico-do-lote-2a-parcial.json`,
+  árvore suja, máquina ocupada) achou o maior no recarregar da página, 0,17 s depois do fim
+  do lote, e outros de até 125 ms no meio dele. A origem dos picos fica para o passo E, que
+  tira o lote do processo da interface.
+- **O tempo do lote** de 20 páginas das rodadas de desempenho ficou em 86–93 s no 2b (2a:
   105,5–108,1 s; 1b: 102,4–113,4 s). No `medir.py` (uma rodada por livro), o xv levou 447 s
   (2a: 460; 1b: 431–435).
 - **Uma queda pode perder o último meio segundo.** O gravador grava meio segundo depois da

@@ -1,11 +1,11 @@
 {
  "data": "2026-10-16",
- "rotulo": "repeticao-2b",
+ "rotulo": "repeticao-2b_sem_congelar",
  "exitstatus": 0,
  "metas_ausentes": [],
  "ordem": "os testes do módulo dividem a janela e os padrões, em ordem fixa: o Enter ensina antes do lote, e o lote lê com esses padrões",
  "ambiente": {
-  "objetos_congelados": 248287,
+  "objetos_congelados": 0,
   "maquina": "DESKTOP-E025G20",
   "maquina_cadastrada": true,
   "cpu": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
@@ -15,23 +15,24 @@
   "pymupdf": "1.26.6",
   "torch": "2.14.0+cpu",
   "threads_do_torch": 6,
-  "commit": "b5c5142",
-  "arvore_suja": true
+  "commit": "6f863c3",
+  "arvore_suja": false,
+  "arquivos_sujos": []
  },
  "medidas": {
   "troca_de_pagina": {
-   "p50_ms": 150.07,
-   "p95_ms": 167.0,
-   "max_ms": 169.23,
+   "p50_ms": 157.37,
+   "p95_ms": 168.14,
+   "max_ms": 213.17,
    "n": 30,
    "alvo_no_cache_ms": 150,
    "alvo_fora_ms": 600,
    "como": "mesmo processo, alternando 2 páginas lidas; hoje não há cache, então este número vale para 'no cache'. 'Fora do cache' (processo novo) não foi medido pelo método e fica para o passo A1."
   },
   "enter_ensinar": {
-   "p50_ms": 35.22,
-   "p95_ms": 54.79,
-   "max_ms": 82.57,
+   "p50_ms": 21.47,
+   "p95_ms": 27.08,
+   "max_ms": 27.44,
    "n": 30,
    "alvo_ms": 100,
    "padroes_no_livro": [
@@ -42,23 +43,30 @@
    "como": "desde o 2b: QTest.keyClick(Enter) no campo, com o caractere lido do primeiro pendente (conferir a leitura), até a cor mudar (a parte síncrona: o glifo manual, a amostra gravada); a propagação vai para a fila e não entra. Até o 2a, era até o fim da propagação (ver enter_ate_o_fim_da_propagacao)"
   },
   "enter_ate_o_fim_da_propagacao": {
-   "p50_ms": 88.4,
-   "p95_ms": 116.26,
-   "max_ms": 132.93,
+   "p50_ms": 72.18,
+   "p95_ms": 84.43,
+   "max_ms": 85.03,
    "n": 30,
    "como": "o mesmo Enter, até a propagação acabar (o que o 2a media como Enter)"
   },
   "enter_com_propagacao_lenta": {
-   "p50_ms": 25.22,
-   "p95_ms": 41.95,
+   "p50_ms": 19.18,
+   "p95_ms": 24.53,
    "n": 10,
    "alvo_ms": 100,
    "como": "o segundo Enter, com a propagação do primeiro presa (1 s), até a cor mudar"
   },
+  "texto_da_pagina": {
+   "p50_ms": 22.08,
+   "p95_ms": 24.05,
+   "max_ms": 24.2,
+   "n": 30,
+   "como": "refazer o painel de texto da página (montar o documento e pôr no painel), que desde o 2b roda 150 ms depois da última mudança, e não dentro do Enter nem da releitura"
+  },
   "releitura_de_um_glifo": {
-   "p50_ms": 15.61,
-   "p95_ms": 21.55,
-   "max_ms": 25.0,
+   "p50_ms": 14.5,
+   "p95_ms": 18.83,
+   "max_ms": 21.11,
    "n": 30,
    "alvo_ms": 150,
    "com_o_lote": "impossível hoje: o lote ocupa o executor"
@@ -66,32 +74,33 @@
   "memoria_do_desfazer": {
    "boxes_por_pagina": 1450,
    "alvo_mb": 50,
-   "acoes": 60,
-   "preso_pelo_historico_bytes": 84323,
-   "bytes_por_acao": 1405,
-   "estimado_300x20_mb": 8.0,
-   "rss_delta_bytes_informativo": 2998272,
-   "como": "tracemalloc ligado antes de 60 ações reais (3 páginas já visitadas × 20): o que é liberado ao esvaziar o histórico, por ação, extrapolado para 300 páginas × 20 ações"
+   "acoes": 300,
+   "preso_pelo_historico_bytes": -500802,
+   "bytes_por_acao": -1669,
+   "estimado_300x20_mb": -9.6,
+   "estimativa_do_historico_300x20_mb": 6.9,
+   "rss_delta_bytes_informativo": 6053888,
+   "como": "tracemalloc ligado antes de 300 ações reais (3 páginas já visitadas × 100): o que é liberado ao esvaziar o histórico, por ação, extrapolado para 300 páginas × 20 ações; e a estimativa que o próprio histórico faz (`HistoricoDoProjeto.bytes`, a que o limite de 50 MB usa). Desde o 2b, 100 ações por página: com 20, o histórico prendia menos que o ruído do coletor de lixo"
   },
   "atraso_durante_o_lote": {
    "paginas": 20,
-   "p99_ms": 21.2,
-   "p95_ms": 13.9,
-   "max_ms": 154.2,
-   "disparos": 5439,
-   "duracao_s": 96.1,
+   "p99_ms": 9.8,
+   "p95_ms": 6.1,
+   "max_ms": 133.1,
+   "disparos": 5694,
+   "duracao_s": 93.2,
    "alvo_p99_ms": 50,
    "acoes_durante_o_lote": "editar, desfazer, esquecer e os limiares são recusados com aviso; F5 e Ctrl+R ficam desligados (passo 2a)",
    "como": "pelo controlador do livro (desde o 2a): inclui gravar o pendente antes do lote e recarregar a página aberta no fim; até o 1b, o lote rodava direto no executor, sem as duas coisas",
    "maior_atraso_no_fim_do_lote": {
-    "ms": 154.2,
-    "segundos_depois_do_fim": 0.16,
+    "ms": 133.1,
+    "segundos_depois_do_fim": 0.15,
     "no_fim": true,
-    "maior_antes_do_fim_ms": 117.0
+    "maior_antes_do_fim_ms": 103.0
    }
   },
   "memoria_total_com_o_lote": {
-   "rss_pico_mb": 1636,
+   "rss_pico_mb": 1638,
    "alvo_mb": 2560,
    "como": "pico do RSS do processo único durante um lote de 20 páginas"
   },

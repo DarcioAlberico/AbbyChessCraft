@@ -14,11 +14,13 @@ from PySide6.QtTest import QTest  # noqa: E402
 from core.box_model import BoxEntry  # noqa: E402
 
 from abbychess import historico as hs  # noqa: E402
+from abbychess.modelo import Box, Pagina  # noqa: E402
 from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL  # noqa: E402
 from abbychess.padroes import PadroesDoLivro  # noqa: E402
 
 from tests import test_janela  # noqa: E402
 from tests.test_janela import _esperar  # noqa: E402
+from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
 # As fixtures da janela de `test_janela`, com o mesmo nome aqui.
 app = test_janela.app
@@ -33,9 +35,13 @@ def _caixas(boxes):
 # O histórico, sem janela
 # ----------------------------------------------------------------------
 
+def _instantaneo(char):
+    pagina = Pagina(pid=1, indice=0, boxes=[Box(1 << 20, BoxEntry(char, 0, 0, 1, 1))])
+    return hs.Instantaneo(pagina.instantaneo())
+
+
 def _passo(n, juntar=None):
-    return hs.Passo(f"passo {n}", hs.instantaneo([BoxEntry(str(n), 0, 0, 1, 1)]),
-                    hs.instantaneo([BoxEntry(str(n + 1), 0, 0, 1, 1)]), juntar=juntar)
+    return hs.Passo(f"passo {n}", _instantaneo(str(n)), _instantaneo(str(n + 1)), juntar=juntar)
 
 
 def test_desfazer_e_refazer_andam_nas_duas_pilhas():
@@ -74,11 +80,13 @@ def test_limite_tira_o_mais_antigo():
     assert historico.desfazer() is None
 
 
-def test_instantaneo_e_copia_e_nao_referencia():
-    boxes = [BoxEntry("a", 0, 0, 1, 1)]
-    estado = hs.instantaneo(boxes)
-    boxes[0].char = "z"
-    assert estado.boxes[0].char == "a"
+def test_instantaneo_nao_segue_a_pagina_que_muda():
+    from abbychess import edicao as ed
+
+    pagina = Pagina(pid=1, indice=0, boxes=[Box(1 << 20, BoxEntry("a", 0, 0, 1, 1))])
+    estado = hs.Instantaneo(pagina.instantaneo())
+    ed.corrigir(pagina, 1 << 20, "z")          # a edição troca o objeto, não o muda
+    assert estado.boxes[0].char == "a" and pagina.entries()[0].char == "z"
 
 
 def test_padrao_guardado_volta_inteiro(tmp_path):
@@ -106,16 +114,16 @@ def test_padrao_guardado_volta_inteiro(tmp_path):
 def _reconhecida(app, janela):
     janela.reconhecer()
     _esperar(app, janela)
-    return _caixas(janela.boxes)
+    return _caixas(boxes(janela))
 
 
 def test_ctrl_z_desfaz_o_ensinar_e_apaga_o_padrao(app, janela):
     inicio = _reconhecida(app, janela)
-    janela._mostrar_box(0)
+    mostrar(janela, 0)
     janela.treino.campo.setText("a")
     janela.treino._ensinar()
     _esperar(app, janela)
-    assert sum(b.source == FONTE_LIVRO for b in janela.boxes) == 4
+    assert sum(b.source == FONTE_LIVRO for b in boxes(janela)) == 4
     assert janela.acao_desfazer.text() == "Desfazer: Ensinar 'a'"
 
     janela.show()
@@ -124,63 +132,63 @@ def test_ctrl_z_desfaz_o_ensinar_e_apaga_o_padrao(app, janela):
     QTest.keyClick(janela.treino.campo, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
     app.processEvents()
 
-    assert _caixas(janela.boxes) == inicio
+    assert _caixas(boxes(janela)) == inicio
     assert janela.leitor.padroes_por_caractere() == {}
     assert _caixas(janela.projeto.carregar_pagina(0)) == inicio  # gravado já desfeito
 
     QTest.keyClick(janela.treino.campo, Qt.Key.Key_Y, Qt.KeyboardModifier.ControlModifier)
     app.processEvents()
     assert len(janela.leitor.padroes_por_caractere()["a"]) == 1
-    assert janela.boxes[0].source == FONTE_MANUAL
-    assert sum(b.source == FONTE_LIVRO for b in janela.boxes) == 4
+    assert boxes(janela)[0].source == FONTE_MANUAL
+    assert sum(b.source == FONTE_LIVRO for b in boxes(janela)) == 4
 
 
 def test_desfazer_dividir_e_descartar(app, janela):
     inicio = _reconhecida(app, janela)
-    janela._mostrar_box(0)
+    mostrar(janela, 0)
     janela.treino._juntar(+1)
     janela.treino._dividir()
-    janela._mostrar_box(2)
+    mostrar(janela, 2)
     janela.treino._descartar()
-    assert len(janela.boxes) == len(inicio) - 1
+    assert len(boxes(janela)) == len(inicio) - 1
 
-    janela.desfazer()                    # volta o descartado
-    assert len(janela.boxes) == len(inicio)
-    janela.desfazer()                    # desfaz a divisão: o par colado volta
-    assert len(janela.boxes) == len(inicio) - 1
-    janela.desfazer()                    # desfaz a junção
-    assert _caixas(janela.boxes) == inicio
+    janela.pagina.desfazer()                    # volta o descartado
+    assert len(boxes(janela)) == len(inicio)
+    janela.pagina.desfazer()                    # desfaz a divisão: o par colado volta
+    assert len(boxes(janela)) == len(inicio) - 1
+    janela.pagina.desfazer()                    # desfaz a junção
+    assert _caixas(boxes(janela)) == inicio
     # O que sobra é o próprio F5, que também se desfaz.
     assert janela.acao_desfazer.text() == "Desfazer: Reconhecer a página"
 
 
 def test_alt_seta_seguidos_se_desfazem_de_uma_vez(app, janela):
     inicio = _reconhecida(app, janela)
-    janela._mostrar_box(0)
+    mostrar(janela, 0)
     for _ in range(3):
         janela.treino._ajustar(0, 0, 1, 0)
-    janela.desfazer()
-    assert _caixas(janela.boxes) == inicio
+    janela.pagina.desfazer()
+    assert _caixas(boxes(janela)) == inicio
 
 
 def test_cada_pagina_tem_o_seu_historico(app, janela):
     _reconhecida(app, janela)
-    janela._mostrar_box(0)
+    mostrar(janela, 0)
     janela.treino._descartar()
     assert janela.acao_desfazer.isEnabled()
-    janela.historicos.pop(0)             # como se fosse outra página
-    janela._atualizar_acoes()
+    janela.pagina.historicos.pop(0)             # como se fosse outra página
+    janela._acoes_mudaram()
     assert not janela.acao_desfazer.isEnabled()
 
 
 def test_desfazer_o_reconhecimento_volta_a_pagina_de_antes(app, janela):
     _reconhecida(app, janela)
-    janela._mostrar_box(0)
+    mostrar(janela, 0)
     janela.treino.campo.setText("Z")
     janela.treino._so_corrigir()
-    corrigida = _caixas(janela.boxes)
+    corrigida = _caixas(boxes(janela))
     janela.reconhecer()                  # o F5 de novo apaga a correção
     _esperar(app, janela)
-    assert janela.boxes[0].char != "Z"
-    janela.desfazer()
-    assert _caixas(janela.boxes) == corrigida
+    assert boxes(janela)[0].char != "Z"
+    janela.pagina.desfazer()
+    assert _caixas(boxes(janela)) == corrigida

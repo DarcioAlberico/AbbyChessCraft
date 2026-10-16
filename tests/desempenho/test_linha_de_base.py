@@ -20,6 +20,7 @@ import pytest
 from tests.desempenho.conftest import cronometrar, p95, percentil
 from tests.livros import PASTA_DOS_PDFS
 from tests.test_janela import _esperar
+from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
 pytestmark = [pytest.mark.desempenho, pytest.mark.livro_real, pytest.mark.timeout(1800)]
 
@@ -59,7 +60,7 @@ def ambiente(tmp_path_factory):
     janela.resize(1600, 1000)
     janela.projeto, janela.fonte, janela.leitor = projeto, fonte, leitor
     janela.seletor.setMaximum(fonte.total)
-    janela.ir_para_pagina(PAGINAS[0], salvar=False)
+    janela.ir_para_pagina(PAGINAS[0])
     yield app, janela
     janela.close()
     QMessageBox.question = pergunta_original
@@ -73,7 +74,7 @@ def test_troca_de_pagina(ambiente, medidas):
     imagem = QImage(1600, 1000, QImage.Format.Format_ARGB32)
 
     def trocar(i):
-        janela.ir_para_pagina(PAGINAS[i % 2], salvar=False)
+        janela.ir_para_pagina(PAGINAS[i % 2])
         pintor = QPainter(imagem)
         janela.visor.render(pintor)
         pintor.end()
@@ -98,18 +99,18 @@ def test_enter_ensinar(ambiente, medidas):
     from PySide6.QtTest import QTest
 
     app, janela = ambiente
-    janela.ir_para_pagina(PAGINAS[0], salvar=False)
+    janela.ir_para_pagina(PAGINAS[0])
     antes = janela.leitor.total_de_padroes
     novos: list = []
 
     def preparar(_i):
-        fila = [k for k in janela._fila() if janela.boxes[k].char]
+        fila = [k for k in fila(janela) if boxes(janela)[k].char]
         if not fila:
-            janela.ir_para_pagina(PAGINAS[(PAGINAS.index(janela.indice_pagina) + 1)
+            janela.ir_para_pagina(PAGINAS[(PAGINAS.index(janela.pagina.indice) + 1)
                                           % len(PAGINAS)], salvar=False)
-            fila = [k for k in janela._fila() if janela.boxes[k].char]
-        janela._mostrar_box(fila[0])
-        char = janela.boxes[janela.atual].char
+            fila = [k for k in fila(janela) if boxes(janela)[k].char]
+        mostrar(janela, fila[0])
+        char = boxes(janela)[atual(janela)].char
         novos.append(char not in janela.leitor.padroes_por_caractere())
         janela.treino.campo.setText(char)
 
@@ -129,11 +130,11 @@ def test_enter_ensinar(ambiente, medidas):
 def test_releitura_de_um_glifo(ambiente, medidas):
     """Ajustar uma borda relê o glifo com a cadeia global, na thread da interface."""
     app, janela = ambiente
-    janela.ir_para_pagina(PAGINAS[1], salvar=False)
-    janela._mostrar_box(0)
+    janela.ir_para_pagina(PAGINAS[1])
+    mostrar(janela, 0)
     lados = [(0, 0, 1, 0), (0, 0, -1, 0)]
 
-    resultado = cronometrar(lambda i: janela._ajustar(*lados[i % 2]))
+    resultado = cronometrar(lambda i: janela.pagina.ajustar(*lados[i % 2]))
     medidas["releitura_de_um_glifo"] = {**resultado, "alvo_ms": 150,
                                         "com_o_lote": "impossível hoje: o lote ocupa o executor"}
 
@@ -163,24 +164,24 @@ def _memoria_do_historico(app, janela) -> dict:
 
     processo = psutil.Process()
     for indice in PAGINAS:
-        janela.ir_para_pagina(indice, salvar=False)
-    janela.historicos.clear()
+        janela.ir_para_pagina(indice)
+    janela.pagina.historicos.clear()
     gc.collect()
     tracemalloc.start()
     try:
         rss_base = processo.memory_info().rss
         acoes = 0
         for indice in PAGINAS:
-            janela.ir_para_pagina(indice, salvar=False)
+            janela.ir_para_pagina(indice)
             for k in range(20):
-                janela._mostrar_box(k)
+                mostrar(janela, k)
                 janela.treino.campo.setText("y")
                 janela.treino._so_corrigir()
                 acoes += 1
         gc.collect()
         cheio, _ = tracemalloc.get_traced_memory()
         rss_cheio = processo.memory_info().rss
-        janela.historicos.clear()
+        janela.pagina.historicos.clear()
         gc.collect()
         vazio, _ = tracemalloc.get_traced_memory()
     finally:

@@ -54,8 +54,8 @@ TITULO = "AbbyChessCraft"
 
 
 class JanelaPrincipal(QMainWindow):
-    #: Da thread do gravador: a página `indice` não gravou (o texto do erro).
-    falha_de_gravacao = Signal(object, str)
+    #: Da thread do gravador: a página `indice` não gravou (o erro).
+    falha_de_gravacao = Signal(object, object)
 
     def __init__(self):
         super().__init__()
@@ -409,7 +409,7 @@ class JanelaPrincipal(QMainWindow):
     def _aviso(self, titulo: str, texto: str) -> None:
         QMessageBox.warning(self, titulo, texto)
 
-    def _gravacao_falhou(self, indice, erro: str) -> None:
+    def _gravacao_falhou(self, indice, erro) -> None:
         pagina = f"A página {indice + 1}" if indice is not None else "Uma página"
         self.statusBar().showMessage(
             f"{pagina} não foi gravada ({erro}). Ela continua com as mudanças em memória e o "

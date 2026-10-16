@@ -28,6 +28,7 @@ from tests.test_janela import _esperar
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ferramentas"))
 import replay_fatia as rf  # noqa: E402
+from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
 app = test_janela.app
 janela = test_janela.janela
@@ -119,61 +120,59 @@ def janela_de_duas_paginas(app, tmp_path, monkeypatch):
         doc.save(str(pdf))
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf)
     j = JanelaPrincipal()
-    j.projeto, j.fonte = projeto, pg.FonteDePaginas(projeto.fonte)
-    j.leitor = LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
-    j.seletor.setMaximum(j.fonte.total)
-    j.ir_para_pagina(0, salvar=False)
+    j.usar(projeto, pg.FonteDePaginas(projeto.fonte),
+           LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
     yield j
     j.close()
 
 
 def test_pagina_seguinte(app, janela_de_duas_paginas, contador):
     janela_d = _pronta(app, janela_de_duas_paginas)
-    assert janela_d.fonte.total == 2 and janela_d.indice_pagina == 0
+    assert janela_d.fonte.total == 2 and janela_d.pagina.indice == 0
     contador.gestos = 0
     QTest.keyClick(janela_d.treino.campo, Qt.Key.Key_PageDown, Qt.KeyboardModifier.ControlModifier)
     assert contador.gestos == CUSTO["pagina_seguinte"]
-    assert janela_d.indice_pagina == 1 and janela_d.seletor.value() == 2
+    assert janela_d.pagina.indice == 1 and janela_d.seletor.value() == 2
 
 
 def test_reler_pendentes(app, janela, contador):
     """Ctrl+R relê os pendentes: o padrão ensinado resolve um 'a' que estava pendente."""
     _pronta(app, janela)
-    janela._mostrar_box(0)
+    mostrar(janela, 0)
     janela.treino.campo.setText("a")
     janela.treino._ensinar()
     _esperar(app, janela)
-    outro = next(i for i, b in enumerate(janela.boxes) if b.char == "a" and i != 0)
-    janela.boxes[outro].char, janela.boxes[outro].source = "", "none"   # volta a pendente
-    assert outro in janela._fila()
+    outro = next(i for i, b in enumerate(boxes(janela)) if b.char == "a" and i != 0)
+    boxes(janela)[outro].char, boxes(janela)[outro].source = "", "none"   # volta a pendente
+    assert outro in fila(janela)
     contador.gestos = 0
     QTest.keyClick(janela.treino.campo, Qt.Key.Key_R, Qt.KeyboardModifier.ControlModifier)
     _esperar(app, janela)
     assert contador.gestos == CUSTO["reler_pendentes"]
-    assert janela.boxes[outro].char == "a" and outro not in janela._fila()
+    assert boxes(janela)[outro].char == "a" and outro not in fila(janela)
 
 
 def test_dividir_e_juntar(app, janela, contador):
     _pronta(app, janela)
-    total, b = len(janela.boxes), janela.boxes[0]
+    total, b = len(boxes(janela)), boxes(janela)[0]
     contador.gestos = 0
     QTest.mouseClick(janela.visor.viewport(), Qt.MouseButton.LeftButton,
                      Qt.KeyboardModifier.NoModifier, _no_visor(janela, *_centro(b)))
     QTest.keyClick(janela.treino.campo, Qt.Key.Key_J, Qt.KeyboardModifier.ControlModifier)
     assert contador.gestos == CUSTO["juntar_glifos"]
-    assert len(janela.boxes) == total - 1
+    assert len(boxes(janela)) == total - 1
 
     contador.gestos = 0
     QTest.mouseClick(janela.visor.viewport(), Qt.MouseButton.LeftButton,
-                     Qt.KeyboardModifier.NoModifier, _no_visor(janela, *_centro(janela.boxes[0])))
+                     Qt.KeyboardModifier.NoModifier, _no_visor(janela, *_centro(boxes(janela)[0])))
     QTest.keyClick(janela.treino.campo, Qt.Key.Key_D, Qt.KeyboardModifier.ControlModifier)
     assert contador.gestos == CUSTO["dividir_glifo"]
-    assert len(janela.boxes) == total
+    assert len(boxes(janela)) == total
 
 
 def test_ensinar_glifo(app, janela, contador):
     _pronta(app, janela)
-    b = janela.boxes[0]
+    b = boxes(janela)[0]
     contador.gestos = 0
     QTest.mouseClick(janela.visor.viewport(), Qt.MouseButton.LeftButton,
                      Qt.KeyboardModifier.NoModifier, _no_visor(janela, *_centro(b)))
@@ -181,28 +180,28 @@ def test_ensinar_glifo(app, janela, contador):
     QTest.keyClick(janela.treino.campo, Qt.Key.Key_Return)
     _esperar(app, janela)
     assert contador.gestos == CUSTO["ensinar_glifo"]
-    assert (janela.boxes[0].char, janela.boxes[0].source) == ("a", FONTE_MANUAL)
+    assert (boxes(janela)[0].char, boxes(janela)[0].source) == ("a", FONTE_MANUAL)
     assert "a" in janela.leitor.padroes_por_caractere()
 
 
 def test_ensinar_da_fila(app, janela, contador):
     """O glifo que a janela já mostra (o primeiro da fila): digitar e Enter, sem clique."""
     _pronta(app, janela)
-    primeiro = janela._fila()[0]
+    primeiro = fila(janela)[0]
     # O campo vem selecionado (e com o foco, que o offscreen não garante dar à janela).
-    assert janela.atual == primeiro and janela.treino.campo.selectedText() == janela.treino.campo.text()
+    assert atual(janela) == primeiro and janela.treino.campo.selectedText() == janela.treino.campo.text()
     contador.gestos = 0
     QTest.keyClicks(janela.treino.campo, "a")
     QTest.keyClick(janela.treino.campo, Qt.Key.Key_Return)
     _esperar(app, janela)
     assert contador.gestos == CUSTO["ensinar_da_fila"]
-    assert (janela.boxes[primeiro].char, janela.boxes[primeiro].source) == ("a", FONTE_MANUAL)
-    assert janela.atual != primeiro             # a janela foi sozinha ao próximo da fila
+    assert (boxes(janela)[primeiro].char, boxes(janela)[primeiro].source) == ("a", FONTE_MANUAL)
+    assert atual(janela) != primeiro             # a janela foi sozinha ao próximo da fila
 
 
 def test_descartar_box(app, janela, contador):
     _pronta(app, janela)
-    total, b = len(janela.boxes), janela.boxes[1]
+    total, b = len(boxes(janela)), boxes(janela)[1]
     botao = next(w for w in janela.treino.findChildren(QPushButton)
                  if w.text().startswith("Não é caractere"))
     contador.gestos = 0
@@ -210,12 +209,12 @@ def test_descartar_box(app, janela, contador):
                      Qt.KeyboardModifier.NoModifier, _no_visor(janela, *_centro(b)))
     QTest.mouseClick(botao, Qt.MouseButton.LeftButton)
     assert contador.gestos == CUSTO["descartar_box"]
-    assert len(janela.boxes) == total - 1
+    assert len(boxes(janela)) == total - 1
 
 
 def test_marcar_glifo(app, janela, contador):
     _pronta(app, janela)
-    a, b = janela.boxes[0], janela.boxes[1]
+    a, b = boxes(janela)[0], boxes(janela)[1]
     porta = janela.visor.viewport()
     contador.gestos = 0
     QTest.keyClick(janela.treino.campo, Qt.Key.Key_T, Qt.KeyboardModifier.ControlModifier)
@@ -227,7 +226,7 @@ def test_marcar_glifo(app, janela, contador):
     QTest.keyClick(janela.treino.campo, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
     assert contador.gestos == CUSTO["marcar_glifo"]
     # O Shift+Enter já avança a fila; o box marcado é o que cobre o "a" e o "b".
-    novo = next(x for x in janela.boxes if x.x1 <= a.x1 + 1 and x.x2 >= b.x2 - 1)
+    novo = next(x for x in boxes(janela) if x.x1 <= a.x1 + 1 and x.x2 >= b.x2 - 1)
     assert (novo.char, novo.source) == ("x", FONTE_MANUAL)
 
 
@@ -246,10 +245,8 @@ def janela_com_diagrama(app, tmp_path, monkeypatch):
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Diagramas",
                                    pagina_com_diagrama(tmp_path / "pagina.png"))
     j = JanelaPrincipal()
-    j.projeto, j.fonte = projeto, pg.FonteDePaginas(projeto.fonte)
-    j.leitor = LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
-    j.seletor.setMaximum(j.fonte.total)
-    j.ir_para_pagina(0, salvar=False)
+    j.usar(projeto, pg.FonteDePaginas(projeto.fonte),
+           LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
     yield j
     if j.dialogo_diagrama is not None:
         j.dialogo_diagrama.close()
@@ -262,7 +259,7 @@ def test_conferir_um_diagrama(app, janela_com_diagrama, contador):
     from abbychess.app import dialogo_diagrama as dd
 
     janela_d = _pronta(app, janela_com_diagrama)
-    x1, y1, x2, y2 = janela_d.diagramas[0].caixa
+    x1, y1, x2, y2 = janela_d.pagina.diagramas[0].caixa
     contador.gestos = 0
     QTest.mouseClick(janela_d.visor.viewport(), Qt.MouseButton.LeftButton,
                      Qt.KeyboardModifier.NoModifier, _no_visor(janela_d, (x1 + x2) / 2, (y1 + y2) / 2))
@@ -290,4 +287,4 @@ def test_conferir_um_diagrama(app, janela_com_diagrama, contador):
     QTest.keyClick(dialogo.posicao, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
     _esperar(app, janela_d)
     assert contador.gestos == CUSTO["fechar_diagrama"]
-    assert janela_d.diagramas[0].conferido
+    assert janela_d.pagina.diagramas[0].conferido

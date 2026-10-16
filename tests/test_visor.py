@@ -483,3 +483,30 @@ def test_enter_na_caixa_de_zoom_devolve_o_foco_e_clicar_noutro_campo_nao(app, ja
     janela.treino.campo.setFocus(Qt.FocusReason.MouseFocusReason)   # e clica noutro campo
     app.processEvents()
     assert QApplication.focusWidget() is janela.treino.campo
+
+
+def test_zoom_vale_com_o_foco_no_campo_do_treino_e_o_v_nao(app, janela):
+    janela.show()
+    app.processEvents()
+    janela.treino.campo.setFocus()
+    app.processEvents()
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_8, Qt.KeyboardModifier.ControlModifier)
+    assert abs(janela.visor.escala() - 1.0) < 1e-6           # Ctrl+8, 100%
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_0, Qt.KeyboardModifier.ControlModifier)
+    assert janela.visor.modo_zoom == "pagina"                 # Ctrl+0
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_V)
+    assert not janela.acao_origem.isChecked()                 # no campo, V é uma letra
+    assert "v" in janela.treino.campo.text().lower()
+
+
+def test_a_seguinte_e_pre_carregada_depois_da_pintura(app, janela_de_60):
+    j = janela_de_60
+    j.ir_para_pagina(10)
+    assert not j.pagina.cache.tem(11)                          # o ir_para não a dispara
+    import time
+
+    fim = time.monotonic() + 5                                  # o relógio da janela, sim
+    while not j.pagina.cache.tem(11) and time.monotonic() < fim:
+        app.processEvents()
+        time.sleep(0.01)
+    assert j.pagina.cache.tem(11)

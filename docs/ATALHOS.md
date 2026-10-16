@@ -62,10 +62,10 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 
 | Ação | Padrão | FineReader | Escopo | Desde |
 |---|---|---|---|---|
-| 100% | Ctrl+8 | Ctrl+8 | imagem | A1 |
-| Afastar (Imagem) ou diminuir o corpo (Documento) | Ctrl+- | Ctrl+- | imagem, documento | A1 |
-| Aproximar (Imagem) ou aumentar o corpo (Documento) | Ctrl+= / Ctrl++ | Ctrl+= / Ctrl++ | imagem, documento | A1 |
-| Largura da página | Ctrl+9 | Ctrl+9 | imagem | A1 |
+| 100% | Ctrl+8 | Ctrl+8 | imagem, glifo | A1 |
+| Afastar (Imagem) ou diminuir o corpo (Documento) | Ctrl+- | Ctrl+- | imagem, documento, glifo | A1 |
+| Aproximar (Imagem) ou aumentar o corpo (Documento) | Ctrl+= / Ctrl++ | Ctrl+= / Ctrl++ | imagem, documento, glifo | A1 |
+| Largura da página | Ctrl+9 | Ctrl+9 | imagem, glifo | A1 |
 | Mostrar a origem das leituras nos boxes | V | V | imagem | A1 |
 | Mover a borda de baixo para baixo | Shift+Down | Shift+Down | imagem, campo_glifo | A2 |
 | Mover a borda de baixo para cima | Shift+Up | Shift+Up | imagem, campo_glifo | A2 |
@@ -75,10 +75,10 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Mover a borda direita para a esquerda | Shift+Left | Shift+Left | imagem, campo_glifo | A2 |
 | Mover a borda esquerda para a direita | Ctrl+Shift+Right | Ctrl+Shift+Right | imagem, campo_glifo | A2 |
 | Mover a borda esquerda para a esquerda | Ctrl+Shift+Left | Ctrl+Shift+Left | imagem, campo_glifo | A2 |
-| Página inteira (Imagem) ou corpo padrão (Documento) | Ctrl+0 | Ctrl+0 | imagem, documento | A1 |
+| Página inteira (Imagem) ou corpo padrão (Documento) | Ctrl+0 | Ctrl+0 | imagem, documento, glifo | A1 |
 | Rolar uma tela (e virar para a página anterior no topo) | PgUp | PgUp | imagem | A1 |
 | Rolar uma tela (e virar para a página seguinte no fim) | PgDn | PgDn | imagem | A1 |
-| Zoom no item atual | Ctrl+7 | Ctrl+7 | imagem | A1 |
+| Zoom no item atual | Ctrl+7 | Ctrl+7 | imagem, glifo | A1 |
 
 ## imagem_areas
 

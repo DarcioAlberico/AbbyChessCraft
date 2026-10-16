@@ -200,15 +200,15 @@ acoes:
     excecoes:
       - {tecla: Ctrl+Shift+Tab, widget: tabwidget, tipo: substitui, motivo: "perfil FineReader: as abas da vista direita trocam com Alt+3"}
   - {id: seguir, descricao: Seguir o item atual nos dois painéis, escopo: [global], padrao: Ctrl+Shift+L, desde_passo: A1}
-  - {id: zoom_mais, descricao: Aproximar (Imagem) ou aumentar o corpo (Documento), escopo: [imagem, documento],
+  - {id: zoom_mais, descricao: Aproximar (Imagem) ou aumentar o corpo (Documento), escopo: [imagem, documento, glifo],
      padrao: [Ctrl+=, Ctrl++], desde_passo: A1}
-  - {id: zoom_menos, descricao: Afastar (Imagem) ou diminuir o corpo (Documento), escopo: [imagem, documento],
+  - {id: zoom_menos, descricao: Afastar (Imagem) ou diminuir o corpo (Documento), escopo: [imagem, documento, glifo],
      padrao: Ctrl+-, desde_passo: A1}
-  - {id: zoom_pagina, descricao: Página inteira (Imagem) ou corpo padrão (Documento), escopo: [imagem, documento],
+  - {id: zoom_pagina, descricao: Página inteira (Imagem) ou corpo padrão (Documento), escopo: [imagem, documento, glifo],
      padrao: Ctrl+0, desde_passo: A1}
-  - {id: zoom_largura, descricao: Largura da página, escopo: [imagem], padrao: Ctrl+9, desde_passo: A1}
-  - {id: zoom_100, descricao: 100%, escopo: [imagem], padrao: Ctrl+8, desde_passo: A1}
-  - {id: zoom_item, descricao: Zoom no item atual, escopo: [imagem], padrao: Ctrl+7, desde_passo: A1}
+  - {id: zoom_largura, descricao: Largura da página, escopo: [imagem, glifo], padrao: Ctrl+9, desde_passo: A1}
+  - {id: zoom_100, descricao: 100%, escopo: [imagem, glifo], padrao: Ctrl+8, desde_passo: A1}
+  - {id: zoom_item, descricao: Zoom no item atual, escopo: [imagem, glifo], padrao: Ctrl+7, desde_passo: A1}
   - {id: mostrar_origem, descricao: Mostrar a origem das leituras nos boxes, escopo: [imagem], padrao: V, desde_passo: A1}
 
   # --- Ferramentas ---------------------------------------------------------------

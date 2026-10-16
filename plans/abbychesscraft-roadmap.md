@@ -443,6 +443,14 @@ aviso.
 3. Os estados vazios.
 4. `accessibleName`.
 5. O perfil FineReader e a reatribuição de atalhos em Opções.
+6. Pendências do A1 (revisão de produto):
+   - os tokens de estado do A1 (Okabe-Ito) não dão o contraste de 3:1 do CA-13.2 contra o
+     papel (o laranja do pendente, 1,8:1 contra o cinza 230; o roxo, 2,45; o verde-azulado,
+     2,74): escolher variantes mais escuras, mantendo os traços distintos;
+   - a seleção ainda é um traço amarelo único (§3.3 pede contorno duplo), e os diagramas
+     usam a paleta antiga (`cores.py`): passar aos tokens;
+   - a conversão do pixmap da página seguinte roda na thread da interface, 400 ms depois de
+     trocar (p50 18 ms, máximo 93): fazer a `QImage` na thread da pré-carga.
 
 **Verificação.** CA-13.1, CA-13.2 e CA-13.3; CA-3.3 e CA-3.7 nos dois perfis.
 

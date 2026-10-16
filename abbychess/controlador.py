@@ -257,8 +257,14 @@ class ControladorDePagina:
         else:
             self.eventos.emitir("atual_mudou")
         self.eventos.emitir("acoes_mudaram")
-        self.cache.precarregar(indice + 1)      # a seguinte, que é a mais provável
         return True
+
+    def precarregar_seguinte(self) -> None:
+        """Renderiza a página seguinte, a mais provável, noutra thread. A janela chama depois
+        de pintar a atual: dentro do `ir_para`, a pré-carga disputava a CPU com a conversão e
+        a pintura da página pedida, e a troca fora do cache ficava ~60 ms mais lenta."""
+        if self.cache is not None and self.fonte is not None:
+            self.cache.precarregar(self.indice + 1)
 
     # ------------------------------------------------------------------
     # Navegação (§3.3)

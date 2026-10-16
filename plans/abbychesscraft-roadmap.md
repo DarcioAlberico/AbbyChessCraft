@@ -284,6 +284,9 @@ lote rodando" é do passo E, o primeiro que deixa medir isso.
 4. Sincronia nos dois sentidos e com a fila; Seguir.
 5. Atualização por eventos, sem perder o cursor.
 
+Pendência do A2: a cláusula da Linha do CA-3.2 (a x-height ≥ 12 px na Linha, em 1366×768 e
+1280×720) entra com a Linha (Ctrl+F5).
+
 **Verificação.** CA-6.1 e CA-6.5; o CA-F.1 com alvo de ≤ 85%; o CA-F.2 (informativo).
 
 ## Passo E — Servidor de leitura (§11, §4.6)

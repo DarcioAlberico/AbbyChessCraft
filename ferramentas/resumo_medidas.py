@@ -249,8 +249,8 @@ def _repeticoes() -> list:
         return []
     linhas = ["", "Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). O p95 "
               "do Enter tem duas faixas no mesmo código (perto de 110–130 e perto de 180–190), e "
-              "o atraso no lote também (perto de 8 e de 21): compare pela mediana (p50), que é "
-              "estável:", "",
+              "o atraso no lote também (perto de 8 e de 21): compare pela mediana (p50), que varia "
+              "bem menos (mas não é imune: uma rodada solta pode sair alta):", "",
               "| Código | Commit | Rodada | " + " | ".join(r for _, _, r in _METAS_REPETIDAS) + " |",
               "|---|---|---|" + "---|" * len(_METAS_REPETIDAS)]
     for (passo, condicao), rodadas in sorted(grupos.items()):

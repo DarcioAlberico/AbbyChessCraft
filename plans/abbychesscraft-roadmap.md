@@ -195,7 +195,8 @@ na mediana do Enter e da troca de página (`docs/revisoes/passo-1a.md`). O 2a ti
 gravações da thread da interface; a verificação dele inclui 3 rodadas completas de
 desempenho (`ABBY_ROTULO_DA_MEDIDA=repeticao-2a`) comparadas, pela **mediana (p50)**, com as
 3 do passo 0 e as 3 do 1a da tabela "Rodadas repetidas": a mediana do Enter e a da troca
-voltam à faixa do passo 0.
+voltam à faixa do passo 0 (em 2026-10-16: Enter 104–105 ms e troca 170–174 ms), com 5 ms de
+tolerância em pelo menos 2 das 3 rodadas.
 
 ## Passo 2b — Desfazer e propagação (§14.2)
 

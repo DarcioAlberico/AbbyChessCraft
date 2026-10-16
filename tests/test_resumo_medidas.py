@@ -141,3 +141,11 @@ def test_rodadas_repetidas_e_historico_da_qualidade(pastas):
     assert "| passo 0 | abc | completa | — | — | — | 110 | — | 21 |" in texto
     historico = [ln for ln in texto.splitlines() if ln.startswith("| xv | c") and ln.endswith(" s |")]
     assert [ln.split(" | ")[1] for ln in historico] == ["c0", "c1"]
+
+
+def test_rodadas_repetidas_mostram_a_mediana(pastas):
+    rodada = {"ambiente": {"commit": "abc"},
+              "medidas": {"enter_ensinar": {"p50_ms": 104.33, "p95_ms": 177.6},
+                          "troca_de_pagina": {"p50_ms": 169.8, "p95_ms": 192.2}}}
+    _gravar(pastas, "2026-10-16-repeticao-0.json", rodada)
+    assert "| passo 0 | abc | completa | 169,8 | 192,2 | 104,33 | 177,6 | — | — |" in rm.gerar()

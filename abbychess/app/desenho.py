@@ -24,11 +24,37 @@ class DesenhoDaJanela:
         self.seletor.setValue(p.indice + 1)
         self.seletor.blockSignals(False)
         self.total_de_paginas.setText(f" de {p.fonte.total} ")
-        self.visor.mostrar_pagina(pixmap_da_pagina(p.imagem))
+        self.visor.mostrar_pagina(self._pixmap(p.indice, p.imagem))
+        self._pre_pixmap.start()                # o da seguinte, quando a pré-carga a tiver
         self.verificacao.limpar("Aperte F7 para verificar o texto da página.")
         self._layout_mudou()
         if self.visor.modo_areas and not p.zonas:
             self.areas.automaticas()
+
+    def _pixmap(self, indice: int, imagem):
+        """O QPixmap da página, das últimas 5 convertidas (a conversão leva dezenas de ms)."""
+        guardado = self._pixmaps.get(indice)
+        if guardado is not None and guardado[0] is imagem:
+            self._pixmaps.move_to_end(indice)
+            return guardado[1]
+        pixmap = pixmap_da_pagina(imagem)
+        self._pixmaps[indice] = (imagem, pixmap)
+        while len(self._pixmaps) > 5:
+            self._pixmaps.popitem(last=False)
+        return pixmap
+
+    def _pre_converter(self) -> None:
+        """Converte a página seguinte, se a pré-carga já a renderizou (fora do clique)."""
+        p = self.pagina
+        if p.cache is not None and p.cache.tem(p.indice + 1):
+            self._pixmap(p.indice + 1, p.cache.pagina(p.indice + 1)[0])
+
+    def _zoom_mudou(self, escala: float, limite: str) -> None:
+        self.caixa_de_zoom.blockSignals(True)
+        self.caixa_de_zoom.setValue(round(escala * 100))
+        self.caixa_de_zoom.blockSignals(False)
+        if limite:
+            self.statusBar().showMessage(f"zoom {limite}", 3000)
 
     def _glifos_mudaram(self, gids=None) -> None:
         """`gids`: só esses mudaram (a leitura, não a caixa nem a lista); None: tudo."""
@@ -58,7 +84,8 @@ class DesenhoDaJanela:
                                "ou vá para o próximo pendente do livro (F6).")
             return
         self.treino.mostrar(p.matriz, p.box_atual(), p.posicao_do_atual())
-        self.visor.selecionar(p.indice_de(p.atual))
+        # Seguir (Ctrl+Shift+L): o item atual fica visível, a 120 px da borda (§3.3).
+        self.visor.selecionar(p.indice_de(p.atual), centralizar=self.acao_seguir.isChecked())
         if not self.executor.so_leves():        # a propagação de um Enter não prende o painel
             self.treino.habilitar(False)
 

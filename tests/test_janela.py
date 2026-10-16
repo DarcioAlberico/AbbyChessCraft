@@ -579,8 +579,7 @@ def test_alt_seta_redesenha_a_caixa_no_visor(app, janela):
     janela.treino._ajustar(0, 0, 1, 0)   # Alt+→: borda direita
     janela.treino._ajustar(0, 0, 0, 1)   # Alt+↓: borda de baixo
     b = boxes(janela)[0]
-    retangulo = janela.visor._itens_dos_boxes[0].rect()
-    assert (retangulo.width(), retangulo.height()) == (b.x2 - b.x1, b.y2 - b.y1)
+    assert janela.visor.item_dos_boxes.grade.caixas[0] == (b.x1, b.y1, b.x2, b.y2)
 
 
 

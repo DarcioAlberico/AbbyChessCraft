@@ -29,9 +29,11 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from collections import OrderedDict
+
 from PySide6.QtCore import QSettings, Qt, QTimer, Signal
 from PySide6.QtGui import QFont
-from PySide6.QtWidgets import (QApplication, QDockWidget, QMainWindow, QPlainTextEdit,
+from PySide6.QtWidgets import (QApplication, QDockWidget, QInputDialog, QMainWindow, QPlainTextEdit,
                                QProgressBar, QTabWidget)
 
 from abbychess.app import acoes, dialogos
@@ -102,6 +104,13 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
         self.visor.zona_arrastada.connect(self.areas.arrastar)
         self.visor.zona_apagada.connect(self.areas.apagar)
         self.visor.zona_tipo.connect(self.areas.trocar_tipo)
+        self.visor.zoom_mudou.connect(self._zoom_mudou)
+        self.visor.pagina_vizinha.connect(self._pagina_vizinha)
+        self._pixmaps = OrderedDict()
+        self._pre_pixmap = QTimer(self)
+        self._pre_pixmap.setSingleShot(True)
+        self._pre_pixmap.setInterval(400)
+        self._pre_pixmap.timeout.connect(self._pre_converter)
         self.setCentralWidget(self.visor)
 
         self.treino = PainelDeTreino()
@@ -267,6 +276,24 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
     # ------------------------------------------------------------------
     def ir_para_pagina(self, indice: int) -> None:
         self.pagina.ir_para(indice)
+
+    def ir_para_a_pagina_pedida(self) -> None:
+        """Ctrl+G: pergunta o número da página (o do PDF) e vai até ela."""
+        p = self.pagina
+        if p.fonte is None:
+            return
+        numero, ok = QInputDialog.getInt(self, "Ir para a página", f"Página (1 a {p.fonte.total}):",
+                                         p.indice + 1, 1, p.fonte.total)
+        if ok:
+            p.ir_para(numero - 1)
+
+    def _pagina_vizinha(self, passo: int) -> None:
+        """PgDn no fim da página abre a seguinte no topo; PgUp no topo, a anterior no fim."""
+        if self.pagina.vizinha(passo):
+            if passo > 0:
+                self.visor.ir_ao_topo()
+            else:
+                self.visor.ir_ao_fim()
 
     def reconhecer(self) -> None:
         p = self.pagina

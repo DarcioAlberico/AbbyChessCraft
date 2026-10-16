@@ -340,6 +340,24 @@ class ControladorDeDiagramas:
         self.pagina = pagina
         self.eventos = pagina.eventos
 
+    def proximo_do_livro(self) -> None:
+        """F8: o primeiro diagrama ainda não conferido desta página, ou a próxima página do
+        livro que tem um (dando a volta no livro), aberta já na conferência."""
+        p = self.pagina
+        if not p.pronto:
+            return
+        if any(not d.conferido for d in p.diagramas):
+            self.conferir()
+            return
+        resumo = p.projeto.resumo_do_livro()
+        com = sorted(i for i, r in resumo.items() if r.get("diagramas_por_conferir", 0) > 0)
+        proxima = next((i for i in com if i > p.indice), com[0] if com else None)
+        if proxima is None or proxima == p.indice:
+            p._avisar("Não há diagrama por conferir no livro.", 6000)
+            return
+        if p.ir_para(proxima):
+            self.conferir()
+
     def clicado(self, x: int, y: int) -> None:
         indice = dg.diagrama_em(self.pagina.diagramas, x, y)
         if indice is not None:

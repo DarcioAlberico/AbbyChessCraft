@@ -26,10 +26,14 @@ primeira abertura, o v1 vai para `backup-v1/` e o projeto passa ao formato 2; ca
 v1 migra (pid = índice) e é gravada na primeira leitura dela. Copiar `backup-v1/` de volta
 reabre o projeto como era (o arquivo v1 presente vence o v2 do mesmo pid).
 
-**A janela de hoje ainda edita listas de `BoxEntry` por índice** (até o passo 2a): as
-funções `carregar_pagina`, `salvar_pagina` e as outras de sempre continuam, e a gravação
-reconcilia a lista com o modelo (`modelo.reconciliar`), mantendo os gids. As páginas lidas
-ficam em memória, no modelo, as `PAGINAS_EM_MEMORIA` mais recentes.
+**A janela edita o modelo** (`abbychess.controlador`, desde o passo 2a) e não grava: ela
+entrega a página a `agendar`, que guarda um instantâneo imutável para o gravador
+(`abbychess.gravador`), uma thread só, com coalescência de meio segundo. `fechar` espera o
+gravador. As funções de listas de `BoxEntry` (`carregar_pagina`, `salvar_pagina`) ficam
+para o lote, as ferramentas e os testes: a gravação delas é síncrona e reconcilia a lista
+com o modelo (`modelo.reconciliar`), mantendo os gids. As páginas lidas ficam em memória,
+no modelo, as `PAGINAS_EM_MEMORIA` mais recentes, e uma página com gravação pendente não
+sai da memória.
 
 Todo arquivo é gravado por `abbychess.gravacao` (temporário, `fsync`, troca). Um
 projeto de versão mais nova abre só para leitura (`somente_leitura`): nada é
@@ -67,6 +71,7 @@ from core.box_model import BoxEntry
 
 from abbychess import gravacao as gv
 from abbychess import procedencia
+from abbychess.gravador import Gravador
 from abbychess import zonas as zn
 from abbychess.modelo import (GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
                               Box, Decisoes,
@@ -204,6 +209,10 @@ class ProjetoDeLivro:
         self.migrado = False
         #: Por que um projeto que não é de versão mais nova abriu só para leitura.
         self.motivo_so_leitura = ""
+        #: O gravador das páginas que a janela edita, criado na primeira entrega.
+        self._gravador: Optional[Gravador] = None
+        #: Avisado da thread do gravador quando uma página não grava: `(indice, erro)`.
+        self.ao_falhar_gravacao = None
 
     # ------------------------------------------------------------------
     # Criar e abrir
@@ -298,11 +307,59 @@ class ProjetoDeLivro:
                 log.warning("não deu para gravar %s ao abrir: %s", ARQUIVO_DO_PROJETO, erro)
         return projeto
 
-    def fechar(self) -> None:
-        """Solta a trava de só leitura que este objeto segura (uma vez só)."""
+    def fechar(self, limite: Optional[float] = 30.0) -> bool:
+        """Espera o gravador gravar o que está pendente e solta a trava de só leitura que
+        este objeto segura (uma vez só). Devolve se ficou tudo gravado."""
+        gravou = True
+        if self._gravador is not None:
+            gravou = self._gravador.fechar(limite)
+            self._gravador = None
         if self._travado:
             self._travado = False
             gv.liberar(self.pasta)
+        return gravou
+
+    # ------------------------------------------------------------------
+    # O gravador (§4.3): a janela entrega, a thread dele grava
+    # ------------------------------------------------------------------
+    @property
+    def gravador(self) -> Gravador:
+        if self._gravador is None:
+            self._gravador = Gravador(self._gravar_instantaneo, ao_falhar=self._falhou)
+        return self._gravador
+
+    def agendar(self, pagina: Pagina) -> bool:
+        """A página mudou: o gravador a grava em até meio segundo. Em só leitura, recusa
+        (devolve falso e nada é gravado)."""
+        if self.somente_leitura:
+            return False
+        with self._trava_do_livro:
+            # Os ids das áreas e dos diagramas nascem aqui, na página viva, e não só no
+            # instantâneo: o que for gravado é o que a página tem.
+            pagina.diagramas = com_ids_de_diagramas(pagina.diagramas)
+            pagina.zonas = zn.com_ids(pagina.zonas)
+            self._guardar_no_cache(pagina)
+            self.gravador.agendar(pagina.pid, pagina.instantaneo())
+        return True
+
+    def descarregar(self, limite: Optional[float] = None) -> bool:
+        """Grava agora o que o gravador tem pendente e espera (antes do lote, que grava na
+        thread dele, por exemplo). Não chame segurando a trava do livro."""
+        return self._gravador.descarregar(limite) if self._gravador is not None else True
+
+    @property
+    def sujas(self) -> set:
+        """Os pids com mudança ainda não gravada."""
+        return self._gravador.sujas if self._gravador is not None else set()
+
+    def _gravar_instantaneo(self, pagina: Pagina) -> None:
+        with self._trava_do_livro:
+            self._gravar(pagina)
+
+    def _falhou(self, pid: int, erro: BaseException) -> None:
+        if self.ao_falhar_gravacao is not None:
+            indice = next((i for i, p in list(self._modelos.items()) if p.pid == pid), None)
+            self.ao_falhar_gravacao(indice, erro)
 
     def salvar(self) -> None:
         gv.gravar_json(self.pasta / ARQUIVO_DO_PROJETO, asdict(self.dados))
@@ -463,12 +520,16 @@ class ProjetoDeLivro:
         with self._trava_do_livro:
             pagina.diagramas = com_ids_de_diagramas(pagina.diagramas)
             pagina.zonas = zn.com_ids(pagina.zonas)
-            dados = _pagina_para_json(pagina)
-            gv.gravar_json(self._arquivo_v2(pagina.pid), dados)
+            self._gravar(pagina)
             self._guardar_no_cache(pagina)
-            # A foto da gravação, do mesmo `as_state()` que foi para o JSON.
-            self._estados[pagina.pid] = {b[0]: hash(tuple(b[1])) for b in dados["boxes"]}
-            self._atualizar_livro(pagina.indice, self._resumo_do_modelo(pagina))
+
+    def _gravar(self, pagina: Pagina) -> None:
+        """A página e o resumo dela em `livro.json` (com a trava do livro)."""
+        dados = _pagina_para_json(pagina)
+        gv.gravar_json(self._arquivo_v2(pagina.pid), dados)
+        # A foto da gravação, do mesmo `as_state()` que foi para o JSON.
+        self._estados[pagina.pid] = {b[0]: hash(tuple(b[1])) for b in dados["boxes"]}
+        self._atualizar_livro(pagina.indice, self._resumo_do_modelo(pagina))
 
     def _guardar_no_cache(self, pagina: Pagina, *, foto_nova: bool = False) -> None:
         """Põe a página no cache; `foto_nova` (a página veio do disco) refaz a foto dos
@@ -477,9 +538,21 @@ class ProjetoDeLivro:
         self._modelos.move_to_end(pagina.indice)
         if foto_nova or pagina.pid not in self._estados:
             self._estados[pagina.pid] = {b.gid: foto(b.entry) for b in pagina.boxes}
-        while len(self._modelos) > PAGINAS_EM_MEMORIA:
-            _, saiu = self._modelos.popitem(last=False)
+        sujas = self.sujas
+        for indice in list(self._modelos):
+            if len(self._modelos) <= PAGINAS_EM_MEMORIA:
+                break
+            saiu = self._modelos[indice]
+            if saiu.pid in sujas or saiu is pagina:
+                continue                    # a página com gravação pendente fica
+            del self._modelos[indice]
             self._estados.pop(saiu.pid, None)
+
+    def pagina_para_editar(self, indice: int) -> Pagina:
+        """A página no modelo, criada (com pid novo) se nada foi gravado dela: é a que a
+        janela edita na primeira mudança."""
+        with self._trava_do_livro:
+            return self._modelo_ou_novo(indice)
 
     def _modelo_ou_novo(self, indice: int) -> Pagina:
         pagina = self.carregar_modelo(indice)
@@ -502,8 +575,8 @@ class ProjetoDeLivro:
         return dif
 
     def gid_do_box(self, indice: int, boxes: Sequence[BoxEntry], posicao: int) -> int:
-        """O gid do box `posicao` da lista que a janela edita (adaptador do passo 1b; o 2a
-        passa a janela a trabalhar com gids).
+        """O gid do box `posicao` de uma lista de `BoxEntry` da página (para quem trabalha
+        com listas: as ferramentas e os testes; a janela, desde o 2a, já tem os gids).
 
         Se a reconciliação deu gids novos, a página é gravada antes de o gid sair daqui:
         quem o pede o grava em disco (o nome do padrão ensinado), e um gid só na memória

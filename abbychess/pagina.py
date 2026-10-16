@@ -335,26 +335,33 @@ def fila_de_revisao(boxes: List[BoxEntry], leitor: LeitorDoLivro) -> List[int]:
 
 def ensinar(imagem: Image.Image, boxes: List[BoxEntry], indice: int, char: str,
             leitor: LeitorDoLivro, projeto: ProjetoDeLivro, pagina: int, *,
-            propagar: bool = True) -> int:
+            propagar: bool = True, gid: Optional[int] = None) -> int:
     """Ensina o box como `char` neste livro e propaga o padrão pela página.
 
     O box ensinado vira manual. Com `propagar`, os boxes ainda pendentes são
     comparados com os padrões do livro, e os que forem o mesmo glifo passam a
     sair dele: é assim que uma correção resolve as repetições da página inteira.
     Devolve quantos pendentes deixaram de ser pendentes.
+
+    `gid` é o do glifo, que vai para o nome do padrão; a janela o dá (ela trabalha com
+    gids). Sem ele, quem trabalha com a lista (ferramentas, testes) o pede ao projeto.
+    Os boxes da lista são mudados no lugar: quem chama da janela passa cópias
+    (`edicao.copias_para_ler`).
     """
     box = boxes[indice]
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
+    if gid is None:
+        gid = projeto.gid_do_box(pagina, boxes, indice)
     leitor.ensinar(recorte(imagem, box), char, altura_de_referencia=referencia,
-                   origem=nome_de_origem(projeto.dados.nome, pagina, indice,
-                                         projeto.gid_do_box(pagina, boxes, indice)))
+                   origem=nome_de_origem(projeto.dados.nome, pagina, indice, gid))
     box.char, box.source, box.confidence = char, FONTE_MANUAL, 1.0
     procedencia.registrar(box, procedencia.NENHUMA)     # é a origem do padrão, não cópia
     return propagar_padroes(imagem, boxes, leitor) if propagar else 0
 
 
 def ensinar_varios(imagem: Image.Image, boxes: List[BoxEntry], indices: List[int], char: str,
-                   leitor: LeitorDoLivro, projeto: ProjetoDeLivro, pagina: int) -> int:
+                   leitor: LeitorDoLivro, projeto: ProjetoDeLivro, pagina: int, *,
+                   gids: Optional[dict] = None) -> int:
     """Ensina vários boxes como o mesmo `char` e propaga uma vez só no fim.
 
     É a seleção do modo de treino: o usuário marca as ocorrências que a leitura
@@ -363,7 +370,8 @@ def ensinar_varios(imagem: Image.Image, boxes: List[BoxEntry], indices: List[int
     que uma amostra só. Devolve quantos pendentes a propagação resolveu.
     """
     for indice in sorted(set(indices)):
-        ensinar(imagem, boxes, indice, char, leitor, projeto, pagina, propagar=False)
+        ensinar(imagem, boxes, indice, char, leitor, projeto, pagina, propagar=False,
+                gid=None if gids is None else gids[indice])
     return propagar_padroes(imagem, boxes, leitor)
 
 

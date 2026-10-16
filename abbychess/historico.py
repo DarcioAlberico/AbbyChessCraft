@@ -1,23 +1,24 @@
 """Desfazer e refazer o que muda a página: o Ctrl+Z do treino.
 
-Cada passo guarda a página antes e depois (boxes e diagramas, copiados) e os
-padrões que ele gravou no livro, inteiros (`padroes.Amostra`). Desfazer volta a
-página ao "antes" e apaga esses padrões; refazer volta ao "depois" e os grava
-de novo. Copiar a página inteira é mais simples que guardar cada operação ao
-contrário, e uma página de 2.000 boxes custa milissegundos para copiar.
+Cada passo guarda a página antes e depois e os padrões que ele gravou no livro, inteiros
+(`padroes.Amostra`). Desfazer volta a página ao "antes" e apaga esses padrões; refazer
+volta ao "depois" e os grava de novo.
 
-O histórico é por página e vale na sessão: fechar o projeto o esquece. Sem Qt.
+A página guardada é o instantâneo do modelo (`Pagina.instantaneo`): desde o passo 2a nada
+da página é mudado no lugar, e uma tupla dos `Box` basta, sem cópia de cada glifo. O
+contador de gids (`proximo_n`) não volta com o desfazer: um gid nunca é reaproveitado.
+
+O histórico é por página e vale na sessão: fechar o projeto o esquece. O desfazer do
+projeto inteiro, com pré-condição por gid, é do passo 2b (§14.2). Sem Qt.
 """
 
 from __future__ import annotations
 
-import copy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import FrozenSet, List, Optional, Sequence
+from typing import FrozenSet, List, Optional
 
-from core.box_model import BoxEntry
-
+from abbychess.modelo import Pagina
 from abbychess.padroes import Amostra
 
 #: Quantos passos cada página guarda. O mais antigo sai primeiro.
@@ -28,17 +29,15 @@ LIMITE = 100
 class Instantaneo:
     """A página num momento: o que o desfazer devolve."""
 
-    boxes: List[BoxEntry]
-    diagramas: list
+    #: O instantâneo do modelo; `None` quando a página ainda não existia no projeto.
+    pagina: Optional[Pagina]
     #: Os arquivos de padrão do livro naquele momento: a diferença entre o antes
     #: e o depois são os padrões que o passo gravou.
     padroes: FrozenSet[Path] = frozenset()
-    #: A página já tinha passado pelo F5 (ver `ProjetoDeLivro.salvar_pagina`).
-    reconhecida: bool = True
 
-
-def instantaneo(boxes: Sequence[BoxEntry], diagramas: Sequence = ()) -> Instantaneo:
-    return Instantaneo(copy.deepcopy(list(boxes)), copy.deepcopy(list(diagramas)))
+    @property
+    def boxes(self):
+        return [b.entry for b in self.pagina.boxes] if self.pagina is not None else []
 
 
 @dataclass

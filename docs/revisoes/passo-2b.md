@@ -159,5 +159,22 @@ roteiro).
   do usuário durante elas (a lista está nos JSON); a verificação de texto não entra na
   leitura nem na fatia.
 
-As medidas de `b5c5142` (acima) ficaram fora do repositório: eram do código antes das
-correções do produto, com o congelamento ligado em metade das rodadas.
+As 6 rodadas de `b5c5142` (acima), que sustentam a saída do congelamento, estão em
+`docs/medidas/2026-10-16-congelamento-2b-com*.json` e `-sem*.json` (o nome tira-as das
+rodadas repetidas da tabela, que agora são as do `6f863c3`).
+
+## Revisão de produto, rodada 2
+
+Completude 9 · Fidelidade das medidas 7 · Clareza 8 · Produtividade 8 — volta, por dois furos
+de fidelidade, sem código do produto:
+
+| Achado | Correção |
+|---|---|
+| **N1** A tabela do portão publicava 0,2 MB para a memória do desfazer (ruído) | o ruído era o gravador, que grava noutra thread entre as duas leituras do `tracemalloc`; o teste o descarrega antes de cada uma; o portão (commit `badede5`) e duas rodadas só da memória deram 8,0–8,1 MB, e a estimativa do histórico 6,9–7,3 |
+| **N2** Os JSON do A/B do congelamento tinham saído de `docs/medidas` | de volta, como `congelamento-2b-*` (do 31e7774), citados no README e aqui |
+| n1 O painel do glifo escolhido não mostrava a leitura que a propagação deu | ele fica e é mostrado de novo, com a leitura nova (se o campo não foi editado); teste |
+| n2 A pergunta da recusa dizia "desfazer" também no refazer | diz a pilha certa |
+| n3 O rótulo "sem congelar" nas linhas do 2b | o texto da tabela explica; os próximos passos medem 3 rodadas sem o A/B (roadmap 0.7) |
+
+O portão do `badede5` substituiu o do `6f863c3` (a diferença é o teste de memória e o
+painel do glifo escolhido, fora do caminho medido do Enter, da releitura e da troca).

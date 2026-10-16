@@ -490,3 +490,7 @@ aviso.
   desempenho do 2b foi refeito (o p95 da releitura já está no alvo; o do Enter ≤ 100 ms em 2
   de 3 rodadas; a memória do desfazer ≤ 50 MB); o 2b religa o painel de treino logo depois
   da parte síncrona do Enter.
+- **0.7 (2026-10-16)** (fechamento do passo 2b, `docs/revisoes/passo-2b.md`): o
+  congelamento da coleta de lixo saiu (`ABBY_CONGELAR=1` religa); os passos seguintes medem
+  3 rodadas (sem o A/B do congelamento) e o Enter até a cor mudar, com o painel de texto à
+  parte (`texto_da_pagina`); o Reler pendentes entrou no desfazer.

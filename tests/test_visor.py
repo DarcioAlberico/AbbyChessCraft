@@ -499,14 +499,16 @@ def test_zoom_vale_com_o_foco_no_campo_do_treino_e_o_v_nao(app, janela):
     assert "v" in janela.treino.campo.text().lower()
 
 
-def test_a_seguinte_e_pre_carregada_depois_da_pintura(app, janela_de_60):
-    j = janela_de_60
-    j.ir_para_pagina(10)
-    assert not j.pagina.cache.tem(11)                          # o ir_para não a dispara
+def test_a_seguinte_e_pre_carregada_depois_da_pintura(app, janela_de_60, monkeypatch):
     import time
 
-    fim = time.monotonic() + 5                                  # o relógio da janela, sim
-    while not j.pagina.cache.tem(11) and time.monotonic() < fim:
+    j = janela_de_60
+    chamadas = []
+    monkeypatch.setattr(j.pagina.cache, "precarregar", chamadas.append)
+    j.ir_para_pagina(10)
+    assert chamadas == []                                      # o ir_para não a dispara
+    fim = time.monotonic() + 2
+    while not chamadas and time.monotonic() < fim:             # o relógio da janela, sim
         app.processEvents()
         time.sleep(0.01)
-    assert j.pagina.cache.tem(11)
+    assert chamadas == [11]

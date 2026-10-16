@@ -72,6 +72,12 @@ letra solta em campo de texto, Ctrl+Alt e ligação nativa encoberta sem exceç�
      Desfazer um ensinar apaga do livro as amostras que ele gravou, e as repetições que elas
      tinham resolvido voltam à fila; refazer as grava de novo. Os Alt+seta seguidos no mesmo
      box se desfazem de uma vez. O menu **Editar** diz o que vai ser desfeito.
+   - **Uma coisa por vez, na ordem** (desde o passo 2a). Ler, ensinar e reconhecer rodam
+     fora da janela, e enquanto isso o painel de treino fica desligado (a barra mostra o que
+     está rodando). O que você pedir nesse meio-tempo, como um F5, um Ctrl+Z ou um "Dividir
+     aqui" no botão direito, não se perde: entra numa fila, que a barra mostra ("… Na fila:
+     Desfazendo, Reconhecendo a página"), e roda quando chegar a vez. Uma edição pedida numa
+     página e que só ganha a vez depois de você ir para outra é descartada, com aviso.
 4. Na página seguinte, o livro já lê com os padrões ensinados.
 5. A aba **Padrões do livro** mostra cada amostra por caractere e permite esquecer as erradas.
 6. **Clicar num diagrama** abre a conferência (ver abaixo).
@@ -97,7 +103,10 @@ página não diz, mas a linha diz que é suposição. A legenda impressa em volt
 jogam", o `▼` do Yusupov) é lida e vira "da legenda"; a escolha na conferência vira
 "informado na revisão". A legenda vale primeiro como está nos boxes da página, a linha
 encostada no tabuleiro com o que os padrões do livro leram e o que você corrigiu; só sem
-ela vale a releitura do core. Por isso ensinar a legenda faz o lado aparecer no F5 seguinte.
+ela vale a releitura do core. Ensinar, corrigir, dividir ou juntar um box da legenda diz o
+lado na hora, sem F5: os diagramas não conferidos da página tiram o lado de novo da linha de
+boxes, sem reler o tabuleiro, e o Ctrl+Z da edição o desfaz junto. O conferido e o de lado
+informado na revisão não mudam.
 
 **Clicar no diagrama** (ou **Ferramentas › Conferir diagramas**, Ctrl+G, que abre o primeiro
 por conferir) mostra o recorte impresso e a posição lida lado a lado, na mesma escala, a
@@ -145,7 +154,7 @@ sempre com as pastas do projeto.
   conferido.
 - **Reconhecer o livro** (Ctrl+Shift+F5) lê um intervalo de páginas ("26-27, 30"; vazio é o
   livro inteiro) em segundo plano, com os padrões do livro, lê os diagramas em FEN como o F5
-  e grava cada página no projeto assim que ela termina. O diagrama já conferido não é relido. A barra mostra a página em que o lote está. Enquanto ele roda, corrigir a página é recusado com aviso na barra, e o que lê (F5, Ctrl+R) espera na fila. Se o intervalo tem
+  e grava cada página no projeto assim que ela termina. O diagrama já conferido não é relido. A barra mostra a página em que o lote está. Enquanto ele roda, o painel de treino e as ações de reconhecer e reler ficam desligadas, e editar a página (dividir, juntar ou marcar pelo visor, desfazer, esquecer padrões, as opções) é recusado na hora, com aviso na barra: cancele o lote ou espere ele acabar. Ver as páginas continua valendo. Se o intervalo tem
   páginas já lidas, ele pergunta: Sim as lê de novo (os boxes e as correções só desta
   ocorrência saem, os padrões ficam), Não as pula. **Cancelar o lote** para ao fim da leitura
   em curso; a página interrompida fica como estava e as já gravadas ficam.
@@ -211,7 +220,9 @@ cabeçalho também.
 (`core.diagrama.confiavel`) aprovou, sai redesenhado do FEN pela fonte de diagrama
 (`core.render_diagrama`), com o FEN e o lado a jogar no texto alternativo e "não revisado"
 quando ninguém o conferiu. No PDF pesquisável, o FEN entra invisível sobre o tabuleiro, e a
-busca o acha. O resto (por ler, ou lido sem confiança) sai como recorte da página, com o
+busca o acha; logo abaixo dele, também invisível, vai a mesma marca do lado do texto
+alternativo ("brancas a jogar (assumido: a página não diz); não revisado"), para o `w` que a
+página não disse não passar por leitura na camada de texto. O resto (por ler, ou lido sem confiança) sai como recorte da página, com o
 motivo no aviso e sem FEN, para um FEN duvidoso não passar por leitura. Na p. 26 do Darcy
 Lima o porteiro recusa os três diagramas, e eles saem como recorte até serem conferidos;
 conferido o primeiro, ele saiu desenhado nos três formatos e o FEN dele foi achado no PDF.
@@ -246,8 +257,11 @@ tenta de novo (até 5 tentativas ao todo, a cada 50 ms). Os `.tmp` que uma queda
   segundo depois da primeira (cem correções seguidas são uma gravação). Se o disco recusar
   (cheio, sem permissão, antivírus segurando o arquivo), a barra de status diz qual página
   não foi gravada; ela continua com as mudanças na memória e o gravador tenta de novo,
-  esperando mais a cada vez. **Fechar a janela grava o que falta antes de fechar**, e
-  avisa se alguma página não pôde ser gravada.
+  esperando mais a cada vez. **Fechar a janela grava o que falta antes de fechar.** Se
+  alguma página não grava, ele pergunta se fecha mesmo assim e perde as mudanças dela;
+  "Não" deixa a janela aberta, com tudo na memória, para você liberar o disco e fechar de
+  novo. Fechar com o lote rodando cancela o lote e espera a página em leitura terminar (ela
+  é gravada; pode levar alguns segundos).
 
 **O modelo v2 (passo 1b).** Cada glifo tem agora uma identidade que não muda (`gid`): a
 página tem um número próprio (`pid`), que reordenar ou inserir páginas não muda, e cada
@@ -430,7 +444,7 @@ Desempenho por passo, em ms ou MB (uma rodada cada, a do portão, que roda no me
 | Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 |
 | Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 |
 
-Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter tem duas faixas no mesmo código (perto de 110–130 e de 180–235); o atraso no lote tem duas faixas sempre (perto de 8 e de 21). Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
+Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter do passo 0 ao 1b tem duas faixas no mesmo código (perto de 110–130 e de 180–235; no 2a, uma só, perto de 90); o atraso no lote tem duas faixas sempre (perto de 8–10 e de 21). Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
 
 | Código | Commit | Rodada | Troca, p50 | Troca, p95 | Enter, p50 | Enter, p95 | Releitura, p50 | Releitura, p95 | Atraso no lote, p99 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -663,30 +677,48 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   (inclusive as lidas pela primeira vez depois, que ficam só em `paginas/p<pid>.json`),
   padrões ensinados (`padroes/`), palavras do léxico, amostras de diagrama e inclinações.
   Antes de abrir um projeto importante pela primeira vez no 1b, vale copiar a pasta inteira.
-- **Desde o passo 2a, o Enter e a releitura estão abaixo do passo 0** (tabela "Rodadas
-  repetidas", 3 rodadas com e 3 sem o congelamento, commit `d19c858`): a mediana do Enter
-  ficou em 82–91 ms (passo 0: 104–105) e a da releitura em 71–75 ms (passo 0: 106–108),
-  porque a gravação saiu da thread da interface e a janela não reconcilia mais a lista dela
-  com o modelo. O p95 do Enter ficou em 90–116 ms e o da releitura em 86–106 ms, dentro do
-  alvo de 150 da releitura; o do Enter (alvo de 100 ms, no 2b) passa do alvo em parte das
-  rodadas. A troca de página não mudou (mediana de 163–178 ms; alvo de 150, no passo A1).
+- **Desde o passo 2a, o Enter e a releitura estão abaixo do passo 0, sem o lote rodando**
+  (tabela "Rodadas repetidas", 3 rodadas com e 3 sem o congelamento, commit `d19c858`): a
+  mediana do Enter ficou em 82–91 ms (passo 0: 104–105) e a da releitura em 71–75 ms
+  (passo 0: 106–108). Saíram três custos da thread da interface: a gravação (o `fsync`), a
+  reconciliação da lista da janela com o modelo e a cópia funda da página a cada passo do
+  desfazer. O p95 do Enter ficou em 90–116 ms e o da releitura em 86–106 ms, dentro do alvo
+  de 150 da releitura; o do Enter (alvo de 100 ms, no 2b) passou do alvo em 1 das 6
+  rodadas. A troca de página não mudou (mediana de 163–178 ms; alvo de 150, no passo A1). O
+  alvo de §2 vale "com o lote rodando", o que só o passo E permite medir.
 - **A memória do desfazer ainda passa do alvo.** O desfazer guarda o instantâneo da página
   sem copiar cada glifo, e a estimativa para 300 páginas × 20 ações caiu de 4,1 GB para
-  164 MB; o alvo é 50 MB, e o desfazer do projeto (com o limite de 50 MB) é do passo 2b.
-- **O congelamento dos modelos para a coleta de lixo (`gc.freeze`, desde o 1b) não faz mais
-  diferença** no 2a: com e sem ele as medianas são as mesmas, e os p95 ficam parecidos (com
-  ele, uma rodada deu 106 ms na releitura e 116 no Enter; sem ele, até 93 e 92). No 1b ele
-  tirava os picos do Enter que a reconciliação causava, e a reconciliação saiu. Ficou
-  ligado; as rodadas do 2b dizem se ele sai.
-- **O atraso da interface durante o lote tem duas faixas** (perto de 10 e de 21 ms de p99),
-  como em todos os passos, abaixo do alvo de 50 ms. O tempo do lote nos livros medidos ficou
-  uns 5% acima do da medida anterior (xv: 460 s contra 435): o caminho do lote não mudou no
-  2a além de gravar numa cópia da página, e a diferença está dentro do que o mesmo código
-  varia de uma rodada para outra nesta máquina, mas não foi repetida para confirmar.
+  164 MB (numa das 6 rodadas, 77 MB: a estimativa extrapola 60 ações e depende do que o
+  coletor de lixo liberou na hora); o alvo é 50 MB, e o desfazer do projeto (com o limite
+  de 50 MB) é do passo 2b.
+- **O congelamento dos modelos para a coleta de lixo (`gc.freeze`, desde o 1b) quase não
+  faz mais diferença** no 2a: as medianas do Enter e da releitura são as mesmas com e sem
+  ele, e os p95 ficam parecidos (com ele, uma rodada deu 106 ms na releitura e 116 no
+  Enter; sem ele, até 93 e 92). A troca de página ficou uns 8 ms mais rápida na mediana com
+  ele (163–172 contra 175–178, 3 rodadas de cada lado). No 1b ele tirava os picos do Enter
+  que a reconciliação causava, e a reconciliação saiu. Ficou ligado; as rodadas do 2b dizem
+  se ele sai.
+- **O atraso da interface durante o lote** tem duas faixas no p99 (perto de 10 e de 21 ms),
+  como em todos os passos, abaixo do alvo de 50 ms. O **máximo** subiu de 85–105 ms (até o
+  1b) para 144–170 ms, e a medida mudou junto: desde o 2a o lote do teste passa pelo
+  controlador do livro, como o do menu, que grava o pendente antes de começar e, no fim,
+  recarrega a página aberta (se ela estava no lote). Uma rodada só do lote com o
+  instante de cada atraso (`docs/medidas/2026-10-16-pico-do-lote-2a-parcial.json`) achou o
+  maior (155 ms) 0,17 s depois do fim do lote, no recarregar da página; mas também atrasos
+  de até 125 ms no meio dele, que esta rodada não separa: ela foi feita com a máquina
+  ocupada por outro trabalho (o lote levou 178 s, contra 106 nas rodadas repetidas). A
+  origem dos picos do meio fica para o passo E, que tira o lote do processo da interface.
+- **O tempo do lote.** No `medir.py` (uma rodada por livro) ele ficou uns 5% acima do 1b (xv:
+  460 s contra 431–435 nas seis medidas anteriores; yusupov e darcy, de 4 a 8% acima). O lote
+  de 20 páginas das rodadas de desempenho, que mede a mesma coisa seis vezes, não mudou:
+  105,5–108,1 s no 2a contra 102,4–113,4 s no 1b. O caminho do lote não mudou no 2a além
+  de gravar numa cópia da página; a diferença do `medir.py` não foi repetida.
 - **Uma queda pode perder o último meio segundo.** O gravador grava meio segundo depois da
   primeira mudança: o que foi feito nesse intervalo, mais o tempo da gravação, se perde
   numa queda de energia ou se o programa for morto (medido pelos testes de processo: tudo o
-  que tinha mais de 500 ms + t_fsync estava gravado). Fechar a janela normalmente grava tudo.
+  que tinha mais de 500 ms + t_fsync estava gravado). **Com o disco recusando**, a perda numa
+  queda é tudo o que mudou desde a primeira falha (a barra de status avisa na hora). Fechar a
+  janela normalmente grava tudo.
 - **A busca automática da fonte lê no máximo 200 arquivos do tamanho certo** por pasta
   procurada; numa pasta com mais que isso, ela desiste e pede para você mostrar a fonte.
 - **No projeto só para leitura, as ações que gravam falham com aviso** em vez de ficarem
@@ -739,10 +771,11 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   se desfaz).
 - **Endireitar só corrige a inclinação.** Página curva perto da lombada, ou girada mais
   de 3°, não se endireita; projeto antigo não endireita (ver **A página torta**).
-- **A legenda só diz o lado depois de ensinada, e no reconhecimento seguinte.** No Xadrez
-  Vitorioso a cadeia global lê mal a fonte em negrito das legendas ("Jo am a hran as"), e o
-  lado sai assumido até ela ser ensinada (ver **O que foi medido**). O lado é lido no F5 e no
-  lote: ensinar a legenda depois só muda o lado no F5 seguinte, ou na conferência.
+- **A legenda só diz o lado depois de ensinada.** No Xadrez Vitorioso a cadeia global lê mal
+  a fonte em negrito das legendas ("Jo am a hran as"), e o lado sai assumido até ela ser
+  ensinada (ver **O que foi medido**). Ensinada ou corrigida na página, o lado muda na hora;
+  mas o padrão novo só chega às legendas das outras páginas quando elas são lidas de novo
+  (F5 ou lote). **Reler pendentes** (Ctrl+R) não muda o lado.
 - **A linha encostada no diagrama é tomada por legenda.** Até 3,5 alturas de referência acima
   ou abaixo do tabuleiro, a linha que diz "jogam as pretas" vale como legenda, mesmo que seja
   prosa. No Teste 1 do Xadrez Vitorioso a prosa é o enunciado e acerta; num livro em que o

@@ -428,6 +428,8 @@ class JanelaPrincipal(QMainWindow):
         acoes.atualizar(self)
 
     def _mensagem(self, texto: str, ms: int) -> None:
+        if ms == 0 and self.executor.na_fila:   # o progresso não apaga a fila da barra
+            texto += f" Na fila: {', '.join(self.executor.na_fila)}."
         self.statusBar().showMessage(texto, ms)
 
     def _falha(self, titulo: str, texto: str) -> None:
@@ -449,8 +451,10 @@ class JanelaPrincipal(QMainWindow):
         if ocupado:
             self.statusBar().showMessage(f"{titulo}…")
             self.treino.habilitar(False)
-        elif self.pagina.atual is not None:
+        elif self.pagina.box_atual() is not None:
             self.treino.habilitar(True)
+            if self.abas.currentWidget() is self.treino and self.isActiveWindow():
+                self.treino.campo.setFocus()    # o próximo caractere vai para o campo
         acoes.atualizar(self)
 
     def _fila_mudou(self, titulos: list) -> None:

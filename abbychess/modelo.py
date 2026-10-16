@@ -184,8 +184,16 @@ class Decisoes:
                 caidas.append(f"glifo virtual '{v.char}' depois do glifo {v.depois_de} "
                               "(o glifo saiu; o virtual foi para o começo da linha)")
             virtuais.append(replace(v, depois_de=novo))
+        quebras = mapear(self.quebras, primeiro, "palavra nova antes")
+        # Dois glifos fundidos podem levar uma quebra e uma junção à mesma fronteira (a
+        # junção que terminava num e a quebra antes do outro). As duas não valem juntas:
+        # fica a junção, que é sobre o glifo que já começava a fronteira, e a quebra cai.
+        conflito = quebras & {b for _, b in juncoes}
+        for g in sorted(conflito):
+            caidas.append(f"palavra nova antes do glifo {g} (o glifo foi fundido no fim de "
+                          "uma palavra juntada)")
         return Decisoes(
-            quebras=mapear(self.quebras, primeiro, "palavra nova antes"),
+            quebras=quebras - conflito,
             juncoes=frozenset(juncoes),
             paragrafo_antes=mapear(self.paragrafo_antes, primeiro, "parágrafo antes"),
             virtuais=tuple(virtuais),

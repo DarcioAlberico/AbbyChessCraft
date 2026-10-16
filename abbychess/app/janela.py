@@ -385,10 +385,13 @@ class JanelaPrincipal(QMainWindow):
         if projeto.somente_leitura:
             QMessageBox.information(
                 self, "Abrir projeto",
-                f"O projeto é da versão {projeto.dados.versao} do formato, mais nova que a "
-                "deste programa. Ele abre só para leitura: dá para ver as páginas, mas nada "
-                "do que for feito aqui é gravado (nem o que você corrigir). Para trabalhar "
-                "nele, abra-o com a versão do programa que o gravou.")
+                (projeto.motivo_so_leitura or
+                 f"O projeto é da versão {projeto.dados.versao} do formato, mais nova que a "
+                 "deste programa. Ele abre só para leitura.")
+                + " Dá para ver as páginas, mas nada do que for feito aqui é gravado (nem o "
+                "que você corrigir)." + ("" if projeto.motivo_so_leitura else
+                                         " Para trabalhar nele, abra-o com a versão do "
+                                         "programa que o gravou."))
         if self.projeto is not None and self.projeto is not projeto:
             self.projeto.fechar()
         self.projeto, self.fonte, self.leitor = projeto, fonte, None
@@ -415,9 +418,11 @@ class JanelaPrincipal(QMainWindow):
             lidas = projeto.paginas_lidas()
             self.ir_para_pagina(lidas[-1] if lidas else 0, salvar=False)
             if projeto.migrado:
-                self.statusBar().showMessage(
-                    "O projeto passou ao formato novo (passo 1b). A cópia de como ele era está "
-                    "em backup-v1, dentro da pasta do projeto.", 15000)
+                QMessageBox.information(
+                    self, "Abrir projeto",
+                    "O projeto passou ao formato novo. Os programas de antes não o abrem mais "
+                    "para trabalhar (só para ver). A cópia das páginas, das áreas e do "
+                    f"projeto.json de antes está em\n{projeto.pasta / 'backup-v1'}")
             if projeto.fonte_relocalizada:
                 QMessageBox.information(
                     self, "Abrir projeto", f"A fonte do livro não estava mais no lugar "

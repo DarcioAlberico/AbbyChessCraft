@@ -194,11 +194,16 @@ class ProjetoDeLivro:
         #: As páginas lidas, no modelo (as mais recentes), e o `as_state()` de cada glifo na
         #: última gravação: a janela muda os `BoxEntry` no lugar, e só a foto diz o que mudou.
         self._modelos: "OrderedDict[int, Pagina]" = OrderedDict()
+        #: Os `p<pid>.json` que o `livro.json` não cita (uma queda entre a página e o livro),
+        #: varridos uma vez por sessão, na primeira página que o livro não acha.
+        self._sem_livro: Optional[set] = None
         self._estados: Dict[int, Dict[int, int]] = {}
         #: A abertura achou a fonte noutro lugar, pelo SHA-256 (a janela avisa).
         self.fonte_relocalizada = False
         #: Esta abertura passou o projeto do formato 1 ao 2 (a janela avisa onde ficou a cópia).
         self.migrado = False
+        #: Por que um projeto que não é de versão mais nova abriu só para leitura.
+        self.motivo_so_leitura = ""
 
     # ------------------------------------------------------------------
     # Criar e abrir
@@ -269,6 +274,9 @@ class ProjetoDeLivro:
                 # Mídia só de leitura (ou sem espaço): sem o `backup-v1/` não se migra nada;
                 # o projeto abre só para leitura, como abria antes.
                 log.warning("o projeto v1 não pôde migrar (%s); abre só para leitura", erro)
+                projeto.motivo_so_leitura = (
+                    "O projeto é do formato antigo e precisa passar ao novo, mas não deu para "
+                    f"gravar na pasta dele ({erro}). Ele abre só para leitura.")
                 projeto.somente_leitura = projeto._travado = True
                 gv.proteger(pasta)
                 return projeto
@@ -421,11 +429,13 @@ class ProjetoDeLivro:
         pid = self._pid_de(indice)
         if pid is not None and self._arquivo_v2(pid).is_file():
             return self._arquivo_v2(pid)
-        citados = {r.get("pid") for r in self._carregar_livro()["paginas"].values()}
+        if self._sem_livro is None:             # uma varredura por sessão, não por acesso
+            citados = {r.get("pid") for r in self._carregar_livro()["paginas"].values()}
+            self._sem_livro = {int(a.stem[1:]) for a in (self.pasta / PASTA_DE_PAGINAS).glob("p*.json")
+                               if a.stem[1:].isdigit() and int(a.stem[1:]) not in citados}
         achados = []
-        for arquivo in (self.pasta / PASTA_DE_PAGINAS).glob("p*.json"):
-            if not arquivo.stem[1:].isdigit() or int(arquivo.stem[1:]) in citados:
-                continue
+        for outro in sorted(self._sem_livro):
+            arquivo = self._arquivo_v2(outro)
             try:
                 bruto = json.loads(arquivo.read_text(encoding="utf-8"))
             except (OSError, ValueError):
@@ -434,7 +444,9 @@ class ProjetoDeLivro:
                 achados.append((bruto.get("gravado_em", ""), int(arquivo.stem[1:]), arquivo))
         if not achados:
             return None
+        # O mais recente pelo `gravado_em` (de segundo em segundo); no empate, o pid maior.
         _, pid, arquivo = max(achados)
+        self._sem_livro -= {p for _, p, _ in achados}
         if len(achados) > 1:
             log.warning("a página %d tem %d arquivos sem o livro; vale o mais recente, p%d",
                         indice + 1, len(achados), pid)
@@ -502,6 +514,8 @@ class ProjetoDeLivro:
             if dif.novos and not self.somente_leitura:
                 if pagina.estado in (RECONHECIDA, VERIFICADA):
                     pagina.estado = proximo_estado(pagina.estado, "editar")
+                elif pagina.estado == NAO_RECONHECIDA and pagina.boxes:
+                    pagina.estado = proximo_estado(pagina.estado, "marcar")
                 self.salvar_modelo(pagina)
             return pagina.boxes[posicao].gid
 

@@ -63,3 +63,26 @@ O que mudou depois dela:
 
 A qualidade e a fatia foram medidas de novo no commit final (`5f969c7`): iguais às do passo 0
 nos três livros.
+
+## Rodada 2
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Código e testes | Correção 7 · Simplicidade 7 · Testes 7 | volta |
+| Produto e medição | Completude 9 · Fidelidade das medidas 7 · Clareza para o usuário 8 · Produtividade 8 | volta |
+
+O que mudou depois dela:
+
+| Achado | Correção |
+|---|---|
+| A reescrita pelos sucessores levava uma quebra e uma junção à mesma fronteira (glifos fundidos); a camada noturna (5.000 exemplos) derrubava a invariante | `reescrever` resolve o conflito: fica a junção, a quebra cai e vai para `caidas`; teste explícito da sequência; a camada noturna passa |
+| `gid_do_box` gravava uma página de glifos marcados como "não reconhecida" | passa a "glifos marcados" |
+| A busca pelos arquivos que o livro não cita rodava a cada acesso a página nova | uma varredura por sessão |
+| **O congelamento piora a releitura, e o texto dizia que não mudava medianas** | o README diz a troca: com ele, o p95 do Enter cai de ~200 para ~135 ms, mas o da releitura sobe de 134–149 para 152–158 ms (acima do alvo) e a mediana dela uns 7 ms; ficou ligado porque o Enter é muito mais frequente que o ajuste de borda |
+| O critério do 2a se apoiava na premissa falsa | refeito: o 2a mede com e sem o congelamento; as medianas, pelas sem, contra o passo 0; o p95 da releitura, pelas com, não pior que o do 1b; o alvo de 150 ms é do 2b |
+| Menores | os JSON de desempenho registram quantos objetos estavam congelados; o teste de desempenho congela depois de criar a janela, como o programa; o aviso da migração é um diálogo (aparece uma vez, na abertura que migra), e o projeto v1 em mídia só de leitura diz por quê; a tabela "Desempenho por passo" diz que é a rodada do portão e remete às repetidas |
+
+O p95 da releitura com o congelamento subiu de 143–151 ms (`e5abbd3`) para 152–158 ms
+(`5f969c7`) entre as rodadas de antes e as de depois das correções da rodada 1; o código
+desse caminho mudou pouco (a foto refeita ao reler do disco, que não acontece na releitura),
+e com três rodadas de cada lado não dá para separar efeito de variação.

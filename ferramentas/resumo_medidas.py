@@ -212,8 +212,9 @@ def _por_passo() -> list:
         arquivo, dados = _ultimo(f"passo-{passo}")
         if dados is not None:
             colunas.append((f"{passo} (`{arquivo.name}`)", dados))
-    linhas = ["", "Desempenho por passo, em ms ou MB (uma rodada cada; quanto o mesmo código "
-              "varia de uma rodada para outra está nas rodadas repetidas, abaixo):", "",
+    linhas = ["", "Desempenho por passo, em ms ou MB (uma rodada cada, a do portão; quanto o "
+              "mesmo código varia de uma rodada para outra, e o que se conclui, está nas "
+              "rodadas repetidas, abaixo):", "",
               "| Meta | " + " | ".join(nome for nome, _ in colunas) + " |",
               "|---|" + "---|" * len(colunas)]
     for chave, campo, rotulo in metas:

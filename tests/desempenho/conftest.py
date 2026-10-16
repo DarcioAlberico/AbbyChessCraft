@@ -82,8 +82,11 @@ def _ambiente() -> dict:
         ram = round(psutil.virtual_memory().total / 2**30, 1)
     except ImportError:
         ram = None
+    import gc
+
     git = estado_do_git()
-    return {"maquina": platform.node(), "maquina_cadastrada": na_maquina_cadastrada(),
+    return {"objetos_congelados": gc.get_freeze_count(),
+            "maquina": platform.node(), "maquina_cadastrada": na_maquina_cadastrada(),
             "cpu": platform.processor(), "ram_gb": ram, "python": sys.version.split()[0],
             "pyside6": PySide6.__version__, "pymupdf": fitz.VersionBind, "torch": torch_versao,
             "threads_do_torch": threads, **git}

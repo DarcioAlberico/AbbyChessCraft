@@ -455,11 +455,11 @@ Desempenho por passo, em ms ou MB (uma rodada cada, a do portão, que roda no me
 
 | Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) | 2a (`2026-10-16-passo-2a.json`) | 2b (`2026-10-16-passo-2b.json`) |
 |---|---|---|---|---|---|
-| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,48 |
-| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 22,65 |
-| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 14,27 |
-| Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 | 164 | 0,2 |
-| Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 9,1 |
+| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,89 |
+| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 23,68 |
+| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 16,92 |
+| Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 | 164 | 8 |
+| Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 12,9 |
 | Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1654 |
 
 Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter do passo 0 ao 1b tem duas faixas no mesmo código (perto de 110–130 e de 180–235; no 2a, uma só, perto de 90); o atraso no lote tem duas faixas sempre (perto de 8–10 e de 21). Desde o 2b o congelamento é desligado (`ABBY_CONGELAR=1` liga): as duas linhas do 2b rodam o mesmo programa (o rótulo `sem_congelar` é do roteiro de medida), e a coluna do Enter mede até a cor mudar (até o 2a, até o fim da propagação). Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
@@ -717,13 +717,15 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   em ~37 ms. A troca de página ficou em 153–158 ms (alvo de 150, no passo A1). O alvo de §2
   vale "com o lote rodando", o que só o passo E permite medir.
 - **A memória do desfazer está no alvo** para correções de um glifo (é o que a medida faz:
-  300 correções reais em 3 páginas): o `tracemalloc` deu 8,0 MB para 300 páginas × 20
-  ações em 5 das 6 rodadas (numa, −9,6: o ruído do coletor de lixo ainda passa o que o
-  histórico prende), e a estimativa do próprio histórico, a que o limite de 50 MB usa, dá
-  6,9 MB, uns 15% abaixo da medida. O F5 é a ação mais cara (a página inteira); 50 MB cabem
+  300 correções reais em 3 páginas): 8,0–8,1 MB para 300 páginas × 20 ações pelo
+  `tracemalloc` (o portão e duas rodadas só da memória, commit `badede5`), e a estimativa do
+  próprio histórico, a que o limite de 50 MB usa, 6,9–7,3 MB, uns 10% abaixo. Nas 6 rodadas
+  repetidas a medida ainda tinha o gravador gravando entre as duas leituras, e uma deu −9,6
+  (o portão do 6f863c3 deu 0,2); o teste passou a esperar o gravador antes de cada leitura. O F5 é a ação mais cara (a página inteira); 50 MB cabem
   umas 50 páginas reconhecidas de novo, e as ações mais antigas saem antes.
 - **O congelamento dos modelos para a coleta de lixo (`gc.freeze`) saiu no 2b.** Nas 6
-  rodadas do commit `b5c5142` (3 com e 3 sem) ele não ajudou: sem ele, as medianas do Enter,
+  rodadas do commit `b5c5142` (3 com e 3 sem, `docs/medidas/2026-10-16-congelamento-2b-*`)
+  ele não ajudou: sem ele, as medianas do Enter,
   da releitura e da troca ficaram iguais ou um pouco melhores; no atraso durante o lote, 2
   das 3 sem ele caíram na faixa de ~21 ms (com ele, 1 de 3), o que é a variação de sempre
   dessa medida, e uma das rodadas com ele estava perturbada (um pico de 935 ms no lote).

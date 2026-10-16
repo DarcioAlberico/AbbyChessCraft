@@ -110,3 +110,11 @@ def test_main_sem_marcadores_recusa(pastas):
 
 def test_sem_medida_nenhuma(pastas):
     assert rm.gerar() == "Linha de base de desempenho: ainda não medida."
+
+
+def test_desempenho_por_passo_ao_lado_da_linha_de_base(pastas):
+    _gravar(pastas, "2026-10-16-linha-de-base.json", _desempenho(190.0))
+    _gravar(pastas, "2026-10-17-passo-1a.json", _desempenho(205.5))
+    _gravar(pastas, "2026-10-17-passo-1a-parcial.json", _desempenho(999.0))
+    linha = next(ln for ln in rm.gerar().splitlines() if ln.startswith("| Troca de página, p95"))
+    assert linha == "| Troca de página, p95 | 190 | 205,5 |"

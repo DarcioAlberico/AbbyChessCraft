@@ -12,8 +12,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import random
 import shutil
+import threading
 from pathlib import Path
 
 import pytest
@@ -51,60 +53,96 @@ def _box(char="a", source="net", confianca=0.5, x=10):
 # A gravação atômica
 # ----------------------------------------------------------------------
 
-class _Falha:
-    """Troca uma etapa de `gravacao` por uma que falha `vezes` vezes (None = sempre)."""
+class _Sistema:
+    """Troca uma chamada ao sistema de `gravacao` (`_write`, `_fsync`, `_replace`) por uma
+    que falha com `PermissionError` `vezes` vezes (None = sempre); as etapas são as reais.
 
-    def __init__(self, monkeypatch, etapa: str, vezes):
-        self.original, self.vezes, self.chamadas = getattr(gv, etapa), vezes, 0
-        monkeypatch.setattr(gv, etapa, self)
+    Guarda os fds abertos, para conferir que nenhum vazou; com `parcial`, a escrita que
+    falha grava antes uns bytes, como um disco que para no meio.
+    """
 
-    def __call__(self, *args):
-        self.chamadas += 1
-        if self.vezes is None or self.chamadas <= self.vezes:
-            if args and isinstance(args[0], int):
-                import os
+    def __init__(self, monkeypatch, chamada: str, vezes, *, parcial: bool = False):
+        self.fds, self.chamadas = [], 0
+        abrir_original, original = gv._abrir_fd, getattr(gv, chamada)
 
-                os.close(args[0])           # o fd do `_sincronizar` não pode vazar
-            raise PermissionError("injetada")
-        return self.original(*args)
+        def abrir(*args):
+            fd = abrir_original(*args)
+            self.fds.append(fd)
+            return fd
+
+        def falhar(*args):
+            self.chamadas += 1
+            if vezes is None or self.chamadas <= vezes:
+                if parcial:
+                    original(args[0], bytes(args[1][:3]))
+                raise PermissionError("injetada")
+            return original(*args)
+
+        monkeypatch.setattr(gv, "_abrir_fd", abrir)
+        monkeypatch.setattr(gv, chamada, falhar)
+
+    def fds_abertos(self) -> list:
+        abertos = []
+        for fd in self.fds:
+            try:
+                os.fstat(fd)
+                abertos.append(fd)
+            except OSError:
+                pass
+        return abertos
 
 
-ETAPAS = ["_escrever", "_sincronizar", "_trocar"]
+CHAMADAS = ["_write", "_fsync", "_replace"]
 
 
-@pytest.mark.parametrize("etapa", ETAPAS)
-def test_tres_falhas_e_depois_sucesso_grava_o_novo(tmp_path, monkeypatch, etapa):
+@pytest.mark.parametrize("chamada", CHAMADAS)
+def test_tres_falhas_e_depois_sucesso_grava_o_novo(tmp_path, monkeypatch, chamada):
     arquivo = tmp_path / "a.json"
     arquivo.write_text("antigo", encoding="utf-8")
-    falha = _Falha(monkeypatch, etapa, 3)
+    sistema = _Sistema(monkeypatch, chamada, 3)
     gv.gravar_texto(arquivo, "novo")
-    assert arquivo.read_text(encoding="utf-8") == "novo" and falha.chamadas == 4
-    assert not list(tmp_path.glob("*.tmp"))
+    assert arquivo.read_text(encoding="utf-8") == "novo" and sistema.chamadas == 4
+    assert not list(tmp_path.glob("*.tmp")) and sistema.fds_abertos() == []
 
 
-@pytest.mark.parametrize("etapa", ETAPAS)
-def test_falha_permanente_deixa_o_antigo_e_sem_temporario(tmp_path, monkeypatch, etapa):
+@pytest.mark.parametrize("chamada", CHAMADAS)
+def test_falha_permanente_deixa_o_antigo_sem_temporario_nem_fd(tmp_path, monkeypatch, chamada):
     arquivo = tmp_path / "a.json"
     arquivo.write_text("antigo", encoding="utf-8")
-    falha = _Falha(monkeypatch, etapa, None)
+    sistema = _Sistema(monkeypatch, chamada, None, parcial=chamada == "_write")
     with pytest.raises(PermissionError):
-        gv.gravar_texto(arquivo, "novo")
+        gv.gravar_texto(arquivo, "novo e bem mais comprido")
     assert arquivo.read_text(encoding="utf-8") == "antigo"
-    assert falha.chamadas == gv.TENTATIVAS
-    assert not list(tmp_path.glob("*.tmp"))
+    assert sistema.chamadas == gv.TENTATIVAS
+    assert not list(tmp_path.glob("*.tmp")) and sistema.fds_abertos() == []
 
 
 def test_outro_erro_nao_tenta_de_novo_e_nao_deixa_temporario(tmp_path, monkeypatch):
     arquivo = tmp_path / "a.json"
     arquivo.write_text("antigo", encoding="utf-8")
+    chamadas = []
 
     def disco_cheio(*_args):
+        chamadas.append(1)
         raise OSError(28, "sem espaço")
 
-    monkeypatch.setattr(gv, "_trocar", disco_cheio)
+    monkeypatch.setattr(gv, "_replace", disco_cheio)
     with pytest.raises(OSError, match="sem espaço"):
         gv.gravar_texto(arquivo, "novo")
-    assert arquivo.read_text(encoding="utf-8") == "antigo"
+    assert arquivo.read_text(encoding="utf-8") == "antigo" and chamadas == [1]
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_interrupcao_durante_a_espera_nao_deixa_temporario(tmp_path, monkeypatch):
+    arquivo = tmp_path / "a.json"
+    _Sistema(monkeypatch, "_replace", None)
+
+    def interromper(_segundos):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(gv.time, "sleep", interromper)
+    with pytest.raises(KeyboardInterrupt):
+        gv.gravar_texto(arquivo, "novo")
     assert not list(tmp_path.glob("*.tmp"))
 
 
@@ -164,27 +202,38 @@ def _cada_arquivo_do_projeto(projeto: ProjetoDeLivro, tmp_path: Path):
             ("zonas", projeto.pasta / "zonas" / "0001.json", zonas)]
 
 
-@pytest.mark.parametrize("etapa", ETAPAS)
-@pytest.mark.parametrize("nome", ["pagina", "marcadas", "projeto.json", "livro.json",
-                                  "inclinacoes.json", "lexico.txt", "metadados", "zonas"])
-def test_cada_arquivo_do_projeto_fica_inteiro_com_falha_permanente(projeto, tmp_path,
-                                                                   monkeypatch, etapa, nome):
+ARQUIVOS = ["pagina", "marcadas", "projeto.json", "livro.json", "inclinacoes.json",
+            "lexico.txt", "metadados", "zonas"]
+
+
+@pytest.mark.parametrize("vezes", [3, None], ids=["3-falhas", "permanente"])
+@pytest.mark.parametrize("chamada", CHAMADAS)
+@pytest.mark.parametrize("nome", ARQUIVOS)
+def test_cada_arquivo_do_projeto_fica_inteiro(projeto, tmp_path, monkeypatch, nome, chamada,
+                                              vezes):
+    """CA-4.2 (1a): o antigo inteiro (falha permanente) ou o novo inteiro (3 falhas e depois
+    sucesso), em cada arquivo que o projeto já tem, sem temporário e sem fd sobrando."""
     alvo = {n: (c, g) for n, c, g in _cada_arquivo_do_projeto(projeto, tmp_path)}
     caminho, gravar = alvo[nome]
     gravar()
     gravar()                                # existe, e com conteúdo de uma gravação inteira
     antes = caminho.read_bytes()
-    _Falha(monkeypatch, etapa, None)
-    with pytest.raises(PermissionError):
-        gravar()
-    assert caminho.read_bytes() == antes
+    identidade = (caminho.stat().st_ino, caminho.stat().st_mtime_ns)
+    sistema = _Sistema(monkeypatch, chamada, vezes)
+    if vezes is None:
+        with pytest.raises(PermissionError):
+            gravar()
+        assert caminho.read_bytes() == antes
+        assert (caminho.stat().st_ino, caminho.stat().st_mtime_ns) == identidade
+    else:
+        gravar()                            # trocado por um arquivo novo (o conteúdo pode
+        assert (caminho.stat().st_ino, caminho.stat().st_mtime_ns) != identidade  # ser igual)
     if caminho.suffix == ".json":
-        json.loads(antes.decode("utf-8"))
-    assert not list(projeto.pasta.rglob("*.tmp"))
+        json.loads(caminho.read_bytes().decode("utf-8"))
+    assert not list(projeto.pasta.rglob("*.tmp")) and sistema.fds_abertos() == []
 
 
-@pytest.mark.parametrize("nome", ["pagina", "marcadas", "projeto.json", "livro.json",
-                                  "inclinacoes.json", "lexico.txt", "metadados", "zonas"])
+@pytest.mark.parametrize("nome", ARQUIVOS)
 def test_cada_arquivo_do_projeto_passa_pela_gravacao_atomica(projeto, tmp_path, monkeypatch,
                                                              nome):
     alvo = {n: (c, g) for n, c, g in _cada_arquivo_do_projeto(projeto, tmp_path)}
@@ -195,6 +244,25 @@ def test_cada_arquivo_do_projeto_passa_pela_gravacao_atomica(projeto, tmp_path, 
                                                           original(c, d))[1])
     gravar()
     assert caminho in gravados
+
+
+def test_padrao_ensinado_esquecido_e_restaurado_passam_pela_gravacao(projeto, monkeypatch):
+    import numpy as np
+
+    gravados, apagados = [], []
+    original_gravar, original_apagar = gv.gravar_bytes, gv.apagar
+    monkeypatch.setattr(gv, "gravar_bytes", lambda c, d: (gravados.append(Path(c)),
+                                                          original_gravar(c, d))[1])
+    monkeypatch.setattr(gv, "apagar", lambda c: (apagados.append(Path(c)), original_apagar(c))[1])
+    padroes = PadroesDoLivro(projeto.pasta_de_padroes)
+    png = padroes.ensinar(np.full((20, 10), 255, np.uint8), "a", origem="x")
+    assert png in gravados and png.suffix == ".png"
+    amostra = padroes.guardar(png)
+    padroes.esquecer(png)
+    assert png.resolve() in [a.resolve() for a in apagados] and not png.exists()
+    gravados.clear()
+    padroes.restaurar(amostra)
+    assert png.resolve() in [g.resolve() for g in gravados] and png.exists()
 
 
 def test_temporarios_sobrando_sao_apagados_ao_abrir(projeto):
@@ -386,3 +454,155 @@ def test_histograma_da_os_pendentes_de_outro_limiar():
         limiares = Limiares(revisao=centesimos / 100)
         assert (pendentes_pelo_histograma(resumo, limiares.revisao)
                 == resumo_das_confiancas(boxes, limiares)["pendentes"]), centesimos
+
+
+# ----------------------------------------------------------------------
+# A trava de só leitura, a fonte em só leitura e a gravação concorrente
+# ----------------------------------------------------------------------
+
+def _versao_99(projeto):
+    _editar_projeto_json(projeto, versao=99)
+
+
+def test_duas_aberturas_so_leitura_da_mesma_pasta_precisam_de_dois_fechar(projeto):
+    projeto.salvar_pagina(0, [_box()])
+    _versao_99(projeto)
+    a, b = ProjetoDeLivro.abrir(projeto.pasta), ProjetoDeLivro.abrir(projeto.pasta)
+    a.fechar()
+    a.fechar()                              # fechar duas vezes não solta a trava do outro
+    with pytest.raises(gv.SomenteLeitura):
+        b.salvar_pagina(0, [_box("b")])
+    b.fechar()
+    assert not gv.protegida(projeto.pasta)
+
+
+def test_trava_de_uma_pasta_nao_afeta_o_projeto_ao_lado(projeto, tmp_path):
+    vizinho = ProjetoDeLivro.criar(tmp_path / "livros", "Vizinho",
+                                   _pagina_sintetica(tmp_path / "outra.png"))
+    _versao_99(projeto)
+    travado = ProjetoDeLivro.abrir(projeto.pasta)
+    try:
+        vizinho.salvar_pagina(0, [_box()])          # não levanta
+        assert vizinho.carregar_pagina(0) == [_box()]
+    finally:
+        travado.fechar()
+
+
+def test_so_leitura_sem_pasta_de_padroes_nao_cria_nada(projeto):
+    import shutil as sh
+
+    sh.rmtree(projeto.pasta_de_padroes)
+    _versao_99(projeto)
+    antes = _instantaneo(projeto.pasta)
+    aberto = ProjetoDeLivro.abrir(projeto.pasta)
+    try:
+        leitor = LeitorDoLivro(aberto.pasta_de_padroes, limiares=aberto.dados.limiares)
+        assert leitor.total_de_padroes == 0
+        assert not aberto.pasta_de_padroes.exists() and _instantaneo(projeto.pasta) == antes
+    finally:
+        aberto.fechar()
+
+
+def test_so_leitura_acha_a_fonte_renomeada_e_relocaliza_so_na_memoria(projeto, tmp_path):
+    antiga = projeto.fonte
+    nova = antiga.with_name("renomeada.png")
+    antiga.rename(nova)
+    _versao_99(projeto)
+    antes = _instantaneo(projeto.pasta)
+    aberto = ProjetoDeLivro.abrir(projeto.pasta)
+    try:
+        assert aberto.fonte == nova.resolve() and aberto.fonte_relocalizada
+        longe = tmp_path / "longe"
+        longe.mkdir()
+        nova.rename(longe / "outra.png")
+        aberto.relocalizar(longe / "outra.png")     # não levanta, não grava
+        assert aberto.fonte == (longe / "outra.png").resolve()
+        assert _instantaneo(projeto.pasta) == antes
+    finally:
+        aberto.fechar()
+
+
+def test_relocalizar_que_falha_ao_gravar_nao_muda_a_memoria(projeto, tmp_path, monkeypatch):
+    antes = (projeto.dados.fonte, projeto.dados.fonte_sha256)
+    nova = projeto.fonte.with_name("copia.png")
+    nova.write_bytes(projeto.fonte.read_bytes())
+
+    def falhar(*_args):
+        raise PermissionError("disco")
+
+    monkeypatch.setattr(gv, "gravar_bytes", falhar)
+    with pytest.raises(PermissionError):
+        projeto.relocalizar(nova)
+    assert (projeto.dados.fonte, projeto.dados.fonte_sha256) == antes
+
+
+def test_fonte_de_mesmo_comeco_e_tamanho_diferente_nao_e_a_fonte(projeto, tmp_path):
+    longe = tmp_path / "longe"
+    longe.mkdir()
+    conteudo = projeto.fonte.read_bytes()
+    projeto.fonte.rename(longe / "guardada.png")
+    (projeto.fonte.parent / "parecida.png").write_bytes(conteudo + b"anexo")
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert reaberto.fonte_ausente                    # mesmo SHA dos 4 MB, outro tamanho
+    with pytest.raises(ProjetoInvalido, match="não é a fonte"):
+        reaberto.relocalizar(projeto.fonte.parent / "parecida.png")
+
+
+def test_abrir_em_midia_so_de_leitura_abre_sem_gravar_o_ajuste(projeto, monkeypatch):
+    _editar_projeto_json(projeto, fonte_sha256="", campo_novo=1)
+
+    def recusar(*_args):
+        raise PermissionError("mídia só de leitura")
+
+    monkeypatch.setattr(gv, "gravar_bytes", recusar)
+    aberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert aberto.dados.fonte_sha256 and aberto.dados.extras == {"campo_novo": 1}
+
+
+def test_livro_json_igual_ao_recalculado_depois_de_mudar_o_limiar(projeto):
+    sorteio = random.Random(3)
+    for indice in range(4):
+        projeto.salvar_pagina(indice, _pagina_aleatoria(sorteio))
+    projeto.dados.limiares = Limiares(revisao=0.55)
+    projeto.salvar()
+    projeto.reaplicar_limiar()
+    gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
+    assert gravado == projeto.recalcular_livro()
+
+
+def test_gravacoes_de_duas_threads_deixam_o_livro_coerente(projeto):
+    """O lote grava de outra thread enquanto a janela grava a página dela."""
+    erros = []
+
+    def gravar(primeira, semente):
+        sorteio = random.Random(semente)
+        try:
+            for _ in range(15):
+                projeto.salvar_pagina(sorteio.randrange(primeira, primeira + 3),
+                                      _pagina_aleatoria(sorteio),
+                                      reconhecida=sorteio.random() > 0.3)
+        except Exception as erro:      # noqa: BLE001 (o teste quer qualquer falha)
+            erros.append(erro)
+
+    linhas = [threading.Thread(target=gravar, args=(k * 3, k)) for k in range(2)]
+    for t in linhas:
+        t.start()
+    for t in linhas:
+        t.join()
+    assert erros == []
+    gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
+    assert gravado == projeto.recalcular_livro()
+
+
+def test_resumo_do_livro_e_copia(projeto):
+    projeto.salvar_pagina(0, [_box()])
+    resumo = projeto.resumo_do_livro()
+    resumo[0]["histograma"]["50"] = 999
+    assert projeto.resumo_do_livro()[0]["histograma"] == {"50": 1}
+
+
+def test_temporario_de_arquivo_do_usuario_nao_e_apagado(projeto):
+    meu = projeto.pasta / "anotacoes.tmp"
+    meu.write_text("meu", encoding="utf-8")
+    ProjetoDeLivro.abrir(projeto.pasta)
+    assert meu.exists()

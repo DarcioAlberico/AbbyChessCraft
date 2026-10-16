@@ -116,3 +116,48 @@ def test_fonte_sumida_e_cancelada_nao_abre(app, projeto_lido, sem_dialogos, tmp_
         assert janela.projeto is None
     finally:
         janela.close()
+
+
+def test_cancelar_a_fonte_de_outro_projeto_mantem_o_aberto(app, projeto_lido, sem_dialogos,  # noqa: F811
+                                                         tmp_path, monkeypatch):
+    janela = _abrir(app, projeto_lido.pasta)
+    try:
+        aberto = janela.projeto
+        segundo = ProjetoDeLivro.criar(tmp_path / "outros", "Segundo",
+                                       _pagina_sintetica(tmp_path / "segunda.png", ("xyz",)))
+        (tmp_path / "longe").mkdir()
+        segundo.fonte.rename(tmp_path / "longe" / "sumiu.png")
+        monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *a, **k: ("", ""))
+        janela.abrir_caminho(str(segundo.pasta))
+        _esperar(app, janela)
+        assert janela.projeto is aberto and janela.boxes
+        janela.ir_para_pagina(0)                        # e ainda grava normalmente
+    finally:
+        janela.close()
+
+
+def test_fonte_achada_sozinha_e_avisada(app, projeto_lido, sem_dialogos):  # noqa: F811
+    projeto_lido.fonte.rename(projeto_lido.fonte.with_name("renomeada.png"))
+    janela = _abrir(app, projeto_lido.pasta)
+    try:
+        assert janela.projeto.fonte.name == "renomeada.png"
+        assert any("foi achada" in a for a in sem_dialogos)
+    finally:
+        janela.close()
+
+
+def test_so_leitura_com_fonte_sumida_acha_pela_memoria_e_nao_grava(app, projeto_lido,  # noqa: F811
+                                                                  sem_dialogos):
+    arquivo = projeto_lido.pasta / "projeto.json"
+    dados = json.loads(arquivo.read_text(encoding="utf-8"))
+    dados["versao"] = 99
+    arquivo.write_text(json.dumps(dados), encoding="utf-8")
+    projeto_lido.fonte.rename(projeto_lido.fonte.with_name("renomeada.png"))
+    antes = _instantaneo(projeto_lido.pasta)
+    janela = _abrir(app, projeto_lido.pasta)
+    try:
+        assert janela.projeto.somente_leitura and janela.boxes
+        assert janela.projeto.fonte.name == "renomeada.png"
+    finally:
+        janela.close()
+    assert _instantaneo(projeto_lido.pasta) == antes

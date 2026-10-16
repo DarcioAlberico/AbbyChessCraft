@@ -121,8 +121,7 @@ class PadroesDoLivro:
 
     def __init__(self, pasta: str | Path, *, distancia_maxima: float = DISTANCIA_MAXIMA,
                  tolerancia_de_altura: float = TOLERANCIA_DE_ALTURA):
-        self.pasta = Path(pasta)
-        self.pasta.mkdir(parents=True, exist_ok=True)
+        self.pasta = Path(pasta)        # a pasta nasce com o primeiro padrão (`gravacao`)
         self.distancia_maxima = distancia_maxima
         self.tolerancia_de_altura = tolerancia_de_altura
         self._carregar()
@@ -136,7 +135,8 @@ class PadroesDoLivro:
         except ValueError:
             self._meta = {}
         vetores, chars, alturas, proporcoes, caminhos = [], [], [], [], []
-        for pasta in sorted(p for p in self.pasta.iterdir() if p.is_dir()):
+        subpastas = self.pasta.iterdir() if self.pasta.is_dir() else ()
+        for pasta in sorted(p for p in subpastas if p.is_dir()):
             char = folder_to_char(pasta.name)
             for png in sorted(pasta.glob("*.png")):
                 imagem = _ler_png(png)

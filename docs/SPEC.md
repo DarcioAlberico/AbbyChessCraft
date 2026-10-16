@@ -306,7 +306,10 @@ FineReader) só passam declaradas no YAML com o motivo.
 - `projeto.json`: campo desconhecido vai para `extras` e é regravado; `versao` maior que a do
   programa abre **só para leitura**, com aviso, e nada é gravado.
 - Fonte do livro: caminho relativo quando dentro da pasta do projeto; se sumir, a abertura
-  pede para localizá-la e confere o SHA-256 dos primeiros 4 MB.
+  procura um arquivo com o mesmo SHA-256 dos primeiros 4 MB e o mesmo tamanho ao lado do
+  caminho antigo, na pasta do projeto e na pasta-mãe dele (e avisa onde o achou); se não
+  achar, pede para localizá-la e confere o SHA-256 e o tamanho. Em só leitura, a fonte achada
+  ou indicada vale só na sessão.
 - **Escrita atômica** em todo arquivo do projeto (páginas, `projeto.json`, `livro.json`,
   `inclinacoes.json`, `marcadas` migradas, `lexico.txt`, os metadados de padrões, o
   `saveState`): temporário, `fsync`, `os.replace`, com nova tentativa em `PermissionError`

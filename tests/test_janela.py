@@ -513,3 +513,56 @@ def test_fechar_pergunta_de_novo_pelo_que_a_tarefa_em_voo_entregou(app, janela, 
     janela.closeEvent(evento)
     assert len(perguntas) == 1 and not evento.isAccepted() and janela.projeto is not None
     monkeypatch.undo()
+
+
+def test_depois_do_enter_e_do_f5_o_foco_fica_no_campo_do_caractere(app, janela):
+    """O ciclo do treino é digitar e Enter, glifo após glifo: o foco não pode sair do campo
+    (no 2a o Enter virou tarefa, e o painel desligado durante ela perdia o foco)."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+
+    janela.show()
+    janela.activateWindow()
+    app.processEvents()
+    janela.reconhecer()
+    _esperar(app, janela)
+    assert QApplication.focusWidget() is janela.treino.campo
+    for char in ("a", "b"):
+        QTest.keyClicks(janela.treino.campo, char)       # vai para o campo, que tem o foco
+        janela.treino.campo.setText(char)
+        QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Return)
+        _esperar(app, janela)
+        assert QApplication.focusWidget() is janela.treino.campo, char
+    assert set(janela.leitor.padroes_por_caractere()) == {"a", "b"}
+
+
+def test_durante_o_lote_editar_e_recusado_na_hora(app, janela):
+    janela.reconhecer()
+    _esperar(app, janela)
+    janela.pagina.lote_rodando = True
+    try:
+        mostrar(janela, 0)
+        janela.treino.campo.setText("z")
+        janela.pagina.corrigir("z")
+        assert "recusado" in janela.statusBar().currentMessage()
+        assert not janela.executor.ocupado               # nada ficou na fila
+        janela.pagina.desfazer()
+        assert not janela.executor.ocupado
+    finally:
+        janela.pagina.lote_rodando = False
+
+
+def test_edicao_que_perde_a_vez_avisa(app, janela):
+    import threading
+
+    janela.reconhecer()
+    _esperar(app, janela)
+    solto = threading.Event()
+    janela.executor.rodar("Lenta", lambda: ((lambda _p: solto.wait(10)), lambda _r: None))
+    mostrar(janela, 0)
+    janela.pagina.corrigir("z")                          # na fila, pedida na página 0
+    janela.pagina.indice = 7                             # como se tivesse trocado de página
+    solto.set()
+    _esperar(app, janela)
+    assert "descartado, porque a página mudou" in janela.statusBar().currentMessage()
+    janela.pagina.indice = 0

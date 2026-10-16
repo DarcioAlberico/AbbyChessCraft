@@ -209,9 +209,17 @@ def test_atraso_e_memoria_durante_o_lote(ambiente, medidas):
     def tique():
         agora = time.perf_counter()
         atrasos.append((agora - ultimo[0]) * 1000 - 16)
+        instantes.append(agora)
         ultimo[0] = agora
         rss.append(processo.memory_info().rss)
 
+    instantes, fim_do_lote = [], []
+
+    def lote_mudou():
+        if not janela.livro.lote_rodando:
+            fim_do_lote.append(time.perf_counter())
+
+    janela.eventos.ligar("lote_mudou", lote_mudou)
     temporizador = QTimer()
     temporizador.setInterval(16)
     temporizador.timeout.connect(tique)
@@ -225,10 +233,28 @@ def test_atraso_e_memoria_durante_o_lote(ambiente, medidas):
         "p95_ms": round(p95(atrasos), 1), "max_ms": round(max(atrasos), 1),
         "disparos": len(atrasos), "duracao_s": round(time.perf_counter() - inicio, 1),
         "alvo_p99_ms": 50,
-        "acoes_durante_o_lote": "editar é recusado com aviso; ler entra na fila (passo 2a)"}
+        "acoes_durante_o_lote": "editar, desfazer, esquecer e os limiares são recusados com "
+                                "aviso; F5 e Ctrl+R ficam desligados (passo 2a)",
+        "como": "pelo controlador do livro (desde o 2a): inclui gravar o pendente antes do "
+                "lote e recarregar a página aberta no fim; até o 1b, o lote rodava direto no "
+                "executor, sem as duas coisas",
+        "maior_atraso_no_fim_do_lote": _maior_no_fim(atrasos, instantes, fim_do_lote)}
     medidas["memoria_total_com_o_lote"] = {
         "rss_pico_mb": round(max(rss) / 2**20) if rss else None, "alvo_mb": 2560,
         "como": f"pico do RSS do processo único durante um lote de {len(LOTE)} páginas"}
+
+
+def _maior_no_fim(atrasos, instantes, fim_do_lote) -> dict:
+    """Onde caiu o maior atraso: no fim do lote (até 1 s depois do aviso de fim, quando a
+    página aberta é recarregada) ou no meio dele."""
+    if not atrasos or not fim_do_lote:
+        return {}
+    k = max(range(len(atrasos)), key=atrasos.__getitem__)
+    distancia = instantes[k] - fim_do_lote[0]
+    return {"ms": round(atrasos[k], 1), "segundos_depois_do_fim": round(distancia, 2),
+            "no_fim": -0.05 <= distancia <= 1.0,
+            "maior_antes_do_fim_ms": round(max((a for a, t in zip(atrasos, instantes)
+                                                if t < fim_do_lote[0]), default=0), 1)}
 
 
 def test_o_que_ainda_nao_existe(medidas):

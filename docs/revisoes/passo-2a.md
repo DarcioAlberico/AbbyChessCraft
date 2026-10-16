@@ -127,9 +127,28 @@ calcula a foto e de que uma tarefa pedida por quem ouve "livre" roda (m16). Os r
   (`repeticao-2a_sem_congelar`). O critério do roadmap passa nas 3 de cada lado: sem
   congelar, a mediana do Enter (82 ms) e a da releitura (71–75 ms) ficaram abaixo da faixa do
   passo 0 (104–105 e 106–108); com o congelamento, o p95 da releitura (86–106 ms) ficou
-  abaixo do do 1b (154–159) e o do Enter (90–116) longe da faixa de ~200. O alvo de 150 ms
+  abaixo do do 1b (154–159) e o do Enter (91–116) longe da faixa de ~200. O alvo de 150 ms
   do p95 da releitura, que era do 2b, já foi alcançado.
 - A memória do desfazer estimada (300 × 20) caiu de 4.121 MB para 164 MB.
 - Qualidade (`medir.py`, os três livros) e fatia (`replay_fatia.py --passo 2a`): iguais às
   do 1b; só o tempo do lote difere (xv 435 → 460 s, yusupov 23,3 → 24,4, darcy 23,7 → 25,5),
   uma rodada de cada, sem repetição.
+
+## Revisão de produto, rodada 1
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Produto e medição | Completude 7 · Fidelidade das medidas 7 · Clareza para o usuário 6 · Produtividade 4 | volta |
+
+| Achado | Correção |
+|---|---|
+| **B1** Depois do Enter o foco saía do campo do caractere (o painel desligado durante a tarefa; o `setFocus` vinha antes do `habilitar`), e a próxima tecla se perdia | o painel liga antes de pôr o foco, e a janela devolve o foco ao campo quando a fila esvazia; teste com a janela mostrada (o foco no campo depois do F5 e de dois Enter de verdade), conferido contra a ordem antiga |
+| **M1** O README e a mensagem diziam que, no lote, ler esperava na fila e editar "esperava", e as edições pelo visor entravam na fila e podiam sumir | a regra é uma: durante o lote, editar, desfazer, esquecer e as opções são **recusados na hora**, com a mensagem "o comando foi recusado"; F5 e Ctrl+R ficam desligados; a edição que perde a vez porque a página mudou é descartada com aviso; testes; README e o campo do JSON de desempenho dizem o mesmo |
+| **M2** A fila não estava explicada | parágrafo no fluxo de treino; a mensagem de progresso do lote não apaga mais a fila da barra |
+| **M3** "O tempo do lote está dentro da variação" sem respaldo | o README cita o lote de 20 páginas das 6 rodadas de desempenho (105,5–108,1 s no 2a, 102,4–113,4 s no 1b) e diz que a diferença do `medir.py` (uma rodada) não foi repetida |
+| **M4** O máximo do atraso no lote subiu (85–105 → 144–170 ms) e a medida mudou sem registro | o README diz que o teste passou a usar o caminho do menu (grava o pendente antes e recarrega a página aberta no fim), e uma rodada com o instante de cada atraso achou o maior no recarregar (0,17 s depois do fim) e outros de até 125 ms no meio, numa máquina ocupada; a origem destes fica para o passo E |
+| **M5** O roadmap do 2b estava velho | o critério do 2b foi refeito (o p95 do Enter ≤ 100 ms em 2 de 3, as medianas não sobem mais de 5 ms, a memória do desfazer ≤ 50 MB, a decisão do congelamento) e o 2b religa o painel logo depois da parte síncrona do Enter; Mudanças 0.6 |
+| m1–m7 | fechar com disco falhando pergunta, e fechar no lote espera a página em leitura (README); a perda numa queda com o disco recusando; "duas faixas" só até o 1b no cabeçalho gerado; o congelamento ainda deixa a troca uns 8 ms mais rápida; a explicação da queda do Enter inclui o desfazer sem cópia funda, "sem o lote", "1 das 6"; a rodada de 77 MB do desfazer; 91–116 no registro |
+
+A correção de B1 não mexe no caminho medido do Enter (é a ordem de duas chamadas do painel),
+e as medidas ficam as do `d19c858`.

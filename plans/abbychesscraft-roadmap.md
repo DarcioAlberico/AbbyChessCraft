@@ -211,14 +211,21 @@ inteira do desfazer.
    - `Transacao` com pré-condição por gid;
    - limite de 50 MB;
    - cobre o esquecer padrão e as zonas.
-2. Propagação assíncrona que emenda a transação do Enter, com token de invalidação.
+2. Propagação assíncrona que emenda a transação do Enter, com token de invalidação; o
+   painel de treino volta a valer logo depois da parte síncrona do Enter (no 2a ele fica
+   desligado até o fim da propagação).
 3. Medir o Enter: alvo de 100 ms.
 
 **Verificação.** CA-4.3 (parte do 2b), CA-14.2 e CA-14.3; a meta do Enter [desempenho].
 
-**O alvo da releitura.** O 2b tira a cópia da página inteira de cada passo do desfazer;
-a verificação dele inclui 3 rodadas completas com o congelamento (`repeticao-2b`), e o p95
-da releitura fica ≤ 150 ms (alvo de §2), em pelo menos 2 das 3.
+**O desempenho do 2b.** O 2a já tirou da interface a gravação, a reconciliação e a cópia
+funda do desfazer: o p95 da releitura ficou em 86–106 ms (o alvo de 150 está alcançado) e o
+do Enter em 90–116 ms (`docs/revisoes/passo-2a.md`). A verificação do 2b inclui 3 rodadas
+completas com o congelamento (`repeticao-2b`) e 3 sem (`repeticao-2b_sem_congelar`): o p95
+do Enter fica ≤ 100 ms em pelo menos 2 das 3 com o congelamento, e as medianas do Enter e
+da releitura não sobem mais de 5 ms acima das do 2a; a memória do desfazer estimada fica
+≤ 50 MB; e as rodadas dizem se o congelamento (`gc.freeze`) continua. O alvo de §2 "com o
+lote rodando" é do passo E, o primeiro que deixa medir isso.
 
 ## Passo A1 — Visor novo (§3.3)
 
@@ -477,3 +484,7 @@ aviso.
   passo 0 deixa de esperar os gabaritos revisados pelo usuário, que têm prazo até o
   fechamento do A3; a linha de base fica presa à tag `passo-0`; o catálogo do replay ganhou
   `ensinar_da_fila` e `reler_pendentes`.
+- **0.6 (2026-10-16)** (fechamento do passo 2a, `docs/revisoes/passo-2a.md`): o critério de
+  desempenho do 2b foi refeito (o p95 da releitura já está no alvo; o do Enter ≤ 100 ms em 2
+  de 3 rodadas; a memória do desfazer ≤ 50 MB); o 2b religa o painel de treino logo depois
+  da parte síncrona do Enter.

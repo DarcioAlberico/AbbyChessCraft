@@ -269,8 +269,8 @@ class PainelDeTreino(QWidget):
                              f"&nbsp;({fonte}, confiança {box.confidence:.2f})")
         self.campo.setText(box.char)
         self.campo.selectAll()
-        self.campo.setFocus()
-        self.habilitar(True)
+        self.habilitar(True)                    # antes do foco: num campo desligado o Qt o
+        self.campo.setFocus()                   # ignora, e a próxima tecla iria para outro lugar
 
     def limpar(self, mensagem: str) -> None:
         self._pagina, self._box = None, None

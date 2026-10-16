@@ -322,11 +322,18 @@ class ControladorDePagina:
         self.executar(titulo, guardado, falhou=falhou, progresso=progresso)
 
     def _editar(self, titulo: str, corpo, *, precisa_de_glifos: bool = True) -> None:
-        """Uma edição na fila: `corpo()` roda na vez dela, se a página ainda é a mesma."""
+        """Uma edição na fila: `corpo()` roda na vez dela, se a página ainda é a mesma (se
+        não é, avisa que a edição foi descartada). Durante o lote, é recusada na hora."""
+        if self.lote_rodando:
+            self._recusar_no_lote()
+            return
         indice = self.indice
 
         def preparar():
-            if self.indice == indice and self._pode_editar(precisa_de_glifos):
+            if self.indice != indice:
+                self._avisar(f"{titulo}: descartado, porque a página mudou (era a {indice + 1}) "
+                             "antes da vez dele na fila.", 8000)
+            elif self._pode_editar(precisa_de_glifos):
                 corpo()
             return None
         self.tarefa(titulo, preparar, falhou=self._falhou(titulo))
@@ -642,10 +649,16 @@ class ControladorDePagina:
 
     def desfazer(self) -> None:
         """Ctrl+Z; espera a tarefa em andamento (vai para a fila)."""
+        if self.lote_rodando:
+            self._recusar_no_lote()
+            return
         indice = self.indice
         self.tarefa("Desfazendo", lambda: self._preparar_voltar(indice, refazer=False))
 
     def refazer(self) -> None:
+        if self.lote_rodando:
+            self._recusar_no_lote()
+            return
         indice = self.indice
         self.tarefa("Refazendo", lambda: self._preparar_voltar(indice, refazer=True))
 
@@ -693,6 +706,9 @@ class ControladorDePagina:
         leitor não muda no meio de uma leitura)."""
         if self.leitor is None:
             return
+        if self.lote_rodando:                   # o lote lê com estes padrões
+            self._recusar_no_lote()
+            return
         caminhos = list(caminhos)
 
         def preparar():
@@ -716,6 +732,10 @@ class ControladorDePagina:
         """Os limiares do livro, gravados no projeto, e a fila refeita com eles (na fila: a
         fila de revisão não muda no meio de uma leitura). A mensagem vai para a barra; um
         problema ao gravar vai em `aviso`."""
+        if self.lote_rodando:
+            self._recusar_no_lote()
+            return
+
         def preparar():
             if self.projeto is not None:
                 self._aplicar_limiares(limiares)
@@ -764,8 +784,8 @@ class ControladorDePagina:
         return falhou
 
     def _recusar_no_lote(self) -> None:
-        self._avisar("O lote está lendo o livro: a edição espera ele acabar (ou cancele o "
-                     "lote no menu Ferramentas).", 8000)
+        self._avisar("O lote está lendo o livro: o comando foi recusado. Espere o lote acabar "
+                     "ou cancele-o no menu Ferramentas.", 8000)
 
     def _pode_ler(self, avisar: bool = True) -> bool:
         if not self.pronto or self.imagem is None:
@@ -809,8 +829,16 @@ class ControladorDePagina:
 
     def _mudou(self, pagina: Pagina, indice: int, descricao: str, antes: hs.Instantaneo, *,
                juntar=None, evento: str = "editar") -> None:
-        """Depois de uma edição: o estado (§4.4), o passo do desfazer, a gravação e o aviso."""
+        """Depois de uma edição: o estado (§4.4), o lado dos diagramas, o passo do desfazer,
+        a gravação e o aviso.
+
+        Ensinar, corrigir, dividir ou juntar um box da legenda muda o que ela diz: o lado
+        dos diagramas não conferidos sai de novo dela aqui, sem reler os tabuleiros, e
+        entra no mesmo passo do desfazer (`diagramas.rederivar_lados`). O F5 já leu tudo."""
         pagina.estado = proximo_estado(pagina.estado, evento)
+        if evento != "reconhecer" and pagina.diagramas and antes.pagina is not None:
+            pagina.diagramas = dg.rederivar_lados(pagina.diagramas, antes.pagina.entries(),
+                                                  pagina.entries())
         depois = hs.Instantaneo(pagina.instantaneo(), self.padroes())
         criados = []
         if self.leitor is not None:

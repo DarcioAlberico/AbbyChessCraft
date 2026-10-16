@@ -54,7 +54,10 @@ class ControladorDeLayout:
         self.atual = None
         self.eventos.emitir("layout_mudou")
 
-    def _trocar(self, zonas: Sequence[zn.Zona], atual: Optional[int]) -> None:
+    def _trocar(self, zonas: Sequence[zn.Zona], atual: Optional[int], descricao: str,
+                juntar=None) -> None:
+        """As áreas novas da página, numa transação do desfazer (§14.2); mudar áreas não
+        muda o estado da página."""
         if self.pagina.lote_rodando:
             self.pagina._recusar_no_lote()
             return
@@ -62,9 +65,10 @@ class ControladorDeLayout:
         if not zonas and p.modelo is None:
             self.atual = None                    # nada a gravar numa página que não existe
         else:
+            antes = p._instantaneo()
             modelo = p._pagina_para_editar()
             modelo.zonas = list(zonas)
-            p._gravar(modelo)
+            p._mudou(modelo, p.indice, descricao, antes, evento=None, juntar=juntar)
             self.atual = atual
         self.eventos.emitir("layout_mudou")
 
@@ -96,7 +100,7 @@ class ControladorDeLayout:
         p.tarefa("Achando as áreas", preparar, falhou=p._falhou("Áreas"))
 
     def _automaticas_prontas(self, zonas) -> None:
-        self._trocar(zonas, None)
+        self._trocar(zonas, None, "Áreas automáticas")
         tipos: dict = {}
         for z in zonas:
             nome = zn.NOMES[z.tipo].lower()
@@ -115,7 +119,7 @@ class ControladorDeLayout:
             p._avisar(f"Não criou a área: {erro}", 6000)
             return
         zonas = self.zonas + [zona]
-        self._trocar(zonas, len(zonas) - 1)
+        self._trocar(zonas, len(zonas) - 1, "Desenhar área")
         p._avisar(f"Área {len(zonas)} de texto criada. 2 diagrama, 3 imagem, 4 ignorar.", 6000)
 
     def escolher(self, indice: int) -> None:
@@ -129,14 +133,15 @@ class ControladorDeLayout:
             return
         largura, altura = p.imagem.size
         zonas[indice] = zn.arrastar(zonas[indice], bordas, dx, dy, largura, altura)
-        self._trocar(zonas, indice)
+        # Os arrastes seguidos da mesma área são um passo só do desfazer.
+        self._trocar(zonas, indice, "Mover área", juntar=("area", p.indice, indice))
 
     def apagar(self, indice: int) -> None:
         zonas = self.zonas
         if not 0 <= indice < len(zonas):
             return
         del zonas[indice]
-        self._trocar(zonas, None)
+        self._trocar(zonas, None, "Apagar área")
         aviso = "" if zonas else " Sem áreas, a página volta à segmentação automática."
         self.pagina._avisar(f"Área apagada.{aviso}", 6000)
 
@@ -145,7 +150,7 @@ class ControladorDeLayout:
         if not 0 <= indice < len(zonas):
             return
         zn.trocar_tipo(zonas, indice, tipo)
-        self._trocar(zonas, indice)
+        self._trocar(zonas, indice, "Trocar o tipo da área")
         self.pagina._avisar(f"Área {indice + 1}: {zn.NOMES[tipo].lower()}.", 5000)
 
 

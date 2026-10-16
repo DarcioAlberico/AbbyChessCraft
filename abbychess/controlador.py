@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Sequence
 
 import numpy as np
@@ -43,10 +44,17 @@ from abbychess import procedencia
 from abbychess import texto as tx
 from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL, precisa_revisao
-from abbychess.modelo import (LIDAS, NAO_RECONHECIDA, Decisoes, Diferenca, Pagina,
-                              proximo_estado, reconciliar)
+from abbychess.modelo import LIDAS, NAO_RECONHECIDA, Diferenca, Pagina, proximo_estado, reconciliar
 
 log = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class Antes:
+    """A página e os padrões do livro quando uma edição começou (o "antes" da transação)."""
+
+    pagina: Optional[Pagina]
+    padroes: frozenset
 
 
 class Eventos:
@@ -69,7 +77,10 @@ class ExecutorSincrono:
 
     ocupado = False
 
-    def __call__(self, titulo: str, preparar, falhou=None, progresso=None) -> None:
+    def so_leves(self) -> bool:
+        return True                         # nada fica rodando: tudo pode na hora
+
+    def __call__(self, titulo: str, preparar, falhou=None, progresso=None, leve=False) -> None:
         par = preparar()
         if par is None:
             return
@@ -103,8 +114,8 @@ class ControladorDePagina:
         self.atual: Optional[int] = None
         self.pulados: set = set()
         self.selecao: set = set()
-        #: O desfazer de cada página desta sessão.
-        self.historicos: Dict[int, hs.Historico] = {}
+        #: O desfazer do projeto (§14.2), da sessão.
+        self.historico = hs.HistoricoDoProjeto()
         #: O lote está lendo o livro: editar a página espera.
         self.lote_rodando = False
         #: Muda a cada `ligar`: a tarefa pedida para outro projeto não roda nem aplica.
@@ -206,7 +217,7 @@ class ControladorDePagina:
         self.geracao += 1
         self.lote_rodando = False               # o lote do projeto anterior não vale aqui
         self.projeto, self.fonte, self.leitor = projeto, fonte, leitor
-        self.historicos = {}
+        self.historico = hs.HistoricoDoProjeto()
         self.modelo, self.atual, self.pulados, self.selecao = None, None, set(), set()
         self.imagem = self.matriz = None
 
@@ -298,10 +309,12 @@ class ControladorDePagina:
     # ------------------------------------------------------------------
     # As tarefas
     # ------------------------------------------------------------------
-    def tarefa(self, titulo: str, preparar, falhou=None, progresso=None) -> None:
+    def tarefa(self, titulo: str, preparar, falhou=None, progresso=None, *,
+               leve: bool = False) -> None:
         """Põe `preparar` na fila do executor, presa ao projeto de agora: se outro projeto
         for aberto antes da vez dela (ou antes do fim do trabalho), ela não roda (ou o
-        resultado não entra)."""
+        resultado não entra). `leve` é a propagação de um Enter, que lê com uma cópia dos
+        padrões: com ela rodando, as edições não esperam (`_agora`)."""
         geracao = self.geracao
 
         def guardado():
@@ -319,13 +332,24 @@ class ControladorDePagina:
                 pronto(resultado)
             return trabalho, pronto_guardado
 
-        self.executar(titulo, guardado, falhou=falhou, progresso=progresso)
+        self.executar(titulo, guardado, falhou=falhou, progresso=progresso, leve=leve)
+
+    def _agora(self) -> bool:
+        """Uma edição pode rodar na hora: nada roda, ou só a propagação de um Enter (que lê
+        com uma cópia dos padrões e só entra nos glifos que não mudaram, §14.2)."""
+        so_leves = getattr(self.executar, "so_leves", None)
+        return so_leves() if so_leves is not None else not getattr(self.executar, "ocupado", False)
 
     def _editar(self, titulo: str, corpo, *, precisa_de_glifos: bool = True) -> None:
-        """Uma edição na fila: `corpo()` roda na vez dela, se a página ainda é a mesma (se
-        não é, avisa que a edição foi descartada). Durante o lote, é recusada na hora."""
+        """Uma edição: na hora, se nada prende o leitor (`_agora`); senão na fila, e `corpo()`
+        roda na vez dela, se a página ainda é a mesma (se não é, avisa que a edição foi
+        descartada). Durante o lote, é recusada na hora."""
         if self.lote_rodando:
             self._recusar_no_lote()
+            return
+        if self._agora():
+            if self._pode_editar(precisa_de_glifos):
+                corpo()
             return
         indice = self.indice
 
@@ -397,7 +421,11 @@ class ControladorDePagina:
         self.tarefa("Relendo", lambda: self._preparar_reler(indice, tudo),
                     falhou=self._falhou("Reler"))
 
-    def _preparar_reler(self, indice: int, tudo: bool):
+    def _preparar_reler(self, indice: int, tudo: bool, transacao: Optional[hs.Transacao] = None):
+        """`transacao` é a do esquecer de padrões que pediu esta releitura: o que ela mudar
+        emenda o `depois` dela, e um Ctrl+Z desfaz as duas coisas."""
+        if transacao is not None and transacao.invalidada:
+            return None
         pagina = self.modelo
         if indice != self.indice or pagina is None or not pagina.boxes or self.leitor is None:
             return None                     # a página mudou antes da vez da releitura
@@ -414,8 +442,13 @@ class ControladorDePagina:
             return pg.ler_boxes(imagem, lidos, leitor, so_pendentes=not tudo, progresso=progresso)
 
         def pronto(resumo):
+            if transacao is not None and transacao.invalidada:
+                return                      # o esquecer foi desfeito enquanto relia
+            foto = pagina.instantaneo()
             dif = ed.aplicar_leituras(pagina, antes, lidos)
             if not dif.vazia:
+                if transacao is not None:
+                    self._emendar(transacao, foto, pagina)
                 self._gravar(pagina)
             if pagina is self.modelo:
                 self.eventos.emitir("glifos_mudaram", dif.mudados)
@@ -433,62 +466,115 @@ class ControladorDePagina:
         self.ensinar_gids({char: alvos}, f"Ensinar '{char}'", self._depois_de_ensinar(char, alvos))
 
     def _depois_de_ensinar(self, char: str, alvos: Sequence[int]):
-        def depois(resolvidos: int) -> None:
+        amostras = f" com {len(alvos)} amostras" if len(alvos) > 1 else ""
+
+        def ensinou() -> None:                          # a parte síncrona: na hora
             self.pulados.difference_update(alvos)
             self.selecao = set()
             self.eventos.emitir("selecao_mudou")
             self.ir_ao_primeiro_pendente()
-            amostras = f" com {len(alvos)} amostras" if len(alvos) > 1 else ""
-            extra = f" e resolveu mais {resolvidos} na página" if resolvidos else ""
-            self._avisar(f"Padrão '{char}' ensinado{amostras}{extra}.", 5000)
-        return depois
+            self._avisar(f"Padrão '{char}' ensinado{amostras}; propagando pela página…", 5000)
+
+        def propagou(resolvidos: int) -> None:          # depois da propagação
+            if resolvidos:
+                self._avisar(f"Padrão '{char}' ensinado{amostras} e resolveu mais "
+                             f"{resolvidos} na página.", 5000)
+            if self.atual is None or self.atual not in self.fila():
+                self.ir_ao_primeiro_pendente()          # o glifo mostrado se resolveu
+        return ensinou, propagou
 
     def ensinar_gids(self, por_char: Dict[str, Sequence[int]], descricao: str,
-                     depois: Optional[Callable[[int], None]] = None, *, juntar=None) -> None:
-        """Ensina cada grupo de gids como o caractere dele e propaga uma vez por grupo.
-        `juntar` é a chave do passo do desfazer que este emenda (a correção de uma palavra
-        que também ensina: um Ctrl+Z desfaz as duas)."""
+                     depois=None, *, juntar=None) -> None:
+        """Ensina cada grupo de gids como o caractere dele (§14.2): a parte síncrona (o
+        glifo vira manual, a amostra é gravada, a cor muda) roda na hora, se nada prende o
+        leitor (`_agora`); a propagação pelos pendentes da página vai para a fila, com uma
+        cópia dos padrões que já tem as amostras novas, e emenda a transação deste Enter.
+        `depois` é `(ensinou, propagou(resolvidos))`, ou uma função só (chamada com o número
+        de resolvidos no fim). `juntar` é a chave da transação que este emenda (a correção de
+        uma palavra que também ensina: um Ctrl+Z desfaz as duas)."""
         indice = self.indice
-        self.tarefa("Ensinando", lambda: self._preparar_ensinar(indice, por_char, descricao,
-                                                                depois, juntar),
-                    falhou=self._falhou("Ensinar"))
 
-    def _preparar_ensinar(self, indice, por_char, descricao, depois, juntar):
+        def agora():
+            self._ensinar_agora(indice, por_char, descricao, depois, juntar)
+
+        if self._agora():
+            agora()
+        else:
+            self.tarefa("Ensinando", lambda: (agora(), None)[1], falhou=self._falhou("Ensinar"))
+
+    def _ensinar_agora(self, indice, por_char, descricao, depois, juntar) -> None:
         pagina = self.modelo
         if indice != self.indice or pagina is None or self.leitor is None:
-            return None
+            return
         vivos = pagina.vivos
         por_char = {c: [g for g in gids if g in vivos] for c, gids in por_char.items()}
         por_char = {c: gids for c, gids in por_char.items() if gids}
         if not por_char:
             self._avisar("O glifo a ensinar saiu da página antes da vez dele.", 6000)
-            return None
+            return
         imagem, leitor, projeto = self.imagem, self.leitor, self.projeto
         antes_inst = self._instantaneo()
         antes = tuple(pagina.boxes)
-        limiares = leitor.limiares
         onde = {b.gid: i for i, b in enumerate(antes)}
-        alvos = {onde[g] for gids in por_char.values() for g in gids}
-        lidos = ed.copias_para_ler(antes, lambda e: precisa_revisao(
-            e.char, e.source, e.confidence, limiares))
-        for i in alvos:
-            if lidos[i] is antes[i].entry:
+        lidos = [b.entry for b in antes]
+        for char, gids in por_char.items():
+            for gid in gids:
+                i = onde[gid]
                 lidos[i] = ed.copia(antes[i].entry)
-        grupos = [(c, [onde[g] for g in gids]) for c, gids in por_char.items()]
+                pg.ensinar(imagem, lidos, i, char, leitor, projeto, indice, propagar=False,
+                           gid=gid)
+        ed.aplicar_leituras(pagina, antes, lidos)
+        transacao = self._mudou(pagina, indice, descricao, antes_inst, juntar=juntar)
+        self.eventos.emitir("padroes_mudaram")
+        ensinou, propagou = depois if isinstance(depois, tuple) else (None, depois)
+        if ensinou is not None and pagina is self.modelo:
+            ensinou()
+        self._propagar(pagina, indice, transacao, propagou)
 
-        def trabalho(_progresso):
-            return sum(pg.ensinar_varios(imagem, lidos, indices, char, leitor, projeto, indice,
-                                         gids={i: antes[i].gid for i in indices})
-                       for char, indices in grupos)
+    def _propagar(self, pagina: Pagina, indice: int, transacao: hs.Transacao,
+                  ao_fim: Optional[Callable[[int], None]]) -> None:
+        """A propagação do Enter: os pendentes da página pelos padrões do livro de agora (uma
+        cópia, que já tem as amostras do Enter), fora da interface. O que ela resolve emenda
+        a `transacao`; desfeita antes do fim, o resultado é descartado."""
+        foto_do_leitor = self.leitor.para_propagar()
+        imagem = self.imagem
 
-        def pronto(resolvidos: int):
-            ed.aplicar_leituras(pagina, antes, lidos)
-            self._mudou(pagina, indice, descricao, antes_inst, juntar=juntar)
-            self.eventos.emitir("padroes_mudaram")
-            if depois is not None and pagina is self.modelo:
-                depois(resolvidos)
+        def preparar():
+            if transacao.invalidada:
+                return None
+            antes = tuple(pagina.boxes)
+            limiares = foto_do_leitor.limiares
+            lidos = ed.copias_para_ler(antes, lambda e: precisa_revisao(
+                e.char, e.source, e.confidence, limiares))
 
-        return trabalho, pronto
+            def trabalho(_progresso):
+                return pg.propagar_padroes(imagem, lidos, foto_do_leitor)
+
+            def pronto(resolvidos: int):
+                if transacao.invalidada:
+                    self._avisar("A propagação foi descartada: o Enter dela foi desfeito.",
+                                 5000)
+                    return
+                foto = pagina.instantaneo()
+                dif = ed.aplicar_leituras(pagina, antes, lidos)
+                if not dif.vazia:
+                    self._emendar(transacao, foto, pagina)
+                    self._gravar(pagina)
+                    if pagina is self.modelo:
+                        self.eventos.emitir("glifos_mudaram", dif.mudados)
+                    self.eventos.emitir("acoes_mudaram")
+                if ao_fim is not None and pagina is self.modelo:
+                    ao_fim(len(dif.mudados))
+            return trabalho, pronto
+
+        self.tarefa("Propagando o padrão", preparar, falhou=self._falhou("Propagar"), leve=True)
+
+    def _emendar(self, transacao: hs.Transacao, antes: Pagina, pagina: Pagina) -> None:
+        mais = hs.mudanca(antes, pagina.instantaneo())
+        if pagina.pid in transacao.paginas:
+            hs.emendar(transacao.paginas[pagina.pid], mais)
+        else:
+            transacao.paginas[pagina.pid] = mais
 
     # ------------------------------------------------------------------
     # Os comandos que editam (na vez deles na fila: na hora, se nada está rodando)
@@ -643,63 +729,75 @@ class ControladorDePagina:
     # ------------------------------------------------------------------
     # Desfazer, padrões e limiares
     # ------------------------------------------------------------------
-    @property
-    def historico(self) -> Optional[hs.Historico]:
-        return self.historicos.get(self.indice)
-
     def desfazer(self) -> None:
-        """Ctrl+Z; espera a tarefa em andamento (vai para a fila)."""
-        if self.lote_rodando:
-            self._recusar_no_lote()
-            return
-        indice = self.indice
-        self.tarefa("Desfazendo", lambda: self._preparar_voltar(indice, refazer=False))
+        """Ctrl+Z: desfaz a última transação do projeto (§14.2), na página dela; com só a
+        propagação de um Enter rodando, na hora (e a propagação é descartada)."""
+        self._desfazer_ou_refazer(refazer=False)
 
     def refazer(self) -> None:
+        self._desfazer_ou_refazer(refazer=True)
+
+    def _desfazer_ou_refazer(self, *, refazer: bool) -> None:
         if self.lote_rodando:
             self._recusar_no_lote()
             return
-        indice = self.indice
-        self.tarefa("Refazendo", lambda: self._preparar_voltar(indice, refazer=True))
-
-    def _preparar_voltar(self, indice: int, *, refazer: bool):
-        historico = self.historicos.get(indice)
-        if indice != self.indice or historico is None or self.leitor is None:
-            return None
-        if self.lote_rodando:
-            self._recusar_no_lote()
-            return None
-        passo = historico.refazer() if refazer else historico.desfazer()
-        if passo is None:
-            return None
-        if refazer:
-            for amostra in passo.criados:
-                self.leitor.padroes.restaurar(amostra)
+        if self._agora():
+            self._voltar(refazer)
         else:
-            for amostra in passo.criados:
+            self.tarefa("Refazendo" if refazer else "Desfazendo",
+                        lambda: (self._voltar(refazer), None)[1],
+                        falhou=self._falhou("Desfazer"))
+
+    def _voltar(self, refazer: bool) -> None:
+        h = self.historico
+        transacao = h.proxima_a_refazer() if refazer else h.proxima_a_desfazer()
+        if transacao is None or self.leitor is None or self.projeto is None:
+            return
+        paginas = {}
+        try:
+            for pid, m in transacao.paginas.items():
+                pagina = (self.modelo if self.modelo is not None and self.modelo.pid == pid
+                          else self.projeto.carregar_modelo(m.indice))
+                if pagina is None or pagina.pid != pid:
+                    raise hs.Recusa(f"a página {m.indice + 1} não é mais a da transação")
+                hs.conferir(m, pagina, para_tras=not refazer)
+                paginas[pid] = pagina
+        except hs.Recusa as recusa:
+            acao = "refazer" if refazer else "desfazer"
+            self.eventos.emitir("aviso", "Desfazer", f"Não dá para {acao} "
+                                f"\u201c{transacao.descricao}\u201d: {recusa}. Nada foi mudado.")
+            return
+        if not refazer:
+            transacao.invalidada = True     # a propagação dela, se ainda roda, não entra
+        for pid, m in transacao.paginas.items():
+            hs.aplicar(m, paginas[pid], para_tras=not refazer)
+            self._gravar(paginas[pid])
+        if refazer:
+            for amostra in transacao.amostras_criadas:
+                self.leitor.padroes.restaurar(amostra)
+            for amostra in transacao.amostras_apagadas:
                 if amostra.caminho.exists():
                     self.leitor.esquecer(amostra.caminho)
-        self._voltar_para(passo.depois if refazer else passo.antes)
-        acao = "Refeito" if refazer else "Desfeito"
-        self._avisar(f"{acao}: {passo.descricao}.", 6000)
-        return None                         # nada a fazer fora da interface
-
-    def _voltar_para(self, estado: hs.Instantaneo) -> None:
-        pagina = self._pagina_para_editar()
-        salvo = estado.pagina
-        pagina.boxes = list(salvo.boxes) if salvo is not None else []
-        pagina.tabuleiros = list(salvo.tabuleiros) if salvo is not None else []
-        pagina.diagramas = list(salvo.diagramas) if salvo is not None else []
-        pagina.decisoes = salvo.decisoes if salvo is not None else Decisoes()
-        pagina.estado = salvo.estado if salvo is not None else NAO_RECONHECIDA
-        # `proximo_n` não volta: um gid nunca é reaproveitado.
-        self.atual, self.pulados, self.selecao = None, set(), set()
-        self._gravar(pagina)
-        self.eventos.emitir("glifos_mudaram", None)
+            h.refeita()
+        else:
+            for amostra in transacao.amostras_criadas:
+                if amostra.caminho.exists():
+                    self.leitor.esquecer(amostra.caminho)
+            for amostra in transacao.amostras_apagadas:
+                self.leitor.padroes.restaurar(amostra)
+            h.desfeita()
+        aberta = self.modelo is not None and self.modelo.pid in transacao.paginas
+        if aberta or not transacao.indices or not self.ir_para(transacao.indices[0]):
+            # A página aberta mudou (ou a da transação não abre): o glifo em revisão, os
+            # pulados e a seleção podem citar glifos que saíram.
+            self.atual, self.pulados, self.selecao = None, set(), set()
+            self.eventos.emitir("glifos_mudaram", None)
+            self.eventos.emitir("selecao_mudou")
+            self.ir_ao_primeiro_pendente()
         self.eventos.emitir("padroes_mudaram")
-        self.eventos.emitir("selecao_mudou")
-        self.ir_ao_primeiro_pendente()
         self.eventos.emitir("acoes_mudaram")
+        acao = "Refeito" if refazer else "Desfeito"
+        self._avisar(f"{acao}: {transacao.descricao}.", 6000)
 
     def esquecer(self, caminhos: Sequence) -> None:
         """Apaga amostras dos padrões do livro e relê a página inteira sem elas (na fila: o
@@ -714,17 +812,28 @@ class ControladorDePagina:
         def preparar():
             if self.leitor is None:
                 return None
+            antes = self._instantaneo()
+            apagadas = [self.leitor.padroes.guardar(c) for c in caminhos]
             for caminho in caminhos:
                 self.leitor.esquecer(caminho)
             self.eventos.emitir("padroes_mudaram")
+            transacao = hs.Transacao(f"Esquecer {len(caminhos)} amostra(s)",
+                                     amostras_apagadas=apagadas)
             if self.modelo is not None:
                 novo = proximo_estado(self.modelo.estado, "esquecer_padrao")
                 if novo != self.modelo.estado:
                     self.modelo.estado = novo
+                    transacao.paginas[self.modelo.pid] = hs.mudanca(
+                        antes.pagina, self.modelo.instantaneo())
                     self._gravar(self.modelo)
                     self._avisar("A página estava verificada e voltou à revisão: o padrão "
                                  "esquecido lia glifos dela.", 8000)
-            self.reler_pendentes(tudo=True)
+            self.historico.registrar(transacao)
+            self.eventos.emitir("acoes_mudaram")
+            if self.modelo is not None and self.modelo.boxes:
+                indice = self.indice
+                self.tarefa("Relendo", lambda: self._preparar_reler(indice, True, transacao),
+                            falhou=self._falhou("Reler"))
             return None
         self.tarefa("Esquecendo padrões", preparar, falhou=self._falhou("Esquecer padrões"))
 
@@ -811,10 +920,10 @@ class ControladorDePagina:
             self.modelo = self.projeto.pagina_para_editar(self.indice)
         return self.modelo
 
-    def _instantaneo(self) -> hs.Instantaneo:
+    def _instantaneo(self) -> Antes:
         """A página agora, com os padrões que o livro tem, para o desfazer."""
         pagina = self.modelo.instantaneo() if self.modelo is not None else None
-        return hs.Instantaneo(pagina, self.padroes())
+        return Antes(pagina, self.padroes())
 
     def _seguir(self, dif: Diferenca) -> None:
         """O atual passa ao primeiro sucessor; pulados e seleção ficam só com os vivos."""
@@ -827,29 +936,31 @@ class ControladorDePagina:
             self._avisar("Decisões que não puderam seguir os glifos: " + "; ".join(dif.caidas),
                          10000)
 
-    def _mudou(self, pagina: Pagina, indice: int, descricao: str, antes: hs.Instantaneo, *,
-               juntar=None, evento: str = "editar") -> None:
+    def _mudou(self, pagina: Pagina, indice: int, descricao: str, antes: Antes, *,
+               juntar=None, evento: Optional[str] = "editar") -> hs.Transacao:
         """Depois de uma edição: o estado (§4.4), o lado dos diagramas, o passo do desfazer,
         a gravação e o aviso.
 
         Ensinar, corrigir, dividir ou juntar um box da legenda muda o que ela diz: o lado
         dos diagramas não conferidos sai de novo dela aqui, sem reler os tabuleiros, e
         entra no mesmo passo do desfazer (`diagramas.rederivar_lados`). O F5 já leu tudo."""
-        pagina.estado = proximo_estado(pagina.estado, evento)
-        if evento != "reconhecer" and pagina.diagramas and antes.pagina is not None:
+        if evento is not None:              # mudar só as áreas não é editar a página (§4.4)
+            pagina.estado = proximo_estado(pagina.estado, evento)
+        if evento not in (None, "reconhecer") and pagina.diagramas and antes.pagina is not None:
             pagina.diagramas = dg.rederivar_lados(pagina.diagramas, antes.pagina.entries(),
                                                   pagina.entries())
-        depois = hs.Instantaneo(pagina.instantaneo(), self.padroes())
         criados = []
         if self.leitor is not None:
-            for caminho in sorted(depois.padroes - antes.padroes):
+            for caminho in sorted(self.padroes() - antes.padroes):
                 criados.append(self.leitor.padroes.guardar(caminho))
-        historico = self.historicos.setdefault(indice, hs.Historico())
-        historico.registrar(hs.Passo(descricao, antes, depois, criados, juntar=juntar))
+        transacao = self.historico.registrar(hs.Transacao(
+            descricao, {pagina.pid: hs.mudanca(antes.pagina, pagina.instantaneo())},
+            amostras_criadas=criados, juntar=juntar))
         self._gravar(pagina)
         if pagina is self.modelo:
             self.eventos.emitir("glifos_mudaram", None)
         self.eventos.emitir("acoes_mudaram")
+        return transacao
 
     def _gravar(self, pagina: Pagina) -> None:
         if not self.projeto.agendar(pagina):

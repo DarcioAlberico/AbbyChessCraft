@@ -274,6 +274,9 @@ class _LeitorSemPadroes:
     def padroes_por_caractere(self):
         return {}
 
+    def para_propagar(self):
+        return self
+
 
 class MaquinaDoControlador(RuleBasedStateMachine):
     @initialize(n=st.integers(1, 40), baixas=st.lists(st.integers(0, 39), max_size=20))
@@ -290,6 +293,10 @@ class MaquinaDoControlador(RuleBasedStateMachine):
         self.ctl.ligar(_ProjetoNaMemoria(pagina), _FonteNaMemoria(self.imagem),
                        _LeitorSemPadroes())
         self.ctl.ir_para(0)
+        self.inicial = (list(pagina.boxes), pagina.decisoes, pagina.estado)
+        #: O reler muda glifos sem passar pelo desfazer (§14.2): depois dele, desfazer tudo
+        #: não precisa voltar à página inicial.
+        self.mudou_por_fora = False
 
     def _gid(self, i):
         gids = self.ctl.gids
@@ -353,7 +360,25 @@ class MaquinaDoControlador(RuleBasedStateMachine):
 
     @rule(tudo=st.booleans())
     def reler(self, tudo):
+        antes = list(self.ctl.modelo.boxes)
         self.ctl.reler_pendentes(tudo)
+        self.mudou_por_fora |= self.ctl.modelo.boxes != antes
+
+    @rule()
+    def desfazer_tudo(self):
+        """CA-4.3 (2b): desfazer tudo volta à página inicial (os mesmos `Box`, as decisões e
+        o estado), se nada a mudou por fora do desfazer."""
+        historico = self.ctl.historico
+        while historico.proxima_a_desfazer() is not None:
+            antes = historico.proxima_a_desfazer()
+            self.ctl.desfazer()
+            if historico.proxima_a_desfazer() is antes:
+                assert self.mudou_por_fora, "desfazer recusado sem mudança por fora"
+                return
+        if not self.mudou_por_fora:
+            boxes, decisoes, estado = self.inicial
+            assert self.ctl.modelo.boxes == boxes
+            assert self.ctl.modelo.decisoes == decisoes and self.ctl.modelo.estado == estado
 
     @rule()
     def desfazer(self):

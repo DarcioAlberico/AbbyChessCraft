@@ -38,6 +38,7 @@ def ambiente(tmp_path_factory):
     from abbychess import livro
     from abbychess import pagina as pg
     from abbychess.app.janela import JanelaPrincipal
+    from abbychess import leitor as leitor_mod
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
 
@@ -47,6 +48,9 @@ def ambiente(tmp_path_factory):
     projeto = ProjetoDeLivro.criar(tmp_path_factory.mktemp("livros"), "Linha de base", _PDF[0])
     leitor = LeitorDoLivro.com_modelos_globais(projeto.pasta_de_padroes,
                                                limiares=projeto.dados.limiares)
+    congelar = getattr(leitor_mod, "congelar_para_a_coleta_de_lixo", None)
+    if congelar is not None:                # como a janela faz ao abrir (desde o 1b)
+        congelar()
     fonte = pg.fonte_do_projeto(projeto)
     livro.reconhecer_paginas(projeto, fonte, leitor, PAGINAS)
     janela = JanelaPrincipal()

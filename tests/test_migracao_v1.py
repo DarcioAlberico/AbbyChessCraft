@@ -145,3 +145,42 @@ def test_copiar_o_backup_v1_de_volta_reabre_pela_versao_de_hoje(projeto_v1):
             destino.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(arquivo, destino)
     _conferir(ProjetoDeLivro.abrir(projeto_v1), verdade)
+
+
+def test_volta_do_backup_com_pagina_nova_nao_repete_gid(projeto_v1):
+    projeto = ProjetoDeLivro.abrir(projeto_v1)
+    projeto.migrar_tudo()
+    from core.box_model import BoxEntry
+
+    projeto.salvar_pagina(5, [BoxEntry("a", 0, 0, 10, 10)])         # uma página nova: pid 3
+    nova = projeto.carregar_modelo(5)
+    assert nova.pid >= 3
+    backup = projeto_v1 / PASTA_DO_BACKUP_V1
+    for arquivo in backup.rglob("*"):
+        if arquivo.is_file():
+            destino = projeto_v1 / arquivo.relative_to(backup)
+            shutil.copyfile(arquivo, destino)
+    reaberto = ProjetoDeLivro.abrir(projeto_v1)
+    reaberto.migrar_tudo()
+    pids = [reaberto.carregar_modelo(i).pid for i in (0, 1, 2, 5)]
+    assert len(set(pids)) == 4 and reaberto.dados.proximo_pid > max(pids)
+    gids = [b.gid for i in (0, 1, 2, 5) for b in reaberto.carregar_modelo(i).boxes]
+    assert len(gids) == len(set(gids))
+
+
+def test_v1_em_midia_so_de_leitura_abre_so_para_leitura(projeto_v1, monkeypatch):
+    def recusar(*_args):
+        raise PermissionError("mídia só de leitura")
+
+    monkeypatch.setattr(gv, "gravar_bytes", recusar)
+    projeto = ProjetoDeLivro.abrir(projeto_v1)
+    try:
+        assert projeto.somente_leitura and not projeto.migrado
+        assert projeto.carregar_pagina(0) is not None          # as páginas v1 aparecem
+    finally:
+        projeto.fechar()
+
+
+def test_a_abertura_que_migra_avisa(projeto_v1):
+    assert ProjetoDeLivro.abrir(projeto_v1).migrado
+    assert not ProjetoDeLivro.abrir(projeto_v1).migrado          # só da primeira vez

@@ -97,3 +97,68 @@ def test_livro_json_tem_o_pid_e_e_igual_ao_recalculado(lido):
     gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
     assert gravado == projeto.recalcular_livro()
     assert {r["pid"] for r in projeto.resumo_do_livro().values()} == {0, 1}
+
+
+def test_livro_sem_a_pagina_acha_o_arquivo_e_nao_duplica(lido):
+    projeto, _, _ = lido
+    arquivo = projeto.pasta / ARQUIVO_DO_LIVRO
+    livro_json = json.loads(arquivo.read_text(encoding="utf-8"))
+    del livro_json["paginas"]["1"]                           # a queda entre página e livro
+    arquivo.write_text(json.dumps(livro_json), encoding="utf-8")
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert reaberto.carregar_pagina(0) is not None
+    reaberto.salvar_pagina(0, reaberto.carregar_pagina(0))
+    assert sorted(p.name for p in (projeto.pasta / "paginas").glob("p*.json")) == ["p0.json"]
+    assert reaberto.resumo_do_livro()[0]["pid"] == 0
+
+
+def test_dois_arquivos_do_mesmo_indice_vale_o_gravado_por_ultimo(lido):
+    projeto, _, _ = lido
+    original = projeto._arquivo_da_pagina(0)
+    bruto = json.loads(original.read_text(encoding="utf-8"))
+    bruto.update(pid=9, gravado_em="2000-01-01T00:00:00+00:00", boxes=[])
+    (projeto.pasta / "paginas" / "p9.json").write_text(json.dumps(bruto), encoding="utf-8")
+    (projeto.pasta / ARQUIVO_DO_LIVRO).unlink()
+    assert ProjetoDeLivro.abrir(projeto.pasta).resumo_do_livro()[0]["pid"] == 0
+
+
+def test_gid_que_a_janela_pede_ja_esta_gravado(lido):
+    projeto, leitor, imagem = lido
+    boxes = projeto.carregar_pagina(0)
+    pg.dividir(imagem, boxes, 0, leitor)
+    gid = projeto.gid_do_box(0, boxes, 0)
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta).carregar_modelo(0)
+    assert gid in reaberto.vivos and reaberto.proximo_n > (gid & ((1 << 20) - 1))
+    assert reaberto.estado == EM_REVISAO
+
+
+def test_so_leitura_com_pagina_v2_nao_grava_nem_ao_pedir_gid(lido):
+    projeto, leitor, imagem = lido
+    arquivo = projeto.pasta / "projeto.json"
+    dados = json.loads(arquivo.read_text(encoding="utf-8"))
+    dados["versao"] = 99
+    arquivo.write_text(json.dumps(dados), encoding="utf-8")
+    antes = {p.name: p.read_bytes() for p in projeto.pasta.rglob("*.json")}
+    aberto = ProjetoDeLivro.abrir(projeto.pasta)
+    try:
+        boxes = aberto.carregar_pagina(0)
+        pg.dividir(imagem, boxes, 0, leitor)
+        g1 = aberto.gid_do_box(0, boxes, 0)
+        assert aberto.gid_do_box(0, boxes, 0) == g1          # a mesma página, o mesmo gid
+        assert {p.name: p.read_bytes() for p in projeto.pasta.rglob("*.json")} == antes
+    finally:
+        aberto.fechar()
+
+
+def test_pagina_que_sai_da_memoria_volta_com_os_mesmos_gids(lido, monkeypatch):
+    import abbychess.projeto as modulo
+
+    projeto, _, imagem = lido
+    monkeypatch.setattr(modulo, "PAGINAS_EM_MEMORIA", 1)
+    gids = [b.gid for b in projeto.carregar_modelo(0).boxes]
+    projeto.salvar_pagina(1, pg.segmentar(imagem)[:2], reconhecida=False)   # expulsa a 0
+    assert 0 not in projeto._modelos
+    boxes = projeto.carregar_pagina(0)
+    projeto.salvar_pagina(0, boxes)
+    assert [b.gid for b in projeto.carregar_modelo(0).boxes] == gids
+    assert projeto.estado_da_pagina(0) == RECONHECIDA                       # nada mudou

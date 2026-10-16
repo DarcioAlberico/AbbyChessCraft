@@ -209,3 +209,31 @@ def test_modos_impresso_e_san():
     assert tx.texto(doc, modo=tx.SAN) == "Ne4+"
     with pytest.raises(ValueError):
         tx.texto(doc, modo="outro")
+
+
+def test_virtuais_no_mesmo_glifo_ficam_na_ordem_em_que_foram_digitados():
+    p = _pagina(*_linha("abc"))
+    a = p.boxes[0].gid
+    p.decisoes = Decisoes(virtuais=(GlifoVirtual(p.alocar(), "X", a), GlifoVirtual(p.alocar(), "Y", a),
+                                    GlifoVirtual(p.alocar(), "1", None),
+                                    GlifoVirtual(p.alocar(), "2", None)))
+    assert tx.texto(tx.montar(p)) == "12aXYbc"
+
+
+def test_quebrar_desfaz_a_juncao_que_termina_no_glifo():
+    from abbychess import edicao as ed
+
+    p = _pagina(*_linha("ab cd"))
+    g = [b.gid for b in p.boxes]
+    ed.juntar_palavras(p, g[1], g[2])
+    assert tx.texto(tx.montar(p)) == "abcd"
+    ed.quebrar(p, g[2])
+    assert tx.texto(tx.montar(p)) == "ab cd"
+    assert not (p.decisoes.quebras & {b for _, b in p.decisoes.juncoes})
+
+
+def test_paragrafo_antes_de_um_glifo_do_meio_da_linha_vale_para_a_linha():
+    p = _pagina(*_linha("um"), *_linha("dois tres", y=60))
+    meio = next(b.gid for b in p.boxes if b.entry.char == "t")
+    p.decisoes = Decisoes(paragrafo_antes=frozenset({meio}))
+    assert [len(b.linhas) for b in tx.montar(p).blocos] == [1, 1]

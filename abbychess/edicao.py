@@ -93,7 +93,9 @@ def quebrar(pagina: Pagina, gid: int) -> Diferenca:
     """Palavra nova antes do glifo (o espaço que a leitura não viu)."""
     _vivo(pagina, gid)
     d = pagina.decisoes
-    return _decidir(pagina, replace(d, quebras=d.quebras | {gid}), [gid])
+    # Uma junção que termina neste glifo é desfeita: as duas não valem juntas.
+    juncoes = frozenset(j for j in d.juncoes if j[1] != gid)
+    return _decidir(pagina, replace(d, quebras=d.quebras | {gid}, juncoes=juncoes), [gid])
 
 
 def juntar_palavras(pagina: Pagina, ultimo: int, primeiro: int) -> Diferenca:

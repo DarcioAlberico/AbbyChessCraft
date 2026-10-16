@@ -328,7 +328,7 @@ FineReader) só passam declaradas no YAML com o motivo.
 |---|---|---|
 | `nao_reconhecida` | página nova | `glifos_marcados` (Ctrl+M) ou `reconhecida` (F5, lote) |
 | `glifos_marcados` | quadro marcado antes do F5 | `reconhecida` (mantém os quadros) |
-| `reconhecida` | F5 ou lote | `em_revisao` na primeira edição |
+| `reconhecida` | F5 ou lote | `em_revisao` na primeira edição (marcar um glifo também é edição); `verificada` (Ctrl+T, a página que não precisou de correção) |
 | `em_revisao` | primeira edição | `verificada` (Ctrl+T) |
 | `verificada` | Ctrl+T | `em_revisao` em qualquer edição dela, ou quando um esquecer de padrão devolve glifos dela à fila (com aviso em Avisos) |
 

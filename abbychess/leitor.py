@@ -106,22 +106,10 @@ class LeitorDoLivro:
         # Caminho absoluto, e não o padrão "training_data": o LearningService o
         # resolve no diretório atual, e aberto daqui ele criaria uma base vazia
         # na pasta do AbbyChessCraft em vez de ler a do PyBoxEditor.
-        import gc
-
-        # O congelamento do leitor anterior sai antes: um projeto trocado não deixa os
-        # modelos velhos presos na memória.
-        gc.unfreeze()
         servico = LearningService(data_dir=str(base_global()))
         rede = servico._predictor if servico.load_predictor() else None
-        leitor = cls(pasta_de_padroes, limiares=limiares, ocr=OCRService(),
-                     rede=rede, base=servico._get_learner(), easyocr=easyocr)
-        # A rede e a base global são centenas de milhares de objetos que não mudam na
-        # sessão; congelados, a coleta de lixo completa do Python não os percorre mais.
-        # Sem isso, cada coleta completa custava ~90 ms na thread da interface (os picos
-        # do p95 da releitura medidos no passo 1b).
-        gc.collect()
-        gc.freeze()
-        return leitor
+        return cls(pasta_de_padroes, limiares=limiares, ocr=OCRService(),
+                   rede=rede, base=servico._get_learner(), easyocr=easyocr)
 
     def trocar_limiares(self, limiares: Limiares) -> None:
         """Passa a ler com outros limiares, sem recarregar os modelos."""
@@ -201,6 +189,29 @@ def precisa_revisao(char: str, fonte: str, confianca: float, limiares: Limiares)
     if not char or fonte == FONTE_NENHUMA:
         return True
     return confianca < limiares.revisao
+
+
+def congelar_para_a_coleta_de_lixo() -> int:
+    """Tira da coleta de lixo do Python tudo o que está vivo agora; devolve quantos objetos.
+
+    É para chamar logo depois de carregar os modelos globais (a janela, ao abrir o
+    projeto): a rede e a base são centenas de milhares de objetos que não mudam na sessão,
+    e cada coleta completa os percorria, ~90 ms na thread da interface (os picos do p95 da
+    releitura medidos no passo 1b). Congela **tudo** o que está vivo, não só os modelos.
+    `ABBY_SEM_CONGELAR=1` desliga, para medir sem. O congelamento de antes é desfeito primeiro, e o que
+    morreu desde então (os modelos do projeto anterior) é recolhido antes de congelar.
+    O que estiver vivo no momento (a janela, o projeto) também fica congelado até a
+    próxima chamada: a memória dele não volta antes disso.
+    """
+    import gc
+    import os
+
+    if os.environ.get("ABBY_SEM_CONGELAR") == "1":     # o A/B da medida (docs/revisoes/passo-1b.md)
+        return 0
+    gc.unfreeze()
+    gc.collect()
+    gc.freeze()
+    return gc.get_freeze_count()
 
 
 def nome_de_origem(projeto_nome: str, pagina: int, indice_box: int,

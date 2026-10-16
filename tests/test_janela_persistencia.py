@@ -77,7 +77,7 @@ def test_versao_mais_nova_abre_so_para_leitura_e_nada_e_gravado(app, projeto_lid
         assert boxes(janela)                              # a página aparece
         mostrar(janela, 0)
         janela.treino.campo.setText("z")
-        janela.treino._so_corrigir()                     # muda na tela, não no disco
+        janela.treino.pedir_so_corrigir()                     # muda na tela, não no disco
         janela.areas.desenhar(1, 1, 60, 60)              # nem a área nova
         from abbychess.projeto import Limiares
 

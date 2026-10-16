@@ -44,7 +44,8 @@ from abbychess import procedencia
 from abbychess import texto as tx
 from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL, precisa_revisao
-from abbychess.modelo import LIDAS, NAO_RECONHECIDA, Diferenca, Pagina, proximo_estado, reconciliar
+from abbychess.modelo import (LIDAS, NAO_RECONHECIDA, VERIFICADA, Diferenca, Pagina, proximo_estado,
+                              reconciliar)
 
 log = logging.getLogger(__name__)
 
@@ -113,6 +114,9 @@ class ControladorDePagina:
         #: O glifo em revisão, os pulados e a seleção do modo de treino, por gid.
         self.atual: Optional[int] = None
         self.pulados: set = set()
+        #: A ordem da fila de glifos (§8.1): "confianca" (o menos confiável primeiro, os
+        #: pulados no fim) ou "leitura" (a ordem da página).
+        self.ordem_da_fila = "confianca"
         self.selecao: set = set()
         #: O desfazer do projeto (§14.2), da sessão.
         self.historico = hs.HistoricoDoProjeto()
@@ -177,11 +181,15 @@ class ControladorDePagina:
         return self.projeto is not None and self.leitor is not None and self.fonte is not None
 
     def fila(self) -> List[int]:
-        """Os gids a revisar, do menos confiável ao mais, com os pulados no fim."""
+        """Os gids a revisar: do menos confiável ao mais, com os pulados no fim; ou, na ordem
+        de leitura (`ordem_da_fila`), na ordem da página."""
         if self.leitor is None or self.modelo is None:
             return []
         boxes = self.modelo.boxes
-        fila = [boxes[i].gid for i in pg.fila_de_revisao(self.modelo.entries(), self.leitor)]
+        indices = pg.fila_de_revisao(self.modelo.entries(), self.leitor)
+        if self.ordem_da_fila == "leitura":
+            return [boxes[i].gid for i in sorted(indices)]
+        fila = [boxes[i].gid for i in indices]
         return [g for g in fila if g not in self.pulados] + [g for g in fila if g in self.pulados]
 
     def alvos(self) -> List[int]:
@@ -345,10 +353,21 @@ class ControladorDePagina:
         self.eventos.emitir("atual_mudou")
 
     def andar(self, passo: int) -> None:
-        """Pula (passo > 0: o atual vai para o fim da fila) ou volta na fila."""
+        """Pula (passo > 0: o atual vai para o fim da fila) ou volta na fila. Na ordem de
+        leitura, anda para o pendente seguinte (ou anterior) na página, sem pular."""
         fila = self.fila()
         if not fila:
             self.ir_ao_primeiro_pendente()
+            return
+        if self.ordem_da_fila == "leitura":
+            ordem = {g: n for n, g in enumerate(self.gids)}
+            aqui = ordem.get(self.atual, -1)
+            if passo > 0:
+                seguintes = [g for g in fila if ordem[g] > aqui]
+                self.escolher(seguintes[0] if seguintes else fila[0])
+            else:
+                anteriores = [g for g in fila if ordem[g] < aqui]
+                self.escolher(anteriores[-1] if anteriores else fila[-1])
             return
         if passo > 0 and self.atual in fila:
             self.pulados.add(self.atual)
@@ -356,6 +375,35 @@ class ControladorDePagina:
             return
         posicao = fila.index(self.atual) if self.atual in fila else 0
         self.escolher(fila[(posicao + passo) % len(fila)])
+
+    def verificar(self) -> None:
+        """Ctrl+T: a página está verificada (§4.4), e a próxima página não verificada abre.
+        Entra no desfazer; uma edição depois a devolve a `em_revisao`."""
+        if self.modelo is None or self.modelo.estado not in LIDAS:
+            self._avisar("Reconheça a página antes de marcá-la como verificada (F5).", 6000)
+            return
+
+        def corpo():
+            antes = self._instantaneo()
+            self._mudou(self.modelo, self.indice, "Página verificada", antes, evento="verificar")
+            self.eventos.emitir("acoes_mudaram")
+            proxima = self._proxima_nao_verificada()
+            if proxima is None:
+                self._avisar("Página verificada. As seguintes já estão todas verificadas.", 6000)
+                return
+            verificada = self.indice + 1
+            self.ir_para(proxima)
+            self._avisar(f"Página {verificada} verificada; abrindo a {proxima + 1}.", 6000)
+        self._editar("Verificando a página", corpo, precisa_de_glifos=False)
+
+    def _proxima_nao_verificada(self) -> Optional[int]:
+        """A primeira página depois da aberta que não está verificada (a não reconhecida
+        conta: está por revisar)."""
+        resumo = self.projeto.resumo_do_livro()
+        for i in range(self.indice + 1, self.fonte.total):
+            if resumo.get(i, {}).get("estado") != VERIFICADA:
+                return i
+        return None
 
     def alternar_na_selecao(self, indice: int) -> None:
         """O Ctrl+clique do modo de treino: põe ou tira o glifo da seleção."""

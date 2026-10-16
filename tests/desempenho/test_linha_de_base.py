@@ -274,7 +274,7 @@ def _memoria_do_historico(app, janela) -> dict:
             for k in range(ACOES_POR_PAGINA):
                 mostrar(janela, k)
                 janela.treino.campo.setText("y")
-                janela.treino._so_corrigir()
+                janela.treino.pedir_so_corrigir()
                 acoes += 1
         # O gravador (outra thread, que o `tracemalloc` também vê) termina antes de cada
         # leitura: sem isso, o que ele aloca e solta entre as duas era maior que o que o

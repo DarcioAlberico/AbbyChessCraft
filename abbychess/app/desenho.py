@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 
+from abbychess import avisos as av
 from abbychess import verificacao as vf
 from abbychess.app import acoes, cores
 from abbychess.app.imagens import pixmap_da_pagina
@@ -27,10 +28,15 @@ class DesenhoDaJanela:
         self.visor.mostrar_pagina(self._pixmap(p.indice, p.imagem))
         self._pre_carga.start()                 # a seguinte, depois desta pintada
         self._pre_pixmap.start()                # e o pixmap dela, quando a pré-carga a tiver
-        self.verificacao.limpar("Aperte F7 para verificar o texto da página.")
+        self.verificacao.limpar("Escolha a fila de palavras desconhecidas (F7) para verificar "
+                                "o texto.")
         self._layout_mudou()
         if self.visor.modo_areas and not p.zonas:
             self.areas.automaticas()
+        if self.fila.modo == "palavras":        # a página nova também é verificada
+            self.verificar_texto()
+        self.atualizar_barra()
+        self.atualizar_paginas()
 
     def _pixmap(self, indice: int, imagem):
         """O QPixmap da página, das últimas 5 convertidas (a conversão leva dezenas de ms)."""
@@ -70,6 +76,8 @@ class DesenhoDaJanela:
                                      [cores.cor_do_diagrama(d) for d in diagramas])
         self._selecao_mudou()
         self.relogio_do_texto.start()
+        self.relogio_das_paginas.start()        # o estado e os pendentes, na gaveta
+        self.atualizar_barra()
         if p.leitor is not None:
             por_char = p.leitor.padroes_por_caractere()
             self.treino.mostrar_contagens(len(pendentes), len(p.boxes),
@@ -77,6 +85,7 @@ class DesenhoDaJanela:
 
     def _atual_mudou(self) -> None:
         p = self.pagina
+        self.atualizar_fila()
         if p.box_atual() is None:
             self.visor.selecionar(None)
             self.treino.limpar("Esta página ainda não foi reconhecida. Aperte F5."
@@ -126,16 +135,20 @@ class DesenhoDaJanela:
 
     def _falha(self, titulo: str, texto: str) -> None:
         self.statusBar().showMessage(f"{titulo}: falhou.")
+        self.registrar_aviso(av.ERRO, titulo, texto)
         QMessageBox.critical(self, titulo, texto)
 
     def _aviso(self, titulo: str, texto: str) -> None:
+        self.registrar_aviso(av.AVISO, titulo, texto)
         QMessageBox.warning(self, titulo, texto)
 
     def _gravacao_falhou(self, indice, erro) -> None:
+        """CA-4.2 (A2): a falha de gravação vai para Avisos, além da barra."""
         pagina = f"A página {indice + 1}" if indice is not None else "Uma página"
-        self.statusBar().showMessage(
-            f"{pagina} não foi gravada ({erro}). Ela continua com as mudanças em memória e o "
-            "programa tenta de novo; não feche antes de liberar o disco.")
+        texto = (f"{pagina} não foi gravada ({erro}). Ela continua com as mudanças em memória "
+                 "e o programa tenta de novo; não feche antes de liberar o disco.")
+        self.statusBar().showMessage(texto)
+        self.registrar_aviso(av.ERRO, "Gravação", texto)
 
     def _ocupado_mudou(self, ocupado: bool, titulo: str) -> None:
         self.progresso.setVisible(ocupado)
@@ -151,7 +164,7 @@ class DesenhoDaJanela:
             foco = QApplication.focusWidget()
             # O próximo caractere vai para o campo, mas sem tirar o foco de quem o tem por
             # escolha (o seletor de página, por exemplo): só de ninguém ou do painel de texto.
-            if (self.abas.currentWidget() is self.treino and self.isActiveWindow()
+            if (self.inspetor.atual() == "glifo" and self.isActiveWindow()
                     and (foco is None or foco is self.texto or self.treino.isAncestorOf(foco))):
                 self.treino.campo.setFocus()
         acoes.atualizar(self)
@@ -164,3 +177,4 @@ class DesenhoDaJanela:
     def _progredir(self, feito: int, total: int) -> None:
         self.progresso.setRange(0, max(total, 1))
         self.progresso.setValue(feito)
+        self.rotulo_do_lote.setText(f"lote {feito}/{total}")

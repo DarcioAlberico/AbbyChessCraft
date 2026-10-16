@@ -489,15 +489,15 @@ Desempenho por passo, em ms ou MB (uma rodada cada, a do portão, que roda no me
 
 | Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) | 2a (`2026-10-16-passo-2a.json`) | 2b (`2026-10-16-passo-2b.json`) | a1 (`2026-10-16-passo-a1.json`) |
 |---|---|---|---|---|---|---|
-| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,89 | 15,03 |
-| Troca fora do cache, p95 | — | — | — | — | — | 243,88 |
-| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 23,68 | 37,33 |
-| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 16,92 | 19,05 |
+| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,89 | 15,21 |
+| Troca fora do cache, p95 | — | — | — | — | — | 147,1 |
+| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 23,68 | 26,63 |
+| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 16,92 | 20,23 |
 | Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 | 164 | 8 | 8 |
-| Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 12,9 | 22,8 |
-| Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1654 | 1803 |
-| Pintura de 2.000 boxes, p95 | — | — | — | — | — | 10,63 |
-| Clique acha o box, p95 | — | — | — | — | — | 0,0018 |
+| Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 12,9 | 22 |
+| Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1654 | 1793 |
+| Pintura de 2.000 boxes, p95 | — | — | — | — | — | 11,5 |
+| Clique acha o box, p95 | — | — | — | — | — | 0,0016 |
 
 Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter do passo 0 ao 1b tem duas faixas no mesmo código (perto de 110–130 e de 180–235; no 2a, uma só, perto de 90); o atraso no lote tem duas faixas sempre (perto de 8–10 e de 21). Desde o 2b o congelamento é desligado (`ABBY_CONGELAR=1` liga): as duas linhas do 2b rodam o mesmo programa (o rótulo `sem_congelar` é do roteiro de medida), e a coluna do Enter mede até a cor mudar (até o 2a, até o fim da propagação). Desde o A1 a troca é no cache de páginas (a vizinha já pré-carregada); a de fora do cache tem coluna própria. Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
 
@@ -513,7 +513,7 @@ Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem 
 | passo 2a sem congelar | d19c858 | completa | 174,66; 175,73; 178,05 | 188,01; 188,63; 188,4 | — | 82,23; 82,43; 82,52 | 91,7; 89,92; 92,03 | 73,15; 70,64; 75,29 | 88,33; 91,91; 92,78 | 11,7; 20,8; 21,5 |
 | passo 2b | 6f863c3 | completa | 157,59; 153,58; 153,66 | 189,56; 171,05; 174,1 | — | 20,85; 21,1; 20,62 | 25,5; 26,13; 25,7 | 13,33; 13,59; 15,26 | 15,65; 16,1; 19,15 | 20,2; 22; 21,8 |
 | passo 2b sem congelar | 6f863c3 | completa | 153,56; 153,19; 157,37 | 173,65; 165,46; 168,14 | — | 20,55; 20,57; 21,47 | 24,01; 27,01; 27,08 | 14,4; 13,82; 14,5 | 16,9; 16,99; 18,83 | 22,3; 9,1; 9,8 |
-| passo a1 | 4e974a5 | completa | 13,88; 13,97; 13,87 | 14,76; 14,62; 14,77 | 214,68; 214,28; 213,02 | 20,64; 30,21; 20,48 | 27,06; 33,47; 25,63 | 14,03; 14,93; 14,87 | 17,75; 21,09; 20,68 | 21,7; 11,8; 10 |
+| passo a1 | 538adae | completa | 14,06; 14,02; 14,12 | 14,65; 14,28; 14,52 | 132,15; 130,39; 132,9 | 20,63; 20,62; 20,82 | 25,86; 22,97; 25,86 | 14,63; 14,5; 14,76 | 21,54; 17,03; 19,82 | 10,4; 22; 22 |
 
 Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
 
@@ -758,17 +758,24 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   (`texto_da_pagina`); no 2a ele entrava nas duas medidas. Mesmo somando, a releitura fica
   em ~37 ms. A troca de página, que no 2b ficou em 153–158 ms, é do passo A1 (abaixo). O alvo de §2
   vale "com o lote rodando", o que só o passo E permite medir.
-- **O visor e a troca de página, desde o passo A1** (3 rodadas do commit `4e974a5`, pasta
+- **O visor e a troca de página, desde o passo A1** (3 rodadas do commit `538adae`, pasta
   limpa). Trocar para uma página no cache, como a seguinte, já pré-carregada, leva 14 ms na
-  mediana e 15 no p95 (alvo de 150; 2b: 153–158 na mediana, sem cache); uma página fora do
-  cache, 213–215 ms na mediana e 229–244 no p95 (alvo de 600). A pintura dos boxes de uma
-  página com 2.000 deles fica em 10–14 ms no p95 em zooms de 5% a 800% (alvo de 33), e o
-  clique acha o box em ~0,002 ms. **A memória com o lote subiu** de ~1654 MB para 1784–1803
-  MB (as 5 páginas e os 5 pixmaps que o cache guarda; alvo de 2560). O Enter até a cor mudar
-  ficou em 20–30 ms na mediana (2b: 21), com uma das 3 rodadas mais alta (30 ms, p95 33),
-  e a do portão com p95 de 37: abaixo do alvo de 100, e dentro da variação de uma rodada
-  solta; a releitura, igual (14–15 na mediana). A qualidade dos três livros e a fatia não
-  mudaram (o passo não mexe na leitura).
+  mediana e 15 no p95 (alvo de 150). Uma página **já visitada** que saiu do cache leva
+  130–133 ms na mediana e 143–149 no p95 (alvo de 600): é o mesmo método da troca do 2b
+  (alternar as páginas 20 e 21, a inclinação já medida, no mesmo processo), que deu
+  153–158. A **primeira** visita a uma página, num projeto que endireita as páginas, mede a
+  inclinação e leva ~500 ms, como no 2b (medida da revisão de produto, fora da tabela); o
+  processo novo de §15.3 não está medido. A pré-carga da seguinte roda 150 ms depois de a
+  página pedida ser pintada: dentro da troca, ela disputava a CPU com a conversão e a
+  pintura, e a troca fora do cache ficava em 213–215 ms (as 3 rodadas do `4e974a5`, em
+  `docs/medidas/2026-10-16-pre-carga-no-ir-para-a1*.json`). A pintura dos boxes de uma
+  página com 2.000 deles fica em 10–13 ms no p95 em zooms de 5% a 800% (alvo de 33), e o
+  clique acha o box em ~0,002 ms. **A memória com o lote subiu** de ~1654 MB para 1773–1793
+  MB (as 5 páginas e os 5 pixmaps que o cache guarda; alvo de 2560). O Enter até a cor
+  mudar, a releitura e o Enter com uma propagação lenta em curso ficaram iguais aos do 2b
+  (21, 15 e 19–21 ms na mediana). A qualidade dos três livros e a fatia, medidas no
+  `4e974a5`, não mudaram (o passo não mexe na leitura; a correção depois dele só muda quando
+  a pré-carga roda e os atalhos de zoom).
 - **A memória do desfazer está no alvo** para correções de um glifo (é o que a medida faz:
   300 correções reais em 3 páginas): 8,0–8,1 MB para 300 páginas × 20 ações pelo
   `tracemalloc` (o portão e uma rodada só da memória no commit `badede5`, outra no `b291e91`,

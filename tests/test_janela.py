@@ -316,7 +316,13 @@ def test_ctrl_clique_de_novo_tira_da_selecao_e_esc_esvazia(app, janela):
     janela.pagina.alternar_na_selecao(6)
     janela.pagina.alternar_na_selecao(3)
     assert selecao(janela) == {0, 6}
-    janela.treino.limpar_selecao.emit()
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+
+    janela.show()                                            # o atalho da janela vale
+    janela.activateWindow()                                  # com ela à mostra
+    app.processEvents()
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_Escape)   # o Esc da janela
     assert selecao(janela) == set() and janela.treino.selecao.text() == ""
 
 

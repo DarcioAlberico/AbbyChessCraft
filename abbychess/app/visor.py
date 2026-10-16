@@ -655,12 +655,17 @@ class VisorDePagina(QGraphicsView):
             return
         self.menu_da_vista().exec(self.viewport().mapToGlobal(self.viewport().rect().center()))
 
+    #: As ações da janela (pelo id do YAML) que o menu da vista oferece.
+    ACOES_DO_MENU = ("zoom_pagina", "zoom_largura", "zoom_100", "zoom_item", "zoom_mais",
+                     "zoom_menos", "mostrar_origem")
+
     def menu_da_vista(self) -> QMenu:
-        """As ações da Imagem (o zoom, a origem, rolar), que a janela pôs no visor."""
+        """O zoom e a origem, das ações que a janela pôs no visor."""
         menu = QMenu(self)
-        for acao in self.actions():
-            if acao.text():
-                menu.addAction(acao)
+        por_id = {a.objectName(): a for a in self.actions()}
+        for id_ in self.ACOES_DO_MENU:
+            if id_ in por_id:
+                menu.addAction(por_id[id_])
         return menu
 
     def wheelEvent(self, evento):

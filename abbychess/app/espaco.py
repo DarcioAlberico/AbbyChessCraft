@@ -55,6 +55,34 @@ def _b64(dados: QByteArray) -> str:
     return base64.b64encode(bytes(dados)).decode("ascii")
 
 
+def _validar_espaco(dados) -> dict:
+    """O `janela.json` com os tipos certos (ValueError, KeyError ou TypeError se não)."""
+    if not isinstance(dados, dict) or dados.get("versao") != VERSAO_DO_ESPACO:
+        raise ValueError("versão ou forma desconhecida")
+    docas = dados.get("docas", {})
+    if not isinstance(docas, dict):
+        raise TypeError("docas não é um objeto")
+    modo_zoom = dados.get("modo_zoom")
+    if modo_zoom not in (None, "pagina", "largura"):
+        raise ValueError(f"modo de zoom desconhecido: {modo_zoom!r}")
+    editor, fila, arranjo = dados.get("editor", "glifo"), dados.get("fila", "confianca"), \
+        dados.get("arranjo", "lado_a_lado")
+    if editor not in ("glifo", "palavra") or fila not in dict(ControladorDaFila.MODOS) \
+            or arranjo not in ARRANJOS:
+        raise ValueError("editor, fila ou arranjo desconhecido")
+    inteiros = {k: dados.get(k, d) for k, d in (("pagina", -1), ("aba", 0), ("foco", 0))}
+    if not all(type(v) is int for v in inteiros.values()):
+        raise TypeError("página, aba ou foco não é um número inteiro")
+    escala = dados.get("escala")
+    if escala is not None and not isinstance(escala, (int, float)):
+        raise TypeError("escala não é um número")
+    return {"janela": QByteArray(base64.b64decode(dados["janela"], validate=True)),
+            "divisor": QByteArray(base64.b64decode(dados["divisor"], validate=True)),
+            "docas": {str(k): bool(v) for k, v in docas.items()}, "modo_zoom": modo_zoom,
+            "escala": float(escala) if escala else None, "editor": editor, "fila": fila,
+            "arranjo": arranjo, **inteiros}
+
+
 def _doca(janela, titulo: str, nome: str, widget, area) -> QDockWidget:
     doca = QDockWidget(titulo, janela)
     doca.setObjectName(nome)
@@ -154,18 +182,27 @@ class EspacoDeTrabalho:
                                     else Qt.Orientation.Horizontal)
 
     def arranjo_padrao(self) -> None:
-        """O arranjo e os tamanhos padrão para a largura da janela (§3.1)."""
+        """O arranjo e os tamanhos padrão para a largura da janela (§3.1). Os tamanhos vão
+        depois do layout: uma doca que acabou de abrir ignora o `resizeDocks`."""
         largura = self.width()
         self.arranjar("lado_a_lado" if largura > LARGURA_DO_EMPILHADO else "empilhado")
-        paginas, imagem, vista, inspetor = TAMANHOS[1920 if largura >= 1700 else 1366]
-        escala = largura / (1920 if largura >= 1700 else 1366)
-        self.resizeDocks([self.doca_inspetor], [max(inspetor, round(inspetor * escala))],
-                         Qt.Orientation.Horizontal)
-        if self.doca_paginas.isVisible():
-            self.resizeDocks([self.doca_paginas], [round(max(paginas, 150) * escala)],
-                             Qt.Orientation.Horizontal)
+        self._tamanhos_padrao()
+        QTimer.singleShot(0, self._tamanhos_padrao)
+
+    def _tamanhos_padrao(self) -> None:
+        """A tabela de §3.1: o Inspetor com 296 px até 1600 de largura e 320 a partir dela,
+        a gaveta com 150, e o resto entre a Imagem e a vista direita, 53% e 47% (760 e 680
+        em 1920; 558 e 500 em 1366)."""
+        largura = self.width()
+        inspetor = TAMANHOS[1920 if largura >= LARGURA_DA_GAVETA else 1366][3]
+        paginas = TAMANHOS[1920][0] if self.doca_paginas.isVisible() else 0
+        self.resizeDocks([self.doca_inspetor], [inspetor], Qt.Orientation.Horizontal)
+        if paginas:
+            self.resizeDocks([self.doca_paginas], [paginas], Qt.Orientation.Horizontal)
         if self.arranjo == "lado_a_lado":
-            self.divisor.setSizes([round(imagem * escala), round(vista * escala)])
+            centro = self.divisor.width()
+            imagem = round(centro * 760 / 1440)
+            self.divisor.setSizes([imagem, centro - imagem])
         else:
             altura = self.divisor.height()
             self.divisor.setSizes([round(altura * 0.6), round(altura * 0.4)])
@@ -174,22 +211,22 @@ class EspacoDeTrabalho:
         """F9: abre ou fecha a gaveta de Páginas."""
         self.doca_paginas.setVisible(not self.doca_paginas.isVisible())
         if self.doca_paginas.isVisible():
-            self.atualizar_paginas()
+            self.atualizar_paginas(seguir=True)
 
     def focar(self, painel: int) -> None:
         """Alt+1 … Alt+5: Páginas, Imagem, vista direita (de novo: a aba seguinte), Inspetor,
         Resultados. Abre o painel fechado."""
         if painel == 1:
             self.doca_paginas.show()
-            self.atualizar_paginas()
+            self.atualizar_paginas(seguir=True)
             self.paginas.focar()
         elif painel == 2:
             if self.arranjo == "so_vista":
-                self.visor.setVisible(True)
+                self.arranjar("lado_a_lado")
             self.visor.setFocus(Qt.FocusReason.ShortcutFocusReason)
         elif painel == 3:
             if self.arranjo == "so_imagem":
-                self.vista.setVisible(True)
+                self.arranjar("lado_a_lado")
             dentro = self.vista.isAncestorOf(QApplication.focusWidget())
             if dentro:
                 self.vista.setCurrentIndex((self.vista.currentIndex() + 1) % self.vista.count())
@@ -211,12 +248,13 @@ class EspacoDeTrabalho:
         return 0
 
     def fechar_sobreposicao(self) -> None:
-        """Esc: fecha o que está por cima, nesta ordem: Resultados, a seleção do modo de
-        marcar (§3.4, regra 4). Nunca cancela tarefa."""
-        if self.doca_resultados.isVisible():
-            self.doca_resultados.hide()
-        elif self.pagina.selecao:
+        """Esc: fecha o que está por cima, na ordem da §3.4 (regra 4): a seleção do modo de
+        marcar, depois Resultados (a busca e os menus, que vêm antes, fecham sozinhos com o
+        Esc). Nunca cancela tarefa."""
+        if self.pagina.selecao:
             self.pagina.limpar_selecao()
+        elif self.doca_resultados.isVisible():
+            self.doca_resultados.hide()
 
     # ------------------------------------------------------------------
     # A fila, a gaveta, a barra e os avisos
@@ -237,11 +275,14 @@ class EspacoDeTrabalho:
         self.inspetor.mostrar_contador(contador)
         self.rotulo_da_fila.setText(f"fila: {self.fila.nome().lower()} {contador}".rstrip())
 
-    def atualizar_paginas(self) -> None:
+    def atualizar_paginas(self, seguir: bool = False) -> None:
+        """A gaveta com o `livro.json` de agora; `seguir`: a página aberta mudou, e a gaveta
+        a escolhe (as outras atualizações não mexem na seleção nem na rolagem)."""
         p = self.pagina
         if not self.doca_paginas.isVisible() or p.projeto is None or p.fonte is None:
             return
-        self.paginas.mostrar(p.fonte.total, p.projeto.resumo_do_livro(), p.indice)
+        self.paginas.mostrar(p.fonte.total, p.projeto.resumo_do_livro(),
+                             p.indice if seguir else None)
 
     def atualizar_barra(self) -> None:
         p = self.pagina
@@ -279,7 +320,7 @@ class EspacoDeTrabalho:
         rodando = self.livro.lote_rodando
         self.rotulo_do_lote.setVisible(rodando)
         self.botao_cancelar.setVisible(rodando)
-        self.atualizar_paginas()
+        self.relogio_das_paginas.start()        # o lote grava páginas em rajada
 
     # ------------------------------------------------------------------
     # O espaço por projeto (CA-3.1, CA-4.2)
@@ -310,54 +351,71 @@ class EspacoDeTrabalho:
                                  f"O arranjo da janela não foi gravado ({erro}).")
 
     def restaurar_espaco(self) -> bool:
-        """O espaço gravado do projeto, se houver; falso se não há (projeto novo)."""
+        """O espaço gravado do projeto, se houver e for legível; falso se não (projeto novo,
+        ou um `janela.json` estragado, que vira aviso e não impede abrir)."""
         caminho = self._caminho_do_espaco()
         if caminho is None or not caminho.exists():
             return False
         try:
-            dados = json.loads(caminho.read_text(encoding="utf-8"))
-            if dados.get("versao") != VERSAO_DO_ESPACO:
-                return False
-            self.restoreState(QByteArray(base64.b64decode(dados["janela"])), VERSAO_DO_ESPACO)
-            self.arranjar(dados.get("arranjo", "lado_a_lado"))
-            self.divisor.restoreState(QByteArray(base64.b64decode(dados["divisor"])))
-            for nome, visivel in dados.get("docas", {}).items():
-                doca = self.findChild(QDockWidget, nome)
-                if doca is not None:
-                    doca.setVisible(visivel)
-        except (OSError, ValueError, KeyError, TypeError) as erro:
+            dados = _validar_espaco(json.loads(caminho.read_text(encoding="utf-8")))
+        except (OSError, ValueError, KeyError, TypeError, AttributeError) as erro:
             log.warning("Espaço de %s ilegível: %s", caminho, erro)
+            self.registrar_aviso(av.AVISO, "Espaço de trabalho",
+                                 f"O arranjo gravado da janela não pôde ser lido ({erro}); "
+                                 "o padrão vale.")
             return False
+        if not self.restoreState(dados["janela"], VERSAO_DO_ESPACO):
+            log.warning("O estado das docas de %s não foi aceito pelo Qt", caminho)
+        self.arranjar(dados["arranjo"])
+        self.divisor.restoreState(dados["divisor"])
+        for nome, visivel in dados["docas"].items():
+            doca = self.findChild(QDockWidget, nome)
+            if doca is not None:
+                doca.setVisible(visivel)
         total = self.pagina.fonte.total if self.pagina.fonte else 0
-        if 0 <= dados.get("pagina", -1) < total and dados["pagina"] != self.pagina.indice:
+        if 0 <= dados["pagina"] < total and dados["pagina"] != self.pagina.indice:
             self.pagina.ir_para(dados["pagina"])
-        if dados.get("modo_zoom") == "pagina":
+        if dados["modo_zoom"] == "pagina":
             self.visor.zoom_pagina()
-        elif dados.get("modo_zoom") == "largura":
+        elif dados["modo_zoom"] == "largura":
             self.visor.zoom_largura()
-        elif dados.get("escala"):
-            self.visor.definir_zoom(float(dados["escala"]))
-        if 0 <= dados.get("aba", -1) < self.vista.count():
+        elif dados["escala"]:
+            self.visor.definir_zoom(dados["escala"])
+        if 0 <= dados["aba"] < self.vista.count():
             self.vista.setCurrentIndex(dados["aba"])
-        if dados.get("fila") in dict(ControladorDaFila.MODOS):
-            self.fila.definir(dados["fila"])
-        if dados.get("editor") in self.inspetor.editores:
-            self.inspetor.mostrar(dados["editor"])
-        if dados.get("foco"):
-            self.focar(int(dados["foco"]))
+        self.fila.definir(dados["fila"])
+        self.inspetor.mostrar(dados["editor"])
+        if dados["foco"]:
+            self.focar(dados["foco"])
         return True
+
+    def _espaco_padrao(self) -> None:
+        """O espaço de um projeto sem `janela.json`: o arranjo da largura, a fila por
+        confiança, o Glifo, o Documento e a página inteira (nada do projeto anterior fica)."""
+        self.fila.definir("confianca")
+        self.inspetor.mostrar("glifo")
+        self.vista.setCurrentIndex(0)
+        self.visor.zoom_pagina()
+        self.arranjo_padrao()
+
+    def abrir_avisos_do_projeto(self, projeto) -> None:
+        """O log de avisos do projeto que abre (ou nenhum, `None`, ao fechar): um aviso entre
+        fechar um projeto e abrir outro não vai para o arquivo do anterior."""
+        if projeto is None:
+            self.avisos.abrir(None)
+        else:
+            self.avisos.abrir(projeto.pasta, gravar=not projeto.somente_leitura)
+        self.resultados.mostrar_avisos(self.avisos.itens)
+        self.atualizar_avisos()
 
     def _espaco_do_projeto_aberto(self) -> None:
         """Ao abrir: o espaço gravado; num projeto sem ele, o padrão, com a gaveta aberta
-        até o primeiro lote se a janela é larga e nada foi reconhecido ainda."""
-        self.avisos.abrir(self.projeto.pasta, gravar=not self.projeto.somente_leitura)
-        self.resultados.mostrar_avisos(self.avisos.itens)
-        self.atualizar_avisos()
+        se a janela é larga e nada foi reconhecido ainda."""
         if not self.restaurar_espaco():
             novo = not any(r.get("estado") in LIDAS for r in self.projeto.resumo_do_livro().values())
             self.doca_paginas.setVisible(novo and self.width() >= LARGURA_DA_GAVETA)
-            self.arranjo_padrao()
-        self.atualizar_paginas()
+            self._espaco_padrao()
+        self.atualizar_paginas(seguir=True)
         self.atualizar_barra()
         self.atualizar_fila()
 

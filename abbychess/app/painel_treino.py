@@ -149,8 +149,6 @@ class PainelDeTreino(QWidget):
     ajustar = Signal(int, int, int, int)
     #: A coluna do corte escolhida no recorte, para o visor marcá-la.
     corte_mudou = Signal(object)
-    #: Esc: esvaziar a seleção do modo de treino.
-    limpar_selecao = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

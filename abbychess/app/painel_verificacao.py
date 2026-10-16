@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton, QSiz
 from core.box_model import BoxEntry
 
 from abbychess import verificacao as vf
-from abbychess.app import cores
+from abbychess.app import cores, teclado
 from abbychess.app.imagens import pixmap_de_cinza
 from abbychess.app.painel_treino import FONTE_DE_SIMBOLOS
 
@@ -37,17 +37,20 @@ ALTURA_DO_RECORTE = 110
 
 
 class _Campo(QLineEdit):
-    """Enter corrige, Ctrl+Enter corrige e ensina."""
+    """A palavra. Enter corrige e Ctrl+Enter corrige e ensina: as ações da janela ligadas em
+    `teclas`, que o campo dispara (o Enter seria dele)."""
 
-    corrigir = Signal()
-    ensinar = Signal()
+    def __init__(self):
+        super().__init__()
+        self.teclas = teclado.AcoesDaTecla()
+
+    def event(self, evento):
+        if self.teclas.sobrepor(evento):
+            return True
+        return super().event(evento)
 
     def keyPressEvent(self, evento):
-        if evento.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            if evento.modifiers() & Qt.KeyboardModifier.ControlModifier:
-                self.ensinar.emit()
-            else:
-                self.corrigir.emit()
+        if self.teclas.disparar(evento):
             return
         super().keyPressEvent(evento)
 
@@ -96,14 +99,12 @@ class PainelDeVerificacao(QWidget):
         self.lido.setFont(QFont(FONTE_DE_SIMBOLOS, 16))
         self.campo = _Campo()
         self.campo.setFont(QFont(FONTE_DE_SIMBOLOS, 18))
-        self.campo.corrigir.connect(self._corrigir)
-        self.campo.ensinar.connect(self._ensinar)
 
         botoes = QHBoxLayout()
         self.botao_corrigir = QPushButton("Corrigir (Enter)")
-        self.botao_corrigir.clicked.connect(self._corrigir)
+        self.botao_corrigir.clicked.connect(self.pedir_corrigir)
         self.botao_ensinar = QPushButton("Corrigir e ensinar (Ctrl+Enter)")
-        self.botao_ensinar.clicked.connect(self._ensinar)
+        self.botao_ensinar.clicked.connect(self.pedir_ensinar)
         botoes.addWidget(self.botao_corrigir)
         botoes.addWidget(self.botao_ensinar)
 
@@ -218,12 +219,12 @@ class PainelDeVerificacao(QWidget):
         texto = self.campo.text().strip()
         return texto if self._ativo and texto else None
 
-    def _corrigir(self) -> None:
+    def pedir_corrigir(self) -> None:
         texto = self._texto()
         if texto:
             self.corrigir.emit(texto)
 
-    def _ensinar(self) -> None:
+    def pedir_ensinar(self) -> None:
         texto = self._texto()
         if texto:
             self.ensinar.emit(texto)

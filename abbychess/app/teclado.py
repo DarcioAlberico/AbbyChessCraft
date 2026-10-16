@@ -16,7 +16,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Dict, Iterable, List, Optional
 
-from PySide6.QtCore import QEvent, Qt
+from PySide6.QtCore import QEvent, QKeyCombination, Qt
 from PySide6.QtGui import QAction, QKeySequence
 
 from abbychess import atalhos
@@ -100,9 +100,13 @@ class AcoesDaTecla:
             self._acoes[do_qt(s)] = q
 
     def _da(self, evento) -> Optional[QAction]:
+        """A ação da tecla do evento. O teclado numérico conta como o principal: o Enter dele
+        ensina como o Return, e as setas dele movem as bordas."""
+        modificadores = evento.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
+        tecla = Qt.Key.Key_Return if evento.key() == Qt.Key.Key_Enter else Qt.Key(evento.key())
         try:
-            nome = do_qt(QKeySequence(evento.keyCombination()))
-        except ValueError:
+            nome = do_qt(QKeySequence(QKeyCombination(modificadores, tecla)))
+        except ValueError:                      # uma tecla sem nome (um modificador sozinho)
             return None
         return self._acoes.get(nome)
 

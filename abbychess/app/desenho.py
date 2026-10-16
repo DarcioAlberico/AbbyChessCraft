@@ -36,7 +36,7 @@ class DesenhoDaJanela:
         if self.fila.modo == "palavras":        # a página nova também é verificada
             self.verificar_texto()
         self.atualizar_barra()
-        self.atualizar_paginas()
+        self.atualizar_paginas(seguir=True)
 
     def _pixmap(self, indice: int, imagem):
         """O QPixmap da página, das últimas 5 convertidas (a conversão leva dezenas de ms)."""

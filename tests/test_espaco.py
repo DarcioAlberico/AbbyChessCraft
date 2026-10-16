@@ -89,54 +89,86 @@ def janela_de_60(app, tmp_path, pdf_de_60_paginas, sim):  # noqa: F811
 # CA-3.7, a parte da janela
 # ----------------------------------------------------------------------
 
-def _registrados(janela):
-    reg = {}
-    for q in janela.findChildren(QAction):
-        if q.shortcuts():
-            reg.setdefault(q.objectName(), set()).update(teclado.do_qt(s) for s in q.shortcuts())
-    return reg
+def _esperado_do_yaml():
+    """As ações com tecla até o passo, lidas do YAML sem passar por `abbychess.atalhos`."""
+    import yaml
+
+    bruto = yaml.safe_load((RAIZ / "docs" / "atalhos.yaml").read_text(encoding="utf-8"))
+    passos = [str(x) for x in bruto["passos"]]
+    limite = passos.index(teclado.PASSO)
+    esperado = {}
+    for item in bruto["acoes"]:
+        sem = item.get("sem_atalho") or []
+        sequencias = item.get(teclado.PERFIL)
+        if (passos.index(str(item["desde_passo"])) <= limite and sequencias
+                and teclado.PERFIL not in sem):
+            lista = sequencias if isinstance(sequencias, list) else [sequencias]
+            esperado[item["id"]] = ({atalhos.normalizar(str(x)) for x in lista}, item["escopo"])
+    return esperado
+
+
+def _widgets_do_escopo(janela):
+    return {"imagem": {janela.visor}, "glifo": {janela.treino},
+            "campo_glifo": {janela.treino.campo}, "palavra": {janela.verificacao},
+            "documento": set(), "galeria": set()}
 
 
 def test_os_atalhos_registrados_sao_exatamente_os_do_yaml_ate_o_passo(janela):
-    esperado = {a.id: set(seqs) for a, seqs in teclado.tabela().ativas(teclado.PERFIL,
-                                                                       teclado.PASSO)}
-    assert _registrados(janela) == esperado
+    esperado = _esperado_do_yaml()
+    por_escopo = _widgets_do_escopo(janela)
+    registrados = {}
+    for q in janela.findChildren(QAction):
+        if not q.shortcuts():
+            continue
+        assert q.objectName() not in registrados, q.objectName()   # uma ação por id
+        registrados[q.objectName()] = {teclado.do_qt(x) for x in q.shortcuts()}
+        sequencias, escopo = esperado.get(q.objectName(), (None, None))
+        assert escopo is not None, f"{q.objectName()} tem tecla e não está no YAML até o passo"
+        if escopo == ["global"]:
+            assert q.shortcutContext() == Qt.ShortcutContext.WindowShortcut, q.objectName()
+        else:
+            assert q.shortcutContext() == Qt.ShortcutContext.WidgetWithChildrenShortcut
+            onde = set().union(*(por_escopo[e] for e in escopo))
+            assert onde and onde <= set(q.associatedObjects()), (q.objectName(), escopo)
+        assert q.receivers("2triggered(bool)") > 0, q.objectName()       # ligada a um comando
+    assert registrados == {k: v for k, (v, _) in esperado.items()}
     assert janela.findChildren(QShortcut) == []           # nada fora do YAML
 
 
 #: O que o README e a SPEC escrevem com cara de atalho e não é uma tecla: gestos e famílias.
-_NAO_SAO_TECLAS = {"clique", "roda", "seta", "arraste", "arrastar", "N", "K/Q/R/B/N/P", "1…Ctrl+5",
-                   "Shift+seta", "letra"}
-_CITACAO = re.compile(r"(?<![\w+])((?:Ctrl|Alt|Shift)(?:\+(?:Ctrl|Alt|Shift))*\+[^\s,;:.)\]*`/|]+"
-                      r"|F(?:[1-9]|1[0-2])\b)")
+_GESTOS = re.compile(r"\+(clique|roda|seta|arraste|arrastar|N\b|letra|qualquer|K/Q/R/B/N/P|1…)")
+_CITACAO = re.compile(r"(?<![\w+])((?:Ctrl|Alt|Shift)(?:\+(?:Ctrl|Alt|Shift))*\+"
+                      r"(?:\+|[^\s,;:.…)\]*`/|]+)|F(?:[1-9]|1[0-2])\b)")
 
 
 def _citados(texto):
-    for bruto in _CITACAO.findall(texto):
-        tecla = bruto.split("+")[-1] if not bruto.endswith("++") else "+"
-        if tecla in _NAO_SAO_TECLAS or bruto.rstrip("+").split("+")[-1] in _NAO_SAO_TECLAS:
+    for casou in _CITACAO.finditer(texto):
+        if _GESTOS.match(texto, casou.end() - len(casou.group(1).split("+")[-1]) - 1):
             continue
-        try:
-            yield atalhos.normalizar(bruto)
-        except ValueError:
-            continue                                     # "Ctrl+clique", "Alt+seta"…
+        if casou.group(1).split("+")[-1] in ("Ctrl", "Alt", "Shift"):
+            continue                                      # "nenhum Ctrl+Alt": uma regra
+        yield atalhos.normalizar(casou.group(1))          # grafia ruim reprova
+
+
+#: Do Qt e do Windows: o Tab anda pelo foco (§3.4, regra 2); Shift+F10 e Menu abrem o menu de
+#: contexto (§3.2).
+_DO_SISTEMA = {"Tab", "Shift+Tab", "Shift+F10", "Menu"}
 
 
 def test_atalho_citado_no_readme_ou_na_spec_existe_no_yaml():
     tabela = teclado.tabela()
-    conhecidos = {s for a in tabela.acoes for seqs in a.sequencias.values() for s in seqs}
-    # As teclas que só são ligações nativas, citadas como tais (o widget as tem).
-    conhecidos |= {s for n in tabela.nativos.values() for lista in n.values() for s in lista}
-    # As do Qt e do Windows: o Tab anda pelo foco (§3.4, regra 2); Shift+F10 e Menu abrem o
-    # menu de contexto (§3.2).
-    conhecidos |= {"Tab", "Shift+Tab", "Shift+F10", "Menu"}
-    faltam = {}
-    for nome in ("README.md", "docs/SPEC.md"):
-        texto = (RAIZ / nome).read_text(encoding="utf-8")
-        for seq in _citados(texto):
-            if seq not in conhecidos:
-                faltam.setdefault(nome, set()).add(seq)
-    assert faltam == {}
+    nativos = {x for n in tabela.nativos.values() for lista in n.values() for x in lista}
+    todos = {x for a in tabela.acoes for seqs in a.sequencias.values() for x in seqs}
+    ja_valem = {x for a, seqs in tabela.ativas(teclado.PERFIL, teclado.PASSO) for x in seqs}
+    # O README descreve o programa de agora; ele cita as teclas antigas só ao lado de "antes".
+    readme = (RAIZ / "README.md").read_text(encoding="utf-8")
+    antigas = {"Tab", "Shift+Tab", "Alt+Shift+Left", "Ctrl+I", "Ctrl+Shift+P", "Ctrl+T"}
+    faltam = {x for x in _citados(readme) if x not in ja_valem | nativos | _DO_SISTEMA | antigas}
+    assert faltam == set(), "o README cita tecla que ainda não vale"
+    # A SPEC descreve todos os passos.
+    spec = (RAIZ / "docs" / "SPEC.md").read_text(encoding="utf-8")
+    faltam = {x for x in _citados(spec) if x not in todos | nativos | _DO_SISTEMA}
+    assert faltam == set()
 
 
 # ----------------------------------------------------------------------
@@ -183,11 +215,24 @@ def test_alt_3_de_novo_cicla_as_abas_da_vista(app, janela):
 # CA-3.2: os tamanhos
 # ----------------------------------------------------------------------
 
-def test_tamanhos_padrao_cabem_em_1366(janela):
-    paginas, imagem, vista, inspetor = espaco.TAMANHOS[1366]
-    assert paginas + imagem + vista + inspetor + 3 * 4 <= 1366    # com as alças
+def _larguras(app, janela):
+    for _ in range(3):
+        app.processEvents()
+    return (janela.doca_paginas.width() if janela.doca_paginas.isVisible() else 0,
+            janela.visor.width(), janela.vista.width(), janela.doca_inspetor.width())
+
+
+def test_tamanhos_padrao_em_1366(app, janela):
+    paginas, imagem, vista, inspetor = _larguras(app, janela)
+    assert janela.arranjo == "lado_a_lado" and paginas == 0       # a gaveta fechada
+    assert abs(imagem - 556) <= 12 and abs(vista - 500) <= 12 and abs(inspetor - 296) <= 4
     assert janela.minimumSizeHint().width() <= 1366
-    assert janela.arranjo == "lado_a_lado" and not janela.doca_paginas.isVisible()
+
+
+def test_tamanhos_padrao_em_1920(app, janela_de_60):
+    paginas, imagem, vista, inspetor = _larguras(app, janela_de_60)
+    assert abs(paginas - 150) <= 4 and abs(inspetor - 320) <= 4
+    assert abs(imagem - 760) <= 12 and abs(vista - 680) <= 12
 
 
 def test_em_1280_o_padrao_e_o_empilhado(app, tmp_path, sim):
@@ -245,20 +290,38 @@ def test_alt_baixo_anda_na_fila_com_o_foco_em_cada_painel_sem_mudar_texto(app, l
     j = lida
     j.doca_paginas.show()
     j.doca_resultados.show()
+    app.processEvents()
     leituras = [(b.char, b.source) for b in boxes(j)]
-    texto_do_campo = None
-    for widget in (j.paginas.lista, j.visor, j.texto, j.treino.campo, j.resultados.avisos):
+    for widget in (j.paginas.lista, j.paginas.filtro, j.visor, j.texto, j.treino.campo,
+                   j.resultados.avisos, j.caixa_de_zoom, j.inspetor.seletor):
         antes = atual(j)
         widget.setFocus()
         app.processEvents()
-        texto_do_campo = j.treino.campo.text()
         QTest.keyClick(widget, Qt.Key.Key_Down, Qt.KeyboardModifier.AltModifier)
         app.processEvents()
         assert atual(j) != antes, widget
         assert [(b.char, b.source) for b in boxes(j)] == leituras     # nunca muda texto
-    assert texto_do_campo is not None
     QTest.keyClick(j.visor, Qt.Key.Key_Up, Qt.KeyboardModifier.AltModifier)
     assert [(b.char, b.source) for b in boxes(j)] == leituras
+
+
+def test_alt_baixo_no_modo_das_palavras_anda_pelas_desconhecidas(app, janela):
+    from core import lexico
+
+    from tests.test_janela_areas_e_verificacao import _ler_a_mao
+
+    j = janela
+    _ler_a_mao(app, j)
+    j.verificador.lexico = lexico.Lexico(palavras={"zzz"})   # as da página são desconhecidas
+    j.fila.definir("palavras")
+    total = len(j.verificador.desconhecidas)
+    assert total >= 2 and j.inspetor.atual() == "palavra"
+    j.verificacao.campo.setFocus()
+    QTest.keyClick(j.verificacao.campo, Qt.Key.Key_Down, Qt.KeyboardModifier.AltModifier)
+    assert j.verificador.posicao == 1
+    assert j.inspetor.contador.text() == f"2/{total}"
+    QTest.keyClick(j.visor, Qt.Key.Key_Up, Qt.KeyboardModifier.AltModifier)
+    assert j.verificador.posicao == 0
 
 
 def test_f7_cicla_o_modo_e_o_editor_do_inspetor(app, lida, monkeypatch):
@@ -287,6 +350,22 @@ def test_na_ordem_de_leitura_alt_baixo_vai_ao_pendente_seguinte_da_pagina(lida):
     assert j.pagina.atual == pendentes[0]
 
 
+def test_na_ordem_de_leitura_decidir_segue_para_o_pendente_seguinte(app, lida):
+    j = lida
+    j.fila.definir("leitura")
+    pendentes = fila(j)
+    j.pagina.escolher(pendentes[0])
+    j.fila.andar(+1)
+    j.fila.andar(+1)                                         # no terceiro
+    j.treino.campo.setText("x")
+    j.treino.pedir_so_corrigir()
+    _esperar(app, j)
+    assert j.pagina.atual == pendentes[3]                    # em frente, não volta ao início
+    j.treino.pedir_descartar()
+    _esperar(app, j)
+    assert j.pagina.atual == pendentes[4]                    # o descartado sai; o seguinte
+
+
 # ----------------------------------------------------------------------
 # Ctrl+T: a página verificada (§4.4)
 # ----------------------------------------------------------------------
@@ -307,9 +386,9 @@ def test_ctrl_t_verifica_a_pagina_e_editar_a_devolve_a_revisao(app, lida):
 
 
 def test_ctrl_t_numa_pagina_nao_reconhecida_avisa(janela):
-    janela.acao_verificada.setEnabled(True)
-    janela.acao_verificada.trigger()
-    assert janela.pagina.modelo is None or janela.pagina.modelo.estado == md.NAO_RECONHECIDA
+    assert janela.pagina.modelo is None                     # a página não foi lida
+    QTest.keyClick(janela.visor, Qt.Key.Key_T, Qt.KeyboardModifier.ControlModifier)
+    assert janela.pagina.modelo is None and janela.pagina.historico.proximo_a_desfazer is None
     assert "Reconheça" in janela.statusBar().currentMessage()
 
 
@@ -321,17 +400,37 @@ def test_no_campo_delete_descarta_e_shift_seta_move_a_borda(app, lida):
     j = lida
     campo = j.treino.campo
     alvo = atual(j)
-    caixa = next(b for b in boxes(j) if b.gid == alvo) if hasattr(boxes(j)[0], "gid") else None
     antes = len(boxes(j))
     campo.setFocus()
     x2 = j.pagina.box_atual().x2
     QTest.keyClick(campo, Qt.Key.Key_Right, Qt.KeyboardModifier.ShiftModifier)
     _esperar(app, j)
     assert j.pagina.box_atual().x2 == x2 + 1                    # Shift+→: a borda direita
+    QTest.keyClick(campo, Qt.Key.Key_Right,
+                   Qt.KeyboardModifier.ShiftModifier | Qt.KeyboardModifier.KeypadModifier)
+    _esperar(app, j)
+    assert j.pagina.box_atual().x2 == x2 + 2                    # a seta do teclado numérico
     QTest.keyClick(campo, Qt.Key.Key_Delete)
     _esperar(app, j)
-    assert len(boxes(j)) == antes - 1                            # Del: não é caractere
-    assert caixa is None or caixa not in boxes(j)
+    assert len(boxes(j)) == antes - 1 and alvo not in j.pagina.gids   # Del: não é caractere
+
+
+@pytest.mark.parametrize("tecla, modificadores, acao", [
+    (Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier, "Ensinar 'x'"),
+    (Qt.Key.Key_Enter, Qt.KeyboardModifier.KeypadModifier, "Ensinar 'x'"),
+    (Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier, "Corrigir para 'x'"),
+])
+def test_enter_no_campo_ensina_e_shift_enter_so_corrige(app, lida, tecla, modificadores, acao):
+    """A exceção 6 de §3.4 pelo teclado: o Enter (também o do teclado numérico) ensina e o
+    Shift+Enter só corrige, com o foco no campo do caractere."""
+    j = lida
+    alvo = atual(j)
+    j.treino.campo.setFocus()
+    j.treino.campo.setText("x")
+    QTest.keyClick(j.treino.campo, tecla, modificadores)
+    _esperar(app, j)
+    assert j.pagina.boxes[j.pagina.gids.index(alvo)].char == "x"
+    assert j.pagina.historico.proximo_a_desfazer == acao
 
 
 def test_f2_abre_a_paleta_e_o_simbolo_entra_no_campo(app, lida):
@@ -349,14 +448,15 @@ def test_f2_abre_a_paleta_e_o_simbolo_entra_no_campo(app, lida):
 # Esc, os menus de contexto, os avisos
 # ----------------------------------------------------------------------
 
-def test_esc_fecha_resultados_e_depois_esvazia_a_selecao(app, lida):
+def test_esc_esvazia_a_selecao_e_depois_fecha_resultados(app, lida):
+    """§3.4, regra 4: busca, menu, seleção, Resultados, nesta ordem."""
     j = lida
     j.doca_resultados.show()
     j.pagina.selecao = {fila(j)[0], fila(j)[1]}
     QTest.keyClick(j.visor, Qt.Key.Key_Escape)
-    assert not j.doca_resultados.isVisible() and j.pagina.selecao
+    assert not j.pagina.selecao and j.doca_resultados.isVisible()
     QTest.keyClick(j.visor, Qt.Key.Key_Escape)
-    assert not j.pagina.selecao
+    assert not j.doca_resultados.isVisible()
 
 
 def _menu_pelo_teclado(app, widget):
@@ -432,6 +532,7 @@ def test_reabrir_o_projeto_restaura_o_espaco(app, tmp_path, pdf_de_60_paginas, s
     j.doca_resultados.show()
     j.visor.definir_zoom(2.0)
     j.vista.setCurrentWidget(j.padroes)
+    j.fila.definir("diagramas")
     j.focar(3)
     app.processEvents()
     tamanhos = j.divisor.sizes()
@@ -445,11 +546,48 @@ def test_reabrir_o_projeto_restaura_o_espaco(app, tmp_path, pdf_de_60_paginas, s
         assert k.arranjo == "empilhado"
         assert all(abs(a - b) <= 2 for a, b in zip(k.divisor.sizes(), tamanhos))
         assert k.doca_paginas.isVisible() and k.doca_resultados.isVisible()
-        assert abs(k.visor.escala() - 2.0) < 1e-6
+        assert abs(k.visor.escala() - 2.0) < 1e-6 and k.visor.modo_zoom is None
         assert k.vista.currentWidget() is k.padroes
+        assert k.fila.modo == "diagramas" and k.inspetor.atual() == "glifo"
         assert _dentro(k.vista)
     finally:
         k.close()
+
+
+@pytest.mark.parametrize("estrago", ['{"versao": 1, "pagina": "x"}', '[1, 2]', '{"versao": 1}',
+                                     '{"versao": 1, "janela": "", "divisor": "", "docas": [1]}',
+                                     'não é JSON'])
+def test_um_janela_json_estragado_nao_impede_abrir(app, tmp_path, sim, estrago):
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Estragado",
+                                   _pagina_sintetica(tmp_path / "pagina.png"))
+    (Path(projeto.pasta) / espaco.ARQUIVO_DO_ESPACO).write_text(estrago, encoding="utf-8")
+    j = _abrir(projeto)
+    try:
+        assert j.pagina.pronto and j.arranjo == "lado_a_lado"
+        assert any("não pôde ser lido" in a.texto for a in j.avisos.itens)
+    finally:
+        j.close()
+
+
+def test_o_projeto_seguinte_sem_espaco_comeca_do_padrao(app, tmp_path, sim):
+    um = ProjetoDeLivro.criar(tmp_path / "livros", "Um", _pagina_sintetica(tmp_path / "um.png"))
+    j = _abrir(um)
+    try:
+        j.fila.definir("palavras")
+        j.vista.setCurrentWidget(j.padroes)
+        j.visor.definir_zoom(3.0)
+        dois = ProjetoDeLivro.criar(tmp_path / "livros", "Dois",
+                                    _pagina_sintetica(tmp_path / "dois.png"))
+        assert j._fechar_projeto()
+        j.usar(dois, pg.FonteDePaginas(dois.fonte),
+               LeitorDoLivro(dois.pasta_de_padroes, limiares=dois.dados.limiares))
+        assert j.fila.modo == "confianca" and j.inspetor.atual() == "glifo"
+        assert j.vista.currentIndex() == 0 and j.visor.modo_zoom == "pagina"
+        j.registrar_aviso(av.AVISO, "Teste", "vai para o Dois")
+        um_log = Path(um.pasta) / av.ARQUIVO
+        assert not um_log.exists() or "vai para o Dois" not in um_log.read_text(encoding="utf-8")
+    finally:
+        j.close()
 
 
 # ----------------------------------------------------------------------

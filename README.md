@@ -103,10 +103,7 @@ página não diz, mas a linha diz que é suposição. A legenda impressa em volt
 jogam", o `▼` do Yusupov) é lida e vira "da legenda"; a escolha na conferência vira
 "informado na revisão". A legenda vale primeiro como está nos boxes da página, a linha
 encostada no tabuleiro com o que os padrões do livro leram e o que você corrigiu; só sem
-ela vale a releitura do core. Ensinar, corrigir, dividir ou juntar um box da legenda diz o
-lado na hora, sem F5: os diagramas não conferidos da página tiram o lado de novo da linha de
-boxes, sem reler o tabuleiro, e o Ctrl+Z da edição o desfaz junto. O conferido e o de lado
-informado na revisão não mudam.
+ela vale a releitura do core. Por isso ensinar a legenda faz o lado aparecer no F5 seguinte.
 
 **Clicar no diagrama** (ou **Ferramentas › Conferir diagramas**, Ctrl+G, que abre o primeiro
 por conferir) mostra o recorte impresso e a posição lida lado a lado, na mesma escala, a
@@ -220,9 +217,7 @@ cabeçalho também.
 (`core.diagrama.confiavel`) aprovou, sai redesenhado do FEN pela fonte de diagrama
 (`core.render_diagrama`), com o FEN e o lado a jogar no texto alternativo e "não revisado"
 quando ninguém o conferiu. No PDF pesquisável, o FEN entra invisível sobre o tabuleiro, e a
-busca o acha; logo abaixo dele, também invisível, vai a mesma marca do lado do texto
-alternativo ("brancas a jogar (assumido: a página não diz); não revisado"), para o `w` que a
-página não disse não passar por leitura na camada de texto. O resto (por ler, ou lido sem confiança) sai como recorte da página, com o
+busca o acha. O resto (por ler, ou lido sem confiança) sai como recorte da página, com o
 motivo no aviso e sem FEN, para um FEN duvidoso não passar por leitura. Na p. 26 do Darcy
 Lima o porteiro recusa os três diagramas, e eles saem como recorte até serem conferidos;
 conferido o primeiro, ele saiu desenhado nos três formatos e o FEN dele foi achado no PDF.
@@ -771,11 +766,10 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   se desfaz).
 - **Endireitar só corrige a inclinação.** Página curva perto da lombada, ou girada mais
   de 3°, não se endireita; projeto antigo não endireita (ver **A página torta**).
-- **A legenda só diz o lado depois de ensinada.** No Xadrez Vitorioso a cadeia global lê mal
-  a fonte em negrito das legendas ("Jo am a hran as"), e o lado sai assumido até ela ser
-  ensinada (ver **O que foi medido**). Ensinada ou corrigida na página, o lado muda na hora;
-  mas o padrão novo só chega às legendas das outras páginas quando elas são lidas de novo
-  (F5 ou lote). **Reler pendentes** (Ctrl+R) não muda o lado.
+- **A legenda só diz o lado depois de ensinada, e no reconhecimento seguinte.** No Xadrez
+  Vitorioso a cadeia global lê mal a fonte em negrito das legendas ("Jo am a hran as"), e o
+  lado sai assumido até ela ser ensinada (ver **O que foi medido**). O lado é lido no F5 e no
+  lote: ensinar a legenda depois só muda o lado no F5 seguinte, ou na conferência.
 - **A linha encostada no diagrama é tomada por legenda.** Até 3,5 alturas de referência acima
   ou abaixo do tabuleiro, a linha que diz "jogam as pretas" vale como legenda, mesmo que seja
   prosa. No Teste 1 do Xadrez Vitorioso a prosa é o enunciado e acerta; num livro em que o

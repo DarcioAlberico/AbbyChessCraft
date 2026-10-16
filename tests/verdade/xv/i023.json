@@ -1,0 +1,1035 @@
+{
+ "livro": "xv",
+ "pdf": "Xadrez Vitorioso - Estrategias - Yasser Seirawan.pdf",
+ "pdf_sha256": "c7277691646ce288f81649f181a2d0316bf1e01ff864b9810c29ce9a0d5b7161",
+ "indice_pdf": 23,
+ "pagina_impressa": 24,
+ "dpi_de_leitura": 300,
+ "render_sha256": "23caabd9c0458060483a902858dfcf4f15dffeeac76a876b5aab94f7b3e9ae29",
+ "pymupdf": "1.26.6",
+ "inclinacao": -0.95,
+ "papel": 255,
+ "verdade_versao": 1,
+ "rotulado_por": "",
+ "revisado_por": "",
+ "blocos": [
+  {
+   "id": "b00",
+   "funcao": "cabecalho",
+   "caixa_rel": [
+    0.11645,
+    0.05975,
+    0.40314,
+    0.07657
+   ],
+   "ordem": 0,
+   "coluna": 0,
+   "texto_impresso": "24 YAS?ER SElRAWAN ?JEREMY SlLMAN"
+  },
+  {
+   "id": "b01",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.2034,
+    0.1042,
+    0.95138,
+    0.11902
+   ],
+   "ordem": 1,
+   "coluna": 0,
+   "texto_impresso": "1ibera o Bispo—c8) ou 2...d6 (que impede 0 ataque das brancas ao Cavalo com e4-"
+  },
+  {
+   "id": "b02",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.20425,
+    0.12468,
+    0.42239,
+    0.1395
+   ],
+   "ordem": 2,
+   "coluna": 0,
+   "texto_impresso": "e5), seguido de 3...Cf6."
+  },
+  {
+   "id": "b03",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.11847,
+    0.16508,
+    0.18017,
+    0.17961
+   ],
+   "ordem": 3,
+   "coluna": 0,
+   "texto_impresso": "4.BC4?"
+  },
+  {
+   "id": "b04",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.25089,
+    0.18599,
+    0.95331,
+    0.20138
+   ],
+   "ordem": 4,
+   "coluna": 0,
+   "texto_impresso": "As brancas agem rapidamente com o objetivo de movimentar todas as peças"
+  },
+  {
+   "id": "b05",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.20574,
+    0.20365,
+    0.95332,
+    0.21875
+   ],
+   "ordem": 5,
+   "coluna": 0,
+   "texto_impresso": "e c0meçar a atacar o Rei preto. perda adicional de materia1 não é uma preocupa-"
+  },
+  {
+   "id": "b06",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.20614,
+    0.22102,
+    0.95453,
+    0.23584
+   ],
+   "ordem": 6,
+   "coluna": 0,
+   "texto_impresso": "ção séria, ?ois sua força ? tão inferior que um j0go tranqüilo só poderia 1evar à"
+  },
+  {
+   "id": "b07",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.20618,
+    0.24175,
+    0.33602,
+    0.25685
+   ],
+   "ordem": 7,
+   "coluna": 0,
+   "texto_impresso": "própria ru1na."
+  },
+  {
+   "id": "b08",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.1204,
+    0.28119,
+    0.25669,
+    0.2963
+   ],
+   "ordem": 8,
+   "coluna": 0,
+   "texto_impresso": "4...fxe4 5.?.0?"
+  },
+  {
+   "id": "b09",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.25323,
+    0.30311,
+    0.95606,
+    0.31821
+   ],
+   "ordem": 9,
+   "coluna": 0,
+   "texto_impresso": "As brancaS imploram para que as pretas capturem o Cava1o e simu1tanea-"
+  },
+  {
+   "id": "b10",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.2077,
+    0.32303,
+    0.61778,
+    0.33785
+   ],
+   "ordem": 10,
+   "coluna": 0,
+   "texto_impresso": "mente desenvolvem ainda mais suas forças."
+  },
+  {
+   "id": "b11",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.12275,
+    0.36385,
+    0.20541,
+    0.37924
+   ],
+   "ordem": 11,
+   "coluna": 0,
+   "texto_impresso": "5...exf3?"
+  },
+  {
+   "id": "b12",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.25557,
+    0.38574,
+    0.95799,
+    0.40056
+   ],
+   "ordem": 12,
+   "coluna": 0,
+   "texto_impresso": "Observe a posição das pretas. Suas peças foram desenvo1?das? ?tes de"
+  },
+  {
+   "id": "b13",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.2076,
+    0.4034,
+    0.9584,
+    0.41822
+   ],
+   "ordem": 13,
+   "coluna": 0,
+   "texto_impresso": "jogar 5...exf3, elas tinham a vantagem material de um Cavalo e dois peões. Não"
+  },
+  {
+   "id": "b14",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.20962,
+    0.42078,
+    0.95841,
+    0.4356
+   ],
+   "ordem": 14,
+   "coluna": 0,
+   "texto_impresso": "precisaVam capturar mais nada! Em vez de capturar as peças do adversário, de-"
+  },
+  {
+   "id": "b15",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.20962,
+    0.43787,
+    0.95922,
+    0.45298
+   ],
+   "ordem": 15,
+   "coluna": 0,
+   "texto_impresso": "veriam ter mobilizado as próprias peças, mantendo as colunas e diagonaiS fecha-"
+  },
+  {
+   "id": "b16",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.21083,
+    0.45554,
+    0.95922,
+    0.47007
+   ],
+   "ordem": 16,
+   "coluna": 0,
+   "texto_impresso": "das para garantir a segurança do Rei. Um 1ance muito mais sensato seria 5...d5"
+  },
+  {
+   "id": "b17",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.21245,
+    0.47263,
+    0.95962,
+    0.48745
+   ],
+   "ordem": 17,
+   "coluna": 0,
+   "texto_impresso": "(que fecharia a diagonal a2-g8 e 1iberaria o Bispo da diagonal branca) ou 5...Cf6,"
+  },
+  {
+   "id": "b18",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.21164,
+    0.49001,
+    0.96044,
+    0.50483
+   ],
+   "ordem": 18,
+   "coluna": 0,
+   "texto_impresso": "seguido de 6...d5. Em amb0s os casos, a enorme Vantagem material daS pretas"
+  },
+  {
+   "id": "b19",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.21206,
+    0.51123,
+    0.30601,
+    0.52292
+   ],
+   "ordem": 19,
+   "coluna": 0,
+   "texto_impresso": "triunfaria."
+  },
+  {
+   "id": "b20",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.12671,
+    0.54959,
+    0.26662,
+    0.56498
+   ],
+   "ordem": 20,
+   "coluna": 0,
+   "texto_impresso": "6.Dxf3 BC5+?"
+  },
+  {
+   "id": "b21",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.25994,
+    0.57181,
+    0.96236,
+    0.58663
+   ],
+   "ordem": 21,
+   "coluna": 0,
+   "texto_impresso": "para as pretas, 6...Cf6 seria melho? pois desenvolveria uma peça. Do modo"
+  },
+  {
+   "id": "b22",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.21357,
+    0.58917,
+    0.96357,
+    0.60399
+   ],
+   "ordem": 22,
+   "coluna": 0,
+   "texto_impresso": "como as coisas estão, as brancas podem entregar mais um peão a fim de env0lver"
+  },
+  {
+   "id": "b23",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.21402,
+    0.60972,
+    0.47248,
+    0.62454
+   ],
+   "ordem": 23,
+   "coluna": 0,
+   "texto_impresso": "todas as suas peças na luta."
+  },
+  {
+   "id": "b24",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.12855,
+    0.64587,
+    0.17653,
+    0.66069
+   ],
+   "ordem": 24,
+   "coluna": 0,
+   "texto_impresso": "7.d4?"
+  },
+  {
+   "id": "b25",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.26217,
+    0.66698,
+    0.96459,
+    0.6818
+   ],
+   "ordem": 25,
+   "coluna": 0,
+   "texto_impresso": "Muito bem. As brancas perdem um Deão, mas liberam o Bispo—c1, com ga,"
+  },
+  {
+   "id": "b26",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.21581,
+    0.68463,
+    0.965,
+    0.69945
+   ],
+   "ordem": 26,
+   "coluna": 0,
+   "texto_impresso": "nho de tempo. O desenVo1vimento agora e mais importante d0 que simples con-"
+  },
+  {
+   "id": "b27",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.21666,
+    0.70525,
+    0.41262,
+    0.72007
+   ],
+   "ordem": 27,
+   "coluna": 0,
+   "texto_impresso": "siderações materiais."
+  },
+  {
+   "id": "b28",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.13037,
+    0.74018,
+    0.32634,
+    0.75557
+   ],
+   "ordem": 28,
+   "coluna": 0,
+   "texto_impresso": "7...Bxd4+ 8.Rh1 d6"
+  },
+  {
+   "id": "b29",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.26361,
+    0.76244,
+    0.96683,
+    0.77754
+   ],
+   "ordem": 29,
+   "coluna": 0,
+   "texto_impresso": "AS pretas finalmente reso1vem enfrentar o problema do desenvolvimento"
+  },
+  {
+   "id": "b30",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.21805,
+    0.78009,
+    0.96684,
+    0.79519
+   ],
+   "ordem": 30,
+   "coluna": 0,
+   "texto_impresso": "das peças. Masjá é tarde; 0 fato de terem ignorado o desenvo1Vimento nos 1ances"
+  },
+  {
+   "id": "b31",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.2185,
+    0.80106,
+    0.45237,
+    0.81559
+   ],
+   "ordem": 31,
+   "coluna": 0,
+   "texto_impresso": "anteriores pesou demais."
+  },
+  {
+   "id": "b32",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.13262,
+    0.83559,
+    0.33705,
+    0.85126
+   ],
+   "ordem": 32,
+   "coluna": 0,
+   "texto_impresso": "9.Bxf4 Cf6 1 ?.Tae1 +"
+  },
+  {
+   "id": "b33",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.26545,
+    0.85819,
+    0.96827,
+    0.87329
+   ],
+   "ordem": 33,
+   "coluna": 0,
+   "texto_impresso": "As pretas vangloriam—se de ter duas peças e um peão a maiS. porém, veja o"
+  },
+  {
+   "id": "b34",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.21989,
+    0.87556,
+    0.96787,
+    0.89066
+   ],
+   "ordem": 34,
+   "coluna": 0,
+   "texto_impresso": "Diagrama 5. Observe as peças nas casas a8, b8, c8, d8 e h8. O que estão fazendo?"
+  },
+  {
+   "id": "b35",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.2203,
+    0.89293,
+    0.96949,
+    0.90832
+   ],
+   "ordem": 35,
+   "coluna": 0,
+   "texto_impresso": "Nada? em absoluto! Agora dê uma o1hada no exército branco. Todos traba1hando"
+  },
+  {
+   "id": "b36",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.22071,
+    0.9106,
+    0.9695,
+    0.92542
+   ],
+   "ordem": 36,
+   "coluna": 0,
+   "texto_impresso": "arduamente! O resu1tado é que as brancas dispõem de uma força muito maior do"
+  },
+  {
+   "id": "b37",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.22152,
+    0.92798,
+    0.9699,
+    0.9428
+   ],
+   "ordem": 37,
+   "coluna": 0,
+   "texto_impresso": "que as pretas. (De maneira curiosa, essa po?ição, na verdade, co1oca as brancas à"
+  },
+  {
+   "id": "b38",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.22189,
+    0.94251,
+    0.96988,
+    0.96018
+   ],
+   "ordem": 38,
+   "coluna": 0,
+   "texto_impresso": "frente em termos de material!) É claro que, Se as pretas env01verem suas peças"
+  },
+  {
+   "id": "b39",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.01317,
+    0.9948,
+    0.03696,
+    0.99623
+   ],
+   "ordem": 39,
+   "coluna": 0,
+   "texto_impresso": "?"
+  }
+ ],
+ "diagramas": [],
+ "linhas_corpo": [
+  {
+   "id": "l01",
+   "bloco": "b01",
+   "caixa_rel": [
+    0.2034,
+    0.1042,
+    0.95138,
+    0.11902
+   ],
+   "texto": "1ibera o Bispo—c8) ou 2...d6 (que impede 0 ataque das brancas ao Cavalo com e4-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l02",
+   "bloco": "b02",
+   "caixa_rel": [
+    0.20425,
+    0.12468,
+    0.42239,
+    0.1395
+   ],
+   "texto": "e5), seguido de 3...Cf6.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l03",
+   "bloco": "b03",
+   "caixa_rel": [
+    0.11847,
+    0.16508,
+    0.18017,
+    0.17961
+   ],
+   "texto": "4.BC4?",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l04",
+   "bloco": "b04",
+   "caixa_rel": [
+    0.25089,
+    0.18599,
+    0.95331,
+    0.20138
+   ],
+   "texto": "As brancas agem rapidamente com o objetivo de movimentar todas as peças",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l05",
+   "bloco": "b05",
+   "caixa_rel": [
+    0.20574,
+    0.20365,
+    0.95332,
+    0.21875
+   ],
+   "texto": "e c0meçar a atacar o Rei preto. perda adicional de materia1 não é uma preocupa-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l06",
+   "bloco": "b06",
+   "caixa_rel": [
+    0.20614,
+    0.22102,
+    0.95453,
+    0.23584
+   ],
+   "texto": "ção séria, ?ois sua força ? tão inferior que um j0go tranqüilo só poderia 1evar à",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l07",
+   "bloco": "b07",
+   "caixa_rel": [
+    0.20618,
+    0.24175,
+    0.33602,
+    0.25685
+   ],
+   "texto": "própria ru1na.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l08",
+   "bloco": "b08",
+   "caixa_rel": [
+    0.1204,
+    0.28119,
+    0.25669,
+    0.2963
+   ],
+   "texto": "4...fxe4 5.?.0?",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l09",
+   "bloco": "b09",
+   "caixa_rel": [
+    0.25323,
+    0.30311,
+    0.95606,
+    0.31821
+   ],
+   "texto": "As brancaS imploram para que as pretas capturem o Cava1o e simu1tanea-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l10",
+   "bloco": "b10",
+   "caixa_rel": [
+    0.2077,
+    0.32303,
+    0.61778,
+    0.33785
+   ],
+   "texto": "mente desenvolvem ainda mais suas forças.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l11",
+   "bloco": "b11",
+   "caixa_rel": [
+    0.12275,
+    0.36385,
+    0.20541,
+    0.37924
+   ],
+   "texto": "5...exf3?",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l12",
+   "bloco": "b12",
+   "caixa_rel": [
+    0.25557,
+    0.38574,
+    0.95799,
+    0.40056
+   ],
+   "texto": "Observe a posição das pretas. Suas peças foram desenvo1?das? ?tes de",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l13",
+   "bloco": "b13",
+   "caixa_rel": [
+    0.2076,
+    0.4034,
+    0.9584,
+    0.41822
+   ],
+   "texto": "jogar 5...exf3, elas tinham a vantagem material de um Cavalo e dois peões. Não",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l14",
+   "bloco": "b14",
+   "caixa_rel": [
+    0.20962,
+    0.42078,
+    0.95841,
+    0.4356
+   ],
+   "texto": "precisaVam capturar mais nada! Em vez de capturar as peças do adversário, de-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l15",
+   "bloco": "b15",
+   "caixa_rel": [
+    0.20962,
+    0.43787,
+    0.95922,
+    0.45298
+   ],
+   "texto": "veriam ter mobilizado as próprias peças, mantendo as colunas e diagonaiS fecha-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l16",
+   "bloco": "b16",
+   "caixa_rel": [
+    0.21083,
+    0.45554,
+    0.95922,
+    0.47007
+   ],
+   "texto": "das para garantir a segurança do Rei. Um 1ance muito mais sensato seria 5...d5",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l17",
+   "bloco": "b17",
+   "caixa_rel": [
+    0.21245,
+    0.47263,
+    0.95962,
+    0.48745
+   ],
+   "texto": "(que fecharia a diagonal a2-g8 e 1iberaria o Bispo da diagonal branca) ou 5...Cf6,",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l18",
+   "bloco": "b18",
+   "caixa_rel": [
+    0.21164,
+    0.49001,
+    0.96044,
+    0.50483
+   ],
+   "texto": "seguido de 6...d5. Em amb0s os casos, a enorme Vantagem material daS pretas",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l19",
+   "bloco": "b19",
+   "caixa_rel": [
+    0.21206,
+    0.51123,
+    0.30601,
+    0.52292
+   ],
+   "texto": "triunfaria.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l20",
+   "bloco": "b20",
+   "caixa_rel": [
+    0.12671,
+    0.54959,
+    0.26662,
+    0.56498
+   ],
+   "texto": "6.Dxf3 BC5+?",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l21",
+   "bloco": "b21",
+   "caixa_rel": [
+    0.25994,
+    0.57181,
+    0.96236,
+    0.58663
+   ],
+   "texto": "para as pretas, 6...Cf6 seria melho? pois desenvolveria uma peça. Do modo",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l22",
+   "bloco": "b22",
+   "caixa_rel": [
+    0.21357,
+    0.58917,
+    0.96357,
+    0.60399
+   ],
+   "texto": "como as coisas estão, as brancas podem entregar mais um peão a fim de env0lver",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l23",
+   "bloco": "b23",
+   "caixa_rel": [
+    0.21402,
+    0.60972,
+    0.47248,
+    0.62454
+   ],
+   "texto": "todas as suas peças na luta.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l24",
+   "bloco": "b24",
+   "caixa_rel": [
+    0.12855,
+    0.64587,
+    0.17653,
+    0.66069
+   ],
+   "texto": "7.d4?",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l25",
+   "bloco": "b25",
+   "caixa_rel": [
+    0.26217,
+    0.66698,
+    0.96459,
+    0.6818
+   ],
+   "texto": "Muito bem. As brancas perdem um Deão, mas liberam o Bispo—c1, com ga,",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l26",
+   "bloco": "b26",
+   "caixa_rel": [
+    0.21581,
+    0.68463,
+    0.965,
+    0.69945
+   ],
+   "texto": "nho de tempo. O desenVo1vimento agora e mais importante d0 que simples con-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l27",
+   "bloco": "b27",
+   "caixa_rel": [
+    0.21666,
+    0.70525,
+    0.41262,
+    0.72007
+   ],
+   "texto": "siderações materiais.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l28",
+   "bloco": "b28",
+   "caixa_rel": [
+    0.13037,
+    0.74018,
+    0.32634,
+    0.75557
+   ],
+   "texto": "7...Bxd4+ 8.Rh1 d6",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l29",
+   "bloco": "b29",
+   "caixa_rel": [
+    0.26361,
+    0.76244,
+    0.96683,
+    0.77754
+   ],
+   "texto": "AS pretas finalmente reso1vem enfrentar o problema do desenvolvimento",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l30",
+   "bloco": "b30",
+   "caixa_rel": [
+    0.21805,
+    0.78009,
+    0.96684,
+    0.79519
+   ],
+   "texto": "das peças. Masjá é tarde; 0 fato de terem ignorado o desenvo1Vimento nos 1ances",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l31",
+   "bloco": "b31",
+   "caixa_rel": [
+    0.2185,
+    0.80106,
+    0.45237,
+    0.81559
+   ],
+   "texto": "anteriores pesou demais.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l32",
+   "bloco": "b32",
+   "caixa_rel": [
+    0.13262,
+    0.83559,
+    0.33705,
+    0.85126
+   ],
+   "texto": "9.Bxf4 Cf6 1 ?.Tae1 +",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l33",
+   "bloco": "b33",
+   "caixa_rel": [
+    0.26545,
+    0.85819,
+    0.96827,
+    0.87329
+   ],
+   "texto": "As pretas vangloriam—se de ter duas peças e um peão a maiS. porém, veja o",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l34",
+   "bloco": "b34",
+   "caixa_rel": [
+    0.21989,
+    0.87556,
+    0.96787,
+    0.89066
+   ],
+   "texto": "Diagrama 5. Observe as peças nas casas a8, b8, c8, d8 e h8. O que estão fazendo?",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l35",
+   "bloco": "b35",
+   "caixa_rel": [
+    0.2203,
+    0.89293,
+    0.96949,
+    0.90832
+   ],
+   "texto": "Nada? em absoluto! Agora dê uma o1hada no exército branco. Todos traba1hando",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l36",
+   "bloco": "b36",
+   "caixa_rel": [
+    0.22071,
+    0.9106,
+    0.9695,
+    0.92542
+   ],
+   "texto": "arduamente! O resu1tado é que as brancas dispõem de uma força muito maior do",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l37",
+   "bloco": "b37",
+   "caixa_rel": [
+    0.22152,
+    0.92798,
+    0.9699,
+    0.9428
+   ],
+   "texto": "que as pretas. (De maneira curiosa, essa po?ição, na verdade, co1oca as brancas à",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l38",
+   "bloco": "b38",
+   "caixa_rel": [
+    0.22189,
+    0.94251,
+    0.96988,
+    0.96018
+   ],
+   "texto": "frente em termos de material!) É claro que, Se as pretas env01verem suas peças",
+   "negrito": false,
+   "texto_verificado": false
+  }
+ ],
+ "estrutura_por": "Claude (estrutura pelas faixas)"
+}

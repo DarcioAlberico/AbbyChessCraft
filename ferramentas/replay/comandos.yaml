@@ -1,0 +1,114 @@
+# O catálogo de comandos do replay da fatia (SPEC §15.4, CA-F.1).
+#
+# Cada comando é o caminho mais curto que a interface oferece, num passo do roadmap, para
+# corrigir um tipo de diferença entre a página lida e o gabarito; `custo` é o número de
+# gestos e `gestos` os descreve. O replay **simula** as correções no núcleo do programa e
+# soma os custos declarados; `tests/test_custo_dos_comandos.py` confere, com QTest e um
+# filtro de eventos, que o custo declarado de cada comando já existente é o que a
+# interface pede. Mudar o catálogo passa pela revisão de produto (§16).
+#
+# As teclas dos comandos do passo 0 são as da janela de hoje (`abbychess/app/janela.py`).
+# `docs/atalhos.yaml` é a tabela de destino, com o passo em que cada atalho novo entra
+# (`desde_passo`); ali o Ctrl+T, por exemplo, deixa de ser o modo de treino no A2. Um
+# comando que muda de tecla num passo ganha uma entrada nova com aquele `passo`.
+#
+# Os custos dos comandos de passos futuros (`conferir_no_passo`) são estimativas: o teste
+# só confere comandos que já existem. Quando o passo os conferir, a versão do catálogo
+# sobe, e a linha de base é medida de novo no worktree da tag `passo-0` com o catálogo
+# novo (o `comparar` recusa catálogos diferentes).
+
+versao: 4
+
+# O que conta como um gesto (a regra do filtro de eventos do teste).
+convencao_de_gestos: >-
+  Um gesto é um clique (MouseButtonPress) ou uma tecla (KeyPress), espontâneos; um acorde
+  (Ctrl+T, Shift+Enter) é um gesto só, porque a tecla modificadora sozinha não conta; a tecla
+  que dispara um atalho conta uma vez (chega como Shortcut, não como KeyPress); arrastar é
+  um gesto (o clique que começa o arraste). Digitar um caractere é um gesto.
+
+# O que nenhum comando do passo corrige ainda: conta com um custo fixo (o trabalho de
+# corrigir fora do programa ou de refazer à mão), para um passo que torna possível uma
+# correção não parecer pior por somar gestos que antes ficavam de fora.
+impossiveis:
+  espaco: {custo: 8, motivo: "palavra junta ou partida: exportar e corrigir no editor de texto"}
+  linha_nao_lida: {custo: 4, motivo: "linha que a leitura não achou: abrir o editor de texto e achar o lugar"}
+  caractere_nao_lido: {custo: 1, motivo: "cada caractere da linha não achada, digitado fora do programa"}
+  diagrama_nao_achado: {custo: 70, motivo: "diagrama não achado: montar a posição fora do programa"}
+  nao_convergiu: {custo: 3, motivo: "diferença que o ensinar desfaz de novo pela propagação"}
+
+comandos:
+  - id: pagina_seguinte
+    passo: "0"
+    corrige: trocar_pagina
+    custo: 1
+    gestos: [Ctrl+PgDn (cada troca de página da fatia; sai em gestos_navegacao)]
+  - id: reler_pendentes
+    passo: "0"
+    corrige: reler
+    custo: 1
+    gestos: [Ctrl+R (relê os pendentes com os padrões ensinados nas páginas anteriores)]
+  - id: ensinar_da_fila
+    passo: "0"
+    corrige: substituicao_da_fila
+    custo: 2
+    gestos: [digitar o caractere (o glifo é o primeiro da fila, que a janela já mostra com o campo selecionado), Enter]
+    efeito: ensina o padrão; depois do Enter a janela vai sozinha ao próximo da fila
+  - id: ensinar_glifo
+    passo: "0"
+    corrige: substituicao
+    custo: 3
+    gestos: [clique no box (Imagem), digitar o caractere (o campo vem selecionado), Enter]
+    efeito: ensina o padrão, e a propagação pode corrigir outras ocorrências
+  - id: descartar_box
+    passo: "0"
+    corrige: sobra
+    custo: 2
+    gestos: [clique no box, clique em "Não é caractere" (o Del não dispara com o foco no campo)]
+  - id: marcar_glifo
+    passo: "0"
+    corrige: falta
+    custo: 4
+    gestos: [Ctrl+T (modo de treino), arrastar o quadro, digitar o caractere, Shift+Enter]
+  - id: dividir_glifo
+    passo: "0"
+    corrige: divisao
+    custo: 2
+    gestos: [clique no box, Ctrl+D (corta no vão da tinta)]
+  - id: juntar_glifos
+    passo: "0"
+    corrige: juncao
+    custo: 2
+    gestos: [clique no primeiro box, Ctrl+J (junta com o seguinte da linha)]
+  - id: abrir_diagrama
+    passo: "0"
+    corrige: abrir_diagrama
+    custo: 1
+    gestos: [clique no diagrama (abre a conferência)]
+  - id: corrigir_casa
+    passo: "0"
+    corrige: casa
+    custo: 2
+    gestos: [clique na casa, tecla da peça (ou Delete)]
+  - id: corrigir_lado
+    passo: "0"
+    corrige: lado
+    custo: 1
+    gestos: [clique no lado a jogar (brancas ou pretas) na conferência]
+  - id: fechar_diagrama
+    passo: "0"
+    corrige: fechar_diagrama
+    custo: 1
+    gestos: [Ctrl+Enter (conferido)]
+  - id: espaco_no_documento
+    passo: D1
+    conferir_no_passo: D1
+    corrige: espaco
+    custo: 2
+    gestos: [clique no ponto do Documento, espaço ou Backspace (confirma ao sair da palavra)]
+  - id: corrigir_no_documento
+    passo: D1
+    conferir_no_passo: D1
+    corrige: substituicao
+    custo: 3
+    gestos: [clique depois do caractere errado no Documento, Backspace, digitar o certo]
+    efeito: corrige sem ensinar (o replay o usa depois que o caractere já foi ensinado)

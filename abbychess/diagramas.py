@@ -95,11 +95,18 @@ class DiagramaLido:
     #: Os rótulos impressos decidiram a orientação. Sem eles, é suposição.
     orientacao_confirmada: bool = False
     titulo: str = ""
+    #: O título que o core releu em volta do tabuleiro; o lado sai dele quando a linha
+    #: de boxes da legenda não diz (`rederivar_lado`).
+    titulo_do_core: str = ""
+    #: Os lados (`acima`, `abaixo`) em que o core achou os rótulos `a`–`h`: não são legenda.
+    lados_de_rotulo: Tuple[str, ...] = ()
     conferido: bool = False
     #: Por que o porteiro do PyBoxEditor não confia na leitura; vazio se confia.
     motivo: str = ""
     #: Por que não deu para ler (modelo ausente, recorte ruim).
     erro: str = ""
+    #: Estável na página (`d0`, `d1`…): é o que o documento cita (§4.2). Vazio até gravar.
+    id: str = ""
 
     # ------------------------------------------------------------------
     @property
@@ -168,6 +175,7 @@ class DiagramaLido:
     # ------------------------------------------------------------------
     def para_json(self) -> dict:
         return {
+            "id": self.id,
             "caixa": [int(v) for v in self.caixa],
             "fen": self.fen,
             "casas": [[c.simbolo or "", round(float(c.confianca), 4), bool(c.arbitrada),
@@ -180,6 +188,8 @@ class DiagramaLido:
             "orientacao": self.orientacao,
             "orientacao_confirmada": self.orientacao_confirmada,
             "titulo": self.titulo,
+            "titulo_do_core": self.titulo_do_core,
+            "lados_de_rotulo": list(self.lados_de_rotulo),
             "conferido": self.conferido,
             "motivo": self.motivo,
             "erro": self.erro,
@@ -199,8 +209,27 @@ class DiagramaLido:
                    roque=bruto.get("roque", ""),
                    orientacao=bruto.get("orientacao", "branca"),
                    orientacao_confirmada=bool(bruto.get("orientacao_confirmada", False)),
-                   titulo=bruto.get("titulo", ""), conferido=bool(bruto.get("conferido", False)),
-                   motivo=bruto.get("motivo", ""), erro=bruto.get("erro", ""))
+                   titulo=bruto.get("titulo", ""),
+                   # Gravado antes do campo, o título é o que se tem do core.
+                   titulo_do_core=bruto.get("titulo_do_core", bruto.get("titulo", "")),
+                   lados_de_rotulo=tuple(bruto.get("lados_de_rotulo", ())),
+                   conferido=bool(bruto.get("conferido", False)),
+                   motivo=bruto.get("motivo", ""), erro=bruto.get("erro", ""),
+                   id=str(bruto.get("id") or ""))
+
+
+def com_ids(diagramas: Sequence[DiagramaLido]) -> List[DiagramaLido]:
+    """Os diagramas com `id` cada um: os que não têm ganham o próximo `dN` livre."""
+    usados = {d.id for d in diagramas if d.id}
+    proximo, saida = 0, []
+    for d in diagramas:
+        if not d.id:
+            while f"d{proximo}" in usados:
+                proximo += 1
+            d = replace(d, id=f"d{proximo}")
+            usados.add(d.id)
+        saida.append(d)
+    return saida
 
 
 def afirmar_lado(tabuleiro: TabuleiroEdicao, lado: str) -> bool:
@@ -247,24 +276,49 @@ def ler_diagrama(imagem, caixa: Caixa, *, escala: Optional[float] = None, classi
     if len(leitura.casas) != 64:
         motivo = next((a for a in leitura.avisos if a != diagrama.AVISO_CONVENCAO), "")
         return DiagramaLido(caixa, erro=motivo or "não deu para ler o tabuleiro")
-    texto_do_titulo = titulo.texto
-    dito = lado_a_jogar.ler(texto_do_titulo)
-    if boxes:
-        # As linhas da página valem mais que a releitura do core: trazem os
-        # padrões do livro e as correções do usuário (ver `legendas_dos_boxes`).
-        legendas = legendas_dos_boxes(boxes, caixa, rotulos.lados)
-        da_pagina = lado_a_jogar.ler_varios(*legendas)
-        if da_pagina and da_pagina.lado:
-            dito, texto_do_titulo = da_pagina, " / ".join(legendas)
-    dito = dito if dito and dito.lado else None
     ok, motivo = diagrama.confiavel(leitura)
-    return DiagramaLido(caixa, casas=leitura.casas,
-                        lado=dito.lado if dito else None,
-                        lado_origem=LADO_DA_LEGENDA if dito else "",
-                        lado_trecho=dito.trecho if dito else "",
-                        orientacao=leitura.orientacao,
+    lido = DiagramaLido(caixa, casas=leitura.casas, orientacao=leitura.orientacao,
                         orientacao_confirmada=rotulos.orientacao is not None,
-                        titulo=texto_do_titulo, motivo="" if ok else motivo)
+                        titulo_do_core=titulo.texto, lados_de_rotulo=tuple(rotulos.lados),
+                        motivo="" if ok else motivo)
+    return _com_lado(lido, legendas_dos_boxes(boxes, caixa, rotulos.lados) if boxes else [])
+
+
+def _com_lado(d: DiagramaLido, legendas: Sequence[str]) -> DiagramaLido:
+    """O diagrama com o lado, a procedência, o trecho e o título que a página diz.
+
+    As linhas da página valem mais que a releitura do core: trazem os padrões do
+    livro e as correções do usuário (ver `legendas_dos_boxes`). Sem lado nelas,
+    vale o título do core.
+    """
+    dito, titulo = lado_a_jogar.ler(d.titulo_do_core), d.titulo_do_core
+    da_pagina = lado_a_jogar.ler_varios(*legendas) if legendas else None
+    if da_pagina and da_pagina.lado:
+        dito, titulo = da_pagina, " / ".join(legendas)
+    dito = dito if dito and dito.lado else None
+    return replace(d, lado=dito.lado if dito else None,
+                   lado_origem=LADO_DA_LEGENDA if dito else "",
+                   lado_trecho=dito.trecho if dito else "", titulo=titulo)
+
+
+def rederivar_lados(diagramas: Sequence[DiagramaLido], antes: Sequence[BoxEntry],
+                    depois: Sequence[BoxEntry]) -> List[DiagramaLido]:
+    """Os diagramas com o lado dito de novo pela legenda, quando a linha dela mudou.
+
+    Ensinar, corrigir, dividir ou juntar um box da legenda muda o que ela diz,
+    e o lado não espera o F5 seguinte: sai das linhas de boxes de `depois`, sem
+    reler o tabuleiro (só `lado`, `lado_origem`, `lado_trecho` e `titulo`). Só
+    muda o diagrama cuja legenda mudou entre `antes` e `depois`; o conferido e o
+    de lado informado por quem conferiu ficam como estão.
+    """
+    saida = []
+    for d in diagramas:
+        if d.lido and not d.conferido and d.lado_origem != LADO_DO_USUARIO:
+            agora = legendas_dos_boxes(depois, d.caixa, d.lados_de_rotulo)
+            if agora != legendas_dos_boxes(antes, d.caixa, d.lados_de_rotulo):
+                d = _com_lado(d, agora)
+        saida.append(d)
+    return saida
 
 
 def legendas_dos_boxes(boxes: Sequence[BoxEntry], caixa: Caixa,
@@ -414,35 +468,13 @@ def texto_da_pagina(boxes: Sequence[BoxEntry], diagramas: Sequence[DiagramaLido]
     pontos, exclamação ou interrogação. Assim o parágrafo que contorna o
     tabuleiro não é partido no meio, e "Veja a posição ao lado:" fica antes
     da posição. Sem fim de frase depois dele, o diagrama vai para o fim.
+
+    A regra mora em `abbychess.texto.montar`; aqui é o modo `san`, como sempre foi.
     """
-    from core.notacao import palavras_da_pagina
+    from abbychess import texto as tx
 
-    lidos = [b for b in boxes if b.char]
-    linhas = []
-    for linha in (palavras_da_pagina(lidos) if lidos else []):
-        indices = [s.indice for p in linha for s in p.simbolos]
-        texto = " ".join(p.texto for p in linha)
-        topo = min((lidos[i].y1 for i in indices), default=0)
-        linhas.append((topo, texto))
-    altura = float(np.median([b.y2 - b.y1 for b in lidos])) if lidos else 0.0
-
-    antes_da_linha: dict = {}
-    ordem = sorted(range(len(diagramas)), key=lambda i: (diagramas[i].caixa[1], diagramas[i].caixa[0]))
-    for numero, i in enumerate(ordem, start=1):
-        y1 = diagramas[i].caixa[1]
-        lugar = len(linhas)
-        for j in range(1, len(linhas)):
-            if linhas[j][0] >= y1 - altura and _FIM_DE_FRASE.search(linhas[j - 1][1]):
-                lugar = j
-                break
-        antes_da_linha.setdefault(lugar, []).append(diagramas[i].linha_de_texto(numero))
-
-    saida = []
-    for j, (_topo, texto) in enumerate(linhas):
-        saida.extend(antes_da_linha.get(j, []))
-        saida.append(texto)
-    saida.extend(antes_da_linha.get(len(linhas), []))
-    return "\n".join(saida)
+    pagina = tx.pagina_avulsa(boxes, diagramas)
+    return tx.texto(tx.montar(pagina), pagina.diagramas, modo=tx.SAN)
 
 
 # ----------------------------------------------------------------------

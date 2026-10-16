@@ -1,0 +1,42 @@
+{
+ "data": "2026-10-16",
+ "rotulo": "repeticao-0-parcial",
+ "exitstatus": 0,
+ "metas_ausentes": [
+  "troca_de_pagina",
+  "enter_ensinar",
+  "releitura_de_um_glifo",
+  "memoria_do_desfazer"
+ ],
+ "ordem": "os testes do módulo dividem a janela e os padrões, em ordem fixa: o Enter ensina antes do lote, e o lote lê com esses padrões",
+ "ambiente": {
+  "maquina": "DESKTOP-E025G20",
+  "maquina_cadastrada": true,
+  "cpu": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
+  "ram_gb": 15.9,
+  "python": "3.13.2",
+  "pyside6": "6.11.1",
+  "pymupdf": "1.26.6",
+  "torch": "2.14.0+cpu",
+  "threads_do_torch": 6,
+  "commit": "25e81b1",
+  "arvore_suja": false
+ },
+ "medidas": {
+  "atraso_durante_o_lote": {
+   "paginas": 20,
+   "p99_ms": 7.7,
+   "p95_ms": 6.1,
+   "max_ms": 100.4,
+   "disparos": 9777,
+   "duracao_s": 158.3,
+   "alvo_p99_ms": 50,
+   "acoes_durante_o_lote": "desabilitadas ou ignoradas (executor ocupado)"
+  },
+  "memoria_total_com_o_lote": {
+   "rss_pico_mb": 1493,
+   "alvo_mb": 2560,
+   "como": "pico do RSS do processo único durante um lote de 20 páginas"
+  }
+ }
+}

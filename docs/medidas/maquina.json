@@ -1,0 +1,15 @@
+{
+ "nome": "DESKTOP-E025G20",
+ "cpu": "AMD Ryzen 5 3600 6-Core Processor",
+ "nucleos": 6,
+ "threads": 12,
+ "ram_gb": 15.9,
+ "so": "Windows-10-10.0.19045-SP0",
+ "python": "3.13.2",
+ "pyside6": "6.11.1",
+ "pymupdf": "1.26.6",
+ "torch": "2.14.0+cpu",
+ "numpy": "2.2.6",
+ "cadastrada_em": "2026-10-16",
+ "nota": "Só nesta máquina as metas de desempenho reprovam (SPEC §15.3); noutra, o banco só reporta."
+}

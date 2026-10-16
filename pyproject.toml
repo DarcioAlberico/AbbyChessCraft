@@ -9,10 +9,17 @@ description = "OCR de livros de xadrez com treino de padrões por livro, sobre o
 requires-python = ">=3.11"
 # O PyBoxEditor não está no PyPI: instale-o em modo editável antes deste pacote
 #   pip install -e C:\Python-Chess2\PyBoxEditor_Tkinter --no-deps
-dependencies = ["PySide6>=6.6", "numpy", "opencv-python", "Pillow", "PyMuPDF", "python-docx"]
+# PyYAML lê `docs/atalhos.yaml` (abbychess.atalhos). O YAML ainda mora em docs/, fora do
+# pacote: no passo A2, quando a janela passa a registrar os atalhos dele, ele vira dado do
+# pacote (package-data) para valer também numa instalação sem o checkout.
+dependencies = ["PySide6>=6.6", "numpy", "opencv-python", "Pillow", "PyMuPDF", "python-docx",
+                "PyYAML>=6.0"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+# pytest-timeout e psutil já são usados; hypothesis entra no passo 1b (CA-4.3),
+# pytest-qt no A2 e regex no B, pelo roadmap.
+dev = ["pytest>=8.0", "pytest-qt>=4.4", "pytest-timeout>=2.3", "hypothesis>=6.100",
+       "regex>=2024.0", "psutil>=5.9"]
 
 [project.scripts]
 abbychess = "abbychess.app.principal:main"
@@ -22,3 +29,12 @@ packages = ["abbychess", "abbychess.app"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+timeout = 60
+# A suíte rápida (pytest -q) deixa de fora as camadas lentas; cada uma roda com -m (SPEC §15.1).
+addopts = "-m 'not livro_real and not desempenho and not processo and not noturno'"
+markers = [
+    "livro_real: usa PDFs de livros reais e os modelos globais; com ABBY_PORTAO=1, ausência é falha",
+    "desempenho: mede tempo ou memória (p95, máquina cadastrada em docs/medidas/maquina.json)",
+    "processo: abre processos filhos (spawn) ou mata processos; só correção",
+    "noturno: propriedades com muitos exemplos e matanças repetidas",
+]

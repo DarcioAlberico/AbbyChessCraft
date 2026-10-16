@@ -26,6 +26,7 @@ from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 from tests import test_janela  # noqa: E402
 from tests.test_janela import _esperar  # noqa: E402
 from tests.test_treino_por_livro import _pagina_sintetica  # noqa: E402
+from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
 app = test_janela.app
 janela = test_janela.janela
@@ -142,8 +143,8 @@ def test_lote_mantem_o_glifo_marcado(tmp_path):
 
 
 def test_f5_numa_pagina_marcada_nao_pergunta_e_mantem_os_quadros(app, janela, monkeypatch):
-    a = pg.segmentar(janela.imagem)[0]
-    janela._criar_box(a.x1 - 3, a.y1 - 3, a.x2 + 3, a.y2 + 3)
+    a = pg.segmentar(janela.pagina.imagem)[0]
+    janela.pagina.marcar(a.x1 - 3, a.y1 - 3, a.x2 + 3, a.y2 + 3)
     janela.treino.campo.setText("a")
     janela.treino._so_corrigir()
     assert not janela.projeto.pagina_reconhecida(0) and janela.projeto.carregar_pagina(0)
@@ -155,9 +156,9 @@ def test_f5_numa_pagina_marcada_nao_pergunta_e_mantem_os_quadros(app, janela, mo
     janela.reconhecer()
     _esperar(app, janela)
 
-    assert janela.reconhecida and janela.projeto.pagina_reconhecida(0)
-    assert (janela.boxes[0].char, janela.boxes[0].source) == ("a", FONTE_MANUAL)
-    assert sum(b.x1 == a.x1 and b.y1 == a.y1 for b in janela.boxes) == 1
+    assert janela.pagina.reconhecida and janela.projeto.pagina_reconhecida(0)
+    assert (boxes(janela)[0].char, boxes(janela)[0].source) == ("a", FONTE_MANUAL)
+    assert sum(b.x1 == a.x1 and b.y1 == a.y1 for b in boxes(janela)) == 1
 
 
 @pytest.mark.parametrize("reconhecida", [True, False])
@@ -165,10 +166,10 @@ def test_desfazer_o_f5_devolve_a_marca_da_pagina(app, janela, reconhecida):
     if reconhecida:
         janela.reconhecer()
         _esperar(app, janela)
-    a = pg.segmentar(janela.imagem)[0]
-    janela._criar_box(a.x1 - 3, a.y1 - 3, a.x2 + 3, a.y2 + 3)
+    a = pg.segmentar(janela.pagina.imagem)[0]
+    janela.pagina.marcar(a.x1 - 3, a.y1 - 3, a.x2 + 3, a.y2 + 3)
     janela.reconhecer()
     _esperar(app, janela)
-    janela.desfazer()
-    assert janela.reconhecida == reconhecida
+    janela.pagina.desfazer()
+    assert janela.pagina.reconhecida == reconhecida
     assert janela.projeto.pagina_reconhecida(0) == reconhecida

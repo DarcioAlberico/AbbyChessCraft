@@ -427,7 +427,14 @@ def _escrever_camada(page, boxes: Sequence[BoxEntry], escala: float, fontes, res
 
 def _escrever_fens(page, diagramas: Sequence[DiagramaLido], escala: float, fontes,
                    resumo) -> None:
-    """O FEN dos diagramas confiáveis, invisível na faixa de cima do tabuleiro."""
+    """O FEN dos diagramas confiáveis, invisível no alto do tabuleiro, e o lado a jogar.
+
+    O FEN fica sozinho na faixa de cima, para a busca achá-lo inteiro; na faixa
+    de baixo dela vai a marca do lado, como no texto alternativo do DOCX e do
+    EPUB: o `w` que ninguém disse sai "assumido", e o diagrama que ninguém
+    conferiu, "não revisado".
+    """
+    from core import lado_a_jogar
     from core.searchable_pdf import FONTE_OCR
 
     fonte = fontes[0]
@@ -435,8 +442,12 @@ def _escrever_fens(page, diagramas: Sequence[DiagramaLido], escala: float, fonte
         if not d.confiavel:
             continue
         x1, y1, x2, y2 = d.caixa
-        faixa = BoxEntry(d.fen, x1, y1, x2, y1 + max(10, (y2 - y1) // 8))
+        altura = max(10, (y2 - y1) // 8)
+        faixa = BoxEntry(d.fen, x1, y1, x2, y1 + altura)
         _escrever(page, faixa, d.fen, FONTE_OCR, fonte, escala)
+        marca = d.marca_do_lado() + ("" if d.conferido else f"; {lado_a_jogar.NAO_REVISADO}")
+        _escrever(page, BoxEntry(marca, x1, y1 + altura, x2, y1 + 2 * altura), marca,
+                  FONTE_OCR, fonte, escala)
         resumo.fens += 1
 
 

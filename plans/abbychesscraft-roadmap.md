@@ -35,12 +35,14 @@ Paralelos, só com git e worktrees e com arquivos disjuntos:
   - `ABBY_PORTAO=1 .venv\Scripts\python.exe -m pytest -q -m "livro_real or desempenho"` no
     fechamento;
   - `C:\Python-Chess2\PyBoxEditor_Tkinter\.venv\Scripts\python.exe -m ruff check --select E,F --line-length 110 abbychess tests`;
-  - `.venv\Scripts\python.exe ferramentas\medir.py --livro xv --paginas 21-27`, com o JSON
-    citado no README.
+  - `.venv\Scripts\python.exe ferramentas\medir.py --livro xv --indices 0,7,20-26` (e os
+    outros livros, com os comandos do README), com o JSON citado no README.
 - README: fluxo, "O que foi medido" (pelo JSON) e "Limitações conhecidas".
 - Fechamento com as três revisões de §16 (nota ≥ 8 em cada eixo), registradas em
   `docs/revisoes/passo-N.md`.
-- Com git: um ramo e um commit por passo. Sem git: cópia da pasta antes do passo
+- Com git: um ramo por passo, com o commit do código, o das correções de cada rodada de
+  revisão e o das medidas (para cada medida registrar o commit que mediu); a tag do passo no
+  commit aprovado. Sem git: cópia da pasta antes do passo
   (`robocopy . ..\AbbyChessCraft_backup_passoN /E /XD .venv rea`).
 
 ## Dependências
@@ -105,10 +107,17 @@ Paralelos, só com git e worktrees e com arquivos disjuntos:
      - Xadrez Vitorioso, índices 20–26;
      - Yusupov, escolher o PDF e fixá-lo por `pdf_sha256`, mais uma página de duas colunas e
        uma de uma;
-     - Darcy Lima, p. 26–27;
+     - Darcy Lima, índices 25–26 (p. 26–27 do PDF, impressas 27–28);
      - três páginas negativas;
-   - conferência cega de 1 página por livro;
+   - a estrutura pelo assistente; o texto pelo usuário (`texto-exportar` / `texto-importar`),
+     porque o assistente não transcreve o texto dos livros (direito autoral);
+   - conferência cega de 1 página por livro, pelo usuário;
    - revisão pelo usuário (§18.3).
+   - Até o texto ser verificado, as medidas de texto ficam "pendentes"; as de estrutura e
+     de diagrama ficam "provisórias" até a revisão e a conferência dos FEN (spec §15.2).
+     **Prazo**: as etapas do usuário não bloqueiam os passos 1a a A2; o texto e os FEN das
+     p. 21–27 do Xadrez Vitorioso têm de estar verificados antes do fechamento do A3, que é o
+     primeiro passo julgado pelo CA-F.1.
 7. **Medidas**:
    - `ferramentas/medir.py`, `tests/desempenho/` e `docs/medidas/maquina.json`;
    - o snapshot `tests/dados/fatia/xv-i020-026-inicial.zip`, `ferramentas/replay_fatia.py` e o
@@ -116,8 +125,10 @@ Paralelos, só com git e worktrees e com arquivos disjuntos:
    - a linha de base de §2, com o replay da fatia sobre a interface de hoje;
    - `docs/medidas/protocolo-fatia.md`.
 
-**Saída.** Primeiro commit, gabaritos revisados e
-`docs/medidas/<data>-linha-de-base.json`.
+**Saída.** O passo em git, com a tag `passo-0` no commit aprovado pelas revisões; os
+gabaritos com a estrutura rotulada pelo assistente (a revisão, o texto e a conferência cega
+são do usuário, no prazo da tarefa 6); `docs/medidas/<data>-linha-de-base.json`, as medidas
+de qualidade dos três livros e a da fatia, medidas com a árvore limpa.
 
 ## Passo 1a — Persistência, ainda no formato v1
 
@@ -179,6 +190,20 @@ servidor) e CA-14.1 (se não fechar só com o `ControladorDePagina`, extrair tam
 verificação e dos diagramas); a caracterização. Daqui em diante, `Box` e `BoxEntry` não são
 mutados no lugar.
 
+**A volta do custo do 1a e do 1b.** O 1a pôs `fsync` síncrono em cada gravação (uns 10 ms
+na mediana do Enter), e o 1b a reconciliação da lista da janela com o modelo (mais 10 a 15 ms
+na do Enter e na da releitura; `docs/revisoes/passo-1a.md` e `passo-1b.md`). O 2a tira as
+gravações da thread da interface e a janela passa a editar o modelo, sem reconciliar; a
+verificação dele inclui 6 rodadas completas de desempenho, 3 sem o congelamento
+(`ABBY_SEM_CONGELAR=1`, `ABBY_ROTULO_DA_MEDIDA=repeticao-2a_sem_congelar`) e 3 com ele
+(`repeticao-2a`, como o programa roda). Pelas **sem congelamento**, comparadas pela mediana
+(p50) com as do passo 0 (que também não congelava), a mediana do Enter e a da releitura
+voltam à faixa do passo 0 (em 2026-10-16: Enter 104–105 ms, releitura 106–108 ms), com 5 ms
+de tolerância, em pelo menos 2 das 3 rodadas. Pelas **com congelamento**, o p95 da
+releitura não fica pior que o do 1b (154–159 ms) e o do Enter não volta à faixa alta de
+~200 ms; o alvo de 150 ms para o p95 da releitura é do passo 2b, que tira a cópia da página
+inteira do desfazer.
+
 ## Passo 2b — Desfazer e propagação (§14.2)
 
 **Tarefas.**
@@ -186,10 +211,23 @@ mutados no lugar.
    - `Transacao` com pré-condição por gid;
    - limite de 50 MB;
    - cobre o esquecer padrão e as zonas.
-2. Propagação assíncrona que emenda a transação do Enter, com token de invalidação.
+2. Propagação assíncrona que emenda a transação do Enter, com token de invalidação; o
+   painel de treino volta a valer logo depois da parte síncrona do Enter (no 2a ele fica
+   desligado até o fim da propagação).
 3. Medir o Enter: alvo de 100 ms.
 
 **Verificação.** CA-4.3 (parte do 2b), CA-14.2 e CA-14.3; a meta do Enter [desempenho].
+
+**O desempenho do 2b.** O 2a já tirou da interface a gravação, a reconciliação e a cópia
+funda do desfazer: o p95 da releitura ficou em 86–106 ms (o alvo de 150 está alcançado) e o
+do Enter em 90–116 ms (`docs/revisoes/passo-2a.md`). A verificação do 2b inclui 3 rodadas
+completas com o congelamento (`repeticao-2b`) e 3 sem (`repeticao-2b_sem_congelar`): o
+Enter é medido até a cor mudar (a parte síncrona, como §2 pede) e fica ≤ 100 ms no p95 em
+pelo menos 2 das 3 com o congelamento (o 2a, medindo até o fim da propagação, já deu 2 de
+3); as medianas do Enter (até o fim da propagação, como no 2a) e da releitura não sobem
+mais de 5 ms acima das do 2a; a memória do desfazer estimada fica
+≤ 50 MB; e as rodadas dizem se o congelamento (`gc.freeze`) continua. O alvo de §2 "com o
+lote rodando" é do passo E, o primeiro que deixa medir isso.
 
 ## Passo A1 — Visor novo (§3.3)
 
@@ -432,9 +470,6 @@ aviso.
 
 - **0.2 (2026-10-15)**: fatia vertical, passo 1 dividido, desfazer unificado, passos I e L,
   dependências corrigidas (rodada 1, `docs/revisoes/rodada-1.md`).
-- **0.4 (2026-10-15)** (rodada 3, `docs/revisoes/rodada-3.md`): verificações por parte, cada
-  uma no passo em que pode passar (CA-4.2, 4.3, 3.2, 3.8, 5.3); `desde_passo` nos atalhos;
-  catálogo de comandos do replay; capturas no A2.
 - **0.3 (2026-10-15)** (rodada 2, `docs/revisoes/rodada-2.md`):
   - Ordem serial explícita.
   - 1b e 1c viraram um passo só, e o formato v2 nasce inteiro.
@@ -444,3 +479,14 @@ aviso.
   - Dependências do I e do F corrigidas.
   - Os tokens de estado entraram no A1.
   - O perfil FineReader foi para o K.
+- **0.4 (2026-10-15)** (rodada 3, `docs/revisoes/rodada-3.md`): verificações por parte, cada
+  uma no passo em que pode passar (CA-4.2, 4.3, 3.2, 3.8, 5.3); `desde_passo` nos atalhos;
+  catálogo de comandos do replay; capturas no A2.
+- **0.5 (2026-10-16)** (fechamento do passo 0, `docs/revisoes/passo-0.md`): a saída do
+  passo 0 deixa de esperar os gabaritos revisados pelo usuário, que têm prazo até o
+  fechamento do A3; a linha de base fica presa à tag `passo-0`; o catálogo do replay ganhou
+  `ensinar_da_fila` e `reler_pendentes`.
+- **0.6 (2026-10-16)** (fechamento do passo 2a, `docs/revisoes/passo-2a.md`): o critério de
+  desempenho do 2b foi refeito (o p95 da releitura já está no alvo; o do Enter ≤ 100 ms em 2
+  de 3 rodadas; a memória do desfazer ≤ 50 MB); o 2b religa o painel de treino logo depois
+  da parte síncrona do Enter.

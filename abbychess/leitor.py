@@ -42,6 +42,9 @@ class Leitura:
     char: str
     fonte: str
     confianca: float
+    #: O padrão do livro que deu a leitura (caminho relativo à pasta dos padrões, com /),
+    #: ou `None` quando ela não veio do livro (procedência, §4.1).
+    amostra: Optional[str] = None
 
 
 class _SemEasyOCR:
@@ -108,6 +111,16 @@ class LeitorDoLivro:
         return cls(pasta_de_padroes, limiares=limiares, ocr=OCRService(),
                    rede=rede, base=servico._get_learner(), easyocr=easyocr)
 
+    def para_propagar(self) -> "LeitorDoLivro":
+        """Um leitor só com os padrões do livro de agora (`PadroesDoLivro.instantaneo`), para
+        a propagação de um Enter rodar fora da interface enquanto o Enter seguinte ensina.
+        Serve para `ler_pelo_livro` e para a fila de revisão; não lê pela cadeia global."""
+        foto = object.__new__(LeitorDoLivro)
+        foto.__dict__.update(self.__dict__)
+        foto.padroes = self.padroes.instantaneo()
+        foto.ocr = foto.rede = foto.base = None
+        return foto
+
     def trocar_limiares(self, limiares: Limiares) -> None:
         """Passa a ler com outros limiares, sem recarregar os modelos."""
         self.limiares = limiares
@@ -121,7 +134,8 @@ class LeitorDoLivro:
         """Só os padrões do livro. É o que basta para propagar um padrão novo."""
         resposta = self.padroes.ler(recorte, altura_relativa(recorte, altura_de_referencia))
         if resposta.char:
-            return Leitura(resposta.char, FONTE_LIVRO, resposta.confianca)
+            return Leitura(resposta.char, FONTE_LIVRO, resposta.confianca,
+                           self.padroes.relativo(resposta.caminho))
         return Leitura("", FONTE_NENHUMA, 0.0)
 
     def ler(self, recorte: np.ndarray, *, altura_de_referencia: Optional[float] = None
@@ -187,6 +201,34 @@ def precisa_revisao(char: str, fonte: str, confianca: float, limiares: Limiares)
     return confianca < limiares.revisao
 
 
-def nome_de_origem(projeto_nome: str, pagina: int, indice_box: int) -> str:
-    """Nome do arquivo de padrão que diz de onde a amostra veio."""
-    return f"{nome_de_pasta(projeto_nome)}_p{pagina + 1:04d}_b{indice_box:05d}"
+def congelar_para_a_coleta_de_lixo() -> int:
+    """Tira da coleta de lixo do Python tudo o que está vivo agora; devolve quantos objetos
+    (0: não congelou).
+
+    **Desligado desde o passo 2b**; `ABBY_CONGELAR=1` liga. No 1b ele tirava os picos do
+    Enter que a reconciliação da janela causava (a rede e a base são centenas de milhares de
+    objetos, e cada coleta completa os percorria); o 2a tirou a reconciliação, e nas rodadas
+    do 2b (3 com e 3 sem, `docs/revisoes/passo-2b.md`) ele não ajudou em nada e ainda
+    prendia a memória do que estivesse vivo na hora. Fica para medir de novo, se um passo
+    voltar a ter coletas longas na thread da interface.
+
+    Ligado: é para chamar logo depois de carregar os modelos globais. O congelamento de antes
+    é desfeito primeiro, e o que morreu desde então é recolhido antes de congelar.
+    """
+    import gc
+    import os
+
+    if os.environ.get("ABBY_CONGELAR") != "1":
+        return 0
+    gc.unfreeze()
+    gc.collect()
+    gc.freeze()
+    return gc.get_freeze_count()
+
+
+def nome_de_origem(projeto_nome: str, pagina: int, indice_box: int,
+                   gid: Optional[int] = None) -> str:
+    """Nome do arquivo de padrão que diz de onde a amostra veio: o glifo de origem pelo gid
+    (estável, §4.1), e a página e a posição só para quem lê o nome."""
+    base = f"{nome_de_pasta(projeto_nome)}_p{pagina + 1:04d}_b{indice_box:05d}"
+    return base if gid is None else f"{base}_g{gid:x}"

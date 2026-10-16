@@ -1,0 +1,1225 @@
+{
+ "livro": "yusupov",
+ "pdf": "Artur Yusupov - Chess Evolution 1 - The Fundamentals (Quality Chess 2011) - editable.pdf",
+ "pdf_sha256": "91f85227cdb43980b49e80f2e6f29d9ab92aabfac5652942a383df5695921427",
+ "indice_pdf": 12,
+ "pagina_impressa": 12,
+ "dpi_de_leitura": 300,
+ "render_sha256": "abb21f95c8b0b037b7d40a625ef99acebf6514905628f03d0c99b4e91bd46b3c",
+ "pymupdf": "1.26.6",
+ "inclinacao": 0.0,
+ "papel": 255,
+ "verdade_versao": 1,
+ "rotulado_por": "",
+ "revisado_por": "",
+ "blocos": [
+  {
+   "id": "b00",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.05309,
+    0.03672,
+    0.076,
+    0.04732
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "???=???",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b00b",
+   "funcao": "cabecalho",
+   "caixa_rel": [
+    0.49,
+    0.03672,
+    0.50567,
+    0.04732
+   ],
+   "ordem": 0,
+   "coluna": 0,
+   "texto_impresso": "T",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b01",
+   "funcao": "cabecalho",
+   "caixa_rel": [
+    0.50464,
+    0.03743,
+    0.56443,
+    0.04732
+   ],
+   "ordem": 1,
+   "coluna": 0,
+   "texto_impresso": "actics 1"
+  },
+  {
+   "id": "b02",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.06237,
+    0.05367,
+    0.08041,
+    0.07027
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "⩱ =?"
+  },
+  {
+   "id": "b03",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.06186,
+    0.07733,
+    0.06546,
+    0.09075
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "??"
+  },
+  {
+   "id": "b04",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.06392,
+    0.06956,
+    0.98144,
+    0.0904
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "?? ?⯹??⯹???⩲♖?♖♖?????=?==??????? ???=????????=??=??=?????????????????=???=???????=?=?=????=???????????? ?? ? ???? ????? = ??? ?? ???? ??? ?? ?? ???? ? ? ???? ??"
+  },
+  {
+   "id": "b05",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.06753,
+    0.08581,
+    0.08557,
+    0.09605
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "⩲ ??⩲?"
+  },
+  {
+   "id": "b06",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.06186,
+    0.09534,
+    0.06856,
+    0.10664
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "?"
+  },
+  {
+   "id": "b07",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.104,
+    0.10558,
+    0.232,
+    0.12147
+   ],
+   "ordem": 2,
+   "coluna": 0,
+   "texto_impresso": "?",
+   "caixa_estimada": true,
+   "diagrama": "d0"
+  },
+  {
+   "id": "b07b",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.4835,
+    0.10558,
+    0.65619,
+    0.12147
+   ],
+   "ordem": 8,
+   "coluna": 1,
+   "texto_impresso": "met by 11...♕d6?+.",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b08",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.06134,
+    0.12359,
+    0.06598,
+    0.12677
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "?"
+  },
+  {
+   "id": "b09",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48557,
+    0.12288,
+    0.72371,
+    0.13806
+   ],
+   "ordem": 9,
+   "coluna": 1,
+   "texto_impresso": "11...♔b7 12.♕c6+ ♔b8—+"
+  },
+  {
+   "id": "b10",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.50258,
+    0.14407,
+    0.69175,
+    0.15501
+   ],
+   "ordem": 10,
+   "coluna": 1,
+   "texto_impresso": "Black went on to win."
+  },
+  {
+   "id": "b11",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.65052,
+    0.18114,
+    0.77835,
+    0.19562
+   ],
+   "ordem": 11,
+   "coluna": 1,
+   "texto_impresso": "Diagram 1-10"
+  },
+  {
+   "id": "b12",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.58763,
+    0.20551,
+    0.84021,
+    0.21893
+   ],
+   "ordem": 12,
+   "coluna": 1,
+   "texto_impresso": "A.Yusupov — A.Rustemov"
+  },
+  {
+   "id": "b13",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.64381,
+    0.22493,
+    0.78505,
+    0.23799
+   ],
+   "ordem": 13,
+   "coluna": 1,
+   "texto_impresso": "Bastia (rapid) 2004"
+  },
+  {
+   "id": "b14",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48557,
+    0.25247,
+    0.56753,
+    0.26695
+   ],
+   "ordem": 14,
+   "coluna": 1,
+   "texto_impresso": "1.♗xh7+!"
+  },
+  {
+   "id": "b15",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48557,
+    0.27366,
+    0.51753,
+    0.2839
+   ],
+   "ordem": 15,
+   "coluna": 1,
+   "texto_impresso": "1—0"
+  },
+  {
+   "id": "b16",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.50412,
+    0.2899,
+    0.94536,
+    0.30614
+   ],
+   "ordem": 16,
+   "coluna": 1,
+   "texto_impresso": "1...♘xh7 2.♕h5 leads to a quick mate, while after"
+  },
+  {
+   "id": "b17",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48557,
+    0.30756,
+    0.94381,
+    0.32451
+   ],
+   "ordem": 17,
+   "coluna": 1,
+   "texto_impresso": "1...♔h8 2.♗g6+ ♔g8 3.♗xf7+ ♖xf7 4.♖h8+! ♔xh8"
+  },
+  {
+   "id": "b18",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48454,
+    0.32698,
+    0.75773,
+    0.34322
+   ],
+   "ordem": 18,
+   "coluna": 1,
+   "texto_impresso": "5.♘xf7+ the black queen drops."
+  },
+  {
+   "id": "b19",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.65,
+    0.38383,
+    0.77629,
+    0.39831
+   ],
+   "ordem": 19,
+   "coluna": 1,
+   "texto_impresso": "Diagram 1-11"
+  },
+  {
+   "id": "b20",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.5134,
+    0.40678,
+    0.53505,
+    0.40749
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "?—"
+  },
+  {
+   "id": "b21",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.61392,
+    0.40678,
+    0.91495,
+    0.42196
+   ],
+   "ordem": 20,
+   "coluna": 1,
+   "texto_impresso": "?.Tal -WUnzick∟?"
+  },
+  {
+   "id": "b22",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.65258,
+    0.42832,
+    0.77474,
+    0.43821
+   ],
+   "ordem": 21,
+   "coluna": 1,
+   "texto_impresso": "Stoc?olm 1960"
+  },
+  {
+   "id": "b23",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48505,
+    0.45445,
+    0.73557,
+    0.46999
+   ],
+   "ordem": 22,
+   "coluna": 1,
+   "texto_impresso": "1.♗xf7+! ♔xf7 2.♕b3+ ♔f8"
+  },
+  {
+   "id": "b24",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.50206,
+    0.47352,
+    0.94433,
+    0.49047
+   ],
+   "ordem": 23,
+   "coluna": 1,
+   "texto_impresso": "2...♘d5 3.exd5+— is no better; nor is 2...♔g6"
+  },
+  {
+   "id": "b25",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48351,
+    0.49223,
+    0.94381,
+    0.50671
+   ],
+   "ordem": 24,
+   "coluna": 1,
+   "texto_impresso": "3.♘h4+ ♔h5 4.♕f3+ ♔xh4 5.♔h2 when Black is"
+  },
+  {
+   "id": "b26",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48351,
+    0.51201,
+    0.6366,
+    0.52331
+   ],
+   "ordem": 25,
+   "coluna": 1,
+   "texto_impresso": "mated next move."
+  },
+  {
+   "id": "b27",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.50052,
+    0.52895,
+    0.94485,
+    0.5459
+   ],
+   "ordem": 26,
+   "coluna": 1,
+   "texto_impresso": "After 2...♔f8 Black resigned, without waiting"
+  },
+  {
+   "id": "b28",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48299,
+    0.54767,
+    0.9433,
+    0.56391
+   ],
+   "ordem": 27,
+   "coluna": 1,
+   "texto_impresso": "for White to demonstrate the obvious 3.♘g5 ♘d5"
+  },
+  {
+   "id": "b29",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48299,
+    0.56744,
+    0.56701,
+    0.57945
+   ],
+   "ordem": 28,
+   "coluna": 1,
+   "texto_impresso": "4.exd5+–."
+  },
+  {
+   "id": "b30",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.64948,
+    0.6416,
+    0.77732,
+    0.65607
+   ],
+   "ordem": 29,
+   "coluna": 1,
+   "texto_impresso": "Diagram 1-12"
+  },
+  {
+   "id": "b31",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.59691,
+    0.66596,
+    0.83041,
+    0.67973
+   ],
+   "ordem": 30,
+   "coluna": 1,
+   "texto_impresso": "G.Kuzmin — VAkopian"
+  },
+  {
+   "id": "b32",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.63402,
+    0.68644,
+    0.79278,
+    0.69633
+   ],
+   "ordem": 31,
+   "coluna": 1,
+   "texto_impresso": "Rostov?on–Don 1993"
+  },
+  {
+   "id": "b33",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48505,
+    0.71292,
+    0.55567,
+    0.72987
+   ],
+   "ordem": 32,
+   "coluna": 1,
+   "texto_impresso": "1...♗g5!"
+  },
+  {
+   "id": "b34",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.50309,
+    0.73199,
+    0.79278,
+    0.74823
+   ],
+   "ordem": 33,
+   "coluna": 1,
+   "texto_impresso": "1...♕a1+ 2.♕e1 achieves nothing."
+  },
+  {
+   "id": "b35",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48299,
+    0.75141,
+    0.53969,
+    0.7666
+   ],
+   "ordem": 34,
+   "coluna": 1,
+   "texto_impresso": "2.fxg4"
+  },
+  {
+   "id": "b36",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.50206,
+    0.76871,
+    0.73711,
+    0.78496
+   ],
+   "ordem": 35,
+   "coluna": 1,
+   "texto_impresso": "2.♗xg5 ♕a1 + 3.♗f1 ♗c4–+"
+  },
+  {
+   "id": "b37",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48247,
+    0.78602,
+    0.64278,
+    0.80049
+   ],
+   "ordem": 36,
+   "coluna": 1,
+   "texto_impresso": "2...♗xd2∓ 3.♔f1?"
+  },
+  {
+   "id": "b38",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.50155,
+    0.80544,
+    0.86701,
+    0.82168
+   ],
+   "ordem": 37,
+   "coluna": 1,
+   "texto_impresso": "3.♕f2∓ would allow White to struggle on."
+  },
+  {
+   "id": "b39",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48299,
+    0.82309,
+    0.56546,
+    0.84004
+   ],
+   "ordem": 38,
+   "coluna": 1,
+   "texto_impresso": "3...♗xg4!"
+  },
+  {
+   "id": "b40",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48247,
+    0.84463,
+    0.51495,
+    0.85487
+   ],
+   "ordem": 39,
+   "coluna": 1,
+   "texto_impresso": "0-1"
+  },
+  {
+   "id": "b41",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.50103,
+    0.86017,
+    0.94278,
+    0.87712
+   ],
+   "ordem": 40,
+   "coluna": 1,
+   "texto_impresso": "If 3.♕xg4 then 3...♕a1+ 4.♔f2 ♕e1+ 5.♔f3"
+  },
+  {
+   "id": "b42",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.48196,
+    0.87924,
+    0.53608,
+    0.8923
+   ],
+   "ordem": 41,
+   "coluna": 1,
+   "texto_impresso": "♕e3#."
+  },
+  {
+   "id": "b43",
+   "funcao": "numero_de_pagina",
+   "caixa_rel": [
+    0.51907,
+    0.95657,
+    0.53814,
+    0.96681
+   ],
+   "ordem": 42,
+   "coluna": 0,
+   "texto_impresso": "12"
+  },
+  {
+   "id": "d0",
+   "funcao": "diagrama",
+   "caixa_rel": [
+    0.10309,
+    0.12818,
+    0.40052,
+    0.33227
+   ],
+   "ordem": 3,
+   "coluna": 0,
+   "texto_impresso": ""
+  },
+  {
+   "id": "d1",
+   "funcao": "diagrama",
+   "caixa_rel": [
+    0.10258,
+    0.40219,
+    0.4,
+    0.60699
+   ],
+   "ordem": 5,
+   "coluna": 0,
+   "texto_impresso": ""
+  },
+  {
+   "id": "d2",
+   "funcao": "diagrama",
+   "caixa_rel": [
+    0.10206,
+    0.67655,
+    0.39948,
+    0.88136
+   ],
+   "ordem": 7,
+   "coluna": 0,
+   "texto_impresso": ""
+  },
+  {
+   "id": "b44",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.104,
+    0.38383,
+    0.23,
+    0.39831
+   ],
+   "ordem": 4,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true,
+   "diagrama": "d1"
+  },
+  {
+   "id": "b45",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.103,
+    0.6564,
+    0.231,
+    0.6709
+   ],
+   "ordem": 6,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true,
+   "diagrama": "d2"
+  }
+ ],
+ "diagramas": [
+  {
+   "id": "d0",
+   "fen": "5rk1/pbr1nppp/1p1qpn2/3pN3/3P1P2/1PPB3R/P2NQ1PP/2R3K1",
+   "fen_lido": "5rk1/pbr1nppp/1p1qpn2/3pN3/3P1P2/1PPB3R/P2NQ1PP/2R3K1",
+   "lado": "w",
+   "legenda": "b07",
+   "lances_seguintes": [
+    "Bxh7+"
+   ],
+   "fen_verificado": false,
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
+  },
+  {
+   "id": "d1",
+   "fen": "3rr1k1/3nbppp/p1R2n2/q2Bp3/1p2P3/5N1P/PP1B1PP1/2RQ2K1",
+   "fen_lido": "3rr1k1/3nbppp/p1R2n2/q2Bp3/1p2P3/5N1P/PP1B1PP1/2RQ2K1",
+   "lado": "w",
+   "legenda": "b44",
+   "lances_seguintes": [
+    "Bxf7+",
+    "Kxf7",
+    "Qb3+",
+    "Kf8"
+   ],
+   "fen_verificado": false,
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
+  },
+  {
+   "id": "d2",
+   "fen": "q5k1/4bppp/3pb3/1N2p3/4P1n1/3B1PQ1/2PB2PP/6K1",
+   "fen_lido": "q5k1/4bppp/3pb3/1N2p3/4P1n1/3B1PQ1/2PB2PP/6K1",
+   "lado": "b",
+   "legenda": "b45",
+   "lances_seguintes": [
+    "Bg5",
+    "fxg4",
+    "Bxd2",
+    "Kf1",
+    "Bxg4"
+   ],
+   "fen_verificado": false,
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
+  }
+ ],
+ "linhas_corpo": [
+  {
+   "id": "l07",
+   "bloco": "b07",
+   "caixa_rel": [
+    0.104,
+    0.10558,
+    0.232,
+    0.12147
+   ],
+   "texto": "?",
+   "negrito": true,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l44",
+   "bloco": "b44",
+   "caixa_rel": [
+    0.104,
+    0.38383,
+    0.23,
+    0.39831
+   ],
+   "texto": "",
+   "negrito": true,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l45",
+   "bloco": "b45",
+   "caixa_rel": [
+    0.103,
+    0.6564,
+    0.231,
+    0.6709
+   ],
+   "texto": "",
+   "negrito": true,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l07b",
+   "bloco": "b07b",
+   "caixa_rel": [
+    0.4835,
+    0.10558,
+    0.65619,
+    0.12147
+   ],
+   "texto": "met by 11...♕d6?+.",
+   "negrito": false,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l09",
+   "bloco": "b09",
+   "caixa_rel": [
+    0.48557,
+    0.12288,
+    0.72371,
+    0.13806
+   ],
+   "texto": "11...♔b7 12.♕c6+ ♔b8—+",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l10",
+   "bloco": "b10",
+   "caixa_rel": [
+    0.50258,
+    0.14407,
+    0.69175,
+    0.15501
+   ],
+   "texto": "Black went on to win.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l11",
+   "bloco": "b11",
+   "caixa_rel": [
+    0.65052,
+    0.18114,
+    0.77835,
+    0.19562
+   ],
+   "texto": "Diagram 1-10",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l12",
+   "bloco": "b12",
+   "caixa_rel": [
+    0.58763,
+    0.20551,
+    0.84021,
+    0.21893
+   ],
+   "texto": "A.Yusupov — A.Rustemov",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l13",
+   "bloco": "b13",
+   "caixa_rel": [
+    0.64381,
+    0.22493,
+    0.78505,
+    0.23799
+   ],
+   "texto": "Bastia (rapid) 2004",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l14",
+   "bloco": "b14",
+   "caixa_rel": [
+    0.48557,
+    0.25247,
+    0.56753,
+    0.26695
+   ],
+   "texto": "1.♗xh7+!",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l15",
+   "bloco": "b15",
+   "caixa_rel": [
+    0.48557,
+    0.27366,
+    0.51753,
+    0.2839
+   ],
+   "texto": "1—0",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l16",
+   "bloco": "b16",
+   "caixa_rel": [
+    0.50412,
+    0.2899,
+    0.94536,
+    0.30614
+   ],
+   "texto": "1...♘xh7 2.♕h5 leads to a quick mate, while after",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l17",
+   "bloco": "b17",
+   "caixa_rel": [
+    0.48557,
+    0.30756,
+    0.94381,
+    0.32451
+   ],
+   "texto": "1...♔h8 2.♗g6+ ♔g8 3.♗xf7+ ♖xf7 4.♖h8+! ♔xh8",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l18",
+   "bloco": "b18",
+   "caixa_rel": [
+    0.48454,
+    0.32698,
+    0.75773,
+    0.34322
+   ],
+   "texto": "5.♘xf7+ the black queen drops.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l19",
+   "bloco": "b19",
+   "caixa_rel": [
+    0.65,
+    0.38383,
+    0.77629,
+    0.39831
+   ],
+   "texto": "Diagram 1-11",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l21",
+   "bloco": "b21",
+   "caixa_rel": [
+    0.61392,
+    0.40678,
+    0.91495,
+    0.42196
+   ],
+   "texto": "?.Tal -WUnzick∟?",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l22",
+   "bloco": "b22",
+   "caixa_rel": [
+    0.65258,
+    0.42832,
+    0.77474,
+    0.43821
+   ],
+   "texto": "Stoc?olm 1960",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l23",
+   "bloco": "b23",
+   "caixa_rel": [
+    0.48505,
+    0.45445,
+    0.73557,
+    0.46999
+   ],
+   "texto": "1.♗xf7+! ♔xf7 2.♕b3+ ♔f8",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l24",
+   "bloco": "b24",
+   "caixa_rel": [
+    0.50206,
+    0.47352,
+    0.94433,
+    0.49047
+   ],
+   "texto": "2...♘d5 3.exd5+— is no better; nor is 2...♔g6",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l25",
+   "bloco": "b25",
+   "caixa_rel": [
+    0.48351,
+    0.49223,
+    0.94381,
+    0.50671
+   ],
+   "texto": "3.♘h4+ ♔h5 4.♕f3+ ♔xh4 5.♔h2 when Black is",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l26",
+   "bloco": "b26",
+   "caixa_rel": [
+    0.48351,
+    0.51201,
+    0.6366,
+    0.52331
+   ],
+   "texto": "mated next move.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l27",
+   "bloco": "b27",
+   "caixa_rel": [
+    0.50052,
+    0.52895,
+    0.94485,
+    0.5459
+   ],
+   "texto": "After 2...♔f8 Black resigned, without waiting",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l28",
+   "bloco": "b28",
+   "caixa_rel": [
+    0.48299,
+    0.54767,
+    0.9433,
+    0.56391
+   ],
+   "texto": "for White to demonstrate the obvious 3.♘g5 ♘d5",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l29",
+   "bloco": "b29",
+   "caixa_rel": [
+    0.48299,
+    0.56744,
+    0.56701,
+    0.57945
+   ],
+   "texto": "4.exd5+–.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l30",
+   "bloco": "b30",
+   "caixa_rel": [
+    0.64948,
+    0.6416,
+    0.77732,
+    0.65607
+   ],
+   "texto": "Diagram 1-12",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l31",
+   "bloco": "b31",
+   "caixa_rel": [
+    0.59691,
+    0.66596,
+    0.83041,
+    0.67973
+   ],
+   "texto": "G.Kuzmin — VAkopian",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l32",
+   "bloco": "b32",
+   "caixa_rel": [
+    0.63402,
+    0.68644,
+    0.79278,
+    0.69633
+   ],
+   "texto": "Rostov?on–Don 1993",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l33",
+   "bloco": "b33",
+   "caixa_rel": [
+    0.48505,
+    0.71292,
+    0.55567,
+    0.72987
+   ],
+   "texto": "1...♗g5!",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l34",
+   "bloco": "b34",
+   "caixa_rel": [
+    0.50309,
+    0.73199,
+    0.79278,
+    0.74823
+   ],
+   "texto": "1...♕a1+ 2.♕e1 achieves nothing.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l35",
+   "bloco": "b35",
+   "caixa_rel": [
+    0.48299,
+    0.75141,
+    0.53969,
+    0.7666
+   ],
+   "texto": "2.fxg4",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l36",
+   "bloco": "b36",
+   "caixa_rel": [
+    0.50206,
+    0.76871,
+    0.73711,
+    0.78496
+   ],
+   "texto": "2.♗xg5 ♕a1 + 3.♗f1 ♗c4–+",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l37",
+   "bloco": "b37",
+   "caixa_rel": [
+    0.48247,
+    0.78602,
+    0.64278,
+    0.80049
+   ],
+   "texto": "2...♗xd2∓ 3.♔f1?",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l38",
+   "bloco": "b38",
+   "caixa_rel": [
+    0.50155,
+    0.80544,
+    0.86701,
+    0.82168
+   ],
+   "texto": "3.♕f2∓ would allow White to struggle on.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l39",
+   "bloco": "b39",
+   "caixa_rel": [
+    0.48299,
+    0.82309,
+    0.56546,
+    0.84004
+   ],
+   "texto": "3...♗xg4!",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l40",
+   "bloco": "b40",
+   "caixa_rel": [
+    0.48247,
+    0.84463,
+    0.51495,
+    0.85487
+   ],
+   "texto": "0-1",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l41",
+   "bloco": "b41",
+   "caixa_rel": [
+    0.50103,
+    0.86017,
+    0.94278,
+    0.87712
+   ],
+   "texto": "If 3.♕xg4 then 3...♕a1+ 4.♔f2 ♕e1+ 5.♔f3",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l42",
+   "bloco": "b42",
+   "caixa_rel": [
+    0.48196,
+    0.87924,
+    0.53608,
+    0.8923
+   ],
+   "texto": "♕e3#.",
+   "negrito": false,
+   "texto_verificado": false
+  }
+ ],
+ "estrutura_por": "Claude (estrutura pelas faixas)"
+}

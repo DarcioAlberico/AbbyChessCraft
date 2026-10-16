@@ -1,0 +1,1488 @@
+{
+ "livro": "darcy",
+ "pdf": "Darcy Lima & Júlio Lapertosa - A Estratégia no Xadrez.pdf",
+ "pdf_sha256": "77e762225966cc39d0a147edb8ed25ed4d7f8ae66a4aad8ddb9fc4112e7ff12c",
+ "indice_pdf": 25,
+ "pagina_impressa": 27,
+ "dpi_de_leitura": 300,
+ "render_sha256": "d6841408691383a348c734bb2d6db8f8840ca4d93f792d53a975632781f19523",
+ "pymupdf": "1.26.6",
+ "inclinacao": 0.0,
+ "papel": 254,
+ "verdade_versao": 1,
+ "rotulado_por": "",
+ "revisado_por": "",
+ "blocos": [
+  {
+   "id": "b00",
+   "funcao": "cabecalho",
+   "caixa_rel": [
+    0.08745,
+    0.0331,
+    0.24549,
+    0.04976
+   ],
+   "ordem": 0,
+   "coluna": 0,
+   "texto_impresso": "RA TÉ G /A"
+  },
+  {
+   "id": "b01",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.01922,
+    0.07024,
+    0.57137,
+    0.08643
+   ],
+   "ordem": 1,
+   "coluna": 0,
+   "texto_impresso": "abertura tem uma importância vital como"
+  },
+  {
+   "id": "b02",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.01961,
+    0.08833,
+    0.57137,
+    0.10476
+   ],
+   "ordem": 2,
+   "coluna": 0,
+   "texto_impresso": "vimos no Rápido Desenvolvimento das"
+  },
+  {
+   "id": "b03",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02118,
+    0.10643,
+    0.57333,
+    0.12405
+   ],
+   "ordem": 3,
+   "coluna": 0,
+   "texto_impresso": "Peças. O grandejogador PauY Morphy, por"
+  },
+  {
+   "id": "b04",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02078,
+    0.12405,
+    0.57176,
+    0.14071
+   ],
+   "ordem": 4,
+   "coluna": 0,
+   "texto_impresso": "volta de 185O parecia estar à frente de"
+  },
+  {
+   "id": "b05",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02157,
+    0.14214,
+    0.57216,
+    0.15905
+   ],
+   "ordem": 5,
+   "coluna": 0,
+   "texto_impresso": "seus contemporâneos, pois conhecia o"
+  },
+  {
+   "id": "b06",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02118,
+    0.16024,
+    0.57216,
+    0.17714
+   ],
+   "ordem": 6,
+   "coluna": 0,
+   "texto_impresso": "fatorTempo, superando a maioria de seus"
+  },
+  {
+   "id": "b07",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02196,
+    0.17833,
+    0.57255,
+    0.195
+   ],
+   "ordem": 7,
+   "coluna": 0,
+   "texto_impresso": "adversários com faci1idade.Veja a posição"
+  },
+  {
+   "id": "b08",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02196,
+    0.19762,
+    0.12039,
+    0.21119
+   ],
+   "ordem": 8,
+   "coluna": 0,
+   "texto_impresso": "ao lado.."
+  },
+  {
+   "id": "b09",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.0702,
+    0.21476,
+    0.57216,
+    0.23167
+   ],
+   "ordem": 10,
+   "coluna": 0,
+   "texto_impresso": "Na partida Morphy x Rosseau em"
+  },
+  {
+   "id": "b10",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02431,
+    0.23333,
+    0.57294,
+    0.24976
+   ],
+   "ordem": 11,
+   "coluna": 0,
+   "texto_impresso": "1849, as negras ficaram somente com a"
+  },
+  {
+   "id": "b11",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02353,
+    0.25143,
+    0.57294,
+    0.26786
+   ],
+   "ordem": 12,
+   "coluna": 0,
+   "texto_impresso": "Dama desenvolvida enquanto Morphy tem"
+  },
+  {
+   "id": "b12",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02196,
+    0.26952,
+    0.93059,
+    0.28667
+   ],
+   "ordem": 13,
+   "coluna": 0,
+   "texto_impresso": "4 peças. Elas quebraram uma importante regra na abertura não"
+  },
+  {
+   "id": "b13",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02314,
+    0.28786,
+    0.93098,
+    0.30476
+   ],
+   "ordem": 14,
+   "coluna": 0,
+   "texto_impresso": "mover duas vezes com a mesma peça até que o desenvolvimento"
+  },
+  {
+   "id": "b14",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02275,
+    0.30595,
+    0.93098,
+    0.32286
+   ],
+   "ordem": 15,
+   "coluna": 0,
+   "texto_impresso": "esteja completo. Rosseau cometeu um erro muito comum entre"
+  },
+  {
+   "id": "b15",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02353,
+    0.32452,
+    0.5502,
+    0.34095
+   ],
+   "ordem": 16,
+   "coluna": 0,
+   "texto_impresso": "inicianteS, jogar Somente com a Dama."
+  },
+  {
+   "id": "b16",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.08078,
+    0.34238,
+    0.93137,
+    0.35952
+   ],
+   "ordem": 17,
+   "coluna": 0,
+   "texto_impresso": "?ances sem utilidade são perdas de tempo. Principalmente os"
+  },
+  {
+   "id": "b17",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02431,
+    0.36,
+    0.93176,
+    0.37786
+   ],
+   "ordem": 18,
+   "coluna": 0,
+   "texto_impresso": "lanCes de peões sem objetivo permitem que o adversário tenha"
+  },
+  {
+   "id": "b18",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02353,
+    0.37929,
+    0.44353,
+    0.39548
+   ],
+   "ordem": 19,
+   "coluna": 0,
+   "texto_impresso": "vantagem no desenvolvimento."
+  },
+  {
+   "id": "b19",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.08745,
+    0.39762,
+    0.57608,
+    0.41405
+   ],
+   "ordem": 20,
+   "coluna": 0,
+   "texto_impresso": "Na primeira partida que apre—"
+  },
+  {
+   "id": "b20",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02471,
+    0.41548,
+    0.57843,
+    0.4319
+   ],
+   "ordem": 21,
+   "coluna": 0,
+   "texto_impresso": "sentaremos entre Morphy e um jogador"
+  },
+  {
+   "id": "b21",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.0251,
+    0.43381,
+    0.57686,
+    0.45024
+   ],
+   "ordem": 22,
+   "coluna": 0,
+   "texto_impresso": "amador em 1856, observe que as negras"
+  },
+  {
+   "id": "b22",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02275,
+    0.4519,
+    0.57686,
+    0.46881
+   ],
+   "ordem": 23,
+   "coluna": 0,
+   "texto_impresso": "jogaram 4 lances de peões, a6, d6,e5 e"
+  },
+  {
+   "id": "b23",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02588,
+    0.47,
+    0.57765,
+    0.48619
+   ],
+   "ordem": 24,
+   "coluna": 0,
+   "texto_impresso": "h6, mas sua situação ainda não estava"
+  },
+  {
+   "id": "b24",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02588,
+    0.48762,
+    0.57804,
+    0.50452
+   ],
+   "ordem": 25,
+   "coluna": 0,
+   "texto_impresso": "comprometida. Os próximos 4 lanCes das"
+  },
+  {
+   "id": "b25",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02706,
+    0.50595,
+    0.57804,
+    0.52286
+   ],
+   "ordem": 26,
+   "coluna": 0,
+   "texto_impresso": "negras, de novo, foram com peões"
+  },
+  {
+   "id": "b26",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.05569,
+    0.52381,
+    0.57843,
+    0.53976
+   ],
+   "ordem": 27,
+   "coluna": 0,
+   "texto_impresso": "d5 dxe4 exd4 e b6 e depois"
+  },
+  {
+   "id": "b27",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02706,
+    0.53571,
+    0.0502,
+    0.55595
+   ],
+   "ordem": 28,
+   "coluna": 0,
+   "texto_impresso": "m..."
+  },
+  {
+   "id": "b28",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.05059,
+    0.53548,
+    0.12824,
+    0.55595
+   ],
+   "ordem": 29,
+   "coluna": 0,
+   "texto_impresso": "ove,r.a.."
+  },
+  {
+   "id": "b29",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.12745,
+    0.53524,
+    0.24667,
+    0.55571
+   ],
+   "ordem": 30,
+   "coluna": 0,
+   "texto_impresso": "m ma:ls. . ."
+  },
+  {
+   "id": "b30",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.2502,
+    0.54,
+    0.57843,
+    0.55786
+   ],
+   "ordem": 31,
+   "coluna": 0,
+   "texto_impresso": "uma vez com ♘g6—h4"
+  },
+  {
+   "id": "b31",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02745,
+    0.55976,
+    0.57804,
+    0.57405
+   ],
+   "ordem": 32,
+   "coluna": 0,
+   "texto_impresso": "cometendo o erro comentado ante–"
+  },
+  {
+   "id": "b32",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02824,
+    0.57762,
+    0.53373,
+    0.59476
+   ],
+   "ordem": 33,
+   "coluna": 0,
+   "texto_impresso": "riormente. Chegamos a esta posição.."
+  },
+  {
+   "id": "b33",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.07529,
+    0.59524,
+    0.93333,
+    0.61238
+   ],
+   "ordem": 35,
+   "coluna": 0,
+   "texto_impresso": "Vemos claramente que as negras ficaram atrasadas em"
+  },
+  {
+   "id": "b34",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02902,
+    0.61333,
+    0.93451,
+    0.63024
+   ],
+   "ordem": 36,
+   "coluna": 0,
+   "texto_impresso": "desenvolvimento e nesta posição cometem outro erro envolvendo o"
+  },
+  {
+   "id": "b35",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.02941,
+    0.63333,
+    0.13294,
+    0.64976
+   ],
+   "ordem": 37,
+   "coluna": 0,
+   "texto_impresso": "??Tempo,,"
+  },
+  {
+   "id": "b36",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.13608,
+    0.63167,
+    0.58157,
+    0.64905
+   ],
+   "ordem": 38,
+   "coluna": 0,
+   "texto_impresso": ". A Troca. Veja esquema abaixo.."
+  },
+  {
+   "id": "b37",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.43412,
+    0.64976,
+    0.9349,
+    0.66619
+   ],
+   "ordem": 40,
+   "coluna": 0,
+   "texto_impresso": "O CaValo negro moveu 3 vezes para"
+  },
+  {
+   "id": "b38",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.38118,
+    0.66786,
+    0.93529,
+    0.68452
+   ],
+   "ordem": 41,
+   "coluna": 0,
+   "texto_impresso": "chegar em h4, as negras o trocaram pelo"
+  },
+  {
+   "id": "b39",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.38118,
+    0.68643,
+    0.93529,
+    0.70262
+   ],
+   "ordem": 42,
+   "coluna": 0,
+   "texto_impresso": "cavalo branco que moveu apenas uma"
+  },
+  {
+   "id": "b40",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.38078,
+    0.70429,
+    0.9349,
+    0.72095
+   ],
+   "ordem": 43,
+   "coluna": 0,
+   "texto_impresso": "vez Cg1—f3, além disto as negras auxiliam"
+  },
+  {
+   "id": "b41",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.38157,
+    0.72286,
+    0.93569,
+    0.73905
+   ],
+   "ordem": 44,
+   "coluna": 0,
+   "texto_impresso": "com esta troca que a Dama branca entre"
+  },
+  {
+   "id": "b42",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.38196,
+    0.74048,
+    0.93569,
+    0.75738
+   ],
+   "ordem": 45,
+   "coluna": 0,
+   "texto_impresso": "em jogo. CAaro Morphy venceu rapi?"
+  },
+  {
+   "id": "b43",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.38196,
+    0.75833,
+    0.93569,
+    0.775
+   ],
+   "ordem": 46,
+   "coluna": 0,
+   "texto_impresso": "damente esta partida. Existem várlas"
+  },
+  {
+   "id": "b44",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.38157,
+    0.77643,
+    0.9349,
+    0.79357
+   ],
+   "ordem": 47,
+   "coluna": 0,
+   "texto_impresso": "formas de ganhar ou perder tempo. Por."
+  },
+  {
+   "id": "b45",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.38353,
+    0.79452,
+    0.93608,
+    0.8119
+   ],
+   "ordem": 48,
+   "coluna": 0,
+   "texto_impresso": "Exemplo.. Desenvolver uma peça fazendo"
+  },
+  {
+   "id": "b46",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.38353,
+    0.81333,
+    0.93608,
+    0.83024
+   ],
+   "ordem": 49,
+   "coluna": 0,
+   "texto_impresso": "uma ameaça fazer um lance obrigando"
+  },
+  {
+   "id": "b47",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.56667,
+    0.825,
+    0.57373,
+    0.83571
+   ],
+   "ordem": 50,
+   "coluna": 0,
+   "texto_impresso": ":"
+  },
+  {
+   "id": "b48",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.38314,
+    0.83214,
+    0.93569,
+    0.84905
+   ],
+   "ordem": 51,
+   "coluna": 0,
+   "texto_impresso": "que o adverSario faça algo que ele devia"
+  },
+  {
+   "id": "b49",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03529,
+    0.85119,
+    0.93529,
+    0.86786
+   ],
+   "ordem": 52,
+   "coluna": 0,
+   "texto_impresso": "fazer de qualquer forma lances com xeques ou ameaça obrigam"
+  },
+  {
+   "id": "b50",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03647,
+    0.8681,
+    0.93647,
+    0.88643
+   ],
+   "ordem": 53,
+   "coluna": 0,
+   "texto_impresso": "uma defe?a forçada etc. Veremos algumaS destas perdas ou ganho"
+  },
+  {
+   "id": "b51",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03569,
+    0.88857,
+    0.93686,
+    0.90571
+   ],
+   "ordem": 54,
+   "coluna": 0,
+   "texto_impresso": "de tempO nas partidas abaixo. Fique atento em suas partidas, pois"
+  },
+  {
+   "id": "b52",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03608,
+    0.90714,
+    0.93686,
+    0.92381
+   ],
+   "ordem": 55,
+   "coluna": 0,
+   "texto_impresso": "deixar seu adversáriO muitos ??tempos,, a frente permite que ele in1cie"
+  },
+  {
+   "id": "b53",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03647,
+    0.92619,
+    0.77176,
+    0.94262
+   ],
+   "ordem": 56,
+   "coluna": 0,
+   "texto_impresso": "um ataque antes que suas peçaŠ estejam preparadas."
+  },
+  {
+   "id": "b54",
+   "funcao": "numero_de_pagina",
+   "caixa_rel": [
+    0.47294,
+    0.97143,
+    0.50706,
+    0.98571
+   ],
+   "ordem": 57,
+   "coluna": 0,
+   "texto_impresso": "27"
+  },
+  {
+   "id": "d0",
+   "funcao": "diagrama",
+   "caixa_rel": [
+    0.60118,
+    0.0719,
+    0.92745,
+    0.25524
+   ],
+   "ordem": 9,
+   "coluna": 0,
+   "texto_impresso": ""
+  },
+  {
+   "id": "d1",
+   "funcao": "diagrama",
+   "caixa_rel": [
+    0.60706,
+    0.40262,
+    0.93216,
+    0.5869
+   ],
+   "ordem": 34,
+   "coluna": 0,
+   "texto_impresso": ""
+  },
+  {
+   "id": "d2",
+   "funcao": "diagrama",
+   "caixa_rel": [
+    0.03373,
+    0.65929,
+    0.35216,
+    0.84167
+   ],
+   "ordem": 39,
+   "coluna": 0,
+   "texto_impresso": ""
+  }
+ ],
+ "diagramas": [
+  {
+   "id": "d0",
+   "fen": "rnbk1bnr/pp1p4/2p4p/4q3/2B2pQP/2N5/PPPP2P1/R1BKR3",
+   "fen_lido": "rnbk1bnr/pp1p4/2p4p/4q3/2B2pQP/2N5/PPPP2P1/R1BKR3",
+   "lado": "?",
+   "legenda": null,
+   "lances_seguintes": [],
+   "fen_verificado": false,
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
+  },
+  {
+   "id": "d1",
+   "fen": "r2qkb1r/2p2pp1/ppn4p/8/3PN2n/PP3N2/bBB2PPP/3Q1RK1",
+   "fen_lido": "r2qkb1r/2p2pp1/ppn4p/8/3PN2n/PP3N2/bBB2PPP/3Q1RK1",
+   "lado": "b",
+   "legenda": null,
+   "lances_seguintes": [
+    "Nxf3+",
+    "Qxf3"
+   ],
+   "fen_verificado": false,
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
+  },
+  {
+   "id": "d2",
+   "fen": "r2qkb1r/2p2pp1/ppn4p/8/3PN2n/PP3N2/bBB2PPP/3Q1RK1",
+   "fen_lido": "r2QkbNr/2b1Bpp1/ppn2NPp/6N1/3PN2n/PP3N2/bBB1rNPP/3Q1RK1",
+   "lado": "?",
+   "legenda": null,
+   "lances_seguintes": [],
+   "fen_verificado": false,
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
+  }
+ ],
+ "linhas_corpo": [
+  {
+   "id": "l01",
+   "bloco": "b01",
+   "caixa_rel": [
+    0.01922,
+    0.07024,
+    0.57137,
+    0.08643
+   ],
+   "texto": "abertura tem uma importância vital como",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l02",
+   "bloco": "b02",
+   "caixa_rel": [
+    0.01961,
+    0.08833,
+    0.57137,
+    0.10476
+   ],
+   "texto": "vimos no Rápido Desenvolvimento das",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l03",
+   "bloco": "b03",
+   "caixa_rel": [
+    0.02118,
+    0.10643,
+    0.57333,
+    0.12405
+   ],
+   "texto": "Peças. O grandejogador PauY Morphy, por",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l04",
+   "bloco": "b04",
+   "caixa_rel": [
+    0.02078,
+    0.12405,
+    0.57176,
+    0.14071
+   ],
+   "texto": "volta de 185O parecia estar à frente de",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l05",
+   "bloco": "b05",
+   "caixa_rel": [
+    0.02157,
+    0.14214,
+    0.57216,
+    0.15905
+   ],
+   "texto": "seus contemporâneos, pois conhecia o",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l06",
+   "bloco": "b06",
+   "caixa_rel": [
+    0.02118,
+    0.16024,
+    0.57216,
+    0.17714
+   ],
+   "texto": "fatorTempo, superando a maioria de seus",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l07",
+   "bloco": "b07",
+   "caixa_rel": [
+    0.02196,
+    0.17833,
+    0.57255,
+    0.195
+   ],
+   "texto": "adversários com faci1idade.Veja a posição",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l08",
+   "bloco": "b08",
+   "caixa_rel": [
+    0.02196,
+    0.19762,
+    0.12039,
+    0.21119
+   ],
+   "texto": "ao lado..",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l09",
+   "bloco": "b09",
+   "caixa_rel": [
+    0.0702,
+    0.21476,
+    0.57216,
+    0.23167
+   ],
+   "texto": "Na partida Morphy x Rosseau em",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l10",
+   "bloco": "b10",
+   "caixa_rel": [
+    0.02431,
+    0.23333,
+    0.57294,
+    0.24976
+   ],
+   "texto": "1849, as negras ficaram somente com a",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l11",
+   "bloco": "b11",
+   "caixa_rel": [
+    0.02353,
+    0.25143,
+    0.57294,
+    0.26786
+   ],
+   "texto": "Dama desenvolvida enquanto Morphy tem",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l12",
+   "bloco": "b12",
+   "caixa_rel": [
+    0.02196,
+    0.26952,
+    0.93059,
+    0.28667
+   ],
+   "texto": "4 peças. Elas quebraram uma importante regra na abertura não",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l13",
+   "bloco": "b13",
+   "caixa_rel": [
+    0.02314,
+    0.28786,
+    0.93098,
+    0.30476
+   ],
+   "texto": "mover duas vezes com a mesma peça até que o desenvolvimento",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l14",
+   "bloco": "b14",
+   "caixa_rel": [
+    0.02275,
+    0.30595,
+    0.93098,
+    0.32286
+   ],
+   "texto": "esteja completo. Rosseau cometeu um erro muito comum entre",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l15",
+   "bloco": "b15",
+   "caixa_rel": [
+    0.02353,
+    0.32452,
+    0.5502,
+    0.34095
+   ],
+   "texto": "inicianteS, jogar Somente com a Dama.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l16",
+   "bloco": "b16",
+   "caixa_rel": [
+    0.08078,
+    0.34238,
+    0.93137,
+    0.35952
+   ],
+   "texto": "?ances sem utilidade são perdas de tempo. Principalmente os",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l17",
+   "bloco": "b17",
+   "caixa_rel": [
+    0.02431,
+    0.36,
+    0.93176,
+    0.37786
+   ],
+   "texto": "lanCes de peões sem objetivo permitem que o adversário tenha",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l18",
+   "bloco": "b18",
+   "caixa_rel": [
+    0.02353,
+    0.37929,
+    0.44353,
+    0.39548
+   ],
+   "texto": "vantagem no desenvolvimento.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l19",
+   "bloco": "b19",
+   "caixa_rel": [
+    0.08745,
+    0.39762,
+    0.57608,
+    0.41405
+   ],
+   "texto": "Na primeira partida que apre—",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l20",
+   "bloco": "b20",
+   "caixa_rel": [
+    0.02471,
+    0.41548,
+    0.57843,
+    0.4319
+   ],
+   "texto": "sentaremos entre Morphy e um jogador",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l21",
+   "bloco": "b21",
+   "caixa_rel": [
+    0.0251,
+    0.43381,
+    0.57686,
+    0.45024
+   ],
+   "texto": "amador em 1856, observe que as negras",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l22",
+   "bloco": "b22",
+   "caixa_rel": [
+    0.02275,
+    0.4519,
+    0.57686,
+    0.46881
+   ],
+   "texto": "jogaram 4 lances de peões, a6, d6,e5 e",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l23",
+   "bloco": "b23",
+   "caixa_rel": [
+    0.02588,
+    0.47,
+    0.57765,
+    0.48619
+   ],
+   "texto": "h6, mas sua situação ainda não estava",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l24",
+   "bloco": "b24",
+   "caixa_rel": [
+    0.02588,
+    0.48762,
+    0.57804,
+    0.50452
+   ],
+   "texto": "comprometida. Os próximos 4 lanCes das",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l25",
+   "bloco": "b25",
+   "caixa_rel": [
+    0.02706,
+    0.50595,
+    0.57804,
+    0.52286
+   ],
+   "texto": "negras, de novo, foram com peões",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l26",
+   "bloco": "b26",
+   "caixa_rel": [
+    0.05569,
+    0.52381,
+    0.57843,
+    0.53976
+   ],
+   "texto": "d5 dxe4 exd4 e b6 e depois",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l27",
+   "bloco": "b27",
+   "caixa_rel": [
+    0.02706,
+    0.53571,
+    0.0502,
+    0.55595
+   ],
+   "texto": "m...",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l28",
+   "bloco": "b28",
+   "caixa_rel": [
+    0.05059,
+    0.53548,
+    0.12824,
+    0.55595
+   ],
+   "texto": "ove,r.a..",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l29",
+   "bloco": "b29",
+   "caixa_rel": [
+    0.12745,
+    0.53524,
+    0.24667,
+    0.55571
+   ],
+   "texto": "m ma:ls. . .",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l30",
+   "bloco": "b30",
+   "caixa_rel": [
+    0.2502,
+    0.54,
+    0.57843,
+    0.55786
+   ],
+   "texto": "uma vez com ♘g6—h4",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l31",
+   "bloco": "b31",
+   "caixa_rel": [
+    0.02745,
+    0.55976,
+    0.57804,
+    0.57405
+   ],
+   "texto": "cometendo o erro comentado ante–",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l32",
+   "bloco": "b32",
+   "caixa_rel": [
+    0.02824,
+    0.57762,
+    0.53373,
+    0.59476
+   ],
+   "texto": "riormente. Chegamos a esta posição..",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l33",
+   "bloco": "b33",
+   "caixa_rel": [
+    0.07529,
+    0.59524,
+    0.93333,
+    0.61238
+   ],
+   "texto": "Vemos claramente que as negras ficaram atrasadas em",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l34",
+   "bloco": "b34",
+   "caixa_rel": [
+    0.02902,
+    0.61333,
+    0.93451,
+    0.63024
+   ],
+   "texto": "desenvolvimento e nesta posição cometem outro erro envolvendo o",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l35",
+   "bloco": "b35",
+   "caixa_rel": [
+    0.02941,
+    0.63333,
+    0.13294,
+    0.64976
+   ],
+   "texto": "??Tempo,,",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l36",
+   "bloco": "b36",
+   "caixa_rel": [
+    0.13608,
+    0.63167,
+    0.58157,
+    0.64905
+   ],
+   "texto": ". A Troca. Veja esquema abaixo..",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l37",
+   "bloco": "b37",
+   "caixa_rel": [
+    0.43412,
+    0.64976,
+    0.9349,
+    0.66619
+   ],
+   "texto": "O CaValo negro moveu 3 vezes para",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l38",
+   "bloco": "b38",
+   "caixa_rel": [
+    0.38118,
+    0.66786,
+    0.93529,
+    0.68452
+   ],
+   "texto": "chegar em h4, as negras o trocaram pelo",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l39",
+   "bloco": "b39",
+   "caixa_rel": [
+    0.38118,
+    0.68643,
+    0.93529,
+    0.70262
+   ],
+   "texto": "cavalo branco que moveu apenas uma",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l40",
+   "bloco": "b40",
+   "caixa_rel": [
+    0.38078,
+    0.70429,
+    0.9349,
+    0.72095
+   ],
+   "texto": "vez Cg1—f3, além disto as negras auxiliam",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l41",
+   "bloco": "b41",
+   "caixa_rel": [
+    0.38157,
+    0.72286,
+    0.93569,
+    0.73905
+   ],
+   "texto": "com esta troca que a Dama branca entre",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l42",
+   "bloco": "b42",
+   "caixa_rel": [
+    0.38196,
+    0.74048,
+    0.93569,
+    0.75738
+   ],
+   "texto": "em jogo. CAaro Morphy venceu rapi?",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l43",
+   "bloco": "b43",
+   "caixa_rel": [
+    0.38196,
+    0.75833,
+    0.93569,
+    0.775
+   ],
+   "texto": "damente esta partida. Existem várlas",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l44",
+   "bloco": "b44",
+   "caixa_rel": [
+    0.38157,
+    0.77643,
+    0.9349,
+    0.79357
+   ],
+   "texto": "formas de ganhar ou perder tempo. Por.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l45",
+   "bloco": "b45",
+   "caixa_rel": [
+    0.38353,
+    0.79452,
+    0.93608,
+    0.8119
+   ],
+   "texto": "Exemplo.. Desenvolver uma peça fazendo",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l46",
+   "bloco": "b46",
+   "caixa_rel": [
+    0.38353,
+    0.81333,
+    0.93608,
+    0.83024
+   ],
+   "texto": "uma ameaça fazer um lance obrigando",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l48",
+   "bloco": "b48",
+   "caixa_rel": [
+    0.38314,
+    0.83214,
+    0.93569,
+    0.84905
+   ],
+   "texto": "que o adverSario faça algo que ele devia",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l49",
+   "bloco": "b49",
+   "caixa_rel": [
+    0.03529,
+    0.85119,
+    0.93529,
+    0.86786
+   ],
+   "texto": "fazer de qualquer forma lances com xeques ou ameaça obrigam",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l50",
+   "bloco": "b50",
+   "caixa_rel": [
+    0.03647,
+    0.8681,
+    0.93647,
+    0.88643
+   ],
+   "texto": "uma defe?a forçada etc. Veremos algumaS destas perdas ou ganho",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l51",
+   "bloco": "b51",
+   "caixa_rel": [
+    0.03569,
+    0.88857,
+    0.93686,
+    0.90571
+   ],
+   "texto": "de tempO nas partidas abaixo. Fique atento em suas partidas, pois",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l52",
+   "bloco": "b52",
+   "caixa_rel": [
+    0.03608,
+    0.90714,
+    0.93686,
+    0.92381
+   ],
+   "texto": "deixar seu adversáriO muitos ??tempos,, a frente permite que ele in1cie",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l53",
+   "bloco": "b53",
+   "caixa_rel": [
+    0.03647,
+    0.92619,
+    0.77176,
+    0.94262
+   ],
+   "texto": "um ataque antes que suas peçaŠ estejam preparadas.",
+   "negrito": false,
+   "texto_verificado": false
+  }
+ ],
+ "estrutura_por": "Claude (estrutura pelas faixas)"
+}

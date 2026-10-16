@@ -1,0 +1,795 @@
+{
+ "livro": "xv",
+ "pdf": "Xadrez Vitorioso - Estrategias - Yasser Seirawan.pdf",
+ "pdf_sha256": "c7277691646ce288f81649f181a2d0316bf1e01ff864b9810c29ce9a0d5b7161",
+ "indice_pdf": 24,
+ "pagina_impressa": 25,
+ "dpi_de_leitura": 300,
+ "render_sha256": "7ed8351287e72a5d11e00a2c92f0a20450391c38597314163674394308d58129",
+ "pymupdf": "1.26.6",
+ "inclinacao": -0.6,
+ "papel": 255,
+ "verdade_versao": 1,
+ "rotulado_por": "",
+ "revisado_por": "",
+ "blocos": [
+  {
+   "id": "b00",
+   "funcao": "cabecalho",
+   "caixa_rel": [
+    0.67686,
+    0.04471,
+    0.94098,
+    0.06153
+   ],
+   "ordem": 0,
+   "coluna": 0,
+   "texto_impresso": "XADREZ VITORlOSO: ESTRATÉG|AS 25"
+  },
+  {
+   "id": "b01",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19653,
+    0.09465,
+    0.94129,
+    0.10947
+   ],
+   "ordem": 1,
+   "coluna": 0,
+   "texto_impresso": "na batalha, acabarão ganhando. por isso, as brancas são forçadas a dar um g01pe"
+  },
+  {
+   "id": "b02",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19639,
+    0.11318,
+    0.55607,
+    0.12828
+   ],
+   "ordem": 2,
+   "coluna": 0,
+   "texto_impresso": "rápido, antes da chegada dos reforços."
+  },
+  {
+   "id": "d0",
+   "funcao": "diagrama",
+   "caixa_rel": [
+    0.38047,
+    0.16506,
+    0.67725,
+    0.37623
+   ],
+   "ordem": 3,
+   "coluna": 0,
+   "texto_impresso": ""
+  },
+  {
+   "id": "b03",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.41244,
+    0.25391,
+    0.74268,
+    0.41065
+   ],
+   "ordem": 4,
+   "coluna": 0,
+   "texto_impresso": "Dia9rama 5. J09am as pretas. .",
+   "diagrama": "d0"
+  },
+  {
+   "id": "b04",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.11859,
+    0.44168,
+    0.27584,
+    0.45678
+   ],
+   "ordem": 5,
+   "coluna": 0,
+   "texto_impresso": "10...Rf8 11.Dd5??"
+  },
+  {
+   "id": "b05",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.24598,
+    0.46551,
+    0.94678,
+    0.48033
+   ],
+   "ordem": 6,
+   "coluna": 0,
+   "texto_impresso": "As brancas ameaçam dar o xeque-mate em f7 e esperam que as preta? se"
+  },
+  {
+   "id": "b06",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.20067,
+    0.48307,
+    0.94624,
+    0.49817
+   ],
+   "ordem": 7,
+   "coluna": 0,
+   "texto_impresso": "entusiasmem?or 11...Cxd5 12.Bxd6+ + Rg8 13.Bxd5+ Be6 14.Bxe6 xeque—mate."
+  },
+  {
+   "id": "b07",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.20133,
+    0.50045,
+    0.9473,
+    0.51555
+   ],
+   "ordem": 8,
+   "coluna": 0,
+   "texto_impresso": "Esse tipo de tática pode parecer chocante para um jogad0r amado? mas as bran-"
+  },
+  {
+   "id": "b08",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.20118,
+    0.51783,
+    0.94796,
+    0.53236
+   ],
+   "ordem": 9,
+   "coluna": 0,
+   "texto_impresso": "cas precisam definir o jogo e sabem que m0vimentos como esse equiva1em a um"
+  },
+  {
+   "id": "b09",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.20186,
+    0.53713,
+    0.35186,
+    0.55167
+   ],
+   "ordem": 10,
+   "coluna": 0,
+   "texto_impresso": "go1pe arrasad0r."
+  },
+  {
+   "id": "b10",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.12051,
+    0.57116,
+    0.32656,
+    0.58655
+   ],
+   "ordem": 11,
+   "coluna": 0,
+   "texto_impresso": "11...Dd7 12.Dxd4 CC6"
+  },
+  {
+   "id": "b11",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.24751,
+    0.59546,
+    0.94872,
+    0.61199
+   ],
+   "ordem": 12,
+   "coluna": 0,
+   "texto_impresso": "As brancas recuperam uma de suas peças, mas as pretas conseguem desen-"
+  },
+  {
+   "id": "b12",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.2022,
+    0.61372,
+    0.75784,
+    0.62854
+   ],
+   "ordem": 13,
+   "coluna": 0,
+   "texto_impresso": "volver uma peça. Se que o ataque das brancas fracassou?"
+  },
+  {
+   "id": "b13",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.12167,
+    0.64961,
+    0.22812,
+    0.665
+   ],
+   "ordem": 14,
+   "coluna": 0,
+   "texto_impresso": "13.Dxf6+ ??"
+  },
+  {
+   "id": "b14",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.24947,
+    0.67486,
+    0.59181,
+    0.68997
+   ],
+   "ordem": 15,
+   "coluna": 0,
+   "texto_impresso": "O Rei das pretas perde sua proteção."
+  },
+  {
+   "id": "b15",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.12218,
+    0.70913,
+    0.54678,
+    0.72851
+   ],
+   "ordem": 16,
+   "coluna": 0,
+   "texto_impresso": "13...9xf6 14.Bh6+ D97 15.Txf6 xeque.mate"
+  },
+  {
+   "id": "b16",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.25036,
+    0.73452,
+    0.95036,
+    0.74934
+   ],
+   "ordem": 17,
+   "coluna": 0,
+   "texto_impresso": "Com exceçã0 do Rei, todas as peças brancaS participaram nesse xeque-mate."
+  },
+  {
+   "id": "b17",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.25062,
+    0.7519,
+    0.95102,
+    0.76644
+   ],
+   "ordem": 18,
+   "coluna": 0,
+   "texto_impresso": "Se uma superioridade em desenvo1vimento pode compensar uII1 déficit ma-"
+  },
+  {
+   "id": "b18",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.20451,
+    0.76917,
+    0.95169,
+    0.78428
+   ],
+   "ordem": 19,
+   "coluna": 0,
+   "texto_impresso": "terial, podemos conclui? então, que a vantagem material não é tão importante"
+  },
+  {
+   "id": "b19",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.20477,
+    0.78684,
+    0.95235,
+    0.80166
+   ],
+   "ordem": 20,
+   "coluna": 0,
+   "texto_impresso": "quanto se imaginava? Conclusão errada. As pretas teriam ganhado o jogo se"
+  },
+  {
+   "id": "b20",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.2054,
+    0.80394,
+    0.95258,
+    0.8159
+   ],
+   "ordem": 21,
+   "coluna": 0,
+   "texto_impresso": "tivessem sido menos ávidas e mais cuidadosas com o desenvolvimento. Mais uma"
+  },
+  {
+   "id": "b21",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.20448,
+    0.82263,
+    0.52182,
+    0.83774
+   ],
+   "ordem": 22,
+   "coluna": 0,
+   "texto_impresso": "vez surge a questão da estratégia:"
+  },
+  {
+   "id": "b22",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.2926,
+    0.8626,
+    0.95349,
+    0.87999
+   ],
+   "ordem": 23,
+   "coluna": 0,
+   "texto_impresso": "Quando tem uma grande desvantagem material o jogador p0de muito bem"
+  },
+  {
+   "id": "b23",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.70839,
+    0.87051,
+    0.71282,
+    0.87905
+   ],
+   "ordem": 24,
+   "coluna": 0,
+   "texto_impresso": ":"
+  },
+  {
+   "id": "b24",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.2928,
+    0.87742,
+    0.95328,
+    0.8911
+   ],
+   "ordem": 25,
+   "coluna": 0,
+   "texto_impresso": "sacrificar mais algumas peças. Quem está por ba1xo, nao Drecisa ter med0 de"
+  },
+  {
+   "id": "b25",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.29302,
+    0.89253,
+    0.95351,
+    0.90649
+   ],
+   "ordem": 26,
+   "coluna": 0,
+   "texto_impresso": "cair! No entanto? ?uem está por cima, deve recusar ?acr ícios adicionais de"
+  },
+  {
+   "id": "b26",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.29325,
+    0.90791,
+    0.95373,
+    0.92159
+   ],
+   "ordem": 27,
+   "coluna": 0,
+   "texto_impresso": "materia1 do advers rio e preoct1par-se mais com o desenvolvimento das peças e"
+  },
+  {
+   "id": "b27",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.29347,
+    0.92302,
+    0.95396,
+    0.9367
+   ],
+   "ordem": 28,
+   "coluna": 0,
+   "texto_impresso": "com a segurança do Rei. Depois de alcançar esses objetivos, ai sim, estará 1iVre"
+  },
+  {
+   "id": "b28",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.2933,
+    0.93932,
+    0.63121,
+    0.953
+   ],
+   "ordem": 29,
+   "coluna": 0,
+   "texto_impresso": "para devorar o que aparecer pela frente."
+  },
+  {
+   "id": "b29",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.06414,
+    0.99098,
+    0.06858,
+    0.99611
+   ],
+   "ordem": 30,
+   "coluna": 0,
+   "texto_impresso": "?"
+  }
+ ],
+ "diagramas": [
+  {
+   "id": "d0",
+   "fen": "rnbqk2r/ppp3pp/3p1n2/8/2Bb1B2/5Q2/PPP3PP/4RR1K",
+   "fen_lido": "rnbqk2r/ppp3pp/3p1n2/8/2Bb1B2/5Q2/PPP3PP/4RR1K",
+   "lado": "b",
+   "legenda": "b03",
+   "lances_seguintes": [
+    "Kf8",
+    "Qd5",
+    "Qd7",
+    "Qxd4",
+    "Nc6",
+    "Qxf6+"
+   ],
+   "fen_verificado": false,
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
+  }
+ ],
+ "linhas_corpo": [
+  {
+   "id": "l01",
+   "bloco": "b01",
+   "caixa_rel": [
+    0.19653,
+    0.09465,
+    0.94129,
+    0.10947
+   ],
+   "texto": "na batalha, acabarão ganhando. por isso, as brancas são forçadas a dar um g01pe",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l02",
+   "bloco": "b02",
+   "caixa_rel": [
+    0.19639,
+    0.11318,
+    0.55607,
+    0.12828
+   ],
+   "texto": "rápido, antes da chegada dos reforços.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l03",
+   "bloco": "b03",
+   "caixa_rel": [
+    0.41244,
+    0.25391,
+    0.74268,
+    0.41065
+   ],
+   "texto": "Dia9rama 5. J09am as pretas. .",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l04",
+   "bloco": "b04",
+   "caixa_rel": [
+    0.11859,
+    0.44168,
+    0.27584,
+    0.45678
+   ],
+   "texto": "10...Rf8 11.Dd5??",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l05",
+   "bloco": "b05",
+   "caixa_rel": [
+    0.24598,
+    0.46551,
+    0.94678,
+    0.48033
+   ],
+   "texto": "As brancas ameaçam dar o xeque-mate em f7 e esperam que as preta? se",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l06",
+   "bloco": "b06",
+   "caixa_rel": [
+    0.20067,
+    0.48307,
+    0.94624,
+    0.49817
+   ],
+   "texto": "entusiasmem?or 11...Cxd5 12.Bxd6+ + Rg8 13.Bxd5+ Be6 14.Bxe6 xeque—mate.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l07",
+   "bloco": "b07",
+   "caixa_rel": [
+    0.20133,
+    0.50045,
+    0.9473,
+    0.51555
+   ],
+   "texto": "Esse tipo de tática pode parecer chocante para um jogad0r amado? mas as bran-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l08",
+   "bloco": "b08",
+   "caixa_rel": [
+    0.20118,
+    0.51783,
+    0.94796,
+    0.53236
+   ],
+   "texto": "cas precisam definir o jogo e sabem que m0vimentos como esse equiva1em a um",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l09",
+   "bloco": "b09",
+   "caixa_rel": [
+    0.20186,
+    0.53713,
+    0.35186,
+    0.55167
+   ],
+   "texto": "go1pe arrasad0r.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l10",
+   "bloco": "b10",
+   "caixa_rel": [
+    0.12051,
+    0.57116,
+    0.32656,
+    0.58655
+   ],
+   "texto": "11...Dd7 12.Dxd4 CC6",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l11",
+   "bloco": "b11",
+   "caixa_rel": [
+    0.24751,
+    0.59546,
+    0.94872,
+    0.61199
+   ],
+   "texto": "As brancas recuperam uma de suas peças, mas as pretas conseguem desen-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l12",
+   "bloco": "b12",
+   "caixa_rel": [
+    0.2022,
+    0.61372,
+    0.75784,
+    0.62854
+   ],
+   "texto": "volver uma peça. Se que o ataque das brancas fracassou?",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l13",
+   "bloco": "b13",
+   "caixa_rel": [
+    0.12167,
+    0.64961,
+    0.22812,
+    0.665
+   ],
+   "texto": "13.Dxf6+ ??",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l14",
+   "bloco": "b14",
+   "caixa_rel": [
+    0.24947,
+    0.67486,
+    0.59181,
+    0.68997
+   ],
+   "texto": "O Rei das pretas perde sua proteção.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l15",
+   "bloco": "b15",
+   "caixa_rel": [
+    0.12218,
+    0.70913,
+    0.54678,
+    0.72851
+   ],
+   "texto": "13...9xf6 14.Bh6+ D97 15.Txf6 xeque.mate",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l16",
+   "bloco": "b16",
+   "caixa_rel": [
+    0.25036,
+    0.73452,
+    0.95036,
+    0.74934
+   ],
+   "texto": "Com exceçã0 do Rei, todas as peças brancaS participaram nesse xeque-mate.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l17",
+   "bloco": "b17",
+   "caixa_rel": [
+    0.25062,
+    0.7519,
+    0.95102,
+    0.76644
+   ],
+   "texto": "Se uma superioridade em desenvo1vimento pode compensar uII1 déficit ma-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l18",
+   "bloco": "b18",
+   "caixa_rel": [
+    0.20451,
+    0.76917,
+    0.95169,
+    0.78428
+   ],
+   "texto": "terial, podemos conclui? então, que a vantagem material não é tão importante",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l19",
+   "bloco": "b19",
+   "caixa_rel": [
+    0.20477,
+    0.78684,
+    0.95235,
+    0.80166
+   ],
+   "texto": "quanto se imaginava? Conclusão errada. As pretas teriam ganhado o jogo se",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l20",
+   "bloco": "b20",
+   "caixa_rel": [
+    0.2054,
+    0.80394,
+    0.95258,
+    0.8159
+   ],
+   "texto": "tivessem sido menos ávidas e mais cuidadosas com o desenvolvimento. Mais uma",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l21",
+   "bloco": "b21",
+   "caixa_rel": [
+    0.20448,
+    0.82263,
+    0.52182,
+    0.83774
+   ],
+   "texto": "vez surge a questão da estratégia:",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l22",
+   "bloco": "b22",
+   "caixa_rel": [
+    0.2926,
+    0.8626,
+    0.95349,
+    0.87999
+   ],
+   "texto": "Quando tem uma grande desvantagem material o jogador p0de muito bem",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l24",
+   "bloco": "b24",
+   "caixa_rel": [
+    0.2928,
+    0.87742,
+    0.95328,
+    0.8911
+   ],
+   "texto": "sacrificar mais algumas peças. Quem está por ba1xo, nao Drecisa ter med0 de",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l25",
+   "bloco": "b25",
+   "caixa_rel": [
+    0.29302,
+    0.89253,
+    0.95351,
+    0.90649
+   ],
+   "texto": "cair! No entanto? ?uem está por cima, deve recusar ?acr ícios adicionais de",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l26",
+   "bloco": "b26",
+   "caixa_rel": [
+    0.29325,
+    0.90791,
+    0.95373,
+    0.92159
+   ],
+   "texto": "materia1 do advers rio e preoct1par-se mais com o desenvolvimento das peças e",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l27",
+   "bloco": "b27",
+   "caixa_rel": [
+    0.29347,
+    0.92302,
+    0.95396,
+    0.9367
+   ],
+   "texto": "com a segurança do Rei. Depois de alcançar esses objetivos, ai sim, estará 1iVre",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l28",
+   "bloco": "b28",
+   "caixa_rel": [
+    0.2933,
+    0.93932,
+    0.63121,
+    0.953
+   ],
+   "texto": "para devorar o que aparecer pela frente.",
+   "negrito": false,
+   "texto_verificado": false
+  }
+ ],
+ "estrutura_por": "Claude (estrutura pelas faixas)"
+}

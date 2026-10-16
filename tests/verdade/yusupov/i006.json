@@ -1,0 +1,1274 @@
+{
+ "livro": "yusupov",
+ "pdf": "Artur Yusupov - Chess Evolution 1 - The Fundamentals (Quality Chess 2011) - editable.pdf",
+ "pdf_sha256": "91f85227cdb43980b49e80f2e6f29d9ab92aabfac5652942a383df5695921427",
+ "indice_pdf": 6,
+ "pagina_impressa": 6,
+ "dpi_de_leitura": 300,
+ "render_sha256": "ac1fb19a6d18ada6f568f414638c910d7ef68eabacf74a1336ece452ea8fce96",
+ "pymupdf": "1.26.6",
+ "inclinacao": 0.0,
+ "papel": 255,
+ "verdade_versao": 1,
+ "rotulado_por": "",
+ "revisado_por": "",
+ "blocos": [
+  {
+   "id": "b00",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.06959,
+    0.06109,
+    0.07062,
+    0.06179
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "?"
+  },
+  {
+   "id": "b01",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.0732,
+    0.0625,
+    0.07629,
+    0.06568
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "??"
+  },
+  {
+   "id": "b02",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.0768,
+    0.06497,
+    0.08557,
+    0.06956
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "??=?"
+  },
+  {
+   "id": "b03",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.0866,
+    0.04873,
+    0.14,
+    0.07027
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "?",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b03b",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.4,
+    0.04873,
+    0.64794,
+    0.07027
+   ],
+   "ordem": 0,
+   "coluna": 0,
+   "texto_impresso": "Intro(1uct1?on",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b04",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.07268,
+    0.07556,
+    0.10619,
+    0.09216
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "??? ? ?"
+  },
+  {
+   "id": "b06",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10825,
+    0.1026,
+    0.943,
+    0.1178
+   ],
+   "ordem": 1,
+   "coluna": 0,
+   "texto_impresso": "D?uring my many years ofwork as a chess trainer, I have noticed that there are only a fow books ? ?",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b07",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10619,
+    0.12112,
+    0.94278,
+    0.1363
+   ],
+   "ordem": 2,
+   "coluna": 0,
+   "texto_impresso": "which are really suitable for most amateur players. Some good books treat individual aspects of"
+  },
+  {
+   "id": "b08",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10773,
+    0.13983,
+    0.93918,
+    0.15501
+   ],
+   "ordem": 3,
+   "coluna": 0,
+   "texto_impresso": "the game (middlegame or endgame, tactics or positional play) without paying any real heed to"
+  },
+  {
+   "id": "b09",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10773,
+    0.15784,
+    0.93918,
+    0.17302
+   ],
+   "ordem": 4,
+   "coluna": 0,
+   "texto_impresso": "the readers, playing levels. mis brought about the idea of working out a teaching programme"
+  },
+  {
+   "id": "b10",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10722,
+    0.1762,
+    0.93918,
+    0.19138
+   ],
+   "ordem": 5,
+   "coluna": 0,
+   "texto_impresso": "aimed specihcally at a certain playing strength. Such teaching programmes, in a brief ?rm and"
+  },
+  {
+   "id": "b11",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10722,
+    0.19456,
+    0.93763,
+    0.20975
+   ],
+   "ordem": 6,
+   "coluna": 0,
+   "texto_impresso": "intended as systematic help for trainers, are common only in Russia, where they are very popular."
+  },
+  {
+   "id": "b12",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10825,
+    0.21292,
+    0.93918,
+    0.22811
+   ],
+   "ordem": 7,
+   "coluna": 0,
+   "texto_impresso": "One very well known and much valued example is a publication by Golenischev, which inspired"
+  },
+  {
+   "id": "b13",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10722,
+    0.23129,
+    0.39588,
+    0.24647
+   ],
+   "ordem": 8,
+   "coluna": 0,
+   "texto_impresso": "some aspects ofmy methodology"
+  },
+  {
+   "id": "b14",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.12629,
+    0.24965,
+    0.93918,
+    0.26483
+   ],
+   "ordem": 9,
+   "coluna": 0,
+   "texto_impresso": "In 2003 I began a 3 year training programme in my chess academy. mree groups were set"
+  },
+  {
+   "id": "b15",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10722,
+    0.26801,
+    0.93866,
+    0.28319
+   ],
+   "ordem": 10,
+   "coluna": 0,
+   "texto_impresso": "up according to playing strength: under Elo 1500, under Elo 1800 and under Elo 2100. Each"
+  },
+  {
+   "id": "b16",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10722,
+    0.28672,
+    0.93866,
+    0.30191
+   ],
+   "ordem": 11,
+   "coluna": 0,
+   "texto_impresso": "annual stage consisted of 24 teaching modules and 24 tests, plus a hnal test at the end of the"
+  },
+  {
+   "id": "b17",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10722,
+    0.30968,
+    0.16546,
+    0.31638
+   ],
+   "ordem": 12,
+   "coluna": 0,
+   "texto_impresso": "course."
+  },
+  {
+   "id": "b18",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.12474,
+    0.3238,
+    0.93918,
+    0.33898
+   ],
+   "ordem": 13,
+   "coluna": 0,
+   "texto_impresso": "mis programme was later taken over, in a different form, by the Chess Tigers University and"
+  },
+  {
+   "id": "b19",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10722,
+    0.34181,
+    0.30825,
+    0.35699
+   ],
+   "ordem": 14,
+   "coluna": 0,
+   "texto_impresso": "is still being used there."
+  },
+  {
+   "id": "b20",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.12423,
+    0.36052,
+    0.93866,
+    0.37571
+   ],
+   "ordem": 15,
+   "coluna": 0,
+   "texto_impresso": "The overwhelmingly positive comments of my students encouraged me to rework this"
+  },
+  {
+   "id": "b21",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10619,
+    0.37888,
+    0.93969,
+    0.39407
+   ],
+   "ordem": 16,
+   "coluna": 0,
+   "texto_impresso": "programme in the form of a series of books. In doing so, I was able to make use of many"
+  },
+  {
+   "id": "b22",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.1067,
+    0.39725,
+    0.93866,
+    0.41243
+   ],
+   "ordem": 17,
+   "coluna": 0,
+   "texto_impresso": "evduations, corrections and suggestions trom my students. While I was redrafting, especially the"
+  },
+  {
+   "id": "b23",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.1067,
+    0.41561,
+    0.8,
+    0.43079
+   ],
+   "ordem": 18,
+   "coluna": 0,
+   "texto_impresso": "explanations in the solutions, that feedback trom my students was very valuable."
+  },
+  {
+   "id": "b24",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.12423,
+    0.43362,
+    0.93918,
+    0.4488
+   ],
+   "ordem": 19,
+   "coluna": 0,
+   "texto_impresso": "mis book is the third volume in a series ofmanuals designed for players who are building the"
+  },
+  {
+   "id": "b25",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10619,
+    0.45233,
+    0.93814,
+    0.46751
+   ],
+   "ordem": 20,
+   "coluna": 0,
+   "texto_impresso": "foundations of their chess knowledge. me reader will receive the necessary basic knowledge in"
+  },
+  {
+   "id": "b26",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10619,
+    0.47069,
+    0.93866,
+    0.48588
+   ],
+   "ordem": 21,
+   "coluna": 0,
+   "texto_impresso": "six areas ofthe game – tactics, positional play, strategy, the calculation ofvariations, the opening"
+  },
+  {
+   "id": "b27",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10619,
+    0.48941,
+    0.25876,
+    0.50459
+   ],
+   "ordem": 22,
+   "coluna": 0,
+   "texto_impresso": "and the endgame."
+  },
+  {
+   "id": "b28",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.12423,
+    0.50777,
+    0.93814,
+    0.52295
+   ],
+   "ordem": 23,
+   "coluna": 0,
+   "texto_impresso": "me reader will beneht from the methodical build?up in this book, even if some of the"
+  },
+  {
+   "id": "b29",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.1067,
+    0.52648,
+    0.93763,
+    0.54167
+   ],
+   "ordem": 24,
+   "coluna": 0,
+   "texto_impresso": "material is familiar, as it will close any possible gaps in his chess knowledge and thus construct"
+  },
+  {
+   "id": "b30",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.1067,
+    0.54449,
+    0.93814,
+    0.55968
+   ],
+   "ordem": 25,
+   "coluna": 0,
+   "texto_impresso": "solid foundations for future success. To make the book entertaining and varied, I have mixed"
+  },
+  {
+   "id": "b31",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10619,
+    0.56285,
+    0.93814,
+    0.57804
+   ],
+   "ordem": 26,
+   "coluna": 0,
+   "texto_impresso": "up these di?erent areas, but you can always see from the header to which area any particular"
+  },
+  {
+   "id": "b32",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10619,
+    0.58157,
+    0.24691,
+    0.5964
+   ],
+   "ordem": 27,
+   "coluna": 0,
+   "texto_impresso": "chapter belongs."
+  },
+  {
+   "id": "b33",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.1232,
+    0.59993,
+    0.93763,
+    0.61511
+   ],
+   "ordem": 28,
+   "coluna": 0,
+   "texto_impresso": "At this point I must emphasize that just working with this book does not guarantee a rise in"
+  },
+  {
+   "id": "b34",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10567,
+    0.61829,
+    0.93814,
+    0.63347
+   ],
+   "ordem": 29,
+   "coluna": 0,
+   "texto_impresso": "your rating. It simply gives you a solid basis for a leap forward in chess ability. You should also"
+  },
+  {
+   "id": "b35",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10515,
+    0.63665,
+    0.93763,
+    0.65184
+   ],
+   "ordem": 30,
+   "coluna": 0,
+   "texto_impresso": "play in tournaments, analyse your own games, play through well?annotated games of stronger"
+  },
+  {
+   "id": "b36",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10567,
+    0.65501,
+    0.38351,
+    0.6702
+   ],
+   "ordem": 31,
+   "coluna": 0,
+   "texto_impresso": "players and read books on chess."
+  },
+  {
+   "id": "b37",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.12423,
+    0.67302,
+    0.94072,
+    0.68821
+   ],
+   "ordem": 32,
+   "coluna": 0,
+   "texto_impresso": "I have also been concerned with another problem area since I moved to Germany: the role of"
+  },
+  {
+   "id": "b38",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10619,
+    0.69174,
+    0.93763,
+    0.70692
+   ],
+   "ordem": 33,
+   "coluna": 0,
+   "texto_impresso": "trainers in chess education. In Germany there are unfortunately too few quali?ed trainers. There"
+  },
+  {
+   "id": "b39",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10619,
+    0.7101,
+    0.93814,
+    0.72528
+   ],
+   "ordem": 34,
+   "coluna": 0,
+   "texto_impresso": "is also a widespread opinion that a talented chess player does not need a trainer. I do not share"
+  },
+  {
+   "id": "b40",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10567,
+    0.72846,
+    0.94021,
+    0.74364
+   ],
+   "ordem": 35,
+   "coluna": 0,
+   "texto_impresso": "that opinion. I believe that many talented German chess players could develop much further, if"
+  },
+  {
+   "id": "b41",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10567,
+    0.74718,
+    0.81701,
+    0.76236
+   ],
+   "ordem": 36,
+   "coluna": 0,
+   "texto_impresso": "they had support at the correct time and ifthey had not left gaps in their learning."
+  },
+  {
+   "id": "b42",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.1232,
+    0.76554,
+    0.93763,
+    0.78072
+   ],
+   "ordem": 37,
+   "coluna": 0,
+   "texto_impresso": "Chess is a complicated sport, which has to be studied for many years. It is hard to imagine"
+  },
+  {
+   "id": "b43",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10567,
+    0.7839,
+    0.93763,
+    0.79908
+   ],
+   "ordem": 38,
+   "coluna": 0,
+   "texto_impresso": "any other sport without coaches. (Is there a single athletics club or football club that does not"
+  },
+  {
+   "id": "b44",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10464,
+    0.80226,
+    0.93763,
+    0.81744
+   ],
+   "ordem": 39,
+   "coluna": 0,
+   "texto_impresso": "have a trainer?) mis manual is intended for the many club players who un?rtunately receive no"
+  },
+  {
+   "id": "b45",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10515,
+    0.82062,
+    0.93711,
+    0.83581
+   ],
+   "ordem": 40,
+   "coluna": 0,
+   "texto_impresso": "support in attempting to master our complicated sport. In this way it is intended as a substitute"
+  },
+  {
+   "id": "b46",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10567,
+    0.83898,
+    0.93711,
+    0.85417
+   ],
+   "ordem": 41,
+   "coluna": 0,
+   "texto_impresso": "for a trainer for those that have none (and a support for trainers), but not an equal replacement"
+  },
+  {
+   "id": "b47",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10567,
+    0.85734,
+    0.21082,
+    0.86864
+   ],
+   "ordem": 42,
+   "coluna": 0,
+   "texto_impresso": "for a trainer."
+  },
+  {
+   "id": "b48",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.12423,
+    0.87571,
+    0.93763,
+    0.89089
+   ],
+   "ordem": 43,
+   "coluna": 0,
+   "texto_impresso": "I further believe that many chess lovers, who show great commitment to working with young"
+  },
+  {
+   "id": "b49",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10515,
+    0.89407,
+    0.93711,
+    0.90925
+   ],
+   "ordem": 44,
+   "coluna": 0,
+   "texto_impresso": "players in chess clubs, will gain with this series of books (as well as with the programme of the"
+  },
+  {
+   "id": "b50",
+   "funcao": "numero_de_pagina",
+   "caixa_rel": [
+    0.51598,
+    0.9541,
+    0.52577,
+    0.96257
+   ],
+   "ordem": 45,
+   "coluna": 0,
+   "texto_impresso": "6"
+  }
+ ],
+ "diagramas": [],
+ "linhas_corpo": [
+  {
+   "id": "l03b",
+   "bloco": "b03b",
+   "caixa_rel": [
+    0.4,
+    0.04873,
+    0.64794,
+    0.07027
+   ],
+   "texto": "Intro(1uct1?on",
+   "negrito": true,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l06",
+   "bloco": "b06",
+   "caixa_rel": [
+    0.10825,
+    0.1026,
+    0.943,
+    0.1178
+   ],
+   "texto": "D?uring my many years ofwork as a chess trainer, I have noticed that there are only a fow books ? ?",
+   "negrito": false,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l07",
+   "bloco": "b07",
+   "caixa_rel": [
+    0.10619,
+    0.12112,
+    0.94278,
+    0.1363
+   ],
+   "texto": "which are really suitable for most amateur players. Some good books treat individual aspects of",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l08",
+   "bloco": "b08",
+   "caixa_rel": [
+    0.10773,
+    0.13983,
+    0.93918,
+    0.15501
+   ],
+   "texto": "the game (middlegame or endgame, tactics or positional play) without paying any real heed to",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l09",
+   "bloco": "b09",
+   "caixa_rel": [
+    0.10773,
+    0.15784,
+    0.93918,
+    0.17302
+   ],
+   "texto": "the readers, playing levels. mis brought about the idea of working out a teaching programme",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l10",
+   "bloco": "b10",
+   "caixa_rel": [
+    0.10722,
+    0.1762,
+    0.93918,
+    0.19138
+   ],
+   "texto": "aimed specihcally at a certain playing strength. Such teaching programmes, in a brief ?rm and",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l11",
+   "bloco": "b11",
+   "caixa_rel": [
+    0.10722,
+    0.19456,
+    0.93763,
+    0.20975
+   ],
+   "texto": "intended as systematic help for trainers, are common only in Russia, where they are very popular.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l12",
+   "bloco": "b12",
+   "caixa_rel": [
+    0.10825,
+    0.21292,
+    0.93918,
+    0.22811
+   ],
+   "texto": "One very well known and much valued example is a publication by Golenischev, which inspired",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l13",
+   "bloco": "b13",
+   "caixa_rel": [
+    0.10722,
+    0.23129,
+    0.39588,
+    0.24647
+   ],
+   "texto": "some aspects ofmy methodology",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l14",
+   "bloco": "b14",
+   "caixa_rel": [
+    0.12629,
+    0.24965,
+    0.93918,
+    0.26483
+   ],
+   "texto": "In 2003 I began a 3 year training programme in my chess academy. mree groups were set",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l15",
+   "bloco": "b15",
+   "caixa_rel": [
+    0.10722,
+    0.26801,
+    0.93866,
+    0.28319
+   ],
+   "texto": "up according to playing strength: under Elo 1500, under Elo 1800 and under Elo 2100. Each",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l16",
+   "bloco": "b16",
+   "caixa_rel": [
+    0.10722,
+    0.28672,
+    0.93866,
+    0.30191
+   ],
+   "texto": "annual stage consisted of 24 teaching modules and 24 tests, plus a hnal test at the end of the",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l17",
+   "bloco": "b17",
+   "caixa_rel": [
+    0.10722,
+    0.30968,
+    0.16546,
+    0.31638
+   ],
+   "texto": "course.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l18",
+   "bloco": "b18",
+   "caixa_rel": [
+    0.12474,
+    0.3238,
+    0.93918,
+    0.33898
+   ],
+   "texto": "mis programme was later taken over, in a different form, by the Chess Tigers University and",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l19",
+   "bloco": "b19",
+   "caixa_rel": [
+    0.10722,
+    0.34181,
+    0.30825,
+    0.35699
+   ],
+   "texto": "is still being used there.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l20",
+   "bloco": "b20",
+   "caixa_rel": [
+    0.12423,
+    0.36052,
+    0.93866,
+    0.37571
+   ],
+   "texto": "The overwhelmingly positive comments of my students encouraged me to rework this",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l21",
+   "bloco": "b21",
+   "caixa_rel": [
+    0.10619,
+    0.37888,
+    0.93969,
+    0.39407
+   ],
+   "texto": "programme in the form of a series of books. In doing so, I was able to make use of many",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l22",
+   "bloco": "b22",
+   "caixa_rel": [
+    0.1067,
+    0.39725,
+    0.93866,
+    0.41243
+   ],
+   "texto": "evduations, corrections and suggestions trom my students. While I was redrafting, especially the",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l23",
+   "bloco": "b23",
+   "caixa_rel": [
+    0.1067,
+    0.41561,
+    0.8,
+    0.43079
+   ],
+   "texto": "explanations in the solutions, that feedback trom my students was very valuable.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l24",
+   "bloco": "b24",
+   "caixa_rel": [
+    0.12423,
+    0.43362,
+    0.93918,
+    0.4488
+   ],
+   "texto": "mis book is the third volume in a series ofmanuals designed for players who are building the",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l25",
+   "bloco": "b25",
+   "caixa_rel": [
+    0.10619,
+    0.45233,
+    0.93814,
+    0.46751
+   ],
+   "texto": "foundations of their chess knowledge. me reader will receive the necessary basic knowledge in",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l26",
+   "bloco": "b26",
+   "caixa_rel": [
+    0.10619,
+    0.47069,
+    0.93866,
+    0.48588
+   ],
+   "texto": "six areas ofthe game – tactics, positional play, strategy, the calculation ofvariations, the opening",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l27",
+   "bloco": "b27",
+   "caixa_rel": [
+    0.10619,
+    0.48941,
+    0.25876,
+    0.50459
+   ],
+   "texto": "and the endgame.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l28",
+   "bloco": "b28",
+   "caixa_rel": [
+    0.12423,
+    0.50777,
+    0.93814,
+    0.52295
+   ],
+   "texto": "me reader will beneht from the methodical build?up in this book, even if some of the",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l29",
+   "bloco": "b29",
+   "caixa_rel": [
+    0.1067,
+    0.52648,
+    0.93763,
+    0.54167
+   ],
+   "texto": "material is familiar, as it will close any possible gaps in his chess knowledge and thus construct",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l30",
+   "bloco": "b30",
+   "caixa_rel": [
+    0.1067,
+    0.54449,
+    0.93814,
+    0.55968
+   ],
+   "texto": "solid foundations for future success. To make the book entertaining and varied, I have mixed",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l31",
+   "bloco": "b31",
+   "caixa_rel": [
+    0.10619,
+    0.56285,
+    0.93814,
+    0.57804
+   ],
+   "texto": "up these di?erent areas, but you can always see from the header to which area any particular",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l32",
+   "bloco": "b32",
+   "caixa_rel": [
+    0.10619,
+    0.58157,
+    0.24691,
+    0.5964
+   ],
+   "texto": "chapter belongs.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l33",
+   "bloco": "b33",
+   "caixa_rel": [
+    0.1232,
+    0.59993,
+    0.93763,
+    0.61511
+   ],
+   "texto": "At this point I must emphasize that just working with this book does not guarantee a rise in",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l34",
+   "bloco": "b34",
+   "caixa_rel": [
+    0.10567,
+    0.61829,
+    0.93814,
+    0.63347
+   ],
+   "texto": "your rating. It simply gives you a solid basis for a leap forward in chess ability. You should also",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l35",
+   "bloco": "b35",
+   "caixa_rel": [
+    0.10515,
+    0.63665,
+    0.93763,
+    0.65184
+   ],
+   "texto": "play in tournaments, analyse your own games, play through well?annotated games of stronger",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l36",
+   "bloco": "b36",
+   "caixa_rel": [
+    0.10567,
+    0.65501,
+    0.38351,
+    0.6702
+   ],
+   "texto": "players and read books on chess.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l37",
+   "bloco": "b37",
+   "caixa_rel": [
+    0.12423,
+    0.67302,
+    0.94072,
+    0.68821
+   ],
+   "texto": "I have also been concerned with another problem area since I moved to Germany: the role of",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l38",
+   "bloco": "b38",
+   "caixa_rel": [
+    0.10619,
+    0.69174,
+    0.93763,
+    0.70692
+   ],
+   "texto": "trainers in chess education. In Germany there are unfortunately too few quali?ed trainers. There",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l39",
+   "bloco": "b39",
+   "caixa_rel": [
+    0.10619,
+    0.7101,
+    0.93814,
+    0.72528
+   ],
+   "texto": "is also a widespread opinion that a talented chess player does not need a trainer. I do not share",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l40",
+   "bloco": "b40",
+   "caixa_rel": [
+    0.10567,
+    0.72846,
+    0.94021,
+    0.74364
+   ],
+   "texto": "that opinion. I believe that many talented German chess players could develop much further, if",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l41",
+   "bloco": "b41",
+   "caixa_rel": [
+    0.10567,
+    0.74718,
+    0.81701,
+    0.76236
+   ],
+   "texto": "they had support at the correct time and ifthey had not left gaps in their learning.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l42",
+   "bloco": "b42",
+   "caixa_rel": [
+    0.1232,
+    0.76554,
+    0.93763,
+    0.78072
+   ],
+   "texto": "Chess is a complicated sport, which has to be studied for many years. It is hard to imagine",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l43",
+   "bloco": "b43",
+   "caixa_rel": [
+    0.10567,
+    0.7839,
+    0.93763,
+    0.79908
+   ],
+   "texto": "any other sport without coaches. (Is there a single athletics club or football club that does not",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l44",
+   "bloco": "b44",
+   "caixa_rel": [
+    0.10464,
+    0.80226,
+    0.93763,
+    0.81744
+   ],
+   "texto": "have a trainer?) mis manual is intended for the many club players who un?rtunately receive no",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l45",
+   "bloco": "b45",
+   "caixa_rel": [
+    0.10515,
+    0.82062,
+    0.93711,
+    0.83581
+   ],
+   "texto": "support in attempting to master our complicated sport. In this way it is intended as a substitute",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l46",
+   "bloco": "b46",
+   "caixa_rel": [
+    0.10567,
+    0.83898,
+    0.93711,
+    0.85417
+   ],
+   "texto": "for a trainer for those that have none (and a support for trainers), but not an equal replacement",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l47",
+   "bloco": "b47",
+   "caixa_rel": [
+    0.10567,
+    0.85734,
+    0.21082,
+    0.86864
+   ],
+   "texto": "for a trainer.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l48",
+   "bloco": "b48",
+   "caixa_rel": [
+    0.12423,
+    0.87571,
+    0.93763,
+    0.89089
+   ],
+   "texto": "I further believe that many chess lovers, who show great commitment to working with young",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l49",
+   "bloco": "b49",
+   "caixa_rel": [
+    0.10515,
+    0.89407,
+    0.93711,
+    0.90925
+   ],
+   "texto": "players in chess clubs, will gain with this series of books (as well as with the programme of the",
+   "negrito": false,
+   "texto_verificado": false
+  }
+ ],
+ "estrutura_por": "Claude (estrutura pelas faixas)"
+}

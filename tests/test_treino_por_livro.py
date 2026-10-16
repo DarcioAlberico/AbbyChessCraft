@@ -15,14 +15,18 @@ from abbychess import pagina as pg
 from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL, LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro, ProjetoInvalido, nome_de_pasta
 
+from tests.livros import PASTA_DOS_PDFS
+
 FONTE_TTF = Path("C:/Windows/Fonts/arial.ttf")
 
 
 def _pagina_sintetica(caminho: Path, linhas=("abc abc abc", "cab bca")) -> Path:
     imagem = Image.new("L", (900, 80 + 90 * len(linhas)), 255)
     desenho = ImageDraw.Draw(imagem)
-    fonte = (ImageFont.truetype(str(FONTE_TTF), 56) if FONTE_TTF.exists()
-             else ImageFont.load_default(size=56))
+    if not FONTE_TTF.exists():
+        # Outra fonte daria outros glifos e outros números: o teste pula, não muda.
+        pytest.skip("a Arial não está nesta máquina")
+    fonte = ImageFont.truetype(str(FONTE_TTF), 56)
     for i, linha in enumerate(linhas):
         desenho.text((40, 40 + 90 * i), linha, fill=0, font=fonte)
     imagem.save(caminho)
@@ -171,9 +175,10 @@ def test_tabuleiros_gravados_voltam_com_a_pagina(projeto):
     assert projeto.carregar_tabuleiros(1) == []
 
 
-_DARCY = sorted(Path("C:/Python-Chess2/PyBoxEditor_Tkinter/PDF").glob("Darcy*/Darcy*.pdf"))
+_DARCY = sorted(PASTA_DOS_PDFS.glob("Darcy*/Darcy*.pdf"))
 
 
+@pytest.mark.livro_real
 @pytest.mark.skipif(not _DARCY, reason="o PDF do Darcy Lima não está nesta máquina")
 def test_diagrama_sem_moldura_sai_do_texto():
     """A p. 26 do Darcy Lima tem três diagramas sem moldura fechada."""

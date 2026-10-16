@@ -1,0 +1,798 @@
+{
+ "livro": "xv",
+ "pdf": "Xadrez Vitorioso - Estrategias - Yasser Seirawan.pdf",
+ "pdf_sha256": "c7277691646ce288f81649f181a2d0316bf1e01ff864b9810c29ce9a0d5b7161",
+ "indice_pdf": 22,
+ "pagina_impressa": 23,
+ "dpi_de_leitura": 300,
+ "render_sha256": "ea891640db9bd0161aea425e09efcb488c56522cc3b6f2d998004cde08af6821",
+ "pymupdf": "1.26.6",
+ "inclinacao": 0.0,
+ "papel": 255,
+ "verdade_versao": 1,
+ "rotulado_por": "",
+ "revisado_por": "",
+ "blocos": [
+  {
+   "id": "b00",
+   "funcao": "cabecalho",
+   "caixa_rel": [
+    0.67379,
+    0.04987,
+    0.9379,
+    0.0664
+   ],
+   "ordem": 0,
+   "coluna": 0,
+   "texto_impresso": "?DREZ vlTORloSo: ESTRATÉGlAS 23"
+  },
+  {
+   "id": "b01",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19153,
+    0.09746,
+    0.9375,
+    0.11257
+   ],
+   "ordem": 1,
+   "coluna": 0,
+   "texto_impresso": "peça não vai fazer muita diferença no final. O importante é empurrar o Rei inimi-"
+  },
+  {
+   "id": "b02",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19153,
+    0.11485,
+    0.62419,
+    0.12967
+   ],
+   "ordem": 2,
+   "coluna": 0,
+   "texto_impresso": "go para a frente, deixando-o em mauS IençóiS."
+  },
+  {
+   "id": "b03",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10726,
+    0.14876,
+    0.39798,
+    0.16415
+   ],
+   "ordem": 3,
+   "coluna": 0,
+   "texto_impresso": "9...Rxe5 10.f4+ Rf5 11.Cd4+"
+  },
+  {
+   "id": "b04",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.2371,
+    0.1727,
+    0.9379,
+    0.19008
+   ],
+   "ordem": 4,
+   "coluna": 0,
+   "texto_impresso": "É claro que, para compenSar a desvantagem da Dama? as brancasT)oderiam"
+  },
+  {
+   "id": "b05",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19113,
+    0.19293,
+    0.9371,
+    0.20747
+   ],
+   "ordem": 5,
+   "coluna": 0,
+   "texto_impresso": "capturar a Dama das pretas, mas nesse momento ojogador busca um tro?u maio?"
+  },
+  {
+   "id": "b06",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.10847,
+    0.22685,
+    0.81935,
+    0.24537
+   ],
+   "ordem": 6,
+   "coluna": 0,
+   "texto_impresso": "11...Rg4 12.h3+ R93 13.Ce2+ Rx92 14.Bd5+ Ce4 15.Bxe4 xeque.mate"
+  },
+  {
+   "id": "b07",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.23629,
+    0.25278,
+    0.9375,
+    0.26845
+   ],
+   "ordem": 7,
+   "coluna": 0,
+   "texto_impresso": "As pretas tiveram o que mereciam. Quando o jogado. r não desenvo1ve as"
+  },
+  {
+   "id": "b08",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19073,
+    0.27102,
+    0.5371,
+    0.28555
+   ],
+   "ordem": 8,
+   "coluna": 0,
+   "texto_impresso": "peça?? acaba caindo em dificu1dade?."
+  },
+  {
+   "id": "b09",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.2371,
+    0.2884,
+    0.9375,
+    0.30294
+   ],
+   "ordem": 9,
+   "coluna": 0,
+   "texto_impresso": "Como vimos? a superioridade no de?envo1Vimento pode compensar a des—"
+  },
+  {
+   "id": "b10",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19032,
+    0.30579,
+    0.9375,
+    0.3206
+   ],
+   "ordem": 10,
+   "coluna": 0,
+   "texto_impresso": "vantagem materia1. No entanto, se o exército adversário for capaz de reduzir a"
+  },
+  {
+   "id": "b11",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19073,
+    0.32317,
+    0.9379,
+    0.33799
+   ],
+   "ordem": 11,
+   "coluna": 0,
+   "texto_impresso": "diferença de desenvolVimento, a vantagem material se reafirma. Quando tiver"
+  },
+  {
+   "id": "b12",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19073,
+    0.34027,
+    0.9379,
+    0.35537
+   ],
+   "ordem": 12,
+   "coluna": 0,
+   "texto_impresso": "uma vantagem materia1, não a1imente as tropas inimigas deixando de lado a"
+  },
+  {
+   "id": "b13",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19073,
+    0.35765,
+    0.38387,
+    0.37247
+   ],
+   "ordem": 13,
+   "coluna": 0,
+   "texto_impresso": "própria mobi1ização."
+  },
+  {
+   "id": "b14",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.23669,
+    0.37504,
+    0.9371,
+    0.39014
+   ],
+   "ordem": 14,
+   "coluna": 0,
+   "texto_impresso": "Demonstrarei me1hor eSse conceito em outro j0go com vantagem predeter-"
+  },
+  {
+   "id": "b15",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19073,
+    0.3927,
+    0.9371,
+    0.40752
+   ],
+   "ordem": 15,
+   "coluna": 0,
+   "texto_impresso": "minada. Como mostra o Diagrama 4, desta vez as brancas não estão tão seguras"
+  },
+  {
+   "id": "b16",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19073,
+    0.41009,
+    0.93629,
+    0.42491
+   ],
+   "ordem": 16,
+   "coluna": 0,
+   "texto_impresso": "de si (ou são mais realistas) e oferecem o Cavalo da Dama como vantagem."
+  },
+  {
+   "id": "b17",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19073,
+    0.42719,
+    0.58226,
+    0.44201
+   ],
+   "ordem": 17,
+   "coluna": 0,
+   "texto_impresso": "portanto, o jogo começa sem o CaValo—b1."
+  },
+  {
+   "id": "b18",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.27258,
+    0.44714,
+    0.27581,
+    0.44885
+   ],
+   "ordem": 18,
+   "coluna": 0,
+   "texto_impresso": "?"
+  },
+  {
+   "id": "d0",
+   "funcao": "diagrama",
+   "caixa_rel": [
+    0.37298,
+    0.47791,
+    0.66935,
+    0.68852
+   ],
+   "ordem": 19,
+   "coluna": 0,
+   "texto_impresso": ""
+  },
+  {
+   "id": "b19",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.475,
+    0.70818,
+    0.56694,
+    0.723
+   ],
+   "ordem": 20,
+   "coluna": 0,
+   "texto_impresso": "Dia?rama 4.",
+   "diagrama": "d0"
+  },
+  {
+   "id": "b20",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.46694,
+    0.72613,
+    0.575,
+    0.73668
+   ],
+   "ordem": 21,
+   "coluna": 0,
+   "texto_impresso": "Ward—BroWne",
+   "diagrama": "d0"
+  },
+  {
+   "id": "b21",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.45121,
+    0.74152,
+    0.59153,
+    0.75435
+   ],
+   "ordem": 22,
+   "coluna": 0,
+   "texto_impresso": "No?ingham/ 1874",
+   "diagrama": "d0"
+  },
+  {
+   "id": "b22",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.40161,
+    0.75663,
+    0.84839,
+    0.76917
+   ],
+   "ordem": 23,
+   "coluna": 0,
+   "texto_impresso": "Vantagem do CavaIo da Dama .",
+   "diagrama": "d0"
+  },
+  {
+   "id": "b23",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.11129,
+    0.80878,
+    0.22016,
+    0.82388
+   ],
+   "ordem": 24,
+   "coluna": 0,
+   "texto_impresso": "1.e4 e5 2.f4"
+  },
+  {
+   "id": "b24",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.23468,
+    0.83557,
+    0.93629,
+    0.85095
+   ],
+   "ordem": 25,
+   "coluna": 0,
+   "texto_impresso": "As brancas mostram imediatamente que estão dispostas a entregar mais"
+  },
+  {
+   "id": "b25",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.18992,
+    0.85295,
+    0.5871,
+    0.86834
+   ],
+   "ordem": 26,
+   "coluna": 0,
+   "texto_impresso": "materia1 para abrir linhas para suas peças."
+  },
+  {
+   "id": "b26",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.11089,
+    0.88686,
+    0.26815,
+    0.90225
+   ],
+   "ordem": 27,
+   "coluna": 0,
+   "texto_impresso": "2lI.exf4 3.Cf3 f5?"
+  },
+  {
+   "id": "b27",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.23508,
+    0.91394,
+    0.93629,
+    0.92932
+   ],
+   "ordem": 28,
+   "coluna": 0,
+   "texto_impresso": "Um 1ance muito ruim. A? pretas enfraquecem a proteção de peões em torno"
+  },
+  {
+   "id": "b28",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.18992,
+    0.93132,
+    0.93629,
+    0.94642
+   ],
+   "ordem": 29,
+   "coluna": 0,
+   "texto_impresso": "do Rei e deixam de desenvolver uma peça. Seria melhor a1go como 2...d5 (que"
+  },
+  {
+   "id": "b29",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.06411,
+    0.9943,
+    0.07258,
+    0.99601
+   ],
+   "ordem": 30,
+   "coluna": 0,
+   "texto_impresso": "?"
+  }
+ ],
+ "diagramas": [
+  {
+   "id": "d0",
+   "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR",
+   "fen_lido": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR",
+   "lado": "?",
+   "legenda": "b19",
+   "lances_seguintes": [
+    "e4",
+    "e5",
+    "f4",
+    "exf4",
+    "Nf3",
+    "f5"
+   ],
+   "fen_verificado": false,
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
+  }
+ ],
+ "linhas_corpo": [
+  {
+   "id": "l01",
+   "bloco": "b01",
+   "caixa_rel": [
+    0.19153,
+    0.09746,
+    0.9375,
+    0.11257
+   ],
+   "texto": "peça não vai fazer muita diferença no final. O importante é empurrar o Rei inimi-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l02",
+   "bloco": "b02",
+   "caixa_rel": [
+    0.19153,
+    0.11485,
+    0.62419,
+    0.12967
+   ],
+   "texto": "go para a frente, deixando-o em mauS IençóiS.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l03",
+   "bloco": "b03",
+   "caixa_rel": [
+    0.10726,
+    0.14876,
+    0.39798,
+    0.16415
+   ],
+   "texto": "9...Rxe5 10.f4+ Rf5 11.Cd4+",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l04",
+   "bloco": "b04",
+   "caixa_rel": [
+    0.2371,
+    0.1727,
+    0.9379,
+    0.19008
+   ],
+   "texto": "É claro que, para compenSar a desvantagem da Dama? as brancasT)oderiam",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l05",
+   "bloco": "b05",
+   "caixa_rel": [
+    0.19113,
+    0.19293,
+    0.9371,
+    0.20747
+   ],
+   "texto": "capturar a Dama das pretas, mas nesse momento ojogador busca um tro?u maio?",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l06",
+   "bloco": "b06",
+   "caixa_rel": [
+    0.10847,
+    0.22685,
+    0.81935,
+    0.24537
+   ],
+   "texto": "11...Rg4 12.h3+ R93 13.Ce2+ Rx92 14.Bd5+ Ce4 15.Bxe4 xeque.mate",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l07",
+   "bloco": "b07",
+   "caixa_rel": [
+    0.23629,
+    0.25278,
+    0.9375,
+    0.26845
+   ],
+   "texto": "As pretas tiveram o que mereciam. Quando o jogado. r não desenvo1ve as",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l08",
+   "bloco": "b08",
+   "caixa_rel": [
+    0.19073,
+    0.27102,
+    0.5371,
+    0.28555
+   ],
+   "texto": "peça?? acaba caindo em dificu1dade?.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l09",
+   "bloco": "b09",
+   "caixa_rel": [
+    0.2371,
+    0.2884,
+    0.9375,
+    0.30294
+   ],
+   "texto": "Como vimos? a superioridade no de?envo1Vimento pode compensar a des—",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l10",
+   "bloco": "b10",
+   "caixa_rel": [
+    0.19032,
+    0.30579,
+    0.9375,
+    0.3206
+   ],
+   "texto": "vantagem materia1. No entanto, se o exército adversário for capaz de reduzir a",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l11",
+   "bloco": "b11",
+   "caixa_rel": [
+    0.19073,
+    0.32317,
+    0.9379,
+    0.33799
+   ],
+   "texto": "diferença de desenvolVimento, a vantagem material se reafirma. Quando tiver",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l12",
+   "bloco": "b12",
+   "caixa_rel": [
+    0.19073,
+    0.34027,
+    0.9379,
+    0.35537
+   ],
+   "texto": "uma vantagem materia1, não a1imente as tropas inimigas deixando de lado a",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l13",
+   "bloco": "b13",
+   "caixa_rel": [
+    0.19073,
+    0.35765,
+    0.38387,
+    0.37247
+   ],
+   "texto": "própria mobi1ização.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l14",
+   "bloco": "b14",
+   "caixa_rel": [
+    0.23669,
+    0.37504,
+    0.9371,
+    0.39014
+   ],
+   "texto": "Demonstrarei me1hor eSse conceito em outro j0go com vantagem predeter-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l15",
+   "bloco": "b15",
+   "caixa_rel": [
+    0.19073,
+    0.3927,
+    0.9371,
+    0.40752
+   ],
+   "texto": "minada. Como mostra o Diagrama 4, desta vez as brancas não estão tão seguras",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l16",
+   "bloco": "b16",
+   "caixa_rel": [
+    0.19073,
+    0.41009,
+    0.93629,
+    0.42491
+   ],
+   "texto": "de si (ou são mais realistas) e oferecem o Cavalo da Dama como vantagem.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l17",
+   "bloco": "b17",
+   "caixa_rel": [
+    0.19073,
+    0.42719,
+    0.58226,
+    0.44201
+   ],
+   "texto": "portanto, o jogo começa sem o CaValo—b1.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l19",
+   "bloco": "b19",
+   "caixa_rel": [
+    0.475,
+    0.70818,
+    0.56694,
+    0.723
+   ],
+   "texto": "Dia?rama 4.",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l20",
+   "bloco": "b20",
+   "caixa_rel": [
+    0.46694,
+    0.72613,
+    0.575,
+    0.73668
+   ],
+   "texto": "Ward—BroWne",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l21",
+   "bloco": "b21",
+   "caixa_rel": [
+    0.45121,
+    0.74152,
+    0.59153,
+    0.75435
+   ],
+   "texto": "No?ingham/ 1874",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l22",
+   "bloco": "b22",
+   "caixa_rel": [
+    0.40161,
+    0.75663,
+    0.84839,
+    0.76917
+   ],
+   "texto": "Vantagem do CavaIo da Dama .",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l23",
+   "bloco": "b23",
+   "caixa_rel": [
+    0.11129,
+    0.80878,
+    0.22016,
+    0.82388
+   ],
+   "texto": "1.e4 e5 2.f4",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l24",
+   "bloco": "b24",
+   "caixa_rel": [
+    0.23468,
+    0.83557,
+    0.93629,
+    0.85095
+   ],
+   "texto": "As brancas mostram imediatamente que estão dispostas a entregar mais",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l25",
+   "bloco": "b25",
+   "caixa_rel": [
+    0.18992,
+    0.85295,
+    0.5871,
+    0.86834
+   ],
+   "texto": "materia1 para abrir linhas para suas peças.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l26",
+   "bloco": "b26",
+   "caixa_rel": [
+    0.11089,
+    0.88686,
+    0.26815,
+    0.90225
+   ],
+   "texto": "2lI.exf4 3.Cf3 f5?",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l27",
+   "bloco": "b27",
+   "caixa_rel": [
+    0.23508,
+    0.91394,
+    0.93629,
+    0.92932
+   ],
+   "texto": "Um 1ance muito ruim. A? pretas enfraquecem a proteção de peões em torno",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l28",
+   "bloco": "b28",
+   "caixa_rel": [
+    0.18992,
+    0.93132,
+    0.93629,
+    0.94642
+   ],
+   "texto": "do Rei e deixam de desenvolver uma peça. Seria melhor a1go como 2...d5 (que",
+   "negrito": false,
+   "texto_verificado": false
+  }
+ ],
+ "estrutura_por": "Claude (estrutura pelas faixas)"
+}

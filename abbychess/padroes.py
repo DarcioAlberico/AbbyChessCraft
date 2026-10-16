@@ -59,6 +59,8 @@ import numpy as np
 
 from core.learner import char_to_folder, folder_to_char
 
+from abbychess import gravacao as gv
+
 LADO = 32
 METADADOS = "metadados.json"
 
@@ -119,8 +121,7 @@ class PadroesDoLivro:
 
     def __init__(self, pasta: str | Path, *, distancia_maxima: float = DISTANCIA_MAXIMA,
                  tolerancia_de_altura: float = TOLERANCIA_DE_ALTURA):
-        self.pasta = Path(pasta)
-        self.pasta.mkdir(parents=True, exist_ok=True)
+        self.pasta = Path(pasta)        # a pasta nasce com o primeiro padrão (`gravacao`)
         self.distancia_maxima = distancia_maxima
         self.tolerancia_de_altura = tolerancia_de_altura
         self._carregar()
@@ -134,7 +135,8 @@ class PadroesDoLivro:
         except ValueError:
             self._meta = {}
         vetores, chars, alturas, proporcoes, caminhos = [], [], [], [], []
-        for pasta in sorted(p for p in self.pasta.iterdir() if p.is_dir()):
+        subpastas = self.pasta.iterdir() if self.pasta.is_dir() else ()
+        for pasta in sorted(p for p in subpastas if p.is_dir()):
             char = folder_to_char(pasta.name)
             for png in sorted(pasta.glob("*.png")):
                 imagem = _ler_png(png)
@@ -154,12 +156,17 @@ class PadroesDoLivro:
     def _chave(self, caminho: Path) -> str:
         return caminho.relative_to(self.pasta).as_posix()
 
+    def relativo(self, caminho) -> Optional[str]:
+        """O caminho da amostra relativo à pasta dos padrões (a procedência gravada no `Box`)."""
+        if caminho is None:
+            return None
+        try:
+            return Path(caminho).resolve().relative_to(self.pasta.resolve()).as_posix()
+        except ValueError:
+            return Path(caminho).name
+
     def _gravar_meta(self) -> None:
-        arquivo = self.pasta / METADADOS
-        temporario = arquivo.with_suffix(".tmp")
-        temporario.write_text(json.dumps(self._meta, ensure_ascii=False, indent=1),
-                              encoding="utf-8", newline="\n")
-        temporario.replace(arquivo)
+        gv.gravar_json(self.pasta / METADADOS, self._meta)
 
     # ------------------------------------------------------------------
     @property
@@ -195,6 +202,19 @@ class PadroesDoLivro:
         return Resposta(self._chars[i], max(0.0, 1.0 - d / ESCALA_DA_CONFIANCA), d,
                         self._caminhos[i])
 
+    def instantaneo(self) -> "PadroesDoLivro":
+        """Os padrões de agora, para ler fora da thread da interface enquanto ela ensina
+        (passo 2b): as matrizes são as mesmas (ensinar e esquecer as trocam, não as mudam no
+        lugar) e as listas, cópias. Só para `ler`: não ensine nem esqueça nele."""
+        foto = object.__new__(PadroesDoLivro)
+        foto.pasta, foto._meta = self.pasta, self._meta
+        foto.distancia_maxima, foto.tolerancia_de_altura = (self.distancia_maxima,
+                                                            self.tolerancia_de_altura)
+        foto._X, foto._normas = self._X, self._normas
+        foto._chars, foto._caminhos = list(self._chars), list(self._caminhos)
+        foto._alturas, foto._proporcoes = self._alturas, self._proporcoes
+        return foto
+
     def ensinar(self, recorte: np.ndarray, char: str, altura_relativa: Optional[float] = None,
                 origem: str = "") -> Path:
         """Grava o recorte no tamanho original e o torna consultável na hora."""
@@ -202,22 +222,23 @@ class PadroesDoLivro:
             raise ValueError("O caractere ensinado não pode ser vazio.")
         cinza = recorte if recorte.ndim == 2 else cv2.cvtColor(recorte, cv2.COLOR_RGB2GRAY)
         pasta = self.pasta / char_to_folder(char)
-        pasta.mkdir(parents=True, exist_ok=True)
         caminho = pasta / f"{_nome_limpo(origem)}.png"
         ok, png = cv2.imencode(".png", cinza)
         if not ok:
             raise OSError(f"O recorte de '{char}' não pôde ser codificado em PNG.")
-        png.tofile(str(caminho))
+        gv.gravar_bytes(caminho, png.tobytes())
         self._meta[self._chave(caminho)] = {
             "altura": None if altura_relativa is None else round(float(altura_relativa), 4),
             "origem": origem,
         }
         self._gravar_meta()
         v = _vetor(cinza)
+        # Listas novas, e não `append`: um instantâneo (a propagação lendo noutra thread)
+        # nunca vê a matriz de um tamanho e as listas de outro.
         self._X = np.vstack([self._X, v[None, :]])
         self._normas = np.append(self._normas, float(v @ v))
-        self._chars.append(char)
-        self._caminhos.append(caminho)
+        self._chars = self._chars + [char]
+        self._caminhos = self._caminhos + [caminho]
         self._proporcoes = np.append(self._proporcoes, np.float32(_proporcao(cinza)))
         self._alturas = np.append(self._alturas, np.float32(
             np.nan if altura_relativa is None else altura_relativa))
@@ -227,7 +248,7 @@ class PadroesDoLivro:
         caminho = Path(caminho).resolve()
         if self.pasta.resolve() not in caminho.parents:
             raise ValueError(f"{caminho} não é um padrão deste livro.")
-        caminho.unlink()
+        gv.apagar(caminho)
         self._meta.pop(caminho.relative_to(self.pasta.resolve()).as_posix(), None)
         self._gravar_meta()
         self._carregar()
@@ -243,8 +264,7 @@ class PadroesDoLivro:
         caminho = Path(amostra.caminho).resolve()
         if self.pasta.resolve() not in caminho.parents:
             raise ValueError(f"{caminho} não é um padrão deste livro.")
-        caminho.parent.mkdir(parents=True, exist_ok=True)
-        caminho.write_bytes(amostra.png)
+        gv.gravar_bytes(caminho, amostra.png)
         self._meta[caminho.relative_to(self.pasta.resolve()).as_posix()] = dict(amostra.meta)
         self._gravar_meta()
         self._carregar()

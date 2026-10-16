@@ -1,0 +1,804 @@
+{
+ "livro": "xv",
+ "pdf": "Xadrez Vitorioso - Estrategias - Yasser Seirawan.pdf",
+ "pdf_sha256": "c7277691646ce288f81649f181a2d0316bf1e01ff864b9810c29ce9a0d5b7161",
+ "indice_pdf": 20,
+ "pagina_impressa": 21,
+ "dpi_de_leitura": 300,
+ "render_sha256": "865bbe7f9a5b46e722fe7ff48ba671f54422808e2acbf1a4cb941696a9752eb4",
+ "pymupdf": "1.26.6",
+ "inclinacao": 0.0,
+ "papel": 255,
+ "verdade_versao": 1,
+ "rotulado_por": "",
+ "revisado_por": "",
+ "blocos": [
+  {
+   "id": "b00",
+   "funcao": "cabecalho",
+   "caixa_rel": [
+    0.69879,
+    0.05044,
+    0.94234,
+    0.06697
+   ],
+   "ordem": 0,
+   "coluna": 0,
+   "texto_impresso": "DREZ VlTOR?OSO: ESTRATÉGlA? 21"
+  },
+  {
+   "id": "b01",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.24355,
+    0.0986,
+    0.94435,
+    0.11314
+   ],
+   "ordem": 1,
+   "coluna": 0,
+   "texto_impresso": "Você reparou que a Dama branca não está no Diagrama 3? p0r quê? Porque"
+  },
+  {
+   "id": "b02",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19839,
+    0.11599,
+    0.94315,
+    0.13052
+   ],
+   "ordem": 2,
+   "coluna": 0,
+   "texto_impresso": "a partida que vamos analisar agora foi jogada com vantagem predeterminada."
+  },
+  {
+   "id": "b03",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19839,
+    0.13337,
+    0.94435,
+    0.14791
+   ],
+   "ordem": 3,
+   "coluna": 0,
+   "texto_impresso": "Hoje, é raro esse tipo de jogo, destinado a dar a um jogador fraco a chance de"
+  },
+  {
+   "id": "b04",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19758,
+    0.15047,
+    0.94395,
+    0.16529
+   ],
+   "ordem": 4,
+   "coluna": 0,
+   "texto_impresso": "vencer umjogad0r muit0 mais f0rte. Com0 é feit0 eSse jog0? Depois de se c0l0ca-"
+  },
+  {
+   "id": "b05",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19798,
+    0.16785,
+    0.94435,
+    0.18239
+   ],
+   "ordem": 5,
+   "coluna": 0,
+   "texto_impresso": "rem todas as peças normalmente no tabuleiro, tira-se a peça ou peão que o joga—"
+  },
+  {
+   "id": "b06",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19798,
+    0.18438,
+    0.94395,
+    0.19977
+   ],
+   "ordem": 6,
+   "coluna": 0,
+   "texto_impresso": "dor mais forte (aquele que dá a vantagem ao outro) oferece. No caso que vamos"
+  },
+  {
+   "id": "b07",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19839,
+    0.20205,
+    0.94395,
+    0.21687
+   ],
+   "ordem": 7,
+   "coluna": 0,
+   "texto_impresso": "analisar agora, o jogador abriu mão da Dama, sendo a partida chamada de '?van-"
+  },
+  {
+   "id": "b08",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19839,
+    0.21944,
+    0.35968,
+    0.23368
+   ],
+   "ordem": 8,
+   "coluna": 0,
+   "texto_impresso": "tagem da Dama,,."
+  },
+  {
+   "id": "b09",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.24395,
+    0.23682,
+    0.94315,
+    0.25135
+   ],
+   "ordem": 9,
+   "coluna": 0,
+   "texto_impresso": "?odemos perguntar então: como as brancas esperam ganhar sem a Dama?"
+  },
+  {
+   "id": "b10",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19798,
+    0.25392,
+    0.94435,
+    0.26874
+   ],
+   "ordem": 10,
+   "coluna": 0,
+   "texto_impresso": "Contra um adversário igualmente hábil, na verdade seria m- uito difícil. Mas nesse"
+  },
+  {
+   "id": "b11",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19798,
+    0.27102,
+    0.94395,
+    0.28641
+   ],
+   "ordem": 11,
+   "coluna": 0,
+   "texto_impresso": "ca?o as brancas são de Wil1iam Norwood Potte? um enxadrista experiente, e ele"
+  },
+  {
+   "id": "b12",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19798,
+    0.28897,
+    0.94274,
+    0.30379
+   ],
+   "ordem": 12,
+   "coluna": 0,
+   "texto_impresso": "sabe que o adVersário, um iniciante, vai cometer erros. A que?tão é a seguinte.."
+  },
+  {
+   "id": "b13",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19798,
+    0.30636,
+    0.94435,
+    0.32089
+   ],
+   "ordem": 13,
+   "coluna": 0,
+   "texto_impresso": "será que esses erroS vão ser tão sérioS a ponto de permitir que potte? sem a"
+  },
+  {
+   "id": "b14",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19798,
+    0.32374,
+    0.94395,
+    0.33827
+   ],
+   "ordem": 14,
+   "coluna": 0,
+   "texto_impresso": "Dama, consiga a vitória? Inicialmente apresento os lances do jogo sem comentá-"
+  },
+  {
+   "id": "b15",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19798,
+    0.34112,
+    0.94435,
+    0.35566
+   ],
+   "ordem": 15,
+   "coluna": 0,
+   "texto_impresso": "rios. Monte a partida no seu próprio tabuleiro e veja se consegue descobrir quais"
+  },
+  {
+   "id": "b16",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19798,
+    0.35794,
+    0.3375,
+    0.36991
+   ],
+   "ordem": 16,
+   "coluna": 0,
+   "texto_impresso": "foram os erros."
+  },
+  {
+   "id": "b17",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.11573,
+    0.4004,
+    0.8496,
+    0.4155
+   ],
+   "ordem": 17,
+   "coluna": 0,
+   "texto_impresso": "1.e4 e5 2.Cf3 CC6 3.B?4 Cf6 4.CC3 Ca5 5.Cxe5 Cxe4 6.d3 CC5 7.Bx? + Re7"
+  },
+  {
+   "id": "b18",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.11452,
+    0.42348,
+    0.76331,
+    0.44258
+   ],
+   "ordem": 18,
+   "coluna": 0,
+   "texto_impresso": "8.Bg5+ Rd6 9.?b5+ Rxe5 1 ?.f4+ Rf5 11.Cd4+ ?g4 12.h3+ R93"
+  },
+  {
+   "id": "b19",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.11573,
+    0.44657,
+    0.62218,
+    0.46537
+   ],
+   "ordem": 19,
+   "coluna": 0,
+   "texto_impresso": "13.Ce2+ Rxg2 ?4. Bd5+ Ce4 15. Bxe4 xeque-mate"
+  },
+  {
+   "id": "d0",
+   "funcao": "diagrama",
+   "caixa_rel": [
+    0.38065,
+    0.51696,
+    0.67702,
+    0.72756
+   ],
+   "ordem": 20,
+   "coluna": 0,
+   "texto_impresso": ""
+  },
+  {
+   "id": "b20",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.48226,
+    0.74836,
+    0.575,
+    0.7629
+   ],
+   "ordem": 21,
+   "coluna": 0,
+   "texto_impresso": "?iagrama 3.",
+   "diagrama": "d0"
+  },
+  {
+   "id": "b21",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.47137,
+    0.7609,
+    0.84839,
+    0.77657
+   ],
+   "ordem": 22,
+   "coluna": 0,
+   "texto_impresso": "Potter-Amador .",
+   "diagrama": "d0"
+  },
+  {
+   "id": "b22",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.47379,
+    0.7817,
+    0.58427,
+    0.79339
+   ],
+   "ordem": 23,
+   "coluna": 0,
+   "texto_impresso": "Londres/ 1870",
+   "diagrama": "d0"
+  },
+  {
+   "id": "b23",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.45161,
+    0.79681,
+    0.60524,
+    0.80935
+   ],
+   "ordem": 24,
+   "coluna": 0,
+   "texto_impresso": "Vantagem da Dama",
+   "diagrama": "d0"
+  },
+  {
+   "id": "b24",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.24315,
+    0.86349,
+    0.94395,
+    0.88287
+   ],
+   "ordem": 25,
+   "coluna": 0,
+   "texto_impresso": "Não se precisa ser um mestre para concluir ?ue as ?retas ?erderam de for—"
+  },
+  {
+   "id": "b25",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19758,
+    0.88031,
+    0.94435,
+    0.89541
+   ],
+   "ordem": 26,
+   "coluna": 0,
+   "texto_impresso": "ma humilhante. Por quê? Você conseguiu descobr1r os pr1ncipa1S erro?? Aém de"
+  },
+  {
+   "id": "b26",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19758,
+    0.89798,
+    0.94395,
+    0.91251
+   ],
+   "ordem": 27,
+   "coluna": 0,
+   "texto_impresso": "não ?er capaz de reconhecer ameaças básicas, o iniciante não deSenvolveu as"
+  },
+  {
+   "id": "b27",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19677,
+    0.91536,
+    0.94355,
+    0.92989
+   ],
+   "ordem": 28,
+   "coluna": 0,
+   "texto_impresso": "peças, sendo e??e o motivo báSico de seu fim. Voltemos ao jogo, desta vez, com"
+  },
+  {
+   "id": "b28",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19758,
+    0.93274,
+    0.52581,
+    0.94728
+   ],
+   "ordem": 29,
+   "coluna": 0,
+   "texto_impresso": "comentários para exp1icar os erros."
+  },
+  {
+   "id": "b29",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.06774,
+    0.99031,
+    0.06895,
+    0.99601
+   ],
+   "ordem": 30,
+   "coluna": 0,
+   "texto_impresso": "?"
+  }
+ ],
+ "diagramas": [
+  {
+   "id": "d0",
+   "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR",
+   "fen_lido": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR",
+   "lado": "?",
+   "legenda": "b20",
+   "lances_seguintes": [],
+   "fen_verificado": false,
+   "lado_verificado": false,
+   "fen_rotulado_por": "assistente, casa a casa contra o recorte do diagrama"
+  }
+ ],
+ "linhas_corpo": [
+  {
+   "id": "l01",
+   "bloco": "b01",
+   "caixa_rel": [
+    0.24355,
+    0.0986,
+    0.94435,
+    0.11314
+   ],
+   "texto": "Você reparou que a Dama branca não está no Diagrama 3? p0r quê? Porque",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l02",
+   "bloco": "b02",
+   "caixa_rel": [
+    0.19839,
+    0.11599,
+    0.94315,
+    0.13052
+   ],
+   "texto": "a partida que vamos analisar agora foi jogada com vantagem predeterminada.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l03",
+   "bloco": "b03",
+   "caixa_rel": [
+    0.19839,
+    0.13337,
+    0.94435,
+    0.14791
+   ],
+   "texto": "Hoje, é raro esse tipo de jogo, destinado a dar a um jogador fraco a chance de",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l04",
+   "bloco": "b04",
+   "caixa_rel": [
+    0.19758,
+    0.15047,
+    0.94395,
+    0.16529
+   ],
+   "texto": "vencer umjogad0r muit0 mais f0rte. Com0 é feit0 eSse jog0? Depois de se c0l0ca-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l05",
+   "bloco": "b05",
+   "caixa_rel": [
+    0.19798,
+    0.16785,
+    0.94435,
+    0.18239
+   ],
+   "texto": "rem todas as peças normalmente no tabuleiro, tira-se a peça ou peão que o joga—",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l06",
+   "bloco": "b06",
+   "caixa_rel": [
+    0.19798,
+    0.18438,
+    0.94395,
+    0.19977
+   ],
+   "texto": "dor mais forte (aquele que dá a vantagem ao outro) oferece. No caso que vamos",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l07",
+   "bloco": "b07",
+   "caixa_rel": [
+    0.19839,
+    0.20205,
+    0.94395,
+    0.21687
+   ],
+   "texto": "analisar agora, o jogador abriu mão da Dama, sendo a partida chamada de '?van-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l08",
+   "bloco": "b08",
+   "caixa_rel": [
+    0.19839,
+    0.21944,
+    0.35968,
+    0.23368
+   ],
+   "texto": "tagem da Dama,,.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l09",
+   "bloco": "b09",
+   "caixa_rel": [
+    0.24395,
+    0.23682,
+    0.94315,
+    0.25135
+   ],
+   "texto": "?odemos perguntar então: como as brancas esperam ganhar sem a Dama?",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l10",
+   "bloco": "b10",
+   "caixa_rel": [
+    0.19798,
+    0.25392,
+    0.94435,
+    0.26874
+   ],
+   "texto": "Contra um adversário igualmente hábil, na verdade seria m- uito difícil. Mas nesse",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l11",
+   "bloco": "b11",
+   "caixa_rel": [
+    0.19798,
+    0.27102,
+    0.94395,
+    0.28641
+   ],
+   "texto": "ca?o as brancas são de Wil1iam Norwood Potte? um enxadrista experiente, e ele",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l12",
+   "bloco": "b12",
+   "caixa_rel": [
+    0.19798,
+    0.28897,
+    0.94274,
+    0.30379
+   ],
+   "texto": "sabe que o adVersário, um iniciante, vai cometer erros. A que?tão é a seguinte..",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l13",
+   "bloco": "b13",
+   "caixa_rel": [
+    0.19798,
+    0.30636,
+    0.94435,
+    0.32089
+   ],
+   "texto": "será que esses erroS vão ser tão sérioS a ponto de permitir que potte? sem a",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l14",
+   "bloco": "b14",
+   "caixa_rel": [
+    0.19798,
+    0.32374,
+    0.94395,
+    0.33827
+   ],
+   "texto": "Dama, consiga a vitória? Inicialmente apresento os lances do jogo sem comentá-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l15",
+   "bloco": "b15",
+   "caixa_rel": [
+    0.19798,
+    0.34112,
+    0.94435,
+    0.35566
+   ],
+   "texto": "rios. Monte a partida no seu próprio tabuleiro e veja se consegue descobrir quais",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l16",
+   "bloco": "b16",
+   "caixa_rel": [
+    0.19798,
+    0.35794,
+    0.3375,
+    0.36991
+   ],
+   "texto": "foram os erros.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l17",
+   "bloco": "b17",
+   "caixa_rel": [
+    0.11573,
+    0.4004,
+    0.8496,
+    0.4155
+   ],
+   "texto": "1.e4 e5 2.Cf3 CC6 3.B?4 Cf6 4.CC3 Ca5 5.Cxe5 Cxe4 6.d3 CC5 7.Bx? + Re7",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l18",
+   "bloco": "b18",
+   "caixa_rel": [
+    0.11452,
+    0.42348,
+    0.76331,
+    0.44258
+   ],
+   "texto": "8.Bg5+ Rd6 9.?b5+ Rxe5 1 ?.f4+ Rf5 11.Cd4+ ?g4 12.h3+ R93",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l19",
+   "bloco": "b19",
+   "caixa_rel": [
+    0.11573,
+    0.44657,
+    0.62218,
+    0.46537
+   ],
+   "texto": "13.Ce2+ Rxg2 ?4. Bd5+ Ce4 15. Bxe4 xeque-mate",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l20",
+   "bloco": "b20",
+   "caixa_rel": [
+    0.48226,
+    0.74836,
+    0.575,
+    0.7629
+   ],
+   "texto": "?iagrama 3.",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l21",
+   "bloco": "b21",
+   "caixa_rel": [
+    0.47137,
+    0.7609,
+    0.84839,
+    0.77657
+   ],
+   "texto": "Potter-Amador .",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l22",
+   "bloco": "b22",
+   "caixa_rel": [
+    0.47379,
+    0.7817,
+    0.58427,
+    0.79339
+   ],
+   "texto": "Londres/ 1870",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l23",
+   "bloco": "b23",
+   "caixa_rel": [
+    0.45161,
+    0.79681,
+    0.60524,
+    0.80935
+   ],
+   "texto": "Vantagem da Dama",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l24",
+   "bloco": "b24",
+   "caixa_rel": [
+    0.24315,
+    0.86349,
+    0.94395,
+    0.88287
+   ],
+   "texto": "Não se precisa ser um mestre para concluir ?ue as ?retas ?erderam de for—",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l25",
+   "bloco": "b25",
+   "caixa_rel": [
+    0.19758,
+    0.88031,
+    0.94435,
+    0.89541
+   ],
+   "texto": "ma humilhante. Por quê? Você conseguiu descobr1r os pr1ncipa1S erro?? Aém de",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l26",
+   "bloco": "b26",
+   "caixa_rel": [
+    0.19758,
+    0.89798,
+    0.94395,
+    0.91251
+   ],
+   "texto": "não ?er capaz de reconhecer ameaças básicas, o iniciante não deSenvolveu as",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l27",
+   "bloco": "b27",
+   "caixa_rel": [
+    0.19677,
+    0.91536,
+    0.94355,
+    0.92989
+   ],
+   "texto": "peças, sendo e??e o motivo báSico de seu fim. Voltemos ao jogo, desta vez, com",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l28",
+   "bloco": "b28",
+   "caixa_rel": [
+    0.19758,
+    0.93274,
+    0.52581,
+    0.94728
+   ],
+   "texto": "comentários para exp1icar os erros.",
+   "negrito": false,
+   "texto_verificado": false
+  }
+ ],
+ "estrutura_por": "Claude (estrutura pelas faixas)"
+}

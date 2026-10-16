@@ -1,0 +1,2045 @@
+{
+ "livro": "yusupov",
+ "pdf": "Artur Yusupov - Chess Evolution 1 - The Fundamentals (Quality Chess 2011) - editable.pdf",
+ "pdf_sha256": "91f85227cdb43980b49e80f2e6f29d9ab92aabfac5652942a383df5695921427",
+ "indice_pdf": 33,
+ "pagina_impressa": 33,
+ "dpi_de_leitura": 300,
+ "render_sha256": "a7416a92d87637e8f1880682c9c2daa0afcc4bf278ccafa2aa2e124983ae0829",
+ "pymupdf": "1.26.6",
+ "inclinacao": 0.0,
+ "papel": 255,
+ "verdade_versao": 1,
+ "rotulado_por": "",
+ "revisado_por": "",
+ "blocos": [
+  {
+   "id": "b00",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.395,
+    0.053,
+    0.576,
+    0.077
+   ],
+   "ordem": 0,
+   "coluna": 0,
+   "texto_impresso": "Solutions",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b00b",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.8,
+    0.053,
+    0.953,
+    0.077
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "?",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b01",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.23557,
+    0.10982,
+    0.29948,
+    0.12112
+   ],
+   "ordem": 1,
+   "coluna": 0,
+   "texto_impresso": "Ex. 3-1"
+  },
+  {
+   "id": "b02",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.13763,
+    0.13383,
+    0.39948,
+    0.14795
+   ],
+   "ordem": 2,
+   "coluna": 0,
+   "texto_impresso": "J.B0lb0chan — L.Pachman"
+  },
+  {
+   "id": "b03",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.13557,
+    0.14725,
+    0.13711,
+    0.14795
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "?"
+  },
+  {
+   "id": "b04",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.17526,
+    0.15395,
+    0.36082,
+    0.16702
+   ],
+   "ordem": 3,
+   "coluna": 0,
+   "texto_impresso": "Moscow Olympiad 1956"
+  },
+  {
+   "id": "b05",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.06959,
+    0.18008,
+    0.28557,
+    0.19562
+   ],
+   "ordem": 4,
+   "coluna": 0,
+   "texto_impresso": "1.♕xf7+! ♔xf7 2.♗xe6#"
+  },
+  {
+   "id": "b06",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.39381,
+    0.20127,
+    0.46753,
+    0.2161
+   ],
+   "ordem": 5,
+   "coluna": 0,
+   "texto_impresso": "(1 point)"
+  },
+  {
+   "id": "b07",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.23505,
+    0.23835,
+    0.29948,
+    0.24965
+   ],
+   "ordem": 6,
+   "coluna": 0,
+   "texto_impresso": "Ex. 3-2"
+  },
+  {
+   "id": "b08",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.15412,
+    0.26201,
+    0.38299,
+    0.27684
+   ],
+   "ordem": 7,
+   "coluna": 0,
+   "texto_impresso": "S.Urusov — K?in0vsky"
+  },
+  {
+   "id": "b09",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.19794,
+    0.28284,
+    0.33763,
+    0.29555
+   ],
+   "ordem": 8,
+   "coluna": 0,
+   "texto_impresso": "St Petersburg 1880"
+  },
+  {
+   "id": "b10",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.06856,
+    0.30968,
+    0.19175,
+    0.32662
+   ],
+   "ordem": 9,
+   "coluna": 0,
+   "texto_impresso": "1.♕g5+!! fxg5"
+  },
+  {
+   "id": "b11",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.08763,
+    0.32804,
+    0.33814,
+    0.34499
+   ],
+   "ordem": 10,
+   "coluna": 0,
+   "texto_impresso": "1...♔f7 2.♕g7+ ♔e8 3.♕e7#"
+  },
+  {
+   "id": "b12",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.06649,
+    0.34569,
+    0.38711,
+    0.36123
+   ],
+   "ordem": 11,
+   "coluna": 0,
+   "texto_impresso": "2.♘h6+! ♔h8 3.♗b2+ ♖f6 4.♗xf6#"
+  },
+  {
+   "id": "b13",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.39175,
+    0.36723,
+    0.46649,
+    0.38206
+   ],
+   "ordem": 12,
+   "coluna": 0,
+   "texto_impresso": "(1 point)"
+  },
+  {
+   "id": "b14",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.23454,
+    0.40431,
+    0.29948,
+    0.41561
+   ],
+   "ordem": 13,
+   "coluna": 0,
+   "texto_impresso": "Ex. 3-3"
+  },
+  {
+   "id": "b15",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.15052,
+    0.42832,
+    0.38454,
+    0.44068
+   ],
+   "ordem": 14,
+   "coluna": 0,
+   "texto_impresso": "Em.Lasker — WSteinitz"
+  },
+  {
+   "id": "b16",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.19691,
+    0.44845,
+    0.3366,
+    0.46116
+   ],
+   "ordem": 15,
+   "coluna": 0,
+   "texto_impresso": "St Petersburg 1895"
+  },
+  {
+   "id": "b17",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.06804,
+    0.47528,
+    0.14175,
+    0.48835
+   ],
+   "ordem": 16,
+   "coluna": 0,
+   "texto_impresso": "1.♕xf4!!"
+  },
+  {
+   "id": "b18",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.08351,
+    0.49541,
+    0.46753,
+    0.51059
+   ],
+   "ordem": 17,
+   "coluna": 0,
+   "texto_impresso": "White can play his moves in a different"
+  },
+  {
+   "id": "b19",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.06649,
+    0.51236,
+    0.46649,
+    0.52895
+   ],
+   "ordem": 18,
+   "coluna": 0,
+   "texto_impresso": "order. You also get 1 point for: 1.♘f6! ♕e7"
+  },
+  {
+   "id": "b20",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.06649,
+    0.53178,
+    0.26495,
+    0.54484
+   ],
+   "ordem": 19,
+   "coluna": 0,
+   "texto_impresso": "2.♕xf4 ♕xf6 3.♕h4+—"
+  },
+  {
+   "id": "b21",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.06804,
+    0.54873,
+    0.2,
+    0.56215
+   ],
+   "ordem": 20,
+   "coluna": 0,
+   "texto_impresso": "1...?4 2.♘f6!"
+  },
+  {
+   "id": "b22",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.39072,
+    0.56992,
+    0.46546,
+    0.58475
+   ],
+   "ordem": 21,
+   "coluna": 0,
+   "texto_impresso": "(1 point)"
+  },
+  {
+   "id": "b23",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.06598,
+    0.58581,
+    0.13505,
+    0.59887
+   ],
+   "ordem": 22,
+   "coluna": 0,
+   "texto_impresso": "2...♘e6"
+  },
+  {
+   "id": "b24",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.08402,
+    0.60523,
+    0.46598,
+    0.62112
+   ],
+   "ordem": 23,
+   "coluna": 0,
+   "texto_impresso": "The black queen cannot flee: 2...♕b5?"
+  },
+  {
+   "id": "b25",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.06598,
+    0.62323,
+    0.12938,
+    0.6363
+   ],
+   "ordem": 24,
+   "coluna": 0,
+   "texto_impresso": "3.♘f7#"
+  },
+  {
+   "id": "b26",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.16753,
+    0.64301,
+    0.46495,
+    0.65819
+   ],
+   "ordem": 25,
+   "coluna": 0,
+   "texto_impresso": "(another 1 point for this variation)"
+  },
+  {
+   "id": "b27",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.08402,
+    0.66031,
+    0.40619,
+    0.67655
+   ],
+   "ordem": 26,
+   "coluna": 0,
+   "texto_impresso": "If2...h6 then 3.♘xd7 hxg5 4.♘f6+?."
+  },
+  {
+   "id": "b28",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.06546,
+    0.67797,
+    0.15928,
+    0.69174
+   ],
+   "ordem": 27,
+   "coluna": 0,
+   "texto_impresso": "3.♘xd7+-"
+  },
+  {
+   "id": "b29",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.23299,
+    0.71681,
+    0.29794,
+    0.72881
+   ],
+   "ordem": 28,
+   "coluna": 0,
+   "texto_impresso": "Ex. 3-4"
+  },
+  {
+   "id": "b30",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.17474,
+    0.73588,
+    0.3567,
+    0.74894
+   ],
+   "ordem": 29,
+   "coluna": 0,
+   "texto_impresso": "Variation from the game"
+  },
+  {
+   "id": "b31",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.13505,
+    0.75953,
+    0.39742,
+    0.77189
+   ],
+   "ordem": 30,
+   "coluna": 0,
+   "texto_impresso": "S.Tarrasch ? S.Tartak0wer"
+  },
+  {
+   "id": "b32",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.22216,
+    0.77966,
+    0.30928,
+    0.78955
+   ],
+   "ordem": 31,
+   "coluna": 0,
+   "texto_impresso": "Berlin 1920"
+  },
+  {
+   "id": "b33",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.06649,
+    0.8065,
+    0.14227,
+    0.81956
+   ],
+   "ordem": 32,
+   "coluna": 0,
+   "texto_impresso": "1.♕xc4!!"
+  },
+  {
+   "id": "b34",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.38969,
+    0.82733,
+    0.4634,
+    0.84216
+   ],
+   "ordem": 33,
+   "coluna": 0,
+   "texto_impresso": "(1 point)"
+  },
+  {
+   "id": "b35",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.06753,
+    0.84287,
+    0.2567,
+    0.85734
+   ],
+   "ordem": 34,
+   "coluna": 0,
+   "texto_impresso": "1...♕xc4 2.♗f5+ ♖d7"
+  },
+  {
+   "id": "b36",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.08351,
+    0.86229,
+    0.46495,
+    0.875
+   ],
+   "ordem": 35,
+   "coluna": 0,
+   "texto_impresso": "2...♕e6 is more resilient: 3.♖xe6 fxe6"
+  },
+  {
+   "id": "b37",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.06443,
+    0.87994,
+    0.46443,
+    0.89442
+   ],
+   "ordem": 36,
+   "coluna": 0,
+   "texto_impresso": "4.♗xe6+ ♖d7 5.♘e5 ♘xe5 6.♗xe5 ♔d8"
+  },
+  {
+   "id": "b38",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.06574,
+    0.8985,
+    0.27912,
+    0.9125
+   ],
+   "ordem": 37,
+   "coluna": 0,
+   "texto_impresso": "7.♗xd7 ♔xd7 8.♗xd4+—",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b38b",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49955,
+    0.108,
+    0.6764,
+    0.123
+   ],
+   "ordem": 38,
+   "coluna": 1,
+   "texto_impresso": "3.♖e8+ ♘d8 4.♘e5",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b38c",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.75137,
+    0.12642,
+    0.89939,
+    0.14142
+   ],
+   "ordem": 39,
+   "coluna": 1,
+   "texto_impresso": "(another 1 point)",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b38d",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.51749,
+    0.1444,
+    0.89939,
+    0.1594
+   ],
+   "ordem": 40,
+   "coluna": 1,
+   "texto_impresso": "4.♖xf8 is just as good: 4...♖xf8 5.♗xd7+",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b38e",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49955,
+    0.16281,
+    0.64564,
+    0.17781
+   ],
+   "ordem": 41,
+   "coluna": 1,
+   "texto_impresso": "♔xd7 6.♘e5++—",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b38f",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49955,
+    0.18123,
+    0.57003,
+    0.19623
+   ],
+   "ordem": 42,
+   "coluna": 1,
+   "texto_impresso": "4...♕b5",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b38g",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.51749,
+    0.19965,
+    0.89939,
+    0.21465
+   ],
+   "ordem": 43,
+   "coluna": 1,
+   "texto_impresso": "4...♕c7 5.♗xd7+ ♔b8 6.♖xd8+ ♕xd8",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b38h",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49955,
+    0.21806,
+    0.70652,
+    0.23306
+   ],
+   "ordem": 44,
+   "coluna": 1,
+   "texto_impresso": "7.♘c6+ ♔a8 8.♘xd8+—",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b38i",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49955,
+    0.23604,
+    0.83531,
+    0.25104
+   ],
+   "ordem": 45,
+   "coluna": 1,
+   "texto_impresso": "5.♖c1+ ♗c5 6.♘xd7+— ♖xe8 7.♘b6#",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b38j",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.92246,
+    0.03565,
+    0.9609,
+    0.13304
+   ],
+   "ordem": null,
+   "coluna": 0,
+   "texto_impresso": "? ??♕? ??????",
+   "caixa_estimada": true
+  },
+  {
+   "id": "b39",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.66701,
+    0.27542,
+    0.73144,
+    0.28672
+   ],
+   "ordem": 46,
+   "coluna": 1,
+   "texto_impresso": "Ex. 3?5"
+  },
+  {
+   "id": "b40",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.58299,
+    0.29944,
+    0.81598,
+    0.31179
+   ],
+   "ordem": 47,
+   "coluna": 1,
+   "texto_impresso": "K.Emmrich — B.Moritz"
+  },
+  {
+   "id": "b41",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.64381,
+    0.32027,
+    0.75567,
+    0.33263
+   ],
+   "ordem": 48,
+   "coluna": 1,
+   "texto_impresso": "Germany 1922"
+  },
+  {
+   "id": "b42",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49948,
+    0.34852,
+    0.9,
+    0.3637
+   ],
+   "ordem": 49,
+   "coluna": 1,
+   "texto_impresso": "In the game, Black went on to lose after"
+  },
+  {
+   "id": "b43",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49948,
+    0.36688,
+    0.71031,
+    0.38206
+   ],
+   "ordem": 50,
+   "coluna": 1,
+   "texto_impresso": "missing the forced mate:"
+  },
+  {
+   "id": "b44",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.50103,
+    0.38242,
+    0.89948,
+    0.40007
+   ],
+   "ordem": 51,
+   "coluna": 1,
+   "texto_impresso": "1...♕xh2+!! 2.♔xh2 ♘g4+ 3.♔g1 ♘h3+"
+  },
+  {
+   "id": "b45",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49897,
+    0.40113,
+    0.61495,
+    0.4149
+   ],
+   "ordem": 52,
+   "coluna": 1,
+   "texto_impresso": "4.♔f1 ♘h2#"
+  },
+  {
+   "id": "b46",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.8232,
+    0.42232,
+    0.89845,
+    0.43715
+   ],
+   "ordem": 53,
+   "coluna": 1,
+   "texto_impresso": "(1 point)"
+  },
+  {
+   "id": "b47",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.66649,
+    0.45904,
+    0.73144,
+    0.47069
+   ],
+   "ordem": 54,
+   "coluna": 1,
+   "texto_impresso": "Ex. 3?6"
+  },
+  {
+   "id": "b48",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.62577,
+    0.4834,
+    0.77216,
+    0.49576
+   ],
+   "ordem": 55,
+   "coluna": 1,
+   "texto_impresso": "M.Tal — Miller"
+  },
+  {
+   "id": "b49",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.63351,
+    0.50424,
+    0.7634,
+    0.51695
+   ],
+   "ordem": 56,
+   "coluna": 1,
+   "texto_impresso": "Los Angeles 1988"
+  },
+  {
+   "id": "b50",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49948,
+    0.53213,
+    0.55052,
+    0.54343
+   ],
+   "ordem": 57,
+   "coluna": 1,
+   "texto_impresso": "1.h4!!"
+  },
+  {
+   "id": "b51",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.81546,
+    0.55155,
+    0.89794,
+    0.56638
+   ],
+   "ordem": 58,
+   "coluna": 1,
+   "texto_impresso": "(2 points)"
+  },
+  {
+   "id": "b52",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.51701,
+    0.5685,
+    0.77423,
+    0.58157
+   ],
+   "ordem": 59,
+   "coluna": 1,
+   "texto_impresso": "Ofcourse not 1.♕xe5?? ♖f1#."
+  },
+  {
+   "id": "b53",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.5,
+    0.58581,
+    0.56753,
+    0.60275
+   ],
+   "ordem": 60,
+   "coluna": 1,
+   "texto_impresso": "1...♕g3"
+  },
+  {
+   "id": "b54",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.51701,
+    0.60523,
+    0.74227,
+    0.61829
+   ],
+   "ordem": 61,
+   "coluna": 1,
+   "texto_impresso": "If 1...♕xe2 then 2.♘xc7#."
+  },
+  {
+   "id": "b55",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49794,
+    0.62429,
+    0.55876,
+    0.63595
+   ],
+   "ordem": 62,
+   "coluna": 1,
+   "texto_impresso": "2.♖d1!"
+  },
+  {
+   "id": "b56",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.74897,
+    0.64301,
+    0.89691,
+    0.65819
+   ],
+   "ordem": 63,
+   "coluna": 1,
+   "texto_impresso": "(another 1 point)"
+  },
+  {
+   "id": "b57",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.51546,
+    0.66172,
+    0.80206,
+    0.67691
+   ],
+   "ordem": 64,
+   "coluna": 1,
+   "texto_impresso": "Threatening both ♖xd5 and ♖d3."
+  },
+  {
+   "id": "b58",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49742,
+    0.67938,
+    0.55979,
+    0.69174
+   ],
+   "ordem": 65,
+   "coluna": 1,
+   "texto_impresso": "2...♖f2"
+  },
+  {
+   "id": "b59",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.51649,
+    0.69739,
+    0.83866,
+    0.71328
+   ],
+   "ordem": 66,
+   "coluna": 1,
+   "texto_impresso": "2...c6 is met by 3.♖d3 ♕b8 4.♖f3!+–."
+  },
+  {
+   "id": "b60",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49742,
+    0.7154,
+    0.57268,
+    0.72917
+   ],
+   "ordem": 67,
+   "coluna": 1,
+   "texto_impresso": "3.♕xf2!!"
+  },
+  {
+   "id": "b61",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.74948,
+    0.73517,
+    0.89691,
+    0.75035
+   ],
+   "ordem": 68,
+   "coluna": 1,
+   "texto_impresso": "(another 1 point)"
+  },
+  {
+   "id": "b62",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.51598,
+    0.75282,
+    0.89742,
+    0.7666
+   ],
+   "ordem": 69,
+   "coluna": 1,
+   "texto_impresso": "3.♘xc7+ also wins: 3...♕xc7 4.♕b5+ ♕c6"
+  },
+  {
+   "id": "b63",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49845,
+    0.77083,
+    0.89742,
+    0.78708
+   ],
+   "ordem": 70,
+   "coluna": 1,
+   "texto_impresso": "5.♖xd5 ♖f6! 6.♗xf6 gxf6 7.♕d3 ♘b4 8.♖d8+"
+  },
+  {
+   "id": "b64",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49742,
+    0.78884,
+    0.89072,
+    0.80579
+   ],
+   "ordem": 71,
+   "coluna": 1,
+   "texto_impresso": "♔e7 9.♕xh7+!! ♔xd8 10.e7+ ♔e8 11.♕g7+—"
+  },
+  {
+   "id": "b65",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49639,
+    0.8072,
+    0.5701,
+    0.82097
+   ],
+   "ordem": 72,
+   "coluna": 1,
+   "texto_impresso": "3...♗xf2"
+  },
+  {
+   "id": "b66",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.51546,
+    0.82521,
+    0.78763,
+    0.83969
+   ],
+   "ordem": 73,
+   "coluna": 1,
+   "texto_impresso": "3...♕xf2 4.♘xc7+ ♔f8 5.e7++—"
+  },
+  {
+   "id": "b67",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.49639,
+    0.84499,
+    0.58557,
+    0.85734
+   ],
+   "ordem": 74,
+   "coluna": 1,
+   "texto_impresso": "4.♖xd5+—"
+  },
+  {
+   "id": "b68",
+   "funcao": "numero_de_pagina",
+   "caixa_rel": [
+    0.47062,
+    0.95869,
+    0.49021,
+    0.96963
+   ],
+   "ordem": 75,
+   "coluna": 0,
+   "texto_impresso": "33"
+  }
+ ],
+ "diagramas": [],
+ "linhas_corpo": [
+  {
+   "id": "l00",
+   "bloco": "b00",
+   "caixa_rel": [
+    0.395,
+    0.053,
+    0.576,
+    0.077
+   ],
+   "texto": "Solutions",
+   "negrito": true,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l01",
+   "bloco": "b01",
+   "caixa_rel": [
+    0.23557,
+    0.10982,
+    0.29948,
+    0.12112
+   ],
+   "texto": "Ex. 3-1",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l02",
+   "bloco": "b02",
+   "caixa_rel": [
+    0.13763,
+    0.13383,
+    0.39948,
+    0.14795
+   ],
+   "texto": "J.B0lb0chan — L.Pachman",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l04",
+   "bloco": "b04",
+   "caixa_rel": [
+    0.17526,
+    0.15395,
+    0.36082,
+    0.16702
+   ],
+   "texto": "Moscow Olympiad 1956",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l05",
+   "bloco": "b05",
+   "caixa_rel": [
+    0.06959,
+    0.18008,
+    0.28557,
+    0.19562
+   ],
+   "texto": "1.♕xf7+! ♔xf7 2.♗xe6#",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l06",
+   "bloco": "b06",
+   "caixa_rel": [
+    0.39381,
+    0.20127,
+    0.46753,
+    0.2161
+   ],
+   "texto": "(1 point)",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l07",
+   "bloco": "b07",
+   "caixa_rel": [
+    0.23505,
+    0.23835,
+    0.29948,
+    0.24965
+   ],
+   "texto": "Ex. 3-2",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l08",
+   "bloco": "b08",
+   "caixa_rel": [
+    0.15412,
+    0.26201,
+    0.38299,
+    0.27684
+   ],
+   "texto": "S.Urusov — K?in0vsky",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l09",
+   "bloco": "b09",
+   "caixa_rel": [
+    0.19794,
+    0.28284,
+    0.33763,
+    0.29555
+   ],
+   "texto": "St Petersburg 1880",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l10",
+   "bloco": "b10",
+   "caixa_rel": [
+    0.06856,
+    0.30968,
+    0.19175,
+    0.32662
+   ],
+   "texto": "1.♕g5+!! fxg5",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l11",
+   "bloco": "b11",
+   "caixa_rel": [
+    0.08763,
+    0.32804,
+    0.33814,
+    0.34499
+   ],
+   "texto": "1...♔f7 2.♕g7+ ♔e8 3.♕e7#",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l12",
+   "bloco": "b12",
+   "caixa_rel": [
+    0.06649,
+    0.34569,
+    0.38711,
+    0.36123
+   ],
+   "texto": "2.♘h6+! ♔h8 3.♗b2+ ♖f6 4.♗xf6#",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l13",
+   "bloco": "b13",
+   "caixa_rel": [
+    0.39175,
+    0.36723,
+    0.46649,
+    0.38206
+   ],
+   "texto": "(1 point)",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l14",
+   "bloco": "b14",
+   "caixa_rel": [
+    0.23454,
+    0.40431,
+    0.29948,
+    0.41561
+   ],
+   "texto": "Ex. 3-3",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l15",
+   "bloco": "b15",
+   "caixa_rel": [
+    0.15052,
+    0.42832,
+    0.38454,
+    0.44068
+   ],
+   "texto": "Em.Lasker — WSteinitz",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l16",
+   "bloco": "b16",
+   "caixa_rel": [
+    0.19691,
+    0.44845,
+    0.3366,
+    0.46116
+   ],
+   "texto": "St Petersburg 1895",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l17",
+   "bloco": "b17",
+   "caixa_rel": [
+    0.06804,
+    0.47528,
+    0.14175,
+    0.48835
+   ],
+   "texto": "1.♕xf4!!",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l18",
+   "bloco": "b18",
+   "caixa_rel": [
+    0.08351,
+    0.49541,
+    0.46753,
+    0.51059
+   ],
+   "texto": "White can play his moves in a different",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l19",
+   "bloco": "b19",
+   "caixa_rel": [
+    0.06649,
+    0.51236,
+    0.46649,
+    0.52895
+   ],
+   "texto": "order. You also get 1 point for: 1.♘f6! ♕e7",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l20",
+   "bloco": "b20",
+   "caixa_rel": [
+    0.06649,
+    0.53178,
+    0.26495,
+    0.54484
+   ],
+   "texto": "2.♕xf4 ♕xf6 3.♕h4+—",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l21",
+   "bloco": "b21",
+   "caixa_rel": [
+    0.06804,
+    0.54873,
+    0.2,
+    0.56215
+   ],
+   "texto": "1...?4 2.♘f6!",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l22",
+   "bloco": "b22",
+   "caixa_rel": [
+    0.39072,
+    0.56992,
+    0.46546,
+    0.58475
+   ],
+   "texto": "(1 point)",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l23",
+   "bloco": "b23",
+   "caixa_rel": [
+    0.06598,
+    0.58581,
+    0.13505,
+    0.59887
+   ],
+   "texto": "2...♘e6",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l24",
+   "bloco": "b24",
+   "caixa_rel": [
+    0.08402,
+    0.60523,
+    0.46598,
+    0.62112
+   ],
+   "texto": "The black queen cannot flee: 2...♕b5?",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l25",
+   "bloco": "b25",
+   "caixa_rel": [
+    0.06598,
+    0.62323,
+    0.12938,
+    0.6363
+   ],
+   "texto": "3.♘f7#",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l26",
+   "bloco": "b26",
+   "caixa_rel": [
+    0.16753,
+    0.64301,
+    0.46495,
+    0.65819
+   ],
+   "texto": "(another 1 point for this variation)",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l27",
+   "bloco": "b27",
+   "caixa_rel": [
+    0.08402,
+    0.66031,
+    0.40619,
+    0.67655
+   ],
+   "texto": "If2...h6 then 3.♘xd7 hxg5 4.♘f6+?.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l28",
+   "bloco": "b28",
+   "caixa_rel": [
+    0.06546,
+    0.67797,
+    0.15928,
+    0.69174
+   ],
+   "texto": "3.♘xd7+-",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l29",
+   "bloco": "b29",
+   "caixa_rel": [
+    0.23299,
+    0.71681,
+    0.29794,
+    0.72881
+   ],
+   "texto": "Ex. 3-4",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l30",
+   "bloco": "b30",
+   "caixa_rel": [
+    0.17474,
+    0.73588,
+    0.3567,
+    0.74894
+   ],
+   "texto": "Variation from the game",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l31",
+   "bloco": "b31",
+   "caixa_rel": [
+    0.13505,
+    0.75953,
+    0.39742,
+    0.77189
+   ],
+   "texto": "S.Tarrasch ? S.Tartak0wer",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l32",
+   "bloco": "b32",
+   "caixa_rel": [
+    0.22216,
+    0.77966,
+    0.30928,
+    0.78955
+   ],
+   "texto": "Berlin 1920",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l33",
+   "bloco": "b33",
+   "caixa_rel": [
+    0.06649,
+    0.8065,
+    0.14227,
+    0.81956
+   ],
+   "texto": "1.♕xc4!!",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l34",
+   "bloco": "b34",
+   "caixa_rel": [
+    0.38969,
+    0.82733,
+    0.4634,
+    0.84216
+   ],
+   "texto": "(1 point)",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l35",
+   "bloco": "b35",
+   "caixa_rel": [
+    0.06753,
+    0.84287,
+    0.2567,
+    0.85734
+   ],
+   "texto": "1...♕xc4 2.♗f5+ ♖d7",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l36",
+   "bloco": "b36",
+   "caixa_rel": [
+    0.08351,
+    0.86229,
+    0.46495,
+    0.875
+   ],
+   "texto": "2...♕e6 is more resilient: 3.♖xe6 fxe6",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l37",
+   "bloco": "b37",
+   "caixa_rel": [
+    0.06443,
+    0.87994,
+    0.46443,
+    0.89442
+   ],
+   "texto": "4.♗xe6+ ♖d7 5.♘e5 ♘xe5 6.♗xe5 ♔d8",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l38",
+   "bloco": "b38",
+   "caixa_rel": [
+    0.06574,
+    0.8985,
+    0.27912,
+    0.9125
+   ],
+   "texto": "7.♗xd7 ♔xd7 8.♗xd4+—",
+   "negrito": false,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l38b",
+   "bloco": "b38b",
+   "caixa_rel": [
+    0.49955,
+    0.108,
+    0.6764,
+    0.123
+   ],
+   "texto": "3.♖e8+ ♘d8 4.♘e5",
+   "negrito": true,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l38c",
+   "bloco": "b38c",
+   "caixa_rel": [
+    0.75137,
+    0.12642,
+    0.89939,
+    0.14142
+   ],
+   "texto": "(another 1 point)",
+   "negrito": false,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l38d",
+   "bloco": "b38d",
+   "caixa_rel": [
+    0.51749,
+    0.1444,
+    0.89939,
+    0.1594
+   ],
+   "texto": "4.♖xf8 is just as good: 4...♖xf8 5.♗xd7+",
+   "negrito": false,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l38e",
+   "bloco": "b38e",
+   "caixa_rel": [
+    0.49955,
+    0.16281,
+    0.64564,
+    0.17781
+   ],
+   "texto": "♔xd7 6.♘e5++—",
+   "negrito": false,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l38f",
+   "bloco": "b38f",
+   "caixa_rel": [
+    0.49955,
+    0.18123,
+    0.57003,
+    0.19623
+   ],
+   "texto": "4...♕b5",
+   "negrito": true,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l38g",
+   "bloco": "b38g",
+   "caixa_rel": [
+    0.51749,
+    0.19965,
+    0.89939,
+    0.21465
+   ],
+   "texto": "4...♕c7 5.♗xd7+ ♔b8 6.♖xd8+ ♕xd8",
+   "negrito": false,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l38h",
+   "bloco": "b38h",
+   "caixa_rel": [
+    0.49955,
+    0.21806,
+    0.70652,
+    0.23306
+   ],
+   "texto": "7.♘c6+ ♔a8 8.♘xd8+—",
+   "negrito": false,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l38i",
+   "bloco": "b38i",
+   "caixa_rel": [
+    0.49955,
+    0.23604,
+    0.83531,
+    0.25104
+   ],
+   "texto": "5.♖c1+ ♗c5 6.♘xd7+— ♖xe8 7.♘b6#",
+   "negrito": true,
+   "texto_verificado": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "l39",
+   "bloco": "b39",
+   "caixa_rel": [
+    0.66701,
+    0.27542,
+    0.73144,
+    0.28672
+   ],
+   "texto": "Ex. 3?5",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l40",
+   "bloco": "b40",
+   "caixa_rel": [
+    0.58299,
+    0.29944,
+    0.81598,
+    0.31179
+   ],
+   "texto": "K.Emmrich — B.Moritz",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l41",
+   "bloco": "b41",
+   "caixa_rel": [
+    0.64381,
+    0.32027,
+    0.75567,
+    0.33263
+   ],
+   "texto": "Germany 1922",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l42",
+   "bloco": "b42",
+   "caixa_rel": [
+    0.49948,
+    0.34852,
+    0.9,
+    0.3637
+   ],
+   "texto": "In the game, Black went on to lose after",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l43",
+   "bloco": "b43",
+   "caixa_rel": [
+    0.49948,
+    0.36688,
+    0.71031,
+    0.38206
+   ],
+   "texto": "missing the forced mate:",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l44",
+   "bloco": "b44",
+   "caixa_rel": [
+    0.50103,
+    0.38242,
+    0.89948,
+    0.40007
+   ],
+   "texto": "1...♕xh2+!! 2.♔xh2 ♘g4+ 3.♔g1 ♘h3+",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l45",
+   "bloco": "b45",
+   "caixa_rel": [
+    0.49897,
+    0.40113,
+    0.61495,
+    0.4149
+   ],
+   "texto": "4.♔f1 ♘h2#",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l46",
+   "bloco": "b46",
+   "caixa_rel": [
+    0.8232,
+    0.42232,
+    0.89845,
+    0.43715
+   ],
+   "texto": "(1 point)",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l47",
+   "bloco": "b47",
+   "caixa_rel": [
+    0.66649,
+    0.45904,
+    0.73144,
+    0.47069
+   ],
+   "texto": "Ex. 3?6",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l48",
+   "bloco": "b48",
+   "caixa_rel": [
+    0.62577,
+    0.4834,
+    0.77216,
+    0.49576
+   ],
+   "texto": "M.Tal — Miller",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l49",
+   "bloco": "b49",
+   "caixa_rel": [
+    0.63351,
+    0.50424,
+    0.7634,
+    0.51695
+   ],
+   "texto": "Los Angeles 1988",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l50",
+   "bloco": "b50",
+   "caixa_rel": [
+    0.49948,
+    0.53213,
+    0.55052,
+    0.54343
+   ],
+   "texto": "1.h4!!",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l51",
+   "bloco": "b51",
+   "caixa_rel": [
+    0.81546,
+    0.55155,
+    0.89794,
+    0.56638
+   ],
+   "texto": "(2 points)",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l52",
+   "bloco": "b52",
+   "caixa_rel": [
+    0.51701,
+    0.5685,
+    0.77423,
+    0.58157
+   ],
+   "texto": "Ofcourse not 1.♕xe5?? ♖f1#.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l53",
+   "bloco": "b53",
+   "caixa_rel": [
+    0.5,
+    0.58581,
+    0.56753,
+    0.60275
+   ],
+   "texto": "1...♕g3",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l54",
+   "bloco": "b54",
+   "caixa_rel": [
+    0.51701,
+    0.60523,
+    0.74227,
+    0.61829
+   ],
+   "texto": "If 1...♕xe2 then 2.♘xc7#.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l55",
+   "bloco": "b55",
+   "caixa_rel": [
+    0.49794,
+    0.62429,
+    0.55876,
+    0.63595
+   ],
+   "texto": "2.♖d1!",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l56",
+   "bloco": "b56",
+   "caixa_rel": [
+    0.74897,
+    0.64301,
+    0.89691,
+    0.65819
+   ],
+   "texto": "(another 1 point)",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l57",
+   "bloco": "b57",
+   "caixa_rel": [
+    0.51546,
+    0.66172,
+    0.80206,
+    0.67691
+   ],
+   "texto": "Threatening both ♖xd5 and ♖d3.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l58",
+   "bloco": "b58",
+   "caixa_rel": [
+    0.49742,
+    0.67938,
+    0.55979,
+    0.69174
+   ],
+   "texto": "2...♖f2",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l59",
+   "bloco": "b59",
+   "caixa_rel": [
+    0.51649,
+    0.69739,
+    0.83866,
+    0.71328
+   ],
+   "texto": "2...c6 is met by 3.♖d3 ♕b8 4.♖f3!+–.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l60",
+   "bloco": "b60",
+   "caixa_rel": [
+    0.49742,
+    0.7154,
+    0.57268,
+    0.72917
+   ],
+   "texto": "3.♕xf2!!",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l61",
+   "bloco": "b61",
+   "caixa_rel": [
+    0.74948,
+    0.73517,
+    0.89691,
+    0.75035
+   ],
+   "texto": "(another 1 point)",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l62",
+   "bloco": "b62",
+   "caixa_rel": [
+    0.51598,
+    0.75282,
+    0.89742,
+    0.7666
+   ],
+   "texto": "3.♘xc7+ also wins: 3...♕xc7 4.♕b5+ ♕c6",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l63",
+   "bloco": "b63",
+   "caixa_rel": [
+    0.49845,
+    0.77083,
+    0.89742,
+    0.78708
+   ],
+   "texto": "5.♖xd5 ♖f6! 6.♗xf6 gxf6 7.♕d3 ♘b4 8.♖d8+",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l64",
+   "bloco": "b64",
+   "caixa_rel": [
+    0.49742,
+    0.78884,
+    0.89072,
+    0.80579
+   ],
+   "texto": "♔e7 9.♕xh7+!! ♔xd8 10.e7+ ♔e8 11.♕g7+—",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l65",
+   "bloco": "b65",
+   "caixa_rel": [
+    0.49639,
+    0.8072,
+    0.5701,
+    0.82097
+   ],
+   "texto": "3...♗xf2",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l66",
+   "bloco": "b66",
+   "caixa_rel": [
+    0.51546,
+    0.82521,
+    0.78763,
+    0.83969
+   ],
+   "texto": "3...♕xf2 4.♘xc7+ ♔f8 5.e7++—",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l67",
+   "bloco": "b67",
+   "caixa_rel": [
+    0.49639,
+    0.84499,
+    0.58557,
+    0.85734
+   ],
+   "texto": "4.♖xd5+—",
+   "negrito": true,
+   "texto_verificado": false
+  }
+ ],
+ "estrutura_por": "Claude (estrutura pelas faixas)"
+}

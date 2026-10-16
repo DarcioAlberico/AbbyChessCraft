@@ -49,13 +49,15 @@ def ambiente(tmp_path_factory):
     leitor = LeitorDoLivro.com_modelos_globais(projeto.pasta_de_padroes,
                                                limiares=projeto.dados.limiares)
     fonte = pg.fonte_do_projeto(projeto)
+    # Como a janela faz ao abrir (desde o 1b): logo depois de carregar os modelos, com o
+    # projeto e a fonte abertos e nenhuma página lida ainda.
+    congelar = getattr(leitor_mod, "congelar_para_a_coleta_de_lixo", None)
+    if congelar is not None:
+        congelar()
     livro.reconhecer_paginas(projeto, fonte, leitor, PAGINAS)
     janela = JanelaPrincipal()
     janela.resize(1600, 1000)
     janela.projeto, janela.fonte, janela.leitor = projeto, fonte, leitor
-    congelar = getattr(leitor_mod, "congelar_para_a_coleta_de_lixo", None)
-    if congelar is not None:                # como a janela faz ao abrir (desde o 1b): depois
-        congelar()                          # dos modelos, com a janela e o projeto vivos
     janela.seletor.setMaximum(fonte.total)
     janela.ir_para_pagina(PAGINAS[0], salvar=False)
     yield app, janela

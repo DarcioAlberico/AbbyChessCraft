@@ -407,7 +407,8 @@ class JanelaPrincipal(QMainWindow):
         def carregar(_progresso):
             leitor = LeitorDoLivro.com_modelos_globais(projeto.pasta_de_padroes,
                                                        limiares=projeto.dados.limiares)
-            congelar_para_a_coleta_de_lixo()
+            log.info("congelados para a coleta de lixo: %d objetos",
+                     congelar_para_a_coleta_de_lixo())
             return leitor
 
         def pronto(leitor: LeitorDoLivro):

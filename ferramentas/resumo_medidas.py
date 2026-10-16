@@ -254,7 +254,9 @@ def _repeticoes() -> list:
               "congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com "
               "`ABBY_SEM_CONGELAR=1`), o p95 do Enter do passo 0 ao 1b tem duas faixas no mesmo "
               "código (perto de 110–130 e de 180–235; no 2a, uma só, perto de 90); o atraso no "
-              "lote tem duas faixas sempre (perto de 8–10 e de 21). "
+              "lote tem duas faixas sempre (perto de 8–10 e de 21). Desde o 2b o congelamento é "
+              "desligado (`ABBY_CONGELAR=1` liga), e a coluna do Enter mede até a cor mudar "
+              "(até o 2a, até o fim da propagação). "
               "Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair "
               "alta):", "",
               "| Código | Commit | Rodada | " + " | ".join(r for _, _, r in _METAS_REPETIDAS) + " |",

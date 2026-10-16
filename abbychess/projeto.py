@@ -658,6 +658,11 @@ class ProjetoDeLivro:
         diz que a gravação é a de um reconhecimento (F5 ou lote), e não de uma edição:
         o estado vai por `proximo_estado` (§4.4).
 
+        A mudança feita **no lugar** num `BoxEntry` (a ferramenta que muda o que
+        `carregar_pagina` devolveu) só é vista se a página tem foto (veio do disco ou de outra
+        gravação por aqui); a página que a janela entregou ao gravador não tem, e a mudança
+        no lugar não entra em `mudados`. Quem trabalha por listas, passe objetos novos.
+
         `diagramas` é a leitura de cada tabuleiro (`abbychess.diagramas`). Sem
         `diagramas` (`None`), ficam os já gravados cujo tabuleiro continua na página:
         quem regrava só os boxes, como o reconhecimento em lote, não apaga uma conferência.

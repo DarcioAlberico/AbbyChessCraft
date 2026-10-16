@@ -433,7 +433,9 @@ def test_fechar_com_pagina_que_nao_grava_pergunta_e_pode_ficar_aberta(app, janel
 
     janela.reconhecer()
     _esperar(app, janela)
-    respostas = iter([QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes])
+    # "Não" no primeiro fechar; no segundo, "Sim" antes e depois de parar as tarefas.
+    respostas = iter([QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes,
+                      QMessageBox.StandardButton.Yes])
     perguntas = []
     monkeypatch.setattr(QMessageBox, "question",
                         lambda _p, _t, texto, *a, **k: (perguntas.append(texto), next(respostas))[1])
@@ -478,3 +480,36 @@ def test_trocar_de_projeto_com_tarefa_em_voo_termina_no_projeto_dela(app, janela
         assert reaberto.paginas_lidas() == [0]           # e o F5 dele foi gravado nele
     finally:
         reaberto.fechar()
+
+
+def test_tarefa_pedida_por_quem_ouve_livre_tambem_roda(app, janela):
+    ordem = []
+    pedida = []
+
+    def ao_ficar_livre(ocupado, _titulo):
+        if not ocupado and not pedida:
+            pedida.append(1)
+            janela.executor.rodar("Depois", lambda: (ordem.append("depois"), None)[1])
+
+    janela.executor.ocupado_mudou.connect(ao_ficar_livre)
+    try:
+        janela.executor.rodar("Antes", lambda: (ordem.append("antes"), None)[1])
+        _esperar(app, janela)
+    finally:
+        janela.executor.ocupado_mudou.disconnect(ao_ficar_livre)
+    assert ordem == ["antes", "depois"]
+
+
+def test_fechar_pergunta_de_novo_pelo_que_a_tarefa_em_voo_entregou(app, janela, monkeypatch):
+    from PySide6.QtGui import QCloseEvent
+
+    perguntas = []
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda _p, _t, texto, *a, **k: (perguntas.append(texto),
+                                                        QMessageBox.StandardButton.No)[1])
+    resultados = iter([True, False])                 # antes da tarefa grava; depois, não
+    monkeypatch.setattr(janela.projeto, "descarregar", lambda limite=None: next(resultados))
+    evento = QCloseEvent()
+    janela.closeEvent(evento)
+    assert len(perguntas) == 1 and not evento.isAccepted() and janela.projeto is not None
+    monkeypatch.undo()

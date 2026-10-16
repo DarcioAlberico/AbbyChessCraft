@@ -236,16 +236,23 @@ class JanelaPrincipal(QMainWindow):
         de mexer nas tarefas: falso quando o usuário prefere não fechar (e perder as
         mudanças dela), e aí nada mudou."""
         projeto = self.projeto
-        if not projeto.descarregar(10):
-            paginas = ", ".join(str(i + 1) for i in projeto.paginas_sujas())
-            if not dialogos.confirmar(self, "Gravar", f"As mudanças da(s) página(s) {paginas} "
-                                      "não puderam ser gravadas (veja a barra de status). "
-                                      "Fechar mesmo assim e perder essas mudanças?"):
-                return False
+        if not self._gravou_ou_perder(projeto):
+            return False
         self._parar_tarefas()                   # o fim da tarefa em voo ainda entra
+        if not self._gravou_ou_perder(projeto):   # e o que ele entregou também é gravado
+            return False
         self.pagina.desligar()
         projeto.fechar(5)
         return True
+
+    def _gravou_ou_perder(self, projeto) -> bool:
+        """Verdadeiro se o gravador gravou tudo, ou se o usuário aceita perder o que falta."""
+        if projeto.descarregar(10):
+            return True
+        paginas = ", ".join(str(i + 1) for i in projeto.paginas_sujas())
+        return dialogos.confirmar(self, "Gravar", f"As mudanças da(s) página(s) {paginas} não "
+                                  "puderam ser gravadas (veja a barra de status). Fechar mesmo "
+                                  "assim e perder essas mudanças?")
 
     # ------------------------------------------------------------------
     # Comandos que perguntam antes

@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "abbychesscraft"
+version = "0.1.0"
+description = "OCR de livros de xadrez com treino de padrões por livro, sobre o core do PyBoxEditor"
+requires-python = ">=3.11"
+# O PyBoxEditor não está no PyPI: instale-o em modo editável antes deste pacote
+#   pip install -e C:\Python-Chess2\PyBoxEditor_Tkinter --no-deps
+dependencies = ["PySide6>=6.6", "numpy", "opencv-python", "Pillow", "PyMuPDF", "python-docx"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+abbychess = "abbychess.app.principal:main"
+
+[tool.setuptools]
+packages = ["abbychess", "abbychess.app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

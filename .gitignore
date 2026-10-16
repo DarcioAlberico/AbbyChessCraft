@@ -1,0 +1,15 @@
+# Ambiente e caches
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+
+# Outro repositório clonado aqui dentro
+rea/
+
+# Projetos de livro e saídas locais
+projetos/
+*.tmp

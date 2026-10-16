@@ -50,6 +50,8 @@ class Gravador:
         self._falhas: Dict[int, int] = {}
         #: pid -> quantas tentativas já houve (o `descarregar` sabe quem já tentou).
         self._tentativas: Dict[int, int] = {}
+        #: pid -> quando foi a última tentativa que falhou (o piso entre duas tentativas).
+        self._ultima_falha: Dict[int, float] = {}
         self._gravando: Optional[int] = None
         self._parar = False
         #: Quantas gravações deram certo (os testes de coalescência contam por aqui).
@@ -66,8 +68,11 @@ class Gravador:
             if self._parar:
                 raise RuntimeError("o gravador já foi fechado")
             self._pendentes[pid] = instantaneo
-            if pid in self._falhas:             # estava falhando: tenta logo com o novo
-                self._prazos[pid] = self._relogio()
+            if pid in self._falhas:
+                # Estava falhando: tenta logo com o novo, mas não antes de `atraso` depois
+                # da última falha (cem edições por segundo não são cem tentativas).
+                self._prazos[pid] = max(self._relogio(),
+                                        self._ultima_falha.get(pid, 0.0) + self.atraso)
             else:
                 self._prazos.setdefault(pid, self._relogio() + self.atraso)
             self._cond.notify_all()
@@ -163,16 +168,21 @@ class Gravador:
                 if erro is None:
                     self.gravacoes += 1
                     self._falhas.pop(pid, None)
+                    self._ultima_falha.pop(pid, None)
                 else:
                     seguidas = self._falhas.get(pid, 0) + 1
                     self._falhas[pid] = seguidas
+                    self._ultima_falha[pid] = self._relogio()
                     if pid not in self._pendentes:    # nada mais novo: tenta o mesmo depois
                         self._pendentes[pid] = instantaneo
                         self._prazos[pid] = self._relogio() + min(
                             ESPERA_MAXIMA, self.atraso * 2 ** seguidas)
                 self._cond.notify_all()
-            if erro is None:
-                if self.ao_gravar is not None:
-                    self.ao_gravar(pid)
-            elif seguidas == 1 and self.ao_falhar is not None:
-                self.ao_falhar(pid, erro)
+            try:                                # um aviso que falha não para o gravador
+                if erro is None:
+                    if self.ao_gravar is not None:
+                        self.ao_gravar(pid)
+                elif seguidas == 1 and self.ao_falhar is not None:
+                    self.ao_falhar(pid, erro)
+            except Exception:
+                log.exception("o aviso do gravador falhou (página p%d)", pid)

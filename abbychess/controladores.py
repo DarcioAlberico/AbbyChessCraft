@@ -93,7 +93,7 @@ class ControladorDeLayout:
                     self._automaticas_prontas(zonas)
             return trabalho, pronto
 
-        p.executar("Achando as áreas", preparar, falhou=p._falhou("Áreas"))
+        p.tarefa("Achando as áreas", preparar, falhou=p._falhou("Áreas"))
 
     def _automaticas_prontas(self, zonas) -> None:
         self._trocar(zonas, None)
@@ -198,7 +198,7 @@ class ControladorDeVerificacao:
                 self.eventos.emitir("verificacao_pronta")
             return trabalho, pronto
 
-        p.executar("Carregando o léxico", preparar, falhou=p._falhou("Léxico"))
+        p.tarefa("Carregando o léxico", preparar, falhou=p._falhou("Léxico"))
         return False
 
     def recontar(self, posicao: Optional[int] = None) -> None:
@@ -234,13 +234,19 @@ class ControladorDeVerificacao:
         return gids
 
     def corrigir(self, texto: str, ensinar: bool = False) -> None:
-        """Grava o texto nos glifos da palavra; com `ensinar`, ensina os que mudaram."""
-        p = self.pagina
+        """Grava o texto nos glifos da palavra; com `ensinar`, ensina os que mudaram. A
+        palavra é a de agora; a correção, na vez dela na fila."""
         palavra = self.atual()
-        if palavra is None or not p._pode_editar():
+        if palavra is None:
             return
         gids = self.gids_da_palavra(palavra)
-        if gids is None:
+        posicao = self.posicao
+        self.pagina._editar("Corrigindo a palavra",
+                            lambda: self._corrigir(gids, posicao, texto, ensinar))
+
+    def _corrigir(self, gids, posicao: int, texto: str, ensinar: bool) -> None:
+        p = self.pagina
+        if gids is None or p._vivos(gids) != gids:
             self.recontar()
             p._avisar("A página mudou desde a contagem; as palavras foram contadas de novo.",
                       6000)
@@ -252,10 +258,12 @@ class ControladorDeVerificacao:
         except ValueError as erro:
             p._avisar(f"Não corrigiu: {erro}", 8000)
             return
-        posicao = self.posicao
         for k, _char in mudados:
             ed.trocar(p.modelo, gids[k], entries[k])
         descricao = f"Corrigir '{texto}'"
+        # A correção e o ensino que vem dela são um passo só do desfazer.
+        passo = ("palavra", object())             # uma chave só deste comando
+        p._mudou(p.modelo, p.indice, descricao, antes, juntar=passo)
 
         def depois(mensagem: str) -> None:
             self.recontar(posicao)
@@ -265,7 +273,6 @@ class ControladorDeVerificacao:
             p._avisar(mensagem, 6000)
 
         if not ensinar or not mudados or p.leitor is None:
-            p._mudou(p.modelo, p.indice, descricao, antes)
             depois(f"'{texto}': {len(mudados)} glifo(s) corrigido(s).")
             return
         por_char: dict = {}
@@ -276,7 +283,7 @@ class ControladorDeVerificacao:
             extra = f"; os padrões resolveram mais {resolvidos} na página" if resolvidos else ""
             depois(f"'{texto}': {len(mudados)} glifo(s) corrigido(s) e ensinado(s){extra}.")
 
-        p.ensinar_gids(por_char, descricao, ensinou, antes=antes)
+        p.ensinar_gids(por_char, descricao, ensinou, juntar=passo)
 
     def ignorar_todas(self) -> None:
         palavra = self.atual()
@@ -343,25 +350,28 @@ class ControladorDeDiagramas:
         pagina_indice = p.indice
 
         def preparar():
-            if p.indice != pagina_indice or p.modelo is None:
+            pagina = p.modelo
+            if p.indice != pagina_indice or pagina is None:
                 return None
-            atuais = p.diagramas
+            atuais = dg.para_caixas(pagina.tabuleiros, pagina.diagramas)
             por_ler = [i for i, d in enumerate(atuais) if not d.lido and not d.erro]
-            imagem, leitor, boxes = p.imagem, p.leitor, p.boxes
+            imagem, leitor, boxes = p.imagem, p.leitor, pagina.entries()
             caixas = [atuais[i].caixa for i in por_ler]
 
             def trabalho(_progresso):
                 return dg.ler_diagramas(imagem, caixas, classificar=leitor.arbitro, boxes=boxes)
 
             def pronto(lidos):
-                novos = p.diagramas
-                for i, lido in zip(por_ler, lidos):
-                    if i < len(novos) and novos[i].caixa == lido.caixa:
-                        novos[i] = lido
-                p.modelo.diagramas = novos
-                p._gravar(p.modelo)
-                self.eventos.emitir("glifos_mudaram", None)
-                if p.indice == pagina_indice:
+                # Na página que pediu, mesmo que o usuário tenha ido a outra.
+                novos = dg.para_caixas(pagina.tabuleiros, pagina.diagramas)
+                for lido in lidos:
+                    for i, d in enumerate(novos):
+                        if d.caixa == lido.caixa and not d.lido:
+                            novos[i] = lido
+                pagina.diagramas = novos
+                p._gravar(pagina)
+                if pagina is p.modelo:
+                    self.eventos.emitir("glifos_mudaram", None)
                     self._abrir(indice)
             return trabalho, pronto
 
@@ -438,7 +448,7 @@ class ControladorDoLivro:
                 self.eventos.emitir("projeto_aberto", leitor)
             return trabalho, pronto
 
-        p.executar("Carregando os modelos", preparar, falhou=p._falhou("Carregar os modelos"))
+        p.tarefa("Carregando os modelos", preparar, falhou=p._falhou("Carregar os modelos"))
 
     def usar(self, projeto, fonte, leitor) -> None:
         """O projeto com o leitor pronto: abre a última página lida (ou a primeira)."""
@@ -458,7 +468,13 @@ class ControladorDoLivro:
         def preparar():
             if not p.pronto:
                 return None
-            p.projeto.descarregar()
+            # O lote grava na thread dele: o que o gravador tem não pode chegar depois e
+            # passar por cima do que o lote leu.
+            if not p.projeto.descarregar(10):
+                p.eventos.emitir("aviso", "Reconhecer o livro", "O lote não começou: há "
+                                 "páginas que não puderam ser gravadas (veja a barra de "
+                                 "status). Libere o disco e tente de novo.")
+                return None
             projeto, fonte, leitor = p.projeto, p.fonte, p.leitor
             self._cancelar = cancelar
             p.lote_rodando = True
@@ -492,7 +508,7 @@ class ControladorDoLivro:
             self._fim()
             p._falhou("Reconhecer o livro")(mensagem)
 
-        p.executar("Reconhecendo o livro", preparar, falhou=falhou, progresso=progredir)
+        p.tarefa("Reconhecendo o livro", preparar, falhou=falhou, progresso=progredir)
 
     def _fim(self) -> None:
         self._cancelar = None
@@ -534,5 +550,5 @@ class ControladorDoLivro:
                 p._avisar(f"Exportado em {destino.name}: {resumo}", 15000)
             return trabalho, pronto
 
-        p.executar(f"Exportando {destino.suffix[1:].upper()}", preparar,
+        p.tarefa(f"Exportando {destino.suffix[1:].upper()}", preparar,
                    falhou=p._falhou("Exportar"))

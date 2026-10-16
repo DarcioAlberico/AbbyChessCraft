@@ -201,9 +201,12 @@ class JanelaPrincipal(QMainWindow):
             raise
 
     def trocar_projeto(self, projeto, fonte) -> None:
-        """Fecha o projeto aberto (o gravador termina antes) e abre `projeto`."""
+        """Fecha o projeto aberto (as tarefas e o gravador terminam antes) e abre `projeto`."""
         if self.projeto is not None and self.projeto is not projeto:
-            self._fechar_projeto()
+            self._parar_tarefas()
+            if not self._fechar_projeto():
+                projeto.fechar()                # o usuário ficou com o aberto
+                return
         projeto.ao_falhar_gravacao = self.falha_de_gravacao.emit
         self.verificador.esquecer_projeto()
         so_leitura = " (só leitura)" if projeto.somente_leitura else ""
@@ -219,12 +222,29 @@ class JanelaPrincipal(QMainWindow):
         self._padroes_mudaram()
         dialogos.avisos_da_abertura(self, self.projeto, leitor)
 
-    def _fechar_projeto(self) -> None:
+    def _parar_tarefas(self) -> None:
+        """Cancela o lote, tira da fila o que não começou e espera a tarefa em andamento
+        (o resultado dela ainda entra, antes de o projeto fechar)."""
+        if self.executor.ocupado:
+            self.livro.cancelar()
+            self.executor.esvaziar()
+            self.statusBar().showMessage("Esperando a tarefa em andamento terminar…")
+            self.executor.esperar()
+            QApplication.processEvents()        # o fim da tarefa chega antes de fechar
+
+    def _fechar_projeto(self) -> bool:
+        """Grava o que falta e fecha o projeto. Se alguma página não grava, pergunta: falso
+        quando o usuário prefere não fechar (e perder as mudanças dela)."""
         projeto = self.projeto
+        if not projeto.descarregar(10):
+            paginas = ", ".join(str(i + 1) for i in projeto.paginas_sujas())
+            if not dialogos.confirmar(self, "Gravar", f"As mudanças da(s) página(s) {paginas} "
+                                      "não puderam ser gravadas (veja a barra de status). "
+                                      "Fechar mesmo assim e perder essas mudanças?"):
+                return False
         self.pagina.desligar()
-        if not projeto.fechar():
-            QMessageBox.warning(self, "Gravar", "Algumas páginas não foram gravadas: "
-                                f"{sorted(projeto.sujas)}. Veja o log.")
+        projeto.fechar(1)
+        return True
 
     # ------------------------------------------------------------------
     # Comandos que perguntam antes
@@ -362,14 +382,14 @@ class JanelaPrincipal(QMainWindow):
 
     def _atual_mudou(self) -> None:
         p = self.pagina
-        if p.atual is None:
+        if p.box_atual() is None:
             self.visor.selecionar(None)
             self.treino.limpar("Esta página ainda não foi reconhecida. Aperte F5."
                                if not p.boxes else
                                "Nada a revisar nesta página. Clique num box para corrigi-lo, "
                                "ou vá para o próximo pendente do livro (F6).")
             return
-        self.treino.mostrar(p.matriz, p.box(p.atual), p.posicao_do_atual())
+        self.treino.mostrar(p.matriz, p.box_atual(), p.posicao_do_atual())
         self.visor.selecionar(p.indice_de(p.atual))
         if self.executor.ocupado:
             self.treino.habilitar(False)
@@ -435,12 +455,8 @@ class JanelaPrincipal(QMainWindow):
         self.progresso.setValue(feito)
 
     def closeEvent(self, evento):
-        if self.executor.ocupado:
-            self.livro.cancelar()
-            self.executor.esvaziar()
-            self.statusBar().showMessage("Esperando a tarefa em andamento terminar…")
-            self.executor.esperar()
-            QApplication.processEvents()        # o fim da tarefa chega antes de fechar
-        if self.projeto is not None:
-            self._fechar_projeto()
+        self._parar_tarefas()
+        if self.projeto is not None and not self._fechar_projeto():
+            evento.ignore()                     # ficou aberta: as mudanças estão na memória
+            return
         super().closeEvent(evento)

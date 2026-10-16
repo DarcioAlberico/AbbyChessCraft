@@ -45,9 +45,10 @@ def test_cem_mudancas_em_400_ms_sao_uma_gravacao():
     gravador = Gravador(disco)
     try:
         inicio = time.monotonic()
-        for k in range(100):
+        for k in range(100):                     # uma a cada 4 ms (o sleep do Windows é de
+            while time.monotonic() < inicio + k * 0.004:   # ~15 ms: espera ativa)
+                pass
             gravador.agendar(1, k)
-            time.sleep(0.004)
         assert time.monotonic() - inicio < gravador.atraso   # tudo antes do prazo
         assert gravador.descarregar(5)
         assert disco.gravados == [99] and gravador.gravacoes == 1

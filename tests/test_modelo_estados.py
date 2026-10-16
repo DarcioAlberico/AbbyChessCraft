@@ -225,6 +225,9 @@ class _ProjetoNaMemoria:
 
     somente_leitura = False
 
+    class dados:
+        nome = "Maquina"
+
     def __init__(self, pagina):
         self.pagina = pagina
         self.agendadas = 0
@@ -262,6 +265,11 @@ class _LeitorSemPadroes:
         from abbychess.leitor import Leitura
 
         return Leitura("", "nenhuma", 0.0)
+
+    ler_pelo_livro = ler
+
+    def ensinar(self, *_a, **_k):
+        return None                              # não guarda padrão: a máquina olha a página
 
     def padroes_por_caractere(self):
         return {}
@@ -335,6 +343,25 @@ class MaquinaDoControlador(RuleBasedStateMachine):
         if gid is not None:
             e = self.ctl.box(gid)
             self.ctl.marcar(e.x1 - 2, e.y1 - 2, e.x2 + 2, e.y2 + 2)
+
+    @rule(c=st.sampled_from("ab"))
+    def ensinar(self, c):
+        atual = self.ctl.atual
+        self.ctl.ensinar(c)
+        if atual is not None:
+            assert self.ctl.box(atual).char == c and self.ctl.box(atual).source == "manual"
+
+    @rule(tudo=st.booleans())
+    def reler(self, tudo):
+        self.ctl.reler_pendentes(tudo)
+
+    @rule()
+    def desfazer(self):
+        self.ctl.desfazer()
+
+    @rule()
+    def refazer(self):
+        self.ctl.refazer()
 
     # ------------------------------------------------------------------
     @invariant()

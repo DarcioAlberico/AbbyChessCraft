@@ -82,6 +82,7 @@ def montar(janela) -> None:
     j.caixa_de_zoom.setToolTip("Zoom da página (Ctrl+roda, Ctrl++ e Ctrl+−)")
     j.caixa_de_zoom.setAccessibleName("Zoom da página")
     j.caixa_de_zoom.valueChanged.connect(lambda valor: j.visor.definir_zoom(valor / 100))
+    j.caixa_de_zoom.editingFinished.connect(lambda: j.visor.setFocus())   # os atalhos voltam
     barra.addWidget(j.caixa_de_zoom)
     j.acao_seguir = _acao(j, "Seguir o item atual", "Ctrl+Shift+L", lambda: None)
     j.acao_seguir.setCheckable(True)

@@ -68,7 +68,12 @@ def test_pintura_e_clique_do_item_dos_boxes(medidas):
     sorteio = random.Random(2026)
     cliques = []
     for _ in range(1000):
-        x, y = sorteio.uniform(0, LARGURA), sorteio.uniform(0, ALTURA)
+        # Metade dos cliques no meio de um box, metade num ponto qualquer da página.
+        if sorteio.random() < 0.5:
+            b = sorteio.choice(boxes)
+            x, y = (b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2
+        else:
+            x, y = sorteio.uniform(0, LARGURA), sorteio.uniform(0, ALTURA)
         inicio = time.perf_counter_ns()
         item.no_ponto(x, y)
         cliques.append((time.perf_counter_ns() - inicio) / 1e6)
@@ -78,6 +83,7 @@ def test_pintura_e_clique_do_item_dos_boxes(medidas):
                                     "como": "paint() do item numa QImage 1920×1080, 10 zooms "
                                             "de 5% a 800% × 6"}
     medidas["clique_no_box"] = {"p95_ms": round(p95(cliques), 4), "n": len(cliques),
-                                "alvo_ms": 2, "como": "GradeDeCaixas.no_ponto, 1.000 pontos "
-                                                      "de semente fixa"}
-    assert p95(tempos) <= 33 * 1.2 and p95(cliques) <= 2 * 1.2
+                                "alvo_ms": 2, "como": "ItemDosBoxes.no_ponto (o que o visor "
+                                                      "chama no clique), 1.000 pontos de "
+                                                      "semente fixa, metade no meio de um box"}
+    assert p95(tempos) <= 33 and p95(cliques) <= 2      # os alvos do CA-3.5

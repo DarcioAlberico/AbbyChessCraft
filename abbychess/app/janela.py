@@ -224,6 +224,7 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
                 projeto.fechar()                # o usuário ficou com o aberto
                 return
         projeto.ao_falhar_gravacao = self.falha_de_gravacao.emit
+        self._pixmaps.clear()                   # as páginas do projeto anterior saem
         self.verificador.esquecer_projeto()
         so_leitura = " (só leitura)" if projeto.somente_leitura else ""
         self.setWindowTitle(f"{projeto.dados.nome}{so_leitura} — {TITULO}")

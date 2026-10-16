@@ -26,13 +26,13 @@ from typing import Optional
 
 import numpy as np
 from PySide6.QtCore import QEvent, Qt, Signal
-from PySide6.QtGui import QFont, QKeySequence, QPainter, QPen, QShortcut
+from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QPixmap, QShortcut
 from PySide6.QtWidgets import (QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
                                QPushButton, QSizePolicy, QToolButton, QVBoxLayout, QWidget)
 
 from core.box_model import BoxEntry
 
-from abbychess.app import cores
+from abbychess.app import cores, estilo
 from abbychess.app.imagens import ampliado, pixmap_de_cinza
 
 #: Figurinas e símbolos que os livros de xadrez imprimem e o teclado não tem.
@@ -67,6 +67,25 @@ NOMES_DAS_FONTES = {
     "none": "ninguém leu",
 }
 
+
+
+
+def _amostra_do_traco(traco) -> QPixmap:
+    """Um retângulo pequeno com o traço e o preenchimento do estado, para a legenda."""
+    pixmap = QPixmap(30, 16)
+    pixmap.fill(QColor(255, 255, 255))
+    pintor = QPainter(pixmap)
+    caneta = QPen(traco.cor)
+    caneta.setWidthF(traco.largura)
+    caneta.setStyle(traco.estilo)
+    pintor.setPen(caneta)
+    if traco.preenchimento:
+        cor = QColor(traco.cor)
+        cor.setAlpha(traco.preenchimento)
+        pintor.setBrush(cor)
+    pintor.drawRect(3, 3, 24, 10)
+    pintor.end()
+    return pixmap
 
 class _CampoDoCaractere(QLineEdit):
     """Enter ensina, Shift+Enter só corrige; o resto é edição normal."""
@@ -217,11 +236,15 @@ class PainelDeTreino(QWidget):
         self.fila = QLabel("")
         self.padroes = QLabel("")
 
-        legenda = QGroupBox("Cores dos boxes")
+        legenda = QGroupBox("Os boxes na página")
         caixa_legenda = QVBoxLayout(legenda)
-        for cor, texto in cores.LEGENDA:
-            linha = QLabel(f'<span style="color:{cor.name()}">■</span> {texto}')
-            caixa_legenda.addWidget(linha)
+        for estado, origem, texto in estilo.LEGENDA:
+            linha = QHBoxLayout()
+            amostra = QLabel()
+            amostra.setPixmap(_amostra_do_traco(estilo.traco(estado, origem)))
+            linha.addWidget(amostra)
+            linha.addWidget(QLabel(texto), 1)
+            caixa_legenda.addLayout(linha)
 
         caixa = QVBoxLayout(self)
         caixa.addWidget(QLabel("<b>Glifo</b>"))

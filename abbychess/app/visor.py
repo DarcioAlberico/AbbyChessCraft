@@ -128,11 +128,15 @@ class VisorDePagina(QGraphicsView):
         self.item_dos_boxes = ItemDosBoxes(pixmap.width(), pixmap.height())
         self.item_dos_boxes.setZValue(1)
         cena.addItem(self.item_dos_boxes)
-        # A escala passa de uma página à outra; nos modos, ela se refaz pela página nova.
+        # A escala passa de uma página à outra; nos modos, ela se refaz pela página nova. A
+        # página nova começa no topo (o PgUp no topo pede o fim, e a janela o põe depois).
+        if self.modo_zoom == "largura":
+            self.verticalScrollBar().setValue(0)
         if self.modo_zoom is not None:
             self._aplicar_modo()
         else:
             self.zoom_mudou.emit(self.escala(), "")
+        self.ir_ao_topo()
 
     def mostrar_boxes(self, boxes: List[BoxEntry], pendentes: set, tabuleiros=(),
                       cores_dos_tabuleiros=None) -> None:
@@ -168,10 +172,7 @@ class VisorDePagina(QGraphicsView):
         item = self.item_dos_boxes
         if item is None or len(boxes) != len(item.grade.caixas):
             return False
-        estados = list(item.estados)
-        for i in indices:
-            estados[i] = gd.estado(boxes[i], i in pendentes)
-        item.atualizar(indices, boxes, estados)
+        item.atualizar({i: gd.estado(boxes[i], i in pendentes) for i in indices}, boxes)
         self._boxes = boxes
         return True
 
@@ -218,9 +219,6 @@ class VisorDePagina(QGraphicsView):
         self.modo_zoom = "largura"
         self._aplicar_modo()
 
-    def ajustar(self) -> None:
-        self.zoom_pagina()
-
     def zoom_item(self) -> None:
         """Ctrl+7: o item atual (o box em revisão) ocupa a vista, com folga em volta."""
         if self._selecionado is None or not 0 <= self._selecionado < len(self._boxes):
@@ -243,9 +241,11 @@ class VisorDePagina(QGraphicsView):
         else:
             nova = min((vista.width() - 4) / cena.width(), (vista.height() - 4) / cena.height())
         modo = self.modo_zoom
+        barra = self.verticalScrollBar()
+        fracao = barra.value() / barra.maximum() if barra.maximum() > 0 else 0.0
         self._escalar(nova, modo)
-        if modo == "largura":
-            self.verticalScrollBar().setValue(self.verticalScrollBar().minimum())
+        if modo == "largura":                   # a mesma altura da página, na escala nova
+            barra.setValue(round(fracao * barra.maximum()))
         else:
             self.centerOn(cena.center())
 
@@ -598,6 +598,13 @@ class VisorDePagina(QGraphicsView):
                 self.zona_escolhida.emit(-1)
                 return
         super().keyPressEvent(evento)
+
+    def focusOutEvent(self, evento):
+        # O espaço solto fora do visor (Alt+Tab, um diálogo) não chega aqui: sem isto, o
+        # próximo clique arrastaria a página em vez de escolher o box.
+        self._espaco, self._panorama = False, None
+        self._cursor_do_modo()
+        super().focusOutEvent(evento)
 
     def keyReleaseEvent(self, evento):
         if evento.key() == Qt.Key.Key_Space and not evento.isAutoRepeat():

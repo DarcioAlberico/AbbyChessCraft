@@ -55,6 +55,18 @@ TRACOS_DA_ORIGEM: Dict[str, Traco] = {
 }
 
 
+#: A legenda do painel de treino: o estado, se ele precisa do V, e o texto.
+LEGENDA = [
+    (gd.PENDENTE, False, "A revisar"),
+    (gd.SEM_LEITURA, False, "Sem leitura"),
+    (gd.AGUARDANDO, False, "Aguardando leitura"),
+    (gd.MANUAL, False, "Aceito (discreto; V mostra a origem)"),
+    (gd.MANUAL, True, "Confirmado por você (com V)"),
+    (gd.LIVRO, True, "Padrão deste livro (com V)"),
+    (gd.REDE, True, "Rede ou base global (com V)"),
+]
+
+
 def traco(estado: str, mostrar_origem: bool) -> Traco:
     if mostrar_origem and estado in TRACOS_DA_ORIGEM:
         return TRACOS_DA_ORIGEM[estado]

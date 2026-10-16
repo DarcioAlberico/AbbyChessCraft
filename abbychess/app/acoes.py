@@ -104,12 +104,14 @@ def montar(janela) -> None:
     j.acao_seguir = acao(j, "seguir", lambda: None, texto="Seguir o item atual", marcavel=True)
     j.acao_seguir.setChecked(True)
     imagem_e_glifo = [j.visor, j.treino]        # o zoom vale também com o foco no treino
-    j.acao_ajustar = acao(j, "zoom_pagina", j.visor.zoom_pagina,
-                          texto="Página inteira", widgets=imagem_e_glifo, barra=barra)
-    j.acao_zoom_mais = acao(j, "zoom_mais", j.visor.zoom_mais, texto="Aproximar",
-                            widgets=imagem_e_glifo)
-    j.acao_zoom_menos = acao(j, "zoom_menos", j.visor.zoom_menos, texto="Afastar",
-                             widgets=imagem_e_glifo)
+    com_o_documento = [*imagem_e_glifo, j.texto]   # e, no Documento, muda o corpo
+    j.acao_ajustar = acao(j, "zoom_pagina", j.zoom_padrao,
+                          texto="Página inteira (no Documento, o corpo padrão)",
+                          widgets=com_o_documento, barra=barra)
+    j.acao_zoom_mais = acao(j, "zoom_mais", j.aproximar, texto="Aproximar",
+                            widgets=com_o_documento)
+    j.acao_zoom_menos = acao(j, "zoom_menos", j.afastar, texto="Afastar",
+                             widgets=com_o_documento)
     j.acao_zoom_largura = acao(j, "zoom_largura", j.visor.zoom_largura,
                                texto="Largura da página", widgets=imagem_e_glifo)
     j.acao_zoom_100 = acao(j, "zoom_100", j.visor.zoom_100, texto="100%", widgets=imagem_e_glifo)
@@ -122,6 +124,17 @@ def montar(janela) -> None:
                                         lambda: j.vista.setCurrentWidget(j.padroes))
     j.acao_fechar = acao(j, "fechar_sobreposicao", j.fechar_sobreposicao,
                          texto="Fechar o que está por cima")
+    j.acao_linha = acao(j, "mostrar_linha", j.alternar_linha, texto="Linha", marcavel=True)
+    j.acao_linha.setChecked(True)
+    j.acao_margens = acao(j, "ocultar_cabecalhos", j.texto.alternar_margens,
+                          texto="Cabeçalhos e rodapés", widgets=[j.texto], marcavel=True)
+    j.acao_margens.setChecked(True)
+    j.acao_realce = teclado.sem_atalho(j, "Realce", j.texto.definir_realce)
+    j.acao_realce.setCheckable(True)
+    j.acao_realce.setChecked(True)
+    j.acao_realce.setToolTip("Baixa confiança, fora do léxico, virtual e aguardando leitura")
+    for q in (j.acao_realce, j.acao_margens):
+        j.barra_do_documento.addAction(q)
 
     # --- Ferramentas -------------------------------------------------------------
     j.acao_modo_treino = acao(j, "marcar_glifo", j.modo_treino,
@@ -188,7 +201,8 @@ def _menus(j) -> None:
     menu = j.menuBar().addMenu("E&xibir")
     for acao in (j.acao_lado_a_lado, j.acao_empilhado, j.acao_so_imagem, j.acao_so_vista,
                  None, j.acao_paginas, j.doca_inspetor.toggleViewAction(),
-                 j.doca_resultados.toggleViewAction(), j.acao_padroes, None, *j.acoes_de_foco,
+                 j.doca_resultados.toggleViewAction(), j.acao_linha, j.acao_padroes, None,
+                 j.acao_realce, j.acao_margens, None, *j.acoes_de_foco,
                  None, j.acao_ajustar, j.acao_zoom_largura, j.acao_zoom_100, j.acao_zoom_item,
                  j.acao_zoom_mais, j.acao_zoom_menos, j.acao_origem, j.acao_seguir):
         menu.addSeparator() if acao is None else menu.addAction(acao)

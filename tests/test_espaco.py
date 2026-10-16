@@ -110,7 +110,12 @@ def _esperado_do_yaml():
 def _widgets_do_escopo(janela):
     return {"imagem": {janela.visor}, "glifo": {janela.treino},
             "campo_glifo": {janela.treino.campo}, "palavra": {janela.verificacao},
-            "documento": set(), "galeria": set()}
+            "documento": {janela.texto}, "galeria": set()}
+
+
+#: (ação, escopo) que só passam a valer quando o Documento fica editável (passo D1): a
+#: paleta insere símbolos, e o Documento é só leitura até lá.
+_SO_DEPOIS_DA_EDICAO = {("paleta", "documento")}
 
 
 def test_os_atalhos_registrados_sao_exatamente_os_do_yaml_ate_o_passo(janela):
@@ -128,7 +133,8 @@ def test_os_atalhos_registrados_sao_exatamente_os_do_yaml_ate_o_passo(janela):
             assert q.shortcutContext() == Qt.ShortcutContext.WindowShortcut, q.objectName()
         else:
             assert q.shortcutContext() == Qt.ShortcutContext.WidgetWithChildrenShortcut
-            onde = set().union(*(por_escopo[e] for e in escopo))
+            onde = set().union(*(por_escopo[e] for e in escopo
+                                 if (q.objectName(), e) not in _SO_DEPOIS_DA_EDICAO))
             assert onde and onde <= set(q.associatedObjects()), (q.objectName(), escopo)
         assert q.receivers("2triggered(bool)") > 0, q.objectName()       # ligada a um comando
     assert registrados == {k: v for k, (v, _) in esperado.items()}
@@ -206,7 +212,7 @@ def test_alt_n_poe_o_foco_no_painel_certo(app, lida):
 
 def test_alt_3_de_novo_cicla_as_abas_da_vista(app, janela):
     janela.focar(3)
-    assert janela.vista.currentWidget() is janela.texto
+    assert janela.vista.currentWidget() is janela.painel_do_documento
     QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_3, Qt.KeyboardModifier.AltModifier)
     assert janela.vista.currentWidget() is janela.padroes and _dentro(janela.vista)
 

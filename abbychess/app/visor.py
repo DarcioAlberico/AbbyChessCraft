@@ -661,6 +661,11 @@ class VisorDePagina(QGraphicsView):
     ACOES_DO_MENU = ("zoom_pagina", "zoom_largura", "zoom_100", "zoom_item", "zoom_mais",
                      "zoom_menos", "mostrar_origem")
 
+    def mostrar_caixa(self, caixa) -> None:
+        """Rola a vista até a caixa (da página), a 120 px da borda se couber (Seguir)."""
+        x1, y1, x2, y2 = caixa
+        self.ensureVisible(QRectF(x1, y1, x2 - x1, y2 - y1), 120, 120)
+
     def menu_da_vista(self) -> QMenu:
         """O zoom e a origem, das ações que a janela pôs no visor."""
         menu = QMenu(self)

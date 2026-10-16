@@ -175,13 +175,14 @@ class DesenhoDaJanela:
     def _limpar_a_mensagem_da_tarefa(self) -> None:
         """A tarefa acabou: o "Carregando o léxico…" dela sai da barra (uma mensagem que
         veio depois, como o resultado, fica)."""
-        mensagem = getattr(self, "_mensagem_da_tarefa", None)
+        mensagem = self._mensagem_da_tarefa
         if mensagem and self.statusBar().currentMessage().startswith(mensagem):
             self.statusBar().clearMessage()
         self._mensagem_da_tarefa = None
 
     def _fila_mudou(self, titulos: list) -> None:
         if self.executor.titulo:
+            self._mensagem_da_tarefa = f"{self.executor.titulo}…"      # a tarefa que roda agora
             fila = f" Na fila: {', '.join(titulos)}." if titulos else ""
             self.statusBar().showMessage(f"{self.executor.titulo}…{fila}")
 

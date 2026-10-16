@@ -734,3 +734,25 @@ def test_esconder_a_imagem_nao_avisa_zoom_minimo(app, lida):
     QTest.keyClick(j.vista, Qt.Key.Key_F7, Qt.KeyboardModifier.ControlModifier)   # lado a lado
     app.processEvents()
     assert "zoom" not in j.statusBar().currentMessage()
+
+
+def test_abrir_e_fechar_a_gaveta_nao_deixa_os_tamanhos_derivarem(app, janela):
+    j = janela
+    inicio = _larguras(app, j)
+    for _ in range(3):
+        QTest.keyClick(j.visor, Qt.Key.Key_F9)
+        aberta = _larguras(app, j)
+        assert abs(aberta[1] - inicio[1]) <= 6                  # a Imagem não muda
+        QTest.keyClick(j.visor, Qt.Key.Key_F9)
+        fechada = _larguras(app, j)
+        assert abs(fechada[1] - inicio[1]) <= 6 and abs(fechada[2] - inicio[2]) <= 6
+
+
+def test_esc_com_resultados_aberto_pelo_aviso_nao_tira_o_foco_do_campo(app, lida):
+    j = lida
+    j.treino.campo.setFocus()
+    j.abrir_avisos()                                            # pelo ⚠, não pelo Alt+5
+    app.processEvents()
+    QTest.keyClick(j.treino.campo, Qt.Key.Key_Escape)
+    app.processEvents()
+    assert not j.doca_resultados.isVisible() and QApplication.focusWidget() is j.treino.campo

@@ -216,6 +216,10 @@ inteira do desfazer.
 
 **Verificação.** CA-4.3 (parte do 2b), CA-14.2 e CA-14.3; a meta do Enter [desempenho].
 
+**O alvo da releitura.** O 2b tira a cópia da página inteira de cada passo do desfazer;
+a verificação dele inclui 3 rodadas completas com o congelamento (`repeticao-2b`), e o p95
+da releitura fica ≤ 150 ms (alvo de §2), em pelo menos 2 das 3.
+
 ## Passo A1 — Visor novo (§3.3)
 
 **Tarefas.**

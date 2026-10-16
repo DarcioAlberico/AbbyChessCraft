@@ -212,9 +212,10 @@ def _por_passo() -> list:
         arquivo, dados = _ultimo(f"passo-{passo}")
         if dados is not None:
             colunas.append((f"{passo} (`{arquivo.name}`)", dados))
-    linhas = ["", "Desempenho por passo, em ms ou MB (uma rodada cada, a do portão; quanto o "
-              "mesmo código varia de uma rodada para outra, e o que se conclui, está nas "
-              "rodadas repetidas, abaixo):", "",
+    linhas = ["", "Desempenho por passo, em ms ou MB (uma rodada cada, a do portão, que roda "
+              "no mesmo processo depois dos testes `livro_real` e por isso não é a condição "
+              "das rodadas repetidas; quanto o mesmo código varia, e o que se conclui, está "
+              "nelas, abaixo):", "",
               "| Meta | " + " | ".join(nome for nome, _ in colunas) + " |",
               "|---|" + "---|" * len(colunas)]
     for chave, campo, rotulo in metas:
@@ -252,7 +253,7 @@ def _repeticoes() -> list:
     linhas = ["", "Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o "
               "congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com "
               "`ABBY_SEM_CONGELAR=1`), o p95 do Enter tem duas faixas no mesmo código (perto de "
-              "110–130 e de 180–190); o atraso no lote tem duas faixas sempre (perto de 8 e de 21). "
+              "110–130 e de 180–235); o atraso no lote tem duas faixas sempre (perto de 8 e de 21). "
               "Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair "
               "alta):", "",
               "| Código | Commit | Rodada | " + " | ".join(r for _, _, r in _METAS_REPETIDAS) + " |",

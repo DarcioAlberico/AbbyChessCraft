@@ -107,3 +107,18 @@ com o alvo de 150 ms no 2b. O custo do modelo, pelas rodadas sem congelamento co
 Os três testes que o revisor de código pediu como menores entraram: o estado
 `glifos_marcados` gravado por `gid_do_box`, o motivo do só leitura em mídia sem gravação, e
 o lote gravando enquanto a janela pede gids (duas threads).
+
+## Rodada 4 (confirmação de produto)
+
+Completude 9 · Fidelidade das medidas 8 · Clareza para o usuário 8 · Produtividade 8 —
+**aceita**. Os menores dela entraram: a tabela "Desempenho por passo" diz por que a rodada do
+portão não é a condição das repetições (congelou 270.070 objetos, contra 247.901, porque
+roda depois dos testes `livro_real`); a legenda das rodadas tem as faixas de hoje; o alvo
+de 150 ms da releitura está na verificação do 2b no roadmap. Fica registrado, sem medida:
+o número de objetos que a janela congela (agora no log) não foi anotado ao lado dos do teste;
+a equivalência vem do lugar da chamada.
+
+**Fechamento.** As duas revisões aceitaram (código na rodada 3, produto na 4). A tag
+`passo-1b` fica no commit que grava este registro. O desempenho final é do `1519d8f`; a
+qualidade e a fatia, do `5f969c7` (o caminho da leitura não mudou depois, e os testes de
+caracterização e a máquina de estados conferem).

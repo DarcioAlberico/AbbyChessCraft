@@ -248,3 +248,85 @@ def test_instantaneo_e_imutavel_frente_as_edicoes(projeto):
     ed.corrigir(pagina, pagina.boxes[0].gid, "q")
     assert len(foto.boxes) == 5 and foto.boxes[1].entry.char == "a"
     assert gid_de(pagina.pid, 0) == foto.boxes[0].gid
+
+
+def test_a_interface_nao_espera_o_disco_do_gravador(projeto, monkeypatch):
+    """Com o gravador preso dentro do `fsync` do livro.json (segurando a trava do livro), as
+    chamadas da interface (entregar, ler a página do cache, o resumo) voltam na hora."""
+    original = gv.gravar_json
+    preso, solto = threading.Event(), threading.Event()
+
+    def gravar(caminho, dados):
+        if caminho.name == ARQUIVO_DO_LIVRO and threading.current_thread().name == "gravador":
+            preso.set()
+            solto.wait(10)
+        original(caminho, dados)
+
+    pagina = _pagina(projeto, 0)
+    outra = _pagina(projeto, 1)
+    projeto.descarregar(5)
+    monkeypatch.setattr(gv, "gravar_json", gravar)
+    projeto.agendar(pagina)
+    projeto.gravador.descarregar(0)              # começa já
+    assert preso.wait(5)
+    try:
+        inicio = time.monotonic()
+        ed.corrigir(outra, outra.boxes[0].gid, "z")
+        projeto.agendar(outra)
+        assert projeto.carregar_modelo(1) is outra
+        assert 1 in projeto.resumo_do_livro()
+        assert time.monotonic() - inicio < 0.5
+    finally:
+        solto.set()
+    assert projeto.descarregar(5)
+
+
+def test_aviso_que_falha_nao_para_o_gravador():
+    disco = _Disco()
+    gravador = Gravador(disco, atraso=0.01, ao_gravar=lambda pid: 1 / 0)
+    try:
+        gravador.agendar(1, "a")
+        assert gravador.descarregar(5)
+        gravador.agendar(1, "b")                 # a thread continua viva
+        assert gravador.descarregar(5)
+        assert disco.gravados == ["a", "b"]
+    finally:
+        gravador.fechar()
+
+
+def test_pagina_falhando_nao_tenta_a_cada_edicao():
+    disco = _Disco()
+    disco.falhar = -1
+    tentativas = []
+    original = disco.__call__
+
+    def contar(instantaneo):
+        tentativas.append(instantaneo)
+        original(instantaneo)
+
+    gravador = Gravador(contar, atraso=0.1)
+    try:
+        gravador.agendar(1, 0)
+        gravador.descarregar(2)
+        inicio = time.monotonic()
+        k = 0
+        while time.monotonic() - inicio < 0.3:   # muitas edições seguidas
+            k += 1
+            gravador.agendar(1, k)
+        assert k > 100 and len(tentativas) <= 5  # uma tentativa por `atraso`, não por edição
+    finally:
+        disco.falhar = 0
+        gravador.fechar(5)
+
+
+def test_salvar_pagina_nao_muda_a_pagina_que_a_interface_mostra(projeto):
+    from tests.test_treino_por_livro import _pagina_sintetica  # noqa: F401 (a fonte já existe)
+
+    mostrada = _pagina(projeto, 0)
+    projeto.agendar(mostrada)
+    projeto.descarregar(5)
+    antes = list(mostrada.boxes)
+    projeto.salvar_pagina(0, [BoxEntry("q", 0, 0, 5, 5, 1.0, "manual")], reconheceu=True)
+    assert mostrada.boxes == antes                     # a da interface não mudou
+    nova = projeto.carregar_modelo(0)
+    assert nova is not mostrada and [b.entry.char for b in nova.boxes] == ["q"]

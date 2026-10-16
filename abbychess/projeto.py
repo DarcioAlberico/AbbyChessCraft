@@ -350,7 +350,7 @@ class ProjetoDeLivro:
             # instantâneo: o que for gravado é o que a página tem.
             pagina.diagramas = com_ids_de_diagramas(pagina.diagramas)
             pagina.zonas = zn.com_ids(pagina.zonas)
-            self._guardar_no_cache(pagina)
+            self._guardar_no_cache(pagina, foto=False)
             instantaneo = pagina.instantaneo()
             # O resumo vale já para quem pergunta (F6, o lote, "lidas"), antes da gravação.
             self._a_gravar[pagina.indice] = (instantaneo, self._resumo_do_modelo(instantaneo))
@@ -496,9 +496,10 @@ class ProjetoDeLivro:
     def carregar_modelo(self, indice: int) -> Optional[Pagina]:
         """A página no modelo v2, ou `None` se nada foi gravado dela. Uma página v1 é
         migrada e gravada aqui, na primeira leitura (§4.3)."""
+        v1 = not self.somente_leitura and self._tem_v1(indice)     # o stat, fora das travas
         with self._trava_do_cache:              # o caminho comum, sem esperar o disco
             em_cache = self._modelos.get(indice)
-            if em_cache is not None and (self.somente_leitura or not self._tem_v1(indice)):
+            if em_cache is not None and not v1:
                 self._modelos.move_to_end(indice)
                 return em_cache
         with self._trava_do_livro:
@@ -572,16 +573,21 @@ class ProjetoDeLivro:
             self._estados[pagina.pid] = {b[0]: hash(tuple(b[1])) for b in dados["boxes"]}
         self._atualizar_livro(pagina.indice, self._resumo_do_modelo(pagina))
 
-    def _guardar_no_cache(self, pagina: Pagina, *, foto_nova: bool = False) -> None:
+    def _guardar_no_cache(self, pagina: Pagina, *, foto_nova: bool = False,
+                          foto: bool = True) -> None:
         """Põe a página no cache; `foto_nova` (a página veio do disco) refaz a foto dos
-        estados, que de outro modo seria a de outra versão da mesma página."""
+        estados, que de outro modo seria a de outra versão da mesma página. `foto=False` é a
+        página que a interface entrega ao gravador: ela não muda nada no lugar, e a foto
+        (um hash por glifo) não é calculada a cada edição."""
         with self._trava_do_cache:
-            self._no_cache(pagina, foto_nova)
+            self._no_cache(pagina, foto_nova, foto)
 
-    def _no_cache(self, pagina: Pagina, foto_nova: bool) -> None:
+    def _no_cache(self, pagina: Pagina, foto_nova: bool, com_foto: bool) -> None:
         self._modelos[pagina.indice] = pagina
         self._modelos.move_to_end(pagina.indice)
-        if foto_nova or pagina.pid not in self._estados:
+        if not com_foto:
+            self._estados.pop(pagina.pid, None)
+        elif foto_nova or pagina.pid not in self._estados:
             self._estados[pagina.pid] = {b.gid: foto(b.entry) for b in pagina.boxes}
         sujas = self.sujas
         for indice in list(self._modelos):
@@ -823,12 +829,14 @@ class ProjetoDeLivro:
     # ------------------------------------------------------------------
     def resumo_do_livro(self) -> Dict[int, dict]:
         """Índice da página -> o resumo dela (`_resumo_do_modelo`), de toda página gravada."""
+        # Os pendentes antes do livro: uma página que o gravador termine entre as duas
+        # leituras já está no livro lido, e não some por uma chamada.
+        with self._trava_do_cache:
+            pendentes = {i: r for i, (_, r) in self._a_gravar.items()}
         livro = self._livro                     # trocado inteiro a cada gravação
         if livro is None:
             with self._trava_do_livro:
                 livro = self._carregar_livro()
-        with self._trava_do_cache:
-            pendentes = {i: r for i, (_, r) in self._a_gravar.items()}
         resumo = {int(k) - 1: v for k, v in livro["paginas"].items()}
         resumo.update(pendentes)
         # Cópia funda: o cache não vaza.

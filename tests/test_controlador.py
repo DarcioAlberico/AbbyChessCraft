@@ -195,3 +195,83 @@ def test_comando_guarda_o_glifo_da_hora_em_que_foi_pedido(dois_projetos):
     executor.tudo()
     assert ctl.box(primeiro).char == "Q" and ctl.box(segundo).char != "Q"
     assert replace(ctl.box(primeiro)).source == "manual"
+
+
+def test_diagramas_lidos_entram_na_pagina_que_pediu(tmp_path, monkeypatch):
+    from abbychess import diagramas as dg
+    from abbychess.controladores import ControladorDeDiagramas
+    from tests.test_livro import pdf_sintetico
+
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
+    try:
+        modelo = projeto.pagina_para_editar(0)
+        modelo.tabuleiros = [(10, 10, 210, 210)]
+        projeto.agendar(modelo)
+        executor = ExecutorManual()
+        ctl = _controlador(projeto, executor)
+        abertas = []
+        ctl.eventos.ligar("conferir", abertas.append)
+        conferencia = ControladorDeDiagramas(ctl)
+        monkeypatch.setattr(dg, "ler_diagramas", lambda _img, caixas, **_k: [
+            dg.DiagramaLido(c, casas=[None] * 64) for c in caixas])
+        conferencia.conferir(0)
+        fim = executor.comecar()
+        ctl.ir_para(1)                                  # o usuário foi adiante
+        fim()
+        assert projeto.carregar_modelo(0).diagramas[0].lido
+        assert projeto.carregar_modelo(1) is None and abertas == []
+    finally:
+        projeto.fechar()
+
+
+def test_corrigir_e_ensinar_uma_palavra_e_um_passo_so_do_desfazer(dois_projetos):
+    from abbychess import verificacao as vf
+    from abbychess.controladores import ControladorDeVerificacao
+
+    a, _ = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    ctl.reconhecer()
+    executor.tudo()
+    verificador = ControladorDeVerificacao(ctl)
+    antes = [b for b in ctl.modelo.boxes]
+    class _SemLexico:                                   # não sinaliza nada ao recontar
+        sinaliza = False
+
+    verificador.lexico = _SemLexico()
+    verificador._gids = ctl.gids
+    verificador.desconhecidas = [vf.Desconhecida("ab", [0, 1])]
+    verificador.corrigir("xy", ensinar=True)
+    executor.tudo()                                     # a correção e, depois, o ensino
+    assert [ctl.box(g).char for g in ctl.gids[:2]] == ["x", "y"]
+    assert ctl.leitor.total_de_padroes == 2
+    ctl.desfazer()
+    executor.tudo()
+    assert ctl.modelo.boxes == antes                    # um Ctrl+Z volta as duas coisas
+    assert ctl.leitor.total_de_padroes == 0
+    assert ctl.historico.proximo_a_desfazer == "Reconhecer a página"
+
+
+def test_lote_nao_comeca_se_o_gravador_nao_descarrega(dois_projetos, monkeypatch):
+    from abbychess.controladores import ControladorDoLivro
+
+    a, _ = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    avisos = []
+    ctl.eventos.ligar("aviso", lambda titulo, texto: avisos.append(texto))
+    monkeypatch.setattr(a, "descarregar", lambda limite=None: False)
+    ControladorDoLivro(ctl).reconhecer([0], refazer=False)
+    executor.tudo()
+    assert avisos and "não começou" in avisos[0]
+    assert not ctl.lote_rodando and a.paginas_lidas() == []
+
+
+def test_trocar_de_projeto_solta_o_lote_preso(dois_projetos):
+    a, b = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    ctl.lote_rodando = True                             # o fim do lote foi descartado
+    ctl.ligar(b, pg.FonteDePaginas(b.fonte),
+              LeitorDoLivro(b.pasta_de_padroes, limiares=b.dados.limiares))
+    assert not ctl.lote_rodando

@@ -203,7 +203,6 @@ class JanelaPrincipal(QMainWindow):
     def trocar_projeto(self, projeto, fonte) -> None:
         """Fecha o projeto aberto (as tarefas e o gravador terminam antes) e abre `projeto`."""
         if self.projeto is not None and self.projeto is not projeto:
-            self._parar_tarefas()
             if not self._fechar_projeto():
                 projeto.fechar()                # o usuário ficou com o aberto
                 return
@@ -233,8 +232,9 @@ class JanelaPrincipal(QMainWindow):
             QApplication.processEvents()        # o fim da tarefa chega antes de fechar
 
     def _fechar_projeto(self) -> bool:
-        """Grava o que falta e fecha o projeto. Se alguma página não grava, pergunta: falso
-        quando o usuário prefere não fechar (e perder as mudanças dela)."""
+        """Grava o que falta e fecha o projeto. Se alguma página não grava, pergunta antes
+        de mexer nas tarefas: falso quando o usuário prefere não fechar (e perder as
+        mudanças dela), e aí nada mudou."""
         projeto = self.projeto
         if not projeto.descarregar(10):
             paginas = ", ".join(str(i + 1) for i in projeto.paginas_sujas())
@@ -242,8 +242,9 @@ class JanelaPrincipal(QMainWindow):
                                       "não puderam ser gravadas (veja a barra de status). "
                                       "Fechar mesmo assim e perder essas mudanças?"):
                 return False
+        self._parar_tarefas()                   # o fim da tarefa em voo ainda entra
         self.pagina.desligar()
-        projeto.fechar(1)
+        projeto.fechar(5)
         return True
 
     # ------------------------------------------------------------------
@@ -455,8 +456,9 @@ class JanelaPrincipal(QMainWindow):
         self.progresso.setValue(feito)
 
     def closeEvent(self, evento):
-        self._parar_tarefas()
-        if self.projeto is not None and not self._fechar_projeto():
+        if self.projeto is None:
+            self._parar_tarefas()
+        elif not self._fechar_projeto():
             evento.ignore()                     # ficou aberta: as mudanças estão na memória
             return
         super().closeEvent(evento)

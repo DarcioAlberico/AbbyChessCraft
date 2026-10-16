@@ -68,8 +68,6 @@ NOMES_DAS_FONTES = {
 }
 
 
-
-
 def _amostra_do_traco(traco) -> QPixmap:
     """Um retângulo pequeno com o traço e o preenchimento do estado, para a legenda."""
     pixmap = QPixmap(30, 16)
@@ -86,6 +84,7 @@ def _amostra_do_traco(traco) -> QPixmap:
     pintor.drawRect(3, 3, 24, 10)
     pintor.end()
     return pixmap
+
 
 class _CampoDoCaractere(QLineEdit):
     """Enter ensina, Shift+Enter só corrige; o resto é edição normal."""
@@ -238,10 +237,16 @@ class PainelDeTreino(QWidget):
 
         legenda = QGroupBox("Os boxes na página")
         caixa_legenda = QVBoxLayout(legenda)
-        for estado, origem, texto in estilo.LEGENDA:
+        amostras = [(estilo.traco(estado, origem), texto)
+                    for estado, origem, texto in estilo.LEGENDA]
+        amostras += [(estilo.Traco(cores.DIAGRAMA, 2.5, Qt.PenStyle.DashLine),
+                      "Diagrama (fora do texto)"),
+                     (estilo.Traco(cores.MARCADO, 2.5, Qt.PenStyle.SolidLine),
+                      "Na seleção (Ctrl+clique)")]
+        for traco, texto in amostras:
             linha = QHBoxLayout()
             amostra = QLabel()
-            amostra.setPixmap(_amostra_do_traco(estilo.traco(estado, origem)))
+            amostra.setPixmap(_amostra_do_traco(traco))
             linha.addWidget(amostra)
             linha.addWidget(QLabel(texto), 1)
             caixa_legenda.addLayout(linha)

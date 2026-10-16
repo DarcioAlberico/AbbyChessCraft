@@ -78,11 +78,10 @@ O que mudou depois dela:
 | A reescrita pelos sucessores levava uma quebra e uma junção à mesma fronteira (glifos fundidos); a camada noturna (5.000 exemplos) derrubava a invariante | `reescrever` resolve o conflito: fica a junção, a quebra cai e vai para `caidas`; teste explícito da sequência; a camada noturna passa |
 | `gid_do_box` gravava uma página de glifos marcados como "não reconhecida" | passa a "glifos marcados" |
 | A busca pelos arquivos que o livro não cita rodava a cada acesso a página nova | uma varredura por sessão |
-| **O congelamento piora a releitura, e o texto dizia que não mudava medianas** | o README diz a troca: com ele, o p95 do Enter cai de ~200 para ~135 ms, mas o da releitura sobe de 134–149 para 152–158 ms (acima do alvo) e a mediana dela uns 7 ms; ficou ligado porque o Enter é muito mais frequente que o ajuste de borda |
-| O critério do 2a se apoiava na premissa falsa | refeito: o 2a mede com e sem o congelamento; as medianas, pelas sem, contra o passo 0; o p95 da releitura, pelas com, não pior que o do 1b; o alvo de 150 ms é do 2b |
+| **O congelamento piorava a releitura, e o texto dizia que não mudava medianas** | o teste congelava antes de criar a janela; o programa congela depois (com a janela e o projeto vivos), e o teste passou a fazer igual. O A/B foi refeito assim no commit desta rodada (`1df8980`, 3 rodadas com e 3 sem): as medianas não mudam; o p95 do Enter cai de ~200 para ~133 ms e o da releitura de 145–166 para 136–144 ms, dentro do alvo. O README diz isso e que o A/B anterior, na outra condição, dava o contrário na releitura |
+| O critério do 2a se apoiava na premissa falsa | refeito: o 2a mede com e sem o congelamento; as medianas, pelas sem, contra o passo 0 (que não congelava); o p95 da releitura, pelas com, ≤ 150 ms, e o do Enter fora da faixa de ~200 |
 | Menores | os JSON de desempenho registram quantos objetos estavam congelados; o teste de desempenho congela depois de criar a janela, como o programa; o aviso da migração é um diálogo (aparece uma vez, na abertura que migra), e o projeto v1 em mídia só de leitura diz por quê; a tabela "Desempenho por passo" diz que é a rodada do portão e remete às repetidas |
 
-O p95 da releitura com o congelamento subiu de 143–151 ms (`e5abbd3`) para 152–158 ms
-(`5f969c7`) entre as rodadas de antes e as de depois das correções da rodada 1; o código
-desse caminho mudou pouco (a foto refeita ao reler do disco, que não acontece na releitura),
-e com três rodadas de cada lado não dá para separar efeito de variação.
+A qualidade e a fatia ficaram as do commit `5f969c7`: as correções desta rodada não
+tocam o caminho da leitura nem o do texto sem decisões (os testes de caracterização e a
+máquina de estados conferem).

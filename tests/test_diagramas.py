@@ -23,6 +23,8 @@ from abbychess import pagina as pg
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.projeto import ProjetoDeLivro
 
+from tests.livros import PASTA_DOS_PDFS
+
 FONTE_TTF = Path("C:/Windows/Fonts/arial.ttf")
 
 #: Uma posição com roque possível dos dois lados.
@@ -41,8 +43,9 @@ def pagina_com_diagrama(caminho: Path, fen: str = FEN, legenda: str = "") -> Pat
     tabuleiro = Image.open(io.BytesIO(png)).convert("L")
     pagina = Image.new("L", (1000, 760), 255)
     desenho = ImageDraw.Draw(pagina)
-    fonte = (ImageFont.truetype(str(FONTE_TTF), 40) if FONTE_TTF.exists()
-             else ImageFont.load_default(size=40))
+    if not FONTE_TTF.exists():
+        pytest.skip("a Arial não está nesta máquina")
+    fonte = ImageFont.truetype(str(FONTE_TTF), 40)
     desenho.text((40, 30), "abc abc:", fill=0, font=fonte)
     pagina.paste(tabuleiro, (300, 110))
     if legenda:
@@ -298,10 +301,11 @@ def test_sem_fim_de_frase_o_diagrama_vai_para_o_fim():
     assert dg.texto_da_pagina([], [_lido()]).startswith("[Diagrama 1:")
 
 
-_DARCY = sorted(Path("C:/Python-Chess2/PyBoxEditor_Tkinter/PDF").glob("Darcy*/Darcy*.pdf"))
+_DARCY = sorted(PASTA_DOS_PDFS.glob("Darcy*/Darcy*.pdf"))
 
 
 @sem_modelo
+@pytest.mark.livro_real
 @pytest.mark.skipif(not _DARCY, reason="o PDF do Darcy Lima não está nesta máquina")
 def test_darcy_p26_tres_diagramas_lidos_e_conferiveis():
     """Os dois sem setas saem certos; o das setas sai errado e o porteiro avisa."""

@@ -42,6 +42,9 @@ class Leitura:
     char: str
     fonte: str
     confianca: float
+    #: O padrão do livro que deu a leitura (caminho relativo à pasta dos padrões, com /),
+    #: ou `None` quando ela não veio do livro (procedência, §4.1).
+    amostra: Optional[str] = None
 
 
 class _SemEasyOCR:
@@ -121,7 +124,8 @@ class LeitorDoLivro:
         """Só os padrões do livro. É o que basta para propagar um padrão novo."""
         resposta = self.padroes.ler(recorte, altura_relativa(recorte, altura_de_referencia))
         if resposta.char:
-            return Leitura(resposta.char, FONTE_LIVRO, resposta.confianca)
+            return Leitura(resposta.char, FONTE_LIVRO, resposta.confianca,
+                           self.padroes.relativo(resposta.caminho))
         return Leitura("", FONTE_NENHUMA, 0.0)
 
     def ler(self, recorte: np.ndarray, *, altura_de_referencia: Optional[float] = None
@@ -187,6 +191,9 @@ def precisa_revisao(char: str, fonte: str, confianca: float, limiares: Limiares)
     return confianca < limiares.revisao
 
 
-def nome_de_origem(projeto_nome: str, pagina: int, indice_box: int) -> str:
-    """Nome do arquivo de padrão que diz de onde a amostra veio."""
-    return f"{nome_de_pasta(projeto_nome)}_p{pagina + 1:04d}_b{indice_box:05d}"
+def nome_de_origem(projeto_nome: str, pagina: int, indice_box: int,
+                   gid: Optional[int] = None) -> str:
+    """Nome do arquivo de padrão que diz de onde a amostra veio: o glifo de origem pelo gid
+    (estável, §4.1), e a página e a posição só para quem lê o nome."""
+    base = f"{nome_de_pasta(projeto_nome)}_p{pagina + 1:04d}_b{indice_box:05d}"
+    return base if gid is None else f"{base}_g{gid:x}"

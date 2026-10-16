@@ -41,6 +41,18 @@ TIPOS = (TEXTO, DIAGRAMA, IMAGEM, IGNORAR)
 
 NOMES = {TEXTO: "Texto", DIAGRAMA: "Diagrama", IMAGEM: "Imagem", IGNORAR: "Ignorar"}
 
+#: A função da área no documento (SPEC §4.2). O tipo diz como a área é lida; a função,
+#: o que o texto dela é. Uma área de texto pode ser corpo, título, cabeçalho corrido,
+#: rodapé, número de página, nota ou legenda.
+FUNCOES = ("texto", "titulo", "cabecalho", "rodape", "numero_de_pagina", "nota", "legenda",
+           "diagrama", "figura", "tabela", "ignorar")
+#: O tipo que cada função dá à área.
+TIPO_DA_FUNCAO = {"texto": TEXTO, "titulo": TEXTO, "cabecalho": TEXTO, "rodape": TEXTO,
+                  "numero_de_pagina": TEXTO, "nota": TEXTO, "legenda": TEXTO,
+                  "diagrama": DIAGRAMA, "figura": IMAGEM, "tabela": IMAGEM, "ignorar": IGNORAR}
+#: A função que escolher um tipo dá (até o passo F trazer a tabela como tipo próprio).
+FUNCAO_DO_TIPO = {TEXTO: "texto", DIAGRAMA: "diagrama", IMAGEM: "figura", IGNORAR: "ignorar"}
+
 #: Quem vence quando duas áreas cobrem o mesmo ponto: o maior.
 PRIORIDADE = {TEXTO: 0, DIAGRAMA: 1, IMAGEM: 2, IGNORAR: 3}
 
@@ -63,6 +75,22 @@ class Zona:
     y1: int
     x2: int
     y2: int
+    #: Estável na página (`z0`, `z1`…): é a que o documento e as decisões citam.
+    id: str = ""
+    #: Vazia = a função padrão do tipo (`FUNCAO_DO_TIPO`).
+    funcao: str = ""
+    #: A posição da área na ordem de leitura do documento; `None` = pela posição na página.
+    ordem: Optional[int] = None
+    #: Veio das áreas automáticas (o layout pode dividi-la; a do usuário, não).
+    automatica: bool = False
+
+    def __post_init__(self):
+        if not self.funcao:
+            object.__setattr__(self, "funcao", FUNCAO_DO_TIPO.get(self.tipo, "texto"))
+        if self.funcao not in FUNCOES:
+            raise ValueError(f"Função de área desconhecida: {self.funcao!r}")
+        if TIPO_DA_FUNCAO[self.funcao] != self.tipo:
+            raise ValueError(f"A função {self.funcao!r} não é de uma área do tipo {self.tipo!r}")
 
     @property
     def caixa(self) -> Caixa:
@@ -72,15 +100,35 @@ class Zona:
         return self.x1 <= x <= self.x2 and self.y1 <= y <= self.y2
 
     def como_dict(self) -> dict:
-        return {"tipo": self.tipo, "caixa": list(self.caixa)}
+        return {"id": self.id, "tipo": self.tipo, "funcao": self.funcao, "caixa": list(self.caixa),
+                "ordem": self.ordem, "automatica": self.automatica}
 
     @classmethod
     def de_dict(cls, dados: dict) -> "Zona":
+        """Também lê o formato v1 (só `tipo` e `caixa`)."""
         tipo = dados.get("tipo", TEXTO)
         if tipo not in TIPOS:
             raise ValueError(f"Tipo de área desconhecido: {tipo!r}")
         x1, y1, x2, y2 = (int(v) for v in dados["caixa"])
-        return cls(tipo, x1, y1, x2, y2)
+        ordem = dados.get("ordem")
+        return cls(tipo, x1, y1, x2, y2, id=str(dados.get("id") or ""),
+                   funcao=str(dados.get("funcao") or ""),
+                   ordem=None if ordem is None else int(ordem),
+                   automatica=bool(dados.get("automatica", False)))
+
+
+def com_ids(zonas: Sequence[Zona]) -> List[Zona]:
+    """As áreas com `id` cada uma: as que não têm ganham o próximo `zN` livre."""
+    usados = {z.id for z in zonas if z.id}
+    proximo, saida = 0, []
+    for z in zonas:
+        if not z.id:
+            while f"z{proximo}" in usados:
+                proximo += 1
+            z = replace(z, id=f"z{proximo}")
+            usados.add(z.id)
+        saida.append(z)
+    return saida
 
 
 def nova(tipo: str, caixa: Caixa, largura: int, altura: int) -> Zona:
@@ -151,7 +199,7 @@ def arrastar(zona: Zona, bordas: str, dx: float, dy: float, largura: int, altura
 def trocar_tipo(zonas: List[Zona], indice: int, tipo: str) -> None:
     if tipo not in TIPOS:
         raise ValueError(f"Tipo de área desconhecido: {tipo!r}")
-    zonas[indice] = replace(zonas[indice], tipo=tipo)
+    zonas[indice] = replace(zonas[indice], tipo=tipo, funcao=FUNCAO_DO_TIPO[tipo])
 
 
 # ----------------------------------------------------------------------
@@ -183,7 +231,7 @@ def automaticas(boxes: Sequence[BoxEntry], tabuleiros: Iterable[Caixa],
                               largura, altura))
         except ValueError:
             continue
-    return zonas
+    return com_ids([replace(z, automatica=True) for z in zonas])
 
 
 def _linhas(boxes: Sequence[BoxEntry]) -> List[List[int]]:

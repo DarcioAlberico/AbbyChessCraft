@@ -1,23 +1,35 @@
 """O projeto de um livro: a fonte, os padrões treinados para ele e as páginas lidas.
 
-Um projeto é uma pasta com esta forma::
+Um projeto é uma pasta com esta forma (formato 2, desde o passo 1b)::
 
     <pasta>/
         projeto.json      nome, caminho da fonte e o SHA-256 dela, idioma, limiares,
-                          data de criação e, em `extras`, os campos que esta versão
-                          não conhece
-        livro.json        o resumo de cada página (estado, pendentes, histograma das
-                          confianças, diagramas por conferir); cache, refeito se faltar
+                          data de criação, o próximo `pid` de página e, em `extras`, os
+                          campos que esta versão não conhece
+        livro.json        o resumo de cada página (índice → pid, estado, pendentes,
+                          histograma das confianças, diagramas por conferir); cache,
+                          refeito se faltar
         padroes/          os padrões deste livro, uma pasta por caractere
-        paginas/0001.json os boxes lidos e corrigidos de cada página, os tabuleiros
-                          e, desde a leitura dos diagramas, o FEN de cada um
+        paginas/p<pid>.json  a página no modelo v2 (`abbychess.modelo`): os glifos com
+                          gid, procedência, estilo e revisão; as decisões do usuário; as
+                          áreas; os tabuleiros e os diagramas lidos; o estado (§4.4)
         diagramas/        as casas conferidas, guardadas como amostras deste livro
-        zonas/0001.json   as áreas da página (texto, diagrama, imagem, ignorar)
         lexico.txt        as palavras que a verificação de texto aprendeu neste livro
+        backup-v1/        o projeto v1 de antes da migração (páginas, áreas, projeto.json)
 
-As áreas ficam fora de `paginas/` de propósito: dá para desenhá-las antes do
-primeiro reconhecimento, e uma página só com áreas não pode contar como lida.
-Projetos sem `zonas/` nem `idioma` abrem como antes: sem áreas e em português.
+**O `pid`** é da página, não da posição dela no PDF: reordenar ou inserir páginas (passo
+L) não o muda, e os gids dos glifos (`pid << 20 | n`) continuam únicos no projeto. A página
+grava o próprio índice, e `livro.json` mapeia índice → pid.
+
+**Migração do v1** (`paginas/0001.json`, `zonas/0001.json`, `paginas/marcadas.json`): na
+primeira abertura, o v1 vai para `backup-v1/` e o projeto passa ao formato 2; cada página
+v1 migra (pid = índice) e é gravada na primeira leitura dela. Copiar `backup-v1/` de volta
+reabre o projeto como era (o arquivo v1 presente vence o v2 do mesmo pid).
+
+**A janela de hoje ainda edita listas de `BoxEntry` por índice** (até o passo 2a): as
+funções `carregar_pagina`, `salvar_pagina` e as outras de sempre continuam, e a gravação
+reconcilia a lista com o modelo (`modelo.reconciliar`), mantendo os gids. As páginas lidas
+ficam em memória, no modelo, as `PAGINAS_EM_MEMORIA` mais recentes.
 
 Todo arquivo é gravado por `abbychess.gravacao` (temporário, `fsync`, troca). Um
 projeto de versão mais nova abre só para leitura (`somente_leitura`): nada é
@@ -44,6 +56,7 @@ import logging
 import math
 import re
 import threading
+from collections import OrderedDict
 import unicodedata
 from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime, timezone
@@ -53,6 +66,10 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
 from core.box_model import BoxEntry
 
 from abbychess import gravacao as gv
+from abbychess import procedencia
+from abbychess import zonas as zn
+from abbychess.modelo import (GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA, RECONHECIDA, Box, Decisoes,
+                              Pagina, gid_de, proximo_estado, reconciliar)
 from abbychess.zonas import Zona
 
 if TYPE_CHECKING:
@@ -68,10 +85,18 @@ ARQUIVO_DAS_MARCADAS = "marcadas.json"
 PASTA_DE_ZONAS = "zonas"
 ARQUIVO_DO_LEXICO = "lexico.txt"
 ARQUIVO_DO_LIVRO = "livro.json"
-VERSAO = 1
+#: 2: o modelo v2 (passo 1b): páginas em `paginas/p<pid>.json`, com gids e decisões.
+VERSAO = 2
+#: A versão do formato de cada `paginas/p<pid>.json`.
+VERSAO_DA_PAGINA = 2
+#: Onde a primeira abertura v2 guarda o projeto v1 de antes (§4.3).
+PASTA_DO_BACKUP_V1 = "backup-v1"
+#: Quantas páginas o projeto guarda em memória, no modelo (as outras relê do disco).
+PAGINAS_EM_MEMORIA = 16
 #: A versão do formato de `livro.json`; outra versão é refeita das páginas.
-#: 2: a confiança 1,0 ganhou a faixa 100 do histograma (os caches v1 são refeitos).
-VERSAO_DO_LIVRO = 2
+#: 2: a confiança 1,0 ganhou a faixa 100 do histograma; 3: o `pid` de cada página e os
+#: estados de §4.4 (os caches anteriores são refeitos).
+VERSAO_DO_LIVRO = 3
 #: Quanto da fonte entra no SHA-256 que a reconhece depois de movida.
 BYTES_DO_SHA = 4 * 2**20
 #: Quantos arquivos do tamanho certo, no máximo, `abrir` lê ao procurar a fonte sumida
@@ -120,6 +145,8 @@ class Projeto:
     #: movida (o tamanho separa dois arquivos de começo igual e evita ler os outros).
     fonte_sha256: str = ""
     fonte_tamanho: int = 0
+    #: O próximo `pid` de página (§4.1): estável, nunca reaproveitado.
+    proximo_pid: int = 0
     #: Os campos de `projeto.json` que esta versão não conhece. Não se perdem: ficam aqui
     #: e são regravados em `extras` (os de `limiares` em `extras["limiares"]`), onde uma
     #: versão futura que os entenda vai buscá-los.
@@ -163,6 +190,10 @@ class ProjetoDeLivro:
         #: `marcadas.json` e `livro.json` mudam juntos, e o `.tmp` de cada um é um só.
         self._trava_do_livro = threading.RLock()
         self._travado = somente_leitura         # este objeto segura uma trava de só leitura
+        #: As páginas lidas, no modelo (as mais recentes), e o `as_state()` de cada glifo na
+        #: última gravação: a janela muda os `BoxEntry` no lugar, e só a foto diz o que mudou.
+        self._modelos: "OrderedDict[int, Pagina]" = OrderedDict()
+        self._estados: Dict[int, Dict[int, tuple]] = {}
         #: A abertura achou a fonte noutro lugar, pelo SHA-256 (a janela avisa).
         self.fonte_relocalizada = False
 
@@ -197,7 +228,8 @@ class ProjetoDeLivro:
         if not arquivo.is_file():
             raise ProjetoInvalido(f"Não há {ARQUIVO_DO_PROJETO} em {pasta}.")
         try:
-            bruto = json.loads(arquivo.read_text(encoding="utf-8"))
+            bytes_do_projeto = arquivo.read_bytes()
+            bruto = json.loads(bytes_do_projeto.decode("utf-8"))
             if not isinstance(bruto, dict):
                 raise ValueError("não é um objeto JSON")
             conhecidos, desconhecidos = _separar(bruto, Projeto)
@@ -226,6 +258,8 @@ class ProjetoDeLivro:
         (pasta / PASTA_DE_PAGINAS).mkdir(exist_ok=True)
         gv.limpar_temporarios(pasta)
         projeto = cls(pasta, dados)
+        if dados.versao < VERSAO:
+            projeto._preparar_migracao(bytes_do_projeto)
         mudou = bool(desconhecidos or outros_limiares)
         if projeto.fonte.is_file():
             if not dados.fonte_sha256 or not dados.fonte_tamanho:
@@ -329,112 +363,195 @@ class ProjetoDeLivro:
         return self.fonte.suffix.lower() == ".pdf"
 
     def _arquivo_da_pagina(self, indice: int) -> Path:
+        """O arquivo v2 da página (`paginas/p<pid>.json`), ou o v1 se ela ainda não migrou."""
+        with self._trava_do_livro:
+            pid = self._pid_de(indice)
+        if pid is not None:
+            return self._arquivo_v2(pid)
+        return self._arquivo_v1(indice)
+
+    def _arquivo_v1(self, indice: int) -> Path:
         return self.pasta / PASTA_DE_PAGINAS / f"{indice + 1:04d}.json"
 
+    def _arquivo_v2(self, pid: int) -> Path:
+        return self.pasta / PASTA_DE_PAGINAS / f"p{pid}.json"
+
     # ------------------------------------------------------------------
-    # Páginas
+    # Páginas (modelo v2, §4.3)
     # ------------------------------------------------------------------
+    def carregar_modelo(self, indice: int) -> Optional[Pagina]:
+        """A página no modelo v2, ou `None` se nada foi gravado dela. Uma página v1 é
+        migrada e gravada aqui, na primeira leitura (§4.3)."""
+        with self._trava_do_livro:
+            if indice in self._modelos and not self._tem_v1(indice):
+                self._modelos.move_to_end(indice)
+                return self._modelos[indice]
+            pid = self._pid_de(indice)
+            if pid is not None and self._arquivo_v2(pid).is_file() and not self._tem_v1(indice):
+                pagina = _pagina_de_json(json.loads(self._arquivo_v2(pid).read_text(encoding="utf-8")))
+            elif self._tem_v1(indice):
+                pagina = self._migrar(indice)
+            else:
+                return None
+            self._guardar_no_cache(pagina)
+            return pagina
+
+    def salvar_modelo(self, pagina: Pagina) -> None:
+        """Grava a página v2 e o resumo dela em `livro.json`."""
+        with self._trava_do_livro:
+            pagina.diagramas = com_ids_de_diagramas(pagina.diagramas)
+            pagina.zonas = zn.com_ids(pagina.zonas)
+            gv.gravar_json(self._arquivo_v2(pagina.pid), _pagina_para_json(pagina))
+            self._guardar_no_cache(pagina)
+            self._estados[pagina.pid] = {b.gid: tuple(b.entry.as_state()) for b in pagina.boxes}
+            self._atualizar_livro(pagina.indice, self._resumo_do_modelo(pagina))
+
+    def _guardar_no_cache(self, pagina: Pagina) -> None:
+        self._modelos[pagina.indice] = pagina
+        self._modelos.move_to_end(pagina.indice)
+        if pagina.pid not in self._estados:
+            self._estados[pagina.pid] = {b.gid: tuple(b.entry.as_state()) for b in pagina.boxes}
+        while len(self._modelos) > PAGINAS_EM_MEMORIA:
+            _, saiu = self._modelos.popitem(last=False)
+            self._estados.pop(saiu.pid, None)
+
+    def _modelo_ou_novo(self, indice: int) -> Pagina:
+        pagina = self.carregar_modelo(indice)
+        if pagina is None:
+            pagina = Pagina(pid=self._alocar_pid(), indice=indice)
+            self._guardar_no_cache(pagina)
+        return pagina
+
+    def _alocar_pid(self) -> int:
+        pid = self.dados.proximo_pid
+        self.dados.proximo_pid += 1
+        if not self.somente_leitura:
+            self.salvar()
+        return pid
+
+    def _reconciliar(self, pagina: Pagina, boxes: Sequence[BoxEntry]):
+        novos, dif = reconciliar(pagina.boxes, boxes, pagina.alocar, procedencia.amostra_de,
+                                 self._estados.get(pagina.pid))
+        pagina.aplicar(dif, novos)
+        return dif
+
+    def gid_do_box(self, indice: int, boxes: Sequence[BoxEntry], posicao: int) -> int:
+        """O gid do box `posicao` da lista que a janela edita (adaptador do passo 1b; o 2a
+        passa a janela a trabalhar com gids). Não grava: reconcilia só na memória."""
+        with self._trava_do_livro:
+            pagina = self._modelo_ou_novo(indice)
+            self._reconciliar(pagina, boxes)
+            return pagina.boxes[posicao].gid
+
     def salvar_pagina(self, indice: int, boxes: List[BoxEntry],
                       tabuleiros: Sequence[Sequence[int]] = (),
                       diagramas: Optional[Sequence["DiagramaLido"]] = None, *,
-                      reconhecida: bool = True) -> None:
+                      reconhecida: bool = True, reconheceu: bool = False) -> None:
         """Grava os boxes de uma página, com confiança, origem e geometria, e os tabuleiros.
 
-        `reconhecida=False` é a página que só tem os glifos marcados à mão no modo
-        de treino: ela é gravada, mas não conta como lida (`paginas_lidas`), e o
-        lote e o F5 a reconhecem mantendo os quadros.
+        É o adaptador do passo 1b: a lista de `BoxEntry` é reconciliada com o modelo
+        (`modelo.reconciliar`), e cada glifo guarda o gid; os que nasceram de uma edição
+        ganham gid novo, e as decisões vão aos sucessores.
 
-        `diagramas` é a leitura de cada tabuleiro (`abbychess.diagramas`). Fica
-        numa chave própria, e `tabuleiros` continua sendo a lista das caixas:
-        uma página gravada antes disso abre igual, só com os diagramas por ler.
-        Sem `diagramas` (`None`), ficam os já gravados cujo tabuleiro continua na
-        página: quem regrava só os boxes, como o reconhecimento em lote, não
-        apaga uma conferência.
+        `reconhecida=False` é a página que só tem os glifos marcados à mão no modo de
+        treino: ela é gravada, mas não conta como lida (`paginas_lidas`). `reconheceu`
+        diz que a gravação é a de um reconhecimento (F5 ou lote), e não de uma edição:
+        o estado vai por `proximo_estado` (§4.4).
+
+        `diagramas` é a leitura de cada tabuleiro (`abbychess.diagramas`). Sem
+        `diagramas` (`None`), ficam os já gravados cujo tabuleiro continua na página:
+        quem regrava só os boxes, como o reconhecimento em lote, não apaga uma conferência.
         """
-        if diagramas is None:
-            from abbychess.diagramas import para_caixas
+        from abbychess.diagramas import para_caixas
 
-            diagramas = para_caixas(tabuleiros, self.carregar_diagramas(indice))
-        dados = {
-            "pagina": indice + 1,
-            "gravado_em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "boxes": [list(b.as_state()) for b in boxes],
-            "tabuleiros": [list(map(int, t)) for t in tabuleiros],
-        }
-        lidos = [d.para_json() for d in diagramas if d.lido or d.erro]
-        if lidos:
-            dados["diagramas"] = lidos
-        conferidos = sum(1 for d in diagramas if (d.lido or d.erro) and d.conferido)
         with self._trava_do_livro:
-            gv.gravar_json(self._arquivo_da_pagina(indice), dados)
-            self._marcar(indice, not reconhecida)
-            self._atualizar_livro(indice, self._resumo_da_pagina(
-                indice, boxes, len(tabuleiros), conferidos))
+            pagina = self._modelo_ou_novo(indice)
+            if diagramas is None:
+                diagramas = para_caixas(tabuleiros, pagina.diagramas)
+            lidos = com_ids_de_diagramas([d for d in diagramas if d.lido or d.erro])
+            dif = self._reconciliar(pagina, boxes)
+            mudou = (not dif.vazia or [list(t) for t in tabuleiros] != [list(t) for t in pagina.tabuleiros]
+                     or [d.para_json() for d in lidos] != [d.para_json() for d in pagina.diagramas])
+            pagina.tabuleiros = [tuple(int(v) for v in t) for t in tabuleiros]
+            pagina.diagramas = list(lidos)
+            if not reconhecida:
+                # A página ainda não passou pelo F5 (ou o desfazer voltou a antes dele): é
+                # o "só glifos marcados" do v1, qualquer que fosse o estado gravado.
+                pagina.estado = GLIFOS_MARCADOS if pagina.boxes else NAO_RECONHECIDA
+            elif reconheceu or pagina.estado in (NAO_RECONHECIDA, GLIFOS_MARCADOS):
+                pagina.estado = proximo_estado(pagina.estado, "reconhecer")
+            elif mudou:
+                pagina.estado = proximo_estado(pagina.estado, "editar")
+            self.salvar_modelo(pagina)
 
     def carregar_pagina(self, indice: int) -> Optional[List[BoxEntry]]:
-        """Os boxes gravados da página, ou `None` se ela ainda não foi lida."""
-        arquivo = self._arquivo_da_pagina(indice)
-        if not arquivo.is_file():
+        """Os boxes gravados da página, ou `None` se ela ainda não foi lida nem marcada.
+        Os objetos são os do modelo: a janela os edita, e a gravação os reconcilia."""
+        pagina = self.carregar_modelo(indice)
+        if pagina is None or (not pagina.boxes and pagina.estado == NAO_RECONHECIDA):
             return None
-        bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-        return [BoxEntry.from_state(tuple(estado)) for estado in bruto["boxes"]]
+        return pagina.entries()
 
     def carregar_tabuleiros(self, indice: int) -> List[Tuple[int, int, int, int]]:
         """As caixas dos tabuleiros achados na página, ou lista vazia."""
-        arquivo = self._arquivo_da_pagina(indice)
-        if not arquivo.is_file():
-            return []
-        bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-        return [tuple(t) for t in bruto.get("tabuleiros", [])]
+        pagina = self.carregar_modelo(indice)
+        return [tuple(t) for t in pagina.tabuleiros] if pagina is not None else []
+
+    def carregar_diagramas(self, indice: int) -> List["DiagramaLido"]:
+        """Os diagramas lidos da página, ou lista vazia se nenhum foi lido."""
+        pagina = self.carregar_modelo(indice)
+        return list(pagina.diagramas) if pagina is not None else []
 
     # ------------------------------------------------------------------
     # Áreas e léxico
     # ------------------------------------------------------------------
-    def _arquivo_das_zonas(self, indice: int) -> Path:
-        return self.pasta / PASTA_DE_ZONAS / f"{indice + 1:04d}.json"
-
     def salvar_zonas(self, indice: int, zonas: Sequence[Zona]) -> None:
-        """Grava as áreas da página. Sem áreas, apaga o arquivo: a página volta
-        à segmentação inteira, em vez de não gerar box nenhum."""
-        arquivo = self._arquivo_das_zonas(indice)
-        if not zonas:
-            gv.apagar(arquivo)
-            return
-        gv.gravar_json(arquivo, {"pagina": indice + 1, "zonas": [z.como_dict() for z in zonas]})
+        """Grava as áreas da página (no arquivo dela, desde o v2). Sem áreas, a página volta
+        à segmentação inteira, em vez de não gerar box nenhum. Uma página sem nada gravado
+        nasce aqui, como não reconhecida: dá para desenhar as áreas antes do F5."""
+        with self._trava_do_livro:
+            if not zonas and self.carregar_modelo(indice) is None:
+                return
+            pagina = self._modelo_ou_novo(indice)
+            pagina.zonas = list(zonas)
+            self.salvar_modelo(pagina)
 
     def carregar_zonas(self, indice: int) -> List[Zona]:
         """As áreas gravadas da página, ou lista vazia."""
-        arquivo = self._arquivo_das_zonas(indice)
-        if not arquivo.is_file():
-            return []
-        bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-        return [Zona.de_dict(z) for z in bruto.get("zonas", [])]
+        pagina = self.carregar_modelo(indice)
+        return list(pagina.zonas) if pagina is not None else []
 
     @property
     def arquivo_do_lexico(self) -> Path:
         return self.pasta / ARQUIVO_DO_LEXICO
 
-    def carregar_diagramas(self, indice: int) -> List["DiagramaLido"]:
-        """Os diagramas lidos da página, ou lista vazia se nenhum foi lido."""
-        from abbychess.diagramas import DiagramaLido
-
-        arquivo = self._arquivo_da_pagina(indice)
-        if not arquivo.is_file():
-            return []
-        bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-        return [DiagramaLido.de_json(d) for d in bruto.get("diagramas", [])]
-
     def paginas_lidas(self) -> List[int]:
         """As páginas reconhecidas (F5 ou lote), sem as que só têm glifos marcados."""
-        pasta = self.pasta / PASTA_DE_PAGINAS
-        marcadas = self._marcadas()
-        return sorted(int(p.stem) - 1 for p in pasta.glob("*.json")
-                      if p.stem.isdigit() and int(p.stem) - 1 not in marcadas)
+        return sorted(i for i, r in self.resumo_do_livro().items() if r["estado"] in LIDAS)
 
     def pagina_reconhecida(self, indice: int) -> bool:
-        return self._arquivo_da_pagina(indice).is_file() and indice not in self._marcadas()
+        resumo = self.resumo_do_livro().get(indice)
+        return resumo is not None and resumo["estado"] in LIDAS
 
-    def _marcadas(self) -> set:
+    def estado_da_pagina(self, indice: int) -> str:
+        resumo = self.resumo_do_livro().get(indice)
+        return resumo["estado"] if resumo is not None else NAO_RECONHECIDA
+
+    # ------------------------------------------------------------------
+    # A migração do v1 (§4.3)
+    # ------------------------------------------------------------------
+    def _tem_v1(self, indice: int) -> bool:
+        return (self._arquivo_v1(indice).is_file()
+                or (self.pasta / PASTA_DE_ZONAS / f"{indice + 1:04d}.json").is_file())
+
+    def _indices_v1(self) -> List[int]:
+        indices = set()
+        for pasta in (self.pasta / PASTA_DE_PAGINAS, self.pasta / PASTA_DE_ZONAS):
+            if pasta.is_dir():
+                indices |= {int(p.stem) - 1 for p in pasta.glob("*.json") if p.stem.isdigit()}
+        return sorted(indices)
+
+    def _marcadas_v1(self) -> set:
         arquivo = self.pasta / PASTA_DE_PAGINAS / ARQUIVO_DAS_MARCADAS
         if not arquivo.is_file():
             return set()
@@ -443,22 +560,80 @@ class ProjetoDeLivro:
         except (ValueError, TypeError):
             return set()
 
-    def _marcar(self, indice: int, marcada: bool) -> None:
-        marcadas = self._marcadas()
-        if (indice in marcadas) == marcada:
-            return
-        marcadas = marcadas | {indice} if marcada else marcadas - {indice}
-        gv.gravar_json(self.pasta / PASTA_DE_PAGINAS / ARQUIVO_DAS_MARCADAS,
-                       sorted(i + 1 for i in marcadas))
+    def _ler_v1(self, indice: int) -> Pagina:
+        """A página v1 (página, áreas, marcadas) como modelo v2, sem gravar: pid = índice."""
+        from abbychess.diagramas import DiagramaLido
+
+        pagina = Pagina(pid=indice, indice=indice)
+        arquivo = self._arquivo_v1(indice)
+        if arquivo.is_file():
+            bruto = json.loads(arquivo.read_text(encoding="utf-8"))
+            pagina.boxes = [Box(gid_de(indice, n), BoxEntry.from_state(tuple(estado)))
+                            for n, estado in enumerate(bruto.get("boxes", []))]
+            pagina.proximo_n = len(pagina.boxes)
+            pagina.tabuleiros = [tuple(int(v) for v in t) for t in bruto.get("tabuleiros", [])]
+            pagina.diagramas = com_ids_de_diagramas(
+                [DiagramaLido.de_json(d) for d in bruto.get("diagramas", [])])
+            pagina.estado = GLIFOS_MARCADOS if indice in self._marcadas_v1() else RECONHECIDA
+        zonas = self.pasta / PASTA_DE_ZONAS / f"{indice + 1:04d}.json"
+        if zonas.is_file():
+            bruto = json.loads(zonas.read_text(encoding="utf-8"))
+            pagina.zonas = zn.com_ids([Zona.de_dict(z) for z in bruto.get("zonas", [])])
+        return pagina
+
+    def _migrar(self, indice: int) -> Pagina:
+        """Grava a página v1 como v2 e tira os arquivos v1 dela (a cópia está em `backup-v1/`).
+        Um arquivo v1 presente vence o v2 de mesmo pid: é o `backup-v1/` copiado de volta
+        (CA-4.5)."""
+        pagina = self._ler_v1(indice)
+        if self.somente_leitura:
+            return pagina
+        self.salvar_modelo(pagina)
+        gv.apagar(self._arquivo_v1(indice))
+        gv.apagar(self.pasta / PASTA_DE_ZONAS / f"{indice + 1:04d}.json")
+        return pagina
+
+    def _preparar_migracao(self, bruto_do_projeto: bytes) -> None:
+        """Na primeira abertura v2 de um projeto v1: `backup-v1/` com as páginas, as áreas e o
+        `projeto.json` de antes, e o contador de pids depois de todo índice v1 e todo pid já
+        gravado. As páginas migram depois, uma a uma, na primeira leitura."""
+        backup = self.pasta / PASTA_DO_BACKUP_V1
+        if not (backup / ARQUIVO_DO_PROJETO).is_file():
+            for nome in (PASTA_DE_PAGINAS, PASTA_DE_ZONAS):
+                origem = self.pasta / nome
+                if origem.is_dir():
+                    for arquivo in sorted(origem.glob("*.json")):
+                        if arquivo.stem.isdigit() or arquivo.name == ARQUIVO_DAS_MARCADAS:
+                            gv.gravar_bytes(backup / nome / arquivo.name, arquivo.read_bytes())
+            gv.gravar_bytes(backup / ARQUIVO_DO_PROJETO, bruto_do_projeto)
+        pids = [int(p.stem[1:]) for p in (self.pasta / PASTA_DE_PAGINAS).glob("p*.json")
+                if p.stem[1:].isdigit()]
+        self.dados.proximo_pid = max([self.dados.proximo_pid, *(i + 1 for i in self._indices_v1()),
+                                      *(p + 1 for p in pids)])
+        self.dados.versao = VERSAO
+        self.salvar()
+        gv.apagar(self.pasta / ARQUIVO_DO_LIVRO)        # o cache é refeito com os pids
+
+    def migrar_tudo(self) -> int:
+        """Migra agora todas as páginas v1 que faltam (as ferramentas e os testes)."""
+        feitas = 0
+        for indice in self._indices_v1():
+            if self.carregar_modelo(indice) is not None:
+                feitas += 1
+        return feitas
 
     # ------------------------------------------------------------------
     # livro.json: o resumo de cada página, sem abrir as páginas
     # ------------------------------------------------------------------
     def resumo_do_livro(self) -> Dict[int, dict]:
-        """Índice da página -> o resumo dela (`_resumo_da_pagina`), das páginas gravadas."""
+        """Índice da página -> o resumo dela (`_resumo_do_modelo`), de toda página gravada."""
         with self._trava_do_livro:
             return {int(k) - 1: json.loads(json.dumps(v))       # cópia funda: o cache não vaza
                     for k, v in self._carregar_livro()["paginas"].items()}
+
+    def _pid_de(self, indice: int) -> Optional[int]:
+        resumo = self._carregar_livro()["paginas"].get(str(indice + 1))
+        return None if resumo is None else resumo.get("pid")
 
     def reaplicar_limiar(self) -> None:
         """Os `pendentes` de `livro.json` com o limiar de revisão de agora, pelo histograma
@@ -475,21 +650,24 @@ class ProjetoDeLivro:
             self._livro = novo                  # o cache só muda depois de gravado
 
     def recalcular_livro(self) -> dict:
-        """O `livro.json` como ele deve ser, lendo todas as páginas gravadas."""
+        """O `livro.json` como ele deve ser, lendo todas as páginas gravadas (v2 e as v1 que
+        ainda não migraram, sem migrá-las)."""
         paginas = {}
-        for arquivo in sorted((self.pasta / PASTA_DE_PAGINAS).glob("*.json")):
-            if not arquivo.stem.isdigit():
+        for arquivo in sorted((self.pasta / PASTA_DE_PAGINAS).glob("p*.json")):
+            if not arquivo.stem[1:].isdigit():
                 continue
-            indice = int(arquivo.stem) - 1
             try:
-                boxes = self.carregar_pagina(indice) or []
-                tabuleiros = self.carregar_tabuleiros(indice)
-                conferidos = sum(1 for d in self.carregar_diagramas(indice) if d.conferido)
+                pagina = _pagina_de_json(json.loads(arquivo.read_text(encoding="utf-8")))
             except (OSError, ValueError, TypeError, KeyError):
                 continue                # página ilegível: fica fora do resumo
-            paginas[str(indice + 1)] = self._resumo_da_pagina(
-                indice, boxes, len(tabuleiros), conferidos)
-        return {"versao": VERSAO_DO_LIVRO, "paginas": paginas}
+            paginas[str(pagina.indice + 1)] = self._resumo_do_modelo(pagina)
+        for indice in self._indices_v1():
+            try:
+                paginas[str(indice + 1)] = self._resumo_do_modelo(self._ler_v1(indice))
+            except (OSError, ValueError, TypeError, KeyError):
+                continue
+        return {"versao": VERSAO_DO_LIVRO,
+                "paginas": dict(sorted(paginas.items(), key=lambda kv: int(kv[0])))}
 
     def _carregar_livro(self) -> dict:
         if self._livro is None:
@@ -515,12 +693,47 @@ class ProjetoDeLivro:
             gv.gravar_json(self.pasta / ARQUIVO_DO_LIVRO, novo)
             self._livro = novo                  # o cache só muda depois de gravado
 
-    def _resumo_da_pagina(self, indice: int, boxes: Sequence[BoxEntry], tabuleiros: int,
-                          conferidos: int) -> dict:
-        return {"estado": "glifos_marcados" if indice in self._marcadas() else "reconhecida",
-                **resumo_das_confiancas(boxes, self.dados.limiares),
+    def _resumo_do_modelo(self, pagina: Pagina) -> dict:
+        tabuleiros = len(pagina.tabuleiros)
+        conferidos = sum(1 for d in pagina.diagramas if d.conferido)
+        return {"pid": pagina.pid, "estado": pagina.estado,
+                **resumo_das_confiancas(pagina.entries(), self.dados.limiares),
                 "diagramas": tabuleiros,
                 "diagramas_por_conferir": max(0, tabuleiros - conferidos)}
+
+
+def _pagina_para_json(pagina: Pagina) -> dict:
+    return {
+        "versao": VERSAO_DA_PAGINA, "pid": pagina.pid, "indice": pagina.indice,
+        "estado": pagina.estado, "proximo_n": pagina.proximo_n,
+        "gravado_em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "boxes": [b.para_json() for b in pagina.boxes],
+        "tabuleiros": [list(map(int, t)) for t in pagina.tabuleiros],
+        "diagramas": [d.para_json() for d in pagina.diagramas],
+        "zonas": [z.como_dict() for z in pagina.zonas],
+        "decisoes": pagina.decisoes.para_json(),
+    }
+
+
+def _pagina_de_json(bruto: dict) -> Pagina:
+    from abbychess.diagramas import DiagramaLido
+
+    if bruto.get("versao") != VERSAO_DA_PAGINA:
+        raise ValueError(f"página de versão {bruto.get('versao')!r}")
+    return Pagina(pid=int(bruto["pid"]), indice=int(bruto["indice"]),
+                  boxes=[Box.de_json(b) for b in bruto.get("boxes", [])],
+                  tabuleiros=[tuple(int(v) for v in t) for t in bruto.get("tabuleiros", [])],
+                  diagramas=[DiagramaLido.de_json(d) for d in bruto.get("diagramas", [])],
+                  zonas=[Zona.de_dict(z) for z in bruto.get("zonas", [])],
+                  decisoes=Decisoes.de_json(bruto.get("decisoes")),
+                  estado=bruto.get("estado", RECONHECIDA),
+                  proximo_n=int(bruto.get("proximo_n", 0)))
+
+
+def com_ids_de_diagramas(diagramas):
+    from abbychess.diagramas import com_ids
+
+    return com_ids(diagramas)
 
 
 def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares) -> dict:

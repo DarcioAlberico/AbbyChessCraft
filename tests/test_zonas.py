@@ -149,13 +149,15 @@ def test_tabuleiro_achado_dentro_do_diagrama_e_o_que_vale():
 def test_areas_gravadas_voltam_iguais_e_nao_contam_como_pagina_lida(projeto):
     zonas = [zn.Zona(zn.TEXTO, 0, 0, 100, 100), zn.Zona(zn.IGNORAR, 10, 10, 50, 50)]
     projeto.salvar_zonas(0, zonas)
-    assert projeto.carregar_zonas(0) == zonas
+    gravadas = projeto.carregar_zonas(0)
+    assert [(z.tipo, z.caixa) for z in gravadas] == [(z.tipo, z.caixa) for z in zonas]
+    assert [z.id for z in gravadas] == ["z0", "z1"]           # cada área ganha um id (v2)
     assert projeto.carregar_zonas(1) == []
     assert projeto.paginas_lidas() == []
     assert projeto.carregar_pagina(0) is None
+    assert projeto.estado_da_pagina(0) == "nao_reconhecida"
     projeto.salvar_zonas(0, [])
     assert projeto.carregar_zonas(0) == []
-    assert not (projeto.pasta / "zonas" / "0001.json").exists()
 
 
 def test_projeto_antigo_abre_sem_areas_e_em_portugues(projeto):

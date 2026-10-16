@@ -26,7 +26,7 @@ from abbychess import pagina as pg
 from abbychess import verificacao as vf
 from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL, FONTE_NENHUMA, LeitorDoLivro
 from abbychess.padroes import PadroesDoLivro
-from abbychess.projeto import (ARQUIVO_DO_LIVRO, Limiares, ProjetoDeLivro, ProjetoInvalido,
+from abbychess.projeto import (ARQUIVO_DO_LIVRO, VERSAO_DO_LIVRO, Limiares, ProjetoDeLivro, ProjetoInvalido,
                                pendentes_pelo_histograma, resumo_das_confiancas)
 from abbychess.zonas import Zona
 
@@ -192,14 +192,16 @@ def _cada_arquivo_do_projeto(projeto: ProjetoDeLivro, tmp_path: Path):
     def zonas():
         projeto.salvar_zonas(0, [Zona("texto", 0, 0, 10 + next(contador) % 50, 10)])
 
-    return [("pagina", projeto._arquivo_da_pagina(0), pagina),
-            ("marcadas", projeto.pasta / "paginas" / "marcadas.json", marcadas),
+    # No v2, a página, a marca dela (o estado) e as áreas ficam no arquivo da página.
+    arquivo_da_pagina = projeto.pasta / "paginas" / f"p{projeto.dados.proximo_pid}.json"
+    return [("pagina", arquivo_da_pagina, pagina),
+            ("marcadas", arquivo_da_pagina, marcadas),
             ("projeto.json", projeto.pasta / "projeto.json", projeto_json),
             ("livro.json", projeto.pasta / ARQUIVO_DO_LIVRO, pagina),
             ("inclinacoes.json", projeto.pasta / "inclinacoes.json", inclinacoes),
             ("lexico.txt", projeto.arquivo_do_lexico, lexico_txt),
             ("metadados", projeto.pasta_de_padroes / "metadados.json", metadados),
-            ("zonas", projeto.pasta / "zonas" / "0001.json", zonas)]
+            ("zonas", arquivo_da_pagina, zonas)]
 
 
 ARQUIVOS = ["pagina", "marcadas", "projeto.json", "livro.json", "inclinacoes.json",
@@ -434,7 +436,7 @@ def test_livro_json_que_falta_e_refeito(projeto):
     projeto.salvar_pagina(2, [_box(), _box(source=FONTE_MANUAL)], reconhecida=False)
     (projeto.pasta / ARQUIVO_DO_LIVRO).unlink()
     resumo = ProjetoDeLivro.abrir(projeto.pasta).resumo_do_livro()
-    assert resumo == {2: {"estado": "glifos_marcados", "boxes": 2, "pendentes": 1,
+    assert resumo == {2: {"pid": 0, "estado": "glifos_marcados", "boxes": 2, "pendentes": 1,
                           "confirmados": 1, "sem_leitura": 0, "histograma": {"50": 1},
                           "diagramas": 0, "diagramas_por_conferir": 0}}
     assert (projeto.pasta / ARQUIVO_DO_LIVRO).is_file()
@@ -618,7 +620,7 @@ def test_livro_json_da_versao_1_e_refeito_com_a_faixa_100(projeto):
     arquivo.write_text(json.dumps(velho), encoding="utf-8")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     assert reaberto.resumo_do_livro()[0]["histograma"] == {"100": 1}
-    assert json.loads(arquivo.read_text(encoding="utf-8"))["versao"] == 2
+    assert json.loads(arquivo.read_text(encoding="utf-8"))["versao"] == VERSAO_DO_LIVRO
 
 
 def _copias_da_fonte(conteudo: bytes, pasta: Path, n: int, outro_tamanho: int):

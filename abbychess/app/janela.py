@@ -494,11 +494,14 @@ class JanelaPrincipal(QMainWindow):
             return False
         return self.projeto is not None
 
-    def _salvar_pagina(self) -> None:
+    def _salvar_pagina(self, *, reconheceu: bool = False) -> None:
+        """Grava a página aberta; `reconheceu` diz que é a gravação do F5 (o estado da
+        página vai por §4.4: uma página em revisão continua em revisão)."""
         if self.projeto is not None and self.boxes and not self.projeto.somente_leitura:
             self.diagramas = dg.para_caixas(self.tabuleiros, self.diagramas)
             self.projeto.salvar_pagina(self.indice_pagina, self.boxes, self.tabuleiros,
-                                       self.diagramas, reconhecida=self.reconhecida)
+                                       self.diagramas, reconhecida=self.reconhecida,
+                                       reconheceu=reconheceu)
 
     def reconhecer(self) -> None:
         if self.leitor is None or self.imagem is None:
@@ -531,7 +534,7 @@ class JanelaPrincipal(QMainWindow):
             self.atual, self.pulados, self.selecao = None, set(), set()
             self.reconhecida = True
             self._registrar("Reconhecer a página", antes)
-            self._salvar_pagina()
+            self._salvar_pagina(reconheceu=True)
             self._atualizar_tudo()
             self._ir_para_o_primeiro_pendente()
             resumo = pg.resumir(boxes, leitor)

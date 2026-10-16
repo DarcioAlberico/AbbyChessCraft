@@ -156,6 +156,15 @@ class PadroesDoLivro:
     def _chave(self, caminho: Path) -> str:
         return caminho.relative_to(self.pasta).as_posix()
 
+    def relativo(self, caminho) -> Optional[str]:
+        """O caminho da amostra relativo à pasta dos padrões (a procedência gravada no `Box`)."""
+        if caminho is None:
+            return None
+        try:
+            return Path(caminho).resolve().relative_to(self.pasta.resolve()).as_posix()
+        except ValueError:
+            return Path(caminho).name
+
     def _gravar_meta(self) -> None:
         gv.gravar_json(self.pasta / METADADOS, self._meta)
 

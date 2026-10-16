@@ -33,9 +33,33 @@ todas corrigidas antes das revisões:
 3. cada coleta completa percorria ~230 mil objetos da rede e da base global; eles são
    congelados (`gc.freeze`) depois de carregados.
 
-Com isso (rodadas completas, tabela "Rodadas repetidas" do README): o p95 da releitura do
-1b ficou em 143–151 ms (1a: 141–165), o p95 do Enter em ~133 ms (1a: ~191; o congelamento
-tirou a faixa alta) e a mediana da troca de página abaixo das do passo 0 e do 1a. O que o
-modelo ainda custa é uns 10 ms na mediana da releitura (~123 contra ~111) e do Enter (~121
-contra ~114). O congelamento também ajudaria o código de antes: a comparação com o 1a é
-honesta sobre a mediana, não sobre o p95.
+## Rodada 1
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Código e testes | Correção 6 · Simplicidade 7 · Testes 6 | volta |
+| Produto e medição | Completude 8 · Fidelidade das medidas 6 · Clareza para o usuário 7 · Produtividade 8 | volta |
+
+O que mudou depois dela:
+
+| Achado | Correção |
+|---|---|
+| Dois virtuais depois do mesmo glifo saíam ao contrário | entram na ordem em que foram digitados (o segundo depois do primeiro), também no começo da linha; teste |
+| `quebrar` depois de `juntar_palavras` na mesma fronteira não fazia nada | `quebrar` desfaz a junção que termina no glifo; invariante na máquina de estados: quebra e junção nunca na mesma fronteira |
+| `livro.json` sem a página (queda entre página e livro) a escondia e a duplicava | a página é achada pelos arquivos que o livro não cita; de dois arquivos do mesmo índice vale o gravado por último (no recálculo também); testes |
+| `gid_do_box` dava gid só na memória, e o gid vai para o nome do padrão | grava a página quando dá gid novo (e o estado vai a "em revisão"); teste depois de reabrir |
+| `paragrafo_antes` só valia no primeiro glifo da linha | vale em qualquer glifo da linha (o documento é feito de linhas inteiras); teste |
+| O cache guardava a foto velha quando a página era relida | a foto é refeita sempre que a página vem do disco; teste de LRU com a página expulsa e relida |
+| Em só leitura, as páginas v1 eram relidas a cada acesso | a página em memória vale |
+| `_arquivo_da_pagina` com docstring falsa | corrigida e o código também |
+| `gc.freeze` escondido na fábrica do leitor | função nomeada, `congelar_para_a_coleta_de_lixo`, chamada pela janela ao abrir o projeto (e pelo teste de desempenho, como a janela), com `ABBY_SEM_CONGELAR=1` para o A/B; a docstring diz que congela tudo o que está vivo |
+| A máquina de estados não via perda de decisão nem o caminho da janela | invariante de preservação (nenhuma edição perde decisão cujo glifo não tocou) e regras pela lista de `BoxEntry` + `reconciliar` (dividir, juntar, descartar, corrigir); dois mutantes conferidos (o `quebrar` antigo e uma reescrita que perde tudo) |
+| CA-4.5 sem página nova antes da volta | teste: uma página v2 nova (pid ≥ 3) antes de copiar o backup; nenhum gid se repete e o contador cobre todos os arquivos |
+| **O custo do modelo misturado com o congelamento** | A/B no commit final: 3 rodadas com e 3 sem o congelamento (`repeticao-1b` e `repeticao-1b_sem_congelar`). Pela mediana, o 1b sem congelar contra o 1a: Enter uns 7 ms e releitura uns 10 ms mais lentos (o custo da reconciliação); a troca uns 12 ms mais rápida (a página em memória). O congelamento não muda medianas; tira a faixa alta do p95 do Enter (~200 → ~135 ms). O p95 da releitura do 1b (152–158 ms) ficou pior que o do passo 0 e passou do alvo; o README o diz |
+| O critério do 2a perdeu o sentido | refeito: medianas do Enter e da releitura de volta à faixa do passo 0 (o congelamento não muda medianas, então a comparação vale) e o p95 da releitura ≤ 150 ms |
+| "Os p95 do 1b ficaram iguais ou melhores" era falso na releitura | corrigido no README |
+| A volta pelo `backup-v1/` prometia demais | o README diz o que volta (páginas, áreas, `projeto.json`) e o que não (correções depois da migração, padrões, léxico, amostras de diagrama, inclinações), e recomenda copiar a pasta antes da primeira abertura |
+| Menores | a migração avisa na barra de status; v1 em mídia só de leitura abre só para leitura; a janela ainda não mostra o estado (dito); a §4.4 da spec ganhou "reconhecida → verificada" e "marcar é edição"; a tabela das rodadas tem a mediana da releitura e explica o congelamento; `a.prof` saiu do git; as rodadas de antes das otimizações estão no commit `6d192c6` |
+
+A qualidade e a fatia foram medidas de novo no commit final (`5f969c7`): iguais às do passo 0
+nos três livros.

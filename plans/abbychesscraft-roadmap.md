@@ -190,13 +190,16 @@ servidor) e CA-14.1 (se não fechar só com o `ControladorDePagina`, extrair tam
 verificação e dos diagramas); a caracterização. Daqui em diante, `Box` e `BoxEntry` não são
 mutados no lugar.
 
-**A volta do custo do 1a.** O 1a pôs `fsync` síncrono em cada gravação e custou uns 10 ms
-na mediana do Enter e da troca de página (`docs/revisoes/passo-1a.md`). O 2a tira essas
-gravações da thread da interface; a verificação dele inclui 3 rodadas completas de
-desempenho (`ABBY_ROTULO_DA_MEDIDA=repeticao-2a`) comparadas, pela **mediana (p50)**, com as
-3 do passo 0 e as 3 do 1a da tabela "Rodadas repetidas": a mediana do Enter e a da troca
-voltam à faixa do passo 0 (em 2026-10-16: Enter 104–105 ms e troca 170–174 ms), com 5 ms de
-tolerância em pelo menos 2 das 3 rodadas.
+**A volta do custo do 1a e do 1b.** O 1a pôs `fsync` síncrono em cada gravação (uns 10 ms
+na mediana do Enter), e o 1b a reconciliação da lista da janela com o modelo (mais 7 a 10 ms
+na do Enter e na da releitura; `docs/revisoes/passo-1a.md` e `passo-1b.md`). O 2a tira as
+gravações da thread da interface e a janela passa a editar o modelo, sem reconciliar; a
+verificação dele inclui 3 rodadas completas de desempenho
+(`ABBY_ROTULO_DA_MEDIDA=repeticao-2a`, com o congelamento, como o programa roda) comparadas
+pela **mediana (p50)** com as do passo 0 da tabela "Rodadas repetidas" (o congelamento não
+muda medianas, então a comparação vale): a mediana do Enter e a da releitura voltam à
+faixa do passo 0 (em 2026-10-16: Enter 104–105 ms, releitura 106–108 ms), com 5 ms de
+tolerância, em pelo menos 2 das 3 rodadas; e o p95 da releitura fica ≤ 150 ms.
 
 ## Passo 2b — Desfazer e propagação (§14.2)
 

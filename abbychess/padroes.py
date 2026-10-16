@@ -59,6 +59,8 @@ import numpy as np
 
 from core.learner import char_to_folder, folder_to_char
 
+from abbychess import gravacao as gv
+
 LADO = 32
 METADADOS = "metadados.json"
 
@@ -155,11 +157,7 @@ class PadroesDoLivro:
         return caminho.relative_to(self.pasta).as_posix()
 
     def _gravar_meta(self) -> None:
-        arquivo = self.pasta / METADADOS
-        temporario = arquivo.with_suffix(".tmp")
-        temporario.write_text(json.dumps(self._meta, ensure_ascii=False, indent=1),
-                              encoding="utf-8", newline="\n")
-        temporario.replace(arquivo)
+        gv.gravar_json(self.pasta / METADADOS, self._meta)
 
     # ------------------------------------------------------------------
     @property
@@ -202,12 +200,11 @@ class PadroesDoLivro:
             raise ValueError("O caractere ensinado não pode ser vazio.")
         cinza = recorte if recorte.ndim == 2 else cv2.cvtColor(recorte, cv2.COLOR_RGB2GRAY)
         pasta = self.pasta / char_to_folder(char)
-        pasta.mkdir(parents=True, exist_ok=True)
         caminho = pasta / f"{_nome_limpo(origem)}.png"
         ok, png = cv2.imencode(".png", cinza)
         if not ok:
             raise OSError(f"O recorte de '{char}' não pôde ser codificado em PNG.")
-        png.tofile(str(caminho))
+        gv.gravar_bytes(caminho, png.tobytes())
         self._meta[self._chave(caminho)] = {
             "altura": None if altura_relativa is None else round(float(altura_relativa), 4),
             "origem": origem,
@@ -227,7 +224,7 @@ class PadroesDoLivro:
         caminho = Path(caminho).resolve()
         if self.pasta.resolve() not in caminho.parents:
             raise ValueError(f"{caminho} não é um padrão deste livro.")
-        caminho.unlink()
+        gv.apagar(caminho)
         self._meta.pop(caminho.relative_to(self.pasta.resolve()).as_posix(), None)
         self._gravar_meta()
         self._carregar()
@@ -243,8 +240,7 @@ class PadroesDoLivro:
         caminho = Path(amostra.caminho).resolve()
         if self.pasta.resolve() not in caminho.parents:
             raise ValueError(f"{caminho} não é um padrão deste livro.")
-        caminho.parent.mkdir(parents=True, exist_ok=True)
-        caminho.write_bytes(amostra.png)
+        gv.gravar_bytes(caminho, amostra.png)
         self._meta[caminho.relative_to(self.pasta.resolve()).as_posix()] = dict(amostra.meta)
         self._gravar_meta()
         self._carregar()

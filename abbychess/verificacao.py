@@ -201,10 +201,15 @@ def corrigir(boxes: List[BoxEntry], indices: Sequence[int], novo: str) -> List[T
 
 
 def adicionar(lex, palavra: str, arquivo: Path) -> bool:
-    """Põe a palavra no dicionário do livro e regrava o `lexico.txt`. Devolve se era nova."""
-    from core import lexico
+    """Põe a palavra no dicionário do livro e regrava o `lexico.txt`. Devolve se era nova.
+
+    O formato é o de `core.lexico.salvar_do_usuario` (minúsculas, ordenadas, uma por
+    linha), mas gravado por `abbychess.gravacao`, com `fsync` e novas tentativas.
+    """
+    from abbychess import gravacao as gv
 
     if not lex.acrescentar(palavra):
         return False
-    lexico.salvar_do_usuario(str(arquivo), lex.do_usuario)
+    lista = sorted({p.strip().lower() for p in lex.do_usuario if p.strip()})
+    gv.gravar_texto(arquivo, "\n".join(lista) + ("\n" if lista else ""))
     return True

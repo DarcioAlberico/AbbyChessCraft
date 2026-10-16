@@ -362,6 +362,17 @@ class JanelaPrincipal(QMainWindow):
 
     def _abrir(self, projeto: ProjetoDeLivro) -> None:
         self._salvar_pagina()
+        if projeto.fonte_ausente and not self._localizar_fonte(projeto):
+            projeto.fechar()
+            return
+        if projeto.somente_leitura:
+            QMessageBox.information(
+                self, "Abrir projeto",
+                f"O projeto é da versão {projeto.dados.versao} do formato, mais nova que a "
+                "deste programa. Ele abre só para leitura: dá para ver as páginas, mas nada "
+                "do que for feito aqui é gravado.")
+        if self.projeto is not None and self.projeto is not projeto:
+            self.projeto.fechar()
         try:
             fonte = pg.fonte_do_projeto(projeto)
         except OSError as erro:
@@ -370,7 +381,8 @@ class JanelaPrincipal(QMainWindow):
         self.projeto, self.fonte, self.leitor = projeto, fonte, None
         self.boxes, self.atual, self.pulados, self.selecao = [], None, set(), set()
         self.lexico, self.ignoradas = None, set()
-        self.setWindowTitle(f"{projeto.dados.nome} — {TITULO}")
+        so_leitura = " (só leitura)" if projeto.somente_leitura else ""
+        self.setWindowTitle(f"{projeto.dados.nome}{so_leitura} — {TITULO}")
         self.seletor.blockSignals(True)
         self.seletor.setMaximum(fonte.total)
         self.seletor.blockSignals(False)
@@ -438,8 +450,32 @@ class JanelaPrincipal(QMainWindow):
             self.treino.limpar("Esta página ainda não foi reconhecida. Aperte F5.")
         self._atualizar_acoes()
 
+    def _localizar_fonte(self, projeto: ProjetoDeLivro) -> bool:
+        """A fonte sumiu e não foi achada pelo SHA-256: o usuário diz onde ela está."""
+        QMessageBox.warning(self, "Abrir projeto",
+                            f"A fonte do livro não está mais em\n{projeto.fonte}\n\nMostre "
+                            "onde ela está agora; o programa confere que é o mesmo arquivo.")
+        while True:
+            caminho, _ = QFileDialog.getOpenFileName(
+                self, "Onde está a fonte do livro?", str(projeto.pasta.parent),
+                "PDF ou imagem (*.pdf *.png *.jpg *.jpeg *.tif *.tiff *.bmp)")
+            if not caminho:
+                return False
+            try:
+                projeto.relocalizar(caminho)
+                return True
+            except (ProjetoInvalido, OSError) as erro:
+                QMessageBox.warning(self, "Abrir projeto", str(erro))
+
+    def _pode_gravar(self) -> bool:
+        """Falso, com o aviso na barra, quando o projeto está aberto só para leitura."""
+        if self.projeto is not None and self.projeto.somente_leitura:
+            self.statusBar().showMessage("Projeto aberto só para leitura: nada é gravado.", 6000)
+            return False
+        return self.projeto is not None
+
     def _salvar_pagina(self) -> None:
-        if self.projeto is not None and self.boxes:
+        if self.projeto is not None and self.boxes and not self.projeto.somente_leitura:
             self.diagramas = dg.para_caixas(self.tabuleiros, self.diagramas)
             self.projeto.salvar_pagina(self.indice_pagina, self.boxes, self.tabuleiros,
                                        self.diagramas, reconhecida=self.reconhecida)
@@ -797,7 +833,8 @@ class JanelaPrincipal(QMainWindow):
     def aplicar_limiares(self, limiares) -> None:
         """Grava os limiares no projeto e refaz a fila com eles."""
         self.projeto.dados.limiares = limiares
-        self.projeto.salvar()
+        if self._pode_gravar():
+            self.projeto.salvar()
         self.leitor.trocar_limiares(limiares)
         self._atualizar_tudo()
         if self.boxes:
@@ -870,7 +907,7 @@ class JanelaPrincipal(QMainWindow):
         self.statusBar().showMessage(f"Áreas automáticas: {resumo}. Corrija e aperte F5.", 10000)
 
     def _gravar_zonas(self) -> None:
-        if self.projeto is not None:
+        if self._pode_gravar():
             self.projeto.salvar_zonas(self.indice_pagina, self.zonas)
         self._mostrar_zonas()
 
@@ -1031,6 +1068,8 @@ class JanelaPrincipal(QMainWindow):
         if palavra is None or self.lexico is None or self.projeto is None:
             return
         texto = self.verificacao.campo.text().strip() or palavra.palavra
+        if not self._pode_gravar():
+            return
         if not vf.adicionar(self.lexico, texto, self.projeto.arquivo_do_lexico):
             self.statusBar().showMessage(f"'{texto}' não entra no dicionário (já está, ou não "
                                          "é só de letras).", 6000)
@@ -1277,4 +1316,6 @@ class JanelaPrincipal(QMainWindow):
             self.statusBar().showMessage("Esperando a tarefa em andamento terminar…")
             self.executor.esperar()
         self._salvar_pagina()
+        if self.projeto is not None:
+            self.projeto.fechar()
         super().closeEvent(evento)

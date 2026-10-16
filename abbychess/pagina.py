@@ -21,6 +21,8 @@ from core import proporcao, vertical
 from core.box_model import BoxEntry
 from core.services.box_service import BoxService
 
+from abbychess import gravacao as gv
+
 from abbychess.leitor import (FONTE_MANUAL, LeitorDoLivro, nome_de_origem,
                               precisa_revisao)
 from abbychess.projeto import EXTENSOES_DE_IMAGEM, ProjetoDeLivro
@@ -106,9 +108,11 @@ class FonteDePaginas:
     """
 
     def __init__(self, caminho: str | Path, *, endireitar: bool = False,
-                 pasta: Optional[str | Path] = None):
+                 pasta: Optional[str | Path] = None, somente_leitura: bool = False):
         self.caminho = Path(caminho)
         self.endireitar = endireitar
+        #: Projeto só para leitura: lê as inclinações gravadas, mas não grava as novas.
+        self.somente_leitura = somente_leitura
         self._arquivo_das_inclinacoes = Path(pasta) / ARQUIVO_DE_INCLINACOES if pasta else None
         self._inclinacoes: dict = {}
         if self._arquivo_das_inclinacoes is not None and self._arquivo_das_inclinacoes.is_file():
@@ -157,10 +161,9 @@ class FonteDePaginas:
         if indice not in self._inclinacoes:
             imagem = imagem if imagem is not None else self.original(indice)
             self._inclinacoes[indice] = medir_inclinacao(np.asarray(imagem.convert("L")))
-            if self._arquivo_das_inclinacoes is not None:
-                self._arquivo_das_inclinacoes.write_text(
-                    json.dumps({str(k): v for k, v in sorted(self._inclinacoes.items())},
-                               indent=1), encoding="utf-8", newline="\n")
+            if self._arquivo_das_inclinacoes is not None and not self.somente_leitura:
+                gv.gravar_json(self._arquivo_das_inclinacoes,
+                               {str(k): v for k, v in sorted(self._inclinacoes.items())})
         angulo = self._inclinacoes[indice]
         return angulo if abs(angulo) >= INCLINACAO_MINIMA else 0.0
 
@@ -168,7 +171,7 @@ class FonteDePaginas:
 def fonte_do_projeto(projeto: ProjetoDeLivro) -> FonteDePaginas:
     """As páginas do livro como o projeto as lê: endireitadas, se ele nasceu assim."""
     return FonteDePaginas(projeto.fonte, endireitar=projeto.dados.endireitar,
-                          pasta=projeto.pasta)
+                          pasta=projeto.pasta, somente_leitura=projeto.somente_leitura)
 
 
 @dataclass

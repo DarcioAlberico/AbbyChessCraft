@@ -3,7 +3,11 @@
 Um projeto é uma pasta com esta forma::
 
     <pasta>/
-        projeto.json      nome, caminho da fonte, idioma, limiares e data de criação
+        projeto.json      nome, caminho da fonte e o SHA-256 dela, idioma, limiares,
+                          data de criação e, em `extras`, os campos que esta versão
+                          não conhece
+        livro.json        o resumo de cada página (estado, pendentes, histograma das
+                          confianças, diagramas por conferir); cache, refeito se faltar
         padroes/          os padrões deste livro, uma pasta por caractere
         paginas/0001.json os boxes lidos e corrigidos de cada página, os tabuleiros
                           e, desde a leitura dos diagramas, o FEN de cada um
@@ -14,6 +18,13 @@ Um projeto é uma pasta com esta forma::
 As áreas ficam fora de `paginas/` de propósito: dá para desenhá-las antes do
 primeiro reconhecimento, e uma página só com áreas não pode contar como lida.
 Projetos sem `zonas/` nem `idioma` abrem como antes: sem áreas e em português.
+
+Todo arquivo é gravado por `abbychess.gravacao` (temporário, `fsync`, troca). Um
+projeto de versão mais nova abre só para leitura (`somente_leitura`): nada é
+gravado nele. A fonte fica com caminho relativo quando está dentro da pasta do
+projeto; se ela sumir, `abrir` procura o mesmo arquivo (pelo SHA-256 dos primeiros
+4 MB) ao lado do caminho antigo e na pasta do projeto, e senão `fonte_ausente` diz
+à janela que peça ao usuário (`relocalizar`).
 
 `padroes/` usa o mesmo formato da base de treino do PyBoxEditor
 (`core.learner.char_to_folder`) mais um `metadados.json` com a altura de cada
@@ -27,15 +38,20 @@ pode ter acento: os padrões são lidos e gravados por `np.fromfile` e
 
 from __future__ import annotations
 
+import hashlib
 import json
+import math
 import re
+import threading
 import unicodedata
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
 
 from core.box_model import BoxEntry
+
+from abbychess import gravacao as gv
 
 if TYPE_CHECKING:
     from abbychess.diagramas import DiagramaLido
@@ -49,7 +65,14 @@ PASTA_DE_PAGINAS = "paginas"
 ARQUIVO_DAS_MARCADAS = "marcadas.json"
 PASTA_DE_ZONAS = "zonas"
 ARQUIVO_DO_LEXICO = "lexico.txt"
+ARQUIVO_DO_LIVRO = "livro.json"
 VERSAO = 1
+#: A versão do formato de `livro.json`; outra versão é refeita das páginas.
+VERSAO_DO_LIVRO = 1
+#: Quanto da fonte entra no SHA-256 que a reconhece depois de movida.
+BYTES_DO_SHA = 4 * 2**20
+#: Quantos arquivos, no máximo, `abrir` confere ao procurar a fonte sumida.
+CANDIDATOS_DA_FONTE = 200
 
 EXTENSOES_DE_IMAGEM = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}
 
@@ -89,10 +112,28 @@ class Projeto:
     #: O idioma da prosa, que escolhe o léxico da verificação de texto.
     idioma: str = "pt"
     versao: int = VERSAO
+    #: O SHA-256 dos primeiros 4 MB da fonte, que a reconhece se ela for movida.
+    fonte_sha256: str = ""
+    #: Os campos de `projeto.json` que esta versão não conhece, guardados para
+    #: voltarem iguais ao arquivo (`limiares` tem os de `Limiares`).
+    extras: Dict[str, object] = field(default_factory=dict)
     #: Endireitar cada página antes de ler (`pagina.medir_inclinacao`). Projeto
     #: novo nasce com isto; o que foi criado antes fica sem, porque os boxes
     #: gravados dele estão nas coordenadas da página torta.
     endireitar: bool = False
+
+
+def sha_da_fonte(caminho: Path) -> str:
+    """O SHA-256 dos primeiros `BYTES_DO_SHA` bytes do arquivo."""
+    with open(caminho, "rb") as arquivo:
+        return hashlib.sha256(arquivo.read(BYTES_DO_SHA)).hexdigest()
+
+
+def _separar(bruto: dict, classe) -> Tuple[dict, dict]:
+    """Os campos que `classe` conhece e os outros."""
+    nomes = {f.name for f in fields(classe)}
+    return ({k: v for k, v in bruto.items() if k in nomes},
+            {k: v for k, v in bruto.items() if k not in nomes})
 
 
 def nome_de_pasta(nome: str) -> str:
@@ -105,9 +146,13 @@ def nome_de_pasta(nome: str) -> str:
 class ProjetoDeLivro:
     """Acesso a um projeto aberto: metadados, padrões e páginas."""
 
-    def __init__(self, pasta: Path, dados: Projeto):
+    def __init__(self, pasta: Path, dados: Projeto, *, somente_leitura: bool = False):
         self.pasta = Path(pasta)
         self.dados = dados
+        #: Versão mais nova que a do programa: nada é gravado (`gravacao.SomenteLeitura`).
+        self.somente_leitura = somente_leitura
+        self._livro: Optional[dict] = None
+        self._trava_do_livro = threading.Lock()
 
     # ------------------------------------------------------------------
     # Criar e abrir
@@ -125,9 +170,9 @@ class ProjetoDeLivro:
             raise ProjetoInvalido(f"Já existe um projeto em {pasta}.")
         (pasta / PASTA_DE_PADROES).mkdir(parents=True, exist_ok=True)
         (pasta / PASTA_DE_PAGINAS).mkdir(parents=True, exist_ok=True)
-        dados = Projeto(nome=nome, fonte=str(fonte),
+        dados = Projeto(nome=nome, fonte=_caminho_gravado(fonte, pasta),
                         criado=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                        endireitar=True)
+                        endireitar=True, fonte_sha256=sha_da_fonte(fonte))
         projeto = cls(pasta, dados)
         projeto.salvar()
         return projeto
@@ -140,19 +185,92 @@ class ProjetoDeLivro:
             raise ProjetoInvalido(f"Não há {ARQUIVO_DO_PROJETO} em {pasta}.")
         try:
             bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-            limiares = Limiares(**bruto.pop("limiares", {}))
-            dados = Projeto(limiares=limiares, **bruto)
+            if not isinstance(bruto, dict):
+                raise ValueError("não é um objeto JSON")
+            conhecidos, desconhecidos = _separar(bruto, Projeto)
+            extras = dict(conhecidos.pop("extras", None) or {})
+            dos_limiares, outros_limiares = _separar(conhecidos.pop("limiares", None) or {},
+                                                     Limiares)
+            if outros_limiares:
+                extras["limiares"] = {**dict(extras.get("limiares") or {}), **outros_limiares}
+            extras.update(desconhecidos)
+            dados = Projeto(limiares=Limiares(**dos_limiares), extras=extras, **conhecidos)
+            if not isinstance(dados.versao, int):
+                raise ValueError(f"versão {dados.versao!r}")
         except (ValueError, TypeError) as erro:
             raise ProjetoInvalido(f"{arquivo} está ilegível: {erro}") from erro
         if dados.versao > VERSAO:
-            raise ProjetoInvalido(
-                f"O projeto é da versão {dados.versao}; este programa lê até a {VERSAO}.")
+            gv.proteger(pasta)
+            return cls(pasta, dados, somente_leitura=True)
+        gv.liberar(pasta)
         (pasta / PASTA_DE_PADROES).mkdir(exist_ok=True)
         (pasta / PASTA_DE_PAGINAS).mkdir(exist_ok=True)
-        return cls(pasta, dados)
+        gv.limpar_temporarios(pasta)
+        projeto = cls(pasta, dados)
+        mudou = bool(desconhecidos or outros_limiares)
+        if projeto.fonte.is_file():
+            if not dados.fonte_sha256:
+                dados.fonte_sha256, mudou = sha_da_fonte(projeto.fonte), True
+        else:
+            achada = projeto._procurar_fonte()
+            if achada is not None:
+                dados.fonte, mudou = _caminho_gravado(achada, pasta), True
+        if mudou:
+            projeto.salvar()
+        return projeto
+
+    def fechar(self) -> None:
+        """Solta a trava de só leitura da pasta (os outros projetos não têm o que soltar)."""
+        if self.somente_leitura:
+            gv.liberar(self.pasta)
 
     def salvar(self) -> None:
-        _gravar_json(self.pasta / ARQUIVO_DO_PROJETO, asdict(self.dados))
+        gv.gravar_json(self.pasta / ARQUIVO_DO_PROJETO, asdict(self.dados))
+
+    # ------------------------------------------------------------------
+    # A fonte do livro
+    # ------------------------------------------------------------------
+    @property
+    def fonte_ausente(self) -> bool:
+        return not self.fonte.is_file()
+
+    def relocalizar(self, caminho: str | Path) -> None:
+        """A fonte foi movida para `caminho`: confere que é o mesmo arquivo e grava.
+
+        Projeto antigo, sem o SHA-256 gravado, aceita o arquivo e passa a ter o dele.
+        """
+        caminho = Path(caminho).resolve()
+        if not caminho.is_file():
+            raise ProjetoInvalido(f"A fonte não existe: {caminho}")
+        sha = sha_da_fonte(caminho)
+        if self.dados.fonte_sha256 and sha != self.dados.fonte_sha256:
+            raise ProjetoInvalido(
+                f"{caminho.name} não é a fonte deste projeto: o conteúdo é outro.")
+        self.dados.fonte, self.dados.fonte_sha256 = _caminho_gravado(caminho, self.pasta), sha
+        self.salvar()
+
+    def _procurar_fonte(self) -> Optional[Path]:
+        """O arquivo com o SHA-256 da fonte, ao lado do caminho antigo ou no projeto."""
+        if not self.dados.fonte_sha256:
+            return None
+        antigo = self.fonte
+        vistos = set()
+        for pasta in (antigo.parent, self.pasta, self.pasta.parent):
+            if not pasta.is_dir():
+                continue
+            for candidato in sorted(pasta.glob("*" + antigo.suffix)):
+                chave = candidato.resolve()
+                if chave in vistos or not candidato.is_file():
+                    continue
+                vistos.add(chave)
+                if len(vistos) > CANDIDATOS_DA_FONTE:
+                    return None
+                try:
+                    if sha_da_fonte(candidato) == self.dados.fonte_sha256:
+                        return chave
+                except OSError:
+                    continue
+        return None
 
     # ------------------------------------------------------------------
     # Caminhos
@@ -163,7 +281,8 @@ class ProjetoDeLivro:
 
     @property
     def fonte(self) -> Path:
-        return Path(self.dados.fonte)
+        caminho = Path(self.dados.fonte)
+        return caminho if caminho.is_absolute() else self.pasta / caminho
 
     @property
     def fonte_e_pdf(self) -> bool:
@@ -205,8 +324,11 @@ class ProjetoDeLivro:
         lidos = [d.para_json() for d in diagramas if d.lido or d.erro]
         if lidos:
             dados["diagramas"] = lidos
-        _gravar_json(self._arquivo_da_pagina(indice), dados)
+        gv.gravar_json(self._arquivo_da_pagina(indice), dados)
         self._marcar(indice, not reconhecida)
+        conferidos = sum(1 for d in diagramas if (d.lido or d.erro) and d.conferido)
+        self._atualizar_livro(indice, self._resumo_da_pagina(
+            indice, boxes, len(tabuleiros), conferidos))
 
     def carregar_pagina(self, indice: int) -> Optional[List[BoxEntry]]:
         """Os boxes gravados da página, ou `None` se ela ainda não foi lida."""
@@ -235,10 +357,9 @@ class ProjetoDeLivro:
         à segmentação inteira, em vez de não gerar box nenhum."""
         arquivo = self._arquivo_das_zonas(indice)
         if not zonas:
-            arquivo.unlink(missing_ok=True)
+            gv.apagar(arquivo)
             return
-        arquivo.parent.mkdir(exist_ok=True)
-        _gravar_json(arquivo, {"pagina": indice + 1, "zonas": [z.como_dict() for z in zonas]})
+        gv.gravar_json(arquivo, {"pagina": indice + 1, "zonas": [z.como_dict() for z in zonas]})
 
     def carregar_zonas(self, indice: int) -> List[Zona]:
         """As áreas gravadas da página, ou lista vazia."""
@@ -286,13 +407,107 @@ class ProjetoDeLivro:
         if (indice in marcadas) == marcada:
             return
         marcadas = marcadas | {indice} if marcada else marcadas - {indice}
-        _gravar_json(self.pasta / PASTA_DE_PAGINAS / ARQUIVO_DAS_MARCADAS,
-                     sorted(i + 1 for i in marcadas))
+        gv.gravar_json(self.pasta / PASTA_DE_PAGINAS / ARQUIVO_DAS_MARCADAS,
+                       sorted(i + 1 for i in marcadas))
+
+    # ------------------------------------------------------------------
+    # livro.json: o resumo de cada página, sem abrir as páginas
+    # ------------------------------------------------------------------
+    def resumo_do_livro(self) -> Dict[int, dict]:
+        """Índice da página -> o resumo dela (`_resumo_da_pagina`), das páginas gravadas."""
+        with self._trava_do_livro:
+            return {int(k) - 1: dict(v) for k, v in self._carregar_livro()["paginas"].items()}
+
+    def recalcular_livro(self) -> dict:
+        """O `livro.json` como ele deve ser, lendo todas as páginas gravadas."""
+        paginas = {}
+        for arquivo in sorted((self.pasta / PASTA_DE_PAGINAS).glob("*.json")):
+            if not arquivo.stem.isdigit():
+                continue
+            indice = int(arquivo.stem) - 1
+            try:
+                boxes = self.carregar_pagina(indice) or []
+                tabuleiros = self.carregar_tabuleiros(indice)
+                conferidos = sum(1 for d in self.carregar_diagramas(indice) if d.conferido)
+            except (OSError, ValueError, TypeError, KeyError):
+                continue                # página ilegível: fica fora do resumo
+            paginas[str(indice + 1)] = self._resumo_da_pagina(
+                indice, boxes, len(tabuleiros), conferidos)
+        return {"versao": VERSAO_DO_LIVRO, "paginas": paginas}
+
+    def _carregar_livro(self) -> dict:
+        if self._livro is None:
+            arquivo = self.pasta / ARQUIVO_DO_LIVRO
+            try:
+                bruto = json.loads(arquivo.read_text(encoding="utf-8"))
+                if bruto.get("versao") != VERSAO_DO_LIVRO or not isinstance(
+                        bruto.get("paginas"), dict):
+                    raise ValueError("versão ou forma inesperada")
+            except (OSError, ValueError, AttributeError):
+                bruto = self.recalcular_livro()
+                if not self.somente_leitura:
+                    gv.gravar_json(arquivo, bruto)
+            self._livro = bruto
+        return self._livro
+
+    def _atualizar_livro(self, indice: int, resumo: dict) -> None:
+        with self._trava_do_livro:
+            livro = self._carregar_livro()
+            livro["paginas"][str(indice + 1)] = resumo
+            livro["paginas"] = dict(sorted(livro["paginas"].items(), key=lambda kv: int(kv[0])))
+            gv.gravar_json(self.pasta / ARQUIVO_DO_LIVRO, livro)
+
+    def _resumo_da_pagina(self, indice: int, boxes: Sequence[BoxEntry], tabuleiros: int,
+                          conferidos: int) -> dict:
+        return {"estado": "glifos_marcados" if indice in self._marcadas() else "reconhecida",
+                **resumo_das_confiancas(boxes, self.dados.limiares),
+                "diagramas": tabuleiros,
+                "diagramas_por_conferir": max(0, tabuleiros - conferidos)}
 
 
-def _gravar_json(caminho: Path, dados) -> None:
-    """Grava por arquivo temporário e troca, para não deixar JSON pela metade."""
-    temporario = caminho.with_suffix(caminho.suffix + ".tmp")
-    temporario.write_text(json.dumps(dados, ensure_ascii=False, indent=1),
-                          encoding="utf-8", newline="\n")
-    temporario.replace(caminho)
+def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares) -> dict:
+    """Os boxes da página em `confirmados`, `sem_leitura` e o histograma do resto.
+
+    O histograma tem 100 faixas de 0,01 (a chave é o centésimo de baixo) e conta só os
+    boxes lidos e não confirmados, os únicos que um limiar de revisão diferente
+    mudaria de lado: com ele, `pendentes_pelo_histograma` dá os pendentes de outro
+    limiar (de duas casas) sem abrir a página.
+    """
+    from abbychess.leitor import FONTE_NENHUMA, FONTES_CONFIRMADAS, precisa_revisao
+
+    confirmados = sem_leitura = 0
+    histograma: Dict[int, int] = {}
+    for b in boxes:
+        if b.source in FONTES_CONFIRMADAS:
+            confirmados += 1
+        elif not b.char or b.source == FONTE_NENHUMA:
+            sem_leitura += 1
+        else:
+            faixa = _faixa(b.confidence)
+            histograma[faixa] = histograma.get(faixa, 0) + 1
+    pendentes = sum(1 for b in boxes if precisa_revisao(b.char, b.source, b.confidence, limiares))
+    return {"boxes": len(boxes), "pendentes": pendentes, "confirmados": confirmados,
+            "sem_leitura": sem_leitura,
+            "histograma": {str(k): histograma[k] for k in sorted(histograma)}}
+
+
+def pendentes_pelo_histograma(resumo: dict, revisao: float) -> int:
+    """Os pendentes da página com o limiar `revisao` (de duas casas, até 0,99), pelo histograma."""
+    corte = math.floor(round(float(revisao) * 100, 6))
+    return resumo["sem_leitura"] + sum(n for k, n in resumo["histograma"].items()
+                                       if int(k) < corte)
+
+
+def _faixa(confianca: float) -> int:
+    # Arredondar a 6 casas antes do piso põe 0,29 na faixa 29, e não na 28 que
+    # `0.29 * 100 == 28.999…` daria. Confiança 1,0 fica na última faixa.
+    return min(99, max(0, math.floor(round(float(confianca) * 100, 6))))
+
+
+def _caminho_gravado(fonte: Path, pasta: Path) -> str:
+    """Relativo (com /) quando a fonte está dentro da pasta do projeto; senão absoluto."""
+    fonte, pasta = Path(fonte).resolve(), Path(pasta).resolve()
+    try:
+        return fonte.relative_to(pasta).as_posix()
+    except ValueError:
+        return str(fonte)

@@ -28,6 +28,7 @@ adicionar entra nele.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence, Tuple
@@ -301,15 +302,46 @@ def corrigir(boxes: List[BoxEntry], indices: Sequence[int], novo: str) -> List[T
     return mudados
 
 
+#: Nome de jogador com iniciais: grupos de letras separados por ponto, com espaço
+#: depois do ponto ou não ("L.Shamkovich", "L. Shamkovich", "J.R.Capablanca").
+_COM_INICIAIS = re.compile(r"[^\W\d_]+(?:\.\s*[^\W\d_]+)+")
+
+
+def formas_para_o_dicionario(texto: str) -> List[str]:
+    """O que entra no dicionário do livro quando o usuário manda adicionar `texto`.
+
+    Palavra comum entra sozinha. Nome com iniciais entra junto e sem espaço
+    (`l.shamkovich`), que é como o núcleo do core lê "L.Shamkovich", e com o
+    sobrenome à parte (`shamkovich`), porque em "L. Shamkovich" o espaço separa
+    as palavras e o "L." sozinho é curto demais para ser perguntado.
+    """
+    from core import lexico
+
+    nuc, _ = lexico.nucleo(texto.strip())
+    if not _COM_INICIAIS.fullmatch(nuc):
+        return [nuc]
+    junto = re.sub(r"\s+", "", nuc)
+    return [junto] + [p for p in junto.split(".") if len(p) >= lexico.MIN_PARTE]
+
+
 def adicionar(lex, palavra: str, arquivo: Path) -> bool:
     """Põe a palavra no dicionário do livro e regrava o `lexico.txt`. Devolve se era nova.
 
     O formato é o de `core.lexico.salvar_do_usuario` (minúsculas, ordenadas, uma por
     linha), mas gravado por `abbychess.gravacao`, com `fsync` e novas tentativas.
+    O nome com iniciais entra com o ponto (`formas_para_o_dicionario`), que o
+    `acrescentar` do core recusa por não ser só letras; `conhece` o acha do mesmo jeito.
     """
     from abbychess import gravacao as gv
 
-    if not lex.acrescentar(palavra):
+    nova = False
+    for forma in formas_para_o_dicionario(palavra):
+        if "." in forma:
+            nova = forma.lower() not in lex.do_usuario or nova
+            lex.do_usuario.add(forma.lower())
+        else:
+            nova = lex.acrescentar(forma) or nova
+    if not nova:
         return False
     lista = sorted({p.strip().lower() for p in lex.do_usuario if p.strip()})
     gv.gravar_texto(arquivo, "\n".join(lista) + ("\n" if lista else ""))

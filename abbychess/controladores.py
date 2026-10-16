@@ -316,8 +316,8 @@ class ControladorDeVerificacao:
             p._avisar("Projeto aberto só para leitura: nada é gravado.", 6000)
             return
         if not vf.adicionar(self.lexico, texto, p.projeto.arquivo_do_lexico):
-            p._avisar(f"'{texto}' não entra no dicionário (já está, ou não é só de letras).",
-                      6000)
+            p._avisar(f"'{texto}' não entra no dicionário (já está, ou não é palavra nem nome "
+                      "como L.Shamkovich).", 6000)
             return
         self.recontar()
         p._avisar(f"'{texto}' entrou no dicionário do livro.", 6000)

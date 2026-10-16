@@ -14,23 +14,23 @@
   "pymupdf": "1.26.6",
   "torch": "2.14.0+cpu",
   "threads_do_torch": 6,
-  "commit": "1312ed0",
+  "commit": "0ebbf9c",
   "arvore_suja": false
  },
  "medidas": {
   "troca_de_pagina": {
-   "p50_ms": 179.07,
-   "p95_ms": 203.96,
-   "max_ms": 230.51,
+   "p50_ms": 181.39,
+   "p95_ms": 193.39,
+   "max_ms": 225.28,
    "n": 30,
    "alvo_no_cache_ms": 150,
    "alvo_fora_ms": 600,
    "como": "mesmo processo, alternando 2 páginas lidas; hoje não há cache, então este número vale para 'no cache'. 'Fora do cache' (processo novo) não foi medido pelo método e fica para o passo A1."
   },
   "enter_ensinar": {
-   "p50_ms": 114.3,
-   "p95_ms": 116.11,
-   "max_ms": 187.43,
+   "p50_ms": 110.14,
+   "p95_ms": 117.8,
+   "max_ms": 196.38,
    "n": 30,
    "alvo_ms": 100,
    "padroes_no_livro": [
@@ -41,9 +41,9 @@
    "como": "QTest.keyClick(Enter) no campo, com o caractere lido do primeiro pendente (conferir a leitura), até o fim da propagação (a cor só muda no fim)"
   },
   "releitura_de_um_glifo": {
-   "p50_ms": 109.0,
-   "p95_ms": 121.31,
-   "max_ms": 127.4,
+   "p50_ms": 112.12,
+   "p95_ms": 131.31,
+   "max_ms": 141.8,
    "n": 30,
    "alvo_ms": 150,
    "com_o_lote": "impossível hoje: o lote ocupa o executor"
@@ -55,21 +55,21 @@
    "preso_pelo_historico_bytes": 43861293,
    "bytes_por_acao": 731022,
    "estimado_300x20_mb": 4182.9,
-   "rss_delta_bytes_informativo": 61251584,
+   "rss_delta_bytes_informativo": 61890560,
    "como": "tracemalloc ligado antes de 60 ações reais (3 páginas já visitadas × 20): o que é liberado ao esvaziar o histórico, por ação, extrapolado para 300 páginas × 20 ações"
   },
   "atraso_durante_o_lote": {
    "paginas": 20,
-   "p99_ms": 8.6,
-   "p95_ms": 6.2,
-   "max_ms": 97.1,
-   "disparos": 6192,
-   "duracao_s": 100.7,
+   "p99_ms": 20.8,
+   "p95_ms": 13.7,
+   "max_ms": 101.0,
+   "disparos": 5869,
+   "duracao_s": 102.3,
    "alvo_p99_ms": 50,
    "acoes_durante_o_lote": "desabilitadas ou ignoradas (executor ocupado)"
   },
   "memoria_total_com_o_lote": {
-   "rss_pico_mb": 1662,
+   "rss_pico_mb": 1663,
    "alvo_mb": 2560,
    "como": "pico do RSS do processo único durante um lote de 20 páginas"
   },

@@ -489,9 +489,10 @@ class ControladorDePagina:
             if resolvidos:
                 self._avisar(f"Padrão '{char}' ensinado{amostras} e resolveu mais "
                              f"{resolvidos} na página.", 5000)
-            if self.atual is None or (self.atual not in self.fila() and not self.escolhido):
-                # O glifo mostrado se resolveu: a janela avança, se o usuário ainda não
-                # começou a digitar nele (`atual_resolvido`).
+            if self.atual is None or self.atual not in self.fila():
+                # O glifo mostrado se resolveu: a janela avança (ou, se o usuário o escolheu,
+                # mostra a leitura nova dele), a não ser que ele já esteja digitando
+                # (`atual_resolvido`).
                 self.eventos.emitir("atual_resolvido")
         return ensinou, propagou
 

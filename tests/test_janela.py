@@ -631,3 +631,4 @@ def test_propagacao_nao_tira_o_glifo_escolhido_por_clique(app, janela, monkeypat
     solto.set()
     _esperar(app, janela)
     assert janela.pagina.atual == escolhido
+    assert janela.treino.campo.text() == "a"              # e com a leitura nova, não a velha

@@ -250,11 +250,16 @@ def _memoria_do_historico(app, janela) -> dict:
                 janela.treino.campo.setText("y")
                 janela.treino._so_corrigir()
                 acoes += 1
+        # O gravador (outra thread, que o `tracemalloc` também vê) termina antes de cada
+        # leitura: sem isso, o que ele aloca e solta entre as duas era maior que o que o
+        # histórico prende (rodadas do 2b com −9,6 e 0,2 MB).
+        janela.projeto.descarregar(10)
         gc.collect()
         cheio, _ = tracemalloc.get_traced_memory()
         rss_cheio = processo.memory_info().rss
         estimativa = janela.pagina.historico.bytes
         janela.pagina.historico.limpar()
+        janela.projeto.descarregar(10)
         gc.collect()
         vazio, _ = tracemalloc.get_traced_memory()
     finally:

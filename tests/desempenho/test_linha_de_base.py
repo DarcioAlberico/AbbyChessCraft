@@ -20,7 +20,7 @@ import pytest
 from tests.desempenho.conftest import cronometrar, p95, percentil
 from tests.livros import PASTA_DOS_PDFS
 from tests.test_janela import _esperar
-from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
+from tests.janela_util import atual, boxes, fila, mostrar
 
 pytestmark = [pytest.mark.desempenho, pytest.mark.livro_real, pytest.mark.timeout(1800)]
 
@@ -58,8 +58,7 @@ def ambiente(tmp_path_factory):
     livro.reconhecer_paginas(projeto, fonte, leitor, PAGINAS)
     janela = JanelaPrincipal()
     janela.resize(1600, 1000)
-    janela.projeto, janela.fonte, janela.leitor = projeto, fonte, leitor
-    janela.seletor.setMaximum(fonte.total)
+    janela.usar(projeto, fonte, leitor)
     janela.ir_para_pagina(PAGINAS[0])
     yield app, janela
     janela.close()
@@ -104,12 +103,12 @@ def test_enter_ensinar(ambiente, medidas):
     novos: list = []
 
     def preparar(_i):
-        fila = [k for k in fila(janela) if boxes(janela)[k].char]
-        if not fila:
+        pendentes = [k for k in fila(janela) if boxes(janela)[k].char]
+        if not pendentes:
             janela.ir_para_pagina(PAGINAS[(PAGINAS.index(janela.pagina.indice) + 1)
-                                          % len(PAGINAS)], salvar=False)
-            fila = [k for k in fila(janela) if boxes(janela)[k].char]
-        mostrar(janela, fila[0])
+                                          % len(PAGINAS)])
+            pendentes = [k for k in fila(janela) if boxes(janela)[k].char]
+        mostrar(janela, pendentes[0])
         char = boxes(janela)[atual(janela)].char
         novos.append(char not in janela.leitor.padroes_por_caractere())
         janela.treino.campo.setText(char)
@@ -202,10 +201,7 @@ def test_atraso_e_memoria_durante_o_lote(ambiente, medidas):
     import psutil
     from PySide6.QtCore import QTimer
 
-    from abbychess import livro
-
     app, janela = ambiente
-    projeto, fonte, leitor = janela.projeto, janela.fonte, janela.leitor
     atrasos, rss = [], []
     ultimo = [time.perf_counter()]
     processo = psutil.Process()
@@ -221,15 +217,15 @@ def test_atraso_e_memoria_durante_o_lote(ambiente, medidas):
     temporizador.timeout.connect(tique)
     temporizador.start()
     inicio = time.perf_counter()
-    janela.executor.rodar("Lote", lambda progresso: livro.reconhecer_paginas(
-        projeto, fonte, leitor, LOTE, refazer=True), lambda _r: None, lambda _m: None)
+    janela.livro.reconhecer(LOTE, refazer=True)      # o caminho do menu, sem o diálogo
     _esperar(app, janela, limite=1500)
     temporizador.stop()
     medidas["atraso_durante_o_lote"] = {
         "paginas": len(LOTE), "p99_ms": round(percentil(atrasos, 0.99), 1),
         "p95_ms": round(p95(atrasos), 1), "max_ms": round(max(atrasos), 1),
         "disparos": len(atrasos), "duracao_s": round(time.perf_counter() - inicio, 1),
-        "alvo_p99_ms": 50, "acoes_durante_o_lote": "desabilitadas ou ignoradas (executor ocupado)"}
+        "alvo_p99_ms": 50,
+        "acoes_durante_o_lote": "editar é recusado com aviso; ler entra na fila (passo 2a)"}
     medidas["memoria_total_com_o_lote"] = {
         "rss_pico_mb": round(max(rss) / 2**20) if rss else None, "alvo_mb": 2560,
         "como": f"pico do RSS do processo único durante um lote de {len(LOTE)} páginas"}

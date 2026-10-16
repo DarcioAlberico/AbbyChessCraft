@@ -118,3 +118,18 @@ tarefas, pelo que a tarefa em voo entregou (m14, teste); a docstring de `salvar_
 que a mudança no lugar não é vista numa página sem foto (m15); testes de que `agendar` não
 calcula a foto e de que uma tarefa pedida por quem ouve "livre" roda (m16). Os resíduos
 (m17) ficam como registrado na rodada 2.
+
+## Medidas (commit `d19c858`)
+
+- Portão (`ABBY_PORTAO=1 -m "livro_real or desempenho"`): 8 passaram;
+  `docs/medidas/2026-10-16-passo-2a.json`.
+- Rodadas repetidas: 3 com o congelamento (`repeticao-2a`) e 3 sem
+  (`repeticao-2a_sem_congelar`). O critério do roadmap passa nas 3 de cada lado: sem
+  congelar, a mediana do Enter (82 ms) e a da releitura (71–75 ms) ficaram abaixo da faixa do
+  passo 0 (104–105 e 106–108); com o congelamento, o p95 da releitura (86–106 ms) ficou
+  abaixo do do 1b (154–159) e o do Enter (90–116) longe da faixa de ~200. O alvo de 150 ms
+  do p95 da releitura, que era do 2b, já foi alcançado.
+- A memória do desfazer estimada (300 × 20) caiu de 4.121 MB para 164 MB.
+- Qualidade (`medir.py`, os três livros) e fatia (`replay_fatia.py --passo 2a`): iguais às
+  do 1b; só o tempo do lote difere (xv 435 → 460 s, yusupov 23,3 → 24,4, darcy 23,7 → 25,5),
+  uma rodada de cada, sem repetição.

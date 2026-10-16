@@ -85,3 +85,24 @@ tarefa que já rodava; o executor agora só enfileira enquanto está no laço ou
 (teste). Sobre conferir um diagrama numa página verificada: ela volta a "em revisão", como
 qualquer edição (§4.4); as áreas e o "reler" continuam fora do desfazer (o desfazer do
 projeto é do 2b).
+
+## Rodada 2
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Código e testes | Correção 8 · Simplicidade 7 · Testes 7 | volta |
+
+Confirmou B1 e M1–M5 resolvidos e a ordem das travas sem ciclo. O que mudou depois dela:
+
+| Achado | Correção |
+|---|---|
+| **M6** A foto (um hash por glifo) voltava a ser calculada na thread da interface na primeira edição depois de cada gravação | a página entregue por `agendar` entra no cache sem foto (`foto=False`), e a foto que houver é descartada; só as gravações síncronas (lote, ferramentas) a mantêm |
+| m9 `lote_rodando` podia ficar preso depois de trocar de projeto | `ligar` o zera, e o controlador do livro zera o pedido de cancelar |
+| m10 O resumo podia mostrar a versão velha de uma página entre duas leituras | lê os pendentes antes do livro |
+| m11 Fechar parava as tarefas antes de perguntar | pergunta antes; parar as tarefas vem depois do "sim" (e o fim da tarefa em voo ainda entra) |
+| m12 Um `stat` dentro da trava do cache | fora das travas |
+| m13 Um `rodar` pedido por quem ouve "livre" ficava parado | o laço do executor confere a fila depois de avisar |
+| Testes que faltavam | a interface não espera o `fsync` do livro (gravador preso); aviso do gravador que falha; o piso das tentativas; `salvar_pagina` não muda a página mostrada; diagramas lidos entram na página que pediu; corrigir e ensinar uma palavra é um passo só do desfazer; o lote não começa sem descarregar; trocar de projeto solta o lote; trocar de projeto pela janela com F5 em voo termina no projeto dele; na máquina do controlador, desfazer logo depois de corrigir, descartar ou juntar volta os mesmos `Box`, o estado e as decisões |
+
+Ficam, de propósito: `gid_do_box` e o `gid=None` de `pagina.ensinar` (o `replay_fatia`
+ensina por listas de `BoxEntry`), e `Instantaneo.boxes` (o que os testes do desfazer leem).

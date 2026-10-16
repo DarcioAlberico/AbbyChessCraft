@@ -87,6 +87,13 @@ class Executor(QObject):
             self.fila_mudou.emit(self.na_fila)
 
     def _proxima(self) -> None:
+        while True:
+            self._esvaziar_a_fila()
+            # Quem ouve `ocupado_mudou(False)` pode ter pedido outra tarefa no laço.
+            if self._tarefa is not None or not self._fila:
+                return
+
+    def _esvaziar_a_fila(self) -> None:
         self._no_laco = True
         try:
             while self._fila:

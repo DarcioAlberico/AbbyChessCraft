@@ -431,6 +431,7 @@ class ControladorDoLivro:
         """Liga o projeto (a fonte já aberta) e carrega os modelos fora da interface; ao fim,
         `projeto_aberto(leitor)` e a última página lida aparece."""
         p = self.pagina
+        self._cancelar = None
         p.ligar(projeto, fonte, None)
 
         def preparar():
@@ -453,6 +454,7 @@ class ControladorDoLivro:
     def usar(self, projeto, fonte, leitor) -> None:
         """O projeto com o leitor pronto: abre a última página lida (ou a primeira)."""
         p = self.pagina
+        self._cancelar = None
         p.ligar(projeto, fonte, leitor)
         lidas = projeto.paginas_lidas()
         p.ir_para(lidas[-1] if lidas else 0)

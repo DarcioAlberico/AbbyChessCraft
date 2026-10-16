@@ -452,3 +452,29 @@ def test_fechar_com_pagina_que_nao_grava_pergunta_e_pode_ficar_aberta(app, janel
     evento = QCloseEvent()
     janela.closeEvent(evento)                          # "Sim": fecha e perde
     assert evento.isAccepted() and janela.projeto is None
+
+
+def test_trocar_de_projeto_com_tarefa_em_voo_termina_no_projeto_dela(app, janela, tmp_path,
+                                                                    monkeypatch):
+    import threading
+
+    from abbychess import pagina as pg
+    from abbychess import zonas as zn
+
+    primeiro = janela.projeto
+    solto = threading.Event()
+    segmentar = zn.segmentar
+    monkeypatch.setattr(zn, "segmentar", lambda *a, **k: (solto.wait(10), segmentar(*a, **k))[1])
+    janela.reconhecer()                                  # preso no trabalho
+    threading.Timer(0.3, solto.set).start()
+    segundo = ProjetoDeLivro.criar(tmp_path / "outros", "Segundo",
+                                   _pagina_sintetica(tmp_path / "segunda.png"))
+    janela.trocar_projeto(segundo, pg.FonteDePaginas(segundo.fonte))
+    _esperar(app, janela)
+    assert janela.projeto is segundo
+    assert segundo.paginas_lidas() == []                 # nada do primeiro entrou aqui
+    reaberto = ProjetoDeLivro.abrir(primeiro.pasta)
+    try:
+        assert reaberto.paginas_lidas() == [0]           # e o F5 dele foi gravado nele
+    finally:
+        reaberto.fechar()

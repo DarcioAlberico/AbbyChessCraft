@@ -204,6 +204,7 @@ class ControladorDePagina:
     def ligar(self, projeto, fonte, leitor) -> None:
         """O projeto aberto, a fonte das páginas e o leitor (os modelos já carregados)."""
         self.geracao += 1
+        self.lote_rodando = False               # o lote do projeto anterior não vale aqui
         self.projeto, self.fonte, self.leitor = projeto, fonte, leitor
         self.historicos = {}
         self.modelo, self.atual, self.pulados, self.selecao = None, None, set(), set()

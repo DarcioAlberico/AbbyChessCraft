@@ -363,6 +363,21 @@ class MaquinaDoControlador(RuleBasedStateMachine):
     def refazer(self):
         self.ctl.refazer()
 
+    @rule(c=st.sampled_from("ab"), qual=st.sampled_from(["corrigir", "descartar", "juntar"]))
+    def editar_e_desfazer(self, c, qual):
+        """Desfazer logo depois de uma edição volta a página (os mesmos `Box`) e o estado."""
+        if self.ctl.atual is None or len(self.ctl.gids) < 2:
+            return
+        antes, estado = list(self.ctl.modelo.boxes), self.ctl.modelo.estado
+        decisoes = self.ctl.modelo.decisoes
+        {"corrigir": lambda: self.ctl.corrigir(c), "descartar": self.ctl.descartar,
+         "juntar": lambda: self.ctl.juntar(+1)}[qual]()
+        if self.ctl.modelo.boxes == antes:
+            return                                   # a edição não se aplicou (sem vizinho)
+        self.ctl.desfazer()
+        assert self.ctl.modelo.boxes == antes and self.ctl.modelo.estado == estado
+        assert self.ctl.modelo.decisoes == decisoes
+
     # ------------------------------------------------------------------
     @invariant()
     def pulados_selecao_e_atual_sao_vivos(self):

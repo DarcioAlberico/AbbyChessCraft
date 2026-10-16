@@ -351,32 +351,32 @@ Medida em 2026-10-16, antes de qualquer mudança do roadmap. As tabelas abaixo s
 dos JSON de `docs/medidas/` por `ferramentas\resumo_medidas.py`; não as edite à mão.
 
 <!-- medidas:inicio -->
-Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (máquina cadastrada: sim; p95 de 30 repetições):
+Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (commit 76ba432; máquina cadastrada: sim; p95 de 30 repetições):
 
 | Meta (spec §2) | Hoje | Alvo |
 |---|---|---|
-| Trocar de página (não há cache) | p95 192 ms | 150 ms no cache; fora do cache ainda não medido pelo método |
-| Enter até a cor do box mudar | p95 185 ms (0 → 35 padrões no livro) | 100 ms |
-| Releitura de um glifo | p95 135 ms; impossível com o lote | 150 ms com o lote |
-| Memória do desfazer, 300 páginas × 20 ações | ~4182,9 MB (estimado) | 50 MB |
-| Atraso da interface durante o lote (20 páginas) | p99 8,1 ms, com as ações desabilitadas | 50 ms, com as ações |
-| Memória com o lote | 1652 MB num processo | 2560 MB |
+| Trocar de página (não há cache) | p95 194 ms | 150 ms no cache; fora do cache ainda não medido pelo método |
+| Enter até a cor do box mudar | p95 111 ms (0 → 35 padrões no livro; 7 das 30 repetições ensinaram caractere novo) | 100 ms |
+| Releitura de um glifo | p95 146 ms; impossível com o lote | 150 ms com o lote |
+| Memória do desfazer, 300 páginas × 20 ações | ~4182,9 MB (estimado de 60 ações em 3 páginas, extrapolado) | 50 MB |
+| Atraso da interface durante o lote (20 páginas) | p99 8,5 ms, com as ações desabilitadas | 50 ms, com as ações |
+| Memória com o lote | 1620 MB num processo | 2560 MB |
 
-Qualidade contra os gabaritos (`ferramentas\medir.py`). Casas e lado só contam nos diagramas conferidos; o provisório (contra o FEN do rascunho, ainda não conferido) vai entre parênteses. "Margens corridas" são cabeçalho, número de página e rodapé; "—" é nada a medir (nenhuma linha tirada, nenhum diagrama).
+Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
 
-| Livro | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Linhas sem par | Casas erradas por diagrama | Lado certo | Ordem (discordância) | CER do corpo | Estado |
-|---|---|---|---|---|---|---|---|---|---|
-| xv | 9 | 0,875 / 1 | 7/7 (1) | 839 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas |
-| yusupov | 3 | 1 / 0,75 | 3/3 (0) | 8 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas |
-| darcy | 2 | — / 0 | 3/3 (0) | 1 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas |
+| Livro | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por diagrama | Lado certo | Ordem | CER do corpo | Estado |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| xv | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 13 | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| yusupov | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 13 | 3/3 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| darcy | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 
-Ainda não medido: ligacao da legenda (passo H (a leitura de hoje não liga legenda a diagrama)); precisao e revocacao por funcao (passo F (a leitura de hoje não classifica blocos)); validacao pelos lances (passo H).
+Ainda não medido: a ligação da legenda ao diagrama, no passo H (a leitura de hoje não liga legenda a diagrama); precisão e revocação por função de bloco, no passo F (a leitura de hoje não classifica blocos); a validação do FEN pelos lances, no passo H.
 
-Fatia (`ferramentas\replay_fatia.py`):
+Fatia (`ferramentas\replay_fatia.py`; **erros** são as diferenças do snapshot contra o gabarito, o N da medida humana):
 
-| Livro | Passo | Páginas | Total | Gestos dos diagramas | Navegação | Estado | JSON |
-|---|---|---|---|---|---|---|---|
-| xv | 0 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas | `2026-10-16-fatia-xv-passo-0.json` |
+| Livro | Passo | Páginas | Total | Gestos dos diagramas | Navegação | Erros | Estado | JSON |
+|---|---|---|---|---|---|---|---|---|
+| xv | 0 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-16-fatia-xv-passo-0.json` |
 <!-- medidas:fim -->
 
 O replay da fatia (os gestos para levar as p. 21–27 ao gabarito) é

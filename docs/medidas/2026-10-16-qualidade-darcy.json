@@ -8,7 +8,7 @@
  "gabaritos": {
   "i025": {
    "verdade_versao": 1,
-   "sha256": "bf48b2e9b7c81a9dcf15a9ec123c72b089e5554eaa3870d6f8e7efd6896c2b12"
+   "sha256": "1228db4525452751d6f648d503cf319105a54aa3f795950942023f1e2f4b8254"
   },
   "i026": {
    "verdade_versao": 1,
@@ -27,6 +27,10 @@
   "diagramas_achados": "3/3",
   "diagramas_falsos": 0,
   "linhas_sem_par": 1,
+  "linhas_sem_par_negativas": 0,
+  "paginas_negativas": 0,
+  "linhas_perdidas": 0,
+  "fen_igual_a_leitura": "2/3",
   "fen_verificados": "0/3",
   "casas_erradas_por_diagrama": null,
   "casas_erradas_provisorio": 3.0,
@@ -35,7 +39,7 @@
   "ordem_discordancia_media": 0.0,
   "cer_corpo": null,
   "linhas_com_texto_verificado": "0/97",
-  "estado": "provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas",
+  "estado": "provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual",
   "lote_s": 23.6,
   "pendentes": 686
  },
@@ -58,6 +62,7 @@
       "id": "d0",
       "casas_erradas": 0,
       "fen_verificado": false,
+      "fen_igual_a_leitura": true,
       "lado_certo": null,
       "lado_verificado": false,
       "confiavel": false
@@ -66,6 +71,7 @@
       "id": "d1",
       "casas_erradas": 0,
       "fen_verificado": false,
+      "fen_igual_a_leitura": true,
       "lado_certo": false,
       "lado_verificado": false,
       "confiavel": false
@@ -74,13 +80,18 @@
       "id": "d2",
       "casas_erradas": 9,
       "fen_verificado": false,
+      "fen_igual_a_leitura": false,
       "lado_certo": null,
       "lado_verificado": false,
       "confiavel": false
      }
     ]
    },
+   "negativa": false,
    "linhas_sem_par": 1,
+   "linhas_perdidas": 0,
+   "conferencia_cega_texto": false,
+   "conferencia_cega_fen": false,
    "corpo": {
     "linhas": 52,
     "casadas": 52,
@@ -107,7 +118,11 @@
     "casados": 0,
     "detalhes": []
    },
+   "negativa": false,
    "linhas_sem_par": 0,
+   "linhas_perdidas": 0,
+   "conferencia_cega_texto": false,
+   "conferencia_cega_fen": false,
    "corpo": {
     "linhas": 45,
     "casadas": 45,
@@ -121,6 +136,6 @@
   }
  },
  "data": "2026-10-16",
- "commit": "8fa59bf",
+ "commit": "76ba432",
  "arvore_suja": false
 }

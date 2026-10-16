@@ -68,6 +68,8 @@ class VisorDePagina(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setBackgroundBrush(QBrush(QColor(90, 90, 90)))
         self._itens: List[QGraphicsRectItem] = []
+        #: O item de cada box, na ordem de `_boxes` (para repintar só alguns).
+        self._itens_dos_boxes: List[QGraphicsRectItem] = []
         self._boxes: List[BoxEntry] = []
         self._selecionado: Optional[int] = None
         self._destaque: Optional[QGraphicsRectItem] = None
@@ -108,7 +110,7 @@ class VisorDePagina(QGraphicsView):
         if self._destaque is not None:
             cena.removeItem(self._destaque)
             self._destaque = None
-        self._itens, self._boxes = [], boxes
+        self._itens, self._boxes, self._itens_dos_boxes = [], boxes, []
         self._tabuleiros = [tuple(t) for t in tabuleiros]
         for i, (x1, y1, x2, y2) in enumerate(self._tabuleiros):
             caneta = QPen(cores_dos_tabuleiros[i] if cores_dos_tabuleiros else cores.DIAGRAMA)
@@ -120,20 +122,38 @@ class VisorDePagina(QGraphicsView):
             cena.addItem(item)
             self._itens.append(item)
         for i, b in enumerate(boxes):
-            cor = cores.cor_do_box(b.char, b.source, i in pendentes)
-            caneta = QPen(cor)
-            caneta.setCosmetic(True)
-            caneta.setWidthF(1.2)
             item = QGraphicsRectItem(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1)
-            item.setPen(caneta)
-            preenchimento = QColor(cor)
-            preenchimento.setAlpha(40 if i in pendentes or not b.char else 0)
-            item.setBrush(QBrush(preenchimento))
+            self._pintar(item, b, i in pendentes)
             cena.addItem(item)
             self._itens.append(item)
+            self._itens_dos_boxes.append(item)
         self.marcar_selecao(self._marcados_indices)
         if self._selecionado is not None and self._selecionado < len(boxes):
             self.selecionar(self._selecionado, centralizar=False)
+
+    @staticmethod
+    def _pintar(item: QGraphicsRectItem, b: BoxEntry, pendente: bool) -> None:
+        cor = cores.cor_do_box(b.char, b.source, pendente)
+        caneta = QPen(cor)
+        caneta.setCosmetic(True)
+        caneta.setWidthF(1.2)
+        item.setPen(caneta)
+        preenchimento = QColor(cor)
+        preenchimento.setAlpha(40 if pendente or not b.char else 0)
+        item.setBrush(QBrush(preenchimento))
+
+    def repintar_boxes(self, boxes: List[BoxEntry], pendentes: set, indices) -> bool:
+        """Repinta só os boxes `indices` (a leitura ou a cor mudou, a caixa não). Falso, sem
+        mudar nada, se a lista não é a desenhada (aí é `mostrar_boxes`)."""
+        if len(boxes) != len(self._itens_dos_boxes):
+            return False
+        for i in indices:
+            b, item = boxes[i], self._itens_dos_boxes[i]
+            if item.rect().toRect().getCoords()[:2] != (b.x1, b.y1):
+                return False                # a caixa mudou: desenhar tudo
+            self._pintar(item, b, i in pendentes)
+        self._boxes = boxes
+        return True
 
     def selecionar(self, indice: Optional[int], centralizar: bool = True) -> None:
         cena = self.scene()

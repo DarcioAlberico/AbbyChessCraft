@@ -7,9 +7,10 @@ nova, até `LIMITE_DE_MEMORIA` (as mais antigas saem). Cada transação diz, por
 ordem de leitura, e os campos da página que mudaram (decisões, áreas, tabuleiros,
 diagramas, estado). Junto, as amostras de padrão que ela criou e as que apagou.
 
-**Pré-condição por gid.** Desfazer só aplica se cada gid tocado está hoje exatamente como a
-transação o deixou (o mesmo objeto `Box`: nada é mudado no lugar desde o 2a); senão recusa,
-inteira, e diz por quê. Uma mudança feita por fora em **outros** gids não impede. A versão
+**Pré-condição por gid.** Desfazer só aplica se cada gid tocado está hoje igual ao que a
+transação o deixou (`igual`: o mesmo objeto, ou o mesmo gid, leitura, caixa, amostra,
+estilo e revisão, como o de uma página relida do disco); senão recusa, inteira, e diz
+por quê. Uma mudança feita por fora em **outros** gids não impede. A versão
 da página não entra. Os campos da página voltam se ainda estão como a transação os deixou;
 se outra coisa os mudou, ficam (e as decisões que citarem um glifo que saiu caem).
 
@@ -37,6 +38,8 @@ VIZINHOS = 3
 CAMPOS = ("decisoes", "zonas", "tabuleiros", "diagramas", "estado")
 #: Estimativa do custo de um glifo guardado (o `Box` e o `BoxEntry`, em bytes).
 BYTES_POR_GLIFO = 600
+#: E de uma área ou um diagrama guardado (um diagrama lido tem 64 casas).
+BYTES_POR_ITEM = 4000
 
 
 @dataclass
@@ -54,15 +57,19 @@ class MudancaDaPagina:
     vizinhos_depois: Dict[int, Tuple[int, ...]] = field(default_factory=dict)
     #: campo -> (valor antes, valor depois), só os que mudaram.
     campos: Dict[str, tuple] = field(default_factory=dict)
-
-    @property
-    def vazia(self) -> bool:
-        return not self.antes and not self.campos
+    #: (ordem antes, ordem depois) dos gids, só quando a edição reordenou os que ficaram
+    #: (marcar um quadro refaz a ordem de leitura da página inteira).
+    ordem: Optional[Tuple[Tuple[int, ...], Tuple[int, ...]]] = None
 
     def bytes(self) -> int:
         tamanho = len(self.antes) * 2 * BYTES_POR_GLIFO
+        tamanho += (len(self.vizinhos_antes) + len(self.vizinhos_depois)) * (VIZINHOS + 2) * 32
+        if self.ordem is not None:
+            tamanho += (len(self.ordem[0]) + len(self.ordem[1])) * 36
         for antes, depois in self.campos.values():
-            tamanho += sys.getsizeof(antes) + sys.getsizeof(depois)
+            for valor in (antes, depois):
+                itens = len(valor) if isinstance(valor, tuple) else 1
+                tamanho += sys.getsizeof(valor) + itens * BYTES_POR_ITEM
         return tamanho
 
 
@@ -107,6 +114,9 @@ def mudanca(antes: Optional[Pagina], depois: Pagina) -> MudancaDaPagina:
     ordem_depois = [b.gid for b in depois.boxes]
     m.vizinhos_antes = _vizinhos(ordem_antes, {g for g in m.antes if m.depois[g] is None})
     m.vizinhos_depois = _vizinhos(ordem_depois, {g for g in m.antes if m.antes[g] is None})
+    ficaram = set(ordem_antes) & set(ordem_depois)
+    if [g for g in ordem_antes if g in ficaram] != [g for g in ordem_depois if g in ficaram]:
+        m.ordem = (tuple(ordem_antes), tuple(ordem_depois))
     for campo in CAMPOS:
         valor_antes = getattr(antes, campo) if antes is not None else _vazio(campo)
         valor_depois = getattr(depois, campo)
@@ -121,13 +131,16 @@ def emendar(m: MudancaDaPagina, mais: MudancaDaPagina) -> None:
     for gid in mais.antes:
         if gid not in m.antes:
             m.antes[gid] = mais.antes[gid]
-            if gid in mais.vizinhos_antes:
-                m.vizinhos_antes[gid] = mais.vizinhos_antes[gid]
+        if gid in mais.vizinhos_antes and gid not in m.vizinhos_antes \
+                and m.antes[gid] is not None:     # mexido em `m`, removido em `mais`
+            m.vizinhos_antes[gid] = mais.vizinhos_antes[gid]
         m.depois[gid] = mais.depois[gid]
         if gid in mais.vizinhos_depois:
             m.vizinhos_depois[gid] = mais.vizinhos_depois[gid]
     for gid in [g for g in m.antes if m.antes[g] is m.depois[g]]:
         del m.antes[gid], m.depois[gid]              # voltou ao que era: não mudou
+    if mais.ordem is not None:
+        m.ordem = ((m.ordem or mais.ordem)[0], mais.ordem[1])
     for campo, (_antes, depois) in mais.campos.items():
         antes = m.campos.get(campo, (_antes, None))[0]
         if antes == depois:
@@ -160,11 +173,22 @@ class Recusa(Exception):
     """A pré-condição não vale: algum gid da transação mudou por fora."""
 
 
+def igual(a: Optional[Box], b: Optional[Box]) -> bool:
+    """O mesmo glifo, no mesmo estado: o mesmo objeto, ou um igual campo a campo (a página
+    que saiu da memória e foi relida do disco tem objetos novos)."""
+    if a is b:
+        return True
+    if a is None or b is None:
+        return False
+    return (a.gid == b.gid and a.amostra == b.amostra and a.estilo == b.estilo
+            and a.revisado == b.revisado and a.entry.as_state() == b.entry.as_state())
+
+
 def conferir(m: MudancaDaPagina, pagina: Optional[Pagina], *, para_tras: bool) -> None:
     """Levanta `Recusa` se a página não está como a transação a deixou (nos gids dela)."""
     esperado = m.depois if para_tras else m.antes
     atuais = {b.gid: b for b in pagina.boxes} if pagina is not None else {}
-    mudados = [gid for gid, box in esperado.items() if atuais.get(gid) is not box]
+    mudados = [gid for gid, box in esperado.items() if not igual(atuais.get(gid), box)]
     if mudados:
         raise Recusa(f"{len(mudados)} glifo(s) da página {m.indice + 1} mudaram depois "
                      "(por outra ação, que não passou por este desfazer)")
@@ -188,6 +212,8 @@ def aplicar(m: MudancaDaPagina, pagina: Pagina, *, para_tras: bool) -> None:
                 lugar = ordem.index(vizinho) + 1
                 break
         ordem.insert(lugar, gid)
+    if m.ordem is not None:
+        ordem = _na_ordem(ordem, m.ordem[0] if para_tras else m.ordem[1])
     caixas = {**atuais, **{g: b for g, b in alvo.items() if b is not None}}
     pagina.boxes = [caixas[g] for g in ordem]
     for campo, (antes, depois) in m.campos.items():
@@ -204,6 +230,19 @@ def aplicar(m: MudancaDaPagina, pagina: Pagina, *, para_tras: bool) -> None:
             juncoes=frozenset(j for j in d.juncoes if set(j) <= vivos),
             virtuais=tuple(v for v in d.virtuais
                            if v.depois_de is None or v.depois_de in vivos))
+
+
+def _na_ordem(ordem: List[int], alvo: Sequence[int]) -> List[int]:
+    """Os gids de `ordem` na ordem de `alvo`; os que `alvo` não tem (de uma edição feita
+    depois) ficam logo depois de quem vinha antes deles em `ordem`."""
+    posicao = {g: i for i, g in enumerate(alvo)}
+    saida = sorted((g for g in ordem if g in posicao), key=posicao.__getitem__)
+    for i, gid in enumerate(ordem):
+        if gid in posicao:
+            continue
+        anterior = next((ordem[k] for k in range(i - 1, -1, -1) if ordem[k] in saida), None)
+        saida.insert(0 if anterior is None else saida.index(anterior) + 1, gid)
+    return saida
 
 
 def _posicao(gid: int, vizinhos: Dict[int, Tuple[int, ...]]) -> int:
@@ -227,6 +266,17 @@ class HistoricoDoProjeto:
         self.limite = limite
         self._desfazer: List[Transacao] = []
         self._refazer: List[Transacao] = []
+        #: transação -> a estimativa dela, calculada uma vez (o total anda junto).
+        self._tamanho: Dict[int, int] = {}
+        self._total = 0
+
+    def _medir(self, transacao: Transacao) -> None:
+        self._total -= self._tamanho.get(id(transacao), 0)
+        self._tamanho[id(transacao)] = transacao.bytes()
+        self._total += self._tamanho[id(transacao)]
+
+    def _esquecer(self, transacao: Transacao) -> None:
+        self._total -= self._tamanho.pop(id(transacao), 0)
 
     def registrar(self, transacao: Transacao) -> Transacao:
         """Uma transação nova, que apaga o que havia para refazer. Uma com a mesma chave
@@ -241,20 +291,27 @@ class HistoricoDoProjeto:
                     ultima.paginas[pid] = m
             ultima.amostras_criadas.extend(transacao.amostras_criadas)
             ultima.amostras_apagadas.extend(transacao.amostras_apagadas)
+            self._medir(ultima)
             return ultima
         self._desfazer.append(transacao)
+        for velha in self._refazer:
+            self._esquecer(velha)
         self._refazer.clear()
-        self._caber()
+        self._medir(transacao)
+        while self._total > self.limite and len(self._desfazer) > 1:
+            self._esquecer(self._desfazer.pop(0))
         return transacao
 
-    def _caber(self) -> None:
-        total = sum(t.bytes() for t in self._desfazer)
-        while total > self.limite and len(self._desfazer) > 1:
-            total -= self._desfazer.pop(0).bytes()
+    def emendou(self, transacao: Transacao) -> None:
+        """A transação cresceu (a propagação a emendou): a estimativa é refeita."""
+        if id(transacao) in self._tamanho:
+            self._medir(transacao)
+            while self._total > self.limite and len(self._desfazer) > 1:
+                self._esquecer(self._desfazer.pop(0))
 
     @property
     def bytes(self) -> int:
-        return sum(t.bytes() for t in self._desfazer + self._refazer)
+        return self._total
 
     def proxima_a_desfazer(self) -> Optional[Transacao]:
         return self._desfazer[-1] if self._desfazer else None
@@ -282,3 +339,5 @@ class HistoricoDoProjeto:
     def limpar(self) -> None:
         self._desfazer.clear()
         self._refazer.clear()
+        self._tamanho.clear()
+        self._total = 0

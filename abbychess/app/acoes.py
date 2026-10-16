@@ -123,9 +123,8 @@ def atualizar(janela) -> None:
     j.acao_areas_auto.setEnabled(editar and j.acao_areas.isChecked())
     j.acao_verificar.setEnabled(tem and bool(p.boxes))
     j.acao_diagramas.setEnabled(tem and bool(p.tabuleiros))
-    historico = p.historico
-    desfazer = historico.proximo_a_desfazer if historico else None
-    refazer = historico.proximo_a_refazer if historico else None
+    desfazer = p.historico.proximo_a_desfazer
+    refazer = p.historico.proximo_a_refazer
     j.acao_desfazer.setEnabled(editar and desfazer is not None)
     j.acao_refazer.setEnabled(editar and refazer is not None)
     j.acao_desfazer.setText(f"Desfazer: {desfazer}" if desfazer else "Desfazer")

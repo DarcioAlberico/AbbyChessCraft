@@ -284,9 +284,9 @@ def test_mudanca_por_fora_nos_gids_recusa_o_desfazer_e_em_outros_nao(app, janela
     janela.pagina.desfazer()
     assert avisos and "Não dá para desfazer" in avisos[0] and "Nada foi mudado" in avisos[0]
     assert modelo.boxes == antes and janela.acao_desfazer.text() == "Desfazer: Corrigir para 'Z'"
-    ed.corrigir(modelo, modelo.boxes[0].gid, "Z")      # um objeto novo, não o da transação
+    ed.corrigir(modelo, modelo.boxes[0].gid, "Z")      # outro objeto, igual ao "depois"
     janela.pagina.desfazer()
-    assert len(avisos) == 2                             # continua recusado: outro objeto
+    assert len(avisos) == 1 and boxes(janela)[0].char != "Z"   # igual por valor: desfaz
 
 
 def _propagacao_presa(monkeypatch):
@@ -330,7 +330,7 @@ def test_desfazer_com_a_propagacao_rodando_descarta_o_resultado_dela(app, janela
 
 
 def test_enter_durante_uma_propagacao_nao_perde_nem_duplica_leitura(app, janela, monkeypatch):
-    _reconhecida(app, janela)
+    inicio = _reconhecida(app, janela)
     solto = _propagacao_presa(monkeypatch)
     mostrar(janela, 0)                                    # o primeiro "a"
     janela.treino.campo.setText("a")
@@ -349,3 +349,90 @@ def test_enter_durante_uma_propagacao_nao_perde_nem_duplica_leitura(app, janela,
     janela.pagina.desfazer()                              # o "b" e a propagação dele
     janela.pagina.desfazer()                              # o "a" e a propagação dele
     assert janela.leitor.padroes_por_caractere() == {}
+    assert _caixas(boxes(janela)) == inicio               # e a página volta inteira
+
+
+def test_desfazer_e_refazer_uma_area(app, janela):
+    janela.areas.desenhar(10, 10, 300, 120)
+    criada = janela.areas.zonas
+    assert len(criada) == 1 and criada[0].id            # o id nasceu com ela
+    janela.pagina.desfazer()
+    assert janela.areas.zonas == []
+    janela.pagina.refazer()
+    assert janela.areas.zonas == criada
+    janela.projeto.descarregar(5)
+    assert janela.projeto.carregar_zonas(0) == criada
+
+
+def test_desfazer_depois_de_a_pagina_sair_da_memoria(app, tmp_path, monkeypatch):
+    """A página relida do disco tem objetos novos: a pré-condição compara por valor."""
+    from PySide6.QtWidgets import QMessageBox
+
+    from abbychess import pagina as pg
+    from abbychess.app.janela import JanelaPrincipal
+    from abbychess.leitor import LeitorDoLivro
+    from abbychess.projeto import ProjetoDeLivro
+    from tests.test_livro import pdf_sintetico
+
+    avisos = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda _p, _t, texto, *a: avisos.append(texto))
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
+    j = JanelaPrincipal()
+    j.usar(projeto, pg.FonteDePaginas(projeto.fonte),
+           LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
+    try:
+        j.reconhecer()
+        _esperar(app, j)
+        mostrar(j, 0)
+        j.pagina.corrigir("Z")
+        j.ir_para_pagina(1)
+        projeto.descarregar(5)
+        projeto._modelos.pop(0)                         # como se 16 páginas tivessem passado
+        j.pagina.desfazer()
+        assert avisos == [] and j.pagina.indice == 0 and boxes(j)[0].char != "Z"
+    finally:
+        j.close()
+
+
+def test_enter_que_nao_grava_a_amostra_nao_deixa_nada(app, janela, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    falhas = []
+    monkeypatch.setattr(QMessageBox, "critical", lambda _p, _t, texto, *a: falhas.append(texto))
+    inicio = _reconhecida(app, janela)
+    mostrar(janela, 0)
+    janela.pagina.alternar_na_selecao(3)                # dois glifos: o segundo falha
+    original = janela.leitor.padroes.ensinar
+    chamadas = []
+
+    def ensinar(*a, **k):
+        chamadas.append(1)
+        if len(chamadas) == 2:
+            raise PermissionError("disco cheio")
+        return original(*a, **k)
+
+    monkeypatch.setattr(janela.leitor.padroes, "ensinar", ensinar)
+    janela.treino.campo.setText("a")
+    janela.treino._ensinar()
+    _esperar(app, janela)
+    assert falhas and "disco cheio" in falhas[0]
+    assert _caixas(boxes(janela)) == inicio               # a página não mudou
+    assert janela.leitor.padroes_por_caractere() == {}    # e a amostra gravada saiu
+    assert janela.pagina.historico.proximo_a_desfazer == "Reconhecer a página"
+
+
+def test_edicao_que_reordena_a_pagina_volta_na_ordem_de_antes():
+    """Marcar um quadro refaz a ordem de leitura da página inteira: a transação guarda a
+    ordem, e desfazer a devolve (o caso que a máquina do controlador achou)."""
+    p = _pagina("abcd")
+    inicial = list(p.boxes)
+    novo = Box((1 << 20) | 9, BoxEntry("x", 0, 50, 8, 59))
+    t = _transacao(p, lambda pg: setattr(pg, "boxes", [pg.boxes[2], pg.boxes[0], novo,
+                                                       pg.boxes[3]]))
+    m = t.paginas[1]
+    assert m.ordem is not None
+    hs.conferir(m, p, para_tras=True)
+    hs.aplicar(m, p, para_tras=True)
+    assert p.boxes == inicial
+    hs.aplicar(m, p, para_tras=False)
+    assert [b.entry.char for b in p.boxes] == ["c", "a", "x", "d"]

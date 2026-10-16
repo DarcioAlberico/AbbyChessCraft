@@ -202,11 +202,14 @@ def _por_passo() -> list:
     if base is None or not passos:
         return []
     metas = (("troca_de_pagina", "p95_ms", "Troca de página, p95"),
+             ("troca_fora_do_cache", "p95_ms", "Troca fora do cache, p95"),
              ("enter_ensinar", "p95_ms", "Enter, p95"),
              ("releitura_de_um_glifo", "p95_ms", "Releitura, p95"),
              ("memoria_do_desfazer", "estimado_300x20_mb", "Desfazer (MB)"),
              ("atraso_durante_o_lote", "p99_ms", "Atraso no lote, p99"),
-             ("memoria_total_com_o_lote", "rss_pico_mb", "Memória com o lote (MB)"))
+             ("memoria_total_com_o_lote", "rss_pico_mb", "Memória com o lote (MB)"),
+             ("pintura_dos_boxes", "p95_ms", "Pintura de 2.000 boxes, p95"),
+             ("clique_no_box", "p95_ms", "Clique acha o box, p95"))
     colunas = [("linha de base", base)]
     for passo in passos:
         arquivo, dados = _ultimo(f"passo-{passo}")
@@ -228,6 +231,7 @@ _REPETICAO = re.compile(r"(?P<data>\d{4}-\d{2}-\d{2})-repeticao-(?P<passo>[^-]+)
                         r"(?P<parcial>-parcial)?(?:-(?P<hora>\d{6}))?\.json")
 _METAS_REPETIDAS = (("troca_de_pagina", "p50_ms", "Troca, p50"),
                     ("troca_de_pagina", "p95_ms", "Troca, p95"),
+                    ("troca_fora_do_cache", "p50_ms", "Fora do cache, p50"),
                     ("enter_ensinar", "p50_ms", "Enter, p50"),
                     ("enter_ensinar", "p95_ms", "Enter, p95"),
                     ("releitura_de_um_glifo", "p50_ms", "Releitura, p50"),
@@ -257,7 +261,8 @@ def _repeticoes() -> list:
               "lote tem duas faixas sempre (perto de 8–10 e de 21). Desde o 2b o congelamento é "
               "desligado (`ABBY_CONGELAR=1` liga): as duas linhas do 2b rodam o mesmo programa (o "
               "rótulo `sem_congelar` é do roteiro de medida), e a coluna do Enter mede até a "
-              "cor mudar (até o 2a, até o fim da propagação). "
+              "cor mudar (até o 2a, até o fim da propagação). Desde o A1 a troca é no cache de páginas "
+              "(a vizinha já pré-carregada); a de fora do cache tem coluna própria. "
               "Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair "
               "alta):", "",
               "| Código | Commit | Rodada | " + " | ".join(r for _, _, r in _METAS_REPETIDAS) + " |",

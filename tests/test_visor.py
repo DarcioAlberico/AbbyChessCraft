@@ -396,20 +396,24 @@ def test_a_mesma_pagina_pedida_por_duas_threads_e_renderizada_uma_vez(pdf_de_60_
     fonte = pg.FonteDePaginas(pdf_de_60_paginas)
     chamadas = []
     original = fonte._pagina
-    devagar = threading.Event()
+    dentro, solta = threading.Event(), threading.Event()
 
     def _pagina(indice):
         chamadas.append(indice)
-        devagar.wait(2)
+        dentro.set()
+        solta.wait(5)
         return original(indice)
 
     fonte._pagina = _pagina
     cache = pg.CacheDePaginas(fonte)
-    cache.precarregar(5)                              # a pré-carga começa
+    cache.precarregar(5)                              # a pré-carga começa a renderizar
+    assert dentro.wait(5)
     resultado = []
     leitor = threading.Thread(target=lambda: resultado.append(cache.pagina(5)))
-    leitor.start()                                     # e o clique pede a mesma
-    devagar.set()
+    leitor.start()                                     # e o clique pede a mesma, no meio
+    leitor.join(0.3)
+    assert leitor.is_alive()                           # espera a pré-carga, não renderiza
+    solta.set()
     leitor.join(5)
     cache.esperar()
     assert chamadas == [5] and resultado and resultado[0] is cache.pagina(5)
@@ -435,3 +439,47 @@ def test_ligar_outro_projeto_troca_o_cache(app, janela_de_60, tmp_path):
                       LeitorDoLivro(outro.pasta_de_padroes))
     assert janela_de_60.pagina.cache is not antigo
     assert janela_de_60.pagina.cache.fonte is janela_de_60.pagina.fonte
+
+
+def test_paint_desenha_o_traco_do_box_logo_fora_do_retangulo_exposto(app):
+    from PySide6.QtCore import QRectF
+    from PySide6.QtGui import QImage, QPainter, QTransform
+    from PySide6.QtWidgets import QStyleOptionGraphicsItem
+
+    from abbychess.app.item_dos_boxes import ItemDosBoxes
+    from core.box_model import BoxEntry
+
+    item = ItemDosBoxes(400, 400)
+    # O box começa em x = 101 da página, logo depois do retângulo exposto (que acaba em
+    # 100,9); a 2×, o traço da borda esquerda dele cai no pixel 201, dentro do exposto.
+    item.trocar([BoxEntry("a", 101, 50, 150, 90, 0.1, "net")], [gd.SEM_LEITURA])
+    imagem = QImage(400, 400, QImage.Format.Format_ARGB32)
+    imagem.fill(0)
+    exposto = QRectF(0, 0, 100.9, 400)
+    opcao = QStyleOptionGraphicsItem()
+    opcao.exposedRect = exposto
+    pintor = QPainter(imagem)
+    pintor.setTransform(QTransform.fromScale(2, 2))
+    pintor.setClipRect(exposto)                      # como a cena faz: só o exposto é pintado
+    item.paint(pintor, opcao)
+    pintor.end()
+    assert any(imagem.pixelColor(201, y).alpha() for y in range(90, 190))
+
+
+def test_enter_na_caixa_de_zoom_devolve_o_foco_e_clicar_noutro_campo_nao(app, janela):
+    janela.show()
+    app.processEvents()
+    caixa = janela.caixa_de_zoom
+    caixa.setFocus()
+    caixa.lineEdit().selectAll()
+    QTest.keyClicks(caixa.lineEdit(), "150")
+    QTest.keyClick(caixa.lineEdit(), Qt.Key.Key_Return)
+    app.processEvents()
+    assert abs(janela.visor.escala() - 1.5) < 1e-6
+    assert QApplication.focusWidget() is janela.visor
+    caixa.setFocus(Qt.FocusReason.MouseFocusReason)
+    app.processEvents()
+    QTest.keyClicks(caixa.lineEdit(), "0")           # editando, sem Enter
+    janela.treino.campo.setFocus(Qt.FocusReason.MouseFocusReason)   # e clica noutro campo
+    app.processEvents()
+    assert QApplication.focusWidget() is janela.treino.campo

@@ -647,12 +647,14 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   (inclusive as lidas pela primeira vez depois, que ficam só em `paginas/p<pid>.json`),
   padrões ensinados (`padroes/`), palavras do léxico, amostras de diagrama e inclinações.
   Antes de abrir um projeto importante pela primeira vez no 1b, vale copiar a pasta inteira.
-- **O modelo v2 custa uns 10 ms na mediana da releitura e do Enter** (tabela "Rodadas
-  repetidas"): cada gravação reconcilia a lista da janela com o modelo. O mesmo passo
-  congelou os modelos globais para a coleta de lixo do Python (`gc.freeze`), o que tirou a
-  faixa alta do p95 do Enter e os picos da releitura, então os p95 do 1b ficaram iguais ou
-  melhores que os do passo 0 e do 1a. A reconciliação sai no passo 2a, e a cópia da página
-  inteira a cada passo do desfazer (que já existia) sai no 2b.
+- **O modelo v2 deixa a releitura e o Enter uns 7 a 10 ms mais lentos na mediana** que no
+  1a (tabela "Rodadas repetidas": o 1b sem o congelamento contra o 1a, os dois sem ele):
+  cada gravação reconcilia a lista da janela com o modelo. A troca de página ficou uns 12 ms
+  mais rápida, porque a página já está em memória. O mesmo passo congelou os modelos globais
+  para a coleta de lixo do Python (`gc.freeze`), o que **não muda as medianas**, mas tira a
+  faixa alta do p95 do Enter (de ~200 para ~135 ms); na releitura, o p95 do 1b (152–158 ms)
+  ficou pior que o do passo 0 e passou do alvo de 150 ms. A reconciliação sai no passo 2a,
+  e a cópia da página inteira a cada passo do desfazer (que já existia) sai no 2b.
 - **A janela ainda edita por índice** (até o passo 2a): cada gravação reconcilia a lista de
   glifos com o modelo, pelo objeto e, depois do desfazer de hoje (que devolve cópias), pela
   caixa. Um glifo que o desfazer de hoje trouxe de volta depois de dividido ganha gid novo

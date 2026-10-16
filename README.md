@@ -703,6 +703,9 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   de até 125 ms no meio dele, que esta rodada não separa: ela foi feita com a máquina
   ocupada por outro trabalho (o lote levou 178 s, contra 106 nas rodadas repetidas). A
   origem dos picos do meio fica para o passo E, que tira o lote do processo da interface.
+  Essa rodada foi medida no commit `f042339` com a árvore suja: a instrumentação do próprio
+  teste (o instante de cada atraso, ainda sem commit) e mudanças de outra sessão na leitura
+  dos diagramas; ela vale para dizer onde cai o maior atraso, não para comparar números.
 - **O tempo do lote.** No `medir.py` (uma rodada por livro) ele ficou uns 5% acima do 1b (xv:
   460 s contra 431–435 nas seis medidas anteriores; yusupov e darcy, de 4 a 8% acima). O lote
   de 20 páginas das rodadas de desempenho, que mede a mesma coisa seis vezes, não mudou:

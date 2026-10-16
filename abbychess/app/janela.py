@@ -453,8 +453,12 @@ class JanelaPrincipal(QMainWindow):
             self.treino.habilitar(False)
         elif self.pagina.box_atual() is not None:
             self.treino.habilitar(True)
-            if self.abas.currentWidget() is self.treino and self.isActiveWindow():
-                self.treino.campo.setFocus()    # o próximo caractere vai para o campo
+            foco = QApplication.focusWidget()
+            # O próximo caractere vai para o campo, mas sem tirar o foco de quem o tem por
+            # escolha (o seletor de página, por exemplo): só de ninguém ou do painel de texto.
+            if (self.abas.currentWidget() is self.treino and self.isActiveWindow()
+                    and (foco is None or foco is self.texto or self.treino.isAncestorOf(foco))):
+                self.treino.campo.setFocus()
         acoes.atualizar(self)
 
     def _fila_mudou(self, titulos: list) -> None:

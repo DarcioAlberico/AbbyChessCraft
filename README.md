@@ -121,7 +121,9 @@ página de 2.000 boxes pinta em ~12 ms em qualquer zoom (o alvo é 33).
 
 - **Zoom** de 5% a 800%: Ctrl+roda ou Ctrl++ e Ctrl+− (no limite, a barra diz "zoom máximo"
   ou "zoom mínimo"); **Ctrl+0** página inteira, **Ctrl+9** largura da página, **Ctrl+8**
-  100%, **Ctrl+7** o glifo atual. A caixa de zoom da barra aceita o número; o Enter devolve
+  100%, **Ctrl+7** o glifo atual. Valem com o foco na página ou no painel de treino; o **V**,
+  só com o foco na página (clique na margem dela), porque no campo do caractere ele é uma
+  letra. A caixa de zoom da barra aceita o número; o Enter devolve
   o teclado à página. Página inteira e largura continuam valendo ao redimensionar a janela.
 - **Rolar**: a roda rola, Shift+roda rola na horizontal; **espaço + arrastar** ou o **botão do
   meio** arrastam a página, sem marcar nada, também no modo de treino.
@@ -157,8 +159,8 @@ lado na hora, sem F5: os diagramas não conferidos da página tiram o lado de no
 boxes, sem reler o tabuleiro, e o Ctrl+Z da edição o desfaz junto. O conferido e o de lado
 informado na revisão não mudam.
 
-**Clicar no diagrama** (ou **Ferramentas › Conferir diagramas**, F8, que abre o próximo
-por conferir do livro) mostra o recorte impresso e a posição lida lado a lado, na mesma escala, a
+**Clicar no diagrama** (ou **Ferramentas › Próximo diagrama por conferir**, F8, que abre o
+próximo por conferir do livro) mostra o recorte impresso e a posição lida lado a lado, na mesma escala, a
 posição desenhada pela fonte de diagrama do PyBoxEditor:
 
 - clique seleciona a casa; a letra da peça a põe (maiúscula branca, minúscula preta); Delete,
@@ -199,7 +201,7 @@ sempre com as pastas do projeto.
   ensina a seleção inteira com o mesmo caractere, uma amostra por box; Shift+Enter corrige
   todos sem gravar padrão; Esc esvazia a seleção.
 - **Padrões do livro** (Ctrl+Shift+P) abre a aba das amostras.
-- **Conferir diagramas** (F8, desde o passo A1; antes era o Ctrl+G, que agora vai para uma
+- **Próximo diagrama por conferir** (F8, desde o passo A1; antes era o Ctrl+G, que agora vai para uma
   página) abre a conferência no próximo diagrama do livro ainda não conferido, a começar
   pela página aberta.
 - **Reconhecer o livro** (Ctrl+Shift+F5) lê um intervalo de páginas ("26-27, 30"; vazio é o

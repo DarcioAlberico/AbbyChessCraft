@@ -107,6 +107,10 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
         self.visor.zoom_mudou.connect(self._zoom_mudou)
         self.visor.pagina_vizinha.connect(self._pagina_vizinha)
         self._pixmaps = OrderedDict()
+        self._pre_carga = QTimer(self)          # a seguinte, depois de pintar a atual
+        self._pre_carga.setSingleShot(True)
+        self._pre_carga.setInterval(150)
+        self._pre_carga.timeout.connect(self.pagina.precarregar_seguinte)
         self._pre_pixmap = QTimer(self)
         self._pre_pixmap.setSingleShot(True)
         self._pre_pixmap.setInterval(400)

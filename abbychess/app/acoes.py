@@ -24,11 +24,14 @@ def _acao(janela, texto, atalho, funcao, barra=None) -> QAction:
     return acao
 
 
-def _da_imagem(janela, texto, atalho, funcao) -> QAction:
-    """Uma ação de escopo `imagem` (docs/atalhos.yaml): o atalho vale com o foco na Imagem."""
+def _da_imagem(janela, texto, atalho, funcao, *, no_glifo=False) -> QAction:
+    """Uma ação de escopo `imagem` (docs/atalhos.yaml): o atalho vale com o foco na Imagem e,
+    com `no_glifo`, também no painel de treino (escopo `glifo`), onde o foco fica no treino."""
     acao = _acao(janela, texto, atalho, funcao)
     acao.setShortcutContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
     janela.visor.addAction(acao)
+    if no_glifo:
+        janela.treino.addAction(acao)
     return acao
 
 
@@ -65,13 +68,14 @@ def montar(janela) -> None:
     j.acao_refazer.setShortcuts([QKeySequence("Ctrl+Y"), QKeySequence("Ctrl+Shift+Z")])
     barra.addSeparator()
     v = j.visor
-    j.acao_ajustar = _da_imagem(j, "Página inteira", "Ctrl+0", v.zoom_pagina)
+    j.acao_ajustar = _da_imagem(j, "Página inteira", "Ctrl+0", v.zoom_pagina, no_glifo=True)
     barra.addAction(j.acao_ajustar)
-    j.acao_zoom_mais = _da_imagem(j, "Aproximar", ["Ctrl+=", "Ctrl++"], v.zoom_mais)
-    j.acao_zoom_menos = _da_imagem(j, "Afastar", "Ctrl+-", v.zoom_menos)
-    j.acao_zoom_largura = _da_imagem(j, "Largura da página", "Ctrl+9", v.zoom_largura)
-    j.acao_zoom_100 = _da_imagem(j, "100%", "Ctrl+8", v.zoom_100)
-    j.acao_zoom_item = _da_imagem(j, "Zoom no item atual", "Ctrl+7", v.zoom_item)
+    j.acao_zoom_mais = _da_imagem(j, "Aproximar", ["Ctrl+=", "Ctrl++"], v.zoom_mais, no_glifo=True)
+    j.acao_zoom_menos = _da_imagem(j, "Afastar", "Ctrl+-", v.zoom_menos, no_glifo=True)
+    j.acao_zoom_largura = _da_imagem(j, "Largura da página", "Ctrl+9", v.zoom_largura,
+                                     no_glifo=True)
+    j.acao_zoom_100 = _da_imagem(j, "100%", "Ctrl+8", v.zoom_100, no_glifo=True)
+    j.acao_zoom_item = _da_imagem(j, "Zoom no item atual", "Ctrl+7", v.zoom_item, no_glifo=True)
     j.acao_origem = _da_imagem(j, "Mostrar a origem das leituras", "V", v.definir_origem)
     j.acao_origem.setCheckable(True)
     j.caixa_de_zoom = QSpinBox()

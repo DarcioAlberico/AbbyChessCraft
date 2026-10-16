@@ -25,7 +25,8 @@ class DesenhoDaJanela:
         self.seletor.blockSignals(False)
         self.total_de_paginas.setText(f" de {p.fonte.total} ")
         self.visor.mostrar_pagina(self._pixmap(p.indice, p.imagem))
-        self._pre_pixmap.start()                # o da seguinte, quando a pré-carga a tiver
+        self._pre_carga.start()                 # a seguinte, depois desta pintada
+        self._pre_pixmap.start()                # e o pixmap dela, quando a pré-carga a tiver
         self.verificacao.limpar("Aperte F7 para verificar o texto da página.")
         self._layout_mudou()
         if self.visor.modo_areas and not p.zonas:

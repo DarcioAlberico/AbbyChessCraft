@@ -490,3 +490,36 @@ def test_refazer_um_enter_desfeito_na_propagacao_propaga_de_novo(app, janela, mo
     assert sum(b.source == FONTE_LIVRO for b in boxes(janela)) == 4
     janela.pagina.desfazer()                            # e o desfazer leva as duas coisas
     assert not any(b.source in (FONTE_LIVRO, FONTE_MANUAL) for b in boxes(janela))
+
+
+def test_refazer_noutra_pagina_abre_a_do_enter_e_propaga(app, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    from abbychess import pagina as pg
+    from abbychess.app.janela import JanelaPrincipal
+    from abbychess.leitor import LeitorDoLivro
+    from abbychess.projeto import ProjetoDeLivro
+    from tests.test_livro import pdf_sintetico
+
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
+    j = JanelaPrincipal()
+    j.usar(projeto, pg.FonteDePaginas(projeto.fonte),
+           LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
+    try:
+        j.reconhecer()
+        _esperar(app, j)
+        solto = _propagacao_presa(monkeypatch)
+        mostrar(j, 0)
+        j.treino.campo.setText("a")
+        j.treino._ensinar()
+        j.pagina.desfazer()                             # com a propagação presa
+        solto.set()
+        _esperar(app, j)
+        j.ir_para_pagina(1)
+        j.pagina.refazer()                              # da página 1
+        _esperar(app, j)
+        assert j.pagina.indice == 0
+        assert sum(b.source == FONTE_LIVRO for b in boxes(j)) >= 1   # propagou de novo
+    finally:
+        j.close()

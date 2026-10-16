@@ -108,3 +108,29 @@ Correção 9 · Simplicidade 8 · Testes 9 — **aceita**.
 - Qualidade (`medir.py`, os três livros) e fatia (`replay_fatia.py --passo 2b`): iguais às
   do 2a; só o tempo do lote (xv 460 → 447 s) e a marca de árvore suja (o README e este
   registro, sem código) diferem.
+
+## Revisão de produto, rodada 1
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Produto e medição | Completude 8 · Fidelidade das medidas 7 · Clareza para o usuário 7 · Produtividade 7 | volta |
+
+O revisor rodou a janela com cenários próprios (offscreen, a propagação presa) e achou:
+
+| Achado | Correção |
+|---|---|
+| **M1** Quando a propagação resolvia o glifo mostrado, o painel pulava e apagava o que o usuário tinha digitado | o painel só avança sozinho se o glifo foi posto pela fila (não escolhido por clique ou Tab) e o campo não foi editado (`atual_resolvido`); três testes (avança, digitando fica, escolhido fica) |
+| **M2** "Desfazer um ensinar devolve as repetições à fila" falhava depois de um Ctrl+R (fora do desfazer) | o Reler pendentes entra no desfazer; o refazer de um Enter desfeito com a propagação descartada roda a propagação de novo; testes |
+| **M3** Uma recusa travava o desfazer inteiro | a recusa pergunta se tira a ação do desfazer, para chegar às anteriores; teste |
+| **M4** A árvore suja de todas as medidas não estava declarada | os JSON passam a listar os arquivos sujos (`arquivos_sujos`); as medidas foram refeitas com a pasta limpa (abaixo) |
+| **M5** A comparação 2a → 2b da releitura não mede o mesmo (o texto da página saiu do tempo medido) | o teste mede o painel de texto à parte (`texto_da_pagina`) e o README diz a mudança de método |
+| m1–m8 | os textos do congelamento, da tabela e da memória (README); a propagação não cobre mais a mensagem do Enter na barra; o refazer propaga de novo; a recusa é uma pergunta, uma vez por Ctrl+Z |
+
+A janela passou de 500 linhas com isso; o desenho foi para um mixin (`app/desenho.py`,
+`DesenhoDaJanela`), com a mesma regra do CA-14.1 (teste ampliado).
+
+## Rodada 4 (código, sobre as correções do produto)
+
+Correção 8 · Simplicidade 8 · Testes 8 — **aceita**. Os dois furos que ela deixou entraram
+junto: o refazer que repropaga decide depois de abrir a página da transação (teste de refazer
+de outra página), e `mostrar` direto zera o "escolhido" (só `escolher` o liga).

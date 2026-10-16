@@ -120,6 +120,8 @@ class ControladorDePagina:
         self.lote_rodando = False
         #: Muda a cada `ligar`: a tarefa pedida para outro projeto não roda nem aplica.
         self.geracao = 0
+        #: O glifo em revisão foi escolhido pelo usuário (e não posto pela fila).
+        self.escolhido = False
 
     # ------------------------------------------------------------------
     # O que a janela lê
@@ -266,11 +268,17 @@ class ControladorDePagina:
 
     def clicar(self, indice: int) -> None:
         """O box clicado no visor (pela posição na lista)."""
-        self.mostrar(self.gid_em(indice))
+        self.escolher(self.gid_em(indice))
+
+    def escolher(self, gid: Optional[int]) -> None:
+        """O glifo que o usuário escolheu (clique, Tab): a propagação não o troca sozinha."""
+        self.mostrar(gid)
+        self.escolhido = self.atual is not None
 
     def ir_ao_primeiro_pendente(self) -> None:
         fila = self.fila()
         self.atual = fila[0] if fila else None
+        self.escolhido = False
         self.eventos.emitir("atual_mudou")
 
     def andar(self, passo: int) -> None:
@@ -281,10 +289,10 @@ class ControladorDePagina:
             return
         if passo > 0 and self.atual in fila:
             self.pulados.add(self.atual)
-            self.mostrar(self.fila()[0])
+            self.escolher(self.fila()[0])
             return
         posicao = fila.index(self.atual) if self.atual in fila else 0
-        self.mostrar(fila[(posicao + passo) % len(fila)])
+        self.escolher(fila[(posicao + passo) % len(fila)])
 
     def alternar_na_selecao(self, indice: int) -> None:
         """O Ctrl+clique do modo de treino: põe ou tira o glifo da seleção."""
@@ -446,6 +454,10 @@ class ControladorDePagina:
             if not dif.vazia:
                 if transacao is not None:
                     self._emendar(transacao, foto, pagina)
+                else:                       # o Ctrl+R também se desfaz (§14.2)
+                    self.historico.registrar(hs.Transacao(
+                        "Reler pendentes", {pagina.pid: hs.mudanca(foto, pagina.instantaneo())}))
+                    self.eventos.emitir("acoes_mudaram")
                 self._gravar(pagina)
             if pagina is self.modelo:
                 self.eventos.emitir("glifos_mudaram", dif.mudados)
@@ -476,8 +488,10 @@ class ControladorDePagina:
             if resolvidos:
                 self._avisar(f"Padrão '{char}' ensinado{amostras} e resolveu mais "
                              f"{resolvidos} na página.", 5000)
-            if self.atual is None or self.atual not in self.fila():
-                self.ir_ao_primeiro_pendente()          # o glifo mostrado se resolveu
+            if self.atual is None or (self.atual not in self.fila() and not self.escolhido):
+                # O glifo mostrado se resolveu: a janela avança, se o usuário ainda não
+                # começou a digitar nele (`atual_resolvido`).
+                self.eventos.emitir("atual_resolvido")
         return ensinou, propagou
 
     def ensinar_gids(self, por_char: Dict[str, Sequence[int]], descricao: str,
@@ -772,7 +786,7 @@ class ControladorDePagina:
                 paginas[pid] = pagina
         except hs.Recusa as recusa:
             acao = "refazer" if refazer else "desfazer"
-            self.eventos.emitir("aviso", "Desfazer", f"Não dá para {acao} "
+            self.eventos.emitir("recusa", refazer, f"Não dá para {acao} "
                                 f"\u201c{transacao.descricao}\u201d: {recusa}. Nada foi mudado.")
             return
         for pid, m in transacao.paginas.items():
@@ -790,6 +804,12 @@ class ControladorDePagina:
                 if amostra.caminho.exists():
                     self.leitor.esquecer(amostra.caminho)
             h.refeita()
+            repropagar = transacao.invalidada and transacao.amostras_criadas
+            if repropagar and self.modelo is not None and self.modelo.pid in transacao.paginas:
+                # A propagação foi descartada quando ele foi desfeito: roda de novo, com os
+                # padrões de agora, e emenda a transação de novo.
+                transacao.invalidada = False
+                self._propagar(self.modelo, self.indice, transacao, None)
         else:
             for amostra in transacao.amostras_criadas:
                 if amostra.caminho.exists():
@@ -809,6 +829,16 @@ class ControladorDePagina:
         self.eventos.emitir("acoes_mudaram")
         acao = "Refeito" if refazer else "Desfeito"
         self._avisar(f"{acao}: {transacao.descricao}.", 6000)
+
+    def tirar_do_desfazer(self, refazer: bool = False) -> None:
+        """Tira a próxima ação do desfazer (ou do refazer) sem aplicá-la: depois de uma
+        recusa, para chegar às anteriores."""
+        if refazer:
+            self.historico.descartar_refazer()
+        else:
+            self.historico.descartar_desfazer()
+        self.eventos.emitir("acoes_mudaram")
+        self._avisar("A ação saiu do desfazer; o Ctrl+Z segue com as anteriores.", 6000)
 
     def esquecer(self, caminhos: Sequence) -> None:
         """Apaga amostras dos padrões do livro e relê a página inteira sem elas (na fila: o

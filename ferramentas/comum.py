@@ -28,12 +28,13 @@ def estado_do_git() -> dict:
     try:
         commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=RAIZ,
                                 capture_output=True, text=True, check=True).stdout.strip()
-        sujo = bool(subprocess.run(["git", "status", "--porcelain", "--", ".",
-                                    ":(exclude)docs/medidas", ":(exclude)README.md"], cwd=RAIZ,
-                                   capture_output=True, text=True, check=True).stdout.strip())
+        sujos = subprocess.run(["git", "status", "--porcelain", "--", ".",
+                                ":(exclude)docs/medidas", ":(exclude)README.md"], cwd=RAIZ,
+                               capture_output=True, text=True, check=True).stdout.splitlines()
     except (OSError, subprocess.CalledProcessError):
-        return {"commit": None, "arvore_suja": None}
-    return {"commit": commit, "arvore_suja": sujo}
+        return {"commit": None, "arvore_suja": None, "arquivos_sujos": None}
+    sujos = [linha.strip() for linha in sujos if linha.strip()]
+    return {"commit": commit, "arvore_suja": bool(sujos), "arquivos_sujos": sujos}
 
 
 def destino_da_medida(data: str, base: str, pasta: Path = MEDIDAS) -> Path:

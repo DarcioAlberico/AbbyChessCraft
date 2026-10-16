@@ -43,10 +43,10 @@ def _aninhadas(classe: ast.ClassDef):
                     yield dentro
 
 
-def violacoes(fonte: str):
+def violacoes(fonte: str, classe_nome: str = "JanelaPrincipal"):
     arvore = ast.parse(fonte)
     classe = next(n for n in arvore.body if isinstance(n, ast.ClassDef)
-                  and n.name == "JanelaPrincipal")
+                  and n.name == classe_nome)
     saida = []
     for funcao in _aninhadas(classe):
         for no in ast.walk(funcao):
@@ -62,6 +62,9 @@ def test_janela_tem_menos_de_500_linhas():
 
 def test_closures_da_janela_so_chamam_comandos_de_controlador():
     assert violacoes(JANELA.read_text(encoding="utf-8")) == []
+    # O desenho é parte da janela (um mixin, desde o 2b): a mesma regra.
+    desenho = (RAIZ / "app" / "desenho.py").read_text(encoding="utf-8")
+    assert violacoes(desenho, "DesenhoDaJanela") == []
 
 
 def test_a_regra_pega_uma_closure_com_logica():

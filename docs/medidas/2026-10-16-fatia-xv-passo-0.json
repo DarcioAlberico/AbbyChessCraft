@@ -1,0 +1,115 @@
+{
+ "livro": "xv",
+ "passo": "0",
+ "snapshot": "xv-i020-026-inicial.zip",
+ "snapshot_sha256": "0cf949dff64e9609389eef1bdc6ef935459fb6fd1e6933c3baaf66bc8fcf2431",
+ "catalogo_versao": 3,
+ "gabaritos": {
+  "i020": {
+   "verdade_versao": 1,
+   "sha256": "9db4c0500477e24f0dbfbb8fae5ebd8aebdb5e8a4f5ea629fe21548a215e96e1"
+  },
+  "i021": {
+   "verdade_versao": 1,
+   "sha256": "33165d42394d58ff96f7235ce5e4945aaa0a89e8a276c5f38c2af1d489133383"
+  },
+  "i022": {
+   "verdade_versao": 1,
+   "sha256": "09a98aae8a8ac49b1ca1abc9323614b8e7846886cf198d419f102368fd31e8e0"
+  },
+  "i023": {
+   "verdade_versao": 1,
+   "sha256": "8cd81686f82c1353791fa38c167e374e7b24c5051b1d8bd1ed7d49cf5e7aca1f"
+  },
+  "i024": {
+   "verdade_versao": 1,
+   "sha256": "ce2020dc3b1c070a1a2c1e146f6818f7dbcea33ac2951e946ce39d45fa99b96b"
+  },
+  "i025": {
+   "verdade_versao": 1,
+   "sha256": "350bdc9d8bb8aa85de79e1442c37a90071ded3de0aa0dad9615044603bd70d32"
+  },
+  "i026": {
+   "verdade_versao": 1,
+   "sha256": "bc92aa62e4c002dda4fbb6ea0975148f93cffa088b321d1b9229e81ef9603518"
+  }
+ },
+ "paginas": {
+  "i020": {
+   "gestos_texto": 0,
+   "gestos_diagramas": 2,
+   "comandos": {
+    "abrir_diagrama": 1,
+    "fechar_diagrama": 1
+   },
+   "impossiveis": {},
+   "linhas_verificadas": 0
+  },
+  "i021": {
+   "gestos_texto": 0,
+   "gestos_diagramas": 0,
+   "comandos": {},
+   "impossiveis": {},
+   "linhas_verificadas": 0
+  },
+  "i022": {
+   "gestos_texto": 0,
+   "gestos_diagramas": 0,
+   "comandos": {},
+   "impossiveis": {},
+   "linhas_verificadas": 0
+  },
+  "i023": {
+   "gestos_texto": 0,
+   "gestos_diagramas": 0,
+   "comandos": {},
+   "impossiveis": {},
+   "linhas_verificadas": 0
+  },
+  "i024": {
+   "gestos_texto": 0,
+   "gestos_diagramas": 3,
+   "comandos": {
+    "abrir_diagrama": 1,
+    "corrigir_lado": 1,
+    "fechar_diagrama": 1
+   },
+   "impossiveis": {},
+   "linhas_verificadas": 0
+  },
+  "i025": {
+   "gestos_texto": 0,
+   "gestos_diagramas": 6,
+   "comandos": {
+    "abrir_diagrama": 2,
+    "corrigir_lado": 2,
+    "fechar_diagrama": 2
+   },
+   "impossiveis": {},
+   "linhas_verificadas": 0
+  },
+  "i026": {
+   "gestos_texto": 0,
+   "gestos_diagramas": 3,
+   "comandos": {
+    "abrir_diagrama": 1,
+    "corrigir_lado": 1,
+    "fechar_diagrama": 1
+   },
+   "impossiveis": {},
+   "linhas_verificadas": 0
+  }
+ },
+ "gestos_texto": 0,
+ "gestos_diagramas": 14,
+ "gestos_navegacao": 6,
+ "impossiveis": {},
+ "custo_dos_impossiveis": 0,
+ "linhas_usadas": [],
+ "estado": "pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas",
+ "gestos": null,
+ "gestos_sem_impossiveis": null,
+ "data": "2026-10-16",
+ "commit": "8fa59bf",
+ "arvore_suja": false
+}

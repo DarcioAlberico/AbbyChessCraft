@@ -356,11 +356,11 @@ Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (máquina cadastrada
 | Meta (spec §2) | Hoje | Alvo |
 |---|---|---|
 | Trocar de página (não há cache) | p95 192 ms | 150 ms no cache; fora do cache ainda não medido pelo método |
-| Enter até a cor do box mudar | p95 107 ms (0 → 35 padrões no livro) | 100 ms |
-| Releitura de um glifo | p95 140 ms; impossível com o lote | 150 ms com o lote |
-| Memória do desfazer, 300 páginas × 20 ações | ~2384,4 MB (estimado) | 50 MB |
-| Atraso da interface durante o lote (20 páginas) | p99 21 ms, com as ações desabilitadas | 50 ms, com as ações |
-| Memória com o lote | 1657 MB num processo | 2560 MB |
+| Enter até a cor do box mudar | p95 185 ms (0 → 35 padrões no livro) | 100 ms |
+| Releitura de um glifo | p95 135 ms; impossível com o lote | 150 ms com o lote |
+| Memória do desfazer, 300 páginas × 20 ações | ~4182,9 MB (estimado) | 50 MB |
+| Atraso da interface durante o lote (20 páginas) | p99 8,1 ms, com as ações desabilitadas | 50 ms, com as ações |
+| Memória com o lote | 1652 MB num processo | 2560 MB |
 
 Qualidade contra os gabaritos (`ferramentas\medir.py`). Casas e lado só contam nos diagramas conferidos; o provisório (contra o FEN do rascunho, ainda não conferido) vai entre parênteses. "Margens corridas" são cabeçalho, número de página e rodapé; "—" é nada a medir (nenhuma linha tirada, nenhum diagrama).
 

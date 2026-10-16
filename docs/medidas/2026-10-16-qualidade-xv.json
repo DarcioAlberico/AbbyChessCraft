@@ -1,0 +1,386 @@
+{
+ "livro": "xv",
+ "indices": [
+  0,
+  7,
+  20,
+  21,
+  22,
+  23,
+  24,
+  25,
+  26
+ ],
+ "pdf_sha256": "c7277691646ce288f81649f181a2d0316bf1e01ff864b9810c29ce9a0d5b7161",
+ "gabaritos": {
+  "i000": {
+   "verdade_versao": 1,
+   "sha256": "6d67d4f2b77583455e0f24572cb2e2517e45bf20815fdfd3c25a828be801339c"
+  },
+  "i007": {
+   "verdade_versao": 1,
+   "sha256": "f28960d65467ed6f9a6364575fc904913d2756cc14b326644751a7bd16c81308"
+  },
+  "i020": {
+   "verdade_versao": 1,
+   "sha256": "9db4c0500477e24f0dbfbb8fae5ebd8aebdb5e8a4f5ea629fe21548a215e96e1"
+  },
+  "i021": {
+   "verdade_versao": 1,
+   "sha256": "33165d42394d58ff96f7235ce5e4945aaa0a89e8a276c5f38c2af1d489133383"
+  },
+  "i022": {
+   "verdade_versao": 1,
+   "sha256": "09a98aae8a8ac49b1ca1abc9323614b8e7846886cf198d419f102368fd31e8e0"
+  },
+  "i023": {
+   "verdade_versao": 1,
+   "sha256": "8cd81686f82c1353791fa38c167e374e7b24c5051b1d8bd1ed7d49cf5e7aca1f"
+  },
+  "i024": {
+   "verdade_versao": 1,
+   "sha256": "ce2020dc3b1c070a1a2c1e146f6818f7dbcea33ac2951e946ce39d45fa99b96b"
+  },
+  "i025": {
+   "verdade_versao": 1,
+   "sha256": "350bdc9d8bb8aa85de79e1442c37a90071ded3de0aa0dad9615044603bd70d32"
+  },
+  "i026": {
+   "verdade_versao": 1,
+   "sha256": "bc92aa62e4c002dda4fbb6ea0975148f93cffa088b321d1b9229e81ef9603518"
+  }
+ },
+ "gabaritos_revisados": "0/9",
+ "nao_medido": {
+  "ligacao_da_legenda": "passo H (a leitura de hoje não liga legenda a diagrama)",
+  "precisao_e_revocacao_por_funcao": "passo F (a leitura de hoje não classifica blocos)",
+  "validacao_pelos_lances": "passo H"
+ },
+ "resumo": {
+  "margens_precisao": 0.875,
+  "margens_revocacao": 1.0,
+  "diagramas_achados": "7/7",
+  "diagramas_falsos": 1,
+  "linhas_sem_par": 839,
+  "fen_verificados": "0/7",
+  "casas_erradas_por_diagrama": null,
+  "casas_erradas_provisorio": 0.0,
+  "lado_certo": "0/0",
+  "lado_certo_provisorio": "1/5",
+  "ordem_discordancia_media": 0.0,
+  "cer_corpo": null,
+  "linhas_com_texto_verificado": "0/241",
+  "estado": "provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas",
+  "lote_s": 431.8,
+  "pendentes": 7473
+ },
+ "paginas": {
+  "i000": {
+   "pagina_impressa": null,
+   "estrutura": true,
+   "estrutura_revisada": false,
+   "margens": {
+    "vp": 0,
+    "fp": 0,
+    "fn": 0
+   },
+   "diagramas": {
+    "verdade": 0,
+    "achados": 1,
+    "casados": 0,
+    "detalhes": []
+   },
+   "linhas_sem_par": 832,
+   "corpo": {
+    "linhas": 10,
+    "casadas": 0,
+    "ordem_discordancia": 0.0,
+    "linhas_verificadas": 0,
+    "cer_erros": 0,
+    "cer_caracteres": 0,
+    "cer": null
+   },
+   "pendentes": 5429
+  },
+  "i007": {
+   "pagina_impressa": null,
+   "estrutura": true,
+   "estrutura_revisada": false,
+   "margens": {
+    "vp": 0,
+    "fp": 0,
+    "fn": 0
+   },
+   "diagramas": {
+    "verdade": 0,
+    "achados": 0,
+    "casados": 0,
+    "detalhes": []
+   },
+   "linhas_sem_par": 1,
+   "corpo": {
+    "linhas": 18,
+    "casadas": 18,
+    "ordem_discordancia": 0.0,
+    "linhas_verificadas": 0,
+    "cer_erros": 0,
+    "cer_caracteres": 0,
+    "cer": null
+   },
+   "pendentes": 130
+  },
+  "i020": {
+   "pagina_impressa": 21,
+   "estrutura": true,
+   "estrutura_revisada": false,
+   "margens": {
+    "vp": 1,
+    "fp": 0,
+    "fn": 0
+   },
+   "diagramas": {
+    "verdade": 1,
+    "achados": 1,
+    "casados": 1,
+    "detalhes": [
+     {
+      "id": "d0",
+      "casas_erradas": 0,
+      "fen_verificado": false,
+      "lado_certo": null,
+      "lado_verificado": false,
+      "confiavel": false
+     }
+    ]
+   },
+   "linhas_sem_par": 0,
+   "corpo": {
+    "linhas": 28,
+    "casadas": 28,
+    "ordem_discordancia": 0.0,
+    "linhas_verificadas": 0,
+    "cer_erros": 0,
+    "cer_caracteres": 0,
+    "cer": null
+   },
+   "pendentes": 287
+  },
+  "i021": {
+   "pagina_impressa": 22,
+   "estrutura": true,
+   "estrutura_revisada": false,
+   "margens": {
+    "vp": 1,
+    "fp": 0,
+    "fn": 0
+   },
+   "diagramas": {
+    "verdade": 0,
+    "achados": 0,
+    "casados": 0,
+    "detalhes": []
+   },
+   "linhas_sem_par": 1,
+   "corpo": {
+    "linhas": 38,
+    "casadas": 37,
+    "ordem_discordancia": 0.0,
+    "linhas_verificadas": 0,
+    "cer_erros": 0,
+    "cer_caracteres": 0,
+    "cer": null
+   },
+   "pendentes": 303
+  },
+  "i022": {
+   "pagina_impressa": 23,
+   "estrutura": true,
+   "estrutura_revisada": false,
+   "margens": {
+    "vp": 1,
+    "fp": 0,
+    "fn": 0
+   },
+   "diagramas": {
+    "verdade": 1,
+    "achados": 1,
+    "casados": 1,
+    "detalhes": [
+     {
+      "id": "d0",
+      "casas_erradas": 0,
+      "fen_verificado": false,
+      "lado_certo": null,
+      "lado_verificado": false,
+      "confiavel": true
+     }
+    ]
+   },
+   "linhas_sem_par": 0,
+   "corpo": {
+    "linhas": 27,
+    "casadas": 27,
+    "ordem_discordancia": 0.0,
+    "linhas_verificadas": 0,
+    "cer_erros": 0,
+    "cer_caracteres": 0,
+    "cer": null
+   },
+   "pendentes": 230
+  },
+  "i023": {
+   "pagina_impressa": 24,
+   "estrutura": true,
+   "estrutura_revisada": false,
+   "margens": {
+    "vp": 1,
+    "fp": 0,
+    "fn": 0
+   },
+   "diagramas": {
+    "verdade": 0,
+    "achados": 0,
+    "casados": 0,
+    "detalhes": []
+   },
+   "linhas_sem_par": 0,
+   "corpo": {
+    "linhas": 38,
+    "casadas": 38,
+    "ordem_discordancia": 0.0,
+    "linhas_verificadas": 0,
+    "cer_erros": 0,
+    "cer_caracteres": 0,
+    "cer": null
+   },
+   "pendentes": 342
+  },
+  "i024": {
+   "pagina_impressa": 25,
+   "estrutura": true,
+   "estrutura_revisada": false,
+   "margens": {
+    "vp": 1,
+    "fp": 0,
+    "fn": 0
+   },
+   "diagramas": {
+    "verdade": 1,
+    "achados": 1,
+    "casados": 1,
+    "detalhes": [
+     {
+      "id": "d0",
+      "casas_erradas": 0,
+      "fen_verificado": false,
+      "lado_certo": false,
+      "lado_verificado": false,
+      "confiavel": false
+     }
+    ]
+   },
+   "linhas_sem_par": 1,
+   "corpo": {
+    "linhas": 27,
+    "casadas": 27,
+    "ordem_discordancia": 0.0,
+    "linhas_verificadas": 0,
+    "cer_erros": 0,
+    "cer_caracteres": 0,
+    "cer": null
+   },
+   "pendentes": 228
+  },
+  "i025": {
+   "pagina_impressa": 26,
+   "estrutura": true,
+   "estrutura_revisada": false,
+   "margens": {
+    "vp": 1,
+    "fp": 1,
+    "fn": 0
+   },
+   "diagramas": {
+    "verdade": 3,
+    "achados": 3,
+    "casados": 3,
+    "detalhes": [
+     {
+      "id": "d0",
+      "casas_erradas": 0,
+      "fen_verificado": false,
+      "lado_certo": true,
+      "lado_verificado": false,
+      "confiavel": true
+     },
+     {
+      "id": "d1",
+      "casas_erradas": 0,
+      "fen_verificado": false,
+      "lado_certo": false,
+      "lado_verificado": false,
+      "confiavel": true
+     },
+     {
+      "id": "d2",
+      "casas_erradas": 0,
+      "fen_verificado": false,
+      "lado_certo": false,
+      "lado_verificado": false,
+      "confiavel": false
+     }
+    ]
+   },
+   "linhas_sem_par": 3,
+   "corpo": {
+    "linhas": 22,
+    "casadas": 20,
+    "ordem_discordancia": 0.0,
+    "linhas_verificadas": 0,
+    "cer_erros": 0,
+    "cer_caracteres": 0,
+    "cer": null
+   },
+   "pendentes": 204
+  },
+  "i026": {
+   "pagina_impressa": 27,
+   "estrutura": true,
+   "estrutura_revisada": false,
+   "margens": {
+    "vp": 1,
+    "fp": 0,
+    "fn": 0
+   },
+   "diagramas": {
+    "verdade": 1,
+    "achados": 1,
+    "casados": 1,
+    "detalhes": [
+     {
+      "id": "d0",
+      "casas_erradas": 0,
+      "fen_verificado": false,
+      "lado_certo": false,
+      "lado_verificado": false,
+      "confiavel": false
+     }
+    ]
+   },
+   "linhas_sem_par": 1,
+   "corpo": {
+    "linhas": 33,
+    "casadas": 33,
+    "ordem_discordancia": 0.0,
+    "linhas_verificadas": 0,
+    "cer_erros": 0,
+    "cer_caracteres": 0,
+    "cer": null
+   },
+   "pendentes": 320
+  }
+ },
+ "data": "2026-10-16",
+ "commit": "8fa59bf",
+ "arvore_suja": false
+}

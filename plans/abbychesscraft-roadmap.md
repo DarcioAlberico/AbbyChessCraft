@@ -266,6 +266,9 @@ lote rodando" é do passo E, o primeiro que deixa medir isso.
 - CA-3.7: o teste de dados mais o da janela, só no perfil padrão, `desde_passo ≤ A2`.
 - CA-4.2 (parte do A2) e CA-8.2 (a parte do Alt+↓).
 - `ferramentas/capturas.py` nasce aqui; capturas para a revisão de design.
+- Pendência do A1: em `docs/atalhos.yaml`, a exceção do `proximo_da_fila` cita o widget
+  `combobox` para a caixa de zoom, que é um `QSpinBox`; acertar o widget ao montar o teste da
+  janela do CA-3.7.
 
 ## Passo A3 — Documento e sincronia (§6.1, §6.2)
 

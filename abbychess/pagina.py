@@ -126,7 +126,9 @@ class FonteDePaginas:
             self._inclinacoes = {int(k): float(v) for k, v in bruto.items()}
         self._pdf = None
         #: Uma página por vez: a janela, a pré-carga (`CacheDePaginas`) e o lote renderizam
-        #: da mesma fonte, de threads diferentes.
+        #: da mesma fonte, de threads diferentes. Com o lote rodando, abrir uma página fora do
+        #: cache espera a página que o lote está renderizando (antes, os dois disputavam o
+        #: fitz sem trava, o que não é seguro).
         self._trava = threading.RLock()
         self.total = 1
         sufixo = self.caminho.suffix.lower()

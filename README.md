@@ -226,13 +226,14 @@ Desde o passo 1a, todo arquivo do projeto (as páginas, `projeto.json`, `livro.j
 deles) é gravado do mesmo jeito: num `.tmp` ao lado, com `fsync`, e trocado pelo antigo de
 uma vez. Uma queda no meio deixa o arquivo antigo inteiro ou o novo inteiro, nunca um JSON
 pela metade; se o Windows segurar o arquivo um instante (antivírus, indexador), a gravação
-tenta de novo 5 vezes. Os `.tmp` que uma queda deixar são apagados na próxima abertura.
+tenta de novo (até 5 tentativas ao todo, a cada 50 ms). Os `.tmp` que uma queda deixar são apagados na próxima abertura.
 
 - **A fonte pode mudar de lugar.** Se o PDF estiver dentro da pasta do projeto, o caminho
   fica relativo, e a pasta inteira pode ser movida. Se a fonte sumir, a abertura procura o
-  mesmo arquivo (pelo SHA-256 dos primeiros 4 MB) ao lado do caminho antigo e na pasta do
-  projeto, e o acha mesmo renomeado; se não achar, pede para você mostrar onde ele está, e
-  recusa um arquivo de conteúdo diferente.
+  mesmo arquivo (pelo SHA-256 dos primeiros 4 MB e pelo tamanho) ao lado do caminho antigo,
+  na pasta do projeto e na pasta onde ela está, e o acha mesmo renomeado (a janela avisa
+  onde); se não achar, pede para você mostrar onde ele está, e recusa um arquivo de
+  conteúdo diferente.
 - **Projeto de versão mais nova abre só para leitura.** Dá para ver as páginas, mas nada é
   gravado (o título da janela diz "só leitura"). Um campo de `projeto.json` que esta versão
   não conhece não se perde: vai para `extras` e volta igual ao arquivo.
@@ -567,8 +568,14 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 - **Gravar não é assíncrono ainda.** Cada gravação de página faz dois `fsync` (a página e o
   `livro.json`) na thread de quem grava; o gravador assíncrono, com coalescência, é do passo
   2a. O formato das páginas ainda é o v1 (o v2 nasce no passo 1b).
-- **No projeto só para leitura, ensinar um padrão falha com aviso** em vez de ficar
-  desabilitado: a janela ainda não desliga as ações (passo A2).
+- **No projeto só para leitura, as ações que gravam falham com aviso** em vez de ficarem
+  desabilitadas: ensinar e esquecer padrões, guardar as casas de um diagrama conferido e o
+  reconhecimento em lote (que avisa só depois de ler a primeira página). A correção feita na
+  tela some ao trocar de página. A janela passa a desligar essas ações no passo A2.
+- **Um projeto aberto por este programa não abre mais no programa da tag `passo-0`.** A
+  primeira abertura grava em `projeto.json` campos novos (`fonte_sha256`, `fonte_tamanho`,
+  `extras`), que o programa do passo 0 recusa como "ilegível". Para voltar ao passo 0 com um
+  livro em andamento, use a cópia de segurança de antes do passo.
 
 - **O Del do treino não descarta o box com o foco no campo do caractere.** O campo fica com a
   tecla, mesmo vazio (achado da tabela de atalhos no passo 0). Por enquanto, use o botão

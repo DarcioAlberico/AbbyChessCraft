@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 import re
 import threading
@@ -52,11 +53,12 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
 from core.box_model import BoxEntry
 
 from abbychess import gravacao as gv
+from abbychess.zonas import Zona
 
 if TYPE_CHECKING:
     from abbychess.diagramas import DiagramaLido
 
-from abbychess.zonas import Zona
+log = logging.getLogger(__name__)
 
 ARQUIVO_DO_PROJETO = "projeto.json"
 PASTA_DE_PADROES = "padroes"
@@ -112,10 +114,13 @@ class Projeto:
     #: O idioma da prosa, que escolhe o léxico da verificação de texto.
     idioma: str = "pt"
     versao: int = VERSAO
-    #: O SHA-256 dos primeiros 4 MB da fonte, que a reconhece se ela for movida.
+    #: O SHA-256 dos primeiros 4 MB da fonte e o tamanho dela, que a reconhecem se ela for
+    #: movida (o tamanho separa dois arquivos de começo igual e evita ler os outros).
     fonte_sha256: str = ""
-    #: Os campos de `projeto.json` que esta versão não conhece, guardados para
-    #: voltarem iguais ao arquivo (`limiares` tem os de `Limiares`).
+    fonte_tamanho: int = 0
+    #: Os campos de `projeto.json` que esta versão não conhece. Não se perdem: ficam aqui
+    #: e são regravados em `extras` (os de `limiares` em `extras["limiares"]`), onde uma
+    #: versão futura que os entenda vai buscá-los.
     extras: Dict[str, object] = field(default_factory=dict)
     #: Endireitar cada página antes de ler (`pagina.medir_inclinacao`). Projeto
     #: novo nasce com isto; o que foi criado antes fica sem, porque os boxes
@@ -152,7 +157,12 @@ class ProjetoDeLivro:
         #: Versão mais nova que a do programa: nada é gravado (`gravacao.SomenteLeitura`).
         self.somente_leitura = somente_leitura
         self._livro: Optional[dict] = None
-        self._trava_do_livro = threading.Lock()
+        #: Uma gravação de página por vez (o lote grava de outra thread): a página,
+        #: `marcadas.json` e `livro.json` mudam juntos, e o `.tmp` de cada um é um só.
+        self._trava_do_livro = threading.RLock()
+        self._travado = somente_leitura         # este objeto segura uma trava de só leitura
+        #: A abertura achou a fonte noutro lugar, pelo SHA-256 (a janela avisa).
+        self.fonte_relocalizada = False
 
     # ------------------------------------------------------------------
     # Criar e abrir
@@ -172,7 +182,8 @@ class ProjetoDeLivro:
         (pasta / PASTA_DE_PAGINAS).mkdir(parents=True, exist_ok=True)
         dados = Projeto(nome=nome, fonte=_caminho_gravado(fonte, pasta),
                         criado=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                        endireitar=True, fonte_sha256=sha_da_fonte(fonte))
+                        endireitar=True, fonte_sha256=sha_da_fonte(fonte),
+                        fonte_tamanho=fonte.stat().st_size)
         projeto = cls(pasta, dados)
         projeto.salvar()
         return projeto
@@ -201,27 +212,37 @@ class ProjetoDeLivro:
             raise ProjetoInvalido(f"{arquivo} está ilegível: {erro}") from erro
         if dados.versao > VERSAO:
             gv.proteger(pasta)
-            return cls(pasta, dados, somente_leitura=True)
-        gv.liberar(pasta)
+            projeto = cls(pasta, dados, somente_leitura=True)
+            if projeto.fonte_ausente:
+                achada = projeto._procurar_fonte()
+                if achada is not None:          # só na memória: nada é gravado
+                    dados.fonte, projeto.fonte_relocalizada = str(achada), True
+            return projeto
         (pasta / PASTA_DE_PADROES).mkdir(exist_ok=True)
         (pasta / PASTA_DE_PAGINAS).mkdir(exist_ok=True)
         gv.limpar_temporarios(pasta)
         projeto = cls(pasta, dados)
         mudou = bool(desconhecidos or outros_limiares)
         if projeto.fonte.is_file():
-            if not dados.fonte_sha256:
-                dados.fonte_sha256, mudou = sha_da_fonte(projeto.fonte), True
+            if not dados.fonte_sha256 or not dados.fonte_tamanho:
+                dados.fonte_sha256 = sha_da_fonte(projeto.fonte)
+                dados.fonte_tamanho, mudou = projeto.fonte.stat().st_size, True
         else:
             achada = projeto._procurar_fonte()
             if achada is not None:
                 dados.fonte, mudou = _caminho_gravado(achada, pasta), True
+                projeto.fonte_relocalizada = True
         if mudou:
-            projeto.salvar()
+            try:
+                projeto.salvar()
+            except OSError as erro:     # mídia só de leitura: abre igual, sem gravar o ajuste
+                log.warning("não deu para gravar %s ao abrir: %s", ARQUIVO_DO_PROJETO, erro)
         return projeto
 
     def fechar(self) -> None:
-        """Solta a trava de só leitura da pasta (os outros projetos não têm o que soltar)."""
-        if self.somente_leitura:
+        """Solta a trava de só leitura que este objeto segura (uma vez só)."""
+        if self._travado:
+            self._travado = False
             gv.liberar(self.pasta)
 
     def salvar(self) -> None:
@@ -242,12 +263,21 @@ class ProjetoDeLivro:
         caminho = Path(caminho).resolve()
         if not caminho.is_file():
             raise ProjetoInvalido(f"A fonte não existe: {caminho}")
-        sha = sha_da_fonte(caminho)
-        if self.dados.fonte_sha256 and sha != self.dados.fonte_sha256:
+        sha, tamanho = sha_da_fonte(caminho), caminho.stat().st_size
+        if self.dados.fonte_sha256 and (sha != self.dados.fonte_sha256 or (
+                self.dados.fonte_tamanho and tamanho != self.dados.fonte_tamanho)):
             raise ProjetoInvalido(
                 f"{caminho.name} não é a fonte deste projeto: o conteúdo é outro.")
-        self.dados.fonte, self.dados.fonte_sha256 = _caminho_gravado(caminho, self.pasta), sha
-        self.salvar()
+        antes = (self.dados.fonte, self.dados.fonte_sha256, self.dados.fonte_tamanho)
+        self.dados.fonte = _caminho_gravado(caminho, self.pasta)
+        self.dados.fonte_sha256, self.dados.fonte_tamanho = sha, tamanho
+        if self.somente_leitura:
+            return              # vale nesta sessão; o arquivo do projeto não muda
+        try:
+            self.salvar()
+        except BaseException:
+            self.dados.fonte, self.dados.fonte_sha256, self.dados.fonte_tamanho = antes
+            raise
 
     def _procurar_fonte(self) -> Optional[Path]:
         """O arquivo com o SHA-256 da fonte, ao lado do caminho antigo ou no projeto."""
@@ -266,6 +296,8 @@ class ProjetoDeLivro:
                 if len(vistos) > CANDIDATOS_DA_FONTE:
                     return None
                 try:
+                    if self.dados.fonte_tamanho and candidato.stat().st_size != self.dados.fonte_tamanho:
+                        continue        # tamanho diferente: nem é preciso ler
                     if sha_da_fonte(candidato) == self.dados.fonte_sha256:
                         return chave
                 except OSError:
@@ -324,11 +356,12 @@ class ProjetoDeLivro:
         lidos = [d.para_json() for d in diagramas if d.lido or d.erro]
         if lidos:
             dados["diagramas"] = lidos
-        gv.gravar_json(self._arquivo_da_pagina(indice), dados)
-        self._marcar(indice, not reconhecida)
         conferidos = sum(1 for d in diagramas if (d.lido or d.erro) and d.conferido)
-        self._atualizar_livro(indice, self._resumo_da_pagina(
-            indice, boxes, len(tabuleiros), conferidos))
+        with self._trava_do_livro:
+            gv.gravar_json(self._arquivo_da_pagina(indice), dados)
+            self._marcar(indice, not reconhecida)
+            self._atualizar_livro(indice, self._resumo_da_pagina(
+                indice, boxes, len(tabuleiros), conferidos))
 
     def carregar_pagina(self, indice: int) -> Optional[List[BoxEntry]]:
         """Os boxes gravados da página, ou `None` se ela ainda não foi lida."""
@@ -416,7 +449,19 @@ class ProjetoDeLivro:
     def resumo_do_livro(self) -> Dict[int, dict]:
         """Índice da página -> o resumo dela (`_resumo_da_pagina`), das páginas gravadas."""
         with self._trava_do_livro:
-            return {int(k) - 1: dict(v) for k, v in self._carregar_livro()["paginas"].items()}
+            return {int(k) - 1: json.loads(json.dumps(v))       # cópia funda: o cache não vaza
+                    for k, v in self._carregar_livro()["paginas"].items()}
+
+    def reaplicar_limiar(self) -> None:
+        """Os `pendentes` de `livro.json` com o limiar de revisão de agora, pelo histograma
+        (exato para os limiares de duas casas da janela de opções)."""
+        if self.somente_leitura:
+            return
+        with self._trava_do_livro:
+            livro = self._carregar_livro()
+            for resumo in livro["paginas"].values():
+                resumo["pendentes"] = pendentes_pelo_histograma(resumo, self.dados.limiares.revisao)
+            gv.gravar_json(self.pasta / ARQUIVO_DO_LIVRO, livro)
 
     def recalcular_livro(self) -> dict:
         """O `livro.json` como ele deve ser, lendo todas as páginas gravadas."""

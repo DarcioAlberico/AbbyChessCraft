@@ -120,10 +120,10 @@ def _nas_negativas(r: dict) -> str:
 
 def _qualidade() -> list:
     cabeca = ["", _LEGENDA, "",
-              "| Livro | Páginas | Margens corridas P / R | Diagramas achados (falsos) | "
+              "| Livro | Commit | Páginas | Margens corridas P / R | Diagramas achados (falsos) | "
               "Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por "
               "diagrama | Lado certo | Ordem | CER do corpo | Estado |",
-              "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     linhas, fora = [], {}
     for livro in LIVROS:
         _, dados = _ultimo(f"qualidade-{livro}")
@@ -136,7 +136,8 @@ def _qualidade() -> list:
         negativas = (f"{r.get('linhas_sem_par_negativas')} ({r.get('paginas_negativas')} pág.)"
                      if r.get("paginas_negativas") else "—")
         linhas.append(
-            f"| {livro} | {len(dados['indices'])} | {_num(r.get('margens_precisao'))} / "
+            f"| {livro} | {dados.get('commit')} | {len(dados['indices'])} | "
+            f"{_num(r.get('margens_precisao'))} / "
             f"{_num(r.get('margens_revocacao'))} | {r.get('diagramas_achados')} "
             f"({r.get('diagramas_falsos')}) | {r.get('linhas_sem_par')} | {negativas} | "
             f"{r.get('linhas_perdidas')}{_nas_negativas(r)} | {r.get('fen_igual_a_leitura')} | "
@@ -188,8 +189,41 @@ def _fatia() -> list:
             "Estado | JSON |", "|---|---|---|---|---|---|---|---|---|", *linhas]
 
 
+_PASSO = re.compile(r"\d{4}-\d{2}-\d{2}-passo-(?P<passo>[^-]+)(?:-\d{6})?\.json")
+
+
+def _por_passo() -> list:
+    """O desempenho de cada passo do roadmap (`ABBY_ROTULO_DA_MEDIDA=passo-<passo>`), ao lado
+    da linha de base: as mesmas metas, a medida mais nova de cada passo."""
+    _, base = _ultimo("linha-de-base")
+    passos = sorted({c["passo"] for a in MEDIDAS.glob("*-passo-*.json")
+                     if (c := _PASSO.fullmatch(a.name))})
+    if base is None or not passos:
+        return []
+    metas = (("troca_de_pagina", "p95_ms", "Troca de página, p95"),
+             ("enter_ensinar", "p95_ms", "Enter, p95"),
+             ("releitura_de_um_glifo", "p95_ms", "Releitura, p95"),
+             ("memoria_do_desfazer", "estimado_300x20_mb", "Desfazer (MB)"),
+             ("atraso_durante_o_lote", "p99_ms", "Atraso no lote, p99"),
+             ("memoria_total_com_o_lote", "rss_pico_mb", "Memória com o lote (MB)"))
+    colunas = [("linha de base", base)]
+    for passo in passos:
+        arquivo, dados = _ultimo(f"passo-{passo}")
+        if dados is not None:
+            colunas.append((f"{passo} (`{arquivo.name}`)", dados))
+    linhas = ["", "Desempenho por passo, em ms ou MB (uma rodada cada; entre rodadas do mesmo "
+              "código, em 2026-10-16, o Enter variou de 111 a 185 ms e a releitura de 135 a "
+              "166 ms: diferenças menores que isso não são efeito do passo):", "",
+              "| Meta | " + " | ".join(nome for nome, _ in colunas) + " |",
+              "|---|" + "---|" * len(colunas)]
+    for chave, campo, rotulo in metas:
+        valores = [_num(dados["medidas"].get(chave, {}).get(campo)) for _, dados in colunas]
+        linhas.append(f"| {rotulo} | " + " | ".join(valores) + " |")
+    return linhas
+
+
 def gerar() -> str:
-    return "\n".join(_desempenho() + _qualidade() + _fatia())
+    return "\n".join(_desempenho() + _por_passo() + _qualidade() + _fatia())
 
 
 def main() -> int:

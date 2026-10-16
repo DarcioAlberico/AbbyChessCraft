@@ -8,13 +8,19 @@ JSON pela metade.
 No Windows, um antivírus ou o indexador que abriu o arquivo um instante faz o
 `os.replace` falhar com `PermissionError`. A gravação tenta de novo
 `TENTATIVAS` vezes, com `ESPERA` segundos entre elas; se não der, apaga o
-temporário e deixa o erro subir, com o arquivo antigo intacto. Os `*.tmp` que
-sobrarem de uma queda são apagados ao abrir o projeto (`limpar_temporarios`).
+temporário e deixa o erro subir, com o arquivo antigo intacto. Qualquer outra
+falha (disco cheio, interrupção) também apaga o temporário e sobe na hora. Os
+temporários que sobrarem de uma queda do processo são apagados ao abrir o
+projeto (`limpar_temporarios`).
 
 Um projeto de versão mais nova que a do programa abre só para leitura: a pasta
 dele fica `protegida`, e qualquer gravação ou remoção dentro dela recusa com
 `SomenteLeitura`. A trava fica aqui, e não em cada chamador, para que nenhum
-caminho de gravação escape dela.
+caminho de gravação escape dela. Ela conta referências: duas aberturas da mesma
+pasta só para leitura precisam de dois `liberar` para soltá-la.
+
+As chamadas ao sistema (`_abrir_fd`, `_write`, `_fsync`, `_replace`) são nomes
+deste módulo para os testes injetarem falha nelas sem trocar as etapas.
 """
 
 from __future__ import annotations
@@ -23,16 +29,24 @@ import json
 import os
 import threading
 import time
+from collections import Counter
 from pathlib import Path
-from typing import Iterable, List, Union
+from typing import List, Union
 
 TENTATIVAS = 5
 ESPERA = 0.05
 SUFIXO_TEMPORARIO = ".tmp"
+#: Os temporários que `limpar_temporarios` apaga: só os que esta gravação cria.
+EXTENSOES_GRAVADAS = (".json", ".txt", ".png")
 
 Caminho = Union[str, Path]
 
-_protegidas: set = set()
+_abrir_fd = os.open
+_write = os.write
+_fsync = os.fsync
+_replace = os.replace
+
+_protegidas: Counter = Counter()
 _trava = threading.Lock()
 
 
@@ -44,17 +58,21 @@ def protegida(caminho: Caminho) -> bool:
     """Se o caminho está dentro de uma pasta aberta só para leitura."""
     alvo = Path(caminho).resolve()
     with _trava:
-        return any(alvo == p or p in alvo.parents for p in _protegidas)
+        return any(alvo == p or p in alvo.parents for p, n in _protegidas.items() if n > 0)
 
 
 def proteger(pasta: Caminho) -> None:
     with _trava:
-        _protegidas.add(Path(pasta).resolve())
+        _protegidas[Path(pasta).resolve()] += 1
 
 
 def liberar(pasta: Caminho) -> None:
+    chave = Path(pasta).resolve()
     with _trava:
-        _protegidas.discard(Path(pasta).resolve())
+        if _protegidas[chave] > 1:
+            _protegidas[chave] -= 1
+        else:
+            _protegidas.pop(chave, None)
 
 
 def _recusar_se_protegida(caminho: Path) -> None:
@@ -68,13 +86,12 @@ def temporario_de(caminho: Caminho) -> Path:
     return caminho.with_name(caminho.name + SUFIXO_TEMPORARIO)
 
 
-# As três etapas ficam em funções próprias para os testes injetarem falha em cada uma.
 def _escrever(temporario: Path, dados: bytes) -> int:
-    fd = os.open(temporario, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_BINARY", 0))
+    fd = _abrir_fd(temporario, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_BINARY", 0))
     try:
         vista = memoryview(dados)
         while vista:
-            vista = vista[os.write(fd, vista):]
+            vista = vista[_write(fd, vista):]
     except BaseException:
         os.close(fd)
         raise
@@ -83,13 +100,13 @@ def _escrever(temporario: Path, dados: bytes) -> int:
 
 def _sincronizar(fd: int) -> None:
     try:
-        os.fsync(fd)
+        _fsync(fd)
     finally:
         os.close(fd)
 
 
 def _trocar(temporario: Path, caminho: Path) -> None:
-    os.replace(temporario, caminho)
+    _replace(temporario, caminho)
 
 
 def gravar_bytes(caminho: Caminho, dados: bytes) -> None:
@@ -98,19 +115,21 @@ def gravar_bytes(caminho: Caminho, dados: bytes) -> None:
     _recusar_se_protegida(caminho)
     caminho.parent.mkdir(parents=True, exist_ok=True)
     temporario = temporario_de(caminho)
-    for tentativa in range(TENTATIVAS):
-        try:
-            _sincronizar(_escrever(temporario, dados))
-            _trocar(temporario, caminho)
-            return
-        except PermissionError:
-            if tentativa == TENTATIVAS - 1:
-                temporario.unlink(missing_ok=True)
-                raise
-            time.sleep(ESPERA)
-        except BaseException:
+    gravado = False
+    try:
+        for tentativa in range(TENTATIVAS):
+            try:
+                _sincronizar(_escrever(temporario, dados))
+                _trocar(temporario, caminho)
+                gravado = True
+                return
+            except PermissionError:
+                if tentativa == TENTATIVAS - 1:
+                    raise
+                time.sleep(ESPERA)
+    finally:
+        if not gravado:
             temporario.unlink(missing_ok=True)
-            raise
 
 
 def gravar_texto(caminho: Caminho, texto: str) -> None:
@@ -130,19 +149,23 @@ def apagar(caminho: Caminho) -> None:
 
 
 def limpar_temporarios(pasta: Caminho) -> List[Path]:
-    """Apaga os `*.tmp` que uma gravação interrompida deixou na pasta. Devolve quais."""
+    """Apaga os temporários (`*.json.tmp`, `*.txt.tmp`, `*.png.tmp`) que uma gravação
+    interrompida deixou na pasta. Devolve quais.
+
+    Um segundo processo com o mesmo projeto aberto perderia um temporário em andamento:
+    o programa não foi feito para isso (§4.3, escritor único).
+    """
     pasta = Path(pasta)
     if protegida(pasta):
         return []
     apagados = []
-    for sobra in _temporarios(pasta):
-        try:
-            sobra.unlink()
-            apagados.append(sobra)
-        except OSError:
-            pass                    # outro processo ainda está com ele; fica para a próxima
+    for extensao in EXTENSOES_GRAVADAS:
+        for sobra in pasta.rglob(f"*{extensao}{SUFIXO_TEMPORARIO}"):
+            if not sobra.is_file():
+                continue
+            try:
+                sobra.unlink()
+                apagados.append(sobra)
+            except OSError:
+                pass                # outro processo ainda está com ele; fica para a próxima
     return apagados
-
-
-def _temporarios(pasta: Path) -> Iterable[Path]:
-    return [p for p in pasta.rglob("*" + SUFIXO_TEMPORARIO) if p.is_file()]

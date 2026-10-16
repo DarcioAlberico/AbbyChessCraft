@@ -365,19 +365,21 @@ class JanelaPrincipal(QMainWindow):
         if projeto.fonte_ausente and not self._localizar_fonte(projeto):
             projeto.fechar()
             return
+        try:
+            fonte = pg.fonte_do_projeto(projeto)
+        except OSError as erro:
+            projeto.fechar()                # o projeto aberto antes continua como estava
+            QMessageBox.warning(self, "Abrir projeto", f"A fonte do livro não abriu:\n{erro}")
+            return
         if projeto.somente_leitura:
             QMessageBox.information(
                 self, "Abrir projeto",
                 f"O projeto é da versão {projeto.dados.versao} do formato, mais nova que a "
                 "deste programa. Ele abre só para leitura: dá para ver as páginas, mas nada "
-                "do que for feito aqui é gravado.")
+                "do que for feito aqui é gravado (nem o que você corrigir). Para trabalhar "
+                "nele, abra-o com a versão do programa que o gravou.")
         if self.projeto is not None and self.projeto is not projeto:
             self.projeto.fechar()
-        try:
-            fonte = pg.fonte_do_projeto(projeto)
-        except OSError as erro:
-            QMessageBox.warning(self, "Abrir projeto", f"A fonte do livro não abriu:\n{erro}")
-            return
         self.projeto, self.fonte, self.leitor = projeto, fonte, None
         self.boxes, self.atual, self.pulados, self.selecao = [], None, set(), set()
         self.lexico, self.ignoradas = None, set()
@@ -399,6 +401,10 @@ class JanelaPrincipal(QMainWindow):
                                     "carregou. A leitura usa só os padrões e a base global.")
             lidas = projeto.paginas_lidas()
             self.ir_para_pagina(lidas[-1] if lidas else 0, salvar=False)
+            if projeto.fonte_relocalizada:
+                QMessageBox.information(
+                    self, "Abrir projeto", f"A fonte do livro não estava mais no lugar "
+                    f"gravado e foi achada (o mesmo arquivo, pelo conteúdo) em:\n{projeto.fonte}")
             self._atualizar_padroes()
             self.statusBar().showMessage(
                 f"Projeto aberto. Base global com {leitor.base.total if leitor.base else 0} "
@@ -835,11 +841,14 @@ class JanelaPrincipal(QMainWindow):
         self.projeto.dados.limiares = limiares
         if self._pode_gravar():
             self.projeto.salvar()
+            self.projeto.reaplicar_limiar()
         self.leitor.trocar_limiares(limiares)
         self._atualizar_tudo()
         if self.boxes:
             self._ir_para_o_primeiro_pendente()
-        self.statusBar().showMessage("Limiares do livro gravados.", 5000)
+        self.statusBar().showMessage(
+            "Limiares aplicados nesta sessão (o projeto é só para leitura)."
+            if self.projeto.somente_leitura else "Limiares do livro gravados.", 5000)
 
     def _esquecer(self, caminhos: list) -> None:
         if self.leitor is None:

@@ -111,6 +111,16 @@ class LeitorDoLivro:
         return cls(pasta_de_padroes, limiares=limiares, ocr=OCRService(),
                    rede=rede, base=servico._get_learner(), easyocr=easyocr)
 
+    def para_propagar(self) -> "LeitorDoLivro":
+        """Um leitor só com os padrões do livro de agora (`PadroesDoLivro.instantaneo`), para
+        a propagação de um Enter rodar fora da interface enquanto o Enter seguinte ensina.
+        Serve para `ler_pelo_livro` e para a fila de revisão; não lê pela cadeia global."""
+        foto = object.__new__(LeitorDoLivro)
+        foto.__dict__.update(self.__dict__)
+        foto.padroes = self.padroes.instantaneo()
+        foto.ocr = foto.rede = foto.base = None
+        return foto
+
     def trocar_limiares(self, limiares: Limiares) -> None:
         """Passa a ler com outros limiares, sem recarregar os modelos."""
         self.limiares = limiares

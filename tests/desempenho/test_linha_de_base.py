@@ -113,17 +113,81 @@ def test_enter_ensinar(ambiente, medidas):
         novos.append(char not in janela.leitor.padroes_por_caractere())
         janela.treino.campo.setText(char)
 
-    def ensinar(_i):
-        QTest.keyClick(janela.treino.campo, Qt.Key.Key_Return)
-        _esperar(app, janela, limite=120)
+    sincronos: list = []
+    totais: list = []
 
-    resultado = cronometrar(ensinar, antes=preparar)
+    def ensinar(_i):
+        inicio = time.perf_counter_ns()
+        QTest.keyClick(janela.treino.campo, Qt.Key.Key_Return)   # volta com a cor mudada
+        sincronos.append((time.perf_counter_ns() - inicio) / 1e6)
+        _esperar(app, janela, limite=120)                       # e a propagação, na fila
+        totais.append((time.perf_counter_ns() - inicio) / 1e6)
+
+    cronometrar(ensinar, antes=preparar)
+    from tests.desempenho.conftest import AQUECIMENTOS
+
+    def resumo(tempos):
+        tempos = tempos[AQUECIMENTOS:]
+        import statistics
+
+        return {"p50_ms": round(statistics.median(tempos), 2), "p95_ms": round(p95(tempos), 2),
+                "max_ms": round(max(tempos), 2), "n": len(tempos)}
+
+    resultado = resumo(sincronos)
     medidas["enter_ensinar"] = {
         **resultado, "alvo_ms": 100,
         "padroes_no_livro": [antes, janela.leitor.total_de_padroes],
         "caracteres_novos": sum(novos[-resultado["n"]:]),
-        "como": "QTest.keyClick(Enter) no campo, com o caractere lido do primeiro pendente "
-                "(conferir a leitura), até o fim da propagação (a cor só muda no fim)"}
+        "como": "desde o 2b: QTest.keyClick(Enter) no campo, com o caractere lido do primeiro "
+                "pendente (conferir a leitura), até a cor mudar (a parte síncrona: o glifo "
+                "manual, a amostra gravada); a propagação vai para a fila e não entra. Até o "
+                "2a, era até o fim da propagação (ver enter_ate_o_fim_da_propagacao)"}
+    medidas["enter_ate_o_fim_da_propagacao"] = {
+        **resumo(totais),
+        "como": "o mesmo Enter, até a propagação acabar (o que o 2a media como Enter)"}
+
+
+def test_enter_com_uma_propagacao_lenta_em_curso(ambiente, medidas):
+    """CA-14.3 [desempenho]: com uma propagação lenta em curso (1 s injetado), a cor do
+    segundo Enter muda dentro da meta (a parte síncrona não espera a propagação)."""
+    import threading
+
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+
+    from abbychess import pagina as pg
+
+    app, janela = ambiente
+    janela.ir_para_pagina(PAGINAS[2])
+    original = pg.propagar_padroes
+    solto = threading.Event()
+    pg.propagar_padroes = lambda *a, **k: (solto.wait(1.0), original(*a, **k))[1]
+    tempos = []
+    try:
+        for _ in range(10):
+            pendentes = [k for k in fila(janela) if boxes(janela)[k].char]
+            if len(pendentes) < 2:
+                break
+            mostrar(janela, pendentes[0])
+            janela.treino.campo.setText(boxes(janela)[pendentes[0]].char)
+            QTest.keyClick(janela.treino.campo, Qt.Key.Key_Return)   # a primeira, presa
+            mostrar(janela, pendentes[1])
+            janela.treino.campo.setText(boxes(janela)[pendentes[1]].char)
+            inicio = time.perf_counter_ns()
+            QTest.keyClick(janela.treino.campo, Qt.Key.Key_Return)   # o segundo Enter
+            tempos.append((time.perf_counter_ns() - inicio) / 1e6)
+            solto.set()
+            _esperar(app, janela, limite=120)
+            solto.clear()
+    finally:
+        pg.propagar_padroes = original
+        solto.set()
+        _esperar(app, janela, limite=120)
+    medidas["enter_com_propagacao_lenta"] = {
+        "p50_ms": round(percentil(tempos, 0.5), 2) if tempos else None,
+        "p95_ms": round(p95(tempos), 2) if tempos else None, "n": len(tempos),
+        "alvo_ms": 100,
+        "como": "o segundo Enter, com a propagação do primeiro presa (1 s), até a cor mudar"}
 
 
 def test_releitura_de_um_glifo(ambiente, medidas):
@@ -151,7 +215,7 @@ def _memoria_do_historico(app, janela) -> dict:
     """O que o histórico prende: a memória que volta quando ele é esvaziado.
 
     O `tracemalloc` liga **antes** da base, então tudo o que as ações alocam é rastreado,
-    e o que some ao esvaziar o histórico (`historicos.clear()`) é exatamente o que ele
+    e o que some ao esvaziar o histórico (`historico.limpar()`) é exatamente o que ele
     prendia. O RSS não serve para isso: o alocador do Windows não devolve a memória ao
     sistema, e na rodada de 2026-10-16 ele não caiu nada ao esvaziar. As 3 páginas são
     visitadas antes da base, para o cache delas não entrar na conta. O RSS vai junto, só
@@ -164,7 +228,7 @@ def _memoria_do_historico(app, janela) -> dict:
     processo = psutil.Process()
     for indice in PAGINAS:
         janela.ir_para_pagina(indice)
-    janela.pagina.historicos.clear()
+    janela.pagina.historico.limpar()
     gc.collect()
     tracemalloc.start()
     try:
@@ -180,7 +244,7 @@ def _memoria_do_historico(app, janela) -> dict:
         gc.collect()
         cheio, _ = tracemalloc.get_traced_memory()
         rss_cheio = processo.memory_info().rss
-        janela.pagina.historicos.clear()
+        janela.pagina.historico.limpar()
         gc.collect()
         vazio, _ = tracemalloc.get_traced_memory()
     finally:

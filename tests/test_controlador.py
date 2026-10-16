@@ -27,22 +27,30 @@ class ExecutorManual:
     """Guarda as tarefas; `comecar()` roda o preparar e o trabalho da primeira e devolve o
     pronto com o resultado, para o teste chamar quando quiser."""
 
-    ocupado = False
-
     def __init__(self):
         self.fila = []
+        #: A tarefa começada cujo fim o teste ainda não chamou (e se ela é leve).
+        self.em_voo = None
 
-    def __call__(self, titulo, preparar, falhou=None, progresso=None):
-        self.fila.append((titulo, preparar))
+    def __call__(self, titulo, preparar, falhou=None, progresso=None, leve=False):
+        self.fila.append((titulo, preparar, leve))
+
+    def so_leves(self):
+        return (self.em_voo is None or self.em_voo) and all(t[2] for t in self.fila)
 
     def comecar(self):
-        titulo, preparar = self.fila.pop(0)
+        titulo, preparar, leve = self.fila.pop(0)
         par = preparar()
         if par is None:
             return None
         trabalho, pronto = par
         resultado = trabalho(lambda *_: None)
-        return lambda: pronto(resultado)
+        self.em_voo = leve
+
+        def fim():
+            self.em_voo = None
+            pronto(resultado)
+        return fim
 
     def tudo(self):
         while self.fila:
@@ -141,10 +149,13 @@ def test_tarefa_na_fila_do_projeto_anterior_nao_roda(dois_projetos):
     a, b = dois_projetos
     executor = ExecutorManual()
     ctl = _controlador(a, executor)
+    ctl.reconhecer()
+    fim = executor.comecar()                           # uma leitura em voo prende a fila
     ctl.marcar(0, 0, 300, 120)                         # na fila, ainda não rodou
     ctl.ligar(b, pg.FonteDePaginas(b.fonte),
               LeitorDoLivro(b.pasta_de_padroes, limiares=b.dados.limiares))
     ctl.ir_para(0)
+    fim()
     executor.tudo()
     assert ctl.boxes == [] and b.carregar_modelo(0) is None
 
@@ -174,10 +185,15 @@ def test_edicao_pedida_numa_pagina_nao_roda_em_outra(tmp_path):
     try:
         executor = ExecutorManual()
         ctl = _controlador(projeto, executor)
-        ctl.marcar(0, 0, 300, 120)                     # pedida na página 0
         ctl.ir_para(1)
+        ctl.reconhecer()
+        fim = executor.comecar()                       # uma leitura em voo prende a fila
+        ctl.ir_para(0)
+        ctl.marcar(0, 0, 300, 120)                     # pedida na página 0, na fila
+        ctl.ir_para(1)
+        fim()
         executor.tudo()
-        assert ctl.boxes == [] and projeto.carregar_modelo(0) is None
+        assert projeto.carregar_modelo(0) is None      # não rodou: a página tinha mudado
     finally:
         projeto.fechar()
 

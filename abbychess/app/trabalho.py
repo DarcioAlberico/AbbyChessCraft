@@ -64,6 +64,8 @@ class Executor(QObject):
         self._tarefa: Optional[_Tarefa] = None
         #: Dentro de `_proxima` ou de um `pronto`: a tarefa pedida ali só entra na fila.
         self._no_laco = False
+        #: A tarefa que roda é leve.
+        self._leve = False
         self.titulo = ""
 
     @property
@@ -74,13 +76,20 @@ class Executor(QObject):
     def na_fila(self) -> List[str]:
         return [t[0] for t in self._fila]
 
-    def __call__(self, titulo: str, preparar, falhou=None, progresso=None) -> None:
-        self.rodar(titulo, preparar, falhou, progresso)
+    def __call__(self, titulo: str, preparar, falhou=None, progresso=None, leve=False) -> None:
+        self.rodar(titulo, preparar, falhou, progresso, leve=leve)
 
-    def rodar(self, titulo: str, preparar, falhou=None, progresso=None) -> None:
+    def so_leves(self) -> bool:
+        """Nada roda nem espera, ou só tarefas leves (a propagação de um Enter, passo 2b):
+        aí uma edição pode rodar na hora, e o painel de treino continua valendo."""
+        return (self._tarefa is None or self._leve) and all(t[4] for t in self._fila)
+
+    def rodar(self, titulo: str, preparar, falhou=None, progresso=None, *,
+              leve: bool = False) -> None:
         """Agenda a tarefa: roda já se nada estiver rodando, senão entra na fila. Pedida de
-        dentro de um `preparar` ou de um `pronto`, espera o laço de `_proxima`."""
-        self._fila.append((titulo, preparar, falhou, progresso))
+        dentro de um `preparar` ou de um `pronto`, espera o laço de `_proxima`. `leve` é a
+        que lê só com uma cópia dos padrões (não prende o leitor nem o painel)."""
+        self._fila.append((titulo, preparar, falhou, progresso, leve))
         if self._tarefa is None and not self._no_laco:
             self._proxima()
         else:
@@ -97,7 +106,7 @@ class Executor(QObject):
         self._no_laco = True
         try:
             while self._fila:
-                titulo, preparar, falhou, progresso = self._fila.popleft()
+                titulo, preparar, falhou, progresso, leve = self._fila.popleft()
                 try:
                     par = preparar()
                 except Exception as erro:
@@ -115,6 +124,7 @@ class Executor(QObject):
                 tarefa.sinais.concluido.connect(lambda r, f=pronto: self._fim(f, r))
                 tarefa.sinais.falhou.connect(lambda m, f=falhou: self._fim(f, m))
                 self._tarefa, self.titulo = tarefa, titulo   # mantém os sinais vivos até o fim
+                self._leve = leve
                 self.ocupado_mudou.emit(True, titulo)
                 self.fila_mudou.emit(self.na_fila)
                 self._pool.start(tarefa)

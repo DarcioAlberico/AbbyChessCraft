@@ -399,7 +399,7 @@ class JanelaPrincipal(QMainWindow):
             return
         self.treino.mostrar(p.matriz, p.box_atual(), p.posicao_do_atual())
         self.visor.selecionar(p.indice_de(p.atual))
-        if self.executor.ocupado:
+        if not self.executor.so_leves():        # a propagação de um Enter não prende o painel
             self.treino.habilitar(False)
 
     def _selecao_mudou(self) -> None:
@@ -448,9 +448,11 @@ class JanelaPrincipal(QMainWindow):
     def _ocupado_mudou(self, ocupado: bool, titulo: str) -> None:
         self.progresso.setVisible(ocupado)
         self.progresso.setRange(0, 0)
-        if ocupado:
+        if ocupado and not self.executor.so_leves():
             self.statusBar().showMessage(f"{titulo}…")
             self.treino.habilitar(False)
+        elif ocupado:
+            self.statusBar().showMessage(f"{titulo}…", 3000)   # a propagação: o painel vale
         elif self.pagina.box_atual() is not None:
             self.treino.habilitar(True)
             foco = QApplication.focusWidget()

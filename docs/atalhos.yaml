@@ -14,7 +14,8 @@
 #   sem_atalho        perfis em que a ação existe só por menu ou botão
 #   desde_passo       o passo do roadmap em que a ação passa a estar registrada
 #   excecoes          encobrimentos declarados: tecla, widget, tipo e motivo
-#                     tipo "redireciona": o widget cede a tecla (ShortcutOverride ignorado)
+#                     tipo "redireciona": o widget entrega à ação a tecla que seria dele (ignora o
+#                       ShortcutOverride, ou o aceita e dispara a ação no keyPressEvent)
 #                     tipo "substitui": o atalho toma o lugar da ligação nativa de propósito
 
 versao: 1
@@ -224,14 +225,14 @@ acoes:
     padrao: Enter
     desde_passo: A2
     excecoes:
-      - {tecla: Enter, widget: lineedit, tipo: redireciona, motivo: "o campo trata o Enter (keyPressEvent)"}
+      - {tecla: Enter, widget: lineedit, tipo: redireciona, motivo: "o campo do caractere fica com o Enter e dispara a ação (exceção 6 de §3.4)"}
   - id: so_corrigir
     descricao: Corrigir só esta ocorrência
     escopo: [campo_glifo]
     padrao: Shift+Enter
     desde_passo: A2
     excecoes:
-      - {tecla: Shift+Enter, widget: lineedit, tipo: redireciona, motivo: "o campo trata o Shift+Enter (keyPressEvent)"}
+      - {tecla: Shift+Enter, widget: lineedit, tipo: redireciona, motivo: "o campo do caractere fica com o Shift+Enter e dispara a ação (exceção 6 de §3.4)"}
   - id: descartar_box
     descricao: Não é caractere (descartar o box)
     escopo: [glifo]
@@ -283,7 +284,7 @@ acoes:
     padrao: Enter
     desde_passo: A2
     excecoes:
-      - {tecla: Enter, widget: lineedit, tipo: redireciona, motivo: "o campo da palavra trata o Enter (keyPressEvent)"}
+      - {tecla: Enter, widget: lineedit, tipo: redireciona, motivo: "o campo da palavra fica com o Enter e dispara a ação"}
   - {id: corrigir_e_ensinar_palavra, descricao: Corrigir a palavra e ensinar os glifos dela,
      escopo: [palavra], padrao: Ctrl+Enter, desde_passo: A2}
   - {id: ignorar_palavra, descricao: Ignorar a palavra, escopo: [palavra], padrao: Ctrl+Shift+I, desde_passo: A2}

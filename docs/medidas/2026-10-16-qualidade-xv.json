@@ -64,7 +64,8 @@
   "linhas_sem_par": 6,
   "linhas_sem_par_negativas": 833,
   "paginas_negativas": 2,
-  "linhas_perdidas": 13,
+  "linhas_perdidas": 3,
+  "linhas_perdidas_negativas": 10,
   "fen_igual_a_leitura": "7/7",
   "fen_verificados": "0/7",
   "casas_erradas_por_diagrama": null,
@@ -75,7 +76,7 @@
   "cer_corpo": null,
   "linhas_com_texto_verificado": "0/241",
   "estado": "provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual",
-  "lote_s": 430.5,
+  "lote_s": 430.6,
   "pendentes": 7473
  },
  "paginas": {
@@ -428,6 +429,6 @@
   }
  },
  "data": "2026-10-16",
- "commit": "76ba432",
+ "commit": "bb0b7e5",
  "arvore_suja": false
 }

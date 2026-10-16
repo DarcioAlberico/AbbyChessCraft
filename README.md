@@ -361,12 +361,14 @@ Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (commit 76ba432; má
 | Memória do desfazer, 300 páginas × 20 ações | ~4182,9 MB (estimado de 60 ações em 3 páginas, extrapolado) | 50 MB |
 | Atraso da interface durante o lote (20 páginas) | p99 8,5 ms, com as ações desabilitadas | 50 ms, com as ações |
 | Memória com o lote | 1620 MB num processo | 2560 MB |
+| Buscar regex no livro | não existe | 1000 ms |
+| Montar o índice da busca | não existe | 2000 ms |
 
 Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
 
 | Livro | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por diagrama | Lado certo | Ordem | CER do corpo | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| xv | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 13 | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| xv | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 3 (+10 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 | yusupov | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 13 | 3/3 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 | darcy | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 
@@ -376,7 +378,7 @@ Fatia (`ferramentas\replay_fatia.py`; **erros** são as diferenças do snapshot 
 
 | Livro | Passo | Páginas | Total | Gestos dos diagramas | Navegação | Erros | Estado | JSON |
 |---|---|---|---|---|---|---|---|---|
-| xv | 0 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-16-fatia-xv-passo-0.json` |
+| xv | 0 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-16-fatia-xv-passo-0.json` |
 <!-- medidas:fim -->
 
 O replay da fatia (os gestos para levar as p. 21–27 ao gabarito) é

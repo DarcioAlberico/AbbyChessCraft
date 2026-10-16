@@ -88,7 +88,7 @@ disputam a trava da fonte) ganhou comentário; o 11 (o Seguir não persiste, e r
 vale no próximo glifo) está no README; o 5 se resolveu com o `ir_ao_topo` em toda página
 mostrada.
 
-## Medidas (commit `4e974a5`, pasta limpa)
+## Medidas da primeira rodada (commit `4e974a5`, pasta limpa; substituídas abaixo)
 
 - Portão (`ABBY_PORTAO=1 -m "livro_real or desempenho"`): 11 passaram;
   `docs/medidas/2026-10-16-passo-a1.json`.
@@ -104,5 +104,39 @@ mostrada.
   - Memória do desfazer: 8,0 MB (estimativa). Memória com o lote: 1784–1803 MB (2b: ~1654;
     o cache de páginas e de pixmaps; alvo de 2560).
   - Atraso no lote: p99 10,0–21,7 ms, máximo 95–106 (alvo de 50 no p99).
-- Qualidade (`medir.py`, os três livros) e fatia (`replay_fatia.py --passo A1`): iguais às
+- Qualidade (`medir.py`, os três livros, no `4e974a5`) e fatia (`replay_fatia.py --passo A1`,
+  no `f386dd1`, que só acrescenta os JSON ao `4e974a5`): iguais às
   do 2b; o lote do xv, 445,5 s (2b: 446,6).
+
+## Revisão de produto, rodada 1
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Produto e medição | Completude 8 · Fidelidade das medidas 7 · Clareza para o usuário 8 · Produtividade 7 | volta |
+
+O revisor rodou a janela offscreen com cenários próprios e mediu a árvore da tag `passo-2b`
+(por `git archive`) ao lado da do A1, na mesma sessão.
+
+| Achado | Correção |
+|---|---|
+| **M1** Com o foco no campo do treino, onde ele fica no fluxo de treino, o zoom não respondia (e o Ctrl+0 valia na janela toda no 2b); o V digitava "v" | Ctrl+0/7/8/9 e Ctrl++/− valem também no escopo `glifo` (`docs/atalhos.yaml`, a mesma ação no painel de treino); o V fica só na página; teste; o README diz onde vale cada um |
+| **M2** A troca fora do cache piorou ~40% contra o 2b pelo mesmo método (213 contra 153 ms), sem dizer; a causa era a pré-carga da seguinte, disparada dentro do `ir_para` | a pré-carga roda 150 ms depois da pintura (`precarregar_seguinte`, por um relógio da janela); teste; as medidas foram refeitas: 130–133 ms na mediana; as rodadas de antes ficaram como `pre-carga-no-ir-para-a1*` |
+| m1 o README não dizia o que "fora do cache" mede | o README diz: a revisita, o mesmo método do 2b; a primeira visita, ~500 ms |
+| m2 o nome do menu do F8 | "Próximo diagrama por conferir", no README |
+| m3–m5 o contraste dos tokens contra o papel (CA-13.2), o contorno duplo da seleção, a pré-conversão do pixmap na thread da interface | registrados no passo K do roadmap |
+| m6 o commit da fatia | a fatia é do `f386dd1`, que só acrescenta os JSON ao `4e974a5` |
+| m7 o Enter com propagação lenta não era citado | está abaixo |
+
+## Medidas finais (commit `538adae`, pasta limpa)
+
+- Portão: 11 passaram; `docs/medidas/2026-10-16-passo-a1.json`.
+- 3 rodadas (`repeticao-a1`):
+  - troca no cache: mediana 14,0–14,1 ms, p95 14,3–14,7;
+  - fora do cache (revisita): mediana 130,4–132,9 ms, p95 142,9–148,6 (portão: 147,1);
+  - Enter até a cor: mediana 20,6–20,8 ms, p95 23,0–25,9; com uma propagação lenta em curso,
+    o segundo Enter, p95 22,7–24,0;
+  - releitura: mediana 14,5–14,8 ms, p95 17,0–21,5;
+  - pintura de 2.000 boxes: p95 10,6–13,3 ms; clique ~0,002 ms;
+  - memória com o lote: 1773–1776 MB (portão: 1793); atraso no lote, p99 10,4–22,0 ms,
+    máximo 95–99.
+- Qualidade e fatia: as do `4e974a5` (acima), sem mudança no caminho da leitura.

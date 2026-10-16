@@ -78,6 +78,10 @@ def test_versao_mais_nova_abre_so_para_leitura_e_nada_e_gravado(app, projeto_lid
         janela.treino.campo.setText("z")
         janela.treino._so_corrigir()                     # muda na tela, não no disco
         janela._gravar_zonas()
+        from abbychess.projeto import Limiares
+
+        janela.aplicar_limiares(Limiares(revisao=0.5))   # vale na sessão, não no disco
+        assert "nesta sessão" in janela.statusBar().currentMessage()
         janela.ir_para_pagina(0)                         # a troca de página grava, se puder
         assert _instantaneo(projeto_lido.pasta) == antes
     finally:
@@ -161,3 +165,24 @@ def test_so_leitura_com_fonte_sumida_acha_pela_memoria_e_nao_grava(app, projeto_
     finally:
         janela.close()
     assert _instantaneo(projeto_lido.pasta) == antes
+
+
+def test_falha_ao_abrir_nao_deixa_a_pasta_travada(app, projeto_lido, sem_dialogos,  # noqa: F811
+                                                monkeypatch):
+    arquivo = projeto_lido.pasta / "projeto.json"
+    dados = json.loads(arquivo.read_text(encoding="utf-8"))
+    dados["versao"] = 99
+    arquivo.write_text(json.dumps(dados), encoding="utf-8")
+    janela = JanelaPrincipal()
+
+    def quebrar():
+        raise RuntimeError("falha no meio da abertura")
+
+    monkeypatch.setattr(janela, "_salvar_pagina", quebrar)
+    try:
+        with pytest.raises(RuntimeError):
+            janela._abrir(ProjetoDeLivro.abrir(projeto_lido.pasta))
+        assert not gv.protegida(projeto_lido.pasta)
+    finally:
+        monkeypatch.undo()
+        janela.close()

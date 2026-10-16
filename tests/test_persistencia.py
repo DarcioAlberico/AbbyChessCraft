@@ -448,9 +448,10 @@ def test_livro_json_estragado_e_refeito(projeto):
 
 def test_histograma_da_os_pendentes_de_outro_limiar():
     sorteio = random.Random(7)
-    boxes = _pagina_aleatoria(sorteio) + [_box(confianca=c) for c in (0.29, 0.5, 0.899999, 0.9)]
+    boxes = _pagina_aleatoria(sorteio) + [_box(confianca=c)
+                                          for c in (0.0, 0.29, 0.5, 0.899999, 0.9, 0.995, 1.0)]
     resumo = resumo_das_confiancas(boxes, Limiares())
-    for centesimos in range(1, 100):
+    for centesimos in range(0, 101):            # de 0,00 a 1,00, a faixa das opções
         limiares = Limiares(revisao=centesimos / 100)
         assert (pendentes_pelo_histograma(resumo, limiares.revisao)
                 == resumo_das_confiancas(boxes, limiares)["pendentes"]), centesimos

@@ -416,30 +416,31 @@ Desempenho por passo, em ms ou MB (uma rodada cada; quanto o mesmo código varia
 
 | Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) |
 |---|---|---|---|
-| Troca de página, p95 | 194,22 | 190,06 | 188,46 |
-| Enter, p95 | 110,88 | 119,73 | 134,2 |
-| Releitura, p95 | 145,73 | 122,08 | 138,57 |
+| Troca de página, p95 | 194,22 | 190,06 | 184,91 |
+| Enter, p95 | 110,88 | 119,73 | 130,29 |
+| Releitura, p95 | 145,73 | 122,08 | 138,12 |
 | Desfazer (MB) | 4182,9 | 4182,9 | 4121 |
-| Atraso no lote, p99 | 8,5 | 8,6 | 21,9 |
-| Memória com o lote (MB) | 1620 | 1661 | 1674 |
+| Atraso no lote, p99 | 8,5 | 8,6 | 8,7 |
+| Memória com o lote (MB) | 1620 | 1661 | 1677 |
 
-Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). O p95 do Enter tem duas faixas no mesmo código (perto de 110–130 e perto de 180–190), e o atraso no lote também (perto de 8 e de 21): compare pela mediana (p50), que varia bem menos (mas não é imune: uma rodada solta pode sair alta):
+Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter tem duas faixas no mesmo código (perto de 110–130 e de 180–190); o atraso no lote tem duas faixas sempre (perto de 8 e de 21). Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
 
-| Código | Commit | Rodada | Troca, p50 | Troca, p95 | Enter, p50 | Enter, p95 | Releitura, p95 | Atraso no lote, p99 |
-|---|---|---|---|---|---|---|---|---|
-| passo 0 | 25e81b1 | completa | 169,76; 174,14; 171,68 | 192,19; 190,98; 192,11 | 104,33; 104,61; 104,66 | 177,63; 179,72; 179,81 | 124,76; 129,43; 142,69 | 21,4; 8,7; 8,3 |
-| passo 0 | 25e81b1 | só do lote, sem os padrões | — | — | — | — | — | 19,9; 7,7; 7,1 |
-| passo 1a | 315db35 | completa | 180,73; 183,85; 180,22 | 195,04; 198,16; 196,84 | 149,4; 114,34; 113,81 | 191,17; 190,97; 190,82 | 165,4; 150,71; 141,33 | 20,8; 21,3; 8,7 |
-| passo 1a | 3bf1ad3 | só do lote, sem os padrões | — | — | — | — | — | 7,5; 20,5; 7,7 |
-| passo 1b | e5abbd3 | completa | 168,89; 166,28; 164,46 | 187,48; 189,18; 187,82 | 121,72; 121,99; 120,77 | 133,15; 133,63; 133,95 | 143,39; 151,09; 146,82 | 8,6; 20,4; 21 |
+| Código | Commit | Rodada | Troca, p50 | Troca, p95 | Enter, p50 | Enter, p95 | Releitura, p50 | Releitura, p95 | Atraso no lote, p99 |
+|---|---|---|---|---|---|---|---|---|---|
+| passo 0 | 25e81b1 | completa | 169,76; 174,14; 171,68 | 192,19; 190,98; 192,11 | 104,33; 104,61; 104,66 | 177,63; 179,72; 179,81 | 107,34; 107,54; 105,85 | 124,76; 129,43; 142,69 | 21,4; 8,7; 8,3 |
+| passo 0 | 25e81b1 | só do lote, sem os padrões | — | — | — | — | — | — | 19,9; 7,7; 7,1 |
+| passo 1a | 315db35 | completa | 180,73; 183,85; 180,22 | 195,04; 198,16; 196,84 | 149,4; 114,34; 113,81 | 191,17; 190,97; 190,82 | 133,34; 111,81; 111,19 | 165,4; 150,71; 141,33 | 20,8; 21,3; 8,7 |
+| passo 1a | 3bf1ad3 | só do lote, sem os padrões | — | — | — | — | — | — | 7,5; 20,5; 7,7 |
+| passo 1b | 5f969c7 | completa | 163,94; 164,03; 163,46 | 188,56; 183,7; 186,58 | 121,81; 136,85; 120,96 | 134,57; 151,53; 133,6 | 128,23; 133,66; 119,32 | 152,14; 157,76; 157,11 | 22,3; 21,8; 9,9 |
+| passo 1b sem congelar | 5f969c7 | completa | 165,02; 172,67; 166,45 | 193,8; 181,22; 183,48 | 131,26; 121; 121,15 | 204,74; 199,5; 202,11 | 120,96; 123,9; 119,62 | 143,18; 133,72; 149,26 | 21,6; 8,9; 22,8 |
 
 Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
 
 | Livro | Commit | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por diagrama | Lado certo | Ordem | CER do corpo | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| xv | bab6a1a | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 3 (+10 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-| yusupov | bab6a1a | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 13 | 3/3 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-| darcy | bab6a1a | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| xv | 5f969c7 | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 3 (+10 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| yusupov | 5f969c7 | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 13 | 3/3 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| darcy | 5f969c7 | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 
 Ainda não medido: a ligação da legenda ao diagrama, no passo H (a leitura de hoje não liga legenda a diagrama); precisão e revocação por função de bloco, no passo F (a leitura de hoje não classifica blocos); a validação do FEN pelos lances, no passo H.
 
@@ -452,14 +453,17 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | xv | 3bf1ad3 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 433,6 s |
 | xv | 315db35 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 432,2 s |
 | xv | bab6a1a | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 434,2 s |
+| xv | 5f969c7 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 434,5 s |
 | yusupov | bb0b7e5 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23 s |
 | yusupov | 0ebbf9c | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,1 s |
 | yusupov | 3bf1ad3 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,4 s |
 | yusupov | bab6a1a | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,4 s |
+| yusupov | 5f969c7 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,3 s |
 | darcy | bb0b7e5 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,5 s |
 | darcy | 0ebbf9c | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,7 s |
 | darcy | 3bf1ad3 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,8 s |
 | darcy | bab6a1a | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,8 s |
+| darcy | 5f969c7 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,7 s |
 
 Fatia (`ferramentas\replay_fatia.py`; **erros** são as diferenças do snapshot contra o gabarito, o N da medida humana):
 

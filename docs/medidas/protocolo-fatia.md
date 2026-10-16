@@ -21,12 +21,13 @@ do estado reconhecido ao gabarito. Ela tem duas partes.
    o `estado` diz **provisório** e o que falta.
 5. **A linha de base é medida com o código do passo 0**, sempre: o replay chama o núcleo do
    programa (ensinar, propagar, dividir), e os passos 1b, 2b e outros mudam esse núcleo.
-   Ela roda num worktree da tag `passo-0`, com os gabaritos copiados do checkout principal
-   (os da medida nova):
+   Ela roda num worktree da tag `passo-0`, com os gabaritos e o catálogo copiados do checkout
+   principal (os da medida nova):
 
    ```text
    git worktree add ..\AbbyChessCraft_passo0 passo-0
    robocopy tests\verdade ..\AbbyChessCraft_passo0\tests\verdade /E
+   copy ferramentas\replay\comandos.yaml ..\AbbyChessCraft_passo0\ferramentas\replay\
    cd ..\AbbyChessCraft_passo0
    ..\AbbyChessCraft\.venv\Scripts\python.exe ferramentas\replay_fatia.py rodar --livro xv --passo 0
    ```
@@ -39,6 +40,10 @@ do estado reconhecido ao gabarito. Ela tem duas partes.
    impossíveis: ≤ 85% da linha de base depois do passo A3, e ≤ 70% depois do D1. Um passo
    que torna possível uma correção antes impossível tem de baixar esse total. A navegação
    entre as páginas (`gestos_navegacao`) entra no total e sai também à parte.
+
+Limite conhecido: o replay só usa o atalho da fila (`ensinar_da_fila`) quando o glifo da
+cabeça da fila tem erro; uma cabeça de fila pendente mas certa não custa nada (a pessoa a
+confirmaria com um Enter). Isso não subestima o custo dos glifos errados.
 
 ## CA-F.2: o tempo de uma pessoa (informativo, não reprova)
 

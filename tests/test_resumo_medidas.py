@@ -87,8 +87,8 @@ def test_fatia_uma_linha_por_livro_e_passo_com_os_erros(pastas):
                                                               gestos_sem_impossiveis=8))
     linhas = [ln for ln in rm.gerar().splitlines() if ln.startswith("| xv |")]
     assert len(linhas) == 2
-    assert "| gestos pendentes | 4 | 0 | 7 | pendente: y |" in linhas[0]
-    assert "10 gestos (8 sem os impossíveis)" in linhas[1]
+    assert "| gestos pendentes | 4 | 0 | 2 (diagramas; texto pendente) | pendente: y |" in linhas[0]
+    assert "10 gestos (8 sem os impossíveis) | 4 | 0 | 7 |" in linhas[1]
 
 
 def test_main_troca_so_o_que_esta_entre_os_marcadores_e_mantem_o_crlf(pastas):

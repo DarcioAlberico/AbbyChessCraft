@@ -857,8 +857,9 @@ dentro da meta de §2.
   `texto_verificado: false`, e o usuário o corrige por `texto-exportar` / `texto-importar`.
   As medidas de texto (CER, CA-9.1, CA-F.1) só contam linhas com `texto_verificado: true`;
   as de estrutura valem quando ela estiver revisada. Yusupov p. 33 tem uma transcrição
-  revisada pelo usuário no corpus do PyBoxEditor (`benchmarks/corpus_v2`), que a ferramenta
-  pode usar como texto desse gabarito sem ninguém copiá-lo à mão.
+  revisada pelo usuário no corpus do PyBoxEditor (`benchmarks/corpus_v2`); trazê-la para o
+  gabarito por ferramenta ficou para depois (registro do passo 0), e o usuário pode usá-la
+  ao verificar o texto.
   **Conferência cega** (usuário ou outra pessoa): 1 página por livro transcrita do zero, sem a
   leitura, com concordância ≥ 99,5% dos caracteres; e 1 diagrama por livro montado sem ver o
   FEN do gabarito, que tem de dar o mesmo FEN. Mudar o gabarito sobe `verdade_versao`.
@@ -875,8 +876,9 @@ dentro da meta de §2.
   carregados (no servidor a partir do passo E; antes, no próprio processo, marcado no JSON
   da medida), PDF já lido uma vez.
 - Enter: do `keyClick` à mudança de cor do box no item.
-- Memória do desfazer: `tracemalloc` do histórico depois de roteiro fixo (300 páginas
-  sintéticas × 20 ações). Memória total: soma do RSS de interface e servidor (`psutil`) no
+- Memória do desfazer: o que o histórico prende (`tracemalloc` ligado antes, o que se
+  libera ao esvaziá-lo) num roteiro fixo de 60 ações em 3 páginas reais, extrapolado para
+  300 páginas × 20 ações (declarado no JSON). Memória total: soma do RSS de interface e servidor (`psutil`) no
   pico de um lote de 20 páginas.
 - Cada execução grava `docs/medidas/AAAA-MM-DD-<rótulo>.json` (`-linha-de-base`,
   `-qualidade-<livro>`, `-fatia-<livro>-passo-<passo>`; com a hora no nome se já houver um
@@ -914,8 +916,11 @@ sessão ≥ 7 dias depois; o resultado é segundos por erro do snapshot.
 
 Cada passo do roadmap fecha com três revisões independentes: **código** (correção,
 simplicidade, testes); **produto e design** (com as capturas de CA-13.2, contra §1 e §2);
-**medição** (`ferramentas/medir.py` e as camadas `livro_real` e `desempenho`). Aprovação:
-nota ≥ 8 em correção, produtividade, layout e testes; abaixo, o passo volta. Registro em
+**medição** (`ferramentas/medir.py` e as camadas `livro_real` e `desempenho`). Os eixos
+de nota são os de cada revisão: correção, simplicidade e testes (código); completude,
+fidelidade das medidas e clareza para o usuário (produto e medição), mais produtividade e
+layout quando o passo mexe na interface. Aprovação: nota ≥ 8 em todos; abaixo, o passo
+volta. Registro em
 `docs/revisoes/`.
 
 ## 17. Fora do escopo

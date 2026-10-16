@@ -292,6 +292,9 @@ def test_erros_iniciais_por_pagina_para_a_medida_humana(cenario):
     resultado = rf.replay("sint", snapshot, "0", verdade=verdade)
     # 14 glifos sem leitura que o gabarito tem, 1 a sobrar e 1 espaço errado, por página.
     assert resultado["paginas"]["i000"]["erros"] == {"texto": 16, "diagramas": 0}
+    # Na segunda, o Ctrl+R corrige quase tudo, mas os erros são os do snapshot, de antes.
+    assert resultado["paginas"]["i001"]["erros"] == {"texto": 16, "diagramas": 0}
+    assert resultado["paginas"]["i001"]["comandos"].get("reler_pendentes") == 1
 
 
 def test_glifo_fora_da_cabeca_da_fila_custa_o_clique():

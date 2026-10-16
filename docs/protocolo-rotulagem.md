@@ -47,7 +47,7 @@ vale assim que a estrutura estiver revisada.
    d0,d1 --lado-verificado d0`, que grava `revisado_por` e marca os diagramas conferidos.
 6. **Rascunho de novo**: `rascunho` recusa refazer um gabarito que já tem trabalho
    (estrutura, texto verificado ou revisão); com `--forcar`, refaz e guarda o anterior em
-   `iNNN.json.bak`.
+   `iNNN.json.bak` (os seguintes, em `.bak1`, `.bak2`…).
 
 ## Regras da estrutura
 

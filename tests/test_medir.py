@@ -168,3 +168,10 @@ def test_negativas_saem_a_parte_e_linhas_perdidas_contam():
     assert r["linhas_sem_par"] == 1          # só a da página de corpo
     assert r["linhas_perdidas"] == 1         # a l1 de i001 não foi lida
     assert r["fen_igual_a_leitura"] == "0/0"
+
+
+def test_fen_mudado_depois_da_conferencia_cega_nao_vale():
+    d = {"fen": E4, "conferencia_cega": {"igual": True, "fen": E4}}
+    assert medir.fen_conferido_as_cegas(d)
+    d["fen"] = INICIAL
+    assert not medir.fen_conferido_as_cegas(d)

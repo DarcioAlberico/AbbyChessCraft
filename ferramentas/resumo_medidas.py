@@ -85,6 +85,10 @@ def _desempenho() -> list:
         "com as ações |",
         f"| Memória com o lote | {total.get('rss_pico_mb')} MB num processo | "
         f"{total.get('alvo_mb')} MB |",
+        *[f"| {rotulo} | {m[chave].get('estado', '—')} | {_ms(m[chave].get('alvo_p95_ms'))} |"
+          for chave, rotulo in (("buscar_regex_no_livro", "Buscar regex no livro"),
+                                ("montar_indice_da_busca", "Montar o índice da busca"))
+          if chave in m],
     ]
 
 
@@ -109,6 +113,11 @@ _LEGENDA = (
     "no texto). \"—\" é nada a medir.")
 
 
+def _nas_negativas(r: dict) -> str:
+    n = r.get("linhas_perdidas_negativas")
+    return f" (+{n} nas negativas)" if n else ""
+
+
 def _qualidade() -> list:
     cabeca = ["", _LEGENDA, "",
               "| Livro | Páginas | Margens corridas P / R | Diagramas achados (falsos) | "
@@ -130,7 +139,7 @@ def _qualidade() -> list:
             f"| {livro} | {len(dados['indices'])} | {_num(r.get('margens_precisao'))} / "
             f"{_num(r.get('margens_revocacao'))} | {r.get('diagramas_achados')} "
             f"({r.get('diagramas_falsos')}) | {r.get('linhas_sem_par')} | {negativas} | "
-            f"{r.get('linhas_perdidas')} | {r.get('fen_igual_a_leitura')} | "
+            f"{r.get('linhas_perdidas')}{_nas_negativas(r)} | {r.get('fen_igual_a_leitura')} | "
             f"{_provisorio(r.get('casas_erradas_por_diagrama'), r.get('casas_erradas_provisorio'))} | "
             f"{_provisorio(r.get('lado_certo'), r.get('lado_certo_provisorio'))} | "
             f"{_num(r.get('ordem_discordancia_media'))} | {cer} | {r.get('estado')} |")
@@ -162,7 +171,12 @@ def _fatia() -> list:
         else:
             total = (f"{dados['gestos']} gestos ({dados['gestos_sem_impossiveis']} sem os "
                      "impossíveis)")
-        erros = sum(sum((p.get("erros") or {}).values()) for p in dados.get("paginas", {}).values())
+        erros_texto = sum((p.get("erros") or {}).get("texto", 0)
+                          for p in dados.get("paginas", {}).values())
+        erros_diagramas = sum((p.get("erros") or {}).get("diagramas", 0)
+                              for p in dados.get("paginas", {}).values())
+        erros = (f"{erros_texto + erros_diagramas}" if dados.get("gestos") is not None
+                 else f"{erros_diagramas} (diagramas; texto pendente)")
         linhas.append(f"| {livro} | {passo} | {paginas} | {total} | "
                       f"{dados.get('gestos_diagramas')} | {dados.get('gestos_navegacao', '—')} | "
                       f"{erros} | {dados.get('estado')} | `{arquivo.name}` |")

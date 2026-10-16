@@ -110,6 +110,8 @@ def test_gabarito_valido_nao_tem_problema():
     (lambda g: g["diagramas"][0].update(fen="8/8/8/8/8/8/8/K6"), "a fileira 1 tem 7 casas"),
     (lambda g: g["diagramas"][0].update(fen="8/8/8/8/8/8/K6k"), "7 fileira(s)"),
     (lambda g: g["diagramas"][0].update(fen="8/8/8/8/8/8/8/K6x"), "caractere 'x'"),
+    (lambda g: g["diagramas"][0].update(fen="8/8/8/8/8/8/8/K06k"), "caractere '0'"),
+    (lambda g: g["diagramas"][0].update(fen="8/8/8/8/8/8/8/K²k4"), "caractere '²'"),
     (lambda g: g["diagramas"][0].update(lado="brancas"), "não é w, b ou ?"),
     (lambda g: g["diagramas"][0].update(legenda="b0"), "não é um bloco de legenda"),
     (lambda g: g["diagramas"][0].update(id="d9"), "falta o bloco de função diagrama"),

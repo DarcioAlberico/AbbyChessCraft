@@ -45,7 +45,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / "ferramentas"))
 
-from comum import destino_da_medida, estado_do_git  # noqa: E402,F401
+from comum import destino_da_medida, estado_do_git  # noqa: E402
 from rotular import (PASTA_DOS_PDFS, VERDADE, _caixa_relativa, _indices,  # noqa: E402
                      levenshtein, problemas_do_fen, sha256_do_arquivo)
 
@@ -89,7 +89,7 @@ def casas(fen: str) -> Optional[list]:
     if problemas_do_fen(pecas):
         return None
     return [c for fileira in pecas.split("/")
-            for ch in fileira for c in (["."] * int(ch) if ch.isdigit() else [ch])]
+            for ch in fileira for c in (["."] * int(ch) if ch in "12345678" else [ch])]
 
 
 def unir_por_linha(caixas):
@@ -207,13 +207,18 @@ def comparar_pagina(gabarito: dict, leitura: Leitura) -> dict:
         "linhas_sem_par": sem_par,
         "linhas_perdidas": len(corpo) - len(casados_c),
         "conferencia_cega_texto": _conferencia_em_dia(gabarito),
-        "conferencia_cega_fen": any(d.get("conferencia_cega", {}).get("igual")
-                                    for d in gabarito["diagramas"]),
+        "conferencia_cega_fen": any(fen_conferido_as_cegas(d) for d in gabarito["diagramas"]),
         "corpo": {"linhas": len(corpo), "casadas": len(casados_c),
                   "ordem_discordancia": round(discordancia(ordem_lida, ordem_certa), 4),
                   "linhas_verificadas": verificadas, "cer_erros": erros,
                   "cer_caracteres": caracteres,
                   "cer": round(erros / caracteres, 4) if caracteres else None}}
+
+
+def fen_conferido_as_cegas(diagrama: dict) -> bool:
+    """A conferência cega deu igual **ao FEN de hoje** (um FEN mudado depois não vale)."""
+    cega = diagrama.get("conferencia_cega") or {}
+    return bool(cega.get("igual")) and cega.get("fen", diagrama.get("fen")) == diagrama.get("fen")
 
 
 def _conferencia_em_dia(gabarito: dict) -> bool:
@@ -262,7 +267,8 @@ def resumir(paginas: dict) -> dict:
         "linhas_sem_par": soma(lambda p: 0 if p["negativa"] else p["linhas_sem_par"]),
         "linhas_sem_par_negativas": soma(lambda p: p["linhas_sem_par"] if p["negativa"] else 0),
         "paginas_negativas": sum(1 for p in paginas.values() if p["negativa"]),
-        "linhas_perdidas": soma(lambda p: p["linhas_perdidas"]),
+        "linhas_perdidas": soma(lambda p: 0 if p["negativa"] else p["linhas_perdidas"]),
+        "linhas_perdidas_negativas": soma(lambda p: p["linhas_perdidas"] if p["negativa"] else 0),
         "fen_igual_a_leitura": f"{sum(d['fen_igual_a_leitura'] for d in detalhes)}/{len(detalhes)}",
         "fen_verificados": f"{len(fen_ok)}/{len(fen_todos)}",
         "casas_erradas_por_diagrama": _razao(sum(d["casas_erradas"] for d in fen_ok), len(fen_ok)),

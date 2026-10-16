@@ -176,6 +176,7 @@ def test_v1_em_midia_so_de_leitura_abre_so_para_leitura(projeto_v1, monkeypatch)
     projeto = ProjetoDeLivro.abrir(projeto_v1)
     try:
         assert projeto.somente_leitura and not projeto.migrado
+        assert "não deu para gravar" in projeto.motivo_so_leitura
         assert projeto.carregar_pagina(0) is not None          # as páginas v1 aparecem
     finally:
         projeto.fechar()

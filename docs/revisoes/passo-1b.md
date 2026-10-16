@@ -85,3 +85,25 @@ O que mudou depois dela:
 A qualidade e a fatia ficaram as do commit `5f969c7`: as correções desta rodada não
 tocam o caminho da leitura nem o do texto sem decisões (os testes de caracterização e a
 máquina de estados conferem).
+
+## Rodada 3
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Código e testes | Correção 8 · Simplicidade 8 · Testes 8 | **aceita** |
+| Produto e medição | Completude 9 · Fidelidade das medidas 7 · Clareza para o usuário 8 · Produtividade 8 | volta |
+
+O bloqueio de produto: o teste congelava depois de ler três páginas, e o programa congela
+antes de abrir qualquer uma (logo depois de carregar os modelos). O teste passou a congelar
+no ponto do programa, a janela registra no log quantos objetos congelou, e o A/B foi refeito
+no commit `1519d8f` (3 rodadas com e 3 sem). O resultado volta ao da rodada 2: o
+congelamento tira a faixa alta do p95 do Enter (200–235 → 140–150 ms) e piora a releitura
+(p95 154–159 ms com, 143–151 sem; a mediana uns 7 ms). O README declara a troca e por que
+o congelamento ficou ligado; o A/B anterior, com as páginas congeladas, fica citado pelo
+commit (`8277fa0`). O critério do 2a voltou a "o p95 da releitura não pior que o do 1b",
+com o alvo de 150 ms no 2b. O custo do modelo, pelas rodadas sem congelamento contra o 1a,
+é de uns 10 a 15 ms na mediana do Enter e da releitura; a troca, uns 10 ms mais rápida.
+
+Os três testes que o revisor de código pediu como menores entraram: o estado
+`glifos_marcados` gravado por `gid_do_box`, o motivo do só leitura em mídia sem gravação, e
+o lote gravando enquanto a janela pede gids (duas threads).

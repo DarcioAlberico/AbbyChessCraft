@@ -647,18 +647,21 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   (inclusive as lidas pela primeira vez depois, que ficam só em `paginas/p<pid>.json`),
   padrões ensinados (`padroes/`), palavras do léxico, amostras de diagrama e inclinações.
   Antes de abrir um projeto importante pela primeira vez no 1b, vale copiar a pasta inteira.
-- **O modelo v2 deixa a releitura e o Enter uns 7 a 10 ms mais lentos na mediana** que no
+- **O modelo v2 deixa a releitura e o Enter uns 10 a 15 ms mais lentos na mediana** que no
   1a (tabela "Rodadas repetidas": o 1b sem o congelamento contra o 1a, os dois sem ele):
-  cada gravação reconcilia a lista da janela com o modelo. A troca de página ficou uns 12 ms
+  cada gravação reconcilia a lista da janela com o modelo. A troca de página ficou uns 10 ms
   mais rápida, porque a página já está em memória.
-- **O congelamento dos modelos para a coleta de lixo (`gc.freeze`, desde o 1b)** não muda
-  as medianas e tira os picos: o p95 do Enter cai de ~200 para ~133 ms e o da releitura de
-  145–166 para 136–144 ms, dentro do alvo de 150 (tabela "Rodadas repetidas", 3 rodadas com
-  e 3 sem, congelando como o programa congela: depois de abrir a janela e o projeto). Um A/B
-  anterior, que congelava antes de criar a janela, tinha dado a releitura pior com o
-  congelamento: congelar também o que a janela e o projeto já guardam é o que ajuda. A
-  reconciliação sai no passo 2a, e a cópia da página inteira a cada passo do desfazer (que
-  já existia) sai no 2b.
+- **O congelamento dos modelos para a coleta de lixo (`gc.freeze`, desde o 1b) é uma troca**
+  (tabela "Rodadas repetidas", 3 rodadas com e 3 sem, congelando no ponto em que o programa
+  congela: modelos carregados, nenhuma página lida). Ele tira a faixa alta do p95 do Enter
+  (de 200–235 para 140–150 ms), mas **piora a releitura**: o p95 dela fica em 154–159 ms
+  (sem: 143–151, numa rodada um pico de 233), acima do alvo de 150, e a mediana sobe uns
+  7 ms. Ficou ligado porque o Enter é a tecla de cada glifo ensinado, e o ajuste de borda é
+  raro. Um A/B anterior (os JSON estão no commit `8277fa0`) congelava depois de ler três
+  páginas e dava a releitura melhor com o congelamento: congelar as páginas abertas também
+  ajuda, mas o programa não o faz, porque a memória delas não voltaria. A reconciliação sai
+  no passo 2a, e a cópia da página inteira a cada passo do desfazer (que já existia) sai no
+  2b.
 - **A janela ainda edita por índice** (até o passo 2a): cada gravação reconcilia a lista de
   glifos com o modelo, pelo objeto e, depois do desfazer de hoje (que devolve cópias), pela
   caixa. Um glifo que o desfazer de hoje trouxe de volta depois de dividido ganha gid novo

@@ -389,29 +389,31 @@ Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (commit 76ba432; má
 | Buscar regex no livro | não existe | 1000 ms |
 | Montar o índice da busca | não existe | 2000 ms |
 
-Desempenho por passo, em ms ou MB (uma rodada cada; entre rodadas do mesmo código, em 2026-10-16, o Enter variou de 111 a 185 ms e a releitura de 135 a 166 ms: diferenças menores que isso não são efeito do passo):
+Desempenho por passo, em ms ou MB (uma rodada cada; quanto o mesmo código varia de uma rodada para outra está nas rodadas repetidas, abaixo):
 
 | Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) |
 |---|---|---|
-| Troca de página, p95 | 194,22 | 195,19 |
-| Enter, p95 | 110,88 | 131,19 |
-| Releitura, p95 | 145,73 | 131,26 |
+| Troca de página, p95 | 194,22 | 190,06 |
+| Enter, p95 | 110,88 | 119,73 |
+| Releitura, p95 | 145,73 | 122,08 |
 | Desfazer (MB) | 4182,9 | 4182,9 |
-| Atraso no lote, p99 | 8,5 | 21,5 |
-| Memória com o lote (MB) | 1620 | 1666 |
+| Atraso no lote, p99 | 8,5 | 8,6 |
+| Memória com o lote (MB) | 1620 | 1661 |
 
-Rodadas repetidas do atraso da interface durante o lote (20 páginas), em ms:
+Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou):
 
-| Código | Commit | p99 de cada rodada | p95 de cada rodada |
-|---|---|---|---|
-| passo 0 | 25e81b1 | 19,9; 7,7; 7,1 | 13,8; 6,1; 6,1 |
-| passo 1a | 3bf1ad3 | 7,5; 20,5; 7,7 | 6,1; 14; 6,1 |
+| Código | Commit | Rodada | Troca, p95 | Enter, p95 | Releitura, p95 | Atraso no lote, p99 |
+|---|---|---|---|---|---|---|
+| passo 0 | 25e81b1 | completa | 192,19; 190,98; 192,11 | 177,63; 179,72; 179,81 | 124,76; 129,43; 142,69 | 21,4; 8,7; 8,3 |
+| passo 0 | 25e81b1 | só do lote, sem os padrões | — | — | — | 19,9; 7,7; 7,1 |
+| passo 1a | 315db35 | completa | 195,04; 198,16; 196,84 | 191,17; 190,97; 190,82 | 165,4; 150,71; 141,33 | 20,8; 21,3; 8,7 |
+| passo 1a | 3bf1ad3 | só do lote, sem os padrões | — | — | — | 7,5; 20,5; 7,7 |
 
 Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
 
 | Livro | Commit | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por diagrama | Lado certo | Ordem | CER do corpo | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| xv | 3bf1ad3 | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 3 (+10 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| xv | 315db35 | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 3 (+10 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 | yusupov | 3bf1ad3 | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 13 | 3/3 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 | darcy | 3bf1ad3 | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 
@@ -424,6 +426,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | xv | bb0b7e5 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 430,6 s |
 | xv | 0ebbf9c | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 433,3 s |
 | xv | 3bf1ad3 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 433,6 s |
+| xv | 315db35 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 432,2 s |
 | yusupov | bb0b7e5 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23 s |
 | yusupov | 0ebbf9c | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,1 s |
 | yusupov | 3bf1ad3 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,4 s |

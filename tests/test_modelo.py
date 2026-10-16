@@ -47,13 +47,16 @@ def test_alocar_nunca_reaproveita():
 
 def test_reescrever_leva_antes_ao_primeiro_e_depois_ao_ultimo_sucessor():
     d = Decisoes(quebras=frozenset({1}), paragrafo_antes=frozenset({1}),
-                 hifen_de_quebra=frozenset({1}), juncoes=frozenset({(1, 9), (8, 1)}),
+                 hifen_de_quebra=frozenset({1}), juncoes=frozenset({(1, 9)}),
                  virtuais=(GlifoVirtual(50, "x", 1),))
     novo, caidas = d.reescrever({1: [10, 11]})
     assert novo.quebras == {10} and novo.paragrafo_antes == {10}
     assert novo.hifen_de_quebra == {11}
-    assert novo.juncoes == {(11, 9), (8, 10)}
+    assert novo.juncoes == {(11, 9)}
     assert novo.virtuais[0].depois_de == 11 and caidas == []
+    # O lado de chegada de uma junção vai ao primeiro sucessor.
+    novo, _ = Decisoes(juncoes=frozenset({(8, 1)})).reescrever({1: [10, 11]})
+    assert novo.juncoes == {(8, 10)}
 
 
 def test_decisao_de_glifo_que_saiu_sem_sucessor_cai_e_e_dita():
@@ -230,6 +233,21 @@ def test_quebrar_desfaz_a_juncao_que_termina_no_glifo():
     ed.quebrar(p, g[2])
     assert tx.texto(tx.montar(p)) == "ab cd"
     assert not (p.decisoes.quebras & {b for _, b in p.decisoes.juncoes})
+
+
+def test_fundir_glifos_nao_deixa_quebra_e_juncao_na_mesma_fronteira():
+    """juntar_palavras(b, c), quebrar(d) e depois juntar os glifos c e d num só."""
+    from abbychess import edicao as ed
+
+    p = _pagina(*_linha("ab cd ef"))
+    a, b, c, d = (x.gid for x in p.boxes[:4])
+    ed.juntar_palavras(p, b, c)
+    ed.quebrar(p, d)
+    assert tx.texto(tx.montar(p)) == "abc d ef"
+    novo, caidas = p.decisoes.reescrever({c: [99], d: [99]})
+    assert not (novo.quebras & {y for _, y in novo.juncoes})
+    assert (b, 99) in novo.juncoes and 99 not in novo.quebras
+    assert any("fundido" in x for x in caidas)
 
 
 def test_paragrafo_antes_de_um_glifo_do_meio_da_linha_vale_para_a_linha():

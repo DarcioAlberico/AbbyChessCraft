@@ -650,11 +650,13 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 - **O modelo v2 deixa a releitura e o Enter uns 7 a 10 ms mais lentos na mediana** que no
   1a (tabela "Rodadas repetidas": o 1b sem o congelamento contra o 1a, os dois sem ele):
   cada gravação reconcilia a lista da janela com o modelo. A troca de página ficou uns 12 ms
-  mais rápida, porque a página já está em memória. O mesmo passo congelou os modelos globais
-  para a coleta de lixo do Python (`gc.freeze`), o que **não muda as medianas**, mas tira a
-  faixa alta do p95 do Enter (de ~200 para ~135 ms); na releitura, o p95 do 1b (152–158 ms)
-  ficou pior que o do passo 0 e passou do alvo de 150 ms. A reconciliação sai no passo 2a,
-  e a cópia da página inteira a cada passo do desfazer (que já existia) sai no 2b.
+  mais rápida, porque a página já está em memória.
+- **O congelamento dos modelos para a coleta de lixo (`gc.freeze`, desde o 1b) é uma troca.**
+  Ele tira a faixa alta do p95 do Enter (de ~200 para ~135 ms) e baixa um pouco a mediana da
+  troca de página, mas **piora a releitura**: o p95 dela passa de 134–149 ms (sem) para
+  152–158 ms (com), acima do alvo de 150, e a mediana sobe uns 7 ms. Ficou ligado porque o
+  Enter é a tecla de cada glifo ensinado, e o ajuste de borda é raro. A reconciliação sai no
+  passo 2a, e a cópia da página inteira a cada passo do desfazer (que já existia) sai no 2b.
 - **A janela ainda edita por índice** (até o passo 2a): cada gravação reconcilia a lista de
   glifos com o modelo, pelo objeto e, depois do desfazer de hoje (que devolve cópias), pela
   caixa. Um glifo que o desfazer de hoje trouxe de volta depois de dividido ganha gid novo

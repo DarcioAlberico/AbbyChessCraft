@@ -6,11 +6,13 @@ corrige (ver `abbychess.verificacao`):
 - **Enter** grava o texto do campo nos glifos da palavra, uma letra por glifo;
   só os que mudaram viram manuais. **Ctrl+Enter** faz o mesmo e ainda ensina
   cada glifo mudado como padrão deste livro.
-- **Tab** pula a palavra; **Shift+Tab** volta.
-- **Ctrl+I** ignora a palavra em toda a página nesta sessão.
+- **Alt+↓** pula a palavra; **Alt+↑** volta (a fila no modo "palavras desconhecidas", F7).
+- **Ctrl+Shift+I** ignora a palavra em toda a página nesta sessão.
 - **Ctrl+Shift+D** põe a palavra no dicionário do livro (`lexico.txt`).
 - O clique num glifo do recorte o abre no painel de treino, para dividir,
   juntar ou ajustar quando a palavra tem glifos de mais ou de menos.
+
+Os atalhos são ações da janela (`app/teclado.py`); o painel oferece os comandos (`pedir_*`).
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ from typing import List, Optional, Sequence
 
 import numpy as np
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont, QKeySequence, QPainter, QPen, QShortcut
+from PySide6.QtGui import QFont, QPainter, QPen
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy,
                                QVBoxLayout, QWidget)
 
@@ -106,11 +108,11 @@ class PainelDeVerificacao(QWidget):
         botoes.addWidget(self.botao_ensinar)
 
         outros = QHBoxLayout()
-        self.botao_anterior = QPushButton("◀ Anterior")
+        self.botao_anterior = QPushButton("◀ Anterior (Alt+↑)")
         self.botao_anterior.clicked.connect(self.anterior.emit)
-        self.botao_pular = QPushButton("Ignorar (Tab)")
+        self.botao_pular = QPushButton("Ignorar (Alt+↓)")
         self.botao_pular.clicked.connect(self.pular.emit)
-        self.botao_todas = QPushButton("Ignorar todas (Ctrl+I)")
+        self.botao_todas = QPushButton("Ignorar todas (Ctrl+Shift+I)")
         self.botao_todas.clicked.connect(self.ignorar_todas.emit)
         for botao in (self.botao_anterior, self.botao_pular, self.botao_todas):
             outros.addWidget(botao)
@@ -135,15 +137,15 @@ class PainelDeVerificacao(QWidget):
         caixa.addWidget(dica)
         caixa.addStretch(1)
 
-        for tecla, acao in ((QKeySequence("Tab"), self.pular.emit),
-                            (QKeySequence("Shift+Tab"), self.anterior.emit),
-                            (QKeySequence("Ctrl+I"), self.ignorar_todas.emit),
-                            (QKeySequence("Ctrl+Shift+D"), self.adicionar.emit)):
-            atalho = QShortcut(tecla, self)
-            atalho.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
-            atalho.activated.connect(lambda a=acao: self._ativo and a())
+        self.limpar("Escolha a fila de palavras desconhecidas (F7) para verificar o texto.")
 
-        self.limpar("Aperte F7 para verificar o texto da página.")
+    def pedir_ignorar_todas(self) -> None:
+        if self._ativo:
+            self.ignorar_todas.emit()
+
+    def pedir_adicionar(self) -> None:
+        if self._ativo:
+            self.adicionar.emit()
 
     # ------------------------------------------------------------------
     def mostrar(self, pagina: np.ndarray, boxes: Sequence[BoxEntry], palavra: vf.Desconhecida,

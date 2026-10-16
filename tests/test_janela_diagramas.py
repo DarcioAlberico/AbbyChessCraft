@@ -199,7 +199,7 @@ def janela_com_legenda(app, tmp_path, monkeypatch):
 def _corrigir(app, janela, gid: int, char: str) -> None:
     janela.pagina.mostrar(gid)
     janela.treino.campo.setText(char)
-    janela.treino._so_corrigir()
+    janela.treino.pedir_so_corrigir()
     _esperar(app, janela)
 
 

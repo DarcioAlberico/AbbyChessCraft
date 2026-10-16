@@ -65,7 +65,9 @@ def janela(app, tmp_path, respostas):
 
 def test_menu_ferramentas_tem_o_lote_e_o_projeto_a_exportacao(janela):
     ferramentas = [a.text() for a in janela.menu_ferramentas.actions()]
-    assert "Reconhecer o livro…" in ferramentas and "Próximo pendente do livro" in ferramentas
+    pagina = next(m for m in janela.menuBar().findChildren(QMenu) if m.title() == "P&ágina")
+    assert "Reconhecer o livro…" in ferramentas
+    assert "Próxima página com pendentes" in [a.text() for a in pagina.actions()]
     projeto = next(m for m in janela.menuBar().findChildren(QMenu) if m.title() == "&Projeto")
     assert "Exportar…" in [a.text() for a in projeto.actions()]
     assert janela.acao_lote.isEnabled() and not janela.acao_cancelar_lote.isEnabled()
@@ -88,7 +90,7 @@ def test_lote_pergunta_e_pula_as_ja_lidas(app, janela, respostas):
     _esperar(app, janela)
     mostrar(janela, 0)
     janela.treino.campo.setText("a")
-    janela.treino._so_corrigir()
+    janela.treino.pedir_so_corrigir()
 
     respostas["pergunta"] = NAO
     janela.reconhecer_livro()

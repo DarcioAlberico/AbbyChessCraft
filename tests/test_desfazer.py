@@ -169,7 +169,7 @@ def test_ctrl_z_desfaz_o_ensinar_e_apaga_o_padrao(app, janela):
     inicio = _reconhecida(app, janela)
     mostrar(janela, 0)
     janela.treino.campo.setText("a")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     _esperar(app, janela)
     assert sum(b.source == FONTE_LIVRO for b in boxes(janela)) == 4
     assert janela.acao_desfazer.text() == "Desfazer: Ensinar 'a'"
@@ -194,10 +194,10 @@ def test_ctrl_z_desfaz_o_ensinar_e_apaga_o_padrao(app, janela):
 def test_desfazer_dividir_e_descartar(app, janela):
     inicio = _reconhecida(app, janela)
     mostrar(janela, 0)
-    janela.treino._juntar(+1)
-    janela.treino._dividir()
+    janela.treino.pedir_juntar(+1)
+    janela.treino.pedir_dividir()
     mostrar(janela, 2)
-    janela.treino._descartar()
+    janela.treino.pedir_descartar()
     assert len(boxes(janela)) == len(inicio) - 1
 
     janela.pagina.desfazer()                    # volta o descartado
@@ -214,7 +214,7 @@ def test_alt_seta_seguidos_se_desfazem_de_uma_vez(app, janela):
     inicio = _reconhecida(app, janela)
     mostrar(janela, 0)
     for _ in range(3):
-        janela.treino._ajustar(0, 0, 1, 0)
+        janela.treino.pedir_ajustar(0, 0, 1, 0)
     janela.pagina.desfazer()
     assert _caixas(boxes(janela)) == inicio
 
@@ -225,7 +225,7 @@ def test_desfazer_o_reconhecimento_volta_a_pagina_de_antes(app, janela):
     _reconhecida(app, janela)
     mostrar(janela, 0)
     janela.treino.campo.setText("Z")
-    janela.treino._so_corrigir()
+    janela.treino.pedir_so_corrigir()
     corrigida = _caixas(boxes(janela))
     janela.reconhecer()                  # o F5 de novo apaga a correção
     _esperar(app, janela)
@@ -309,7 +309,7 @@ def test_desfazer_depois_da_propagacao_volta_a_pagina_toda(app, janela):
     inicio = _reconhecida(app, janela)
     mostrar(janela, 0)
     janela.treino.campo.setText("a")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     _esperar(app, janela)
     assert sum(b.source == FONTE_LIVRO for b in boxes(janela)) == 4   # a propagação resolveu
     janela.pagina.desfazer()
@@ -321,7 +321,7 @@ def test_desfazer_com_a_propagacao_rodando_descarta_o_resultado_dela(app, janela
     solto = _propagacao_presa(monkeypatch)
     mostrar(janela, 0)
     janela.treino.campo.setText("a")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     assert boxes(janela)[0].source == FONTE_MANUAL       # a parte síncrona, na hora
     assert janela.executor.ocupado                        # a propagação, presa
     janela.pagina.desfazer()                              # roda na hora, com ela presa
@@ -337,11 +337,11 @@ def test_enter_durante_uma_propagacao_nao_perde_nem_duplica_leitura(app, janela,
     solto = _propagacao_presa(monkeypatch)
     mostrar(janela, 0)                                    # o primeiro "a"
     janela.treino.campo.setText("a")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     assert janela.treino.campo.isEnabled()                # o painel vale durante ela
     mostrar(janela, 1)                                    # o "b", com a primeira presa
     janela.treino.campo.setText("b")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     assert (boxes(janela)[1].char, boxes(janela)[1].source) == ("b", FONTE_MANUAL)
     solto.set()
     _esperar(app, janela)
@@ -416,7 +416,7 @@ def test_enter_que_nao_grava_a_amostra_nao_deixa_nada(app, janela, monkeypatch):
 
     monkeypatch.setattr(janela.leitor.padroes, "ensinar", ensinar)
     janela.treino.campo.setText("a")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     _esperar(app, janela)
     assert falhas and "disco cheio" in falhas[0]
     assert _caixas(boxes(janela)) == inicio               # a página não mudou
@@ -464,7 +464,7 @@ def test_reler_pendentes_entra_no_desfazer(app, janela):
     inicio = _reconhecida(app, janela)
     mostrar(janela, 0)
     janela.treino.campo.setText("a")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     _esperar(app, janela)
     janela.pagina.desfazer()                            # o Enter e a propagação saem
     janela.leitor.padroes.restaurar(janela.pagina.historico.proxima_a_refazer()
@@ -481,7 +481,7 @@ def test_refazer_um_enter_desfeito_na_propagacao_propaga_de_novo(app, janela, mo
     solto = _propagacao_presa(monkeypatch)
     mostrar(janela, 0)
     janela.treino.campo.setText("a")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     janela.pagina.desfazer()                            # com a propagação presa
     solto.set()
     _esperar(app, janela)
@@ -512,7 +512,7 @@ def test_refazer_noutra_pagina_abre_a_do_enter_e_propaga(app, tmp_path, monkeypa
         solto = _propagacao_presa(monkeypatch)
         mostrar(j, 0)
         j.treino.campo.setText("a")
-        j.treino._ensinar()
+        j.treino.pedir_ensinar()
         j.pagina.desfazer()                             # com a propagação presa
         solto.set()
         _esperar(app, j)

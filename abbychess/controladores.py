@@ -586,3 +586,62 @@ class ControladorDoLivro:
 
         p.tarefa(f"Exportando {destino.suffix[1:].upper()}", preparar,
                    falhou=p._falhou("Exportar"))
+
+
+class ControladorDaFila:
+    """A fila da revisão (§8.1): o modo, e o próximo e o anterior nele (Alt+↓ / Alt+↑, em
+    qualquer painel). O escopo livro (Shift+F7) é do passo C; aqui, a página."""
+
+    #: (modo, nome no seletor do Inspetor), na ordem do F7.
+    MODOS = (("confianca", "Confiança"), ("leitura", "Ordem de leitura"),
+             ("palavras", "Palavras desconhecidas"), ("diagramas", "Diagramas por conferir"))
+    #: Os modos que andam pelos glifos (o Inspetor mostra o Glifo).
+    DE_GLIFOS = ("confianca", "leitura")
+
+    def __init__(self, pagina: ControladorDePagina, verificador: ControladorDeVerificacao,
+                 conferencia: ControladorDeDiagramas):
+        self.pagina, self.verificador, self.conferencia = pagina, verificador, conferencia
+        self.eventos = pagina.eventos
+        self.modo = "confianca"
+
+    def nome(self, modo: Optional[str] = None) -> str:
+        return dict(self.MODOS)[modo or self.modo]
+
+    def definir(self, modo: str) -> None:
+        if modo not in dict(self.MODOS):
+            raise ValueError(f"modo da fila desconhecido: {modo!r}")
+        self.modo = modo
+        if modo in self.DE_GLIFOS:
+            self.pagina.ordem_da_fila = modo
+            self.pagina.pulados = set()
+        self.eventos.emitir("modo_da_fila_mudou", modo)
+
+    def ciclar(self) -> None:
+        """F7: o modo seguinte."""
+        modos = [m for m, _ in self.MODOS]
+        self.definir(modos[(modos.index(self.modo) + 1) % len(modos)])
+
+    def andar(self, passo: int) -> None:
+        """Alt+↓ (passo +1) e Alt+↑ (−1): o item seguinte ou o anterior no modo de agora.
+        Nunca muda texto."""
+        if self.modo in self.DE_GLIFOS:
+            self.pagina.andar(passo)
+        elif self.modo == "palavras":
+            self.verificador.andar(passo)
+        else:
+            self.conferencia.proximo_do_livro()
+
+    def contador(self) -> str:
+        """"12/204": a posição do item atual na fila do modo, e o tamanho dela."""
+        p = self.pagina
+        if self.modo in self.DE_GLIFOS:
+            fila = p.fila()
+            n = fila.index(p.atual) + 1 if p.atual in fila else 0
+            return f"{n}/{len(fila)}"
+        if self.modo == "palavras":
+            total = len(self.verificador.desconhecidas)
+            return f"{self.verificador.posicao + 1 if total else 0}/{total}"
+        if p.projeto is None:
+            return "0"
+        resumo = p.projeto.resumo_do_livro()
+        return str(sum(r.get("diagramas_por_conferir", 0) for r in resumo.values()))

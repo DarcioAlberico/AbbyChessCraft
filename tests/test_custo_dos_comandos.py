@@ -140,7 +140,7 @@ def test_reler_pendentes(app, janela, contador):
     _pronta(app, janela)
     mostrar(janela, 0)
     janela.treino.campo.setText("a")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     _esperar(app, janela)
     outro = next(i for i, b in enumerate(boxes(janela)) if b.char == "a" and i != 0)
     boxes(janela)[outro].char, boxes(janela)[outro].source = "", "none"   # volta a pendente
@@ -217,7 +217,7 @@ def test_marcar_glifo(app, janela, contador):
     a, b = boxes(janela)[0], boxes(janela)[1]
     porta = janela.visor.viewport()
     contador.gestos = 0
-    QTest.keyClick(janela.treino.campo, Qt.Key.Key_T, Qt.KeyboardModifier.ControlModifier)
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_M, Qt.KeyboardModifier.ControlModifier)
     inicio, fim = _no_visor(janela, a.x1 - 4, b.y1 - 4), _no_visor(janela, b.x2 + 1, a.y2 + 4)
     QTest.mousePress(porta, Qt.MouseButton.LeftButton, pos=inicio)
     QTest.mouseMove(porta, fim)

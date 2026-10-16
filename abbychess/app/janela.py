@@ -15,13 +15,14 @@ O caminho de uso é o do FineReader com treino de padrões:
    pela revisão do livro todo, de página em página. **Exportar** escreve o PDF
    pesquisável, o DOCX ou o EPUB das páginas reconhecidas.
 7. O **editor de áreas** (Ctrl+Shift+A) corrige o que a página tem de texto,
-   diagrama, imagem e o que ignorar, antes do F5. A **verificação de texto** (F7)
-   anda pelas palavras que o léxico do core não conhece.
+   diagrama, imagem e o que ignorar, antes do F5. A **verificação de texto** (a fila de
+   palavras desconhecidas, F7) anda pelas palavras que o léxico do core não conhece.
 
 A janela só compõe, liga sinais a comandos e desenha o que os eventos dizem (SPEC §14.1).
 Os comandos e o estado estão nos controladores sem Qt (`abbychess.controlador`,
-`abbychess.controladores`); as ações e os menus, em `app/acoes.py`; os diálogos, em
-`app/dialogos.py`.
+`abbychess.controladores`); as ações e os menus, em `app/acoes.py` (os atalhos, de
+`docs/atalhos.yaml` por `app/teclado.py`); os painéis, os arranjos e o espaço por projeto,
+em `app/espaco.py`; os diálogos, em `app/dialogos.py`.
 """
 
 from __future__ import annotations
@@ -31,13 +32,14 @@ from typing import Optional
 
 from collections import OrderedDict
 
-from PySide6.QtCore import QSettings, Qt, QTimer, Signal
+from PySide6.QtCore import QSettings, QTimer, Signal
 from PySide6.QtGui import QFont
-from PySide6.QtWidgets import (QApplication, QDockWidget, QInputDialog, QMainWindow, QPlainTextEdit,
-                               QProgressBar, QTabWidget)
+from PySide6.QtWidgets import QApplication, QInputDialog, QMainWindow, QPlainTextEdit
 
+from abbychess import avisos as av
 from abbychess.app import acoes, dialogos
 from abbychess.app.desenho import DesenhoDaJanela
+from abbychess.app.espaco import EspacoDeTrabalho
 from abbychess.app.dialogo_diagrama import DialogoDeDiagrama
 from abbychess.app.opcoes import DialogoDeOpcoes
 from abbychess.app.painel_padroes import PainelDePadroes
@@ -54,7 +56,7 @@ log = logging.getLogger(__name__)
 TITULO = "AbbyChessCraft"
 
 
-class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
+class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
     #: Da thread do gravador: a página `indice` não gravou (o erro).
     falha_de_gravacao = Signal(object, object)
 
@@ -73,14 +75,13 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
         self.conferencia = ControladorDeDiagramas(self.pagina)
         self.livro = ControladorDoLivro(self.pagina)
         self._montar_paineis()
+        self._montar_espaco()
         acoes.montar(self)
         self._ligar_eventos()
-        self.progresso = QProgressBar()
-        self.progresso.setMaximumWidth(260)
-        self.progresso.hide()
-        self.statusBar().addPermanentWidget(self.progresso)
         self.treino.limpar("Crie um projeto (Ctrl+N) ou abra um existente (Ctrl+O).")
         acoes.atualizar(self)
+        self.arranjo_padrao()
+        self.atualizar_fila()
 
     # O projeto aberto, para quem lê de fora (os testes, os diálogos).
     projeto = property(lambda self: self.pagina.projeto)
@@ -93,7 +94,7 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
     def _montar_paineis(self) -> None:
         p, v = self.pagina, self.verificador
         self.visor = VisorDePagina()
-        self.visor.box_clicado.connect(p.clicar)
+        self.visor.box_clicado.connect(self._box_clicado)
         self.visor.dividir_em.connect(p.dividir_em)
         self.visor.juntar_com.connect(p.juntar_com)
         self.visor.area_desenhada.connect(p.marcar)
@@ -115,7 +116,6 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
         self._pre_pixmap.setSingleShot(True)
         self._pre_pixmap.setInterval(400)
         self._pre_pixmap.timeout.connect(self._pre_converter)
-        self.setCentralWidget(self.visor)
 
         self.treino = PainelDeTreino()
         self.treino.ensinar.connect(p.ensinar)
@@ -141,19 +141,9 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
         self.verificacao.adicionar.connect(self._adicionar_palavra)
         self.verificacao.glifo_escolhido.connect(self._glifo_da_palavra)
 
-        self.abas = abas = QTabWidget()
-        abas.addTab(self.treino, "Treino")
-        abas.addTab(self.padroes, "Padrões do livro")
-        abas.addTab(self.verificacao, "Verificação")
-        abas.currentChanged.connect(self._aba_mudou)
-        doca = QDockWidget("Treino de padrões", self)
-        doca.setObjectName("doca_treino")
-        doca.setWidget(abas)
-        doca.setMinimumWidth(420)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, doca)
-
-        self.texto = QPlainTextEdit()
+        self.texto = QPlainTextEdit()           # o Documento, até o A3: o texto de hoje
         self.texto.setReadOnly(True)
+        self.texto.setTabChangesFocus(True)
         # O texto da página é refeito uma vez, um instante depois da última mudança: montar
         # o documento leva dezenas de ms, e um Enter muda a página duas vezes (o glifo e,
         # depois, a propagação).
@@ -162,10 +152,7 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
         self.relogio_do_texto.setInterval(150)
         self.relogio_do_texto.timeout.connect(self.pintar_texto)
         self.texto.setFont(QFont(FONTE_DE_SIMBOLOS, 11))
-        doca_texto = QDockWidget("Texto reconhecido", self)
-        doca_texto.setObjectName("doca_texto")
-        doca_texto.setWidget(self.texto)
-        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, doca_texto)
+        self.texto.setAccessibleName("Documento: o texto reconhecido da página")
 
     def _ligar_eventos(self) -> None:
         e = self.eventos
@@ -183,6 +170,9 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
                              ("projeto_aberto", self._projeto_aberto),
                              ("acoes_mudaram", self._acoes_mudaram),
                              ("lote_mudou", self._acoes_mudaram),
+                             ("lote_mudou", self._lote_na_barra),
+                             ("modo_da_fila_mudou", self._modo_da_fila_mudou),
+                             ("palavra_mudou", self.atualizar_fila),
                              ("mensagem", self._mensagem),
                              ("falha", self._falha),
                              ("aviso", self._aviso)):
@@ -241,6 +231,7 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
 
     def _projeto_aberto(self, leitor) -> None:
         self._padroes_mudaram()
+        self._espaco_do_projeto_aberto()
         dialogos.avisos_da_abertura(self, self.projeto, leitor)
 
     def _parar_tarefas(self) -> None:
@@ -263,6 +254,7 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
         self._parar_tarefas()                   # o fim da tarefa em voo ainda entra
         if not self._gravou_ou_perder(projeto):   # e o que ele entregou também é gravado
             return False
+        self.gravar_espaco()
         self.pagina.desligar()
         projeto.fechar(5)
         return True
@@ -365,13 +357,11 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
             self.statusBar().showMessage("Editor de áreas desligado.", 5000)
 
     def verificar_texto(self) -> None:
-        """F7: mostra a verificação, com a primeira palavra desconhecida."""
-        if not self.verificador.verificar():
-            return                              # o léxico carrega; `verificacao_pronta` volta
-        if self.abas.currentWidget() is self.verificacao:
-            self.verificador.recontar(0)
-        else:
-            self.abas.setCurrentWidget(self.verificacao)  # `_aba_mudou` reconta
+        """A fila de palavras desconhecidas: a Palavra no Inspetor, com a primeira delas
+        (recontada: o treino pode ter dividido ou juntado glifos)."""
+        self.inspetor.mostrar("palavra")
+        if self.verificador.verificar():        # senão o léxico carrega, e
+            self.verificador.recontar(0)        # `verificacao_pronta` volta aqui
 
     def _adicionar_palavra(self) -> None:
         self.verificador.adicionar(self.verificacao.campo.text())
@@ -380,8 +370,13 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
         """O glifo clicado no recorte vai para o painel de treino, para editar."""
         gid = self.verificador.gid_do_glifo(indice)
         if gid is not None:
-            self.abas.setCurrentWidget(self.treino)
+            self.inspetor.mostrar("glifo")
             self.pagina.escolher(gid)
+
+    def _box_clicado(self, indice: int) -> None:
+        """O clique num box é ação explícita: o Inspetor mostra o Glifo dele."""
+        self.inspetor.mostrar("glifo")
+        self.pagina.clicar(indice)
 
     def _atual_resolvido(self) -> None:
         """A propagação resolveu o glifo mostrado: vai ao próximo pendente (ou, se o usuário
@@ -396,17 +391,10 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
 
     def _recusa(self, refazer: bool, texto: str) -> None:
         pilha = "refazer" if refazer else "desfazer"
+        self.registrar_aviso(av.AVISO, "Desfazer" if not refazer else "Refazer", texto)
         if dialogos.confirmar(self, "Desfazer", texto + f"\n\nTirar esta ação do {pilha} e "
                               "continuar com as outras?"):
             self.pagina.tirar_do_desfazer(refazer)
-
-    def _aba_mudou(self, _indice: int) -> None:
-        """Voltar à verificação reconta: o treino pode ter dividido ou juntado glifos."""
-        if self.abas.currentWidget() is self.verificacao:
-            if self.verificador.lexico is not None and self.pagina.boxes:
-                self.verificador.recontar()
-        else:
-            self.visor.marcar_palavra(None)
 
     def _abrir_conferencia(self, indice: int) -> DialogoDeDiagrama:
         dialogo = DialogoDeDiagrama(self.pagina.matriz, self.pagina.diagramas, indice, self)
@@ -416,6 +404,7 @@ class JanelaPrincipal(DesenhoDaJanela, QMainWindow):
         return dialogo
 
     def closeEvent(self, evento):
+        self.config.setValue("geometria", self.saveGeometry())
         if self.projeto is None:
             self._parar_tarefas()
         elif not self._fechar_projeto():

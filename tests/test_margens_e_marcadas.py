@@ -146,7 +146,7 @@ def test_f5_numa_pagina_marcada_nao_pergunta_e_mantem_os_quadros(app, janela, mo
     a = pg.segmentar(janela.pagina.imagem)[0]
     janela.pagina.marcar(a.x1 - 3, a.y1 - 3, a.x2 + 3, a.y2 + 3)
     janela.treino.campo.setText("a")
-    janela.treino._so_corrigir()
+    janela.treino.pedir_so_corrigir()
     assert not janela.projeto.pagina_reconhecida(0) and janela.projeto.carregar_pagina(0)
 
     def nao_pergunte(*_a, **_k):

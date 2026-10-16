@@ -576,11 +576,6 @@ class VisorDePagina(QGraphicsView):
 
     def keyPressEvent(self, evento):
         tecla = evento.key()
-        sem_modificador = not (evento.modifiers() & (Qt.KeyboardModifier.ControlModifier
-                                                    | Qt.KeyboardModifier.AltModifier))
-        if tecla in (Qt.Key.Key_PageDown, Qt.Key.Key_PageUp) and sem_modificador:
-            self.rolar_tela(+1 if tecla == Qt.Key.Key_PageDown else -1)
-            return
         if tecla == Qt.Key.Key_Space and not evento.isAutoRepeat():
             self._espaco = True
             self.viewport().setCursor(Qt.CursorShape.OpenHandCursor)

@@ -401,9 +401,11 @@ class ProjetoDeLivro:
         with self._trava_do_livro:
             pagina.diagramas = com_ids_de_diagramas(pagina.diagramas)
             pagina.zonas = zn.com_ids(pagina.zonas)
-            gv.gravar_json(self._arquivo_v2(pagina.pid), _pagina_para_json(pagina))
+            dados = _pagina_para_json(pagina)
+            gv.gravar_json(self._arquivo_v2(pagina.pid), dados)
             self._guardar_no_cache(pagina)
-            self._estados[pagina.pid] = {b.gid: tuple(b.entry.as_state()) for b in pagina.boxes}
+            # A foto da gravação, do mesmo `as_state()` que foi para o JSON.
+            self._estados[pagina.pid] = {b[0]: tuple(b[1]) for b in dados["boxes"]}
             self._atualizar_livro(pagina.indice, self._resumo_do_modelo(pagina))
 
     def _guardar_no_cache(self, pagina: Pagina) -> None:

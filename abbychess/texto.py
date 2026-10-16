@@ -213,17 +213,22 @@ def _na_ordem_das_zonas(blocos: List[Bloco], zonas: Sequence) -> List[Bloco]:
 
 def normalizar(char: str, modo: str) -> str:
     """O caractere como sai do programa no modo (§4.2)."""
+    return _normalizador(modo)(char)
+
+
+def _normalizador(modo: str):
     from core.notacao import FIGURINAS, normalizar_saida
 
     if modo == SAN:
-        return FIGURINAS.get(char, normalizar_saida(char))
+        return lambda c: FIGURINAS.get(c) or normalizar_saida(c)
     if modo == IMPRESSO:
-        return normalizar_saida(char)
+        return normalizar_saida
     raise ValueError(f"modo desconhecido {modo!r}")
 
 
 def texto(documento: Documento, diagramas: Sequence = (), modo: str = IMPRESSO) -> str:
     """O texto do documento: uma linha impressa por linha, e uma linha por diagrama."""
+    normal = _normalizador(modo)
     por_id = {d.id: d for d in diagramas}
     numero = {d.id: k for k, d in enumerate(sorted(diagramas, key=lambda d: (d.caixa[1], d.caixa[0])),
                                             start=1)}
@@ -235,7 +240,7 @@ def texto(documento: Documento, diagramas: Sequence = (), modo: str = IMPRESSO) 
                 saida.append(d.linha_de_texto(numero[bloco.diagrama_id]))
             continue
         for linha in bloco.linhas:
-            saida.append(" ".join("".join(normalizar(documento.chars[g], modo) for g in p.gids)
+            saida.append(" ".join("".join(normal(documento.chars[g]) for g in p.gids)
                                   for p in linha.palavras))
     return "\n".join(saida)
 

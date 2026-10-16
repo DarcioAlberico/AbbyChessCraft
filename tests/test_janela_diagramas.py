@@ -21,6 +21,7 @@ from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
 from tests.test_diagramas import FEN, pagina_com_diagrama, sem_modelo  # noqa: E402
 from tests.test_janela import _esperar  # noqa: E402
+from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
 pytestmark = sem_modelo
 
@@ -37,11 +38,8 @@ def janela(app, tmp_path, monkeypatch):
     fonte = pagina_com_diagrama(tmp_path / "pagina.png")
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Diagramas", fonte)
     j = JanelaPrincipal()
-    j.projeto = projeto
-    j.fonte = pg.FonteDePaginas(projeto.fonte)
-    j.leitor = LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
-    j.seletor.setMaximum(j.fonte.total)
-    j.ir_para_pagina(0, salvar=False)
+    j.usar(projeto, pg.FonteDePaginas(projeto.fonte),
+          LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
     yield j
     if j.dialogo_diagrama is not None:
         j.dialogo_diagrama.close()
@@ -55,7 +53,7 @@ def _reconhecida(app, janela):
 
 
 def _clicar_no_diagrama(app, janela) -> dd.DialogoDeDiagrama:
-    x1, y1, x2, y2 = janela.diagramas[0].caixa
+    x1, y1, x2, y2 = janela.pagina.diagramas[0].caixa
     janela.visor.diagrama_clicado.emit((x1 + x2) // 2, (y1 + y2) // 2)
     _esperar(app, janela)
     dialogo = janela.dialogo_diagrama
@@ -70,12 +68,13 @@ def _clicar_na_casa(dialogo, linha: int, coluna: int, botao=Qt.MouseButton.LeftB
 
 def test_reconhecer_le_o_diagrama_e_poe_o_fen_no_texto(app, janela):
     _reconhecida(app, janela)
-    assert len(janela.diagramas) == 1
-    d = janela.diagramas[0]
+    assert len(janela.pagina.diagramas) == 1
+    d = janela.pagina.diagramas[0]
     assert d.fen == FEN + " w - - 0 1"
     assert d.lado is None
     texto = janela.texto.toPlainText()
     assert f"[Diagrama 1: {FEN} w - - 0 1 — brancas a jogar (assumido: a página não diz)" in texto
+    janela.projeto.descarregar()
     gravado = json.loads(janela.projeto._arquivo_da_pagina(0).read_text(encoding="utf-8"))
     assert gravado["diagramas"][0]["fen"] == d.fen
 
@@ -107,7 +106,7 @@ def test_corrigir_casa_a_casa_escolher_o_lado_e_conferir(app, janela):
     dialogo.confirmar()
 
     assert not dialogo.isVisible()                       # era o único diagrama
-    d = janela.diagramas[0]
+    d = janela.pagina.diagramas[0]
     assert d.conferido and d.fen == esperado
     assert "pretas a jogar (informado na revisão)" in janela.texto.toPlainText()
     assert "não revisado" not in janela.texto.toPlainText()
@@ -132,36 +131,36 @@ def test_fechar_sem_conferir_nao_leva_nada(app, janela):
     _clicar_na_casa(dialogo, 4, 4)
     QTest.keyClicks(dialogo.posicao, "Q")
     dialogo.reject()
-    assert not janela.diagramas[0].conferido
-    assert janela.diagramas[0].fen == FEN + " w - - 0 1"
+    assert not janela.pagina.diagramas[0].conferido
+    assert janela.pagina.diagramas[0].fen == FEN + " w - - 0 1"
 
 
 def test_conferencia_sobrevive_a_reabrir_e_a_reconhecer(app, janela):
     dialogo = _clicar_no_diagrama(app, _reconhecida(app, janela))
     dialogo.radio_brancas.click()
     dialogo.confirmar()
-    conferido = janela.diagramas[0].fen
+    conferido = janela.pagina.diagramas[0].fen
 
     janela.ir_para_pagina(0)
-    assert janela.diagramas[0].conferido and janela.diagramas[0].fen == conferido
+    assert janela.pagina.diagramas[0].conferido and janela.pagina.diagramas[0].fen == conferido
     janela.reconhecer()
     _esperar(app, janela)
-    assert janela.diagramas[0].conferido and janela.diagramas[0].lado == "w"
+    assert janela.pagina.diagramas[0].conferido and janela.pagina.diagramas[0].lado == "w"
     assert "brancas a jogar (informado na revisão)" in janela.texto.toPlainText()
 
 
 def test_pagina_antiga_le_o_diagrama_no_primeiro_clique(app, janela):
     """Página gravada antes da leitura: só as caixas; o clique lê e abre."""
-    imagem = janela.imagem
+    imagem = janela.pagina.imagem
     segmentada = pg.segmentar_pagina(imagem)
     arquivo = janela.projeto.pasta / "paginas" / "0001.json"
     arquivo.write_text(json.dumps({"pagina": 1, "boxes": [],
                                    "tabuleiros": [list(t) for t in segmentada.tabuleiros]}),
                        encoding="utf-8")
-    janela.ir_para_pagina(0, salvar=False)
-    assert len(janela.tabuleiros) == 1 and not janela.diagramas[0].lido
+    janela.ir_para_pagina(0)
+    assert len(janela.pagina.tabuleiros) == 1 and not janela.pagina.diagramas[0].lido
     assert "[Diagrama 1: ainda não lido]" in janela.texto.toPlainText()
 
     dialogo = _clicar_no_diagrama(app, janela)
     assert dialogo.fen.text() == FEN + " w - - 0 1"
-    assert janela.diagramas[0].lido
+    assert janela.pagina.diagramas[0].lido

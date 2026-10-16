@@ -22,7 +22,10 @@ from core.box_model import BoxEntry
 NENHUMA = ""
 
 _registro: dict = {}
-_trava = threading.Lock()
+#: Reentrante: o callback da referência fraca roda quando um `BoxEntry` morre, o que pode
+#: acontecer no meio de `registrar` (a coleta de lixo escolhe a hora), na mesma thread que
+#: já segura a trava. Com uma trava simples, a thread esperaria por ela mesma.
+_trava = threading.RLock()
 
 
 def registrar(entry: BoxEntry, amostra: Optional[str]) -> None:

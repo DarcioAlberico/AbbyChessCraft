@@ -211,6 +211,9 @@ class ProjetoDeLivro:
         self.motivo_so_leitura = ""
         #: O gravador das páginas que a janela edita, criado na primeira entrega.
         self._gravador: Optional[Gravador] = None
+        #: índice -> (instantâneo, resumo) das páginas entregues e ainda não gravadas: o
+        #: resumo do livro as mostra como estão, e não como o disco ainda está.
+        self._a_gravar: Dict[int, tuple] = {}
         #: Avisado da thread do gravador quando uma página não grava: `(indice, erro)`.
         self.ao_falhar_gravacao = None
 
@@ -339,7 +342,10 @@ class ProjetoDeLivro:
             pagina.diagramas = com_ids_de_diagramas(pagina.diagramas)
             pagina.zonas = zn.com_ids(pagina.zonas)
             self._guardar_no_cache(pagina)
-            self.gravador.agendar(pagina.pid, pagina.instantaneo())
+            instantaneo = pagina.instantaneo()
+            # O resumo vale já para quem pergunta (F6, o lote, "lidas"), antes da gravação.
+            self._a_gravar[pagina.indice] = (instantaneo, self._resumo_do_modelo(instantaneo))
+            self.gravador.agendar(pagina.pid, instantaneo)
         return True
 
     def descarregar(self, limite: Optional[float] = None) -> bool:
@@ -355,6 +361,9 @@ class ProjetoDeLivro:
     def _gravar_instantaneo(self, pagina: Pagina) -> None:
         with self._trava_do_livro:
             self._gravar(pagina)
+            pendente = self._a_gravar.get(pagina.indice)
+            if pendente is not None and pendente[0] is pagina:
+                del self._a_gravar[pagina.indice]
 
     def _falhou(self, pid: int, erro: BaseException) -> None:
         if self.ao_falhar_gravacao is not None:
@@ -777,8 +786,11 @@ class ProjetoDeLivro:
     def resumo_do_livro(self) -> Dict[int, dict]:
         """Índice da página -> o resumo dela (`_resumo_do_modelo`), de toda página gravada."""
         with self._trava_do_livro:
-            return {int(k) - 1: json.loads(json.dumps(v))       # cópia funda: o cache não vaza
-                    for k, v in self._carregar_livro()["paginas"].items()}
+            resumo = {int(k) - 1: json.loads(json.dumps(v))     # cópia funda: o cache não vaza
+                      for k, v in self._carregar_livro()["paginas"].items()}
+            for indice, (_, pendente) in self._a_gravar.items():
+                resumo[indice] = json.loads(json.dumps(pendente))
+            return dict(sorted(resumo.items()))
 
     def _pid_de(self, indice: int) -> Optional[int]:
         resumo = self._carregar_livro()["paginas"].get(str(indice + 1))

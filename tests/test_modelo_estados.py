@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 
 import pytest
-from hypothesis import HealthCheck, settings
+from hypothesis import HealthCheck, Phase, settings
 from hypothesis import strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, initialize, invariant, rule
 from PIL import Image, ImageDraw
@@ -210,5 +210,156 @@ class MaquinaDaPagina(RuleBasedStateMachine):
 
 MaquinaDaPagina.TestCase.settings = settings(
     max_examples=EXEMPLOS, derandomize=True, stateful_step_count=25, deadline=None,
+    # Sem a fase "explain": ela roda com rastreio linha a linha e leva minutos.
+    phases=[Phase.explicit, Phase.reuse, Phase.generate, Phase.target, Phase.shrink],
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 test_maquina_da_pagina = pytest.mark.timeout(600)(MaquinaDaPagina.TestCase)
+
+
+# ----------------------------------------------------------------------
+# CA-4.3 (parte do 2a): o controlador, com pular e selecionar
+# ----------------------------------------------------------------------
+
+class _ProjetoNaMemoria:
+    """O que o controlador pede ao projeto, sem disco."""
+
+    somente_leitura = False
+
+    def __init__(self, pagina):
+        self.pagina = pagina
+        self.agendadas = 0
+
+    def carregar_modelo(self, indice):
+        return self.pagina
+
+    def pagina_para_editar(self, indice):
+        return self.pagina
+
+    def agendar(self, pagina):
+        self.agendadas += 1
+        return True
+
+
+class _FonteNaMemoria:
+    total = 1
+
+    def __init__(self, imagem):
+        self.imagem = imagem
+
+    def pagina(self, indice):
+        return self.imagem
+
+
+class _LeitorSemPadroes:
+    """A fila sai das confianças; ler não acha nada (como um livro sem padrões)."""
+
+    def __init__(self):
+        from abbychess.projeto import Limiares
+
+        self.limiares = Limiares()
+
+    def ler(self, *_a, **_k):
+        from abbychess.leitor import Leitura
+
+        return Leitura("", "nenhuma", 0.0)
+
+    def padroes_por_caractere(self):
+        return {}
+
+
+class MaquinaDoControlador(RuleBasedStateMachine):
+    @initialize(n=st.integers(1, 40), baixas=st.lists(st.integers(0, 39), max_size=20))
+    def montar(self, n, baixas):
+        from dataclasses import replace as trocar
+
+        from abbychess.controlador import ControladorDePagina
+
+        self.imagem, pagina = _pagina_sintetica(n)
+        # Algumas confianças baixas: elas fazem a fila.
+        pagina.boxes = [trocar(b, entry=trocar(b.entry, confidence=0.2)) if i in baixas else b
+                        for i, b in enumerate(pagina.boxes)]
+        self.ctl = ControladorDePagina()
+        self.ctl.ligar(_ProjetoNaMemoria(pagina), _FonteNaMemoria(self.imagem),
+                       _LeitorSemPadroes())
+        self.ctl.ir_para(0)
+
+    def _gid(self, i):
+        gids = self.ctl.gids
+        return gids[i % len(gids)] if gids else None
+
+    @rule(i=st.integers(0, 10_000))
+    def mostrar(self, i):
+        self.ctl.mostrar(self._gid(i))
+
+    @rule(passo=st.sampled_from([+1, -1]))
+    def pular(self, passo):
+        self.ctl.andar(passo)
+
+    @rule(i=st.integers(0, 10_000))
+    def selecionar(self, i):
+        if self.ctl.gids:
+            self.ctl.alternar_na_selecao(i % len(self.ctl.gids))
+
+    @rule()
+    def limpar_selecao(self):
+        self.ctl.limpar_selecao()
+
+    @rule(x=st.integers(0, 40))
+    def dividir(self, x):
+        atual = self.ctl.atual
+        if atual is None:
+            return
+        caixa = self.ctl.box(atual)
+        antes = set(self.ctl.gids)
+        self.ctl.dividir(caixa.x1 + x if caixa.x1 + x < caixa.x2 and x > 0 else None)
+        if atual not in self.ctl.gids:           # dividiu: o atual é a primeira parte
+            novos = [g for g in self.ctl.gids if g not in antes]
+            assert self.ctl.atual == novos[0] and len(novos) == 2
+
+    @rule(passo=st.sampled_from([+1, -1]))
+    def juntar(self, passo):
+        self.ctl.juntar(passo)
+
+    @rule()
+    def descartar(self):
+        if len(self.ctl.gids) > 1:
+            self.ctl.descartar()
+
+    @rule(c=st.sampled_from("abz"))
+    def corrigir(self, c):
+        self.ctl.corrigir(c)
+
+    @rule(i=st.integers(0, 10_000))
+    def marcar(self, i):
+        gid = self._gid(i)
+        if gid is not None:
+            e = self.ctl.box(gid)
+            self.ctl.marcar(e.x1 - 2, e.y1 - 2, e.x2 + 2, e.y2 + 2)
+
+    # ------------------------------------------------------------------
+    @invariant()
+    def pulados_selecao_e_atual_sao_vivos(self):
+        vivos = set(self.ctl.gids)
+        assert self.ctl.pulados <= vivos
+        assert self.ctl.selecao <= vivos
+        assert self.ctl.atual is None or self.ctl.atual in vivos
+
+    @invariant()
+    def fila_e_uma_permutacao_dos_pendentes(self):
+        fila = self.ctl.fila()
+        assert len(fila) == len(set(fila)) and set(fila) <= set(self.ctl.gids)
+
+    @invariant()
+    def gids_unicos_e_decisoes_vivas(self):
+        modelo = self.ctl.modelo
+        gids = [b.gid for b in modelo.boxes]
+        assert len(gids) == len(set(gids))
+        assert modelo.decisoes.gids() <= modelo.vivos
+
+
+MaquinaDoControlador.TestCase.settings = settings(
+    max_examples=EXEMPLOS, derandomize=True, stateful_step_count=25, deadline=None,
+    # Sem a fase "explain": ela roda com rastreio linha a linha e leva minutos.
+    phases=[Phase.explicit, Phase.reuse, Phase.generate, Phase.target, Phase.shrink],
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+test_maquina_do_controlador = pytest.mark.timeout(600)(MaquinaDoControlador.TestCase)

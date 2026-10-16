@@ -255,3 +255,20 @@ def test_paragrafo_antes_de_um_glifo_do_meio_da_linha_vale_para_a_linha():
     meio = next(b.gid for b in p.boxes if b.entry.char == "t")
     p.decisoes = Decisoes(paragrafo_antes=frozenset({meio}))
     assert [len(b.linhas) for b in tx.montar(p).blocos] == [1, 1]
+
+
+def test_procedencia_aceita_o_callback_no_meio_de_registrar():
+    """A coleta de lixo pode matar um `BoxEntry` registrado (e chamar o callback, que pega a
+    trava) enquanto a mesma thread está dentro de `registrar`; com trava simples, travava."""
+    import gc
+
+    from core.box_model import BoxEntry
+
+    morto = BoxEntry("a", 0, 0, 1, 1)
+    procedencia.registrar(morto, "padroes/a.png")
+    vivo = BoxEntry("b", 0, 0, 1, 1)
+    with procedencia._trava:                  # como se registrar estivesse no meio
+        del morto
+        gc.collect()                          # o callback roda aqui, na mesma thread
+        procedencia.registrar(vivo, "padroes/b.png")
+    assert procedencia.amostra_de(vivo) == "padroes/b.png"

@@ -21,6 +21,7 @@ from abbychess.projeto import ProjetoDeLivro
 
 from tests.test_janela import _esperar, app  # noqa: F401 (fixture)
 from tests.test_treino_por_livro import _pagina_sintetica
+from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
 
 @pytest.fixture
@@ -73,14 +74,14 @@ def test_versao_mais_nova_abre_so_para_leitura_e_nada_e_gravado(app, projeto_lid
     try:
         assert janela.projeto.somente_leitura and "só leitura" in janela.windowTitle()
         assert any("só para leitura" in a for a in sem_dialogos)
-        assert janela.boxes                              # a página aparece
-        janela._mostrar_box(0)
+        assert boxes(janela)                              # a página aparece
+        mostrar(janela, 0)
         janela.treino.campo.setText("z")
         janela.treino._so_corrigir()                     # muda na tela, não no disco
-        janela._gravar_zonas()
+        janela.areas.desenhar(1, 1, 60, 60)              # nem a área nova
         from abbychess.projeto import Limiares
 
-        janela.aplicar_limiares(Limiares(revisao=0.5))   # vale na sessão, não no disco
+        janela.pagina.aplicar_limiares(Limiares(revisao=0.5))   # vale na sessão, não no disco
         assert "nesta sessão" in janela.statusBar().currentMessage()
         janela.ir_para_pagina(0)                         # a troca de página grava, se puder
         assert _instantaneo(projeto_lido.pasta) == antes
@@ -104,7 +105,7 @@ def test_fonte_sumida_e_pedida_e_conferida(app, projeto_lido, sem_dialogos, tmp_
     try:
         assert janela.projeto is not None and janela.projeto.fonte == guardada.resolve()
         assert any("não é a fonte" in a for a in sem_dialogos)    # a primeira foi recusada
-        assert janela.boxes
+        assert boxes(janela)
     finally:
         janela.close()
 
@@ -134,7 +135,7 @@ def test_cancelar_a_fonte_de_outro_projeto_mantem_o_aberto(app, projeto_lido, se
         monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *a, **k: ("", ""))
         janela.abrir_caminho(str(segundo.pasta))
         _esperar(app, janela)
-        assert janela.projeto is aberto and janela.boxes
+        assert janela.projeto is aberto and boxes(janela)
         janela.ir_para_pagina(0)                        # e ainda grava normalmente
     finally:
         janela.close()
@@ -160,7 +161,7 @@ def test_so_leitura_com_fonte_sumida_acha_pela_memoria_e_nao_grava(app, projeto_
     antes = _instantaneo(projeto_lido.pasta)
     janela = _abrir(app, projeto_lido.pasta)
     try:
-        assert janela.projeto.somente_leitura and janela.boxes
+        assert janela.projeto.somente_leitura and boxes(janela)
         assert janela.projeto.fonte.name == "renomeada.png"
     finally:
         janela.close()
@@ -175,16 +176,15 @@ def test_falha_ao_abrir_nao_deixa_a_pasta_travada(app, projeto_lido, sem_dialogo
     arquivo.write_text(json.dumps(dados), encoding="utf-8")
     janela = JanelaPrincipal()
 
-    def quebrar():
+    def quebrar(*_a):
         raise RuntimeError("falha no meio da abertura")
 
-    monkeypatch.setattr(janela, "_salvar_pagina", quebrar)
+    monkeypatch.setattr(janela, "trocar_projeto", quebrar)
     try:
         with pytest.raises(RuntimeError):
-            janela._abrir(ProjetoDeLivro.abrir(projeto_lido.pasta))
+            janela.abrir(ProjetoDeLivro.abrir(projeto_lido.pasta))
         assert not gv.protegida(projeto_lido.pasta)
     finally:
-        monkeypatch.setattr(janela, "_salvar_pagina", lambda: None)   # o close chama
         janela.close()
 
 
@@ -198,7 +198,7 @@ def test_limiares_que_nao_gravam_avisam_e_nao_dizem_gravados(app, projeto_lido, 
             raise PermissionError("disco")
 
         monkeypatch.setattr(gv, "gravar_bytes", falhar)
-        janela.aplicar_limiares(Limiares(revisao=0.5))
+        janela.pagina.aplicar_limiares(Limiares(revisao=0.5))
         assert any("não foram gravados" in a for a in sem_dialogos)
         assert janela.statusBar().currentMessage() == ("Limiares aplicados nesta sessão "
                                                        "(não foram gravados).")

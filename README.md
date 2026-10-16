@@ -835,7 +835,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   130–134; a pintura dos boxes, 12–13 no p95; a releitura, 14–15 na mediana. O Enter até a
   cor mudar ficou em 21 ms na mediana em 2 das 3 rodadas e no portão; numa rodada, 30 ms na
   mediana e 67 no p95, com um pico de 286 ms (abaixo do alvo de 100 no p95, e a mesma rodada
-  solta que o A1 teve; não investigado). A **Linha** (Ctrl+F5) e a cláusula dela no CA-3.2
+  solta que o A1 teve; não investigado). A **Linha** (a linha atual ampliada) e a cláusula dela no CA-3.2
   (a x-height ≥ 12 px nela) são do passo A3; a da Imagem (≥ 6 px no zoom largura, no índice
   25 do livro de referência) passa em 1366×768 e em 1280×720. O Shift+F10 e a tecla Menu
   vêm do Windows como pedido de menu de contexto; o teste confere que cada painel abre o

@@ -202,21 +202,23 @@ def precisa_revisao(char: str, fonte: str, confianca: float, limiares: Limiares)
 
 
 def congelar_para_a_coleta_de_lixo() -> int:
-    """Tira da coleta de lixo do Python tudo o que está vivo agora; devolve quantos objetos.
+    """Tira da coleta de lixo do Python tudo o que está vivo agora; devolve quantos objetos
+    (0: não congelou).
 
-    É para chamar logo depois de carregar os modelos globais (a janela, ao abrir o
-    projeto): a rede e a base são centenas de milhares de objetos que não mudam na sessão,
-    e cada coleta completa os percorria, ~90 ms na thread da interface (os picos do p95 da
-    releitura medidos no passo 1b). Congela **tudo** o que está vivo, não só os modelos.
-    `ABBY_SEM_CONGELAR=1` desliga, para medir sem. O congelamento de antes é desfeito primeiro, e o que
-    morreu desde então (os modelos do projeto anterior) é recolhido antes de congelar.
-    O que estiver vivo no momento (a janela, o projeto) também fica congelado até a
-    próxima chamada: a memória dele não volta antes disso.
+    **Desligado desde o passo 2b**; `ABBY_CONGELAR=1` liga. No 1b ele tirava os picos do
+    Enter que a reconciliação da janela causava (a rede e a base são centenas de milhares de
+    objetos, e cada coleta completa os percorria); o 2a tirou a reconciliação, e nas rodadas
+    do 2b (3 com e 3 sem, `docs/revisoes/passo-2b.md`) ele não ajudou em nada e ainda
+    prendia a memória do que estivesse vivo na hora. Fica para medir de novo, se um passo
+    voltar a ter coletas longas na thread da interface.
+
+    Ligado: é para chamar logo depois de carregar os modelos globais. O congelamento de antes
+    é desfeito primeiro, e o que morreu desde então é recolhido antes de congelar.
     """
     import gc
     import os
 
-    if os.environ.get("ABBY_SEM_CONGELAR") == "1":     # o A/B da medida (docs/revisoes/passo-1b.md)
+    if os.environ.get("ABBY_CONGELAR") != "1":
         return 0
     gc.unfreeze()
     gc.collect()

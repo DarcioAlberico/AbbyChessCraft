@@ -289,7 +289,7 @@ def problemas_do_fen(fen: str) -> str:
     for n, fileira in enumerate(fileiras):
         casas = 0
         for c in fileira:
-            if c.isdigit():
+            if c in "12345678":
                 casas += int(c)
             elif c in "KQRBNPkqrbnp":
                 casas += 1
@@ -531,7 +531,7 @@ def cego_fen(livro: str, pagina: str, diagrama: str, fen: str, por: str) -> bool
     if alvo is None:
         raise SystemExit(f"{pagina} não tem o diagrama {diagrama}")
     igual = pecas == alvo["fen"]
-    alvo["conferencia_cega"] = {"igual": igual, "por": por, "data": _hoje()}
+    alvo["conferencia_cega"] = {"igual": igual, "fen": pecas, "por": por, "data": _hoje()}
     if igual:
         alvo["fen_verificado"] = True
     _gravar_gabarito(arquivo, gabarito)

@@ -104,3 +104,35 @@ O que mudou depois dela:
 | A CA-F.2 sem de onde tirar o N | o replay grava `erros` (texto e diagramas) por página; o README e o protocolo dizem como somar |
 | Menores | `robocopy` e o rótulo da medida no README; nomes dos JSON na §15.3; "estimado de 60 ações em 3 páginas"; caracteres novos do Enter no README; a legenda diz o que a ordem não vê; `percentil` único para p95 e p99; `medir.casas` usa a regra de FEN do `rotular`; o uso do `tempo_da_fatia` no docstring |
 | O texto dos livros no git | decisão: o repositório é privado e local (README, "Limitações conhecidas", e o docstring do `rotular.py`) |
+
+## Rodada 4 (confirmação)
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Código e testes | Correção 7 · Simplicidade 8 · Testes 8 | aceita com o bloqueio corrigido ("com o item 1 corrigido e testado, a Correção sobe para 8 ou mais e a rodada aceita") |
+| Produto e medição | Completude 9 · Fidelidade das medidas 8 · Clareza para o usuário 8 | aceita |
+
+O que mudou depois dela:
+
+| Achado | Correção |
+|---|---|
+| Bloqueio: os `erros` da página eram contados depois do Ctrl+R | contados antes de qualquer correção; o teste confere a segunda página, onde o reler age |
+| O roteiro do worktree não copiava o catálogo | README e protocolo copiam `comandos.yaml` junto com os gabaritos |
+| A ordem das etapas desfazia a conferência cega de quem trabalha sozinho | o README diz a ordem: transcrição e FEN às cegas primeiro, revisão e texto depois, o `cego --txt` por último |
+| "Perdidas" misturava a capa | as das páginas negativas à parte |
+| "Erros" da fatia sem dizer que é só diagrama | "N (diagramas; texto pendente)" enquanto o texto não for verificado |
+| A busca sumia da tabela de desempenho | as duas metas aparecem, "não existe" |
+| A conferência cega do FEN não sabia de um FEN mudado depois | grava o FEN conferido; vale só se ainda for o do gabarito |
+| Dígito Unicode e `0` no FEN | só `1`–`8` contam como casas vazias |
+| Textos | `.bak1`, `.bak2` no protocolo; caminho absoluto do registro e a variável desligada na etapa 6; "medida com o código do passo 0"; Mudanças do roadmap em ordem; os eixos da §16; a §15.2 (a transcrição do Yusupov p. 33 ficou para depois); a §15.3 (memória por 60 ações em 3 páginas) |
+
+Ficam registrados para depois (menores, sem efeito nas medidas): o `sys.path` das
+ferramentas repetido nos testes (com as fixtures, no passo 2a); a hora no nome da medida
+tem resolução de segundo; a versão do PyBoxEditor e dos modelos no JSON da fatia; editar a
+estrutura à mão não sobe `verdade_versao` (o SHA-256 de cada gabarito nas medidas segura a
+comparação).
+
+**Fechamento.** A tag `passo-0` fica no commit que grava as medidas desta rodada. O
+desempenho foi medido no `76ba432`; de lá até a tag, `abbychess/` e `tests/desempenho/` não
+mudam (só ferramentas de medida, testes delas e documentação), e a qualidade e a fatia
+foram medidas de novo no commit das correções desta rodada.

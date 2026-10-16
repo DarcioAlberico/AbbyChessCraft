@@ -55,7 +55,7 @@ sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / "ferramentas"))
 
 from comum import destino_da_medida, estado_do_git  # noqa: E402
-from medir import casar, casas  # noqa: E402
+from medir import casar, casas, fen_conferido_as_cegas  # noqa: E402
 from rotular import PASTA_DOS_PDFS, VERDADE, _caixa_relativa, _indices, sha256_do_arquivo  # noqa: E402
 
 FATIA = RAIZ / "tests" / "dados" / "fatia"
@@ -255,6 +255,12 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
         texto_conta = _Contas(disponiveis, catalogo.get("impossiveis", {}))
         if posicao:
             navegacao.usar("trocar_pagina")
+        # Os erros da página são os do snapshot, antes de qualquer correção (o reler
+        # inclusive): o N da CA-F.2 não pode depender do passo nem da ordem das páginas.
+        linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
+        inicial = diferencas(boxes, linhas, caixas, palavra, gabarito)
+        erros_iniciais = (len(inicial.acoes) + inicial.faltas + inicial.espacos
+                          + inicial.caracteres_sem_par)
         if ensinados and "reler" in disponiveis:
             pg.propagar_padroes(imagem, boxes, leitor)
             texto_conta.usar("reler")
@@ -262,10 +268,6 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
         erros_diagramas = _replay_dos_diagramas(projeto, fonte, indice, imagem, gabarito,
                                                 diagramas_conta)
 
-        linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
-        inicial = diferencas(boxes, linhas, caixas, palavra, gabarito)
-        erros_iniciais = (len(inicial.acoes) + inicial.faltas + inicial.espacos
-                          + inicial.caracteres_sem_par)
         for _ in range(LIMITE_DE_PASSOS):
             linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
             dif = diferencas(boxes, linhas, caixas, palavra, gabarito)
@@ -377,7 +379,7 @@ def _estado(resultado: dict, gabaritos) -> str:
                and g["conferencia_cega"]["texto"].get("verdade_versao") == g.get("verdade_versao")
                for g in gabaritos):
         falta.append("sem conferência cega do texto aprovada e em dia")
-    if diagramas and not any(d.get("conferencia_cega", {}).get("igual") for d in diagramas):
+    if diagramas and not any(fen_conferido_as_cegas(d) for d in diagramas):
         falta.append("sem conferência cega de FEN igual")
     if not resultado["linhas_usadas"]:
         falta = [f for f in falta if not f.startswith("texto verificado")]

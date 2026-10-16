@@ -439,16 +439,8 @@ aviso.
 
 ## Mudanças
 
-- **0.5 (2026-10-16)** (fechamento do passo 0, `docs/revisoes/passo-0.md`): a saída do
-  passo 0 deixa de esperar os gabaritos revisados pelo usuário, que têm prazo até o
-  fechamento do A3; a linha de base fica presa à tag `passo-0`; o catálogo do replay ganhou
-  `ensinar_da_fila` e `reler_pendentes`.
-
 - **0.2 (2026-10-15)**: fatia vertical, passo 1 dividido, desfazer unificado, passos I e L,
   dependências corrigidas (rodada 1, `docs/revisoes/rodada-1.md`).
-- **0.4 (2026-10-15)** (rodada 3, `docs/revisoes/rodada-3.md`): verificações por parte, cada
-  uma no passo em que pode passar (CA-4.2, 4.3, 3.2, 3.8, 5.3); `desde_passo` nos atalhos;
-  catálogo de comandos do replay; capturas no A2.
 - **0.3 (2026-10-15)** (rodada 2, `docs/revisoes/rodada-2.md`):
   - Ordem serial explícita.
   - 1b e 1c viraram um passo só, e o formato v2 nasce inteiro.
@@ -458,3 +450,10 @@ aviso.
   - Dependências do I e do F corrigidas.
   - Os tokens de estado entraram no A1.
   - O perfil FineReader foi para o K.
+- **0.4 (2026-10-15)** (rodada 3, `docs/revisoes/rodada-3.md`): verificações por parte, cada
+  uma no passo em que pode passar (CA-4.2, 4.3, 3.2, 3.8, 5.3); `desde_passo` nos atalhos;
+  catálogo de comandos do replay; capturas no A2.
+- **0.5 (2026-10-16)** (fechamento do passo 0, `docs/revisoes/passo-0.md`): a saída do
+  passo 0 deixa de esperar os gabaritos revisados pelo usuário, que têm prazo até o
+  fechamento do A3; a linha de base fica presa à tag `passo-0`; o catálogo do replay ganhou
+  `ensinar_da_fila` e `reler_pendentes`.

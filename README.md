@@ -347,7 +347,7 @@ que é a mesma. O lado a jogar sai "assumido" nos três: a página não diz.
 
 ### A linha de base do roadmap (passo 0)
 
-Medida em 2026-10-16, antes de qualquer mudança do roadmap. As tabelas abaixo são geradas
+Medida em 2026-10-16 com o código do passo 0 (a tag `passo-0`). As tabelas abaixo são geradas
 dos JSON de `docs/medidas/` por `ferramentas\resumo_medidas.py`; não as edite à mão.
 
 <!-- medidas:inicio -->
@@ -394,11 +394,13 @@ cd ..\AbbyChessCraft_passo0
 ..\AbbyChessCraft\.venv\Scripts\python.exe ferramentas\replay_fatia.py rodar --livro xv --passo 0
 ```
 
-Os gabaritos do worktree têm de ser os mesmos da medida nova (o `comparar` recusa medidas
-com gabaritos de versões diferentes); copie-os antes de rodar, e traga o JSON de volta:
+Os gabaritos e o catálogo de comandos do worktree têm de ser os da medida nova (o
+`comparar` recusa medidas com gabaritos ou catálogos de versões diferentes); copie-os antes
+de rodar, e traga o JSON de volta:
 
 ```text
 robocopy tests\verdade ..\AbbyChessCraft_passo0\tests\verdade /E
+copy ferramentas\replay\comandos.yaml ..\AbbyChessCraft_passo0\ferramentas\replay\
 copy ..\AbbyChessCraft_passo0\docs\medidas\*-fatia-xv-passo-0*.json docs\medidas\
 ```
 
@@ -429,6 +431,12 @@ verificados antes do fechamento do A3**, o primeiro passo julgado pelos gestos d
 (sem eles, o número não existe). Enquanto isso, as medidas de texto ficam "pendentes" e as
 de diagrama e estrutura, "provisórias", e o README diz isso em cada tabela.
 
+**A ordem importa para a conferência cega.** Se você faz tudo sozinho, comece por ela: gere
+o modelo e transcreva a página às cegas (etapa 3), e monte às cegas o FEN de um diagrama por
+livro, **antes** de abrir o gabarito ou o `.txt`. Depois revise a estrutura e o texto (etapas
+1 e 2). O `cego --txt` que grava o resultado roda **por último**, depois do `texto-importar`:
+ele compara com o texto verificado e fica preso à versão do gabarito, que o importar sobe.
+
 1. **Revisar a estrutura** de cada gabarito (`tests\verdade\<livro>\iNNN.json`) olhando as
    faixas em `.rotulagem\<livro>\iNNN\`. Corrija no JSON o que estiver errado (função,
    ordem, coluna, caixas). Para cada diagrama, confira o FEN casa a casa contra
@@ -454,7 +462,7 @@ de diagrama e estrutura, "provisórias", e o README diz isso em cada tabela.
    .venv\Scripts\python.exe ferramentas\rotular.py texto-importar --livro xv --por "Seu nome"
    ```
 
-3. **Conferência cega** (outra pessoa, ou você antes de ver o `.txt`), numa página por
+3. **Conferência cega** (outra pessoa, ou você antes das etapas 1 e 2), numa página por
    livro. O modelo traz os ids das linhas, com o texto em branco:
 
    ```text
@@ -488,9 +496,12 @@ de diagrama e estrutura, "provisórias", e o README diz isso em cada tabela.
    índices 20–22 e some o tempo; o protocolo completo (os blocos e a segunda sessão depois
    de 7 dias) está em `docs\medidas\protocolo-fatia.md`.
 
+   No worktree da tag, e depois no checkout principal (o registro vai para um caminho
+   absoluto, e a variável é desligada depois da sessão):
+
    ```text
-   $env:ABBY_REGISTRO_DE_EVENTOS = "sessao-base.jsonl"; ..\AbbyChessCraft\.venv\Scripts\python.exe -m abbychess <cópia do projeto>
-   .venv\Scripts\python.exe ferramentas\tempo_da_fatia.py sessao-base.jsonl --erros <N> --por "Seu nome" --passo 0 --bloco i020-i022
+   $env:ABBY_REGISTRO_DE_EVENTOS = "C:\Python-Chess2\sessao-base.jsonl"; ..\AbbyChessCraft\.venv\Scripts\python.exe -m abbychess <cópia do projeto>; Remove-Item Env:ABBY_REGISTRO_DE_EVENTOS
+   .venv\Scripts\python.exe ferramentas\tempo_da_fatia.py C:\Python-Chess2\sessao-base.jsonl --erros <N> --por "Seu nome" --passo 0 --bloco i020-i022
    ```
 
    O N é a soma dos erros das páginas do bloco (`paginas.iNNN.erros` no JSON da fatia

@@ -106,10 +106,22 @@ class LeitorDoLivro:
         # Caminho absoluto, e não o padrão "training_data": o LearningService o
         # resolve no diretório atual, e aberto daqui ele criaria uma base vazia
         # na pasta do AbbyChessCraft em vez de ler a do PyBoxEditor.
+        import gc
+
+        # O congelamento do leitor anterior sai antes: um projeto trocado não deixa os
+        # modelos velhos presos na memória.
+        gc.unfreeze()
         servico = LearningService(data_dir=str(base_global()))
         rede = servico._predictor if servico.load_predictor() else None
-        return cls(pasta_de_padroes, limiares=limiares, ocr=OCRService(),
-                   rede=rede, base=servico._get_learner(), easyocr=easyocr)
+        leitor = cls(pasta_de_padroes, limiares=limiares, ocr=OCRService(),
+                     rede=rede, base=servico._get_learner(), easyocr=easyocr)
+        # A rede e a base global são centenas de milhares de objetos que não mudam na
+        # sessão; congelados, a coleta de lixo completa do Python não os percorre mais.
+        # Sem isso, cada coleta completa custava ~90 ms na thread da interface (os picos
+        # do p95 da releitura medidos no passo 1b).
+        gc.collect()
+        gc.freeze()
+        return leitor
 
     def trocar_limiares(self, limiares: Limiares) -> None:
         """Passa a ler com outros limiares, sem recarregar os modelos."""

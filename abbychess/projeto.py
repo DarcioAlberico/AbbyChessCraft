@@ -69,7 +69,7 @@ from abbychess import gravacao as gv
 from abbychess import procedencia
 from abbychess import zonas as zn
 from abbychess.modelo import (GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA, RECONHECIDA, Box, Decisoes,
-                              Pagina, gid_de, proximo_estado, reconciliar)
+                              Pagina, foto, gid_de, proximo_estado, reconciliar)
 from abbychess.zonas import Zona
 
 if TYPE_CHECKING:
@@ -193,7 +193,7 @@ class ProjetoDeLivro:
         #: As páginas lidas, no modelo (as mais recentes), e o `as_state()` de cada glifo na
         #: última gravação: a janela muda os `BoxEntry` no lugar, e só a foto diz o que mudou.
         self._modelos: "OrderedDict[int, Pagina]" = OrderedDict()
-        self._estados: Dict[int, Dict[int, tuple]] = {}
+        self._estados: Dict[int, Dict[int, int]] = {}
         #: A abertura achou a fonte noutro lugar, pelo SHA-256 (a janela avisa).
         self.fonte_relocalizada = False
 
@@ -405,14 +405,14 @@ class ProjetoDeLivro:
             gv.gravar_json(self._arquivo_v2(pagina.pid), dados)
             self._guardar_no_cache(pagina)
             # A foto da gravação, do mesmo `as_state()` que foi para o JSON.
-            self._estados[pagina.pid] = {b[0]: tuple(b[1]) for b in dados["boxes"]}
+            self._estados[pagina.pid] = {b[0]: hash(tuple(b[1])) for b in dados["boxes"]}
             self._atualizar_livro(pagina.indice, self._resumo_do_modelo(pagina))
 
     def _guardar_no_cache(self, pagina: Pagina) -> None:
         self._modelos[pagina.indice] = pagina
         self._modelos.move_to_end(pagina.indice)
         if pagina.pid not in self._estados:
-            self._estados[pagina.pid] = {b.gid: tuple(b.entry.as_state()) for b in pagina.boxes}
+            self._estados[pagina.pid] = {b.gid: foto(b.entry) for b in pagina.boxes}
         while len(self._modelos) > PAGINAS_EM_MEMORIA:
             _, saiu = self._modelos.popitem(last=False)
             self._estados.pop(saiu.pid, None)

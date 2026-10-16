@@ -334,7 +334,7 @@ class Pagina:
 
 def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
                 amostra_de=lambda entry: None,
-                estados: Optional[Dict[int, tuple]] = None) -> Tuple[List[Box], Diferenca]:
+                estados: Optional[Dict[int, int]] = None) -> Tuple[List[Box], Diferenca]:
     """Os `Box` da lista `depois` (os `BoxEntry` que a janela de hoje edita por índice),
     com os gids de `antes` onde dá e gids novos onde não dá, e a `Diferenca` entre as duas.
 
@@ -349,16 +349,16 @@ def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
        sem sucessor (descartar).
 
     `amostra_de(entry)` dá a procedência registrada da leitura (`abbychess.procedencia`);
-    sem ela, um glifo que não mudou de leitura guarda a amostra que tinha. `estados` é o
-    `as_state()` de cada gid na última gravação: a janela muda o `BoxEntry` no lugar, e só
-    a foto de antes diz se ele mudou (sem ela, vale o estado atual de `antes`).
+    sem ela, um glifo que não mudou de leitura guarda a amostra que tinha. `estados` é a
+    foto da última gravação, `foto(entry)` de cada gid: a janela muda o `BoxEntry` no
+    lugar, e só a foto de antes diz se ele mudou (sem ela, vale o estado atual de `antes`).
     """
     por_objeto = {id(b.entry): b for b in antes}
     usados: Set[int] = set()
     saida: List[Optional[Box]] = [None] * len(depois)
     dif = Diferenca()
     estados = estados or {}
-    agora = [tuple(e.as_state()) for e in depois]           # uma vez por glifo
+    agora = [foto(e) for e in depois]                       # uma vez por glifo
 
     def manter(i: int, velho: Box, entry: BoxEntry, estado_antes) -> None:
         usados.add(velho.gid)
@@ -390,7 +390,7 @@ def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
             velho = next((b for b in por_caixa.get(_caixa(entry), []) if b.gid not in usados),
                          None)
             if velho is not None:
-                manter(i, velho, entry, estados.get(velho.gid, tuple(velho.entry.as_state())))
+                manter(i, velho, entry, estados.get(velho.gid, foto(velho.entry)))
     saidos = [b for b in antes if b.gid not in usados]
     for i, entry in enumerate(depois):                       # 3. nascidos
         if saida[i] is not None:
@@ -402,6 +402,17 @@ def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
         dif.removidos.add(velho.gid)
         dif.sucessores[velho.gid] = [n.gid for n in dif.novos if _sobrepoe(velho.entry, n.entry)]
     return list(saida), dif
+
+
+def foto(entry: BoxEntry) -> int:
+    """O estado do glifo num inteiro (o hash do `as_state()`), para comparar depois.
+
+    Um inteiro, e não a tupla: a foto de cada página fica guardada entre uma gravação e a
+    seguinte, e milhares de tuplas de vida longa disparavam a coleta de lixo completa do
+    Python a cada poucas edições (os picos do p95 da releitura medidos no 1b). Um dict de
+    inteiros não é rastreado pelo coletor.
+    """
+    return hash(tuple(entry.as_state()))
 
 
 def _caixa(e: BoxEntry) -> tuple:

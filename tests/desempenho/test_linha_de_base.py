@@ -133,21 +133,26 @@ def test_releitura_de_um_glifo(ambiente, medidas):
 
 
 def test_memoria_do_desfazer(ambiente, medidas):
-    """A memória que o histórico prende, pelo RSS, por ação, extrapolada para 300 × 20."""
+    """A memória que o histórico prende (tracemalloc), por ação, extrapolada para 300 × 20."""
     app, janela = ambiente
     medidas["memoria_do_desfazer"] = {
         "boxes_por_pagina": round(sum(len(janela.projeto.carregar_pagina(i)) for i in PAGINAS)
                                   / len(PAGINAS)),
-        "alvo_mb": 50, **_memoria_pelo_rss(app, janela)}
+        "alvo_mb": 50, **_memoria_do_historico(app, janela)}
 
 
-def _memoria_pelo_rss(app, janela) -> dict:
-    """O RSS antes das ações, cheio e depois de esvaziar o histórico.
+def _memoria_do_historico(app, janela) -> dict:
+    """O que o histórico prende: a memória que volta quando ele é esvaziado.
 
-    As 3 páginas são visitadas antes da base, para o cache de imagem e a leitura delas
-    não entrarem na conta do histórico. O que volta ao esvaziá-lo é o que ele prendia; o
-    que não volta fica registrado (o alocador do Windows nem sempre devolve).
+    O `tracemalloc` liga **antes** da base, então tudo o que as ações alocam é rastreado,
+    e o que some ao esvaziar o histórico (`historicos.clear()`) é exatamente o que ele
+    prendia. O RSS não serve para isso: o alocador do Windows não devolve a memória ao
+    sistema, e na rodada de 2026-10-16 ele não caiu nada ao esvaziar. As 3 páginas são
+    visitadas antes da base, para o cache delas não entrar na conta. O RSS vai junto, só
+    como informação.
     """
+    import tracemalloc
+
     import psutil
 
     processo = psutil.Process()
@@ -155,27 +160,34 @@ def _memoria_pelo_rss(app, janela) -> dict:
         janela.ir_para_pagina(indice, salvar=False)
     janela.historicos.clear()
     gc.collect()
-    base = processo.memory_info().rss
-    acoes = 0
-    for indice in PAGINAS:
-        janela.ir_para_pagina(indice, salvar=False)
-        for k in range(20):
-            janela._mostrar_box(k)
-            janela.treino.campo.setText("y")
-            janela.treino._so_corrigir()
-            acoes += 1
-    gc.collect()
-    cheio = processo.memory_info().rss
-    janela.historicos.clear()
-    gc.collect()
-    vazio = processo.memory_info().rss
-    por_acao = (cheio - base) / acoes
-    return {"acoes": acoes, "rss_base": base, "rss_cheio": cheio, "rss_apos_esvaziar": vazio,
-            "delta_bruto_bytes": cheio - base, "devolvido_ao_esvaziar_bytes": cheio - vazio,
-            "bytes_por_acao_rss": round(por_acao),
+    tracemalloc.start()
+    try:
+        rss_base = processo.memory_info().rss
+        acoes = 0
+        for indice in PAGINAS:
+            janela.ir_para_pagina(indice, salvar=False)
+            for k in range(20):
+                janela._mostrar_box(k)
+                janela.treino.campo.setText("y")
+                janela.treino._so_corrigir()
+                acoes += 1
+        gc.collect()
+        cheio, _ = tracemalloc.get_traced_memory()
+        rss_cheio = processo.memory_info().rss
+        janela.historicos.clear()
+        gc.collect()
+        vazio, _ = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    preso = cheio - vazio
+    por_acao = preso / acoes
+    return {"acoes": acoes, "preso_pelo_historico_bytes": preso,
+            "bytes_por_acao": round(por_acao),
             "estimado_300x20_mb": round(por_acao * 300 * 20 / 2**20, 1),
-            "como": f"RSS depois de {acoes} ações reais (3 páginas já visitadas × 20) menos o "
-                    "de antes; extrapolado para 300 páginas × 20 ações"}
+            "rss_delta_bytes_informativo": rss_cheio - rss_base,
+            "como": f"tracemalloc ligado antes de {acoes} ações reais (3 páginas já visitadas "
+                    "× 20): o que é liberado ao esvaziar o histórico, por ação, extrapolado "
+                    "para 300 páginas × 20 ações"}
 
 
 def test_atraso_e_memoria_durante_o_lote(ambiente, medidas):

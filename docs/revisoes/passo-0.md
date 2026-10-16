@@ -55,7 +55,7 @@ O que mudou depois dela:
 | Regras de exceção e escopo sem teste; `any` frouxo | casos de exceção fora do escopo, tipo inválido, id repetido, pai inexistente, chave errada, escopo vazio; cada caso exige que **todo** problema achado seja o da regra |
 | README com estado digitado; fatia fixa; fim de linha | o estado vem do JSON; a fatia lista cada (livro, passo) pelo nome do arquivo; o README é lido e gravado com `newline=""` |
 | `mkdtemp` vazando | `TemporaryDirectory` |
-| Memória do desfazer contaminada; JSON parcial | as páginas são visitadas antes da base; RSS cheio, depois de esvaziar e o delta bruto no JSON; sessão com falha grava `-falhou`; mesmo dia e rótulo só com `ABBY_SOBRESCREVER_MEDIDA=1` |
+| Memória do desfazer contaminada; JSON parcial | as páginas são visitadas antes da base; a medida passou do RSS (que não caiu nada ao esvaziar o histórico: o alocador não devolve) para o tracemalloc ligado antes da base, contando o que é liberado ao esvaziar; sessão com falha grava `-falhou`; mesmo dia e rótulo só com `ABBY_SOBRESCREVER_MEDIDA=1` |
 | Enter fora do método | `QTest.keyClick(Enter)` no campo, com o caractere lido do primeiro pendente (conferir a leitura) |
 | JSON de desempenho gerado por código antigo | medido de novo depois do commit do passo 0, com a árvore limpa |
 | Linha de base da fatia solta do código do passo 0 | a linha de base roda num worktree da tag `passo-0`; o JSON da fatia leva versão e SHA-256 de cada gabarito, e o `comparar` recusa catálogo ou gabaritos diferentes |

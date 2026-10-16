@@ -190,6 +190,13 @@ servidor) e CA-14.1 (se não fechar só com o `ControladorDePagina`, extrair tam
 verificação e dos diagramas); a caracterização. Daqui em diante, `Box` e `BoxEntry` não são
 mutados no lugar.
 
+**A volta do custo do 1a.** O 1a pôs `fsync` síncrono em cada gravação e custou uns 10 ms
+na mediana do Enter e da troca de página (`docs/revisoes/passo-1a.md`). O 2a tira essas
+gravações da thread da interface; a verificação dele inclui 3 rodadas completas de
+desempenho (`ABBY_ROTULO_DA_MEDIDA=repeticao-2a`) comparadas, pela **mediana (p50)**, com as
+3 do passo 0 e as 3 do 1a da tabela "Rodadas repetidas": a mediana do Enter e a da troca
+voltam à faixa do passo 0.
+
 ## Passo 2b — Desfazer e propagação (§14.2)
 
 **Tarefas.**

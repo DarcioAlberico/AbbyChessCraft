@@ -6,8 +6,9 @@ Nenhum número das medidas é digitado à mão no README (SPEC §15.3): este scr
 que estiver entre `<!-- medidas:inicio -->` e `<!-- medidas:fim -->` pela tabela gerada da
 medida mais recente de cada tipo (linha de base de desempenho, qualidade por livro, fatia
 por livro e passo). "Mais recente" é pela data e pela hora do nome do arquivo
-(`comum.ultima_medida`); os `-falhou` e `-parcial` nunca entram. O estado de cada medida
-vem do próprio JSON.
+(`comum.ultima_medida`); os `-falhou` e `-parcial` nunca entram nessas tabelas (as rodadas
+repetidas só do lote, que são `-parcial`, aparecem só na tabela delas, marcadas). O estado
+de cada medida vem do próprio JSON.
 """
 
 from __future__ import annotations
@@ -223,7 +224,9 @@ def _por_passo() -> list:
 
 _REPETICAO = re.compile(r"(?P<data>\d{4}-\d{2}-\d{2})-repeticao-(?P<passo>[^-]+)"
                         r"(?P<parcial>-parcial)?(?:-(?P<hora>\d{6}))?\.json")
-_METAS_REPETIDAS = (("troca_de_pagina", "p95_ms", "Troca, p95"),
+_METAS_REPETIDAS = (("troca_de_pagina", "p50_ms", "Troca, p50"),
+                    ("troca_de_pagina", "p95_ms", "Troca, p95"),
+                    ("enter_ensinar", "p50_ms", "Enter, p50"),
                     ("enter_ensinar", "p95_ms", "Enter, p95"),
                     ("releitura_de_um_glifo", "p95_ms", "Releitura, p95"),
                     ("atraso_durante_o_lote", "p99_ms", "Atraso no lote, p99"))
@@ -244,7 +247,10 @@ def _repeticoes() -> list:
             grupos.setdefault((casou["passo"], condicao), []).append((ordem, dados))
     if not grupos:
         return []
-    linhas = ["", "Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou):", "",
+    linhas = ["", "Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). O p95 "
+              "do Enter tem duas faixas no mesmo código (perto de 110–130 e perto de 180–190), e "
+              "o atraso no lote também (perto de 8 e de 21): compare pela mediana (p50), que é "
+              "estável:", "",
               "| Código | Commit | Rodada | " + " | ".join(r for _, _, r in _METAS_REPETIDAS) + " |",
               "|---|---|---|" + "---|" * len(_METAS_REPETIDAS)]
     for (passo, condicao), rodadas in sorted(grupos.items()):

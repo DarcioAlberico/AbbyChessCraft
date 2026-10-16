@@ -77,6 +77,23 @@ O que mudou depois dela:
 | A migração do cache v1, o limite de candidatos da fonte e o tamanho na relocalização automática sem teste | testes: o `livro.json` v1 com a confiança 1,0 em "99" é refeito com "100" e versão 2; com o limite em 2, três arquivos do tamanho certo antes da fonte fazem a busca desistir, e trinta de outro tamanho não contam; o tamanho regravado |
 | `_atualizar_livro` mudava o cache antes de gravar | o cache só muda depois de gravado; teste |
 | Mensagens dos limiares contraditórias quando a gravação falha | "gravados" só quando gravou; se só o `livro.json` falha, o aviso diz isso; teste |
-| **O A/B do atraso foi só do lote, outra carga; a conclusão ia além dos dados** | A/B **completo** (o módulo inteiro de desempenho, 3 rodadas na tag `passo-0` e 3 no 1a `315db35`, na mesma máquina, tabela "Rodadas repetidas" gerada no README). Resultado: **o 1a custa tempo.** O Enter (p95) ficou acima do passo 0 nas três rodadas, e a troca de página também; o atraso no lote cai mais vezes na faixa alta (nas rodadas completas do A/B, 2 de 3 no 1a contra 1 de 3 no passo 0; as só do lote, de outro commit, deram 1 de 3 em cada), abaixo do alvo de 50 ms. A troca de página ficou só ~2% acima, perto da variação; o Enter é a diferença clara. A causa provável são os `fsync` síncronos novos (página, `livro.json`, padrão e metadados). O README declara isso nas Limitações; o gravador assíncrono do passo 2a, com coalescência, tira essas gravações da thread da interface e do lote, e a medida do 2a tem de mostrar a volta |
+| **O A/B do atraso foi só do lote, outra carga; a conclusão ia além dos dados** | A/B **completo** (o módulo inteiro de desempenho, 3 rodadas na tag `passo-0` e 3 no 1a `315db35`, na mesma máquina, tabela "Rodadas repetidas" gerada no README). Resultado: **o 1a custa tempo.** O Enter (p95) ficou acima do passo 0 nas três rodadas, e a troca de página também; pela mediana (p50), que é estável, o Enter e a troca custam uns 10 ms a mais no 1a em todas as rodadas completas (o p95 do Enter tem duas faixas no mesmo código, e o da linha de base, 111 ms, é a de baixo). O atraso no lote tem duas faixas nos dois códigos (nas completas do A/B, 2 de 3 altas no 1a e 1 de 3 no passo 0; nas só do lote, de outro commit, 1 de 3 em cada): com estas rodadas, não dá para separar o efeito do 1a no atraso, que fica abaixo do alvo de 50 ms. A causa provável são os `fsync` síncronos novos (página, `livro.json`, padrão e metadados). O README declara isso nas Limitações; o gravador assíncrono do passo 2a, com coalescência, tira essas gravações da thread da interface e do lote, e a medida do 2a tem de mostrar a volta |
 | Número digitado à mão na legenda do desempenho por passo | saiu; a variação está nas rodadas repetidas, geradas dos JSON |
 | A tabela das rodadas não dizia a condição | coluna "Rodada": completa ou só do lote, sem os padrões |
+
+## Rodada 4 (confirmação)
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Código e testes | Correção 8,5 · Simplicidade 8,5 · Testes 8,5 | aceita |
+| Produto e medição | Completude 8,5 · Fidelidade das medidas 7 · Clareza para o usuário 8 · Produtividade 8 | volta, só por texto |
+
+O que mudou depois dela (só texto e o gerador das tabelas; o código do programa não mudou):
+
+| Achado | Correção |
+|---|---|
+| O custo provado pelo p95 do Enter, que tem duas faixas no mesmo código; a linha de base mostra a faixa baixa | a tabela "Rodadas repetidas" mostra também a mediana (p50) do Enter e da troca, e a legenda explica as duas faixas; as Limitações dão o custo pela mediana (uns 10 ms no Enter e na troca) e dizem que o "111 ms" da linha de base é a faixa baixa |
+| "Cai mais vezes na faixa alta" ia além dos dados | "com estas rodadas, não dá para separar o efeito do 1a no atraso" |
+| A releitura passou do alvo em duas rodadas do 1a | nas Limitações |
+| O critério da volta no 2a não estava escrito | no roadmap, antes do 2b: 3 rodadas completas no 2a, comparadas pela mediana com as 3 do passo 0 e as 3 do 1a |
+| A docstring do gerador dizia que `-parcial` nunca entra | corrigida |

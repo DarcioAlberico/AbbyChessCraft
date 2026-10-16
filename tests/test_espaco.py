@@ -756,3 +756,13 @@ def test_esc_com_resultados_aberto_pelo_aviso_nao_tira_o_foco_do_campo(app, lida
     QTest.keyClick(j.treino.campo, Qt.Key.Key_Escape)
     app.processEvents()
     assert not j.doca_resultados.isVisible() and QApplication.focusWidget() is j.treino.campo
+
+
+def test_fechar_a_gaveta_pelo_x_tambem_devolve_a_largura(app, janela):
+    j = janela
+    inicio = _larguras(app, j)
+    j.alternar_paginas()
+    _larguras(app, j)
+    j.doca_paginas.close()                                      # o X da doca
+    fechada = _larguras(app, j)
+    assert abs(fechada[1] - inicio[1]) <= 6 and abs(fechada[2] - inicio[2]) <= 6

@@ -26,7 +26,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 from PySide6.QtCore import QRectF, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QPixmap
+from PySide6.QtGui import QBrush, QColor, QContextMenuEvent, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (QGraphicsItem, QGraphicsLineItem, QGraphicsRectItem,
                                QGraphicsScene, QGraphicsView, QMenu)
 
@@ -626,6 +626,9 @@ class VisorDePagina(QGraphicsView):
                    for x1, y1, x2, y2 in getattr(self, "_tabuleiros", ()))
 
     def contextMenuEvent(self, evento):
+        if evento.reason() == QContextMenuEvent.Reason.Keyboard:
+            self._menu_pelo_teclado()           # Shift+F10 e a tecla Menu (§3.2)
+            return
         ponto = self.mapToScene(evento.pos())
         if self.modo_areas:
             indice = zn.zona_em(self._zonas, ponto.x(), ponto.y())
@@ -636,9 +639,29 @@ class VisorDePagina(QGraphicsView):
             return
         indice = self._box_em(ponto)
         if indice is None:
+            self.menu_da_vista().exec(evento.globalPos())
             return
         self.box_clicado.emit(indice)
         self.menu_do_box(indice, int(ponto.x())).exec(evento.globalPos())
+
+    def _menu_pelo_teclado(self) -> None:
+        """O menu do box em revisão, no meio dele; sem box, o da vista, no meio dela."""
+        indice = self._selecionado
+        if indice is not None and 0 <= indice < len(self._boxes) and not self.modo_areas:
+            b = self._boxes[indice]
+            centro = self.mapFromScene((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)
+            self.menu_do_box(indice, (b.x1 + b.x2) // 2).exec(
+                self.viewport().mapToGlobal(centro))
+            return
+        self.menu_da_vista().exec(self.viewport().mapToGlobal(self.viewport().rect().center()))
+
+    def menu_da_vista(self) -> QMenu:
+        """As ações da Imagem (o zoom, a origem, rolar), que a janela pôs no visor."""
+        menu = QMenu(self)
+        for acao in self.actions():
+            if acao.text():
+                menu.addAction(acao)
+        return menu
 
     def wheelEvent(self, evento):
         modificadores = evento.modifiers()

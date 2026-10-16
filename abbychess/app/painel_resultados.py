@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QListWidget, QListWidgetItem, QTabWidget
+from PySide6.QtWidgets import QApplication, QListWidget, QListWidgetItem, QMenu, QTabWidget
 
 from abbychess import avisos as av
 from abbychess.app import estilo
@@ -26,6 +26,25 @@ class PainelDeResultados(QTabWidget):
         self.avisos.setWordWrap(True)
         self.addTab(self.resultados, "Resultados")
         self.addTab(self.avisos, "Avisos")
+        for lista in (self.resultados, self.avisos):
+            lista.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            lista.customContextMenuRequested.connect(
+                lambda ponto, lista=lista: self.menu_de_contexto(lista).exec(
+                    lista.viewport().mapToGlobal(ponto)))
+
+    def menu_de_contexto(self, lista: QListWidget) -> QMenu:
+        """Copiar a linha (ou todas) e limpar a lista da tela (o log no disco fica)."""
+        menu = QMenu(self)
+        item = lista.currentItem()
+        copiar = menu.addAction("Copiar")
+        copiar.setEnabled(item is not None)
+        copiar.triggered.connect(lambda: QApplication.clipboard().setText(item.text()))
+        todas = menu.addAction("Copiar tudo")
+        todas.triggered.connect(lambda: QApplication.clipboard().setText(
+            "\n".join(lista.item(n).text() for n in range(lista.count()))))
+        limpar = menu.addAction("Limpar a lista")
+        limpar.triggered.connect(lista.clear)
+        return menu
 
     def mostrar_avisos(self, itens: Iterable[av.Aviso]) -> None:
         self.avisos.clear()

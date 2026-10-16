@@ -228,6 +228,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
         """O projeto com o leitor já pronto (os testes; a abertura passa por `abrir`)."""
         projeto.ao_falhar_gravacao = self.falha_de_gravacao.emit
         self.livro.usar(projeto, fonte, leitor)
+        self._espaco_do_projeto_aberto()
 
     def _projeto_aberto(self, leitor) -> None:
         self._padroes_mudaram()

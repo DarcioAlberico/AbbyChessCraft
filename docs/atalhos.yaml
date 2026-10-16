@@ -151,14 +151,14 @@ acoes:
     padrao: Alt+Down
     desde_passo: A2
     excecoes:
-      - {tecla: Alt+Down, widget: combobox, tipo: substitui, motivo: "a caixa de zoom tem ClickFocus e abre com F4 ou clique"}
+      - {tecla: Alt+Down, widget: combobox, tipo: substitui, motivo: "o filtro da gaveta de Páginas abre a lista com F4 ou clique; Alt+↓ é da fila em qualquer painel (§8.1)"}
   - id: anterior_da_fila
     descricao: Item anterior da fila
     escopo: [global]
     padrao: Alt+Up
     desde_passo: A2
     excecoes:
-      - {tecla: Alt+Up, widget: combobox, tipo: substitui, motivo: "a caixa de zoom tem ClickFocus e abre com F4 ou clique"}
+      - {tecla: Alt+Up, widget: combobox, tipo: substitui, motivo: "o filtro da gaveta de Páginas fecha a lista com Esc ou clique; Alt+↑ é da fila (§8.1)"}
   - {id: ciclar_modo_da_fila, descricao: Ciclar o modo da fila, escopo: [global], padrao: F7,
      finereader: Ctrl+Shift+F7, desde_passo: A2}
   - {id: alternar_escopo_da_fila, descricao: Alternar o escopo da fila (página ou livro), escopo: [global],

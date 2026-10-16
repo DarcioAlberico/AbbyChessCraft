@@ -1,0 +1,118 @@
+"""Passo 1a na janela: projeto só para leitura e fonte que sumiu.
+
+A abertura passa por `JanelaPrincipal.abrir_caminho`, como pela linha de comando. O
+leitor com os modelos globais é trocado por um só com os padrões do livro, para o teste
+não carregar a rede.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+import pytest
+from PySide6.QtWidgets import QFileDialog, QMessageBox
+
+from abbychess import gravacao as gv
+from abbychess.app.janela import JanelaPrincipal
+from abbychess.leitor import LeitorDoLivro
+from abbychess.projeto import ProjetoDeLivro
+
+from tests.test_janela import _esperar, app  # noqa: F401 (fixture)
+from tests.test_treino_por_livro import _pagina_sintetica
+
+
+@pytest.fixture
+def sem_dialogos(monkeypatch):
+    """Registra os avisos em vez de abrir caixas de diálogo."""
+    avisos = []
+    for nome in ("information", "warning"):
+        monkeypatch.setattr(QMessageBox, nome,
+                            lambda _pai, titulo, texto, *a, **k: avisos.append(texto))
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.Yes)
+    monkeypatch.setattr(LeitorDoLivro, "com_modelos_globais",
+                        classmethod(lambda cls, pasta, limiares=None: cls(pasta, limiares=limiares)))
+    return avisos
+
+
+@pytest.fixture
+def projeto_lido(tmp_path, app):  # noqa: F811
+    from abbychess import livro, pagina as pg
+
+    fonte = _pagina_sintetica(tmp_path / "pagina.png")
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Janela", fonte)
+    leitor = LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
+    livro.reconhecer_paginas(projeto, pg.fonte_do_projeto(projeto), leitor, [0])
+    return projeto
+
+
+def _instantaneo(pasta: Path) -> dict:
+    return {str(p.relative_to(pasta)): (p.stat().st_mtime_ns,
+                                        hashlib.sha256(p.read_bytes()).hexdigest())
+            for p in sorted(pasta.rglob("*")) if p.is_file()}
+
+
+def _abrir(app, pasta):  # noqa: F811
+    janela = JanelaPrincipal()
+    janela.abrir_caminho(str(pasta))
+    _esperar(app, janela)
+    return janela
+
+
+def test_versao_mais_nova_abre_so_para_leitura_e_nada_e_gravado(app, projeto_lido,  # noqa: F811
+                                                               sem_dialogos):
+    arquivo = projeto_lido.pasta / "projeto.json"
+    dados = json.loads(arquivo.read_text(encoding="utf-8"))
+    dados["versao"] = 99
+    arquivo.write_text(json.dumps(dados), encoding="utf-8")
+    antes = _instantaneo(projeto_lido.pasta)
+
+    janela = _abrir(app, projeto_lido.pasta)
+    try:
+        assert janela.projeto.somente_leitura and "só leitura" in janela.windowTitle()
+        assert any("só para leitura" in a for a in sem_dialogos)
+        assert janela.boxes                              # a página aparece
+        janela._mostrar_box(0)
+        janela.treino.campo.setText("z")
+        janela.treino._so_corrigir()                     # muda na tela, não no disco
+        janela._gravar_zonas()
+        janela.ir_para_pagina(0)                         # a troca de página grava, se puder
+        assert _instantaneo(projeto_lido.pasta) == antes
+    finally:
+        janela.close()
+    assert _instantaneo(projeto_lido.pasta) == antes     # fechar também não grava
+    assert not gv.protegida(projeto_lido.pasta)          # e solta a trava
+
+
+def test_fonte_sumida_e_pedida_e_conferida(app, projeto_lido, sem_dialogos, tmp_path,  # noqa: F811
+                                         monkeypatch):
+    guardada = tmp_path / "longe" / "a-fonte.png"
+    guardada.parent.mkdir()
+    projeto_lido.fonte.rename(guardada)
+    errada = _pagina_sintetica(tmp_path / "longe" / "outra.png", ("xyz",))
+    respostas = iter([str(errada), str(guardada)])
+    monkeypatch.setattr(QFileDialog, "getOpenFileName",
+                        lambda *a, **k: (next(respostas), ""))
+
+    janela = _abrir(app, projeto_lido.pasta)
+    try:
+        assert janela.projeto is not None and janela.projeto.fonte == guardada.resolve()
+        assert any("não é a fonte" in a for a in sem_dialogos)    # a primeira foi recusada
+        assert janela.boxes
+    finally:
+        janela.close()
+
+
+def test_fonte_sumida_e_cancelada_nao_abre(app, projeto_lido, sem_dialogos, tmp_path,  # noqa: F811
+                                          monkeypatch):
+    # Fora das pastas onde a abertura procura pelo SHA-256: renomeada ao lado, seria achada.
+    (tmp_path / "longe").mkdir()
+    projeto_lido.fonte.rename(tmp_path / "longe" / "sumiu.png")
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *a, **k: ("", ""))
+    janela = _abrir(app, projeto_lido.pasta)
+    try:
+        assert janela.projeto is None
+    finally:
+        janela.close()

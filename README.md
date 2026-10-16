@@ -219,6 +219,27 @@ conferido o primeiro, ele saiu desenhado nos três formatos e o FEN dele foi ach
 Nas páginas 26 e 27 do Darcy Lima, o lote levou 24 s depois de 13 s carregando os modelos, e
 os três arquivos saíram em 1,5 s (PDF), 0,8 s (DOCX) e 0,5 s (EPUB).
 
+### O projeto no disco
+
+Desde o passo 1a, todo arquivo do projeto (as páginas, `projeto.json`, `livro.json`,
+`inclinacoes.json`, `marcadas.json`, `lexico.txt`, as áreas e os padrões com os metadados
+deles) é gravado do mesmo jeito: num `.tmp` ao lado, com `fsync`, e trocado pelo antigo de
+uma vez. Uma queda no meio deixa o arquivo antigo inteiro ou o novo inteiro, nunca um JSON
+pela metade; se o Windows segurar o arquivo um instante (antivírus, indexador), a gravação
+tenta de novo 5 vezes. Os `.tmp` que uma queda deixar são apagados na próxima abertura.
+
+- **A fonte pode mudar de lugar.** Se o PDF estiver dentro da pasta do projeto, o caminho
+  fica relativo, e a pasta inteira pode ser movida. Se a fonte sumir, a abertura procura o
+  mesmo arquivo (pelo SHA-256 dos primeiros 4 MB) ao lado do caminho antigo e na pasta do
+  projeto, e o acha mesmo renomeado; se não achar, pede para você mostrar onde ele está, e
+  recusa um arquivo de conteúdo diferente.
+- **Projeto de versão mais nova abre só para leitura.** Dá para ver as páginas, mas nada é
+  gravado (o título da janela diz "só leitura"). Um campo de `projeto.json` que esta versão
+  não conhece não se perde: vai para `extras` e volta igual ao arquivo.
+- **`livro.json`** é o resumo de cada página lida (estado, pendentes, o histograma das
+  confianças e os diagramas por conferir), atualizado a cada gravação de página. É um cache:
+  se faltar ou estragar, é refeito das páginas na abertura.
+
 ### A página torta
 
 Projeto novo endireita cada página antes de ler. A inclinação é medida pelo perfil de
@@ -516,7 +537,8 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 
 | Arquivo | O que faz |
 |---|---|
-| `abbychess/projeto.py` | A pasta do projeto: fonte, idioma, limiares, páginas lidas, áreas |
+| `abbychess/projeto.py` | A pasta do projeto: fonte (relativa, relocalizada pelo SHA-256), idioma, limiares, `extras`, só leitura, páginas lidas, áreas, `livro.json` |
+| `abbychess/gravacao.py` | A gravação atômica de todo arquivo do projeto e a trava de só leitura |
 | `abbychess/zonas.py` | As áreas da página: geometria, áreas automáticas, reconhecer pelas áreas |
 | `abbychess/verificacao.py` | O léxico do livro, as palavras desconhecidas e a correção por glifo |
 | `abbychess/padroes.py` | Os padrões do livro, com altura, proporção e leitura segura para acento |
@@ -541,6 +563,12 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | `tests/golden/caracterizacao/` | O comportamento de hoje, fixado antes da refatoração do roadmap |
 
 ## Limitações conhecidas
+
+- **Gravar não é assíncrono ainda.** Cada gravação de página faz dois `fsync` (a página e o
+  `livro.json`) na thread de quem grava; o gravador assíncrono, com coalescência, é do passo
+  2a. O formato das páginas ainda é o v1 (o v2 nasce no passo 1b).
+- **No projeto só para leitura, ensinar um padrão falha com aviso** em vez de ficar
+  desabilitado: a janela ainda não desliga as ações (passo A2).
 
 - **O Del do treino não descarta o box com o foco no campo do caractere.** O campo fica com a
   tecla, mesmo vazio (achado da tabela de atalhos no passo 0). Por enquanto, use o botão

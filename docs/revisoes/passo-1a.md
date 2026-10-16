@@ -62,3 +62,21 @@ O que mudou depois dela:
 | A seção das medidas dizia "passo 0" e a qualidade do passo 0 sumia da tabela | "As medidas do roadmap"; "Histórico da qualidade" com todas as medidas de cada livro, que mostra a qualidade do 1a igual à do passo 0 |
 | A árvore suja com correções do código medido | commit das correções e todas as medidas de novo nele |
 | Menores | "o projeto não foi aberto" ao cancelar a fonte; os avisos de só leitura dizem que a fonte achada ou indicada vale na sessão; onde a busca procura (o README, o docstring e a spec iguais); o limite de 200 conta só arquivos do tamanho certo, e está nas Limitações; erro ao gravar os limiares vira aviso; o roadmap descreve os commits do passo; as Limitações falam do `fsync` sem coalescência em disco lento ou com antivírus |
+
+## Rodada 3
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Código e testes | Correção 8 · Simplicidade 8 · Testes 7 | volta |
+| Produto e medição | Completude 8,5 · Fidelidade das medidas 6,5 · Clareza para o usuário 8 · Produtividade 8 | volta |
+
+O que mudou depois dela:
+
+| Achado | Correção |
+|---|---|
+| A migração do cache v1, o limite de candidatos da fonte e o tamanho na relocalização automática sem teste | testes: o `livro.json` v1 com a confiança 1,0 em "99" é refeito com "100" e versão 2; com o limite em 2, três arquivos do tamanho certo antes da fonte fazem a busca desistir, e trinta de outro tamanho não contam; o tamanho regravado |
+| `_atualizar_livro` mudava o cache antes de gravar | o cache só muda depois de gravado; teste |
+| Mensagens dos limiares contraditórias quando a gravação falha | "gravados" só quando gravou; se só o `livro.json` falha, o aviso diz isso; teste |
+| **O A/B do atraso foi só do lote, outra carga; a conclusão ia além dos dados** | A/B **completo** (o módulo inteiro de desempenho, 3 rodadas na tag `passo-0` e 3 no 1a `315db35`, na mesma máquina, tabela "Rodadas repetidas" gerada no README). Resultado: **o 1a custa tempo.** O Enter (p95) ficou acima do passo 0 nas três rodadas, e a troca de página também; o atraso no lote cai mais vezes na faixa alta (contando todas as rodadas completas, 4 de 6 no 1a contra 1 de 5 no passo 0), abaixo do alvo de 50 ms. A causa provável são os `fsync` síncronos novos (página, `livro.json`, padrão e metadados). O README declara isso nas Limitações; o gravador assíncrono do passo 2a, com coalescência, tira essas gravações da thread da interface e do lote, e a medida do 2a tem de mostrar a volta |
+| Número digitado à mão na legenda do desempenho por passo | saiu; a variação está nas rodadas repetidas, geradas dos JSON |
+| A tabela das rodadas não dizia a condição | coluna "Rodada": completa ou só do lote, sem os padrões |

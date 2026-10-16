@@ -604,10 +604,13 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 
 ## Limitações conhecidas
 
-- **Gravar não é assíncrono ainda.** Cada gravação de página faz dois `fsync` (a página e o
-  `livro.json`) na thread de quem grava, inclusive a cada troca de página e a cada página do
-  lote. Num SSD isso não aparece na troca de página; num disco lento, de rede ou com
-  antivírus que examina cada gravação, pode aparecer. O gravador assíncrono, com
+- **Gravar não é assíncrono ainda, e isso custa tempo desde o 1a.** Cada gravação de página
+  faz dois `fsync` (a página e o `livro.json`) na thread de quem grava, inclusive a cada
+  troca de página e a cada página do lote, e ensinar um glifo grava também o padrão e os
+  metadados. Nas rodadas repetidas (tabela acima), o Enter e a troca de página do 1a ficam
+  acima dos do passo 0 em todas as rodadas, e o atraso da interface durante o lote cai mais
+  vezes na faixa alta (continua abaixo do alvo de 50 ms). Num disco lento, de rede ou com
+  antivírus que examina cada gravação, a diferença cresce. O gravador assíncrono, com
   coalescência, é do passo 2a. O formato das páginas ainda é o v1 (o v2 nasce no passo 1b).
 - **A busca automática da fonte lê no máximo 200 arquivos do tamanho certo** por pasta
   procurada; numa pasta com mais que isso, ela desiste e pede para você mostrar a fonte.

@@ -11,8 +11,9 @@ fazem dele uma ferramenta de revisão e não um corretor:
   (`lexico.suspeitas_da_pagina`). `Bxf6` e `exd5` nunca aparecem aqui.
 
 A correção é por glifo: o texto novo da palavra é repartido pelos boxes dela,
-e só os boxes que mudaram viram manuais. Se o número de letras não bate com o
-de glifos, o erro é de segmentação (dois glifos colados, um partido), e quem
+e só os boxes que mudaram viram manuais. O glifo lido com duas letras (`♕f`)
+pode ficar com uma (`♔`); fora disso, se o número de letras não bate com o de
+glifos, o erro é de segmentação (dois glifos colados, um partido), e quem
 resolve é dividir ou juntar no painel de treino, não a verificação. O espaço
 digitado não é letra: é a palavra nova antes do glifo (`quebras`), a decisão
 `edicao.quebrar` do modelo, e a contagem das palavras a respeita.
@@ -188,11 +189,13 @@ def recorte_da_palavra(pagina: np.ndarray, boxes: Sequence[BoxEntry], indices: S
 def repartir(boxes: Sequence[BoxEntry], indices: Sequence[int], novo: str) -> List[str]:
     """O texto novo repartido pelos glifos da palavra, um pedaço por box.
 
-    Com tantas letras quanto glifos, uma por glifo. Senão, se o texto antigo
-    tinha o mesmo comprimento do novo (um box de ligadura como `fi` conta duas),
-    cada box fica com o mesmo número de letras de antes. Fora disso é erro de
-    segmentação, e o `ValueError` diz o que fazer. Os espaços não são letras:
-    cada um é uma palavra nova (`quebras`).
+    Cada glifo fica com uma letra, ou com duas se já tinha duas (um box de
+    ligadura como `fi` ou `f8`). O glifo de duas letras pode ficar com uma, nunca
+    o contrário: `♔f8` sobre os glifos lidos `♕f` e `f8` dá `♔` e `f8`. Com mais
+    de um jeito, vale o que muda menos glifos e, depois, menos letras; se ainda
+    sobra empate, ou se não há jeito, é erro de segmentação, e o `ValueError` diz
+    o que fazer. Os espaços não são letras: cada um é uma palavra nova
+    (`quebras`).
     """
     return _repartir(boxes, indices, novo)[0]
 
@@ -213,19 +216,15 @@ def _repartir(boxes: Sequence[BoxEntry], indices: Sequence[int], novo: str
     letras = "".join(palavras)
     if not letras:
         raise ValueError("Digite a palavra.")
-    if len(letras) == len(indices):
-        pedacos = list(letras)
-    else:
-        tamanhos = [len(boxes[i].char) for i in indices]
-        if sum(tamanhos) != len(letras):
-            raise ValueError(f"A palavra tem {len(indices)} glifo(s) e o texto novo "
-                             f"{len(letras)} letra(s). Divida ou junte os glifos no painel "
-                             "de treino.")
-        pedacos, pos = [], 0
-        for t in tamanhos:
-            pedacos.append(letras[pos:pos + t])
-            pos += t
-    inicio, pos = {}, 0                    # letra em que cada glifo começa -> posição dele
+    pedacos = _pelos_glifos([boxes[i].char for i in indices], letras)
+    if pedacos is None:
+        raise ValueError(f"A palavra tem {len(indices)} glifo(s) e o texto novo "
+                         f"{len(letras)} letra(s). Divida ou junte os glifos no painel "
+                         "de treino.")
+    if not pedacos:
+        raise ValueError("Há mais de um jeito de pôr essas letras nos glifos. Clique no "
+                         "glifo e corrija no painel de treino.")
+    inicio, pos = {}, 0                   # letra em que cada glifo começa -> posição dele
     for k, pedaco in enumerate(pedacos):
         inicio.setdefault(pos, k)
         pos += len(pedaco)
@@ -237,6 +236,55 @@ def _repartir(boxes: Sequence[BoxEntry], indices: Sequence[int], novo: str
                              "glifo no painel de treino.")
         saida.append(inicio[pos])
     return pedacos, saida
+
+
+def _pelos_glifos(antigos: Sequence[str], letras: str) -> Optional[List[str]]:
+    """As letras repartidas pelos glifos lidos `antigos` (ver `repartir`).
+
+    Programação dinâmica por (glifos usados, letras usadas), com o custo (glifos
+    mudados, letras editadas) e quantos caminhos dão esse custo. Devolve `None`
+    sem jeito nenhum e `[]` quando o melhor jeito não é único.
+    """
+    n, m = len(antigos), len(letras)
+    #: (i, j) -> (custo, caminhos, (j de antes, pedaço do glifo i - 1))
+    melhor = {(0, 0): ((0, 0), 1, None)}
+    for i, antigo in enumerate(antigos):
+        for j in range(m):
+            if (i, j) not in melhor:
+                continue
+            (mudados, editadas), caminhos, _ = melhor[(i, j)]
+            for t in range(1, max(1, len(antigo)) + 1):
+                if j + t > m:
+                    break
+                pedaco = letras[j:j + t]
+                custo = (mudados + (pedaco != antigo), editadas + _distancia(antigo, pedaco))
+                atual = melhor.get((i + 1, j + t))
+                if atual is None or custo < atual[0]:
+                    melhor[(i + 1, j + t)] = (custo, caminhos, (j, pedaco))
+                elif custo == atual[0]:
+                    melhor[(i + 1, j + t)] = (custo, atual[1] + caminhos, atual[2])
+    fim = melhor.get((n, m))
+    if fim is None:
+        return None
+    if fim[1] > 1:
+        return []
+    pedacos, i, j = [], n, m
+    while i:
+        j, pedaco = melhor[(i, j)][2]
+        pedacos.append(pedaco)
+        i -= 1
+    return pedacos[::-1]
+
+
+def _distancia(a: str, b: str) -> int:
+    """A distância de edição (Levenshtein) entre dois textos curtos."""
+    linha = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        anterior, linha[0] = linha[0], i
+        for j, cb in enumerate(b, 1):
+            anterior, linha[j] = linha[j], min(linha[j] + 1, linha[j - 1] + 1,
+                                               anterior + (ca != cb))
+    return linha[-1]
 
 
 def corrigir(boxes: List[BoxEntry], indices: Sequence[int], novo: str) -> List[Tuple[int, str]]:

@@ -26,6 +26,8 @@ pytestmark = [pytest.mark.desempenho, pytest.mark.livro_real, pytest.mark.timeou
 
 _PDF = sorted(PASTA_DOS_PDFS.glob("Xadrez Vitorioso*/*.pdf"))
 PAGINAS = [20, 21, 22]
+#: As ações da medida da memória do desfazer em cada página.
+ACOES_POR_PAGINA = 100
 LOTE = list(range(20, 40))          # 20 páginas para a memória total (§15.3)
 
 
@@ -236,7 +238,7 @@ def _memoria_do_historico(app, janela) -> dict:
         acoes = 0
         for indice in PAGINAS:
             janela.ir_para_pagina(indice)
-            for k in range(20):
+            for k in range(ACOES_POR_PAGINA):
                 mostrar(janela, k)
                 janela.treino.campo.setText("y")
                 janela.treino._so_corrigir()
@@ -244,6 +246,7 @@ def _memoria_do_historico(app, janela) -> dict:
         gc.collect()
         cheio, _ = tracemalloc.get_traced_memory()
         rss_cheio = processo.memory_info().rss
+        estimativa = janela.pagina.historico.bytes
         janela.pagina.historico.limpar()
         gc.collect()
         vazio, _ = tracemalloc.get_traced_memory()
@@ -254,10 +257,14 @@ def _memoria_do_historico(app, janela) -> dict:
     return {"acoes": acoes, "preso_pelo_historico_bytes": preso,
             "bytes_por_acao": round(por_acao),
             "estimado_300x20_mb": round(por_acao * 300 * 20 / 2**20, 1),
+            "estimativa_do_historico_300x20_mb": round(estimativa / acoes * 300 * 20 / 2**20, 1),
             "rss_delta_bytes_informativo": rss_cheio - rss_base,
             "como": f"tracemalloc ligado antes de {acoes} ações reais (3 páginas já visitadas "
-                    "× 20): o que é liberado ao esvaziar o histórico, por ação, extrapolado "
-                    "para 300 páginas × 20 ações"}
+                    f"× {ACOES_POR_PAGINA}): o que é liberado ao esvaziar o histórico, por "
+                    "ação, extrapolado para 300 páginas × 20 ações; e a estimativa que o "
+                    "próprio histórico faz (`HistoricoDoProjeto.bytes`, a que o limite de 50 MB "
+                    "usa). Desde o 2b, 100 ações por página: com 20, o histórico prendia menos "
+                    "que o ruído do coletor de lixo"}
 
 
 def test_atraso_e_memoria_durante_o_lote(ambiente, medidas):

@@ -166,7 +166,9 @@ class PainelDeTreino(QWidget):
 
         self.contexto = QLabel()
         self.contexto.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.contexto.setMinimumHeight(70)
+        # O mínimo explícito: o do pixmap (escalado pela largura do rótulo) faria o Glifo
+        # crescer com ele e passar do Inspetor.
+        self.contexto.setMinimumSize(1, 70)
         self.contexto.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.contexto.setStyleSheet("background: white; border: 1px solid #999;")
 
@@ -192,7 +194,7 @@ class PainelDeTreino(QWidget):
         botao_anterior.setToolTip("O anterior da fila (Alt+↑)")
         botao_anterior.clicked.connect(self.anterior.emit)
         botao_pular = QPushButton("Pular ▶")
-        botao_pular.setToolTip("O próximo da fila, sem decidir (Alt+↓)")
+        botao_pular.setToolTip("Pula para o próximo da fila, sem decidir (Alt+↓)")
         botao_pular.clicked.connect(self.pular.emit)
         botao_dividir = QPushButton("Dividir")
         botao_dividir.setToolTip("Divide o box em dois glifos, na linha vermelha do recorte "
@@ -206,6 +208,8 @@ class PainelDeTreino(QWidget):
         botao_juntar_depois.clicked.connect(lambda: self.pedir_juntar(+1))
         self._botoes = [botao_ensinar, botao_corrigir, botao_descartar, botao_anterior, botao_pular,
                         botao_dividir, botao_juntar_antes, botao_juntar_depois]
+        for botao in self._botoes:              # o teclado é o do campo: o Tab não para neles
+            botao.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         editar = QHBoxLayout()
         editar.addWidget(botao_juntar_antes)
@@ -237,7 +241,9 @@ class PainelDeTreino(QWidget):
         self.selecao = QLabel("")
         self.selecao.setWordWrap(True)
         self.fila = QLabel("")
+        self.fila.setWordWrap(True)
         self.padroes = QLabel("")
+        self.padroes.setWordWrap(True)
 
         legenda = QGroupBox("Os boxes na página")
         caixa_legenda = QVBoxLayout(legenda)
@@ -252,7 +258,9 @@ class PainelDeTreino(QWidget):
             amostra = QLabel()
             amostra.setPixmap(_amostra_do_traco(traco))
             linha.addWidget(amostra)
-            linha.addWidget(QLabel(texto), 1)
+            rotulo = QLabel(texto)
+            rotulo.setWordWrap(True)
+            linha.addWidget(rotulo, 1)
             caixa_legenda.addLayout(linha)
 
         caixa = QVBoxLayout(self)
@@ -286,8 +294,10 @@ class PainelDeTreino(QWidget):
         self.contexto.setPixmap(self._contexto(pagina, box))
         fonte = NOMES_DAS_FONTES.get(box.source, box.source or "sem leitura")
         lido = box.char if box.char else "—"
-        self.leitura.setText(f"{posicao}<br>Leitura: <b style='font-size:16pt'>{lido}</b> "
-                             f"&nbsp;({fonte}, confiança {box.confidence:.2f})")
+        confianca = f"{box.confidence:.2f}".replace(".", ",")
+        linhas = ([posicao] if posicao else []) + [
+            f"Leitura: <b style='font-size:16pt'>{lido}</b> &nbsp;({fonte}, confiança {confianca})"]
+        self.leitura.setText("<br>".join(linhas))
         self.campo.setText(box.char)
         self.campo.selectAll()
         self.habilitar(True)                    # antes do foco: num campo desligado o Qt o

@@ -251,7 +251,7 @@ def test_projeto_novo_em_janela_larga_abre_a_gaveta(janela_de_60):
     j = janela_de_60
     assert j.doca_paginas.isVisible()
     assert j.paginas.lista.topLevelItemCount() == 60
-    assert j.paginas.lista.topLevelItem(0).text(1) == "não reconhecida"
+    assert j.paginas.lista.topLevelItem(0).toolTip(1) == "não reconhecida"
 
 
 # ----------------------------------------------------------------------
@@ -634,3 +634,103 @@ def test_x_height_na_imagem_no_zoom_largura(app, tmp_path, sim, largura, altura,
         assert x_height * j.visor.escala() >= 6, (x_height, j.visor.escala())
     finally:
         j.close()
+
+
+# ----------------------------------------------------------------------
+# A revisão de produto do A2: o Inspetor em 296 px, a gaveta, o Ctrl+T, o Esc, as alturas
+# ----------------------------------------------------------------------
+
+def _cabe(app, editor, rolagem):
+    """Nenhum filho visível do editor passa da largura útil do Inspetor."""
+    app.processEvents()
+    largura = rolagem.viewport().width()
+    from PySide6.QtWidgets import QWidget
+
+    fora = [w for w in editor.findChildren(QWidget) if w.isVisible()
+            and w.mapTo(editor, w.rect().topRight()).x() > largura + 1]
+    return fora
+
+
+@pytest.mark.parametrize("editor", ["glifo", "palavra"])
+def test_os_editores_cabem_no_inspetor_de_296_px(app, lida, editor):
+    from core import lexico
+
+    j = lida
+    if editor == "palavra":
+        j.verificador.lexico = lexico.Lexico(palavras={"zzz"})
+        j.fila.definir("palavras")
+    app.processEvents()
+    assert abs(j.doca_inspetor.width() - 296) <= 4
+    rolagem = j.inspetor._rolagens[editor]
+    assert _cabe(app, j.inspetor.editores[editor], rolagem) == []
+
+
+def test_ctrl_t_com_pendentes_pergunta_e_o_nao_deixa_a_pagina(app, lida, monkeypatch):
+    j = lida
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.No)
+    assert fila(j)
+    QTest.keyClick(j.visor, Qt.Key.Key_T, Qt.KeyboardModifier.ControlModifier)
+    assert j.pagina.modelo.estado != md.VERIFICADA
+
+
+def test_f9_em_1366_abre_a_gaveta_de_150_sem_estreitar_a_imagem(app, janela):
+    j = janela
+    imagem = _larguras(app, j)[1]
+    QTest.keyClick(j.visor, Qt.Key.Key_F9)
+    paginas, depois, _, inspetor = _larguras(app, j)
+    assert abs(paginas - 150) <= 4 and abs(depois - imagem) <= 6 and abs(inspetor - 296) <= 4
+    lista = j.paginas.lista
+    colunas = sum(lista.columnWidth(c) for c in range(lista.columnCount()))
+    assert colunas <= lista.viewport().width()               # Rev. e Diag. à vista
+
+
+def test_esc_em_resultados_devolve_o_foco_ao_painel_de_antes(app, lida):
+    j = lida
+    j.texto.setFocus()
+    app.processEvents()
+    QTest.keyClick(j.texto, Qt.Key.Key_5, Qt.KeyboardModifier.AltModifier)
+    assert _dentro(j.resultados)
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Escape)
+    app.processEvents()
+    assert not j.doca_resultados.isVisible() and QApplication.focusWidget() is j.texto
+
+
+def test_resultados_em_768_de_altura_abre_com_130(app, janela):
+    janela.abrir_avisos()
+    for _ in range(3):
+        app.processEvents()
+    assert abs(janela.doca_resultados.height() - 130) <= 6
+
+
+def test_reabrir_noutra_largura_usa_os_tamanhos_padrao(app, tmp_path, pdf_de_60_paginas, sim):  # noqa: F811
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Largo", pdf_de_60_paginas)
+    j = _abrir(projeto, 1920, 1080)
+    j.divisor.setSizes([1100, 340])
+    app.processEvents()
+    j.close()
+    k = _abrir(ProjetoDeLivro.abrir(projeto.pasta), 1366, 768)
+    try:
+        paginas, imagem, vista, inspetor = _larguras(app, k)
+        assert k.doca_paginas.isVisible()                   # a visibilidade volta
+        assert abs(inspetor - 296) <= 4 and abs(paginas - 150) <= 4
+        assert abs(imagem / (imagem + vista) - 760 / 1440) < 0.03   # os tamanhos, não os 1100
+    finally:
+        k.close()
+
+
+def test_a_mensagem_da_tarefa_sai_da_barra_quando_ela_acaba(app, lida, monkeypatch):
+    j = lida
+    monkeypatch.setattr(j.executor, "so_leves", lambda: False)    # uma tarefa que prende
+    j.executor.ocupado_mudou.emit(True, "Carregando o léxico")
+    assert j.statusBar().currentMessage() == "Carregando o léxico…"
+    j.executor.ocupado_mudou.emit(False, "")
+    assert j.statusBar().currentMessage() == ""
+
+
+def test_esconder_a_imagem_nao_avisa_zoom_minimo(app, lida):
+    j = lida
+    j.visor.zoom_pagina()
+    QTest.keyClick(j.visor, Qt.Key.Key_F8, Qt.KeyboardModifier.ControlModifier)   # só a vista
+    QTest.keyClick(j.vista, Qt.Key.Key_F7, Qt.KeyboardModifier.ControlModifier)   # lado a lado
+    app.processEvents()
+    assert "zoom" not in j.statusBar().currentMessage()

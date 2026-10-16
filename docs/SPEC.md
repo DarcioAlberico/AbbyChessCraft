@@ -202,7 +202,7 @@ Regras:
    palavra e avança. Ensinar fora do Glifo e da Galeria é **Ctrl+Enter**.
 6. Exceção documentada: no campo de 1 caractere do Glifo, Shift+seta e Ctrl+Shift+seta movem
    as bordas e Del descarta o box (`ShortcutOverride` aceito), porque não há texto para
-   selecionar nem apagar à direita. (Hoje o Del do treino não dispara com o foco no campo:
+   selecionar nem apagar à direita. (Até o A1 o Del do treino não disparava com o foco no campo, o que o A2 corrigiu:
    achado da tabela de atalhos no passo 0.)
 
 Extrato do perfil padrão, com o que muda em relação a hoje:

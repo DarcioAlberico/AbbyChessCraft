@@ -187,7 +187,9 @@ class VisorDePagina(QGraphicsView):
     def escala(self) -> float:
         return self.transform().m11()
 
-    def _escalar(self, nova: float, modo: Optional[str] = None) -> None:
+    def _escalar(self, nova: float, modo: Optional[str] = None, *, avisar: bool = True) -> None:
+        """`avisar`: o limite vai à barra ("zoom máximo"); o ajuste da página inteira ou da
+        largura ao redimensionar não avisa."""
         limite = ""
         if nova >= self.ESCALA_MAXIMA:
             nova, limite = self.ESCALA_MAXIMA, "máximo"
@@ -197,7 +199,7 @@ class VisorDePagina(QGraphicsView):
         if abs(fator - 1) > 1e-6:
             self.scale(fator, fator)
         self.modo_zoom = modo
-        self.zoom_mudou.emit(self.escala(), limite)
+        self.zoom_mudou.emit(self.escala(), limite if avisar else "")
 
     def zoom_mais(self) -> None:
         self._escalar(self.escala() * self.PASSO_DO_ZOOM)
@@ -233,9 +235,9 @@ class VisorDePagina(QGraphicsView):
 
     def _aplicar_modo(self) -> None:
         cena = self.scene().sceneRect()
-        if cena.isEmpty():
-            return
         vista = self.viewport().rect()
+        if cena.isEmpty() or vista.width() < 40 or vista.height() < 40:
+            return                              # sem tamanho útil (a doca recolhida): nada
         if self.modo_zoom == "largura":
             nova = (vista.width() - 4) / cena.width()
         else:
@@ -243,7 +245,7 @@ class VisorDePagina(QGraphicsView):
         modo = self.modo_zoom
         barra = self.verticalScrollBar()
         fracao = barra.value() / barra.maximum() if barra.maximum() > 0 else 0.0
-        self._escalar(nova, modo)
+        self._escalar(nova, modo, avisar=False)
         if modo == "largura":                   # a mesma altura da página, na escala nova
             barra.setValue(round(fracao * barra.maximum()))
         else:

@@ -63,7 +63,7 @@ def montar(janela) -> None:
     j.acao_lote = acao(j, "reconhecer_livro", j.reconhecer_livro, texto="Reconhecer o livro…")
     j.acao_proximo_do_livro = acao(j, "proxima_pagina_pendente", livro.proximo_pendente,
                                    texto="Próxima página com pendentes")
-    j.acao_verificada = acao(j, "pagina_verificada", p.verificar,
+    j.acao_verificada = acao(j, "pagina_verificada", j.verificar_pagina,
                              texto="Página verificada (abre a próxima)")
     barra.addSeparator()
 

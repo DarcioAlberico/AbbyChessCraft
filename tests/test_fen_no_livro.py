@@ -111,6 +111,18 @@ def test_epub_tem_o_fen_no_texto_alternativo(projeto, fonte, tmp_path):
     with zipfile.ZipFile(destino) as z:
         xhtml = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".xhtml"))
     assert FEN in xhtml
+    # O lado que ninguém disse sai carimbado como assumido, no alt e na legenda.
+    assert f"{FEN} w - - 0 1 — brancas a jogar (assumido: a página não diz)" in xhtml
+
+
+def test_epub_com_o_lado_informado_na_conferencia(projeto, fonte, tmp_path):
+    _gravar_com(projeto, fonte, _lido(conferido=True, lado="b", lado_origem="usuario"))
+    destino = tmp_path / "livro.epub"
+    ex.exportar(projeto, destino)
+    with zipfile.ZipFile(destino) as z:
+        xhtml = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".xhtml"))
+    assert f"{FEN} b - - 0 1 — pretas a jogar (informado na revisão)" in xhtml
+    assert "assumido" not in xhtml and "não revisado" not in xhtml
 
 
 def test_docx_sai_com_o_diagrama_desenhado(projeto, fonte, tmp_path):

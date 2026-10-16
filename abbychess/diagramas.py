@@ -95,6 +95,11 @@ class DiagramaLido:
     #: Os rótulos impressos decidiram a orientação. Sem eles, é suposição.
     orientacao_confirmada: bool = False
     titulo: str = ""
+    #: O título que o core releu em volta do tabuleiro; o lado sai dele quando a linha
+    #: de boxes da legenda não diz (`rederivar_lado`).
+    titulo_do_core: str = ""
+    #: Os lados (`acima`, `abaixo`) em que o core achou os rótulos `a`–`h`: não são legenda.
+    lados_de_rotulo: Tuple[str, ...] = ()
     conferido: bool = False
     #: Por que o porteiro do PyBoxEditor não confia na leitura; vazio se confia.
     motivo: str = ""
@@ -183,6 +188,8 @@ class DiagramaLido:
             "orientacao": self.orientacao,
             "orientacao_confirmada": self.orientacao_confirmada,
             "titulo": self.titulo,
+            "titulo_do_core": self.titulo_do_core,
+            "lados_de_rotulo": list(self.lados_de_rotulo),
             "conferido": self.conferido,
             "motivo": self.motivo,
             "erro": self.erro,
@@ -202,7 +209,11 @@ class DiagramaLido:
                    roque=bruto.get("roque", ""),
                    orientacao=bruto.get("orientacao", "branca"),
                    orientacao_confirmada=bool(bruto.get("orientacao_confirmada", False)),
-                   titulo=bruto.get("titulo", ""), conferido=bool(bruto.get("conferido", False)),
+                   titulo=bruto.get("titulo", ""),
+                   # Gravado antes do campo, o título é o que se tem do core.
+                   titulo_do_core=bruto.get("titulo_do_core", bruto.get("titulo", "")),
+                   lados_de_rotulo=tuple(bruto.get("lados_de_rotulo", ())),
+                   conferido=bool(bruto.get("conferido", False)),
                    motivo=bruto.get("motivo", ""), erro=bruto.get("erro", ""),
                    id=str(bruto.get("id") or ""))
 
@@ -265,24 +276,49 @@ def ler_diagrama(imagem, caixa: Caixa, *, escala: Optional[float] = None, classi
     if len(leitura.casas) != 64:
         motivo = next((a for a in leitura.avisos if a != diagrama.AVISO_CONVENCAO), "")
         return DiagramaLido(caixa, erro=motivo or "não deu para ler o tabuleiro")
-    texto_do_titulo = titulo.texto
-    dito = lado_a_jogar.ler(texto_do_titulo)
-    if boxes:
-        # As linhas da página valem mais que a releitura do core: trazem os
-        # padrões do livro e as correções do usuário (ver `legendas_dos_boxes`).
-        legendas = legendas_dos_boxes(boxes, caixa, rotulos.lados)
-        da_pagina = lado_a_jogar.ler_varios(*legendas)
-        if da_pagina and da_pagina.lado:
-            dito, texto_do_titulo = da_pagina, " / ".join(legendas)
-    dito = dito if dito and dito.lado else None
     ok, motivo = diagrama.confiavel(leitura)
-    return DiagramaLido(caixa, casas=leitura.casas,
-                        lado=dito.lado if dito else None,
-                        lado_origem=LADO_DA_LEGENDA if dito else "",
-                        lado_trecho=dito.trecho if dito else "",
-                        orientacao=leitura.orientacao,
+    lido = DiagramaLido(caixa, casas=leitura.casas, orientacao=leitura.orientacao,
                         orientacao_confirmada=rotulos.orientacao is not None,
-                        titulo=texto_do_titulo, motivo="" if ok else motivo)
+                        titulo_do_core=titulo.texto, lados_de_rotulo=tuple(rotulos.lados),
+                        motivo="" if ok else motivo)
+    return _com_lado(lido, legendas_dos_boxes(boxes, caixa, rotulos.lados) if boxes else [])
+
+
+def _com_lado(d: DiagramaLido, legendas: Sequence[str]) -> DiagramaLido:
+    """O diagrama com o lado, a procedência, o trecho e o título que a página diz.
+
+    As linhas da página valem mais que a releitura do core: trazem os padrões do
+    livro e as correções do usuário (ver `legendas_dos_boxes`). Sem lado nelas,
+    vale o título do core.
+    """
+    dito, titulo = lado_a_jogar.ler(d.titulo_do_core), d.titulo_do_core
+    da_pagina = lado_a_jogar.ler_varios(*legendas) if legendas else None
+    if da_pagina and da_pagina.lado:
+        dito, titulo = da_pagina, " / ".join(legendas)
+    dito = dito if dito and dito.lado else None
+    return replace(d, lado=dito.lado if dito else None,
+                   lado_origem=LADO_DA_LEGENDA if dito else "",
+                   lado_trecho=dito.trecho if dito else "", titulo=titulo)
+
+
+def rederivar_lados(diagramas: Sequence[DiagramaLido], antes: Sequence[BoxEntry],
+                    depois: Sequence[BoxEntry]) -> List[DiagramaLido]:
+    """Os diagramas com o lado dito de novo pela legenda, quando a linha dela mudou.
+
+    Ensinar, corrigir, dividir ou juntar um box da legenda muda o que ela diz,
+    e o lado não espera o F5 seguinte: sai das linhas de boxes de `depois`, sem
+    reler o tabuleiro (só `lado`, `lado_origem`, `lado_trecho` e `titulo`). Só
+    muda o diagrama cuja legenda mudou entre `antes` e `depois`; o conferido e o
+    de lado informado por quem conferiu ficam como estão.
+    """
+    saida = []
+    for d in diagramas:
+        if d.lido and not d.conferido and d.lado_origem != LADO_DO_USUARIO:
+            agora = legendas_dos_boxes(depois, d.caixa, d.lados_de_rotulo)
+            if agora != legendas_dos_boxes(antes, d.caixa, d.lados_de_rotulo):
+                d = _com_lado(d, agora)
+        saida.append(d)
+    return saida
 
 
 def legendas_dos_boxes(boxes: Sequence[BoxEntry], caixa: Caixa,

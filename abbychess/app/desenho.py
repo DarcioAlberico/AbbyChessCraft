@@ -10,6 +10,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from abbychess import avisos as av
+from abbychess import grade as gd
 from abbychess import verificacao as vf
 from abbychess.app import acoes, cores
 from abbychess.app.imagens import pixmap_da_pagina
@@ -94,14 +95,28 @@ class DesenhoDaJanela:
                                "ou vá para o próximo pendente do livro (F6).")
             return
         self.treino.mostrar(p.matriz, p.box_atual(), p.posicao_do_atual())
+        # A fila e a Imagem levam o Documento e a Linha ao glifo (§6.2).
+        self.texto.ir_ao_gid(p.atual, rolar=self.acao_seguir.isChecked())
+        self._mostrar_a_linha()
         # Seguir (Ctrl+Shift+L): o item atual fica visível, a 120 px da borda (§3.3).
         self.visor.selecionar(p.indice_de(p.atual), centralizar=self.acao_seguir.isChecked())
         if not self.executor.so_leves():        # a propagação de um Enter não prende o painel
             self.treino.habilitar(False)
 
     def pintar_texto(self) -> None:
+        """O Documento da página, com o realce de cada glifo (§6.1), sem perder o lugar."""
         self.relogio_do_texto.stop()
-        self.texto.setPlainText(self.pagina.texto())
+        p, v = self.pagina, self.verificador
+        na_fila = set(p.fila())
+        estados = {b.gid: gd.estado(b.entry, b.gid in na_fila) for b in p.modelo.boxes} \
+            if p.modelo is not None else {}
+        desconhecidos = set()
+        if v.lexico is not None and v._gids:
+            desconhecidos = {v._gids[i] for d in v.desconhecidas for i in d.indices
+                             if i < len(v._gids)}
+        self.texto.montar(p.documento(), p.diagramas, estados, desconhecidos, p.gids_virtuais(),
+                          p.matriz)
+        self._mostrar_a_linha()
 
     def _selecao_mudou(self) -> None:
         p = self.pagina

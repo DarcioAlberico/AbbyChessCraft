@@ -33,17 +33,17 @@ from typing import Optional
 from collections import OrderedDict
 
 from PySide6.QtCore import QSettings, QTimer, Signal
-from PySide6.QtGui import QFont
-from PySide6.QtWidgets import QApplication, QInputDialog, QMainWindow, QPlainTextEdit
+from PySide6.QtWidgets import QApplication, QInputDialog, QMainWindow
 
 from abbychess import avisos as av
 from abbychess.app import acoes, dialogos
 from abbychess.app.desenho import DesenhoDaJanela
 from abbychess.app.espaco import EspacoDeTrabalho
 from abbychess.app.dialogo_diagrama import DialogoDeDiagrama
+from abbychess.app.documento import VistaDoDocumento
 from abbychess.app.opcoes import DialogoDeOpcoes
 from abbychess.app.painel_padroes import PainelDePadroes
-from abbychess.app.painel_treino import FONTE_DE_SIMBOLOS, PainelDeTreino
+from abbychess.app.painel_treino import PainelDeTreino
 from abbychess.app.painel_verificacao import PainelDeVerificacao
 from abbychess.app.trabalho import Executor
 from abbychess.app.visor import VisorDePagina
@@ -140,9 +140,9 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
         self.verificacao.adicionar.connect(self._adicionar_palavra)
         self.verificacao.glifo_escolhido.connect(self._glifo_da_palavra)
 
-        self.texto = QPlainTextEdit()           # o Documento, até o A3: o texto de hoje
-        self.texto.setReadOnly(True)
-        self.texto.setTabChangesFocus(True)
+        self.texto = VistaDoDocumento()         # o Documento (§6.1), só leitura até o D1
+        self.texto.glifo_clicado.connect(self._documento_clicado)
+        self.texto.cursor_na_palavra.connect(self._palavra_do_documento)
         # O texto da página é refeito uma vez, um instante depois da última mudança: montar
         # o documento leva dezenas de ms, e um Enter muda a página duas vezes (o glifo e,
         # depois, a propagação).
@@ -150,8 +150,6 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
         self.relogio_do_texto.setSingleShot(True)
         self.relogio_do_texto.setInterval(150)
         self.relogio_do_texto.timeout.connect(self.pintar_texto)
-        self.texto.setFont(QFont(FONTE_DE_SIMBOLOS, 11))
-        self.texto.setAccessibleName("Documento: o texto reconhecido da página")
 
     def _ligar_eventos(self) -> None:
         e = self.eventos

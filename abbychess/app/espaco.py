@@ -1,7 +1,7 @@
 """O espaço de trabalho da janela (SPEC §3.1, §3.2): os painéis, os arranjos e o foco.
 
 - A área central é um `QSplitter` com a **Imagem** (o visor) e a **vista direita** (abas:
-  Documento, que até o A3 é o texto reconhecido de hoje, e Padrões do livro).
+  Documento, §6, e Padrões do livro), e embaixo dele a faixa **Linha** (Ctrl+F5).
 - **Inspetor** (à direita), **Páginas** (a gaveta, à esquerda) e **Resultados / Avisos**
   (embaixo) são `QDockWidget`.
 - A **barra de status** tem a página e o estado, a fila, a caixa de zoom, o lote com o ✕ que
@@ -26,13 +26,15 @@ from typing import Optional
 from PySide6.QtCore import QByteArray, Qt, QTimer
 from PySide6.QtWidgets import (QApplication, QDialog, QDockWidget, QLabel, QMessageBox,
                                QProgressBar, QSpinBox, QSplitter, QTabWidget, QTextBrowser,
-                               QToolButton, QVBoxLayout)
+                               QToolBar, QToolButton, QVBoxLayout, QWidget)
 
 from abbychess import avisos as av
 from abbychess import gravacao as gv
+from abbychess import verificacao as vf
 from abbychess.modelo import LIDAS
 from abbychess.app import visor as vs
 from abbychess.app.inspetor import PainelDoInspetor
+from abbychess.app.linha import FaixaDaLinha
 from abbychess.app.painel_paginas import NOMES_DOS_ESTADOS, PainelDePaginas
 from abbychess.app.painel_resultados import PainelDeResultados
 from abbychess.controladores import ControladorDaFila
@@ -99,10 +101,18 @@ class EspacoDeTrabalho:
         self.avisos = av.RegistroDeAvisos()
         self.fila = ControladorDaFila(self.pagina, self.verificador, self.conferencia)
 
+        self.painel_do_documento = QWidget()
+        self.barra_do_documento = QToolBar("Documento")
+        self.barra_do_documento.setIconSize(self.barra_do_documento.iconSize() * 0.75)
+        caixa = QVBoxLayout(self.painel_do_documento)
+        caixa.setContentsMargins(0, 0, 0, 0)
+        caixa.setSpacing(0)
+        caixa.addWidget(self.barra_do_documento)
+        caixa.addWidget(self.texto, 1)
         self.vista = QTabWidget()
         self.vista.setObjectName("vista_direita")
         self.vista.setDocumentMode(True)
-        self.vista.addTab(self.texto, "Documento")
+        self.vista.addTab(self.painel_do_documento, "Documento")
         self.vista.addTab(self.padroes, "Padrões")
         self.divisor = QSplitter(Qt.Orientation.Horizontal)
         self.divisor.setObjectName("divisor")
@@ -110,7 +120,14 @@ class EspacoDeTrabalho:
         self.divisor.setHandleWidth(4)
         self.divisor.addWidget(self.visor)
         self.divisor.addWidget(self.vista)
-        self.setCentralWidget(self.divisor)
+        self.linha = FaixaDaLinha()
+        centro = QWidget()
+        caixa = QVBoxLayout(centro)
+        caixa.setContentsMargins(0, 0, 0, 0)
+        caixa.setSpacing(4)
+        caixa.addWidget(self.divisor, 1)
+        caixa.addWidget(self.linha)
+        self.setCentralWidget(centro)
         self.arranjo = "lado_a_lado"
 
         self.inspetor = PainelDoInspetor(ControladorDaFila.MODOS,
@@ -199,11 +216,21 @@ class EspacoDeTrabalho:
         self._tamanhos_padrao()
         QTimer.singleShot(0, self._tamanhos_padrao)
 
+    def alternar_linha(self, mostrar: Optional[bool] = None) -> None:
+        """Ctrl+F5: mostra ou esconde a faixa Linha (`mostrar`, o estado da ação marcável)."""
+        self.linha.setVisible((not self.linha.isVisible()) if mostrar is None else bool(mostrar))
+        self._mostrar_a_linha()
+
+    def _altura_da_linha(self) -> None:
+        """80 px até 1080 de altura de tela útil, 96 acima (§3.1)."""
+        self.linha.setFixedHeight(96 if self.height() >= 1000 else 80)
+
     def _tamanhos_padrao(self) -> None:
         """A tabela de §3.1: o Inspetor com 296 px até 1600 de largura e 320 a partir dela,
         a gaveta com 150, e o resto entre a Imagem e a vista direita, 53% e 47% (760 e 680
         em 1920; 558 e 500 em 1366)."""
         largura = self.width()
+        self._altura_da_linha()
         inspetor = TAMANHOS[1920 if largura >= LARGURA_DA_GAVETA else 1366][3]
         paginas = TAMANHOS[1920][0] if self.doca_paginas.isVisible() else 0
         self.resizeDocks([self.doca_inspetor], [inspetor], Qt.Orientation.Horizontal)
@@ -285,6 +312,63 @@ class EspacoDeTrabalho:
                 self._foco_antes_dos_resultados = QApplication.focusWidget()
             self.mostrar_resultados()
             self.resultados.focar()
+
+    def _no_documento(self) -> bool:
+        foco = QApplication.focusWidget()
+        return foco is not None and (foco is self.texto or self.texto.isAncestorOf(foco))
+
+    def aproximar(self) -> None:
+        """Ctrl++: aumenta o corpo do Documento, com o foco nele; senão aproxima a Imagem."""
+        self.texto.mudar_corpo(+1) if self._no_documento() else self.visor.zoom_mais()
+
+    def afastar(self) -> None:
+        self.texto.mudar_corpo(-1) if self._no_documento() else self.visor.zoom_menos()
+
+    def zoom_padrao(self) -> None:
+        """Ctrl+0: o corpo padrão no Documento; a página inteira na Imagem."""
+        self.texto.mudar_corpo(0) if self._no_documento() else self.visor.zoom_pagina()
+
+    # ------------------------------------------------------------------
+    # A sincronia (§6.2): o Documento, a Imagem, a Linha e a fila
+    # ------------------------------------------------------------------
+    def _indices(self, gids) -> list:
+        p = self.pagina
+        return [i for i in (p.indice_de(g) for g in gids) if i is not None]
+
+    def _documento_clicado(self, gid: int, gids: list) -> None:
+        """O clique numa palavra do Documento: os glifos dela destacados na Imagem (CA-6.1) e
+        o glifo clicado no Glifo do Inspetor (ação explícita)."""
+        self._palavra_do_documento(gids)
+        if self.pagina.indice_de(gid) is not None:
+            self.inspetor.mostrar("glifo")
+            self.pagina.escolher(gid)
+
+    def _palavra_do_documento(self, gids: list) -> None:
+        """O cursor do Documento numa palavra: ela destacada na Imagem e na Linha; com Seguir,
+        a Imagem rola até ela."""
+        indices = self._indices(gids)
+        if not indices:
+            return
+        caixa = vf.caixa_da_palavra(self.pagina.boxes, indices)
+        self.visor.marcar_palavra(caixa)
+        if self.acao_seguir.isChecked():
+            self.visor.mostrar_caixa(caixa)
+        self._mostrar_a_linha(gids[0])
+
+    def _mostrar_a_linha(self, gid=None) -> None:
+        """A faixa Linha com a linha do glifo (o atual, se nenhum é dado)."""
+        p = self.pagina
+        gid = p.atual if gid is None else gid
+        if not self.linha.isVisible() or gid is None or p.matriz is None:
+            self.linha.limpar()
+            return
+        linha = [g for g in self.texto.linha_de(gid) if p.indice_de(g) is not None]
+        if not linha:
+            self.linha.limpar()
+            return
+        boxes = p.boxes
+        self.linha.mostrar(p.matriz, [boxes[p.indice_de(g)] for g in linha],
+                           linha.index(gid) if gid in linha else None)
 
     def painel_com_o_foco(self) -> int:
         """O número do Alt+N do painel com o foco (0: nenhum)."""

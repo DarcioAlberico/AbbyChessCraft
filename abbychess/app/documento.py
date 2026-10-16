@@ -1,0 +1,383 @@
+"""O Documento (SPEC §6.1, §6.2): a página reconhecida, montada num `QTextDocument`.
+
+- **De onde vem**: do documento derivado (`abbychess.texto.montar`), no modo `impresso`
+  (♘ como impresso). Cada bloco do documento vira um parágrafo, com as linhas refluídas; os
+  títulos em título, cabeçalho, rodapé e número de página em cinza pequeno (Ctrl+Shift+H os
+  oculta), as notas em corpo menor.
+- **O mapa posição → gid** fica no `QTextBlockUserData` de cada parágrafo (uma lista com o
+  gid de cada caractere, -1 nos espaços), não num `QTextCharFormat` por glifo: a coleção de
+  formatos do documento não libera e vazaria a cada montagem (§6.2).
+- **Os diagramas** entram inline e atômicos: o desenho da posição lida (ou o recorte da
+  página, se não lida), a linha dele em monoespaçado, o estado e "Copiar FEN".
+- **O realce** (liga e desliga): baixa confiança com fundo laranja-claro, fora do léxico com
+  ondulado, glifo virtual com pontilhado, aguardando leitura em cinza; manual e revisado sem
+  realce.
+- **Somente leitura** até o passo D1, que traz a edição.
+
+Montar de novo (uma edição, a propagação) não perde o lugar: o cursor volta ao mesmo gid e a
+rolagem fica onde estava (CA-6.5).
+"""
+
+from __future__ import annotations
+
+from typing import Dict, Iterable, List, Optional, Sequence, Set
+
+import numpy as np
+from PySide6.QtCore import QRectF, Qt, QUrl, Signal
+from PySide6.QtGui import (QColor, QFont, QGuiApplication, QImage, QPainter, QPen, QTextBlockFormat,
+                           QTextBlockUserData, QTextCharFormat, QTextCursor, QTextDocument,
+                           QTextImageFormat)
+from PySide6.QtWidgets import QTextEdit
+
+from abbychess import grade as gd
+from abbychess import texto as tx
+from abbychess.app import estilo
+from abbychess.app.imagens import pixmap_de_cinza
+
+FONTE = "Segoe UI Symbol"
+MONO = "Consolas"
+CORPO_PADRAO = 11
+CORPO_MINIMO, CORPO_MAXIMO = 7, 28
+#: As funções em cinza pequeno, que Ctrl+Shift+H oculta.
+MARGENS = {"cabecalho", "rodape", "numero_de_pagina"}
+FUNDO_DE_BAIXA_CONFIANCA = QColor(255, 226, 184)
+#: A figurina de cada peça no desenho do diagrama.
+FIGURINAS = {"K": "♔", "Q": "♕", "R": "♖", "B": "♗", "N": "♘", "P": "♙",
+             "k": "♚", "q": "♛", "r": "♜", "b": "♝", "n": "♞", "p": "♟"}
+LADO_DA_CASA = 22
+
+
+class _MapaDoBloco(QTextBlockUserData):
+    """O gid de cada caractere do parágrafo (-1 onde não há glifo) e, se o parágrafo é um
+    diagrama, o id dele."""
+
+    def __init__(self, gids: List[int], diagrama_id: Optional[str] = None):
+        super().__init__()
+        self.gids = gids
+        self.diagrama_id = diagrama_id
+
+
+def imagem_do_diagrama(diagrama, matriz: Optional[np.ndarray]) -> QImage:
+    """A posição lida desenhada (casas e figurinas); sem leitura, o recorte da página."""
+    if not diagrama.lido:
+        if matriz is None:
+            imagem = QImage(8 * LADO_DA_CASA, 8 * LADO_DA_CASA, QImage.Format.Format_RGB32)
+            imagem.fill(QColor(240, 240, 240))
+            return imagem
+        x1, y1, x2, y2 = (int(v) for v in diagrama.caixa)
+        recorte = pixmap_de_cinza(matriz[max(0, y1):y2, max(0, x1):x2]).toImage()
+        return recorte.scaledToHeight(8 * LADO_DA_CASA, Qt.TransformationMode.SmoothTransformation)
+    lado = LADO_DA_CASA
+    imagem = QImage(8 * lado + 2, 8 * lado + 2, QImage.Format.Format_RGB32)
+    imagem.fill(QColor(255, 255, 255))
+    pintor = QPainter(imagem)
+    pintor.setRenderHint(QPainter.RenderHint.Antialiasing)
+    pintor.setFont(QFont(FONTE, int(lado * 0.62)))
+    for n, casa in enumerate(diagrama.casas[:64]):
+        linha, coluna = divmod(n, 8)
+        retangulo = QRectF(1 + coluna * lado, 1 + linha * lado, lado, lado)
+        if (linha + coluna) % 2:
+            pintor.fillRect(retangulo, QColor(181, 196, 166))
+        if casa.simbolo:
+            pintor.setPen(QColor(0, 0, 0))
+            pintor.drawText(retangulo, Qt.AlignmentFlag.AlignCenter, FIGURINAS.get(casa.simbolo, "?"))
+    pintor.setPen(QPen(QColor(90, 90, 90)))
+    pintor.drawRect(QRectF(0.5, 0.5, 8 * lado + 1, 8 * lado + 1))
+    pintor.end()
+    return imagem
+
+
+def estado_do_diagrama(diagrama) -> str:
+    if diagrama.conferido:
+        return "conferido"
+    if diagrama.lido:
+        return "lido, não conferido"
+    return "não lido"
+
+
+class VistaDoDocumento(QTextEdit):
+    #: O clique num glifo: o gid dele e os gids da palavra.
+    glifo_clicado = Signal(int, list)
+    #: O cursor andou (teclado ou clique) para a palavra destes gids.
+    cursor_na_palavra = Signal(list)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setReadOnly(True)                  # a edição é do passo D1
+        self.setUndoRedoEnabled(False)
+        self.setTabChangesFocus(True)
+        self.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse
+                                     | Qt.TextInteractionFlag.TextSelectableByKeyboard
+                                     | Qt.TextInteractionFlag.LinksAccessibleByMouse)
+        self.setAccessibleName("Documento: o texto reconhecido da página")
+        self.realce = True
+        self.mostrar_margens = True
+        self.corpo = CORPO_PADRAO
+        self._diagramas: Dict[str, object] = {}
+        self._linha_do_gid: Dict[int, List[int]] = {}
+        self._palavra_do_gid: Dict[int, List[int]] = {}
+        self._movendo = False                   # o cursor posto pelo programa não avisa
+        self._entrada = None                     # o que a última montagem recebeu
+        self.cursorPositionChanged.connect(self._cursor_mudou)
+
+    # ------------------------------------------------------------------
+    # Montar
+    # ------------------------------------------------------------------
+    def montar(self, documento: Optional[tx.Documento], diagramas: Sequence = (),
+               estados: Optional[Dict[int, str]] = None, desconhecidos: Iterable[int] = (),
+               virtuais: Iterable[int] = (), matriz: Optional[np.ndarray] = None) -> None:
+        """O documento da página. Sem documento (página não lida), fica vazio."""
+        self._entrada = (documento, list(diagramas), dict(estados or {}), set(desconhecidos),
+                         set(virtuais), matriz)
+        gid_do_cursor = self.gid_no_cursor()
+        rolagem = self.verticalScrollBar().value()
+        novo = QTextDocument(self)
+        novo.setDefaultFont(QFont(FONTE, self.corpo))
+        self._linha_do_gid, self._palavra_do_gid = {}, {}
+        if documento is not None:
+            self._preencher(novo, *self._entrada)
+        self._movendo = True
+        try:
+            self.setDocument(novo)
+            if gid_do_cursor is not None:
+                self.ir_ao_gid(gid_do_cursor, rolar=False)
+            self.verticalScrollBar().setValue(rolagem)
+        finally:
+            self._movendo = False
+
+    def remontar(self) -> None:
+        """A mesma página, com o realce, as margens ou o corpo de agora."""
+        if self._entrada is not None:
+            self.montar(*self._entrada)
+
+    def _preencher(self, doc, documento, diagramas, estados, desconhecidos, virtuais, matriz):
+        normal = tx._normalizador(tx.IMPRESSO)
+        self._diagramas = {d.id: d for d in diagramas}
+        numero = {d.id: k for k, d in enumerate(sorted(diagramas, key=lambda d: (d.caixa[1], d.caixa[0])),
+                                                start=1)}
+        cursor = QTextCursor(doc)
+        primeiro = True
+        for bloco in documento.blocos:
+            if bloco.funcao in MARGENS and not self.mostrar_margens:
+                continue
+            if not primeiro:
+                cursor.insertBlock()
+            primeiro = False
+            cursor.setBlockFormat(self._formato_do_bloco(bloco.funcao))
+            if bloco.diagrama_id is not None:
+                self._por_diagrama(doc, cursor, self._diagramas.get(bloco.diagrama_id),
+                                   numero.get(bloco.diagrama_id, 0), matriz)
+                continue
+            base = self._formato_do_caractere(bloco.funcao)
+            gids: List[int] = []
+            corrida, formato_da_corrida = [], None
+
+            def escrever():
+                if corrida:
+                    cursor.insertText("".join(corrida), formato_da_corrida)
+                    corrida.clear()
+
+            for n_linha, linha in enumerate(bloco.linhas):
+                gids_da_linha = [g for p in linha.palavras for g in p.gids]
+                for n_palavra, palavra in enumerate(linha.palavras):
+                    if n_linha or n_palavra:
+                        if formato_da_corrida is not base:
+                            escrever()
+                            formato_da_corrida = base
+                        corrida.append(" ")
+                        gids.append(-1)
+                    for g in palavra.gids:
+                        self._linha_do_gid[g] = gids_da_linha
+                        self._palavra_do_gid[g] = list(palavra.gids)
+                        letras = normal(documento.chars.get(g, "")) or "□"
+                        formato = self._formato_do_glifo(base, estados.get(g), g in desconhecidos,
+                                                         g in virtuais)
+                        if formato is not formato_da_corrida:
+                            escrever()
+                            formato_da_corrida = formato
+                        corrida.append(letras)
+                        gids.extend([g] * len(letras))
+            escrever()
+            cursor.block().setUserData(_MapaDoBloco(gids))
+
+    def _por_diagrama(self, doc, cursor, diagrama, numero: int, matriz) -> None:
+        if diagrama is None:
+            cursor.block().setUserData(_MapaDoBloco([]))
+            return
+        nome = f"diagrama:{diagrama.id}"
+        doc.addResource(QTextDocument.ResourceType.ImageResource, QUrl(nome),
+                        imagem_do_diagrama(diagrama, matriz))
+        formato = QTextImageFormat()
+        formato.setName(nome)
+        cursor.insertImage(formato)
+        mono = QTextCharFormat()
+        mono.setFont(QFont(MONO, max(CORPO_MINIMO, self.corpo - 2)))
+        cursor.insertText(" " + diagrama.linha_de_texto(numero), mono)
+        estado = QTextCharFormat()
+        estado.setForeground(estilo.CINZA)
+        cursor.insertText(f" {estado_do_diagrama(diagrama)}", estado)
+        if diagrama.lido:
+            ligacao = QTextCharFormat()
+            ligacao.setAnchor(True)
+            ligacao.setAnchorHref(f"copiar-fen:{diagrama.id}")
+            ligacao.setForeground(estilo.AZUL)
+            ligacao.setFontUnderline(True)
+            cursor.insertText(" · ", estado)
+            cursor.insertText("Copiar FEN", ligacao)
+        texto = cursor.block().text()
+        cursor.block().setUserData(_MapaDoBloco([-1] * len(texto), diagrama.id))
+
+    def _formato_do_bloco(self, funcao: str) -> QTextBlockFormat:
+        formato = QTextBlockFormat()
+        formato.setBottomMargin(self.corpo * 0.6)
+        if funcao == "titulo":
+            formato.setTopMargin(self.corpo * 0.6)
+        return formato
+
+    def _formato_do_caractere(self, funcao: str) -> QTextCharFormat:
+        formato = QTextCharFormat()
+        if funcao == "titulo":
+            formato.setFontWeight(QFont.Weight.Bold)
+            formato.setFontPointSize(self.corpo * 1.3)
+        elif funcao in MARGENS:
+            formato.setForeground(estilo.CINZA)
+            formato.setFontPointSize(max(CORPO_MINIMO, self.corpo * 0.8))
+        elif funcao == "nota":
+            formato.setFontPointSize(max(CORPO_MINIMO, self.corpo * 0.85))
+        return formato
+
+    def _formato_do_glifo(self, base: QTextCharFormat, estado: Optional[str], desconhecido: bool,
+                          virtual: bool) -> QTextCharFormat:
+        """O formato do glifo pelo realce; o `base` (o mesmo objeto) quando não há realce, para
+        as corridas de texto seguido ficarem numa inserção só."""
+        if not self.realce or not (desconhecido or virtual
+                                   or estado in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO)):
+            return base
+        chave = (id(base), estado, desconhecido, virtual)
+        cache = getattr(self, "_formatos", None)
+        if cache is None or cache[0] is not base:
+            cache = self._formatos = (base, {})
+        if chave in cache[1]:
+            return cache[1][chave]
+        formato = QTextCharFormat(base)
+        if estado in (gd.PENDENTE, gd.SEM_LEITURA):
+            formato.setBackground(FUNDO_DE_BAIXA_CONFIANCA)
+        elif estado == gd.AGUARDANDO:
+            formato.setForeground(estilo.CINZA)
+        if desconhecido:
+            formato.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
+            formato.setUnderlineColor(estilo.VERMELHAO)
+        elif virtual:
+            formato.setUnderlineStyle(QTextCharFormat.UnderlineStyle.DotLine)
+            formato.setUnderlineColor(estilo.AZUL)
+        cache[1][chave] = formato
+        return formato
+
+    # ------------------------------------------------------------------
+    # O mapa
+    # ------------------------------------------------------------------
+    def gid_na_posicao(self, posicao: int) -> Optional[int]:
+        bloco = self.document().findBlock(posicao)
+        mapa = bloco.userData() if bloco.isValid() else None
+        if not isinstance(mapa, _MapaDoBloco):
+            return None
+        i = posicao - bloco.position()
+        for k in (i, i - 1):                    # o cursor fica entre dois caracteres
+            if 0 <= k < len(mapa.gids) and mapa.gids[k] >= 0:
+                return mapa.gids[k]
+        return None
+
+    def gid_no_cursor(self) -> Optional[int]:
+        if self.document().isEmpty():
+            return None
+        return self.gid_na_posicao(self.textCursor().position())
+
+    def posicao_do_gid(self, gid: int) -> Optional[int]:
+        bloco = self.document().begin()
+        while bloco.isValid():
+            mapa = bloco.userData()
+            if isinstance(mapa, _MapaDoBloco) and gid in mapa.gids:
+                return bloco.position() + mapa.gids.index(gid)
+            bloco = bloco.next()
+        return None
+
+    def palavra_de(self, gid: int) -> List[int]:
+        return list(self._palavra_do_gid.get(gid, []))
+
+    def linha_de(self, gid: int) -> List[int]:
+        """Os gids da linha impressa do glifo (para a faixa Linha)."""
+        return list(self._linha_do_gid.get(gid, []))
+
+    def ir_ao_gid(self, gid: Optional[int], rolar: bool = True) -> None:
+        """Põe o cursor no glifo (sem avisar: foi o programa) e, com `rolar`, o mostra."""
+        posicao = None if gid is None else self.posicao_do_gid(gid)
+        if posicao is None:
+            return
+        anterior, self._movendo = self._movendo, True
+        try:
+            cursor = self.textCursor()
+            cursor.setPosition(posicao)
+            self.setTextCursor(cursor)
+            if rolar:
+                self.ensureCursorVisible()
+        finally:
+            self._movendo = anterior
+
+    # ------------------------------------------------------------------
+    # Realce, margens, corpo
+    # ------------------------------------------------------------------
+    def definir_realce(self, sim: bool) -> None:
+        self.realce = bool(sim)
+        self.remontar()
+
+    def alternar_margens(self, mostrar: Optional[bool] = None) -> None:
+        """Ctrl+Shift+H: mostra ou oculta cabeçalhos, rodapés e números de página (`mostrar`,
+        o estado da ação marcável; sem ele, o contrário do de agora)."""
+        self.mostrar_margens = (not self.mostrar_margens) if mostrar is None else bool(mostrar)
+        self.remontar()
+
+    def mudar_corpo(self, passo: int) -> None:
+        """O zoom do Documento: o corpo do texto (passo 0 volta ao padrão)."""
+        corpo = CORPO_PADRAO if passo == 0 else self.corpo + passo
+        corpo = max(CORPO_MINIMO, min(CORPO_MAXIMO, corpo))
+        if corpo != self.corpo:
+            self.corpo = corpo
+            self.remontar()
+
+    # ------------------------------------------------------------------
+    # Eventos
+    # ------------------------------------------------------------------
+    def _cursor_mudou(self) -> None:
+        if self._movendo:
+            return
+        gid = self.gid_no_cursor()
+        if gid is not None:
+            self.cursor_na_palavra.emit(self.palavra_de(gid))
+
+    def mouseReleaseEvent(self, evento):
+        super().mouseReleaseEvent(evento)
+        if evento.button() != Qt.MouseButton.LeftButton:
+            return
+        ancora = self.anchorAt(evento.position().toPoint())
+        if ancora.startswith("copiar-fen:"):
+            self.copiar_fen(ancora.split(":", 1)[1])
+            return
+        if self.textCursor().hasSelection():
+            return
+        gid = self.gid_na_posicao(self.cursorForPosition(evento.position().toPoint()).position())
+        if gid is not None:
+            self.glifo_clicado.emit(gid, self.palavra_de(gid))
+
+    def copiar_fen(self, diagrama_id: str) -> None:
+        diagrama = self._diagramas.get(diagrama_id)
+        if diagrama is not None and diagrama.lido:
+            QGuiApplication.clipboard().setText(diagrama.fen)
+
+    def ids_dos_diagramas(self) -> Set[str]:
+        ids, bloco = set(), self.document().begin()
+        while bloco.isValid():
+            mapa = bloco.userData()
+            if isinstance(mapa, _MapaDoBloco) and mapa.diagrama_id:
+                ids.add(mapa.diagrama_id)
+            bloco = bloco.next()
+        return ids

@@ -7,7 +7,7 @@ import copy
 import pytest
 from core.box_model import BoxEntry
 
-from abbychess import procedencia
+from abbychess import modelo, procedencia
 from abbychess import texto as tx
 from abbychess.modelo import (EM_REVISAO, GLIFOS_MARCADOS, NAO_RECONHECIDA, RECONHECIDA,
                               VERIFICADA, Box, Decisoes, Estilo, GlifoVirtual, Pagina, gid_de,
@@ -112,7 +112,7 @@ def test_estado_ou_evento_desconhecido_e_erro():
 
 def test_reconciliar_mesmo_objeto_mantem_o_gid_e_ve_a_mudanca_pela_foto():
     p = _pagina(_e(0), _e(30))
-    foto = {b.gid: tuple(b.entry.as_state()) for b in p.boxes}
+    foto = {b.gid: modelo.foto(b.entry) for b in p.boxes}
     entries = p.entries()
     entries[1].char = "z"                                   # a janela muda no lugar
     novos, dif = reconciliar(p.boxes, entries, p.alocar, estados=foto)
@@ -143,7 +143,7 @@ def test_reconciliar_dividir_juntar_e_descartar_dao_os_sucessores():
 def test_reconciliar_guarda_a_amostra_de_quem_nao_mudou_e_tira_a_de_quem_mudou():
     p = _pagina(_e(0), _e(30))
     p.boxes = [Box(b.gid, b.entry, "lower_a/x.png") for b in p.boxes]
-    foto = {b.gid: tuple(b.entry.as_state()) for b in p.boxes}
+    foto = {b.gid: modelo.foto(b.entry) for b in p.boxes}
     entries = p.entries()
     entries[1].char, entries[1].source = "q", "manual"
     novos, _ = reconciliar(p.boxes, entries, p.alocar, procedencia.amostra_de, foto)

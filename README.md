@@ -53,17 +53,21 @@ letra solta em campo de texto, Ctrl+Alt e ligação nativa encoberta sem exceç�
 1. **Novo projeto** (Ctrl+N) liga um PDF ou uma imagem a uma pasta de projeto do livro.
 2. **Reconhecer página** (F5) segmenta a página, separa os diagramas do texto, lê cada glifo
    e lê cada diagrama em FEN, que entra no texto reconhecido da página.
-3. O painel de treino mostra o glifo menos confiável, ampliado e na linha em que está.
+3. O **Inspetor**, à direita, mostra o glifo menos confiável, ampliado e na linha em que
+   está (o editor Glifo; ver "O espaço de trabalho", abaixo).
    - **Enter** ensina o padrão para este livro. As repetições do mesmo glifo saem da fila na hora.
    - **Shift+Enter** corrige só esta ocorrência, sem gravar padrão.
    - **Del** tira da página um box que não é caractere.
-   - **Tab** pula para o próximo; Shift+Tab volta.
+   - **Alt+↓** pula para o próximo da fila; **Alt+↑** volta. Valem com o foco em qualquer
+     painel e nunca mudam texto (desde o passo A2; antes eram Tab e Shift+Tab, e o Tab agora
+     só anda pelo foco).
    - **Ctrl+D** divide um box que juntou dois glifos, como o "rp" da p. 27 do Darcy Lima:
      no ponto clicado no recorte ampliado ou, sem clique, no vão da tinta. As partes são
      aparadas à própria tinta, relidas, e a primeira aparece para ser ensinada.
    - **Ctrl+J** junta com o box seguinte da linha; **Ctrl+Shift+J**, com o anterior.
-   - **Alt+seta** move a borda direita ou a de baixo; **Alt+Shift+seta**, a esquerda ou a de
-     cima. O box é relido a cada passo.
+   - **Shift+seta** move a borda direita ou a de baixo; **Ctrl+Shift+seta**, a esquerda ou a
+     de cima (desde o A2; antes, Alt+seta, que agora é das páginas visitadas). Valem no campo
+     do caractere e com o foco na página. O box é relido a cada passo.
    - O botão direito sobre um box, na página, também divide no ponto e junta.
    - A paleta insere figurinas e símbolos de avaliação.
    - **Ctrl+Z** desfaz e **Ctrl+Y** (ou Ctrl+Shift+Z) refaz, também com o foco no campo do
@@ -74,7 +78,7 @@ letra solta em campo de texto, Ctrl+Alt e ligação nativa encoberta sem exceç�
      2b): o Ctrl+Z desfaz a última ação do livro, mesmo que ela tenha sido noutra página, e
      abre essa página. Desfazer um ensinar apaga do livro as amostras que ele gravou, e as
      repetições que elas tinham resolvido voltam à fila; refazer as grava de novo; desfazer
-     um esquecer devolve as amostras. Os Alt+seta seguidos no mesmo box, e os arrastes
+     um esquecer devolve as amostras. Os ajustes de borda seguidos no mesmo box, e os arrastes
      seguidos da mesma área, se desfazem de uma vez. O menu **Editar** diz o que vai ser
      desfeito. **Se algum glifo da ação mudou depois por um caminho que não passa pelo
      desfazer** (o reconhecimento em lote), o desfazer recusa e diz por quê, sem mudar nada,
@@ -90,15 +94,18 @@ letra solta em campo de texto, Ctrl+Alt e ligação nativa encoberta sem exceç�
      ainda rodando desfaz o Enter e descarta o que ela ia resolver; o refazer refaz o glifo
      e roda a propagação de novo.
    - **Uma coisa por vez, na ordem** (desde o passo 2a). Reconhecer e reler rodam fora da
-     janela, e enquanto isso o painel de treino fica desligado (a barra mostra o que está
+     janela, e enquanto isso o Glifo do Inspetor fica desligado (a barra mostra o que está
      rodando); a propagação de um Enter não o desliga. O que você pedir nesse meio-tempo,
      como um F5, um Ctrl+Z ou um "Dividir aqui" no botão direito, não se perde: entra numa
      fila, que a barra mostra ("… Na fila: Desfazendo, Reconhecendo a página"), e roda
      quando chegar a vez. Uma edição pedida numa página e que só ganha a vez depois de você
      ir para outra é descartada, com aviso.
 4. Na página seguinte, o livro já lê com os padrões ensinados.
-5. A aba **Padrões do livro** mostra cada amostra por caractere e permite esquecer as erradas.
-6. **Clicar num diagrama** abre a conferência (ver abaixo).
+5. A aba **Padrões** da vista direita mostra cada amostra por caractere e permite esquecer as
+   erradas (Alt+3 cicla as abas).
+6. **Ctrl+T** marca a página como verificada e abre a próxima não verificada (desde o A2).
+   Uma edição depois a devolve a "em revisão"; o Ctrl+Z desfaz a marca.
+7. **Clicar num diagrama** abre a conferência (ver abaixo).
 
 Os boxes na página (desde o passo A1): **o que chama o olho é o que falta revisar.** Cada
 estado tem cor e traço próprios, para não depender só da cor (a paleta Okabe-Ito, legível
@@ -110,9 +117,50 @@ para quem não distingue vermelho de verde):
 - os aceitos ficam discretos, num cinza fino. **V** liga e desliga "mostrar a origem": roxo é
   o que você confirmou, verde-azulado um padrão do livro, azul a rede ou a base global.
 
-O painel de treino tem a legenda, desenhada com o traço de cada estado. Ciano é a seleção do
+O Glifo do Inspetor tem a legenda, desenhada com o traço de cada estado. Ciano é a seleção do
 modo de treino. O tracejado do diagrama: cinza ainda não lido, laranja lido mas a conferir,
 azul lido com confiança, roxo conferido por você.
+
+### O espaço de trabalho
+
+Desde o passo A2 a janela é a do FineReader:
+
+- **Imagem e vista direita** dividem o meio, lado a lado (Ctrl+F7) ou empilhadas
+  (Ctrl+Shift+F7); **Ctrl+F6** deixa só a Imagem e **Ctrl+F8** só a vista direita. A vista
+  direita tem as abas **Documento** (até o passo A3, o texto reconhecido de antes) e
+  **Padrões**. Até 1280 px de largura o padrão é o empilhado.
+- O **Inspetor** é um editor só, o do item atual: **Glifo** (o treino) ou **Palavra** (a
+  verificação de texto). No cabeçalho, a **fila**: o modo (confiança, ordem de leitura,
+  palavras desconhecidas, diagramas por conferir) e a posição nela. **F7** passa ao modo
+  seguinte, e o seletor escolhe um. O editor só troca por um clique num item ou pelo modo da
+  fila, nunca pelo foco. No campo do caractere, Enter, Shift+Enter, Del e as setas das bordas
+  são do Glifo; **F2** abre a paleta de símbolos.
+- A gaveta de **Páginas** (**F9**) lista o livro: o número, o estado (não reconhecida, glifos
+  marcados, reconhecida, em revisão, verificada), os glifos a revisar e os diagramas por
+  conferir. Enter ou duplo clique abre a página; o filtro mostra um estado; com várias
+  selecionadas, o menu de contexto as reconhece em lote. Num projeto novo, numa janela de
+  1600 px ou mais, ela abre sozinha.
+- **Resultados / Avisos**, embaixo, guarda os avisos e os erros do projeto, com a hora, em
+  `avisos.log` (nada some com a mensagem de 5 s da barra): as falhas de gravação e de tarefa,
+  os avisos e as recusas do desfazer. O **⚠** da barra de status conta os novos e abre o
+  painel.
+- **Alt+1** a **Alt+5** levam o foco a Páginas, Imagem, vista direita (de novo: a aba
+  seguinte), Inspetor e Resultados, abrindo o painel fechado. **Esc** fecha Resultados e,
+  depois, esvazia a seleção. **Shift+F10** e a tecla **Menu** abrem o menu de contexto do
+  painel com o foco.
+- A barra de status mostra a página e o estado dela, a fila, o zoom e, no lote, o andamento
+  e o **✕** que o cancela.
+- **O arranjo é do projeto**: ao fechar, ele vai para `janela.json` (gravado inteiro ou não
+  gravado, como as páginas) e volta ao reabrir, com as docas, os tamanhos, o zoom, a aba e o
+  editor ativos, o painel com o foco e a página aberta.
+- **Ajuda › Atalhos do teclado** mostra a tabela de `docs/ATALHOS.md`, gerada de
+  `docs/atalhos.yaml`, de onde o programa registra cada atalho.
+
+**O que mudou de tecla no A2**: Tab → Alt+↓ (a fila); Ctrl+T (modo de treino) → **Ctrl+M**
+(marcar glifo à mão), e o Ctrl+T passou a "página verificada"; Alt+seta (bordas) →
+Shift+seta e Ctrl+Shift+seta; F7 (verificação) → F7 cicla o modo da fila, e a verificação é
+o modo "palavras desconhecidas"; Ctrl+I (ignorar a palavra) → Ctrl+Shift+I; Ctrl+Shift+P
+(Padrões) → Alt+3.
 
 ### A página: zoom e navegação
 
@@ -121,7 +169,7 @@ página de 2.000 boxes pinta em ~12 ms em qualquer zoom (o alvo é 33).
 
 - **Zoom** de 5% a 800%: Ctrl+roda ou Ctrl++ e Ctrl+− (no limite, a barra diz "zoom máximo"
   ou "zoom mínimo"); **Ctrl+0** página inteira, **Ctrl+9** largura da página, **Ctrl+8**
-  100%, **Ctrl+7** o glifo atual. Valem com o foco na página ou no painel de treino; o **V**,
+  100%, **Ctrl+7** o glifo atual. Valem com o foco na página ou no Glifo do Inspetor; o **V**,
   só com o foco na página (clique na margem dela), porque no campo do caractere ele é uma
   letra. A caixa de zoom da barra aceita o número; o Enter devolve
   o teclado à página. Página inteira e largura continuam valendo ao redimensionar a janela.
@@ -131,7 +179,7 @@ página de 2.000 boxes pinta em ~12 ms em qualquer zoom (o alvo é 33).
   o PgUp abre a anterior no fim.
 - **Alt+Home** e **Alt+End**: primeira e última página. **Ctrl+G**: ir para a página pedida.
   **Alt+←** e **Alt+→** voltam e avançam pelas páginas visitadas, como num navegador.
-- **Seguir** (Ctrl+Shift+L, ligado): a página rola para manter o glifo do painel de treino à
+- **Seguir** (Ctrl+Shift+L, ligado): a página rola para manter o glifo do Inspetor à
   vista, longe da borda. Desligado, a vista fica onde você a deixou. Religá-lo não leva a
   vista ao glifo na hora, só no próximo, e ele volta ligado quando o programa abre.
 - **F8**: o próximo diagrama do livro ainda por conferir (na própria página, se houver).
@@ -189,7 +237,7 @@ sempre com as pastas do projeto.
 
 ### O menu Ferramentas
 
-- **Modo de treino** (Ctrl+T): o arraste na página desenha o quadro de um glifo, em vez de
+- **Marcar glifo à mão** (Ctrl+M, desde o A2; antes Ctrl+T): o arraste na página desenha o quadro de um glifo, em vez de
   mover a página. O quadro é aparado à tinta, substitui os boxes que ficam dentro dele, é lido
   e vai para o painel, onde Enter o ensina. Funciona também numa página ainda não reconhecida:
   dá para marcar e ensinar os glifos difíceis primeiro e só então apertar F5. Na p. 27 do
@@ -200,17 +248,18 @@ sempre com as pastas do projeto.
 - **Ctrl+clique** num box, em qualquer modo, põe o box na seleção (ou o tira dela). Enter
   ensina a seleção inteira com o mesmo caractere, uma amostra por box; Shift+Enter corrige
   todos sem gravar padrão; Esc esvazia a seleção.
-- **Padrões do livro** (Ctrl+Shift+P) abre a aba das amostras.
+- **Padrões do livro** (no menu Exibir; Alt+3 cicla as abas da vista direita) abre a aba das
+  amostras.
 - **Próximo diagrama por conferir** (F8, desde o passo A1; antes era o Ctrl+G, que agora vai para uma
   página) abre a conferência no próximo diagrama do livro ainda não conferido, a começar
   pela página aberta.
 - **Reconhecer o livro** (Ctrl+Shift+F5) lê um intervalo de páginas ("26-27, 30"; vazio é o
   livro inteiro) em segundo plano, com os padrões do livro, lê os diagramas em FEN como o F5
-  e grava cada página no projeto assim que ela termina. O diagrama já conferido não é relido. A barra mostra a página em que o lote está. Enquanto ele roda, o painel de treino e as ações de reconhecer e reler ficam desligadas, e editar a página (dividir, juntar ou marcar pelo visor, desfazer, esquecer padrões, as opções) é recusado na hora, com aviso na barra: cancele o lote ou espere ele acabar. Ver as páginas continua valendo. Se o intervalo tem
+  e grava cada página no projeto assim que ela termina. O diagrama já conferido não é relido. A barra mostra a página em que o lote está. Enquanto ele roda, o Glifo do Inspetor e as ações de reconhecer e reler ficam desligadas, e editar a página (dividir, juntar ou marcar pelo visor, desfazer, esquecer padrões, as opções) é recusado na hora, com aviso na barra: cancele o lote ou espere ele acabar. Ver as páginas continua valendo. Se o intervalo tem
   páginas já lidas, ele pergunta: Sim as lê de novo (os boxes e as correções só desta
   ocorrência saem, os padrões ficam), Não as pula. **Cancelar o lote** para ao fim da leitura
   em curso; a página interrompida fica como estava e as já gravadas ficam.
-- **Próximo pendente do livro** (F6) é a fila de revisão do livro todo: mostra o pendente
+- **Próxima página com pendentes** (F6, no menu Página) é a fila de revisão do livro todo: mostra o pendente
   desta página e, quando ela acaba, abre a próxima página gravada que ainda tem glifo a
   revisar, dando a volta no livro.
 - **Editor de áreas** (Ctrl+Shift+A): as áreas da página, como as do FineReader. Ao ligar,
@@ -225,14 +274,14 @@ sempre com as pastas do projeto.
   É um modo à parte do de treino, que também usa o arraste: ligar um desliga o outro.
   **Refazer as áreas automáticas** descarta as da página e sugere de novo. Apagar todas volta
   a página à segmentação automática inteira.
-- **Verificação de texto** (F7): anda pelas palavras da página que o léxico do core não
-  conhece (`core.lexico`), na aba **Verificação**, com o recorte da palavra e os glifos dela
+- **Verificação de texto** (a fila "palavras desconhecidas", F7): anda pelas palavras da página que o léxico do core não
+  conhece (`core.lexico`), no editor **Palavra** do Inspetor, com o recorte da palavra e os glifos dela
   contornados. O léxico só aponta, nunca troca nada, e não vê notação: `Bxf6` e `exd5` não
   aparecem. **Enter** grava o texto do campo nos glifos, uma letra por glifo, e só os que
-  mudaram viram manuais; **Ctrl+Enter** também os ensina como padrões do livro. **Tab** pula,
-  **Shift+Tab** volta, **Ctrl+I** ignora a palavra nesta sessão e **Ctrl+Shift+D** a põe no
+  mudaram viram manuais; **Ctrl+Enter** também os ensina como padrões do livro. **Alt+↓** pula,
+  **Alt+↑** volta, **Ctrl+Shift+I** ignora a palavra nesta sessão e **Ctrl+Shift+D** a põe no
   dicionário do livro (`lexico.txt` do projeto). Se a palavra tem glifos de mais ou de menos,
-  o clique no glifo do recorte o abre no painel de treino, para dividir ou juntar. O léxico é
+  o clique no glifo do recorte o abre no Glifo, para dividir ou juntar. O léxico é
   o do idioma do projeto (`idioma` no `projeto.json`, português por padrão: o pacote Hunspell
   do core com os nomes próprios), mais o `.lexico.txt` que o PyBoxEditor guarda ao lado do
   PDF, só para leitura.

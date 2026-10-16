@@ -1,0 +1,17 @@
+{
+ "nome": "Fixture v1",
+ "fonte": "fonte.pdf",
+ "criado": "2026-10-16T07:23:03+00:00",
+ "limiares": {
+  "livro": 0.25,
+  "rede": 0.8,
+  "base": 0.3,
+  "revisao": 0.9
+ },
+ "idioma": "pt",
+ "versao": 1,
+ "endireitar": true,
+ "campo_do_futuro": {
+  "anotacao": "deve sobreviver"
+ }
+}

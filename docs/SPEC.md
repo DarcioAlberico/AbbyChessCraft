@@ -52,18 +52,23 @@ todo no teclado, conhecendo o FineReader.
 
 Toda meta de tempo é um **alvo**; o **corte** que reprova é alvo × 1,2 (§15.3).
 
-| Meta (p95, §15.3) | Hoje | Alvo |
-|---|---|---|
-| Trocar para página lida no cache | ~1 s | ≤ 150 ms |
-| Trocar para página lida fora do cache | ~1 s | ≤ 600 ms |
-| Enter (ensinar): box muda de cor | espera a propagação | ≤ 100 ms |
-| Releitura de um glifo (dividir, ajustar) com o lote rodando | — | ≤ 150 ms |
-| Buscar regex no livro (230 páginas, índice pronto) | não existe | ≤ 1 s |
-| Montar o índice da busca ao abrir (230 páginas) | — | ≤ 2 s, em segundo plano |
-| Atraso de evento da interface durante o lote | travada | p99 ≤ 50 ms |
-| Memória do desfazer (300 páginas × 20 ações) | centenas de MB | ≤ 50 MB |
-| Memória total com o lote rodando | — | ≤ 2,5 GB |
-| Gestos para levar as p. 21–27 ao gabarito (replay, CA-F.1) | linha de base do passo 0 | ≤ 85% depois da Fatia A; ≤ 70% depois da edição (D1) |
+| Meta (p95, §15.3) | Alvo |
+|---|---|
+| Trocar para página lida no cache | ≤ 150 ms |
+| Trocar para página lida fora do cache | ≤ 600 ms |
+| Enter (ensinar): box muda de cor | ≤ 100 ms |
+| Releitura de um glifo (dividir, ajustar) com o lote rodando | ≤ 150 ms |
+| Buscar regex no livro (230 páginas, índice pronto) | ≤ 1 s |
+| Montar o índice da busca ao abrir (230 páginas) | ≤ 2 s, em segundo plano |
+| Atraso de evento da interface durante o lote | p99 ≤ 50 ms, com as ações funcionando |
+| Memória do desfazer (300 páginas × 20 ações) | ≤ 50 MB |
+| Memória total com o lote rodando | ≤ 2,5 GB |
+| Gestos para levar as p. 21–27 ao gabarito (replay, CA-F.1) | ≤ 85% da linha de base depois do A3; ≤ 70% depois do D1 |
+
+O número de hoje de cada meta não fica aqui: ele está no JSON da medida
+(`docs/medidas/`) e na tabela que `ferramentas/resumo_medidas.py` gera no README
+("A linha de base do roadmap"). Um número digitado num documento envelhece sem aviso
+(§15.3).
 
 ## 3. O espaço de trabalho
 
@@ -196,7 +201,9 @@ Regras:
 5. **Enter confirma no contexto**: no Glifo e na Galeria, ensina; no Documento, confirma a
    palavra e avança. Ensinar fora do Glifo e da Galeria é **Ctrl+Enter**.
 6. Exceção documentada: no campo de 1 caractere do Glifo, Shift+seta e Ctrl+Shift+seta movem
-   as bordas (`ShortcutOverride` aceito), porque não há texto para selecionar.
+   as bordas e Del descarta o box (`ShortcutOverride` aceito), porque não há texto para
+   selecionar nem apagar à direita. (Hoje o Del do treino não dispara com o foco no campo:
+   achado da tabela de atalhos no passo 0.)
 
 Extrato do perfil padrão, com o que muda em relação a hoje:
 
@@ -299,7 +306,10 @@ FineReader) só passam declaradas no YAML com o motivo.
 - `projeto.json`: campo desconhecido vai para `extras` e é regravado; `versao` maior que a do
   programa abre **só para leitura**, com aviso, e nada é gravado.
 - Fonte do livro: caminho relativo quando dentro da pasta do projeto; se sumir, a abertura
-  pede para localizá-la e confere o SHA-256 dos primeiros 4 MB.
+  procura um arquivo com o mesmo SHA-256 dos primeiros 4 MB e o mesmo tamanho ao lado do
+  caminho antigo, na pasta do projeto e na pasta-mãe dele (e avisa onde o achou); se não
+  achar, pede para localizá-la e confere o SHA-256 e o tamanho. Em só leitura, a fonte achada
+  ou indicada vale só na sessão.
 - **Escrita atômica** em todo arquivo do projeto (páginas, `projeto.json`, `livro.json`,
   `inclinacoes.json`, `marcadas` migradas, `lexico.txt`, os metadados de padrões, o
   `saveState`): temporário, `fsync`, `os.replace`, com nova tentativa em `PermissionError`
@@ -318,7 +328,7 @@ FineReader) só passam declaradas no YAML com o motivo.
 |---|---|---|
 | `nao_reconhecida` | página nova | `glifos_marcados` (Ctrl+M) ou `reconhecida` (F5, lote) |
 | `glifos_marcados` | quadro marcado antes do F5 | `reconhecida` (mantém os quadros) |
-| `reconhecida` | F5 ou lote | `em_revisao` na primeira edição |
+| `reconhecida` | F5 ou lote | `em_revisao` na primeira edição (marcar um glifo também é edição); `verificada` (Ctrl+T, a página que não precisou de correção) |
 | `em_revisao` | primeira edição | `verificada` (Ctrl+T) |
 | `verificada` | Ctrl+T | `em_revisao` em qualquer edição dela, ou quando um esquecer de padrão devolve glifos dela à fila (com aviso em Avisos) |
 
@@ -823,7 +833,7 @@ dentro da meta de §2.
 - `pyproject.toml`: os marcadores; `addopts = -m "not livro_real and not desempenho and not
   processo and not noturno"`; `timeout = 60`; `[dev]` com hypothesis, pytest-qt,
   pytest-timeout, regex e psutil.
-- **Portão**: com `ABBY_PORTAO=1`, um hook (`pytest_collection_modifyitems`) transforma o
+- **Portão**: com `ABBY_PORTAO=1`, um hook (`pytest_runtest_makereport`) transforma o
   skip de `livro_real` por PDF ausente em falha.
 - `tests/conftest.py` central com a `QApplication` e as fixtures; `time.sleep` em laço vira
   `qtbot.waitUntil`.
@@ -840,12 +850,23 @@ dentro da meta de §2.
   texto, negrito); `papel` (o cinza mediano do fundo).
 - Páginas: Xadrez Vitorioso índices 20–26; Yusupov (Chess Evolution 1, um dos três PDFs da
   pasta, fixado por `pdf_sha256` no passo 0): uma de duas colunas e uma de uma; Darcy Lima
-  p. 26–27; três negativas (capa, sumário, sem diagrama).
-- `ferramentas/rotular.py` exporta a leitura atual para correção humana; outra pessoa revisa.
-  **Conferência cega**: 1 página por livro é transcrita do zero, sem a leitura, e a
-  concordância com o gabarito assistido tem de ser ≥ 99,5% dos caracteres. Mudar o gabarito
-  sobe `verdade_versao`. O texto do livro tem direito autoral: os gabaritos ficam fora de
-  qualquer publicação.
+  índices 25–26 (p. 26–27 do PDF, impressas 27–28); três negativas (capa, sumário, sem
+  diagrama).
+- `ferramentas/rotular.py` exporta a leitura atual como rascunho (`docs/protocolo-rotulagem.md`).
+  **O gabarito tem duas partes**: a **estrutura** (funções, ordem, colunas, negrito, caixas,
+  diagramas com FEN, lado, legenda e primeiros lances), rotulada pelo assistente pelas faixas
+  da página e revisada pelo usuário; e o **texto** de cada linha, que o assistente não
+  transcreve (direito autoral do livro): começa como a leitura do programa, com
+  `texto_verificado: false`, e o usuário o corrige por `texto-exportar` / `texto-importar`.
+  As medidas de texto (CER, CA-9.1, CA-F.1) só contam linhas com `texto_verificado: true`;
+  as de estrutura valem quando ela estiver revisada. Yusupov p. 33 tem uma transcrição
+  revisada pelo usuário no corpus do PyBoxEditor (`benchmarks/corpus_v2`); trazê-la para o
+  gabarito por ferramenta ficou para depois (registro do passo 0), e o usuário pode usá-la
+  ao verificar o texto.
+  **Conferência cega** (usuário ou outra pessoa): 1 página por livro transcrita do zero, sem a
+  leitura, com concordância ≥ 99,5% dos caracteres; e 1 diagrama por livro montado sem ver o
+  FEN do gabarito, que tem de dar o mesmo FEN. Mudar o gabarito sobe `verdade_versao`.
+  Os gabaritos ficam fora de qualquer publicação.
 - Métricas: P/R por função, Kendall da ordem, ligação de legenda, casas erradas no FEN, CER do
   corpo, P/R da validação pelos lances.
 
@@ -858,39 +879,51 @@ dentro da meta de §2.
   carregados (no servidor a partir do passo E; antes, no próprio processo, marcado no JSON
   da medida), PDF já lido uma vez.
 - Enter: do `keyClick` à mudança de cor do box no item.
-- Memória do desfazer: `tracemalloc` do histórico depois de roteiro fixo (300 páginas
-  sintéticas × 20 ações). Memória total: soma do RSS de interface e servidor (`psutil`) no
+- Memória do desfazer: o que o histórico prende (`tracemalloc` ligado antes, o que se
+  libera ao esvaziá-lo) num roteiro fixo de 60 ações em 3 páginas reais, extrapolado para
+  300 páginas × 20 ações (declarado no JSON). Memória total: soma do RSS de interface e servidor (`psutil`) no
   pico de um lote de 20 páginas.
-- Cada execução grava `docs/medidas/AAAA-MM-DD.json` (CPU, RAM, versões de Python, PySide6,
+- Cada execução grava `docs/medidas/AAAA-MM-DD-<rótulo>.json` (`-linha-de-base`,
+  `-qualidade-<livro>`, `-fatia-<livro>-passo-<passo>`; com a hora no nome se já houver um
+  do dia, salvo `ABBY_SOBRESCREVER_MEDIDA=1`) (CPU, RAM, versões de Python, PySide6,
   PyMuPDF, torch, threads, commit). Falha só na máquina cadastrada em
   `docs/medidas/maquina.json`; noutra, só reporta.
-- `ferramentas/medir.py --livro xv --paginas 21-27` gera o JSON que o README cita; nenhum
-  número é digitado à mão no README.
+- `ferramentas/medir.py --livro xv --indices 0,7,20-26` (as páginas da fatia e duas
+  negativas) gera o JSON que o README cita; nenhum número é digitado à mão no README.
 
 ### 15.4 A medida da fatia
 
 **CA-F.1** [livro_real] A partir de `tests/dados/fatia/xv-i020-026-inicial.zip` (projeto
-reconhecido, padrões vazios, SHA-256 fixado), `ferramentas/replay_fatia.py` leva as páginas
-ao gabarito (CER 0 nas `linhas_corpo`, FEN conferidos), dirigido por QTest: percorre as
-diferenças snapshot → gabarito na ordem de leitura e, para cada uma, escolhe o comando de
-menor custo em `ferramentas/replay/comandos.yaml` (catálogo versionado: comando, passo em que
-existe, custo em gestos). O mesmo algoritmo e o mesmo catálogo, filtrado por `passo ≤
-atual`, rodam na linha de base e depois; um teste confere que o custo declarado de cada
-comando é igual aos gestos contados; o catálogo passa pela revisão de produto. O número de gestos (`keyPress` e `mousePress`
-contados por filtro de eventos, com a divisão por painel registrada) é ≤ 85% do mesmo replay
-na linha de base depois da Fatia A, e ≤ 70% depois do passo D1.
+reconhecido, padrões vazios, SHA-256 fixado), `ferramentas/replay_fatia.py` **simula** as
+correções que levam as páginas ao gabarito (as `linhas_corpo` verificadas e os diagramas):
+percorre as diferenças snapshot → gabarito na ordem de leitura e, para cada uma, aplica no
+núcleo do programa o comando de menor custo de `ferramentas/replay/comandos.yaml`
+(catálogo versionado: comando, passo em que existe, custo em gestos) e soma o custo
+declarado. O custo de cada comando é conferido contra a interface real por
+`tests/test_custo_dos_comandos.py`: QTest e um filtro de eventos que conta cliques, teclas
+que não são modificador e atalhos disparados. O mesmo algoritmo e o mesmo catálogo,
+filtrado por `passo ≤ atual`, rodam na linha de base e depois; o que nenhum comando do passo
+corrige entra com o custo fixo de "impossível" declarado no catálogo. A linha de base é
+sempre medida com o código da tag `passo-0` (o replay chama o núcleo, que muda); duas
+medidas só se comparam com o mesmo snapshot, catálogo e versões dos gabaritos. O total
+`gestos` (com os impossíveis) é ≤ 85% da linha de base depois do passo A3, e ≤ 70% depois
+do passo D1.
 **CA-F.2** (informativo, não reprova) Tempo humano pelo protocolo
-`docs/medidas/protocolo-fatia.md`: o mesmo snapshot; o tempo é o log de eventos da
-aplicação, descontados intervalos ociosos > 60 s; a linha de base num bloco de páginas e a
-medida em outro bloco equivalente, invertendo os blocos numa segunda sessão ≥ 7 dias depois;
-o resultado é segundos por erro do snapshot.
+`docs/medidas/protocolo-fatia.md`: o mesmo snapshot; o tempo vem do registro de gestos da
+aplicação (`ABBY_REGISTRO_DE_EVENTOS`, somado por `ferramentas/tempo_da_fatia.py`),
+descontados intervalos ociosos > 60 s; a linha de base num bloco de páginas, no programa da
+tag `passo-0`, e a medida em outro bloco equivalente, invertendo os blocos numa segunda
+sessão ≥ 7 dias depois; o resultado é segundos por erro do snapshot.
 
 ## 16. As revisões
 
 Cada passo do roadmap fecha com três revisões independentes: **código** (correção,
 simplicidade, testes); **produto e design** (com as capturas de CA-13.2, contra §1 e §2);
-**medição** (`ferramentas/medir.py` e as camadas `livro_real` e `desempenho`). Aprovação:
-nota ≥ 8 em correção, produtividade, layout e testes; abaixo, o passo volta. Registro em
+**medição** (`ferramentas/medir.py` e as camadas `livro_real` e `desempenho`). Os eixos
+de nota são os de cada revisão: correção, simplicidade e testes (código); completude,
+fidelidade das medidas e clareza para o usuário (produto e medição), mais produtividade e
+layout quando o passo mexe na interface. Aprovação: nota ≥ 8 em todos; abaixo, o passo
+volta. Registro em
 `docs/revisoes/`.
 
 ## 17. Fora do escopo

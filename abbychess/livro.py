@@ -164,7 +164,8 @@ def _reconhecer_uma(projeto, fonte, leitor, indice, cancelado) -> pg.ResumoDaLei
     if cancelado():
         raise Cancelado
     diagramas = dg.mesclar(lidos, projeto.carregar_diagramas(indice))
-    projeto.salvar_pagina(indice, segmentada.boxes, segmentada.tabuleiros, diagramas)
+    projeto.salvar_pagina(indice, segmentada.boxes, segmentada.tabuleiros, diagramas,
+                          reconheceu=True)
     resumo.diagramas = sum(d.lido for d in diagramas)
     return resumo
 

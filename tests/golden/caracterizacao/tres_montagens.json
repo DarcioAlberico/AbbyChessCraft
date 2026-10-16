@@ -1,0 +1,11 @@
+{
+ "pagina.texto": "As brancas jogam 1.Nf3 e o pre-\nto responde com 1...e5 logo.\nNovo paragrafo depois do vao.",
+ "diagramas.texto_da_pagina": "As brancas jogam 1.Nf3 e o pre-\nto responde com 1...e5 logo.\n[Diagrama 1: ainda não lido]\nNovo paragrafo depois do vao.",
+ "exportar.paragrafos": [
+  "As brancas jogam 1.♘f3 e o preto responde com 1...e5 logo. Novo paragrafo depois do vao."
+ ],
+ "exportar.paragrafos_com_corte": [
+  "As brancas jogam 1.♘f3 e o preto responde com 1...e5 logo.",
+  "Novo paragrafo depois do vao."
+ ]
+}

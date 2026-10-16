@@ -118,8 +118,9 @@ class PainelDeVerificacao(QWidget):
         self.botao_adicionar.clicked.connect(self.adicionar.emit)
 
         dica = QLabel("O léxico só aponta: nada é trocado sem você. Notação (Bxf6, exd5) "
-                      "nunca aparece aqui. Com letras de mais ou de menos, clique no glifo "
-                      "e divida ou junte no painel de treino.")
+                      "nunca aparece aqui. Um espaço digitado separa a palavra em duas. Com "
+                      "letras de mais ou de menos, clique no glifo e divida ou junte no "
+                      "painel de treino.")
         dica.setWordWrap(True)
         dica.setStyleSheet("color: #666;")
 

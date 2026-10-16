@@ -24,6 +24,8 @@ from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
 from tests.test_janela import _esperar  # noqa: E402
 from tests.test_livro import pdf_sintetico  # noqa: E402
+from tests.janela_util import trocar_entries  # noqa: E402
+from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
 SIM = QMessageBox.StandardButton.Yes
 NAO = QMessageBox.StandardButton.No
@@ -55,11 +57,8 @@ def respostas(monkeypatch):
 def janela(app, tmp_path, respostas):
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Livro", pdf_sintetico(tmp_path))
     j = JanelaPrincipal()
-    j.projeto = projeto
-    j.fonte = pg.FonteDePaginas(projeto.fonte)
-    j.leitor = LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
-    j.seletor.setMaximum(j.fonte.total)
-    j.ir_para_pagina(0, salvar=False)
+    j.usar(projeto, pg.FonteDePaginas(projeto.fonte),
+          LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
     yield j
     j.close()
 
@@ -78,7 +77,7 @@ def test_lote_reconhece_o_intervalo_e_mostra_a_pagina_atual(app, janela, respost
     assert janela.acao_cancelar_lote.isEnabled()
     _esperar(app, janela)
     assert janela.projeto.paginas_lidas() == [0, 1]
-    assert janela.boxes, "a página aberta foi lida no lote e recarregada"
+    assert boxes(janela), "a página aberta foi lida no lote e recarregada"
     assert "Lote concluído" in janela.statusBar().currentMessage()
     assert not janela.acao_cancelar_lote.isEnabled()
     assert respostas["perguntas"] == 0  # nada lido antes: nada a perguntar
@@ -87,7 +86,7 @@ def test_lote_reconhece_o_intervalo_e_mostra_a_pagina_atual(app, janela, respost
 def test_lote_pergunta_e_pula_as_ja_lidas(app, janela, respostas):
     janela.reconhecer()
     _esperar(app, janela)
-    janela._mostrar_box(0)
+    mostrar(janela, 0)
     janela.treino.campo.setText("a")
     janela.treino._so_corrigir()
 
@@ -101,7 +100,7 @@ def test_lote_pergunta_e_pula_as_ja_lidas(app, janela, respostas):
 
 def test_cancelar_o_lote_guarda_o_que_ja_foi_lido(app, janela, respostas):
     janela.reconhecer_livro()
-    janela.cancelar_lote()
+    janela.livro.cancelar()
     _esperar(app, janela)
     assert "Lote cancelado" in janela.statusBar().currentMessage()
     assert len(janela.projeto.paginas_lidas()) < 3
@@ -111,20 +110,19 @@ def test_f6_vai_para_a_proxima_pagina_com_pendentes(app, janela):
     janela.reconhecer_livro()
     _esperar(app, janela)
     # Resolve a página 1 inteira; a 2 também, e o F6 tem de achar a 3.
-    for b in janela.boxes:
-        b.char, b.source, b.confidence = "a", FONTE_MANUAL, 1.0
-    boxes = janela.projeto.carregar_pagina(1)
-    for b in boxes:
-        b.char, b.source, b.confidence = "a", FONTE_MANUAL, 1.0
-    janela.projeto.salvar_pagina(1, boxes)
+    def resolver(e):
+        e.char, e.source, e.confidence = "a", FONTE_MANUAL, 1.0
 
-    janela.proximo_pendente_do_livro()
-    assert janela.indice_pagina == 2
-    assert janela.atual == janela._fila()[0]
+    trocar_entries(janela, 0, resolver)
+    trocar_entries(janela, 1, resolver)
+
+    janela.livro.proximo_pendente()
+    assert janela.pagina.indice == 2
+    assert atual(janela) == fila(janela)[0]
 
     # Com pendentes na página aberta, F6 fica nela.
-    janela.proximo_pendente_do_livro()
-    assert janela.indice_pagina == 2
+    janela.livro.proximo_pendente()
+    assert janela.pagina.indice == 2
 
 
 def test_exportar_epub_pela_janela(app, janela, respostas, tmp_path):

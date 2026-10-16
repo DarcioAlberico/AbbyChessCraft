@@ -23,6 +23,8 @@ from abbychess import pagina as pg
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.projeto import ProjetoDeLivro
 
+from tests.livros import PASTA_DOS_PDFS
+
 FONTE_TTF = Path("C:/Windows/Fonts/arial.ttf")
 
 #: Uma posição com roque possível dos dois lados.
@@ -41,8 +43,9 @@ def pagina_com_diagrama(caminho: Path, fen: str = FEN, legenda: str = "") -> Pat
     tabuleiro = Image.open(io.BytesIO(png)).convert("L")
     pagina = Image.new("L", (1000, 760), 255)
     desenho = ImageDraw.Draw(pagina)
-    fonte = (ImageFont.truetype(str(FONTE_TTF), 40) if FONTE_TTF.exists()
-             else ImageFont.load_default(size=40))
+    if not FONTE_TTF.exists():
+        pytest.skip("a Arial não está nesta máquina")
+    fonte = ImageFont.truetype(str(FONTE_TTF), 40)
     desenho.text((40, 30), "abc abc:", fill=0, font=fonte)
     pagina.paste(tabuleiro, (300, 110))
     if legenda:
@@ -161,7 +164,8 @@ def test_edicao_volta_com_o_que_foi_conferido():
 
 def test_json_vai_e_volta():
     d = _lido(lado="b", lado_origem=dg.LADO_DA_LEGENDA, lado_trecho="pretas jogam",
-              titulo="Diagrama 4", motivo="a peça na casa mais fraca ficou em 60%")
+              titulo="Diagrama 4", titulo_do_core="Di4", lados_de_rotulo=("abaixo",),
+              motivo="a peça na casa mais fraca ficou em 60%")
     bruto = json.loads(json.dumps(d.para_json()))
     volta = dg.DiagramaLido.de_json(bruto)
     assert volta.para_json() == d.para_json()
@@ -207,7 +211,7 @@ def test_fen_gravado_volta_com_a_pagina(projeto):
     d = _lido(caixa=caixa).conferir(_lido().edicao())
     projeto.salvar_pagina(0, boxes, [caixa], [d])
 
-    bruto = json.loads((projeto.pasta / "paginas" / "0001.json").read_text(encoding="utf-8"))
+    bruto = json.loads(projeto._arquivo_da_pagina(0).read_text(encoding="utf-8"))
     assert bruto["tabuleiros"] == [list(caixa)]
     assert bruto["diagramas"][0]["fen"] == d.fen
 
@@ -217,7 +221,7 @@ def test_fen_gravado_volta_com_a_pagina(projeto):
 
 
 def test_pagina_gravada_antes_da_leitura_abre_com_diagramas_por_ler(projeto):
-    """O formato antigo, sem a chave "diagramas", continua valendo."""
+    """O formato antigo (v1, sem a chave "diagramas") continua valendo: a página migra."""
     arquivo = projeto.pasta / "paginas" / "0001.json"
     arquivo.write_text(json.dumps({"pagina": 1, "boxes": [], "tabuleiros": [[1, 2, 401, 402]]}),
                        encoding="utf-8")
@@ -298,10 +302,11 @@ def test_sem_fim_de_frase_o_diagrama_vai_para_o_fim():
     assert dg.texto_da_pagina([], [_lido()]).startswith("[Diagrama 1:")
 
 
-_DARCY = sorted(Path("C:/Python-Chess2/PyBoxEditor_Tkinter/PDF").glob("Darcy*/Darcy*.pdf"))
+_DARCY = sorted(PASTA_DOS_PDFS.glob("Darcy*/Darcy*.pdf"))
 
 
 @sem_modelo
+@pytest.mark.livro_real
 @pytest.mark.skipif(not _DARCY, reason="o PDF do Darcy Lima não está nesta máquina")
 def test_darcy_p26_tres_diagramas_lidos_e_conferiveis():
     """Os dois sem setas saem certos; o das setas sai errado e o porteiro avisa."""
@@ -389,3 +394,50 @@ def test_legenda_sem_leitura_nos_boxes_continua_assumida(tmp_path):
     d = dg.ler_diagramas(imagem, segmentada.tabuleiros, escala=segmentada.escala,
                          boxes=segmentada.boxes)[0]
     assert d.lado is None and d.lado_origem == ""
+
+
+# ----------------------------------------------------------------------
+# O lado de novo quando a legenda muda (sem reler o tabuleiro)
+# ----------------------------------------------------------------------
+
+_CAIXA = (100, 100, 500, 500)
+
+
+def test_ensinar_a_legenda_diz_o_lado_sem_reler_o_tabuleiro():
+    antes = _legenda("Diagrama 5. Jo9am as pretas.", 110, 530)
+    depois = _legenda("Diagrama 5. Jogam as pretas.", 110, 530)
+    d = _lido(caixa=_CAIXA, titulo="Di5", titulo_do_core="Di5")
+
+    [novo] = dg.rederivar_lados([d], antes, depois)
+
+    assert (novo.lado, novo.lado_origem, novo.lado_trecho) == ("b", dg.LADO_DA_LEGENDA,
+                                                               "jogam as pretas")
+    assert novo.titulo == "Diagrama 5. Jogam as pretas."
+    assert novo.casas is d.casas and novo.fen.split()[1] == "b"
+    # Desfeita a correção, a legenda não diz mais nada: vale o título do core.
+    [volta] = dg.rederivar_lados([novo], depois, antes)
+    assert (volta.lado, volta.lado_origem, volta.lado_trecho, volta.titulo) == (None, "", "", "Di5")
+
+
+def test_titulo_do_core_vale_quando_a_legenda_dos_boxes_nao_diz():
+    antes = _legenda("Diagrama 5. Jogam as pretas.", 110, 530)
+    depois = _legenda("Diagrama 5. Jo9am as pretas.", 110, 530)
+    d = _lido(caixa=_CAIXA, lado="b", lado_origem=dg.LADO_DA_LEGENDA,
+              titulo="Diagrama 5. Jogam as pretas.", titulo_do_core="brancas jogam")
+    [novo] = dg.rederivar_lados([d], antes, depois)
+    assert (novo.lado, novo.lado_origem, novo.titulo) == ("w", dg.LADO_DA_LEGENDA, "brancas jogam")
+
+
+def test_conferido_informado_e_legenda_que_nao_mudou_ficam_como_estao():
+    antes = _legenda("Diagrama 5. Jo9am as pretas.", 110, 530)
+    depois = _legenda("Diagrama 5. Jogam as pretas.", 110, 530)
+    conferido = _lido(caixa=_CAIXA, conferido=True)
+    informado = _lido(caixa=_CAIXA, lado="w", lado_origem=dg.LADO_DO_USUARIO)
+    por_ler = dg.DiagramaLido(_CAIXA)
+    rotulos_abaixo = _lido(caixa=_CAIXA, lados_de_rotulo=("abaixo",))
+    diagramas = [conferido, informado, por_ler, rotulos_abaixo]
+
+    assert all(a is b for a, b in zip(dg.rederivar_lados(diagramas, antes, depois), diagramas))
+    # A mesma legenda antes e depois: nada é relido, mesmo o que diria outro lado.
+    assumido = _lido(caixa=_CAIXA)
+    assert dg.rederivar_lados([assumido], depois, list(depois))[0] is assumido

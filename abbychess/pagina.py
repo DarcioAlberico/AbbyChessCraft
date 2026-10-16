@@ -21,6 +21,9 @@ from core import proporcao, vertical
 from core.box_model import BoxEntry
 from core.services.box_service import BoxService
 
+from abbychess import gravacao as gv
+from abbychess import procedencia
+
 from abbychess.leitor import (FONTE_MANUAL, LeitorDoLivro, nome_de_origem,
                               precisa_revisao)
 from abbychess.projeto import EXTENSOES_DE_IMAGEM, ProjetoDeLivro
@@ -106,9 +109,11 @@ class FonteDePaginas:
     """
 
     def __init__(self, caminho: str | Path, *, endireitar: bool = False,
-                 pasta: Optional[str | Path] = None):
+                 pasta: Optional[str | Path] = None, somente_leitura: bool = False):
         self.caminho = Path(caminho)
         self.endireitar = endireitar
+        #: Projeto só para leitura: lê as inclinações gravadas, mas não grava as novas.
+        self.somente_leitura = somente_leitura
         self._arquivo_das_inclinacoes = Path(pasta) / ARQUIVO_DE_INCLINACOES if pasta else None
         self._inclinacoes: dict = {}
         if self._arquivo_das_inclinacoes is not None and self._arquivo_das_inclinacoes.is_file():
@@ -157,10 +162,9 @@ class FonteDePaginas:
         if indice not in self._inclinacoes:
             imagem = imagem if imagem is not None else self.original(indice)
             self._inclinacoes[indice] = medir_inclinacao(np.asarray(imagem.convert("L")))
-            if self._arquivo_das_inclinacoes is not None:
-                self._arquivo_das_inclinacoes.write_text(
-                    json.dumps({str(k): v for k, v in sorted(self._inclinacoes.items())},
-                               indent=1), encoding="utf-8", newline="\n")
+            if self._arquivo_das_inclinacoes is not None and not self.somente_leitura:
+                gv.gravar_json(self._arquivo_das_inclinacoes,
+                               {str(k): v for k, v in sorted(self._inclinacoes.items())})
         angulo = self._inclinacoes[indice]
         return angulo if abs(angulo) >= INCLINACAO_MINIMA else 0.0
 
@@ -168,7 +172,7 @@ class FonteDePaginas:
 def fonte_do_projeto(projeto: ProjetoDeLivro) -> FonteDePaginas:
     """As páginas do livro como o projeto as lê: endireitadas, se ele nasceu assim."""
     return FonteDePaginas(projeto.fonte, endireitar=projeto.dados.endireitar,
-                          pasta=projeto.pasta)
+                          pasta=projeto.pasta, somente_leitura=projeto.somente_leitura)
 
 
 @dataclass
@@ -297,6 +301,7 @@ def _ler_um(pagina: np.ndarray, box: BoxEntry, leitor: LeitorDoLivro,
             referencia: Optional[float]) -> None:
     leitura = leitor.ler(vertical.recorte_de_pe(pagina, box), altura_de_referencia=referencia)
     box.char, box.source, box.confidence = leitura.char, leitura.fonte, leitura.confianca
+    procedencia.registrar(box, leitura.amostra)
 
 
 def _reler(imagem: Image.Image, boxes: List[BoxEntry], indices: List[int],
@@ -330,24 +335,33 @@ def fila_de_revisao(boxes: List[BoxEntry], leitor: LeitorDoLivro) -> List[int]:
 
 def ensinar(imagem: Image.Image, boxes: List[BoxEntry], indice: int, char: str,
             leitor: LeitorDoLivro, projeto: ProjetoDeLivro, pagina: int, *,
-            propagar: bool = True) -> int:
+            propagar: bool = True, gid: Optional[int] = None) -> int:
     """Ensina o box como `char` neste livro e propaga o padrão pela página.
 
     O box ensinado vira manual. Com `propagar`, os boxes ainda pendentes são
     comparados com os padrões do livro, e os que forem o mesmo glifo passam a
     sair dele: é assim que uma correção resolve as repetições da página inteira.
     Devolve quantos pendentes deixaram de ser pendentes.
+
+    `gid` é o do glifo, que vai para o nome do padrão; a janela o dá (ela trabalha com
+    gids). Sem ele, quem trabalha com a lista (ferramentas, testes) o pede ao projeto.
+    Os boxes da lista são mudados no lugar: quem chama da janela passa cópias
+    (`edicao.copias_para_ler`).
     """
     box = boxes[indice]
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
+    if gid is None:
+        gid = projeto.gid_do_box(pagina, boxes, indice)
     leitor.ensinar(recorte(imagem, box), char, altura_de_referencia=referencia,
-                   origem=nome_de_origem(projeto.dados.nome, pagina, indice))
+                   origem=nome_de_origem(projeto.dados.nome, pagina, indice, gid))
     box.char, box.source, box.confidence = char, FONTE_MANUAL, 1.0
+    procedencia.registrar(box, procedencia.NENHUMA)     # é a origem do padrão, não cópia
     return propagar_padroes(imagem, boxes, leitor) if propagar else 0
 
 
 def ensinar_varios(imagem: Image.Image, boxes: List[BoxEntry], indices: List[int], char: str,
-                   leitor: LeitorDoLivro, projeto: ProjetoDeLivro, pagina: int) -> int:
+                   leitor: LeitorDoLivro, projeto: ProjetoDeLivro, pagina: int, *,
+                   gids: Optional[dict] = None) -> int:
     """Ensina vários boxes como o mesmo `char` e propaga uma vez só no fim.
 
     É a seleção do modo de treino: o usuário marca as ocorrências que a leitura
@@ -356,7 +370,8 @@ def ensinar_varios(imagem: Image.Image, boxes: List[BoxEntry], indices: List[int
     que uma amostra só. Devolve quantos pendentes a propagação resolveu.
     """
     for indice in sorted(set(indices)):
-        ensinar(imagem, boxes, indice, char, leitor, projeto, pagina, propagar=False)
+        ensinar(imagem, boxes, indice, char, leitor, projeto, pagina, propagar=False,
+                gid=None if gids is None else gids[indice])
     return propagar_padroes(imagem, boxes, leitor)
 
 
@@ -377,6 +392,7 @@ def propagar_padroes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorD
         leitura = leitor.ler_pelo_livro(vertical.recorte_de_pe(pagina, box), referencia)
         if leitura.char:
             box.char, box.source, box.confidence = leitura.char, leitura.fonte, leitura.confianca
+            procedencia.registrar(box, leitura.amostra)
             resolvidos += 1
     return resolvidos
 
@@ -385,6 +401,7 @@ def confirmar(boxes: List[BoxEntry], indice: int, char: str) -> None:
     """Aceita a leitura do box sem gravar padrão: corrige só esta ocorrência."""
     box = boxes[indice]
     box.char, box.source, box.confidence = char, FONTE_MANUAL, 1.0
+    procedencia.registrar(box, procedencia.NENHUMA)
 
 
 def descartar(boxes: List[BoxEntry], indice: int) -> BoxEntry:
@@ -393,10 +410,14 @@ def descartar(boxes: List[BoxEntry], indice: int) -> BoxEntry:
 
 
 def texto(boxes: List[BoxEntry]) -> str:
-    """O texto da página na ordem de leitura, pelas linhas e palavras do core."""
-    from core.notacao import texto_da_pagina
+    """O texto da página na ordem de leitura, pelas linhas e palavras do core.
 
-    return texto_da_pagina([b for b in boxes if b.char])
+    É o documento de `abbychess.texto.montar`, no modo `san` (as figurinhas como letras),
+    que é como o texto sempre saiu daqui.
+    """
+    from abbychess import texto as tx
+
+    return tx.texto(tx.montar(tx.pagina_avulsa(boxes)), modo=tx.SAN)
 
 
 # ----------------------------------------------------------------------

@@ -327,6 +327,15 @@ class Pagina:
     def entries(self) -> List[BoxEntry]:
         return [b.entry for b in self.boxes]
 
+    def instantaneo(self) -> "Pagina":
+        """A página agora, para o gravador e o desfazer: uma cópia rasa, que vale porque
+        nada da página é mudado no lugar (desde o 2a, uma edição troca as listas e os
+        objetos). Custa uma tupla por lista, não uma cópia de cada glifo."""
+        return Pagina(pid=self.pid, indice=self.indice, boxes=tuple(self.boxes),
+                      tabuleiros=tuple(self.tabuleiros), diagramas=tuple(self.diagramas),
+                      zonas=tuple(self.zonas), decisoes=self.decisoes, estado=self.estado,
+                      proximo_n=self.proximo_n)
+
     def aplicar(self, diferenca: Diferenca, nova_ordem: Sequence[Box]) -> Diferenca:
         """Põe na página a lista de boxes depois da edição e leva as decisões aos sucessores.
 

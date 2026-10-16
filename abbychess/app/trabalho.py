@@ -1,16 +1,23 @@
-"""Trabalho pesado fora da thread da interface, uma tarefa por vez.
+"""Trabalho pesado fora da thread da interface: uma tarefa por vez, as outras na fila.
 
-Ler uma página leva segundos e carregar os modelos também; feito na thread do Qt,
-a janela congelaria. A tarefa roda num `QThreadPool` e devolve o resultado por
-sinal, que o Qt entrega na thread da interface. Uma tarefa por vez porque o
-leitor do livro não é seguro para duas threads ao mesmo tempo.
+Ler uma página leva segundos e carregar os modelos também; feito na thread do Qt, a
+janela congelaria. A tarefa roda num `QThreadPool` e devolve o resultado por sinal, que o
+Qt entrega na thread da interface. Uma por vez porque o leitor do livro não é seguro para
+duas threads ao mesmo tempo.
+
+**Nada é ignorado** (passo 2a): a tarefa pedida com outra rodando entra na fila, e a fila
+aparece na barra de status (`fila_mudou`). Cada tarefa é `preparar()`, chamado na thread
+da interface quando chega a vez dela (tira o instantâneo do que a tarefa vai usar, e
+devolve `(trabalho, pronto)`, ou None para não fazer nada), `trabalho(progresso)` fora da
+interface e `pronto(resultado)` de novo na interface (`abbychess.controlador`).
 """
 
 from __future__ import annotations
 
 import logging
 import traceback
-from typing import Any, Callable, Optional
+from collections import deque
+from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
 
@@ -40,42 +47,82 @@ class _Tarefa(QRunnable):
 
 
 class Executor(QObject):
-    """Roda uma tarefa por vez e avisa quando está ocupado."""
+    """Roda uma tarefa por vez, enfileira as outras e avisa o que está rodando e esperando."""
 
+    #: (ocupado, título da tarefa que roda)
     ocupado_mudou = Signal(bool, str)
+    #: Os títulos das tarefas que esperam a vez.
+    fila_mudou = Signal(list)
+    #: (feito, total) da tarefa que roda.
+    progresso = Signal(int, int)
 
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._pool = QThreadPool(self)
         self._pool.setMaxThreadCount(1)
-        self._ocupado = False
+        self._fila: deque = deque()
         self._tarefa: Optional[_Tarefa] = None
+        self.titulo = ""
 
     @property
     def ocupado(self) -> bool:
-        return self._ocupado
+        return self._tarefa is not None or bool(self._fila)
 
-    def rodar(self, titulo: str, funcao, ao_concluir=None, ao_falhar=None, ao_progredir=None) -> bool:
-        """Agenda `funcao(progresso)`. Devolve False se já há uma tarefa rodando."""
-        if self._ocupado:
-            return False
-        tarefa = _Tarefa(funcao)
-        if ao_progredir:
-            tarefa.sinais.progresso.connect(ao_progredir)
-        tarefa.sinais.concluido.connect(lambda r: self._fim(ao_concluir, r))
-        tarefa.sinais.falhou.connect(lambda m: self._fim(ao_falhar, m))
-        self._tarefa = tarefa  # mantém os sinais vivos até o fim
-        self._ocupado = True
-        self.ocupado_mudou.emit(True, titulo)
-        self._pool.start(tarefa)
-        return True
+    @property
+    def na_fila(self) -> List[str]:
+        return [t[0] for t in self._fila]
 
-    def _fim(self, callback, valor):
-        self._ocupado = False
-        self._tarefa = None
+    def __call__(self, titulo: str, preparar, falhou=None, progresso=None) -> None:
+        self.rodar(titulo, preparar, falhou, progresso)
+
+    def rodar(self, titulo: str, preparar, falhou=None, progresso=None) -> None:
+        """Agenda a tarefa: roda já se nada estiver rodando, senão entra na fila."""
+        self._fila.append((titulo, preparar, falhou, progresso))
+        if self._tarefa is None:
+            self._proxima()
+        else:
+            self.fila_mudou.emit(self.na_fila)
+
+    def _proxima(self) -> None:
+        while self._fila:
+            titulo, preparar, falhou, progresso = self._fila.popleft()
+            try:
+                par = preparar()
+            except Exception as erro:
+                log.exception("a preparação de %r falhou", titulo)
+                if falhou is not None:
+                    falhou(f"{erro}\n\n{traceback.format_exc(limit=3)}")
+                continue
+            if par is None:
+                continue                        # nada a fazer fora da interface
+            trabalho, pronto = par
+            tarefa = _Tarefa(trabalho)
+            tarefa.sinais.progresso.connect(self.progresso.emit)
+            if progresso is not None:
+                tarefa.sinais.progresso.connect(progresso)
+            tarefa.sinais.concluido.connect(lambda r, f=pronto: self._fim(f, r))
+            tarefa.sinais.falhou.connect(lambda m, f=falhou: self._fim(f, m))
+            self._tarefa, self.titulo = tarefa, titulo   # mantém os sinais vivos até o fim
+            self.ocupado_mudou.emit(True, titulo)
+            self.fila_mudou.emit(self.na_fila)
+            self._pool.start(tarefa)
+            return
+        self._tarefa, self.titulo = None, ""
         self.ocupado_mudou.emit(False, "")
-        if callback:
-            callback(valor)
+        self.fila_mudou.emit([])
+
+    def _fim(self, callback, valor) -> None:
+        self._tarefa = None
+        try:
+            if callback is not None:
+                callback(valor)
+        finally:
+            self._proxima()                     # um erro no fim não para a fila
+
+    def esvaziar(self) -> None:
+        """Tira da fila o que ainda não começou (ao fechar)."""
+        self._fila.clear()
+        self.fila_mudou.emit([])
 
     def esperar(self, ms: int = 30000) -> bool:
         return self._pool.waitForDone(ms)

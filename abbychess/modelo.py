@@ -347,37 +347,43 @@ def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
     a foto de antes diz se ele mudou (sem ela, vale o estado atual de `antes`).
     """
     por_objeto = {id(b.entry): b for b in antes}
-    por_caixa: Dict[tuple, List[Box]] = {}
-    for b in antes:
-        por_caixa.setdefault(_caixa(b.entry), []).append(b)
     usados: Set[int] = set()
     saida: List[Optional[Box]] = [None] * len(depois)
     dif = Diferenca()
+    estados = estados or {}
+    agora = [tuple(e.as_state()) for e in depois]           # uma vez por glifo
 
     def manter(i: int, velho: Box, entry: BoxEntry, estado_antes) -> None:
         usados.add(velho.gid)
-        mudou = tuple(entry.as_state()) != estado_antes
+        mudou = agora[i] != estado_antes
         registrada = amostra_de(entry)
         if registrada is None:              # ninguém leu este objeto desde a gravação
             amostra = None if mudou else velho.amostra
         else:
             amostra = registrada or None    # "" = lido, mas não por um padrão do livro
-        saida[i] = replace(velho, entry=entry, amostra=amostra)
+        if entry is velho.entry and amostra == velho.amostra:
+            saida[i] = velho                # o caso comum: nada a copiar
+        else:
+            saida[i] = replace(velho, entry=entry, amostra=amostra)
         if mudou:
             dif.mudados.add(velho.gid)
 
-    atuais = {b.gid: tuple(b.entry.as_state()) for b in antes}
-    estados = {**atuais, **(estados or {})}
     for i, entry in enumerate(depois):                       # 1. o mesmo objeto
         velho = por_objeto.get(id(entry))
         if velho is not None and velho.entry is entry and velho.gid not in usados:
-            manter(i, velho, entry, estados[velho.gid])
-    for i, entry in enumerate(depois):                       # 2. a mesma caixa
-        if saida[i] is not None:
-            continue
-        velho = next((b for b in por_caixa.get(_caixa(entry), []) if b.gid not in usados), None)
-        if velho is not None:
-            manter(i, velho, entry, estados[velho.gid])
+            manter(i, velho, entry, estados.get(velho.gid, agora[i]))
+    if any(s is None for s in saida):                        # 2. a mesma caixa
+        por_caixa: Dict[tuple, List[Box]] = {}
+        for b in antes:
+            if b.gid not in usados:
+                por_caixa.setdefault(_caixa(b.entry), []).append(b)
+        for i, entry in enumerate(depois):
+            if saida[i] is not None:
+                continue
+            velho = next((b for b in por_caixa.get(_caixa(entry), []) if b.gid not in usados),
+                         None)
+            if velho is not None:
+                manter(i, velho, entry, estados.get(velho.gid, tuple(velho.entry.as_state())))
     saidos = [b for b in antes if b.gid not in usados]
     for i, entry in enumerate(depois):                       # 3. nascidos
         if saida[i] is not None:

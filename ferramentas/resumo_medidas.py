@@ -211,9 +211,8 @@ def _por_passo() -> list:
         arquivo, dados = _ultimo(f"passo-{passo}")
         if dados is not None:
             colunas.append((f"{passo} (`{arquivo.name}`)", dados))
-    linhas = ["", "Desempenho por passo, em ms ou MB (uma rodada cada; entre rodadas do mesmo "
-              "código, em 2026-10-16, o Enter variou de 111 a 185 ms e a releitura de 135 a "
-              "166 ms: diferenças menores que isso não são efeito do passo):", "",
+    linhas = ["", "Desempenho por passo, em ms ou MB (uma rodada cada; quanto o mesmo código "
+              "varia de uma rodada para outra está nas rodadas repetidas, abaixo):", "",
               "| Meta | " + " | ".join(nome for nome, _ in colunas) + " |",
               "|---|" + "---|" * len(colunas)]
     for chave, campo, rotulo in metas:
@@ -222,31 +221,42 @@ def _por_passo() -> list:
     return linhas
 
 
-_REPETICAO = re.compile(r"(?P<data>\d{4}-\d{2}-\d{2})-repeticao-(?P<passo>[^-]+)-parcial"
-                        r"(?:-(?P<hora>\d{6}))?\.json")
+_REPETICAO = re.compile(r"(?P<data>\d{4}-\d{2}-\d{2})-repeticao-(?P<passo>[^-]+)"
+                        r"(?P<parcial>-parcial)?(?:-(?P<hora>\d{6}))?\.json")
+_METAS_REPETIDAS = (("troca_de_pagina", "p95_ms", "Troca, p95"),
+                    ("enter_ensinar", "p95_ms", "Enter, p95"),
+                    ("releitura_de_um_glifo", "p95_ms", "Releitura, p95"),
+                    ("atraso_durante_o_lote", "p99_ms", "Atraso no lote, p99"))
 
 
 def _repeticoes() -> list:
-    """As rodadas repetidas de uma medida (`ABBY_ROTULO_DA_MEDIDA=repeticao-<passo>`, com
-    `-k`), para separar o efeito de um passo da variação entre rodadas."""
+    """As rodadas repetidas (`ABBY_ROTULO_DA_MEDIDA=repeticao-<passo>`), para separar o efeito
+    de um passo da variação entre rodadas do mesmo código. A rodada **completa** roda o
+    módulo inteiro, na ordem da linha de base (o lote lê com os padrões que o Enter
+    ensinou); a **só do lote** (`-k atraso`, `-parcial`) lê sem eles e é outra carga."""
     grupos = {}
-    for arquivo in MEDIDAS.glob("*-repeticao-*-parcial*.json"):
+    for arquivo in MEDIDAS.glob("*-repeticao-*.json"):
         casou = _REPETICAO.fullmatch(arquivo.name)
         if casou:
             dados = json.loads(arquivo.read_text(encoding="utf-8"))
+            condicao = "só do lote, sem os padrões" if casou["parcial"] else "completa"
             ordem = (casou["data"], casou["hora"] or "")
-            grupos.setdefault(casou["passo"], []).append((ordem, dados))
+            grupos.setdefault((casou["passo"], condicao), []).append((ordem, dados))
     if not grupos:
         return []
-    linhas = ["", "Rodadas repetidas do atraso da interface durante o lote (20 páginas), em ms:",
-              "", "| Código | Commit | p99 de cada rodada | p95 de cada rodada |", "|---|---|---|---|"]
-    for passo, rodadas in sorted(grupos.items()):
+    linhas = ["", "Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou):", "",
+              "| Código | Commit | Rodada | " + " | ".join(r for _, _, r in _METAS_REPETIDAS) + " |",
+              "|---|---|---|" + "---|" * len(_METAS_REPETIDAS)]
+    for (passo, condicao), rodadas in sorted(grupos.items()):
         rodadas.sort(key=lambda r: r[0])
-        atrasos = [d["medidas"].get("atraso_durante_o_lote", {}) for _, d in rodadas]
         commits = sorted({d["ambiente"].get("commit") for _, d in rodadas})
-        linhas.append(f"| passo {passo} | {', '.join(commits)} | "
-                      f"{'; '.join(_num(a.get('p99_ms')) for a in atrasos)} | "
-                      f"{'; '.join(_num(a.get('p95_ms')) for a in atrasos)} |")
+        valores = []
+        for chave, campo, _ in _METAS_REPETIDAS:
+            serie = [d["medidas"].get(chave, {}).get(campo) for _, d in rodadas]
+            valores.append("; ".join(_num(v) for v in serie) if any(v is not None for v in serie)
+                           else "—")
+        linhas.append(f"| passo {passo} | {', '.join(commits)} | {condicao} | "
+                      + " | ".join(valores) + " |")
     return linhas
 
 

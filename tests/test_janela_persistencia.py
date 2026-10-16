@@ -184,5 +184,24 @@ def test_falha_ao_abrir_nao_deixa_a_pasta_travada(app, projeto_lido, sem_dialogo
             janela._abrir(ProjetoDeLivro.abrir(projeto_lido.pasta))
         assert not gv.protegida(projeto_lido.pasta)
     finally:
+        monkeypatch.setattr(janela, "_salvar_pagina", lambda: None)   # o close chama
+        janela.close()
+
+
+def test_limiares_que_nao_gravam_avisam_e_nao_dizem_gravados(app, projeto_lido,  # noqa: F811
+                                                            sem_dialogos, monkeypatch):
+    from abbychess.projeto import Limiares
+
+    janela = _abrir(app, projeto_lido.pasta)
+    try:
+        def falhar(*_args):
+            raise PermissionError("disco")
+
+        monkeypatch.setattr(gv, "gravar_bytes", falhar)
+        janela.aplicar_limiares(Limiares(revisao=0.5))
+        assert any("não foram gravados" in a for a in sem_dialogos)
+        assert janela.statusBar().currentMessage() == ("Limiares aplicados nesta sessão "
+                                                       "(não foram gravados).")
+    finally:
         monkeypatch.undo()
         janela.close()

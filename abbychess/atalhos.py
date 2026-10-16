@@ -61,6 +61,8 @@ def normalizar(sequencia: str) -> str:
     """
     partes, tecla = _partir(sequencia)
     mods = {m.capitalize() for m in partes}
+    if len(mods) != len(partes):
+        raise ValueError(f"modificador repetido em {sequencia!r}")
     desconhecidos = mods - set(MODIFICADORES)
     if desconhecidos:
         raise ValueError(f"modificador desconhecido em {sequencia!r}: {sorted(desconhecidos)}")
@@ -113,7 +115,10 @@ class Tabela:
     acoes: List[Acao]
 
     def da_acao(self, id_: str) -> Acao:
-        return next(a for a in self.acoes if a.id == id_)
+        acao = next((a for a in self.acoes if a.id == id_), None)
+        if acao is None:
+            raise KeyError(f"não há ação {id_!r} em {ARQUIVO.name}")
+        return acao
 
     def ativas(self, perfil: str, passo: Optional[str] = None) -> List[Tuple[Acao, List[str]]]:
         """As ações com sequência no perfil (e já registradas no `passo`, se dado)."""
@@ -141,6 +146,15 @@ def carregar(caminho: Path = ARQUIVO) -> Tabela:
         forma += [f"falta `{k}`" for k in ("id", "descricao", "desde_passo") if not item.get(k)]
         if not _lista(item.get("escopo")):
             forma.append("`escopo` vazio ou ausente")
+        excecoes = []
+        for e in item.get("excecoes") or []:
+            faltam = [k for k in ("tecla", "widget", "tipo", "motivo") if not isinstance(e, dict)
+                      or k not in e]
+            if faltam:
+                forma.append(f"exceção sem {', '.join(faltam)}")
+                continue
+            excecoes.append(Excecao(normalizar(e["tecla"]), str(e["widget"]), str(e["tipo"]),
+                                    str(e["motivo"])))
         sem = _lista(item.get("sem_atalho"))
         padrao = [normalizar(s) for s in _lista(item.get(perfis[0]))]
         sequencias = {perfis[0]: [] if perfis[0] in sem else padrao}
@@ -154,8 +168,7 @@ def carregar(caminho: Path = ARQUIVO) -> Tabela:
             id=str(item.get("id") or f"<ação {n + 1}>"), descricao=str(item.get("descricao", "")),
             escopo=_lista(item.get("escopo")), sequencias=sequencias, sem_atalho=sem,
             desde_passo=str(item.get("desde_passo", "")),
-            excecoes=[Excecao(normalizar(e["tecla"]), e["widget"], e["tipo"], e["motivo"])
-                      for e in item.get("excecoes") or []],
+            excecoes=excecoes,
             declarados=declarados, problemas_de_forma=forma))
     return Tabela(perfis, [str(p) for p in bruto["passos"]], bruto["escopos"],
                   list(bruto["widgets_da_janela"]),

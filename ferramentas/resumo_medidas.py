@@ -4,7 +4,10 @@ r"""Escreve no README as tabelas das medidas, a partir dos JSON de `docs/medidas
 
 Nenhum número das medidas é digitado à mão no README (SPEC §15.3): este script troca o
 que estiver entre `<!-- medidas:inicio -->` e `<!-- medidas:fim -->` pela tabela gerada da
-medida mais recente de cada tipo (linha de base de desempenho, qualidade por livro, fatia).
+medida mais recente de cada tipo (linha de base de desempenho, qualidade por livro, fatia
+por livro e passo). "Mais recente" é pela data e pela hora do nome do arquivo
+(`comum.ultima_medida`); os `-falhou` e `-parcial` nunca entram. O estado de cada medida
+vem do próprio JSON.
 """
 
 from __future__ import annotations
@@ -15,16 +18,26 @@ import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(RAIZ / "ferramentas"))
+
+from comum import ultima_medida  # noqa: E402
+
 MEDIDAS = RAIZ / "docs" / "medidas"
 README = RAIZ / "README.md"
 INICIO, FIM = "<!-- medidas:inicio -->", "<!-- medidas:fim -->"
+LIVROS = ("xv", "yusupov", "darcy")
+_FATIA = re.compile(r"\d{4}-\d{2}-\d{2}-fatia-(?P<livro>[^-]+)-passo-(?P<passo>[^-]+)"
+                    r"(?:-(?P<hora>\d{6}))?\.json")
+_NOMES = {"ligacao_da_legenda": "a ligação da legenda ao diagrama",
+          "precisao_e_revocacao_por_funcao": "precisão e revocação por função de bloco",
+          "validacao_pelos_lances": "a validação do FEN pelos lances"}
 
 
-def _ultimo(padrao: str):
-    arquivos = sorted(MEDIDAS.glob(padrao))
-    if not arquivos:
+def _ultimo(base: str):
+    arquivo = ultima_medida(base, MEDIDAS)
+    if arquivo is None:
         return None, None
-    return arquivos[-1], json.loads(arquivos[-1].read_text(encoding="utf-8"))
+    return arquivo, json.loads(arquivo.read_text(encoding="utf-8"))
 
 
 def _ms(valor) -> str:
@@ -39,7 +52,7 @@ def _num(valor) -> str:
 
 
 def _desempenho() -> list:
-    arquivo, dados = _ultimo("*-linha-de-base.json")
+    arquivo, dados = _ultimo("linha-de-base")
     if dados is None:
         return ["Linha de base de desempenho: ainda não medida."]
     m = dados["medidas"]
@@ -47,28 +60,32 @@ def _desempenho() -> list:
     releitura, memoria = m.get("releitura_de_um_glifo", {}), m.get("memoria_do_desfazer", {})
     lote, total = m.get("atraso_durante_o_lote", {}), m.get("memoria_total_com_o_lote", {})
     padroes = enter.get("padroes_no_livro") or ["?", "?"]
-    linhas = [
-        f"Desempenho, de `docs/medidas/{arquivo.name}` (máquina cadastrada: "
-        f"{'sim' if dados['ambiente'].get('maquina_cadastrada') else 'não'}; p95 de "
-        f"{troca.get('n', '?')} repetições):",
+    novos = enter.get("caracteres_novos")
+    novos = (f"; {novos} das {enter.get('n')} repetições ensinaram caractere novo"
+             if novos is not None else "")
+    acoes = memoria.get("acoes")
+    estimativa = f"estimado de {acoes} ações em 3 páginas" if acoes else "estimado"
+    return [
+        f"Desempenho, de `docs/medidas/{arquivo.name}` (commit {dados['ambiente'].get('commit')}; "
+        f"máquina cadastrada: {'sim' if dados['ambiente'].get('maquina_cadastrada') else 'não'}; "
+        f"p95 de {troca.get('n', '?')} repetições):",
         "",
         "| Meta (spec §2) | Hoje | Alvo |",
         "|---|---|---|",
         f"| Trocar de página (não há cache) | p95 {_ms(troca.get('p95_ms'))} | "
         f"{troca.get('alvo_no_cache_ms')} ms no cache; fora do cache ainda não medido pelo método |",
         f"| Enter até a cor do box mudar | p95 {_ms(enter.get('p95_ms'))} "
-        f"({padroes[0]} → {padroes[1]} padrões no livro) | {enter.get('alvo_ms')} ms |",
+        f"({padroes[0]} → {padroes[1]} padrões no livro{novos}) | {enter.get('alvo_ms')} ms |",
         f"| Releitura de um glifo | p95 {_ms(releitura.get('p95_ms'))}; impossível com o lote | "
         f"{releitura.get('alvo_ms')} ms com o lote |",
         f"| Memória do desfazer, 300 páginas × 20 ações | ~{_num(memoria.get('estimado_300x20_mb'))} MB "
-        f"(estimado) | {memoria.get('alvo_mb')} MB |",
+        f"({estimativa}, extrapolado) | {memoria.get('alvo_mb')} MB |",
         f"| Atraso da interface durante o lote ({lote.get('paginas')} páginas) | p99 "
         f"{_num(lote.get('p99_ms'))} ms, com as ações desabilitadas | {lote.get('alvo_p99_ms')} ms, "
         "com as ações |",
         f"| Memória com o lote | {total.get('rss_pico_mb')} MB num processo | "
         f"{total.get('alvo_mb')} MB |",
     ]
-    return linhas
 
 
 def _provisorio(valor_ok, valor_todos) -> str:
@@ -80,53 +97,64 @@ def _provisorio(valor_ok, valor_todos) -> str:
     return f"pendente (provisório: {_num(valor_todos)})"
 
 
+_LEGENDA = (
+    "Qualidade contra os gabaritos (`ferramentas\\medir.py`). **Margens corridas**: cabeçalho, "
+    "número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com "
+    "nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à "
+    "parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só "
+    "contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN "
+    "rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e "
+    "a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. **Ordem**: "
+    "pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai "
+    "no texto). \"—\" é nada a medir.")
+
+
 def _qualidade() -> list:
-    linhas = ["", "Qualidade contra os gabaritos (`ferramentas\\medir.py`). Casas e lado só "
-              "contam nos diagramas conferidos; o provisório (contra o FEN do rascunho, ainda "
-              "não conferido) vai entre parênteses. \"Margens corridas\" são cabeçalho, número "
-              "de página e rodapé; \"—\" é nada a medir (nenhuma linha tirada, nenhum "
-              "diagrama).", "",
+    cabeca = ["", _LEGENDA, "",
               "| Livro | Páginas | Margens corridas P / R | Diagramas achados (falsos) | "
-              "Linhas sem par | Casas erradas por diagrama | Lado certo | Ordem "
-              "(discordância) | CER do corpo | Estado |",
-              "|---|---|---|---|---|---|---|---|---|---|"]
-    achou = False
-    for livro in ("xv", "yusupov", "darcy"):
-        arquivo, dados = _ultimo(f"*-qualidade-{livro}.json")
+              "Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por "
+              "diagrama | Lado certo | Ordem | CER do corpo | Estado |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    linhas, fora = [], {}
+    for livro in LIVROS:
+        _, dados = _ultimo(f"qualidade-{livro}")
         if dados is None:
             continue
-        achou = True
         r = dados["resumo"]
+        fora.update(dados.get("nao_medido") or {})
         cer = ("pendente" if r.get("cer_corpo") is None
                else f"{r['cer_corpo']:.2%}".replace(".", ","))
+        negativas = (f"{r.get('linhas_sem_par_negativas')} ({r.get('paginas_negativas')} pág.)"
+                     if r.get("paginas_negativas") else "—")
         linhas.append(
             f"| {livro} | {len(dados['indices'])} | {_num(r.get('margens_precisao'))} / "
             f"{_num(r.get('margens_revocacao'))} | {r.get('diagramas_achados')} "
-            f"({r.get('diagramas_falsos')}) | {r.get('linhas_sem_par')} | "
+            f"({r.get('diagramas_falsos')}) | {r.get('linhas_sem_par')} | {negativas} | "
+            f"{r.get('linhas_perdidas')} | {r.get('fen_igual_a_leitura')} | "
             f"{_provisorio(r.get('casas_erradas_por_diagrama'), r.get('casas_erradas_provisorio'))} | "
             f"{_provisorio(r.get('lado_certo'), r.get('lado_certo_provisorio'))} | "
             f"{_num(r.get('ordem_discordancia_media'))} | {cer} | {r.get('estado')} |")
-    if achou:
-        _, algum = _ultimo("*-qualidade-xv.json")
-        fora = (algum or {}).get("nao_medido") or {}
-        if fora:
-            linhas += ["", "Ainda não medido: " + "; ".join(
-                f"{k.replace('_', ' ')} ({v})" for k, v in fora.items()) + "."]
-    return linhas if achou else []
-
-
-_FATIA = re.compile(r"\d{4}-\d{2}-\d{2}-fatia-(?P<livro>[^-]+)-passo-(?P<passo>.+)\.json")
+    if not linhas:
+        return []
+    saida = cabeca + linhas
+    if fora:
+        saida += ["", "Ainda não medido: " + "; ".join(
+            f"{_NOMES.get(k, k)}, no {v}" for k, v in fora.items()) + "."]
+    return saida
 
 
 def _fatia() -> list:
     """A medida mais recente de cada (livro, passo), com o estado que o JSON dá."""
     mais_recente = {}
-    for arquivo in sorted(MEDIDAS.glob("*-fatia-*-passo-*.json")):
+    for arquivo in MEDIDAS.glob("*-fatia-*-passo-*.json"):
         casou = _FATIA.fullmatch(arquivo.name)
         if casou:
-            mais_recente[(casou["livro"], casou["passo"])] = arquivo
+            chave = (casou["livro"], casou["passo"])
+            ordem = (arquivo.name[:10], casou["hora"] or "")
+            if chave not in mais_recente or ordem > mais_recente[chave][0]:
+                mais_recente[chave] = (ordem, arquivo)
     linhas = []
-    for (livro, passo), arquivo in sorted(mais_recente.items()):
+    for (livro, passo), (_, arquivo) in sorted(mais_recente.items()):
         dados = json.loads(arquivo.read_text(encoding="utf-8"))
         paginas = ", ".join(sorted(dados.get("paginas", {})))
         if dados.get("gestos") is None:
@@ -134,14 +162,16 @@ def _fatia() -> list:
         else:
             total = (f"{dados['gestos']} gestos ({dados['gestos_sem_impossiveis']} sem os "
                      "impossíveis)")
+        erros = sum(sum((p.get("erros") or {}).values()) for p in dados.get("paginas", {}).values())
         linhas.append(f"| {livro} | {passo} | {paginas} | {total} | "
                       f"{dados.get('gestos_diagramas')} | {dados.get('gestos_navegacao', '—')} | "
-                      f"{dados.get('estado')} | `{arquivo.name}` |")
+                      f"{erros} | {dados.get('estado')} | `{arquivo.name}` |")
     if not linhas:
         return []
-    return ["", "Fatia (`ferramentas\\replay_fatia.py`):", "",
-            "| Livro | Passo | Páginas | Total | Gestos dos diagramas | Navegação | Estado | "
-            "JSON |", "|---|---|---|---|---|---|---|---|", *linhas]
+    return ["", "Fatia (`ferramentas\\replay_fatia.py`; **erros** são as diferenças do snapshot "
+            "contra o gabarito, o N da medida humana):", "",
+            "| Livro | Passo | Páginas | Total | Gestos dos diagramas | Navegação | Erros | "
+            "Estado | JSON |", "|---|---|---|---|---|---|---|---|---|", *linhas]
 
 
 def gerar() -> str:

@@ -878,7 +878,9 @@ dentro da meta de §2.
 - Memória do desfazer: `tracemalloc` do histórico depois de roteiro fixo (300 páginas
   sintéticas × 20 ações). Memória total: soma do RSS de interface e servidor (`psutil`) no
   pico de um lote de 20 páginas.
-- Cada execução grava `docs/medidas/AAAA-MM-DD.json` (CPU, RAM, versões de Python, PySide6,
+- Cada execução grava `docs/medidas/AAAA-MM-DD-<rótulo>.json` (`-linha-de-base`,
+  `-qualidade-<livro>`, `-fatia-<livro>-passo-<passo>`; com a hora no nome se já houver um
+  do dia, salvo `ABBY_SOBRESCREVER_MEDIDA=1`) (CPU, RAM, versões de Python, PySide6,
   PyMuPDF, torch, threads, commit). Falha só na máquina cadastrada em
   `docs/medidas/maquina.json`; noutra, só reporta.
 - `ferramentas/medir.py --livro xv --indices 0,7,20-26` (as páginas da fatia e duas

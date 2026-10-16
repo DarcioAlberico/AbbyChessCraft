@@ -42,7 +42,7 @@ def test_normalizar(bruto, esperado):
     assert atalhos.normalizar(bruto) == esperado
 
 
-@pytest.mark.parametrize("bruto", ["Ctrl+", "Ctrl+Foo", "Hyper+A", "F25", ""])
+@pytest.mark.parametrize("bruto", ["Ctrl+", "Ctrl+Foo", "Hyper+A", "F25", "", "Ctrl+Ctrl+A"])
 def test_normalizar_recusa_o_que_nao_e_tecla(bruto):
     with pytest.raises(ValueError):
         atalhos.normalizar(bruto)
@@ -162,6 +162,14 @@ def test_tabela_minima_valida(tmp_path):
         - {id: a, descricao: B, escopo: [global], padrao: F6, desde_passo: A2}
      """, "id repetido"),
     ("""
+        - id: a
+          descricao: A
+          escopo: [global]
+          padrao: Ctrl+Z
+          desde_passo: A2
+          excecoes: [{tecla: Ctrl+Z, widget: textedit}]
+     """, "exceção sem tipo, motivo"),
+    ("""
 - {id: a, descricao: A, escopo: [global], padrao: F5, finerader: F6, desde_passo: A2}
 """,
      "chave desconhecida 'finerader'"),
@@ -224,3 +232,8 @@ def test_ativas_respeita_desde_passo():
     tabela = atalhos.carregar()
     no_a1 = {a.id for a, _ in tabela.ativas("padrao", "A1")}
     assert "ir_para_pagina" in no_a1 and "substituir" not in no_a1
+
+
+def test_acao_que_nao_existe_e_erro_claro():
+    with pytest.raises(KeyError, match="não há ação 'nenhuma'"):
+        atalhos.carregar().da_acao("nenhuma")

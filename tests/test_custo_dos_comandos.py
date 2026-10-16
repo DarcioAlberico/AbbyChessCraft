@@ -5,7 +5,8 @@ janela com eventos reais (QTest), e um filtro de eventos conta os gestos: cada
 `KeyPress` e `MouseButtonPress` espontâneo (o que sobe para o widget pai chega como não
 espontâneo e não conta de novo), mais cada `Shortcut` disparado (a tecla de um atalho não
 chega como `KeyPress`); a tecla modificadora sozinha não conta, porque um acorde é um
-gesto. O total tem de ser o `custo` do catálogo, e o efeito
+gesto. A regra é `registro_de_eventos.tipo_do_gesto`, a mesma que mede a pessoa na CA-F.2.
+O total tem de ser o `custo` do catálogo, e o efeito
 tem de ser o que o comando promete.
 """
 
@@ -15,10 +16,11 @@ import sys
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QEvent, QObject, QPoint, Qt
+from PySide6.QtCore import QObject, QPoint, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QPushButton
 
+from abbychess.app.registro_de_eventos import tipo_do_gesto
 from abbychess.leitor import FONTE_MANUAL
 
 from tests import test_janela, test_janela_diagramas
@@ -32,26 +34,15 @@ janela = test_janela.janela
 CUSTO = {c["id"]: c["custo"] for c in rf.carregar_catalogo()["comandos"] if str(c["passo"]) == "0"}
 
 
-_MODIFICADORES = {Qt.Key.Key_Shift, Qt.Key.Key_Control, Qt.Key.Key_Alt, Qt.Key.Key_Meta,
-                  Qt.Key.Key_AltGr}
-
-
 class _Contador(QObject):
+    """Conta os gestos pela mesma regra do registro da CA-F.2 (`tipo_do_gesto`)."""
+
     def __init__(self):
         super().__init__()
         self.gestos = 0
 
     def eventFilter(self, _objeto, evento):
-        if evento.type() == QEvent.Type.Shortcut:
-            # A tecla que dispara um atalho não chega como KeyPress: chega como Shortcut.
-            self.gestos += 1
-            return False
-        if not evento.spontaneous():
-            return False
-        if evento.type() == QEvent.Type.MouseButtonPress:
-            self.gestos += 1
-        elif evento.type() == QEvent.Type.KeyPress and evento.key() not in _MODIFICADORES:
-            # Um acorde (Ctrl+T, Shift+Enter) é um gesto: a tecla modificadora não conta.
+        if tipo_do_gesto(evento) is not None:
             self.gestos += 1
         return False
 
@@ -83,7 +74,8 @@ def _centro(b):
 
 
 def test_o_catalogo_do_passo_0_e_o_que_este_teste_cobre():
-    assert set(CUSTO) == {"pagina_seguinte", "reler_pendentes", "ensinar_glifo", "descartar_box",
+    assert set(CUSTO) == {"pagina_seguinte", "reler_pendentes", "ensinar_da_fila", "ensinar_glifo",
+                          "descartar_box",
                           "marcar_glifo",
                           "dividir_glifo", "juntar_glifos", "abrir_diagrama", "corrigir_casa",
                           "corrigir_lado", "fechar_diagrama"}
@@ -191,6 +183,21 @@ def test_ensinar_glifo(app, janela, contador):
     assert contador.gestos == CUSTO["ensinar_glifo"]
     assert (janela.boxes[0].char, janela.boxes[0].source) == ("a", FONTE_MANUAL)
     assert "a" in janela.leitor.padroes_por_caractere()
+
+
+def test_ensinar_da_fila(app, janela, contador):
+    """O glifo que a janela já mostra (o primeiro da fila): digitar e Enter, sem clique."""
+    _pronta(app, janela)
+    primeiro = janela._fila()[0]
+    # O campo vem selecionado (e com o foco, que o offscreen não garante dar à janela).
+    assert janela.atual == primeiro and janela.treino.campo.selectedText() == janela.treino.campo.text()
+    contador.gestos = 0
+    QTest.keyClicks(janela.treino.campo, "a")
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_Return)
+    _esperar(app, janela)
+    assert contador.gestos == CUSTO["ensinar_da_fila"]
+    assert (janela.boxes[primeiro].char, janela.boxes[primeiro].source) == ("a", FONTE_MANUAL)
+    assert janela.atual != primeiro             # a janela foi sozinha ao próximo da fila
 
 
 def test_descartar_box(app, janela, contador):

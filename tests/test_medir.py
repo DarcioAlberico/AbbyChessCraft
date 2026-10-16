@@ -84,7 +84,8 @@ def test_comparar_pagina_diagrama_casas_lado_e_falso():
     d = medir.comparar_pagina(_gabarito(), leitura)["diagramas"]
     assert (d["verdade"], d["achados"], d["casados"]) == (1, 2, 1)
     assert d["detalhes"] == [{"id": "d0", "casas_erradas": 2, "fen_verificado": True,
-                              "lado_certo": False, "lado_verificado": True, "confiavel": True}]
+                              "fen_igual_a_leitura": False, "lado_certo": False,
+                              "lado_verificado": True, "confiavel": True}]
 
 
 def test_comparar_pagina_ordem_pelo_bloco_e_cer_so_nas_verificadas():
@@ -132,10 +133,38 @@ def test_resumo_sem_fen_conferido_fica_sem_numero():
     assert r["casas_erradas_por_diagrama"] is None and r["casas_erradas_provisorio"] == 2.0
 
 
-def test_resumo_valido_quando_nada_falta():
-    g = _gabarito(revisado_por="Usuário")
+def _sem_pendencia():
+    g = _gabarito(revisado_por="Usuário", verdade_versao=2,
+                  conferencia_cega={"texto": {"aprovada": True, "verdade_versao": 2}})
     for ln in g["linhas_corpo"]:
         ln["texto_verificado"] = True
+    g["diagramas"][0]["conferencia_cega"] = {"igual": True}
+    return g
+
+
+def test_resumo_valido_quando_nada_falta():
+    g = _sem_pendencia()
     leitura = Leitura(diagramas=[DiagramaDaLeitura([0.2, 0.5, 0.6, 0.9], E4, "b")])
     r = medir.resumir({"i000": medir.comparar_pagina(g, leitura)})
     assert r["estado"] == "válida" and r["casas_erradas_por_diagrama"] == 0.0
+
+
+def test_conferencia_cega_feita_numa_versao_velha_nao_vale():
+    g = _sem_pendencia()
+    g["verdade_versao"] = 3                  # o texto mudou depois da conferência
+    leitura = Leitura(diagramas=[DiagramaDaLeitura([0.2, 0.5, 0.6, 0.9], E4, "b")])
+    r = medir.resumir({"i000": medir.comparar_pagina(g, leitura)})
+    assert r["estado"] == "provisória: sem conferência cega do texto aprovada e em dia"
+
+
+def test_negativas_saem_a_parte_e_linhas_perdidas_contam():
+    negativa = _gabarito(negativa=True)
+    negativa["linhas_corpo"] = []
+    lixo = Leitura(linhas=[([0.3, 0.6, 0.5, 0.62], "lixo"), ([0.3, 0.7, 0.5, 0.72], "lixo")])
+    corpo = Leitura(linhas=[([0.1, 0.1, 0.9, 0.2], "uma linha"), ([0.3, 0.6, 0.5, 0.62], "x")])
+    r = medir.resumir({"i000": medir.comparar_pagina(negativa, lixo),
+                       "i001": medir.comparar_pagina(_gabarito(), corpo)})
+    assert (r["linhas_sem_par_negativas"], r["paginas_negativas"]) == (2, 1)
+    assert r["linhas_sem_par"] == 1          # só a da página de corpo
+    assert r["linhas_perdidas"] == 1         # a l1 de i001 não foi lida
+    assert r["fen_igual_a_leitura"] == "0/0"

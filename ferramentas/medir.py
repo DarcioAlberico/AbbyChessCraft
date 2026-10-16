@@ -13,8 +13,9 @@ programa faz, e compara com `tests/verdade/<livro>/`:
 - **diagramas**: tabuleiros achados (IoU ≥ 0,5) e falsos; casas erradas no FEN e lado a
   jogar **só nos diagramas com `fen_verificado` / `lado_verificado`** (os outros dão o
   número provisório, contra o FEN do rascunho, à parte);
-- **linhas sem par**: linhas lidas que não casam com nenhuma linha do gabarito (a medida
-  de "nada inventado" das páginas negativas: capa, sumário);
+- **linhas sem par**: linhas lidas que não casam com nenhuma linha do gabarito, à parte
+  nas páginas `negativa` (capa, sumário: a medida de "nada inventado") e no resto; e
+  **linhas perdidas**: linhas do gabarito que a leitura não achou (a revocação de linhas);
 - **ordem**: distância de Kendall (normalizada) entre a ordem lida e a do gabarito, nas
   linhas de corpo casadas;
 - **CER do corpo**: só sobre as linhas com `texto_verificado: true` (o texto do gabarito é
@@ -44,8 +45,9 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / "ferramentas"))
 
+from comum import destino_da_medida, estado_do_git  # noqa: E402,F401
 from rotular import (PASTA_DOS_PDFS, VERDADE, _caixa_relativa, _indices,  # noqa: E402
-                     levenshtein, sha256_do_arquivo)
+                     levenshtein, problemas_do_fen, sha256_do_arquivo)
 
 MEDIDAS = RAIZ / "docs" / "medidas"
 IOU_MINIMO = 0.5
@@ -81,17 +83,13 @@ def casar(previstos, verdade):
 
 
 def casas(fen: str) -> Optional[list]:
-    """As 64 casas da parte das peças do FEN ('.' = vazia), ou `None` se ele for malformado."""
-    saida = []
-    for fileira in (fen or "").split(" ")[0].split("/"):
-        for c in fileira:
-            if c.isdigit():
-                saida.extend(["."] * int(c))
-            elif c in "KQRBNPkqrbnp":
-                saida.append(c)
-            else:
-                return None
-    return saida if len(saida) == 64 else None
+    """As 64 casas da parte das peças do FEN ('.' = vazia), ou `None` se ele for malformado
+    (pela mesma regra de `rotular.problemas_do_fen`)."""
+    pecas = (fen or "").split(" ")[0]
+    if problemas_do_fen(pecas):
+        return None
+    return [c for fileira in pecas.split("/")
+            for ch in fileira for c in (["."] * int(ch) if ch.isdigit() else [ch])]
 
 
 def unir_por_linha(caixas):
@@ -174,6 +172,7 @@ def comparar_pagina(gabarito: dict, leitura: Leitura) -> dict:
         detalhes.append({
             "id": verdade["id"], "casas_erradas": erradas,
             "fen_verificado": bool(verdade.get("fen_verificado")),
+            "fen_igual_a_leitura": verdade["fen"] == verdade.get("fen_lido"),
             "lado_certo": (lido.lado == verdade["lado"]) if lado_dito else None,
             "lado_verificado": bool(verdade.get("lado_verificado")) and lado_dito,
             "confiavel": lido.confiavel})
@@ -204,12 +203,24 @@ def comparar_pagina(gabarito: dict, leitura: Leitura) -> dict:
         "margens": margens,
         "diagramas": {"verdade": len(blocos_d), "achados": len(leitura.diagramas),
                       "casados": len(casados_d), "detalhes": detalhes},
+        "negativa": bool(gabarito.get("negativa")),
         "linhas_sem_par": sem_par,
+        "linhas_perdidas": len(corpo) - len(casados_c),
+        "conferencia_cega_texto": _conferencia_em_dia(gabarito),
+        "conferencia_cega_fen": any(d.get("conferencia_cega", {}).get("igual")
+                                    for d in gabarito["diagramas"]),
         "corpo": {"linhas": len(corpo), "casadas": len(casados_c),
                   "ordem_discordancia": round(discordancia(ordem_lida, ordem_certa), 4),
                   "linhas_verificadas": verificadas, "cer_erros": erros,
                   "cer_caracteres": caracteres,
                   "cer": round(erros / caracteres, 4) if caracteres else None}}
+
+
+def _conferencia_em_dia(gabarito: dict) -> bool:
+    """A conferência cega do texto aprovada e feita sobre a versão atual do gabarito."""
+    texto = gabarito.get("conferencia_cega", {}).get("texto", {})
+    return bool(texto.get("aprovada")) and texto.get("verdade_versao") == gabarito.get(
+        "verdade_versao")
 
 
 def _razao(a, b):
@@ -239,12 +250,20 @@ def resumir(paginas: dict) -> dict:
         pendencias.append(f"FEN conferido em {len(fen_ok)}/{len(fen_todos)} diagramas")
     if verificadas < linhas:
         pendencias.append(f"texto verificado em {verificadas}/{linhas} linhas")
+    if not any(p["conferencia_cega_texto"] for p in paginas.values()):
+        pendencias.append("sem conferência cega do texto aprovada e em dia")
+    if fen_todos and not any(p["conferencia_cega_fen"] for p in paginas.values()):
+        pendencias.append("sem conferência cega de FEN igual")
     return {
         "margens_precisao": _razao(vp, vp + fp),
         "margens_revocacao": _razao(vp, vp + fn),
         "diagramas_achados": f"{casados_d}/{verdade_d}",
         "diagramas_falsos": soma(lambda p: p["diagramas"]["achados"] - p["diagramas"]["casados"]),
-        "linhas_sem_par": soma(lambda p: p["linhas_sem_par"]),
+        "linhas_sem_par": soma(lambda p: 0 if p["negativa"] else p["linhas_sem_par"]),
+        "linhas_sem_par_negativas": soma(lambda p: p["linhas_sem_par"] if p["negativa"] else 0),
+        "paginas_negativas": sum(1 for p in paginas.values() if p["negativa"]),
+        "linhas_perdidas": soma(lambda p: p["linhas_perdidas"]),
+        "fen_igual_a_leitura": f"{sum(d['fen_igual_a_leitura'] for d in detalhes)}/{len(detalhes)}",
         "fen_verificados": f"{len(fen_ok)}/{len(fen_todos)}",
         "casas_erradas_por_diagrama": _razao(sum(d["casas_erradas"] for d in fen_ok), len(fen_ok)),
         "casas_erradas_provisorio": _razao(sum(d["casas_erradas"] for d in fen_todos),
@@ -328,20 +347,6 @@ def _sha_do_gabarito(livro: str, indice: int) -> str:
     return sha256_do_arquivo(VERDADE / livro / f"i{indice:03d}.json")
 
 
-def estado_do_git() -> dict:
-    import subprocess
-
-    try:
-        commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=RAIZ,
-                                capture_output=True, text=True, check=True).stdout.strip()
-        sujo = bool(subprocess.run(["git", "status", "--porcelain", "--", ".",
-                                    ":(exclude)docs/medidas"], cwd=RAIZ,
-                                   capture_output=True, text=True, check=True).stdout.strip())
-    except (OSError, subprocess.CalledProcessError):
-        return {"commit": None, "arvore_suja": None}
-    return {"commit": commit, "arvore_suja": sujo}
-
-
 def main(argv=None) -> int:
     analisador = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     analisador.add_argument("--livro", required=True)
@@ -373,7 +378,7 @@ def main(argv=None) -> int:
     resultado["data"] = datetime.date.today().isoformat()
     resultado.update(estado_do_git())
     MEDIDAS.mkdir(parents=True, exist_ok=True)
-    destino = MEDIDAS / f"{resultado['data']}-qualidade-{args.livro}.json"
+    destino = destino_da_medida(resultado["data"], f"qualidade-{args.livro}")
     destino.write_text(json.dumps(resultado, ensure_ascii=False, indent=1) + "\n",
                        encoding="utf-8", newline="\n")
     print(json.dumps(resultado["resumo"], ensure_ascii=False, indent=1))

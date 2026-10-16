@@ -41,3 +41,24 @@ o docstring foi corrigido. Projeto antigo sem SHA gravado aceita o arquivo indic
 relocalização (a abertura com a fonte presente já grava o SHA, então o caso é raro).
 Dois commits por passo (código e medidas), como no passo 0, para as medidas registrarem o
 commit do código que mediram.
+
+## Rodada 2
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Código e testes | Correção 7 · Simplicidade 8 · Testes 7 | volta |
+| Produto e medição | Completude 8 · Fidelidade das medidas 6,5 · Clareza para o usuário 8 · Produtividade 8 | volta |
+
+O que mudou depois dela:
+
+| Achado | Correção |
+|---|---|
+| Com o limiar de revisão 1,00, o histograma contava a confiança 1,0 como pendente | a confiança 1,0 tem a faixa 100 só dela; `VERSAO_DO_LIVRO` 2 refaz os caches antigos; o teste varre de 0,00 a 1,00 com confianças 0 e 1 |
+| A chamada da janela a `reaplicar_limiar` sem teste | teste da janela: `livro.json` igual ao recalculado depois de cada troca de limiar (inclusive 1,00 e 0,00); em só leitura, nada muda e a mensagem diz "nesta sessão" |
+| `reaplicar_limiar` mudava o cache antes de gravar | o cache só muda depois de gravado |
+| A trava de só leitura podia ficar sem dono numa falha da abertura | a trava é posta por último em `abrir`; `_abrir` fecha o projeto novo se algo falhar; teste |
+| A relocalização automática não gravava o tamanho | grava |
+| **O atraso no lote "piorou 2,4 vezes" sem declaração** | A/B com 3 rodadas no código da tag `passo-0` e 3 no 1a (`3bf1ad3`), na mesma máquina: o p99 tem duas faixas, perto de 7–8 ms e perto de 20 ms, e cada código caiu uma vez na de cima (passo 0: 19,9; 7,7; 7,1 — 1a: 7,5; 20,5; 7,7). Não é efeito do passo. O README mostra as rodadas (tabela gerada "Rodadas repetidas") |
+| A seção das medidas dizia "passo 0" e a qualidade do passo 0 sumia da tabela | "As medidas do roadmap"; "Histórico da qualidade" com todas as medidas de cada livro, que mostra a qualidade do 1a igual à do passo 0 |
+| A árvore suja com correções do código medido | commit das correções e todas as medidas de novo nele |
+| Menores | "o projeto não foi aberto" ao cancelar a fonte; os avisos de só leitura dizem que a fonte achada ou indicada vale na sessão; onde a busca procura (o README, o docstring e a spec iguais); o limite de 200 conta só arquivos do tamanho certo, e está nas Limitações; erro ao gravar os limiares vira aviso; o roadmap descreve os commits do passo; as Limitações falam do `fsync` sem coalescência em disco lento ou com antivírus |

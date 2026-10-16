@@ -143,14 +143,14 @@ class VisorDePagina(QGraphicsView):
         item.setBrush(QBrush(preenchimento))
 
     def repintar_boxes(self, boxes: List[BoxEntry], pendentes: set, indices) -> bool:
-        """Repinta só os boxes `indices` (a leitura ou a cor mudou, a caixa não). Falso, sem
-        mudar nada, se a lista não é a desenhada (aí é `mostrar_boxes`)."""
+        """Repinta só os boxes `indices`, com a caixa e a cor de agora (a lista é a mesma:
+        nenhum entrou nem saiu). Falso, sem mudar nada, se a lista não é a desenhada (aí é
+        `mostrar_boxes`)."""
         if len(boxes) != len(self._itens_dos_boxes):
             return False
         for i in indices:
             b, item = boxes[i], self._itens_dos_boxes[i]
-            if item.rect().toRect().getCoords()[:2] != (b.x1, b.y1):
-                return False                # a caixa mudou: desenhar tudo
+            item.setRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1)   # o Alt+seta muda a caixa
             self._pintar(item, b, i in pendentes)
         self._boxes = boxes
         return True

@@ -568,3 +568,16 @@ def test_edicao_que_perde_a_vez_avisa(app, janela):
     _esperar(app, janela)
     assert "descartado, porque a página mudou" in janela.statusBar().currentMessage()
     janela.pagina.indice = 0
+
+
+def test_alt_seta_redesenha_a_caixa_no_visor(app, janela):
+    """O repintar só dos glifos que mudaram também move a caixa (a borda direita e a de
+    baixo não mexem no canto de cima)."""
+    janela.reconhecer()
+    _esperar(app, janela)
+    mostrar(janela, 0)
+    janela.treino._ajustar(0, 0, 1, 0)   # Alt+→: borda direita
+    janela.treino._ajustar(0, 0, 0, 1)   # Alt+↓: borda de baixo
+    b = boxes(janela)[0]
+    retangulo = janela.visor._itens_dos_boxes[0].rect()
+    assert (retangulo.width(), retangulo.height()) == (b.x2 - b.x1, b.y2 - b.y1)

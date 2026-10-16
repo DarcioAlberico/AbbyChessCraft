@@ -355,26 +355,28 @@ Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (máquina cadastrada
 
 | Meta (spec §2) | Hoje | Alvo |
 |---|---|---|
-| Trocar de página (não há cache) | p95 191 ms | 150 ms no cache; fora do cache ainda não medido pelo método |
-| Enter até a cor do box mudar | p95 184 ms (0 → 35 padrões no livro) | 100 ms |
-| Releitura de um glifo | p95 166 ms; impossível com o lote | 150 ms com o lote |
-| Memória do desfazer, 300 páginas × 20 ações | ~454,3 MB (estimado) | 50 MB |
-| Atraso da interface durante o lote (20 páginas) | p99 20,5 ms, com as ações desabilitadas | 50 ms, com as ações |
-| Memória com o lote | 1632 MB num processo | 2560 MB |
+| Trocar de página (não há cache) | p95 192 ms | 150 ms no cache; fora do cache ainda não medido pelo método |
+| Enter até a cor do box mudar | p95 107 ms (0 → 35 padrões no livro) | 100 ms |
+| Releitura de um glifo | p95 140 ms; impossível com o lote | 150 ms com o lote |
+| Memória do desfazer, 300 páginas × 20 ações | ~2384,4 MB (estimado) | 50 MB |
+| Atraso da interface durante o lote (20 páginas) | p99 21 ms, com as ações desabilitadas | 50 ms, com as ações |
+| Memória com o lote | 1657 MB num processo | 2560 MB |
 
 Qualidade contra os gabaritos (`ferramentas\medir.py`). Casas e lado só contam nos diagramas conferidos; o provisório (contra o FEN do rascunho, ainda não conferido) vai entre parênteses. "Margens corridas" são cabeçalho, número de página e rodapé; "—" é nada a medir (nenhuma linha tirada, nenhum diagrama).
 
 | Livro | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Linhas sem par | Casas erradas por diagrama | Lado certo | Ordem (discordância) | CER do corpo | Estado |
 |---|---|---|---|---|---|---|---|---|---|
-| xv | 7 | — / — | 7/7 (0) | None | 0 | 1/5 | 0 | pendente | provisória: estrutura rotulada pelo assistente, ainda não revisada |
-| yusupov | 3 | — / — | 3/3 (0) | None | 0 | 0/3 | 0 | pendente | provisória: estrutura rotulada pelo assistente, ainda não revisada |
-| darcy | 2 | — / — | 3/3 (0) | None | 3 | 0/1 | 0 | pendente | provisória: estrutura rotulada pelo assistente, ainda não revisada |
+| xv | 9 | 0,875 / 1 | 7/7 (1) | 839 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas |
+| yusupov | 3 | 1 / 0,75 | 3/3 (0) | 8 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas |
+| darcy | 2 | — / 0 | 3/3 (0) | 1 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas |
+
+Ainda não medido: ligacao da legenda (passo H (a leitura de hoje não liga legenda a diagrama)); precisao e revocacao por funcao (passo F (a leitura de hoje não classifica blocos)); validacao pelos lances (passo H).
 
 Fatia (`ferramentas\replay_fatia.py`):
 
 | Livro | Passo | Páginas | Total | Gestos dos diagramas | Navegação | Estado | JSON |
 |---|---|---|---|---|---|---|---|
-| xv | 0 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | — | pendente: nenhuma linha com texto verificado | `2026-10-16-fatia-xv-passo-0.json` |
+| xv | 0 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas | `2026-10-16-fatia-xv-passo-0.json` |
 <!-- medidas:fim -->
 
 O replay da fatia (os gestos para levar as p. 21–27 ao gabarito) é

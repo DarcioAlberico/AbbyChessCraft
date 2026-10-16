@@ -451,6 +451,9 @@ aviso.
      usam a paleta antiga (`cores.py`): passar aos tokens;
    - a conversão do pixmap da página seguinte roda na thread da interface, 400 ms depois de
      trocar (p50 18 ms, máximo 93): fazer a `QImage` na thread da pré-carga.
+   - folhear depressa páginas nunca vistas: a pré-carga adiada chega tarde (parado 0,25 s
+     por página, ~403 ms por troca); cancelar ou adiar a pré-carga quando outra página já foi
+     pedida.
 
 **Verificação.** CA-13.1, CA-13.2 e CA-13.3; CA-3.3 e CA-3.7 nos dois perfis.
 

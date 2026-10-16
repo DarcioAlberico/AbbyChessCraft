@@ -140,3 +140,29 @@ O revisor rodou a janela offscreen com cenários próprios e mediu a árvore da 
   - memória com o lote: 1773–1776 MB (portão: 1793); atraso no lote, p99 10,4–22,0 ms,
     máximo 95–99.
 - Qualidade e fatia: as do `4e974a5` (acima), sem mudança no caminho da leitura.
+
+## Rodada 4 (código, sobre as correções do produto)
+
+Correção 9 · Simplicidade 9 · Testes 8 — **aceita**. O menor dela entrou junto (`75ede09`):
+o teste da pré-carga passou a usar um espião, para provar que o `ir_para` não a dispara e o
+relógio da janela sim, em vez de olhar o cache logo depois (que passaria mesmo com a
+pré-carga de volta no `ir_para`). Fica a nota para o A3: o zoom do Documento usa as mesmas
+teclas no corpo do texto.
+
+## Revisão de produto, rodada 2
+
+Completude 8 · Fidelidade das medidas 9 · Clareza para o usuário 9 · Produtividade 8 —
+**aceita**. O revisor refez o cenário do M1 (o zoom com o foco no campo do treino) e mediu o
+M2 pelo método do 2b: 133–135 ms na mediana, igual com e sem a pré-carga (2b: 149–154). As
+duas observações dele ficam registradas, sem fazer voltar:
+
+- folhear depressa páginas nunca vistas, num projeto que endireita, ficou mais lento que na
+  rodada 1 (parado 0,25 s em cada página: ~403 ms contra ~243), ainda melhor que o 2b
+  (~500): a pré-carga adiada chega tarde. No passo K: cancelar ou adiar a pré-carga quando
+  outra página já foi pedida;
+- o V pede um clique na margem da página quando se está no treino (o README diz; o Alt+2
+  do A2 resolve).
+
+**Fechamento.** As duas revisões aceitaram: código na rodada 4, produto na 2. A tag
+`passo-a1` fica no commit que grava este registro. As medidas de desempenho são as 3
+rodadas e o portão do `538adae`; a qualidade, do `4e974a5`, e a fatia, do `f386dd1`.

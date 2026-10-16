@@ -3,11 +3,11 @@
  "passo": "0",
  "snapshot": "xv-i020-026-inicial.zip",
  "snapshot_sha256": "0cf949dff64e9609389eef1bdc6ef935459fb6fd1e6933c3baaf66bc8fcf2431",
- "catalogo_versao": 3,
+ "catalogo_versao": 4,
  "gabaritos": {
   "i020": {
    "verdade_versao": 1,
-   "sha256": "9db4c0500477e24f0dbfbb8fae5ebd8aebdb5e8a4f5ea629fe21548a215e96e1"
+   "sha256": "a55f44e679fbb1f15098deafc05db636d54615072ec5eb85c1b82ea114639f52"
   },
   "i021": {
    "verdade_versao": 1,
@@ -15,7 +15,7 @@
   },
   "i022": {
    "verdade_versao": 1,
-   "sha256": "09a98aae8a8ac49b1ca1abc9323614b8e7846886cf198d419f102368fd31e8e0"
+   "sha256": "66c8a65b59a0952695850d40fde19a274da58cc60d50c9909e3090294730a76a"
   },
   "i023": {
    "verdade_versao": 1,
@@ -23,15 +23,15 @@
   },
   "i024": {
    "verdade_versao": 1,
-   "sha256": "ce2020dc3b1c070a1a2c1e146f6818f7dbcea33ac2951e946ce39d45fa99b96b"
+   "sha256": "0b622dd9d3f5a6baf624a0a22bb040d4266851b0a6f1254bff2737a3a3681507"
   },
   "i025": {
    "verdade_versao": 1,
-   "sha256": "350bdc9d8bb8aa85de79e1442c37a90071ded3de0aa0dad9615044603bd70d32"
+   "sha256": "49a4bd5b562b0a6e61f7679efafb3edbd87ee4db9087bf0fe9c8d5dba6bba36f"
   },
   "i026": {
    "verdade_versao": 1,
-   "sha256": "bc92aa62e4c002dda4fbb6ea0975148f93cffa088b321d1b9229e81ef9603518"
+   "sha256": "53af8e207a1a2a0724648d9dc7bdeb855edc8d4a6ac629e8afb1cd40d9d19c83"
   }
  },
  "paginas": {
@@ -43,28 +43,44 @@
     "fechar_diagrama": 1
    },
    "impossiveis": {},
-   "linhas_verificadas": 0
+   "linhas_verificadas": 0,
+   "erros": {
+    "texto": 0,
+    "diagramas": 0
+   }
   },
   "i021": {
    "gestos_texto": 0,
    "gestos_diagramas": 0,
    "comandos": {},
    "impossiveis": {},
-   "linhas_verificadas": 0
+   "linhas_verificadas": 0,
+   "erros": {
+    "texto": 0,
+    "diagramas": 0
+   }
   },
   "i022": {
    "gestos_texto": 0,
    "gestos_diagramas": 0,
    "comandos": {},
    "impossiveis": {},
-   "linhas_verificadas": 0
+   "linhas_verificadas": 0,
+   "erros": {
+    "texto": 0,
+    "diagramas": 0
+   }
   },
   "i023": {
    "gestos_texto": 0,
    "gestos_diagramas": 0,
    "comandos": {},
    "impossiveis": {},
-   "linhas_verificadas": 0
+   "linhas_verificadas": 0,
+   "erros": {
+    "texto": 0,
+    "diagramas": 0
+   }
   },
   "i024": {
    "gestos_texto": 0,
@@ -75,7 +91,11 @@
     "fechar_diagrama": 1
    },
    "impossiveis": {},
-   "linhas_verificadas": 0
+   "linhas_verificadas": 0,
+   "erros": {
+    "texto": 0,
+    "diagramas": 1
+   }
   },
   "i025": {
    "gestos_texto": 0,
@@ -86,7 +106,11 @@
     "fechar_diagrama": 2
    },
    "impossiveis": {},
-   "linhas_verificadas": 0
+   "linhas_verificadas": 0,
+   "erros": {
+    "texto": 0,
+    "diagramas": 2
+   }
   },
   "i026": {
    "gestos_texto": 0,
@@ -97,7 +121,11 @@
     "fechar_diagrama": 1
    },
    "impossiveis": {},
-   "linhas_verificadas": 0
+   "linhas_verificadas": 0,
+   "erros": {
+    "texto": 0,
+    "diagramas": 1
+   }
   }
  },
  "gestos_texto": 0,
@@ -106,10 +134,10 @@
  "impossiveis": {},
  "custo_dos_impossiveis": 0,
  "linhas_usadas": [],
- "estado": "pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas",
+ "estado": "pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual",
  "gestos": null,
  "gestos_sem_impossiveis": null,
  "data": "2026-10-16",
- "commit": "8fa59bf",
+ "commit": "76ba432",
  "arvore_suja": false
 }

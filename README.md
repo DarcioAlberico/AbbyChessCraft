@@ -238,9 +238,29 @@ tenta de novo (até 5 tentativas ao todo, a cada 50 ms). Os `.tmp` que uma queda
 - **Projeto de versão mais nova abre só para leitura.** Dá para ver as páginas, mas nada é
   gravado (o título da janela diz "só leitura"). Um campo de `projeto.json` que esta versão
   não conhece não se perde: vai para `extras` e volta igual ao arquivo.
-- **`livro.json`** é o resumo de cada página lida (estado, pendentes, o histograma das
-  confianças e os diagramas por conferir), atualizado a cada gravação de página. É um cache:
-  se faltar ou estragar, é refeito das páginas na abertura.
+- **`livro.json`** é o resumo de cada página gravada (o `pid` dela, o estado, pendentes, o
+  histograma das confianças e os diagramas por conferir), atualizado a cada gravação de
+  página. É um cache: se faltar ou estragar, é refeito das páginas na abertura.
+
+**O modelo v2 (passo 1b).** Cada glifo tem agora uma identidade que não muda (`gid`): a
+página tem um número próprio (`pid`), que reordenar ou inserir páginas não muda, e cada
+glifo um gid dela. Dividir um glifo aposenta o gid dele e dá gids novos às partes, e o
+programa sabe quem veio de quem. O que muda para você:
+
+- **As páginas ficam em `paginas/p<pid>.json`**, com os glifos, as áreas (antes em
+  `zonas/`), os diagramas, a marca de "só glifos marcados" (antes em `marcadas.json`) e o
+  estado da página: não reconhecida, glifos marcados, reconhecida, em revisão (depois da
+  primeira correção) ou verificada (a marcação de verificada chega no passo C).
+- **Um projeto antigo migra sozinho.** Na primeira abertura, o projeto como era vai para
+  `backup-v1/`, e cada página passa ao formato novo quando é aberta pela primeira vez.
+  Copiar `backup-v1/` de volta por cima do projeto o devolve ao que era.
+- **Cada leitura sabe de que padrão veio.** O glifo lido por um padrão do livro guarda qual
+  amostra o leu (é o que a revisão do passo C vai mostrar), e o padrão ensinado leva no
+  nome o gid do glifo de onde saiu.
+- **O texto da página** (o painel de texto, a busca e as exportações de hoje) sai de um
+  documento montado das páginas (`abbychess.texto.montar`), com as decisões que você tomar
+  a partir do passo D1 (espaço a mais ou a menos, o caractere que falta, parágrafo). Hoje
+  ele sai igual ao de antes, conferido pelos testes de caracterização.
 
 ### A página torta
 
@@ -577,7 +597,11 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 
 | Arquivo | O que faz |
 |---|---|
-| `abbychess/projeto.py` | A pasta do projeto: fonte (relativa, relocalizada pelo SHA-256), idioma, limiares, `extras`, só leitura, páginas lidas, áreas, `livro.json` |
+| `abbychess/projeto.py` | A pasta do projeto: fonte (relativa, relocalizada pelo SHA-256), idioma, limiares, `extras`, só leitura, as páginas no formato v2 (`p<pid>.json`), a migração do v1, `livro.json` |
+| `abbychess/modelo.py` | O modelo da página: `Box` com gid, decisões, `Diferenca`, `Pagina`, o estado da página e a reconciliação com a janela de hoje |
+| `abbychess/edicao.py` | As edições por gid (dividir, juntar, marcar, descartar, quebrar e juntar palavras, glifo virtual), cada uma com os sucessores |
+| `abbychess/texto.py` | O documento derivado da página (`montar`) e o texto dele, nos modos impresso e SAN |
+| `abbychess/procedencia.py` | De que amostra do livro veio cada leitura |
 | `abbychess/gravacao.py` | A gravação atômica de todo arquivo do projeto e a trava de só leitura |
 | `abbychess/zonas.py` | As áreas da página: geometria, áreas automáticas, reconhecer pelas áreas |
 | `abbychess/verificacao.py` | O léxico do livro, as palavras desconhecidas e a correção por glifo |
@@ -603,6 +627,14 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | `tests/golden/caracterizacao/` | O comportamento de hoje, fixado antes da refatoração do roadmap |
 
 ## Limitações conhecidas
+
+- **Um projeto aberto pelo passo 1b não abre mais nos programas de antes** (o formato é o
+  2). Para voltar, copie `backup-v1/` por cima do projeto: as correções feitas depois da
+  migração se perdem.
+- **A janela ainda edita por índice** (até o passo 2a): cada gravação reconcilia a lista de
+  glifos com o modelo, pelo objeto e, depois do desfazer de hoje (que devolve cópias), pela
+  caixa. Um glifo que o desfazer de hoje trouxe de volta depois de dividido ganha gid novo
+  (o desfazer por gid é do passo 2b).
 
 - **Gravar não é assíncrono ainda, e isso custa tempo desde o 1a.** Cada gravação de página
   faz dois `fsync` (a página e o `livro.json`) na thread de quem grava, inclusive a cada

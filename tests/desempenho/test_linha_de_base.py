@@ -68,7 +68,8 @@ def ambiente(tmp_path_factory):
 
 
 def test_troca_de_pagina(ambiente, medidas):
-    """De `ir_para_pagina` ao visor pintado numa QImage 1600×1000. Hoje não há cache."""
+    """De `ir_para_pagina` ao visor pintado numa QImage 1600×1000, alternando 2 páginas lidas:
+    desde o A1 as duas estão no cache (a página renderizada e o pixmap)."""
     from PySide6.QtGui import QImage, QPainter
 
     app, janela = ambiente
@@ -82,10 +83,35 @@ def test_troca_de_pagina(ambiente, medidas):
 
     resultado = cronometrar(trocar)
     medidas["troca_de_pagina"] = {
-        **resultado, "alvo_no_cache_ms": 150, "alvo_fora_ms": 600,
-        "como": "mesmo processo, alternando 2 páginas lidas; hoje não há cache, então este "
-                "número vale para 'no cache'. 'Fora do cache' (processo novo) não foi medido "
-                "pelo método e fica para o passo A1."}
+        **resultado, "alvo_no_cache_ms": 150,
+        "como": "mesmo processo, alternando 2 páginas lidas, as duas no cache (desde o A1)"}
+
+
+def test_troca_de_pagina_fora_do_cache(ambiente, medidas):
+    """A mesma troca com o cache esvaziado antes de cada uma: renderizar e endireitar a
+    página, convertê-la para o visor e desenhar os boxes (§2: ≤ 600 ms)."""
+    from PySide6.QtGui import QImage, QPainter
+
+    app, janela = ambiente
+    imagem = QImage(1600, 1000, QImage.Format.Format_ARGB32)
+
+    def esvaziar(_i):
+        janela.pagina.cache.esperar()
+        with janela.pagina.cache._trava:
+            janela.pagina.cache._paginas.clear()
+        janela._pixmaps.clear()
+
+    def trocar(i):
+        janela.ir_para_pagina(PAGINAS[i % 2])
+        pintor = QPainter(imagem)
+        janela.visor.render(pintor)
+        pintor.end()
+
+    resultado = cronometrar(trocar, antes=esvaziar, aquecimentos=2, repeticoes=12)
+    medidas["troca_fora_do_cache"] = {
+        **resultado, "alvo_ms": 600,
+        "como": "mesmo processo, o cache de páginas e o de pixmaps esvaziados antes de cada "
+                "troca (o processo novo, com a primeira carga do PDF, não está nesta medida)"}
 
 
 def test_enter_ensinar(ambiente, medidas):

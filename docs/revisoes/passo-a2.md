@@ -129,3 +129,21 @@ pelo X ou pelo menu não repunha os tamanhos) entrou junto: a reposição segue 
   memória com o lote, 1781–1783 MB (portão 1799); atraso no lote, p99 9,5–22,2.
 - Qualidade (`medir.py`, os três livros, no `93c94a7`) e fatia (`--passo A2`, no `d37d61f`,
   que só acrescenta os JSON; o catálogo com as entradas do A2): iguais às do A1.
+
+## Revisão de produto, rodada 2
+
+Completude 9 · Fidelidade das medidas 9 · Clareza para o usuário 9 · Produtividade 8 ·
+Design 8 — **aceita**. Os três menores dela entraram junto, depois das medidas (só mexem
+nos tamanhos ao reabrir, no foco da barra e no cabeçalho da gaveta, fora do que as medidas
+cronometram):
+
+- reabrir em 1366 um projeto gravado em 1920 com a gaveta aberta deixava a Imagem com 478 px
+  (x-height ~5,5): abaixo de 1600 de largura, os tamanhos padrão tiram a gaveta da vista
+  direita, como o F9, e reaplicam a altura de Resultados; teste;
+- o Tab do campo ia ao ⚠ da barra: o ⚠ e o ✕ não pegam o foco pelo Tab;
+- a coluna do estado da gaveta ganhou o cabeçalho "Est.". A versão do catálogo do replay
+  fica em 4 enquanto nenhum custo mudar (as entradas do A2 têm os custos do passo 0).
+
+**Fechamento.** As duas revisões aceitaram: código na rodada 4, produto na 2. A tag
+`passo-a2` fica no commit que grava este registro. As medidas de desempenho são as 3 rodadas
+e o portão do `93c94a7`; a qualidade, do `93c94a7`, e a fatia, do `d37d61f`.

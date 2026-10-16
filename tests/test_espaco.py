@@ -713,7 +713,7 @@ def test_reabrir_noutra_largura_usa_os_tamanhos_padrao(app, tmp_path, pdf_de_60_
         paginas, imagem, vista, inspetor = _larguras(app, k)
         assert k.doca_paginas.isVisible()                   # a visibilidade volta
         assert abs(inspetor - 296) <= 4 and abs(paginas - 150) <= 4
-        assert abs(imagem / (imagem + vista) - 760 / 1440) < 0.03   # os tamanhos, não os 1100
+        assert abs(imagem - 556) <= 12 and vista > 300     # os de 1366, não os 1100
     finally:
         k.close()
 
@@ -766,3 +766,18 @@ def test_fechar_a_gaveta_pelo_x_tambem_devolve_a_largura(app, janela):
     j.doca_paginas.close()                                      # o X da doca
     fechada = _larguras(app, j)
     assert abs(fechada[1] - inicio[1]) <= 6 and abs(fechada[2] - inicio[2]) <= 6
+
+
+def test_reabrir_em_1366_com_a_gaveta_aberta_mantem_a_imagem(app, tmp_path, pdf_de_60_paginas, sim):  # noqa: F811
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Gaveta", pdf_de_60_paginas)
+    j = _abrir(projeto, 1920, 1080)
+    j.mostrar_resultados()
+    app.processEvents()
+    j.close()
+    k = _abrir(ProjetoDeLivro.abrir(projeto.pasta), 1366, 768)
+    try:
+        paginas, imagem, _, inspetor = _larguras(app, k)
+        assert abs(paginas - 150) <= 4 and abs(imagem - 556) <= 12
+        assert abs(k.doca_resultados.height() - 130) <= 6
+    finally:
+        k.close()

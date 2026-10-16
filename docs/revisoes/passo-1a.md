@@ -97,3 +97,15 @@ O que mudou depois dela (só texto e o gerador das tabelas; o código do program
 | A releitura passou do alvo em duas rodadas do 1a | nas Limitações |
 | O critério da volta no 2a não estava escrito | no roadmap, antes do 2b: 3 rodadas completas no 2a, comparadas pela mediana com as 3 do passo 0 e as 3 do 1a |
 | A docstring do gerador dizia que `-parcial` nunca entra | corrigida |
+
+Confirmação da rodada 4 (produto e medição): Completude 8,5 · Fidelidade das medidas 8 ·
+Clareza para o usuário 8,5 · Produtividade 8 — **aceita**. Os três menores dela também
+entraram: a legenda diz que a mediana não é imune (uma rodada do 1a deu 149 ms), o critério
+de volta do 2a tem a faixa em números e a tolerância, e o teste do gerador confere um valor
+de mediana impresso.
+
+**Fechamento.** As duas revisões aceitaram. A tag `passo-1a` fica no commit que grava este
+registro. As medidas do 1a são do `315db35` (desempenho, o A/B e o xv) e do `3bf1ad3`
+(yusupov, darcy e fatia); de lá até a tag, `abbychess/` só mudou em `_atualizar_livro` e
+nas mensagens de `aplicar_limiares` (rodada 3, medidas refeitas no `315db35`), e depois
+disso só documentação e o gerador das tabelas.

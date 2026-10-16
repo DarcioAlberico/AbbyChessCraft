@@ -400,7 +400,7 @@ Desempenho por passo, em ms ou MB (uma rodada cada; quanto o mesmo código varia
 | Atraso no lote, p99 | 8,5 | 8,6 |
 | Memória com o lote (MB) | 1620 | 1661 |
 
-Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). O p95 do Enter tem duas faixas no mesmo código (perto de 110–130 e perto de 180–190), e o atraso no lote também (perto de 8 e de 21): compare pela mediana (p50), que é estável:
+Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). O p95 do Enter tem duas faixas no mesmo código (perto de 110–130 e perto de 180–190), e o atraso no lote também (perto de 8 e de 21): compare pela mediana (p50), que varia bem menos (mas não é imune: uma rodada solta pode sair alta):
 
 | Código | Commit | Rodada | Troca, p50 | Troca, p95 | Enter, p50 | Enter, p95 | Releitura, p95 | Atraso no lote, p99 |
 |---|---|---|---|---|---|---|---|---|

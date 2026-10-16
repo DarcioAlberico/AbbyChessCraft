@@ -74,7 +74,7 @@ def test_reconhecer_le_o_diagrama_e_poe_o_fen_no_texto(app, janela):
     d = janela.pagina.diagramas[0]
     assert d.fen == FEN + " w - - 0 1"
     assert d.lado is None
-    texto = janela.texto.toPlainText()
+    texto = _texto(janela)
     assert f"[Diagrama 1: {FEN} w - - 0 1 — brancas a jogar (assumido: a página não diz)" in texto
     janela.projeto.descarregar()
     gravado = json.loads(janela.projeto._arquivo_da_pagina(0).read_text(encoding="utf-8"))
@@ -110,8 +110,8 @@ def test_corrigir_casa_a_casa_escolher_o_lado_e_conferir(app, janela):
     assert not dialogo.isVisible()                       # era o único diagrama
     d = janela.pagina.diagramas[0]
     assert d.conferido and d.fen == esperado
-    assert "pretas a jogar (informado na revisão)" in janela.texto.toPlainText()
-    assert "não revisado" not in janela.texto.toPlainText()
+    assert "pretas a jogar (informado na revisão)" in _texto(janela)
+    assert "não revisado" not in _texto(janela)
     assert [x.fen for x in janela.projeto.carregar_diagramas(0)] == [esperado]
     # As duas casas corrigidas viram amostra, só na pasta do projeto.
     assert (janela.projeto.pasta / "diagramas" / "pecas" / "branca" / "Q").is_dir()
@@ -148,7 +148,7 @@ def test_conferencia_sobrevive_a_reabrir_e_a_reconhecer(app, janela):
     janela.reconhecer()
     _esperar(app, janela)
     assert janela.pagina.diagramas[0].conferido and janela.pagina.diagramas[0].lado == "w"
-    assert "brancas a jogar (informado na revisão)" in janela.texto.toPlainText()
+    assert "brancas a jogar (informado na revisão)" in _texto(janela)
 
 
 def test_pagina_antiga_le_o_diagrama_no_primeiro_clique(app, janela):
@@ -161,7 +161,7 @@ def test_pagina_antiga_le_o_diagrama_no_primeiro_clique(app, janela):
                        encoding="utf-8")
     janela.ir_para_pagina(0)
     assert len(janela.pagina.tabuleiros) == 1 and not janela.pagina.diagramas[0].lido
-    assert "[Diagrama 1: ainda não lido]" in janela.texto.toPlainText()
+    assert "[Diagrama 1: ainda não lido]" in _texto(janela)
 
     dialogo = _clicar_no_diagrama(app, janela)
     assert dialogo.fen.text() == FEN + " w - - 0 1"
@@ -178,7 +178,7 @@ def test_lote_le_o_diagrama_e_a_pagina_nao_fica_por_ler(app, janela, monkeypatch
     assert janela.projeto.paginas_lidas() == [0]
     [d] = janela.pagina.diagramas
     assert d.lido and d.fen == FEN + " w - - 0 1" and d.lado is None
-    texto = janela.texto.toPlainText()
+    texto = _texto(janela)
     assert "ainda não lido" not in texto
     assert f"[Diagrama 1: {FEN} w - - 0 1 — brancas a jogar (assumido: a página não diz)" in texto
 
@@ -222,12 +222,12 @@ def test_corrigir_a_legenda_muda_o_lado_sem_f5_e_desfaz_junto(app, janela_com_le
     d = p.diagramas[0]
     assert (d.lado, d.lado_origem, d.titulo) == ("b", dg.LADO_DA_LEGENDA, "pretas jogam")
     assert d.casas == casas and d.fen == FEN + " b - - 0 1"
-    assert "pretas a jogar (da legenda)" in janela.texto.toPlainText()
+    assert "pretas a jogar (da legenda)" in _texto(janela)
 
     p.desfazer()
     _esperar(app, janela)
     assert p.diagramas[0].lado is None
-    assert "(assumido: a página não diz)" in janela.texto.toPlainText()
+    assert "(assumido: a página não diz)" in _texto(janela)
     p.refazer()
     _esperar(app, janela)
     assert p.diagramas[0].lado == "b"
@@ -244,3 +244,9 @@ def test_lado_informado_na_conferencia_nao_muda_com_a_legenda(app, janela_com_le
     for b, c in zip(legenda, "pretasjogam"):
         _corrigir(app, janela, b.gid, c)
     assert (p.diagramas[0].lado, p.diagramas[0].lado_origem) == ("w", dg.LADO_DO_USUARIO)
+
+
+def _texto(janela) -> str:
+    """O painel de texto, sem esperar o relógio que o refaz depois da última mudança."""
+    janela.pintar_texto()
+    return janela.texto.toPlainText()

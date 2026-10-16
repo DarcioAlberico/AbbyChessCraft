@@ -423,9 +423,8 @@ class ControladorDePagina:
 
     def _preparar_reler(self, indice: int, tudo: bool, transacao: Optional[hs.Transacao] = None):
         """`transacao` é a do esquecer de padrões que pediu esta releitura: o que ela mudar
-        emenda o `depois` dela, e um Ctrl+Z desfaz as duas coisas."""
-        if transacao is not None and transacao.invalidada:
-            return None
+        emenda o `depois` dela, e um Ctrl+Z desfaz as duas coisas (o Ctrl+Z espera a
+        releitura: ela não é leve)."""
         pagina = self.modelo
         if indice != self.indice or pagina is None or not pagina.boxes or self.leitor is None:
             return None                     # a página mudou antes da vez da releitura
@@ -442,8 +441,6 @@ class ControladorDePagina:
             return pg.ler_boxes(imagem, lidos, leitor, so_pendentes=not tudo, progresso=progresso)
 
         def pronto(resumo):
-            if transacao is not None and transacao.invalidada:
-                return                      # o esquecer foi desfeito enquanto relia
             foto = pagina.instantaneo()
             dif = ed.aplicar_leituras(pagina, antes, lidos)
             if not dif.vazia:
@@ -517,12 +514,22 @@ class ControladorDePagina:
         antes = tuple(pagina.boxes)
         onde = {b.gid: i for i, b in enumerate(antes)}
         lidos = [b.entry for b in antes]
-        for char, gids in por_char.items():
-            for gid in gids:
-                i = onde[gid]
-                lidos[i] = ed.copia(antes[i].entry)
-                pg.ensinar(imagem, lidos, i, char, leitor, projeto, indice, propagar=False,
-                           gid=gid)
+        try:
+            for char, gids in por_char.items():
+                for gid in gids:
+                    i = onde[gid]
+                    lidos[i] = ed.copia(antes[i].entry)
+                    pg.ensinar(imagem, lidos, i, char, leitor, projeto, indice,
+                               propagar=False, gid=gid)
+        except Exception as erro:        # disco cheio, antivírus: nada do Enter fica
+            for caminho in self.padroes() - antes_inst.padroes:
+                try:
+                    leitor.esquecer(caminho)
+                except Exception:
+                    log.exception("a amostra %s ficou sem o Enter dela", caminho)
+            log.exception("o Enter falhou")
+            self._falhou("Ensinar")(f"O padrão não foi ensinado: {erro}")
+            return
         ed.aplicar_leituras(pagina, antes, lidos)
         transacao = self._mudou(pagina, indice, descricao, antes_inst, juntar=juntar)
         self.eventos.emitir("padroes_mudaram")
@@ -575,6 +582,7 @@ class ControladorDePagina:
             hs.emendar(transacao.paginas[pagina.pid], mais)
         else:
             transacao.paginas[pagina.pid] = mais
+        self.historico.emendou(transacao)
 
     # ------------------------------------------------------------------
     # Os comandos que editam (na vez deles na fila: na hora, se nada está rodando)
@@ -767,11 +775,14 @@ class ControladorDePagina:
             self.eventos.emitir("aviso", "Desfazer", f"Não dá para {acao} "
                                 f"\u201c{transacao.descricao}\u201d: {recusa}. Nada foi mudado.")
             return
-        if not refazer:
-            transacao.invalidada = True     # a propagação dela, se ainda roda, não entra
         for pid, m in transacao.paginas.items():
             hs.aplicar(m, paginas[pid], para_tras=not refazer)
-            self._gravar(paginas[pid])
+        if not refazer:
+            # A propagação dela, se ainda roda, não entra; e o refazer não a roda de novo
+            # (refaz o que a transação guardou: o Ctrl+R relê os pendentes).
+            transacao.invalidada = True
+        for pagina in paginas.values():
+            self._gravar(pagina)
         if refazer:
             for amostra in transacao.amostras_criadas:
                 self.leitor.padroes.restaurar(amostra)
@@ -953,12 +964,22 @@ class ControladorDePagina:
         if self.leitor is not None:
             for caminho in sorted(self.padroes() - antes.padroes):
                 criados.append(self.leitor.padroes.guardar(caminho))
+        # Os ids das áreas e dos diagramas nascem antes de medir: o que a transação guarda é
+        # o que vai para o disco (e o desfazer compara com o que a página tem).
+        pagina.zonas = zn.com_ids(pagina.zonas)
+        pagina.diagramas = dg.com_ids(pagina.diagramas)
         transacao = self.historico.registrar(hs.Transacao(
             descricao, {pagina.pid: hs.mudanca(antes.pagina, pagina.instantaneo())},
             amostras_criadas=criados, juntar=juntar))
         self._gravar(pagina)
         if pagina is self.modelo:
-            self.eventos.emitir("glifos_mudaram", None)
+            m = transacao.paginas.get(pagina.pid)
+            # Só a leitura de alguns glifos mudou (a lista e as caixas, não): a janela
+            # repinta só eles; senão, tudo.
+            so_leitura = (m is not None and m.ordem is None and not m.campos.keys() - {"estado"}
+                          and all(a is not None and d is not None for a, d in
+                                  zip(m.antes.values(), m.depois.values())))
+            self.eventos.emitir("glifos_mudaram", set(m.antes) if so_leitura else None)
         self.eventos.emitir("acoes_mudaram")
         return transacao
 

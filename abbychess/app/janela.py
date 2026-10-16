@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from PySide6.QtCore import QSettings, Qt, Signal
+from PySide6.QtCore import QSettings, Qt, QTimer, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (QApplication, QDockWidget, QMainWindow, QMessageBox, QPlainTextEdit,
                                QProgressBar, QTabWidget)
@@ -142,6 +142,13 @@ class JanelaPrincipal(QMainWindow):
 
         self.texto = QPlainTextEdit()
         self.texto.setReadOnly(True)
+        # O texto da página é refeito uma vez, um instante depois da última mudança: montar
+        # o documento leva dezenas de ms, e um Enter muda a página duas vezes (o glifo e,
+        # depois, a propagação).
+        self.relogio_do_texto = QTimer(self)
+        self.relogio_do_texto.setSingleShot(True)
+        self.relogio_do_texto.setInterval(150)
+        self.relogio_do_texto.timeout.connect(self.pintar_texto)
         self.texto.setFont(QFont(FONTE_DE_SIMBOLOS, 11))
         doca_texto = QDockWidget("Texto reconhecido", self)
         doca_texto.setObjectName("doca_texto")
@@ -374,15 +381,19 @@ class JanelaPrincipal(QMainWindow):
         if self.visor.modo_areas and not p.zonas:
             self.areas.automaticas()
 
-    def _glifos_mudaram(self, _gids=None) -> None:
+    def _glifos_mudaram(self, gids=None) -> None:
+        """`gids`: só esses mudaram (a leitura, não a caixa nem a lista); None: tudo."""
         p = self.pagina
         na_fila = set(p.fila())
-        pendentes = {i for i, g in enumerate(p.gids) if g in na_fila}
-        diagramas = p.diagramas
-        self.visor.mostrar_boxes(p.boxes, pendentes, [d.caixa for d in diagramas],
-                                 [cores.cor_do_diagrama(d) for d in diagramas])
+        todos = p.gids
+        pendentes = {i for i, g in enumerate(todos) if g in na_fila}
+        mudados = None if gids is None else [i for i, g in enumerate(todos) if g in gids]
+        if mudados is None or not self.visor.repintar_boxes(p.boxes, pendentes, mudados):
+            diagramas = p.diagramas
+            self.visor.mostrar_boxes(p.boxes, pendentes, [d.caixa for d in diagramas],
+                                     [cores.cor_do_diagrama(d) for d in diagramas])
         self._selecao_mudou()
-        self.texto.setPlainText(p.texto())
+        self.relogio_do_texto.start()
         if p.leitor is not None:
             por_char = p.leitor.padroes_por_caractere()
             self.treino.mostrar_contagens(len(pendentes), len(p.boxes),
@@ -401,6 +412,10 @@ class JanelaPrincipal(QMainWindow):
         self.visor.selecionar(p.indice_de(p.atual))
         if not self.executor.so_leves():        # a propagação de um Enter não prende o painel
             self.treino.habilitar(False)
+
+    def pintar_texto(self) -> None:
+        self.relogio_do_texto.stop()
+        self.texto.setPlainText(self.pagina.texto())
 
     def _selecao_mudou(self) -> None:
         p = self.pagina

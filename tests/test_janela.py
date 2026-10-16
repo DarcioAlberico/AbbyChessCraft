@@ -51,6 +51,8 @@ def _esperar(app, janela, limite=20.0):
         time.sleep(0.01)
     app.processEvents()
     assert not janela.executor.ocupado, "a tarefa não terminou no prazo"
+    if janela.relogio_do_texto.isActive():          # o texto da página, sem esperar o relógio
+        janela.pintar_texto()
 
 
 def test_pagina_nova_pede_reconhecimento(janela):

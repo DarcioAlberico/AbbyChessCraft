@@ -412,7 +412,7 @@ Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (commit 76ba432; má
 | Buscar regex no livro | não existe | 1000 ms |
 | Montar o índice da busca | não existe | 2000 ms |
 
-Desempenho por passo, em ms ou MB (uma rodada cada, a do portão; quanto o mesmo código varia de uma rodada para outra, e o que se conclui, está nas rodadas repetidas, abaixo):
+Desempenho por passo, em ms ou MB (uma rodada cada, a do portão, que roda no mesmo processo depois dos testes `livro_real` e por isso não é a condição das rodadas repetidas; quanto o mesmo código varia, e o que se conclui, está nelas, abaixo):
 
 | Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) |
 |---|---|---|---|
@@ -423,7 +423,7 @@ Desempenho por passo, em ms ou MB (uma rodada cada, a do portão; quanto o mesmo
 | Atraso no lote, p99 | 8,5 | 8,6 | 15,1 |
 | Memória com o lote (MB) | 1620 | 1661 | 1676 |
 
-Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter tem duas faixas no mesmo código (perto de 110–130 e de 180–190); o atraso no lote tem duas faixas sempre (perto de 8 e de 21). Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
+Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter tem duas faixas no mesmo código (perto de 110–130 e de 180–235); o atraso no lote tem duas faixas sempre (perto de 8 e de 21). Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
 
 | Código | Commit | Rodada | Troca, p50 | Troca, p95 | Enter, p50 | Enter, p95 | Releitura, p50 | Releitura, p95 | Atraso no lote, p99 |
 |---|---|---|---|---|---|---|---|---|---|

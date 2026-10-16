@@ -200,6 +200,13 @@ def test_releitura_de_um_glifo(ambiente, medidas):
     lados = [(0, 0, 1, 0), (0, 0, -1, 0)]
 
     resultado = cronometrar(lambda i: janela.pagina.ajustar(*lados[i % 2]))
+    # O texto da página é refeito um instante depois da última mudança (desde o 2b), fora do
+    # tempo acima: o que ele custa na interface, à parte.
+    medidas["texto_da_pagina"] = {
+        **cronometrar(lambda i: janela.pintar_texto()),
+        "como": "refazer o painel de texto da página (montar o documento e pôr no painel), "
+                "que desde o 2b roda 150 ms depois da última mudança, e não dentro do Enter "
+                "nem da releitura"}
     medidas["releitura_de_um_glifo"] = {**resultado, "alvo_ms": 150,
                                         "com_o_lote": "impossível hoje: o lote ocupa o executor"}
 

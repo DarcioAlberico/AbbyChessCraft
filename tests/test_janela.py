@@ -581,3 +581,53 @@ def test_alt_seta_redesenha_a_caixa_no_visor(app, janela):
     b = boxes(janela)[0]
     retangulo = janela.visor._itens_dos_boxes[0].rect()
     assert (retangulo.width(), retangulo.height()) == (b.x2 - b.x1, b.y2 - b.y1)
+
+
+
+def _enter_com_propagacao_presa(app, janela, monkeypatch):
+    import threading
+
+    from abbychess import pagina as pg
+
+    solto = threading.Event()
+    original = pg.propagar_padroes
+    monkeypatch.setattr(pg, "propagar_padroes",
+                        lambda *a, **k: (solto.wait(10), original(*a, **k))[1])
+    janela.reconhecer()
+    _esperar(app, janela)
+    mostrar(janela, 0)                                    # o primeiro "a"
+    janela.treino.campo.setText("a")
+    janela.treino._ensinar()                              # a propagação, presa
+    return solto
+
+
+def test_propagacao_que_resolve_o_glifo_mostrado_avanca_se_nada_foi_digitado(app, janela,
+                                                                          monkeypatch):
+    solto = _enter_com_propagacao_presa(app, janela, monkeypatch)
+    mostrar(janela, 3)                                    # outro "a", posto (não escolhido)
+    mostrado = janela.pagina.atual
+    solto.set()
+    _esperar(app, janela)
+    assert janela.pagina.atual != mostrado               # ele se resolveu: o painel anda
+
+
+def test_propagacao_nao_tira_o_glifo_em_que_o_usuario_digita(app, janela, monkeypatch):
+    from PySide6.QtTest import QTest
+
+    solto = _enter_com_propagacao_presa(app, janela, monkeypatch)
+    mostrar(janela, 3)                                    # um "a" que a propagação resolve
+    mostrado = janela.pagina.atual
+    janela.treino.campo.clear()
+    QTest.keyClicks(janela.treino.campo, "q")             # o usuário começou a digitar
+    solto.set()
+    _esperar(app, janela)
+    assert janela.pagina.atual == mostrado and janela.treino.campo.text() == "q"
+
+
+def test_propagacao_nao_tira_o_glifo_escolhido_por_clique(app, janela, monkeypatch):
+    solto = _enter_com_propagacao_presa(app, janela, monkeypatch)
+    janela.pagina.clicar(3)                               # um "a", escolhido por clique
+    escolhido = janela.pagina.atual
+    solto.set()
+    _esperar(app, janela)
+    assert janela.pagina.atual == escolhido

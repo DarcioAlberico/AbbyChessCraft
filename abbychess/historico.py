@@ -336,6 +336,15 @@ class HistoricoDoProjeto:
     def refeita(self) -> None:
         self._desfazer.append(self._refazer.pop())
 
+    def descartar_desfazer(self) -> None:
+        """Tira a próxima a desfazer sem aplicá-la (a que foi recusada)."""
+        if self._desfazer:
+            self._esquecer(self._desfazer.pop())
+
+    def descartar_refazer(self) -> None:
+        if self._refazer:
+            self._esquecer(self._refazer.pop())
+
     def limpar(self) -> None:
         self._desfazer.clear()
         self._refazer.clear()

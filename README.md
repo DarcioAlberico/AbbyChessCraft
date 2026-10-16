@@ -69,21 +69,26 @@ letra solta em campo de texto, Ctrl+Alt e ligação nativa encoberta sem exceç�
    - **Ctrl+Z** desfaz e **Ctrl+Y** (ou Ctrl+Shift+Z) refaz, também com o foco no campo do
      caractere: ensinar, corrigir, descartar, dividir, juntar, ajustar as bordas, marcar um
      glifo, corrigir uma palavra na verificação, conferir um diagrama, o próprio F5, as
-     áreas do editor de áreas e esquecer padrões. **O desfazer é do projeto** (desde o passo
+     áreas do editor de áreas, esquecer padrões e o Reler pendentes. **O desfazer é do
+     projeto** (desde o passo
      2b): o Ctrl+Z desfaz a última ação do livro, mesmo que ela tenha sido noutra página, e
      abre essa página. Desfazer um ensinar apaga do livro as amostras que ele gravou, e as
      repetições que elas tinham resolvido voltam à fila; refazer as grava de novo; desfazer
      um esquecer devolve as amostras. Os Alt+seta seguidos no mesmo box, e os arrastes
      seguidos da mesma área, se desfazem de uma vez. O menu **Editar** diz o que vai ser
-     desfeito. **Se algum glifo da ação mudou depois por outro caminho** (o lote, Reler
-     pendentes), o desfazer recusa, diz por quê e não muda nada; uma mudança em outros
-     glifos não impede.
+     desfeito. **Se algum glifo da ação mudou depois por um caminho que não passa pelo
+     desfazer** (o reconhecimento em lote), o desfazer recusa e diz por quê, sem mudar nada,
+     e pergunta se você quer tirar essa ação do desfazer para chegar às anteriores; uma
+     mudança em outros glifos não impede.
    - **O Enter não espera a página toda** (desde o passo 2b). O glifo ensinado muda de cor
      na hora e o próximo pendente já aparece; a propagação do padrão pelos outros pendentes
      da página roda em seguida, fora da janela ("Propagando o padrão" na barra), e o que ela
      resolver muda de cor quando ela acaba. Dá para ensinar o glifo seguinte enquanto isso.
-     Um Ctrl+Z com a propagação ainda rodando desfaz o Enter e descarta o que ela ia
-     resolver (o refazer refaz só o glifo ensinado; Ctrl+R relê os pendentes).
+     Se a propagação resolver o glifo que o painel mostra, o painel passa ao próximo
+     pendente, a não ser que você já tenha começado a digitar nele ou o tenha escolhido com
+     um clique (aí ele fica, e o que você digitou não se perde). Um Ctrl+Z com a propagação
+     ainda rodando desfaz o Enter e descarta o que ela ia resolver; o refazer refaz o glifo
+     e roda a propagação de novo.
    - **Uma coisa por vez, na ordem** (desde o passo 2a). Reconhecer e reler rodam fora da
      janela, e enquanto isso o painel de treino fica desligado (a barra mostra o que está
      rodando); a propagação de um Enter não o desliga. O que você pedir nesse meio-tempo,
@@ -781,10 +786,12 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   palavra desconhecida, mas o espaço que falta não é um glifo; a palavra fica sinalizada até
   ir para o dicionário ou ser ignorada. Pedaços de lance que o core não reconhece como
   notação ("xd", "O...Qf") também aparecem.
-- **O desfazer é da sessão.** Fechar o projeto o esquece, e ele guarda até 50 MB (as
-  ações mais antigas saem). Ficam fora dele o reconhecimento em lote (que tem "voltar ao
-  estado antes do lote" no passo E), o Reler pendentes e as amostras de diagrama guardadas
-  na conferência (a conferência em si se desfaz).
+- **O desfazer é da sessão.** Fechar o projeto o esquece, e ele guarda até 50 MB pela
+  estimativa dele (as ações mais antigas saem). Ficam fora dele o reconhecimento em lote
+  (que ganha "voltar ao estado antes do lote" no passo E) e as amostras de diagrama
+  guardadas na conferência (a conferência em si se desfaz). Depois de um lote que releu
+  uma página, o Ctrl+Z das ações de antes nela é recusado (os glifos mudaram), e a pergunta
+  da recusa deixa tirá-las do caminho.
 - **Endireitar só corrige a inclinação.** Página curva perto da lombada, ou girada mais
   de 3°, não se endireita; projeto antigo não endireita (ver **A página torta**).
 - **A legenda só diz o lado depois de ensinada.** No Xadrez Vitorioso a cadeia global lê mal

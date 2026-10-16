@@ -273,7 +273,10 @@ def test_mudanca_por_fora_nos_gids_recusa_o_desfazer_e_em_outros_nao(app, janela
     from abbychess import edicao as ed
 
     avisos = []
-    monkeypatch.setattr(QMessageBox, "warning", lambda _p, _t, texto, *a: avisos.append(texto))
+    # A recusa pergunta se tira a ação do desfazer: aqui, "não".
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda _p, _t, texto, *a, **k: (avisos.append(texto),
+                                                        QMessageBox.StandardButton.No)[1])
     _reconhecida(app, janela)
     mostrar(janela, 0)
     janela.pagina.corrigir("Z")
@@ -436,3 +439,54 @@ def test_edicao_que_reordena_a_pagina_volta_na_ordem_de_antes():
     assert p.boxes == inicial
     hs.aplicar(m, p, para_tras=False)
     assert [b.entry.char for b in p.boxes] == ["c", "a", "x", "d"]
+
+
+def test_recusa_pode_tirar_a_acao_e_seguir_com_as_anteriores(app, janela, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    from abbychess import edicao as ed
+
+    _reconhecida(app, janela)
+    mostrar(janela, 1)
+    janela.pagina.corrigir("Q")                         # a anterior
+    mostrar(janela, 0)
+    janela.pagina.corrigir("Z")                         # a recusada
+    modelo = janela.pagina.modelo
+    ed.corrigir(modelo, modelo.boxes[0].gid, "W")       # por fora
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
+    janela.pagina.desfazer()                            # recusa, e "sim": tira a ação
+    assert janela.acao_desfazer.text() == "Desfazer: Corrigir para 'Q'"
+    janela.pagina.desfazer()                            # e a anterior volta
+    assert boxes(janela)[1].char != "Q" and boxes(janela)[0].char == "W"
+
+
+def test_reler_pendentes_entra_no_desfazer(app, janela):
+    inicio = _reconhecida(app, janela)
+    mostrar(janela, 0)
+    janela.treino.campo.setText("a")
+    janela.treino._ensinar()
+    _esperar(app, janela)
+    janela.pagina.desfazer()                            # o Enter e a propagação saem
+    janela.leitor.padroes.restaurar(janela.pagina.historico.proxima_a_refazer()
+                                    .amostras_criadas[0])      # o padrão volta por fora
+    janela.pagina.reler_pendentes()
+    _esperar(app, janela)
+    assert janela.acao_desfazer.text() == "Desfazer: Reler pendentes"
+    janela.pagina.desfazer()
+    assert _caixas(boxes(janela)) == inicio
+
+
+def test_refazer_um_enter_desfeito_na_propagacao_propaga_de_novo(app, janela, monkeypatch):
+    _reconhecida(app, janela)
+    solto = _propagacao_presa(monkeypatch)
+    mostrar(janela, 0)
+    janela.treino.campo.setText("a")
+    janela.treino._ensinar()
+    janela.pagina.desfazer()                            # com a propagação presa
+    solto.set()
+    _esperar(app, janela)
+    janela.pagina.refazer()                             # refaz e propaga de novo
+    _esperar(app, janela)
+    assert sum(b.source == FONTE_LIVRO for b in boxes(janela)) == 4
+    janela.pagina.desfazer()                            # e o desfazer leva as duas coisas
+    assert not any(b.source in (FONTE_LIVRO, FONTE_MANUAL) for b in boxes(janela))

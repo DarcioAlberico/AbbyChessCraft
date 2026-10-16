@@ -718,10 +718,12 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   vale "com o lote rodando", o que só o passo E permite medir.
 - **A memória do desfazer está no alvo** para correções de um glifo (é o que a medida faz:
   300 correções reais em 3 páginas): 8,0–8,1 MB para 300 páginas × 20 ações pelo
-  `tracemalloc` (o portão e duas rodadas só da memória, commit `badede5`), e a estimativa do
+  `tracemalloc` (o portão e uma rodada só da memória no commit `badede5`, outra no `b291e91`,
+  que só mexe na verificação), e a estimativa do
   próprio histórico, a que o limite de 50 MB usa, 6,9–7,3 MB, uns 10% abaixo. Nas 6 rodadas
   repetidas a medida ainda tinha o gravador gravando entre as duas leituras, e uma deu −9,6
-  (o portão do 6f863c3 deu 0,2); o teste passou a esperar o gravador antes de cada leitura. O F5 é a ação mais cara (a página inteira); 50 MB cabem
+  (o portão do 6f863c3, que está no commit `84b3ce6`, deu 0,2); o teste passou a esperar o
+  gravador antes de cada leitura. O F5 é a ação mais cara (a página inteira); 50 MB cabem
   umas 50 páginas reconhecidas de novo, e as ações mais antigas saem antes.
 - **O congelamento dos modelos para a coleta de lixo (`gc.freeze`) saiu no 2b.** Nas 6
   rodadas do commit `b5c5142` (3 com e 3 sem, `docs/medidas/2026-10-16-congelamento-2b-*`)

@@ -178,3 +178,14 @@ de fidelidade, sem código do produto:
 
 O portão do `badede5` substituiu o do `6f863c3` (a diferença é o teste de memória e o
 painel do glifo escolhido, fora do caminho medido do Enter, da releitura e da troca).
+
+## Revisão de produto, rodada 3
+
+Completude 9 · Fidelidade das medidas 8 · Clareza para o usuário 9 · Produtividade 9 —
+**aceita**. Os dois menores dela entraram no README: uma das rodadas só de memória foi
+medida no `b291e91` (outra sessão, só a verificação), não no `badede5`; e o portão do
+`6f863c3`, que deu 0,2 MB, está no commit `84b3ce6`.
+
+**Fechamento.** As duas revisões aceitaram: código na rodada 4, produto na 3. A tag
+`passo-2b` fica no commit que grava este registro. As medidas de desempenho são as 6 rodadas
+do `6f863c3` e o portão do `badede5`; a qualidade e a fatia, do `6f863c3`.

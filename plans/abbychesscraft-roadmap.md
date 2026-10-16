@@ -200,8 +200,7 @@ verificação dele inclui 6 rodadas completas de desempenho, 3 sem o congelament
 (p50) com as do passo 0 (que também não congelava), a mediana do Enter e a da releitura
 voltam à faixa do passo 0 (em 2026-10-16: Enter 104–105 ms, releitura 106–108 ms), com 5 ms
 de tolerância, em pelo menos 2 das 3 rodadas. Pelas **com congelamento**, o p95 da
-releitura não fica pior que o do 1b (152–158 ms); o alvo de 150 ms para ele é do passo 2b,
-que tira a cópia da página do desfazer.
+releitura fica ≤ 150 ms (o 1b deu 136–144 ms) e o do Enter não volta à faixa alta de ~200 ms.
 
 ## Passo 2b — Desfazer e propagação (§14.2)
 

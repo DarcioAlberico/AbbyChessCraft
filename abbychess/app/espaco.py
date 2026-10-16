@@ -162,12 +162,14 @@ class EspacoDeTrabalho:
         self.botao_cancelar.setToolTip("Cancelar o lote")
         self.botao_cancelar.setAccessibleName("Cancelar o lote")
         self.botao_cancelar.clicked.connect(self.livro.cancelar)
+        self.botao_cancelar.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.progresso = QProgressBar()
         self.progresso.setMaximumWidth(200)
         self.botao_avisos = QToolButton()
         self.botao_avisos.setAccessibleName("Avisos e erros")
         self.botao_avisos.setToolTip("Os avisos e erros do projeto (Resultados / Avisos)")
         self.botao_avisos.clicked.connect(self.abrir_avisos)
+        self.botao_avisos.setFocusPolicy(Qt.FocusPolicy.NoFocus)    # o Tab do campo não para aqui
         for widget in (self.rotulo_da_pagina, self.rotulo_da_fila, self.caixa_de_zoom,
                        self.rotulo_do_lote, self.botao_cancelar, self.progresso,
                        self.botao_avisos):
@@ -209,11 +211,16 @@ class EspacoDeTrabalho:
             self.resizeDocks([self.doca_paginas], [paginas], Qt.Orientation.Horizontal)
         if self.arranjo == "lado_a_lado":
             centro = self.divisor.width()
-            imagem = round(centro * 760 / 1440)
+            # Abaixo de 1600 a gaveta aberta sai da vista direita, como no F9 (a Imagem de
+            # 1366 é o limite da x-height do CA-3.2); de 1600 em diante a tabela já a conta.
+            emprestado = paginas if largura < LARGURA_DA_GAVETA else 0
+            imagem = round((centro + emprestado) * 760 / 1440)
             self.divisor.setSizes([imagem, centro - imagem])
         else:
             altura = self.divisor.height()
             self.divisor.setSizes([round(altura * 0.6), round(altura * 0.4)])
+        if self.doca_resultados.isVisible():
+            self._altura_dos_resultados()
 
     def alternar_paginas(self) -> None:
         """F9: abre ou fecha a gaveta de Páginas."""

@@ -58,7 +58,7 @@ class PainelDePaginas(QWidget):
         self.lista.setAccessibleName("Páginas do livro")
         self.lista.setRootIsDecorated(False)
         self.lista.setUniformRowHeights(True)
-        self.lista.setHeaderLabels(["Pág.", "", "Rev.", "Diag."])
+        self.lista.setHeaderLabels(["Pág.", "Est.", "Rev.", "Diag."])
         self.lista.headerItem().setToolTip(1, "O estado da página (passe o mouse no símbolo)")
         self.lista.headerItem().setToolTip(2, "Glifos a revisar")
         self.lista.headerItem().setToolTip(3, "Diagramas por conferir")
@@ -66,7 +66,7 @@ class PainelDePaginas(QWidget):
         self.lista.itemActivated.connect(self._abrir_item)
         self.lista.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.lista.customContextMenuRequested.connect(self._menu)
-        for coluna, largura in enumerate((36, 22, 36, 32)):    # cabem nos 130 px da gaveta
+        for coluna, largura in enumerate((34, 28, 34, 32)):    # cabem nos 130 px da gaveta
             self.lista.setColumnWidth(coluna, largura)
 
         caixa = QVBoxLayout(self)

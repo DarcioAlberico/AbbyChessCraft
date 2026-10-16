@@ -1,0 +1,144 @@
+{
+ "livro": "xv",
+ "passo": "A2",
+ "snapshot": "xv-i020-026-inicial.zip",
+ "snapshot_sha256": "0cf949dff64e9609389eef1bdc6ef935459fb6fd1e6933c3baaf66bc8fcf2431",
+ "catalogo_versao": 4,
+ "gabaritos": {
+  "i020": {
+   "verdade_versao": 1,
+   "sha256": "a55f44e679fbb1f15098deafc05db636d54615072ec5eb85c1b82ea114639f52"
+  },
+  "i021": {
+   "verdade_versao": 1,
+   "sha256": "33165d42394d58ff96f7235ce5e4945aaa0a89e8a276c5f38c2af1d489133383"
+  },
+  "i022": {
+   "verdade_versao": 1,
+   "sha256": "66c8a65b59a0952695850d40fde19a274da58cc60d50c9909e3090294730a76a"
+  },
+  "i023": {
+   "verdade_versao": 1,
+   "sha256": "8cd81686f82c1353791fa38c167e374e7b24c5051b1d8bd1ed7d49cf5e7aca1f"
+  },
+  "i024": {
+   "verdade_versao": 1,
+   "sha256": "0b622dd9d3f5a6baf624a0a22bb040d4266851b0a6f1254bff2737a3a3681507"
+  },
+  "i025": {
+   "verdade_versao": 1,
+   "sha256": "49a4bd5b562b0a6e61f7679efafb3edbd87ee4db9087bf0fe9c8d5dba6bba36f"
+  },
+  "i026": {
+   "verdade_versao": 1,
+   "sha256": "53af8e207a1a2a0724648d9dc7bdeb855edc8d4a6ac629e8afb1cd40d9d19c83"
+  }
+ },
+ "paginas": {
+  "i020": {
+   "gestos_texto": 0,
+   "gestos_diagramas": 2,
+   "comandos": {
+    "abrir_diagrama": 1,
+    "fechar_diagrama": 1
+   },
+   "impossiveis": {},
+   "linhas_verificadas": 0,
+   "erros": {
+    "texto": 0,
+    "diagramas": 0
+   }
+  },
+  "i021": {
+   "gestos_texto": 0,
+   "gestos_diagramas": 0,
+   "comandos": {},
+   "impossiveis": {},
+   "linhas_verificadas": 0,
+   "erros": {
+    "texto": 0,
+    "diagramas": 0
+   }
+  },
+  "i022": {
+   "gestos_texto": 0,
+   "gestos_diagramas": 0,
+   "comandos": {},
+   "impossiveis": {},
+   "linhas_verificadas": 0,
+   "erros": {
+    "texto": 0,
+    "diagramas": 0
+   }
+  },
+  "i023": {
+   "gestos_texto": 0,
+   "gestos_diagramas": 0,
+   "comandos": {},
+   "impossiveis": {},
+   "linhas_verificadas": 0,
+   "erros": {
+    "texto": 0,
+    "diagramas": 0
+   }
+  },
+  "i024": {
+   "gestos_texto": 0,
+   "gestos_diagramas": 3,
+   "comandos": {
+    "abrir_diagrama": 1,
+    "corrigir_lado": 1,
+    "fechar_diagrama": 1
+   },
+   "impossiveis": {},
+   "linhas_verificadas": 0,
+   "erros": {
+    "texto": 0,
+    "diagramas": 1
+   }
+  },
+  "i025": {
+   "gestos_texto": 0,
+   "gestos_diagramas": 6,
+   "comandos": {
+    "abrir_diagrama": 2,
+    "corrigir_lado": 2,
+    "fechar_diagrama": 2
+   },
+   "impossiveis": {},
+   "linhas_verificadas": 0,
+   "erros": {
+    "texto": 0,
+    "diagramas": 2
+   }
+  },
+  "i026": {
+   "gestos_texto": 0,
+   "gestos_diagramas": 3,
+   "comandos": {
+    "abrir_diagrama": 1,
+    "corrigir_lado": 1,
+    "fechar_diagrama": 1
+   },
+   "impossiveis": {},
+   "linhas_verificadas": 0,
+   "erros": {
+    "texto": 0,
+    "diagramas": 1
+   }
+  }
+ },
+ "gestos_texto": 0,
+ "gestos_diagramas": 14,
+ "gestos_navegacao": 6,
+ "impossiveis": {},
+ "custo_dos_impossiveis": 0,
+ "linhas_usadas": [],
+ "estado": "pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual",
+ "gestos": null,
+ "gestos_sem_impossiveis": null,
+ "data": "2026-10-16",
+ "commit": "cec156f",
+ "arvore_suja": false,
+ "arquivos_sujos": []
+}

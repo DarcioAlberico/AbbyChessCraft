@@ -191,27 +191,6 @@ def test_os_modos_de_zoom(app, janela_de_60):
     assert j.caixa_de_zoom.focusPolicy() == Qt.FocusPolicy.ClickFocus
 
 
-def test_botao_do_meio_e_espaco_arrastam_a_pagina(app, janela_de_60):
-    j = janela_de_60
-    j.visor.definir_zoom(4.0)
-    j.visor.modo_treino = True                       # mesmo no modo de treino
-    porta = j.visor.viewport()
-    barra = j.visor.verticalScrollBar()
-    barra.setValue(barra.maximum() // 2)
-    antes = barra.value()
-    QTest.mousePress(porta, Qt.MouseButton.MiddleButton, pos=QPoint(300, 300))
-    QTest.mouseMove(porta, QPoint(300, 200))
-    QTest.mouseRelease(porta, Qt.MouseButton.MiddleButton, pos=QPoint(300, 200))
-    assert barra.value() == antes + 100
-    j.visor.setFocus()
-    QTest.keyPress(j.visor, Qt.Key.Key_Space)
-    QTest.mousePress(porta, Qt.MouseButton.LeftButton, pos=QPoint(300, 300))
-    QTest.mouseMove(porta, QPoint(300, 350))
-    QTest.mouseRelease(porta, Qt.MouseButton.LeftButton, pos=QPoint(300, 350))
-    QTest.keyRelease(j.visor, Qt.Key.Key_Space)
-    assert barra.value() == antes + 50 and j.pagina.boxes == []   # arrastou, não marcou
-
-
 # ----------------------------------------------------------------------
 # O item dos boxes na janela de verdade (a página sintética de `test_janela`)
 # ----------------------------------------------------------------------
@@ -304,3 +283,155 @@ def test_f8_vai_ao_proximo_diagrama_por_conferir_do_livro(app, tmp_path, monkeyp
         assert j.pagina.indice == 2 and abertas == [0]
     finally:
         j.close()
+
+
+def test_botao_do_meio_e_espaco_arrastam_a_pagina_sem_marcar(app, janela):
+    janela.show()
+    app.processEvents()
+    j = janela
+    j.visor.definir_zoom(8.0)
+    j.modo_treino(True)                              # mesmo no modo de treino
+    antes_dos_boxes = list(j.pagina.modelo.boxes)
+    porta = j.visor.viewport()
+    barra = j.visor.verticalScrollBar()
+    assert barra.maximum() >= 200
+    barra.setValue(0)
+    antes = barra.value()
+    QTest.mousePress(porta, Qt.MouseButton.MiddleButton, pos=QPoint(300, 300))
+    QTest.mouseMove(porta, QPoint(300, 200))
+    QTest.mouseRelease(porta, Qt.MouseButton.MiddleButton, pos=QPoint(300, 200))
+    assert barra.value() == antes + 100
+    j.visor.setFocus()
+    QTest.keyPress(j.visor, Qt.Key.Key_Space)
+    QTest.mousePress(porta, Qt.MouseButton.LeftButton, pos=QPoint(300, 300))
+    QTest.mouseMove(porta, QPoint(300, 350))
+    QTest.mouseRelease(porta, Qt.MouseButton.LeftButton, pos=QPoint(300, 350))
+    QTest.keyRelease(j.visor, Qt.Key.Key_Space)
+    assert barra.value() == antes + 50
+    assert j.pagina.modelo.boxes == antes_dos_boxes      # arrastou, não marcou quadro
+
+
+def test_espaco_solto_fora_do_visor_nao_fica_preso(app, janela):
+    janela.show()
+    app.processEvents()
+    janela.visor.setFocus()
+    QTest.keyPress(janela.visor, Qt.Key.Key_Space)
+    janela.treino.campo.setFocus()                   # o foco sai (Alt+Tab, um diálogo)
+    app.processEvents()
+    assert not janela.visor._espaco
+
+
+def test_seguir_desligado_nao_move_a_vista(app, janela):
+    janela.show()
+    app.processEvents()
+    janela.visor.definir_zoom(3.0)
+    janela.acao_seguir.setChecked(False)
+    barra_h, barra_v = janela.visor.horizontalScrollBar(), janela.visor.verticalScrollBar()
+    barra_h.setValue(0)
+    barra_v.setValue(0)
+    for _ in range(4):
+        janela.pagina.andar(+1)
+    assert (barra_h.value(), barra_v.value()) == (0, 0)
+
+
+def test_zoom_no_item_atual_e_shift_roda(app, janela):
+    from PySide6.QtCore import QPointF
+    from PySide6.QtGui import QWheelEvent
+
+    janela.show()
+    app.processEvents()
+    mostrar(janela, 0)
+    janela.visor.zoom_item()
+    b = boxes(janela)[0]
+    centro = janela.visor.mapFromScene((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)
+    vista = janela.visor.viewport().rect()
+    assert janela.visor.escala() > 1 and vista.contains(centro)
+    barra = janela.visor.horizontalScrollBar()
+    barra.setValue(barra.maximum() // 2)
+    antes = barra.value()
+    evento = QWheelEvent(QPointF(100, 100), QPointF(100, 100), QPoint(0, 0), QPoint(0, -120),
+                         Qt.MouseButton.NoButton, Qt.KeyboardModifier.ShiftModifier,
+                         Qt.ScrollPhase.NoScrollPhase, False)
+    janela.visor.wheelEvent(evento)
+    assert barra.value() > antes
+
+
+def test_pixmap_em_cache_vale_so_para_a_mesma_imagem(app, janela):
+    from PIL import Image
+
+    primeiro = janela._pixmap(0, janela.pagina.imagem)
+    assert janela._pixmap(0, janela.pagina.imagem) is primeiro
+    outra = Image.new("L", janela.pagina.imagem.size, 255)
+    assert janela._pixmap(0, outra) is not primeiro
+
+
+def test_pgdn_com_a_pagina_inteira_na_vista_vira_a_pagina(app, janela_de_60):
+    j = janela_de_60
+    j.ir_para_pagina(3)
+    j.visor.zoom_pagina()                            # a página cabe: não há o que rolar
+    j.visor.setFocus()
+    QTest.keyClick(j.visor, Qt.Key.Key_PageDown)
+    assert j.pagina.indice == 4
+    QTest.keyClick(j.visor, Qt.Key.Key_PageUp)
+    assert j.pagina.indice == 3
+
+
+def test_f8_sem_diagrama_avisa_e_na_propria_pagina_abre_ela(app, janela, monkeypatch):
+    janela.acao_diagramas.trigger()
+    assert "Não há diagrama por conferir" in janela.statusBar().currentMessage()
+    abertos = []
+    monkeypatch.setattr(janela.conferencia, "conferir", lambda indice=None: abertos.append(1))
+    janela.pagina.modelo.tabuleiros = [(10, 10, 210, 210)]
+    janela.acao_diagramas.trigger()
+    assert abertos == [1] and janela.pagina.indice == 0
+
+
+# ----------------------------------------------------------------------
+# O cache com duas threads, e as visitas
+# ----------------------------------------------------------------------
+
+def test_a_mesma_pagina_pedida_por_duas_threads_e_renderizada_uma_vez(pdf_de_60_paginas):
+    import threading
+
+    fonte = pg.FonteDePaginas(pdf_de_60_paginas)
+    chamadas = []
+    original = fonte._pagina
+    devagar = threading.Event()
+
+    def _pagina(indice):
+        chamadas.append(indice)
+        devagar.wait(2)
+        return original(indice)
+
+    fonte._pagina = _pagina
+    cache = pg.CacheDePaginas(fonte)
+    cache.precarregar(5)                              # a pré-carga começa
+    resultado = []
+    leitor = threading.Thread(target=lambda: resultado.append(cache.pagina(5)))
+    leitor.start()                                     # e o clique pede a mesma
+    devagar.set()
+    leitor.join(5)
+    cache.esperar()
+    assert chamadas == [5] and resultado and resultado[0] is cache.pagina(5)
+
+
+def test_visitas_cortam_o_que_vinha_depois_ao_navegar_no_meio(app, janela_de_60):
+    p = janela_de_60.pagina
+    for k in (3, 10, 20):
+        p.ir_para(k)
+    p.voltar_visita()
+    p.voltar_visita()                                  # em 3, com 10 e 20 adiante
+    p.ir_para(40)                                      # navegar corta o adiante
+    assert not p.pode_avancar and p.visitas[-2:] == [3, 40]
+
+
+def test_ligar_outro_projeto_troca_o_cache(app, janela_de_60, tmp_path):
+    from tests.test_treino_por_livro import _pagina_sintetica
+
+    antigo = janela_de_60.pagina.cache
+    outro = ProjetoDeLivro.criar(tmp_path / "outros", "Outro",
+                                 _pagina_sintetica(tmp_path / "outra.png"))
+    janela_de_60.usar(outro, pg.FonteDePaginas(outro.fonte),
+                      LeitorDoLivro(outro.pasta_de_padroes))
+    assert janela_de_60.pagina.cache is not antigo
+    assert janela_de_60.pagina.cache.fonte is janela_de_60.pagina.fonte

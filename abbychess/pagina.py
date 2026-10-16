@@ -15,7 +15,7 @@ import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 from PIL import Image
@@ -169,6 +169,10 @@ class FonteDePaginas:
 
     def inclinacao(self, indice: int, imagem: Optional[Image.Image] = None) -> float:
         """O ângulo aplicado à página: o gravado, ou medido agora e gravado."""
+        with self._trava:
+            return self._inclinacao(indice, imagem)
+
+    def _inclinacao(self, indice: int, imagem: Optional[Image.Image] = None) -> float:
         if not self.endireitar:
             return 0.0
         if indice not in self._inclinacoes:
@@ -197,6 +201,9 @@ class CacheDePaginas:
         self._trava = threading.Lock()
         self._pedida: Optional[int] = None
         self._thread: Optional[threading.Thread] = None
+        #: índice -> o aviso de que a renderização em curso dele acabou: quem pede a mesma
+        #: página espera, em vez de renderizá-la de novo (a pré-carga e o clique juntos).
+        self._em_curso: Dict[int, threading.Event] = {}
 
     @property
     def total(self) -> int:
@@ -207,18 +214,29 @@ class CacheDePaginas:
             return indice in self._paginas
 
     def pagina(self, indice: int) -> Tuple[Image.Image, np.ndarray]:
-        with self._trava:
-            if indice in self._paginas:
+        while True:
+            with self._trava:
+                if indice in self._paginas:
+                    self._paginas.move_to_end(indice)
+                    return self._paginas[indice]
+                aviso = self._em_curso.get(indice)
+                if aviso is None:
+                    aviso = self._em_curso[indice] = threading.Event()
+                    break                       # esta thread renderiza
+            aviso.wait()                        # outra renderiza: espera e olha de novo
+        try:
+            imagem = self.fonte.pagina(indice)
+            par = (imagem, np.asarray(imagem.convert("L")))
+            with self._trava:
+                self._paginas[indice] = par
                 self._paginas.move_to_end(indice)
-                return self._paginas[indice]
-        imagem = self.fonte.pagina(indice)
-        par = (imagem, np.asarray(imagem.convert("L")))
-        with self._trava:
-            self._paginas[indice] = par
-            self._paginas.move_to_end(indice)
-            while len(self._paginas) > self.tamanho:
-                self._paginas.popitem(last=False)
-        return par
+                while len(self._paginas) > self.tamanho:
+                    self._paginas.popitem(last=False)
+            return par
+        finally:
+            with self._trava:
+                del self._em_curso[indice]
+            aviso.set()
 
     def precarregar(self, indice: int) -> None:
         """Renderiza a página `indice` em segundo plano, se ela ainda não está no cache."""
@@ -226,7 +244,7 @@ class CacheDePaginas:
             return
         with self._trava:
             self._pedida = indice
-            if self._thread is not None and self._thread.is_alive():
+            if self._thread is not None:
                 return                          # a thread que roda pega o pedido novo
             self._thread = threading.Thread(target=self._pre_carga, daemon=True,
                                              name="pre-carga")
@@ -236,8 +254,9 @@ class CacheDePaginas:
         while True:
             with self._trava:
                 indice, self._pedida = self._pedida, None
-            if indice is None:
-                return
+                if indice is None:              # decidido na trava: nenhum pedido se perde
+                    self._thread = None
+                    return
             try:
                 self.pagina(indice)
             except Exception:                   # a página que não renderiza: avisa na vez dela

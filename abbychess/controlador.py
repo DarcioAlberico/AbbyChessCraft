@@ -282,15 +282,21 @@ class ControladorDePagina:
         """Alt+←: a página visitada antes desta."""
         if self._visita <= 0:
             return False
+        if not self.ir_para(self.visitas[self._visita - 1], visita=False):
+            return False
         self._visita -= 1
-        return self.ir_para(self.visitas[self._visita], visita=False)
+        self.eventos.emitir("acoes_mudaram")    # Alt+←/→ ligam e desligam pelo lugar novo
+        return True
 
     def avancar_visita(self) -> bool:
         """Alt+→: a página visitada depois (depois de um Alt+←)."""
         if self._visita >= len(self.visitas) - 1:
             return False
+        if not self.ir_para(self.visitas[self._visita + 1], visita=False):
+            return False
         self._visita += 1
-        return self.ir_para(self.visitas[self._visita], visita=False)
+        self.eventos.emitir("acoes_mudaram")    # Alt+←/→ ligam e desligam pelo lugar novo
+        return True
 
     def primeira(self) -> bool:
         return self.ir_para(0)

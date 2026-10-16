@@ -47,17 +47,17 @@ class ItemDosBoxes(QGraphicsItem):
         self.estados = list(estados)
         self.update()
 
-    def atualizar(self, indices: Sequence[int], boxes: Sequence[BoxEntry],
-                  estados: Sequence[str]) -> None:
-        """Só os boxes `indices` mudaram (a leitura ou a caixa; a lista é a mesma)."""
-        for i in indices:
+    def atualizar(self, estados: Dict[int, str], boxes: Sequence[BoxEntry]) -> None:
+        """Só os boxes de `estados` (índice -> estado novo) mudaram: a leitura ou a caixa;
+        a lista é a mesma."""
+        for i, estado_novo in estados.items():
             velha = self.grade.caixas[i]
             b = boxes[i]
             nova = (b.x1, b.y1, b.x2, b.y2)
             if nova != velha:
                 self.update(self._retangulo(velha))
                 self.grade.mover(i, nova)
-            self.estados[i] = estados[i]
+            self.estados[i] = estado_novo
             self.update(self._retangulo(nova))
 
     def definir_origem(self, sim: bool) -> None:
@@ -90,10 +90,16 @@ class ItemDosBoxes(QGraphicsItem):
             self._canetas[chave] = (caneta, pincel)
         return self._canetas[chave]
 
+    #: Metade do traço mais largo (o "sem leitura", 2,6 px) e 1 px, em pixels da tela: um box
+    #: fora do retângulo exposto por menos que isso ainda pinta dentro dele.
+    ALCANCE_DO_TRACO = 2.3
+
     def paint(self, pintor: QPainter, opcao: QStyleOptionGraphicsItem, widget=None) -> None:
         exposto = opcao.exposedRect if opcao is not None else self._limites
-        indices = self.grade.no_retangulo(exposto.left(), exposto.top(), exposto.right(),
-                                          exposto.bottom())
+        escala = max(abs(pintor.worldTransform().m11()), 1e-6)
+        alcance = self.ALCANCE_DO_TRACO / escala          # em pixels da página
+        indices = self.grade.no_retangulo(exposto.left() - alcance, exposto.top() - alcance,
+                                          exposto.right() + alcance, exposto.bottom() + alcance)
         por_estado: Dict[str, List[int]] = {}
         for i in indices:
             por_estado.setdefault(self.estados[i], []).append(i)

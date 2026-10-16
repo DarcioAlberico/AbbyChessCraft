@@ -1,12 +1,11 @@
-"""As cores da interface num lugar só: a cor de cada box diz de onde veio a leitura."""
+"""As cores da interface que ainda não passaram para `app/estilo.py` (os boxes já passaram,
+no A1): os diagramas, as áreas, a seleção e a palavra da verificação. O passo K leva o resto
+para os tokens."""
 
 from PySide6.QtGui import QColor
 
-from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL
-
-MANUAL = QColor(142, 68, 173)       # roxo: o usuário decidiu
-LIVRO = QColor(39, 174, 96)         # verde: padrão deste livro
-CONFIAVEL = QColor(41, 128, 185)    # azul: rede ou base global, acima do limiar
+MANUAL = QColor(142, 68, 173)       # roxo: o diagrama conferido por você
+CONFIAVEL = QColor(41, 128, 185)    # azul: o diagrama lido com confiança
 PENDENTE = QColor(230, 126, 34)     # laranja: vai para a revisão
 SEM_LEITURA = QColor(192, 57, 43)   # vermelho: ninguém leu
 SELECIONADO = QColor(241, 196, 15)  # amarelo: o box em revisão
@@ -22,16 +21,6 @@ COR_DA_ZONA = {
     "ignorar": QColor(127, 140, 141),
 }
 
-LEGENDA = [
-    (MANUAL, "Confirmado por você"),
-    (LIVRO, "Padrão deste livro"),
-    (CONFIAVEL, "Rede ou base global"),
-    (PENDENTE, "A revisar"),
-    (SEM_LEITURA, "Sem leitura"),
-    (DIAGRAMA, "Diagrama (fora do texto)"),
-    (MARCADO, "Na seleção (Ctrl+clique)"),
-]
-
 
 def cor_do_diagrama(diagrama) -> QColor:
     """Tracejado do tabuleiro: cinza por ler, laranja a conferir, azul confiável, roxo conferido."""
@@ -41,14 +30,3 @@ def cor_do_diagrama(diagrama) -> QColor:
         return DIAGRAMA
     return CONFIAVEL if diagrama.confiavel else PENDENTE
 
-
-def cor_do_box(char: str, fonte: str, pendente: bool) -> QColor:
-    if fonte == FONTE_MANUAL:
-        return MANUAL
-    if not char:
-        return SEM_LEITURA
-    if pendente:
-        return PENDENTE
-    if fonte == FONTE_LIVRO:
-        return LIVRO
-    return CONFIAVEL

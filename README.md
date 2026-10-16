@@ -143,7 +143,8 @@ Desde o passo A2 a janela é a do FineReader:
 - A gaveta de **Páginas** (**F9**) lista o livro: o número, o estado (um símbolo: · não
   reconhecida, ✎ glifos marcados, ○ reconhecida, ◐ em revisão, ✓ verificada; o nome na dica),
   os glifos a revisar e os diagramas por conferir, em 150 px tirados da vista direita (a
-  Imagem fica do tamanho que tinha). Enter ou duplo clique abre a página; o filtro mostra um estado; com várias
+  Imagem fica do tamanho que tinha). Ao fechar, o meio volta aos tamanhos de antes de ela
+  abrir (um ajuste do divisor feito com ela aberta não fica). Enter ou duplo clique abre a página; o filtro mostra um estado; com várias
   selecionadas, o menu de contexto as reconhece em lote. Num projeto novo, numa janela de
   1600 px ou mais, ela abre sozinha.
 - **Resultados / Avisos**, embaixo, guarda os avisos e os erros do projeto, com a hora, em

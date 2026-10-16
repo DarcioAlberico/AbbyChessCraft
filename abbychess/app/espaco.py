@@ -125,6 +125,8 @@ class EspacoDeTrabalho:
         self.doca_paginas = _doca(self, "Páginas", "doca_paginas", self.paginas,
                                   Qt.DockWidgetArea.LeftDockWidgetArea)
         self.doca_paginas.hide()
+        # Fechar a gaveta por qualquer caminho (F9, o X, o menu Exibir) devolve a largura.
+        self.doca_paginas.visibilityChanged.connect(self._gaveta_mudou)
         self.resultados = PainelDeResultados()
         self.doca_resultados = _doca(self, "Resultados / Avisos", "doca_resultados",
                                      self.resultados, Qt.DockWidgetArea.BottomDockWidgetArea)
@@ -216,8 +218,7 @@ class EspacoDeTrabalho:
     def alternar_paginas(self) -> None:
         """F9: abre ou fecha a gaveta de Páginas."""
         if self.doca_paginas.isVisible():
-            self.doca_paginas.hide()
-            QTimer.singleShot(0, self._repor_o_divisor)    # os 150 px voltam a quem tinha
+            self.doca_paginas.hide()                # `_gaveta_mudou` devolve os 150 px
         else:
             self.abrir_gaveta()
 
@@ -240,6 +241,10 @@ class EspacoDeTrabalho:
         imagem = antes[0] if antes and self.visor.isVisible() else 0
         if imagem and self.arranjo == "lado_a_lado" and centro > imagem + 200:
             self.divisor.setSizes([imagem, centro - imagem])
+
+    def _gaveta_mudou(self, visivel: bool) -> None:
+        if not visivel and self._divisor_antes_da_gaveta:
+            QTimer.singleShot(0, self._repor_o_divisor)
 
     def _repor_o_divisor(self) -> None:
         """A gaveta fechou: o divisor volta aos tamanhos de antes de ela abrir (sem isto, cada

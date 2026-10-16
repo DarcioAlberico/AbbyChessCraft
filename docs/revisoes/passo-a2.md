@@ -42,6 +42,7 @@ Ramo `passo-a2-espaco`, a partir da tag `passo-a1` (6e3464d).
 | A verificação de texto é um modo da fila | §8.1 lista "palavras desconhecidas" entre os modos; o F7 de antes (abrir a verificação) virou o F7 de ciclar o modo |
 | O Inspetor não encolhe abaixo de 296 px | a tabela de §3.1; o Glifo foi apertado (margens, rótulos com a tecla na dica) para caber |
 | A Linha (Ctrl+F5) e a cláusula dela no CA-3.2 ficam para o A3 | o YAML a põe no A3, com o Documento |
+| Os botões do Glifo e da Palavra não pegam o foco pelo Tab | com o Tab, o foco ia ao "Ensinar" e o caractere digitado depois se perdia (revisão de produto, m1); todo botão tem tecla, e o nome dele (o texto) fica para o leitor de tela. A navegação só por Tab entre os botões volta, se for o caso, com a acessibilidade do passo K |
 
 ## Verificação
 

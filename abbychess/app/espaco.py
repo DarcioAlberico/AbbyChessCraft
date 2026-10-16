@@ -134,7 +134,8 @@ class EspacoDeTrabalho:
         self.setCorner(Qt.Corner.BottomLeftCorner, Qt.DockWidgetArea.BottomDockWidgetArea)
         self.setCorner(Qt.Corner.BottomRightCorner, Qt.DockWidgetArea.RightDockWidgetArea)
         self._foco_antes_dos_resultados = None
-        self._imagem_antes_da_gaveta = 0
+        self._divisor_antes_da_gaveta: list = []
+        self._mensagem_da_tarefa: Optional[str] = None
         self.relogio_das_paginas = QTimer(self)     # a gaveta depois de uma rajada de edições
         self.relogio_das_paginas.setSingleShot(True)
         self.relogio_das_paginas.setInterval(500)
@@ -216,6 +217,7 @@ class EspacoDeTrabalho:
         """F9: abre ou fecha a gaveta de Páginas."""
         if self.doca_paginas.isVisible():
             self.doca_paginas.hide()
+            QTimer.singleShot(0, self._repor_o_divisor)    # os 150 px voltam a quem tinha
         else:
             self.abrir_gaveta()
 
@@ -224,7 +226,7 @@ class EspacoDeTrabalho:
         (em 1366, a x-height do CA-3.2 depende dela). A doca e o `resizeDocks` assentam no
         laço de eventos, um depois do outro; a largura da Imagem volta no fim."""
         if not self.doca_paginas.isVisible():
-            self._imagem_antes_da_gaveta = self.visor.width() if self.visor.isVisible() else 0
+            self._divisor_antes_da_gaveta = self.divisor.sizes()
             self.doca_paginas.show()
             QTimer.singleShot(0, self._largura_da_gaveta)
         self.atualizar_paginas(seguir=True)
@@ -234,9 +236,17 @@ class EspacoDeTrabalho:
         QTimer.singleShot(0, self._repor_a_imagem)
 
     def _repor_a_imagem(self) -> None:
-        imagem, centro = self._imagem_antes_da_gaveta, sum(self.divisor.sizes())
+        antes, centro = self._divisor_antes_da_gaveta, sum(self.divisor.sizes())
+        imagem = antes[0] if antes and self.visor.isVisible() else 0
         if imagem and self.arranjo == "lado_a_lado" and centro > imagem + 200:
             self.divisor.setSizes([imagem, centro - imagem])
+
+    def _repor_o_divisor(self) -> None:
+        """A gaveta fechou: o divisor volta aos tamanhos de antes de ela abrir (sem isto, cada
+        abrir e fechar deixaria a Imagem maior e a vista direita menor)."""
+        antes, self._divisor_antes_da_gaveta = self._divisor_antes_da_gaveta, []
+        if antes and len(antes) == len(self.divisor.sizes()):
+            self.divisor.setSizes(antes)
 
     def focar(self, painel: int) -> None:
         """Alt+1 … Alt+5: Páginas, Imagem, vista direita (de novo: a aba seguinte), Inspetor,
@@ -280,13 +290,18 @@ class EspacoDeTrabalho:
         if self.pagina.selecao:
             self.pagina.limpar_selecao()
         elif self.doca_resultados.isVisible():
+            foco = QApplication.focusWidget()       # antes do hide, que já move o foco
+            estava = foco is not None and (foco is self.resultados
+                                           or self.resultados.isAncestorOf(foco))
             self.doca_resultados.hide()
-            self._devolver_o_foco()
+            self._devolver_o_foco(estava)
 
-    def _devolver_o_foco(self) -> None:
+    def _devolver_o_foco(self, estava_em_resultados: bool) -> None:
         """Depois de fechar Resultados, o foco volta a quem o tinha antes do Alt+5 (ou à
         Imagem), e não ao botão ⚠ da barra."""
         antes, self._foco_antes_dos_resultados = self._foco_antes_dos_resultados, None
+        if not estava_em_resultados:
+            return                              # o foco estava noutro painel: fica onde está
         alvo = antes if antes is not None and antes.isVisible() else self.visor
         alvo.setFocus(Qt.FocusReason.OtherFocusReason)
 

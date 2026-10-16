@@ -97,6 +97,10 @@ def montar(janela) -> None:
                             ("vista", "Ir à vista direita (de novo: a aba seguinte)"),
                             ("inspetor", "Ir ao Inspetor"), ("resultados", "Ir a Resultados")),
                            start=1)]
+    j.caixa_de_zoom.valueChanged.connect(lambda valor: j.visor.definir_zoom(valor / 100))
+    # O Enter na caixa devolve o foco ao visor (os atalhos voltam). Não pelo editingFinished,
+    # que também vem quando a caixa perde o foco: roubaria o clique dado noutro campo.
+    j.caixa_de_zoom.lineEdit().returnPressed.connect(lambda: j.visor.setFocus())
     j.acao_seguir = acao(j, "seguir", lambda: None, texto="Seguir o item atual", marcavel=True)
     j.acao_seguir.setChecked(True)
     imagem_e_glifo = [j.visor, j.treino]        # o zoom vale também com o foco no treino

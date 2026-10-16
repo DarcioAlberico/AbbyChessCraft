@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QDockWidget, QLabel, QMess
 
 from abbychess import avisos as av
 from abbychess import gravacao as gv
+from abbychess.modelo import LIDAS
 from abbychess.app import visor as vs
 from abbychess.app.inspetor import PainelDoInspetor
 from abbychess.app.painel_paginas import NOMES_DOS_ESTADOS, PainelDePaginas
@@ -41,13 +42,17 @@ log = logging.getLogger(__name__)
 ARQUIVO_DO_ESPACO = "janela.json"
 VERSAO_DO_ESPACO = 1
 ARRANJOS = ("so_imagem", "lado_a_lado", "empilhado", "so_vista")
-#: Abaixo desta largura o arranjo padrão é o empilhado (§3.1).
+#: Até esta largura o arranjo padrão é o empilhado (§3.1: abaixo de 1280, e em 1280×720).
 LARGURA_DO_EMPILHADO = 1280
 #: A partir desta, a gaveta de Páginas abre num projeto novo (até o primeiro lote).
 LARGURA_DA_GAVETA = 1600
 #: As larguras padrão (§3.1, com as alças): (Páginas, Imagem, vista direita, Inspetor).
 TAMANHOS = {1366: (0, 556, 500, 296), 1920: (150, 760, 680, 320)}
 ATALHOS_MD = Path(__file__).resolve().parents[2] / "docs" / "ATALHOS.md"
+
+
+def _b64(dados: QByteArray) -> str:
+    return base64.b64encode(bytes(dados)).decode("ascii")
 
 
 def _doca(janela, titulo: str, nome: str, widget, area) -> QDockWidget:
@@ -114,11 +119,7 @@ class EspacoDeTrabalho:
         self.caixa_de_zoom.setKeyboardTracking(False)
         self.caixa_de_zoom.setFocusPolicy(Qt.FocusPolicy.ClickFocus)   # o Tab não para nela
         self.caixa_de_zoom.setToolTip("Zoom da página (Ctrl+roda, Ctrl++ e Ctrl+−)")
-        self.caixa_de_zoom.setAccessibleName("Zoom da página")
-        self.caixa_de_zoom.valueChanged.connect(lambda valor: self.visor.definir_zoom(valor / 100))
-        # O Enter na caixa devolve o foco ao visor (os atalhos voltam). Não pelo editingFinished,
-        # que também vem quando a caixa perde o foco: roubaria o clique dado noutro campo.
-        self.caixa_de_zoom.lineEdit().returnPressed.connect(lambda: self.visor.setFocus())
+        self.caixa_de_zoom.setAccessibleName("Zoom da página")     # ligada em `acoes.montar`
         self.rotulo_do_lote = QLabel("")
         self.botao_cancelar = QToolButton()
         self.botao_cancelar.setText("✕")
@@ -155,7 +156,7 @@ class EspacoDeTrabalho:
     def arranjo_padrao(self) -> None:
         """O arranjo e os tamanhos padrão para a largura da janela (§3.1)."""
         largura = self.width()
-        self.arranjar("lado_a_lado" if largura >= LARGURA_DO_EMPILHADO else "empilhado")
+        self.arranjar("lado_a_lado" if largura > LARGURA_DO_EMPILHADO else "empilhado")
         paginas, imagem, vista, inspetor = TAMANHOS[1920 if largura >= 1700 else 1366]
         escala = largura / (1920 if largura >= 1700 else 1366)
         self.resizeDocks([self.doca_inspetor], [round(inspetor * escala)],
@@ -279,10 +280,8 @@ class EspacoDeTrabalho:
         return None if projeto is None else Path(projeto.pasta) / ARQUIVO_DO_ESPACO
 
     def estado_do_espaco(self) -> dict:
-        def b64(dados: QByteArray) -> str:
-            return base64.b64encode(bytes(dados)).decode("ascii")
-        return {"versao": VERSAO_DO_ESPACO, "janela": b64(self.saveState(VERSAO_DO_ESPACO)),
-                "divisor": b64(self.divisor.saveState()), "arranjo": self.arranjo,
+        return {"versao": VERSAO_DO_ESPACO, "janela": _b64(self.saveState(VERSAO_DO_ESPACO)),
+                "divisor": _b64(self.divisor.saveState()), "arranjo": self.arranjo,
                 "docas": {d.objectName(): d.isVisible() for d in
                           (self.doca_inspetor, self.doca_paginas, self.doca_resultados)},
                 "escala": self.visor.escala(), "modo_zoom": self.visor.modo_zoom,
@@ -346,7 +345,7 @@ class EspacoDeTrabalho:
         self.resultados.mostrar_avisos(self.avisos.itens)
         self.atualizar_avisos()
         if not self.restaurar_espaco():
-            novo = not self.projeto.resumo_do_livro()
+            novo = not any(r.get("estado") in LIDAS for r in self.projeto.resumo_do_livro().values())
             self.doca_paginas.setVisible(novo and self.width() >= LARGURA_DA_GAVETA)
             self.arranjo_padrao()
         self.atualizar_paginas()

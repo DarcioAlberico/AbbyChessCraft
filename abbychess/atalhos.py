@@ -37,6 +37,8 @@ _SINONIMOS = {
     "esc": "Esc", "space": "Space", "espaco": "Space", "backspace": "Backspace",
     "left": "Left", "right": "Right", "up": "Up", "down": "Down", "home": "Home", "end": "End",
     "tab": "Tab", "menu": "Menu", "insert": "Insert", "ins": "Insert",
+    # Como o README e a SPEC escrevem: as setas e o sinal de menos tipográfico.
+    "←": "Left", "→": "Right", "↑": "Up", "↓": "Down", "−": "-",
 }
 _TECLA_DE_FUNCAO = re.compile(r"[fF]([1-9]|1\d|2[0-4])")
 _TECLAS_DE_EDICAO = {"Space", "Enter", "Backspace", "Delete"}
@@ -68,10 +70,10 @@ def normalizar(sequencia: str) -> str:
         raise ValueError(f"modificador desconhecido em {sequencia!r}: {sorted(desconhecidos)}")
     if not tecla:
         raise ValueError(f"sequência sem tecla: {sequencia!r}")
-    if len(tecla) == 1 or _TECLA_DE_FUNCAO.fullmatch(tecla):
-        tecla = tecla.upper()
-    elif tecla.lower() in _SINONIMOS:
+    if tecla.lower() in _SINONIMOS:
         tecla = _SINONIMOS[tecla.lower()]
+    elif len(tecla) == 1 or _TECLA_DE_FUNCAO.fullmatch(tecla):
+        tecla = tecla.upper()
     else:
         raise ValueError(f"tecla desconhecida em {sequencia!r}: {tecla!r}")
     return "+".join([m for m in MODIFICADORES if m in mods] + [tecla])

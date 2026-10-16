@@ -65,6 +65,9 @@ def test_closures_da_janela_so_chamam_comandos_de_controlador():
     # O desenho é parte da janela (um mixin, desde o 2b): a mesma regra.
     desenho = (RAIZ / "app" / "desenho.py").read_text(encoding="utf-8")
     assert violacoes(desenho, "DesenhoDaJanela") == []
+    # O espaço de trabalho (os painéis, os arranjos, o foco) também, desde o A2.
+    espaco = (RAIZ / "app" / "espaco.py").read_text(encoding="utf-8")
+    assert violacoes(espaco, "EspacoDeTrabalho") == []
 
 
 def test_a_regra_pega_uma_closure_com_logica():

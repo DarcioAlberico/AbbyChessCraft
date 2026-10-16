@@ -79,9 +79,33 @@ def test_letras_de_mais_ou_de_menos_pedem_dividir_ou_juntar(boxes, lex):
     palavra = vf.desconhecidas(boxes, lex)[0]
     with pytest.raises(ValueError, match="Divida ou junte"):
         vf.corrigir(boxes, palavra.indices, "bcaa")
-    with pytest.raises(ValueError, match="sem espaços"):
-        vf.corrigir(boxes, palavra.indices, "b ca")
+    with pytest.raises(ValueError, match="Divida ou junte"):
+        vf.corrigir(boxes, palavra.indices, "b caa")   # o espaço não conta como letra
     assert "".join(boxes[i].char for i in palavra.indices) == "bca"
+
+
+def test_espaco_digitado_e_palavra_nova_antes_do_glifo(boxes, lex):
+    palavra = vf.desconhecidas(boxes, lex)[0]
+    assert vf.quebras(boxes, palavra.indices, " b  ca ") == [1]
+    assert vf.quebras(boxes, palavra.indices, "bca") == []
+    vf.corrigir(boxes, palavra.indices, "a bc")
+    assert "".join(boxes[i].char for i in palavra.indices) == "abc"
+
+
+def test_espaco_dentro_da_ligadura_e_recusado(boxes):
+    boxes[0].char, boxes[1].char = "fi", "x"
+    assert vf.quebras(boxes, [0, 1], "fi x") == [1]
+    with pytest.raises(ValueError, match="dentro de um glifo"):
+        vf.quebras(boxes, [0, 1], "f ix")
+
+
+def test_a_quebra_do_usuario_parte_a_palavra_suspeita(boxes):
+    lex = lexico.Lexico(palavras={"abc", "cab", "ca"})
+    palavra = vf.desconhecidas(boxes, lex)[0]
+    b, c, a = palavra.indices
+    assert vf.desconhecidas(boxes, lex, quebras=[c]) == []      # "b" (curta) e "ca"
+    [so_bc] = vf.desconhecidas(boxes, lex, quebras=[a])          # "bc" e "a" (curta)
+    assert so_bc.palavra == "bc" and so_bc.indices == [b, c]
 
 
 def test_ligadura_reparte_pelo_tamanho_de_antes(boxes):

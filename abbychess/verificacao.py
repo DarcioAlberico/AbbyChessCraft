@@ -13,7 +13,9 @@ fazem dele uma ferramenta de revisão e não um corretor:
 A correção é por glifo: o texto novo da palavra é repartido pelos boxes dela,
 e só os boxes que mudaram viram manuais. Se o número de letras não bate com o
 de glifos, o erro é de segmentação (dois glifos colados, um partido), e quem
-resolve é dividir ou juntar no painel de treino, não a verificação.
+resolve é dividir ou juntar no painel de treino, não a verificação. O espaço
+digitado não é letra: é a palavra nova antes do glifo (`quebras`), a decisão
+`edicao.quebrar` do modelo, e a contagem das palavras a respeita.
 
 O português usa o pacote Hunspell do core (`pt.hunspell.gz` com `core.afixos`),
 como o editor do PyBoxEditor (`core.editor.ortografia`), mais os nomes próprios
@@ -105,11 +107,14 @@ class Desconhecida:
         return MOTIVOS.get(self.motivo, self.motivo)
 
 
-def desconhecidas(boxes: Sequence[BoxEntry], lex, ignoradas: Iterable[str] = ()
-                  ) -> List[Desconhecida]:
+def desconhecidas(boxes: Sequence[BoxEntry], lex, ignoradas: Iterable[str] = (),
+                  quebras: Iterable[int] = ()) -> List[Desconhecida]:
     """As palavras de prosa da página fora do léxico, na ordem de leitura.
 
     `ignoradas` são as do "Ignorar todas" desta sessão, comparadas sem caixa.
+    `quebras` são os índices dos boxes que começam palavra por decisão do usuário
+    (o espaço digitado aqui, `edicao.quebrar`): a palavra suspeita que tem um deles
+    no meio é partida, e cada pedaço é perguntado ao léxico de novo.
 
     O glifo sem leitura no meio da palavra (o "ç" de "ameaçavam" que ninguém
     leu) entra nos índices dela: o núcleo do core só conta caracteres, e sem
@@ -122,11 +127,30 @@ def desconhecidas(boxes: Sequence[BoxEntry], lex, ignoradas: Iterable[str] = ()
     fora = {p.lower() for p in ignoradas}
     if not any(b.char for b in boxes):
         return []
+    quebras = set(quebras)
     saida = []
-    for s in lexico.suspeitas_da_pagina(list(boxes), lex):
+    for s in _partidas(lexico.suspeitas_da_pagina(list(boxes), lex), boxes, lex, quebras):
         if s.palavra.lower() in fora or not s.indices:
             continue
         saida.append(Desconhecida(s.palavra, _com_os_vazios(boxes, s.indices), s.motivo))
+    return saida
+
+
+def _partidas(suspeitas, boxes: Sequence[BoxEntry], lex, quebras: set) -> list:
+    """As suspeitas com as quebras do usuário aplicadas: os pedaços que o léxico conhece saem."""
+    from core import lexico
+
+    saida = []
+    for s in suspeitas:
+        if not quebras.intersection(s.indices[1:]):
+            saida.append(s)
+            continue
+        pedacos = [[s.indices[0]]]
+        for i in s.indices[1:]:
+            if i in quebras:
+                pedacos.append([])
+            pedacos[-1].append(i)
+        saida.extend(lexico.sinalizar([[(boxes[i].char, i) for i in p] for p in pedacos], lex))
     return saida
 
 
@@ -167,23 +191,52 @@ def repartir(boxes: Sequence[BoxEntry], indices: Sequence[int], novo: str) -> Li
     Com tantas letras quanto glifos, uma por glifo. Senão, se o texto antigo
     tinha o mesmo comprimento do novo (um box de ligadura como `fi` conta duas),
     cada box fica com o mesmo número de letras de antes. Fora disso é erro de
-    segmentação, e o `ValueError` diz o que fazer.
+    segmentação, e o `ValueError` diz o que fazer. Os espaços não são letras:
+    cada um é uma palavra nova (`quebras`).
     """
-    novo = novo.strip()
-    if not novo or any(c.isspace() for c in novo):
-        raise ValueError("Digite a palavra sem espaços. Para separar ou juntar glifos, "
-                         "use Dividir e Juntar no painel de treino.")
-    if len(novo) == len(indices):
-        return list(novo)
-    tamanhos = [len(boxes[i].char) for i in indices]
-    if sum(tamanhos) == len(novo):
+    return _repartir(boxes, indices, novo)[0]
+
+
+def quebras(boxes: Sequence[BoxEntry], indices: Sequence[int], novo: str) -> List[int]:
+    """As posições em `indices` dos glifos antes dos quais o texto novo tem espaço.
+
+    "Next is" digitado sobre os seis glifos de "Nextis" dá `[4]`: o "i" começa
+    uma palavra (o espaço que a leitura não viu, `edicao.quebrar`). O espaço que
+    cai dentro de um box de ligadura é recusado, porque não há glifo onde partir.
+    """
+    return _repartir(boxes, indices, novo)[1]
+
+
+def _repartir(boxes: Sequence[BoxEntry], indices: Sequence[int], novo: str
+              ) -> Tuple[List[str], List[int]]:
+    palavras = novo.split()
+    letras = "".join(palavras)
+    if not letras:
+        raise ValueError("Digite a palavra.")
+    if len(letras) == len(indices):
+        pedacos = list(letras)
+    else:
+        tamanhos = [len(boxes[i].char) for i in indices]
+        if sum(tamanhos) != len(letras):
+            raise ValueError(f"A palavra tem {len(indices)} glifo(s) e o texto novo "
+                             f"{len(letras)} letra(s). Divida ou junte os glifos no painel "
+                             "de treino.")
         pedacos, pos = [], 0
         for t in tamanhos:
-            pedacos.append(novo[pos:pos + t])
+            pedacos.append(letras[pos:pos + t])
             pos += t
-        return pedacos
-    raise ValueError(f"A palavra tem {len(indices)} glifo(s) e o texto novo {len(novo)} "
-                     "letra(s). Divida ou junte os glifos no painel de treino.")
+    inicio, pos = {}, 0                    # letra em que cada glifo começa -> posição dele
+    for k, pedaco in enumerate(pedacos):
+        inicio.setdefault(pos, k)
+        pos += len(pedaco)
+    saida, pos = [], 0
+    for palavra in palavras[:-1]:
+        pos += len(palavra)
+        if pos not in inicio:
+            raise ValueError("O espaço cai dentro de um glifo de duas letras. Divida o "
+                             "glifo no painel de treino.")
+        saida.append(inicio[pos])
+    return pedacos, saida
 
 
 def corrigir(boxes: List[BoxEntry], indices: Sequence[int], novo: str) -> List[Tuple[int, str]]:

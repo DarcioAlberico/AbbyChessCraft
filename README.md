@@ -230,10 +230,11 @@ tenta de novo (até 5 tentativas ao todo, a cada 50 ms). Os `.tmp` que uma queda
 
 - **A fonte pode mudar de lugar.** Se o PDF estiver dentro da pasta do projeto, o caminho
   fica relativo, e a pasta inteira pode ser movida. Se a fonte sumir, a abertura procura o
-  mesmo arquivo (pelo SHA-256 dos primeiros 4 MB e pelo tamanho) ao lado do caminho antigo,
-  na pasta do projeto e na pasta onde ela está, e o acha mesmo renomeado (a janela avisa
+  mesmo arquivo (pelo SHA-256 dos primeiros 4 MB e pelo tamanho) na pasta onde ela estava,
+  na pasta do projeto e na pasta-mãe do projeto, e o acha mesmo renomeado (a janela avisa
   onde); se não achar, pede para você mostrar onde ele está, e recusa um arquivo de
-  conteúdo diferente.
+  conteúdo diferente. Num projeto só para leitura, o lugar novo vale só na sessão: a busca
+  (ou a pergunta) se repete a cada abertura.
 - **Projeto de versão mais nova abre só para leitura.** Dá para ver as páginas, mas nada é
   gravado (o título da janela diz "só leitura"). Um campo de `projeto.json` que esta versão
   não conhece não se perde: vai para `extras` e volta igual ao arquivo.
@@ -367,10 +368,12 @@ Os três diagramas da p. 26, sem moldura e sem coordenadas, saem lidos em 0,2 s 
 Os três abrem na conferência; o terceiro se corrige casa a casa até a posição do segundo,
 que é a mesma. O lado a jogar sai "assumido" nos três: a página não diz.
 
-### A linha de base do roadmap (passo 0)
+### As medidas do roadmap
 
-Medida em 2026-10-16 com o código do passo 0 (a tag `passo-0`). As tabelas abaixo são geradas
-dos JSON de `docs/medidas/` por `ferramentas\resumo_medidas.py`; não as edite à mão.
+A primeira tabela é a linha de base, medida em 2026-10-16 com o código do passo 0 (a tag
+`passo-0`); as seguintes trazem cada passo ao lado dela. A qualidade e a fatia mostram a
+medida mais nova, com o commit, e o histórico da qualidade mostra todas. As tabelas são
+geradas dos JSON de `docs/medidas/` por `ferramentas\resumo_medidas.py`; não as edite à mão.
 
 <!-- medidas:inicio -->
 Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (commit 76ba432; máquina cadastrada: sim; p95 de 30 repetições):
@@ -578,8 +581,12 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 ## Limitações conhecidas
 
 - **Gravar não é assíncrono ainda.** Cada gravação de página faz dois `fsync` (a página e o
-  `livro.json`) na thread de quem grava; o gravador assíncrono, com coalescência, é do passo
-  2a. O formato das páginas ainda é o v1 (o v2 nasce no passo 1b).
+  `livro.json`) na thread de quem grava, inclusive a cada troca de página e a cada página do
+  lote. Num SSD isso não aparece na troca de página; num disco lento, de rede ou com
+  antivírus que examina cada gravação, pode aparecer. O gravador assíncrono, com
+  coalescência, é do passo 2a. O formato das páginas ainda é o v1 (o v2 nasce no passo 1b).
+- **A busca automática da fonte lê no máximo 200 arquivos do tamanho certo** por pasta
+  procurada; numa pasta com mais que isso, ela desiste e pede para você mostrar a fonte.
 - **No projeto só para leitura, as ações que gravam falham com aviso** em vez de ficarem
   desabilitadas: ensinar e esquecer padrões, guardar as casas de um diagrama conferido e o
   reconhecimento em lote (que avisa só depois de ler a primeira página). A correção feita na

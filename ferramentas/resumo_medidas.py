@@ -222,8 +222,63 @@ def _por_passo() -> list:
     return linhas
 
 
+_REPETICAO = re.compile(r"(?P<data>\d{4}-\d{2}-\d{2})-repeticao-(?P<passo>[^-]+)-parcial"
+                        r"(?:-(?P<hora>\d{6}))?\.json")
+
+
+def _repeticoes() -> list:
+    """As rodadas repetidas de uma medida (`ABBY_ROTULO_DA_MEDIDA=repeticao-<passo>`, com
+    `-k`), para separar o efeito de um passo da variação entre rodadas."""
+    grupos = {}
+    for arquivo in MEDIDAS.glob("*-repeticao-*-parcial*.json"):
+        casou = _REPETICAO.fullmatch(arquivo.name)
+        if casou:
+            dados = json.loads(arquivo.read_text(encoding="utf-8"))
+            ordem = (casou["data"], casou["hora"] or "")
+            grupos.setdefault(casou["passo"], []).append((ordem, dados))
+    if not grupos:
+        return []
+    linhas = ["", "Rodadas repetidas do atraso da interface durante o lote (20 páginas), em ms:",
+              "", "| Código | Commit | p99 de cada rodada | p95 de cada rodada |", "|---|---|---|---|"]
+    for passo, rodadas in sorted(grupos.items()):
+        rodadas.sort(key=lambda r: r[0])
+        atrasos = [d["medidas"].get("atraso_durante_o_lote", {}) for _, d in rodadas]
+        commits = sorted({d["ambiente"].get("commit") for _, d in rodadas})
+        linhas.append(f"| passo {passo} | {', '.join(commits)} | "
+                      f"{'; '.join(_num(a.get('p99_ms')) for a in atrasos)} | "
+                      f"{'; '.join(_num(a.get('p95_ms')) for a in atrasos)} |")
+    return linhas
+
+
+def _historico_da_qualidade() -> list:
+    """Todas as medidas de qualidade, por livro e na ordem: o que um passo mudou aparece."""
+    linhas = []
+    for livro in LIVROS:
+        medidas = []
+        for arquivo in MEDIDAS.glob(f"*-qualidade-{livro}*.json"):
+            casou = re.fullmatch(rf"(\d{{4}}-\d{{2}}-\d{{2}})-qualidade-{livro}(?:-(\d{{6}}))?\.json",
+                                 arquivo.name)
+            if casou:
+                medidas.append(((casou[1], casou[2] or ""), arquivo))
+        for _, arquivo in sorted(medidas):
+            dados = json.loads(arquivo.read_text(encoding="utf-8"))
+            r = dados["resumo"]
+            linhas.append(
+                f"| {livro} | {dados.get('commit')} | {_num(r.get('margens_precisao'))} / "
+                f"{_num(r.get('margens_revocacao'))} | {r.get('diagramas_achados')} "
+                f"({r.get('diagramas_falsos')}) | {r.get('linhas_sem_par')} | "
+                f"{r.get('linhas_perdidas')} | {_num(r.get('casas_erradas_provisorio'))} | "
+                f"{r.get('lado_certo_provisorio')} | {_num(r.get('lote_s'))} s |")
+    if not linhas:
+        return []
+    return ["", "Histórico da qualidade (todas as medidas; casas e lado provisórios):", "",
+            "| Livro | Commit | Margens P / R | Diagramas (falsos) | Sem par | Perdidas | Casas | "
+            "Lado | Lote |", "|---|---|---|---|---|---|---|---|---|", *linhas]
+
+
 def gerar() -> str:
-    return "\n".join(_desempenho() + _por_passo() + _qualidade() + _fatia())
+    return "\n".join(_desempenho() + _por_passo() + _repeticoes() + _qualidade()
+                     + _historico_da_qualidade() + _fatia())
 
 
 def main() -> int:

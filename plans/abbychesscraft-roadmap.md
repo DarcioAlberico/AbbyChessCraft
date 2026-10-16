@@ -40,7 +40,9 @@ Paralelos, só com git e worktrees e com arquivos disjuntos:
 - README: fluxo, "O que foi medido" (pelo JSON) e "Limitações conhecidas".
 - Fechamento com as três revisões de §16 (nota ≥ 8 em cada eixo), registradas em
   `docs/revisoes/passo-N.md`.
-- Com git: um ramo e um commit por passo. Sem git: cópia da pasta antes do passo
+- Com git: um ramo por passo, com o commit do código, o das correções de cada rodada de
+  revisão e o das medidas (para cada medida registrar o commit que mediu); a tag do passo no
+  commit aprovado. Sem git: cópia da pasta antes do passo
   (`robocopy . ..\AbbyChessCraft_backup_passoN /E /XD .venv rea`).
 
 ## Dependências

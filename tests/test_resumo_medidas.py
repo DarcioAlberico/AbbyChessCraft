@@ -118,3 +118,22 @@ def test_desempenho_por_passo_ao_lado_da_linha_de_base(pastas):
     _gravar(pastas, "2026-10-17-passo-1a-parcial.json", _desempenho(999.0))
     linha = next(ln for ln in rm.gerar().splitlines() if ln.startswith("| Troca de página, p95"))
     assert linha == "| Troca de página, p95 | 190 | 205,5 |"
+
+
+def test_rodadas_repetidas_e_historico_da_qualidade(pastas):
+    rodada = {"ambiente": {"commit": "abc"},
+              "medidas": {"atraso_durante_o_lote": {"p99_ms": 8.5, "p95_ms": 6.0}}}
+    _gravar(pastas, "2026-10-16-repeticao-0-parcial.json", rodada)
+    _gravar(pastas, "2026-10-16-repeticao-0-parcial-120000.json",
+            {**rodada, "medidas": {"atraso_durante_o_lote": {"p99_ms": 9.0, "p95_ms": 6.5}}})
+    resumo = {"margens_precisao": 1.0, "margens_revocacao": 1.0, "diagramas_achados": "1/1",
+              "diagramas_falsos": 0, "linhas_sem_par": 0, "linhas_perdidas": 1,
+              "casas_erradas_provisorio": 0.0, "lado_certo_provisorio": "1/1", "lote_s": 10.0}
+    _gravar(pastas, "2026-10-16-qualidade-xv.json", {"commit": "c0", "indices": [0],
+                                                     "resumo": resumo})
+    _gravar(pastas, "2026-10-16-qualidade-xv-020000.json", {"commit": "c1", "indices": [0],
+                                                            "resumo": resumo})
+    texto = rm.gerar()
+    assert "| passo 0 | abc | 8,5; 9 | 6; 6,5 |" in texto
+    historico = [ln for ln in texto.splitlines() if ln.startswith("| xv | c") and ln.endswith(" s |")]
+    assert [ln.split(" | ")[1] for ln in historico] == ["c0", "c1"]

@@ -361,9 +361,19 @@ class JanelaPrincipal(QMainWindow):
             QMessageBox.warning(self, "Abrir projeto", str(erro))
 
     def _abrir(self, projeto: ProjetoDeLivro) -> None:
+        try:
+            self._abrir_projeto(projeto)
+        except BaseException:
+            if projeto is not self.projeto:
+                projeto.fechar()                # a trava de só leitura não fica sem dono
+            raise
+
+    def _abrir_projeto(self, projeto: ProjetoDeLivro) -> None:
         self._salvar_pagina()
         if projeto.fonte_ausente and not self._localizar_fonte(projeto):
             projeto.fechar()
+            self.statusBar().showMessage("O projeto não foi aberto: a fonte do livro não foi "
+                                         "indicada.", 8000)
             return
         try:
             fonte = pg.fonte_do_projeto(projeto)
@@ -404,7 +414,9 @@ class JanelaPrincipal(QMainWindow):
             if projeto.fonte_relocalizada:
                 QMessageBox.information(
                     self, "Abrir projeto", f"A fonte do livro não estava mais no lugar "
-                    f"gravado e foi achada (o mesmo arquivo, pelo conteúdo) em:\n{projeto.fonte}")
+                    f"gravado e foi achada (o mesmo arquivo, pelo conteúdo) em:\n{projeto.fonte}"
+                    + ("\n\nComo o projeto é só para leitura, isso vale nesta sessão, e a "
+                       "busca se repete a cada abertura." if projeto.somente_leitura else ""))
             self._atualizar_padroes()
             self.statusBar().showMessage(
                 f"Projeto aberto. Base global com {leitor.base.total if leitor.base else 0} "
@@ -460,7 +472,9 @@ class JanelaPrincipal(QMainWindow):
         """A fonte sumiu e não foi achada pelo SHA-256: o usuário diz onde ela está."""
         QMessageBox.warning(self, "Abrir projeto",
                             f"A fonte do livro não está mais em\n{projeto.fonte}\n\nMostre "
-                            "onde ela está agora; o programa confere que é o mesmo arquivo.")
+                            "onde ela está agora; o programa confere que é o mesmo arquivo."
+                            + ("\n\nComo o projeto é só para leitura, o lugar novo vale só "
+                               "nesta sessão." if projeto.somente_leitura else ""))
         while True:
             caminho, _ = QFileDialog.getOpenFileName(
                 self, "Onde está a fonte do livro?", str(projeto.pasta.parent),
@@ -840,8 +854,12 @@ class JanelaPrincipal(QMainWindow):
         """Grava os limiares no projeto e refaz a fila com eles."""
         self.projeto.dados.limiares = limiares
         if self._pode_gravar():
-            self.projeto.salvar()
-            self.projeto.reaplicar_limiar()
+            try:
+                self.projeto.salvar()
+                self.projeto.reaplicar_limiar()
+            except OSError as erro:
+                QMessageBox.warning(self, "Opções", "Os limiares valem nesta sessão, mas não "
+                                    f"foram gravados no projeto:\n{erro}")
         self.leitor.trocar_limiares(limiares)
         self._atualizar_tudo()
         if self.boxes:

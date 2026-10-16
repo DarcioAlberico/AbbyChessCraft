@@ -23,8 +23,8 @@ Todo arquivo é gravado por `abbychess.gravacao` (temporário, `fsync`, troca). 
 projeto de versão mais nova abre só para leitura (`somente_leitura`): nada é
 gravado nele. A fonte fica com caminho relativo quando está dentro da pasta do
 projeto; se ela sumir, `abrir` procura o mesmo arquivo (pelo SHA-256 dos primeiros
-4 MB) ao lado do caminho antigo e na pasta do projeto, e senão `fonte_ausente` diz
-à janela que peça ao usuário (`relocalizar`).
+4 MB e pelo tamanho) na pasta do caminho antigo, na do projeto e na pasta-mãe do
+projeto, e senão `fonte_ausente` diz à janela que peça ao usuário (`relocalizar`).
 
 `padroes/` usa o mesmo formato da base de treino do PyBoxEditor
 (`core.learner.char_to_folder`) mais um `metadados.json` com a altura de cada
@@ -70,10 +70,12 @@ ARQUIVO_DO_LEXICO = "lexico.txt"
 ARQUIVO_DO_LIVRO = "livro.json"
 VERSAO = 1
 #: A versão do formato de `livro.json`; outra versão é refeita das páginas.
-VERSAO_DO_LIVRO = 1
+#: 2: a confiança 1,0 ganhou a faixa 100 do histograma (os caches v1 são refeitos).
+VERSAO_DO_LIVRO = 2
 #: Quanto da fonte entra no SHA-256 que a reconhece depois de movida.
 BYTES_DO_SHA = 4 * 2**20
-#: Quantos arquivos, no máximo, `abrir` confere ao procurar a fonte sumida.
+#: Quantos arquivos do tamanho certo, no máximo, `abrir` lê ao procurar a fonte sumida
+#: (os de outro tamanho nem são lidos e não contam).
 CANDIDATOS_DA_FONTE = 200
 
 EXTENSOES_DE_IMAGEM = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}
@@ -211,12 +213,14 @@ class ProjetoDeLivro:
         except (ValueError, TypeError) as erro:
             raise ProjetoInvalido(f"{arquivo} está ilegível: {erro}") from erro
         if dados.versao > VERSAO:
-            gv.proteger(pasta)
-            projeto = cls(pasta, dados, somente_leitura=True)
+            projeto = cls(pasta, dados, somente_leitura=False)
             if projeto.fonte_ausente:
                 achada = projeto._procurar_fonte()
                 if achada is not None:          # só na memória: nada é gravado
                     dados.fonte, projeto.fonte_relocalizada = str(achada), True
+            # A trava por último: uma falha antes dela não deixa a pasta travada sem dono.
+            projeto.somente_leitura = projeto._travado = True
+            gv.proteger(pasta)
             return projeto
         (pasta / PASTA_DE_PADROES).mkdir(exist_ok=True)
         (pasta / PASTA_DE_PAGINAS).mkdir(exist_ok=True)
@@ -231,6 +235,7 @@ class ProjetoDeLivro:
             achada = projeto._procurar_fonte()
             if achada is not None:
                 dados.fonte, mudou = _caminho_gravado(achada, pasta), True
+                dados.fonte_tamanho = achada.stat().st_size
                 projeto.fonte_relocalizada = True
         if mudou:
             try:
@@ -280,11 +285,12 @@ class ProjetoDeLivro:
             raise
 
     def _procurar_fonte(self) -> Optional[Path]:
-        """O arquivo com o SHA-256 da fonte, ao lado do caminho antigo ou no projeto."""
+        """O arquivo com o SHA-256 e o tamanho da fonte: na pasta do caminho antigo, na do
+        projeto ou na pasta-mãe do projeto."""
         if not self.dados.fonte_sha256:
             return None
         antigo = self.fonte
-        vistos = set()
+        vistos, lidos = set(), 0
         for pasta in (antigo.parent, self.pasta, self.pasta.parent):
             if not pasta.is_dir():
                 continue
@@ -293,11 +299,13 @@ class ProjetoDeLivro:
                 if chave in vistos or not candidato.is_file():
                     continue
                 vistos.add(chave)
-                if len(vistos) > CANDIDATOS_DA_FONTE:
-                    return None
                 try:
-                    if self.dados.fonte_tamanho and candidato.stat().st_size != self.dados.fonte_tamanho:
+                    tamanho = self.dados.fonte_tamanho
+                    if tamanho and candidato.stat().st_size != tamanho:
                         continue        # tamanho diferente: nem é preciso ler
+                    lidos += 1
+                    if lidos > CANDIDATOS_DA_FONTE:
+                        return None
                     if sha_da_fonte(candidato) == self.dados.fonte_sha256:
                         return chave
                 except OSError:
@@ -459,9 +467,12 @@ class ProjetoDeLivro:
             return
         with self._trava_do_livro:
             livro = self._carregar_livro()
-            for resumo in livro["paginas"].values():
-                resumo["pendentes"] = pendentes_pelo_histograma(resumo, self.dados.limiares.revisao)
-            gv.gravar_json(self.pasta / ARQUIVO_DO_LIVRO, livro)
+            revisao = self.dados.limiares.revisao
+            novo = {"versao": livro["versao"],
+                    "paginas": {k: {**v, "pendentes": pendentes_pelo_histograma(v, revisao)}
+                                for k, v in livro["paginas"].items()}}
+            gv.gravar_json(self.pasta / ARQUIVO_DO_LIVRO, novo)
+            self._livro = novo                  # o cache só muda depois de gravado
 
     def recalcular_livro(self) -> dict:
         """O `livro.json` como ele deve ser, lendo todas as páginas gravadas."""
@@ -513,7 +524,8 @@ class ProjetoDeLivro:
 def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares) -> dict:
     """Os boxes da página em `confirmados`, `sem_leitura` e o histograma do resto.
 
-    O histograma tem 100 faixas de 0,01 (a chave é o centésimo de baixo) e conta só os
+    O histograma tem faixas de 0,01 (a chave é o centésimo de baixo; 100 é a confiança
+    1,0) e conta só os
     boxes lidos e não confirmados, os únicos que um limiar de revisão diferente
     mudaria de lado: com ele, `pendentes_pelo_histograma` dá os pendentes de outro
     limiar (de duas casas) sem abrir a página.
@@ -545,8 +557,9 @@ def pendentes_pelo_histograma(resumo: dict, revisao: float) -> int:
 
 def _faixa(confianca: float) -> int:
     # Arredondar a 6 casas antes do piso põe 0,29 na faixa 29, e não na 28 que
-    # `0.29 * 100 == 28.999…` daria. Confiança 1,0 fica na última faixa.
-    return min(99, max(0, math.floor(round(float(confianca) * 100, 6))))
+    # `0.29 * 100 == 28.999…` daria. Confiança 1,0 tem a faixa 100 só dela, para o limiar
+    # 1,00 (o máximo das opções) não a contar como pendente.
+    return min(100, max(0, math.floor(round(float(confianca) * 100, 6))))
 
 
 def _caminho_gravado(fonte: Path, pasta: Path) -> str:

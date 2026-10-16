@@ -84,6 +84,23 @@ def test_letras_de_mais_ou_de_menos_pedem_dividir_ou_juntar(boxes, lex):
     assert "".join(boxes[i].char for i in palavra.indices) == "bca"
 
 
+def test_glifo_lido_com_duas_letras_pode_ficar_com_uma(boxes):
+    boxes[0].char, boxes[1].char = "♕f", "f8"         # ♔f8 lido como ♕ff8
+    mudados = vf.corrigir(boxes, [0, 1], "♔f8")
+    assert mudados == [(0, "♔")] and boxes[1].char == "f8"
+    boxes[0].char, boxes[1].char = "fi", "x"
+    assert vf.repartir(boxes, [0, 1], "fx") == ["f", "x"]
+
+
+def test_reparticao_sem_jeito_unico_e_recusada(boxes):
+    boxes[0].char, boxes[1].char = "ab", "cd"
+    with pytest.raises(ValueError, match="mais de um jeito"):
+        vf.repartir(boxes, [0, 1], "xyz")              # x|yz ou xy|z
+    boxes[0].char = "a"                                # glifo de uma letra não ganha outra
+    with pytest.raises(ValueError, match="Divida ou junte"):
+        vf.repartir(boxes, [0, 1], "abcde")
+
+
 def test_espaco_digitado_e_palavra_nova_antes_do_glifo(boxes, lex):
     palavra = vf.desconhecidas(boxes, lex)[0]
     assert vf.quebras(boxes, palavra.indices, " b  ca ") == [1]

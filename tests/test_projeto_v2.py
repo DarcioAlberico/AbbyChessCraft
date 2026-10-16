@@ -162,3 +162,33 @@ def test_pagina_que_sai_da_memoria_volta_com_os_mesmos_gids(lido, monkeypatch):
     projeto.salvar_pagina(0, boxes)
     assert [b.gid for b in projeto.carregar_modelo(0).boxes] == gids
     assert projeto.estado_da_pagina(0) == RECONHECIDA                       # nada mudou
+
+
+def test_gid_de_glifo_marcado_grava_a_pagina_como_glifos_marcados(lido):
+    projeto, _, imagem = lido
+    marcados = pg.segmentar(imagem)[:2]
+    projeto.gid_do_box(7, marcados, 0)                       # página que nunca foi gravada
+    assert ProjetoDeLivro.abrir(projeto.pasta).estado_da_pagina(7) == GLIFOS_MARCADOS
+
+
+def test_lote_gravando_enquanto_a_janela_pede_gids(lido):
+    import threading
+
+    projeto, _, imagem = lido
+    erros = []
+
+    def lote():
+        try:
+            for k in range(10):
+                projeto.salvar_pagina(10 + k, pg.segmentar(imagem)[:3], reconheceu=True)
+        except Exception as erro:        # noqa: BLE001 (o teste quer qualquer falha)
+            erros.append(erro)
+
+    linha = threading.Thread(target=lote)
+    linha.start()
+    boxes = projeto.carregar_pagina(0)
+    gids = [projeto.gid_do_box(0, boxes, i) for i in range(5)]
+    linha.join()
+    assert erros == [] and len(set(gids)) == 5
+    gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
+    assert gravado == projeto.recalcular_livro()

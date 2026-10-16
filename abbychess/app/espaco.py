@@ -159,7 +159,7 @@ class EspacoDeTrabalho:
         self.arranjar("lado_a_lado" if largura > LARGURA_DO_EMPILHADO else "empilhado")
         paginas, imagem, vista, inspetor = TAMANHOS[1920 if largura >= 1700 else 1366]
         escala = largura / (1920 if largura >= 1700 else 1366)
-        self.resizeDocks([self.doca_inspetor], [round(inspetor * escala)],
+        self.resizeDocks([self.doca_inspetor], [max(inspetor, round(inspetor * escala))],
                          Qt.Orientation.Horizontal)
         if self.doca_paginas.isVisible():
             self.resizeDocks([self.doca_paginas], [round(max(paginas, 150) * escala)],
@@ -198,7 +198,7 @@ class EspacoDeTrabalho:
             self.doca_inspetor.show()
             self.inspetor.focar()
         elif painel == 5:
-            self.doca_resultados.show()
+            self.mostrar_resultados()
             self.resultados.focar()
 
     def painel_com_o_foco(self) -> int:
@@ -260,8 +260,17 @@ class EspacoDeTrabalho:
         novos = self.avisos.novos
         self.botao_avisos.setText(f"⚠{novos}" if novos else "⚠")
 
+    def mostrar_resultados(self) -> None:
+        """Abre Resultados / Avisos com a altura padrão (200 px, §3.1)."""
+        if not self.doca_resultados.isVisible():
+            self.doca_resultados.show()
+            QTimer.singleShot(0, self._altura_dos_resultados)   # depois do layout da doca
+
+    def _altura_dos_resultados(self) -> None:
+        self.resizeDocks([self.doca_resultados], [200], Qt.Orientation.Vertical)
+
     def abrir_avisos(self) -> None:
-        self.doca_resultados.show()
+        self.mostrar_resultados()
         self.resultados.ir_aos_avisos()
         self.avisos.visto()
         self.atualizar_avisos()

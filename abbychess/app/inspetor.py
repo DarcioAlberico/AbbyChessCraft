@@ -60,6 +60,8 @@ class PainelDoInspetor(QWidget):
             rolagem = QScrollArea()
             rolagem.setWidgetResizable(True)
             rolagem.setFrameShape(QScrollArea.Shape.NoFrame)
+            # Só rola na vertical: o editor se ajusta à largura do Inspetor (296 px em 1366).
+            rolagem.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             rolagem.setWidget(editor)
             self.pilha.addWidget(rolagem)
             self._rolagens[nome] = rolagem

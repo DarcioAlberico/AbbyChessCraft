@@ -367,6 +367,7 @@ def test_comando_com_tarefa_rodando_entra_na_fila_e_aparece(app, janela):
 def test_editar_nao_grava_na_hora_e_fechar_grava(app, janela):
     janela.reconhecer()
     _esperar(app, janela)
+    janela.projeto.gravador.atraso = 30       # nada grava sozinho durante o teste
     mostrar(janela, 1)
     janela.treino.campo.setText("q")
     janela.treino._so_corrigir()
@@ -400,8 +401,54 @@ def test_falha_de_gravacao_aparece_na_barra(app, janela, monkeypatch):
                and time.monotonic() < fim):
             app.processEvents()
             time.sleep(0.01)
-        print(repr(janela.statusBar().currentMessage()))
         assert "A página 1 não foi gravada (disco cheio)" in janela.statusBar().currentMessage()
         assert janela.projeto.sujas
     finally:
         monkeypatch.undo()                   # o fechar da fixture grava (e não pergunta)
+
+
+def test_tarefa_pedida_dentro_de_outra_espera_a_vez_e_o_executor_continua_certo(app, janela):
+    ordem = []
+
+    def segunda():
+        ordem.append("segunda")
+        return (lambda _p: ordem.append("trabalho 2")), (lambda _r: ordem.append("fim 2"))
+
+    def primeira():
+        ordem.append("primeira")
+        janela.executor.rodar("Segunda", segunda)       # pedida de dentro do preparar
+        return (lambda _p: ordem.append("trabalho 1")), (lambda _r: ordem.append("fim 1"))
+
+    janela.executor.rodar("Primeira", primeira)
+    assert janela.executor.ocupado and janela.executor.na_fila == ["Segunda"]
+    _esperar(app, janela)
+    assert ordem == ["primeira", "trabalho 1", "fim 1", "segunda", "trabalho 2", "fim 2"]
+    assert not janela.executor.ocupado
+
+
+def test_fechar_com_pagina_que_nao_grava_pergunta_e_pode_ficar_aberta(app, janela, monkeypatch):
+    from PySide6.QtGui import QCloseEvent
+
+    from abbychess import gravacao as gv
+
+    janela.reconhecer()
+    _esperar(app, janela)
+    respostas = iter([QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes])
+    perguntas = []
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda _p, _t, texto, *a, **k: (perguntas.append(texto), next(respostas))[1])
+
+    def falhar(*_a, **_k):
+        raise PermissionError("disco cheio")
+
+    monkeypatch.setattr(gv, "gravar_json", falhar)
+    mostrar(janela, 1)
+    janela.treino.campo.setText("q")
+    janela.treino._so_corrigir()
+    evento = QCloseEvent()
+    janela.closeEvent(evento)                          # "Não": fica aberta
+    assert not evento.isAccepted() and janela.projeto is not None
+    assert "página(s) 1" in perguntas[0]
+    evento = QCloseEvent()
+    janela.closeEvent(evento)                          # "Sim": fecha e perde
+    assert evento.isAccepted() and janela.projeto is None

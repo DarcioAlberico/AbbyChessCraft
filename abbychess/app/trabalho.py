@@ -62,6 +62,8 @@ class Executor(QObject):
         self._pool.setMaxThreadCount(1)
         self._fila: deque = deque()
         self._tarefa: Optional[_Tarefa] = None
+        #: Dentro de `_proxima` ou de um `pronto`: a tarefa pedida ali só entra na fila.
+        self._no_laco = False
         self.titulo = ""
 
     @property
@@ -76,47 +78,54 @@ class Executor(QObject):
         self.rodar(titulo, preparar, falhou, progresso)
 
     def rodar(self, titulo: str, preparar, falhou=None, progresso=None) -> None:
-        """Agenda a tarefa: roda já se nada estiver rodando, senão entra na fila."""
+        """Agenda a tarefa: roda já se nada estiver rodando, senão entra na fila. Pedida de
+        dentro de um `preparar` ou de um `pronto`, espera o laço de `_proxima`."""
         self._fila.append((titulo, preparar, falhou, progresso))
-        if self._tarefa is None:
+        if self._tarefa is None and not self._no_laco:
             self._proxima()
         else:
             self.fila_mudou.emit(self.na_fila)
 
     def _proxima(self) -> None:
-        while self._fila:
-            titulo, preparar, falhou, progresso = self._fila.popleft()
-            try:
-                par = preparar()
-            except Exception as erro:
-                log.exception("a preparação de %r falhou", titulo)
-                if falhou is not None:
-                    falhou(f"{erro}\n\n{traceback.format_exc(limit=3)}")
-                continue
-            if par is None:
-                continue                        # nada a fazer fora da interface
-            trabalho, pronto = par
-            tarefa = _Tarefa(trabalho)
-            tarefa.sinais.progresso.connect(self.progresso.emit)
-            if progresso is not None:
-                tarefa.sinais.progresso.connect(progresso)
-            tarefa.sinais.concluido.connect(lambda r, f=pronto: self._fim(f, r))
-            tarefa.sinais.falhou.connect(lambda m, f=falhou: self._fim(f, m))
-            self._tarefa, self.titulo = tarefa, titulo   # mantém os sinais vivos até o fim
-            self.ocupado_mudou.emit(True, titulo)
-            self.fila_mudou.emit(self.na_fila)
-            self._pool.start(tarefa)
-            return
-        self._tarefa, self.titulo = None, ""
-        self.ocupado_mudou.emit(False, "")
-        self.fila_mudou.emit([])
+        self._no_laco = True
+        try:
+            while self._fila:
+                titulo, preparar, falhou, progresso = self._fila.popleft()
+                try:
+                    par = preparar()
+                except Exception as erro:
+                    log.exception("a preparação de %r falhou", titulo)
+                    if falhou is not None:
+                        falhou(f"{erro}\n\n{traceback.format_exc(limit=3)}")
+                    continue
+                if par is None:
+                    continue                    # nada a fazer fora da interface
+                trabalho, pronto = par
+                tarefa = _Tarefa(trabalho)
+                tarefa.sinais.progresso.connect(self.progresso.emit)
+                if progresso is not None:
+                    tarefa.sinais.progresso.connect(progresso)
+                tarefa.sinais.concluido.connect(lambda r, f=pronto: self._fim(f, r))
+                tarefa.sinais.falhou.connect(lambda m, f=falhou: self._fim(f, m))
+                self._tarefa, self.titulo = tarefa, titulo   # mantém os sinais vivos até o fim
+                self.ocupado_mudou.emit(True, titulo)
+                self.fila_mudou.emit(self.na_fila)
+                self._pool.start(tarefa)
+                return
+            self._tarefa, self.titulo = None, ""
+            self.ocupado_mudou.emit(False, "")
+            self.fila_mudou.emit([])
+        finally:
+            self._no_laco = False
 
     def _fim(self, callback, valor) -> None:
         self._tarefa = None
+        self._no_laco = True                    # o que o `pronto` pedir espera a vez
         try:
             if callback is not None:
                 callback(valor)
         finally:
+            self._no_laco = False
             self._proxima()                     # um erro no fim não para a fila
 
     def esvaziar(self) -> None:

@@ -145,7 +145,7 @@ sempre com as pastas do projeto.
   conferido.
 - **Reconhecer o livro** (Ctrl+Shift+F5) lê um intervalo de páginas ("26-27, 30"; vazio é o
   livro inteiro) em segundo plano, com os padrões do livro, lê os diagramas em FEN como o F5
-  e grava cada página no projeto assim que ela termina. O diagrama já conferido não é relido. A barra mostra a página em que o lote está. Se o intervalo tem
+  e grava cada página no projeto assim que ela termina. O diagrama já conferido não é relido. A barra mostra a página em que o lote está. Enquanto ele roda, corrigir a página é recusado com aviso na barra, e o que lê (F5, Ctrl+R) espera na fila. Se o intervalo tem
   páginas já lidas, ele pergunta: Sim as lê de novo (os boxes e as correções só desta
   ocorrência saem, os padrões ficam), Não as pula. **Cancelar o lote** para ao fim da leitura
   em curso; a página interrompida fica como estava e as já gravadas ficam.
@@ -241,6 +241,13 @@ tenta de novo (até 5 tentativas ao todo, a cada 50 ms). Os `.tmp` que uma queda
 - **`livro.json`** é o resumo de cada página gravada (o `pid` dela, o estado, pendentes, o
   histograma das confianças e os diagramas por conferir), atualizado a cada gravação de
   página. É um cache: se faltar ou estragar, é refeito das páginas na abertura.
+- **A gravação não trava a janela (passo 2a).** Uma correção não grava na hora: ela vai
+  para um gravador numa thread própria, que junta as mudanças da mesma página e grava meio
+  segundo depois da primeira (cem correções seguidas são uma gravação). Se o disco recusar
+  (cheio, sem permissão, antivírus segurando o arquivo), a barra de status diz qual página
+  não foi gravada; ela continua com as mudanças na memória e o gravador tenta de novo,
+  esperando mais a cada vez. **Fechar a janela grava o que falta antes de fechar**, e
+  avisa se alguma página não pôde ser gravada.
 
 **O modelo v2 (passo 1b).** Cada glifo tem agora uma identidade que não muda (`gid`): a
 página tem um número próprio (`pid`), que reordenar ou inserir páginas não muda, e cada
@@ -610,8 +617,11 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | Arquivo | O que faz |
 |---|---|
 | `abbychess/projeto.py` | A pasta do projeto: fonte (relativa, relocalizada pelo SHA-256), idioma, limiares, `extras`, só leitura, as páginas no formato v2 (`p<pid>.json`), a migração do v1, `livro.json` |
-| `abbychess/modelo.py` | O modelo da página: `Box` com gid, decisões, `Diferenca`, `Pagina`, o estado da página e a reconciliação com a janela de hoje |
-| `abbychess/edicao.py` | As edições por gid (dividir, juntar, marcar, descartar, quebrar e juntar palavras, glifo virtual), cada uma com os sucessores |
+| `abbychess/modelo.py` | O modelo da página: `Box` com gid, decisões, `Diferenca`, `Pagina` (e o instantâneo dela), o estado da página e a reconciliação da página relida (F5, lote) |
+| `abbychess/edicao.py` | As edições por gid (dividir, juntar, marcar, ajustar, corrigir, descartar, quebrar e juntar palavras, glifo virtual), cada uma com os sucessores, sem mudar nada no lugar |
+| `abbychess/controlador.py` | O `ControladorDePagina`: a página aberta, a fila, a seleção, o desfazer e os comandos da janela, por gid e sem Qt |
+| `abbychess/controladores.py` | Os controladores das áreas, da verificação, dos diagramas e do livro (abrir, lote, F6, exportar) |
+| `abbychess/gravador.py` | O gravador das páginas: uma thread, instantâneos imutáveis, coalescência de meio segundo |
 | `abbychess/texto.py` | O documento derivado da página (`montar`) e o texto dele, nos modos impresso e SAN |
 | `abbychess/procedencia.py` | De que amostra do livro veio cada leitura |
 | `abbychess/gravacao.py` | A gravação atômica de todo arquivo do projeto e a trava de só leitura |
@@ -624,7 +634,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | `abbychess/livro.py` | O lote de páginas, com cancelamento, e a fila de revisão do livro todo |
 | `abbychess/exportar.py` | PDF pesquisável, DOCX e EPUB a partir das páginas gravadas, pelo core do PyBoxEditor, sem o cabeçalho e o rodapé corridos |
 | `abbychess/historico.py` | Desfazer e refazer: a página antes e depois de cada passo e os padrões que ele gravou |
-| `abbychess/app/` | A interface PySide6: janela, visor da página, painéis de treino, padrões e verificação, opções, conferência de diagramas |
+| `abbychess/app/` | A interface PySide6: a janela (só liga sinais aos controladores e desenha), `acoes.py` (menus e atalhos), `dialogos.py`, o executor com fila (`trabalho.py`), visor da página, painéis de treino, padrões e verificação, opções, conferência de diagramas |
 | `tests/` | O núcleo e a janela, sem depender do modelo global |
 | `docs/ANALISE_PYBOXEDITOR.md` | O que o PyBoxEditor oferece a este projeto |
 | `docs/SPEC.md` | A especificação da aplicação completa (v0.4, aprovada nas revisões) |
@@ -662,11 +672,6 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   ajuda, mas o programa não o faz, porque a memória delas não voltaria. A reconciliação sai
   no passo 2a, e a cópia da página inteira a cada passo do desfazer (que já existia) sai no
   2b.
-- **A janela ainda edita por índice** (até o passo 2a): cada gravação reconcilia a lista de
-  glifos com o modelo, pelo objeto e, depois do desfazer de hoje (que devolve cópias), pela
-  caixa. Um glifo que o desfazer de hoje trouxe de volta depois de dividido ganha gid novo
-  (o desfazer por gid é do passo 2b).
-
 - **Gravar não é assíncrono ainda, e isso custa tempo desde o 1a.** Cada gravação de página
   faz dois `fsync` (a página e o `livro.json`) na thread de quem grava, inclusive a cada
   troca de página e a cada página do lote, e ensinar um glifo grava também o padrão e os
@@ -684,7 +689,8 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 - **No projeto só para leitura, as ações que gravam falham com aviso** em vez de ficarem
   desabilitadas: ensinar e esquecer padrões, guardar as casas de um diagrama conferido e o
   reconhecimento em lote (que avisa só depois de ler a primeira página). A correção feita na
-  tela some ao trocar de página. A janela passa a desligar essas ações no passo A2.
+  tela fica só na memória: some ao fechar (ou quando a página sai das 16 que o programa
+  guarda). A janela passa a desligar essas ações no passo A2.
 - **Um projeto aberto por este programa não abre mais no programa da tag `passo-0`.** A
   primeira abertura grava em `projeto.json` campos novos (`fonte_sha256`, `fonte_tamanho`,
   `extras`), que o programa do passo 0 recusa como "ilegível". Para voltar ao passo 0 com um
@@ -706,8 +712,9 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   Projeto, a exportação; o editor de áreas, a verificação de texto e a leitura e
   conferência dos diagramas.
 - **O lote não aprende sozinho.** Ele lê com os padrões que existem quando começa; ensinar
-  durante o lote não é possível (a janela fica ocupada), e o que se ensina depois só vale
-  para as páginas lidas de novo ou com Ctrl+R.
+  durante o lote não é possível (a edição é recusada com aviso enquanto ele roda), e o que
+  se ensina depois só vale para as páginas lidas de novo ou com Ctrl+R. O lote grava as
+  páginas na thread dele, e não pelo gravador; o servidor de leitura do passo E muda isso.
 - **Os parágrafos exportados saem do vão entre linhas.** Recuo de primeira linha, títulos,
   cabeçalho e rodapé de página não são reconhecidos: o cabeçalho corrido entra como
   parágrafo, e uma página de duas colunas sai na ordem de leitura, mas sem marcar a coluna.

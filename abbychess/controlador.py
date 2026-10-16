@@ -11,14 +11,16 @@ modelo (`abbychess.edicao`), que o gravador grava (`ProjetoDeLivro.agendar`).
 `falha(titulo, texto)` e `aviso(titulo, texto)`; os outros controladores acrescentam os
 deles.
 
-**O trabalho pesado** (ler, ensinar, reconhecer) vai para `executar(titulo, preparar,
-falhou=, progresso=)`: a janela passa o executor do Qt, que enfileira as tarefas e roda uma
-por vez; os testes passam o `ExecutorSincrono`. `preparar()` roda na thread da interface
-quando chega a vez da tarefa, tira o instantâneo do que a tarefa precisa e devolve
-`(trabalho, pronto)`: `trabalho(progresso)` roda fora da interface sobre cópias, e
-`pronto(resultado)` põe o resultado na página, só nos glifos que não mudaram enquanto a
-tarefa rodava (`edicao.aplicar_leituras`). O que o usuário pediu (os gids, o caractere) é
-guardado na hora do comando: uma tarefa na fila não ensina outro glifo.
+**Todo comando que muda a página ou usa o leitor é uma tarefa** (`tarefa`), e as tarefas
+rodam uma por vez, na ordem: a janela passa o executor do Qt, que as enfileira; os testes
+passam o `ExecutorSincrono`. `preparar()` roda na thread da interface quando chega a vez
+da tarefa: as edições (dividir, juntar, corrigir…) se fazem ali mesmo, e as leituras (ler,
+ensinar, reconhecer) tiram o instantâneo do que precisam e devolvem `(trabalho, pronto)`;
+`trabalho(progresso)` roda fora da interface sobre cópias, e `pronto(resultado)` põe o
+resultado na página que a tarefa guardou. Assim o leitor nunca é usado por duas threads, e
+nenhuma edição acontece no meio de uma leitura. O que o usuário pediu (os gids, o
+caractere) é guardado na hora do comando: uma tarefa na fila não ensina outro glifo; e a
+tarefa de outro projeto (aberto antes do atual) é descartada, pela `geracao`.
 
 Enquanto o lote lê o livro (`lote_rodando`), editar a página é recusado com aviso: o lote
 grava as páginas na thread dele.
@@ -105,6 +107,8 @@ class ControladorDePagina:
         self.historicos: Dict[int, hs.Historico] = {}
         #: O lote está lendo o livro: editar a página espera.
         self.lote_rodando = False
+        #: Muda a cada `ligar`: a tarefa pedida para outro projeto não roda nem aplica.
+        self.geracao = 0
 
     # ------------------------------------------------------------------
     # O que a janela lê
@@ -199,6 +203,7 @@ class ControladorDePagina:
     # ------------------------------------------------------------------
     def ligar(self, projeto, fonte, leitor) -> None:
         """O projeto aberto, a fonte das páginas e o leitor (os modelos já carregados)."""
+        self.geracao += 1
         self.projeto, self.fonte, self.leitor = projeto, fonte, leitor
         self.historicos = {}
         self.modelo, self.atual, self.pulados, self.selecao = None, None, set(), set()
@@ -290,6 +295,42 @@ class ControladorDePagina:
         self.eventos.emitir("selecao_mudou")
 
     # ------------------------------------------------------------------
+    # As tarefas
+    # ------------------------------------------------------------------
+    def tarefa(self, titulo: str, preparar, falhou=None, progresso=None) -> None:
+        """Põe `preparar` na fila do executor, presa ao projeto de agora: se outro projeto
+        for aberto antes da vez dela (ou antes do fim do trabalho), ela não roda (ou o
+        resultado não entra)."""
+        geracao = self.geracao
+
+        def guardado():
+            if self.geracao != geracao:
+                return None
+            par = preparar()
+            if par is None:
+                return None
+            trabalho, pronto = par
+
+            def pronto_guardado(resultado):
+                if self.geracao != geracao:
+                    log.info("o resultado de %r foi descartado: o projeto mudou", titulo)
+                    return
+                pronto(resultado)
+            return trabalho, pronto_guardado
+
+        self.executar(titulo, guardado, falhou=falhou, progresso=progresso)
+
+    def _editar(self, titulo: str, corpo, *, precisa_de_glifos: bool = True) -> None:
+        """Uma edição na fila: `corpo()` roda na vez dela, se a página ainda é a mesma."""
+        indice = self.indice
+
+        def preparar():
+            if self.indice == indice and self._pode_editar(precisa_de_glifos):
+                corpo()
+            return None
+        self.tarefa(titulo, preparar, falhou=self._falhou(titulo))
+
+    # ------------------------------------------------------------------
     # Os comandos que leem (fora da thread da interface)
     # ------------------------------------------------------------------
     def reconhecer(self) -> None:
@@ -299,8 +340,8 @@ class ControladorDePagina:
         if not self._pode_ler():
             return
         indice = self.indice
-        self.executar("Reconhecendo a página", lambda: self._preparar_reconhecer(indice),
-                      falhou=self._falhou("Reconhecer página"))
+        self.tarefa("Reconhecendo a página", lambda: self._preparar_reconhecer(indice),
+                    falhou=self._falhou("Reconhecer página"))
 
     def _preparar_reconhecer(self, indice: int):
         if indice != self.indice or not self._pode_ler(avisar=False):
@@ -345,8 +386,8 @@ class ControladorDePagina:
         if not self._pode_ler() or not self.boxes:
             return
         indice = self.indice
-        self.executar("Relendo", lambda: self._preparar_reler(indice, tudo),
-                      falhou=self._falhou("Reler"))
+        self.tarefa("Relendo", lambda: self._preparar_reler(indice, tudo),
+                    falhou=self._falhou("Reler"))
 
     def _preparar_reler(self, indice: int, tudo: bool):
         pagina = self.modelo
@@ -395,17 +436,16 @@ class ControladorDePagina:
         return depois
 
     def ensinar_gids(self, por_char: Dict[str, Sequence[int]], descricao: str,
-                     depois: Optional[Callable[[int], None]] = None,
-                     antes: Optional[hs.Instantaneo] = None) -> None:
+                     depois: Optional[Callable[[int], None]] = None, *, juntar=None) -> None:
         """Ensina cada grupo de gids como o caractere dele e propaga uma vez por grupo.
-        `antes` é o instantâneo do desfazer, quando o passo começou antes (a correção de
-        uma palavra que também ensina)."""
+        `juntar` é a chave do passo do desfazer que este emenda (a correção de uma palavra
+        que também ensina: um Ctrl+Z desfaz as duas)."""
         indice = self.indice
-        self.executar("Ensinando", lambda: self._preparar_ensinar(indice, por_char, descricao,
-                                                                  depois, antes),
-                      falhou=self._falhou("Ensinar"))
+        self.tarefa("Ensinando", lambda: self._preparar_ensinar(indice, por_char, descricao,
+                                                                depois, juntar),
+                    falhou=self._falhou("Ensinar"))
 
-    def _preparar_ensinar(self, indice, por_char, descricao, depois, antes_do_passo):
+    def _preparar_ensinar(self, indice, por_char, descricao, depois, juntar):
         pagina = self.modelo
         if indice != self.indice or pagina is None or self.leitor is None:
             return None
@@ -416,7 +456,7 @@ class ControladorDePagina:
             self._avisar("O glifo a ensinar saiu da página antes da vez dele.", 6000)
             return None
         imagem, leitor, projeto = self.imagem, self.leitor, self.projeto
-        antes_inst = antes_do_passo or self._instantaneo()
+        antes_inst = self._instantaneo()
         antes = tuple(pagina.boxes)
         limiares = leitor.limiares
         onde = {b.gid: i for i, b in enumerate(antes)}
@@ -435,7 +475,7 @@ class ControladorDePagina:
 
         def pronto(resolvidos: int):
             ed.aplicar_leituras(pagina, antes, lidos)
-            self._mudou(pagina, indice, descricao, antes_inst)
+            self._mudou(pagina, indice, descricao, antes_inst, juntar=juntar)
             self.eventos.emitir("padroes_mudaram")
             if depois is not None and pagina is self.modelo:
                 depois(resolvidos)
@@ -443,66 +483,91 @@ class ControladorDePagina:
         return trabalho, pronto
 
     # ------------------------------------------------------------------
-    # Os comandos que editam (na hora)
+    # Os comandos que editam (na vez deles na fila: na hora, se nada está rodando)
     # ------------------------------------------------------------------
+    def _vivos(self, gids) -> List[int]:
+        vivos = set(self.gids)
+        return [g for g in gids if g in vivos]
+
     def corrigir(self, char: str) -> None:
         """Shift+Enter: aceita `char` no glifo em revisão (ou na seleção) sem ensinar."""
-        if self.atual is None or not self._pode_editar():
+        if self.atual is None:
             return
-        antes = self._instantaneo()
-        alvos = self.alvos()
-        for gid in alvos:
-            ed.corrigir(self.modelo, gid, char)
-        self.pulados.difference_update(alvos)
-        self.selecao = set()
-        self._mudou(self.modelo, self.indice, f"Corrigir para '{char}'", antes)
-        self.eventos.emitir("selecao_mudou")
-        self.ir_ao_primeiro_pendente()
+        pedidos = self.alvos()
+
+        def corpo():
+            alvos = self._vivos(pedidos)
+            if not alvos:
+                self._avisar("O glifo a corrigir saiu da página antes da vez dele.", 6000)
+                return
+            antes = self._instantaneo()
+            for gid in alvos:
+                ed.corrigir(self.modelo, gid, char)
+            self.pulados.difference_update(alvos)
+            self.selecao = set()
+            self._mudou(self.modelo, self.indice, f"Corrigir para '{char}'", antes)
+            self.eventos.emitir("selecao_mudou")
+            self.ir_ao_primeiro_pendente()
+        self._editar("Corrigindo", corpo)
 
     def descartar(self) -> None:
         """Del: tira o glifo da página (não é caractere)."""
-        if self.atual is None or not self._pode_editar():
+        gid = self.atual
+        if gid is None:
             return
-        antes = self._instantaneo()
-        dif = ed.descartar(self.modelo, self.atual)
-        self._seguir(dif)
-        self.selecao = set()
-        self._mudou(self.modelo, self.indice, "Descartar box", antes)
-        self.eventos.emitir("selecao_mudou")
-        self.ir_ao_primeiro_pendente()
+
+        def corpo():
+            if not self._vivos([gid]):
+                return
+            antes = self._instantaneo()
+            dif = ed.descartar(self.modelo, gid)
+            self._seguir(dif)
+            self.selecao = set()
+            self._mudou(self.modelo, self.indice, "Descartar box", antes)
+            self.eventos.emitir("selecao_mudou")
+            self.ir_ao_primeiro_pendente()
+        self._editar("Descartando", corpo)
 
     def dividir(self, coluna: Optional[int] = None, gid: Optional[int] = None) -> None:
         """Ctrl+D: divide o glifo em dois (no ponto `coluna`, ou pela tinta) e mostra a
         primeira parte, já relida."""
         gid = self.atual if gid is None else gid
-        if gid is None or not self._pode_editar():
+        if gid is None:
             return
-        antes = self._instantaneo()
-        try:
-            dif = ed.dividir(self.modelo, self.imagem, gid, self.leitor, x=coluna)
-        except ValueError as erro:
-            self._avisar(f"Não dividiu: {erro}", 6000)
-            return
-        self._seguir(dif)
-        self._depois_de_editar(dif.novos[0].gid, "Dividir box", antes,
-                               "Box dividido em dois; as partes foram relidas.")
+
+        def corpo():
+            if not self._vivos([gid]):
+                return
+            antes = self._instantaneo()
+            try:
+                dif = ed.dividir(self.modelo, self.imagem, gid, self.leitor, x=coluna)
+            except ValueError as erro:
+                self._avisar(f"Não dividiu: {erro}", 6000)
+                return
+            self._seguir(dif)
+            self._depois_de_editar(dif.novos[0].gid, "Dividir box", antes,
+                                   "Box dividido em dois; as partes foram relidas.")
+        self._editar("Dividindo", corpo)
 
     def juntar(self, passo: int, gid: Optional[int] = None) -> None:
         """Ctrl+J: junta o glifo com o vizinho da mesma linha (passo +1 ou -1)."""
         gid = self.atual if gid is None else gid
-        if gid is None or not self._pode_editar():
+        if gid is None:
             return
-        i = self.indice_de(gid)
-        outro = pg.vizinho(self.boxes, i, passo) if i is not None else None
-        if outro is None:
-            lado = "seguinte" if passo > 0 else "anterior"
-            self._avisar(f"Não há box {lado} nesta linha para juntar.", 6000)
-            return
-        antes = self._instantaneo()
-        dif = ed.juntar(self.modelo, self.imagem, gid, self.gid_em(outro), self.leitor)
-        self._seguir(dif)
-        self._depois_de_editar(dif.novos[0].gid, "Juntar boxes", antes,
-                               "Boxes juntados; o box novo foi relido.")
+
+        def corpo():
+            i = self.indice_de(gid)
+            outro = pg.vizinho(self.boxes, i, passo) if i is not None else None
+            if outro is None:
+                lado = "seguinte" if passo > 0 else "anterior"
+                self._avisar(f"Não há box {lado} nesta linha para juntar.", 6000)
+                return
+            antes = self._instantaneo()
+            dif = ed.juntar(self.modelo, self.imagem, gid, self.gid_em(outro), self.leitor)
+            self._seguir(dif)
+            self._depois_de_editar(dif.novos[0].gid, "Juntar boxes", antes,
+                                   "Boxes juntados; o box novo foi relido.")
+        self._editar("Juntando", corpo)
 
     def dividir_em(self, indice: int, coluna: int) -> None:
         """O "Dividir aqui" do menu do visor (o box pela posição na lista)."""
@@ -518,38 +583,46 @@ class ControladorDePagina:
     def ajustar(self, esquerda: int, cima: int, direita: int, baixo: int) -> None:
         """Alt+seta: move as bordas do glifo em revisão, em pixels da página."""
         gid = self.atual
-        if gid is None or not self._pode_editar():
+        if gid is None:
             return
-        antes = self._instantaneo()
-        try:
-            ed.ajustar(self.modelo, self.imagem, gid, self.leitor, esquerda=esquerda,
-                       cima=cima, direita=direita, baixo=baixo)
-        except ValueError as erro:
-            self._avisar(f"Não ajustou: {erro}", 6000)
-            return
-        b = self.box(gid)
-        # Os Alt+seta seguidos no mesmo box viram um passo só.
-        self._depois_de_editar(gid, "Ajustar bordas", antes,
-                               f"Box em ({b.x1}, {b.y1})–({b.x2}, {b.y2}).",
-                               juntar=("ajustar", gid))
+
+        def corpo():
+            if not self._vivos([gid]):
+                return
+            antes = self._instantaneo()
+            try:
+                ed.ajustar(self.modelo, self.imagem, gid, self.leitor, esquerda=esquerda,
+                           cima=cima, direita=direita, baixo=baixo)
+            except ValueError as erro:
+                self._avisar(f"Não ajustou: {erro}", 6000)
+                return
+            b = self.box(gid)
+            # Os Alt+seta seguidos no mesmo box viram um passo só.
+            self._depois_de_editar(gid, "Ajustar bordas", antes,
+                                   f"Box em ({b.x1}, {b.y1})–({b.x2}, {b.y2}).",
+                                   juntar=("ajustar", gid))
+        self._editar("Ajustando", corpo)
 
     def marcar(self, x1: int, y1: int, x2: int, y2: int) -> None:
         """O quadro desenhado no modo de treino vira glifo, lido, no lugar dos de dentro."""
-        if self.imagem is None or not self._pode_editar(precisa_de_glifos=False):
+        if self.imagem is None:
             return
-        antes = self._instantaneo()
-        pagina = self._pagina_para_editar()
-        try:
-            dif = ed.marcar(pagina, self.imagem, (x1, y1, x2, y2), self.leitor)
-        except ValueError as erro:
-            self._avisar(f"Não marcou: {erro}", 6000)
-            return
-        self._seguir(dif)
-        tirados = len(dif.removidos)
-        extra = f", no lugar de {tirados} box(es) de dentro" if tirados else ""
-        self._depois_de_editar(dif.novos[0].gid, "Marcar glifo", antes,
-                               f"Glifo marcado{extra}. Digite o caractere e Enter.",
-                               evento="marcar")
+
+        def corpo():
+            antes = self._instantaneo()
+            pagina = self._pagina_para_editar()
+            try:
+                dif = ed.marcar(pagina, self.imagem, (x1, y1, x2, y2), self.leitor)
+            except ValueError as erro:
+                self._avisar(f"Não marcou: {erro}", 6000)
+                return
+            self._seguir(dif)
+            tirados = len(dif.removidos)
+            extra = f", no lugar de {tirados} box(es) de dentro" if tirados else ""
+            self._depois_de_editar(dif.novos[0].gid, "Marcar glifo", antes,
+                                   f"Glifo marcado{extra}. Digite o caractere e Enter.",
+                                   evento="marcar")
+        self._editar("Marcando", corpo, precisa_de_glifos=False)
 
     def _depois_de_editar(self, mostrar: int, descricao: str, antes: hs.Instantaneo,
                           mensagem: str, *, juntar=None, evento: str = "editar") -> None:
@@ -569,11 +642,11 @@ class ControladorDePagina:
     def desfazer(self) -> None:
         """Ctrl+Z; espera a tarefa em andamento (vai para a fila)."""
         indice = self.indice
-        self.executar("Desfazendo", lambda: self._preparar_voltar(indice, refazer=False))
+        self.tarefa("Desfazendo", lambda: self._preparar_voltar(indice, refazer=False))
 
     def refazer(self) -> None:
         indice = self.indice
-        self.executar("Refazendo", lambda: self._preparar_voltar(indice, refazer=True))
+        self.tarefa("Refazendo", lambda: self._preparar_voltar(indice, refazer=True))
 
     def _preparar_voltar(self, indice: int, *, refazer: bool):
         historico = self.historicos.get(indice)
@@ -615,24 +688,40 @@ class ControladorDePagina:
         self.eventos.emitir("acoes_mudaram")
 
     def esquecer(self, caminhos: Sequence) -> None:
-        """Apaga amostras dos padrões do livro e relê a página inteira sem elas."""
+        """Apaga amostras dos padrões do livro e relê a página inteira sem elas (na fila: o
+        leitor não muda no meio de uma leitura)."""
         if self.leitor is None:
             return
-        for caminho in caminhos:
-            self.leitor.esquecer(caminho)
-        self.eventos.emitir("padroes_mudaram")
-        if self.modelo is not None:
-            novo = proximo_estado(self.modelo.estado, "esquecer_padrao")
-            if novo != self.modelo.estado:
-                self.modelo.estado = novo
-                self._gravar(self.modelo)
-                self._avisar("A página estava verificada e voltou à revisão: o padrão "
-                             "esquecido lia glifos dela.", 8000)
-        self.reler_pendentes(tudo=True)
+        caminhos = list(caminhos)
 
-    def aplicar_limiares(self, limiares) -> str:
-        """Os limiares do livro, gravados no projeto, e a fila refeita com eles. Devolve a
-        mensagem para a barra; um problema ao gravar vai em `aviso`."""
+        def preparar():
+            if self.leitor is None:
+                return None
+            for caminho in caminhos:
+                self.leitor.esquecer(caminho)
+            self.eventos.emitir("padroes_mudaram")
+            if self.modelo is not None:
+                novo = proximo_estado(self.modelo.estado, "esquecer_padrao")
+                if novo != self.modelo.estado:
+                    self.modelo.estado = novo
+                    self._gravar(self.modelo)
+                    self._avisar("A página estava verificada e voltou à revisão: o padrão "
+                                 "esquecido lia glifos dela.", 8000)
+            self.reler_pendentes(tudo=True)
+            return None
+        self.tarefa("Esquecendo padrões", preparar, falhou=self._falhou("Esquecer padrões"))
+
+    def aplicar_limiares(self, limiares) -> None:
+        """Os limiares do livro, gravados no projeto, e a fila refeita com eles (na fila: a
+        fila de revisão não muda no meio de uma leitura). A mensagem vai para a barra; um
+        problema ao gravar vai em `aviso`."""
+        def preparar():
+            if self.projeto is not None:
+                self._aplicar_limiares(limiares)
+            return None
+        self.tarefa("Aplicando os limiares", preparar, falhou=self._falhou("Opções"))
+
+    def _aplicar_limiares(self, limiares) -> None:
         projeto = self.projeto
         projeto.dados.limiares = limiares
         gravou = False
@@ -661,7 +750,6 @@ class ControladorDePagina:
         else:
             mensagem = "Limiares aplicados nesta sessão (não foram gravados)."
         self._avisar(mensagem, 5000)
-        return mensagem
 
     # ------------------------------------------------------------------
     # Por dentro
@@ -691,6 +779,11 @@ class ControladorDePagina:
         if not self._pode_ler():
             return False
         return not precisa_de_glifos or bool(self.boxes)
+
+    def box_atual(self) -> Optional[BoxEntry]:
+        """O glifo em revisão, ou None se ele não está mais na página (o lote a releu)."""
+        i = self.indice_de(self.atual)
+        return self.modelo.boxes[i].entry if i is not None else None
 
     def _pagina_para_editar(self) -> Pagina:
         if self.modelo is None:

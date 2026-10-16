@@ -355,8 +355,10 @@ def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
     """Os `Box` da lista `depois` (os `BoxEntry` que a janela de hoje edita por índice),
     com os gids de `antes` onde dá e gids novos onde não dá, e a `Diferenca` entre as duas.
 
-    É o adaptador do passo 1b, que o 2a remove: a janela ainda edita a lista de
-    `BoxEntry` com as funções de `abbychess.pagina`, e o modelo descobre o que mudou.
+    É o que passa os gids (e as decisões) de uma página para a mesma página relida
+    inteira (o F5 e o lote), e o que reconcilia as listas de `BoxEntry` de quem grava por
+    `ProjetoDeLivro.salvar_pagina` (o lote, as ferramentas). A janela não reconcilia mais:
+    desde o 2a ela edita o modelo (`abbychess.edicao`).
 
     1. O mesmo objeto `BoxEntry` é o mesmo glifo (mudado, se o estado mudou).
     2. Senão, a mesma caixa é o mesmo glifo (o desfazer de hoje devolve cópias).

@@ -152,3 +152,24 @@ calcula a foto e de que uma tarefa pedida por quem ouve "livre" roda (m16). Os r
 
 A correção de B1 não mexe no caminho medido do Enter (é a ordem de duas chamadas do painel),
 e as medidas ficam as do `d19c858`.
+
+## Revisão de produto, rodada 2
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Produto e medição | Completude 9 · Fidelidade das medidas 8 · Clareza para o usuário 9 · Produtividade 8 | **aceita** |
+
+O revisor avaliou o commit extraído (sem as mudanças não commitadas de outra sessão que
+estavam na pasta) e confirmou B1, M1–M5 e m1–m7. Um trecho dessa outra sessão (o `_mudou`
+chamando `diagramas.rederivar_lados`, e dois parágrafos do README) tinha entrado por engano
+no 050cde6; saiu nos commits 23fb3b3 e 1de9831, e a suíte num worktree limpo do 1de9831
+deu 541 passando. Os menores dela entraram: o README diz que a rodada do pico do lote foi
+medida com a árvore suja e para que ela vale (n1); o foco só volta ao campo se ninguém o
+tinha, ou se estava no painel de texto ou no próprio painel de treino (n2); o critério do
+Enter do 2b passa a medir até a cor mudar, como §2 pede, já que medindo até o fim da
+propagação o 2a já cumpre (n3); este parágrafo (n4).
+
+**Fechamento.** As duas revisões aceitaram: código na rodada 3, produto na 2. A tag
+`passo-2a` fica no commit que grava este registro. As medidas de desempenho, de qualidade e
+da fatia são do `d19c858`; o que veio depois não toca o caminho medido (a ordem do foco no
+painel, as recusas no lote, textos e testes).

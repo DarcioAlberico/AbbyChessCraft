@@ -221,9 +221,11 @@ inteira do desfazer.
 **O desempenho do 2b.** O 2a já tirou da interface a gravação, a reconciliação e a cópia
 funda do desfazer: o p95 da releitura ficou em 86–106 ms (o alvo de 150 está alcançado) e o
 do Enter em 90–116 ms (`docs/revisoes/passo-2a.md`). A verificação do 2b inclui 3 rodadas
-completas com o congelamento (`repeticao-2b`) e 3 sem (`repeticao-2b_sem_congelar`): o p95
-do Enter fica ≤ 100 ms em pelo menos 2 das 3 com o congelamento, e as medianas do Enter e
-da releitura não sobem mais de 5 ms acima das do 2a; a memória do desfazer estimada fica
+completas com o congelamento (`repeticao-2b`) e 3 sem (`repeticao-2b_sem_congelar`): o
+Enter é medido até a cor mudar (a parte síncrona, como §2 pede) e fica ≤ 100 ms no p95 em
+pelo menos 2 das 3 com o congelamento (o 2a, medindo até o fim da propagação, já deu 2 de
+3); as medianas do Enter (até o fim da propagação, como no 2a) e da releitura não sobem
+mais de 5 ms acima das do 2a; a memória do desfazer estimada fica
 ≤ 50 MB; e as rodadas dizem se o congelamento (`gc.freeze`) continua. O alvo de §2 "com o
 lote rodando" é do passo E, o primeiro que deixa medir isso.
 

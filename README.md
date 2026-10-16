@@ -221,9 +221,9 @@ os três arquivos saíram em 1,5 s (PDF), 0,8 s (DOCX) e 0,5 s (EPUB).
 
 ### O projeto no disco
 
-Desde o passo 1a, todo arquivo do projeto (as páginas, `projeto.json`, `livro.json`,
-`inclinacoes.json`, `marcadas.json`, `lexico.txt`, as áreas e os padrões com os metadados
-deles) é gravado do mesmo jeito: num `.tmp` ao lado, com `fsync`, e trocado pelo antigo de
+Desde o passo 1a, todo arquivo do projeto (as páginas, que desde o 1b trazem as áreas e a
+marca de "só glifos marcados", `projeto.json`, `livro.json`, `inclinacoes.json`,
+`lexico.txt` e os padrões com os metadados deles) é gravado do mesmo jeito: num `.tmp` ao lado, com `fsync`, e trocado pelo antigo de
 uma vez. Uma queda no meio deixa o arquivo antigo inteiro ou o novo inteiro, nunca um JSON
 pela metade; se o Windows segurar o arquivo um instante (antivírus, indexador), a gravação
 tenta de novo (até 5 tentativas ao todo, a cada 50 ms). Os `.tmp` que uma queda deixar são apagados na próxima abertura.
@@ -251,12 +251,15 @@ programa sabe quem veio de quem. O que muda para você:
   `zonas/`), os diagramas, a marca de "só glifos marcados" (antes em `marcadas.json`) e o
   estado da página: não reconhecida, glifos marcados, reconhecida, em revisão (depois da
   primeira correção) ou verificada (a marcação de verificada chega no passo C).
-- **Um projeto antigo migra sozinho.** Na primeira abertura, o projeto como era vai para
-  `backup-v1/`, e cada página passa ao formato novo quando é aberta pela primeira vez.
-  Copiar `backup-v1/` de volta por cima do projeto o devolve ao que era.
+- **Um projeto antigo migra sozinho.** Na primeira abertura, as páginas, as áreas e o
+  `projeto.json` como eram vão para `backup-v1/` (a barra de status avisa), e cada página
+  passa ao formato novo quando é aberta pela primeira vez. Num disco onde não dá para
+  gravar a cópia, o projeto abre só para leitura, sem migrar.
 - **Cada leitura sabe de que padrão veio.** O glifo lido por um padrão do livro guarda qual
   amostra o leu (é o que a revisão do passo C vai mostrar), e o padrão ensinado leva no
   nome o gid do glifo de onde saiu.
+- **O estado de cada página** é gravado desde já, mas a janela ainda não o mostra (a
+  galeria de páginas é do passo C).
 - **O texto da página** (o painel de texto, a busca e as exportações de hoje) sai de um
   documento montado das páginas (`abbychess.texto.montar`), com as decisões que você tomar
   a partir do passo D1 (espaço a mais ou a menos, o caractere que falta, parágrafo). Hoje
@@ -633,9 +636,13 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 
 ## Limitações conhecidas
 
-- **Um projeto aberto pelo passo 1b não abre mais nos programas de antes** (o formato é o
-  2). Para voltar, copie `backup-v1/` por cima do projeto: as correções feitas depois da
-  migração se perdem.
+- **Voltar a um programa de antes do 1b** pede a cópia: o programa do 1a abre o projeto
+  migrado só para leitura (o formato é o 2) e mostra as páginas migradas como não lidas.
+  Copiar `backup-v1/` por cima do projeto devolve as páginas, as áreas e o `projeto.json`
+  de antes da migração; **não volta** o que foi feito depois dela: correções nas páginas
+  (inclusive as lidas pela primeira vez depois, que ficam só em `paginas/p<pid>.json`),
+  padrões ensinados (`padroes/`), palavras do léxico, amostras de diagrama e inclinações.
+  Antes de abrir um projeto importante pela primeira vez no 1b, vale copiar a pasta inteira.
 - **O modelo v2 custa uns 10 ms na mediana da releitura e do Enter** (tabela "Rodadas
   repetidas"): cada gravação reconcilia a lista da janela com o modelo. O mesmo passo
   congelou os modelos globais para a coleta de lixo do Python (`gc.freeze`), o que tirou a
@@ -658,7 +665,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   também tem duas faixas, nos dois códigos, e com estas rodadas não dá para dizer se o 1a o
   muda; ele fica abaixo do alvo de 50 ms. Num disco lento, de rede ou com antivírus que
   examina cada gravação, a diferença cresce. O gravador assíncrono, com
-  coalescência, é do passo 2a. O formato das páginas ainda é o v1 (o v2 nasce no passo 1b).
+  coalescência, é do passo 2a.
 - **A busca automática da fonte lê no máximo 200 arquivos do tamanho certo** por pasta
   procurada; numa pasta com mais que isso, ela desiste e pede para você mostrar a fonte.
 - **No projeto só para leitura, as ações que gravam falham com aviso** em vez de ficarem

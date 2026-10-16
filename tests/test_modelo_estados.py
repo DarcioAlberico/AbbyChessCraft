@@ -2,9 +2,12 @@
 
 Uma página sintética de 900×400 com 1 a 60 glifos (cada um, dois traços de tinta com um vão,
 para o `dividir` ter onde cortar). As regras do 1b: dividir, juntar, marcar, quebrar,
-juntar palavras e o glifo virtual. A cada passo, os invariantes de §4.5: gids únicos;
+juntar palavras e o glifo virtual, pelas edições por gid (`abbychess.edicao`) e também pelo
+caminho da janela de hoje (a lista de `BoxEntry` editada por `abbychess.pagina` e
+reconciliada, `modelo.reconciliar`). A cada passo, os invariantes de §4.5: gids únicos;
 aposentados ∩ vivos = ∅; nenhuma decisão cita gid aposentado; `montar()` cobre cada glifo
-lido e cada virtual uma vez.
+lido e cada virtual uma vez. E dois do modelo: nenhuma edição perde uma decisão cujo glifo
+ela não tocou, e uma quebra e uma junção nunca valem na mesma fronteira.
 
 Suíte rápida: `derandomize=True`, `max_examples=200`. A camada noturna roda 5.000.
 """
@@ -22,8 +25,9 @@ from PIL import Image, ImageDraw
 from core.box_model import BoxEntry
 
 from abbychess import edicao as ed
+from abbychess import pagina as pg
 from abbychess import texto as tx
-from abbychess.modelo import Box, Pagina, gid_de
+from abbychess.modelo import Box, Pagina, foto, gid_de, reconciliar
 
 LARGURA, ALTURA = 900, 400
 EXEMPLOS = 5000 if os.environ.get("ABBY_NOTURNO") == "1" else 200
@@ -55,22 +59,48 @@ class MaquinaDaPagina(RuleBasedStateMachine):
         vivos = [b.gid for b in self.pagina.boxes]
         return vivos[data_i % len(vivos)] if vivos else None
 
-    def _registrar(self, dif):
+    def _registrar(self, dif, antes=None):
         novos = {b.gid for b in dif.novos}
         assert not novos & self.alocados, "gid reaproveitado"
         self.alocados |= novos
+        if antes is not None:
+            self._preservou(antes, dif.removidos)
+
+    def _preservou(self, antes, removidos):
+        """Toda decisão de antes cujo glifo a edição não tocou continua igual."""
+        depois = self.pagina.decisoes
+        assert {g for g in antes.quebras if g not in removidos} <= depois.quebras
+        assert {g for g in antes.paragrafo_antes if g not in removidos} <= depois.paragrafo_antes
+        assert {j for j in antes.juncoes if not (set(j) & removidos)} <= depois.juncoes
+        intactos = {v.gid for v in antes.virtuais if v.depois_de not in removidos}
+        assert intactos <= {v.gid for v in depois.virtuais}
+
+    def _pela_janela(self, editar):
+        """A edição como a janela de hoje a faz: na lista de `BoxEntry`, depois reconciliada."""
+        antes = self.pagina.decisoes
+        foto_de_antes = {b.gid: foto(b.entry) for b in self.pagina.boxes}
+        entries = self.pagina.entries()
+        try:
+            editar(entries)
+        except ValueError:
+            return
+        novos, dif = reconciliar(self.pagina.boxes, entries, self.pagina.alocar,
+                                 estados=foto_de_antes)
+        self.pagina.aplicar(dif, novos)
+        self._registrar(dif, antes)
 
     @rule(i=st.integers(0, 10_000))
     def dividir(self, i):
         gid = self._escolher(i)
         if gid is None:
             return
+        antes = self.pagina.decisoes
         try:
             dif = ed.dividir(self.pagina, self.imagem, gid)
         except ValueError:
             return                                    # sem tinta dos dois lados: não divide
         assert dif.sucessores[gid] == [b.gid for b in dif.novos] and len(dif.novos) == 2
-        self._registrar(dif)
+        self._registrar(dif, antes)
 
     @rule(i=st.integers(0, 10_000))
     def juntar(self, i):
@@ -78,9 +108,10 @@ class MaquinaDaPagina(RuleBasedStateMachine):
             return
         k = i % (len(self.pagina.boxes) - 1)
         a, b = self.pagina.boxes[k].gid, self.pagina.boxes[k + 1].gid
+        antes = self.pagina.decisoes
         dif = ed.juntar(self.pagina, self.imagem, a, b)
         assert dif.sucessores == {a: [dif.novos[0].gid], b: [dif.novos[0].gid]}
-        self._registrar(dif)
+        self._registrar(dif, antes)
 
     @rule(i=st.integers(0, 10_000))
     def marcar(self, i):
@@ -88,11 +119,12 @@ class MaquinaDaPagina(RuleBasedStateMachine):
         if gid is None:
             return
         e = self.pagina.box(gid).entry
+        antes = self.pagina.decisoes
         try:
             dif = ed.marcar(self.pagina, self.imagem, (e.x1 - 2, e.y1 - 2, e.x2 + 2, e.y2 + 2))
         except ValueError:
             return
-        self._registrar(dif)
+        self._registrar(dif, antes)
 
     @rule(i=st.integers(0, 10_000))
     def quebrar(self, i):
@@ -118,7 +150,33 @@ class MaquinaDaPagina(RuleBasedStateMachine):
     def descartar(self, i):
         gid = self._escolher(i)
         if gid is not None and len(self.pagina.boxes) > 1:
-            ed.descartar(self.pagina, gid)
+            antes = self.pagina.decisoes
+            dif = ed.descartar(self.pagina, gid)
+            self._preservou(antes, dif.removidos)
+
+    @rule(i=st.integers(0, 10_000))
+    def dividir_pela_janela(self, i):
+        if self.pagina.boxes:
+            k = i % len(self.pagina.boxes)
+            self._pela_janela(lambda entries: pg.dividir(self.imagem, entries, k))
+
+    @rule(i=st.integers(0, 10_000))
+    def juntar_pela_janela(self, i):
+        if len(self.pagina.boxes) >= 2:
+            k = i % (len(self.pagina.boxes) - 1)
+            self._pela_janela(lambda entries: pg.juntar(self.imagem, entries, k, k + 1))
+
+    @rule(i=st.integers(0, 10_000))
+    def descartar_pela_janela(self, i):
+        if len(self.pagina.boxes) >= 2:
+            k = i % len(self.pagina.boxes)
+            self._pela_janela(lambda entries: pg.descartar(entries, k))
+
+    @rule(i=st.integers(0, 10_000))
+    def corrigir_pela_janela(self, i):
+        if self.pagina.boxes:
+            k = i % len(self.pagina.boxes)
+            self._pela_janela(lambda entries: pg.confirmar(entries, k, "z"))
 
     # ------------------------------------------------------------------
     @invariant()
@@ -136,6 +194,11 @@ class MaquinaDaPagina(RuleBasedStateMachine):
     @invariant()
     def nenhuma_decisao_cita_gid_aposentado(self):
         assert self.pagina.decisoes.gids() <= self.pagina.vivos
+
+    @invariant()
+    def quebra_e_juncao_nunca_na_mesma_fronteira(self):
+        d = self.pagina.decisoes
+        assert not (d.quebras & {b for _, b in d.juncoes})
 
     @invariant()
     def montar_cobre_cada_glifo_uma_vez(self):

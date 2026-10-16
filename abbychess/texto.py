@@ -98,7 +98,9 @@ def montar(pagina: Pagina) -> Documento:
     por_gid = {b.gid: b.entry for b in lidos}
     zonas_de_texto = [z for z in pagina.zonas if z.tipo == "texto"]
     zona_da_linha = [_zona_da_linha(ln, por_gid, zonas_de_texto) for ln in linhas]
-    novo_paragrafo = [any(p and p[0] in pagina.decisoes.paragrafo_antes for p in ln[:1])
+    # Um parágrafo antes de qualquer glifo da linha começa o bloco nessa linha (o
+    # documento é feito de linhas inteiras; partir uma linha é do layout, passo F).
+    novo_paragrafo = [any(g in pagina.decisoes.paragrafo_antes for p in ln for g in p)
                       for ln in linhas]
 
     # Onde cada diagrama entra: antes da linha `lugar` (len(linhas) = no fim).
@@ -161,20 +163,25 @@ def _aplicar_decisoes(linhas: List[List[List[int]]], decisoes: Decisoes) -> List
             else:
                 juntas.append(list(p))
         saida.append(juntas)
-    for v in decisoes.virtuais:                               # virtuais
-        _inserir_virtual(saida, v)
+    ultimo: Dict[Optional[int], int] = {}                     # virtuais, na ordem em que
+    for v in decisoes.virtuais:                               # foram digitados: o segundo
+        depois = ultimo.get(v.depois_de, v.depois_de)         # depois do mesmo glifo vem
+        _inserir_virtual(saida, v, depois)                    # depois do primeiro
+        ultimo[v.depois_de] = v.gid
     return saida
 
 
-def _inserir_virtual(linhas: List[List[List[int]]], v) -> None:
-    if v.depois_de is not None:
+def _inserir_virtual(linhas: List[List[List[int]]], v, depois: Optional[int]) -> None:
+    """O virtual `v` depois do glifo `depois` (o âncora dele, ou o último virtual já posto
+    nesse âncora), ou no começo da primeira linha."""
+    if depois is not None:
         for linha in linhas:
             for k, p in enumerate(linha):
-                if v.depois_de in p:
+                if depois in p:
                     if v.palavra_nova:
                         linha.insert(k + 1, [v.gid])
                     else:
-                        p.insert(p.index(v.depois_de) + 1, v.gid)
+                        p.insert(p.index(depois) + 1, v.gid)
                     return
     if not linhas:
         linhas.append([[v.gid]])

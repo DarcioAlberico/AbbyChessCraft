@@ -68,7 +68,8 @@ from core.box_model import BoxEntry
 from abbychess import gravacao as gv
 from abbychess import procedencia
 from abbychess import zonas as zn
-from abbychess.modelo import (GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA, RECONHECIDA, Box, Decisoes,
+from abbychess.modelo import (GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
+                              Box, Decisoes,
                               Pagina, foto, gid_de, proximo_estado, reconciliar)
 from abbychess.zonas import Zona
 
@@ -196,6 +197,8 @@ class ProjetoDeLivro:
         self._estados: Dict[int, Dict[int, int]] = {}
         #: A abertura achou a fonte noutro lugar, pelo SHA-256 (a janela avisa).
         self.fonte_relocalizada = False
+        #: Esta abertura passou o projeto do formato 1 ao 2 (a janela avisa onde ficou a cópia).
+        self.migrado = False
 
     # ------------------------------------------------------------------
     # Criar e abrir
@@ -259,7 +262,16 @@ class ProjetoDeLivro:
         gv.limpar_temporarios(pasta)
         projeto = cls(pasta, dados)
         if dados.versao < VERSAO:
-            projeto._preparar_migracao(bytes_do_projeto)
+            try:
+                projeto._preparar_migracao(bytes_do_projeto)
+                projeto.migrado = True
+            except OSError as erro:
+                # Mídia só de leitura (ou sem espaço): sem o `backup-v1/` não se migra nada;
+                # o projeto abre só para leitura, como abria antes.
+                log.warning("o projeto v1 não pôde migrar (%s); abre só para leitura", erro)
+                projeto.somente_leitura = projeto._travado = True
+                gv.proteger(pasta)
+                return projeto
         mudou = bool(desconhecidos or outros_limiares)
         if projeto.fonte.is_file():
             if not dados.fonte_sha256 or not dados.fonte_tamanho:
@@ -363,12 +375,15 @@ class ProjetoDeLivro:
         return self.fonte.suffix.lower() == ".pdf"
 
     def _arquivo_da_pagina(self, indice: int) -> Path:
-        """O arquivo v2 da página (`paginas/p<pid>.json`), ou o v1 se ela ainda não migrou."""
+        """O arquivo da página: o v2 (`paginas/p<pid>.json`) se existe, senão o v1 se ela
+        ainda não migrou, senão onde o v2 vai ficar."""
         with self._trava_do_livro:
             pid = self._pid_de(indice)
-        if pid is not None:
+        if pid is not None and self._arquivo_v2(pid).is_file():
             return self._arquivo_v2(pid)
-        return self._arquivo_v1(indice)
+        if self._arquivo_v1(indice).is_file() or pid is None:
+            return self._arquivo_v1(indice)
+        return self._arquivo_v2(pid)
 
     def _arquivo_v1(self, indice: int) -> Path:
         return self.pasta / PASTA_DE_PAGINAS / f"{indice + 1:04d}.json"
@@ -383,18 +398,53 @@ class ProjetoDeLivro:
         """A página no modelo v2, ou `None` se nada foi gravado dela. Uma página v1 é
         migrada e gravada aqui, na primeira leitura (§4.3)."""
         with self._trava_do_livro:
-            if indice in self._modelos and not self._tem_v1(indice):
+            em_cache = self._modelos.get(indice)
+            # Um v1 que apareceu (o `backup-v1/` copiado de volta) vence a página em
+            # memória; em só leitura nada migra, e a página em memória vale.
+            v1 = (em_cache is None or not self.somente_leitura) and self._tem_v1(indice)
+            if em_cache is not None and not v1:
                 self._modelos.move_to_end(indice)
-                return self._modelos[indice]
-            pid = self._pid_de(indice)
-            if pid is not None and self._arquivo_v2(pid).is_file() and not self._tem_v1(indice):
-                pagina = _pagina_de_json(json.loads(self._arquivo_v2(pid).read_text(encoding="utf-8")))
-            elif self._tem_v1(indice):
+                return em_cache
+            if v1:
                 pagina = self._migrar(indice)
             else:
-                return None
-            self._guardar_no_cache(pagina)
+                arquivo = self._arquivo_v2_de(indice)
+                if arquivo is None:
+                    return None
+                pagina = _pagina_de_json(json.loads(arquivo.read_text(encoding="utf-8")))
+            self._guardar_no_cache(pagina, foto_nova=True)
             return pagina
+
+    def _arquivo_v2_de(self, indice: int) -> Optional[Path]:
+        """O `p<pid>.json` da página: pelo `livro.json` e, se ele não a tiver (uma queda entre
+        gravar a página e gravar o livro), pelos arquivos que o livro não cita."""
+        pid = self._pid_de(indice)
+        if pid is not None and self._arquivo_v2(pid).is_file():
+            return self._arquivo_v2(pid)
+        citados = {r.get("pid") for r in self._carregar_livro()["paginas"].values()}
+        achados = []
+        for arquivo in (self.pasta / PASTA_DE_PAGINAS).glob("p*.json"):
+            if not arquivo.stem[1:].isdigit() or int(arquivo.stem[1:]) in citados:
+                continue
+            try:
+                bruto = json.loads(arquivo.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if bruto.get("indice") == indice:
+                achados.append((bruto.get("gravado_em", ""), int(arquivo.stem[1:]), arquivo))
+        if not achados:
+            return None
+        _, pid, arquivo = max(achados)
+        if len(achados) > 1:
+            log.warning("a página %d tem %d arquivos sem o livro; vale o mais recente, p%d",
+                        indice + 1, len(achados), pid)
+        pagina = _pagina_de_json(json.loads(arquivo.read_text(encoding="utf-8")))
+        resumo = self._resumo_do_modelo(pagina)
+        if self.somente_leitura:
+            self._livro["paginas"][str(indice + 1)] = resumo
+        else:
+            self._atualizar_livro(indice, resumo)
+        return arquivo
 
     def salvar_modelo(self, pagina: Pagina) -> None:
         """Grava a página v2 e o resumo dela em `livro.json`."""
@@ -408,10 +458,12 @@ class ProjetoDeLivro:
             self._estados[pagina.pid] = {b[0]: hash(tuple(b[1])) for b in dados["boxes"]}
             self._atualizar_livro(pagina.indice, self._resumo_do_modelo(pagina))
 
-    def _guardar_no_cache(self, pagina: Pagina) -> None:
+    def _guardar_no_cache(self, pagina: Pagina, *, foto_nova: bool = False) -> None:
+        """Põe a página no cache; `foto_nova` (a página veio do disco) refaz a foto dos
+        estados, que de outro modo seria a de outra versão da mesma página."""
         self._modelos[pagina.indice] = pagina
         self._modelos.move_to_end(pagina.indice)
-        if pagina.pid not in self._estados:
+        if foto_nova or pagina.pid not in self._estados:
             self._estados[pagina.pid] = {b.gid: foto(b.entry) for b in pagina.boxes}
         while len(self._modelos) > PAGINAS_EM_MEMORIA:
             _, saiu = self._modelos.popitem(last=False)
@@ -439,10 +491,18 @@ class ProjetoDeLivro:
 
     def gid_do_box(self, indice: int, boxes: Sequence[BoxEntry], posicao: int) -> int:
         """O gid do box `posicao` da lista que a janela edita (adaptador do passo 1b; o 2a
-        passa a janela a trabalhar com gids). Não grava: reconcilia só na memória."""
+        passa a janela a trabalhar com gids).
+
+        Se a reconciliação deu gids novos, a página é gravada antes de o gid sair daqui:
+        quem o pede o grava em disco (o nome do padrão ensinado), e um gid só na memória
+        voltaria a ser alocado depois de uma queda."""
         with self._trava_do_livro:
             pagina = self._modelo_ou_novo(indice)
-            self._reconciliar(pagina, boxes)
+            dif = self._reconciliar(pagina, boxes)
+            if dif.novos and not self.somente_leitura:
+                if pagina.estado in (RECONHECIDA, VERIFICADA):
+                    pagina.estado = proximo_estado(pagina.estado, "editar")
+                self.salvar_modelo(pagina)
             return pagina.boxes[posicao].gid
 
     def salvar_pagina(self, indice: int, boxes: List[BoxEntry],
@@ -654,15 +714,22 @@ class ProjetoDeLivro:
     def recalcular_livro(self) -> dict:
         """O `livro.json` como ele deve ser, lendo todas as páginas gravadas (v2 e as v1 que
         ainda não migraram, sem migrá-las)."""
-        paginas = {}
+        paginas, quando = {}, {}
         for arquivo in sorted((self.pasta / PASTA_DE_PAGINAS).glob("p*.json")):
             if not arquivo.stem[1:].isdigit():
                 continue
             try:
-                pagina = _pagina_de_json(json.loads(arquivo.read_text(encoding="utf-8")))
+                bruto = json.loads(arquivo.read_text(encoding="utf-8"))
+                pagina = _pagina_de_json(bruto)
             except (OSError, ValueError, TypeError, KeyError):
                 continue                # página ilegível: fica fora do resumo
-            paginas[str(pagina.indice + 1)] = self._resumo_do_modelo(pagina)
+            chave, ordem = str(pagina.indice + 1), (bruto.get("gravado_em", ""), pagina.pid)
+            if chave in quando:         # dois arquivos do mesmo índice: vale o mais recente
+                log.warning("a página %s tem mais de um arquivo; vale o gravado por último",
+                            chave)
+                if ordem < quando[chave]:
+                    continue
+            paginas[chave], quando[chave] = self._resumo_do_modelo(pagina), ordem
         for indice in self._indices_v1():
             try:
                 paginas[str(indice + 1)] = self._resumo_do_modelo(self._ler_v1(indice))

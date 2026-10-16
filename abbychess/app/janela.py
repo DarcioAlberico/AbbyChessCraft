@@ -55,6 +55,7 @@ from abbychess.app.painel_treino import FONTE_DE_SIMBOLOS, PainelDeTreino
 from abbychess.app.painel_verificacao import PainelDeVerificacao
 from abbychess.app.trabalho import Executor
 from abbychess.app.visor import VisorDePagina
+from abbychess.leitor import congelar_para_a_coleta_de_lixo
 from abbychess.leitor import LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro, ProjetoInvalido
 
@@ -401,8 +402,10 @@ class JanelaPrincipal(QMainWindow):
         self.total_de_paginas.setText(f" de {fonte.total} ")
 
         def carregar(_progresso):
-            return LeitorDoLivro.com_modelos_globais(projeto.pasta_de_padroes,
-                                                     limiares=projeto.dados.limiares)
+            leitor = LeitorDoLivro.com_modelos_globais(projeto.pasta_de_padroes,
+                                                       limiares=projeto.dados.limiares)
+            congelar_para_a_coleta_de_lixo()
+            return leitor
 
         def pronto(leitor: LeitorDoLivro):
             self.leitor = leitor
@@ -411,6 +414,10 @@ class JanelaPrincipal(QMainWindow):
                                     "carregou. A leitura usa só os padrões e a base global.")
             lidas = projeto.paginas_lidas()
             self.ir_para_pagina(lidas[-1] if lidas else 0, salvar=False)
+            if projeto.migrado:
+                self.statusBar().showMessage(
+                    "O projeto passou ao formato novo (passo 1b). A cópia de como ele era está "
+                    "em backup-v1, dentro da pasta do projeto.", 15000)
             if projeto.fonte_relocalizada:
                 QMessageBox.information(
                     self, "Abrir projeto", f"A fonte do livro não estava mais no lugar "

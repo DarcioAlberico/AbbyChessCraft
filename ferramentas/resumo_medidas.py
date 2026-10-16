@@ -228,6 +228,7 @@ _METAS_REPETIDAS = (("troca_de_pagina", "p50_ms", "Troca, p50"),
                     ("troca_de_pagina", "p95_ms", "Troca, p95"),
                     ("enter_ensinar", "p50_ms", "Enter, p50"),
                     ("enter_ensinar", "p95_ms", "Enter, p95"),
+                    ("releitura_de_um_glifo", "p50_ms", "Releitura, p50"),
                     ("releitura_de_um_glifo", "p95_ms", "Releitura, p95"),
                     ("atraso_durante_o_lote", "p99_ms", "Atraso no lote, p99"))
 
@@ -247,10 +248,12 @@ def _repeticoes() -> list:
             grupos.setdefault((casou["passo"], condicao), []).append((ordem, dados))
     if not grupos:
         return []
-    linhas = ["", "Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). O p95 "
-              "do Enter tem duas faixas no mesmo código (perto de 110–130 e perto de 180–190), e "
-              "o atraso no lote também (perto de 8 e de 21): compare pela mediana (p50), que varia "
-              "bem menos (mas não é imune: uma rodada solta pode sair alta):", "",
+    linhas = ["", "Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o "
+              "congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com "
+              "`ABBY_SEM_CONGELAR=1`), o p95 do Enter tem duas faixas no mesmo código (perto de "
+              "110–130 e de 180–190); o atraso no lote tem duas faixas sempre (perto de 8 e de 21). "
+              "Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair "
+              "alta):", "",
               "| Código | Commit | Rodada | " + " | ".join(r for _, _, r in _METAS_REPETIDAS) + " |",
               "|---|---|---|" + "---|" * len(_METAS_REPETIDAS)]
     for (passo, condicao), rodadas in sorted(grupos.items()):
@@ -261,7 +264,7 @@ def _repeticoes() -> list:
             serie = [d["medidas"].get(chave, {}).get(campo) for _, d in rodadas]
             valores.append("; ".join(_num(v) for v in serie) if any(v is not None for v in serie)
                            else "—")
-        linhas.append(f"| passo {passo} | {', '.join(commits)} | {condicao} | "
+        linhas.append(f"| passo {passo.replace('_', ' ')} | {', '.join(commits)} | {condicao} | "
                       + " | ".join(valores) + " |")
     return linhas
 

@@ -643,6 +643,6 @@ class ControladorDaFila:
             total = len(self.verificador.desconhecidas)
             return f"{self.verificador.posicao + 1 if total else 0}/{total}"
         if p.projeto is None:
-            return "0 por conferir"
+            return "0"
         resumo = p.projeto.resumo_do_livro()
-        return f"{sum(r.get('diagramas_por_conferir', 0) for r in resumo.values())} por conferir"
+        return str(sum(r.get("diagramas_por_conferir", 0) for r in resumo.values()))

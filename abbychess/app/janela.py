@@ -295,6 +295,17 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
             else:
                 self.visor.ir_ao_fim()
 
+    def verificar_pagina(self) -> None:
+        """Ctrl+T: com glifos a revisar, pergunta antes de marcar a página como verificada
+        (a confirmação na barra é do passo C)."""
+        pendentes = len(self.pagina.fila()) if self.pagina.modelo is not None else 0
+        if pendentes and not dialogos.confirmar(
+                self, "Página verificada", f"A página tem {pendentes} glifo(s) a revisar. "
+                "Marcá-la como verificada assim mesmo, com eles como estão?\n\n(Marcar um "
+                "glifo à mão, que era o Ctrl+T, agora é Ctrl+M.)"):
+            return
+        self.pagina.verificar()
+
     def reconhecer(self) -> None:
         p = self.pagina
         if p.reconhecida and p.boxes and not dialogos.confirmar(
@@ -338,8 +349,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
             self.modo_areas(False)
         self.visor.definir_modo_treino(sim)
         self.statusBar().showMessage(
-            "Modo de treino: arraste em volta de um glifo para marcá-lo; Ctrl+clique junta "
-            "boxes na seleção." if sim else "Modo de treino desligado.", 8000)
+            "Marcar glifo à mão: arraste em volta de um glifo para marcá-lo; Ctrl+clique junta "
+            "boxes na seleção." if sim else "Marcar glifo à mão: desligado.", 8000)
 
     def modo_areas(self, sim: bool) -> None:
         """Liga o editor de áreas, que desliga o modo de treino: os dois usam o arraste."""

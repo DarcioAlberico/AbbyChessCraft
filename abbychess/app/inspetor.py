@@ -16,10 +16,9 @@ from PySide6.QtWidgets import (QHBoxLayout, QLabel, QMenu, QScrollArea, QStacked
                                QToolButton, QVBoxLayout, QWidget)
 
 DICAS = {
-    "glifo": "Enter ensina · Shift+Enter só esta · Del descarta · Alt+↓ próximo · "
-             "Ctrl+D divide · Ctrl+J junta · Shift+seta bordas · F2 símbolos",
-    "palavra": "Enter corrige · Ctrl+Enter corrige e ensina · Alt+↓ próxima · "
-               "Ctrl+Shift+I ignora todas · Ctrl+Shift+D dicionário",
+    "glifo": "Alt+↓ pula · Ctrl+D divide · Ctrl+J junta · Shift+seta bordas · F2 símbolos",
+    "palavra": "Enter corrige · Ctrl+Enter corrige e ensina · Alt+↓ pula · "
+               "Ctrl+Shift+I ignora a palavra · Ctrl+Shift+D dicionário",
 }
 
 

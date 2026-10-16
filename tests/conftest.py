@@ -19,6 +19,11 @@ import os
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# O offscreen não acha as fontes do sistema: sem elas o texto sai em quadrados largos, e as
+# medidas de largura dos painéis (CA-3.2, o Inspetor de 296 px) não valem como no programa.
+if os.name == "nt":
+    os.environ.setdefault("QT_QPA_FONTDIR", os.path.join(os.environ.get("WINDIR", r"C:\Windows"),
+                                                         "Fonts"))
 
 
 @pytest.hookimpl(hookwrapper=True)

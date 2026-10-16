@@ -454,6 +454,8 @@ aviso.
      usam a paleta antiga (`cores.py`): passar aos tokens;
    - a conversão do pixmap da página seguinte roda na thread da interface, 400 ms depois de
      trocar (p50 18 ms, máximo 93): fazer a `QImage` na thread da pré-carga.
+   - em zoom baixo (22%), o fundo laranja dos boxes pendentes cobre a letra (revisão de
+     produto do A2): só o contorno abaixo de ~40%;
    - folhear depressa páginas nunca vistas: a pré-carga adiada chega tarde (parado 0,25 s
      por página, ~403 ms por troca); cancelar ou adiar a pré-carga quando outra página já foi
      pedida.

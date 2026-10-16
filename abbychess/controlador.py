@@ -204,9 +204,10 @@ class ControladorDePagina:
         return [g for g in self.gids if g in escolhidos]
 
     def posicao_do_atual(self) -> str:
-        fila = self.fila()
-        if self.atual in fila:
-            return f"Pendente {fila.index(self.atual) + 1} de {len(fila)}"
+        """O que o Glifo diz da posição: nada, se o glifo está na fila (o contador do Inspetor
+        a mostra); "fora da fila", se não."""
+        if self.atual in self.fila():
+            return ""
         return "Box fora da fila (já confirmado ou confiável)"
 
     def texto(self) -> str:

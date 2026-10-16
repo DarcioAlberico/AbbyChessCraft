@@ -78,6 +78,8 @@ def main() -> int:
     from abbychess.projeto import ProjetoDeLivro
 
     app = QApplication.instance() or QApplication([])
+    from PySide6.QtGui import QFont
+    app.setFont(QFont("Segoe UI", 9))           # a fonte do Windows, não a de reserva
     saida = Path(args.saida)
     saida.mkdir(parents=True, exist_ok=True)
     pdf = _pdf(args)
@@ -95,13 +97,16 @@ def main() -> int:
         for nome, largura, altura, arranjo, docas in CENARIOS:
             janela.resize(largura, altura)
             app.processEvents()
-            janela.doca_paginas.setVisible("doca_paginas" in docas)
+            janela.doca_paginas.hide()
             janela.doca_resultados.hide()
             janela.arranjo_padrao()
-            if "doca_resultados" in docas:
-                janela.mostrar_resultados()
+            app.processEvents()
+            # As docas abrem pelo caminho do usuário (F9, o ⚠), não pelo arranjo padrão.
+            if "doca_paginas" in docas:
+                janela.alternar_paginas()
                 app.processEvents()
-                janela._altura_dos_resultados()  # o layout das outras docas veio depois
+            if "doca_resultados" in docas:
+                janela.abrir_avisos()
                 app.processEvents()
             if arranjo is not None:
                 janela.arranjar(arranjo)

@@ -104,7 +104,9 @@ letra solta em campo de texto, Ctrl+Alt e ligação nativa encoberta sem exceç�
 5. A aba **Padrões** da vista direita mostra cada amostra por caractere e permite esquecer as
    erradas (Alt+3 cicla as abas).
 6. **Ctrl+T** marca a página como verificada e abre a próxima não verificada (desde o A2).
-   Uma edição depois a devolve a "em revisão"; o Ctrl+Z desfaz a marca.
+   Com glifos ainda a revisar, ele pergunta antes. Uma edição depois a devolve a "em
+   revisão"; o Ctrl+Z desfaz a marca. (Até o A1, o Ctrl+T era o modo de treino, que agora
+   é o Ctrl+M.)
 7. **Clicar num diagrama** abre a conferência (ver abaixo).
 
 Os boxes na página (desde o passo A1): **o que chama o olho é o que falta revisar.** Cada
@@ -132,12 +134,16 @@ Desde o passo A2 a janela é a do FineReader:
 - O **Inspetor** é um editor só, o do item atual: **Glifo** (o treino) ou **Palavra** (a
   verificação de texto). No cabeçalho, a **fila**: o modo (confiança, ordem de leitura,
   palavras desconhecidas, diagramas por conferir) e a posição nela. **F7** passa ao modo
-  seguinte, e o seletor escolhe um. O editor só troca por um clique num item ou pelo modo da
+  seguinte, e o seletor escolhe um. O Alt+↓ leva o foco ao campo do Inspetor, de qualquer
+  painel. No modo "diagramas por conferir", o Inspetor continua no Glifo (o editor de
+  Diagrama é do passo H) e o Alt+↓, que só anda para a frente, abre a conferência do
+  próximo. O editor só troca por um clique num item ou pelo modo da
   fila, nunca pelo foco. No campo do caractere, Enter, Shift+Enter, Del e as setas das bordas
   são do Glifo; **F2** abre a paleta de símbolos.
-- A gaveta de **Páginas** (**F9**) lista o livro: o número, o estado (não reconhecida, glifos
-  marcados, reconhecida, em revisão, verificada), os glifos a revisar e os diagramas por
-  conferir. Enter ou duplo clique abre a página; o filtro mostra um estado; com várias
+- A gaveta de **Páginas** (**F9**) lista o livro: o número, o estado (um símbolo: · não
+  reconhecida, ✎ glifos marcados, ○ reconhecida, ◐ em revisão, ✓ verificada; o nome na dica),
+  os glifos a revisar e os diagramas por conferir, em 150 px tirados da vista direita (a
+  Imagem fica do tamanho que tinha). Enter ou duplo clique abre a página; o filtro mostra um estado; com várias
   selecionadas, o menu de contexto as reconhece em lote. Num projeto novo, numa janela de
   1600 px ou mais, ela abre sozinha.
 - **Resultados / Avisos**, embaixo, guarda os avisos e os erros do projeto, com a hora, em
@@ -145,8 +151,8 @@ Desde o passo A2 a janela é a do FineReader:
   os avisos e as recusas do desfazer. O **⚠** da barra de status conta os novos e abre o
   painel.
 - **Alt+1** a **Alt+5** levam o foco a Páginas, Imagem, vista direita (de novo: a aba
-  seguinte), Inspetor e Resultados, abrindo o painel fechado. **Esc** fecha Resultados e,
-  depois, esvazia a seleção. **Shift+F10** e a tecla **Menu** abrem o menu de contexto do
+  seguinte), Inspetor e Resultados, abrindo o painel fechado. **Esc** esvazia a seleção e,
+  depois, fecha Resultados (o foco volta ao painel de antes). **Shift+F10** e a tecla **Menu** abrem o menu de contexto do
   painel com o foco.
 - A barra de status mostra a página e o estado dela, a fila, o zoom e, no lote, o andamento
   e o **✕** que o cancela.
@@ -834,14 +840,20 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   As medidas do A1 ficaram iguais: a troca no cache em 12 ms na mediana, fora do cache
   130–134; a pintura dos boxes, 12–13 no p95; a releitura, 14–15 na mediana. O Enter até a
   cor mudar ficou em 21 ms na mediana em 2 das 3 rodadas e no portão; numa rodada, 30 ms na
-  mediana e 67 no p95, com um pico de 286 ms (abaixo do alvo de 100 no p95, e a mesma rodada
-  solta que o A1 teve; não investigado). A **Linha** (a linha atual ampliada) e a cláusula dela no CA-3.2
+  mediana e 67 no p95, com um pico de 286 ms (abaixo do alvo de 100 no p95). **Não é a rodada
+  solta do A1**: lá (commit `4e974a5`) a rodada alta tinha p95 de 33 e máximo de 35, um
+  deslocamento por igual; aqui há uma cauda, e na mesma rodada o Enter com uma propagação
+  lenta teve p95 de 42 (nas outras, 24–26), e as 3 rodadas finais do A1 não tiveram rodada
+  alta. O A2 mudou o caminho do Enter no campo (a ação do YAML, o `ShortcutOverride`); as
+  medidas foram refeitas depois da revisão de produto (abaixo, no registro do passo). A **Linha** (a linha atual ampliada) e a cláusula dela no CA-3.2
   (a x-height ≥ 12 px nela) são do passo A3; a da Imagem (≥ 6 px no zoom largura, no índice
   25 do livro de referência) passa em 1366×768 e em 1280×720. O Shift+F10 e a tecla Menu
   vêm do Windows como pedido de menu de contexto; o teste confere que cada painel abre o
   menu nesse pedido, não a tecla em si. A gaveta de Páginas é refeita do `livro.json` a cada
   troca de página e meio segundo depois de uma rajada de edições: o desempenho com 230
-  páginas (CA-8.3) é do passo C.
+  páginas (CA-8.3) é do passo C. Com ela aberta (o padrão de um projeto novo numa janela de
+  1600 px ou mais), a troca no cache passa de ~11 para ~16 ms na mediana (medida da revisão
+  de produto, fora do protocolo); as medidas oficiais rodam com ela fechada.
 - **A memória do desfazer está no alvo** para correções de um glifo (é o que a medida faz:
   300 correções reais em 3 páginas): 8,0–8,1 MB para 300 páginas × 20 ações pelo
   `tracemalloc` (o portão e uma rodada só da memória no commit `badede5`, outra no `b291e91`,
@@ -881,15 +893,13 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   desabilitadas: ensinar e esquecer padrões, guardar as casas de um diagrama conferido e o
   reconhecimento em lote (que avisa só depois de ler a primeira página). A correção feita na
   tela fica só na memória: some ao fechar (ou quando a página sai das 16 que o programa
-  guarda). A janela passa a desligar essas ações no passo A2.
+  guarda). Desligar essas ações na janela ficou para depois (o A2 não o fez; o passo K,
+  com os estados vazios e os tokens, é o lugar).
 - **Um projeto aberto por este programa não abre mais no programa da tag `passo-0`.** A
   primeira abertura grava em `projeto.json` campos novos (`fonte_sha256`, `fonte_tamanho`,
   `extras`), que o programa do passo 0 recusa como "ilegível". Para voltar ao passo 0 com um
   livro em andamento, use a cópia de segurança de antes do passo.
 
-- **O Del do treino não descarta o box com o foco no campo do caractere.** O campo fica com a
-  tecla, mesmo vazio (achado da tabela de atalhos no passo 0). Por enquanto, use o botão
-  "Não é caractere"; o passo A2 corrige pela regra 6 de §3.4 da spec.
 - **O repositório tem conteúdo de livros** (`tests/verdade/`, `tests/dados/fatia/`): ele é
   privado e fica local, por decisão do passo 0 (o texto dos gabaritos é a referência das
   medidas e precisa estar versionado com elas). Não publique o repositório; para publicar,

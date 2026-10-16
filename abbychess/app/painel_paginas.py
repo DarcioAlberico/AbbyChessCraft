@@ -1,6 +1,7 @@
 """A gaveta de Páginas (SPEC §3.1): o livro inteiro numa lista, lida de `livro.json`.
 
-Cada linha tem o número, o estado (§4.4), os glifos a revisar e os diagramas por conferir;
+Cada linha tem o número, o estado (§4.4, um símbolo com cor, o nome na dica), os glifos a
+revisar e os diagramas por conferir, em 150 px;
 as páginas que nunca foram reconhecidas aparecem como "não reconhecida". Enter ou duplo
 clique abre a página; a seleção múltipla (Shift, Ctrl) vai para "Reconhecer as
 selecionadas" no menu de contexto. O filtro mostra só um estado.
@@ -15,6 +16,16 @@ from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QMenu, QTreeWidget,
                                QVBoxLayout, QWidget)
 
 from abbychess import modelo as md
+from abbychess.app import estilo
+
+#: O símbolo e a cor de cada estado na coluna estreita (a cor não carrega o sentido sozinha).
+SIMBOLOS_DOS_ESTADOS = {
+    md.NAO_RECONHECIDA: ("·", estilo.CINZA),
+    md.GLIFOS_MARCADOS: ("✎", estilo.ROXO_AVERMELHADO),
+    md.RECONHECIDA: ("○", estilo.LARANJA),
+    md.EM_REVISAO: ("◐", estilo.VERMELHAO),
+    md.VERIFICADA: ("✓", estilo.VERDE_AZULADO),
+}
 
 NOMES_DOS_ESTADOS = {
     md.NAO_RECONHECIDA: "não reconhecida",
@@ -47,12 +58,15 @@ class PainelDePaginas(QWidget):
         self.lista.setAccessibleName("Páginas do livro")
         self.lista.setRootIsDecorated(False)
         self.lista.setUniformRowHeights(True)
-        self.lista.setHeaderLabels(["Pág.", "Estado", "Rev.", "Diag."])
+        self.lista.setHeaderLabels(["Pág.", "", "Rev.", "Diag."])
+        self.lista.headerItem().setToolTip(1, "O estado da página (passe o mouse no símbolo)")
+        self.lista.headerItem().setToolTip(2, "Glifos a revisar")
+        self.lista.headerItem().setToolTip(3, "Diagramas por conferir")
         self.lista.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.lista.itemActivated.connect(self._abrir_item)
         self.lista.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.lista.customContextMenuRequested.connect(self._menu)
-        for coluna, largura in enumerate((44, 104, 40, 40)):
+        for coluna, largura in enumerate((36, 22, 36, 32)):    # cabem nos 130 px da gaveta
             self.lista.setColumnWidth(coluna, largura)
 
         caixa = QVBoxLayout(self)
@@ -82,12 +96,18 @@ class PainelDePaginas(QWidget):
             pendentes = r.get("pendentes")
             diagramas = r.get("diagramas_por_conferir", 0)
             item = self.lista.topLevelItem(i)
-            for coluna, texto in enumerate((str(i + 1), NOMES_DOS_ESTADOS.get(estado, estado),
+            simbolo, cor = SIMBOLOS_DOS_ESTADOS.get(estado, ("?", estilo.CINZA))
+            for coluna, texto in enumerate((str(i + 1), simbolo,
                                             "" if pendentes is None else str(pendentes),
                                             str(diagramas) if diagramas else "")):
                 if item.text(coluna) != texto:
                     item.setText(coluna, texto)
-            item.setData(1, Qt.ItemDataRole.UserRole, estado)
+            if item.data(1, Qt.ItemDataRole.UserRole) != estado:
+                item.setData(1, Qt.ItemDataRole.UserRole, estado)
+                item.setToolTip(1, NOMES_DOS_ESTADOS.get(estado, estado))
+                item.setForeground(1, cor)
+                apagada = estado == md.NAO_RECONHECIDA      # o que ainda não foi lido, atenuado
+                item.setForeground(0, estilo.CINZA if apagada else self.palette().text())
         self._filtrar()
         if atual is not None:
             self.marcar_atual(atual)

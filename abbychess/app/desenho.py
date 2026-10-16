@@ -154,12 +154,15 @@ class DesenhoDaJanela:
         self.progresso.setVisible(ocupado)
         self.progresso.setRange(0, 0)
         if ocupado and not self.executor.so_leves():
-            self.statusBar().showMessage(f"{titulo}…")
+            self._mensagem_da_tarefa = f"{titulo}…"
+            self.statusBar().showMessage(self._mensagem_da_tarefa)
             self.treino.habilitar(False)
         elif ocupado:
             pass                                # a propagação: o painel vale, e a mensagem
                                                 # do Enter fica na barra
-        elif self.pagina.box_atual() is not None:
+        else:
+            self._limpar_a_mensagem_da_tarefa()
+        if not ocupado and self.pagina.box_atual() is not None:
             self.treino.habilitar(True)
             foco = QApplication.focusWidget()
             # O próximo caractere vai para o campo, mas sem tirar o foco de quem o tem por
@@ -168,6 +171,14 @@ class DesenhoDaJanela:
                     and (foco is None or foco is self.texto or self.treino.isAncestorOf(foco))):
                 self.treino.campo.setFocus()
         acoes.atualizar(self)
+
+    def _limpar_a_mensagem_da_tarefa(self) -> None:
+        """A tarefa acabou: o "Carregando o léxico…" dela sai da barra (uma mensagem que
+        veio depois, como o resultado, fica)."""
+        mensagem = getattr(self, "_mensagem_da_tarefa", None)
+        if mensagem and self.statusBar().currentMessage().startswith(mensagem):
+            self.statusBar().clearMessage()
+        self._mensagem_da_tarefa = None
 
     def _fila_mudou(self, titulos: list) -> None:
         if self.executor.titulo:

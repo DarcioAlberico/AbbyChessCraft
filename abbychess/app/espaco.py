@@ -70,7 +70,8 @@ def _validar_espaco(dados) -> dict:
     if editor not in ("glifo", "palavra") or fila not in dict(ControladorDaFila.MODOS) \
             or arranjo not in ARRANJOS:
         raise ValueError("editor, fila ou arranjo desconhecido")
-    inteiros = {k: dados.get(k, d) for k, d in (("pagina", -1), ("aba", 0), ("foco", 0))}
+    inteiros = {k: dados.get(k, d) for k, d in (("pagina", -1), ("aba", 0), ("foco", 0),
+                                                 ("largura", 0))}
     if not all(type(v) is int for v in inteiros.values()):
         raise TypeError("página, aba ou foco não é um número inteiro")
     escala = dados.get("escala")
@@ -128,8 +129,12 @@ class EspacoDeTrabalho:
         self.doca_resultados = _doca(self, "Resultados / Avisos", "doca_resultados",
                                      self.resultados, Qt.DockWidgetArea.BottomDockWidgetArea)
         self.doca_resultados.hide()
-        for canto in (Qt.Corner.BottomLeftCorner, Qt.Corner.BottomRightCorner):
-            self.setCorner(canto, Qt.DockWidgetArea.BottomDockWidgetArea)
+        # Resultados embaixo da gaveta e do centro; o Inspetor vai até o pé da janela, para
+        # Resultados abertos não esconderem os botões do Glifo em 768 de altura.
+        self.setCorner(Qt.Corner.BottomLeftCorner, Qt.DockWidgetArea.BottomDockWidgetArea)
+        self.setCorner(Qt.Corner.BottomRightCorner, Qt.DockWidgetArea.RightDockWidgetArea)
+        self._foco_antes_dos_resultados = None
+        self._imagem_antes_da_gaveta = 0
         self.relogio_das_paginas = QTimer(self)     # a gaveta depois de uma rajada de edições
         self.relogio_das_paginas.setSingleShot(True)
         self.relogio_das_paginas.setInterval(500)
@@ -209,16 +214,35 @@ class EspacoDeTrabalho:
 
     def alternar_paginas(self) -> None:
         """F9: abre ou fecha a gaveta de Páginas."""
-        self.doca_paginas.setVisible(not self.doca_paginas.isVisible())
         if self.doca_paginas.isVisible():
-            self.atualizar_paginas(seguir=True)
+            self.doca_paginas.hide()
+        else:
+            self.abrir_gaveta()
+
+    def abrir_gaveta(self) -> None:
+        """A gaveta com 150 px, tirados da vista direita: a Imagem fica do tamanho que tinha
+        (em 1366, a x-height do CA-3.2 depende dela). A doca e o `resizeDocks` assentam no
+        laço de eventos, um depois do outro; a largura da Imagem volta no fim."""
+        if not self.doca_paginas.isVisible():
+            self._imagem_antes_da_gaveta = self.visor.width() if self.visor.isVisible() else 0
+            self.doca_paginas.show()
+            QTimer.singleShot(0, self._largura_da_gaveta)
+        self.atualizar_paginas(seguir=True)
+
+    def _largura_da_gaveta(self) -> None:
+        self.resizeDocks([self.doca_paginas], [TAMANHOS[1920][0]], Qt.Orientation.Horizontal)
+        QTimer.singleShot(0, self._repor_a_imagem)
+
+    def _repor_a_imagem(self) -> None:
+        imagem, centro = self._imagem_antes_da_gaveta, sum(self.divisor.sizes())
+        if imagem and self.arranjo == "lado_a_lado" and centro > imagem + 200:
+            self.divisor.setSizes([imagem, centro - imagem])
 
     def focar(self, painel: int) -> None:
         """Alt+1 … Alt+5: Páginas, Imagem, vista direita (de novo: a aba seguinte), Inspetor,
         Resultados. Abre o painel fechado."""
         if painel == 1:
-            self.doca_paginas.show()
-            self.atualizar_paginas(seguir=True)
+            self.abrir_gaveta()
             self.paginas.focar()
         elif painel == 2:
             if self.arranjo == "so_vista":
@@ -235,6 +259,8 @@ class EspacoDeTrabalho:
             self.doca_inspetor.show()
             self.inspetor.focar()
         elif painel == 5:
+            if not self.resultados.isAncestorOf(QApplication.focusWidget()):
+                self._foco_antes_dos_resultados = QApplication.focusWidget()
             self.mostrar_resultados()
             self.resultados.focar()
 
@@ -255,6 +281,14 @@ class EspacoDeTrabalho:
             self.pagina.limpar_selecao()
         elif self.doca_resultados.isVisible():
             self.doca_resultados.hide()
+            self._devolver_o_foco()
+
+    def _devolver_o_foco(self) -> None:
+        """Depois de fechar Resultados, o foco volta a quem o tinha antes do Alt+5 (ou à
+        Imagem), e não ao botão ⚠ da barra."""
+        antes, self._foco_antes_dos_resultados = self._foco_antes_dos_resultados, None
+        alvo = antes if antes is not None and antes.isVisible() else self.visor
+        alvo.setFocus(Qt.FocusReason.OtherFocusReason)
 
     # ------------------------------------------------------------------
     # A fila, a gaveta, a barra e os avisos
@@ -308,7 +342,9 @@ class EspacoDeTrabalho:
             QTimer.singleShot(0, self._altura_dos_resultados)   # depois do layout da doca
 
     def _altura_dos_resultados(self) -> None:
-        self.resizeDocks([self.doca_resultados], [200], Qt.Orientation.Vertical)
+        """200 px (§3.1); numa janela de menos de 900 de altura, 130, para a página ficar."""
+        altura = 200 if self.height() >= 900 else 130
+        self.resizeDocks([self.doca_resultados], [altura], Qt.Orientation.Vertical)
 
     def abrir_avisos(self) -> None:
         self.mostrar_resultados()
@@ -337,7 +373,7 @@ class EspacoDeTrabalho:
                 "escala": self.visor.escala(), "modo_zoom": self.visor.modo_zoom,
                 "aba": self.vista.currentIndex(), "editor": self.inspetor.atual(),
                 "fila": self.fila.modo, "foco": self.painel_com_o_foco(),
-                "pagina": self.pagina.indice}
+                "pagina": self.pagina.indice, "largura": self.width()}
 
     def gravar_espaco(self) -> None:
         """Grava o espaço do projeto aberto (atômico, como as páginas)."""
@@ -368,6 +404,10 @@ class EspacoDeTrabalho:
             log.warning("O estado das docas de %s não foi aceito pelo Qt", caminho)
         self.arranjar(dados["arranjo"])
         self.divisor.restoreState(dados["divisor"])
+        if dados["largura"] and abs(dados["largura"] - self.width()) > 150:
+            # Gravado noutra largura de janela: as docas e o arranjo voltam, os tamanhos são
+            # os padrão desta (1920 numa tela de 1366 deixaria a Imagem com 464 px).
+            QTimer.singleShot(0, self._tamanhos_padrao)
         for nome, visivel in dados["docas"].items():
             doca = self.findChild(QDockWidget, nome)
             if doca is not None:

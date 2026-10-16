@@ -80,13 +80,52 @@ Correção 9 · Simplicidade 8 · Testes 9 — **aceita**. A observação dela (
 `redireciona` das exceções do Enter, que a legenda descrevia só como "o widget cede a
 tecla") virou a legenda do YAML (`1da748e`).
 
-## Medidas (commit `1da748e`, pasta limpa)
+## Medidas da primeira rodada (commit `1da748e`, pasta limpa; substituídas abaixo)
 
-- Portão: 13 passaram; `docs/medidas/2026-10-16-passo-a2.json`.
-- 3 rodadas (`repeticao-a2`): troca no cache, mediana 12,0–12,1 ms; fora do cache,
+- Portão: 13 passaram (hoje `docs/medidas/2026-10-16-primeira-rodada-a2-portao.json`).
+- 3 rodadas (hoje `primeira-rodada-a2*`): troca no cache, mediana 12,0–12,1 ms; fora do cache,
   130,1–133,6 (p95 144–146); Enter até a cor, mediana 21,1; 30,4; 21,3 e p95 24,2; 66,7;
   25,6 (uma rodada solta, com um pico de 286 ms; o portão, 21,5 e 25,9); com uma propagação
   lenta, p95 24,1; 42,4; 26,2; releitura, mediana 14,3–15,2; pintura, p95 11,8–13,3; memória
   com o lote, 1776–1780 MB (portão 1793); desfazer, 8,0 MB; atraso no lote, p99 9,1–22,1.
 - Qualidade (`medir.py`, os três livros) e fatia (`--passo A2`, commit `cec156f`, que só
   acrescenta os JSON): iguais às do A1; o lote do xv, 452,6 s (A1: 445,5).
+
+## Revisão de produto, rodada 1
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Produto, design e medição | Completude 8 · Fidelidade das medidas 7 · Clareza 7 · Produtividade 7 · Design 6 | volta |
+
+| Achado | Correção |
+|---|---|
+| **M1** O editor Palavra não cabia no Inspetor (os botões e o recorte cortados, com a rolagem horizontal desligada) | botões em grade de 2 colunas com o rótulo curto e a tecla na dica; o recorte e o contexto do Glifo não alargam o painel pelo pixmap; os rótulos quebram a linha; teste de que nenhum filho dos dois editores passa da largura em 296 px |
+| **M2** A gaveta: em 150 px só se viam o número e o estado cortado; o F9 em 1366 a abria com 260 px e a Imagem caía a 419 (x-height 4,8); a captura não mostrava isso | o estado num símbolo com cor e o nome na dica, as quatro colunas em 130 px; o F9 tira os 150 px da vista direita e a Imagem fica; as capturas abrem as docas pelo caminho do usuário |
+| **M3** O Ctrl+T, que era o modo de treino, marcava sem perguntar uma página com pendentes e abria outra | com pendentes, ele pergunta, e lembra que marcar à mão é Ctrl+M |
+| **M4** O README dizia que a rodada alta do Enter era "a mesma do A1" | o README diz a diferença (uma cauda, não um deslocamento); as medidas foram refeitas (abaixo): sem a cauda |
+| m1, m2, m5, m6, m7, m9, m10 | os botões fora do Tab; o Esc devolve o foco; a mensagem da tarefa sai da barra; "zoom mínimo" só no zoom do usuário; o espaço de outra largura volta com os tamanhos padrão; Resultados com 130 px abaixo de 900 de altura e o Inspetor até o pé; os rótulos; o Glifo não repete a posição |
+| m3, m4, m8, m11, m13 | o README (a ordem do Esc, as limitações vencidas, o modo dos diagramas, o custo da gaveta aberta), a SPEC §3.4, o catálogo do replay (descartar e marcar do A2) |
+| m12 | as capturas na Segoe UI; os testes passaram a rodar com as fontes do Windows (`QT_QPA_FONTDIR`), para as larguras valerem como no programa |
+| m14 | o fundo dos pendentes em zoom baixo, no passo K |
+
+## Rodadas 3 e 4 (código, sobre as correções do produto)
+
+Rodada 3: Correção 7 · Simplicidade 7 · Testes 8 — volta: abrir e fechar a gaveta fazia o
+divisor derivar até a vista direita encolher (o fechar não devolvia os 150 px), e o Esc que
+fechava Resultados abertos pelo ⚠ tirava o foco do campo. Os dois corrigidos (os tamanhos
+guardados ao abrir e repostos ao fechar; o foco lido antes do `hide`), com testes.
+
+Rodada 4: Correção 8 · Simplicidade 8 · Testes 8 — **aceita**. A observação dela (fechar
+pelo X ou pelo menu não repunha os tamanhos) entrou junto: a reposição segue o
+`visibilityChanged` da doca, com teste.
+
+## Medidas finais (commit `93c94a7`, pasta limpa)
+
+- Portão: 13 passaram; `docs/medidas/2026-10-16-passo-a2.json`.
+- 3 rodadas (`repeticao-a2`): troca no cache, mediana 14,2–14,3 ms; fora do cache,
+  129,9–135,2 (p95 145–150); Enter até a cor, mediana 20,8–21,4 e p95 24,4–27,8 (sem a
+  cauda da primeira medida); com uma propagação lenta, p95 22,4–25,2; até o fim da
+  propagação, mediana 71,8–72,6; releitura, mediana 14,7–15,5; pintura, p95 11,8–13,3;
+  memória com o lote, 1781–1783 MB (portão 1799); atraso no lote, p99 9,5–22,2.
+- Qualidade (`medir.py`, os três livros, no `93c94a7`) e fatia (`--passo A2`, no `d37d61f`,
+  que só acrescenta os JSON; o catálogo com as entradas do A2): iguais às do A1.

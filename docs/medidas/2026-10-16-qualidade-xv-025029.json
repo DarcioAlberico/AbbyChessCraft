@@ -76,7 +76,7 @@
   "cer_corpo": null,
   "linhas_com_texto_verificado": "0/241",
   "estado": "provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual",
-  "lote_s": 434.2,
+  "lote_s": 433.3,
   "pendentes": 7473
  },
  "paginas": {
@@ -429,6 +429,6 @@
   }
  },
  "data": "2026-10-16",
- "commit": "1312ed0",
+ "commit": "0ebbf9c",
  "arvore_suja": false
 }

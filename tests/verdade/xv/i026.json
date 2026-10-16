@@ -1,0 +1,932 @@
+{
+ "livro": "xv",
+ "pdf": "Xadrez Vitorioso - Estrategias - Yasser Seirawan.pdf",
+ "pdf_sha256": "c7277691646ce288f81649f181a2d0316bf1e01ff864b9810c29ce9a0d5b7161",
+ "indice_pdf": 26,
+ "pagina_impressa": 27,
+ "dpi_de_leitura": 300,
+ "render_sha256": "edf358867d053ee76ee9ac21aee42134a15a89232468d95961ded4f448d8c9cb",
+ "pymupdf": "1.26.6",
+ "inclinacao": -0.45,
+ "papel": 255,
+ "verdade_versao": 1,
+ "rotulado_por": "",
+ "revisado_por": "",
+ "blocos": [
+  {
+   "id": "b00",
+   "funcao": "cabecalho",
+   "caixa_rel": [
+    0.67086,
+    0.04533,
+    0.93457,
+    0.06214
+   ],
+   "ordem": 0,
+   "coluna": 0,
+   "texto_impresso": "?DREZ vlTORlOSo: EsTRATÉGlAs 27"
+  },
+  {
+   "id": "b01",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.23509,
+    0.09441,
+    0.93509,
+    0.10923
+   ],
+   "ordem": 1,
+   "coluna": 0,
+   "texto_impresso": "No Diagrama 6, as brancas têm dois peões a mais. As pretas, Dorém, com as"
+  },
+  {
+   "id": "b02",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.18972,
+    0.11192,
+    0.93529,
+    0.12674
+   ],
+   "ordem": 2,
+   "coluna": 0,
+   "texto_impresso": "ameaças 1...D?2+ e 1...Tf2, estão tentando dific11ltar as coisas. Será o caso de as"
+  },
+  {
+   "id": "b03",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.18911,
+    0.12931,
+    0.93548,
+    0.14413
+   ],
+   "ordem": 3,
+   "coluna": 0,
+   "texto_impresso": "brancas entrarem em panico ou existirá uma sa?da fác?? Se e1as optarem pela estraté—"
+  },
+  {
+   "id": "b04",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19011,
+    0.14669,
+    0.93568,
+    0.16179
+   ],
+   "ordem": 4,
+   "coluna": 0,
+   "texto_impresso": "?a das trocas, todos 0s seus prob1emas serão reso1xridos; a opção é 1.Dd4 (1.Dc3"
+  },
+  {
+   "id": "b05",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.1903,
+    0.16379,
+    0.93546,
+    0.17861
+   ],
+   "ordem": 5,
+   "coluna": 0,
+   "texto_impresso": "também é bom). ?sim que as Damas saem do tab111etro, as ameaças às brancas dei–"
+  },
+  {
+   "id": "b06",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.18969,
+    0.18091,
+    0.92719,
+    0.19602
+   ],
+   "ordem": 6,
+   "coluna": 0,
+   "texto_impresso": "xam de exfstr e a ritória fica mais fác?, tranqüi1a, nam fir1al com dois peões a mais."
+  },
+  {
+   "id": "b07",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.23504,
+    0.19815,
+    0.93665,
+    0.21297
+   ],
+   "ordem": 7,
+   "coluna": 0,
+   "texto_impresso": "A mesma idéia pode ser rista no Diagrama 7, embora nesse caso a solução"
+  },
+  {
+   "id": "b08",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19047,
+    0.21566,
+    0.93644,
+    0.23047
+   ],
+   "ordem": 8,
+   "coluna": 0,
+   "texto_impresso": "Seja um pouco mais criatiVa. As brancaS têm uma grande Vantagem de quatro"
+  },
+  {
+   "id": "b09",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19026,
+    0.23304,
+    0.93663,
+    0.24786
+   ],
+   "ordem": 9,
+   "coluna": 0,
+   "texto_impresso": "peões, mas as pretas ameaçam com 1...Cxh2 e 1...Cf2 xeque—mate. Caso as bran–"
+  },
+  {
+   "id": "b10",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19045,
+    0.25014,
+    0.93642,
+    0.26524
+   ],
+   "ordem": 10,
+   "coluna": 0,
+   "texto_impresso": "cas façam o lance 1.Dd6, as preta? conseguem se salvar.com 1...Cf2+ 2.Rh2"
+  },
+  {
+   "id": "b11",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19105,
+    0.26752,
+    0.93702,
+    0.28291
+   ],
+   "ordem": 11,
+   "coluna": 0,
+   "texto_impresso": "Cg4+ e alcançam um empate por xeque pe?étu0. No entanto, ao trocar as Da-"
+  },
+  {
+   "id": "b12",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19084,
+    0.28519,
+    0.93681,
+    0.30001
+   ],
+   "ordem": 12,
+   "coluna": 0,
+   "texto_impresso": "mas, as brancas acabam com todos o? seus Drob1emas. A questão, aqui, é que"
+  },
+  {
+   "id": "b13",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19104,
+    0.30257,
+    0.93741,
+    0.31768
+   ],
+   "ordem": 13,
+   "coluna": 0,
+   "texto_impresso": "essa troca parece imposs?vel. Ou será que na0? Na verdade, as brancaS podem"
+  },
+  {
+   "id": "b14",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19163,
+    0.31996,
+    0.9376,
+    0.33477
+   ],
+   "ordem": 14,
+   "coluna": 0,
+   "texto_impresso": "ganhar usando o seguinte truque: 1.Db8+! Rxb8 2.Cc6+, num garfo ao Rei e à"
+  },
+  {
+   "id": "b15",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19142,
+    0.33734,
+    0.93658,
+    0.35216
+   ],
+   "ordem": 15,
+   "coluna": 0,
+   "texto_impresso": "Dama, 1evando a um final vitorioso. Depois de 2...Rb7 3.Cxd4 Cf2+ 4.?2 Cg4+"
+  },
+  {
+   "id": "b16",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19202,
+    0.35485,
+    0.78758,
+    0.36967
+   ],
+   "ordem": 16,
+   "coluna": 0,
+   "texto_impresso": "5.Rg3, as pretas não têm opção, a não ser abandonar a partida."
+  },
+  {
+   "id": "b17",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.23776,
+    0.36913,
+    0.93816,
+    0.3868
+   ],
+   "ordem": 17,
+   "coluna": 0,
+   "texto_impresso": "Obviamente, trocar peças pode ser uma estratégia defensiva importante. ?s"
+  },
+  {
+   "id": "b18",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19119,
+    0.38921,
+    0.93837,
+    0.40403
+   ],
+   "ordem": 18,
+   "coluna": 0,
+   "texto_impresso": "vezes é difícil descobrir um mod0 de fazer a troca desejada, mas o resultado"
+  },
+  {
+   "id": "b19",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.1922,
+    0.40788,
+    0.47446,
+    0.4227
+   ],
+   "ordem": 19,
+   "coluna": 0,
+   "texto_impresso": "final, em gera1, vale o esforço."
+  },
+  {
+   "id": "b20",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.23795,
+    0.42385,
+    0.93835,
+    0.43867
+   ],
+   "ordem": 20,
+   "coluna": 0,
+   "texto_impresso": "No próximo exemp1o, aS brancas sacrificam um peão para mobilizar rapida-"
+  },
+  {
+   "id": "b21",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19217,
+    0.44136,
+    0.93895,
+    0.45617
+   ],
+   "ordem": 21,
+   "coluna": 0,
+   "texto_impresso": "mente, ? exército. No Diagrama 8, aS brancas acabaram de rocar e oferecem o"
+  },
+  {
+   "id": "b22",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19237,
+    0.45874,
+    0.93874,
+    0.47327
+   ],
+   "ordem": 22,
+   "coluna": 0,
+   "texto_impresso": "peão—b2 como isca às pretas (que ainda estão em inferioridade de desenvolrimen-"
+  },
+  {
+   "id": "b23",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19256,
+    0.47591,
+    0.91232,
+    0.49073
+   ],
+   "ordem": 23,
+   "coluna": 0,
+   "texto_impresso": "to). Ar1tes de cap?rar esse peão, as pretas devem responder a duas perguntas:"
+  },
+  {
+   "id": "b24",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.25097,
+    0.50759,
+    0.93928,
+    0.52213
+   ],
+   "ordem": 24,
+   "coluna": 0,
+   "texto_impresso": "1. Depois de capt11rar o peão-b2, será poss?vel desenVolverem-se tanto quan-"
+  },
+  {
+   "id": "b25",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.28503,
+    0.52605,
+    0.41607,
+    0.53745
+   ],
+   "ordem": 25,
+   "coluna": 0,
+   "texto_impresso": "to as brancas?"
+  },
+  {
+   "id": "b26",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.25015,
+    0.54179,
+    0.94047,
+    0.55661
+   ],
+   "ordem": 26,
+   "coluna": 0,
+   "texto_impresso": "2. será que as brancas poderão usar as linhaS abertas pe1a minha captura"
+  },
+  {
+   "id": "b27",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.28543,
+    0.56048,
+    0.53906,
+    0.57501
+   ],
+   "ordem": 27,
+   "coluna": 0,
+   "texto_impresso": "para me deixar em apuros?"
+  },
+  {
+   "id": "d0",
+   "funcao": "diagrama",
+   "caixa_rel": [
+    0.37701,
+    0.61143,
+    0.67459,
+    0.82232
+   ],
+   "ordem": 28,
+   "coluna": 0,
+   "texto_impresso": ""
+  },
+  {
+   "id": "b28",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.40983,
+    0.76162,
+    0.84854,
+    0.84597
+   ],
+   "ordem": 29,
+   "coluna": 0,
+   "texto_impresso": "Diag?ama 8. Jo?am as pretas. .",
+   "diagrama": "d0"
+  },
+  {
+   "id": "b29",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.46483,
+    0.84967,
+    0.59064,
+    0.86022
+   ],
+   "ordem": 30,
+   "coluna": 0,
+   "texto_impresso": "Gormon-SiIman",
+   "diagrama": "d0"
+  },
+  {
+   "id": "b30",
+   "funcao": "legenda",
+   "caixa_rel": [
+    0.44404,
+    0.86477,
+    0.61259,
+    0.87646
+   ],
+   "ordem": 31,
+   "coluna": 0,
+   "texto_impresso": "Memorial Ervin/ 1987",
+   "diagrama": "d0"
+  },
+  {
+   "id": "b31",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.24251,
+    0.90659,
+    0.94493,
+    0.92141
+   ],
+   "ordem": 32,
+   "coluna": 0,
+   "texto_impresso": "Na situação das pretas, o fato mais importante é o seguinte: sobreviVendo"
+  },
+  {
+   "id": "b32",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19754,
+    0.92381,
+    0.94472,
+    0.93892
+   ],
+   "ordem": 33,
+   "coluna": 0,
+   "texto_impresso": "ao ataque das brancas, e1e terá uma vantagem material que oferece excelente"
+  },
+  {
+   "id": "b33",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.19733,
+    0.94119,
+    0.84612,
+    0.95629
+   ],
+   "ordem": 34,
+   "coluna": 0,
+   "texto_impresso": "chance de vitória. E é com esse objetivo em mente que ele deVe lutar."
+  },
+  {
+   "id": "b34",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.05952,
+    0.99417,
+    0.06718,
+    0.99617
+   ],
+   "ordem": 35,
+   "coluna": 0,
+   "texto_impresso": "-"
+  }
+ ],
+ "diagramas": [
+  {
+   "id": "d0",
+   "fen": "r3kb1r/p2bpppp/1qpp4/6B1/3NP1n1/2N5/PPP2PPP/R2Q1RK1",
+   "fen_lido": "r3kb1r/p2bpppp/1qpp4/6B1/3NP1n1/2N5/PPP2PPP/R2Q1RK1",
+   "lado": "b",
+   "legenda": "b28",
+   "lances_seguintes": [],
+   "fen_verificado": false,
+   "lado_verificado": false
+  }
+ ],
+ "linhas_corpo": [
+  {
+   "id": "l01",
+   "bloco": "b01",
+   "caixa_rel": [
+    0.23509,
+    0.09441,
+    0.93509,
+    0.10923
+   ],
+   "texto": "No Diagrama 6, as brancas têm dois peões a mais. As pretas, Dorém, com as",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l02",
+   "bloco": "b02",
+   "caixa_rel": [
+    0.18972,
+    0.11192,
+    0.93529,
+    0.12674
+   ],
+   "texto": "ameaças 1...D?2+ e 1...Tf2, estão tentando dific11ltar as coisas. Será o caso de as",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l03",
+   "bloco": "b03",
+   "caixa_rel": [
+    0.18911,
+    0.12931,
+    0.93548,
+    0.14413
+   ],
+   "texto": "brancas entrarem em panico ou existirá uma sa?da fác?? Se e1as optarem pela estraté—",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l04",
+   "bloco": "b04",
+   "caixa_rel": [
+    0.19011,
+    0.14669,
+    0.93568,
+    0.16179
+   ],
+   "texto": "?a das trocas, todos 0s seus prob1emas serão reso1xridos; a opção é 1.Dd4 (1.Dc3",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l05",
+   "bloco": "b05",
+   "caixa_rel": [
+    0.1903,
+    0.16379,
+    0.93546,
+    0.17861
+   ],
+   "texto": "também é bom). ?sim que as Damas saem do tab111etro, as ameaças às brancas dei–",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l06",
+   "bloco": "b06",
+   "caixa_rel": [
+    0.18969,
+    0.18091,
+    0.92719,
+    0.19602
+   ],
+   "texto": "xam de exfstr e a ritória fica mais fác?, tranqüi1a, nam fir1al com dois peões a mais.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l07",
+   "bloco": "b07",
+   "caixa_rel": [
+    0.23504,
+    0.19815,
+    0.93665,
+    0.21297
+   ],
+   "texto": "A mesma idéia pode ser rista no Diagrama 7, embora nesse caso a solução",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l08",
+   "bloco": "b08",
+   "caixa_rel": [
+    0.19047,
+    0.21566,
+    0.93644,
+    0.23047
+   ],
+   "texto": "Seja um pouco mais criatiVa. As brancaS têm uma grande Vantagem de quatro",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l09",
+   "bloco": "b09",
+   "caixa_rel": [
+    0.19026,
+    0.23304,
+    0.93663,
+    0.24786
+   ],
+   "texto": "peões, mas as pretas ameaçam com 1...Cxh2 e 1...Cf2 xeque—mate. Caso as bran–",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l10",
+   "bloco": "b10",
+   "caixa_rel": [
+    0.19045,
+    0.25014,
+    0.93642,
+    0.26524
+   ],
+   "texto": "cas façam o lance 1.Dd6, as preta? conseguem se salvar.com 1...Cf2+ 2.Rh2",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l11",
+   "bloco": "b11",
+   "caixa_rel": [
+    0.19105,
+    0.26752,
+    0.93702,
+    0.28291
+   ],
+   "texto": "Cg4+ e alcançam um empate por xeque pe?étu0. No entanto, ao trocar as Da-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l12",
+   "bloco": "b12",
+   "caixa_rel": [
+    0.19084,
+    0.28519,
+    0.93681,
+    0.30001
+   ],
+   "texto": "mas, as brancas acabam com todos o? seus Drob1emas. A questão, aqui, é que",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l13",
+   "bloco": "b13",
+   "caixa_rel": [
+    0.19104,
+    0.30257,
+    0.93741,
+    0.31768
+   ],
+   "texto": "essa troca parece imposs?vel. Ou será que na0? Na verdade, as brancaS podem",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l14",
+   "bloco": "b14",
+   "caixa_rel": [
+    0.19163,
+    0.31996,
+    0.9376,
+    0.33477
+   ],
+   "texto": "ganhar usando o seguinte truque: 1.Db8+! Rxb8 2.Cc6+, num garfo ao Rei e à",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l15",
+   "bloco": "b15",
+   "caixa_rel": [
+    0.19142,
+    0.33734,
+    0.93658,
+    0.35216
+   ],
+   "texto": "Dama, 1evando a um final vitorioso. Depois de 2...Rb7 3.Cxd4 Cf2+ 4.?2 Cg4+",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l16",
+   "bloco": "b16",
+   "caixa_rel": [
+    0.19202,
+    0.35485,
+    0.78758,
+    0.36967
+   ],
+   "texto": "5.Rg3, as pretas não têm opção, a não ser abandonar a partida.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l17",
+   "bloco": "b17",
+   "caixa_rel": [
+    0.23776,
+    0.36913,
+    0.93816,
+    0.3868
+   ],
+   "texto": "Obviamente, trocar peças pode ser uma estratégia defensiva importante. ?s",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l18",
+   "bloco": "b18",
+   "caixa_rel": [
+    0.19119,
+    0.38921,
+    0.93837,
+    0.40403
+   ],
+   "texto": "vezes é difícil descobrir um mod0 de fazer a troca desejada, mas o resultado",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l19",
+   "bloco": "b19",
+   "caixa_rel": [
+    0.1922,
+    0.40788,
+    0.47446,
+    0.4227
+   ],
+   "texto": "final, em gera1, vale o esforço.",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l20",
+   "bloco": "b20",
+   "caixa_rel": [
+    0.23795,
+    0.42385,
+    0.93835,
+    0.43867
+   ],
+   "texto": "No próximo exemp1o, aS brancas sacrificam um peão para mobilizar rapida-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l21",
+   "bloco": "b21",
+   "caixa_rel": [
+    0.19217,
+    0.44136,
+    0.93895,
+    0.45617
+   ],
+   "texto": "mente, ? exército. No Diagrama 8, aS brancas acabaram de rocar e oferecem o",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l22",
+   "bloco": "b22",
+   "caixa_rel": [
+    0.19237,
+    0.45874,
+    0.93874,
+    0.47327
+   ],
+   "texto": "peão—b2 como isca às pretas (que ainda estão em inferioridade de desenvolrimen-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l23",
+   "bloco": "b23",
+   "caixa_rel": [
+    0.19256,
+    0.47591,
+    0.91232,
+    0.49073
+   ],
+   "texto": "to). Ar1tes de cap?rar esse peão, as pretas devem responder a duas perguntas:",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l24",
+   "bloco": "b24",
+   "caixa_rel": [
+    0.25097,
+    0.50759,
+    0.93928,
+    0.52213
+   ],
+   "texto": "1. Depois de capt11rar o peão-b2, será poss?vel desenVolverem-se tanto quan-",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l25",
+   "bloco": "b25",
+   "caixa_rel": [
+    0.28503,
+    0.52605,
+    0.41607,
+    0.53745
+   ],
+   "texto": "to as brancas?",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l26",
+   "bloco": "b26",
+   "caixa_rel": [
+    0.25015,
+    0.54179,
+    0.94047,
+    0.55661
+   ],
+   "texto": "2. será que as brancas poderão usar as linhaS abertas pe1a minha captura",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l27",
+   "bloco": "b27",
+   "caixa_rel": [
+    0.28543,
+    0.56048,
+    0.53906,
+    0.57501
+   ],
+   "texto": "para me deixar em apuros?",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l28",
+   "bloco": "b28",
+   "caixa_rel": [
+    0.40983,
+    0.76162,
+    0.84854,
+    0.84597
+   ],
+   "texto": "Diag?ama 8. Jo?am as pretas. .",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l29",
+   "bloco": "b29",
+   "caixa_rel": [
+    0.46483,
+    0.84967,
+    0.59064,
+    0.86022
+   ],
+   "texto": "Gormon-SiIman",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l30",
+   "bloco": "b30",
+   "caixa_rel": [
+    0.44404,
+    0.86477,
+    0.61259,
+    0.87646
+   ],
+   "texto": "Memorial Ervin/ 1987",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l31",
+   "bloco": "b31",
+   "caixa_rel": [
+    0.24251,
+    0.90659,
+    0.94493,
+    0.92141
+   ],
+   "texto": "Na situação das pretas, o fato mais importante é o seguinte: sobreviVendo",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l32",
+   "bloco": "b32",
+   "caixa_rel": [
+    0.19754,
+    0.92381,
+    0.94472,
+    0.93892
+   ],
+   "texto": "ao ataque das brancas, e1e terá uma vantagem material que oferece excelente",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l33",
+   "bloco": "b33",
+   "caixa_rel": [
+    0.19733,
+    0.94119,
+    0.84612,
+    0.95629
+   ],
+   "texto": "chance de vitória. E é com esse objetivo em mente que ele deVe lutar.",
+   "negrito": false,
+   "texto_verificado": false
+  }
+ ],
+ "estrutura_por": "Claude (estrutura pelas faixas)"
+}

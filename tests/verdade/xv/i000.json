@@ -1,0 +1,384 @@
+{
+ "livro": "xv",
+ "pdf": "Xadrez Vitorioso - Estrategias - Yasser Seirawan.pdf",
+ "pdf_sha256": "c7277691646ce288f81649f181a2d0316bf1e01ff864b9810c29ce9a0d5b7161",
+ "indice_pdf": 0,
+ "pagina_impressa": null,
+ "dpi_de_leitura": 300,
+ "render_sha256": "7b73339dbdd434866ce9a31d27c2bfd3e2c56326d8912c63eaff59e6b9307765",
+ "pymupdf": "1.26.6",
+ "inclinacao": 0.0,
+ "papel": 250,
+ "verdade_versao": 1,
+ "rotulado_por": "",
+ "revisado_por": "",
+ "blocos": [
+  {
+   "id": "t01",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.055,
+    0.083,
+    0.703,
+    0.128
+   ],
+   "ordem": 0,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "t02",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.19,
+    0.145,
+    0.857,
+    0.22
+   ],
+   "ordem": 1,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "t03",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.191,
+    0.313,
+    0.527,
+    0.344
+   ],
+   "ordem": 2,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "t04",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.191,
+    0.348,
+    0.412,
+    0.372
+   ],
+   "ordem": 3,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "t05",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.05,
+    0.786,
+    0.21,
+    0.804
+   ],
+   "ordem": 4,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "t06",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.05,
+    0.81,
+    0.143,
+    0.828
+   ],
+   "ordem": 5,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "t07",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.05,
+    0.837,
+    0.13,
+    0.855
+   ],
+   "ordem": 6,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "t08",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.05,
+    0.862,
+    0.235,
+    0.88
+   ],
+   "ordem": 7,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "t09",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.05,
+    0.887,
+    0.205,
+    0.905
+   ],
+   "ordem": 8,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "t10",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.05,
+    0.913,
+    0.173,
+    0.931
+   ],
+   "ordem": 9,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "x01",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.0,
+    0.0,
+    1.0,
+    0.075
+   ],
+   "ordem": 10,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "x02",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.86,
+    0.075,
+    1.0,
+    0.375
+   ],
+   "ordem": 11,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "x03",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.0,
+    0.375,
+    1.0,
+    0.785
+   ],
+   "ordem": 12,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "x04",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.31,
+    0.785,
+    1.0,
+    1.0
+   ],
+   "ordem": 13,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "x05",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.0,
+    0.935,
+    0.31,
+    1.0
+   ],
+   "ordem": 14,
+   "coluna": 0,
+   "texto_impresso": "",
+   "caixa_estimada": true
+  },
+  {
+   "id": "d0",
+   "funcao": "ignorar",
+   "caixa_rel": [
+    0.81452,
+    0.87974,
+    0.93952,
+    0.97321
+   ],
+   "ordem": 15,
+   "coluna": 0,
+   "texto_impresso": ""
+  }
+ ],
+ "diagramas": [],
+ "linhas_corpo": [
+  {
+   "id": "lt01",
+   "bloco": "t01",
+   "caixa_rel": [
+    0.055,
+    0.083,
+    0.703,
+    0.128
+   ],
+   "texto": "",
+   "texto_verificado": false,
+   "negrito": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "lt02",
+   "bloco": "t02",
+   "caixa_rel": [
+    0.19,
+    0.145,
+    0.857,
+    0.22
+   ],
+   "texto": "",
+   "texto_verificado": false,
+   "negrito": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "lt03",
+   "bloco": "t03",
+   "caixa_rel": [
+    0.191,
+    0.313,
+    0.527,
+    0.344
+   ],
+   "texto": "",
+   "texto_verificado": false,
+   "negrito": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "lt04",
+   "bloco": "t04",
+   "caixa_rel": [
+    0.191,
+    0.348,
+    0.412,
+    0.372
+   ],
+   "texto": "",
+   "texto_verificado": false,
+   "negrito": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "lt05",
+   "bloco": "t05",
+   "caixa_rel": [
+    0.05,
+    0.786,
+    0.21,
+    0.804
+   ],
+   "texto": "",
+   "texto_verificado": false,
+   "negrito": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "lt06",
+   "bloco": "t06",
+   "caixa_rel": [
+    0.05,
+    0.81,
+    0.143,
+    0.828
+   ],
+   "texto": "",
+   "texto_verificado": false,
+   "negrito": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "lt07",
+   "bloco": "t07",
+   "caixa_rel": [
+    0.05,
+    0.837,
+    0.13,
+    0.855
+   ],
+   "texto": "",
+   "texto_verificado": false,
+   "negrito": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "lt08",
+   "bloco": "t08",
+   "caixa_rel": [
+    0.05,
+    0.862,
+    0.235,
+    0.88
+   ],
+   "texto": "",
+   "texto_verificado": false,
+   "negrito": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "lt09",
+   "bloco": "t09",
+   "caixa_rel": [
+    0.05,
+    0.887,
+    0.205,
+    0.905
+   ],
+   "texto": "",
+   "texto_verificado": false,
+   "negrito": false,
+   "caixa_estimada": true
+  },
+  {
+   "id": "lt10",
+   "bloco": "t10",
+   "caixa_rel": [
+    0.05,
+    0.913,
+    0.173,
+    0.931
+   ],
+   "texto": "",
+   "texto_verificado": false,
+   "negrito": false,
+   "caixa_estimada": true
+  }
+ ],
+ "estrutura_por": "Claude (estrutura pelas faixas)"
+}

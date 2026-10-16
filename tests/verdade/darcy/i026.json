@@ -1,0 +1,1204 @@
+{
+ "livro": "darcy",
+ "pdf": "Darcy Lima & Júlio Lapertosa - A Estratégia no Xadrez.pdf",
+ "pdf_sha256": "77e762225966cc39d0a147edb8ed25ed4d7f8ae66a4aad8ddb9fc4112e7ff12c",
+ "indice_pdf": 26,
+ "pagina_impressa": 28,
+ "dpi_de_leitura": 300,
+ "render_sha256": "14884ba86d439dec4c2915431026877261a950f1a78246c404d633bed87944b1",
+ "pymupdf": "1.26.6",
+ "inclinacao": 0.0,
+ "papel": 254,
+ "verdade_versao": 1,
+ "rotulado_por": "",
+ "revisado_por": "",
+ "blocos": [
+  {
+   "id": "b00",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.08471,
+    0.06381,
+    0.37804,
+    0.08071
+   ],
+   "ordem": 0,
+   "coluna": 0,
+   "texto_impresso": "Morphy,P — Amateur"
+  },
+  {
+   "id": "b01",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.08706,
+    0.08333,
+    0.34588,
+    0.09667
+   ],
+   "ordem": 1,
+   "coluna": 0,
+   "texto_impresso": "1856. ."
+  },
+  {
+   "id": "b02",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.08471,
+    0.10214,
+    0.93412,
+    0.11929
+   ],
+   "ordem": 2,
+   "coluna": 0,
+   "texto_impresso": "Antigamente era costume dar alguma vantagem material ao"
+  },
+  {
+   "id": "b03",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03451,
+    0.12048,
+    0.9349,
+    0.13833
+   ],
+   "ordem": 3,
+   "coluna": 0,
+   "texto_impresso": "adversário mais fraco. Aqui Mor?hy joga sem a ♖a1 1.e4 e5 2.♘f3"
+  },
+  {
+   "id": "b04",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03529,
+    0.13786,
+    0.93451,
+    0.155
+   ],
+   "ordem": 4,
+   "coluna": 0,
+   "texto_impresso": "♘c6 3.♗c4 d6 4.c3 ♗e6 5.♗b5 Evitando a troca devido ?"
+  },
+  {
+   "id": "b05",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.0349,
+    0.15738,
+    0.93608,
+    0.18167
+   ],
+   "ordem": 5,
+   "coluna": 0,
+   "texto_impresso": "desvantagem de materia1. 5...a6 6.♗a4 ♘ge7 A saÍda do Cavalo ∞r"
+  },
+  {
+   "id": "b06",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03529,
+    0.17833,
+    0.93529,
+    0.19643
+   ],
+   "ordem": 6,
+   "coluna": 0,
+   "texto_impresso": "e7 é mals lenta Perde tempo já que o Cava1o terá que sair para"
+  },
+  {
+   "id": "b07",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03569,
+    0.18952,
+    0.93608,
+    0.21548
+   ],
+   "ordem": 7,
+   "coluna": 0,
+   "texto_impresso": "per,mitir o desenv.olvimento do ♗f8 7.0-0 h6? Na abe?tura este,1ance"
+  },
+  {
+   "id": "b08",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03529,
+    0.21714,
+    0.93608,
+    0.235
+   ],
+   "ordem": 8,
+   "coluna": 0,
+   "texto_impresso": "só é bom quando impede a!guma ameaça a casa g5. As neg?as"
+  },
+  {
+   "id": "b09",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03569,
+    0.23667,
+    0.93647,
+    0.25429
+   ],
+   "ordem": 9,
+   "coluna": 0,
+   "texto_impresso": "podiam usar o tempo gasto Com este la?Ce para des.envolver uma"
+  },
+  {
+   "id": "b10",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03608,
+    0.25405,
+    0.93765,
+    0.27429
+   ],
+   "ordem": 10,
+   "coluna": 0,
+   "texto_impresso": "peeça. 8.a3 as negras amea?avam capturar este peão 8...♗a2 9.♗c2"
+  },
+  {
+   "id": "b11",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03608,
+    0.2719,
+    0.93686,
+    0.29238
+   ],
+   "ordem": 11,
+   "coluna": 0,
+   "texto_impresso": "♘g6 10.d4 d5 Com uma ser?e de lances consecutivos que perdem"
+  },
+  {
+   "id": "b12",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.0349,
+    0.29452,
+    0.93882,
+    0.3119
+   ],
+   "ordem": 12,
+   "coluna": 0,
+   "texto_impresso": "tempo as negras vão comprometer sua posição. Era melhor"
+  },
+  {
+   "id": "b13",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03647,
+    0.31262,
+    0.93765,
+    0.33167
+   ],
+   "ordem": 13,
+   "coluna": 0,
+   "texto_impresso": "desenvover o ♗f8 ou jogar ... ♗c4 ameaçando a ♖f1 que ganha um"
+  },
+  {
+   "id": "b14",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03569,
+    0.33143,
+    0.93922,
+    0.35071
+   ],
+   "ordem": 14,
+   "coluna": 0,
+   "texto_impresso": "tempo já que também melhora a posição do ♗a2 11.♘bd2 Morphy"
+  },
+  {
+   "id": "b15",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03725,
+    0.35119,
+    0.93843,
+    0.37048
+   ],
+   "ordem": 15,
+   "coluna": 0,
+   "texto_impresso": "desenvo?ve uma peça 11...dxe4 12.♘xe4 ?xd4 13.b3 Prende o ♗a2"
+  },
+  {
+   "id": "b16",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03882,
+    0.37024,
+    0.93922,
+    0.38952
+   ],
+   "ordem": 16,
+   "coluna": 0,
+   "texto_impresso": "13...b6? Completa perda de tempo, lance inútil 14.cxd4 ♘h4 O?tra"
+  },
+  {
+   "id": "b17",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03882,
+    0.39167,
+    0.94,
+    0.40881
+   ],
+   "ordem": 17,
+   "coluna": 0,
+   "texto_impresso": "perda de tempo movendo mais uma vez o cava1o já desenvolv?do"
+  },
+  {
+   "id": "b18",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03961,
+    0.40929,
+    0.94,
+    0.42833
+   ],
+   "ordem": 18,
+   "coluna": 0,
+   "texto_impresso": "15.♗b2 ♘xf3+ Lance que troca uma peça que gastou vários temp?s"
+  },
+  {
+   "id": "b19",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03569,
+    0.42857,
+    0.94,
+    0.4469
+   ],
+   "ordem": 19,
+   "coluna": 0,
+   "texto_impresso": ".por uma que só tinha movido uma vez 16.♕xf3 ♘xd4? Permite que"
+  },
+  {
+   "id": "b20",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03922,
+    0.4481,
+    0.93765,
+    0.4669
+   ],
+   "ordem": 20,
+   "coluna": 0,
+   "texto_impresso": "a ♖f1 .entre em jogo com ganho de tempo 17.♗xd4 ♕xd4 18.♖d1"
+  },
+  {
+   "id": "b21",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03804,
+    0.46738,
+    0.94039,
+    0.48571
+   ],
+   "ordem": 21,
+   "coluna": 0,
+   "texto_impresso": "♕b2 Consequência d.a falta de conhecimento da questão dos"
+  },
+  {
+   "id": "b22",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03922,
+    0.48786,
+    0.94078,
+    0.50952
+   ],
+   "ordem": 22,
+   "coluna": 0,
+   "texto_impresso": "??Tem.pos,, as pe?as de Morphy estão mobilizadas para o assa1tofinaI"
+  },
+  {
+   "id": "b23",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03961,
+    0.50714,
+    0.94078,
+    0.53976
+   ],
+   "ordem": 23,
+   "coluna": 0,
+   "texto_impresso": "enquanto a maIoria das peças negras estão nas casas de origem"
+  },
+  {
+   "id": "b24",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04,
+    0.52452,
+    0.94118,
+    0.54357
+   ],
+   "ordem": 24,
+   "coluna": 0,
+   "texto_impresso": "ou mal colocadas 19.♘f6+! Não h tempo para impedir o ataque o"
+  },
+  {
+   "id": "b25",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03961,
+    0.54333,
+    0.94235,
+    0.56286
+   ],
+   "ordem": 25,
+   "coluna": 0,
+   "texto_impresso": "ataque a descoberto é fataE 19...gxf6 20.♕xa8+ ♔e7 21.♖e1+ Morpny"
+  },
+  {
+   "id": "b26",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04,
+    0.56476,
+    0.94196,
+    0.58238
+   ],
+   "ordem": 26,
+   "coluna": 0,
+   "texto_impresso": "arremata utilizando outra forma de ganha tempos. Dando Xeques o"
+  },
+  {
+   "id": "b27",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04,
+    0.58405,
+    0.94392,
+    0.6019
+   ],
+   "ordem": 27,
+   "coluna": 0,
+   "texto_impresso": "adversário é obrigado a se defender não tendo tempo de mobilizar"
+  },
+  {
+   "id": "b28",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04,
+    0.60119,
+    0.94196,
+    0.62048
+   ],
+   "ordem": 28,
+   "coluna": 0,
+   "texto_impresso": "suas forças para a defesa.. [21 .♕d8+! ♔e6 22.♕d7+ ♔e5 23.♕f5#]"
+  },
+  {
+   "id": "b29",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04,
+    0.62,
+    0.94275,
+    0.6381
+   ],
+   "ordem": 29,
+   "coluna": 0,
+   "texto_impresso": "21...♔d6 22.♕d8+ ♔c6 23.♗e4+ ♔b5 24.♕d5+ ♗c5 25.♕c4+ ♔a5"
+  },
+  {
+   "id": "b30",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.03961,
+    0.64095,
+    0.21059,
+    0.65571
+   ],
+   "ordem": 30,
+   "coluna": 0,
+   "texto_impresso": "26.♕a4# 1—0"
+  },
+  {
+   "id": "b31",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.09294,
+    0.6819,
+    0.50392,
+    0.69905
+   ],
+   "ordem": 31,
+   "coluna": 0,
+   "texto_impresso": "Marache N — Morphy,P [c52]"
+  },
+  {
+   "id": "b32",
+   "funcao": "titulo",
+   "caixa_rel": [
+    0.09294,
+    0.7,
+    0.30353,
+    0.71476
+   ],
+   "ordem": 32,
+   "coluna": 0,
+   "texto_impresso": "New York 1857"
+  },
+  {
+   "id": "b33",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.09333,
+    0.71262,
+    0.94353,
+    0.7369
+   ],
+   "ordem": 33,
+   "coluna": 0,
+   "texto_impresso": "1.e4 e5 2.♘f3 ♘c6 3.♗c4♗c5 4.b4 O Gambito Evans, as brancas"
+  },
+  {
+   "id": "b34",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04078,
+    0.73833,
+    0.94431,
+    0.75762
+   ],
+   "ordem": 34,
+   "coluna": 0,
+   "texto_impresso": "entregam um peão para ganhartempos e dominar o centro 4...♗xb4"
+  },
+  {
+   "id": "b35",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04157,
+    0.75786,
+    0.94353,
+    0.77714
+   ],
+   "ordem": 35,
+   "coluna": 0,
+   "texto_impresso": "5.c3 ♗a5 6.d4 exd4 7.e5? Perde um importante tempo movendo o"
+  },
+  {
+   "id": "b36",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04196,
+    0.77762,
+    0.94353,
+    0.79619
+   ],
+   "ordem": 36,
+   "coluna": 0,
+   "texto_impresso": "peão. Melhor era 7. ♘xd4 7...d5! Abre a diagonal ao ♗c8 e ataca o"
+  },
+  {
+   "id": "b37",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04039,
+    0.79595,
+    0.94314,
+    0.81548
+   ],
+   "ordem": 37,
+   "coluna": 0,
+   "texto_impresso": "♗c4 ganhando tempos. 8.exd6 ♕xd6 9.0-0 ♘ge7 10.♘g5? Gasta"
+  },
+  {
+   "id": "b38",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04235,
+    0.8181,
+    0.94353,
+    0.835
+   ],
+   "ordem": 38,
+   "coluna": 0,
+   "texto_impresso": "um tempo com uma peça já desenvolvida, forçando as negras a"
+  },
+  {
+   "id": "b39",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04275,
+    0.835,
+    0.94353,
+    0.85524
+   ],
+   "ordem": 39,
+   "coluna": 0,
+   "texto_impresso": "rocarem, o que elas fariam de quaEquer forma. Observe que a ala"
+  },
+  {
+   "id": "b40",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04235,
+    0.85476,
+    0.94392,
+    0.8731
+   ],
+   "ordem": 40,
+   "coluna": 0,
+   "texto_impresso": "da Dama das brancas não est desenvolvida [10.♗a3 desenvo!ve"
+  },
+  {
+   "id": "b41",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04235,
+    0.87262,
+    0.94431,
+    0.89262
+   ],
+   "ordem": 41,
+   "coluna": 0,
+   "texto_impresso": "ganhando tempo 1O...♕f6 11.♘xd4 seria melhor.] 10...0-0 11.♗d3"
+  },
+  {
+   "id": "b42",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04157,
+    0.89238,
+    0.94431,
+    0.91143
+   ],
+   "ordem": 42,
+   "coluna": 0,
+   "texto_impresso": "♗f5 Morphy propõe a troca de um Bispo que moveu uma vez pelo"
+  },
+  {
+   "id": "b43",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04392,
+    0.91262,
+    0.94471,
+    0.93048
+   ],
+   "ordem": 43,
+   "coluna": 0,
+   "texto_impresso": "Bispo branco que fezvários lances. 12.♗xf5 ♘xf5 13.♗a3 As brancas"
+  },
+  {
+   "id": "b44",
+   "funcao": "texto",
+   "caixa_rel": [
+    0.04235,
+    0.93286,
+    0.94471,
+    0.95095
+   ],
+   "ordem": 44,
+   "coluna": 0,
+   "texto_impresso": "vão ganhar a quaEidade. Morphy gasta os tempos que as brancas"
+  },
+  {
+   "id": "b45",
+   "funcao": "numero_de_pagina",
+   "caixa_rel": [
+    0.48353,
+    0.9819,
+    0.51765,
+    0.9969
+   ],
+   "ordem": 45,
+   "coluna": 0,
+   "texto_impresso": "28"
+  }
+ ],
+ "diagramas": [],
+ "linhas_corpo": [
+  {
+   "id": "l00",
+   "bloco": "b00",
+   "caixa_rel": [
+    0.08471,
+    0.06381,
+    0.37804,
+    0.08071
+   ],
+   "texto": "Morphy,P — Amateur",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l01",
+   "bloco": "b01",
+   "caixa_rel": [
+    0.08706,
+    0.08333,
+    0.34588,
+    0.09667
+   ],
+   "texto": "1856. .",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l02",
+   "bloco": "b02",
+   "caixa_rel": [
+    0.08471,
+    0.10214,
+    0.93412,
+    0.11929
+   ],
+   "texto": "Antigamente era costume dar alguma vantagem material ao",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l03",
+   "bloco": "b03",
+   "caixa_rel": [
+    0.03451,
+    0.12048,
+    0.9349,
+    0.13833
+   ],
+   "texto": "adversário mais fraco. Aqui Mor?hy joga sem a ♖a1 1.e4 e5 2.♘f3",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l04",
+   "bloco": "b04",
+   "caixa_rel": [
+    0.03529,
+    0.13786,
+    0.93451,
+    0.155
+   ],
+   "texto": "♘c6 3.♗c4 d6 4.c3 ♗e6 5.♗b5 Evitando a troca devido ?",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l05",
+   "bloco": "b05",
+   "caixa_rel": [
+    0.0349,
+    0.15738,
+    0.93608,
+    0.18167
+   ],
+   "texto": "desvantagem de materia1. 5...a6 6.♗a4 ♘ge7 A saÍda do Cavalo ∞r",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l06",
+   "bloco": "b06",
+   "caixa_rel": [
+    0.03529,
+    0.17833,
+    0.93529,
+    0.19643
+   ],
+   "texto": "e7 é mals lenta Perde tempo já que o Cava1o terá que sair para",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l07",
+   "bloco": "b07",
+   "caixa_rel": [
+    0.03569,
+    0.18952,
+    0.93608,
+    0.21548
+   ],
+   "texto": "per,mitir o desenv.olvimento do ♗f8 7.0-0 h6? Na abe?tura este,1ance",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l08",
+   "bloco": "b08",
+   "caixa_rel": [
+    0.03529,
+    0.21714,
+    0.93608,
+    0.235
+   ],
+   "texto": "só é bom quando impede a!guma ameaça a casa g5. As neg?as",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l09",
+   "bloco": "b09",
+   "caixa_rel": [
+    0.03569,
+    0.23667,
+    0.93647,
+    0.25429
+   ],
+   "texto": "podiam usar o tempo gasto Com este la?Ce para des.envolver uma",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l10",
+   "bloco": "b10",
+   "caixa_rel": [
+    0.03608,
+    0.25405,
+    0.93765,
+    0.27429
+   ],
+   "texto": "peeça. 8.a3 as negras amea?avam capturar este peão 8...♗a2 9.♗c2",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l11",
+   "bloco": "b11",
+   "caixa_rel": [
+    0.03608,
+    0.2719,
+    0.93686,
+    0.29238
+   ],
+   "texto": "♘g6 10.d4 d5 Com uma ser?e de lances consecutivos que perdem",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l12",
+   "bloco": "b12",
+   "caixa_rel": [
+    0.0349,
+    0.29452,
+    0.93882,
+    0.3119
+   ],
+   "texto": "tempo as negras vão comprometer sua posição. Era melhor",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l13",
+   "bloco": "b13",
+   "caixa_rel": [
+    0.03647,
+    0.31262,
+    0.93765,
+    0.33167
+   ],
+   "texto": "desenvover o ♗f8 ou jogar ... ♗c4 ameaçando a ♖f1 que ganha um",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l14",
+   "bloco": "b14",
+   "caixa_rel": [
+    0.03569,
+    0.33143,
+    0.93922,
+    0.35071
+   ],
+   "texto": "tempo já que também melhora a posição do ♗a2 11.♘bd2 Morphy",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l15",
+   "bloco": "b15",
+   "caixa_rel": [
+    0.03725,
+    0.35119,
+    0.93843,
+    0.37048
+   ],
+   "texto": "desenvo?ve uma peça 11...dxe4 12.♘xe4 ?xd4 13.b3 Prende o ♗a2",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l16",
+   "bloco": "b16",
+   "caixa_rel": [
+    0.03882,
+    0.37024,
+    0.93922,
+    0.38952
+   ],
+   "texto": "13...b6? Completa perda de tempo, lance inútil 14.cxd4 ♘h4 O?tra",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l17",
+   "bloco": "b17",
+   "caixa_rel": [
+    0.03882,
+    0.39167,
+    0.94,
+    0.40881
+   ],
+   "texto": "perda de tempo movendo mais uma vez o cava1o já desenvolv?do",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l18",
+   "bloco": "b18",
+   "caixa_rel": [
+    0.03961,
+    0.40929,
+    0.94,
+    0.42833
+   ],
+   "texto": "15.♗b2 ♘xf3+ Lance que troca uma peça que gastou vários temp?s",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l19",
+   "bloco": "b19",
+   "caixa_rel": [
+    0.03569,
+    0.42857,
+    0.94,
+    0.4469
+   ],
+   "texto": ".por uma que só tinha movido uma vez 16.♕xf3 ♘xd4? Permite que",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l20",
+   "bloco": "b20",
+   "caixa_rel": [
+    0.03922,
+    0.4481,
+    0.93765,
+    0.4669
+   ],
+   "texto": "a ♖f1 .entre em jogo com ganho de tempo 17.♗xd4 ♕xd4 18.♖d1",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l21",
+   "bloco": "b21",
+   "caixa_rel": [
+    0.03804,
+    0.46738,
+    0.94039,
+    0.48571
+   ],
+   "texto": "♕b2 Consequência d.a falta de conhecimento da questão dos",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l22",
+   "bloco": "b22",
+   "caixa_rel": [
+    0.03922,
+    0.48786,
+    0.94078,
+    0.50952
+   ],
+   "texto": "??Tem.pos,, as pe?as de Morphy estão mobilizadas para o assa1tofinaI",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l23",
+   "bloco": "b23",
+   "caixa_rel": [
+    0.03961,
+    0.50714,
+    0.94078,
+    0.53976
+   ],
+   "texto": "enquanto a maIoria das peças negras estão nas casas de origem",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l24",
+   "bloco": "b24",
+   "caixa_rel": [
+    0.04,
+    0.52452,
+    0.94118,
+    0.54357
+   ],
+   "texto": "ou mal colocadas 19.♘f6+! Não h tempo para impedir o ataque o",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l25",
+   "bloco": "b25",
+   "caixa_rel": [
+    0.03961,
+    0.54333,
+    0.94235,
+    0.56286
+   ],
+   "texto": "ataque a descoberto é fataE 19...gxf6 20.♕xa8+ ♔e7 21.♖e1+ Morpny",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l26",
+   "bloco": "b26",
+   "caixa_rel": [
+    0.04,
+    0.56476,
+    0.94196,
+    0.58238
+   ],
+   "texto": "arremata utilizando outra forma de ganha tempos. Dando Xeques o",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l27",
+   "bloco": "b27",
+   "caixa_rel": [
+    0.04,
+    0.58405,
+    0.94392,
+    0.6019
+   ],
+   "texto": "adversário é obrigado a se defender não tendo tempo de mobilizar",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l28",
+   "bloco": "b28",
+   "caixa_rel": [
+    0.04,
+    0.60119,
+    0.94196,
+    0.62048
+   ],
+   "texto": "suas forças para a defesa.. [21 .♕d8+! ♔e6 22.♕d7+ ♔e5 23.♕f5#]",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l29",
+   "bloco": "b29",
+   "caixa_rel": [
+    0.04,
+    0.62,
+    0.94275,
+    0.6381
+   ],
+   "texto": "21...♔d6 22.♕d8+ ♔c6 23.♗e4+ ♔b5 24.♕d5+ ♗c5 25.♕c4+ ♔a5",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l30",
+   "bloco": "b30",
+   "caixa_rel": [
+    0.03961,
+    0.64095,
+    0.21059,
+    0.65571
+   ],
+   "texto": "26.♕a4# 1—0",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l31",
+   "bloco": "b31",
+   "caixa_rel": [
+    0.09294,
+    0.6819,
+    0.50392,
+    0.69905
+   ],
+   "texto": "Marache N — Morphy,P [c52]",
+   "negrito": true,
+   "texto_verificado": false
+  },
+  {
+   "id": "l32",
+   "bloco": "b32",
+   "caixa_rel": [
+    0.09294,
+    0.7,
+    0.30353,
+    0.71476
+   ],
+   "texto": "New York 1857",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l33",
+   "bloco": "b33",
+   "caixa_rel": [
+    0.09333,
+    0.71262,
+    0.94353,
+    0.7369
+   ],
+   "texto": "1.e4 e5 2.♘f3 ♘c6 3.♗c4♗c5 4.b4 O Gambito Evans, as brancas",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l34",
+   "bloco": "b34",
+   "caixa_rel": [
+    0.04078,
+    0.73833,
+    0.94431,
+    0.75762
+   ],
+   "texto": "entregam um peão para ganhartempos e dominar o centro 4...♗xb4",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l35",
+   "bloco": "b35",
+   "caixa_rel": [
+    0.04157,
+    0.75786,
+    0.94353,
+    0.77714
+   ],
+   "texto": "5.c3 ♗a5 6.d4 exd4 7.e5? Perde um importante tempo movendo o",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l36",
+   "bloco": "b36",
+   "caixa_rel": [
+    0.04196,
+    0.77762,
+    0.94353,
+    0.79619
+   ],
+   "texto": "peão. Melhor era 7. ♘xd4 7...d5! Abre a diagonal ao ♗c8 e ataca o",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l37",
+   "bloco": "b37",
+   "caixa_rel": [
+    0.04039,
+    0.79595,
+    0.94314,
+    0.81548
+   ],
+   "texto": "♗c4 ganhando tempos. 8.exd6 ♕xd6 9.0-0 ♘ge7 10.♘g5? Gasta",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l38",
+   "bloco": "b38",
+   "caixa_rel": [
+    0.04235,
+    0.8181,
+    0.94353,
+    0.835
+   ],
+   "texto": "um tempo com uma peça já desenvolvida, forçando as negras a",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l39",
+   "bloco": "b39",
+   "caixa_rel": [
+    0.04275,
+    0.835,
+    0.94353,
+    0.85524
+   ],
+   "texto": "rocarem, o que elas fariam de quaEquer forma. Observe que a ala",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l40",
+   "bloco": "b40",
+   "caixa_rel": [
+    0.04235,
+    0.85476,
+    0.94392,
+    0.8731
+   ],
+   "texto": "da Dama das brancas não est desenvolvida [10.♗a3 desenvo!ve",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l41",
+   "bloco": "b41",
+   "caixa_rel": [
+    0.04235,
+    0.87262,
+    0.94431,
+    0.89262
+   ],
+   "texto": "ganhando tempo 1O...♕f6 11.♘xd4 seria melhor.] 10...0-0 11.♗d3",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l42",
+   "bloco": "b42",
+   "caixa_rel": [
+    0.04157,
+    0.89238,
+    0.94431,
+    0.91143
+   ],
+   "texto": "♗f5 Morphy propõe a troca de um Bispo que moveu uma vez pelo",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l43",
+   "bloco": "b43",
+   "caixa_rel": [
+    0.04392,
+    0.91262,
+    0.94471,
+    0.93048
+   ],
+   "texto": "Bispo branco que fezvários lances. 12.♗xf5 ♘xf5 13.♗a3 As brancas",
+   "negrito": false,
+   "texto_verificado": false
+  },
+  {
+   "id": "l44",
+   "bloco": "b44",
+   "caixa_rel": [
+    0.04235,
+    0.93286,
+    0.94471,
+    0.95095
+   ],
+   "texto": "vão ganhar a quaEidade. Morphy gasta os tempos que as brancas",
+   "negrito": false,
+   "texto_verificado": false
+  }
+ ],
+ "estrutura_por": "Claude (estrutura pelas faixas)"
+}

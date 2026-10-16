@@ -1,0 +1,329 @@
+# Os atalhos do AbbyChessCraft: a fonte única (SPEC §3.4, CA-3.7).
+#
+# O código registra os atalhos a partir deste arquivo (do passo A2 em diante), e
+# `docs/ATALHOS.md` é gerado dele por `ferramentas/atalhos.py`. Atalho novo entra
+# aqui primeiro; o teste `tests/test_atalhos.py` reprova colisão, letra solta em
+# widget editável, Ctrl+Alt, Alt+letra (é dos menus) e encobrimento de ligação
+# nativa não declarado.
+#
+# Campos de cada ação:
+#   id, descricao     identificador estável e texto para a documentação
+#   escopo            lista de escopos (abaixo); "global" vale com o foco em qualquer lugar
+#   padrao            a sequência no perfil padrão (ou lista de sequências)
+#   finereader        a sequência no perfil FineReader; se faltar, igual à do padrão
+#   sem_atalho        perfis em que a ação existe só por menu ou botão
+#   desde_passo       o passo do roadmap em que a ação passa a estar registrada
+#   excecoes          encobrimentos declarados: tecla, widget, tipo e motivo
+#                     tipo "redireciona": o widget cede a tecla (ShortcutOverride ignorado)
+#                     tipo "substitui": o atalho toma o lugar da ligação nativa de propósito
+
+versao: 1
+perfis: [padrao, finereader]
+passos: ["0", 1a, 1b, 2a, 2b, A1, A2, A3, E, D1, B, D2, C, I, F, G, H, J, K, L]
+
+escopos:
+  global:       {widgets: [], editavel: false}
+  imagem:       {widgets: [graphicsview], editavel: false}
+  imagem_areas: {dentro_de: imagem, widgets: [graphicsview], editavel: false}
+  documento:    {widgets: [textedit], editavel: true}
+  glifo:        {widgets: [lineedit], editavel: true}
+  campo_glifo:  {dentro_de: glifo, widgets: [lineedit], editavel: true}
+  palavra:      {widgets: [lineedit], editavel: true}
+  galeria:      {widgets: [listview], editavel: true}
+  diagrama:     {widgets: [tabuleiro], editavel: true}
+  busca:        {widgets: [lineedit], editavel: true}
+  paginas:      {widgets: [listview], editavel: false}
+
+# Widgets que existem em algum lugar da janela e por isso concorrem com os globais.
+widgets_da_janela: [lineedit, textedit, graphicsview, listview, tabwidget, combobox, tabuleiro]
+
+# Ligações nativas. "vence": o widget aceita o ShortcutOverride e o atalho não dispara
+# com o foco nele. "perde": o atalho dispara e a ligação nativa some.
+nativos:
+  lineedit:
+    vence: [Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z, Ctrl+Backspace,
+            Ctrl+Delete, Left, Right, Home, End, Shift+Left, Shift+Right, Shift+Home, Shift+End,
+            Ctrl+Left, Ctrl+Right, Ctrl+Shift+Left, Ctrl+Shift+Right, Backspace, Delete, Enter,
+            Shift+Enter]
+  textedit:
+    vence: [Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z, Ctrl+Backspace,
+            Ctrl+Delete, Left, Right, Up, Down, Home, End, PgUp, PgDn, Shift+Left, Shift+Right,
+            Shift+Up, Shift+Down, Shift+Home, Shift+End, Shift+PgUp, Shift+PgDn, Ctrl+Left,
+            Ctrl+Right, Ctrl+Up, Ctrl+Down, Ctrl+Home, Ctrl+End, Ctrl+Shift+Left,
+            Ctrl+Shift+Right, Ctrl+Shift+Up, Ctrl+Shift+Down, Ctrl+Shift+Home, Ctrl+Shift+End,
+            Backspace, Delete, Enter, Shift+Enter]
+  graphicsview:
+    perde: [Left, Right, Up, Down, PgUp, PgDn, Home, End]
+  listview:
+    perde: [Left, Right, Up, Down, Shift+Left, Shift+Right, Shift+Up, Shift+Down, PgUp, PgDn,
+            Home, End, Ctrl+A]
+  tabwidget:
+    perde: [Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+PgUp, Ctrl+PgDn]
+  combobox:
+    perde: [Alt+Down, Alt+Up, F4]
+  tabuleiro:
+    vence: [Left, Right, Up, Down, Delete, Backspace, Space]
+
+acoes:
+  # --- Projeto -------------------------------------------------------------------
+  - {id: novo_projeto, descricao: Novo projeto, escopo: [global], padrao: Ctrl+N, desde_passo: A2}
+  - {id: abrir_projeto, descricao: Abrir projeto, escopo: [global], padrao: Ctrl+O, desde_passo: A2}
+  - {id: exportar, descricao: Exportar, escopo: [global], padrao: Ctrl+E, desde_passo: A2}
+  - {id: opcoes, descricao: Opções do livro, escopo: [global], padrao: "Ctrl+,", desde_passo: A2}
+  - {id: sair, descricao: Sair, escopo: [global], padrao: Ctrl+Q, desde_passo: A2}
+  - {id: cancelar_lote, descricao: Cancelar o lote (também o ✕ da barra de status),
+     escopo: [global], sem_atalho: [padrao, finereader], desde_passo: A2}
+
+  # --- Editar --------------------------------------------------------------------
+  - id: desfazer
+    descricao: Desfazer
+    escopo: [global]
+    padrao: Ctrl+Z
+    desde_passo: A2
+    excecoes:
+      - {tecla: Ctrl+Z, widget: lineedit, tipo: redireciona, motivo: "o desfazer é da página (§6.3, §3.4)"}
+      - {tecla: Ctrl+Z, widget: textedit, tipo: redireciona, motivo: "o desfazer do QTextDocument fica desligado (§6.3)"}
+  - id: refazer
+    descricao: Refazer
+    escopo: [global]
+    padrao: [Ctrl+Y, Ctrl+Shift+Z]
+    desde_passo: A2
+    excecoes:
+      - {tecla: Ctrl+Y, widget: lineedit, tipo: redireciona, motivo: "o refazer é da página"}
+      - {tecla: Ctrl+Y, widget: textedit, tipo: redireciona, motivo: "o refazer é da página"}
+      - {tecla: Ctrl+Shift+Z, widget: lineedit, tipo: redireciona, motivo: "o refazer é da página"}
+      - {tecla: Ctrl+Shift+Z, widget: textedit, tipo: redireciona, motivo: "o refazer é da página"}
+  - {id: localizar, descricao: Localizar, escopo: [global], padrao: Ctrl+F, desde_passo: B}
+  - {id: proxima_ocorrencia, descricao: Próxima ocorrência, escopo: [global], padrao: F3, desde_passo: B}
+  - {id: ocorrencia_anterior, descricao: Ocorrência anterior, escopo: [global], padrao: Shift+F3, desde_passo: B}
+  - {id: todas_em_resultados, descricao: Todas as ocorrências em Resultados, escopo: [global], padrao: Alt+Enter, desde_passo: B}
+  - {id: substituir, descricao: Substituir, escopo: [global], padrao: Ctrl+H, desde_passo: D2}
+
+  # --- Página e livro ------------------------------------------------------------
+  - id: pagina_anterior
+    descricao: Página anterior
+    escopo: [global]
+    padrao: Ctrl+PgUp
+    desde_passo: A1
+    excecoes:
+      - {tecla: Ctrl+PgUp, widget: tabwidget, tipo: substitui, motivo: "troca a página; as abas da vista direita trocam com Alt+3"}
+  - id: pagina_seguinte
+    descricao: Página seguinte
+    escopo: [global]
+    padrao: Ctrl+PgDn
+    desde_passo: A1
+    excecoes:
+      - {tecla: Ctrl+PgDn, widget: tabwidget, tipo: substitui, motivo: "troca a página; as abas da vista direita trocam com Alt+3"}
+  - {id: primeira_pagina, descricao: Primeira página, escopo: [global], padrao: Alt+Home, desde_passo: A1}
+  - {id: ultima_pagina, descricao: Última página, escopo: [global], padrao: Alt+End, desde_passo: A1}
+  - {id: ir_para_pagina, descricao: Ir para a página, escopo: [global], padrao: Ctrl+G, desde_passo: A1}
+  - {id: voltar_visita, descricao: Página visitada antes, escopo: [global], padrao: Alt+Left, desde_passo: A1}
+  - {id: avancar_visita, descricao: Página visitada depois, escopo: [global], padrao: Alt+Right, desde_passo: A1}
+  - id: rolar_tela_acima
+    descricao: Rolar uma tela (e virar para a página anterior no topo)
+    escopo: [imagem]
+    padrao: PgUp
+    desde_passo: A1
+    excecoes:
+      - {tecla: PgUp, widget: graphicsview, tipo: substitui, motivo: "rola uma tela e vira a página no fim (§3.3)"}
+  - id: rolar_tela_abaixo
+    descricao: Rolar uma tela (e virar para a página seguinte no fim)
+    escopo: [imagem]
+    padrao: PgDn
+    desde_passo: A1
+    excecoes:
+      - {tecla: PgDn, widget: graphicsview, tipo: substitui, motivo: "rola uma tela e vira a página no fim (§3.3)"}
+  - {id: reconhecer_pagina, descricao: Reconhecer a página, escopo: [global], padrao: F5, finereader: Ctrl+F9, desde_passo: A2}
+  - {id: reconhecer_livro, descricao: Reconhecer o livro (lote), escopo: [global], padrao: Ctrl+Shift+F5, desde_passo: A2}
+  - {id: reler_pendentes, descricao: Reler os pendentes, escopo: [global], padrao: Ctrl+R, desde_passo: A2}
+  - {id: reconhecer_zona, descricao: Reconhecer só a zona escolhida, escopo: [imagem_areas], padrao: Ctrl+Shift+R,
+     finereader: Ctrl+Shift+B, desde_passo: F}
+  - {id: proxima_pagina_pendente, descricao: Próxima página com pendentes, escopo: [global], padrao: F6,
+     finereader: Alt+PgDn, desde_passo: A2}
+  - {id: pagina_verificada, descricao: Marcar a página verificada e abrir a próxima, escopo: [global], padrao: Ctrl+T, desde_passo: A2}
+  - {id: voltar_antes_do_lote, descricao: Voltar a página ao estado antes do lote, escopo: [global],
+     sem_atalho: [padrao, finereader], desde_passo: E}
+
+  # --- A fila de revisão ---------------------------------------------------------
+  - id: proximo_da_fila
+    descricao: Próximo item da fila
+    escopo: [global]
+    padrao: Alt+Down
+    desde_passo: A2
+    excecoes:
+      - {tecla: Alt+Down, widget: combobox, tipo: substitui, motivo: "a caixa de zoom tem ClickFocus e abre com F4 ou clique"}
+  - id: anterior_da_fila
+    descricao: Item anterior da fila
+    escopo: [global]
+    padrao: Alt+Up
+    desde_passo: A2
+    excecoes:
+      - {tecla: Alt+Up, widget: combobox, tipo: substitui, motivo: "a caixa de zoom tem ClickFocus e abre com F4 ou clique"}
+  - {id: ciclar_modo_da_fila, descricao: Ciclar o modo da fila, escopo: [global], padrao: F7,
+     finereader: Ctrl+Shift+F7, desde_passo: A2}
+  - {id: alternar_escopo_da_fila, descricao: Alternar o escopo da fila (página ou livro), escopo: [global],
+     padrao: Shift+F7, finereader: Ctrl+Shift+F8, desde_passo: C}
+  - {id: fila_em_palavras, descricao: Fila no modo palavras desconhecidas, escopo: [global],
+     sem_atalho: [padrao], finereader: Ctrl+F7, desde_passo: K}
+  - {id: proximo_diagrama, descricao: Próximo diagrama por conferir do livro, escopo: [global], padrao: F8,
+     finereader: Ctrl+F8, desde_passo: A1}
+
+  # --- Exibir: arranjos, painéis, zoom -------------------------------------------
+  - {id: arranjo_so_imagem, descricao: Só a Imagem, escopo: [global], padrao: Ctrl+F6, finereader: F6, desde_passo: A2}
+  - {id: arranjo_lado_a_lado, descricao: Imagem e vista direita lado a lado, escopo: [global], padrao: Ctrl+F7,
+     finereader: F7, desde_passo: A2}
+  - {id: arranjo_empilhado, descricao: Imagem e vista direita empilhadas, escopo: [global], padrao: Ctrl+Shift+F7,
+     finereader: Shift+F7, desde_passo: A2}
+  - {id: arranjo_so_vista, descricao: Só a vista direita, escopo: [global], padrao: Ctrl+F8, finereader: F8, desde_passo: A2}
+  - {id: mostrar_paginas, descricao: Mostrar ou esconder Páginas, escopo: [global], padrao: F9, finereader: F5, desde_passo: A2}
+  - {id: mostrar_linha, descricao: Mostrar ou esconder a Linha, escopo: [global], padrao: Ctrl+F5, desde_passo: A3}
+  - {id: foco_paginas, descricao: Foco em Páginas, escopo: [global], padrao: Alt+1, desde_passo: A2}
+  - {id: foco_imagem, descricao: Foco na Imagem, escopo: [global], padrao: Alt+2, desde_passo: A2}
+  - {id: foco_vista, descricao: Foco na vista direita (repetido cicla as abas), escopo: [global], padrao: Alt+3, desde_passo: A2}
+  - {id: foco_inspetor, descricao: Foco no Inspetor, escopo: [global], padrao: Alt+4, finereader: Alt+5, desde_passo: A2}
+  - {id: foco_resultados, descricao: Foco em Resultados, escopo: [global], padrao: Alt+5, finereader: Alt+6, desde_passo: A2}
+  - {id: foco_linha, descricao: Foco na Linha, escopo: [global], sem_atalho: [padrao], finereader: Alt+4, desde_passo: K}
+  - id: painel_seguinte
+    descricao: Painel seguinte
+    escopo: [global]
+    sem_atalho: [padrao]
+    finereader: Ctrl+Tab
+    desde_passo: K
+    excecoes:
+      - {tecla: Ctrl+Tab, widget: tabwidget, tipo: substitui, motivo: "perfil FineReader: as abas da vista direita trocam com Alt+3"}
+  - id: painel_anterior
+    descricao: Painel anterior
+    escopo: [global]
+    sem_atalho: [padrao]
+    finereader: Ctrl+Shift+Tab
+    desde_passo: K
+    excecoes:
+      - {tecla: Ctrl+Shift+Tab, widget: tabwidget, tipo: substitui, motivo: "perfil FineReader: as abas da vista direita trocam com Alt+3"}
+  - {id: seguir, descricao: Seguir o item atual nos dois painéis, escopo: [global], padrao: Ctrl+Shift+L, desde_passo: A1}
+  - {id: zoom_mais, descricao: Aproximar (Imagem) ou aumentar o corpo (Documento), escopo: [imagem, documento],
+     padrao: [Ctrl+=, Ctrl++], desde_passo: A1}
+  - {id: zoom_menos, descricao: Afastar (Imagem) ou diminuir o corpo (Documento), escopo: [imagem, documento],
+     padrao: Ctrl+-, desde_passo: A1}
+  - {id: zoom_pagina, descricao: Página inteira (Imagem) ou corpo padrão (Documento), escopo: [imagem, documento],
+     padrao: Ctrl+0, desde_passo: A1}
+  - {id: zoom_largura, descricao: Largura da página, escopo: [imagem], padrao: Ctrl+9, desde_passo: A1}
+  - {id: zoom_100, descricao: 100%, escopo: [imagem], padrao: Ctrl+8, desde_passo: A1}
+  - {id: zoom_item, descricao: Zoom no item atual, escopo: [imagem], padrao: Ctrl+7, desde_passo: A1}
+  - {id: mostrar_origem, descricao: Mostrar a origem das leituras nos boxes, escopo: [imagem], padrao: V, desde_passo: A1}
+
+  # --- Ferramentas ---------------------------------------------------------------
+  - {id: marcar_glifo, descricao: Marcar glifo à mão (quadro), escopo: [global], padrao: Ctrl+M, desde_passo: A2}
+  - {id: modo_areas, descricao: Editor de áreas, escopo: [global], padrao: Ctrl+Shift+A, desde_passo: A2}
+  - {id: areas_automaticas, descricao: Refazer as áreas automáticas, escopo: [global],
+     sem_atalho: [padrao, finereader], desde_passo: A2}
+
+  # --- Inspetor: Glifo (o treino) --------------------------------------------------
+  - id: ensinar
+    descricao: Ensinar o padrão
+    escopo: [campo_glifo]
+    padrao: Enter
+    desde_passo: A2
+    excecoes:
+      - {tecla: Enter, widget: lineedit, tipo: redireciona, motivo: "o campo trata o Enter (keyPressEvent)"}
+  - id: so_corrigir
+    descricao: Corrigir só esta ocorrência
+    escopo: [campo_glifo]
+    padrao: Shift+Enter
+    desde_passo: A2
+    excecoes:
+      - {tecla: Shift+Enter, widget: lineedit, tipo: redireciona, motivo: "o campo trata o Shift+Enter (keyPressEvent)"}
+  - id: descartar_box
+    descricao: Não é caractere (descartar o box)
+    escopo: [glifo]
+    padrao: Delete
+    desde_passo: A2
+    excecoes:
+      - {tecla: Delete, widget: lineedit, tipo: redireciona, motivo: "campo de 1 caractere (regra 6 de §3.4)"}
+  - {id: dividir, descricao: Dividir o box, escopo: [glifo], padrao: Ctrl+D, desde_passo: A2}
+  - {id: juntar_seguinte, descricao: Juntar com o seguinte da linha, escopo: [glifo], padrao: Ctrl+J, desde_passo: A2}
+  - {id: juntar_anterior, descricao: Juntar com o anterior da linha, escopo: [glifo], padrao: Ctrl+Shift+J, desde_passo: A2}
+  - id: borda_direita_esq
+    descricao: Mover a borda direita para a esquerda
+    escopo: [imagem, campo_glifo]
+    padrao: Shift+Left
+    desde_passo: A2
+    excecoes:
+      - {tecla: Shift+Left, widget: lineedit, tipo: redireciona, motivo: "campo de 1 caractere (regra 6 de §3.4)"}
+  - id: borda_direita_dir
+    descricao: Mover a borda direita para a direita
+    escopo: [imagem, campo_glifo]
+    padrao: Shift+Right
+    desde_passo: A2
+    excecoes:
+      - {tecla: Shift+Right, widget: lineedit, tipo: redireciona, motivo: "campo de 1 caractere (regra 6 de §3.4)"}
+  - {id: borda_baixo_cima, descricao: Mover a borda de baixo para cima, escopo: [imagem, campo_glifo], padrao: Shift+Up, desde_passo: A2}
+  - {id: borda_baixo_baixo, descricao: Mover a borda de baixo para baixo, escopo: [imagem, campo_glifo], padrao: Shift+Down, desde_passo: A2}
+  - id: borda_esquerda_esq
+    descricao: Mover a borda esquerda para a esquerda
+    escopo: [imagem, campo_glifo]
+    padrao: Ctrl+Shift+Left
+    desde_passo: A2
+    excecoes:
+      - {tecla: Ctrl+Shift+Left, widget: lineedit, tipo: redireciona, motivo: "campo de 1 caractere (regra 6 de §3.4)"}
+  - id: borda_esquerda_dir
+    descricao: Mover a borda esquerda para a direita
+    escopo: [imagem, campo_glifo]
+    padrao: Ctrl+Shift+Right
+    desde_passo: A2
+    excecoes:
+      - {tecla: Ctrl+Shift+Right, widget: lineedit, tipo: redireciona, motivo: "campo de 1 caractere (regra 6 de §3.4)"}
+  - {id: borda_topo_cima, descricao: Mover a borda de cima para cima, escopo: [imagem, campo_glifo], padrao: Ctrl+Shift+Up, desde_passo: A2}
+  - {id: borda_topo_baixo, descricao: Mover a borda de cima para baixo, escopo: [imagem, campo_glifo], padrao: Ctrl+Shift+Down, desde_passo: A2}
+  - {id: paleta, descricao: Paleta de símbolos no cursor, escopo: [documento, glifo, galeria], padrao: F2, desde_passo: A2}
+
+  # --- Inspetor: Palavra (a verificação) ---------------------------------------------
+  - {id: ignorar_palavra, descricao: Ignorar a palavra, escopo: [palavra], padrao: Ctrl+Shift+I, desde_passo: A2}
+  - {id: adicionar_ao_lexico, descricao: Adicionar ao dicionário do livro, escopo: [palavra], padrao: Ctrl+Shift+D, desde_passo: A2}
+
+  # --- Documento -----------------------------------------------------------------------
+  - id: confirmar_e_avancar
+    descricao: Confirmar a palavra e ir à próxima duvidosa
+    escopo: [documento]
+    padrao: Enter
+    desde_passo: D1
+    excecoes:
+      - {tecla: Enter, widget: textedit, tipo: redireciona, motivo: "a sessão de edição trata o Enter (§6.3)"}
+  - id: confirmar_sem_avancar
+    descricao: Confirmar a palavra sem avançar
+    escopo: [documento]
+    padrao: Shift+Enter
+    desde_passo: D1
+    excecoes:
+      - {tecla: Shift+Enter, widget: textedit, tipo: redireciona, motivo: "a sessão de edição trata o Shift+Enter (§6.3)"}
+  - {id: ensinar_no_documento, descricao: Confirmar e ensinar o glifo sob o cursor, escopo: [documento], padrao: Ctrl+Enter, desde_passo: D1}
+  - {id: novo_paragrafo, descricao: Novo parágrafo antes da palavra, escopo: [documento], padrao: Ctrl+Shift+Enter, desde_passo: G}
+  - {id: ocultar_cabecalhos, descricao: Mostrar ou ocultar cabeçalhos e rodapés, escopo: [documento], padrao: Ctrl+Shift+H, desde_passo: A3}
+  - {id: negrito, descricao: Negrito, escopo: [documento], padrao: Ctrl+B, desde_passo: G}
+  - {id: italico, descricao: Itálico, escopo: [documento], padrao: Ctrl+I, desde_passo: G}
+  - {id: sublinhado, descricao: Sublinhado, escopo: [documento], padrao: Ctrl+U, desde_passo: G}
+  - {id: figurina_rei, descricao: Figurina ♔ (repetir alterna para ♚), escopo: [documento, galeria], padrao: Ctrl+Shift+K, desde_passo: D1}
+  - {id: figurina_dama, descricao: Figurina ♕ (repetir alterna para ♛), escopo: [documento, galeria], padrao: Ctrl+Shift+Q, desde_passo: D1}
+  - {id: figurina_torre, descricao: Figurina ♖ (repetir alterna para ♜), escopo: [documento, galeria], padrao: Ctrl+Shift+R, desde_passo: D1}
+  - {id: figurina_bispo, descricao: Figurina ♗ (repetir alterna para ♝), escopo: [documento, galeria], padrao: Ctrl+Shift+B, desde_passo: D1}
+  - {id: figurina_cavalo, descricao: Figurina ♘ (repetir alterna para ♞), escopo: [documento, galeria], padrao: Ctrl+Shift+N, desde_passo: D1}
+  - {id: figurina_peao, descricao: Figurina ♙ (repetir alterna para ♟), escopo: [documento, galeria], padrao: Ctrl+Shift+P, desde_passo: D1}
+
+  # --- Modo Áreas ----------------------------------------------------------------------
+  - {id: funcao_texto, descricao: "Função da zona: texto", escopo: [imagem_areas], padrao: T, desde_passo: F}
+  - {id: funcao_titulo, descricao: "Função da zona: título", escopo: [imagem_areas], padrao: H, desde_passo: F}
+  - {id: funcao_cabecalho, descricao: "Função da zona: cabeçalho", escopo: [imagem_areas], padrao: C, desde_passo: F}
+  - {id: funcao_rodape, descricao: "Função da zona: rodapé", escopo: [imagem_areas], padrao: R, desde_passo: F}
+  - {id: funcao_numero, descricao: "Função da zona: número de página", escopo: [imagem_areas], padrao: P, desde_passo: F}
+  - {id: funcao_nota, descricao: "Função da zona: nota", escopo: [imagem_areas], padrao: N, desde_passo: F}
+  - {id: funcao_legenda, descricao: "Função da zona: legenda", escopo: [imagem_areas], padrao: L, desde_passo: F}
+  - {id: funcao_diagrama, descricao: "Função da zona: diagrama", escopo: [imagem_areas], padrao: D, desde_passo: F}
+  - {id: funcao_ignorar, descricao: "Função da zona: ignorar", escopo: [imagem_areas], padrao: X, desde_passo: F}
+  - {id: tipo_texto, descricao: "Tipo da zona: texto", escopo: [imagem_areas], sem_atalho: [padrao], finereader: Ctrl+1, desde_passo: K}
+  - {id: tipo_diagrama, descricao: "Tipo da zona: diagrama", escopo: [imagem_areas], sem_atalho: [padrao], finereader: Ctrl+2, desde_passo: K}
+  - {id: tipo_tabela, descricao: "Tipo da zona: tabela", escopo: [imagem_areas], sem_atalho: [padrao], finereader: Ctrl+3, desde_passo: K}
+  - {id: tipo_imagem, descricao: "Tipo da zona: imagem", escopo: [imagem_areas], sem_atalho: [padrao], finereader: Ctrl+4, desde_passo: K}
+  - {id: tipo_ignorar, descricao: "Tipo da zona: ignorar", escopo: [imagem_areas], sem_atalho: [padrao], finereader: Ctrl+5, desde_passo: K}
+
+  # --- Sobreposições -------------------------------------------------------------------
+  - {id: fechar_sobreposicao, descricao: "Fechar o que está por cima (busca, menu, seleção, Resultados)",
+     escopo: [global], padrao: Esc, desde_passo: A2}

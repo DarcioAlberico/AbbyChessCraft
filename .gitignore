@@ -13,3 +13,6 @@ rea/
 # Projetos de livro e saídas locais
 projetos/
 *.tmp
+
+# Faixas das páginas dos livros para transcrever os gabaritos (direito autoral)
+.rotulagem/

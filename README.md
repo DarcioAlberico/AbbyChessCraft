@@ -21,13 +21,32 @@ Para recriar o ambiente do zero:
 py -3.13 -m venv --system-site-packages .venv
 .venv\Scripts\python.exe -m pip install -e C:\Python-Chess2\PyBoxEditor_Tkinter --no-deps
 .venv\Scripts\python.exe -m pip install -e . --no-deps
+.venv\Scripts\python.exe -m pip install hypothesis regex psutil pytest-timeout pytest-qt PyYAML
 ```
 
-Os testes:
+Os testes vêm em camadas (SPEC §15.1). A suíte rápida roda sempre e fica abaixo de 60 s; as
+outras rodam com `-m`:
 
 ```text
 .venv\Scripts\python.exe -m pytest -q
+.venv\Scripts\python.exe -m pytest -q -m livro_real
+.venv\Scripts\python.exe -m pytest -q -m desempenho tests\desempenho
 ```
+
+`livro_real` usa os PDFs da pasta do PyBoxEditor e os modelos globais; com
+`ABBY_PORTAO=1`, um teste desses que pularia por falta do livro **falha** (é o portão de
+fechamento de cada passo do roadmap). O portão só vale com as camadas selecionadas, porque
+o `addopts` as tira da suíte rápida:
+
+```text
+$env:ABBY_PORTAO = "1"; .venv\Scripts\python.exe -m pytest -q -m "livro_real or desempenho"
+```
+
+`desempenho` mede as metas de §2 da spec e grava o resultado em `docs/medidas/`.
+
+O projeto está em git desde 2026-10-16. Os atalhos têm uma fonte só, `docs/atalhos.yaml`;
+`docs/ATALHOS.md` é gerado dele por `ferramentas\atalhos.py`, e o teste reprova colisão,
+letra solta em campo de texto, Ctrl+Alt e ligação nativa encoberta sem exceção declarada.
 
 ## O fluxo de treino
 
@@ -326,6 +345,150 @@ Os três diagramas da p. 26, sem moldura e sem coordenadas, saem lidos em 0,2 s 
 Os três abrem na conferência; o terceiro se corrige casa a casa até a posição do segundo,
 que é a mesma. O lado a jogar sai "assumido" nos três: a página não diz.
 
+### A linha de base do roadmap (passo 0)
+
+Medida em 2026-10-16, antes de qualquer mudança do roadmap. As tabelas abaixo são geradas
+dos JSON de `docs/medidas/` por `ferramentas\resumo_medidas.py`; não as edite à mão.
+
+<!-- medidas:inicio -->
+Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (máquina cadastrada: sim; p95 de 30 repetições):
+
+| Meta (spec §2) | Hoje | Alvo |
+|---|---|---|
+| Trocar de página (não há cache) | p95 191 ms | 150 ms no cache; fora do cache ainda não medido pelo método |
+| Enter até a cor do box mudar | p95 184 ms (0 → 35 padrões no livro) | 100 ms |
+| Releitura de um glifo | p95 166 ms; impossível com o lote | 150 ms com o lote |
+| Memória do desfazer, 300 páginas × 20 ações | ~454,3 MB (estimado) | 50 MB |
+| Atraso da interface durante o lote (20 páginas) | p99 20,5 ms, com as ações desabilitadas | 50 ms, com as ações |
+| Memória com o lote | 1632 MB num processo | 2560 MB |
+
+Qualidade contra os gabaritos (`ferramentas\medir.py`). Casas e lado só contam nos diagramas conferidos; o provisório (contra o FEN do rascunho, ainda não conferido) vai entre parênteses. "Margens corridas" são cabeçalho, número de página e rodapé; "—" é nada a medir (nenhuma linha tirada, nenhum diagrama).
+
+| Livro | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Linhas sem par | Casas erradas por diagrama | Lado certo | Ordem (discordância) | CER do corpo | Estado |
+|---|---|---|---|---|---|---|---|---|---|
+| xv | 7 | — / — | 7/7 (0) | None | 0 | 1/5 | 0 | pendente | provisória: estrutura rotulada pelo assistente, ainda não revisada |
+| yusupov | 3 | — / — | 3/3 (0) | None | 0 | 0/3 | 0 | pendente | provisória: estrutura rotulada pelo assistente, ainda não revisada |
+| darcy | 2 | — / — | 3/3 (0) | None | 3 | 0/1 | 0 | pendente | provisória: estrutura rotulada pelo assistente, ainda não revisada |
+
+Fatia (`ferramentas\replay_fatia.py`):
+
+| Livro | Passo | Páginas | Total | Gestos dos diagramas | Navegação | Estado | JSON |
+|---|---|---|---|---|---|---|---|
+| xv | 0 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | — | pendente: nenhuma linha com texto verificado | `2026-10-16-fatia-xv-passo-0.json` |
+<!-- medidas:fim -->
+
+O replay da fatia (os gestos para levar as p. 21–27 ao gabarito) é
+`ferramentas\replay_fatia.py rodar --livro xv --passo 0`; o texto dele fica **pendente**
+até você verificar o texto dos gabaritos, e os gestos dos diagramas ficam **provisórios**
+até os FEN serem conferidos.
+
+**A linha de base fica presa à tag `passo-0`.** O replay e as medidas chamam o núcleo do
+programa, que os passos seguintes mudam. Por isso a linha de base é sempre medida com o
+código do passo 0, num worktree da tag, mesmo depois que o roadmap andar:
+
+```text
+git worktree add ..\AbbyChessCraft_passo0 passo-0
+cd ..\AbbyChessCraft_passo0
+..\AbbyChessCraft\.venv\Scripts\python.exe ferramentas\replay_fatia.py rodar --livro xv --passo 0
+```
+
+Os gabaritos do worktree têm de ser os mesmos da medida nova: copie `tests\verdade\` do
+checkout principal para o worktree antes de rodar (o `comparar` recusa medidas com
+gabaritos de versões diferentes). O JSON sai em `docs\medidas\` do worktree; traga-o
+para o checkout principal.
+
+### Os gabaritos
+
+`tests/verdade/` tem o gabarito de 14 páginas:
+
+| Livro | Páginas (índice do PDF) | Para medir |
+|---|---|---|
+| Xadrez Vitorioso | 20–26 (impressas 21–27) | o corpo, os cabeçalhos, as legendas e 7 diagramas |
+| Xadrez Vitorioso | 0 (capa), 7 (sumário) | páginas negativas: nada de corpo nem diagrama inventado; a 21 (impressa 22) é a terceira negativa, sem diagrama |
+| Yusupov | 6 (uma coluna), 12 (duas colunas com 3 diagramas), 33 (duas colunas, soluções) | colunas e ordem de leitura |
+| Darcy Lima | 25 e 26 (impressas 27 e 28) | a digitalização ruim e 3 diagramas sem moldura |
+
+São 13 diagramas ao todo. O protocolo está em `docs/protocolo-rotulagem.md`. A
+**estrutura** (função de cada bloco, ordem, colunas, negrito, os diagramas com FEN, lado a
+jogar, legenda e primeiros lances) foi rotulada pelo assistente olhando as faixas da
+página. O **texto** de cada linha é seu: o assistente não transcreve o texto dos livros,
+que têm direito autoral.
+
+#### O que falta você fazer
+
+O passo 0 está fechado como código: as ferramentas, os gabaritos com a estrutura e as
+medidas de hoje. As etapas abaixo são suas e **não bloqueiam** o roadmap, porque a linha de
+base pode ser medida de novo a qualquer momento no worktree da tag `passo-0` (acima).
+Enquanto elas não forem feitas, as medidas de texto ficam "pendentes" e as de diagrama e
+estrutura, "provisórias", e o README diz isso em cada tabela.
+
+1. **Revisar a estrutura** de cada gabarito (`tests\verdade\<livro>\iNNN.json`) olhando as
+   faixas em `.rotulagem\<livro>\iNNN\`. Corrija no JSON o que estiver errado (função,
+   ordem, coluna, caixas). Para cada diagrama, confira o FEN casa a casa contra
+   `.rotulagem\<livro>\iNNN\diagrama_dN.png` e o lado a jogar; depois assine, dizendo
+   quais FEN e lados você conferiu:
+
+   ```text
+   .venv\Scripts\python.exe ferramentas\rotular.py revisar --livro xv --pagina i020 --por "Seu nome" --fen-verificado d0 --lado-verificado d0
+   ```
+
+2. **Verificar o texto**, um livro por vez:
+
+   ```text
+   .venv\Scripts\python.exe ferramentas\rotular.py texto-exportar --livro xv
+   ```
+
+   Abra `.rotulagem\xv\iNNN.txt` (uma linha por linha impressa, `lNN<TAB>texto`) ao lado
+   de `.rotulagem\xv\iNNN\faixa_KK.png` (o id vermelho na margem é o da linha), corrija o
+   texto e apague o `!` do começo **só** das linhas que você conferiu: apagar os `!` em
+   massa marcaria como verdade a leitura do próprio programa. Depois:
+
+   ```text
+   .venv\Scripts\python.exe ferramentas\rotular.py texto-importar --livro xv --por "Seu nome"
+   ```
+
+3. **Conferência cega** (outra pessoa, ou você antes de ver o `.txt`), numa página por
+   livro. O modelo traz os ids das linhas, com o texto em branco:
+
+   ```text
+   .venv\Scripts\python.exe ferramentas\rotular.py cego-modelo --livro xv --pagina i022
+   ```
+
+   Transcreva cada linha em `.rotulagem\xv\i022.cego.txt` olhando só as faixas, e grave
+   o resultado no gabarito (aprova com concordância ≥ 99,5%):
+
+   ```text
+   .venv\Scripts\python.exe ferramentas\rotular.py cego --livro xv --pagina i022 --por "Nome" --txt .rotulagem\xv\i022.cego.txt
+   ```
+
+   O mesmo com um diagrama por livro: monte o FEN só pela imagem do diagrama, sem ver o do
+   gabarito, e rode `rotular.py cego --livro xv --pagina i020 --por "Nome" --diagrama d0
+   --fen "<FEN>"`; igual ao gabarito, o FEN fica conferido.
+4. **Validar**, em cada livro: `ferramentas\rotular.py validar --livro <livro>` sem
+   problemas (FEN de 8×8, lado, legenda que existe, ordens únicas).
+5. **Medir de novo** (comandos exatos) e gerar as tabelas:
+
+   ```text
+   .venv\Scripts\python.exe ferramentas\medir.py --livro xv --indices 0,7,20-26
+   .venv\Scripts\python.exe ferramentas\medir.py --livro yusupov --indices 6,12,33
+   .venv\Scripts\python.exe ferramentas\medir.py --livro darcy --indices 25,26
+   .venv\Scripts\python.exe ferramentas\resumo_medidas.py
+   ```
+
+   e o replay da linha de base no worktree da tag `passo-0` (acima).
+6. **A medida humana da fatia (CA-F.2)**, informativa: no programa da tag `passo-0`, abra
+   uma cópia do snapshot da fatia com o registro de gestos ligado, corrija as páginas
+   índices 20–22 e some o tempo; o protocolo completo (os blocos e a segunda sessão depois
+   de 7 dias) está em `docs\medidas\protocolo-fatia.md`.
+
+   ```text
+   $env:ABBY_REGISTRO_DE_EVENTOS = "sessao-base.jsonl"; ..\AbbyChessCraft\.venv\Scripts\python.exe -m abbychess <cópia do projeto>
+   .venv\Scripts\python.exe ferramentas\tempo_da_fatia.py sessao-base.jsonl --erros <N> --por "Seu nome" --passo 0 --bloco i020-i022
+   ```
+
+`.rotulagem` fica fora do git. "p. N" nas seções mais acima é o número da página no
+programa (a do PDF, índice N − 1); os gabaritos dizem também a página impressa.
+
 ## Onde está o quê
 
 | Arquivo | O que faz |
@@ -346,8 +509,21 @@ que é a mesma. O lado a jogar sai "assumido" nos três: a página não diz.
 | `docs/SPEC.md` | A especificação da aplicação completa (v0.4, aprovada nas revisões) |
 | `plans/abbychesscraft-roadmap.md` | O roadmap em passos, com a ordem serial e o contrato de cada passo |
 | `docs/pesquisa/`, `docs/revisoes/` | A pesquisa do FineReader e a auditoria do programa; o registro das rodadas de revisão |
+| `docs/atalhos.yaml`, `docs/ATALHOS.md` | Os atalhos (a fonte única) e a tabela gerada |
+| `docs/medidas/` | A máquina cadastrada e cada medida, em JSON |
+| `abbychess/atalhos.py` | Ler e conferir a tabela de atalhos, sem Qt |
+| `ferramentas/` | `rotular.py` (gabaritos, conferência cega, revisão), `medir.py` (qualidade), `replay_fatia.py` e `replay/comandos.yaml` (a fatia), `tempo_da_fatia.py` (CA-F.2), `atalhos.py`, `resumo_medidas.py` (as tabelas do README) |
+| `abbychess/app/registro_de_eventos.py` | O registro de gestos da CA-F.2, ligado por `ABBY_REGISTRO_DE_EVENTOS` |
+| `tests/verdade/`, `tests/dados/fatia/` | Os gabaritos e o snapshot da fatia (conteúdo de livros: não publicar) |
+| `tests/golden/caracterizacao/` | O comportamento de hoje, fixado antes da refatoração do roadmap |
 
 ## Limitações conhecidas
+
+- **O Del do treino não descarta o box com o foco no campo do caractere.** O campo fica com a
+  tecla, mesmo vazio (achado da tabela de atalhos no passo 0). Por enquanto, use o botão
+  "Não é caractere"; o passo A2 corrige pela regra 6 de §3.4 da spec.
+- **O repositório tem conteúdo de livros** (`tests/verdade/`, `tests/dados/fatia/`): é para
+  ficar local; não publique sem tirar essas pastas.
 
 - **Dividir corta numa coluna só.** O corte escolhido à mão é sempre vertical e reto; dois
   glifos empilhados ou encaixados em diagonal só se dividem pelo corte automático, que

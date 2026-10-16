@@ -13,11 +13,13 @@ def main(argv=None) -> int:
     # Importados aqui para `--help` e os testes não pagarem a carga do Qt.
     from PySide6.QtWidgets import QApplication
 
+    from abbychess.app import registro_de_eventos
     from abbychess.app.janela import JanelaPrincipal
 
     app = QApplication(argv)
     app.setApplicationName("AbbyChessCraft")
     app.setOrganizationName("AbbyChessCraft")
+    registro = registro_de_eventos.instalar(app)    # noqa: F841 (vive enquanto o app vive)
     janela = JanelaPrincipal()
     janela.show()
     if len(argv) > 1:

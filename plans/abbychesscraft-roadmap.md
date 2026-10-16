@@ -35,8 +35,8 @@ Paralelos, só com git e worktrees e com arquivos disjuntos:
   - `ABBY_PORTAO=1 .venv\Scripts\python.exe -m pytest -q -m "livro_real or desempenho"` no
     fechamento;
   - `C:\Python-Chess2\PyBoxEditor_Tkinter\.venv\Scripts\python.exe -m ruff check --select E,F --line-length 110 abbychess tests`;
-  - `.venv\Scripts\python.exe ferramentas\medir.py --livro xv --paginas 21-27`, com o JSON
-    citado no README.
+  - `.venv\Scripts\python.exe ferramentas\medir.py --livro xv --indices 0,7,20-26` (e os
+    outros livros, com os comandos do README), com o JSON citado no README.
 - README: fluxo, "O que foi medido" (pelo JSON) e "Limitações conhecidas".
 - Fechamento com as três revisões de §16 (nota ≥ 8 em cada eixo), registradas em
   `docs/revisoes/passo-N.md`.
@@ -105,10 +105,14 @@ Paralelos, só com git e worktrees e com arquivos disjuntos:
      - Xadrez Vitorioso, índices 20–26;
      - Yusupov, escolher o PDF e fixá-lo por `pdf_sha256`, mais uma página de duas colunas e
        uma de uma;
-     - Darcy Lima, p. 26–27;
+     - Darcy Lima, índices 25–26 (p. 26–27 do PDF, impressas 27–28);
      - três páginas negativas;
-   - conferência cega de 1 página por livro;
+   - a estrutura pelo assistente; o texto pelo usuário (`texto-exportar` / `texto-importar`),
+     porque o assistente não transcreve o texto dos livros (direito autoral);
+   - conferência cega de 1 página por livro, pelo usuário;
    - revisão pelo usuário (§18.3).
+   - Até o texto ser verificado, as medidas de texto ficam "pendentes de gabarito" e as de
+     estrutura (cabeçalhos, legendas, ordem, FEN) já valem.
 7. **Medidas**:
    - `ferramentas/medir.py`, `tests/desempenho/` e `docs/medidas/maquina.json`;
    - o snapshot `tests/dados/fatia/xv-i020-026-inicial.zip`, `ferramentas/replay_fatia.py` e o

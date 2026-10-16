@@ -211,7 +211,9 @@ class ControladorDeVerificacao:
             return
         p = self.pagina
         self._gids = p.gids
-        self.desconhecidas = vf.desconhecidas(p.boxes, self.lexico, self.ignoradas)
+        decididas = p.modelo.decisoes.quebras if p.modelo is not None else frozenset()
+        quebras = [i for i, g in enumerate(self._gids) if g in decididas]
+        self.desconhecidas = vf.desconhecidas(p.boxes, self.lexico, self.ignoradas, quebras)
         self.mostrar(self.posicao if posicao is None else posicao)
 
     def mostrar(self, posicao: int) -> None:
@@ -258,13 +260,18 @@ class ControladorDeVerificacao:
             return
         antes = p._instantaneo()
         entries = [ed.copia(p.box(g)) for g in gids]
+        indices = list(range(len(entries)))
         try:
-            mudados = vf.corrigir(entries, list(range(len(entries))), texto)
+            espacos = vf.quebras(entries, indices, texto)
+            mudados = vf.corrigir(entries, indices, texto)
         except ValueError as erro:
             p._avisar(f"Não corrigiu: {erro}", 8000)
             return
         for k, _char in mudados:
             ed.trocar(p.modelo, gids[k], entries[k])
+        espacos = [k for k in espacos if gids[k] not in p.modelo.decisoes.quebras]
+        for k in espacos:                         # o espaço que a leitura não viu
+            ed.quebrar(p.modelo, gids[k])
         descricao = f"Corrigir '{texto}'"
         # A correção e o ensino que vem dela são um passo só do desfazer.
         passo = ("palavra", object())             # uma chave só deste comando
@@ -277,8 +284,9 @@ class ControladorDeVerificacao:
                 self.mostrar(posicao + 1)         # continua desconhecida: segue adiante
             p._avisar(mensagem, 6000)
 
+        separadas = f", {len(espacos)} palavra(s) separada(s)" if espacos else ""
         if not ensinar or not mudados or p.leitor is None:
-            depois(f"'{texto}': {len(mudados)} glifo(s) corrigido(s).")
+            depois(f"'{texto}': {len(mudados)} glifo(s) corrigido(s){separadas}.")
             return
         por_char: dict = {}
         for k, char in mudados:
@@ -286,7 +294,8 @@ class ControladorDeVerificacao:
 
         def ensinou(resolvidos: int) -> None:
             extra = f"; os padrões resolveram mais {resolvidos} na página" if resolvidos else ""
-            depois(f"'{texto}': {len(mudados)} glifo(s) corrigido(s) e ensinado(s){extra}.")
+            depois(f"'{texto}': {len(mudados)} glifo(s) corrigido(s) e ensinado(s)"
+                   f"{separadas}{extra}.")
 
         p.ensinar_gids(por_char, descricao, ensinou, juntar=passo)
 

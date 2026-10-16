@@ -268,6 +268,33 @@ def test_corrigir_e_ensinar_uma_palavra_e_um_passo_so_do_desfazer(dois_projetos)
     assert ctl.historico.proximo_a_desfazer == "Reconhecer a página"
 
 
+def test_espaco_na_correcao_separa_a_palavra_e_desfaz_junto(dois_projetos):
+    from abbychess import verificacao as vf
+    from abbychess.controladores import ControladorDeVerificacao
+
+    a, _ = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    ctl.reconhecer()
+    executor.tudo()
+    verificador = ControladorDeVerificacao(ctl)
+
+    class _SemLexico:                                   # não sinaliza nada ao recontar
+        sinaliza = False
+
+    verificador.lexico = _SemLexico()
+    verificador._gids = ctl.gids
+    verificador.desconhecidas = [vf.Desconhecida("ab", [0, 1])]
+    primeiro, segundo = ctl.gids[:2]
+    verificador.corrigir("x y")
+    executor.tudo()
+    assert [ctl.box(g).char for g in (primeiro, segundo)] == ["x", "y"]
+    assert ctl.modelo.decisoes.quebras == {segundo}
+    ctl.desfazer()
+    executor.tudo()
+    assert ctl.modelo.decisoes.quebras == frozenset()   # a letra e o espaço, um Ctrl+Z
+
+
 def test_lote_nao_comeca_se_o_gravador_nao_descarrega(dois_projetos, monkeypatch):
     from abbychess.controladores import ControladorDoLivro
 

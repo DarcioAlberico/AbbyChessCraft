@@ -22,6 +22,7 @@ from core.box_model import BoxEntry
 from core.services.box_service import BoxService
 
 from abbychess import gravacao as gv
+from abbychess import procedencia
 
 from abbychess.leitor import (FONTE_MANUAL, LeitorDoLivro, nome_de_origem,
                               precisa_revisao)
@@ -300,6 +301,7 @@ def _ler_um(pagina: np.ndarray, box: BoxEntry, leitor: LeitorDoLivro,
             referencia: Optional[float]) -> None:
     leitura = leitor.ler(vertical.recorte_de_pe(pagina, box), altura_de_referencia=referencia)
     box.char, box.source, box.confidence = leitura.char, leitura.fonte, leitura.confianca
+    procedencia.registrar(box, leitura.amostra)
 
 
 def _reler(imagem: Image.Image, boxes: List[BoxEntry], indices: List[int],
@@ -344,8 +346,10 @@ def ensinar(imagem: Image.Image, boxes: List[BoxEntry], indice: int, char: str,
     box = boxes[indice]
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
     leitor.ensinar(recorte(imagem, box), char, altura_de_referencia=referencia,
-                   origem=nome_de_origem(projeto.dados.nome, pagina, indice))
+                   origem=nome_de_origem(projeto.dados.nome, pagina, indice,
+                                         projeto.gid_do_box(pagina, boxes, indice)))
     box.char, box.source, box.confidence = char, FONTE_MANUAL, 1.0
+    procedencia.registrar(box, procedencia.NENHUMA)     # é a origem do padrão, não cópia
     return propagar_padroes(imagem, boxes, leitor) if propagar else 0
 
 
@@ -380,6 +384,7 @@ def propagar_padroes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorD
         leitura = leitor.ler_pelo_livro(vertical.recorte_de_pe(pagina, box), referencia)
         if leitura.char:
             box.char, box.source, box.confidence = leitura.char, leitura.fonte, leitura.confianca
+            procedencia.registrar(box, leitura.amostra)
             resolvidos += 1
     return resolvidos
 
@@ -388,6 +393,7 @@ def confirmar(boxes: List[BoxEntry], indice: int, char: str) -> None:
     """Aceita a leitura do box sem gravar padrão: corrige só esta ocorrência."""
     box = boxes[indice]
     box.char, box.source, box.confidence = char, FONTE_MANUAL, 1.0
+    procedencia.registrar(box, procedencia.NENHUMA)
 
 
 def descartar(boxes: List[BoxEntry], indice: int) -> BoxEntry:
@@ -396,10 +402,14 @@ def descartar(boxes: List[BoxEntry], indice: int) -> BoxEntry:
 
 
 def texto(boxes: List[BoxEntry]) -> str:
-    """O texto da página na ordem de leitura, pelas linhas e palavras do core."""
-    from core.notacao import texto_da_pagina
+    """O texto da página na ordem de leitura, pelas linhas e palavras do core.
 
-    return texto_da_pagina([b for b in boxes if b.char])
+    É o documento de `abbychess.texto.montar`, no modo `san` (as figurinhas como letras),
+    que é como o texto sempre saiu daqui.
+    """
+    from abbychess import texto as tx
+
+    return tx.texto(tx.montar(tx.pagina_avulsa(boxes)), modo=tx.SAN)
 
 
 # ----------------------------------------------------------------------

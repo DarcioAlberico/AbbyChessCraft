@@ -100,6 +100,8 @@ class DiagramaLido:
     motivo: str = ""
     #: Por que não deu para ler (modelo ausente, recorte ruim).
     erro: str = ""
+    #: Estável na página (`d0`, `d1`…): é o que o documento cita (§4.2). Vazio até gravar.
+    id: str = ""
 
     # ------------------------------------------------------------------
     @property
@@ -168,6 +170,7 @@ class DiagramaLido:
     # ------------------------------------------------------------------
     def para_json(self) -> dict:
         return {
+            "id": self.id,
             "caixa": [int(v) for v in self.caixa],
             "fen": self.fen,
             "casas": [[c.simbolo or "", round(float(c.confianca), 4), bool(c.arbitrada),
@@ -200,7 +203,22 @@ class DiagramaLido:
                    orientacao=bruto.get("orientacao", "branca"),
                    orientacao_confirmada=bool(bruto.get("orientacao_confirmada", False)),
                    titulo=bruto.get("titulo", ""), conferido=bool(bruto.get("conferido", False)),
-                   motivo=bruto.get("motivo", ""), erro=bruto.get("erro", ""))
+                   motivo=bruto.get("motivo", ""), erro=bruto.get("erro", ""),
+                   id=str(bruto.get("id") or ""))
+
+
+def com_ids(diagramas: Sequence[DiagramaLido]) -> List[DiagramaLido]:
+    """Os diagramas com `id` cada um: os que não têm ganham o próximo `dN` livre."""
+    usados = {d.id for d in diagramas if d.id}
+    proximo, saida = 0, []
+    for d in diagramas:
+        if not d.id:
+            while f"d{proximo}" in usados:
+                proximo += 1
+            d = replace(d, id=f"d{proximo}")
+            usados.add(d.id)
+        saida.append(d)
+    return saida
 
 
 def afirmar_lado(tabuleiro: TabuleiroEdicao, lado: str) -> bool:
@@ -414,35 +432,13 @@ def texto_da_pagina(boxes: Sequence[BoxEntry], diagramas: Sequence[DiagramaLido]
     pontos, exclamação ou interrogação. Assim o parágrafo que contorna o
     tabuleiro não é partido no meio, e "Veja a posição ao lado:" fica antes
     da posição. Sem fim de frase depois dele, o diagrama vai para o fim.
+
+    A regra mora em `abbychess.texto.montar`; aqui é o modo `san`, como sempre foi.
     """
-    from core.notacao import palavras_da_pagina
+    from abbychess import texto as tx
 
-    lidos = [b for b in boxes if b.char]
-    linhas = []
-    for linha in (palavras_da_pagina(lidos) if lidos else []):
-        indices = [s.indice for p in linha for s in p.simbolos]
-        texto = " ".join(p.texto for p in linha)
-        topo = min((lidos[i].y1 for i in indices), default=0)
-        linhas.append((topo, texto))
-    altura = float(np.median([b.y2 - b.y1 for b in lidos])) if lidos else 0.0
-
-    antes_da_linha: dict = {}
-    ordem = sorted(range(len(diagramas)), key=lambda i: (diagramas[i].caixa[1], diagramas[i].caixa[0]))
-    for numero, i in enumerate(ordem, start=1):
-        y1 = diagramas[i].caixa[1]
-        lugar = len(linhas)
-        for j in range(1, len(linhas)):
-            if linhas[j][0] >= y1 - altura and _FIM_DE_FRASE.search(linhas[j - 1][1]):
-                lugar = j
-                break
-        antes_da_linha.setdefault(lugar, []).append(diagramas[i].linha_de_texto(numero))
-
-    saida = []
-    for j, (_topo, texto) in enumerate(linhas):
-        saida.extend(antes_da_linha.get(j, []))
-        saida.append(texto)
-    saida.extend(antes_da_linha.get(len(linhas), []))
-    return "\n".join(saida)
+    pagina = tx.pagina_avulsa(boxes, diagramas)
+    return tx.texto(tx.montar(pagina), pagina.diagramas, modo=tx.SAN)
 
 
 # ----------------------------------------------------------------------

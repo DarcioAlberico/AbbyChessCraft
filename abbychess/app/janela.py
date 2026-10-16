@@ -127,7 +127,6 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
         self.treino.juntar.connect(p.juntar)
         self.treino.ajustar.connect(p.ajustar)
         self.treino.corte_mudou.connect(self.visor.marcar_corte)
-        self.treino.limpar_selecao.connect(p.limpar_selecao)
 
         self.padroes = PainelDePadroes()
         self.padroes.esquecer.connect(self.esquecer)
@@ -219,6 +218,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
                 return
         projeto.ao_falhar_gravacao = self.falha_de_gravacao.emit
         self._pixmaps.clear()                   # as páginas do projeto anterior saem
+        self.abrir_avisos_do_projeto(projeto)
         self.verificador.esquecer_projeto()
         so_leitura = " (só leitura)" if projeto.somente_leitura else ""
         self.setWindowTitle(f"{projeto.dados.nome}{so_leitura} — {TITULO}")
@@ -227,6 +227,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
     def usar(self, projeto, fonte, leitor) -> None:
         """O projeto com o leitor já pronto (os testes; a abertura passa por `abrir`)."""
         projeto.ao_falhar_gravacao = self.falha_de_gravacao.emit
+        self.abrir_avisos_do_projeto(projeto)
         self.livro.usar(projeto, fonte, leitor)
         self._espaco_do_projeto_aberto()
 
@@ -256,6 +257,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
         if not self._gravou_ou_perder(projeto):   # e o que ele entregou também é gravado
             return False
         self.gravar_espaco()
+        self.abrir_avisos_do_projeto(None)
         self.pagina.desligar()
         projeto.fechar(5)
         return True

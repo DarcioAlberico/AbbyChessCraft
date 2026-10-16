@@ -141,5 +141,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Ação | Padrão | FineReader | Escopo | Desde |
 |---|---|---|---|---|
 | Adicionar ao dicionário do livro | Ctrl+Shift+D | Ctrl+Shift+D | palavra | A2 |
+| Corrigir a palavra | Enter | Enter | palavra | A2 |
+| Corrigir a palavra e ensinar os glifos dela | Ctrl+Enter | Ctrl+Enter | palavra | A2 |
 | Ignorar a palavra | Ctrl+Shift+I | Ctrl+Shift+I | palavra | A2 |
 

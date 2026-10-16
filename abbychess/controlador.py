@@ -117,6 +117,9 @@ class ControladorDePagina:
         #: A ordem da fila de glifos (§8.1): "confianca" (o menos confiável primeiro, os
         #: pulados no fim) ou "leitura" (a ordem da página).
         self.ordem_da_fila = "confianca"
+        #: Na ordem de leitura: (página, posição na ordem da página) do último glifo mostrado,
+        #: para a decisão seguir em frente mesmo quando o glifo sai (descartar, juntar).
+        self._lugar_de_leitura = (-1, 0)
         self.selecao: set = set()
         #: O desfazer do projeto (§14.2), da sessão.
         self.historico = hs.HistoricoDoProjeto()
@@ -334,8 +337,15 @@ class ControladorDePagina:
         if gid is not None and self.indice_de(gid) is None:
             return
         self.atual = gid
+        self._guardar_lugar()
         self.escolhido = False                  # `escolher` o liga depois, se foi o usuário
         self.eventos.emitir("atual_mudou")
+
+    def _guardar_lugar(self) -> None:
+        if self.atual is not None and self.ordem_da_fila == "leitura":
+            gids = self.gids
+            if self.atual in gids:
+                self._lugar_de_leitura = (self.indice, gids.index(self.atual))
 
     def clicar(self, indice: int) -> None:
         """O box clicado no visor (pela posição na lista)."""
@@ -347,8 +357,19 @@ class ControladorDePagina:
         self.escolhido = self.atual is not None
 
     def ir_ao_primeiro_pendente(self) -> None:
+        """O próximo a revisar depois de uma decisão: o primeiro da fila; na ordem de
+        leitura, o primeiro pendente a partir do lugar do glifo decidido (e, no fim da
+        página, o primeiro dela)."""
         fila = self.fila()
-        self.atual = fila[0] if fila else None
+        if self.ordem_da_fila == "leitura" and fila:
+            ordem = {g: n for n, g in enumerate(self.gids)}
+            pagina, lugar = self._lugar_de_leitura
+            lugar = ordem.get(self.atual, lugar if pagina == self.indice else 0)
+            adiante = [g for g in fila if ordem[g] >= lugar]
+            self.atual = adiante[0] if adiante else fila[0]
+        else:
+            self.atual = fila[0] if fila else None
+        self._guardar_lugar()
         self.escolhido = False
         self.eventos.emitir("atual_mudou")
 

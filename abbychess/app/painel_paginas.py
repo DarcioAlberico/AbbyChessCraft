@@ -8,7 +8,7 @@ selecionadas" no menu de contexto. O filtro mostra só um estado.
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QMenu, QTreeWidget, QTreeWidgetItem,
@@ -39,6 +39,9 @@ class PainelDePaginas(QWidget):
         for estado, nome in NOMES_DOS_ESTADOS.items():
             self.filtro.addItem(nome.capitalize(), estado)
         self.filtro.currentIndexChanged.connect(self._filtrar)
+        # A largura pelo começo do texto, não pelo item mais longo: a gaveta tem 150 px (§3.1).
+        self.filtro.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.filtro.setMinimumContentsLength(8)
 
         self.lista = QTreeWidget()
         self.lista.setAccessibleName("Páginas do livro")
@@ -58,27 +61,36 @@ class PainelDePaginas(QWidget):
         caixa.addWidget(self.lista, 1)
 
     # ------------------------------------------------------------------
-    def mostrar(self, total: int, resumo: Dict[int, dict], atual: int) -> None:
-        """As `total` páginas do livro, com o resumo das que estão em `livro.json`."""
+    def mostrar(self, total: int, resumo: Dict[int, dict], atual: Optional[int]) -> None:
+        """As `total` páginas do livro, com o resumo das que estão em `livro.json`. Com o
+        mesmo número de páginas, atualiza as linhas no lugar (a seleção e a rolagem ficam);
+        `atual` (a página aberta mudou) escolhe a linha dela."""
         self.lista.setUpdatesEnabled(False)
-        self.lista.clear()
-        itens = []
+        if self.lista.topLevelItemCount() != total:
+            self.lista.clear()
+            itens = []
+            for i in range(total):
+                item = QTreeWidgetItem()
+                item.setData(0, Qt.ItemDataRole.UserRole, i)
+                for coluna in (0, 2, 3):
+                    item.setTextAlignment(coluna, Qt.AlignmentFlag.AlignRight)
+                itens.append(item)
+            self.lista.addTopLevelItems(itens)
         for i in range(total):
             r = resumo.get(i, {})
             estado = r.get("estado", md.NAO_RECONHECIDA)
             pendentes = r.get("pendentes")
             diagramas = r.get("diagramas_por_conferir", 0)
-            item = QTreeWidgetItem([str(i + 1), NOMES_DOS_ESTADOS.get(estado, estado),
-                                    "" if pendentes is None else str(pendentes),
-                                    str(diagramas) if diagramas else ""])
-            item.setData(0, Qt.ItemDataRole.UserRole, i)
+            item = self.lista.topLevelItem(i)
+            for coluna, texto in enumerate((str(i + 1), NOMES_DOS_ESTADOS.get(estado, estado),
+                                            "" if pendentes is None else str(pendentes),
+                                            str(diagramas) if diagramas else "")):
+                if item.text(coluna) != texto:
+                    item.setText(coluna, texto)
             item.setData(1, Qt.ItemDataRole.UserRole, estado)
-            for coluna in (0, 2, 3):
-                item.setTextAlignment(coluna, Qt.AlignmentFlag.AlignRight)
-            itens.append(item)
-        self.lista.addTopLevelItems(itens)
         self._filtrar()
-        self.marcar_atual(atual)
+        if atual is not None:
+            self.marcar_atual(atual)
         self.lista.setUpdatesEnabled(True)
 
     def marcar_atual(self, indice: int) -> None:

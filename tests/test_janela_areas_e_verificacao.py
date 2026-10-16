@@ -118,7 +118,7 @@ def test_verificar_anda_pelas_desconhecidas_e_corrige(app, janela):  # noqa: F81
     assert not janela.verificacao.recorte.pixmap().isNull()
 
     janela.verificacao.campo.setText("abc")
-    janela.verificacao._corrigir()
+    janela.verificacao.pedir_corrigir()
     assert janela.verificador.desconhecidas == []
     assert "Nenhuma" in janela.verificacao.posicao.text()
     assert [b.char for b in boxes(janela)[-3:]] == ["a", "b", "c"]
@@ -131,7 +131,7 @@ def test_corrigir_e_ensinar_grava_o_padrao(app, janela):  # noqa: F811
     janela.verificador.lexico = lexico.Lexico(palavras={"abc", "cab"})
     janela.verificar_texto()
     janela.verificacao.campo.setText("aca")
-    janela.verificacao._ensinar()
+    janela.verificacao.pedir_ensinar()
     _esperar(app, janela)
     assert "a" in janela.leitor.padroes_por_caractere()
 

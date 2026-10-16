@@ -156,6 +156,13 @@ def montar(janela) -> None:
     for q in (j.acao_ensinar, j.acao_so_corrigir, j.acao_descartar, *j.acoes_das_bordas):
         campo.teclas.ligar(q)                   # no campo, a tecla é dele (exceção 6, §3.4)
     j.acao_paleta = acao(j, "paleta", t.abrir_paleta, texto="Símbolos…", widgets=[t])
+    palavra = j.verificacao.campo
+    j.acao_corrigir_palavra = acao(j, "corrigir_palavra", j.verificacao.pedir_corrigir,
+                                   widgets=[j.verificacao])
+    j.acao_ensinar_palavra = acao(j, "corrigir_e_ensinar_palavra", j.verificacao.pedir_ensinar,
+                                  widgets=[j.verificacao])
+    for q in (j.acao_corrigir_palavra, j.acao_ensinar_palavra):
+        palavra.teclas.ligar(q)
     j.acao_ignorar = acao(j, "ignorar_palavra", j.verificacao.pedir_ignorar_todas,
                           widgets=[j.verificacao])
     j.acao_adicionar = acao(j, "adicionar_ao_lexico", j.verificacao.pedir_adicionar,

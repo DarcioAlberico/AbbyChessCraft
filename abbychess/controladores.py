@@ -623,7 +623,8 @@ class ControladorDaFila:
 
     def andar(self, passo: int) -> None:
         """Alt+↓ (passo +1) e Alt+↑ (−1): o item seguinte ou o anterior no modo de agora.
-        Nunca muda texto."""
+        Nunca muda texto. Nos diagramas, os dois vão ao próximo por conferir: o conferido sai
+        da fila, e não há "anterior" a que voltar."""
         if self.modo in self.DE_GLIFOS:
             self.pagina.andar(passo)
         elif self.modo == "palavras":
@@ -642,6 +643,6 @@ class ControladorDaFila:
             total = len(self.verificador.desconhecidas)
             return f"{self.verificador.posicao + 1 if total else 0}/{total}"
         if p.projeto is None:
-            return "0"
+            return "0 por conferir"
         resumo = p.projeto.resumo_do_livro()
-        return str(sum(r.get("diagramas_por_conferir", 0) for r in resumo.values()))
+        return f"{sum(r.get('diagramas_por_conferir', 0) for r in resumo.values())} por conferir"

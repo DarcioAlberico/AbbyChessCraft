@@ -14,7 +14,7 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent / "abbychess"
 JANELA = RAIZ / "app" / "janela.py"
-CONTROLADORES = {"pagina", "areas", "verificador", "conferencia", "livro"}
+CONTROLADORES = {"pagina", "areas", "verificador", "conferencia", "livro", "fila"}
 
 
 def _chamada_de_controlador(chamada: ast.Call) -> bool:

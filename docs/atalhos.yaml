@@ -277,6 +277,15 @@ acoes:
   - {id: paleta, descricao: Paleta de símbolos no cursor, escopo: [documento, glifo, galeria], padrao: F2, desde_passo: A2}
 
   # --- Inspetor: Palavra (a verificação) ---------------------------------------------
+  - id: corrigir_palavra
+    descricao: Corrigir a palavra
+    escopo: [palavra]
+    padrao: Enter
+    desde_passo: A2
+    excecoes:
+      - {tecla: Enter, widget: lineedit, tipo: redireciona, motivo: "o campo da palavra trata o Enter (keyPressEvent)"}
+  - {id: corrigir_e_ensinar_palavra, descricao: Corrigir a palavra e ensinar os glifos dela,
+     escopo: [palavra], padrao: Ctrl+Enter, desde_passo: A2}
   - {id: ignorar_palavra, descricao: Ignorar a palavra, escopo: [palavra], padrao: Ctrl+Shift+I, desde_passo: A2}
   - {id: adicionar_ao_lexico, descricao: Adicionar ao dicionário do livro, escopo: [palavra], padrao: Ctrl+Shift+D, desde_passo: A2}
 

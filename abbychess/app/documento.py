@@ -26,9 +26,9 @@ from typing import Dict, Iterable, List, Optional, Sequence, Set
 
 import numpy as np
 from PySide6.QtCore import QRectF, Qt, QUrl, Signal
-from PySide6.QtGui import (QColor, QFont, QGuiApplication, QImage, QPainter, QPen, QTextBlockFormat,
-                           QTextBlockUserData, QTextCharFormat, QTextCursor, QTextDocument,
-                           QTextImageFormat)
+from PySide6.QtGui import (QColor, QFont, QFontMetrics, QGuiApplication, QImage, QPainter, QPen,
+                           QTextBlockFormat, QTextBlockUserData, QTextCharFormat, QTextCursor,
+                           QTextDocument, QTextImageFormat)
 from PySide6.QtWidgets import QTextEdit
 
 from abbychess import grade as gd
@@ -367,7 +367,13 @@ class VistaDoDocumento(QTextEdit):
         antes.setPosition(posicao)
         depois.setPosition(posicao + 1)
         esquerda, direita = self.cursorRect(antes), self.cursorRect(depois)
-        if direita.y() != esquerda.y() or not esquerda.x() - 2 <= ponto.x() <= direita.x() + 2:
+        fim = direita.x()
+        if direita.y() != esquerda.y():
+            # O caractere termina a linha visual: a posição seguinte já está na de baixo, e a
+            # borda direita dele vem da largura do próprio caractere.
+            letra = bloco.text()[i:i + 1]
+            fim = esquerda.x() + QFontMetrics(depois.charFormat().font()).horizontalAdvance(letra)
+        if not esquerda.x() - 2 <= ponto.x() <= fim + 2:
             return None
         return mapa.gids[i]
 

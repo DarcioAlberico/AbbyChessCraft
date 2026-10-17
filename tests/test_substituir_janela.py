@@ -157,3 +157,18 @@ def test_outra_substituicao_tira_a_previa_velha(jb):  # noqa: F811
     _ate(lambda: _texto(jb) == "casas velha casas")
     _ate(lambda: not jb.resultados.na_previa)
     assert "A prévia saiu" in jb.resultados.resultados.item(0).text()
+
+
+def test_substituir_pula_o_ja_trocado_tambem_noutra_pagina(jb, monkeypatch):  # noqa: F811
+    from dataclasses import replace
+
+    _pagina_lida(jb, "Casa velha")
+    _buscar(jb, "casa")
+    _substituir_por(jb, "Casa")
+    _ate(lambda: not jb.busca.buscando and not jb.barra_de_busca.relogio.isActive())
+    noutra = replace(jb._ocorrencias[0], pagina=5)       # uma "Casa" na página 6
+    jb._ocorrencias, jb._posicao = [jb._ocorrencias[0], noutra], 0
+    idas = []
+    monkeypatch.setattr(jb, "_ir_a_ocorrencia", idas.append)
+    jb.substituir_atual()
+    assert idas == [] and "Nada mais a substituir" in jb.statusBar().currentMessage()

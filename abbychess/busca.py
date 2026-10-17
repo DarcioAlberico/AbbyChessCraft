@@ -86,12 +86,13 @@ def e_lance(token: str, idioma: str) -> bool:
 
 
 def indexar_pagina(pagina: Pagina, idioma: str = "pt", margens: Optional[Iterable[int]] = None,
-                   versao: int = 0) -> PaginaIndexada:
+                   versao: int = 0, montada=None) -> PaginaIndexada:
     """A página no índice. `margens`: os gids do cabeçalho e do rodapé (sem eles, a regra
-    barata das linhas montadas, `_margens_pelas_linhas`)."""
+    barata das linhas montadas, `_margens_pelas_linhas`). `montada`: o (texto, unidades) de
+    `sessao.texto_e_unidades`, se quem chama já o tem (montar a página é o caro)."""
     from abbychess import sessao as ss
 
-    texto, unidades = ss.texto_e_unidades(pagina)
+    texto, unidades = montada if montada is not None else ss.texto_e_unidades(pagina)
     gids: List[Optional[int]] = [u.gid for u in unidades]
     margens = set(_margens_pelas_linhas(pagina, texto, gids) if margens is None else margens)
     codigos = [" "] * len(texto)
@@ -512,23 +513,31 @@ def buscar(paginas: Mapping[int, PaginaIndexada], opcoes: Opcoes,
             if trecho is None:
                 continue
             inicio, fim = trecho
-        posicao = inicio
-        while posicao <= fim:
-            try:
-                casado = expressao.search(pagina.texto, posicao, fim, concurrent=True,
-                                          timeout=tempo_limite)
-            except TimeoutError as erro:
-                raise PadraoLento(f"padrão lento demais (página {indice + 1})") from erro
-            if casado is None:
-                break
-            if casado.end() == casado.start():  # o casamento vazio: adiante, sem ocorrência
-                posicao = casado.end() + 1
-                continue
+        for casado in casamentos(pagina, expressao, inicio, fim, tempo_limite, indice):
             ocorrencia = _ocorrencia(pagina, casado.start(), casado.end())
             if ocorrencia is not None and ocorrencia.etiqueta in opcoes.onde:
                 resultado.ocorrencias.append(ocorrencia)
-            posicao = casado.end()
     return resultado
+
+
+def casamentos(pagina: PaginaIndexada, expressao, inicio: int, fim: int,
+               tempo_limite: float = TEMPO_LIMITE, indice: int = 0):
+    """Os casamentos não vazios em `pagina.texto[inicio:fim]`, um `search` por vez (o
+    tempo-limite conta cada um; `PadraoLento` no primeiro estourado)."""
+    posicao = inicio
+    while posicao <= fim:
+        try:
+            casado = expressao.search(pagina.texto, posicao, fim, concurrent=True,
+                                      timeout=tempo_limite)
+        except TimeoutError as erro:
+            raise PadraoLento(f"padrão lento demais (página {indice + 1})") from erro
+        if casado is None:
+            return
+        if casado.end() == casado.start():      # o casamento vazio: adiante, sem ocorrência
+            posicao = casado.end() + 1
+            continue
+        yield casado
+        posicao = casado.end()
 
 
 def _trecho_da_selecao(pagina: PaginaIndexada, selecao) -> Optional[Tuple[int, int]]:

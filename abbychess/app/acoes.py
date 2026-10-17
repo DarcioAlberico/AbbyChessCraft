@@ -30,6 +30,7 @@ def montar(janela) -> None:
     j.acao_ocorrencia_anterior = acao(j, "ocorrencia_anterior", j.ocorrencia_anterior)
     j.acao_todas_em_resultados = acao(j, "todas_em_resultados", j.todas_em_resultados)
     j.acao_buscar_glifo = teclado.sem_atalho(j, "Buscar glifo…", j.buscar_glifo)
+    j.acao_substituir = acao(j, "substituir", j.substituir, texto="Substituir…")
     j.acao_opcoes = acao(j, "opcoes", j.opcoes, texto="Opções…")
     j.acao_sair = acao(j, "sair", j.close, texto="Sair")
     j.acao_cancelar_lote = acao(j, "cancelar_lote", livro.cancelar, texto="Cancelar o lote")
@@ -222,8 +223,8 @@ def _menus(j) -> None:
     menu.addAction(j.acao_desfazer)
     menu.addAction(j.acao_refazer)
     menu.addSeparator()                         # localizar (§7.1)
-    for acao in (j.acao_localizar, j.acao_proxima_ocorrencia, j.acao_ocorrencia_anterior,
-                 j.acao_todas_em_resultados, j.acao_buscar_glifo):
+    for acao in (j.acao_localizar, j.acao_substituir, j.acao_proxima_ocorrencia,
+                 j.acao_ocorrencia_anterior, j.acao_todas_em_resultados, j.acao_buscar_glifo):
         menu.addAction(acao)
     menu.addSeparator()                         # a sessão do Documento (§6.3)
     for acao in (j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_ensinar_no_documento):
@@ -295,6 +296,7 @@ def atualizar(janela) -> None:
     for q in (j.acao_localizar, j.acao_proxima_ocorrencia, j.acao_ocorrencia_anterior,
               j.acao_todas_em_resultados, j.acao_buscar_glifo):
         q.setEnabled(tem)
+    j.acao_substituir.setEnabled(editar)
     j.acao_areas.setEnabled(tem)
     j.acao_areas_auto.setEnabled(editar and j.acao_areas.isChecked())
     j.acao_verificar.setEnabled(tem and bool(p.boxes))

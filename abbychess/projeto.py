@@ -347,9 +347,10 @@ class ProjetoDeLivro:
             self._gravador = Gravador(self._gravar_instantaneo, ao_falhar=self._falhou)
         return self._gravador
 
-    def agendar(self, pagina: Pagina) -> bool:
+    def agendar(self, pagina: Pagina, resumo: Optional[dict] = None) -> bool:
         """A página mudou: o gravador a grava em até meio segundo. Em só leitura, recusa
-        (devolve falso e nada é gravado)."""
+        (devolve falso e nada é gravado). `resumo`: o de `resumo_do_modelo`, se quem chama
+        já o calculou fora da interface (substituir no livro inteiro)."""
         if self.somente_leitura:
             return False
         with self._trava_do_cache:              # sem a trava do livro: não espera o disco
@@ -360,7 +361,8 @@ class ProjetoDeLivro:
             self._guardar_no_cache(pagina, foto=False)
             instantaneo = pagina.instantaneo()
             # O resumo vale já para quem pergunta (F6, o lote, "lidas"), antes da gravação.
-            self._a_gravar[pagina.indice] = (instantaneo, self._resumo_do_modelo(instantaneo))
+            self._a_gravar[pagina.indice] = (instantaneo, resumo if resumo is not None
+                                             else self._resumo_do_modelo(instantaneo))
             self.gravador.agendar(pagina.pid, instantaneo)
         return True
 
@@ -527,6 +529,33 @@ class ProjetoDeLivro:
             return _pagina_de_json(json.loads(arquivo.read_text(encoding="utf-8")))
         except (OSError, ValueError):
             return None
+
+    def carimbo(self, indice: int) -> Optional[tuple]:
+        """O (arquivo, tamanho, mtime) do JSON v2 da página, tomado antes de `ler_sem_migrar`:
+        `adotar` sabe por ele se o arquivo mudou desde a leitura."""
+        arquivo = self.arquivo_da_pagina(indice)
+        if arquivo is None:
+            return None
+        try:
+            estado = arquivo.stat()
+        except OSError:
+            return None
+        return (str(arquivo), estado.st_size, estado.st_mtime_ns)
+
+    def adotar(self, pagina: Pagina, carimbo: Optional[tuple]) -> Optional[Pagina]:
+        """A página lida fora do cache (`ler_sem_migrar` do JSON, numa thread) entra nele
+        como a viva, se nada a mudou desde a leitura: nenhuma outra entrou no cache e o
+        arquivo tem o mesmo `carimbo`. Devolve a do cache (a adotada, ou a que já estava lá),
+        ou None (leia com `pagina_para_editar`). Só a interface adota."""
+        with self._trava_do_livro:
+            em_cache = self.modelo_em_memoria(pagina.indice)
+            if em_cache is not None:
+                return em_cache
+            if (carimbo is None or self._tem_v1(pagina.indice)
+                    or self.carimbo(pagina.indice) != carimbo):
+                return None
+            self._guardar_no_cache(pagina, foto_nova=True)
+            return pagina
 
     def modelo_em_memoria(self, indice: int) -> Optional[Pagina]:
         """A página do cache, sem ler o disco (None se ela não está na memória)."""
@@ -1016,6 +1045,10 @@ class ProjetoDeLivro:
                     "paginas": dict(sorted(paginas.items(), key=lambda kv: int(kv[0])))}
             gv.gravar_json(self.pasta / ARQUIVO_DO_LIVRO, novo)
             self._livro = novo                  # o cache só muda depois de gravado
+
+    def resumo_do_modelo(self, pagina: Pagina) -> dict:
+        """O resumo da página no `livro.json` (sem mudar nada: vale numa thread)."""
+        return self._resumo_do_modelo(pagina)
 
     def _resumo_do_modelo(self, pagina: Pagina) -> dict:
         tabuleiros = len(pagina.tabuleiros)

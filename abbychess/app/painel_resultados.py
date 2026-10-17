@@ -2,7 +2,10 @@
 
 Resultados mostra o que a busca (passo B) manda para ele: uma linha por ocorrência, com a
 página, a linha e o trecho, o casamento em negrito (Enter ou duplo clique leva até ele), ou
-os glifos da busca por glifo. Avisos mostra o log persistente do projeto
+os glifos da busca por glifo. A prévia da substituição (passo D2) põe uma caixa de marcar em
+cada caso (antes → depois, prosa ou notação; os que ainda não têm tradução, desmarcados e
+desabilitados, com o motivo na dica) e o botão "Aplicar N" (Enter); o duplo clique leva ao
+caso. Avisos mostra o log persistente do projeto
 (`abbychess.avisos`): os erros em vermelhão, os avisos em laranja, o mais novo embaixo. Esc
 fecha o painel (`fechar_sobreposicao`).
 """
@@ -14,8 +17,9 @@ from typing import Iterable, Sequence
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QAbstractTextDocumentLayout, QPalette, QTextDocument
-from PySide6.QtWidgets import (QApplication, QListWidget, QListWidgetItem, QMenu, QStyle,
-                               QStyledItemDelegate, QStyleOptionViewItem, QTabWidget)
+from PySide6.QtWidgets import (QApplication, QListWidget, QListWidgetItem, QMenu,
+                               QPushButton, QStyle, QStyledItemDelegate, QStyleOptionViewItem,
+                               QTabWidget, QVBoxLayout, QWidget)
 
 from abbychess import avisos as av
 from abbychess.app import estilo
@@ -71,18 +75,33 @@ class PainelDeResultados(QTabWidget):
     escolhido = Signal(object)
     #: O aviso escolhido que cita uma página (e o ponto de um glifo): (página, x, y).
     aviso_escolhido = Signal(int, object, object)
+    #: "Aplicar N" na prévia da substituição: página -> os casos marcados.
+    aplicar_previa = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.resultados = QListWidget()
+        self.resultados = _ListaDeResultados(self)
         self.resultados.setAccessibleName("Resultados")
         self.resultados.setItemDelegate(_DelegadoHtml(self.resultados))
         self.resultados.setUniformItemSizes(True)   # 2.000 linhas sem medir cada uma
         self.resultados.itemActivated.connect(self._ativado)
+        self.resultados.itemChanged.connect(self._marcado)
+        self.botao_aplicar = QPushButton("Aplicar")
+        self.botao_aplicar.setAccessibleName("Aplicar a substituição dos casos marcados")
+        self.botao_aplicar.clicked.connect(self._aplicar)
+        self.botao_aplicar.hide()
+        self._na_previa = False
+        aba = QWidget()
+        caixa = QVBoxLayout(aba)
+        caixa.setContentsMargins(0, 0, 0, 0)
+        caixa.setSpacing(2)
+        caixa.addWidget(self.botao_aplicar)
+        caixa.addWidget(self.resultados)
         self.avisos = QListWidget()
         self.avisos.setAccessibleName("Avisos e erros do projeto")
         self.avisos.setWordWrap(True)
-        self.addTab(self.resultados, "Resultados")
+        self.aba_de_resultados = aba
+        self.addTab(aba, "Resultados")
         self.addTab(self.avisos, "Avisos")
         self.avisos.itemActivated.connect(self._aviso_ativado)
         for lista in (self.resultados, self.avisos):
@@ -122,10 +141,80 @@ class PainelDeResultados(QTabWidget):
         if alvo is not None:
             self.escolhido.emit(alvo)
 
+    def _limpar(self) -> None:
+        self._na_previa = False
+        self.botao_aplicar.hide()
+        self.resultados.clear()
+
+    def mostrar_previa(self, previas: Sequence, cabecalho: str) -> None:
+        """A prévia da substituição: um caso por linha, marcado (os sem tradução,
+        desmarcados e desabilitados), e o botão "Aplicar N"."""
+        from abbychess import busca as bs
+
+        self._limpar()
+        self.resultados.blockSignals(True)
+        self.resultados.addItem(cabecalho)
+        linhas = 0
+        for previa in previas:
+            for caso in previa.casos:
+                if linhas == LIMITE_DE_LINHAS:
+                    break
+                linhas += 1
+                onde = "notação" if caso.etiqueta == bs.NOTACAO else "prosa"
+                item = QListWidgetItem(f"p. {caso.pagina + 1}, l. {caso.linha} · {onde}: "
+                                       f"{caso.antes} → {caso.depois}")
+                item.setData(PAPEL_DO_ALVO, caso)
+                if caso.aplicavel:
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                    item.setCheckState(Qt.CheckState.Checked)
+                else:
+                    item.setFlags((item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                                  & ~Qt.ItemFlag.ItemIsEnabled)
+                    item.setCheckState(Qt.CheckState.Unchecked)
+                    item.setToolTip(f"Sem tradução ainda: {caso.motivo}")
+                self.resultados.addItem(item)
+        total = sum(len(p.casos) for p in previas)
+        if total > linhas:
+            self.resultados.addItem(f"… e mais {total - linhas} (refine a busca; só os "
+                                    "mostrados são aplicados)")
+        self.resultados.blockSignals(False)
+        self._na_previa = True
+        self.botao_aplicar.show()
+        self._marcado()
+        self.setCurrentWidget(self.aba_de_resultados)
+
+    def casos_marcados(self) -> dict:
+        """Página -> os casos marcados na prévia."""
+        marcados: dict = {}
+        if not self._na_previa:
+            return marcados
+        for n in range(self.resultados.count()):
+            item = self.resultados.item(n)
+            caso = item.data(PAPEL_DO_ALVO)
+            if caso is not None and item.checkState() == Qt.CheckState.Checked:
+                marcados.setdefault(caso.pagina, []).append(caso)
+        return marcados
+
+    def _marcado(self, *_):
+        if self._na_previa:
+            n = sum(len(c) for c in self.casos_marcados().values())
+            self.botao_aplicar.setText(f"Aplicar {n} (Enter)")
+            self.botao_aplicar.setEnabled(n > 0)
+
+    def _aplicar(self) -> None:
+        marcados = self.casos_marcados()
+        if marcados:
+            self._limpar()
+            self.aplicar_previa.emit(marcados)
+
+    @property
+    def na_previa(self) -> bool:
+        return self._na_previa
+
     def mostrar_ocorrencias(self, ocorrencias: Sequence, cabecalho: str) -> None:
         """As ocorrências da busca, uma por linha: "p. 12, l. 3: …trecho…", o casamento em
         negrito; `cabecalho` em cima (a contagem, as páginas que ficaram fora)."""
-        self.resultados.clear()
+        self._limpar()
         self.resultados.addItem(cabecalho)
         for o in ocorrencias[:LIMITE_DE_LINHAS]:
             tamanho = o.fim - o.inicio
@@ -142,7 +231,7 @@ class PainelDeResultados(QTabWidget):
         if len(ocorrencias) > LIMITE_DE_LINHAS:
             self.resultados.addItem(f"… e mais {len(ocorrencias) - LIMITE_DE_LINHAS} "
                                     "(refine a busca)")
-        self.setCurrentWidget(self.resultados)
+        self.setCurrentWidget(self.aba_de_resultados)
 
     def _aviso_ativado(self, item: QListWidgetItem) -> None:
         from abbychess.app.busca_na_janela import lugar_do_aviso
@@ -156,7 +245,7 @@ class PainelDeResultados(QTabWidget):
         grupo de fonte."""
         from abbychess import busca as bs
 
-        self.resultados.clear()
+        self._limpar()
         self.resultados.addItem(cabecalho)
         for g in glifos[:LIMITE_DE_LINHAS]:
             grupo = bs.grupo_da_fonte(g.fonte)
@@ -167,10 +256,27 @@ class PainelDeResultados(QTabWidget):
             self.resultados.addItem(item)
         if len(glifos) > LIMITE_DE_LINHAS:
             self.resultados.addItem(f"… e mais {len(glifos) - LIMITE_DE_LINHAS}")
-        self.setCurrentWidget(self.resultados)
+        self.setCurrentWidget(self.aba_de_resultados)
 
     def ir_aos_avisos(self) -> None:
         self.setCurrentWidget(self.avisos)
 
     def focar(self) -> None:
-        self.currentWidget().setFocus(Qt.FocusReason.ShortcutFocusReason)
+        alvo = self.resultados if self.currentWidget() is self.aba_de_resultados else self.avisos
+        alvo.setFocus(Qt.FocusReason.ShortcutFocusReason)
+
+
+class _ListaDeResultados(QListWidget):
+    """A lista de Resultados: na prévia da substituição, Enter aplica (§7.2), e o duplo
+    clique continua levando ao caso."""
+
+    def __init__(self, painel: "PainelDeResultados"):
+        super().__init__()
+        self._painel = painel
+
+    def keyPressEvent(self, evento):
+        if (evento.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and self._painel.na_previa
+                and self._painel.botao_aplicar.isEnabled()):
+            self._painel._aplicar()
+            return
+        super().keyPressEvent(evento)

@@ -1165,3 +1165,301 @@ class ControladorDaBusca:
             self._na_interface(fim)
 
         threading.Thread(target=rodar, name="busca-por-glifo", daemon=True).start()
+
+
+# ----------------------------------------------------------------------
+# Substituir (§7.2, passo D2)
+# ----------------------------------------------------------------------
+
+class ControladorDaSubstituicao:
+    """Substituir: os casos (`substituir.casos_da_pagina`) e a aplicação numa transação do
+    desfazer, mesmo no livro inteiro.
+
+    Na página aberta, `na_pagina` aplica direto (um caso, ou todos). Fora dela, `previa`
+    monta os casos numa thread, lendo as páginas sem o cache e sem migrar
+    (`projeto.ler_sem_migrar`), e a janela os mostra em Resultados; `aplicar` aplica os
+    aceitos. As cópias das páginas são editadas na thread do executor (a fila: nada mais
+    edita enquanto isso) e trocadas na interface, que confere que a página não mudou desde
+    a leitura (se mudou, aplica na de agora, se os trechos ainda são os mesmos; senão a
+    página fica de fora, com o motivo). Os eventos:
+
+    - `previa_pronta(previas)` (uma `substituir.Previa` por página com casos);
+    - `previa_progresso(feitas, total)`;
+    - `substituicao_falhou(mensagem)` (o substituto inválido, o padrão lento, um erro);
+    - `substituicao_feita(casos, paginas, falhas, sem_traducao)` (`falhas`: página ->
+      motivo; `sem_traducao`: os casos da página aberta que ficaram de fora).
+    """
+
+    def __init__(self, pagina: ControladorDePagina, busca: ControladorDaBusca):
+        self.pagina = pagina
+        self.busca = busca
+        self.eventos = pagina.eventos
+        self._numero = 0
+        self._lidas: dict = {}                  # índice -> a página como a prévia a leu
+        self._carimbos: dict = {}               # índice -> o arquivo dela na leitura
+        self._geracao_das_lidas = None          # o projeto delas
+
+    # ------------------------------------------------------------------
+    def _preparar(self, opcoes, modelo: str):
+        from abbychess import busca as bs
+        from abbychess import substituir as sb
+
+        expressao, _dica = bs.compilar(opcoes)
+        sb.validar(modelo, expressao, opcoes.regex)
+        return expressao, sb.substituto(modelo, opcoes.regex)
+
+    def _paginas(self, opcoes) -> List[int]:
+        from abbychess import busca as bs
+
+        lidas = sorted(self.pagina.projeto.paginas_lidas())
+        if opcoes.escopo in (bs.PAGINA, bs.SELECAO):
+            alvo = (opcoes.selecao[0] if opcoes.escopo == bs.SELECAO and opcoes.selecao
+                    else opcoes.pagina_atual)
+            return [alvo] if alvo in lidas else []
+        if opcoes.escopo == bs.INTERVALO and opcoes.intervalo is not None:
+            a, b = sorted(opcoes.intervalo)
+            return [i for i in lidas if a <= i <= b]
+        return lidas
+
+    def _casos(self, pagina, opcoes, expressao, trocar, alvo: str):
+        from abbychess import busca as bs
+        from abbychess import sessao as ss
+        from abbychess import substituir as sb
+
+        montada = ss.texto_e_unidades(pagina)
+        indexada = bs.indexar_pagina(pagina, self.busca.idioma, montada=montada)
+        trecho = None
+        if opcoes.escopo == bs.SELECAO:
+            trecho = bs._trecho_da_selecao(indexada, opcoes.selecao)
+            if trecho is None:
+                return sb.Previa(pagina.indice, montada[0], [])
+        casos = sb.casos_da_pagina(indexada, montada[1], expressao, trocar, alvo, opcoes.onde,
+                                   trecho)
+        return sb.Previa(pagina.indice, montada[0], casos)
+
+    def _na_interface(self, funcao) -> None:
+        self.busca._na_interface(funcao)
+
+    # ------------------------------------------------------------------
+    def previa(self, opcoes, modelo: str, alvo: str) -> bool:
+        """Os casos fora da página aberta, numa thread (o fim em `previa_pronta` ou
+        `substituicao_falhou`). False se o padrão ou o substituto não compilam."""
+        from abbychess import busca as bs
+
+        try:
+            expressao, trocar = self._preparar(opcoes, modelo)
+        except bs.PadraoInvalido as erro:
+            self.eventos.emitir("substituicao_falhou", f"Regex inválida: {erro}")
+            return False
+        self._numero += 1
+        numero, geracao = self._numero, self.pagina.geracao
+        projeto, indices = self.pagina.projeto, self._paginas(opcoes)
+
+        def rodar():
+            previas, lidas, carimbos, erro = [], {}, {}, None
+            try:
+                for n, i in enumerate(indices):
+                    if numero != self._numero:
+                        return
+                    # O carimbo antes de ler: se o arquivo mudar depois, aplicar o vê.
+                    carimbo = (projeto.carimbo(i) if projeto.modelo_em_memoria(i) is None
+                               else None)
+                    pagina = projeto.ler_sem_migrar(i)
+                    if pagina is None:
+                        continue
+                    previa = self._casos(pagina, opcoes, expressao, trocar, alvo)
+                    if previa.casos:
+                        previas.append(previa)
+                        lidas[i], carimbos[i] = pagina, carimbo
+                    if n % 10 == 9:
+                        self._na_interface(lambda f=n + 1: self._progresso(numero, f,
+                                                                           len(indices)))
+            except bs.PadraoLento as lento:
+                erro = f"Substituição abortada: {lento}."
+            except Exception as falha:          # o erro vai para a barra
+                log.exception("a prévia da substituição falhou")
+                erro = f"A prévia falhou: {falha}"
+            self._na_interface(lambda: self._previa_pronta(numero, geracao, previas, lidas,
+                                                           carimbos, erro))
+
+        threading.Thread(target=rodar, name="previa-da-substituicao", daemon=True).start()
+        return True
+
+    def _progresso(self, numero: int, feitas: int, total: int) -> None:
+        if numero == self._numero:
+            self.eventos.emitir("previa_progresso", feitas, total)
+
+    def _previa_pronta(self, numero, geracao, previas, lidas, carimbos, erro) -> None:
+        if numero != self._numero or geracao != self.pagina.geracao:
+            return
+        if erro is not None:
+            self.eventos.emitir("substituicao_falhou", erro)
+            return
+        self._lidas, self._carimbos, self._geracao_das_lidas = lidas, carimbos, geracao
+        self.eventos.emitir("previa_pronta", previas)
+
+    def cancelar(self) -> None:
+        self._numero += 1
+
+    # ------------------------------------------------------------------
+    def na_pagina(self, opcoes, modelo: str, alvo: str, posicao: Optional[int] = None):
+        """Na página aberta, direto (§7.2): o caso que contém `posicao` (o casamento atual
+        da busca), ou todos (`posicao` None). O que ainda não tem tradução fica de fora, com
+        o aviso. Devolve os casos pedidos (aplicados na vez deles na fila), ou None."""
+        from abbychess import busca as bs
+
+        pc = self.pagina
+        if pc.modelo is None or pc.projeto is None:
+            self.eventos.emitir("substituicao_falhou", "Nada a substituir nesta página.")
+            return None
+        try:
+            expressao, trocar = self._preparar(opcoes, modelo)
+            previa = self._casos(pc.modelo, opcoes, expressao, trocar, alvo)
+        except (bs.PadraoInvalido, bs.PadraoLento) as erro:
+            self.eventos.emitir("substituicao_falhou", str(erro))
+            return None
+        casos = previa.casos
+        if posicao is not None:
+            casos = [c for c in casos if c.inicio <= posicao < c.fim][:1]
+        bons = [c for c in casos if c.aplicavel]
+        if not bons:
+            motivo = casos[0].motivo if casos else "nada a substituir aqui"
+            self.eventos.emitir("substituicao_falhou", f"Não substituído: {motivo}.")
+            return None
+        self._lidas, self._carimbos = {pc.indice: pc.modelo.instantaneo()}, {}
+        self._geracao_das_lidas = pc.geracao
+        self.aplicar({pc.indice: bons}, _descricao(bons), sem_traducao=len(casos) - len(bons))
+        return bons
+
+    def aplicar(self, aceitos, descricao: str, sem_traducao: int = 0) -> None:
+        """Os casos aceitos (página -> casos), numa transação do desfazer (ver o docstring
+        da classe). O fim em `substituicao_feita`."""
+        from abbychess import historico as hs
+        from abbychess import sessao as ss
+        from abbychess import substituir as sb
+
+        aceitos = {i: list(c) for i, c in aceitos.items() if c}
+        pc = self.pagina
+        if not aceitos or pc.projeto is None:
+            return
+        if self._geracao_das_lidas != pc.geracao:
+            self.eventos.emitir("substituicao_falhou", "A prévia é de outro projeto: refaça.")
+            return
+        fontes = {i: self._lidas.get(i) for i in aceitos}
+        carimbos = dict(self._carimbos)
+
+        def preparar():
+            projeto = pc.projeto
+            for i in aceitos:
+                if fontes[i] is None:           # sem a leitura da prévia: a de agora
+                    fontes[i] = projeto.pagina_para_editar(i).instantaneo()
+
+            def trabalho(_progresso):
+                # Fora da interface: a cópia editada, o estado, os lados dos diagramas, a
+                # mudança para o desfazer e o resumo do livro (a interface só troca).
+                feitas, falhas = {}, {}
+                for i, casos in aceitos.items():
+                    copia = fontes[i].instantaneo()
+                    try:
+                        sb.aplicar_na_pagina(copia, casos)
+                        _depois_de_editar(copia, fontes[i])
+                        feitas[i] = (copia, hs.mudanca(fontes[i], copia.instantaneo()),
+                                     projeto.resumo_do_modelo(copia))
+                    except ss.Recusa as recusa:
+                        falhas[i] = str(recusa)
+                    except Exception as erro:   # a página fica de fora; o resto vale
+                        log.exception("substituir na página %d falhou", i + 1)
+                        falhas[i] = f"a substituição falhou: {erro}"
+                return feitas, falhas
+
+            def pronto(resultado):
+                self._trocar(aceitos, fontes, carimbos, *resultado, descricao, sem_traducao)
+            return trabalho, pronto
+        pc.tarefa("Substituindo", preparar, falhou=pc._falhou("Substituir"))
+
+    def _trocar(self, aceitos, fontes, carimbos, feitas, falhas, descricao,
+                sem_traducao) -> None:
+        """Na interface: as cópias editadas entram nas páginas, numa transação. A página que
+        a prévia leu do disco, e que ninguém abriu desde então, é adotada como a viva
+        (`projeto.adotar`: sem ler o JSON de novo)."""
+        from abbychess import historico as hs
+        from abbychess import sessao as ss
+        from abbychess import substituir as sb
+
+        pc = self.pagina
+        projeto = pc.projeto
+        transacao = hs.Transacao(descricao)
+        mudadas = []
+        for i, (copia, mudanca, resumo) in sorted(feitas.items()):
+            fonte = fontes[i]
+            if pc.modelo is not None and pc.modelo.indice == i:
+                viva = pc.modelo
+            else:
+                viva = projeto.adotar(fonte, carimbos.get(i)) or projeto.pagina_para_editar(i)
+            if viva is fonte or _mesma_pagina(viva, fonte):
+                viva.boxes, viva.decisoes = list(copia.boxes), copia.decisoes
+                viva.proximo_n = max(viva.proximo_n, copia.proximo_n)
+                viva.estado = copia.estado
+                viva.diagramas, viva.zonas = list(copia.diagramas), list(copia.zonas)
+            else:                               # mudou desde a leitura: na de agora
+                antes = viva.instantaneo()
+                try:
+                    sb.aplicar_na_pagina(viva, aceitos[i])
+                except Exception as erro:
+                    viva.boxes, viva.decisoes = list(antes.boxes), antes.decisoes
+                    falhas[i] = (str(erro) if isinstance(erro, ss.Recusa)
+                                 else f"a substituição falhou: {erro}")
+                    continue
+                _depois_de_editar(viva, antes)
+                mudanca, resumo = hs.mudanca(antes, viva.instantaneo()), None
+            transacao.paginas[viva.pid] = mudanca
+            mudadas.append((viva, resumo))
+        casos = sum(len(aceitos[p.indice]) for p, _r in mudadas)
+        if mudadas:
+            pc.historico.registrar(transacao)
+            gravou = all([projeto.agendar(p, resumo) for p, resumo in mudadas])
+            if not gravou:
+                pc._avisar("Projeto aberto só para leitura: nada é gravado.", 6000)
+            mudadas = [p for p, _r in mudadas]
+            if any(p is pc.modelo for p in mudadas):
+                vivos = pc.modelo.vivos
+                pc.pulados &= vivos
+                pc.selecao &= vivos
+                if pc.atual not in vivos:
+                    pc.atual = None
+                self.eventos.emitir("glifos_mudaram", None)
+            self.eventos.emitir("acoes_mudaram")
+        self._lidas = {}
+        self.eventos.emitir("substituicao_feita", casos, len(mudadas), dict(falhas),
+                            sem_traducao)
+
+
+def _depois_de_editar(pagina, antes) -> None:
+    """O que toda edição faz depois (como `ControladorDePagina._mudou`): o estado (§4.4), o
+    lado dos diagramas pela legenda, os ids das áreas e dos diagramas."""
+    from abbychess.modelo import proximo_estado
+
+    pagina.estado = proximo_estado(pagina.estado, "editar")
+    if pagina.diagramas:
+        pagina.diagramas = dg.rederivar_lados(list(pagina.diagramas), antes.entries(),
+                                              pagina.entries())
+    pagina.zonas = zn.com_ids(list(pagina.zonas))
+    pagina.diagramas = dg.com_ids(list(pagina.diagramas))
+
+
+def _mesma_pagina(viva, lida) -> bool:
+    """A página de agora é a que foi lida (os mesmos glifos e decisões)."""
+    from abbychess import historico as hs
+
+    if (viva.pid != lida.pid or viva.decisoes != lida.decisoes
+            or len(viva.boxes) != len(lida.boxes)):
+        return False
+    return all(a is b or hs.igual(a, b) for a, b in zip(viva.boxes, lida.boxes))
+
+
+def _descricao(casos) -> str:
+    """O nome da transação no menu Editar ("Substituir 'casa' por 'lar'", ou "Substituir 12
+    ocorrências")."""
+    if len(casos) == 1:
+        return f"Substituir '{casos[0].antes[:30]}' por '{casos[0].depois[:30]}'"
+    return f"Substituir {len(casos)} ocorrências"

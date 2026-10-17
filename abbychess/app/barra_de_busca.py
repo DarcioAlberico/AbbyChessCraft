@@ -7,6 +7,10 @@ com as classes de xadrez `\\L`, `\\P`, `\\C`, `\\V`, expandidas na dica do campo
 instante (a anterior é cancelada); Enter e Shift+Enter vão à próxima e à anterior; Alt+Enter
 manda todas para Resultados; Esc fecha. A barra só diz o que o usuário pediu
 (`opcoes`): quem busca é a janela, pelo `ControladorDaBusca`.
+
+Com Ctrl+H (§7.2, passo D2), a terceira linha: **substituir por** (com `\\1` e
+`\\g<nome>` quando a regex está ligada), **Prosa | Notação | Ambos** e os botões
+**Substituir** (Enter no campo) e **Todas** (Ctrl+Enter no campo).
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QLineEdit, QMenu,
                                QVBoxLayout, QWidget)
 
 from abbychess import busca as bs
+from abbychess import substituir as sb
 from abbychess.app import estilo
 
 ESCOPOS = ((bs.LIVRO, "Livro"), (bs.PAGINA, "Página"), (bs.SELECAO, "Seleção"),
@@ -36,6 +41,9 @@ class BarraDeBusca(QWidget):
     anterior = Signal()
     todas = Signal()
     fechar = Signal()
+    #: Substituir a ocorrência atual; substituir todas (§7.2).
+    substituir = Signal()
+    substituir_todas = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -78,6 +86,31 @@ class BarraDeBusca(QWidget):
         anterior = self._acao_simples("▲", "Ocorrência anterior (Shift+F3)", self.anterior.emit)
         seguinte = self._acao_simples("▼", "Próxima ocorrência (F3)", self.proxima.emit)
         fechar = self._acao_simples("✕", "Fechar a barra (Esc)", self.fechar.emit)
+        self.substituto = QLineEdit()
+        self.substituto.setPlaceholderText("Substituir por")
+        self.substituto.setAccessibleName("Substituir por")
+        self.substituto.setToolTip("Com a regex ligada, \\1 e \\g<nome> trazem os grupos. "
+                                   "Enter: substituir · Ctrl+Enter: todas")
+        self.substituto.setMinimumWidth(120)
+        self.alvo = QComboBox()
+        self.alvo.setAccessibleName("Substituir em: prosa, notação ou ambos")
+        self.alvo.setToolTip("Prosa nunca toca a notação, e Notação nunca toca a prosa; o FEN "
+                             "nunca é substituído")
+        for valor, rotulo in sb.ALVOS:
+            self.alvo.addItem(rotulo, valor)
+        self.botao_substituir = self._acao_simples("Substituir", "Substituir a ocorrência "
+                                                   "atual (Enter no campo)", self.substituir.emit)
+        self.botao_todas = self._acao_simples("Todas", "Substituir todas (Ctrl+Enter no campo); "
+                                              "fora da página, com a prévia em Resultados",
+                                              self.substituir_todas.emit)
+        self.linha_de_substituir = QWidget()
+        linha = QHBoxLayout(self.linha_de_substituir)
+        linha.setContentsMargins(0, 0, 0, 0)
+        linha.setSpacing(2)
+        linha.addWidget(self.substituto, 1)
+        for w in (self.alvo, self.botao_substituir, self.botao_todas):
+            linha.addWidget(w)
+        self.linha_de_substituir.hide()
 
         # Duas linhas: o campo, a contagem e as setas em cima; as opções embaixo (numa
         # vista direita estreita, uma linha só deixaria o campo com ~60 px).
@@ -95,6 +128,7 @@ class BarraDeBusca(QWidget):
                   self.intervalo, self.onde):
             baixo.addWidget(w)
         baixo.addStretch(1)
+        caixa.addWidget(self.linha_de_substituir)
 
         self.relogio = QTimer(self)
         self.relogio.setSingleShot(True)
@@ -138,6 +172,22 @@ class BarraDeBusca(QWidget):
             self.campo.setText(texto)
         self.campo.setFocus(Qt.FocusReason.ShortcutFocusReason)
         self.campo.selectAll()
+
+    def abrir_substituir(self, texto: Optional[str] = None) -> None:
+        """Ctrl+H: a barra com a linha de substituir; o foco no substituto se já há o que
+        localizar."""
+        self.abrir(texto)
+        self.linha_de_substituir.show()
+        if self.campo.text():
+            self.substituto.setFocus(Qt.FocusReason.ShortcutFocusReason)
+            self.substituto.selectAll()
+
+    def esconder_substituir(self) -> None:
+        self.linha_de_substituir.hide()
+
+    @property
+    def substituindo(self) -> bool:
+        return not self.linha_de_substituir.isHidden()
 
     def escolher_escopo(self, escopo: str) -> None:
         self.escopo.setCurrentIndex(max(0, self.escopo.findData(escopo)))
@@ -187,6 +237,12 @@ class BarraDeBusca(QWidget):
 
     def keyPressEvent(self, evento):
         tecla, mods = evento.key(), evento.modifiers()
+        if tecla in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and self.substituto.hasFocus():
+            if mods & Qt.KeyboardModifier.ControlModifier:
+                self.substituir_todas.emit()
+            else:
+                self.substituir.emit()
+            return
         if tecla in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             if mods & Qt.KeyboardModifier.AltModifier:
                 self.todas.emit()

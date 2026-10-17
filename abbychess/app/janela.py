@@ -38,6 +38,7 @@ from PySide6.QtWidgets import QApplication, QInputDialog, QMainWindow
 from abbychess import avisos as av
 from abbychess.app import acoes, dialogos
 from abbychess.app.busca_na_janela import BuscaNaJanela
+from abbychess.app.substituir_na_janela import SubstituirNaJanela
 from abbychess.app.desenho import DesenhoDaJanela
 from abbychess.app.edicao_na_janela import EdicaoNoDocumento
 from abbychess.app.espaco import EspacoDeTrabalho
@@ -60,7 +61,7 @@ TITULO = "AbbyChessCraft"
 
 
 class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoDocumento,
-                      BuscaNaJanela, QMainWindow):
+                      BuscaNaJanela, SubstituirNaJanela, QMainWindow):
     #: Da thread do gravador: a página `indice` não gravou (o erro).
     falha_de_gravacao = Signal(object, object)
 
@@ -81,6 +82,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         self._montar_paineis()
         self._montar_espaco()
         self._montar_busca()
+        self._montar_substituir()
         acoes.montar(self)
         self._ligar_eventos()
         self.treino.limpar("Crie um projeto (Ctrl+N) ou abra um existente (Ctrl+O).")
@@ -250,6 +252,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
 
     def _projeto_aberto(self, leitor) -> None:
         self.fechar_busca()
+        self._limpar_previa()
         self.busca.abrir()                      # o índice da busca, em segundo plano (§7.3)
         self._padroes_mudaram()
         self._espaco_do_projeto_aberto()

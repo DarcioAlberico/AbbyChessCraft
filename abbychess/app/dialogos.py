@@ -172,17 +172,22 @@ def intervalo_do_lote(janela, projeto, total: int) -> Optional[Tuple[List[int], 
     return indices, refazer
 
 
-def reler_depois(janela, paginas) -> Optional[bool]:
-    """Retomar o lote com páginas que ele não sobrescreveu: lê-las também? None é cancelar."""
+def reler_depois(janela, paginas, *, faltou: bool) -> Optional[bool]:
+    """Retomar o lote com páginas que ele não sobrescreveu: lê-las também? None é cancelar.
+    Sem nada que tenha faltado do lote, a pergunta é só "ler essas?" (Sim ou Cancelar)."""
     botoes = QMessageBox.StandardButton
     lista = ", ".join(str(i + 1) for i in paginas)
-    resposta = QMessageBox.question(
-        janela, "Retomar o lote",
-        f"O lote não sobrescreveu as páginas {lista}, porque você as mudou durante a sessão. "
-        "Ler essas também?\n\nSim as lê de novo: as correções manuais e os glifos revisados "
-        "ficam, as outras mudanças delas saem, e o Ctrl+Z delas deixa de valer. Não lê só o "
-        "que faltou do lote.",
-        botoes.Yes | botoes.No | botoes.Cancel, botoes.No)
+    efeito = ("Sim as lê de novo, a aberta também: as correções manuais e os glifos revisados "
+              "ficam, as outras mudanças delas saem, e o Ctrl+Z delas deixa de valer.")
+    if faltou:
+        texto = (f"O lote não sobrescreveu as páginas {lista}, porque você as mudou. Ler essas "
+                 f"também?\n\n{efeito} Não lê só o que faltou do lote.")
+        opcoes, padrao = botoes.Yes | botoes.No | botoes.Cancel, botoes.No
+    else:
+        texto = (f"O lote não sobrescreveu as páginas {lista}, porque você as mudou. Ler "
+                 f"essas agora?\n\n{efeito}")
+        opcoes, padrao = botoes.Yes | botoes.Cancel, botoes.Cancel
+    resposta = QMessageBox.question(janela, "Retomar o lote", texto, opcoes, padrao)
     if resposta == botoes.Cancel:
         return None
     return resposta == botoes.Yes

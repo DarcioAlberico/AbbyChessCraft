@@ -489,3 +489,55 @@ def test_a_decisao_que_cai_e_descrita_pelo_glifo_e_nao_pelo_gid():
                               [Box(gid, BoxEntry("k", 40, 50, 60, 80, 0.9, "rede"))])
     assert caidas == ["quebra do glifo 'k' em (40, 50) (o glifo saiu)"]
 
+
+def test_retomar_com_reler_depois_nao_rele_o_que_o_lote_mandou_pular(ctl, projeto):
+    """Rodada 4: o "Não" (sem refazer) do lote cancelado continua valendo para o que faltou;
+    só as páginas confirmadas são lidas de novo."""
+    p = ctl.pagina
+    ctl.reconhecer([1, 2], refazer=False)
+    ctl.executor.tudo()
+    p.ir_para(1)
+    p.escolher(p.gids[0])
+    p.corrigir("R")
+    ctl.reconhecer([1], refazer=True)                     # a 1, aberta e mudada
+    ctl.executor.tudo()
+    ctl.reconhecer([0, 2], refazer=False)
+    ctl.cancelar()                                        # antes de começar
+    ctl.executor.tudo()
+    assert ctl.restante == ([0, 2], False) and ctl.reler_depois == [1]
+    lidas = []
+    ctl.eventos.ligar("pagina_do_lote", lidas.append)
+    ctl.retomar(com_reler_depois=True)                    # a 1 ainda aberta: lida também
+    ctl.executor.tudo()
+    assert sorted(lidas) == [0, 1] and ctl.fins[-1].puladas == [2]
+    assert ctl.reler_depois == [] and not ctl.pode_retomar
+
+
+def test_o_f5_tira_a_pagina_de_reler_depois(ctl, projeto):
+    from abbychess.controladores import ARQUIVO_DO_LOTE
+
+    p = ctl.pagina
+    ctl.reconhecer([0], refazer=False)
+    ctl.executor.tudo()
+    p.escolher(p.gids[0])
+    p.corrigir("R")
+    ctl.reconhecer([0], refazer=True)
+    ctl.executor.tudo()
+    assert ctl.reler_depois == [0] and (projeto.pasta / ARQUIVO_DO_LOTE).exists()
+    p.reconhecer()                                        # o F5 a releu
+    ctl.executor.tudo()
+    assert ctl.reler_depois == [] and not (projeto.pasta / ARQUIVO_DO_LOTE).exists()
+
+
+def test_o_digito_do_glifo_virtual_nao_vira_um_glifo():
+    from core.box_model import BoxEntry
+
+    from abbychess.modelo import Box, descrever_caidas, gid_de
+
+    quatro, outro = gid_de(0, 4), gid_de(0, 17)
+    boxes = [Box(quatro, BoxEntry("x", 1, 2, 3, 4, 0.9, "rede")),
+             Box(outro, BoxEntry("e", 40, 50, 60, 80, 0.9, "rede"))]
+    texto = f"glifo virtual '4' depois do glifo {outro} (o glifo saiu)"
+    assert descrever_caidas([texto], boxes) == [
+        "glifo virtual '4' depois do glifo 'e' em (40, 50) (o glifo saiu)"]
+

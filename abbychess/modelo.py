@@ -480,7 +480,10 @@ def descrever_caidas(caidas: Sequence[str], boxes: Sequence[Box]) -> List[str]:
             return casou.group(0)
         return f"'{e.char or '?'}' em ({e.x1}, {e.y1})"
 
-    return [re.sub(r"\d+", glifo, texto) for texto in caidas]
+    # Só o número depois de "glifo " ou de "palavras " e o depois do "+" da junção: o
+    # caractere de um glifo virtual também pode ser um dígito.
+    return [re.sub(r"(?:(?<=glifo )|(?<=palavras )|(?<=\+))\d+", glifo, texto)
+            for texto in caidas]
 
 
 def _celulas(e: BoxEntry, lado: int = 64):

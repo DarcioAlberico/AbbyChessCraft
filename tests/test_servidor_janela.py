@@ -70,8 +70,9 @@ def test_o_glifo_marcado_fica_aguardando_e_recebe_a_leitura_do_servidor(app, jan
         [pg.aguardando(x) for x in p.boxes]))
     p.marcar(b.x1 - 1, b.y1 - 1, b.x2 + 1, b.y2 + 1)
     assert any(any(v) for v in vistos)                         # desenhado como aguardando
-    _esperar(app, janela)
-    marcado = p.box(p.atual)
+    gid = p.atual
+    _ate(app, lambda: not pg.aguardando(p.box(gid)))           # volta pelo laço de eventos
+    marcado = p.box(gid)
     assert (marcado.char, marcado.source) == (leitor_falso.LETRA, leitor_falso.FONTE)
     assert not any(pg.aguardando(x) for x in p.boxes)
     p.desfazer()                                               # o quadro e a leitura: um passo
@@ -243,3 +244,44 @@ def test_o_lote_para_quando_o_servidor_desiste(app, janela_do_livro, monkeypatch
     resultado = j.fins[-1]
     assert servidor.desistiu and resultado.cancelado and len(resultado.falhas) == 1
     assert j.livro.pode_retomar and len(resultado.lidas) < 51
+
+
+def test_a_procedencia_do_padrao_volta_do_filho_no_f5(app, janela):  # noqa: F811
+    p = janela.pagina
+    janela.reconhecer()
+    _esperar(app, janela)
+    p.escolher(p.gids[0])
+    p.ensinar("a")                                       # o primeiro glifo é um "a"
+    _esperar(app, janela)
+    janela.reconhecer()                                  # os outros "a", pelo padrão, no filho
+    _esperar(app, janela)
+    pelo_livro = [b for b in p.modelo.boxes if b.entry.source == "livro"]
+    assert pelo_livro and all(b.amostra for b in pelo_livro)
+
+
+def test_ca_11_7_sem_servidor_pronto_o_glifo_fica_aguardando_sem_prender_a_fila(
+        app, projeto_lido, sem_dialogos, monkeypatch):  # noqa: F811
+    monkeypatch.setenv("ABBY_SERVIDOR", "1")
+    monkeypatch.setenv("ABBY_FABRICA_DE_LEITOR", "tests.leitor_falso:criar")
+    monkeypatch.setenv("ABBY_FALSO_ATRASO_AO_ABRIR", "4")
+    janela = JanelaPrincipal()
+    try:
+        janela.abrir_caminho(str(projeto_lido.pasta))
+        _esperar(app, janela)
+        p = janela.pagina
+        assert not p.servidor.pronto.is_set()            # os "modelos" ainda carregam
+        b = p.box(p.gids[0])
+        p.marcar(b.x1 - 1, b.y1 - 1, b.x2 + 1, b.y2 + 1)
+        gid = p.atual
+        assert pg.aguardando(p.box(gid)) and not janela.executor.ocupado
+        p.escolher(p.gids[1])
+        p.ensinar("b")                                   # o Enter não espera os modelos
+        assert p.box(p.gids[1]).char == "b"
+        _esperar(app, janela)                            # a propagação, com o "b" só
+        assert pg.aguardando(p.box(gid)) and not p.servidor.pronto.is_set()
+        _ate(app, p.servidor.pronto.is_set)
+        _ate(app, lambda: not pg.aguardando(p.box(gid)))
+        assert p.box(gid).char == leitor_falso.LETRA
+    finally:
+        janela.close()
+

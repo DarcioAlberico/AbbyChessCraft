@@ -249,7 +249,8 @@ def atualizar(janela) -> None:
     j.acao_lote.setEnabled(tem and sem_lote)
     j.acao_cancelar_lote.setEnabled(j.livro.lote_rodando)
     j.acao_retomar_lote.setEnabled(tem and j.livro.pode_retomar)
-    j.acao_antes_do_lote.setEnabled(tem and p.projeto.tem_antes_do_lote(p.indice))
+    j.acao_antes_do_lote.setEnabled(tem and not p.projeto.somente_leitura
+                                    and p.projeto.tem_antes_do_lote(p.indice))
     j.acao_proximo_do_livro.setEnabled(tem)
     j.acao_exportar.setEnabled(tem)
     j.acao_areas.setEnabled(tem)

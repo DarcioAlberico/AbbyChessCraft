@@ -50,6 +50,8 @@ log = logging.getLogger(__name__)
 
 FABRICA_PADRAO = "abbychess.servidor_de_leitura:leitor_global"
 INTERATIVO, LOTE = 0, 1
+#: O resultado de um pedido cancelado (ou abandonado ao fechar).
+CANCELADO = "cancelado"
 
 
 class Cancelado(Exception):
@@ -103,6 +105,16 @@ def reler_boxes(imagem, boxes, leitor, *, so_pendentes: bool, progresso=None):
 
     resumo = pg.ler_boxes(imagem, boxes, leitor, so_pendentes=so_pendentes, progresso=progresso)
     return boxes, [procedencia.amostra_de(b) for b in boxes], resumo
+
+
+def registrar_procedencia(boxes, amostras) -> None:
+    """A procedência das leituras que voltaram do filho: o registro é por objeto e não
+    atravessa a fila (§4.1), e a interface o refaz nos boxes que chegaram."""
+    from abbychess import procedencia
+
+    for box, amostra in zip(boxes, amostras):
+        if amostra is not None:
+            procedencia.registrar(box, amostra)
 
 
 def ler_recortes(itens, leitor) -> list:
@@ -173,8 +185,10 @@ class _Laco:
         self.sair = False
         self.atendendo: Optional[int] = None       # o id do pedido em curso
         self.no_lote: Optional[int] = None         # o id do pedido do lote em curso
-        #: A ordem em que os pedidos começaram (os testes a pedem: CA-11.8).
+        #: A ordem em que os pedidos começaram e a em que terminaram (os testes as pedem:
+        #: CA-11.8 e a vez entre glifos).
         self.ordem: List[int] = []
+        self.fins: List[int] = []
 
     def rodar(self) -> None:
         self.leitor = _fabrica(self.fabrica)(self.pasta, self.limiares)
@@ -210,8 +224,13 @@ class _Laco:
             elif tipo == "limiares":
                 self.leitor.trocar_limiares(mensagem[1])
             elif tipo == "cancelar":
-                self.cancelados.add(mensagem[1])
-                self.lotes = deque(m for m in self.lotes if m[1] != mensagem[1])
+                # O que espera na fila continua nela e, na vez dele, responde "cancelado"
+                # (`_atender`): quem pediu sempre recebe resposta. O que já terminou não guarda
+                # nada (o cancelamento chegou tarde).
+                id_ = mensagem[1]
+                na_fila = any(m[1] == id_ for m in (*self.interativos, *self.lotes))
+                if na_fila or id_ in (self.atendendo, self.no_lote):
+                    self.cancelados.add(id_)
             elif tipo == "sair":
                 self.sair = True
                 return
@@ -221,18 +240,17 @@ class _Laco:
         (dentro de um pedido interativo, não: ele não é interrompido)."""
         if self.no_lote is not None and self.atendendo == self.no_lote:
             self._receber(bloquear=False)
-            if self.no_lote in self.cancelados:
-                raise Cancelado
-            lote = self.no_lote
+            if self.no_lote in self.cancelados or self.sair:
+                raise Cancelado                 # o "sair" também para a página do lote
             while self.interativos and not self.sair:
                 self._atender(self.interativos.popleft())
-            self.atendendo, self.no_lote = lote, lote
         return ler(recorte, **k)
 
     def _atender(self, mensagem) -> None:
         _, id_, prioridade, operacao, argumentos = mensagem
-        if id_ in self.cancelados:
-            self.saida.put(("resposta", id_, False, "cancelado"))
+        if id_ in self.cancelados or self.sair:
+            self.cancelados.discard(id_)
+            self.saida.put(("resposta", id_, False, CANCELADO))
             return
         self.ordem.append(id_)
         anterior = (self.atendendo, self.no_lote)
@@ -242,13 +260,14 @@ class _Laco:
         try:
             resultado = self._operar(operacao, argumentos)
         except Cancelado:
-            self.saida.put(("resposta", id_, False, "cancelado"))
+            self.saida.put(("resposta", id_, False, CANCELADO))
         except Exception as erro:  # a interface decide: o log do filho guarda o rastro
             self.saida.put(("resposta", id_, False,
                             f"{erro}\n\n{traceback.format_exc(limit=4)}"))
         else:
             self.saida.put(("resposta", id_, True, resultado))
         finally:
+            self.fins.append(id_)
             self.atendendo, self.no_lote = anterior
             self.cancelados.discard(id_)
 
@@ -269,6 +288,8 @@ class _Laco:
             return automaticas(argumentos, leitor)
         if operacao == "ordem":
             return list(self.ordem)
+        if operacao == "fins":
+            return list(self.fins)
         if operacao == "padroes":                  # os testes conferem os deltas
             return leitor.padroes.total
         if operacao == "pid":
@@ -305,18 +326,21 @@ class Pedido:
 
     @property
     def cancelado(self) -> bool:
-        return not self.ok and self.resultado == "cancelado"
+        return not self.ok and self.resultado == CANCELADO
 
 
 class ServidorDeLeitura:
     """O filho, visto da interface: pedir, esperar, cancelar, mandar os deltas, fechar."""
 
     def __init__(self, pasta_de_padroes, limiares, *, fabrica: Optional[str] = None,
-                 ao_avisar: Optional[Callable[[str, str], None]] = None,
+                 ao_avisar: Optional[Callable[[str, str, bool], None]] = None,
                  ao_ficar_pronto: Optional[Callable[[dict], None]] = None):
         self.pasta, self.limiares = pasta_de_padroes, limiares
         self.fabrica = fabrica or os.environ.get("ABBY_FABRICA_DE_LEITOR") or FABRICA_PADRAO
-        self.ao_avisar = ao_avisar or (lambda titulo, texto: log.warning("%s: %s", titulo, texto))
+        #: `ao_avisar(titulo, texto, desistiu)`, na thread ouvinte, com o `desistiu` da hora
+        #: do aviso (duas quedas seguidas não chegam as duas como a segunda).
+        self.ao_avisar = ao_avisar or (lambda titulo, texto, _desistiu: log.warning(
+            "%s: %s", titulo, texto))
         self._contexto = mp.get_context("spawn")
         self._ids = itertools.count(1)
         self._pendentes: Dict[int, Pedido] = {}
@@ -361,6 +385,11 @@ class ServidorDeLeitura:
             self._entrada.put(mensagem)
         return pedido
 
+    @property
+    def parado(self) -> bool:
+        """Desistiu depois da segunda queda, ou fechou: não lê mais."""
+        return self.desistiu or self._fechando
+
     def esperar(self, pedido: Pedido, timeout: Optional[float] = None):
         """O resultado do pedido (numa thread que pode esperar: nunca na da interface)."""
         if not pedido.feito.wait(timeout):
@@ -376,10 +405,22 @@ class ServidorDeLeitura:
         return self.esperar(self.pedir(operacao, argumentos, prioridade=prioridade), timeout)
 
     def cancelar(self, pedido: Pedido) -> None:
-        """Para o pedido (o do lote para no glifo seguinte; um que não começou nem começa)."""
+        """Para o pedido (o do lote para no glifo seguinte; um que não começou nem começa, e
+        responde "cancelado" na vez dele)."""
         with self._trava:
-            if not pedido.feito.is_set():
+            if not pedido.feito.is_set() and not self._fechando:
                 self._entrada.put(("cancelar", pedido.id))
+
+    def abandonar_pendentes(self) -> None:
+        """Ao fechar: quem espera um pedido recebe "cancelado" já (a tarefa em curso termina
+        sem esperar a leitura), e o filho é avisado para não começar o que falta."""
+        with self._trava:
+            pendentes, self._pendentes = list(self._pendentes.values()), {}
+            if not self._fechando:
+                for pedido in pendentes:
+                    self._entrada.put(("cancelar", pedido.id))
+        for pedido in pendentes:
+            self._concluir(pedido, False, CANCELADO)
 
     def enviar_padroes(self, criados, apagados) -> None:
         """Os deltas dos padrões: `criados` [(caminho, altura)], `apagados` [caminho]."""
@@ -454,25 +495,30 @@ class ServidorDeLeitura:
                 for pedido in self._pendentes.values():
                     self._entrada.put(pedido.mensagem)
         if pendentes is None:
-            self.ao_avisar("Servidor de leitura",
-                           f"O servidor de leitura parou ({motivo}) e foi aberto de novo; os "
-                           "pedidos em curso foram reenviados.")
+            self._avisar(f"O servidor de leitura parou ({motivo}) e foi aberto de novo; os "
+                         "pedidos em curso foram reenviados.", False)
             return
         for pedido in pendentes:
             self._concluir(pedido, False, "o servidor de leitura caiu duas vezes")
-        self.ao_avisar("Servidor de leitura",
-                       f"O servidor de leitura parou de novo ({motivo}). Reabra o projeto para "
-                       "voltar a ler as páginas.")
+        self._avisar(f"O servidor de leitura parou de novo ({motivo}). Reabra o projeto para "
+                     "voltar a ler as páginas.", True)
+
+    def _avisar(self, texto: str, desistiu: bool) -> None:
+        try:
+            self.ao_avisar("Servidor de leitura", texto, desistiu)
+        except Exception:  # quem ouve falhou: o ouvinte continua (e o rastro fica no log)
+            log.exception("o aviso do servidor de leitura falhou")
 
     def fechar(self, espera: float = 5.0) -> None:
         """Termina o filho: pede para sair, espera `espera` s e, se preciso, o encerra."""
-        if self._fechando:
-            return
-        self._fechando = True
-        try:
-            self._entrada.put(("sair",))
-        except (OSError, ValueError):
-            pass
+        with self._trava:                       # uma queda agora não reabre o filho
+            if self._fechando:
+                return
+            self._fechando = True
+            try:
+                self._entrada.put(("sair",))
+            except (OSError, ValueError):
+                pass
         self.processo.join(espera)
         if self.processo.is_alive():
             self.processo.terminate()
@@ -480,7 +526,7 @@ class ServidorDeLeitura:
         with self._trava:
             pendentes, self._pendentes = list(self._pendentes.values()), {}
         for pedido in pendentes:
-            self._concluir(pedido, False, "cancelado")
+            self._concluir(pedido, False, CANCELADO)
         for fila in (self._entrada, self._saida):
             try:
                 fila.close()

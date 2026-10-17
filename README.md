@@ -765,29 +765,32 @@ Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (commit 76ba432; má
 
 Desempenho por passo, em ms ou MB (uma rodada cada, a do portão, que roda no mesmo processo depois dos testes `livro_real` e por isso não é a condição das rodadas repetidas; quanto o mesmo código varia, e o que se conclui, está nelas, abaixo):
 
-| Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) | 2a (`2026-10-16-passo-2a.json`) | 2b (`2026-10-16-passo-2b.json`) | a1 (`2026-10-16-passo-a1.json`) | a2 (`2026-10-16-passo-a2.json`) | a3 (`2026-10-17-passo-a3.json`) | e (`2026-10-17-passo-e.json`) | d1 (`2026-10-17-passo-d1-094555.json`) | b (`2026-10-17-passo-b.json`) |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,89 | 15,21 | 16,04 | 14,5 | 16,74 | 17,44 | 18,97 |
-| Troca fora do cache, p95 | — | — | — | — | — | 147,1 | 144,68 | 145,27 | 146,97 | 147,86 | 150,02 |
-| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 23,68 | 26,63 | 26,8 | 22,41 | 26,12 | 29,66 | 27,35 |
-| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 16,92 | 20,23 | 20,88 | 20,15 | 44,48 | 45,03 | 46,99 |
-| Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 | 164 | 8 | 8 | 8 | 8 | 8 | 8 | 8 |
-| Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 12,9 | 22 | 12 | 9,5 | 2,2 | 2,3 | 2,4 |
-| Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1654 | 1793 | 1799 | 1823 | 2050 | 2053 | 2459 |
-| Releitura com o lote, p95 | — | — | — | — | — | — | — | — | 124,11 | 113,34 | 92,99 |
-| Atraso no lote falso (51 p.), p99 | — | — | — | — | — | — | — | — | 14,1 | 2,8 | 4,1 |
-| Gravar uma página do lote, p95 | — | — | — | — | — | — | — | — | 17,6 | 19,2 | 19,7 |
-| Lote com servidor (s/p.) | — | — | — | — | — | — | — | — | 8,33 | 8,34 | 8,5 |
-| Lote sem servidor (s/p.) | — | — | — | — | — | — | — | — | 8,26 | 8,52 | 8,48 |
-| Pintura de 2.000 boxes, p95 | — | — | — | — | — | 11,5 | 13,14 | 13,2 | 13,12 | 13,27 | 13,2 |
-| Montar o Documento, p95 | — | — | — | — | 25,61 | 22,72 | 25,97 | 31,78 | 39,82 | 34,81 | 35,42 |
-| Clique no Documento, p95 | — | — | — | — | — | — | — | 2,84 | 3,25 | 3,46 | 3,26 |
-| Clique acha o box, p95 | — | — | — | — | — | 0,0016 | 0,0016 | 0,0016 | 0,0017 | 0,0017 | 0,0017 |
-| Montar o índice da busca (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | 1395,66 |
-| Buscar regex no livro (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | 17,25 |
-| Atraso durante a busca, p99 | — | — | — | — | — | — | — | — | — | — | 2 |
-| Atraso durante o aborto, p99 | — | — | — | — | — | — | — | — | — | — | 2 |
-| Índice pela janela (230 p.), máx. | — | — | — | — | — | — | — | — | — | — | 2217 |
+| Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) | 2a (`2026-10-16-passo-2a.json`) | 2b (`2026-10-16-passo-2b.json`) | a1 (`2026-10-16-passo-a1.json`) | a2 (`2026-10-16-passo-a2.json`) | a3 (`2026-10-17-passo-a3.json`) | e (`2026-10-17-passo-e.json`) | d1 (`2026-10-17-passo-d1-094555.json`) | b (`2026-10-17-passo-b.json`) | d2 (`2026-10-17-passo-d2.json`) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,89 | 15,21 | 16,04 | 14,5 | 16,74 | 17,44 | 18,97 | 18,6 |
+| Troca fora do cache, p95 | — | — | — | — | — | 147,1 | 144,68 | 145,27 | 146,97 | 147,86 | 150,02 | 153,78 |
+| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 23,68 | 26,63 | 26,8 | 22,41 | 26,12 | 29,66 | 27,35 | 32,23 |
+| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 16,92 | 20,23 | 20,88 | 20,15 | 44,48 | 45,03 | 46,99 | 51,44 |
+| Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 | 164 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 |
+| Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 12,9 | 22 | 12 | 9,5 | 2,2 | 2,3 | 2,4 | 2,5 |
+| Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1654 | 1793 | 1799 | 1823 | 2050 | 2053 | 2459 | 2468 |
+| Releitura com o lote, p95 | — | — | — | — | — | — | — | — | 124,11 | 113,34 | 92,99 | 111,17 |
+| Atraso no lote falso (51 p.), p99 | — | — | — | — | — | — | — | — | 14,1 | 2,8 | 4,1 | 4,6 |
+| Gravar uma página do lote, p95 | — | — | — | — | — | — | — | — | 17,6 | 19,2 | 19,7 | 22 |
+| Lote com servidor (s/p.) | — | — | — | — | — | — | — | — | 8,33 | 8,34 | 8,5 | 8,71 |
+| Lote sem servidor (s/p.) | — | — | — | — | — | — | — | — | 8,26 | 8,52 | 8,48 | 8,71 |
+| Pintura de 2.000 boxes, p95 | — | — | — | — | — | 11,5 | 13,14 | 13,2 | 13,12 | 13,27 | 13,2 | 13,46 |
+| Montar o Documento, p95 | — | — | — | — | 25,61 | 22,72 | 25,97 | 31,78 | 39,82 | 34,81 | 35,42 | 34,88 |
+| Clique no Documento, p95 | — | — | — | — | — | — | — | 2,84 | 3,25 | 3,46 | 3,26 | 3,43 |
+| Clique acha o box, p95 | — | — | — | — | — | 0,0016 | 0,0016 | 0,0016 | 0,0017 | 0,0017 | 0,0017 | 0,0017 |
+| Montar o índice da busca (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | 1395,66 | 1430,76 |
+| Buscar regex no livro (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | 17,25 | 15,07 |
+| Atraso durante a busca, p99 | — | — | — | — | — | — | — | — | — | — | 2 | 1,8 |
+| Atraso durante o aborto, p99 | — | — | — | — | — | — | — | — | — | — | 2 | 1,2 |
+| Índice pela janela (230 p.), máx. | — | — | — | — | — | — | — | — | — | — | 2217 | 2257 |
+| Substituir no livro: a janela presa (230 p.) | — | — | — | — | — | — | — | — | — | — | — | 371 |
+| Substituir no livro: o Ctrl+Z (230 p.) | — | — | — | — | — | — | — | — | — | — | — | 563 |
+| Substituir no livro: o desfazer (MB) | — | — | — | — | — | — | — | — | — | — | — | 43,4 |
 
 Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter do passo 0 ao 1b tem duas faixas no mesmo código (perto de 110–130 e de 180–235; no 2a, uma só, perto de 90); o atraso no lote tem duas faixas sempre (perto de 8–10 e de 21). Desde o 2b o congelamento é desligado (`ABBY_CONGELAR=1` liga): as duas linhas do 2b rodam o mesmo programa (o rótulo `sem_congelar` é do roteiro de medida), e a coluna do Enter mede até a cor mudar (até o 2a, até o fim da propagação). Desde o A1 a troca é no cache de páginas (a vizinha já pré-carregada); a de fora do cache tem coluna própria. Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
 
@@ -806,6 +809,7 @@ Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem 
 | passo e | 9c759e2 | completa | 14,51; 14,42; 14,56 | 19,08; 17,73; 19,45 | 134,01; 134,1; 133,4 | 23,93; 23,92; 23,99 | 25,85; 28,95; 29,18 | 38,97; 38,73; 38,97 | 43,78; 42,3; 45,41 | 2,2; 2,2; 2,2 | 105,28; 64,42; 65,99 |
 | passo d1 | c955dff | completa | 15,21; 14,99; 14,91 | 19,92; 19,05; 17,88 | 133,54; 133,05; 134,86 | 24,63; 33,33; 24,89 | 30,22; 36,06; 27,03 | 35,51; 38,84; 38,67 | 41,52; 44,55; 43,99 | 2,2; 2,2; 2,2 | 117,22; 66,18; 73,22 |
 | passo b | c96247f | completa | 15,45; 14,97; 15,41 | 17,5; 16,58; 19,28 | 135,29; 135,04; 140,82 | 24,38; 23,83; 24,2 | 26,23; 30,84; 32,35 | 40,98; 39,41; 42,02 | 46,51; 46,05; 73,56 | 3,1; 2,5; 2,5 | 81,96; 73,53; 92,71 |
+| passo d2 | 6a6564a | completa | 15,57; 15,15; 15,66 | 17,16; 18,68; 16,91 | 140,63; 138,89; 146,39 | 35,22; 45,13; 46,88 | 42,51; 67,24; 61,19 | 42,17; 42,59; 46,02 | 50,27; 48,95; 54,52 | 2,6; 2,6; 2,6 | 83,66; 70,76; 82,4 |
 | passo 1b sem congelar | 1519d8f | completa | 169,84; 175,66; 170,16 | 192,25; 202,72; 196,29 | — | 123,14; 126,27; 144,94 | 199,91; 203,93; 234,95 | 124,11; 123,85; 140,89 | 142,6; 150,72; 233,54 | 14,4; 15,5; 16,3 | — |
 | passo 2a sem congelar | d19c858 | completa | 174,66; 175,73; 178,05 | 188,01; 188,63; 188,4 | — | 82,23; 82,43; 82,52 | 91,7; 89,92; 92,03 | 73,15; 70,64; 75,29 | 88,33; 91,91; 92,78 | 11,7; 20,8; 21,5 | — |
 | passo 2b sem congelar | 6f863c3 | completa | 153,56; 153,19; 157,37 | 173,65; 165,46; 168,14 | — | 20,55; 20,57; 21,47 | 24,01; 27,01; 27,08 | 14,4; 13,82; 14,5 | 16,9; 16,99; 18,83 | 22,3; 9,1; 9,8 | — |
@@ -814,9 +818,9 @@ Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: ca
 
 | Livro | Commit | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por diagrama | Lado certo | Ordem | CER do corpo | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| xv | c96247f | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 3 (+10 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-| yusupov | c96247f | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 13 | 3/3 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-| darcy | c96247f | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| xv | 6a6564a | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 3 (+10 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| yusupov | 6a6564a | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 13 | 3/3 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| darcy | 6a6564a | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 
 Ainda não medido: a ligação da legenda ao diagrama, no passo H (a leitura de hoje não liga legenda a diagrama); precisão e revocação por função de bloco, no passo F (a leitura de hoje não classifica blocos); a validação do FEN pelos lances, no passo H.
 
@@ -844,6 +848,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | xv | dd38d99 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 440,9 s |
 | xv | c955dff | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 446,5 s |
 | xv | c96247f | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 447,8 s |
+| xv | 6a6564a | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 458,1 s |
 | yusupov | bb0b7e5 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23 s |
 | yusupov | 0ebbf9c | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,1 s |
 | yusupov | 3bf1ad3 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,4 s |
@@ -863,6 +868,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | yusupov | dd38d99 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 22,9 s |
 | yusupov | c955dff | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 22,9 s |
 | yusupov | c96247f | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,8 s |
+| yusupov | 6a6564a | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 24,6 s |
 | darcy | bb0b7e5 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,5 s |
 | darcy | 0ebbf9c | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,7 s |
 | darcy | 3bf1ad3 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,8 s |
@@ -882,6 +888,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | darcy | dd38d99 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 24,5 s |
 | darcy | c955dff | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 24,4 s |
 | darcy | c96247f | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 24,5 s |
+| darcy | 6a6564a | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 25,5 s |
 
 Fatia (`ferramentas\replay_fatia.py`; **erros** são as diferenças do snapshot contra o gabarito, o N da medida humana):
 
@@ -898,6 +905,7 @@ Fatia (`ferramentas\replay_fatia.py`; **erros** são as diferenças do snapshot 
 | xv | E | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-E.json` |
 | xv | D1 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-D1-101106.json` |
 | xv | B | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-B.json` |
+| xv | D2 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-D2.json` |
 <!-- medidas:fim -->
 
 O replay da fatia (os gestos para levar as p. 21–27 ao gabarito) é

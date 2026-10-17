@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
+from concurrent.futures import CancelledError
 from pathlib import Path
 from typing import List, Optional, Sequence
 
@@ -906,6 +907,8 @@ class ControladorDaBusca:
         self._geracao = 0
         self._busca = 0
         self._velhas: set = set()
+        self._leitura = 0                       # conta as leituras das páginas a refazer
+        self._lida_em: dict = {}                # página -> a leitura que a pôs no índice
         self._pendente = None                   # a busca pedida antes de o índice ficar pronto
         self.ultimo_resultado = None
         self.eventos.ligar("pagina_reconhecida", self.marcar_velha)
@@ -936,7 +939,7 @@ class ControladorDaBusca:
         self._geracao += 1
         self._busca += 1
         geracao = self._geracao
-        self.indice, self._velhas, self._pendente = {}, set(), None
+        self.indice, self._velhas, self._pendente, self._lida_em = {}, set(), None, {}
         self.ultimo_resultado = None
         self.pronto.clear()
         projeto = self.pagina.projeto
@@ -974,11 +977,11 @@ class ControladorDaBusca:
                 indice = bs.construir(fontes, idioma, paralelo=paralelo, pool=pool,
                                       cancelado=lambda: not vale(), ao_indexar=contar)
             except Exception as erro:       # o índice parcial vale; o erro vai aos Avisos
-                log.exception("o índice da busca não foi montado inteiro")
-                self._na_interface(lambda e=erro: self.eventos.emitir(
-                    "aviso", "Índice da busca", f"Algumas páginas ficaram fora da busca: {e}"))
-            finally:
-                pool.liberar()                  # parados, os processos ocupariam memória
+                if vale() and not isinstance(erro, CancelledError):
+                    log.exception("o índice da busca não foi montado inteiro")
+                    self._na_interface(lambda e=erro: self.eventos.emitir(
+                        "aviso", "Índice da busca",
+                        f"Algumas páginas ficaram fora da busca: {str(e) or repr(e)}"))
             self._na_interface(lambda: self._indice_pronto(geracao, indice))
 
         threading.Thread(target=montar, name="indice-da-busca", daemon=True).start()
@@ -1030,22 +1033,15 @@ class ControladorDaBusca:
             return dica
         numero, geracao = self._busca, self._geracao
         self._em_voo = numero
-        refazer, carregar, velhas = self._paginas_a_refazer()
-        projeto, idioma = self.pagina.projeto, self.idioma
+        leitura, refazer, carregar, velhas = self._paginas_a_refazer()
         indice = dict(self.indice)
 
         def rodar():
             vale = lambda: numero == self._busca and geracao == self._geracao   # noqa: E731
-            resultado, erro = None, None
+            resultado, erro, refeitas = None, None, {}
             try:
-                for i, (pagina, versao) in refazer.items():
-                    indice[i] = bs.indexar_pagina(pagina, idioma, versao=versao)
-                for i, versao in carregar.items():
-                    if not vale():
-                        break
-                    pagina = projeto.ler_sem_migrar(i)
-                    if pagina is not None:
-                        indice[i] = bs.indexar_pagina(pagina, idioma, versao=versao)
+                refeitas = self._refazer(refazer, carregar, vale)
+                indice.update(refeitas)
                 if vale():
                     resultado = bs.buscar(indice, opcoes, cancelado=lambda: not vale(),
                                           tempo_limite=bs.TEMPO_LIMITE, expressao=expressao)
@@ -1054,17 +1050,33 @@ class ControladorDaBusca:
             except Exception as falha:          # o erro vai para a barra, e a busca termina
                 log.exception("a busca falhou")
                 erro = f"A busca falhou: {falha}"
-            self._na_interface(lambda: self._fim(numero, geracao, indice, velhas, resultado,
-                                                 erro))
+            self._na_interface(lambda: self._fim(numero, geracao, leitura, refeitas, velhas,
+                                                 resultado, erro))
 
         threading.Thread(target=rodar, name="busca", daemon=True).start()
         return dica
 
+    def _refazer(self, refazer: dict, carregar: dict, vale) -> dict:
+        """Indexa as páginas a refazer (fora da thread da interface); devolve só elas."""
+        from abbychess import busca as bs
+
+        projeto, idioma, refeitas = self.pagina.projeto, self.idioma, {}
+        for i, (pagina, versao) in refazer.items():
+            refeitas[i] = bs.indexar_pagina(pagina, idioma, versao=versao)
+        for i, versao in carregar.items():
+            if not vale():
+                break
+            pagina = projeto.ler_sem_migrar(i)
+            if pagina is not None:
+                refeitas[i] = bs.indexar_pagina(pagina, idioma, versao=versao)
+        return refeitas
+
     def _paginas_a_refazer(self):
         """As páginas do índice que mudaram: as editadas (a versão no histórico) e as na
         memória, como instantâneo (a interface pode mudá-las durante a busca); as relidas e
-        as que entraram no livro depois, para ler na thread. Devolve também as velhas que
-        este pedido leva (voltam a velhas se ele não terminar)."""
+        as que entraram no livro depois, para ler na thread. Devolve também o número desta
+        leitura (a mais nova vence no índice) e as velhas que este pedido leva (voltam a
+        velhas se ele não terminar)."""
         projeto, historico = self.pagina.projeto, self.pagina.historico
         refazer, carregar = {}, {}
         lidas = set(projeto.paginas_lidas())
@@ -1081,18 +1093,27 @@ class ControladorDaBusca:
         for i in [i for i in self.indice if i not in lidas]:
             self.indice.pop(i, None)            # deixou de ser reconhecida (o desfazer do F5)
         velhas, self._velhas = self._velhas & set(refazer) | self._velhas & set(carregar), set()
-        return refazer, carregar, velhas
+        self._leitura += 1
+        return self._leitura, refazer, carregar, velhas
 
-    def _fim(self, numero: int, geracao: int, indice: dict, velhas: set, resultado, erro) -> None:
+    def _guardar(self, leitura: int, refeitas: dict) -> None:
+        """As páginas refeitas entram no índice, se ainda são lidas e se nenhuma leitura mais
+        nova (que viu o disco depois) já as pôs lá."""
+        lidas = set(self.pagina.projeto.paginas_lidas()) if self.pagina.projeto else set()
+        for i, indexada in refeitas.items():
+            atual = self.indice.get(i)
+            if (i in lidas and self._lida_em.get(i, 0) < leitura
+                    and (atual is None or indexada.versao >= atual.versao)):
+                self.indice[i] = indexada
+                self._lida_em[i] = leitura
+
+    def _fim(self, numero: int, geracao: int, leitura: int, refeitas: dict, velhas: set,
+             resultado, erro) -> None:
         if numero == self._em_voo:
             self._em_voo = -1
         if geracao != self._geracao:
             return
-        lidas = set(self.pagina.projeto.paginas_lidas()) if self.pagina.projeto else set()
-        for i, indexada in indice.items():      # o que foi refeito fica, se ainda vale
-            atual = self.indice.get(i)
-            if i in lidas and (atual is None or indexada.versao >= atual.versao):
-                self.indice[i] = indexada
+        self._guardar(leitura, refeitas)        # o que foi refeito fica, se ainda vale
         if resultado is None and erro is None:  # abandonada: as relidas voltam a velhas
             self._velhas |= velhas
         if numero != self._busca:               # uma busca mais nova já foi pedida
@@ -1110,18 +1131,34 @@ class ControladorDaBusca:
         total = p.fonte.total if p.fonte is not None else 0
         return max(0, total - len(self.indice))
 
-    def glifos(self, char: str, fontes=None, minima: float = 0.0, maxima: float = 1.0):
-        """A busca por glifo (§7.1), no índice com as páginas que mudaram já refeitas (na
-        hora: elas são poucas)."""
+    def glifos(self, char: str, fontes=None, minima: float = 0.0, maxima: float = 1.0,
+               ao_terminar=None) -> None:
+        """A busca por glifo (§7.1), numa thread, no índice com as páginas que mudaram já
+        refeitas (depois de um lote, elas são muitas); `ao_terminar(achados)` é chamado na
+        interface (não é chamado se outro projeto foi aberto no meio)."""
         from abbychess import busca as bs
 
-        if self.pagina.projeto is not None and self.pronto.is_set():
-            refazer, carregar, _velhas = self._paginas_a_refazer()
-            idioma = self.idioma
-            for i, (pagina, versao) in refazer.items():
-                self.indice[i] = bs.indexar_pagina(pagina, idioma, versao=versao)
-            for i, versao in carregar.items():
-                pagina = self.pagina.projeto.ler_sem_migrar(i)
-                if pagina is not None:
-                    self.indice[i] = bs.indexar_pagina(pagina, idioma, versao=versao)
-        return bs.buscar_glifos(self.indice, char, fontes, minima, maxima)
+        geracao, indice = self._geracao, dict(self.indice)
+        leitura, refazer, carregar, velhas = (
+            self._paginas_a_refazer() if self.pagina.projeto is not None and self.pronto.is_set()
+            else (0, {}, {}, set()))
+
+        def rodar():
+            refeitas, achados = {}, []
+            try:
+                refeitas = self._refazer(refazer, carregar, lambda: geracao == self._geracao)
+                indice.update(refeitas)
+                achados = bs.buscar_glifos(indice, char, fontes, minima, maxima)
+            except Exception:
+                log.exception("a busca por glifo falhou")
+                self._velhas |= velhas
+
+            def fim():
+                if geracao != self._geracao:
+                    return
+                self._guardar(leitura, refeitas)
+                if ao_terminar is not None:
+                    ao_terminar(achados)
+            self._na_interface(fim)
+
+        threading.Thread(target=rodar, name="busca-por-glifo", daemon=True).start()

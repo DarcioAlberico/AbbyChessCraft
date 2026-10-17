@@ -228,6 +228,11 @@ def test_ca_7_4_casa_e_valoracao_em_ingles(classe, positivos, negativos):
         assert not _achados(_indice(token, idioma="en"), rf"^{classe}$", regex=True, idioma="en")
 
 
+def test_a_casa_depois_da_desambiguacao():
+    indexada = _indice("Nbd7 Rae1 Cbd2 Tfe1 R1e2 exd5 the5 a43 i9")
+    assert _achados(indexada, r"\C", regex=True) == ["d7", "e1", "d2", "e1", "e2", "d5"]
+
+
 def test_figurina_igual_a_letra_so_na_peca_de_um_lance():
     indexada = _indice("Cada nada C1e2 ♘1e2 Rd1 Td1")
     assert _achados(indexada, "Cada", figurina_letra=True) == ["Cada"]
@@ -237,9 +242,22 @@ def test_figurina_igual_a_letra_so_na_peca_de_um_lance():
 
 def test_o_tempo_limite_conta_cada_casamento(monkeypatch):
     """Muitos casamentos rápidos numa página não estouram o tempo-limite (só o casamento
-    lento conta)."""
-    indexada = _indice(" ".join(["a"] * 1000))
-    assert len(bs.buscar({0: indexada}, bs.Opcoes("a"), tempo_limite=0.05).ocorrencias) == 1000
+    lento conta), nem com outra thread disputando o GIL (o laço em Python entre os
+    casamentos não entra na conta)."""
+    indexada = _indice(" ".join(["a"] * 100))
+    parar = threading.Event()
+
+    def ocupar():
+        while not parar.is_set():
+            sum(range(2000))
+    vizinha = threading.Thread(target=ocupar, daemon=True)
+    vizinha.start()
+    try:
+        achadas = bs.buscar({0: indexada}, bs.Opcoes("a"), tempo_limite=0.05).ocorrencias
+    finally:
+        parar.set()
+        vizinha.join()
+    assert len(achadas) == 100
 
 
 @pytest.fixture
@@ -356,6 +374,41 @@ def test_trocar_de_projeto_durante_a_montagem_fica_com_o_novo(livro_escrito, mon
     assert busca._geracao == geracao + 1 and sorted(busca.indice) == [0, 1, 2]
 
 
+def test_uma_busca_velha_nao_desfaz_a_pagina_relida_por_uma_mais_nova(livro_escrito):
+    """A busca 1 termina depois da 2, que releu a página: o texto da 2 fica."""
+    projeto, ctl, busca, escrever, eventos = livro_escrito
+    busca.buscar(bs.Opcoes("casa"))
+    _esperar(lambda: eventos["fins"])
+    escrever(1, "relida")
+    busca.marcar_velha(1)
+    leitura_velha, refazer, carregar, _v = busca._paginas_a_refazer()   # a busca 1 a lê antes
+    velha = busca._refazer(refazer, carregar, lambda: True)
+    assert velha[1].texto == "relida"
+    escrever(1, "outra")
+    busca.marcar_velha(1)
+    busca.buscar(bs.Opcoes("outra"))                     # a busca 2, mais nova, termina antes
+    _esperar(lambda: len(eventos["fins"]) == 2)
+    busca._guardar(leitura_velha, velha)                 # o fim atrasado da busca 1
+    busca.buscar(bs.Opcoes("outra"))
+    _esperar(lambda: len(eventos["fins"]) == 3)
+    assert len(eventos["fins"][-1].ocorrencias) == 1
+
+
+def test_a_busca_por_glifo_roda_fora_da_interface(livro_escrito):
+    projeto, ctl, busca, escrever, eventos = livro_escrito
+    busca.abrir()
+    _esperar(busca.pronto.is_set)
+    fila, achados = [], []
+    ctl.executar.na_interface = fila.append
+    escrever(2, "aaa")
+    busca.marcar_velha(2)
+    busca.glifos("a", ao_terminar=achados.append)
+    assert not achados                                   # volta na hora, sem ler a página
+    _esperar(lambda: fila)
+    fila.pop(0)()
+    assert sum(g.pagina == 2 for g in achados[0]) == 3 and busca.indice[2].texto == "aaa"
+
+
 def test_os_resultados_voltam_pela_fila_da_interface(livro_escrito):
     projeto, ctl, busca, escrever, eventos = livro_escrito
     fila = []
@@ -365,6 +418,46 @@ def test_os_resultados_voltam_pela_fila_da_interface(livro_escrito):
     assert not eventos["fins"]                           # nada chega fora da interface
     fila.pop(0)()
     assert len(eventos["fins"][-1].ocorrencias) == 2
+
+
+@pytest.mark.processo
+def test_trocar_de_projeto_com_o_pool_nao_esvazia_o_indice_novo(tmp_path):
+    """A montagem velha, cancelada, não fecha os processos que a nova está usando."""
+    import json
+    import time
+    from types import SimpleNamespace
+
+    from abbychess.controlador import Eventos
+    from abbychess.controladores import ControladorDaBusca
+    from abbychess.projeto import _pagina_para_json
+
+    def projeto(nome):
+        pasta = tmp_path / nome
+        pasta.mkdir()
+        for i in range(120):
+            p = _pagina(f"{nome} pagina {i} com Cf3 e casa")
+            p.indice = i
+            (pasta / f"p{i}.json").write_text(json.dumps(_pagina_para_json(p)), encoding="utf-8")
+        return SimpleNamespace(dados=SimpleNamespace(idioma="pt"), paginas_lidas=lambda: range(120),
+                               pid_da_pagina=lambda i: i, modelo_em_memoria=lambda i: None,
+                               arquivo_da_pagina=lambda i: pasta / f"p{i}.json")
+    ctl = SimpleNamespace(projeto=projeto("a"), eventos=Eventos(), executar=SimpleNamespace(),
+                          historico=SimpleNamespace(versao=lambda pid: 0))
+    busca = ControladorDaBusca(ctl, paralelo=True)
+    avisos = []
+    ctl.eventos.ligar("aviso", lambda *a: avisos.append(a))
+    busca.pool.obter()                                  # aquecido, como no programa
+    busca.pool.devolver()
+    busca.abrir()
+    time.sleep(0.3)
+    ctl.projeto = projeto("b")
+    busca.abrir()
+    try:
+        _esperar(busca.pronto.is_set, 60)
+        assert len(busca.indice) == 120 and not avisos
+        assert busca.indice[0].texto.startswith("b pagina")
+    finally:
+        busca.pool.liberar()
 
 
 @pytest.mark.processo

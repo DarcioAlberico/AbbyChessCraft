@@ -265,8 +265,10 @@ você digita:
   "♘f3" e "Nf3" (a letra conta como peça quando vem seguida de uma casa).
 - **O escopo**: o livro, a página aberta, a seleção do Documento ou um intervalo de páginas
   ("3-10"; um intervalo que não se lê aparece como erro na barra). A seleção fica a de quando
-  você escolheu Seleção, mesmo que o cursor ande. **Onde**: prosa, notação, FEN (o do
-  diagrama lido), legendas (a partir do passo H) e cabeçalhos e rodapés.
+  você escolheu Seleção, mesmo que o cursor ande, e o escopo diz de que página ela é
+  ("Seleção (p. 3)"); ela cai ao fechar a barra ou trocar de página, e o Ctrl+F sem seleção
+  volta ao escopo de antes. **Onde**: prosa, notação, FEN (o do diagrama lido), legendas (a
+  partir do passo H) e cabeçalhos e rodapés.
 - **F3** e **Shift+F3** (ou Enter e Shift+Enter na barra) vão à próxima e à anterior, dando a
   volta no livro; a ocorrência atual fica em laranja no Documento e contornada na Imagem, as
   outras da página em amarelo. **Alt+Enter** manda todas para **Resultados** (página, linha e
@@ -280,14 +282,16 @@ você digita:
   segundo, com o aviso. A janela continua respondendo durante a busca (o atraso de um evento
   fica em ~2 ms). Buscar uma regex num livro de 230 páginas leva ~13 ms.
 - **Editar › Buscar glifo…**: caractere, fonte (rede, base global, livro, manual, sem
-  leitura) e faixa de confiança; a lista vai para Resultados (a Galeria é do passo C).
+  leitura) e faixa de confiança; a lista vai para Resultados (a Galeria é do passo C). Ela
+  roda em segundo plano, como a busca.
 - **O índice** é montado ao abrir o projeto, em segundo plano, nos processos que o programa
-  abre ao começar (e fecha depois de cada índice); não vai para o disco. 230 páginas levam
-  ~1,4 s com os processos já abertos (o alvo é 2 s), e 1,7–2,2 s pela janela com o servidor de
-  leitura subindo junto; com o projeto aberto logo ao abrir o programa (os processos por
-  abrir), ~2,0 s. O que você edita, o F5 e o lote refazem as páginas deles antes da busca
-  seguinte, e o livro v1 é lido sem migrar. As páginas não reconhecidas ficam fora (a barra
-  de status diz quantas, no escopo do livro).
+  abre ao começar (6 processos, ~290 MB, fechados quando o índice fica pronto, ou depois de
+  5 minutos se nenhum projeto for aberto); não vai para o disco. 230 páginas levam 1,4–1,5 s
+  com os processos já abertos (o alvo é 2 s), e 1,7–2,4 s pela janela com o servidor de
+  leitura subindo junto. Com os processos por abrir (o projeto aberto logo ao abrir o
+  programa, ou o segundo projeto da sessão), 2,0–2,3 s. O que você edita, o F5 e o lote
+  refazem as páginas deles antes da busca seguinte, e o livro v1 é lido sem migrar. As
+  páginas não reconhecidas ficam fora (a barra de status diz quantas, no escopo do livro).
 - **Os Avisos** que citam uma página (como as decisões que não seguiram os glifos relidos,
   desde o passo E) abrem a página com Enter ou duplo clique, e o glifo do ponto citado.
 
@@ -1221,7 +1225,10 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   (a primeira e a última, curtas, com número, separadas do texto), e não da regra completa
   da exportação; a legenda ganha a etiqueta dela no passo H; a busca por glifo mostra uma
   lista em Resultados até a Galeria do passo C; buscar antes de o índice ficar pronto espera
-  por ele (a barra de status mostra o progresso).
+  por ele (a barra de status mostra o progresso). O índice de 230 páginas cumpre os 2 s só
+  com os processos já abertos (o primeiro projeto, aberto um pouco depois do programa); o
+  projeto aberto junto com o programa, e o segundo da sessão, levam 2,0–2,3 s (CA-7.1, uma
+  limitação conhecida).
 - **A edição no Documento, desde o D1**: o que é do passo G (k letras por 1, 1 por k, o
   parágrafo, os estilos) é recusado com aviso; o Ctrl+T com uma edição do texto ainda na fila
   pede para tentar de novo depois que ela entrar; num projeto com páginas lidas antes do D1,

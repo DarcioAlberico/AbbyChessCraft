@@ -12,8 +12,8 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QMenu, QProgressBar, QTreeWidget,
-                               QTreeWidgetItem, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QHeaderView, QMenu, QProgressBar,
+                               QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from abbychess import modelo as md
 from abbychess.app import estilo
@@ -67,8 +67,17 @@ class PainelDePaginas(QWidget):
         self.lista.itemActivated.connect(self._abrir_item)
         self.lista.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.lista.customContextMenuRequested.connect(self._menu)
-        for coluna, largura in enumerate((32, 22, 30, 28, 28)):    # cabem nos 144 px da lista
+        # As colunas cabem nos 144 px da lista mesmo com a barra vertical (~17 px no Windows):
+        # a Pág. fica com o que sobra, e a lista nunca rola na horizontal.
+        cabecalho = self.lista.header()
+        cabecalho.setStretchLastSection(False)
+        cabecalho.setMinimumSectionSize(16)
+        cabecalho.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for coluna, largura in enumerate((22, 24, 26, 24), start=1):
+            cabecalho.setSectionResizeMode(coluna, QHeaderView.ResizeMode.Fixed)
             self.lista.setColumnWidth(coluna, largura)
+        self.lista.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.lista.headerItem().setToolTip(0, "A página do livro")
         self.lista.setColumnHidden(4, True)     # só com uma busca (§7.1)
         self._contagem = None
 

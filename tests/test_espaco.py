@@ -688,6 +688,11 @@ def test_f9_em_1366_abre_a_gaveta_de_150_sem_estreitar_a_imagem(app, janela):
     lista = j.paginas.lista
     colunas = sum(lista.columnWidth(c) for c in range(lista.columnCount()))
     assert colunas <= lista.viewport().width()               # Rev. e Diag. à vista
+    lista.setColumnHidden(4, False)                          # com a coluna da busca, e a barra
+    fixas = sum(lista.columnWidth(c) for c in range(1, 5))   # vertical do Windows (~17 px)
+    assert fixas + 26 <= lista.viewport().width() - 17       # a Pág. cabe "230"
+    assert lista.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+    lista.setColumnHidden(4, True)
 
 
 def test_esc_em_resultados_devolve_o_foco_ao_painel_de_antes(app, lida):

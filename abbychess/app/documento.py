@@ -31,8 +31,6 @@ from PySide6.QtGui import (QColor, QFont, QFontMetrics, QGuiApplication, QImage,
                            QTextDocument, QTextImageFormat)
 from PySide6.QtWidgets import QTextEdit
 
-from core.lado_a_jogar import NAO_REVISADO
-
 from abbychess import grade as gd
 from abbychess import texto as tx
 from abbychess.app import estilo
@@ -136,12 +134,13 @@ class VistaDoDocumento(QTextEdit):
     def montar(self, documento: Optional[tx.Documento], diagramas: Sequence = (),
                estados: Optional[Dict[int, str]] = None, desconhecidos: Iterable[int] = (),
                virtuais: Iterable[int] = (), matriz: Optional[np.ndarray] = None,
-               margens: Iterable[int] = ()) -> None:
+               margens: Iterable[int] = (),
+               aviso: str = "Página não reconhecida: F5 reconhece.") -> None:
         """O documento da página; sem documento (a página não reconhecida), o aviso.
         `margens`: os glifos do cabeçalho e do rodapé corridos, em cinza pequeno (a linha
         toda de margem; Ctrl+Shift+H a oculta), até as áreas terem função (passo F)."""
         self._entrada = (documento, list(diagramas), dict(estados or {}), set(desconhecidos),
-                         set(virtuais), matriz, set(margens))
+                         set(virtuais), matriz, set(margens), aviso)
         lugar = self._lugar()
         rolagem = self.verticalScrollBar().value()
         novo = QTextDocument(self)
@@ -149,11 +148,11 @@ class VistaDoDocumento(QTextEdit):
         self._linha_do_gid, self._palavra_do_gid, self._diagramas = {}, {}, {}
         self._formatos = {}
         if documento is not None:
-            self._preencher(novo, *self._entrada)
+            self._preencher(novo, *self._entrada[:-1])
         else:
             aviso = QTextCharFormat()
             aviso.setForeground(estilo.CINZA)
-            QTextCursor(novo).insertText("Página não reconhecida: F5 reconhece.", aviso)
+            QTextCursor(novo).insertText(self._entrada[-1], aviso)
         antigo = self.document()
         # O documento padrão do QTextEdit é do controle de texto, que o apaga no setDocument; o
         # nosso anterior (filho da vista) sai aqui, ou cada montagem o deixaria vivo.
@@ -228,11 +227,11 @@ class VistaDoDocumento(QTextEdit):
         for bloco in documento.blocos:
             if bloco.funcao in MARGENS and not self.mostrar_margens:
                 continue
-            if not primeiro:
-                cursor.insertBlock()
-            primeiro = False
-            cursor.setBlockFormat(self._formato_do_bloco(bloco.funcao))
             if bloco.diagrama_id is not None:
+                if not primeiro:
+                    cursor.insertBlock()
+                primeiro = False
+                cursor.setBlockFormat(self._formato_do_bloco(bloco.funcao))
                 self._por_diagrama(doc, cursor, self._diagramas.get(bloco.diagrama_id),
                                    numero.get(bloco.diagrama_id, 0), matriz)
                 continue
@@ -241,16 +240,28 @@ class VistaDoDocumento(QTextEdit):
             escritas = 0
             for linha in bloco.linhas:
                 gids = [g for p in linha.palavras for g in p.gids]
-                margem = bool(gids) and all(g in margens for g in gids)
+                margem = self._de_margem(gids, documento, margens, virtuais)
                 if margem and not self.mostrar_margens:
                     for g in gids:                  # a Linha ainda acha a linha dela
                         self._linha_do_gid[g] = gids
                     continue
-                if escritas:
-                    cursor.insertBlock(self._formato_do_bloco(bloco.funcao, continua=True))
+                # O parágrafo abre só aqui: um bloco todo de margem, oculto, não deixa um vazio.
+                if not primeiro:
+                    cursor.insertBlock(self._formato_do_bloco(bloco.funcao, continua=bool(escritas)))
+                else:
+                    cursor.setBlockFormat(self._formato_do_bloco(bloco.funcao))
+                primeiro = False
                 escritas += 1
                 self._linha(cursor, linha, documento, de_margem if margem else base, normal,
                             estados, desconhecidos, virtuais)
+
+    @staticmethod
+    def _de_margem(gids, documento, margens, virtuais) -> bool:
+        """A linha é de margem quando os glifos lidos dela (não o □ nem o virtual) estão todos
+        nas margens corridas, e há pelo menos um."""
+        lidos = [g for g in gids if g not in virtuais
+                 and documento.chars.get(g, tx.NAO_LIDO) != tx.NAO_LIDO]
+        return bool(lidos) and all(g in margens for g in lidos)
 
     def _linha(self, cursor, linha, documento, base, normal, estados, desconhecidos,
                virtuais) -> None:
@@ -301,7 +312,7 @@ class VistaDoDocumento(QTextEdit):
         mono = QTextCharFormat()
         mono.setFont(QFont(MONO, max(CORPO_MINIMO, self.corpo - 2)))
         # No Documento, só o estado de §6.1, embaixo: o "não revisado" é da exportação.
-        linha = diagrama.linha_de_texto(numero).replace(f"; {NAO_REVISADO}", "")
+        linha = diagrama.linha_de_texto(numero, com_ressalva=False)
         cursor.insertText(" " + linha, mono)
         estado = QTextCharFormat()
         estado.setForeground(estilo.CINZA)

@@ -112,8 +112,10 @@ class DesenhoDaJanela:
         na_fila = set(p.fila())
         estados = {b.gid: gd.estado(b.entry, b.gid in na_fila) for b in p.modelo.boxes} \
             if p.modelo is not None else {}
+        aviso = ("Nada reconhecido nesta página." if p.reconhecida
+                 else "Página não reconhecida: F5 reconhece.")
         self.texto.montar(p.documento(), p.diagramas, estados, v.gids_desconhecidos(),
-                          p.gids_virtuais(), p.matriz, p.gids_de_margem())
+                          p.gids_virtuais(), p.matriz, p.gids_de_margem(), aviso)
         self._mostrar_a_linha()
 
     def _selecao_mudou(self) -> None:

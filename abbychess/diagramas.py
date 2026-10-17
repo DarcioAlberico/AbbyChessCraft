@@ -128,12 +128,13 @@ class DiagramaLido:
         """`brancas a jogar (assumido: a página não diz)` e as outras procedências."""
         return lado_a_jogar.marca(self.lado, self.lado_origem if self.lado else "")
 
-    def linha_de_texto(self, numero: int) -> str:
-        """A linha do diagrama no texto reconhecido da página."""
+    def linha_de_texto(self, numero: int, *, com_ressalva: bool = True) -> str:
+        """A linha do diagrama no texto reconhecido da página. `com_ressalva` falso tira o
+        "não revisado" (o Documento mostra o estado à parte, §6.1)."""
         if not self.lido:
             motivo = self.erro or "ainda não lido"
             return f"[Diagrama {numero}: {motivo}]"
-        ressalva = "" if self.conferido else f"; {lado_a_jogar.NAO_REVISADO}"
+        ressalva = "" if self.conferido or not com_ressalva else f"; {lado_a_jogar.NAO_REVISADO}"
         return (f"[Diagrama {numero}: {self.fen}{lado_a_jogar.SEPARADOR_DO_ALT}"
                 f"{self.marca_do_lado()}{ressalva}]")
 

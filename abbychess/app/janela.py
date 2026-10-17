@@ -227,17 +227,24 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
         self.setWindowTitle(f"{projeto.dados.nome}{so_leitura} — {TITULO}")
         self.livro.abrir(projeto, fonte)
 
-    def usar(self, projeto, fonte, leitor) -> None:
-        """O projeto com o leitor já pronto (os testes; a abertura passa por `abrir`)."""
+    def usar(self, projeto, fonte, leitor, servidor=None) -> None:
+        """O projeto com o leitor já pronto (os testes e as medidas; a abertura passa por
+        `abrir`). Com o `servidor`, o leitor é o da interface (só os padrões do livro)."""
         projeto.ao_falhar_gravacao = self.falha_de_gravacao.emit
         self.abrir_avisos_do_projeto(projeto)
-        self.livro.usar(projeto, fonte, leitor)
+        self.livro.usar(projeto, fonte, leitor, servidor)
         self._espaco_do_projeto_aberto()
 
     def _projeto_aberto(self, leitor) -> None:
         self._padroes_mudaram()
         self._espaco_do_projeto_aberto()
         dialogos.avisos_da_abertura(self, self.projeto)
+        servidor = self.pagina.servidor
+        if servidor is not None and not servidor.pronto.is_set():
+            # §9.1: a navegação já vale; o que for lido antes fica "aguardando leitura".
+            self.statusBar().showMessage("Carregando os modelos no servidor de leitura… As "
+                                         "páginas já abrem; a leitura começa quando ele "
+                                         "terminar.")
 
     def _modelos_prontos(self, estado: dict) -> None:
         leitor = self.leitor

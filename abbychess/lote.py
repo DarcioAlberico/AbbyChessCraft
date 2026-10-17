@@ -168,6 +168,13 @@ class CondutorDoLote:
                 self.resultado.cancelado = True
                 self._terminar()
                 return
+            servidor_caiu = (isinstance(resultado, sl.ErroDoServidor)
+                             and p.servidor is not None and p.servidor.desistiu)
+            if servidor_caiu:                   # as outras páginas falhariam do mesmo jeito
+                self.resultado.falhas[indice] = str(resultado)
+                self.resultado.cancelado = True
+                self._terminar()
+                return
             self.restante.popleft()
             if isinstance(resultado, Exception):
                 log.warning("a página %d não foi reconhecida: %s", indice + 1, resultado)
@@ -188,7 +195,10 @@ class CondutorDoLote:
                 resultado = ler(self._cancelar.is_set)
             except Exception as erro:  # a leitura que falhou volta como resultado
                 resultado = erro
-            self.p.executar.na_interface(lambda: voltou(resultado))
+            try:
+                self.p.executar.na_interface(lambda: voltou(resultado))
+            except RuntimeError:  # a janela fechou no meio da página: nada a gravar
+                log.info("o lote terminou com a janela já fechada")
 
         threading.Thread(target=rodar, name="lote", daemon=True).start()
 

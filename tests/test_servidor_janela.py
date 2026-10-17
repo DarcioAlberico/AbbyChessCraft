@@ -176,6 +176,10 @@ def test_ca_11_1_e_11_2_durante_o_lote_navegar_e_ensinar_valem_na_hora(app, jane
     # CA-11.2: as páginas começadas depois do Enter leem o "a" pelo padrão do livro.
     assert feitas_ao_ensinar < 49
     assert any(b.entry.char == "a" and b.entry.source == "livro" for b in ultima.boxes)
+    # CA-4.4: o livro.json é o recalculado, com as páginas que vieram do servidor.
+    assert p.projeto.descarregar(10)
+    gravado = json.loads((p.projeto.pasta / "livro.json").read_text(encoding="utf-8"))
+    assert gravado == p.projeto.recalcular_livro()
 
 
 def test_ca_11_4_a_aberta_editada_durante_a_leitura_fica_para_reler_depois(
@@ -219,3 +223,23 @@ def test_ca_11_3_fechar_com_o_lote_ativo_termina_o_filho_e_as_paginas_carregam(a
     finally:
         reaberto.fechar()
 
+
+def test_o_lote_para_quando_o_servidor_desiste(app, janela_do_livro, monkeypatch):  # noqa: F811
+    """Na segunda queda o servidor desiste: o lote para (as páginas seguintes falhariam todas)
+    e o que faltou fica para retomar depois de reabrir o projeto."""
+    from PySide6.QtWidgets import QMessageBox
+
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.No)
+    j = janela_do_livro
+    p = j.pagina
+    servidor = p.servidor
+    j.livro.reconhecer(list(range(51)), refazer=False)
+    _ate(app, lambda: len(p.projeto.paginas_lidas()) >= 1)
+    servidor.processo.kill()
+    _ate(app, lambda: servidor.reinicios == 1 and servidor.pronto.is_set())
+    _ate(app, lambda: len(p.projeto.paginas_lidas()) >= 3)        # o lote seguiu no reaberto
+    servidor.processo.kill()
+    _ate(app, lambda: not j.livro.lote_rodando, 60)
+    resultado = j.fins[-1]
+    assert servidor.desistiu and resultado.cancelado and len(resultado.falhas) == 1
+    assert j.livro.pode_retomar and len(resultado.lidas) < 51

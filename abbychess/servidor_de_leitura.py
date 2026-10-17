@@ -273,6 +273,8 @@ class _Laco:
             return leitor.padroes.total
         if operacao == "pid":
             return os.getpid()
+        if operacao == "modulos":                  # os testes: o filho não carrega o Qt
+            return sorted(m for m in ("PySide6", "torch") if m in sys.modules)
         raise ValueError(f"operação desconhecida {operacao!r}")
 
 

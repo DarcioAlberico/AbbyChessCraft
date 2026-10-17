@@ -1,0 +1,107 @@
+"""O laço do servidor de leitura numa thread, com filas comuns (SPEC §11; a suíte rápida).
+
+O mesmo `_Laco` que roda no filho, sem abrir processo: a vez entre glifos, os deltas, o
+cancelamento e o erro de uma operação. Os testes com o filho de verdade (`spawn`, a queda e o
+fechamento) estão em `tests/test_servidor.py`, na camada `processo`.
+"""
+
+from __future__ import annotations
+
+import queue
+import threading
+import time
+
+import numpy as np
+import pytest
+from PIL import Image
+
+from abbychess import servidor_de_leitura as sl
+from abbychess.padroes import PadroesDoLivro
+from abbychess.projeto import Limiares
+
+from tests import leitor_falso
+from tests.test_treino_por_livro import _pagina_sintetica
+
+
+@pytest.fixture
+def imagem(tmp_path):
+    return Image.open(_pagina_sintetica(tmp_path / "pagina.png")).convert("L")
+
+
+@pytest.fixture
+def laco(tmp_path, monkeypatch):
+    monkeypatch.setattr(sl, "_baixar_a_prioridade", lambda: None)   # não a do pytest
+    monkeypatch.setenv("ABBY_FALSO_MS_POR_GLIFO", "5")
+    entrada, saida = queue.Queue(), queue.Queue()
+    laco = sl._Laco(entrada, saida, "tests.leitor_falso:criar", tmp_path / "padroes", Limiares())
+    thread = threading.Thread(target=laco.rodar, daemon=True)
+    thread.start()
+    assert saida.get(timeout=10)[0] == "pronto"
+    laco.pasta_de_teste = tmp_path / "padroes"
+    yield laco
+    entrada.put(("sair",))
+    thread.join(5)
+
+
+def _respostas(laco, quantas: int) -> dict:
+    respostas = {}
+    while len(respostas) < quantas:
+        _, id_, ok, resultado = laco.saida.get(timeout=20)
+        respostas[id_] = (ok, resultado)
+    return respostas
+
+
+def test_o_interativo_passa_na_frente_da_proxima_pagina_do_lote(laco, imagem):
+    for id_ in (1, 2, 3):
+        laco.entrada.put(("pedido", id_, sl.LOTE, "ler_pagina", (imagem, [], [])))
+    time.sleep(0.03)                                      # o lote começou a página 1
+    laco.entrada.put(("pedido", 9, sl.INTERATIVO, "ler_pagina", (imagem, [], [])))
+    respostas = _respostas(laco, 4)
+    assert all(ok for ok, _ in respostas.values())
+    assert laco.ordem.index(9) < laco.ordem.index(2)
+    lida = respostas[9][1]
+    assert {b.char for b in lida.boxes} == {leitor_falso.LETRA}
+
+
+def test_o_delta_vale_no_pedido_seguinte_e_o_apagado_sai(laco):
+    padroes = PadroesDoLivro(laco.pasta_de_teste)
+    recorte = np.full((30, 20), 0, np.uint8)
+    caminho = padroes.ensinar(recorte, "a", 1.0, origem="o1")
+    laco.entrada.put(("padroes", [(str(caminho), 1.0)], []))
+    laco.entrada.put(("pedido", 1, sl.INTERATIVO, "ler_recortes", [(recorte, 30.0)]))
+    [(ok, [leitura])] = _respostas(laco, 1).values()
+    assert ok and (leitura.char, leitura.fonte) == ("a", "livro")
+    laco.entrada.put(("padroes", [], [str(caminho)]))
+    laco.entrada.put(("pedido", 2, sl.INTERATIVO, "padroes", None))
+    assert _respostas(laco, 1)[2] == (True, 0)
+
+
+def test_cancelar_para_a_pagina_do_lote_e_a_que_nao_comecou(laco, imagem):
+    laco.entrada.put(("pedido", 1, sl.LOTE, "ler_pagina", (imagem, [], [])))
+    laco.entrada.put(("pedido", 2, sl.LOTE, "ler_pagina", (imagem, [], [])))
+    time.sleep(0.03)
+    laco.entrada.put(("cancelar", 1))
+    laco.entrada.put(("cancelar", 2))
+    respostas = _respostas(laco, 1)                       # o 2 sai da fila sem resposta
+    assert respostas[1] == (False, "cancelado")
+    assert 2 not in laco.ordem
+
+
+def test_a_operacao_que_falha_volta_como_erro_e_o_laco_segue(laco):
+    laco.entrada.put(("pedido", 1, sl.INTERATIVO, "nao_existe", None))
+    laco.entrada.put(("pedido", 2, sl.INTERATIVO, "pid", None))
+    respostas = _respostas(laco, 2)
+    assert not respostas[1][0] and "nao_existe" in respostas[1][1]
+    assert respostas[2][0]
+
+
+def test_o_modulo_principal_guardado_nao_abre_a_janela_no_filho():
+    """O filho do `spawn` importa `abbychess.__main__` como `__mp_main__`: nada do Qt."""
+    import subprocess
+    import sys
+
+    codigo = ("import runpy, sys; runpy.run_module('abbychess.__main__', run_name='__mp_main__');"
+              "print('PySide6' in sys.modules)")
+    saida = subprocess.run([sys.executable, "-c", codigo], capture_output=True, text=True,
+                           timeout=60)
+    assert saida.stdout.strip() == "False", saida.stderr

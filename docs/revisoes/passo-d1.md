@@ -64,6 +64,7 @@ Ramo `passo-d1-edicao`, a partir da tag `passo-e` (f2ddfae).
 | Produto 2 | produto, design e medição | 7 · 7 · 8 · 8 · 8 | volta |
 | Código 5 | código e testes | 8 · 8 · 8 | aceita |
 | Produto 3 | produto, design e medição | 8 · 7 (só o relato das medidas) · 8 · 8 · 8 | volta só pelo M5 |
+| Produto 4 | produto, design e medição | 8 · 8 · 8 · 8 · 8 | aceita |
 
 **Código 1** (12 cenários de borda, 7 errados): o virtual cuja âncora sai ia ao começo da
 página; o 2º virtual na mesma âncora saía na ordem errada; a letra antes de um virtual no
@@ -85,7 +86,10 @@ Ctrl+T com a sessão na fila; o cursor deslocado pela montagem. **Produto 2**: M
 hífen; o modo pelo livro; o colar com toda palavra mudada. **Código 5**: aceita; o contador
 da fila ao trocar de projeto, as sessões da fila ao fechar, o `agora` pelo sinal, a faixa sem
 a matriz inteira. **Produto 3**: a primeira confirmação no modo "como o livro" lia todas as
-páginas (agora o resumo do `livro.json`).
+páginas (agora o resumo do `livro.json`). **Produto 4**: aceita (as tabelas idênticas ao gerador, os
+números do relato conferidos com os JSON); os menores (uma frase que exagerava o p95 do
+Enter, o atraso com o leitor falso, duas limitações levadas ao README, o nome da fatia da
+primeira bateria) entraram no fechamento, fora do caminho medido.
 
 ## Verificação
 
@@ -106,6 +110,8 @@ unidade de cada caractere); o pico durante o lote de 132–137 para 92–105 ms.
 fatia iguais às do E. Detalhe no README ("A edição no Documento, desde o passo D1"). A
 primeira bateria (`dd38d99`, antes das revisões de produto) está em
 `docs/medidas/2026-10-17-primeira-rodada-d1*.json`.
+
+**Fechamento.** As duas revisões aceitaram: código na rodada 5, produto na rodada 4.
 
 ## CA-F.1
 

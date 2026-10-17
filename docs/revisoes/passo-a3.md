@@ -72,16 +72,57 @@ Correção 9 · Simplicidade 8 · Testes 9 — **aceita**. O defeito menor que e
 glifo de uma linha visual quebrada não se achava pelo clique) entrou junto (`b4fd450`), com
 teste.
 
-## Medidas (commit `f058c02`, pasta limpa)
+## As medidas
 
-- Portão: 16 passaram; `docs/medidas/2026-10-16-passo-a3.json`.
-- 3 rodadas (`repeticao-a3`): o clique no Documento, mediana 10,1–10,5 ms e p95 20,3–23,0
-  (alvo de 50); montar o Documento (`texto_da_pagina`), mediana 30,8–31,4 e p95 33,4–35,8
-  (A2: ~22, o texto puro); troca no cache, mediana 14,2–14,4; fora do cache, 129,7–131,7;
-  Enter até a cor, mediana 30,4; 21,1; 21,2 e p95 38,8; 27,1; 27,7 (a primeira rodada
-  deslocada por igual, como no A1); com uma propagação lenta, p95 37,9; 28,6; 22,2;
-  releitura, mediana 14,3–15,3; memória com o lote, 1805–1806 MB; atraso no lote, p99
-  9,9–21,2.
-- Qualidade (`medir.py`, os três livros, no `f058c02`) e fatia (`--passo A3`, no `63cce57`):
-  iguais às do A2. O CA-F.1 continua "gestos pendentes": o texto do gabarito não está
-  verificado.
+Três baterias, todas com a pasta limpa: a do `f058c02` (antes da revisão de produto,
+`…-primeira-rodada-a3*`), a do `34001f8` (depois das correções da revisão, `…-segunda-rodada-a3*`:
+mostrou montar o Documento em 52 ms e o atual_mudou mais lento, pelas margens recalculadas a
+cada montagem e pela busca linear da Linha) e a final, do `271d582`, depois de corrigir as
+duas. Uma quarta, do `276c689`, foi descartada inteira: a correção da chave do cache foi
+escrita na worktree com ela rodando.
+
+### Medidas finais (commit `271d582`)
+
+- Portão: 16 passaram; `docs/medidas/2026-10-17-passo-a3.json`.
+- 3 rodadas (`repeticao-a3`), na ordem em que rodaram:
+  - o clique no Documento: mediana 2,44; 2,48; 2,46 ms e p95 2,72; 2,79; 2,76 (alvo de 50);
+  - montar o Documento: mediana 31,1; 31,1; 31,1 e p95 32,1; 31,9; 32,7 (A2, o texto puro: ~22);
+  - Enter até a cor: mediana 30,0; 21,3; 21,2 e p95 37,0; 22,9; 22,9 (a primeira rodada
+    deslocada por igual; o portão, 21,1 e 22,4);
+  - Enter com uma propagação lenta: p95 35,8; 22,6; 35,2;
+  - Enter até o fim da propagação: mediana 89,3; 80,8; 80,7 (A2: 71,8–72,6);
+  - troca no cache: mediana 14,3; 14,1; 14,1; fora do cache: 128,4; 129,4; 128,2;
+  - releitura: mediana 14,1; 14,6; 14,4;
+  - memória com o lote: 1807; 1807; 1806 MB (portão 1823; A2: 1781–1783);
+  - atraso no lote: p99 21,0; 9,4; 9,7.
+- Qualidade (`medir.py`, os três livros, no `271d582`) e fatia (`--passo A3`, no `b8ebe2a`,
+  que só acrescenta os JSON): iguais às do A2. O CA-F.1 continua "gestos pendentes".
+
+## Revisão de produto, rodada 1
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Produto, design e medição | Completude 7 · Fidelidade das medidas 6 · Clareza 8 · Produtividade 7 · Design 8 | volta |
+
+| Achado | Correção |
+|---|---|
+| **M1** O CA-F.1 pendente, contra o prazo do roadmap (o gabarito verificado antes do fechamento do A3); e o replay não ganha nada com o A3 | levado ao usuário: **roadmap 0.8**, com o sim dele: o prazo passa ao D1, e o alvo de ≤ 85% depois do A3 sai |
+| **M2** A formatação por função e o Ctrl+Shift+H não faziam nada numa página real (nenhuma área tem função até o F) | o cabeçalho e o rodapé corridos pela regra da exportação (`gids_de_margem`) saem em cinza, e o Ctrl+Shift+H os oculta; o README diz que título e nota são do F |
+| **M3** O glifo atual da fila não ficava marcado no Documento sem o foco nele | `marcar_atual`: fundo próprio (extraSelection), refeito a cada montagem; teste |
+| **M4** As rodadas descritas fora de ordem, e a do A2 chamada de deslocamento | a ordem pela hora dos arquivos; a do A2 é uma cauda (acima) |
+| **M5** O Enter até o fim da propagação e a memória com o lote subiram sem dizer | ditos no README e aqui, com as causas prováveis; o que vinha do A3 mesmo (as margens recalculadas, a busca linear da Linha) foi corrigido antes da medida final |
+| m1–m9 | as capturas com a página endireitada; o contorno velho sai quando a fila anda; o Documento vai junto com a fila (README); o corpo 10 abaixo de 1600 px; o CR no README; só o estado do diagrama no Documento; a página não reconhecida diz isso; o rótulo curto "Página inteira"; a nota na SPEC §6.1 |
+
+## Rodadas 3 e 4 (código, sobre as correções do produto)
+
+Rodada 3: Correção 8 · Simplicidade 8 · Testes 8 — **aceita**, com quatro menores, que
+entraram (`320cdc3`): o bloco só de margem não deixa parágrafo vazio; a linha de margem com
+□ ou virtual continua margem; a Linha do clique é a do glifo clicado; "Nada reconhecido
+nesta página." para a página reconhecida e vazia; e `linha_de_texto(com_ressalva=False)` no
+lugar do `replace` de string.
+
+Rodada 4 (sobre a otimização do `276c689`): Correção 7 · Simplicidade 8 · Testes 8 — volta:
+a chave do cache das margens só olhava os gids, e corrigir o número da página ("l2" → "12")
+deixava a margem velha. A chave passou a ter o texto, a posição de cada glifo lido e a altura
+da página (`271d582`), com o teste de invalidação (que falha com a chave antiga) e o de
+"Nada reconhecido".

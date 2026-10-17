@@ -521,3 +521,23 @@ def test_ctrl_shift_n_no_campo_do_glifo(j):
     assert j.treino.campo.text() == "♘"
     j.inserir_figurina("♘")
     assert j.treino.campo.text() == "♞"
+
+
+def test_backspace_so_no_hifen_de_fim_de_linha_e_recusado(j):
+    pagina = _escrever(j, "exem-", "plo bom")
+    antes = [b.gid for b in pagina.boxes]
+    _por_o_cursor(j, 5)                                   # logo depois do hífen
+    _tecla(j, Qt.Key.Key_Backspace)
+    _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    assert [b.gid for b in pagina.boxes] == antes and _texto(j).startswith("exem-")
+    assert "hífen" in j.linha.aviso
+
+
+def test_o_cursor_volta_ao_lugar_quando_a_montagem_tira_o_espaco_a_mais(j):
+    _escrever(j, "ganhar tempos fim")
+    _por_o_cursor(j, 6)
+    QTest.keyClicks(j.texto, " ")                         # "ganhar  tempos fim"
+    _por_o_cursor(j, 16)                                  # sai da sessão: depois do "f"
+    QApplication.processEvents()
+    QApplication.processEvents()
+    assert _texto(j) == "ganhar tempos fim" and j.texto.textCursor().position() == 15

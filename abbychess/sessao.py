@@ -89,16 +89,28 @@ def alinhar(original: str, novo: str, fixos: Sequence[Tuple[int, int]] = ()
     return pares
 
 
-#: Acima disto (caracteres do original × do novo), sem fixos, o alinhamento se ancora nos
-#: trechos longos iguais: colar a página inteira por cima custaria segundos no Levenshtein.
+#: Acima disto (caracteres do original × do novo), sem fixos, o alinhamento se ancora nas
+#: palavras iguais, e um vão ainda maior se alinha numa faixa em volta da diagonal: colar a
+#: página inteira por cima custaria segundos no Levenshtein completo.
 CELULAS_SEM_ANCORAS = 250_000
-#: O menor trecho igual que vira âncora (um trecho curto pode casar no lugar errado).
-TRECHO_MINIMO = 12
+#: A folga da faixa, além da diferença de tamanho dos dois lados.
+FOLGA_DA_FAIXA = 32
 
 
 def _trechos_longos_iguais(original: str, novo: str) -> List[Tuple[int, int]]:
-    blocos = difflib.SequenceMatcher(None, original, novo, autojunk=False).get_matching_blocks()
-    return [(b.a + k, b.b + k) for b in blocos if b.size >= TRECHO_MINIMO for k in range(b.size)]
+    """Os pares de caracteres das palavras iguais nos dois lados, na ordem (um difflib sobre
+    as listas de palavras, que são curtas: o de caracteres fica quadrático em texto
+    repetitivo)."""
+    de = list(re.finditer(r"\S+", original))
+    para = list(re.finditer(r"\S+", novo))
+    blocos = difflib.SequenceMatcher(None, [t.group(0) for t in de], [t.group(0) for t in para],
+                                     autojunk=False).get_matching_blocks()
+    pares: List[Tuple[int, int]] = []
+    for bloco in blocos:
+        for k in range(bloco.size):
+            x, y = de[bloco.a + k], para[bloco.b + k]
+            pares += [(x.start() + c, y.start() + c) for c in range(len(x.group(0)))]
+    return pares
 
 
 def _troca(a: str, b: str) -> int:
@@ -111,14 +123,22 @@ def _troca(a: str, b: str) -> int:
 
 
 def _levenshtein(original: str, novo: str) -> List[Tuple[Optional[int], Optional[int]]]:
+    """O alinhamento de menor custo; grande demais, só numa faixa em volta da diagonal."""
     n, m = len(original), len(novo)
-    custo = [[0] * (m + 1) for _ in range(n + 1)]
-    for i in range(1, n + 1):
+    infinito = n + m + 1
+    custo = [[infinito] * (m + 1) for _ in range(n + 1)]
+    for i in range(n + 1):
         custo[i][0] = i
-    for j in range(1, m + 1):
+    for j in range(m + 1):
         custo[0][j] = j
+    faixa = abs(n - m) + FOLGA_DA_FAIXA if n * m > CELULAS_SEM_ANCORAS else None
     for i in range(1, n + 1):
-        for j in range(1, m + 1):
+        if faixa is None:
+            colunas = range(1, m + 1)
+        else:
+            centro = i * m // n
+            colunas = range(max(1, centro - faixa), min(m, centro + faixa) + 1)
+        for j in colunas:
             custo[i][j] = min(custo[i - 1][j - 1] + _troca(original[i - 1], novo[j - 1]),
                               custo[i - 1][j] + 1, custo[i][j - 1] + 1)
     pares: List[Tuple[Optional[int], Optional[int]]] = []
@@ -226,9 +246,10 @@ def gid_no_cursor(unidades: Sequence[Unidade], novo: str, onde: int,
 
 
 def planejar(unidades: Sequence[Unidade], novo: str,
-             fixos: Sequence[Tuple[int, int]] = ()) -> Plano:
+             fixos: Sequence[Tuple[int, int]] = (), fim_de_linha: bool = False) -> Plano:
     """O plano da sessão: o que fica, o que sai, o que entra, e as fronteiras. `fixos`, os
-    pares (no original, no novo) que nenhuma edição tocou (ver `alinhar`)."""
+    pares (no original, no novo) que nenhuma edição tocou (ver `alinhar`); `fim_de_linha`,
+    a sessão termina numa quebra de linha impressa (o hífen dela parte uma palavra)."""
     novo = _normalizar(novo)
     original = "".join(u.texto if u.tipo != LINHA else " " for u in unidades)
     pares = alinhar(original, novo, fixos)
@@ -262,7 +283,7 @@ def planejar(unidades: Sequence[Unidade], novo: str,
             plano.sair.add(gid)
         elif depois != antes:
             plano.corrigir[gid] = depois
-    _recusar_o_hifen_de_fim_de_linha(unidades, plano.sair)
+    _recusar_o_hifen_de_fim_de_linha(unidades, plano.sair, fim_de_linha)
     plano.linha_mantida = any(unidades[i].tipo == LINHA and (j is None or novo[j] != " ")
                               for i, j in pares if i is not None)
     ficam = [gid for item, gid in itens if item == "glifo"]
@@ -305,13 +326,13 @@ def _recusar_o_que_e_do_passo_g(unidades, novo, pares) -> None:
 HIFENS = "-‐‑"
 
 
-def _recusar_o_hifen_de_fim_de_linha(unidades, sair) -> None:
+def _recusar_o_hifen_de_fim_de_linha(unidades, sair, fim_de_linha: bool) -> None:
     """Apagar o hífen do fim de uma linha impressa é juntar as duas metades da palavra
     (§6.3, "hífen de fim de linha apagado"): isso é do passo G, e sem ele o box do hífen sairia
     e a palavra continuaria partida."""
     for k, u in enumerate(unidades):
-        if (u.glifo and u.gid in sair and u.texto in HIFENS
-                and k + 1 < len(unidades) and unidades[k + 1].tipo == LINHA):
+        no_fim = (unidades[k + 1].tipo == LINHA if k + 1 < len(unidades) else fim_de_linha)
+        if u.glifo and u.gid in sair and u.texto in HIFENS and no_fim:
             raise Recusa(f"{PROXIMA_VERSAO} (juntar a palavra partida pelo hífen)")
 
 
@@ -433,9 +454,9 @@ def palavras_em(unidades: Sequence[Unidade], inicio: int, fim: int) -> Tuple[int
 
 
 def editar(pagina: Pagina, unidades: Sequence[Unidade], novo: str,
-           fixos: Sequence[Tuple[int, int]] = ()) -> Plano:
+           fixos: Sequence[Tuple[int, int]] = (), fim_de_linha: bool = False) -> Plano:
     """Planeja e aplica (levanta `Recusa` sem mudar nada)."""
-    plano = planejar(unidades, novo, fixos)
+    plano = planejar(unidades, novo, fixos, fim_de_linha)
     aplicar(pagina, plano)
     return plano
 

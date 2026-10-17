@@ -179,26 +179,20 @@ def palavra_nova(palavras, n: int, linha: int, virtuais, de_fora
     return None, seguinte, True
 
 
-def absorver_virtual(pagina: Pagina, gid: int) -> str:
-    """O box `gid`, recém-marcado sobre a tinta de uma letra que faltava: o glifo virtual
-    colado nele na palavra montada (o primeiro, à esquerda; senão, à direita) sai, e a letra
-    dele vai para o box (manual: foi o usuário que a digitou). Devolve a letra, ou "" se não
-    havia virtual ali."""
+def virtual_vizinho(pagina: Pagina, gid: int) -> Optional[Tuple[int, str]]:
+    """O glifo virtual colado no box `gid` na palavra montada (o da esquerda; senão, o da
+    direita), como (gid, letra), ou None. O box recém-marcado sobre a tinta de uma letra que
+    faltava pode ser ela, ou outra coisa (a vírgula ao lado): quem decide é o usuário."""
     virtuais = {v.gid: v for v in pagina.decisoes.virtuais}
     onde, montadas = pagina_montada(pagina)
     if gid not in onde or not virtuais:
-        return ""
+        return None
     palavra = montadas[onde[gid]]
     k = palavra.index(gid)
     vizinho = next((g for g in (palavra[k - 1] if k else None,
                                 palavra[k + 1] if k + 1 < len(palavra) else None)
                     if g in virtuais), None)
-    if vizinho is None:
-        return ""
-    letra = virtuais[vizinho].char
-    ed.apagar_virtual(pagina, vizinho)
-    ed.corrigir(pagina, gid, letra)
-    return letra
+    return None if vizinho is None else (vizinho, virtuais[vizinho].char)
 
 
 def pagina_montada(pagina: Pagina):

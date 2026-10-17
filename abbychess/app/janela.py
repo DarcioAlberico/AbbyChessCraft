@@ -179,6 +179,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
                              ("resultado", self._resultado),
                              ("sessao_recusada", self._sessao_recusada),
                              ("estrutural", self._aviso_estrutural),
+                             ("caractere_sugerido", self._caractere_sugerido),
                              ("pagina_do_lote", self._pagina_do_lote),
                              ("acoes_mudaram", self._acoes_mudaram),
                              ("lote_mudou", self._acoes_mudaram),
@@ -276,7 +277,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         de mexer nas tarefas: falso quando o usuário prefere não fechar (e perder as
         mudanças dela), e aí nada mudou."""
         projeto = self.projeto
-        self.confirmar_a_sessao_aberta()
+        self.confirmar_a_sessao_aberta(agora=True)
         if not self._gravou_ou_perder(projeto):
             return False
         self._parar_tarefas()                   # o fim da tarefa em voo ainda entra

@@ -243,8 +243,9 @@ O Documento se edita como um editor de texto, e cada edição vira o que ela é 
 - **As figurinas** (§6.4): num lance que você digitou, a letra da peça vira figurina ao
   confirmar, quando o livro é de figurinas ("Cf3" → "♘f3" em português; "Nf3" → "♘f3" em
   inglês; "(Cf3)," → "(♘f3),"). O lance que ficou igual e no mesmo lugar não muda. **Opções ›
-  Peças nos lances** escolhe figurinas, letras ou, o padrão, **como o livro**: figurinas se a
-  página tem figurinas lidas, letras se não tem.
+  Peças nos lances** escolhe figurinas, letras ou, o padrão, **como o livro**: figurinas se o
+  livro tem figurinas lidas (em qualquer página lida), letras se não tem (uma figurina lida
+  por engano num livro de letras liga o modo: escolha "Letras" nas Opções).
   **Ctrl+Shift+K/Q/R/B/N/P** inserem ♔♕♖♗♘♙ no cursor (o mesmo atalho de novo alterna para a
   preta, ♚♛♜♝♞♟), e **F2** abre a paleta de símbolos no cursor.
 - **O diagrama não se apaga**: uma seleção que o cruza apaga o texto e o diagrama fica.

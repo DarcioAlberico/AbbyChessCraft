@@ -67,7 +67,7 @@ class PainelDePaginas(QWidget):
         self.lista.itemActivated.connect(self._abrir_item)
         self.lista.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.lista.customContextMenuRequested.connect(self._menu)
-        for coluna, largura in enumerate((34, 28, 34, 32, 30)):    # cabem nos 130 px da gaveta
+        for coluna, largura in enumerate((32, 22, 30, 28, 28)):    # cabem nos 144 px da lista
             self.lista.setColumnWidth(coluna, largura)
         self.lista.setColumnHidden(4, True)     # só com uma busca (§7.1)
         self._contagem = None

@@ -69,18 +69,22 @@ class _DelegadoHtml(QStyledItemDelegate):
 class PainelDeResultados(QTabWidget):
     #: A linha escolhida (Enter, duplo clique): a ocorrência ou o glifo achado dela.
     escolhido = Signal(object)
+    #: O aviso escolhido que cita uma página (e o ponto de um glifo): (página, x, y).
+    aviso_escolhido = Signal(int, object, object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.resultados = QListWidget()
         self.resultados.setAccessibleName("Resultados")
         self.resultados.setItemDelegate(_DelegadoHtml(self.resultados))
+        self.resultados.setUniformItemSizes(True)   # 2.000 linhas sem medir cada uma
         self.resultados.itemActivated.connect(self._ativado)
         self.avisos = QListWidget()
         self.avisos.setAccessibleName("Avisos e erros do projeto")
         self.avisos.setWordWrap(True)
         self.addTab(self.resultados, "Resultados")
         self.addTab(self.avisos, "Avisos")
+        self.avisos.itemActivated.connect(self._aviso_ativado)
         for lista in (self.resultados, self.avisos):
             lista.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
             lista.customContextMenuRequested.connect(
@@ -140,13 +144,25 @@ class PainelDeResultados(QTabWidget):
                                     "(refine a busca)")
         self.setCurrentWidget(self.resultados)
 
-    def mostrar_glifos(self, glifos: Sequence, cabecalho: str) -> None:
-        """Os glifos da busca por glifo (até a Galeria do passo C)."""
+    def _aviso_ativado(self, item: QListWidgetItem) -> None:
+        from abbychess.app.busca_na_janela import lugar_do_aviso
+
+        lugar = lugar_do_aviso(item.toolTip() or item.text())
+        if lugar is not None:
+            self.aviso_escolhido.emit(*lugar)
+
+    def mostrar_glifos(self, glifos: Sequence, cabecalho: str, nomes=None) -> None:
+        """Os glifos da busca por glifo (até a Galeria do passo C); `nomes`, o nome de cada
+        grupo de fonte."""
+        from abbychess import busca as bs
+
         self.resultados.clear()
         self.resultados.addItem(cabecalho)
         for g in glifos[:LIMITE_DE_LINHAS]:
-            item = QListWidgetItem(f"p. {g.pagina + 1}: '{g.char or '□'}', fonte {g.fonte or 'aguardando'}, "
-                                   f"confiança {g.confianca:.2f} (glifo {g.gid & 0xFFFFF})")
+            grupo = bs.grupo_da_fonte(g.fonte)
+            fonte = (nomes or {}).get(grupo, grupo)
+            item = QListWidgetItem(f"p. {g.pagina + 1}: '{g.char or '□'}', {fonte.lower()}, "
+                                   f"confiança {g.confianca:.2f}")
             item.setData(PAPEL_DO_ALVO, g)
             self.resultados.addItem(item)
         if len(glifos) > LIMITE_DE_LINHAS:

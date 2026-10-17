@@ -230,7 +230,9 @@ def _por_passo() -> list:
              ("clique_no_box", "p95_ms", "Clique acha o box, p95"),
              ("montar_indice_da_busca", "p95_ms", "Montar o índice da busca (230 p.), p95"),
              ("buscar_regex_no_livro", "p95_ms", "Buscar regex no livro (230 p.), p95"),
-             ("atraso_durante_a_busca", "p99_ms", "Atraso durante a busca, p99"))
+             ("atraso_durante_a_busca", "p99_ms", "Atraso durante a busca, p99"),
+             ("atraso_durante_o_aborto", "p99_ms", "Atraso durante o aborto, p99"),
+             ("indice_pela_janela", "max_ms", "Índice pela janela (230 p.), máx."))
     colunas = [("linha de base", base)]
     for passo in passos:
         arquivo, dados = _ultimo(f"passo-{passo}")

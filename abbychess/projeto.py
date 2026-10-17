@@ -506,6 +506,23 @@ class ProjetoDeLivro:
         with self._trava_do_livro:
             return self._arquivo_v2_de(indice)
 
+    def ler_sem_migrar(self, indice: int) -> Optional[Pagina]:
+        """A página como está, sem passar pelo cache e sem migrar a v1 (o índice da busca,
+        numa thread: §11, um escritor só): o instantâneo da que está na memória, a v1 lida
+        como v2, ou o JSON v2 gravado; None se nada foi gravado dela."""
+        modelo = self.modelo_em_memoria(indice)
+        if modelo is not None:
+            return modelo.instantaneo()
+        if self._tem_v1(indice):
+            return self._ler_v1(indice)
+        arquivo = self.arquivo_da_pagina(indice)
+        if arquivo is None:
+            return None
+        try:
+            return _pagina_de_json(json.loads(arquivo.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            return None
+
     def modelo_em_memoria(self, indice: int) -> Optional[Pagina]:
         """A página do cache, sem ler o disco (None se ela não está na memória)."""
         with self._trava_do_cache:

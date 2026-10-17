@@ -252,30 +252,44 @@ O Documento se edita como um editor de texto, e cada edição vira o que ela é 
 
 ### Localizar (passo B)
 
-**Ctrl+F** abre a barra no topo da vista direita (com a seleção do Documento como texto) e
-busca enquanto você digita:
+**Ctrl+F** abre a barra no topo da vista direita (na aba Documento; a seleção do Documento
+vira o texto, e uma seleção longa ou de várias linhas vira o escopo Seleção) e busca enquanto
+você digita:
 
 - **Aa** separa maiúsculas e minúsculas; **ab|** acha só a palavra inteira; **.\*** liga a
   expressão regular, com as classes de xadrez **`\L`** (lance: Cf3, exd5, O-O, e8=D+),
   **`\P`** (peça: as figurinas e as letras do idioma do livro), **`\C`** (casa: a1 a h8) e
-  **`\V`** (valoração: ± ∓ ⩲ ⩱ +- -+ ! ? !? ?!); a expansão delas aparece na dica do campo.
-  **♘=C** (figurina = letra) faz "Cf3" achar também "♘f3" e "Nf3".
+  **`\V`** (valoração: ± ∓ ⩲ ⩱ +- -+ += =+ = ∞ ! ? !! ?? !? ?! □); a expansão delas aparece na
+  dica do campo. As classes valem com qualquer **Aa** (B, o bispo, não é b, a coluna), e
+  `^` e `$` valem em cada linha impressa. **♘=C** (figurina = letra) faz "Cf3" achar também
+  "♘f3" e "Nf3" (a letra conta como peça quando vem seguida de uma casa).
 - **O escopo**: o livro, a página aberta, a seleção do Documento ou um intervalo de páginas
-  ("3-10"). **Onde**: prosa, notação, FEN (o do diagrama lido), legendas (a partir do passo
-  H) e cabeçalhos e rodapés.
+  ("3-10"; um intervalo que não se lê aparece como erro na barra). A seleção fica a de quando
+  você escolheu Seleção, mesmo que o cursor ande. **Onde**: prosa, notação, FEN (o do
+  diagrama lido), legendas (a partir do passo H) e cabeçalhos e rodapés.
 - **F3** e **Shift+F3** (ou Enter e Shift+Enter na barra) vão à próxima e à anterior, dando a
   volta no livro; a ocorrência atual fica em laranja no Documento e contornada na Imagem, as
   outras da página em amarelo. **Alt+Enter** manda todas para **Resultados** (página, linha e
   o trecho, com o casamento em negrito; Enter ou duplo clique leva até ela), e a gaveta das
-  páginas ganha a coluna **Ach.** com a contagem de cada página. **Esc** fecha a barra.
+  páginas ganha a coluna **Ach.** com a contagem de cada página. F3 com a barra fechada a
+  abre e vai à primeira; Enter ou F3 logo depois de digitar esperam a busca nova. Editar a
+  página com a barra aberta refaz a contagem (a ocorrência atual continua). **Esc**, com o
+  foco na barra, a fecha.
 - A regex inválida aparece na barra ("erro", com a mensagem na dica); um padrão lento demais
-  (como `(\w+)+$` num texto longo) aborta a busca inteira no primeiro meio segundo de uma
-  página, com o aviso. A janela continua respondendo durante a busca.
+  (como `(\w+)+$` num texto longo) aborta a busca inteira quando um casamento passa de meio
+  segundo, com o aviso. A janela continua respondendo durante a busca (o atraso de um evento
+  fica em ~2 ms). Buscar uma regex num livro de 230 páginas leva ~13 ms.
 - **Editar › Buscar glifo…**: caractere, fonte (rede, base global, livro, manual, sem
   leitura) e faixa de confiança; a lista vai para Resultados (a Galeria é do passo C).
-- **O índice** é montado ao abrir o projeto, em segundo plano (em processos à parte), e não vai
-  para o disco; o que você edita, o F5 e o lote refazem as páginas deles antes da busca
-  seguinte. As páginas não reconhecidas ficam fora (a barra de status diz quantas).
+- **O índice** é montado ao abrir o projeto, em segundo plano, nos processos que o programa
+  abre ao começar (e fecha depois de cada índice); não vai para o disco. 230 páginas levam
+  ~1,4 s com os processos já abertos (o alvo é 2 s), e 1,7–2,2 s pela janela com o servidor de
+  leitura subindo junto; com o projeto aberto logo ao abrir o programa (os processos por
+  abrir), ~2,0 s. O que você edita, o F5 e o lote refazem as páginas deles antes da busca
+  seguinte, e o livro v1 é lido sem migrar. As páginas não reconhecidas ficam fora (a barra
+  de status diz quantas, no escopo do livro).
+- **Os Avisos** que citam uma página (como as decisões que não seguiram os glifos relidos,
+  desde o passo E) abrem a página com Enter ou duplo clique, e o glifo do ponto citado.
 
 ### A página: zoom e navegação
 

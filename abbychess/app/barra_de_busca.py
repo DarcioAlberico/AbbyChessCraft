@@ -16,7 +16,7 @@ from typing import Optional, Tuple
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QLineEdit, QMenu, QToolButton,
-                               QWidget)
+                               QVBoxLayout, QWidget)
 
 from abbychess import busca as bs
 from abbychess.app import estilo
@@ -44,6 +44,7 @@ class BarraDeBusca(QWidget):
         self.campo.setPlaceholderText("Localizar")
         self.campo.setAccessibleName("Texto a localizar")
         self.campo.setClearButtonEnabled(True)
+        self.campo.setMinimumWidth(180)         # uma regex inteira cabe, também em 1366×768
         self.maiusculas = self._botao("Aa", "Maiúsculas e minúsculas diferentes")
         self.palavra = self._botao("ab|", "Palavra inteira")
         self.regex = self._botao(".*", "Expressão regular (com \\L lance, \\P peça, \\C casa, "
@@ -78,13 +79,22 @@ class BarraDeBusca(QWidget):
         seguinte = self._acao_simples("▼", "Próxima ocorrência (F3)", self.proxima.emit)
         fechar = self._acao_simples("✕", "Fechar a barra (Esc)", self.fechar.emit)
 
-        caixa = QHBoxLayout(self)
+        # Duas linhas: o campo, a contagem e as setas em cima; as opções embaixo (numa
+        # vista direita estreita, uma linha só deixaria o campo com ~60 px).
+        caixa = QVBoxLayout(self)
         caixa.setContentsMargins(4, 2, 4, 2)
         caixa.setSpacing(2)
-        caixa.addWidget(self.campo, 1)
+        cima, baixo = QHBoxLayout(), QHBoxLayout()
+        for linha in (cima, baixo):
+            linha.setSpacing(2)
+            caixa.addLayout(linha)
+        cima.addWidget(self.campo, 1)
+        for w in (self.contador, anterior, seguinte, fechar):
+            cima.addWidget(w)
         for w in (self.maiusculas, self.palavra, self.regex, self.figurina, self.escopo,
-                  self.intervalo, self.onde, self.contador, anterior, seguinte, fechar):
-            caixa.addWidget(w)
+                  self.intervalo, self.onde):
+            baixo.addWidget(w)
+        baixo.addStretch(1)
 
         self.relogio = QTimer(self)
         self.relogio.setSingleShot(True)
@@ -129,6 +139,9 @@ class BarraDeBusca(QWidget):
         self.campo.setFocus(Qt.FocusReason.ShortcutFocusReason)
         self.campo.selectAll()
 
+    def escolher_escopo(self, escopo: str) -> None:
+        self.escopo.setCurrentIndex(max(0, self.escopo.findData(escopo)))
+
     def opcoes(self, **contexto) -> bs.Opcoes:
         """As opções da barra, com o `contexto` da janela (a página aberta, a seleção, o
         idioma)."""
@@ -151,6 +164,7 @@ class BarraDeBusca(QWidget):
 
     def mostrar_contagem(self, atual: Optional[int], total: int) -> None:
         self.contador.setStyleSheet("")
+        self.contador.setToolTip("")
         if total == 0:
             self.contador.setText("nada" if self.campo.text() else "")
         elif atual is None:

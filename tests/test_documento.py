@@ -430,3 +430,39 @@ def test_a_pagina_nao_reconhecida_diz_no_documento(app, janela):  # noqa: F811
     janela.pintar_texto()
     assert "não reconhecida" in janela.texto.toPlainText()
     assert not janela.acao_realce.isEnabled()
+
+
+def test_um_bloco_so_de_margem_oculto_nao_deixa_paragrafo_vazio(app):
+    documento = _doc(_bloco("b0", "texto", [[9, 10, 11]]), _bloco("b1", "texto", [[1, 2]]),
+                     _bloco("b2", "texto", [[4, 5]]), chars=CHARS)
+    v = _vista(app, documento, margens={9, 10, 11})
+    v.alternar_margens(False)
+    assert v.toPlainText() == "ab\nde"
+
+
+def test_a_linha_de_margem_com_um_glifo_nao_lido_continua_margem(app):
+    chars = {**CHARS, 12: tx.NAO_LIDO}
+    v = _vista(app, _doc(_bloco("b0", "texto", [[9, 12, 11]], [[1, 2]]), chars=chars),
+               margens={9, 11})
+    v.alternar_margens(False)
+    assert v.toPlainText() == "ab"
+
+
+def test_a_linha_do_clique_e_a_do_glifo_clicado(app, lida_a_mao):
+    j = lida_a_mao
+    alvo = j.pagina.gids[5]                                # o meio de uma palavra
+    _clicar_no_gid(app, j, alvo)
+    marcado = [n for n in range(len(j.linha._boxes)) if n == j.linha._atual]
+    assert marcado and j.pagina.boxes.index(j.linha._boxes[marcado[0]]) == 5
+
+
+def test_o_documento_mostra_o_estado_e_a_exportacao_o_nao_revisado(app):
+    from core.diagrama_modelo import Casa
+    from core.lado_a_jogar import NAO_REVISADO
+
+    from abbychess.diagramas import DiagramaLido
+
+    casas = [Casa(n // 8, n % 8, "K" if n == 60 else ("k" if n == 4 else "")) for n in range(64)]
+    d = DiagramaLido((0, 0, 100, 100), casas, lado="w", id="d0")
+    assert NAO_REVISADO in d.linha_de_texto(1)
+    assert NAO_REVISADO not in d.linha_de_texto(1, com_ressalva=False)

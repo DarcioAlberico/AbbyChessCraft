@@ -351,9 +351,9 @@ class EspacoDeTrabalho:
         if self.pagina.indice_de(gid) is not None:
             self.inspetor.mostrar("glifo")
             self.pagina.escolher(gid)            # a Linha e o cursor seguem pelo atual_mudou
-        self._palavra_do_documento(gids)        # depois: o atual_mudou apaga o contorno velho
+        self._palavra_do_documento(gids, gid)   # depois: o atual_mudou apaga o contorno velho
 
-    def _palavra_do_documento(self, gids: list) -> None:
+    def _palavra_do_documento(self, gids: list, gid_da_linha=None) -> None:
         """O cursor do Documento numa palavra: ela destacada na Imagem e na Linha; com Seguir,
         a Imagem rola até ela."""
         indices = self._indices(gids)
@@ -363,7 +363,7 @@ class EspacoDeTrabalho:
         self.visor.marcar_palavra_do_documento(caixa)
         if self.acao_seguir.isChecked():        # só com Seguir a Imagem rola (§6.2)
             self.visor.mostrar_caixa(caixa)
-        self._mostrar_a_linha(gids[0])
+        self._mostrar_a_linha(gids[0] if gid_da_linha is None else gid_da_linha)
 
     def _mostrar_a_linha(self, gid=None) -> None:
         """A faixa Linha com a linha do glifo (o atual, se nenhum é dado)."""

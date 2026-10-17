@@ -374,13 +374,26 @@ class CondutorDoLote:
 
 
 def _paginas(indices) -> str:
-    return ", ".join(str(i + 1) for i in indices)
+    """As páginas como o usuário as vê, com as seguidas em faixa: "2–51, 60"."""
+    faixas, numeros = [], sorted({int(i) + 1 for i in indices})
+    for n in numeros:
+        if faixas and n == faixas[-1][1] + 1:
+            faixas[-1][1] = n
+        else:
+            faixas.append([n, n])
+    return ", ".join(f"{a}–{b}" if b > a else str(a) for a, b in faixas)
+
+
+def tem_detalhe(resultado: ResultadoDoLote) -> bool:
+    """O fim do lote tem algo a conferir (vai aos Avisos); o lote limpo não."""
+    return bool(resultado.cancelado or resultado.reler_depois or resultado.falhas
+                or resultado.caidas)
 
 
 def resumo_do_fim(resultado: ResultadoDoLote) -> str:
     """A mensagem curta do fim do lote, para a barra (o detalhe vai aos Avisos)."""
     if resultado.servidor_parou:
-        inicio = "Lote interrompido: o servidor de leitura parou"
+        inicio = "Lote interrompido (o servidor de leitura parou)"
     elif resultado.cancelado:
         inicio = "Lote cancelado"
     else:

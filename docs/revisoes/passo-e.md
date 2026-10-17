@@ -45,6 +45,8 @@ Ramo `passo-e-servidor`, a partir da tag `passo-a3` (6388b28).
 | Os pedidos do F5 e do reler esperam o servidor dentro de uma tarefa do executor | a ordem das tarefas e o descarte por projeto (`geracao`) continuam os de sempre |
 | Sem servidor (`ABBY_SERVIDOR=0`), o lote lê numa tarefa do executor por página | o leitor da interface é de uma thread por vez; a edição pedida no meio espera a página |
 | O lote para quando o servidor desiste | as páginas seguintes falhariam todas; o que faltou fica para retomar depois de reabrir |
+| O que não pôde seguir os glifos relidos (§4.6) vai aos Avisos, e não a uma lista própria em Resultados | Resultados e Avisos são o mesmo painel (A2); a lista que abre a página é do passo B, com a busca |
+| Reconhecer o livro fica em Ferramentas e também no menu Projeto, com Cancelar e Retomar | a §11 pede Cancelar em Projeto; os três juntos ali, e o Reconhecer onde sempre esteve |
 | `livro.reconhecer_paginas` roda o mesmo condutor, com um controlador sem janela | as regras do lote (verificada, §4.6, `.antes-do-lote`) não divergem entre a janela e as ferramentas; o laço não se aninha, para centenas de páginas no executor síncrono |
 | O glifo "aguardando" lido sem a transação de origem entra fora do desfazer | não é decisão de ninguém; a pré-condição do desfazer aceita o aguardando lido depois (`historico.lido_depois`), e o refazer de outra página não se perde só por abrir uma página |
 
@@ -154,3 +156,20 @@ docstring, e o teste do cancelar e do sair no meio da segmentação.
     fora do cache 134,0; 134,1; 133,4; montar o Documento p95 31,8; 33,5; 32,4 [39,8];
     clique no Documento p95 3,4; 3,3; 3,3.
 - Qualidade (`medir.py`, os três livros) e fatia (`--passo E`): iguais às do A3.
+
+## Revisão de produto, rodada 2
+
+Completude 8 · Fidelidade das medidas 8 · Clareza para o usuário 8 · Produtividade 8 ·
+Design 8 — **aceita**. Dos menores, entraram depois das medidas (só textos e os Avisos do
+fim do lote, fora do caminho medido): a frase do fim depois da queda, os Avisos só com o que
+há a conferir e as páginas em faixas, Reconhecer o livro também no menu Projeto; no README,
+a leitura do pico do atraso (ele começa na volta de cada página), a memória dita como
+explicação provável e o tempo da suíte (58–59 s). Ficam pendentes: tirar da thread da janela
+o que a volta de cada página faz além de gravar (~115 ms; para o D1, que edita durante o
+lote); a memória com o módulo do servidor sozinho em 3 rodadas; a posição das caídas que
+abre o glifo (passo B); o resumo do lote interrompido nos Avisos quando o usuário reabre o
+projeto na hora (o `lote.json` fica certo).
+
+**Fechamento.** As duas revisões aceitaram: código na rodada 5 (a 4 aceitou o resto), produto
+na 2. A tag `passo-e` fica no commit que grava este registro. As medidas de desempenho são as
+3 rodadas e o portão do `9c759e2`; a qualidade e a fatia, do mesmo commit.

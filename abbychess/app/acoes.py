@@ -189,7 +189,7 @@ def montar(janela) -> None:
 
 def _menus(j) -> None:
     menu = j.menuBar().addMenu("&Projeto")
-    for acao in (j.acao_novo, j.acao_abrir, None, j.acao_exportar, None,
+    for acao in (j.acao_novo, j.acao_abrir, None, j.acao_exportar, None, j.acao_lote,
                  j.acao_cancelar_lote, j.acao_retomar_lote, None, j.acao_sair):
         menu.addSeparator() if acao is None else menu.addAction(acao)
     menu = j.menuBar().addMenu("&Editar")

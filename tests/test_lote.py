@@ -541,3 +541,14 @@ def test_o_digito_do_glifo_virtual_nao_vira_um_glifo():
     assert descrever_caidas([texto], boxes) == [
         "glifo virtual '4' depois do glifo 'e' em (40, 50) (o glifo saiu)"]
 
+
+def test_as_paginas_do_detalhe_vao_em_faixas_e_o_lote_limpo_nao_tem_detalhe():
+    from abbychess import lote
+
+    limpo = lote.ResultadoDoLote(lidas=list(range(1, 51)) + [59])
+    assert not lote.tem_detalhe(limpo)
+    assert "Lidas: 2–51, 60;" in lote.detalhe_do_fim(limpo)
+    parou = lote.ResultadoDoLote(lidas=[0], cancelado=True, servidor_parou=True)
+    assert lote.tem_detalhe(parou)
+    assert lote.resumo_do_fim(parou).startswith("Lote interrompido (o servidor de leitura parou): ")
+

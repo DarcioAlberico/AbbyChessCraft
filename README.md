@@ -365,7 +365,8 @@ corrigir "Cava1o" para "Cavalo" trocou só o glifo do "1".
 lida e o lote com "refazer" mantêm os glifos corrigidos à mão e os revisados; o glifo que a
 segmentação devolve com a caixa um pouco diferente (interseção sobre união de ao menos 0,6
 com a de antes) continua o mesmo, com as decisões dele (quebras, junções, glifos
-virtuais). O que não pôde seguir os glifos relidos vai para os Avisos.
+virtuais). O que não pôde seguir os glifos relidos vai para os Avisos, com o caractere e
+a posição do glifo (em pixels da página; os itens que abrem a página são do passo B).
 
 Os modelos globais do PyBoxEditor (a rede e a base, ~1 GB na memória) ficam num **processo
 filho**, aberto com o projeto, e não mais na janela. Ele faz toda leitura que não sai dos
@@ -963,9 +964,12 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   com os padrões do livro e os modelos no servidor; até o A3, os modelos ficavam na própria
   janela. **O atraso da interface durante o lote** caiu para p99 de 2,2 ms nas 3 rodadas e
   no portão (alvo de 50; até o A3, as duas faixas de ~9 e ~21 ms), agora com todas as ações
-  valendo. O máximo ficou em 132–137 ms (no A3, 96–106): cai a ~0,13 s de uma gravação de
-  página, e gravar uma página que volta do servidor custa 18–22 ms no p95 na janela, então o
-  pico não é a gravação em si (não investigado além disso). Com o leitor falso, 51 páginas
+  valendo. O máximo ficou em 132–137 ms (no A3, 96–106), e começa junto com a volta de
+  uma página: o atraso é igual à distância até a gravação mais perto (o tique só dispara no
+  fim do engasgo). Gravar a página custa 18–22 ms no p95; o resto vem do que a mesma volta
+  faz na janela (o `lote.json` e preparar a página seguinte: carregar o modelo dela e o que o
+  §4.6 mantém). Na prática, a cada página do lote (~8 s) um comando pode passar de 100 ms;
+  tirar isso da thread da janela fica para o D1, que edita durante o lote. Com o leitor falso, 51 páginas
   sintéticas, uma a cada ~200 ms: p99 de 7,6–14 ms. **A releitura de um glifo com o lote
   rodando** (CA-11.7, do Alt+seta ao glifo lido pelo servidor) ficou em 40–46 ms na mediana
   e 64–124 no p95 (124 no portão; alvo de 150), com máximos de até 364 ms. Na primeira
@@ -974,10 +978,10 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   thread do filho. **A releitura sem o lote** passou de 14–15 ms (A3) a 37–39 na mediana e
   42–45 no p95, porque agora vai ao servidor (nas 30 repetições o glifo não estava nos padrões
   do livro); o alvo é 150. **A memória somada** (a janela e o servidor) ficou em 1959–2050
-  MB (alvo de 2560): o servidor com ~1010, e a janela com 720–820, porque o processo de teste
-  guarda o que os módulos anteriores carregaram (as páginas e o histórico da linha de base);
-  com o módulo do servidor sozinho, numa versão anterior do passo, a soma foi de 1616 (janela
-  ~450). **O lote de 20 páginas levou 161–163 s** (A3: 88), e não pelo servidor: o projeto
+  MB (alvo de 2560): o servidor com ~1010, e a janela com 720–820. A explicação provável é
+  que o processo de teste guarda o que os módulos anteriores carregaram (as páginas e o
+  histórico da linha de base): com o módulo do servidor sozinho, numa versão anterior do
+  passo e numa rodada só, a soma foi de 1616 (janela ~450). Não foi repetido em 3 rodadas. **O lote de 20 páginas levou 161–163 s** (A3: 88), e não pelo servidor: o projeto
   da medida não tem padrões (no A3, o lote lia com os padrões que os testes do Enter tinham
   ensinado, e a leitura pelo padrão pula a cadeia global); no mesmo projeto, com os mesmos
   padrões, as mesmas 5 páginas levam 8,2 s cada com o servidor e sem ele
@@ -988,7 +992,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   e os recortes lidos pelo servidor dão os mesmos boxes e leituras que lidos no processo, que
   é como `medir.py` e a fatia leem. As medidas da primeira versão do passo, com a linha de
   base ainda sem o servidor, estão em `docs/medidas/2026-10-17-primeira-rodada-e*.json`.
-- **A suíte rápida está em 58 s**, perto do limite de 60 (§15.1): os testes do servidor
+- **A suíte rápida está em 58–59 s**, no limite de 60 (§15.1): os testes do servidor
   falso e do laço do filho somaram ~5 s. Um passo que acrescente testes rápidos vai precisar
   tirar tempo de algum lugar.
 - **O Documento, desde o passo A3** (3 rodadas do commit `271d582`, pasta limpa). O clique

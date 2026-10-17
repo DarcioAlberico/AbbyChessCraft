@@ -613,13 +613,15 @@ class ControladorDoLivro:
         faltam = list(condutor.restante) if resultado.cancelado else []
         self._guardar(faltam, condutor.refazer, self._reler_depois_de(condutor))
         mensagem = lt.resumo_do_fim(resultado)
-        if self.pode_retomar or (resultado.servidor_parou and faltam):
-            reabrir = "Reabra o projeto e use " if resultado.servidor_parou else ""
-            mensagem += f" {reabrir}Projeto › Retomar o lote continua."
+        if resultado.servidor_parou and faltam:
+            mensagem += " Reabra o projeto e use Projeto › Retomar o lote."
+        elif self.pode_retomar:
+            mensagem += " Projeto › Retomar o lote continua."
         self.eventos.emitir("lote_mudou")
         self.eventos.emitir("acoes_mudaram")
         self.eventos.emitir("lote_terminou", mensagem, resultado)
-        self.pagina._avisar(mensagem + " Detalhes em Avisos (⚠).", 15000)
+        detalhe = " Detalhes em Avisos (⚠)." if lt.tem_detalhe(resultado) else ""
+        self.pagina._avisar(mensagem + detalhe, 15000)
 
     def _reler_depois_de(self, condutor) -> List[int]:
         """As páginas para reler depois: as de antes deste lote que ele não leu, e as dele."""

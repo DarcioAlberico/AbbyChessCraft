@@ -66,8 +66,9 @@ class LoteNaJanela:
     def _lote_terminou(self, mensagem: str, resultado) -> None:
         self.paginas.esconder_lote()
         self.rotulo_do_lote.setText("")
-        self.registrar_aviso(av.ERRO if resultado.servidor_parou else av.AVISO,
-                             "Reconhecer o livro", lt.detalhe_do_fim(resultado))
+        if lt.tem_detalhe(resultado):          # o lote limpo não é um aviso
+            self.registrar_aviso(av.ERRO if resultado.servidor_parou else av.AVISO,
+                                 "Reconhecer o livro", lt.detalhe_do_fim(resultado))
         if self.pagina.indice in resultado.lidas:
             self.pintar_texto()
 

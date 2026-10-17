@@ -124,14 +124,14 @@ def test_o_interativo_nao_espera_a_segmentacao_da_pagina_do_lote(laco, imagem, m
     from abbychess import zonas as zn
 
     original = zn.segmentar
-    monkeypatch.setattr(zn, "segmentar", lambda *a, **k: (time.sleep(0.6), original(*a, **k))[1])
+    monkeypatch.setattr(zn, "segmentar", lambda *a, **k: (time.sleep(0.4), original(*a, **k))[1])
     laco.entrada.put(("pedido", 1, sl.LOTE, "ler_pagina", (imagem, [], [])))
     time.sleep(0.1)                                       # o lote está segmentando
     inicio = time.perf_counter()
     laco.entrada.put(("pedido", 9, sl.INTERATIVO, "ler_recortes",
                       [(np.full((30, 20), 0, np.uint8), 30.0)]))
     respostas = _respostas(laco, 1)
-    assert 9 in respostas and time.perf_counter() - inicio < 0.3
+    assert 9 in respostas and time.perf_counter() - inicio < 0.2
     assert _respostas(laco, 1)[1][0]                      # e a página do lote termina
 
 
@@ -140,7 +140,7 @@ def test_cancelar_e_sair_no_meio_da_segmentacao_param_a_pagina_do_lote(laco, ima
     from abbychess import zonas as zn
 
     original = zn.segmentar
-    monkeypatch.setattr(zn, "segmentar", lambda *a, **k: (time.sleep(0.3), original(*a, **k))[1])
+    monkeypatch.setattr(zn, "segmentar", lambda *a, **k: (time.sleep(0.2), original(*a, **k))[1])
     laco.entrada.put(("pedido", 1, sl.LOTE, "ler_pagina", (imagem, [], [])))
     laco.entrada.put(("pedido", 2, sl.LOTE, "ler_pagina", (imagem, [], [])))
     time.sleep(0.1)                                       # a 1 está segmentando

@@ -6,11 +6,11 @@ lote não trava mais"). O filho é aberto com o projeto (`spawn`), importa só e
 que a leitura pede (sem PySide6), guarda os modelos e atende **toda** leitura global: o F5,
 as releituras de glifo, a leitura e releitura dos diagramas, e o lote.
 
-**A vez.** Os pedidos têm duas prioridades, interativo e lote. O lote lê página a página, e
-entre um glifo e outro o servidor olha a fila: um pedido interativo (um F5, uma releitura)
-é atendido ali mesmo, antes do glifo seguinte do lote (`_ler_com_vez`); um cancelamento do
-lote para a página no glifo seguinte. Prioridade `BELOW_NORMAL` e
-`torch.set_num_threads(núcleos − 2)`.
+**A vez.** Os pedidos têm duas prioridades, interativo e lote. A página do lote roda numa
+thread de trabalho do filho, e um pedido interativo (um F5, uma releitura) é atendido assim
+que chega: a página do lote para antes do glifo seguinte até ele terminar (`_Laco`), mesmo
+no meio da segmentação dela; um cancelamento do lote para a página no glifo seguinte.
+Prioridade `BELOW_NORMAL` e `torch.set_num_threads(núcleos − 2)`.
 
 **Os padrões.** O filho tem os padrões do livro lidos do disco ao começar. Depois, a
 interface manda os **deltas** (as amostras criadas e as apagadas), que valem a partir do
@@ -174,7 +174,15 @@ def _baixar_a_prioridade() -> None:
 
 
 class _Laco:
-    """O laço do filho: recebe, ordena por prioridade e atende."""
+    """O laço do filho: recebe e atende, com a página do lote numa thread de trabalho.
+
+    **A vez.** A thread principal recebe as mensagens e atende os pedidos interativos na
+    hora, mesmo com uma página do lote em curso: enquanto um interativo roda, a página do lote
+    para antes do glifo seguinte (`_livre`), e o leitor lê um glifo por vez (`_trava`). Assim
+    a segmentação da página do lote, que não tem glifos no meio (~0,5 s numa página cheia),
+    também dá a vez, e a releitura de um glifo não espera por ela. Os deltas dos padrões e
+    os limiares entram assim que chegam, entre um glifo e outro (sob a mesma trava).
+    """
 
     def __init__(self, entrada, saida, fabrica: str, pasta_de_padroes, limiares):
         self.entrada, self.saida = entrada, saida
@@ -183,12 +191,17 @@ class _Laco:
         self.lotes: deque = deque()
         self.cancelados: set = set()
         self.sair = False
-        self.atendendo: Optional[int] = None       # o id do pedido em curso
-        self.no_lote: Optional[int] = None         # o id do pedido do lote em curso
+        self.interativo: Optional[int] = None      # o id do interativo em curso
+        self.no_lote: Optional[int] = None         # o id da página do lote em curso
         #: A ordem em que os pedidos começaram e a em que terminaram (os testes as pedem:
         #: CA-11.8 e a vez entre glifos).
         self.ordem: List[int] = []
         self.fins: List[int] = []
+        self._trava = threading.Lock()             # o leitor: um glifo por vez
+        self._livre = threading.Event()            # nenhum interativo rodando
+        self._livre.set()
+        self._acordar = threading.Event()          # a página do lote terminou
+        self._trabalhador: Optional[threading.Thread] = None
 
     def rodar(self) -> None:
         self.leitor = _fabrica(self.fabrica)(self.pasta, self.limiares)
@@ -197,19 +210,25 @@ class _Laco:
         self.leitor.ler = lambda recorte, **k: self._ler_com_vez(ler_original, recorte, **k)
         self.saida.put(("pronto", os.getpid(), estado_do_leitor(self.leitor)))
         while not self.sair:
-            self._receber(bloquear=not (self.interativos or self.lotes))
+            self._receber(bloquear=not (self.interativos or (self.lotes and not self._no_lote())))
             if self.interativos:
-                self._atender(self.interativos.popleft())
-            elif self.lotes:
-                self._atender(self.lotes.popleft())
+                self._atender_interativo(self.interativos.popleft())
+            elif self.lotes and not self._no_lote():
+                self._comecar_lote(self.lotes.popleft())
+        if self._trabalhador is not None:          # o "sair" para a página no glifo seguinte
+            self._trabalhador.join(5)
+
+    def _no_lote(self) -> bool:
+        return self._trabalhador is not None and self._trabalhador.is_alive()
 
     def _receber(self, bloquear: bool) -> None:
         while True:
             try:
-                mensagem = self.entrada.get(timeout=0.5) if bloquear else self.entrada.get_nowait()
+                mensagem = self.entrada.get(timeout=0.2) if bloquear else self.entrada.get_nowait()
             except queue.Empty:
-                if bloquear:
+                if bloquear and not self._acordar.is_set():
                     continue
+                self._acordar.clear()
                 return
             bloquear = False
             tipo = mensagem[0]
@@ -217,46 +236,66 @@ class _Laco:
                 (self.interativos if mensagem[2] == INTERATIVO else self.lotes).append(mensagem)
             elif tipo == "padroes":
                 _, criados, apagados = mensagem
-                for caminho in apagados:
-                    self.leitor.padroes.excluir(caminho)
-                for caminho, altura in criados:
-                    self.leitor.padroes.incluir(caminho, altura)
+                with self._trava:                  # não no meio do glifo do lote
+                    for caminho in apagados:
+                        self.leitor.padroes.excluir(caminho)
+                    for caminho, altura in criados:
+                        self.leitor.padroes.incluir(caminho, altura)
             elif tipo == "limiares":
-                self.leitor.trocar_limiares(mensagem[1])
+                with self._trava:
+                    self.leitor.trocar_limiares(mensagem[1])
             elif tipo == "cancelar":
                 # O que espera na fila continua nela e, na vez dele, responde "cancelado"
                 # (`_atender`): quem pediu sempre recebe resposta. O que já terminou não guarda
                 # nada (o cancelamento chegou tarde).
                 id_ = mensagem[1]
                 na_fila = any(m[1] == id_ for m in (*self.interativos, *self.lotes))
-                if na_fila or id_ in (self.atendendo, self.no_lote):
+                if na_fila or id_ in (self.interativo, self.no_lote):
                     self.cancelados.add(id_)
             elif tipo == "sair":
                 self.sair = True
                 return
 
     def _ler_com_vez(self, ler, recorte, **k):
-        """Um glifo, depois de dar a vez: o que chegou na fila e os interativos pendentes
-        (dentro de um pedido interativo, não: ele não é interrompido)."""
-        if self.no_lote is not None and self.atendendo == self.no_lote:
-            self._receber(bloquear=False)
+        """Um glifo. O do lote espera os interativos em curso e para se foi cancelado (ou se
+        o servidor vai sair); o interativo só espera o glifo do lote que está sendo lido."""
+        if threading.current_thread() is self._trabalhador:
+            while not self._livre.wait(0.1) and not self.sair:
+                pass
             if self.no_lote in self.cancelados or self.sair:
-                raise Cancelado                 # o "sair" também para a página do lote
-            while self.interativos and not self.sair:
-                self._atender(self.interativos.popleft())
-        return ler(recorte, **k)
+                raise Cancelado
+        with self._trava:
+            return ler(recorte, **k)
+
+    def _atender_interativo(self, mensagem) -> None:
+        self.interativo = mensagem[1]
+        self._livre.clear()
+        try:
+            self._atender(mensagem)
+        finally:
+            self._livre.set()
+            self.interativo = None
+
+    def _comecar_lote(self, mensagem) -> None:
+        self.no_lote = mensagem[1]
+
+        def rodar():
+            try:
+                self._atender(mensagem)
+            finally:
+                self.no_lote = None
+                self._acordar.set()                # o laço começa a página seguinte
+
+        self._trabalhador = threading.Thread(target=rodar, name="pagina-do-lote", daemon=True)
+        self._trabalhador.start()
 
     def _atender(self, mensagem) -> None:
-        _, id_, prioridade, operacao, argumentos = mensagem
+        _, id_, _prioridade, operacao, argumentos = mensagem
         if id_ in self.cancelados or self.sair:
             self.cancelados.discard(id_)
             self.saida.put(("resposta", id_, False, CANCELADO))
             return
         self.ordem.append(id_)
-        anterior = (self.atendendo, self.no_lote)
-        self.atendendo = id_
-        if prioridade == LOTE:
-            self.no_lote = id_
         try:
             resultado = self._operar(operacao, argumentos)
         except Cancelado:
@@ -268,7 +307,6 @@ class _Laco:
             self.saida.put(("resposta", id_, True, resultado))
         finally:
             self.fins.append(id_)
-            self.atendendo, self.no_lote = anterior
             self.cancelados.discard(id_)
 
     def _operar(self, operacao: str, argumentos):

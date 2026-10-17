@@ -116,3 +116,21 @@ def test_o_modulo_principal_guardado_nao_abre_a_janela_no_filho():
     saida = subprocess.run([sys.executable, "-c", codigo], capture_output=True, text=True,
                            timeout=60)
     assert saida.stdout.strip() == "False", saida.stderr
+
+
+def test_o_interativo_nao_espera_a_segmentacao_da_pagina_do_lote(laco, imagem, monkeypatch):
+    """A segmentação não tem glifos no meio (~0,5 s numa página cheia): a página do lote roda
+    numa thread, e a releitura de um glifo é respondida durante ela."""
+    from abbychess import zonas as zn
+
+    original = zn.segmentar
+    monkeypatch.setattr(zn, "segmentar", lambda *a, **k: (time.sleep(1.0), original(*a, **k))[1])
+    laco.entrada.put(("pedido", 1, sl.LOTE, "ler_pagina", (imagem, [], [])))
+    time.sleep(0.1)                                       # o lote está segmentando
+    inicio = time.perf_counter()
+    laco.entrada.put(("pedido", 9, sl.INTERATIVO, "ler_recortes",
+                      [(np.full((30, 20), 0, np.uint8), 30.0)]))
+    respostas = _respostas(laco, 1)
+    assert 9 in respostas and time.perf_counter() - inicio < 0.5
+    assert _respostas(laco, 1)[1][0]                      # e a página do lote termina
+

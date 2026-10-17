@@ -87,6 +87,8 @@ log = logging.getLogger(__name__)
 ARQUIVO_DO_PROJETO = "projeto.json"
 PASTA_DE_PADROES = "padroes"
 PASTA_DE_PAGINAS = "paginas"
+#: A página como estava antes de o lote com "refazer" a reler (§4.6), uma por pid.
+PASTA_ANTES_DO_LOTE = ".antes-do-lote"
 #: As páginas que só têm glifos marcados à mão no modo de treino, sem o F5.
 ARQUIVO_DAS_MARCADAS = "marcadas.json"
 PASTA_DE_ZONAS = "zonas"
@@ -690,6 +692,41 @@ class ProjetoDeLivro:
             elif mudou:
                 pagina.estado = proximo_estado(pagina.estado, "editar")
             self.salvar_modelo(pagina)
+
+    # ------------------------------------------------------------------
+    # Antes do lote (§4.6)
+    # ------------------------------------------------------------------
+    def _arquivo_antes_do_lote(self, pid: int) -> Path:
+        return self.pasta / PASTA_DE_PAGINAS / PASTA_ANTES_DO_LOTE / f"p{pid}.json"
+
+    def guardar_antes_do_lote(self, pagina: Pagina) -> None:
+        """A página como está agora, antes de o lote com "refazer" a reler: o lote não entra
+        no desfazer, e "Voltar ao estado antes do lote" a restaura."""
+        gv.gravar_json(self._arquivo_antes_do_lote(pagina.pid),
+                       _pagina_para_json(pagina.instantaneo()))
+
+    def tem_antes_do_lote(self, indice: int) -> bool:
+        with self._trava_do_livro:
+            pid = self._pid_de(indice)
+        return pid is not None and self._arquivo_antes_do_lote(pid).is_file()
+
+    def voltar_ao_antes_do_lote(self, indice: int) -> Pagina:
+        """Põe de volta a página copiada antes do lote (o JSON idêntico ao copiado), e a
+        cópia sai. O gravador grava antes o que tem pendente: senão, a gravação dele passaria
+        por cima da página restaurada."""
+        self.descarregar(10)
+        with self._trava_do_livro:
+            pid = self._pid_de(indice)
+            if pid is None:
+                raise OSError(f"a página {indice + 1} não tem cópia de antes do lote")
+            copia = self._arquivo_antes_do_lote(pid)
+            dados = copia.read_bytes()
+            gv.gravar_bytes(self._arquivo_v2(pid), dados)
+            pagina = _pagina_de_json(json.loads(dados.decode("utf-8")))
+            self._guardar_no_cache(pagina, foto_nova=True)
+            self._atualizar_livro(indice, self._resumo_do_modelo(pagina))
+            gv.apagar(copia)
+            return pagina
 
     def carregar_pagina(self, indice: int) -> Optional[List[BoxEntry]]:
         """Os boxes gravados da página, ou `None` se ela ainda não foi lida nem marcada.

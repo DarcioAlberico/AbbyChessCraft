@@ -544,18 +544,18 @@ def test_depois_do_enter_e_do_f5_o_foco_fica_no_campo_do_caractere(app, janela):
     assert set(janela.leitor.padroes_por_caractere()) == {"a", "b"}
 
 
-def test_durante_o_lote_editar_e_recusado_na_hora(app, janela):
+def test_durante_o_lote_editar_vale_na_hora(app, janela):
+    """Passo E: o lote grava entre um comando e outro; nada é recusado."""
     janela.reconhecer()
     _esperar(app, janela)
     janela.pagina.lote_rodando = True
     try:
         mostrar(janela, 0)
-        janela.treino.campo.setText("z")
         janela.pagina.corrigir("z")
-        assert "recusado" in janela.statusBar().currentMessage()
-        assert not janela.executor.ocupado               # nada ficou na fila
+        assert janela.pagina.box(janela.pagina.gids[0]).char == "z"
+        assert janela.acao_reconhecer.isEnabled() and janela.acao_reler.isEnabled()
         janela.pagina.desfazer()
-        assert not janela.executor.ocupado
+        assert janela.pagina.box(janela.pagina.gids[0]).char != "z"
     finally:
         janela.pagina.lote_rodando = False
 

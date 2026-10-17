@@ -74,6 +74,8 @@ acoes:
   - {id: sair, descricao: Sair, escopo: [global], padrao: Ctrl+Q, desde_passo: A2}
   - {id: cancelar_lote, descricao: Cancelar o lote (também o ✕ da barra de status),
      escopo: [global], sem_atalho: [padrao, finereader], desde_passo: A2}
+  - {id: retomar_lote, descricao: Retomar o lote cancelado de onde parou, escopo: [global],
+     sem_atalho: [padrao, finereader], desde_passo: E}
 
   # --- Editar --------------------------------------------------------------------
   - id: desfazer

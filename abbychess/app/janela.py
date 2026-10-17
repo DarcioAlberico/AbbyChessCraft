@@ -167,6 +167,9 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
                              ("projeto_aberto", self._projeto_aberto),
                              ("modelos_prontos", self._modelos_prontos),
                              ("servidor_caiu", self._servidor_caiu),
+                             ("lote_progresso", self._lote_progrediu),
+                             ("lote_terminou", self._lote_terminou),
+                             ("pagina_do_lote", self._pagina_do_lote),
                              ("acoes_mudaram", self._acoes_mudaram),
                              ("lote_mudou", self._acoes_mudaram),
                              ("lote_mudou", self._lote_na_barra),
@@ -250,11 +253,34 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
             if self._fechar_projeto():
                 self.abrir_caminho(str(pasta))
 
+    def voltar_ao_antes_do_lote(self) -> None:
+        if dialogos.confirmar(self, "Voltar ao estado antes do lote", "A página volta a ser a "
+                              "de antes do último lote com \u201crefazer\u201d; o que mudou nela "
+                              "depois do lote se perde (e não entra no desfazer). Voltar?"):
+            self.livro.voltar_ao_antes_do_lote()
+
+    def _lote_progrediu(self, feitas: int, total: int, estimativa) -> None:
+        texto = f"Lote: {feitas} de {total}"
+        if estimativa:
+            texto += f", cerca de {_duracao(estimativa)}"
+        self.rotulo_do_lote.setText(texto)
+        self.paginas.mostrar_lote(feitas, total, texto)
+
+    def _pagina_do_lote(self, _indice: int) -> None:
+        self.relogio_das_paginas.start()        # a gaveta, depois de uma rajada de páginas
+
+    def _lote_terminou(self, mensagem: str, resultado) -> None:
+        self.paginas.esconder_lote()
+        if resultado.reler_depois or resultado.falhas:
+            self.registrar_aviso(av.AVISO, "Reconhecer o livro", mensagem)
+        if self.pagina.indice in resultado.lidas:
+            self.pintar_texto()
+
     def _parar_tarefas(self) -> None:
         """Cancela o lote, tira da fila o que não começou e espera a tarefa em andamento
         (o resultado dela ainda entra, antes de o projeto fechar)."""
+        self.livro.cancelar()
         if self.executor.ocupado:
-            self.livro.cancelar()
             self.executor.esvaziar()
             self.statusBar().showMessage("Esperando a tarefa em andamento terminar…")
             self.executor.esperar()
@@ -439,3 +465,13 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
             evento.ignore()                     # ficou aberta: as mudanças estão na memória
             return
         super().closeEvent(evento)
+
+
+def _duracao(segundos: float) -> str:
+    """O tempo estimado do lote, arredondado como se fala: "40 s", "3 min", "1 h 20 min"."""
+    if segundos < 60:
+        return f"{max(1, round(segundos / 10) * 10)} s"
+    minutos = round(segundos / 60)
+    if minutos < 60:
+        return f"{minutos} min"
+    return f"{minutos // 60} h {minutos % 60:02d} min"

@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import logging
 import os
-import threading
 from pathlib import Path
 from typing import List, Optional, Sequence
 
@@ -24,6 +23,7 @@ from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import exportar as ex
 from abbychess import livro
+from abbychess import lote as lt
 from abbychess import servidor_de_leitura as sl
 from abbychess import verificacao as vf
 from abbychess import zonas as zn
@@ -59,9 +59,6 @@ class ControladorDeLayout:
                 juntar=None) -> None:
         """As áreas novas da página, numa transação do desfazer (§14.2); mudar áreas não
         muda o estado da página."""
-        if self.pagina.lote_rodando:
-            self.pagina._recusar_no_lote()
-            return
         p = self.pagina
         if not zonas and p.modelo is None:
             self.atual = None                    # nada a gravar numa página que não existe
@@ -433,9 +430,7 @@ class ControladorDeDiagramas:
     def aplicar(self, indice: int, tabuleiro, tudo: bool) -> None:
         """Grava o diagrama conferido, refaz o texto e guarda as amostras no projeto."""
         p = self.pagina
-        if p.modelo is None or p.lote_rodando:
-            if p.lote_rodando:
-                p._recusar_no_lote()
+        if p.modelo is None:
             return
         antes = p._instantaneo()
         diagramas = p.diagramas
@@ -466,14 +461,16 @@ class ControladorDoLivro:
     def __init__(self, pagina: ControladorDePagina):
         self.pagina = pagina
         self.eventos = pagina.eventos
-        #: O pedido de cancelar o lote em andamento, ou None sem lote.
-        self._cancelar: Optional[threading.Event] = None
+        #: O lote em andamento (`lote.CondutorDoLote`), ou None.
+        self._condutor = None
+        #: O que faltou do lote cancelado, `(indices, refazer)`, para retomar.
+        self.restante = None
         #: O servidor cujo `modelos_prontos` já foi emitido (uma vez por servidor).
         self._modelos_avisados = None
 
     @property
     def lote_rodando(self) -> bool:
-        return self._cancelar is not None
+        return self._condutor is not None
 
     def abrir(self, projeto, fonte) -> None:
         """Liga o projeto (a fonte já aberta) e prepara a leitura fora da interface; ao fim,
@@ -484,7 +481,7 @@ class ControladorDoLivro:
         `modelos_prontos(estado)` vem quando ele termina. Sem servidor, os modelos carregam
         aqui (numa thread) e `modelos_prontos` vem logo depois de `projeto_aberto`."""
         p = self.pagina
-        self._cancelar = None
+        self._largar_lote()
         p.ligar(projeto, fonte, None)
         com_servidor = os.environ.get("ABBY_SERVIDOR", "1") != "0"
 
@@ -541,75 +538,92 @@ class ControladorDoLivro:
     def usar(self, projeto, fonte, leitor, servidor=None) -> None:
         """O projeto com o leitor pronto: abre a última página lida (ou a primeira)."""
         p = self.pagina
-        self._cancelar = None
+        self._largar_lote()
         p.ligar(projeto, fonte, leitor, servidor)
         lidas = projeto.paginas_lidas()
         p.ir_para(lidas[-1] if lidas else 0)
 
     def reconhecer(self, indices: Sequence[int], refazer: bool) -> None:
-        """Lê as páginas `indices` em segundo plano, gravando cada uma (`livro.reconhecer_paginas`).
-        Antes, o que a janela tem por gravar é gravado: o lote grava na thread dele."""
+        """Lê as páginas `indices` pelo condutor do lote (`lote.CondutorDoLote`): pelo
+        servidor, com a janela livre (as edições não esperam), e gravando cada página aqui,
+        na thread da interface (o escritor único, §11)."""
         p = self.pagina
         if not p.pronto:
             return
-        cancelar = threading.Event()
-
-        def preparar():
-            if not p.pronto:
-                return None
-            # O lote grava na thread dele: o que o gravador tem não pode chegar depois e
-            # passar por cima do que o lote leu.
-            if not p.projeto.descarregar(10):
-                p.eventos.emitir("aviso", "Reconhecer o livro", "O lote não começou: há "
-                                 "páginas que não puderam ser gravadas (veja a barra de "
-                                 "status). Libere o disco e tente de novo.")
-                return None
-            projeto, fonte, leitor = p.projeto, p.fonte, p.leitor
-            self._cancelar = cancelar
-            p.lote_rodando = True
-            self.eventos.emitir("lote_mudou")
-
-            def trabalho(progresso):
-                return livro.reconhecer_paginas(projeto, fonte, leitor, indices, refazer=refazer,
-                                                progresso=progresso, cancelado=cancelar.is_set)
-
-            def pronto(resultado: livro.ResultadoDoLote):
-                self._fim()
-                if p.indice in resultado.lidas:
-                    p.recarregar()
-                partes = [f"{len(resultado.lidas)} página(s) reconhecida(s)",
-                          f"{resultado.total_de_pendentes} glifo(s) a revisar",
-                          f"{sum(resultado.diagramas.values())} diagrama(s) lido(s) em FEN"]
-                if resultado.puladas:
-                    partes.append(f"{len(resultado.puladas)} já lida(s) pulada(s)")
-                if resultado.falhas:
-                    partes.append("falharam: " + ", ".join(str(i + 1) for i in resultado.falhas))
-                inicio = "Lote cancelado: " if resultado.cancelado else "Lote concluído: "
-                p._avisar(inicio + "; ".join(partes) + ". F6 vai ao próximo pendente do livro.",
-                          15000)
-            return trabalho, pronto
-
-        def progredir(feitas: int, total: int) -> None:
-            if not cancelar.is_set():
-                p._avisar(f"Reconhecendo o livro: {feitas} de {total} páginas…", 0)
-
-        def falhou(mensagem: str) -> None:
-            self._fim()
-            p._falhou("Reconhecer o livro")(mensagem)
-
-        p.tarefa("Reconhecendo o livro", preparar, falhou=falhou, progresso=progredir)
-
-    def _fim(self) -> None:
-        self._cancelar = None
-        self.pagina.lote_rodando = False
+        if self._condutor is not None:
+            p._avisar("O lote já está lendo o livro. Cancele-o (✕ na barra) antes de começar "
+                      "outro.", 8000)
+            return
+        self.restante = None
+        condutor = lt.CondutorDoLote(
+            p, indices, refazer, ao_progresso=self._progrediu,
+            ao_gravar=lambda indice: self.eventos.emitir("pagina_do_lote", indice),
+            ao_fim=lambda resultado: self._fim_do_lote(condutor, resultado))
+        self._condutor = condutor
+        p.lote_rodando = True
         self.eventos.emitir("lote_mudou")
         self.eventos.emitir("acoes_mudaram")
+        condutor.comecar()
+
+    def _progrediu(self, feitas: int, total: int, estimativa: Optional[float]) -> None:
+        self.eventos.emitir("lote_progresso", feitas, total, estimativa)
+
+    def _fim_do_lote(self, condutor, resultado) -> None:
+        if self._condutor is not condutor:
+            return                              # de um lote largado (outro projeto)
+        self._condutor = None
+        self.pagina.lote_rodando = False
+        if resultado.cancelado and condutor.restante:
+            self.restante = (list(condutor.restante), condutor.refazer)
+        mensagem = lt.resumo_do_fim(resultado)
+        if self.restante is not None:
+            mensagem += " Ferramentas › Retomar o lote continua de onde parou."
+        self.eventos.emitir("lote_mudou")
+        self.eventos.emitir("acoes_mudaram")
+        self.eventos.emitir("lote_terminou", mensagem, resultado)
+        self.pagina._avisar(mensagem + " F6 vai ao próximo pendente do livro.", 15000)
+
+    def _largar_lote(self) -> None:
+        """Outro projeto: o lote deste não grava mais nada (o condutor confere a geração)."""
+        if self._condutor is not None:
+            self._condutor.cancelar()
+        self._condutor = None
+        self.restante = None
 
     def cancelar(self) -> None:
-        """Pede o fim do lote; a página em leitura não é gravada pela metade."""
-        if self._cancelar is not None:
-            self._cancelar.set()
-            self.pagina._avisar("Cancelando o lote ao fim da leitura em curso…", 0)
+        """Pede o fim do lote: a página em leitura para no glifo seguinte e fica como estava;
+        o que faltou fica para `retomar`."""
+        if self._condutor is not None:
+            self._condutor.cancelar()
+            self.pagina._avisar("Cancelando o lote: a página em leitura para no glifo "
+                                "seguinte…", 0)
+
+    def retomar(self) -> None:
+        """Continua o lote cancelado de onde parou (sem ler de novo as já lidas, CA-11.5)."""
+        if self.restante is None or self._condutor is not None:
+            return
+        indices, refazer = self.restante
+        self.reconhecer(indices, refazer)
+
+    @property
+    def pode_retomar(self) -> bool:
+        return self.restante is not None and self._condutor is None
+
+    def voltar_ao_antes_do_lote(self) -> None:
+        """Página › Voltar ao estado antes do lote (§4.6): a página aberta volta a ser a que
+        o lote com "refazer" copiou antes de relê-la."""
+        p = self.pagina
+        if not p.pronto or not p.projeto.tem_antes_do_lote(p.indice):
+            p._avisar("Esta página não tem cópia de antes do lote.", 6000)
+            return
+        try:
+            p.projeto.voltar_ao_antes_do_lote(p.indice)
+        except OSError as erro:
+            p.eventos.emitir("aviso", "Voltar ao estado antes do lote", str(erro))
+            return
+        p.ir_para(p.indice, visita=False)
+        self.eventos.emitir("acoes_mudaram")
+        p._avisar(f"A página {p.indice + 1} voltou ao estado de antes do lote.", 8000)
 
     def proximo_pendente(self) -> None:
         """F6: o pendente desta página ou, se ela acabou, a próxima página com pendentes."""

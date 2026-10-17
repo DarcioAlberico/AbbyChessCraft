@@ -157,11 +157,9 @@ def test_a_busca_por_glifo_vai_para_resultados(jb, monkeypatch):
     monkeypatch.setattr(bj.DialogoDaBuscaPorGlifo, "exec", lambda self: QDialog.DialogCode.Accepted)
     monkeypatch.setattr(bj.DialogoDaBuscaPorGlifo, "pedido", lambda self: ("a", None, 0.0, 1.0))
     jb.buscar_glifo()
-    lista = jb.resultados.resultados
-    _ate(lambda: lista.count() and "Glifos" in lista.item(0).text())     # numa thread
-    lista = jb.resultados.resultados
-    assert "Glifos 'a'" in lista.item(0).text() and lista.count() == 3
-    lista.itemActivated.emit(lista.item(2))
+    modelo = jb.galeria.modelo                           # desde o passo C, na Galeria
+    _ate(lambda: modelo.rowCount() == 2 and "Glifos 'a'" in jb.galeria.titulo.text())
+    jb.galeria.escolhido.emit(next(i for i in modelo.itens if i.gid == pagina.boxes[3].gid))
     assert jb.pagina.atual == pagina.boxes[3].gid
 
 

@@ -38,6 +38,7 @@ from PySide6.QtWidgets import QApplication, QInputDialog, QMainWindow
 from abbychess import avisos as av
 from abbychess.app import acoes, dialogos
 from abbychess.app.busca_na_janela import BuscaNaJanela
+from abbychess.app.galeria_na_janela import GaleriaNaJanela
 from abbychess.app.substituir_na_janela import SubstituirNaJanela
 from abbychess.app.desenho import DesenhoDaJanela
 from abbychess.app.edicao_na_janela import EdicaoNoDocumento
@@ -61,7 +62,7 @@ TITULO = "AbbyChessCraft"
 
 
 class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoDocumento,
-                      BuscaNaJanela, SubstituirNaJanela, QMainWindow):
+                      BuscaNaJanela, SubstituirNaJanela, GaleriaNaJanela, QMainWindow):
     #: Da thread do gravador: a página `indice` não gravou (o erro).
     falha_de_gravacao = Signal(object, object)
 
@@ -83,6 +84,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         self._montar_espaco()
         self._montar_busca()
         self._montar_substituir()
+        self._montar_galeria()
         acoes.montar(self)
         self._ligar_eventos()
         self.treino.limpar("Crie um projeto (Ctrl+N) ou abra um existente (Ctrl+O).")
@@ -243,6 +245,9 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         so_leitura = " (só leitura)" if projeto.somente_leitura else ""
         self.setWindowTitle(f"{projeto.dados.nome}{so_leitura} — {TITULO}")
         self.livro.abrir(projeto, fonte)
+        # O espaço e a gaveta já, pelo livro.json, sem esperar o leitor (§8.1, CA-8.3: o
+        # painel de Páginas com o livro todo logo ao abrir); `_projeto_aberto` os refaz.
+        self._espaco_do_projeto_aberto()
 
     def usar(self, projeto, fonte, leitor, servidor=None) -> None:
         """O projeto com o leitor já pronto (os testes e as medidas; a abertura passa por

@@ -1026,6 +1026,64 @@ class ControladorDePagina:
             self.ir_ao_primeiro_pendente()
         self._editar("Corrigindo", corpo)
 
+    def corrigir_no_livro(self, alvos, char: str, recortes=None) -> None:
+        """A Galeria (§8.2): `char` nos glifos `alvos` (página -> gids), em quantas páginas
+        forem, num passo do desfazer e sem ensinar (digitar, Shift+Enter). Com `recortes`
+        ((página, gid) -> o recorte do glifo), cada um também é ensinado: uma amostra por
+        glifo (Enter). Os glifos ficam `manual`; a página editada sai de verificada."""
+        from core import proporcao
+
+        from abbychess.leitor import nome_de_origem
+
+        alvos = {int(i): list(g) for i, g in alvos.items() if g}
+        if not alvos or not char:
+            return
+
+        def corpo():
+            n = sum(len(g) for g in alvos.values())
+            acao = "Ensinar" if recortes else "Corrigir para"
+            transacao = hs.Transacao(f"{acao} '{char}' ({n} glifo(s), Galeria)")
+            aberta, feitos = False, 0
+            for indice, gids in sorted(alvos.items()):
+                if self.modelo is not None and indice == self.indice:
+                    pagina, aberta = self.modelo, True
+                else:
+                    pagina = self.projeto.pagina_para_editar(indice)
+                vivos = set(pagina.vivos)
+                gids = [g for g in gids if g in vivos]
+                if not gids:
+                    continue
+                antes = pagina.instantaneo()
+                referencia = (proporcao.altura_de_referencia(pagina.entries())
+                              if recortes else None)
+                for gid in gids:
+                    recorte = (recortes or {}).get((indice, gid))
+                    if recorte is not None and self.leitor is not None:
+                        caminho = self.leitor.ensinar(
+                            recorte, char, altura_de_referencia=referencia,
+                            origem=nome_de_origem(self.projeto.dados.nome, indice,
+                                                  pagina.indice_de(gid), gid))
+                        transacao.amostras_criadas.append(self.leitor.padroes.guardar(caminho))
+                    ed.corrigir(pagina, gid, char)
+                    feitos += 1
+                pagina.estado = proximo_estado(pagina.estado, "editar")
+                transacao.paginas[pagina.pid] = hs.mudanca(antes, pagina.instantaneo())
+                self._gravar(pagina)
+            if not transacao.paginas:
+                self._avisar("Os glifos escolhidos na Galeria saíram das páginas.", 6000)
+                return
+            self.historico.registrar(transacao)
+            if transacao.amostras_criadas:
+                self.eventos.emitir("padroes_mudaram")
+            if aberta:
+                self.selecao = set()
+                self.eventos.emitir("glifos_mudaram", None)
+                self.eventos.emitir("selecao_mudou")
+            self.eventos.emitir("acoes_mudaram")
+            self.eventos.emitir("galeria_aplicada", feitos, len(transacao.paginas),
+                                bool(transacao.amostras_criadas))
+        self._editar("Galeria", corpo, so_nesta_pagina=False, precisa_de_glifos=False)
+
     def descartar(self) -> None:
         """Del: tira o glifo da página (não é caractere)."""
         gid = self.atual

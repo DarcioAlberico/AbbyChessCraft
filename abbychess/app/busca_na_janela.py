@@ -348,8 +348,8 @@ class BuscaNaJanela:
 
     # ------------------------------------------------------------------
     def buscar_glifo(self) -> None:
-        """A busca por glifo (§7.1): caractere, fonte e faixa de confiança; a lista vai para
-        Resultados (a Galeria é do passo C)."""
+        """A busca por glifo (§7.1): caractere, fonte e faixa de confiança; os glifos achados
+        abrem na Galeria (§8.2)."""
         if self.projeto is None:
             return
         dialogo = DialogoDaBuscaPorGlifo(self)
@@ -362,10 +362,9 @@ class BuscaNaJanela:
 
         def mostrar(achados):
             self.statusBar().clearMessage()
-            self.resultados.mostrar_glifos(
-                achados, f"Glifos {descricao}, confiança de {minima:.2f} a {maxima:.2f}: "
-                         f"{len(achados)}{montando}", NOMES_DAS_FONTES)
-            self.mostrar_resultados()
+            self.mostrar_glifos_na_galeria(
+                achados, f"Glifos {descricao}, confiança de {minima:.2f} a {maxima:.2f}"
+                         f"{montando}")
         self.busca.glifos(char, fontes, minima, maxima, ao_terminar=mostrar)
 
     def _barra_de_busca_com_o_foco(self) -> bool:

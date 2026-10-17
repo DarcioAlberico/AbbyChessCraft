@@ -78,11 +78,13 @@ class LoteNaJanela:
         livro = self.livro
         com_reler = False
         if livro.pode_retomar and livro.reler_depois:
-            resposta = dialogos.reler_depois(self, livro.reler_depois)
+            resposta = dialogos.reler_depois(self, livro.reler_depois,
+                                             faltou=livro.restante is not None)
             if resposta is None:
                 return
             com_reler = resposta
         livro.retomar(com_reler)
+
 
 def _duracao(segundos: float) -> str:
     """O tempo estimado do lote, arredondado como se fala: "40 s", "3 min", "1 h 20 min"."""

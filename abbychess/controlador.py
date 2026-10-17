@@ -479,6 +479,7 @@ class ControladorDePagina:
         def corpo():
             antes = self._instantaneo()
             self._mudou(self.modelo, self.indice, "Página verificada", antes, evento="verificar")
+            self.eventos.emitir("pagina_verificada", self.indice)
             self.eventos.emitir("acoes_mudaram")
             proxima = self._proxima_nao_verificada()
             if proxima is None:
@@ -628,6 +629,7 @@ class ControladorDePagina:
             if pagina is self.modelo:
                 self.atual, self.pulados, self.selecao = None, set(), set()
             self._mudou(pagina, indice, "Reconhecer a página", antes, evento="reconhecer")
+            self.eventos.emitir("pagina_reconhecida", indice)
             if pagina is self.modelo:
                 self.ir_ao_primeiro_pendente()
                 resumo = pg.resumir(pagina.entries(), leitor)

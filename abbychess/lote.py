@@ -100,11 +100,16 @@ class CondutorDoLote:
                  ao_progresso: Optional[Callable[[int, int, Optional[float]], None]] = None,
                  ao_gravar: Optional[Callable[[int], None]] = None,
                  ao_fim: Optional[Callable[[ResultadoDoLote], None]] = None,
-                 cancelado: Callable[[], bool] = lambda: False):
+                 cancelado: Callable[[], bool] = lambda: False,
+                 forcar: Sequence[int] = ()):
         self.p = pagina
         self.indices = list(indices)
         self.restante = deque(self.indices)
         self.refazer = refazer
+        #: As páginas que o usuário mandou ler de novo de qualquer jeito (as que ficaram para
+        #: reler depois, confirmadas no Retomar): lidas mesmo já lidas, e mesmo abertas com
+        #: passos no desfazer (a confirmação disse que o Ctrl+Z delas deixa de valer).
+        self.forcar = set(forcar)
         self.ao_progresso = ao_progresso or (lambda *_: None)
         self.ao_gravar = ao_gravar or (lambda _indice: None)
         self.ao_fim = ao_fim or (lambda _resultado: None)
@@ -186,9 +191,10 @@ class CondutorDoLote:
         estado = self.p.projeto.estado_da_pagina(indice)
         if estado == VERIFICADA:
             return VERIFICADA_PULADA
-        if estado in LIDAS and not self.refazer:
+        forcada = indice in self.forcar
+        if estado in LIDAS and not (self.refazer or forcada):
             return JA_LIDA
-        if self._aberta_e_suja(indice):
+        if not forcada and self._aberta_e_suja(indice):
             return RELER_DEPOIS
         return None
 
@@ -326,7 +332,8 @@ class CondutorDoLote:
         p = self.p
         projeto = p.projeto
         pagina = projeto.pagina_para_editar(indice)
-        if self.refazer and pagina.estado in LIDAS and not projeto.somente_leitura:
+        if (self.refazer or indice in self.forcar) and pagina.estado in LIDAS \
+                and not projeto.somente_leitura:
             projeto.guardar_antes_do_lote(pagina)                         # §4.6
         de_antes = list(pagina.boxes)
         novos, dif = reconciliar(pagina.boxes, lida.boxes, pagina.alocar, procedencia.amostra_de,

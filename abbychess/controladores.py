@@ -487,6 +487,8 @@ class ControladorDoLivro:
         self._reler_depois_antes: List[int] = []
         #: "Abrir sem o servidor" nesta sessão (os modelos não carregaram no filho).
         self.sem_servidor = False
+        self.eventos.ligar("pagina_reconhecida", self._saiu_de_reler_depois)
+        self.eventos.ligar("pagina_verificada", self._saiu_de_reler_depois)
         #: O servidor cujo `modelos_prontos` já foi emitido (uma vez por servidor).
         self._modelos_avisados = None
 
@@ -569,7 +571,8 @@ class ControladorDoLivro:
         lidas = projeto.paginas_lidas()
         p.ir_para(lidas[-1] if lidas else 0)
 
-    def reconhecer(self, indices: Sequence[int], refazer: bool) -> None:
+    def reconhecer(self, indices: Sequence[int], refazer: bool,
+                   forcar: Sequence[int] = ()) -> None:
         """Lê as páginas `indices` pelo condutor do lote (`lote.CondutorDoLote`): pelo
         servidor, com a janela livre (as edições não esperam), e gravando cada página aqui,
         na thread da interface (o escritor único, §11)."""
@@ -583,7 +586,7 @@ class ControladorDoLivro:
         self.restante = None
         self._reler_depois_antes = [i for i in self.reler_depois if i not in indices]
         condutor = lt.CondutorDoLote(
-            p, indices, refazer, ao_progresso=self._progrediu,
+            p, indices, refazer, forcar=forcar, ao_progresso=self._progrediu,
             ao_gravar=lambda indice: self.eventos.emitir("pagina_do_lote", indice),
             ao_fim=lambda resultado: self._fim_do_lote(condutor, resultado))
         self._condutor = condutor
@@ -691,11 +694,19 @@ class ControladorDoLivro:
                                     "retomar o lote.", 8000)
             return
         indices, refazer = self.restante if self.restante is not None else ([], False)
-        if com_reler_depois and self.reler_depois:
-            indices = list(indices) + [i for i in self.reler_depois if i not in indices]
-            refazer = True                      # elas já foram lidas: lidas de novo
-        if indices:
-            self.reconhecer(indices, refazer)
+        forcar = list(self.reler_depois) if com_reler_depois else []
+        indices = list(indices) + [i for i in forcar if i not in indices]
+        if indices:                             # o "refazer" do lote vale para o que faltou
+            self.reconhecer(indices, refazer, forcar=forcar)
+        else:
+            self.pagina._avisar("Nada faltou do lote.", 6000)
+
+    def _saiu_de_reler_depois(self, indice: int) -> None:
+        """O F5 releu a página, ou ela foi verificada: não fica mais para reler depois."""
+        if indice in self.reler_depois and self._condutor is None:
+            faltam, refazer = self.restante if self.restante is not None else ([], False)
+            self._guardar(faltam, refazer, [i for i in self.reler_depois if i != indice])
+            self.eventos.emitir("acoes_mudaram")
 
     @property
     def pode_retomar(self) -> bool:

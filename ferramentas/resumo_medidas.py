@@ -232,7 +232,11 @@ def _por_passo() -> list:
              ("buscar_regex_no_livro", "p95_ms", "Buscar regex no livro (230 p.), p95"),
              ("atraso_durante_a_busca", "p99_ms", "Atraso durante a busca, p99"),
              ("atraso_durante_o_aborto", "p99_ms", "Atraso durante o aborto, p99"),
-             ("indice_pela_janela", "max_ms", "Índice pela janela (230 p.), máx."))
+             ("indice_pela_janela", "max_ms", "Índice pela janela (230 p.), máx."),
+             ("substituir_no_livro", "trocar_na_interface_ms",
+              "Substituir no livro: a janela presa (230 p.)"),
+             ("substituir_no_livro", "desfazer_ms", "Substituir no livro: o Ctrl+Z (230 p.)"),
+             ("substituir_no_livro", "desfazer_mb", "Substituir no livro: o desfazer (MB)"))
     colunas = [("linha de base", base)]
     for passo in passos:
         arquivo, dados = _ultimo(f"passo-{passo}")

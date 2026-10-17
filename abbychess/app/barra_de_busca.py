@@ -142,6 +142,11 @@ class BarraDeBusca(QWidget):
     def escolher_escopo(self, escopo: str) -> None:
         self.escopo.setCurrentIndex(max(0, self.escopo.findData(escopo)))
 
+    def rotular_selecao(self, pagina: Optional[int]) -> None:
+        """O escopo Seleção diz de que página é a seleção guardada ("Seleção (p. 3)")."""
+        self.escopo.setItemText(self.escopo.findData(bs.SELECAO),
+                                "Seleção" if pagina is None else f"Seleção (p. {pagina})")
+
     def opcoes(self, **contexto) -> bs.Opcoes:
         """As opções da barra, com o `contexto` da janela (a página aberta, a seleção, o
         idioma)."""

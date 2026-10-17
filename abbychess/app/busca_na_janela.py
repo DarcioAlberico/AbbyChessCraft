@@ -43,8 +43,10 @@ class BuscaNaJanela:
         self._mandar_para_resultados = False
         #: A ida pedida (F3, Enter) antes de a busca terminar: +1, -1 ou None.
         self._ida_pendente: Optional[int] = None
-        #: A seleção do Documento quando o escopo Seleção foi escolhido (o cursor anda).
+        #: A seleção do Documento quando o escopo Seleção foi escolhido (o cursor anda), e
+        #: o escopo de antes (o Ctrl+F sem seleção volta a ele).
         self._selecao_congelada = None
+        self._escopo_antes = bs.LIVRO
         #: (página, versão no histórico) da página aberta na última busca: a edição dela
         #: (a versão muda) refaz a busca; trocar de página, não.
         self._versao_buscada = None
@@ -66,12 +68,17 @@ class BuscaNaJanela:
         self.vista.setCurrentWidget(self.painel_do_documento)
         cursor = self.texto.textCursor()
         selecionado = cursor.selectedText()
-        texto = None
+        texto, escopo = None, self.barra_de_busca.escopo.currentData()
         if selecionado and (" " in selecionado or len(selecionado) > SELECAO_LONGA):
-            self._selecao_congelada = self._selecao_atual()
+            if escopo != bs.SELECAO:
+                self._escopo_antes = escopo
+            self._congelar_selecao(self._selecao_atual())
             self.barra_de_busca.escolher_escopo(bs.SELECAO)
-        elif selecionado:
-            texto = selecionado
+        else:
+            if escopo == bs.SELECAO:            # sem seleção: o escopo de antes
+                self._congelar_selecao(None)
+                self.barra_de_busca.escolher_escopo(self._escopo_antes)
+            texto = selecionado or None
         self.barra_de_busca.abrir(texto)
         if self.barra_de_busca.campo.text():
             self.barra_de_busca.relogio.stop()
@@ -82,13 +89,26 @@ class BuscaNaJanela:
         self.busca.cancelar()
         self._ocorrencias, self._posicao, self._ida_pendente = [], None, None
         self._mandar_para_resultados = False
+        self._congelar_selecao(None)
         self.texto.destacar_busca([])
         self.paginas.mostrar_ocorrencias(None)
         self.texto.setFocus(Qt.FocusReason.OtherFocusReason)
 
     def _escopo_mudou(self, *_):
         if self.barra_de_busca.escopo.currentData() == bs.SELECAO:
-            self._selecao_congelada = self._selecao_atual() or self._selecao_congelada
+            selecao = self._selecao_atual()
+            if selecao is not None:
+                self._congelar_selecao(selecao)
+
+    def _congelar_selecao(self, selecao) -> None:
+        """Guarda a seleção do escopo Seleção (None a esquece); a seleção azul sai do
+        Documento, para não cobrir as ocorrências."""
+        self._selecao_congelada = selecao
+        self.barra_de_busca.rotular_selecao(None if selecao is None else selecao[0] + 1)
+        if selecao is not None:
+            cursor = self.texto.textCursor()
+            cursor.clearSelection()
+            self.texto.setTextCursor(cursor)
 
     def _selecao_atual(self):
         """A seleção do Documento como (página, gid do primeiro glifo, gid do último)."""
@@ -196,7 +216,11 @@ class BuscaNaJanela:
         return f" {fora} página(s) não reconhecida(s) ficaram fora." if fora else ""
 
     def _destacar_na_pagina(self) -> None:
-        """As ocorrências da página aberta, no Documento (a atual em laranja)."""
+        """As ocorrências da página aberta, no Documento (a atual em laranja). A seleção
+        guardada de outra página cai."""
+        if (self._selecao_congelada is not None
+                and self._selecao_congelada[0] != self.pagina.indice):
+            self._congelar_selecao(None)
         if self.barra_de_busca.isHidden():
             return
         aqui = [n for n, o in enumerate(self._ocorrencias) if o.pagina == self.pagina.indice]
@@ -318,14 +342,17 @@ class BuscaNaJanela:
         if dialogo.exec() != QDialog.DialogCode.Accepted:
             return
         char, fontes, minima, maxima = dialogo.pedido()
-        achados = self.busca.glifos(char, fontes, minima, maxima)
         descricao = f"'{char}'" if char else "qualquer caractere"
-        self.resultados.mostrar_glifos(
-            achados, f"Glifos {descricao}, confiança de {minima:.2f} a {maxima:.2f}: "
-                     f"{len(achados)}" + ("" if self.busca.pronto.is_set()
-                                          else " (o índice ainda está sendo montado)"),
-            NOMES_DAS_FONTES)
-        self.mostrar_resultados()
+        montando = "" if self.busca.pronto.is_set() else " (o índice ainda está sendo montado)"
+        self.statusBar().showMessage(f"Buscando glifos {descricao}…")
+
+        def mostrar(achados):
+            self.statusBar().clearMessage()
+            self.resultados.mostrar_glifos(
+                achados, f"Glifos {descricao}, confiança de {minima:.2f} a {maxima:.2f}: "
+                         f"{len(achados)}{montando}", NOMES_DAS_FONTES)
+            self.mostrar_resultados()
+        self.busca.glifos(char, fontes, minima, maxima, ao_terminar=mostrar)
 
     def _barra_de_busca_com_o_foco(self) -> bool:
         foco = QApplication.focusWidget()

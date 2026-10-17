@@ -514,7 +514,12 @@ class ProjetoDeLivro:
         if modelo is not None:
             return modelo.instantaneo()
         if self._tem_v1(indice):
-            return self._ler_v1(indice)
+            with self._trava_do_livro:          # a interface pode migrá-la agora
+                if self._tem_v1(indice):
+                    return self._ler_v1(indice)
+            modelo = self.modelo_em_memoria(indice)     # migrada: na memória, ou no v2
+            if modelo is not None:
+                return modelo.instantaneo()
         arquivo = self.arquivo_da_pagina(indice)
         if arquivo is None:
             return None

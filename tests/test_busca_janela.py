@@ -132,6 +132,24 @@ def test_a_pagina_editada_entra_na_busca_seguinte(jb):
     assert jb.barra_de_busca.contador.text() == "1"
 
 
+def test_o_ctrl_f_sem_selecao_esquece_o_escopo_selecao(jb):
+    from abbychess import busca as bs
+
+    _pagina_lida(jb, "casa velha", "outra casa")
+    cursor = jb.texto.textCursor()
+    cursor.setPosition(0)
+    cursor.setPosition(len(jb.texto.toPlainText()), cursor.MoveMode.KeepAnchor)
+    jb.texto.setTextCursor(cursor)
+    jb.localizar()
+    b = jb.barra_de_busca
+    assert b.escopo.currentData() == bs.SELECAO and b.escopo.currentText() == "Seleção (p. 1)"
+    assert not jb.texto.textCursor().hasSelection()     # o azul não cobre o amarelo
+    jb.fechar_busca()
+    jb.localizar()                                       # sem seleção
+    assert b.escopo.currentData() == bs.LIVRO and jb._selecao_congelada is None
+    assert b.escopo.itemText(b.escopo.findData(bs.SELECAO)) == "Seleção"
+
+
 def test_a_busca_por_glifo_vai_para_resultados(jb, monkeypatch):
     from abbychess.app import busca_na_janela as bj
 
@@ -139,6 +157,8 @@ def test_a_busca_por_glifo_vai_para_resultados(jb, monkeypatch):
     monkeypatch.setattr(bj.DialogoDaBuscaPorGlifo, "exec", lambda self: QDialog.DialogCode.Accepted)
     monkeypatch.setattr(bj.DialogoDaBuscaPorGlifo, "pedido", lambda self: ("a", None, 0.0, 1.0))
     jb.buscar_glifo()
+    lista = jb.resultados.resultados
+    _ate(lambda: lista.count() and "Glifos" in lista.item(0).text())     # numa thread
     lista = jb.resultados.resultados
     assert "Glifos 'a'" in lista.item(0).text() and lista.count() == 3
     lista.itemActivated.emit(lista.item(2))

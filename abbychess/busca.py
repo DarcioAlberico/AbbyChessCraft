@@ -179,20 +179,35 @@ def processos_para_indexar() -> int:
     return max(1, min(6, (os.cpu_count() or 2) - 2))
 
 
+#: Segundos que os processos aquecidos esperam um projeto antes de fechar sozinhos.
+OCIOSO = 300.0
+
+
 class PoolDoIndice:
     """Os processos que montam o índice, abertos com o programa (`aquecer`, numa thread: abrir
     e importar custa ~0,75 s, que assim não fica no caminho de abrir o projeto) e fechados
-    depois do primeiro índice (`liberar`: parados, eles ocupariam memória à toa); o próximo
-    projeto aberto os abre de novo."""
+    quando o último índice que os usa termina (`obter` e `devolver` contam os usos: parados,
+    eles ocupariam ~600 MB à toa), ou depois de `OCIOSO` s sem projeto aberto; o próximo
+    projeto aberto os abre de novo (o alvo de 2 s do índice vale para o primeiro projeto)."""
 
     def __init__(self):
         self._pool: Optional[ProcessPoolExecutor] = None
         self._trava = threading.Lock()
         self._pronto = threading.Event()
+        self._usos = 0
 
-    def aquecer(self) -> None:
+    def aquecer(self, ocioso: float = None) -> None:
         """Abre os processos e carrega os módulos neles, numa thread (volta na hora)."""
         threading.Thread(target=self._abrir, name="pool-do-indice", daemon=True).start()
+        relogio = threading.Timer(OCIOSO if ocioso is None else ocioso, self._fechar_se_ocioso)
+        relogio.daemon = True
+        relogio.start()
+
+    def _fechar_se_ocioso(self) -> None:
+        with self._trava:
+            ocioso = self._usos == 0
+        if ocioso:
+            self.liberar()
 
     def _abrir(self) -> Optional[ProcessPoolExecutor]:
         import multiprocessing
@@ -210,10 +225,23 @@ class PoolDoIndice:
             return self._pool
 
     def obter(self) -> Optional[ProcessPoolExecutor]:
-        """O pool aberto (abre agora, se não foi aquecido)."""
+        """O pool aberto (abre agora, se não foi aquecido), contado como um uso até
+        `devolver`."""
+        with self._trava:
+            self._usos += 1
         return self._abrir()
 
+    def devolver(self) -> None:
+        """O fim de um uso; o último fecha os processos (as tarefas de outro uso nunca são
+        canceladas por este)."""
+        with self._trava:
+            self._usos = max(0, self._usos - 1)
+            ultimo = self._usos == 0
+        if ultimo:
+            self.liberar()
+
     def liberar(self) -> None:
+        """Fecha os processos agora."""
         with self._trava:
             pool, self._pool = self._pool, None
             self._pronto.clear()
@@ -233,14 +261,12 @@ def construir(fontes: Mapping[int, Tuple[object, int]], idioma: str = "pt", *,
     tarefas = [(fonte, idioma, versao) for _i, (fonte, versao) in sorted(fontes.items())]
     if not tarefas:
         return saida
-    proprio = None
+    usado = None
     if not paralelo or len(tarefas) < 8:
         resultados: Iterable = map(_indexar_tarefa, tarefas)
     else:
-        executor = pool.obter() if pool is not None else None
-        if executor is None:
-            proprio = PoolDoIndice()
-            executor = proprio.obter()
+        usado = pool if pool is not None else PoolDoIndice()
+        executor = usado.obter()
         resultados = (executor.map(_indexar_tarefa, tarefas, chunksize=4) if executor is not None
                       else map(_indexar_tarefa, tarefas))
     try:
@@ -252,8 +278,11 @@ def construir(fontes: Mapping[int, Tuple[object, int]], idioma: str = "pt", *,
                 if ao_indexar is not None:
                     ao_indexar(indexada)
     finally:
-        if proprio is not None:
-            proprio.liberar()
+        fechar = getattr(resultados, "close", None)
+        if fechar is not None:                  # cancela as tarefas deste índice que faltam
+            fechar()
+        if usado is not None:
+            usado.devolver()
     return saida
 
 
@@ -268,11 +297,12 @@ def _classe_de_pecas(idioma: str) -> str:
 def classes(idioma: str) -> Dict[str, str]:
     """A expansão de cada classe de xadrez (§7.1), para o idioma do livro. Cada uma fica
     fora do "ignorar maiúsculas" (`(?-i:...)`: B, o bispo, não é b, a coluna), e o lance e a
-    casa não começam nem terminam no meio de uma palavra ("the5", "a43")."""
+    casa não começam nem terminam no meio de uma palavra ("the5", "a43"; a casa depois da
+    coluna ou da linha que desambigua vale: Nbd7, Rae1, R1e2, exd5)."""
     pecas = regex.escape(_classe_de_pecas(idioma))
     lance = (rf"(?-i:(?<!\w)(?:[{pecas}]?[a-h]?[1-8]?[-x]?[a-h][1-8](?:=[{pecas}])?"
              r"|O-O(?:-O)?|0-0(?:-0)?)[+#]?(?![\w+#]))")
-    casa = r"(?-i:(?<![a-wyz0-9])[a-h][1-8](?![0-9]))"
+    casa = r"(?-i:(?<![a-wyz][a-wyz])(?<![i-wyz09])[a-h][1-8](?![0-9]))"
     valoracao = (r"(?-i:(?:\+-|-\+|\+=|=\+|!!|\?\?|!\?|\?!|‼|⁇|⁉|⁈|[±∓⩲⩱∞□!?]"
                  r"|(?<!\w)=(?!\w)))")
     return {"L": lance, "P": f"(?-i:[{pecas}])", "C": casa, "V": valoracao}

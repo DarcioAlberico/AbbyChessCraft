@@ -280,19 +280,35 @@ def test_atraso_durante_o_lote_com_o_leitor_falso(tmp_path, medidas):
     temporizador = QTimer()
     temporizador.setInterval(16)
     temporizador.timeout.connect(tique)
+    buscas = []                                         # desde o B, como no real
+
+    def buscar():
+        janela.localizar()
+        janela.barra_de_busca.campo.setText(("e", "casa")[len(buscas) % 2])
+        janela.barra_de_busca.relogio.stop()
+        janela._buscar()
+        buscas.append(time.perf_counter())
+
+    relogio_da_busca = QTimer()
+    relogio_da_busca.setInterval(2000)
+    relogio_da_busca.timeout.connect(buscar)
     temporizador.start()
+    relogio_da_busca.start()
     inicio = time.perf_counter()
     try:
         janela.livro.reconhecer(list(range(51)), refazer=False)
         _ate(app, lambda: not janela.livro.lote_rodando, 600)
     finally:
         temporizador.stop()
+        relogio_da_busca.stop()
         duracao = time.perf_counter() - inicio
         janela.close()
     medidas["atraso_durante_o_lote_falso"] = {
         "paginas": 51, "p99_ms": round(percentil(atrasos, 0.99), 1),
         "p95_ms": round(p95(atrasos), 1), "max_ms": round(max(atrasos), 1),
         "disparos": len(atrasos), "duracao_s": round(duracao, 1), "alvo_p99_ms": 50,
+        "buscas_durante_o_lote": len(buscas),
         "como": "o lote de 51 páginas sintéticas pelo servidor com o leitor falso (10 ms por "
-                "glifo, ~200 ms por página): a janela grava uma página a cada ~200 ms"}
+                "glifo, ~200 ms por página): a janela grava uma página a cada ~200 ms; desde o "
+                "B, uma busca a cada 2 s (Localizar) durante o lote"}
 

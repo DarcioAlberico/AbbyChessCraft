@@ -457,6 +457,8 @@ aviso.
      trocar (p50 18 ms, máximo 93): fazer a `QImage` na thread da pré-carga.
    - em zoom baixo (22%), o fundo laranja dos boxes pendentes cobre a letra (revisão de
      produto do A2): só o contorno abaixo de ~40%;
+   - o fundo azul-claro do glifo atual no Documento é discreto sobre um □ (revisão de produto
+     do A3): um tom mais forte;
    - folhear depressa páginas nunca vistas: a pré-carga adiada chega tarde (parado 0,25 s
      por página, ~403 ms por troca); cancelar ou adiar a pré-carga quando outra página já foi
      pedida.

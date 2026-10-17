@@ -1106,11 +1106,36 @@ class ControladorDePagina:
                          else f"Aceitar '{' '.join(original.split())[:40]}'")
             self._mudou(pagina, indice, descricao, antes)
             aviso = plano.estrutural()
+            if plano.virtuais and self._tinta_sem_box(pagina, plano):
+                aviso += " · há tinta sem box aqui: Ctrl+M marca o quadro"
             if aviso:
                 self.eventos.emitir("estrutural", aviso)
             if ensinar_gid is not None:
                 self._ensinar_do_documento(ensinar_gid, virtuais)
         self._editar("Editando o texto", corpo)
+
+    def _tinta_sem_box(self, pagina: Pagina, plano) -> bool:
+        """Há tinta sem box onde uma letra que faltou entrou (a letra que a segmentação não
+        viu): a faixa ao lado do glifo âncora, do tamanho das letras, até o vizinho da linha."""
+        if self.matriz is None:
+            return False
+        caixas = {b.gid: b.entry for b in pagina.boxes}
+        for letras, (lado, ancora), _nova in plano.virtuais:
+            e = caixas.get(ancora)
+            if e is None:
+                continue
+            largura = max(4, (e.x2 - e.x1)) * len(letras)
+            mesma_linha = [b for b in caixas.values() if b is not e and b.y1 < e.y2 and b.y2 > e.y1]
+            if lado == "depois":
+                x1 = e.x2 + 1
+                x2 = min([x1 + largura] + [b.x1 for b in mesma_linha if b.x1 >= e.x2])
+            else:
+                x2 = e.x1 - 1
+                x1 = max([x2 - largura] + [b.x2 for b in mesma_linha if b.x2 <= e.x1])
+            recorte = self.matriz[max(0, e.y1):e.y2, max(0, x1):max(0, x2)]
+            if recorte.size and int((recorte < 128).sum()) >= 12:
+                return True
+        return False
 
     def _ensinar_do_documento(self, gid: int, virtuais) -> None:
         """Ctrl+Enter: o glifo sob o cursor, ensinado com o caractere dele."""
@@ -1269,6 +1294,12 @@ class ControladorDePagina:
                 self._aplicar_limiares(limiares)
             return None
         self.tarefa("Aplicando os limiares", preparar, falhou=self._falhou("Opções"))
+
+    def definir_notacao(self, notacao: str) -> None:
+        """Como o livro escreve as peças nos lances (§6.4), no projeto (gravado junto com os
+        limiares, que vêm logo depois)."""
+        if self.projeto is not None:
+            self.projeto.dados.notacao = notacao
 
     def _aplicar_limiares(self, limiares) -> None:
         projeto = self.projeto

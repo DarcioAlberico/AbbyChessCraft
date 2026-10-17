@@ -287,3 +287,31 @@ def test_a_pagina_sem_texto_deixa_o_documento_so_para_leitura(j):
     assert j.texto.isReadOnly()                           # o aviso não se edita
     _escrever(j, "casa")
     assert not j.texto.isReadOnly()
+
+
+def test_o_modo_das_pecas_fica_nas_opcoes_do_livro(j):
+    import json
+
+    from abbychess.app.opcoes import DialogoDeOpcoes
+
+    dialogo = DialogoDeOpcoes(j.projeto.dados.limiares, j, notacao="letras")
+    assert dialogo.notacao() == "letras"
+    j.pagina.definir_notacao("letras")
+    j.pagina._aplicar_limiares(j.projeto.dados.limiares)  # grava o projeto
+    bruto = json.loads((j.projeto.pasta / "projeto.json").read_text(encoding="utf-8"))
+    assert bruto["notacao"] == "letras"
+
+
+def test_a_letra_que_faltou_sobre_tinta_sem_box_oferece_o_ctrl_m(j):
+    import numpy as np
+
+    pagina = _escrever(j, "csa")
+    matriz = np.full((300, 900), 255, np.uint8)
+    matriz[20:50, 40:60] = 0                              # tinta logo depois do "c", sem box
+    j.pagina.matriz = matriz
+    _por_o_cursor(j, 1)
+    QTest.keyClicks(j.texto, "a")
+    _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    assert len(pagina.decisoes.virtuais) == 1
+    assert "Ctrl+M marca o quadro" in j.linha.aviso
+

@@ -28,6 +28,7 @@ def montar(janela) -> None:
     j.acao_opcoes = acao(j, "opcoes", j.opcoes, texto="Opções…")
     j.acao_sair = acao(j, "sair", j.close, texto="Sair")
     j.acao_cancelar_lote = acao(j, "cancelar_lote", livro.cancelar, texto="Cancelar o lote")
+    j.acao_retomar_lote = acao(j, "retomar_lote", livro.retomar, texto="Retomar o lote")
     j.acao_desfazer = acao(j, "desfazer", p.desfazer)
     j.acao_refazer = acao(j, "refazer", p.refazer)
     barra.addSeparator()
@@ -65,6 +66,8 @@ def montar(janela) -> None:
                                    texto="Próxima página com pendentes")
     j.acao_verificada = acao(j, "pagina_verificada", j.verificar_pagina,
                              texto="Página verificada (abre a próxima)")
+    j.acao_antes_do_lote = acao(j, "voltar_antes_do_lote", j.voltar_ao_antes_do_lote,
+                                texto="Voltar ao estado antes do lote…")
     barra.addSeparator()
 
     # --- A fila ----------------------------------------------------------------
@@ -194,7 +197,8 @@ def _menus(j) -> None:
     menu = j.menuBar().addMenu("P&ágina")
     for acao in (j.acao_anterior, j.acao_seguinte, j.acao_primeira, j.acao_ultima,
                  j.acao_ir_para, j.acao_voltar_visita, j.acao_avancar_visita, None,
-                 j.acao_reconhecer, j.acao_reler, j.acao_verificada, None,
+                 j.acao_reconhecer, j.acao_reler, j.acao_verificada, j.acao_antes_do_lote,
+                 None,
                  j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
                  j.acao_proximo_do_livro, j.acao_diagramas):
         menu.addSeparator() if acao is None else menu.addAction(acao)
@@ -208,7 +212,8 @@ def _menus(j) -> None:
         menu.addSeparator() if acao is None else menu.addAction(acao)
     j.menu_ferramentas = j.menuBar().addMenu("&Ferramentas")
     for acao in (j.acao_modo_treino, j.acao_areas, j.acao_areas_auto, j.acao_verificar, None,
-                 j.acao_lote, j.acao_cancelar_lote, None, j.acao_opcoes):
+                 j.acao_lote, j.acao_cancelar_lote, j.acao_retomar_lote, None,
+                 j.acao_opcoes):
         j.menu_ferramentas.addSeparator() if acao is None else j.menu_ferramentas.addAction(acao)
     menu = j.menuBar().addMenu("Aj&uda")
     menu.addAction("Atalhos do teclado", j.mostrar_atalhos)
@@ -219,12 +224,13 @@ def atualizar(janela) -> None:
     """Liga e desliga as ações pelo estado: projeto aberto, lote rodando, o que a página tem.
 
     Uma tarefa rodando não desliga quase nada: o comando pedido entra na fila do
-    executor, que a barra de status mostra. O lote desliga o que edita a página."""
+    executor, que a barra de status mostra. O lote (passo E) também não: ele grava entre um
+    comando e outro; só abrir outro projeto e começar outro lote esperam o fim dele."""
     j, p = janela, janela.pagina
     tem = p.pronto
     sem_lote = not p.lote_rodando
     total = p.fonte.total if p.fonte else 0
-    editar = tem and sem_lote
+    editar = tem
     j.acao_novo.setEnabled(sem_lote)
     j.acao_abrir.setEnabled(sem_lote)
     j.acao_reconhecer.setEnabled(editar)
@@ -240,8 +246,10 @@ def atualizar(janela) -> None:
     j.seletor.setEnabled(tem)
     j.acao_modo_treino.setEnabled(tem)
     j.acao_opcoes.setEnabled(editar)
-    j.acao_lote.setEnabled(editar)
+    j.acao_lote.setEnabled(tem and sem_lote)
     j.acao_cancelar_lote.setEnabled(j.livro.lote_rodando)
+    j.acao_retomar_lote.setEnabled(tem and j.livro.pode_retomar)
+    j.acao_antes_do_lote.setEnabled(tem and p.projeto.tem_antes_do_lote(p.indice))
     j.acao_proximo_do_livro.setEnabled(tem)
     j.acao_exportar.setEnabled(tem)
     j.acao_areas.setEnabled(tem)

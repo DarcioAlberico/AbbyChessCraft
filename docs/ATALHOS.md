@@ -49,6 +49,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Refazer | Ctrl+Y / Ctrl+Shift+Z | Ctrl+Y / Ctrl+Shift+Z | global | A2 |
 | Refazer as áreas automáticas | — | — | global | A2 |
 | Reler os pendentes | Ctrl+R | Ctrl+R | global | A2 |
+| Retomar o lote cancelado de onde parou | — | — | global | E |
 | Sair | Ctrl+Q | Ctrl+Q | global | A2 |
 | Seguir o item atual nos dois painéis | Ctrl+Shift+L | Ctrl+Shift+L | global | A1 |
 | Substituir | Ctrl+H | Ctrl+H | global | D2 |

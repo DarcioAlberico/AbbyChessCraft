@@ -6,11 +6,14 @@ de uma vez e a revisão anda pelo documento todo, não por página. Aqui é igua
 - `reconhecer_paginas` lê um intervalo de páginas com os padrões do livro e
   grava cada uma no projeto assim que termina, para um cancelamento ou uma
   falha no meio não perder o que já foi lido. Página já lida só é lida de novo
-  com `refazer`: a decisão é de quem chama, que pergunta ao usuário.
+  com `refazer`: a decisão é de quem chama, que pergunta ao usuário. A verificada
+  é pulada sempre (CA-8.5), e a relida mantém os glifos `manual` e `revisado`
+  (§4.6). É o caminho síncrono, das ferramentas e dos testes; a janela lê o lote
+  pelo `lote.CondutorDoLote`, que grava na thread da interface.
 - `proxima_com_pendentes` acha a próxima página gravada que ainda tem glifo
   para revisar, dando a volta no livro.
 
-Sem Qt: a janela roda isto numa thread do `Executor` e os testes chamam direto.
+Sem Qt.
 """
 
 from __future__ import annotations
@@ -25,8 +28,9 @@ from core.box_model import BoxEntry
 
 from abbychess import diagramas as dg
 from abbychess import pagina as pg
-from abbychess import zonas as zn
+from abbychess import servidor_de_leitura as sl
 from abbychess.leitor import LeitorDoLivro, precisa_revisao
+from abbychess.modelo import LIDAS, VERIFICADA
 from abbychess.projeto import Limiares, ProjetoDeLivro
 
 log = logging.getLogger(__name__)
@@ -36,8 +40,9 @@ log = logging.getLogger(__name__)
 Progresso = Callable[[int, int], None]
 
 
-class Cancelado(Exception):
-    """O usuário cancelou o lote; as páginas já gravadas ficam."""
+#: O usuário cancelou o lote; as páginas já gravadas ficam (a do servidor e a daqui são a
+#: mesma: o cancelamento chega pela leitura).
+Cancelado = sl.Cancelado
 
 
 @dataclass
@@ -46,6 +51,10 @@ class ResultadoDoLote:
     lidas: List[int] = field(default_factory=list)
     #: As que já estavam lidas e ficaram como estavam.
     puladas: List[int] = field(default_factory=list)
+    #: As verificadas, puladas mesmo com "refazer" (CA-8.5).
+    verificadas: List[int] = field(default_factory=list)
+    #: As abertas e com mudança na janela, que o lote não sobrescreveu (CA-11.4).
+    reler_depois: List[int] = field(default_factory=list)
     #: Página -> motivo, para a que não abriu ou não segmentou.
     falhas: Dict[int, str] = field(default_factory=dict)
     #: Página -> quantos glifos ficaram para revisar.
@@ -110,7 +119,6 @@ def reconhecer_paginas(projeto: ProjetoDeLivro, fonte: pg.FonteDePaginas,
     """
     indices = list(indices)
     resultado = ResultadoDoLote()
-    lidas = set(projeto.paginas_lidas())
     total = len(indices)
     if progresso:
         progresso(0, total)
@@ -118,7 +126,10 @@ def reconhecer_paginas(projeto: ProjetoDeLivro, fonte: pg.FonteDePaginas,
         if cancelado():
             resultado.cancelado = True
             break
-        if indice in lidas and not refazer:
+        estado = projeto.estado_da_pagina(indice)
+        if estado == VERIFICADA:
+            resultado.verificadas.append(indice)
+        elif estado in LIDAS and not refazer:
             resultado.puladas.append(indice)
         else:
             try:
@@ -147,25 +158,18 @@ def _reconhecer_uma(projeto, fonte, leitor, indice, cancelado) -> pg.ResumoDaLei
     refazer o livro não desfaz o tabuleiro corrigido à mão.
     """
     imagem = fonte.pagina(indice)
-    # Com áreas gravadas (editor de áreas), só o texto delas vira box.
-    segmentada = zn.segmentar(imagem, projeto.carregar_zonas(indice), leitor)
+    modelo = projeto.carregar_modelo(indice)
+    # Com áreas gravadas (editor de áreas), só o texto delas vira box; e ficam os glifos
+    # marcados à mão da página ainda não lida, ou os manuais e revisados da já lida (§4.6).
+    marcados = (pg.a_manter_na_releitura(modelo.boxes, modelo.estado in LIDAS)
+                if modelo is not None else [])
+    lida = sl.ler_pagina(imagem, projeto.carregar_zonas(indice), marcados, leitor,
+                         cancelado=cancelado)
     if cancelado():
         raise Cancelado
-    # A página que só tinha glifos marcados à mão os mantém (pagina.manter_marcados).
-    if not projeto.pagina_reconhecida(indice):
-        marcados = projeto.carregar_pagina(indice) or []
-        if marcados:
-            segmentada.boxes = pg.manter_marcados(segmentada.boxes, marcados)
-    resumo = pg.ler_boxes(imagem, segmentada.boxes, leitor, cancelado=cancelado)
-    if cancelado():
-        raise Cancelado
-    lidos = dg.ler_diagramas(imagem, segmentada.tabuleiros, escala=segmentada.escala,
-                             classificar=leitor.arbitro, boxes=segmentada.boxes)
-    if cancelado():
-        raise Cancelado
-    diagramas = dg.mesclar(lidos, projeto.carregar_diagramas(indice))
-    projeto.salvar_pagina(indice, segmentada.boxes, segmentada.tabuleiros, diagramas,
-                          reconheceu=True)
+    diagramas = dg.mesclar(lida.diagramas, projeto.carregar_diagramas(indice))
+    projeto.salvar_pagina(indice, lida.boxes, lida.tabuleiros, diagramas, reconheceu=True)
+    resumo = pg.resumir(lida.boxes, leitor)
     resumo.diagramas = sum(d.lido for d in diagramas)
     return resumo
 

@@ -313,6 +313,11 @@ class HistoricoDoProjeto:
     def bytes(self) -> int:
         return self._total
 
+    def toca(self, pid: int) -> bool:
+        """Alguma transação do desfazer ou do refazer muda a página `pid` (o lote não a
+        sobrescreve: o Ctrl+Z dela seria recusado, §11)."""
+        return any(pid in t.paginas for t in (*self._desfazer, *self._refazer))
+
     def proxima_a_desfazer(self) -> Optional[Transacao]:
         return self._desfazer[-1] if self._desfazer else None
 

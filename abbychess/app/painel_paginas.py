@@ -12,8 +12,8 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QMenu, QTreeWidget, QTreeWidgetItem,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QMenu, QProgressBar, QTreeWidget,
+                               QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from abbychess import modelo as md
 from abbychess.app import estilo
@@ -69,10 +69,27 @@ class PainelDePaginas(QWidget):
         for coluna, largura in enumerate((34, 28, 34, 32)):    # cabem nos 130 px da gaveta
             self.lista.setColumnWidth(coluna, largura)
 
+        #: O progresso do lote (passo E): as páginas feitas, e o tempo estimado na dica.
+        self.lote = QProgressBar()
+        self.lote.setAccessibleName("Progresso do lote")
+        self.lote.setTextVisible(True)
+        self.lote.setFormat("%v de %m")
+        self.lote.hide()
+
         caixa = QVBoxLayout(self)
         caixa.setContentsMargins(2, 2, 2, 2)
         caixa.addWidget(self.filtro)
+        caixa.addWidget(self.lote)
         caixa.addWidget(self.lista, 1)
+
+    def mostrar_lote(self, feitas: int, total: int, texto: str) -> None:
+        self.lote.setRange(0, max(1, total))
+        self.lote.setValue(feitas)
+        self.lote.setToolTip(texto)
+        self.lote.show()
+
+    def esconder_lote(self) -> None:
+        self.lote.hide()
 
     # ------------------------------------------------------------------
     def mostrar(self, total: int, resumo: Dict[int, dict], atual: Optional[int]) -> None:

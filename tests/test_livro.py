@@ -115,7 +115,7 @@ def test_lote_pula_as_ja_lidas_sem_refazer(projeto, fonte, leitor):
 
     refeito = livro.reconhecer_paginas(projeto, fonte, leitor, [1], refazer=True)
     assert refeito.lidas == [1]
-    assert projeto.carregar_pagina(1)[0].source != FONTE_MANUAL
+    assert projeto.carregar_pagina(1)[0].source == FONTE_MANUAL      # §4.6: a correção fica
 
 
 def test_cancelar_para_entre_paginas_e_guarda_as_feitas(projeto, fonte, leitor):

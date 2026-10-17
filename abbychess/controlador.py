@@ -22,8 +22,9 @@ nenhuma edição acontece no meio de uma leitura. O que o usuário pediu (os gid
 caractere) é guardado na hora do comando: uma tarefa na fila não ensina outro glifo; e a
 tarefa de outro projeto (aberto antes do atual) é descartada, pela `geracao`.
 
-Enquanto o lote lê o livro (`lote_rodando`), editar a página é recusado com aviso: o lote
-grava as páginas na thread dele.
+O lote (`lote.CondutorDoLote`, `lote_rodando`) não prende a janela: lê pelo servidor e
+grava cada página aqui, na thread da interface, entre um comando e outro; as edições, o F5 e
+o desfazer valem durante ele.
 
 **O servidor de leitura** (§11, `servidor`): com ele, a interface não tem os modelos globais;
 o leitor dela só tem os padrões do livro (a propagação, a fila), e o que eles não leem fica
@@ -140,7 +141,7 @@ class ControladorDePagina:
         self.selecao: set = set()
         #: O desfazer do projeto (§14.2), da sessão.
         self.historico = hs.HistoricoDoProjeto()
-        #: O lote está lendo o livro: editar a página espera.
+        #: O lote está lendo o livro (a janela mostra o progresso e o ✕; nada é recusado).
         self.lote_rodando = False
         #: Muda a cada `ligar`: a tarefa pedida para outro projeto não roda nem aplica.
         self.geracao = 0
@@ -547,10 +548,7 @@ class ControladorDePagina:
     def _editar(self, titulo: str, corpo, *, precisa_de_glifos: bool = True) -> None:
         """Uma edição: na hora, se nada prende o leitor (`_agora`); senão na fila, e `corpo()`
         roda na vez dela, se a página ainda é a mesma (se não é, avisa que a edição foi
-        descartada). Durante o lote, é recusada na hora."""
-        if self.lote_rodando:
-            self._recusar_no_lote()
-            return
+        descartada)."""
         if self._agora():
             if self._pode_editar(precisa_de_glifos):
                 corpo()
@@ -1035,9 +1033,6 @@ class ControladorDePagina:
         self._desfazer_ou_refazer(refazer=True)
 
     def _desfazer_ou_refazer(self, *, refazer: bool) -> None:
-        if self.lote_rodando:
-            self._recusar_no_lote()
-            return
         if self._agora():
             self._voltar(refazer)
         else:
@@ -1120,9 +1115,6 @@ class ControladorDePagina:
         leitor não muda no meio de uma leitura)."""
         if self.leitor is None:
             return
-        if self.lote_rodando:                   # o lote lê com estes padrões
-            self._recusar_no_lote()
-            return
         caminhos = list(caminhos)
 
         def preparar():
@@ -1157,9 +1149,6 @@ class ControladorDePagina:
         """Os limiares do livro, gravados no projeto, e a fila refeita com eles (na fila: a
         fila de revisão não muda no meio de uma leitura). A mensagem vai para a barra; um
         problema ao gravar vai em `aviso`."""
-        if self.lote_rodando:
-            self._recusar_no_lote()
-            return
 
         def preparar():
             if self.projeto is not None:
@@ -1210,18 +1199,8 @@ class ControladorDePagina:
             self.eventos.emitir("falha", titulo, mensagem)
         return falhou
 
-    def _recusar_no_lote(self) -> None:
-        self._avisar("O lote está lendo o livro: o comando foi recusado. Espere o lote acabar "
-                     "ou cancele-o no menu Ferramentas.", 8000)
-
     def _pode_ler(self, avisar: bool = True) -> bool:
-        if not self.pronto or self.imagem is None:
-            return False
-        if self.lote_rodando:
-            if avisar:
-                self._recusar_no_lote()
-            return False
-        return True
+        return self.pronto and self.imagem is not None
 
     def _pode_editar(self, precisa_de_glifos: bool = True) -> bool:
         if not self._pode_ler():

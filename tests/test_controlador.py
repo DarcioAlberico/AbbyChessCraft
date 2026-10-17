@@ -295,21 +295,6 @@ def test_espaco_na_correcao_separa_a_palavra_e_desfaz_junto(dois_projetos):
     assert ctl.modelo.decisoes.quebras == frozenset()   # a letra e o espaço, um Ctrl+Z
 
 
-def test_lote_nao_comeca_se_o_gravador_nao_descarrega(dois_projetos, monkeypatch):
-    from abbychess.controladores import ControladorDoLivro
-
-    a, _ = dois_projetos
-    executor = ExecutorManual()
-    ctl = _controlador(a, executor)
-    avisos = []
-    ctl.eventos.ligar("aviso", lambda titulo, texto: avisos.append(texto))
-    monkeypatch.setattr(a, "descarregar", lambda limite=None: False)
-    ControladorDoLivro(ctl).reconhecer([0], refazer=False)
-    executor.tudo()
-    assert avisos and "não começou" in avisos[0]
-    assert not ctl.lote_rodando and a.paginas_lidas() == []
-
-
 def test_trocar_de_projeto_solta_o_lote_preso(dois_projetos):
     a, b = dois_projetos
     executor = ExecutorManual()

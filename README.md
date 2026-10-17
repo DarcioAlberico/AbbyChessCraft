@@ -298,6 +298,35 @@ você digita:
 - **Os Avisos** que citam uma página (como as decisões que não seguiram os glifos relidos,
   desde o passo E) abrem a página com Enter ou duplo clique, e o glifo do ponto citado.
 
+### Substituir (passo D2)
+
+**Ctrl+H** abre a barra de Localizar com a linha de substituir (Ctrl+F a esconde de novo):
+
+- **Substituir por**: com a regex ligada, `\1` e `\g<nome>` trazem os grupos (um grupo que
+  a regex não tem é erro na barra); sem ela, o texto vai como está. **Prosa | Notação |
+  Ambos** (o padrão é Prosa, que inclui as legendas e os cabeçalhos): a Prosa nunca toca uma
+  palavra de notação, e a Notação nunca toca a prosa; o FEN é pesquisável, mas nunca
+  substituído. O filtro **Onde** da busca também vale.
+- **Substituir** (ou Enter no campo) troca a ocorrência atual, se ela está na página aberta,
+  e vai à próxima; se ela está noutra página, vai até ela primeiro. **Todas** (ou Ctrl+Enter
+  no campo), no escopo Página ou Seleção, troca direto. No Livro ou num intervalo, monta
+  sempre a **prévia** em Resultados: um caso por linha (página, linha, prosa ou notação, as
+  palavras antes → depois), cada um com a caixa marcada; o botão **Aplicar N** (ou Enter na
+  lista) aplica só os marcados, e o duplo clique leva ao caso.
+- Cada caso é a menor sequência de palavras que um ou mais casamentos tocam. A troca segue a
+  tabela da edição no Documento (§6.3): uma letra trocada fica `manual`, uma letra que sobra
+  tira o glifo dela, uma que falta vira glifo virtual; o que é do passo G (k glifos virando
+  uma letra, como "sa" → "r" em "casa" → "lar", ou uma letra virando k, como "m" → "rn")
+  aparece na prévia desmarcado e desabilitado, com o motivo na dica, e na página aberta fica
+  de fora, com o aviso. Substituir não ensina nem marca nada como revisado.
+- Tudo o que uma vez Substituir ou Todas trocou, mesmo no livro inteiro, é **um passo** do
+  desfazer: um Ctrl+Z volta todas as páginas. Uma página editada entre a prévia e o Aplicar
+  recebe a troca na versão de agora, se as palavras ainda são as mesmas; senão fica de fora,
+  com o motivo nos Avisos.
+- Num livro de 230 páginas, trocar "e" por "E" (28.693 casos) leva ~9 s de prévia, em segundo
+  plano, com o progresso na barra de status, mais ~9 s para editar as cópias das páginas, e
+  prende a janela por ~0,7 s ao trocá-las; o Ctrl+Z leva ~0,5 s.
+
 ### A página: zoom e navegação
 
 Desde o passo A1 o visor desenha os boxes num item só, e só o pedaço da tela que mudou: a
@@ -1015,11 +1044,12 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | `abbychess/servidor_de_leitura.py` | O servidor de leitura (§11): o processo filho com os modelos globais, a vez entre glifos, os deltas dos padrões, a queda e o fechamento |
 | `abbychess/sessao.py` | A sessão de edição do Documento sem Qt (§6.3): alinhar, planejar (ou recusar o que é do passo G), aplicar; as figurinas (§6.4) |
 | `abbychess/busca.py` | Localizar sem Qt (§7.1, §7.3): o índice das páginas (montado em processos), a busca com o `regex` e o tempo-limite, as classes `\L` `\P` `\C` `\V`, figurina = letra, a busca por glifo |
+| `abbychess/substituir.py` | Substituir sem Qt (§7.2): os casos (Prosa, Notação, Ambos; o FEN nunca), `\1` e `\g<nome>`, o que ainda não tem tradução, e aplicar numa página como uma sessão de edição |
 | `abbychess/ancoragem.py` | Onde os glifos virtuais da sessão ficam (a âncora de cada um, como o usuário os digitou) e as palavras que a montagem do core parte ou junta quando um box sai |
 | `abbychess/lote.py` | O lote da janela (`CondutorDoLote`): decide, lê pelo servidor e grava na thread da interface; cancelar, retomar, `.antes-do-lote/` |
 | `abbychess/exportar.py` | PDF pesquisável, DOCX e EPUB a partir das páginas gravadas, pelo core do PyBoxEditor, sem o cabeçalho e o rodapé corridos |
 | `abbychess/historico.py` | O desfazer do projeto: transações por gid (o que cada ação mudou, por página), a pré-condição, o limite de 50 MB, a propagação que emenda o Enter |
-| `abbychess/app/` | A interface PySide6 (a edição no Documento: `documento.py` e `edicao_na_janela.py`; Localizar: `barra_de_busca.py` e `busca_na_janela.py`): a janela (só liga sinais aos controladores e desenha), `acoes.py` (menus e atalhos), `dialogos.py`, o executor com fila (`trabalho.py`), visor da página, painéis de treino, padrões e verificação, opções, conferência de diagramas |
+| `abbychess/app/` | A interface PySide6 (a edição no Documento: `documento.py` e `edicao_na_janela.py`; Localizar: `barra_de_busca.py` e `busca_na_janela.py`; Substituir: `substituir_na_janela.py`): a janela (só liga sinais aos controladores e desenha), `acoes.py` (menus e atalhos), `dialogos.py`, o executor com fila (`trabalho.py`), visor da página, painéis de treino, padrões e verificação, opções, conferência de diagramas |
 | `tests/` | O núcleo e a janela, sem depender do modelo global |
 | `docs/ANALISE_PYBOXEDITOR.md` | O que o PyBoxEditor oferece a este projeto |
 | `docs/SPEC.md` | A especificação da aplicação completa (v0.4, aprovada nas revisões) |
@@ -1242,6 +1272,11 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   com os processos já abertos (o primeiro projeto, aberto um pouco depois do programa); o
   projeto aberto junto com o programa, e o segundo da sessão, levam 2,0–2,9 s, e pela janela
   o índice chega a 2,4 s (CA-7.1, uma limitação conhecida).
+- **Substituir, desde o passo D2**: o que é do passo G fica de fora (aparece desabilitado na
+  prévia), e isso inclui trocar uma palavra por outra mais curta ou mais longa quando a
+  diferença cai no meio dela ("casa" → "lar"); a troca no fim da palavra tem tradução
+  ("casas" → "casa", "casa" → "casas"). As figurinas não entram sozinhas no texto
+  substituído (o §6.4 é da digitação). A prévia lê as páginas uma a uma (~40 ms cada).
 - **A edição no Documento, desde o D1**: o que é do passo G (k letras por 1, 1 por k, o
   parágrafo, os estilos) é recusado com aviso; o Ctrl+T com uma edição do texto ainda na fila
   pede para tentar de novo depois que ela entrar; num projeto com páginas lidas antes do D1,

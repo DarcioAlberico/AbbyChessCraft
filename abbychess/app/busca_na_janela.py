@@ -66,6 +66,7 @@ class BuscaNaJanela:
         if self.projeto is None:
             return
         self.vista.setCurrentWidget(self.painel_do_documento)
+        self.barra_de_busca.esconder_substituir()   # o Ctrl+H a mostra de novo (passo D2)
         cursor = self.texto.textCursor()
         selecionado = cursor.selectedText()
         texto, escopo = None, self.barra_de_busca.escopo.currentData()
@@ -206,6 +207,8 @@ class BuscaNaJanela:
         if self._mandar_para_resultados:
             self._mandar_para_resultados = False
             self._mostrar_em_resultados()
+        if self._ir_depois_de_substituir():
+            return
         if self._ida_pendente is not None:
             passo, self._ida_pendente = self._ida_pendente, None
             self._andar(passo)

@@ -273,8 +273,12 @@ def planejar(unidades: Sequence[Unidade], novo: str,
         else:
             itens.append(("linha", None) if u is not None and u.tipo == LINHA else ("espaco", None))
 
+    texto_do_gid: Dict[int, str] = {}           # uma passada (a página inteira, no D2)
+    for u in unidades:
+        if u.glifo:
+            texto_do_gid[u.gid] = texto_do_gid.get(u.gid, "") + u.texto
     for gid, letras in letras_do_gid.items():
-        antes = "".join(u.texto for u in unidades if u.gid == gid)
+        antes = texto_do_gid.get(gid, "")
         depois = "".join(letras)
         if not depois:
             plano.sair.add(gid)
@@ -501,8 +505,9 @@ def aplicar(pagina: Pagina, plano: Plano) -> None:
     for gid in plano.sair & virtuais:
         ed.apagar_virtual(pagina, gid)
     boxes_que_saem = plano.sair - virtuais
+    vivos = pagina.vivos
     com_box = {lp for lp, p in ag.palavras_da_sequencia(sequencia, plano.linha)
-               if any(g not in virtuais and g in pagina.vivos and g not in boxes_que_saem
+               if any(g not in virtuais and g in vivos and g not in boxes_que_saem
                       for g in p)}
     plano.linha_sem_boxes = any(lp not in com_box
                                 for lp, _p in ag.palavras_da_sequencia(sequencia, plano.linha))

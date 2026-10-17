@@ -137,6 +137,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
 
         self.padroes = PainelDePadroes()
         self.padroes.esquecer.connect(self.esquecer)
+        self.padroes.ir_para.connect(self.ir_a_origem)
+        self.treino.campo.textChanged.connect(self._aviso_de_ensino)
 
         self.verificacao = PainelDeVerificacao()
         self.verificacao.corrigir.connect(v.corrigir)

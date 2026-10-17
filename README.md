@@ -192,7 +192,7 @@ mais como texto puro:
 - **Ctrl++ e Ctrl+−** com o foco no Documento mudam o corpo do texto (Ctrl+0 volta ao
   padrão: 10 numa janela de menos de 1600 px, para a linha caber na vista direita, e 11 de
   1600 em diante); com o foco na Imagem, o zoom dela.
-- **É só leitura** até o passo D1, que traz a edição no Documento.
+- **Dá para editar**, desde o passo D1 (abaixo).
 
 **A sincronia**: o clique numa palavra do Documento a contorna (tracejado azul) na Imagem e
 leva o glifo clicado ao Inspetor; o cursor andando pelo Documento (as setas) contorna a
@@ -206,6 +206,39 @@ vai junto até o glifo seguinte. A página não reconhecida diz isso no Document
 **A Linha** (**Ctrl+F5** a esconde e mostra), embaixo da Imagem e da vista direita: a linha
 do glifo atual ampliada, a imagem em cima e o texto lido embaixo, cada caractere sob o glifo
 dele, e o glifo atual contornado.
+
+### Editar no Documento (passo D1)
+
+O Documento se edita como um editor de texto, e cada edição vira o que ela é na página:
+
+- **Digite por cima.** Começar a mudar uma palavra abre uma **sessão**, que cobre as palavras
+  que você tocou (e cresce se a edição seguinte tocar as vizinhas). Nada muda na página
+  enquanto a sessão está aberta. Ela **confirma** quando o cursor sai dela (as setas, um
+  clique fora, outro painel), com **Enter** (e o cursor vai à próxima palavra duvidosa),
+  **Shift+Enter** (fica ali) ou **Ctrl+Enter** (e ensina o glifo sob o cursor, como o Enter
+  do Glifo; o glifo virtual não ensina). Confirmar é **um passo** do desfazer, e todos os
+  glifos da sessão ficam **revisados**: saem da fila e dos pendentes do livro.
+- **Esc** (ou Ctrl+Z com a sessão aberta) devolve a palavra ao que era, e **Ctrl+Y** a
+  confirma de novo. Fora de uma sessão, Ctrl+Z e Ctrl+Y são o desfazer do projeto.
+- **Enter numa palavra sem mudança** a aceita (como o *Skip* do FineReader): os glifos ficam
+  revisados, sem trocar a fonte da leitura.
+- O que cada edição faz: **trocar uma letra** corrige o glifo (fica manual, como o
+  Shift+Enter do Glifo); **apagar uma letra** tira o glifo da página (o Ctrl+Z o devolve);
+  **digitar uma letra que faltou** cria um **glifo virtual** (sem caixa, pontilhado azul; se
+  houver tinta sem box no lugar, a Linha oferece o **Ctrl+M** para marcar o quadro); **um
+  espaço** parte a palavra, e **apagar um espaço** junta as duas (na mesma linha impressa).
+  Colar, arrastar e o IME dão o mesmo resultado que digitar. As edições que mudam a estrutura
+  (glifo tirado, glifo virtual) avisam na Linha ("1 glifo(s) tirado(s) · Ctrl+Z desfaz").
+- **Ainda não** (passo G): trocar duas letras por uma ("rn" → "m", que é juntar os glifos) ou
+  uma por duas ("m" → "rn", dividir); separar ou juntar junto de um glifo virtual. A sessão é
+  recusada, a palavra volta ao que era, e a Linha diz "este tipo de edição chega numa próxima
+  versão". Negrito, itálico e sublinhado e o parágrafo novo também são do G.
+- **As figurinas** (§6.4): num lance que você digitou, a letra da peça vira figurina ao
+  confirmar, quando o livro é de figurinas ("Cf3" → "♘f3" em português; "Nf3" → "♘f3" em
+  inglês). **Opções › Peças nos lances** escolhe figurinas ou letras para o livro.
+  **Ctrl+Shift+K/Q/R/B/N/P** inserem ♔♕♖♗♘♙ no cursor (o mesmo atalho de novo alterna para a
+  preta, ♚♛♜♝♞♟), e **F2** abre a paleta de símbolos no cursor.
+- **O diagrama não se apaga**: uma seleção que o cruza apaga o texto e o diagrama fica.
 
 ### A página: zoom e navegação
 
@@ -903,10 +936,11 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | `abbychess/diagramas.py` | Ler cada tabuleiro em FEN, o lado a jogar (pela legenda nos boxes), a conferência, as amostras no projeto e o FEN no texto |
 | `abbychess/livro.py` | O lote síncrono das ferramentas e dos testes, e a fila de revisão do livro todo |
 | `abbychess/servidor_de_leitura.py` | O servidor de leitura (§11): o processo filho com os modelos globais, a vez entre glifos, os deltas dos padrões, a queda e o fechamento |
+| `abbychess/sessao.py` | A sessão de edição do Documento sem Qt (§6.3): alinhar, planejar (ou recusar o que é do passo G), aplicar; as figurinas (§6.4) |
 | `abbychess/lote.py` | O lote da janela (`CondutorDoLote`): decide, lê pelo servidor e grava na thread da interface; cancelar, retomar, `.antes-do-lote/` |
 | `abbychess/exportar.py` | PDF pesquisável, DOCX e EPUB a partir das páginas gravadas, pelo core do PyBoxEditor, sem o cabeçalho e o rodapé corridos |
 | `abbychess/historico.py` | O desfazer do projeto: transações por gid (o que cada ação mudou, por página), a pré-condição, o limite de 50 MB, a propagação que emenda o Enter |
-| `abbychess/app/` | A interface PySide6: a janela (só liga sinais aos controladores e desenha), `acoes.py` (menus e atalhos), `dialogos.py`, o executor com fila (`trabalho.py`), visor da página, painéis de treino, padrões e verificação, opções, conferência de diagramas |
+| `abbychess/app/` | A interface PySide6 (a edição no Documento: `documento.py` e `edicao_na_janela.py`): a janela (só liga sinais aos controladores e desenha), `acoes.py` (menus e atalhos), `dialogos.py`, o executor com fila (`trabalho.py`), visor da página, painéis de treino, padrões e verificação, opções, conferência de diagramas |
 | `tests/` | O núcleo e a janela, sem depender do modelo global |
 | `docs/ANALISE_PYBOXEDITOR.md` | O que o PyBoxEditor oferece a este projeto |
 | `docs/SPEC.md` | A especificação da aplicação completa (v0.4, aprovada nas revisões) |
@@ -1097,6 +1131,10 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   treino, os padrões, as opções, o reconhecimento do livro em lote e a fila do livro; no
   Projeto, a exportação; o editor de áreas, a verificação de texto e a leitura e
   conferência dos diagramas.
+- **A edição no Documento, desde o D1**: o que é do passo G (k letras por 1, 1 por k, junto
+  de um glifo virtual, o parágrafo, os estilos) é recusado com aviso; apagar a quebra de
+  linha impressa entre duas palavras não as junta (as linhas são da página). A posição que a
+  Linha e os Avisos dão de um glifo é em pixels da página.
 - **O lote não volta às páginas que já leu.** O padrão ensinado durante o lote vale nas
   páginas que ele começar depois (desde o passo E); as que ele já leu só mudam lidas de novo
   (F5, Ctrl+R ou outro lote).

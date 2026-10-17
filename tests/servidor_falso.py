@@ -37,6 +37,12 @@ class ServidorFalso:
     def parado(self) -> bool:
         return self.desistiu or self.fechado
 
+    def derrubar(self) -> None:
+        """A segunda queda: o servidor desiste, e a leitura em curso falha como no de
+        verdade."""
+        self.desistiu = True
+        self.segurar.set()
+
     def pedir(self, operacao: str, argumentos=None, *, prioridade: int = sl.INTERATIVO,
               ao_terminar: Callable = None) -> sl.Pedido:
         pedido = sl.Pedido(next(self._ids), operacao, prioridade, ("pedido",), ao_terminar)
@@ -50,6 +56,8 @@ class ServidorFalso:
                 self.segurar.wait(30)
                 if pedido.id in self.cancelados:
                     raise sl.Cancelado
+                if self.desistiu:
+                    raise RuntimeError("o servidor de leitura caiu duas vezes")
                 imagem, zonas, marcados = argumentos
                 resultado = sl.ler_pagina(imagem, zonas, marcados, self.leitor)
             elif pedido.operacao == "reler_boxes":

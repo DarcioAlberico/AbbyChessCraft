@@ -311,13 +311,17 @@ sempre com as pastas do projeto.
   manuais e os glifos revisados** (como o F5, §4.6), Não as pula. A **página aberta em que
   você mexeu nesta sessão** (algum passo dela no desfazer) não é sobrescrita, nem a que você
   mudar (aberta ou não) enquanto o lote a lê: ficam para "reler depois", e a mensagem do fim
-  e os Avisos dizem quais (abra e aperte F5, ou rode o lote nelas depois). A que você
-  verificar (Ctrl+T) enquanto o lote a lê continua verificada. Antes de reler uma página já lida, o lote guarda
+  e os Avisos dizem quais; **Projeto › Retomar o lote** as lê. A que você verificar
+  (Ctrl+T) enquanto o lote a lê continua verificada. Antes de reler uma página já lida, o lote guarda
   como ela estava em `paginas/.antes-do-lote/`, e **Página › Voltar ao estado antes do lote**
-  a devolve (o que mudou nela depois do lote se perde; não entra no desfazer). **Cancelar o
-  lote** (o ✕ da barra ou o menu) para a página em leitura no glifo seguinte; ela fica como
-  estava, as já gravadas ficam, e **Ferramentas › Retomar o lote** continua de onde parou,
-  sem ler nenhuma página duas vezes.
+  a devolve (a confirmação diz de quando é a cópia; o que mudou na página depois disso se
+  perde e não entra no desfazer). **Cancelar o lote** (o ✕ da barra ou Projeto › Cancelar
+  o lote) para a página em leitura no glifo seguinte; ela fica como estava, as já gravadas
+  ficam, e **Projeto › Retomar o lote** continua de onde parou, sem ler nenhuma página duas
+  vezes, e lê também as que ficaram para reler depois. O que falta fica guardado no projeto
+  (`lote.json`): fechar o programa, ou o servidor parar, não perde o ponto. No fim, a barra
+  diz o resumo curto (lidas, a revisar, para reler depois, falhas), e os **Avisos** (⚠)
+  guardam o detalhe, página por página.
 - **Próxima página com pendentes** (F6, no menu Página) é a fila de revisão do livro todo: mostra o pendente
   desta página e, quando ela acaba, abre a próxima página gravada que ainda tem glifo a
   revisar, dando a volta no livro.
@@ -356,23 +360,31 @@ corrigir "Cava1o" para "Cavalo" trocou só o glifo do "1".
 
 ### O servidor de leitura (passo E)
 
+**Reconhecer de novo sem perder decisões** (§4.6, também do passo E): o F5 numa página já
+lida e o lote com "refazer" mantêm os glifos corrigidos à mão e os revisados; o glifo que a
+segmentação devolve com a caixa um pouco diferente (interseção sobre união de ao menos 0,6
+com a de antes) continua o mesmo, com as decisões dele (quebras, junções, glifos
+virtuais). O que não pôde seguir os glifos relidos vai para os Avisos.
+
 Os modelos globais do PyBoxEditor (a rede e a base, ~1 GB na memória) ficam num **processo
 filho**, aberto com o projeto, e não mais na janela. Ele faz toda leitura que não sai dos
 padrões do livro: o F5, o Reler pendentes, o lote, os diagramas, as áreas automáticas e a
 leitura de um glifo depois de dividir, juntar, ajustar ou marcar. O que muda para você:
 
-- **O projeto abre na hora.** A barra diz "Carregando os modelos no servidor de leitura…";
-  as páginas já abrem e o Enter já ensina. O F5 pedido antes de os modelos ficarem prontos
-  espera por eles.
+- **O projeto abre na hora.** A barra diz "Carregando os modelos no servidor de leitura…",
+  com uma barra ocupada ("Modelos…") até eles ficarem prontos; as páginas já abrem e o Enter
+  já ensina. O F5 pedido antes disso espera por eles.
 - **Aguardando leitura.** A janela só tem os padrões do livro. O glifo que eles não leem
-  (depois de dividir, por exemplo) aparece em cinza tracejado, "aguardando leitura", e
+  (depois de dividir, por exemplo) aparece em cinza, com traço e ponto, "aguardando leitura", e
   recebe a leitura do servidor em seguida, num passo só do desfazer com a edição.
 - **Os padrões vão junto.** O que você ensina ou esquece é mandado ao servidor antes do
   pedido seguinte; uma página do lote em andamento passa a usá-lo a partir do glifo
   seguinte.
 - **Se o servidor cair**, ele é aberto de novo sozinho e os pedidos em curso são refeitos;
   isso fica nos Avisos (⚠ na barra). Se cair de novo, a janela avisa e oferece reabrir o
-  projeto; o lote para, e Retomar o lote continua depois.
+  projeto; o lote para, e Retomar o lote continua depois de reabrir. Se ele nunca conseguir
+  carregar os modelos (um modelo que falta, o torch quebrado), a janela diz a causa e
+  oferece abrir o projeto sem o servidor, com os modelos na própria janela.
 - **A memória** é a dos dois processos somados (a medida "Memória com o lote" soma os dois).
 
 `ABBY_SERVIDOR=0` faz a janela ler sem o servidor, com os modelos nela mesma (é o que a
@@ -1065,9 +1077,9 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 - **O lote não volta às páginas que já leu.** O padrão ensinado durante o lote vale nas
   páginas que ele começar depois (desde o passo E); as que ele já leu só mudam lidas de novo
   (F5, Ctrl+R ou outro lote).
-- **"Reler depois" não é uma lista guardada.** As páginas abertas em que você mexeu, e que o
-  lote por isso não sobrescreveu, aparecem na mensagem do fim e nos Avisos; não há um
-  comando que releia só elas (rode o lote no intervalo delas).
+- **As páginas para reler depois não abrem pelos Avisos.** O detalhe do fim do lote as lista
+  em texto; Retomar o lote as lê, mas clicar nelas nos Avisos ainda não abre a página (o
+  painel de Resultados ganha itens que abrem a página no passo B, com a busca).
 - **Voltar ao estado antes do lote não se desfaz**, e vale para a última releitura de cada
   página pelo lote com "refazer" (a cópia de uma releitura substitui a da anterior).
 - **Os parágrafos exportados saem do vão entre linhas.** Recuo de primeira linha, títulos,

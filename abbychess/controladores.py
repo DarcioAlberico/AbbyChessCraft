@@ -32,6 +32,9 @@ from abbychess.leitor import LeitorDoLivro, congelar_para_a_coleta_de_lixo
 
 log = logging.getLogger(__name__)
 
+#: O que o último lote deixou para retomar, na pasta do projeto.
+ARQUIVO_DO_LOTE = "lote.json"
+
 
 # ----------------------------------------------------------------------
 # As áreas da página (o editor de áreas)
@@ -555,6 +558,7 @@ class ControladorDoLivro:
         p = self.pagina
         self._largar_lote()
         p.ligar(projeto, fonte, leitor, servidor)
+        self._ler_restante()
         lidas = projeto.paginas_lidas()
         p.ir_para(lidas[-1] if lidas else 0)
 
@@ -588,15 +592,56 @@ class ControladorDoLivro:
             return                              # de um lote largado (outro projeto)
         self._condutor = None
         self.pagina.lote_rodando = False
-        if resultado.cancelado and condutor.restante:
-            self.restante = (list(condutor.restante), condutor.refazer)
+        # O que faltou (cancelado, ou o servidor parou) e as páginas para reler depois:
+        # "Retomar o lote" lê essas, e elas ficam guardadas no projeto (`lote.json`).
+        faltam = list(condutor.restante) if resultado.cancelado else []
+        faltam += [i for i in resultado.reler_depois if i not in faltam]
+        self._guardar_restante((faltam, condutor.refazer) if faltam else None)
         mensagem = lt.resumo_do_fim(resultado)
         if self.restante is not None:
-            mensagem += " Ferramentas › Retomar o lote continua de onde parou."
+            reabrir = "Reabra o projeto e use " if resultado.servidor_parou else ""
+            mensagem += f" {reabrir}Projeto › Retomar o lote lê as {len(faltam)} que ficaram."
         self.eventos.emitir("lote_mudou")
         self.eventos.emitir("acoes_mudaram")
         self.eventos.emitir("lote_terminou", mensagem, resultado)
-        self.pagina._avisar(mensagem + " F6 vai ao próximo pendente do livro.", 15000)
+        self.pagina._avisar(mensagem + " Detalhes em Avisos (⚠).", 15000)
+
+    def _arquivo_do_lote(self):
+        p = self.pagina
+        return Path(p.projeto.pasta) / ARQUIVO_DO_LOTE if p.projeto is not None else None
+
+    def _guardar_restante(self, restante) -> None:
+        """O que o lote deixou para retomar, na memória e em `lote.json` (sobrevive a fechar
+        o projeto e ao servidor que parou)."""
+        from abbychess import gravacao as gv
+
+        self.restante = restante
+        arquivo, projeto = self._arquivo_do_lote(), self.pagina.projeto
+        if arquivo is None or projeto.somente_leitura:
+            return
+        try:
+            if restante is None:
+                gv.apagar(arquivo)
+            else:
+                gv.gravar_json(arquivo, {"paginas": [int(i) for i in restante[0]],
+                                         "refazer": bool(restante[1])})
+        except OSError as erro:
+            log.warning("o lote a retomar não foi gravado: %s", erro)
+
+    def _ler_restante(self) -> None:
+        import json
+
+        self.restante = None
+        arquivo = self._arquivo_do_lote()
+        if arquivo is None or not arquivo.is_file():
+            return
+        try:
+            bruto = json.loads(arquivo.read_text(encoding="utf-8"))
+            total = self.pagina.fonte.total
+            paginas = [int(i) for i in bruto["paginas"] if 0 <= int(i) < total]
+            self.restante = (paginas, bool(bruto["refazer"])) if paginas else None
+        except (OSError, ValueError, KeyError, TypeError) as erro:
+            log.warning("o lote a retomar (%s) não abriu: %s", arquivo, erro)
 
     def _largar_lote(self) -> None:
         """Outro projeto: o lote deste não grava mais nada (o condutor confere a geração)."""
@@ -614,15 +659,18 @@ class ControladorDoLivro:
                                 "seguinte…", 0)
 
     def retomar(self) -> None:
-        """Continua o lote cancelado de onde parou (sem ler de novo as já lidas, CA-11.5)."""
-        if self.restante is None or self._condutor is not None:
+        """Continua o lote cancelado de onde parou (sem ler de novo as já lidas, CA-11.5), e
+        lê as que ficaram para reler depois."""
+        if not self.pode_retomar:
             return
         indices, refazer = self.restante
         self.reconhecer(indices, refazer)
 
     @property
     def pode_retomar(self) -> bool:
-        return self.restante is not None and self._condutor is None
+        servidor = self.pagina.servidor
+        return (self.restante is not None and self._condutor is None
+                and not (servidor is not None and servidor.parado))
 
     def voltar_ao_antes_do_lote(self) -> None:
         """Página › Voltar ao estado antes do lote (§4.6): a página aberta volta a ser a que

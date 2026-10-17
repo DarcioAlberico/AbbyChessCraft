@@ -38,7 +38,7 @@ from abbychess import pagina as pg
 from abbychess import procedencia
 from abbychess import servidor_de_leitura as sl
 from abbychess.controlador import TEMPO_DO_PEDIDO
-from abbychess.modelo import LIDAS, VERIFICADA, proximo_estado, reconciliar
+from abbychess.modelo import IOU_DA_RELEITURA, LIDAS, VERIFICADA, proximo_estado, reconciliar
 
 log = logging.getLogger(__name__)
 
@@ -65,7 +65,12 @@ class ResultadoDoLote:
     pendentes: Dict[int, int] = field(default_factory=dict)
     #: Página -> quantos diagramas foram lidos em FEN.
     diagramas: Dict[int, int] = field(default_factory=dict)
+    #: Página -> as decisões que não puderam seguir os glifos relidos (§4.6).
+    caidas: Dict[int, List[str]] = field(default_factory=dict)
     cancelado: bool = False
+    #: O lote parou porque o servidor de leitura desistiu (a página em curso fica para
+    #: retomar, e não conta como falha).
+    servidor_parou: bool = False
 
     @property
     def total_de_pendentes(self) -> int:
@@ -257,9 +262,9 @@ class CondutorDoLote:
             return
         if isinstance(resultado, sl.ErroDoServidor) and p.servidor is not None \
                 and p.servidor.desistiu:
-            # As outras páginas falhariam do mesmo jeito: o lote para, e o que faltou fica
-            # para retomar depois de reabrir o projeto.
-            self.resultado.falhas[indice] = str(resultado)
+            # As outras páginas falhariam do mesmo jeito: o lote para, e o que faltou (esta
+            # página também) fica para retomar depois de reabrir o projeto.
+            self.resultado.servidor_parou = True
             self.resultado.cancelado = True
             self._terminar()
             return
@@ -322,8 +327,11 @@ class CondutorDoLote:
         pagina = projeto.pagina_para_editar(indice)
         if self.refazer and pagina.estado in LIDAS and not projeto.somente_leitura:
             projeto.guardar_antes_do_lote(pagina)                         # §4.6
-        novos, dif = reconciliar(pagina.boxes, lida.boxes, pagina.alocar, procedencia.amostra_de)
+        novos, dif = reconciliar(pagina.boxes, lida.boxes, pagina.alocar, procedencia.amostra_de,
+                                 iou_minimo=IOU_DA_RELEITURA)
         pagina.aplicar(dif, novos)
+        if dif.caidas:
+            self.resultado.caidas[indice] = list(dif.caidas)
         pagina.tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
         pagina.diagramas = dg.mesclar(lida.diagramas, dg.para_caixas(pagina.tabuleiros,
                                                                      pagina.diagramas))
@@ -356,19 +364,42 @@ class CondutorDoLote:
         self.ao_fim(self.resultado)
 
 
+def _paginas(indices) -> str:
+    return ", ".join(str(i + 1) for i in indices)
+
+
 def resumo_do_fim(resultado: ResultadoDoLote) -> str:
-    """A mensagem do fim do lote, para a barra e os Avisos."""
-    partes = [f"{len(resultado.lidas)} página(s) reconhecida(s)",
-              f"{resultado.total_de_pendentes} glifo(s) a revisar",
-              f"{sum(resultado.diagramas.values())} diagrama(s) lido(s) em FEN"]
-    if resultado.puladas:
-        partes.append(f"{len(resultado.puladas)} já lida(s) pulada(s)")
-    if resultado.verificadas:
-        partes.append(f"{len(resultado.verificadas)} verificada(s) pulada(s)")
+    """A mensagem curta do fim do lote, para a barra (o detalhe vai aos Avisos)."""
+    if resultado.servidor_parou:
+        inicio = "Lote interrompido: o servidor de leitura parou"
+    elif resultado.cancelado:
+        inicio = "Lote cancelado"
+    else:
+        inicio = "Lote concluído"
+    partes = [f"{len(resultado.lidas)} lida(s)", f"{resultado.total_de_pendentes} a revisar"]
     if resultado.reler_depois:
-        partes.append("para reler depois (mudadas por você nesta sessão): "
-                      + ", ".join(str(i + 1) for i in resultado.reler_depois))
+        partes.append(f"{len(resultado.reler_depois)} para reler depois")
     if resultado.falhas:
-        partes.append("falharam: " + ", ".join(str(i + 1) for i in resultado.falhas))
-    inicio = "Lote cancelado: " if resultado.cancelado else "Lote concluído: "
-    return inicio + "; ".join(partes) + "."
+        partes.append(f"{len(resultado.falhas)} falharam")
+    return f"{inicio}: " + ", ".join(partes) + "."
+
+
+def detalhe_do_fim(resultado: ResultadoDoLote) -> str:
+    """O que os Avisos guardam do fim do lote: as páginas de cada caso."""
+    linhas = [resumo_do_fim(resultado),
+              f"Lidas: {_paginas(resultado.lidas) or 'nenhuma'}; "
+              f"{sum(resultado.diagramas.values())} diagrama(s) lido(s) em FEN."]
+    if resultado.puladas:
+        linhas.append(f"Já lidas, puladas: {_paginas(resultado.puladas)}.")
+    if resultado.verificadas:
+        linhas.append(f"Verificadas, puladas: {_paginas(resultado.verificadas)}.")
+    if resultado.reler_depois:
+        linhas.append("Para reler depois (mudadas por você nesta sessão, ou enquanto o lote "
+                      f"as lia): {_paginas(resultado.reler_depois)}.")
+    if resultado.falhas:
+        linhas.append("Falharam: " + "; ".join(f"{i + 1} ({motivo.splitlines()[0]})"
+                                              for i, motivo in resultado.falhas.items()) + ".")
+    for indice, caidas in resultado.caidas.items():
+        linhas.append(f"Página {indice + 1}, decisões que não seguiram os glifos relidos: "
+                      + "; ".join(caidas) + ".")
+    return "\n".join(linhas)

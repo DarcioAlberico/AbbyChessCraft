@@ -37,10 +37,9 @@ def ambiente(tmp_path_factory):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication, QMessageBox
 
-    from abbychess import livro
     from abbychess import pagina as pg
+    from abbychess import servidor_de_leitura as sl
     from abbychess.app.janela import JanelaPrincipal
-    from abbychess import leitor as leitor_mod
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
 
@@ -48,22 +47,32 @@ def ambiente(tmp_path_factory):
     pergunta_original = QMessageBox.question
     QMessageBox.question = staticmethod(lambda *a, **k: QMessageBox.StandardButton.Yes)
     projeto = ProjetoDeLivro.criar(tmp_path_factory.mktemp("livros"), "Linha de base", _PDF[0])
-    leitor = LeitorDoLivro.com_modelos_globais(projeto.pasta_de_padroes,
-                                               limiares=projeto.dados.limiares)
+    limiares = projeto.dados.limiares
     fonte = pg.fonte_do_projeto(projeto)
-    # Como a janela faz ao abrir (desde o 1b): logo depois de carregar os modelos, com o
-    # projeto e a fonte abertos e nenhuma página lida ainda.
-    congelar = getattr(leitor_mod, "congelar_para_a_coleta_de_lixo", None)
-    if congelar is not None:
-        congelar()
-    livro.reconhecer_paginas(projeto, fonte, leitor, PAGINAS)
+    # Desde o passo E, como o programa abre o projeto: a janela só com os padrões do livro e
+    # os modelos no servidor de leitura (§15.3), e as páginas lidas pelo lote, por ele.
+    servidor = sl.ServidorDeLeitura(projeto.pasta_de_padroes, limiares,
+                                    fabrica=sl.FABRICA_PADRAO)
+    assert servidor.pronto.wait(300), "o servidor não carregou os modelos"
     janela = JanelaPrincipal()
     janela.resize(1600, 1000)
-    janela.usar(projeto, fonte, leitor)
+    janela.usar(projeto, fonte, LeitorDoLivro(projeto.pasta_de_padroes, limiares=limiares,
+                                              aguardar=True), servidor)
+    janela.livro.reconhecer(PAGINAS, refazer=False)
+    _ate(app, lambda: not janela.livro.lote_rodando, 600)
     janela.ir_para_pagina(PAGINAS[0])
     yield app, janela
     janela.close()
     QMessageBox.question = pergunta_original
+
+
+def _ate(app, condicao, limite: float) -> None:
+    fim = time.monotonic() + limite
+    while not condicao() and time.monotonic() < fim:
+        app.processEvents()
+        time.sleep(0.002)
+    app.processEvents()
+    assert condicao(), "a condição não chegou no prazo"
 
 
 def test_troca_de_pagina(ambiente, medidas):
@@ -218,13 +227,25 @@ def test_enter_com_uma_propagacao_lenta_em_curso(ambiente, medidas):
 
 
 def test_releitura_de_um_glifo(ambiente, medidas):
-    """Ajustar uma borda relê o glifo com a cadeia global, na thread da interface."""
+    """Ajustar uma borda relê o glifo: pelos padrões do livro na janela e, se eles não o
+    leem, pelo servidor (desde o E; o tempo vai até a leitura dele chegar)."""
+    from abbychess import pagina as pg
+
     app, janela = ambiente
     janela.ir_para_pagina(PAGINAS[1])
     mostrar(janela, 0)
+    p = janela.pagina
+    gid = p.atual
     lados = [(0, 0, 1, 0), (0, 0, -1, 0)]
+    pelo_servidor = []
 
-    resultado = cronometrar(lambda i: janela.pagina.ajustar(*lados[i % 2]))
+    def reler(i):
+        p.escolher(gid)
+        p.ajustar(*lados[i % 2])
+        pelo_servidor.append(pg.aguardando(p.box(gid)))
+        _ate(app, lambda: not pg.aguardando(p.box(gid)), 30)
+
+    resultado = cronometrar(reler)
     # O texto da página é refeito um instante depois da última mudança (desde o 2b), fora do
     # tempo acima: o que ele custa na interface, à parte.
     medidas["texto_da_pagina"] = {
@@ -232,8 +253,10 @@ def test_releitura_de_um_glifo(ambiente, medidas):
         "como": "refazer o painel de texto da página (montar o documento e pôr no painel), "
                 "que desde o 2b roda 150 ms depois da última mudança, e não dentro do Enter "
                 "nem da releitura"}
-    medidas["releitura_de_um_glifo"] = {**resultado, "alvo_ms": 150,
-                                        "com_o_lote": "impossível hoje: o lote ocupa o executor"}
+    medidas["releitura_de_um_glifo"] = {
+        **resultado, "alvo_ms": 150, "pelo_servidor": sum(pelo_servidor[-resultado["n"]:]),
+        "como": "Alt+→/← alternados num glifo, do comando à leitura dele (pelos padrões na "
+                "janela, ou pelo servidor, sem o lote; com o lote: releitura_com_o_lote)"}
 
 
 def test_memoria_do_desfazer(ambiente, medidas):

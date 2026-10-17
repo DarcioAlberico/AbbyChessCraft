@@ -711,6 +711,17 @@ class ProjetoDeLivro:
         pagina = self.carregar_modelo(indice)
         return pagina is not None and self._arquivo_antes_do_lote(pagina.pid).is_file()
 
+    def data_antes_do_lote(self, indice: int) -> Optional[datetime]:
+        """Quando a cópia de antes do lote foi feita (a hora do arquivo), ou None."""
+        pagina = self.carregar_modelo(indice)
+        if pagina is None:
+            return None
+        arquivo = self._arquivo_antes_do_lote(pagina.pid)
+        try:
+            return datetime.fromtimestamp(arquivo.stat().st_mtime)
+        except OSError:
+            return None
+
     def voltar_ao_antes_do_lote(self, indice: int) -> Pagina:
         """Põe de volta a página copiada antes do lote (o JSON idêntico ao copiado), e a
         cópia sai. O gravador grava antes o que tem pendente: senão, a gravação dele passaria

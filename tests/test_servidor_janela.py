@@ -242,8 +242,9 @@ def test_o_lote_para_quando_o_servidor_desiste(app, janela_do_livro, monkeypatch
     servidor.processo.kill()
     _ate(app, lambda: not j.livro.lote_rodando, 60)
     resultado = j.fins[-1]
-    assert servidor.desistiu and resultado.cancelado and len(resultado.falhas) == 1
-    assert j.livro.pode_retomar and len(resultado.lidas) < 51
+    assert servidor.desistiu and resultado.servidor_parou and not resultado.falhas
+    assert j.livro.restante is not None and len(resultado.lidas) < 51
+    assert not j.livro.pode_retomar                    # “Não”: o servidor está parado
 
 
 def test_a_procedencia_do_padrao_volta_do_filho_no_f5(app, janela):  # noqa: F811

@@ -182,6 +182,16 @@ class EspacoDeTrabalho:
         self.botao_cancelar.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.progresso = QProgressBar()
         self.progresso.setMaximumWidth(200)
+        #: Os modelos carregando no servidor de leitura (§9.1): ocupado, sem número (o filho
+        #: não diz em que etapa está), até `modelos_prontos`.
+        self.carregando = QProgressBar()
+        self.carregando.setRange(0, 0)
+        self.carregando.setMaximumWidth(120)
+        self.carregando.setFormat("Modelos…")
+        self.carregando.setTextVisible(True)
+        self.carregando.setAccessibleName("Carregando os modelos de leitura")
+        self.carregando.setToolTip("O servidor de leitura está carregando os modelos; as "
+                                   "páginas já abrem e o Enter já ensina.")
         self.botao_avisos = QToolButton()
         self.botao_avisos.setAccessibleName("Avisos e erros")
         self.botao_avisos.setToolTip("Os avisos e erros do projeto (Resultados / Avisos)")
@@ -189,9 +199,11 @@ class EspacoDeTrabalho:
         self.botao_avisos.setFocusPolicy(Qt.FocusPolicy.NoFocus)    # o Tab do campo não para aqui
         for widget in (self.rotulo_da_pagina, self.rotulo_da_fila, self.caixa_de_zoom,
                        self.rotulo_do_lote, self.botao_cancelar, self.progresso,
+                       self.carregando,
                        self.botao_avisos):
             barra.addPermanentWidget(widget)
-        for widget in (self.rotulo_do_lote, self.botao_cancelar, self.progresso):
+        for widget in (self.rotulo_do_lote, self.botao_cancelar, self.progresso,
+                       self.carregando):
             widget.hide()
         self.atualizar_avisos()
 

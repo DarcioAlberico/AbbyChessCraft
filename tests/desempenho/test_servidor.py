@@ -27,6 +27,9 @@ _PDF = sorted(PASTA_DOS_PDFS.glob("Xadrez Vitorioso*/*.pdf"))
 ABERTA = 20
 LOTE = list(range(21, 41))          # 20 páginas para o atraso e a memória total (§15.3)
 LOTE_DA_RELEITURA = list(range(41, 61))
+#: As páginas lidas pelo lote com o servidor e depois sem ele, no mesmo projeto e com os
+#: mesmos padrões (as do LOTE, já lidas uma vez: o "refazer").
+LOTE_DA_COMPARACAO = list(range(21, 26))
 
 
 def _ate(app, condicao, limite: float) -> None:
@@ -100,15 +103,31 @@ def test_atraso_e_memoria_durante_o_lote(ambiente, medidas):
         ultimo[0] = agora
         rss.append(_rss_mb(processos))
 
+    from abbychess import lote
+
+    gravacoes, gravar_original = [], lote.CondutorDoLote._gravar
+
+    def gravar(self, indice, lida):                      # quanto a janela gasta em cada página
+        inicio_da_pagina = time.perf_counter()
+        gravar_original(self, indice, lida)
+        gravacoes.append((inicio_da_pagina, (time.perf_counter() - inicio_da_pagina) * 1000))
+
     temporizador = QTimer()
     temporizador.setInterval(16)
     temporizador.timeout.connect(tique)
+    lote.CondutorDoLote._gravar = gravar
     temporizador.start()
     inicio = time.perf_counter()
-    janela.livro.reconhecer(LOTE, refazer=True)          # o caminho do menu, sem o diálogo
-    _ate(app, lambda: not janela.livro.lote_rodando, 1500)
-    fim = time.perf_counter()
-    temporizador.stop()
+    try:
+        janela.livro.reconhecer(LOTE, refazer=True)      # o caminho do menu, sem o diálogo
+        _ate(app, lambda: not janela.livro.lote_rodando, 1500)
+    finally:
+        fim = time.perf_counter()
+        temporizador.stop()
+        lote.CondutorDoLote._gravar = gravar_original
+    k = max(range(len(atrasos)), key=atrasos.__getitem__)
+    perto = min(gravacoes, key=lambda g: abs(g[0] - instantes[k]))
+    tempos_de_gravar = [ms for _, ms in gravacoes]
     medidas["atraso_durante_o_lote"] = {
         "paginas": len(LOTE), "p99_ms": round(percentil(atrasos, 0.99), 1),
         "p95_ms": round(p95(atrasos), 1), "max_ms": round(max(atrasos), 1),
@@ -116,9 +135,18 @@ def test_atraso_e_memoria_durante_o_lote(ambiente, medidas):
         "alvo_p99_ms": 50,
         "acoes_durante_o_lote": "todas valem (passo E): o lote lê no servidor e grava na "
                                 "interface entre um comando e outro",
+        "maior_atraso": {"ms": round(atrasos[k], 1),
+                         "segundos_da_gravacao_mais_perto": round(instantes[k] - perto[0], 3),
+                         "gravacao_mais_perto_ms": round(perto[1], 1)},
         "como": "pelo servidor de leitura (desde o E): a leitura no filho, com a prioridade "
                 "abaixo do normal; a interface reconcilia e entrega cada página ao gravador. "
                 "Até o A3, o lote lia numa thread do processo da interface"}
+    medidas["gravar_pagina_do_lote"] = {
+        "p50_ms": round(percentil(tempos_de_gravar, 0.5), 1),
+        "p95_ms": round(p95(tempos_de_gravar), 1), "max_ms": round(max(tempos_de_gravar), 1),
+        "n": len(tempos_de_gravar),
+        "como": "o que a janela faz com cada página que volta do servidor (a cópia de antes, "
+                "reconciliar os gids, o resumo, entregar ao gravador), na thread da interface"}
     medidas["memoria_total_com_o_lote"] = {
         "rss_pico_mb": round(max(rss)) if rss else None, "alvo_mb": 2560,
         "interface_no_fim_mb": round(_rss_mb(processos[:1])),
@@ -157,3 +185,90 @@ def test_releitura_de_um_glifo_com_o_lote_rodando(ambiente, medidas):
         "como": "Alt+→/← alternados num glifo da página aberta: a interface o deixa "
                 "aguardando e o servidor o lê entre um glifo e outro do lote (de outras "
                 "páginas); do comando ao glifo lido, com o laço de eventos girando"}
+
+
+def test_lote_com_e_sem_servidor(ambiente, medidas):
+    """As mesmas páginas, o mesmo projeto e os mesmos padrões: o tempo de cada página pelo
+    lote com o servidor, e lida na própria janela (o `sl.ler_pagina` com o leitor real
+    carregado aqui; o último teste do módulo, porque os modelos ficam no processo)."""
+    from abbychess import lote
+    from abbychess import servidor_de_leitura as sl
+
+    app, janela = ambiente
+    p = janela.pagina
+    tempos = []
+    original = lote.CondutorDoLote._voltou
+
+    def voltou(self, pedida, resultado):
+        tempos.append(time.perf_counter() - pedida.inicio)
+        original(self, pedida, resultado)
+
+    lote.CondutorDoLote._voltou = voltou
+    try:
+        janela.livro.reconhecer(LOTE_DA_COMPARACAO, refazer=True)
+        _ate(app, lambda: not janela.livro.lote_rodando, 900)
+    finally:
+        lote.CondutorDoLote._voltou = original
+    leitor = sl.leitor_global(p.projeto.pasta_de_padroes, p.projeto.dados.limiares)
+    sem = []
+    for indice in LOTE_DA_COMPARACAO:
+        inicio = time.perf_counter()
+        sl.ler_pagina(p.fonte.pagina(indice), [], [], leitor)
+        sem.append(time.perf_counter() - inicio)
+    medidas["lote_com_e_sem_servidor"] = {
+        "paginas": LOTE_DA_COMPARACAO, "padroes_no_livro": leitor.total_de_padroes,
+        "com_servidor_s_por_pagina": round(sum(tempos) / len(tempos), 2),
+        "sem_servidor_s_por_pagina": round(sum(sem) / len(sem), 2),
+        "como": "o lote com o servidor (do pedido à resposta, com a página renderizada) e "
+                "`ler_pagina` na própria janela com o leitor real, nas mesmas páginas"}
+
+
+def test_atraso_durante_o_lote_com_o_leitor_falso(tmp_path, medidas):
+    """CA-11.1 [desempenho], primeiro com o falso: 50 páginas sintéticas (~200 ms cada)."""
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QApplication
+
+    from abbychess import pagina as pg
+    from abbychess import servidor_de_leitura as sl
+    from abbychess.app.janela import JanelaPrincipal
+    from abbychess.leitor import LeitorDoLivro
+    from abbychess.projeto import ProjetoDeLivro
+    from tests.test_livro import PAGINAS, pdf_sintetico
+
+    app = QApplication.instance() or QApplication([])
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Falso", pdf_sintetico(tmp_path,
+                                                                                PAGINAS * 17))
+    limiares = projeto.dados.limiares
+    servidor = sl.ServidorDeLeitura(projeto.pasta_de_padroes, limiares,
+                                    fabrica="tests.leitor_falso:criar")
+    assert servidor.pronto.wait(60)
+    janela = JanelaPrincipal()
+    janela.usar(projeto, pg.FonteDePaginas(projeto.fonte),
+                LeitorDoLivro(projeto.pasta_de_padroes, limiares=limiares, aguardar=True),
+                servidor)
+    atrasos, ultimo = [], [time.perf_counter()]
+
+    def tique():
+        agora = time.perf_counter()
+        atrasos.append((agora - ultimo[0]) * 1000 - 16)
+        ultimo[0] = agora
+
+    temporizador = QTimer()
+    temporizador.setInterval(16)
+    temporizador.timeout.connect(tique)
+    temporizador.start()
+    inicio = time.perf_counter()
+    try:
+        janela.livro.reconhecer(list(range(51)), refazer=False)
+        _ate(app, lambda: not janela.livro.lote_rodando, 600)
+    finally:
+        temporizador.stop()
+        duracao = time.perf_counter() - inicio
+        janela.close()
+    medidas["atraso_durante_o_lote_falso"] = {
+        "paginas": 51, "p99_ms": round(percentil(atrasos, 0.99), 1),
+        "p95_ms": round(p95(atrasos), 1), "max_ms": round(max(atrasos), 1),
+        "disparos": len(atrasos), "duracao_s": round(duracao, 1), "alvo_p99_ms": 50,
+        "como": "o lote de 51 páginas sintéticas pelo servidor com o leitor falso (10 ms por "
+                "glifo, ~200 ms por página): a janela grava uma página a cada ~200 ms"}
+

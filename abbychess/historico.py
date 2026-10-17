@@ -242,8 +242,19 @@ def aplicar(m: MudancaDaPagina, pagina: Pagina, *, para_tras: bool) -> None:
             d, quebras=d.quebras & vivos, paragrafo_antes=d.paragrafo_antes & vivos,
             hifen_de_quebra=d.hifen_de_quebra & vivos,
             juncoes=frozenset(j for j in d.juncoes if set(j) <= vivos),
-            virtuais=tuple(v for v in d.virtuais
-                           if v.depois_de is None or v.depois_de in vivos))
+            virtuais=_virtuais_ancorados(d.virtuais, vivos))
+
+
+def _virtuais_ancorados(virtuais, vivos) -> tuple:
+    """Os virtuais cujas âncoras ainda estão na página (um box vivo ou um virtual que fica)."""
+    ficam = tuple(virtuais)
+    while True:
+        gids = vivos | {v.gid for v in ficam}
+        filtrados = tuple(v for v in ficam if (v.depois_de is None or v.depois_de in gids)
+                          and (v.antes_de is None or v.antes_de in gids))
+        if len(filtrados) == len(ficam):
+            return filtrados
+        ficam = filtrados
 
 
 def _na_ordem(ordem: List[int], alvo: Sequence[int]) -> List[int]:

@@ -461,12 +461,14 @@ deixa a ordem como estava.
 - A cada `contentsChange`, o texto atual da sessão é **realinhado** contra o original
   (Levenshtein; desempate: substituição antes de inserir+apagar; alinhamento à esquerda),
   então teclas, IME, painel de emojis, colar, arrastar e autocompletar dão o mesmo resultado.
+  Os caracteres que nenhum `contentsChange` tocou ficam com o glifo deles, e só os vãos entre
+  eles são realinhados (D1: apagar o segundo "s" de "cassa" tira o segundo glifo).
 - A sessão **confirma** ao sair dela (cursor ou clique fora), com Enter (e avança à próxima
   palavra duvidosa) ou Shift+Enter (sem avançar), como **um passo** do desfazer. Esc
   **restaura** a sessão (e Ctrl+Y a reaplica). Depois de confirmar, o bloco é
   **re-renderizado do modelo**.
 - **Enter numa palavra sem mudança** a aceita: os glifos ficam `revisado` e saem da fila
-  (como o Skip do FineReader).
+  (como o Skip do FineReader). Só os que têm leitura (D1): o □ e o aguardando ficam na fila.
 - Mapeamento dos trechos alinhados:
 
 | Trecho | Vira | Passo |

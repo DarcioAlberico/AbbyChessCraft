@@ -154,20 +154,26 @@ def test_ca_6_4_cada_linha_d1_se_desfaz_com_um_ctrl_z(j, como):
         pagina = _escrever(j, original)
         antes = pagina.instantaneo()
         _por_o_cursor(j, de, ate)
-        if not novo:                                      # apagar é sempre por tecla
-            _tecla(j, Qt.Key.Key_Delete)
-        elif como == "teclas":
+        if como == "teclas":
             if de != ate:
                 _tecla(j, Qt.Key.Key_Delete)
             if novo:
                 QTest.keyClicks(j.texto, novo)
         elif como == "colar":
+            if not novo:                                  # cola a letra de antes por cima
+                _por_o_cursor(j, de - 1, ate)
+                novo = original[de - 1]
             dados = QMimeData()
             dados.setText(novo)
             j.texto.insertFromMimeData(dados)
-        else:
+        elif novo:
             evento = QInputMethodEvent()
             evento.setCommitString(novo)
+            j.texto.inputMethodEvent(evento)
+        else:                                             # o IME apaga pelo trecho de troca
+            _por_o_cursor(j, ate)
+            evento = QInputMethodEvent()
+            evento.setCommitString("", de - ate, ate - de)
             j.texto.inputMethodEvent(evento)
         _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
         assert _texto(j) == esperado, (como, original)
@@ -315,3 +321,117 @@ def test_a_letra_que_faltou_sobre_tinta_sem_box_oferece_o_ctrl_m(j):
     assert len(pagina.decisoes.virtuais) == 1
     assert "Ctrl+M marca o quadro" in j.linha.aviso
 
+
+
+# ----------------------------------------------------------------------
+# A revisão de código do D1
+# ----------------------------------------------------------------------
+
+def test_apagar_o_segundo_de_dois_iguais_tira_o_segundo_glifo(j):
+    pagina = _escrever(j, "cassa ab ab")
+    s1, s2 = pagina.boxes[2].gid, pagina.boxes[3].gid
+    _por_o_cursor(j, 4)                                   # depois do segundo "s"
+    _tecla(j, Qt.Key.Key_Backspace)
+    _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    assert _texto(j) == "casa ab ab" and s1 in pagina.vivos and s2 not in pagina.vivos
+    primeiro, segundo = {b.gid for b in pagina.boxes[4:6]}, {b.gid for b in pagina.boxes[6:8]}
+    _por_o_cursor(j, 7, 10)                               # " ab", o segundo
+    _tecla(j, Qt.Key.Key_Delete)
+    _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    assert _texto(j) == "casa ab" and primeiro <= pagina.vivos and not segundo & pagina.vivos
+
+
+def test_o_confirmar_agendado_nao_aceita_outra_palavra(j):
+    pagina = _escrever(j, "ab de")
+    emitidas = []
+    j.texto.sessao_confirmada.connect(lambda *a: emitidas.append(a[1]))
+    try:
+        _por_o_cursor(j, 1)
+        QTest.keyClicks(j.texto, "x")                     # "axb de"
+        _por_o_cursor(j, 5)                               # sai da sessão (agenda o confirmar)
+        _por_o_cursor(j, 6)                               # e anda de novo antes do laço girar
+        QApplication.processEvents()
+        QApplication.processEvents()
+    finally:
+        j.texto.sessao_confirmada.disconnect()
+        j.texto.sessao_confirmada.connect(j._sessao_do_documento)
+    assert emitidas == ["axb"]
+    assert not any(b.revisado for b in pagina.boxes if b.entry.char in "de")
+
+
+def test_enter_numa_palavra_com_um_nao_lido_nao_o_revisa(j):
+    pagina = _escrever(j, "casa velha")
+    pagina.boxes[1].entry.char = ""                       # □
+    j.pintar_texto()
+    _por_o_cursor(j, 2)
+    _tecla(j, Qt.Key.Key_Return)
+    assert not pagina.boxes[1].revisado and pagina.boxes[0].revisado
+
+
+def test_o_ctrl_y_depois_do_desfazer_do_projeto_refaz_o_projeto(j):
+    _escrever(j, "casa velha")
+    _por_o_cursor(j, 4)
+    QTest.keyClicks(j.texto, "s")
+    _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)    # "casas"
+    _por_o_cursor(j, 11)
+    QTest.keyClicks(j.texto, "x")                         # "velhax", na sessão
+    j.fechar_sobreposicao()                               # Esc: "velha" volta
+    j.desfazer()                                          # o Ctrl+Z do projeto: "casa"
+    j.pintar_texto()
+    j.refazer()                                           # refaz o projeto, não o "velhax"
+    j.pintar_texto()
+    assert _texto(j) == "casas velha"
+
+
+def test_ctrl_enter_e_um_passo_do_desfazer_e_a_letra_nova_nao_ensina(j):
+    pagina = _escrever(j, "conc1uir")
+    antes = [b.entry.as_state() for b in pagina.boxes]
+    _por_o_cursor(j, 4, 5)
+    QTest.keyClicks(j.texto, "l")
+    j.confirmar_no_documento(ensinar=True)
+    QApplication.processEvents()
+    assert pagina.boxes[4].entry.char == "l" and len(j.pagina.historico._desfazer) == 1
+    j.desfazer()
+    j.pintar_texto()
+    assert [b.entry.as_state() for b in pagina.boxes] == antes and _texto(j) == "conc1uir"
+    _escrever(j, "csa")
+    _por_o_cursor(j, 1)
+    QTest.keyClicks(j.texto, "a")
+    j.confirmar_no_documento(ensinar=True)
+    QApplication.processEvents()
+    assert "não ensina" in j.statusBar().currentMessage()
+
+
+def test_colar_html_entra_como_texto_e_o_tab_e_um_espaco(j):
+    pagina = _escrever(j, "ganhartempos")
+    _por_o_cursor(j, 0, 12)
+    dados = QMimeData()
+    dados.setHtml("<b>ganhar</b>\ttempos")
+    dados.setText("ganhar\ttempos")
+    j.texto.insertFromMimeData(dados)
+    _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    assert _texto(j) == "ganhar tempos" and pagina.decisoes.quebras
+    assert not pagina.decisoes.virtuais
+
+
+def test_o_ime_com_composicao_so_conta_o_que_foi_confirmado(j):
+    pagina = _escrever(j, "csa")
+    _por_o_cursor(j, 1)
+    composicao = QInputMethodEvent("a", [])               # o preedit, ainda sem commit
+    j.texto.inputMethodEvent(composicao)
+    QApplication.processEvents()
+    final = QInputMethodEvent()
+    final.setCommitString("a")
+    j.texto.inputMethodEvent(final)
+    _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    assert _texto(j) == "casa" and len(pagina.decisoes.virtuais) == 1
+
+
+def test_desfazer_a_edicao_tira_o_revisado(j):
+    pagina = _escrever(j, "conc1uir")
+    _por_o_cursor(j, 4, 5)
+    QTest.keyClicks(j.texto, "l")
+    _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    assert all(b.revisado for b in pagina.boxes)
+    j.desfazer()
+    assert not any(b.revisado for b in pagina.boxes)

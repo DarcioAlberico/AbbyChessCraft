@@ -716,6 +716,12 @@ class ControladorDoLivro:
             self._condutor.cancelar()
         self._condutor = None
         self.restante, self.reler_depois = None, []
+        self.esperar_a_gravacao()
+
+    def esperar_a_gravacao(self) -> None:
+        """O `lote.json` que a thread ainda grava chega ao disco (fechar o projeto ou trocar de
+        projeto não perde o ponto da última página)."""
+        self._gravador_do_lote.esperar()
 
     def cancelar(self) -> None:
         """Pede o fim do lote: a página em leitura para no glifo seguinte e fica como estava;

@@ -30,7 +30,7 @@ from __future__ import annotations
 import copy
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
 
@@ -177,20 +177,36 @@ def _aplicar_decisoes(linhas: List[List[List[int]]], decisoes: Decisoes) -> List
             else:
                 juntas.append(list(p))
         saida.append(juntas)
-    ultimo: Dict[Optional[int], int] = {}                     # virtuais, na ordem em que
-    for v in decisoes.virtuais:                               # foram digitados: o segundo
-        if v.antes_de is not None and v.depois_de is None:    # depois do mesmo glifo vem
-            _inserir_antes(saida, v)                          # depois do primeiro
-            continue
-        depois = ultimo.get(v.depois_de, v.depois_de)
-        _inserir_virtual(saida, v, depois)
-        ultimo[v.depois_de] = v.gid
+    # Os virtuais: cada um logo depois (ou logo antes) da âncora dele, que é um box ou outro
+    # virtual; o que se ancora num virtual espera ele entrar. Um virtual sem âncora na
+    # página (ou num ciclo) vai para o começo da primeira linha.
+    postos: Set[int] = set()
+    faltam = list(decisoes.virtuais)
+    gids_virtuais = {v.gid for v in faltam}
+    while faltam:
+        resto = []
+        for v in faltam:
+            ancora = v.antes_de if v.antes_de is not None and v.depois_de is None else v.depois_de
+            if ancora in gids_virtuais and ancora not in postos:
+                resto.append(v)
+                continue
+            if v.antes_de is not None and v.depois_de is None:
+                _inserir_antes(saida, v)
+            else:
+                _inserir_virtual(saida, v, v.depois_de)
+            postos.add(v.gid)
+        if len(resto) == len(faltam):           # um ciclo: não há âncora a esperar
+            for v in resto:
+                _inserir_virtual(saida, v, None)
+            break
+        faltam = resto
     return saida
 
 
 def _inserir_antes(linhas: List[List[List[int]]], v) -> None:
-    """O virtual antes do box `antes_de`: na palavra dele ou, com `palavra_nova`, numa
-    palavra nova logo antes dela; sem o box, no começo da primeira linha."""
+    """O virtual antes do glifo `antes_de` (um box ou outro virtual): na palavra dele ou,
+    com `palavra_nova`, numa palavra nova logo antes dela; sem ele, no começo da primeira
+    linha."""
     for linha in linhas:
         for k, p in enumerate(linha):
             if v.antes_de in p:
@@ -203,8 +219,8 @@ def _inserir_antes(linhas: List[List[List[int]]], v) -> None:
 
 
 def _inserir_virtual(linhas: List[List[List[int]]], v, depois: Optional[int]) -> None:
-    """O virtual `v` depois do glifo `depois` (o âncora dele, ou o último virtual já posto
-    nesse âncora), ou no começo da primeira linha."""
+    """O virtual `v` logo depois do glifo `depois` (um box ou outro virtual), ou no começo
+    da primeira linha."""
     if depois is not None:
         for linha in linhas:
             for k, p in enumerate(linha):

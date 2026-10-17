@@ -21,10 +21,14 @@
   confirma ao sair dela (cursor, clique, foco), com Enter (e vai à próxima palavra
   duvidosa), Shift+Enter ou Ctrl+Enter (e ensina o glifo sob o cursor): a janela leva as
   unidades e o texto ao controlador (`sessao_confirmada`), e o bloco é montado de novo do
-  modelo. Esc (ou Ctrl+Z) restaura a sessão, e Ctrl+Y a reaplica. Enter numa palavra sem
-  mudança a aceita. O desfazer do `QTextDocument` fica desligado. Tocar um diagrama confirma
-  na hora: o diagrama não sai (CA-6.8). Com uma sessão aberta, uma montagem que vem de fora
-  (a propagação, o relógio do texto) espera o fim dela.
+  modelo. Esc (ou Ctrl+Z) restaura a sessão, e Ctrl+Y a reaplica (até outra montagem ou o
+  cursor sair dela). Enter numa palavra sem mudança a aceita. O desfazer do `QTextDocument`
+  fica desligado. Tocar um diagrama confirma na hora: o diagrama não sai (CA-6.8). Com uma
+  sessão aberta, uma montagem que vem de fora (a propagação, o relógio do texto) espera o
+  fim dela. A vista sabe, de cada caractere de agora, de qual caractere da montagem ele veio
+  (`_origem`, mantida pelo `contentsChange`): o que nenhuma edição tocou fica com o glifo
+  dele (`sessao.alinhar`, os `fixos`), e apagar o segundo "s" de "cassa" tira o segundo. O
+  colar entra só como texto.
 
 Montar de novo (uma edição, a propagação) não perde o lugar: o cursor volta ao mesmo gid e a
 rolagem fica onde estava (CA-6.5).
@@ -118,13 +122,15 @@ class VistaDoDocumento(QTextEdit):
     #: O cursor andou (teclado ou clique) para a palavra destes gids.
     cursor_na_palavra = Signal(list)
     #: A sessão confirmada: as unidades originais, o texto de agora, se avança à próxima
-    #: duvidosa, o gid a ensinar (Ctrl+Enter, ou None) e o último glifo da sessão.
-    sessao_confirmada = Signal(list, str, bool, object, object)
+    #: duvidosa, o gid a ensinar (Ctrl+Enter, ou None), o último glifo da sessão e os pares
+    #: (no original, no novo) que nenhuma edição tocou.
+    sessao_confirmada = Signal(list, str, bool, object, object, list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setReadOnly(True)                  # editável quando há página (montar)
         self.setUndoRedoEnabled(False)          # o desfazer é do projeto (§6.3)
+        self.setAcceptRichText(False)           # colar e arrastar trazem só o texto
         self.setTabChangesFocus(True)
         self.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse
                                      | Qt.TextInteractionFlag.TextSelectableByKeyboard
@@ -151,9 +157,15 @@ class VistaDoDocumento(QTextEdit):
         self._texto0 = ""
         #: A sessão aberta: o trecho [a, b) do texto da montagem que ela cobre.
         self._sessao: Optional[tuple] = None
+        #: O número da sessão aberta: o confirmar agendado confere que ainda é ela.
+        self._numero_da_sessao = 0
+        #: De cada caractere do documento de agora, o índice dele no texto da montagem
+        #: (None no que foi digitado); None se o `contentsChange` se perdeu.
+        self._origem: Optional[List[Optional[int]]] = []
         self._montando = False
         self._pendente = None                   # a montagem que espera a sessão acabar
-        self._restaurada = None                 # (unidades, texto) do Esc, para o Ctrl+Y
+        #: (unidades, texto, fixos, a, b) do Esc, para o Ctrl+Y.
+        self._restaurada: Optional[tuple] = None
         self._duvidosos: Set[int] = set()
         self._ultima_figurina: Optional[tuple] = None
         self.cursorPositionChanged.connect(self._cursor_mudou)
@@ -176,6 +188,7 @@ class VistaDoDocumento(QTextEdit):
             self._pendente = entrada
             return
         self._pendente = None
+        self._restaurada = None                 # o Ctrl+Y vale só sobre a montagem do Esc
         self._entrada = entrada
         lugar = self._lugar()
         rolagem = self.verticalScrollBar().value()
@@ -235,6 +248,7 @@ class VistaDoDocumento(QTextEdit):
             bloco = bloco.next()
         self._unidades = unidades
         self._texto0 = self.document().toPlainText()
+        self._origem = list(range(len(self._texto0)))
         self._sessao = None
 
     def _lugar(self):
@@ -552,10 +566,14 @@ class VistaDoDocumento(QTextEdit):
     def _cursor_mudou(self) -> None:
         if self._sessao is not None and not self._montando:
             if not self._dentro_da_sessao(self.textCursor().position()):
-                QTimer.singleShot(0, lambda: self.confirmar(avancar=False))   # saiu dela
+                self._confirmar_depois()        # saiu dela
             return                              # na sessão, os mapas estão velhos
         if self._movendo or self._clicando:     # o clique avisa uma vez, no release
             return
+        if self._restaurada is not None:        # o cursor saiu da palavra do Esc
+            _u, _t, _f, a, b = self._restaurada
+            if not a <= self.textCursor().position() <= b:
+                self._restaurada = None
         gid = self.gid_no_cursor()
         if gid is not None:
             self.cursor_na_palavra.emit(self.palavra_de(gid))
@@ -635,13 +653,18 @@ class VistaDoDocumento(QTextEdit):
     def pode_reaplicar(self) -> bool:
         return self._restaurada is not None and self._sessao is None
 
-    def _texto_mudou(self, _posicao: int, _removidos: int, _inseridos: int) -> None:
+    def _texto_mudou(self, posicao: int, removidos: int, inseridos: int) -> None:
         if self._montando:
             return
         atual = self.document().toPlainText()
         antes = self._texto0
+        if self._origem is not None:
+            self._origem[posicao:posicao + removidos] = [None] * inseridos
+            if len(self._origem) != len(atual):
+                self._origem = None             # o Qt contou diferente: sem os fixos
         if atual == antes:
             self._sessao = None
+            self._origem = list(range(len(antes)))
             return
         inicio = 0
         limite = min(len(atual), len(antes))
@@ -651,11 +674,32 @@ class VistaDoDocumento(QTextEdit):
         while fim < limite - inicio and atual[-1 - fim] == antes[-1 - fim]:
             fim += 1
         a, b = ss.palavras_em(self._unidades, inicio, len(antes) - fim)
+        if self._sessao is None:
+            self._numero_da_sessao += 1
         self._sessao = (a, b)
         self._restaurada = None
         if any(u.tipo == ss.OUTRO for u in self._unidades[a:b]):
             # Um diagrama tocado: confirma já (o texto apagado sai, o diagrama volta).
-            QTimer.singleShot(0, lambda: self.confirmar(avancar=False))
+            self._confirmar_depois()
+
+    def _confirmar_depois(self) -> None:
+        """Confirma a sessão aberta agora no próximo giro do laço de eventos, se ela ainda
+        estiver aberta: nunca outra, nem a palavra sob o cursor (o aceitar do Enter)."""
+        numero = self._numero_da_sessao
+
+        def confirmar():
+            if self._sessao is not None and self._numero_da_sessao == numero:
+                self.confirmar(avancar=False)
+        QTimer.singleShot(0, confirmar)
+
+    def _fixos(self, a: int, b: int) -> List[tuple]:
+        """Os pares (no original, no novo) da sessão [a, b) que nenhuma edição tocou."""
+        if self._origem is None:
+            return []
+        atual = self.document().toPlainText()
+        fim = b + len(atual) - len(self._texto0)
+        return [(o - a, k - a) for k, o in enumerate(self._origem[a:fim], a)
+                if o is not None and a <= o < b and self._texto0[o] == atual[k]]
 
     def _texto_da_sessao(self) -> str:
         a, b = self._sessao
@@ -679,48 +723,41 @@ class VistaDoDocumento(QTextEdit):
                     self.ir_a_proxima_duvidosa(posicao)
                 return
             novo = self._texto0[a:b]
+            fixos = [(k, k) for k in range(len(novo))]
         else:
             a, b = self._sessao
             novo = self._texto_da_sessao()
+            fixos = self._fixos(a, b)
         unidades = self._unidades[a:b]
-        alvo = self._gid_alinhado(unidades, novo, posicao - a) if ensinar else None
+        alvo = ss.gid_no_cursor(unidades, novo, posicao - a, fixos) if ensinar else None
         ultimo = next((u.gid for u in reversed(unidades) if u.glifo), None)
         self._sessao, self._restaurada = None, None
-        self.sessao_confirmada.emit(list(unidades), novo, avancar, alvo, ultimo)
-
-    @staticmethod
-    def _gid_alinhado(unidades, novo: str, onde: int) -> Optional[int]:
-        """O glifo do original que ficou na posição `onde` do texto novo (o do Ctrl+Enter)."""
-        original = "".join(u.texto for u in unidades)
-        por_novo = {j: i for i, j in ss.alinhar(original, ss._normalizar(novo))
-                    if i is not None and j is not None}
-        for j in (onde - 1, onde):
-            i = por_novo.get(j)
-            if i is not None and unidades[i].glifo:
-                return unidades[i].gid
-        return None
+        self.sessao_confirmada.emit(list(unidades), novo, avancar, alvo, ultimo, fixos)
 
     def restaurar(self) -> None:
         """Esc (ou Ctrl+Z na sessão): a palavra volta ao que era; Ctrl+Y a reaplica."""
         if self._sessao is None:
             return
         a, b = self._sessao
-        self._restaurada = (list(self._unidades[a:b]), self._texto_da_sessao())
+        restaurada = (list(self._unidades[a:b]), self._texto_da_sessao(), self._fixos(a, b), a, b)
         self._sessao = None
         entrada = self._pendente or self._entrada
-        restaurada = self._restaurada
         if entrada is not None:
             self.montar(*entrada)
         self._restaurada = restaurada
+
+    def esquecer_a_restaurada(self) -> None:
+        """O Ctrl+Z e o Ctrl+Y do projeto: o Ctrl+Y não reaplica mais a palavra do Esc."""
+        self._restaurada = None
 
     def reaplicar(self) -> None:
         """Ctrl+Y depois do Esc: a sessão restaurada, confirmada como estava."""
         if not self.pode_reaplicar:
             return
-        unidades, novo = self._restaurada
+        unidades, novo, fixos, _a, _b = self._restaurada
         self._restaurada = None
         ultimo = next((u.gid for u in reversed(unidades) if u.glifo), None)
-        self.sessao_confirmada.emit(unidades, novo, False, None, ultimo)
+        self.sessao_confirmada.emit(unidades, novo, False, None, ultimo, fixos)
 
     def ir_a_proxima_duvidosa(self, depois_de: int) -> bool:
         """O cursor no começo da próxima palavra com um glifo duvidoso (pendente, sem
@@ -797,5 +834,5 @@ class VistaDoDocumento(QTextEdit):
     def focusOutEvent(self, evento):
         super().focusOutEvent(evento)
         if self._sessao is not None and evento.reason() != Qt.FocusReason.PopupFocusReason:
-            QTimer.singleShot(0, lambda: self.confirmar(avancar=False))   # o clique fora
+            self._confirmar_depois()            # o clique fora
 

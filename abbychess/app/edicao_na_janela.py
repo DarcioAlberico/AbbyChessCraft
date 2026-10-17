@@ -7,16 +7,19 @@ from __future__ import annotations
 
 
 class EdicaoNoDocumento:
-    def _sessao_do_documento(self, unidades, novo, avancar, ensinar_gid, ultimo) -> None:
-        """A sessão confirmada: o controlador aplica, o Documento é montado de novo do modelo
-        e o cursor vai ao fim da palavra (ou, com Enter, à próxima duvidosa)."""
-        self.pagina.confirmar_sessao(unidades, novo, ensinar_gid=ensinar_gid)
-        self.pintar_texto()
-        if avancar:
-            depois = self.texto.posicao_do_gid(ultimo) if ultimo is not None else None
-            self.texto.ir_a_proxima_duvidosa(depois if depois is not None else 0)
-        else:
-            self.texto.ir_ao_fim_do_gid(ultimo)
+    def _sessao_do_documento(self, unidades, novo, avancar, ensinar_gid, ultimo, fixos) -> None:
+        """A sessão confirmada: o controlador aplica; quando a edição entra na página (na
+        hora, ou na vez dela na fila), o Documento é montado de novo do modelo e o cursor vai
+        ao fim da palavra (ou, com Enter, à próxima duvidosa)."""
+        def entrou() -> None:
+            self.pintar_texto()
+            if avancar:
+                depois = self.texto.posicao_do_gid(ultimo) if ultimo is not None else None
+                self.texto.ir_a_proxima_duvidosa(depois if depois is not None else 0)
+            else:
+                self.texto.ir_ao_fim_do_gid(ultimo)
+        self.pagina.confirmar_sessao(unidades, novo, ensinar_gid=ensinar_gid, fixos=fixos,
+                                     depois=entrou)
 
     def _sessao_recusada(self, motivo: str) -> None:
         self.linha.avisar(f"Edição recusada: {motivo}")
@@ -28,6 +31,7 @@ class EdicaoNoDocumento:
         if self.texto.tem_sessao:
             self.texto.restaurar()
         else:
+            self.texto.esquecer_a_restaurada()
             self.pagina.desfazer()
 
     def refazer(self) -> None:

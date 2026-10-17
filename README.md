@@ -216,26 +216,33 @@ O Documento se edita como um editor de texto, e cada edição vira o que ela é 
   enquanto a sessão está aberta. Ela **confirma** quando o cursor sai dela (as setas, um
   clique fora, outro painel), com **Enter** (e o cursor vai à próxima palavra duvidosa),
   **Shift+Enter** (fica ali) ou **Ctrl+Enter** (e ensina o glifo sob o cursor, como o Enter
-  do Glifo; o glifo virtual não ensina). Confirmar é **um passo** do desfazer, e todos os
-  glifos da sessão ficam **revisados**: saem da fila e dos pendentes do livro.
+  do Glifo, no mesmo passo do desfazer; o glifo virtual e a letra que você acabou de digitar
+  não ensinam). Confirmar é **um passo** do desfazer, e os glifos da sessão que têm leitura
+  ficam **revisados**: saem da fila e dos pendentes do livro (o □ e o aguardando ficam).
 - **Esc** (ou Ctrl+Z com a sessão aberta) devolve a palavra ao que era, e **Ctrl+Y** a
-  confirma de novo. Fora de uma sessão, Ctrl+Z e Ctrl+Y são o desfazer do projeto.
-- **Enter numa palavra sem mudança** a aceita (como o *Skip* do FineReader): os glifos ficam
-  revisados, sem trocar a fonte da leitura.
+  confirma de novo, enquanto o cursor não sai dela. Fora de uma sessão, Ctrl+Z e Ctrl+Y são o
+  desfazer do projeto.
+- **Enter numa palavra sem mudança** a aceita (como o *Skip* do FineReader): os glifos com
+  leitura ficam revisados, sem trocar a fonte da leitura.
 - O que cada edição faz: **trocar uma letra** corrige o glifo (fica manual, como o
   Shift+Enter do Glifo); **apagar uma letra** tira o glifo da página (o Ctrl+Z o devolve);
   **digitar uma letra que faltou** cria um **glifo virtual** (sem caixa, pontilhado azul; se
   houver tinta sem box no lugar, a Linha oferece o **Ctrl+M** para marcar o quadro); **um
-  espaço** parte a palavra, e **apagar um espaço** junta as duas (na mesma linha impressa).
-  Colar, arrastar e o IME dão o mesmo resultado que digitar. As edições que mudam a estrutura
-  (glifo tirado, glifo virtual) avisam na Linha ("1 glifo(s) tirado(s) · Ctrl+Z desfaz").
+  espaço** parte a palavra, e **apagar um espaço** junta as duas (na mesma linha impressa),
+  também junto de um glifo virtual. O texto da página depois de confirmar é o que você
+  digitou: o glifo virtual fica onde você o pôs, mesmo se a letra ao lado dele sair depois.
+  Colar (só o texto; o tab vira espaço), arrastar e o IME dão o mesmo resultado que digitar.
+  Numa palavra com letras repetidas, sai o glifo da letra que você apagou ("cassa": o
+  Backspace no segundo "s" tira o segundo). As edições que mudam a estrutura (glifo tirado,
+  glifo virtual) avisam na Linha ("1 glifo(s) tirado(s) · Ctrl+Z desfaz").
 - **Ainda não** (passo G): trocar duas letras por uma ("rn" → "m", que é juntar os glifos) ou
-  uma por duas ("m" → "rn", dividir); separar ou juntar junto de um glifo virtual. A sessão é
-  recusada, a palavra volta ao que era, e a Linha diz "este tipo de edição chega numa próxima
-  versão". Negrito, itálico e sublinhado e o parágrafo novo também são do G.
+  uma por duas ("m" → "rn", dividir, e também uma letra no meio de uma ligadura como "fi").
+  A sessão é recusada, a palavra volta ao que era, e a Linha diz "este tipo de edição chega
+  numa próxima versão". Negrito, itálico e sublinhado e o parágrafo novo também são do G.
 - **As figurinas** (§6.4): num lance que você digitou, a letra da peça vira figurina ao
   confirmar, quando o livro é de figurinas ("Cf3" → "♘f3" em português; "Nf3" → "♘f3" em
-  inglês). **Opções › Peças nos lances** escolhe figurinas ou letras para o livro.
+  inglês; "(Cf3)," → "(♘f3),"). O lance que ficou igual e no mesmo lugar não muda. **Opções ›
+  Peças nos lances** escolhe figurinas ou letras para o livro.
   **Ctrl+Shift+K/Q/R/B/N/P** inserem ♔♕♖♗♘♙ no cursor (o mesmo atalho de novo alterna para a
   preta, ♚♛♜♝♞♟), e **F2** abre a paleta de símbolos no cursor.
 - **O diagrama não se apaga**: uma seleção que o cruza apaga o texto e o diagrama fica.
@@ -1131,10 +1138,11 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   treino, os padrões, as opções, o reconhecimento do livro em lote e a fila do livro; no
   Projeto, a exportação; o editor de áreas, a verificação de texto e a leitura e
   conferência dos diagramas.
-- **A edição no Documento, desde o D1**: o que é do passo G (k letras por 1, 1 por k, junto
-  de um glifo virtual, o parágrafo, os estilos) é recusado com aviso; apagar a quebra de
-  linha impressa entre duas palavras não as junta (as linhas são da página). A posição que a
-  Linha e os Avisos dão de um glifo é em pixels da página.
+- **A edição no Documento, desde o D1**: o que é do passo G (k letras por 1, 1 por k, o
+  parágrafo, os estilos) é recusado com aviso; apagar a quebra de linha impressa entre duas
+  palavras não as junta, e uma linha que perde todos os boxes some, com o glifo virtual que
+  sobrou indo para a linha vizinha (as linhas são da página). A posição que a Linha e os
+  Avisos dão de um glifo é em pixels da página.
 - **O lote não volta às páginas que já leu.** O padrão ensinado durante o lote vale nas
   páginas que ele começar depois (desde o passo E); as que ele já leu só mudam lidas de novo
   (F5, Ctrl+R ou outro lote).

@@ -481,6 +481,12 @@ class ControladorDoLivro:
         self._condutor = None
         #: O que faltou do lote cancelado, `(indices, refazer)`, para retomar.
         self.restante = None
+        #: As páginas que o lote não sobrescreveu (mudadas pelo usuário): Retomar as lê só
+        #: com a confirmação dele.
+        self.reler_depois: List[int] = []
+        self._reler_depois_antes: List[int] = []
+        #: "Abrir sem o servidor" nesta sessão (os modelos não carregaram no filho).
+        self.sem_servidor = False
         #: O servidor cujo `modelos_prontos` já foi emitido (uma vez por servidor).
         self._modelos_avisados = None
 
@@ -499,7 +505,7 @@ class ControladorDoLivro:
         p = self.pagina
         self._largar_lote()
         p.ligar(projeto, fonte, None)
-        com_servidor = os.environ.get("ABBY_SERVIDOR", "1") != "0"
+        com_servidor = not self.sem_servidor and os.environ.get("ABBY_SERVIDOR", "1") != "0"
 
         def preparar():
             def trabalho(_progresso):
@@ -552,6 +558,7 @@ class ControladorDoLivro:
             # janela oferece reabrir o projeto (§11).
             texto, desistiu = valor             # o `desistiu` da hora do aviso
             self.eventos.emitir(evento, texto, desistiu)
+            self.eventos.emitir("acoes_mudaram")        # Retomar desliga com ele parado
 
     def usar(self, projeto, fonte, leitor, servidor=None) -> None:
         """O projeto com o leitor pronto: abre a última página lida (ou a primeira)."""
@@ -574,17 +581,23 @@ class ControladorDoLivro:
                       "outro.", 8000)
             return
         self.restante = None
+        self._reler_depois_antes = [i for i in self.reler_depois if i not in indices]
         condutor = lt.CondutorDoLote(
             p, indices, refazer, ao_progresso=self._progrediu,
             ao_gravar=lambda indice: self.eventos.emitir("pagina_do_lote", indice),
             ao_fim=lambda resultado: self._fim_do_lote(condutor, resultado))
         self._condutor = condutor
+        self._guardar(condutor.indices, refazer, self._reler_depois_antes)
         p.lote_rodando = True
         self.eventos.emitir("lote_mudou")
         self.eventos.emitir("acoes_mudaram")
         condutor.comecar()
 
     def _progrediu(self, feitas: int, total: int, estimativa: Optional[float]) -> None:
+        condutor = self._condutor
+        if condutor is not None and feitas:     # o ponto, a cada página (G1 da rodada 3)
+            self._guardar(list(condutor.restante), condutor.refazer,
+                          self._reler_depois_de(condutor))
         self.eventos.emitir("lote_progresso", feitas, total, estimativa)
 
     def _fim_do_lote(self, condutor, resultado) -> None:
@@ -592,46 +605,53 @@ class ControladorDoLivro:
             return                              # de um lote largado (outro projeto)
         self._condutor = None
         self.pagina.lote_rodando = False
-        # O que faltou (cancelado, ou o servidor parou) e as páginas para reler depois:
-        # "Retomar o lote" lê essas, e elas ficam guardadas no projeto (`lote.json`).
+        # O que faltou (cancelado, ou o servidor parou) e as páginas para reler depois ficam
+        # para "Retomar o lote", guardadas no projeto (`lote.json`).
         faltam = list(condutor.restante) if resultado.cancelado else []
-        faltam += [i for i in resultado.reler_depois if i not in faltam]
-        self._guardar_restante((faltam, condutor.refazer) if faltam else None)
+        self._guardar(faltam, condutor.refazer, self._reler_depois_de(condutor))
         mensagem = lt.resumo_do_fim(resultado)
-        if self.restante is not None:
+        if self.pode_retomar or (resultado.servidor_parou and faltam):
             reabrir = "Reabra o projeto e use " if resultado.servidor_parou else ""
-            mensagem += f" {reabrir}Projeto › Retomar o lote lê as {len(faltam)} que ficaram."
+            mensagem += f" {reabrir}Projeto › Retomar o lote continua."
         self.eventos.emitir("lote_mudou")
         self.eventos.emitir("acoes_mudaram")
         self.eventos.emitir("lote_terminou", mensagem, resultado)
         self.pagina._avisar(mensagem + " Detalhes em Avisos (⚠).", 15000)
 
+    def _reler_depois_de(self, condutor) -> List[int]:
+        """As páginas para reler depois: as de antes deste lote que ele não leu, e as dele."""
+        antes = [i for i in self._reler_depois_antes if i not in condutor.resultado.lidas]
+        return antes + [i for i in condutor.resultado.reler_depois if i not in antes]
+
     def _arquivo_do_lote(self):
         p = self.pagina
         return Path(p.projeto.pasta) / ARQUIVO_DO_LOTE if p.projeto is not None else None
 
-    def _guardar_restante(self, restante) -> None:
-        """O que o lote deixou para retomar, na memória e em `lote.json` (sobrevive a fechar
-        o projeto e ao servidor que parou)."""
+    def _guardar(self, faltam: Sequence[int], refazer: bool, reler_depois: Sequence[int]) -> None:
+        """O que o lote deixou para retomar, na memória e em `lote.json`. É gravado ao começar
+        o lote e a cada página (fechar o projeto no meio do lote não perde o ponto, nem deixa
+        valer o arquivo de um lote anterior), e no fim."""
         from abbychess import gravacao as gv
 
-        self.restante = restante
+        self.restante = (list(faltam), bool(refazer)) if faltam else None
+        self.reler_depois = list(reler_depois)
         arquivo, projeto = self._arquivo_do_lote(), self.pagina.projeto
         if arquivo is None or projeto.somente_leitura:
             return
         try:
-            if restante is None:
+            if not faltam and not reler_depois:
                 gv.apagar(arquivo)
             else:
-                gv.gravar_json(arquivo, {"paginas": [int(i) for i in restante[0]],
-                                         "refazer": bool(restante[1])})
+                gv.gravar_json(arquivo, {"paginas": [int(i) for i in faltam],
+                                         "refazer": bool(refazer),
+                                         "reler_depois": [int(i) for i in reler_depois]})
         except OSError as erro:
             log.warning("o lote a retomar não foi gravado: %s", erro)
 
     def _ler_restante(self) -> None:
         import json
 
-        self.restante = None
+        self.restante, self.reler_depois = None, []
         arquivo = self._arquivo_do_lote()
         if arquivo is None or not arquivo.is_file():
             return
@@ -640,15 +660,18 @@ class ControladorDoLivro:
             total = self.pagina.fonte.total
             paginas = [int(i) for i in bruto["paginas"] if 0 <= int(i) < total]
             self.restante = (paginas, bool(bruto["refazer"])) if paginas else None
+            self.reler_depois = [int(i) for i in bruto.get("reler_depois", [])
+                                 if 0 <= int(i) < total]
         except (OSError, ValueError, KeyError, TypeError) as erro:
             log.warning("o lote a retomar (%s) não abriu: %s", arquivo, erro)
 
     def _largar_lote(self) -> None:
-        """Outro projeto: o lote deste não grava mais nada (o condutor confere a geração)."""
+        """Outro projeto: o lote deste não grava mais nada (o condutor confere a geração); o
+        que faltava já está em `lote.json`, gravado a cada página."""
         if self._condutor is not None:
             self._condutor.cancelar()
         self._condutor = None
-        self.restante = None
+        self.restante, self.reler_depois = None, []
 
     def cancelar(self) -> None:
         """Pede o fim do lote: a página em leitura para no glifo seguinte e fica como estava;
@@ -658,18 +681,26 @@ class ControladorDoLivro:
             self.pagina._avisar("Cancelando o lote: a página em leitura para no glifo "
                                 "seguinte…", 0)
 
-    def retomar(self) -> None:
-        """Continua o lote cancelado de onde parou (sem ler de novo as já lidas, CA-11.5), e
-        lê as que ficaram para reler depois."""
+    def retomar(self, com_reler_depois: bool = False) -> None:
+        """Continua o lote cancelado de onde parou (sem ler de novo as já lidas, CA-11.5); com
+        `com_reler_depois` (o usuário confirmou), lê também as que ficaram para reler depois,
+        que ele tinha mudado (as correções manuais ficam, §4.6)."""
         if not self.pode_retomar:
+            if self.restante is not None or self.reler_depois:
+                self.pagina._avisar("O servidor de leitura parou: reabra o projeto para "
+                                    "retomar o lote.", 8000)
             return
-        indices, refazer = self.restante
-        self.reconhecer(indices, refazer)
+        indices, refazer = self.restante if self.restante is not None else ([], False)
+        if com_reler_depois and self.reler_depois:
+            indices = list(indices) + [i for i in self.reler_depois if i not in indices]
+            refazer = True                      # elas já foram lidas: lidas de novo
+        if indices:
+            self.reconhecer(indices, refazer)
 
     @property
     def pode_retomar(self) -> bool:
         servidor = self.pagina.servidor
-        return (self.restante is not None and self._condutor is None
+        return ((self.restante is not None or bool(self.reler_depois)) and self._condutor is None
                 and not (servidor is not None and servidor.parado))
 
     def voltar_ao_antes_do_lote(self) -> None:

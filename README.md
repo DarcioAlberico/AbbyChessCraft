@@ -311,15 +311,16 @@ sempre com as pastas do projeto.
   manuais e os glifos revisados** (como o F5, §4.6), Não as pula. A **página aberta em que
   você mexeu nesta sessão** (algum passo dela no desfazer) não é sobrescrita, nem a que você
   mudar (aberta ou não) enquanto o lote a lê: ficam para "reler depois", e a mensagem do fim
-  e os Avisos dizem quais; **Projeto › Retomar o lote** as lê. A que você verificar
+  e os Avisos dizem quais; **Projeto › Retomar o lote** pergunta se as lê também (as
+  correções manuais e os revisados ficam; as outras mudanças delas saem). A que você verificar
   (Ctrl+T) enquanto o lote a lê continua verificada. Antes de reler uma página já lida, o lote guarda
   como ela estava em `paginas/.antes-do-lote/`, e **Página › Voltar ao estado antes do lote**
   a devolve (a confirmação diz de quando é a cópia; o que mudou na página depois disso se
   perde e não entra no desfazer). **Cancelar o lote** (o ✕ da barra ou Projeto › Cancelar
   o lote) para a página em leitura no glifo seguinte; ela fica como estava, as já gravadas
   ficam, e **Projeto › Retomar o lote** continua de onde parou, sem ler nenhuma página duas
-  vezes, e lê também as que ficaram para reler depois. O que falta fica guardado no projeto
-  (`lote.json`): fechar o programa, ou o servidor parar, não perde o ponto. No fim, a barra
+  vezes. O que falta fica guardado no projeto (`lote.json`, gravado a cada página):
+  fechar o programa no meio do lote, ou o servidor parar, não perde o ponto. No fim, a barra
   diz o resumo curto (lidas, a revisar, para reler depois, falhas), e os **Avisos** (⚠)
   guardam o detalhe, página por página.
 - **Próxima página com pendentes** (F6, no menu Página) é a fila de revisão do livro todo: mostra o pendente

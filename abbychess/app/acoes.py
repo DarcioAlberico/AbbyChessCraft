@@ -28,7 +28,7 @@ def montar(janela) -> None:
     j.acao_opcoes = acao(j, "opcoes", j.opcoes, texto="Opções…")
     j.acao_sair = acao(j, "sair", j.close, texto="Sair")
     j.acao_cancelar_lote = acao(j, "cancelar_lote", livro.cancelar, texto="Cancelar o lote")
-    j.acao_retomar_lote = acao(j, "retomar_lote", livro.retomar, texto="Retomar o lote")
+    j.acao_retomar_lote = acao(j, "retomar_lote", j.retomar_lote, texto="Retomar o lote")
     j.acao_desfazer = acao(j, "desfazer", p.desfazer)
     j.acao_refazer = acao(j, "refazer", p.refazer)
     barra.addSeparator()

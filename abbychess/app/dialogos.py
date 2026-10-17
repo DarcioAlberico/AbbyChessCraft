@@ -172,6 +172,22 @@ def intervalo_do_lote(janela, projeto, total: int) -> Optional[Tuple[List[int], 
     return indices, refazer
 
 
+def reler_depois(janela, paginas) -> Optional[bool]:
+    """Retomar o lote com páginas que ele não sobrescreveu: lê-las também? None é cancelar."""
+    botoes = QMessageBox.StandardButton
+    lista = ", ".join(str(i + 1) for i in paginas)
+    resposta = QMessageBox.question(
+        janela, "Retomar o lote",
+        f"O lote não sobrescreveu as páginas {lista}, porque você as mudou durante a sessão. "
+        "Ler essas também?\n\nSim as lê de novo: as correções manuais e os glifos revisados "
+        "ficam, as outras mudanças delas saem, e o Ctrl+Z delas deixa de valer. Não lê só o "
+        "que faltou do lote.",
+        botoes.Yes | botoes.No | botoes.Cancel, botoes.No)
+    if resposta == botoes.Cancel:
+        return None
+    return resposta == botoes.Yes
+
+
 def destino_da_exportacao(janela, projeto) -> Optional[Path]:
     if not projeto.paginas_lidas():
         QMessageBox.information(janela, "Exportar", "Nenhuma página foi reconhecida ainda.")

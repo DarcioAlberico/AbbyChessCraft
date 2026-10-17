@@ -5,8 +5,6 @@ lote". Um mixin da `JanelaPrincipal`, como `EspacoDeTrabalho`.
 
 from __future__ import annotations
 
-import os
-
 from abbychess import avisos as av
 from abbychess import lote as lt
 from abbychess.app import dialogos
@@ -37,7 +35,7 @@ class LoteNaJanela:
             pergunta, sem_servidor = texto + "\n\nReabrir o projeto agora?", False
         if dialogos.confirmar(self, "Servidor de leitura", pergunta):
             if sem_servidor:
-                os.environ["ABBY_SERVIDOR"] = "0"           # nesta sessão
+                self.livro.sem_servidor = True              # nesta sessão
             pasta = self.projeto.pasta
             if self._fechar_projeto():
                 self.abrir_caminho(str(pasta))
@@ -73,6 +71,18 @@ class LoteNaJanela:
         if self.pagina.indice in resultado.lidas:
             self.pintar_texto()
 
+
+    def retomar_lote(self) -> None:
+        """Projeto › Retomar o lote: o que faltou e, se o usuário quiser, as páginas que o lote
+        não sobrescreveu porque ele as tinha mudado."""
+        livro = self.livro
+        com_reler = False
+        if livro.pode_retomar and livro.reler_depois:
+            resposta = dialogos.reler_depois(self, livro.reler_depois)
+            if resposta is None:
+                return
+            com_reler = resposta
+        livro.retomar(com_reler)
 
 def _duracao(segundos: float) -> str:
     """O tempo estimado do lote, arredondado como se fala: "40 s", "3 min", "1 h 20 min"."""

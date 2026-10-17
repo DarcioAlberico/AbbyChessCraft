@@ -558,7 +558,7 @@ class ControladorDePagina:
         pagina = self._pagina_para_editar()
         imagem, leitor, zonas = self.imagem, self.leitor, list(pagina.zonas)
         antes = self._instantaneo()
-        marcados = [] if pagina.estado in LIDAS else [ed.copia(b.entry) for b in pagina.boxes]
+        marcados = pg.a_manter_na_releitura(pagina.boxes, pagina.estado in LIDAS)   # §4.6
 
         def trabalho(progresso):
             segmentada = zn.segmentar(imagem, zonas, leitor)

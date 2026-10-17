@@ -179,7 +179,8 @@ def _cada_arquivo_do_projeto(projeto: ProjetoDeLivro, tmp_path: Path):
         fonte.inclinacao(0)
 
     def lexico_txt():
-        lexico = um("lexico", lambda: vf.carregar_lexico("pt", projeto.arquivo_do_lexico))
+        # Um idioma sem lista: o léxico vazio carrega na hora, e o que se mede é o arquivo.
+        lexico = um("lexico", lambda: vf.carregar_lexico("xx", projeto.arquivo_do_lexico))
         vf.adicionar(lexico, "palavra" + "".join(chr(97 + int(d)) for d in str(next(contador))),
                      projeto.arquivo_do_lexico)
 
@@ -325,7 +326,7 @@ def test_versao_maior_abre_so_para_leitura_e_nada_muda(projeto, tmp_path):
         with pytest.raises(gv.SomenteLeitura):
             aberto.salvar_zonas(0, [])
         with pytest.raises(gv.SomenteLeitura):
-            vf.adicionar(vf.carregar_lexico("pt", aberto.arquivo_do_lexico), "nova",
+            vf.adicionar(vf.carregar_lexico("xx", aberto.arquivo_do_lexico), "nova",
                          aberto.arquivo_do_lexico)
         import numpy as np
 

@@ -24,6 +24,13 @@ tarefa de outro projeto (aberto antes do atual) é descartada, pela `geracao`.
 
 Enquanto o lote lê o livro (`lote_rodando`), editar a página é recusado com aviso: o lote
 grava as páginas na thread dele.
+
+**O servidor de leitura** (§11, `servidor`): com ele, a interface não tem os modelos globais;
+o leitor dela só tem os padrões do livro (a propagação, a fila), e o que eles não leem fica
+"aguardando leitura". O F5, o reler, os diagramas e os glifos aguardando vão ao servidor, e a
+resposta entra como a da propagação: nos glifos que não mudaram, emendando a transação da
+edição. Antes de cada pedido, os padrões criados e apagados desde o último vão ao servidor
+(`_sincronizar_padroes`). Sem servidor (os testes, as ferramentas), lê-se aqui mesmo.
 """
 
 from __future__ import annotations
@@ -41,6 +48,7 @@ from abbychess import edicao as ed
 from abbychess import historico as hs
 from abbychess import pagina as pg
 from abbychess import procedencia
+from abbychess import servidor_de_leitura as sl
 from abbychess import texto as tx
 from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL, precisa_revisao
@@ -81,6 +89,9 @@ class ExecutorSincrono:
     def so_leves(self) -> bool:
         return True                         # nada fica rodando: tudo pode na hora
 
+    def na_interface(self, funcao) -> None:
+        funcao()                            # não há outra thread de interface
+
     def __call__(self, titulo: str, preparar, falhou=None, progresso=None, leve=False) -> None:
         par = preparar()
         if par is None:
@@ -106,6 +117,10 @@ class ControladorDePagina:
         self.projeto = None
         self.fonte = None
         self.leitor = None
+        #: O servidor de leitura do projeto (§11), ou None: lê-se na interface.
+        self.servidor: Optional[sl.ServidorDeLeitura] = None
+        #: Os padrões que o servidor já tem (os deltas vão a partir deles).
+        self._enviados: frozenset = frozenset()
         self.indice = 0
         self.imagem = None
         self.matriz: Optional[np.ndarray] = None
@@ -131,6 +146,7 @@ class ControladorDePagina:
         self.geracao = 0
         #: O glifo em revisão foi escolhido pelo usuário (e não posto pela fila).
         self.escolhido = False
+        self.eventos.ligar("padroes_mudaram", self._sincronizar_padroes)
 
     # ------------------------------------------------------------------
     # O que a janela lê
@@ -255,15 +271,25 @@ class ControladorDePagina:
         return frozenset(v.gid for v in self.modelo.decisoes.virtuais)
 
     def padroes(self) -> frozenset:
-        if self.leitor is None:
+        return self.padroes_de(self.leitor)
+
+    @staticmethod
+    def padroes_de(leitor) -> frozenset:
+        if leitor is None:
             return frozenset()
-        return frozenset(c for v in self.leitor.padroes_por_caractere().values() for c in v)
+        return frozenset(c for v in leitor.padroes_por_caractere().values() for c in v)
 
     # ------------------------------------------------------------------
     # Projeto e páginas
     # ------------------------------------------------------------------
-    def ligar(self, projeto, fonte, leitor) -> None:
-        """O projeto aberto, a fonte das páginas e o leitor (os modelos já carregados)."""
+    def ligar(self, projeto, fonte, leitor, servidor: Optional[sl.ServidorDeLeitura] = None
+              ) -> None:
+        """O projeto aberto, a fonte das páginas e o leitor (os modelos já carregados; ou,
+        com o `servidor`, só os padrões do livro). O servidor do projeto anterior fecha."""
+        if self.servidor is not None and self.servidor is not servidor:
+            self.servidor.fechar()
+        self.servidor = servidor
+        self._enviados = self.padroes_de(leitor) if servidor is not None else frozenset()
         self.geracao += 1
         self.lote_rodando = False               # o lote do projeto anterior não vale aqui
         self.projeto, self.fonte, self.leitor = projeto, fonte, leitor
@@ -299,6 +325,7 @@ class ControladorDePagina:
         self.eventos.emitir("glifos_mudaram", None)
         if self.boxes:
             self.ir_ao_primeiro_pendente()
+            self._ler_os_aguardando(self.modelo, indice, None)
             if not self.reconhecida:
                 self._avisar(f"Página com {len(self.boxes)} glifo(s) marcados à mão e ainda não "
                              "reconhecida. O F5 reconhece o resto e mantém os quadros.", 10000)
@@ -559,22 +586,21 @@ class ControladorDePagina:
         imagem, leitor, zonas = self.imagem, self.leitor, list(pagina.zonas)
         antes = self._instantaneo()
         marcados = pg.a_manter_na_releitura(pagina.boxes, pagina.estado in LIDAS)   # §4.6
+        servidor = self._servidor_para_pedir()
 
         def trabalho(progresso):
-            segmentada = zn.segmentar(imagem, zonas, leitor)
-            if marcados:
-                segmentada.boxes = pg.manter_marcados(segmentada.boxes, marcados)
-            pg.ler_boxes(imagem, segmentada.boxes, leitor, progresso=progresso)
-            lidos = dg.ler_diagramas(imagem, segmentada.tabuleiros, escala=segmentada.escala,
-                                     classificar=leitor.arbitro, boxes=segmentada.boxes)
-            return segmentada, lidos
+            if servidor is None:
+                return sl.ler_pagina(imagem, zonas, marcados, leitor, progresso=progresso)
+            lida = servidor.chamar("ler_pagina", (imagem, zonas, marcados))
+            _registrar_procedencia(lida.boxes, lida.amostras)
+            return lida
 
-        def pronto(resultado):
-            segmentada, lidos = resultado
-            novos, dif = reconciliar(pagina.boxes, segmentada.boxes, pagina.alocar,
+        def pronto(lida: sl.PaginaLida):
+            lidos = lida.diagramas
+            novos, dif = reconciliar(pagina.boxes, lida.boxes, pagina.alocar,
                                      procedencia.amostra_de)
             pagina.aplicar(dif, novos)
-            pagina.tabuleiros = [tuple(int(v) for v in t) for t in segmentada.tabuleiros]
+            pagina.tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
             # A conferência de antes vale mais que a releitura do mesmo tabuleiro.
             pagina.diagramas = dg.mesclar(lidos, dg.para_caixas(pagina.tabuleiros,
                                                                 pagina.diagramas))
@@ -614,12 +640,21 @@ class ControladorDePagina:
             lidos = ed.copias_para_ler(antes, lambda e: precisa_revisao(
                 e.char, e.source, e.confidence, limiares))
 
-        def trabalho(progresso):
-            return pg.ler_boxes(imagem, lidos, leitor, so_pendentes=not tudo, progresso=progresso)
+        servidor = self._servidor_para_pedir()
 
-        def pronto(resumo):
+        def trabalho(progresso):
+            if servidor is None:
+                resumo = pg.ler_boxes(imagem, lidos, leitor, so_pendentes=not tudo,
+                                      progresso=progresso)
+                return lidos, resumo
+            relidos, amostras, resumo = servidor.chamar("reler_boxes", (imagem, lidos, not tudo))
+            _registrar_procedencia(relidos, amostras)
+            return relidos, resumo
+
+        def pronto(resultado):
+            relidos, resumo = resultado
             foto = pagina.instantaneo()
-            dif = ed.aplicar_leituras(pagina, antes, lidos)
+            dif = ed.aplicar_leituras(pagina, antes, relidos)
             if not dif.vazia:
                 if transacao is not None:
                     self._emendar(transacao, foto, pagina)
@@ -759,6 +794,76 @@ class ControladorDePagina:
             return trabalho, pronto
 
         self.tarefa("Propagando o padrão", preparar, falhou=self._falhou("Propagar"), leve=True)
+
+    def _ler_os_aguardando(self, pagina: Pagina, indice: int,
+                           transacao: Optional[hs.Transacao]) -> None:
+        """§11: os glifos que a interface não leu (o leitor dela só tem os padrões do livro)
+        vão ao servidor, só os recortes; a resposta entra nos que não mudaram desde o pedido
+        e emenda a `transacao` da edição que os criou (sem ela, é uma transação própria)."""
+        if self.servidor is None or not any(pg.aguardando(b.entry) for b in pagina.boxes):
+            return
+
+        def preparar():
+            desfeita = transacao is not None and transacao.invalidada
+            if desfeita or pagina is not self.modelo or indice != self.indice:
+                return None                 # desfeita, ou a página saiu: lida ao voltar
+            servidor = self._servidor_para_pedir()
+            if servidor is None:
+                return None
+            antes = tuple(pagina.boxes)
+            indices = [i for i, b in enumerate(antes) if pg.aguardando(b.entry)]
+            if not indices:
+                return None
+            entradas = [b.entry for b in antes]
+            recortes = pg.recortes_para_ler(self.imagem, entradas, indices)
+
+            def trabalho(_progresso):
+                return servidor.chamar("ler_recortes", recortes)
+
+            def pronto(leituras):
+                if transacao is not None and transacao.invalidada:
+                    return
+                lidos = list(entradas)
+                for i, leitura in zip(indices, leituras):
+                    lidos[i] = ed.copia(entradas[i])
+                    pg.por_leitura(lidos[i], leitura)
+                foto = pagina.instantaneo()
+                dif = ed.aplicar_leituras(pagina, antes, lidos)
+                if dif.vazia:
+                    return
+                if transacao is not None:
+                    self._emendar(transacao, foto, pagina)
+                else:
+                    self.historico.registrar(hs.Transacao(
+                        "Ler os glifos aguardando",
+                        {pagina.pid: hs.mudanca(foto, pagina.instantaneo())}))
+                self._gravar(pagina)
+                if pagina is self.modelo:
+                    self.eventos.emitir("glifos_mudaram", dif.mudados)
+                    if self.atual is None:
+                        self.ir_ao_primeiro_pendente()
+                self.eventos.emitir("acoes_mudaram")
+            return trabalho, pronto
+
+        self.tarefa("Lendo os glifos", preparar, falhou=self._falhou("Ler os glifos"), leve=True)
+
+    def _servidor_para_pedir(self) -> Optional[sl.ServidorDeLeitura]:
+        """O servidor, com os padrões de agora já mandados (os deltas valem a partir do
+        pedido seguinte, §11); None sem servidor."""
+        self._sincronizar_padroes()
+        return self.servidor
+
+    def _sincronizar_padroes(self) -> None:
+        """Manda ao servidor as amostras criadas e apagadas desde a última vez."""
+        if self.servidor is None or self.leitor is None:
+            return
+        agora = self.padroes()
+        criados, apagados = agora - self._enviados, self._enviados - agora
+        if criados or apagados:
+            altura = self.leitor.padroes.altura_de
+            self.servidor.enviar_padroes([(c, altura(c)) for c in sorted(criados)],
+                                         sorted(apagados))
+            self._enviados = agora
 
     def _emendar(self, transacao: hs.Transacao, antes: Pagina, pagina: Pagina) -> None:
         mais = hs.mudanca(antes, pagina.instantaneo())
@@ -1081,6 +1186,8 @@ class ControladorDePagina:
                                         "resumo do livro (livro.json) não; ele é refeito na "
                                         f"próxima gravação de página:\n{erro}")
         self.leitor.trocar_limiares(limiares)
+        if self.servidor is not None:
+            self.servidor.trocar_limiares(limiares)
         self.eventos.emitir("glifos_mudaram", None)
         if self.boxes:
             self.ir_ao_primeiro_pendente()
@@ -1172,6 +1279,7 @@ class ControladorDePagina:
             descricao, {pagina.pid: hs.mudanca(antes.pagina, pagina.instantaneo())},
             amostras_criadas=criados, juntar=juntar))
         self._gravar(pagina)
+        self._ler_os_aguardando(pagina, indice, transacao)
         if pagina is self.modelo:
             m = transacao.paginas.get(pagina.pid)
             # Só a leitura de alguns glifos mudou (a lista e as caixas, não): a janela
@@ -1187,3 +1295,10 @@ class ControladorDePagina:
         if not self.projeto.agendar(pagina):
             self._avisar("Projeto aberto só para leitura: nada é gravado.", 6000)
 
+
+def _registrar_procedencia(boxes, amostras) -> None:
+    """A procedência das leituras que voltaram do servidor (o registro é por objeto e não
+    atravessa a fila, §4.1)."""
+    for box, amostra in zip(boxes, amostras):
+        if amostra is not None:
+            procedencia.registrar(box, amostra)

@@ -165,6 +165,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
                              ("atual_resolvido", self._atual_resolvido),
                              ("recusa", self._recusa),
                              ("projeto_aberto", self._projeto_aberto),
+                             ("modelos_prontos", self._modelos_prontos),
+                             ("servidor_caiu", self._servidor_caiu),
                              ("acoes_mudaram", self._acoes_mudaram),
                              ("lote_mudou", self._acoes_mudaram),
                              ("lote_mudou", self._lote_na_barra),
@@ -232,7 +234,21 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
     def _projeto_aberto(self, leitor) -> None:
         self._padroes_mudaram()
         self._espaco_do_projeto_aberto()
-        dialogos.avisos_da_abertura(self, self.projeto, leitor)
+        dialogos.avisos_da_abertura(self, self.projeto)
+
+    def _modelos_prontos(self, estado: dict) -> None:
+        leitor = self.leitor
+        dialogos.avisos_dos_modelos(self, estado, leitor.arquivos_de_padrao() if leitor else 0)
+
+    def _servidor_caiu(self, texto: str, desistiu: bool) -> None:
+        """§11: a primeira queda do servidor de leitura (reaberto sozinho) vai para os Avisos;
+        na segunda ele desistiu, e a janela oferece reabrir o projeto."""
+        self.registrar_aviso(av.ERRO if desistiu else av.AVISO, "Servidor de leitura", texto)
+        if desistiu and self.projeto is not None and dialogos.confirmar(
+                self, "Servidor de leitura", texto + "\n\nReabrir o projeto agora?"):
+            pasta = self.projeto.pasta
+            if self._fechar_projeto():
+                self.abrir_caminho(str(pasta))
 
     def _parar_tarefas(self) -> None:
         """Cancela o lote, tira da fila o que não começou e espera a tarefa em andamento

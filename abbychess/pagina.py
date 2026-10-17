@@ -15,7 +15,7 @@ import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 from PIL import Image
@@ -27,7 +27,7 @@ from core.services.box_service import BoxService
 from abbychess import gravacao as gv
 from abbychess import procedencia
 
-from abbychess.leitor import (FONTE_MANUAL, LeitorDoLivro, nome_de_origem,
+from abbychess.leitor import (FONTE_AGUARDANDO, FONTE_MANUAL, LeitorDoLivro, nome_de_origem,
                               precisa_revisao)
 from abbychess.projeto import EXTENSOES_DE_IMAGEM, ProjetoDeLivro
 
@@ -401,9 +401,28 @@ def ler_boxes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorDoLivro,
 
 def _ler_um(pagina: np.ndarray, box: BoxEntry, leitor: LeitorDoLivro,
             referencia: Optional[float]) -> None:
-    leitura = leitor.ler(vertical.recorte_de_pe(pagina, box), altura_de_referencia=referencia)
+    por_leitura(box, leitor.ler(vertical.recorte_de_pe(pagina, box),
+                                altura_de_referencia=referencia))
+
+
+def por_leitura(box: BoxEntry, leitura) -> None:
+    """Põe a leitura (`leitor.Leitura`) no box e registra de que amostra ela veio."""
     box.char, box.source, box.confidence = leitura.char, leitura.fonte, leitura.confianca
     procedencia.registrar(box, leitura.amostra)
+
+
+def aguardando(box: BoxEntry) -> bool:
+    """O box ainda não lido (§11): a interface não o leu e espera o servidor."""
+    return not box.char and box.source == FONTE_AGUARDANDO
+
+
+def recortes_para_ler(imagem: Image.Image, boxes: List[BoxEntry], indices: Sequence[int]
+                      ) -> List[Tuple[np.ndarray, Optional[float]]]:
+    """Os recortes em pé dos boxes `indices`, com a altura de referência da página: o pedido
+    de leitura de glifos ao servidor (§11), sem mandar a página inteira pela fila."""
+    pagina = np.asarray(imagem.convert("L"))
+    referencia = proporcao.altura_de_referencia(boxes) if boxes else None
+    return [(vertical.recorte_de_pe(pagina, boxes[i]), referencia) for i in indices]
 
 
 def _reler(imagem: Image.Image, boxes: List[BoxEntry], indices: List[int],

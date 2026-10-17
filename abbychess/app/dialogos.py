@@ -110,11 +110,8 @@ def localizar_fonte(janela, projeto: ProjetoDeLivro) -> bool:
             QMessageBox.warning(janela, "Abrir projeto", str(erro))
 
 
-def avisos_da_abertura(janela, projeto: ProjetoDeLivro, leitor) -> None:
-    """O que a abertura achou e o usuário precisa saber: rede ausente, migração, fonte movida."""
-    if leitor.rede is None:
-        QMessageBox.warning(janela, "Modelo", "A rede de glifos do PyBoxEditor não "
-                            "carregou. A leitura usa só os padrões e a base global.")
+def avisos_da_abertura(janela, projeto: ProjetoDeLivro) -> None:
+    """O que a abertura achou e o usuário precisa saber: migração, fonte movida."""
     if projeto.migrado:
         QMessageBox.information(
             janela, "Abrir projeto",
@@ -127,9 +124,17 @@ def avisos_da_abertura(janela, projeto: ProjetoDeLivro, leitor) -> None:
             f"gravado e foi achada (o mesmo arquivo, pelo conteúdo) em:\n{projeto.fonte}"
             + ("\n\nComo o projeto é só para leitura, isso vale nesta sessão, e a "
                "busca se repete a cada abertura." if projeto.somente_leitura else ""))
+
+
+def avisos_dos_modelos(janela, estado: dict, padroes: int) -> None:
+    """Os modelos globais carregaram (no servidor de leitura, §11, ou aqui): a rede ausente
+    e o resumo na barra."""
+    if not estado.get("rede"):
+        QMessageBox.warning(janela, "Modelo", "A rede de glifos do PyBoxEditor não "
+                            "carregou. A leitura usa só os padrões e a base global.")
     janela.statusBar().showMessage(
-        f"Projeto aberto. Base global com {leitor.base.total if leitor.base else 0} "
-        f"referências; {leitor.arquivos_de_padrao()} padrões deste livro.", 8000)
+        f"Modelos prontos. Base global com {estado.get('base', 0)} referências; "
+        f"{padroes} padrões deste livro.", 8000)
 
 
 def intervalo_do_lote(janela, projeto, total: int) -> Optional[Tuple[List[int], bool]]:

@@ -21,6 +21,7 @@ def _texto(jb):  # noqa: F811
 
 def _substituir_por(jb, texto):  # noqa: F811
     b = jb.barra_de_busca
+    jb._limpar_previa()                                  # a do teste anterior
     jb.substituir()
     b.substituto.setText(texto)
 
@@ -53,14 +54,14 @@ def test_todas_no_livro_so_aplica_pela_previa(jb):  # noqa: F811
     _buscar(jb, "casa")
     _substituir_por(jb, "lata")
     jb.substituir_todas()
-    lista = jb.resultados.resultados
     _ate(lambda: jb.resultados.na_previa)
     assert _texto(jb) == "casa velha casa"               # nada sem a prévia (CA-7.5)
-    marcados = [lista.item(n) for n in range(lista.count())
-                if lista.item(n).checkState() == Qt.CheckState.Checked]
-    assert len(marcados) == 2 and "Aplicar 2" in jb.resultados.botao_aplicar.text()
-    marcados[1].setCheckState(Qt.CheckState.Unchecked)   # desmarcar um caso
-    QTest.keyClick(lista, Qt.Key.Key_Return)              # Enter aplica
+    modelo, vista = jb.resultados.modelo_da_previa, jb.resultados.previa
+    assert modelo.rowCount() == 2 and "Aplicar 2" in jb.resultados.botao_aplicar.text()
+    vista.setCurrentIndex(modelo.index(1))
+    QTest.keyClick(vista, Qt.Key.Key_Space)               # desmarcar um caso
+    assert "Aplicar 1" in jb.resultados.botao_aplicar.text()
+    QTest.keyClick(vista, Qt.Key.Key_Return)              # Enter aplica
     _ate(lambda: _texto(jb) == "lata velha casa")
     jb.desfazer()
     _ate(lambda: _texto(jb) == "casa velha casa")
@@ -82,7 +83,77 @@ def test_o_caso_sem_traducao_vem_desabilitado_na_previa(jb):  # noqa: F811
     _substituir_por(jb, "rn")
     jb.substituir_todas()
     _ate(lambda: jb.resultados.na_previa)
-    lista = jb.resultados.resultados
-    item = lista.item(1)
-    assert not item.flags() & Qt.ItemFlag.ItemIsEnabled and "dividir" in item.toolTip()
+    modelo = jb.resultados.modelo_da_previa
+    indice = modelo.index(0)
+    assert not modelo.flags(indice) & Qt.ItemFlag.ItemIsEnabled
+    assert "dividir" in modelo.data(indice, Qt.ItemDataRole.ToolTipRole)
     assert not jb.resultados.botao_aplicar.isEnabled()
+
+
+# ----------------------------------------------------------------------
+# As revisões do passo D2
+# ----------------------------------------------------------------------
+
+def test_a_previa_mostra_e_aplica_todos_os_casos_mesmo_alem_de_2000(jb):  # noqa: F811
+    from abbychess.app import painel_resultados as pr
+
+    linhas = [" ".join(["a"] * 75) for _ in range(30)]   # 2.250 casos
+    _pagina_lida(jb, *linhas)
+    _buscar(jb, "a")
+    _substituir_por(jb, "o")
+    jb.substituir_todas()
+    _ate(lambda: jb.resultados.na_previa, 30)
+    assert jb.resultados.modelo_da_previa.rowCount() == 2250 > pr.LIMITE_DE_LINHAS
+    assert "Aplicar 2250" in jb.resultados.botao_aplicar.text()
+    QTest.keyClick(jb.resultados.previa, Qt.Key.Key_Return)
+    _ate(lambda: "a" not in _texto(jb), 30)
+    jb.desfazer()                                         # um Ctrl+Z volta todos
+    _ate(lambda: "o" not in _texto(jb), 30)
+
+
+def test_shift_enter_e_o_duplo_clique_vao_ao_caso(jb, monkeypatch):  # noqa: F811
+    _pagina_lida(jb, "casa velha casa")
+    _buscar(jb, "casa")
+    _substituir_por(jb, "lata")
+    jb.substituir_todas()
+    _ate(lambda: jb.resultados.na_previa)
+    idas, gids = [], []
+    monkeypatch.setattr(jb, "_ir_a_pagina_ja_montada", idas.append)
+    monkeypatch.setattr(jb.texto, "ir_ao_gid", gids.append)
+    modelo, vista = jb.resultados.modelo_da_previa, jb.resultados.previa
+    vista.setCurrentIndex(modelo.index(1))
+    QTest.keyClick(vista, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    caso = modelo.caso(1)
+    assert idas == [caso.pagina] and gids == [caso.gids[0]]
+    assert _texto(jb) == "casa velha casa"                # foi, sem aplicar
+    vista.doubleClicked.emit(modelo.index(0))
+    assert gids[-1] == modelo.caso(0).gids[0]
+
+
+def test_substituir_pula_o_que_ja_esta_como_o_substituto(jb):  # noqa: F811
+    _pagina_lida(jb, "casa velha")
+    _buscar(jb, "casa")
+    _substituir_por(jb, "Casa")
+    jb.substituir_atual()
+    _ate(lambda: jb._posicao == 0)
+    jb.substituir_atual()
+    _ate(lambda: _texto(jb) == "Casa velha")
+    _ate(lambda: not jb.busca.buscando and not jb.barra_de_busca.relogio.isActive())
+    jb.substituir_atual()                                 # "Casa" já é o substituto
+    assert "erro" not in jb.barra_de_busca.contador.text()
+    assert "Nada mais a substituir" in jb.statusBar().currentMessage()
+
+
+def test_outra_substituicao_tira_a_previa_velha(jb):  # noqa: F811
+    from abbychess import busca as bs
+
+    _pagina_lida(jb, "casa velha casa")
+    _buscar(jb, "casa")
+    _substituir_por(jb, "casas")
+    jb.substituir_todas()
+    _ate(lambda: jb.resultados.na_previa)
+    jb.barra_de_busca.escolher_escopo(bs.PAGINA)
+    jb.substituir_todas()                                 # Todas na página, por fora
+    _ate(lambda: _texto(jb) == "casas velha casas")
+    _ate(lambda: not jb.resultados.na_previa)
+    assert "A prévia saiu" in jb.resultados.resultados.item(0).text()

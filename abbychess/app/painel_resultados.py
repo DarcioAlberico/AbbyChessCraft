@@ -2,10 +2,11 @@
 
 Resultados mostra o que a busca (passo B) manda para ele: uma linha por ocorrência, com a
 página, a linha e o trecho, o casamento em negrito (Enter ou duplo clique leva até ele), ou
-os glifos da busca por glifo. A prévia da substituição (passo D2) põe uma caixa de marcar em
-cada caso (antes → depois, prosa ou notação; os que ainda não têm tradução, desmarcados e
-desabilitados, com o motivo na dica) e o botão "Aplicar N" (Enter); o duplo clique leva ao
-caso. Avisos mostra o log persistente do projeto
+os glifos da busca por glifo. A prévia da substituição (passo D2) mostra todos os casos,
+cada um com a caixa de marcar (antes → depois, prosa ou notação; os que ainda não têm
+tradução, desmarcados e desabilitados, com o motivo na dica): Espaço marca ou desmarca os
+selecionados (Shift e Ctrl+A selecionam vários), Enter ou "Aplicar N" aplica os marcados, e
+Shift+Enter ou o duplo clique leva ao caso. Avisos mostra o log persistente do projeto
 (`abbychess.avisos`): os erros em vermelhão, os avisos em laranja, o mais novo embaixo. Esc
 fecha o painel (`fechar_sobreposicao`).
 """
@@ -15,11 +16,12 @@ from __future__ import annotations
 import html
 from typing import Iterable, Sequence
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QAbstractListModel, QModelIndex, QSize, Qt, Signal
 from PySide6.QtGui import QAbstractTextDocumentLayout, QPalette, QTextDocument
-from PySide6.QtWidgets import (QApplication, QListWidget, QListWidgetItem, QMenu,
-                               QPushButton, QStyle, QStyledItemDelegate, QStyleOptionViewItem,
-                               QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QApplication, QLabel, QListView,
+                               QListWidget, QListWidgetItem, QMenu, QPushButton, QStyle,
+                               QStyledItemDelegate, QStyleOptionViewItem, QTabWidget,
+                               QVBoxLayout, QWidget)
 
 from abbychess import avisos as av
 from abbychess.app import estilo
@@ -80,23 +82,28 @@ class PainelDeResultados(QTabWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.resultados = _ListaDeResultados(self)
+        self.resultados = QListWidget()
         self.resultados.setAccessibleName("Resultados")
         self.resultados.setItemDelegate(_DelegadoHtml(self.resultados))
         self.resultados.setUniformItemSizes(True)   # 2.000 linhas sem medir cada uma
         self.resultados.itemActivated.connect(self._ativado)
-        self.resultados.itemChanged.connect(self._marcado)
+        # A prévia da substituição: todos os casos (um modelo, sem limite de linhas).
+        self.cabecalho_da_previa = QLabel()
+        self.cabecalho_da_previa.setWordWrap(True)
         self.botao_aplicar = QPushButton("Aplicar")
         self.botao_aplicar.setAccessibleName("Aplicar a substituição dos casos marcados")
         self.botao_aplicar.clicked.connect(self._aplicar)
-        self.botao_aplicar.hide()
-        self._na_previa = False
+        self.modelo_da_previa = ModeloDaPrevia(self)
+        self.modelo_da_previa.marcas_mudaram.connect(self._marcado)
+        self.previa = _VistaDaPrevia(self)
+        self.previa.setModel(self.modelo_da_previa)
         aba = QWidget()
         caixa = QVBoxLayout(aba)
         caixa.setContentsMargins(0, 0, 0, 0)
         caixa.setSpacing(2)
-        caixa.addWidget(self.botao_aplicar)
-        caixa.addWidget(self.resultados)
+        for w in (self.cabecalho_da_previa, self.botao_aplicar, self.previa, self.resultados):
+            caixa.addWidget(w)
+        self._mostrar_a_previa(False)
         self.avisos = QListWidget()
         self.avisos.setAccessibleName("Avisos e erros do projeto")
         self.avisos.setWordWrap(True)
@@ -141,63 +148,43 @@ class PainelDeResultados(QTabWidget):
         if alvo is not None:
             self.escolhido.emit(alvo)
 
+    def _mostrar_a_previa(self, sim: bool) -> None:
+        for w in (self.cabecalho_da_previa, self.botao_aplicar, self.previa):
+            w.setVisible(sim)
+        self.resultados.setVisible(not sim)
+
     def _limpar(self) -> None:
-        self._na_previa = False
-        self.botao_aplicar.hide()
+        self.modelo_da_previa.mostrar([])
+        self._mostrar_a_previa(False)
         self.resultados.clear()
 
-    def mostrar_previa(self, previas: Sequence, cabecalho: str) -> None:
-        """A prévia da substituição: um caso por linha, marcado (os sem tradução,
-        desmarcados e desabilitados), e o botão "Aplicar N"."""
-        from abbychess import busca as bs
+    def limpar_previa(self, aviso: str = "") -> None:
+        """A prévia sai (outra substituição mudou as páginas); `aviso` fica em Resultados."""
+        if self.na_previa:
+            self._limpar()
+            if aviso:
+                self.resultados.addItem(aviso)
 
-        self._limpar()
-        self.resultados.blockSignals(True)
-        self.resultados.addItem(cabecalho)
-        linhas = 0
-        for previa in previas:
-            for caso in previa.casos:
-                if linhas == LIMITE_DE_LINHAS:
-                    break
-                linhas += 1
-                onde = "notação" if caso.etiqueta == bs.NOTACAO else "prosa"
-                item = QListWidgetItem(f"p. {caso.pagina + 1}, l. {caso.linha} · {onde}: "
-                                       f"{caso.antes} → {caso.depois}")
-                item.setData(PAPEL_DO_ALVO, caso)
-                if caso.aplicavel:
-                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-                    item.setCheckState(Qt.CheckState.Checked)
-                else:
-                    item.setFlags((item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-                                  & ~Qt.ItemFlag.ItemIsEnabled)
-                    item.setCheckState(Qt.CheckState.Unchecked)
-                    item.setToolTip(f"Sem tradução ainda: {caso.motivo}")
-                self.resultados.addItem(item)
-        total = sum(len(p.casos) for p in previas)
-        if total > linhas:
-            self.resultados.addItem(f"… e mais {total - linhas} (refine a busca; só os "
-                                    "mostrados são aplicados)")
-        self.resultados.blockSignals(False)
-        self._na_previa = True
-        self.botao_aplicar.show()
+    def mostrar_previa(self, previas: Sequence, cabecalho: str) -> None:
+        """A prévia da substituição: todos os casos, um por linha, marcados (os sem
+        tradução, desmarcados e desabilitados), e o botão "Aplicar N"."""
+        self.resultados.clear()
+        self.cabecalho_da_previa.setText(cabecalho)
+        self.modelo_da_previa.mostrar([c for p in previas for c in p.casos])
+        self._mostrar_a_previa(True)
         self._marcado()
         self.setCurrentWidget(self.aba_de_resultados)
 
     def casos_marcados(self) -> dict:
-        """Página -> os casos marcados na prévia."""
+        """Página -> os casos marcados na prévia (todos, também os fora da tela)."""
         marcados: dict = {}
-        if not self._na_previa:
-            return marcados
-        for n in range(self.resultados.count()):
-            item = self.resultados.item(n)
-            caso = item.data(PAPEL_DO_ALVO)
-            if caso is not None and item.checkState() == Qt.CheckState.Checked:
-                marcados.setdefault(caso.pagina, []).append(caso)
+        for caso in self.modelo_da_previa.marcados():
+            marcados.setdefault(caso.pagina, []).append(caso)
         return marcados
 
     def _marcado(self, *_):
-        if self._na_previa:
-            n = sum(len(c) for c in self.casos_marcados().values())
+        if self.na_previa:
+            n = self.modelo_da_previa.quantos_marcados()
             self.botao_aplicar.setText(f"Aplicar {n} (Enter)")
             self.botao_aplicar.setEnabled(n > 0)
 
@@ -207,9 +194,14 @@ class PainelDeResultados(QTabWidget):
             self._limpar()
             self.aplicar_previa.emit(marcados)
 
+    def _ir_ao_caso(self, indice: QModelIndex) -> None:
+        caso = self.modelo_da_previa.caso(indice.row()) if indice.isValid() else None
+        if caso is not None:
+            self.escolhido.emit(caso)
+
     @property
     def na_previa(self) -> bool:
-        return self._na_previa
+        return self.modelo_da_previa.rowCount() > 0 and not self.previa.isHidden()
 
     def mostrar_ocorrencias(self, ocorrencias: Sequence, cabecalho: str) -> None:
         """As ocorrências da busca, uma por linha: "p. 12, l. 3: …trecho…", o casamento em
@@ -262,21 +254,117 @@ class PainelDeResultados(QTabWidget):
         self.setCurrentWidget(self.avisos)
 
     def focar(self) -> None:
-        alvo = self.resultados if self.currentWidget() is self.aba_de_resultados else self.avisos
+        if self.currentWidget() is not self.aba_de_resultados:
+            alvo = self.avisos
+        else:
+            alvo = self.previa if self.na_previa else self.resultados
         alvo.setFocus(Qt.FocusReason.ShortcutFocusReason)
 
 
-class _ListaDeResultados(QListWidget):
-    """A lista de Resultados: na prévia da substituição, Enter aplica (§7.2), e o duplo
-    clique continua levando ao caso."""
+class ModeloDaPrevia(QAbstractListModel):
+    """Os casos da prévia e a marca de cada um (sem um item Qt por caso: 28 mil casos
+    mostram na hora)."""
+
+    marcas_mudaram = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._casos: list = []
+        self._marcas = bytearray()
+
+    def mostrar(self, casos) -> None:
+        self.beginResetModel()
+        self._casos = list(casos)
+        self._marcas = bytearray(1 if c.aplicavel else 0 for c in self._casos)
+        self.endResetModel()
+
+    def caso(self, linha: int):
+        return self._casos[linha] if 0 <= linha < len(self._casos) else None
+
+    def marcados(self):
+        return [c for c, m in zip(self._casos, self._marcas) if m]
+
+    def quantos_marcados(self) -> int:
+        return sum(self._marcas)
+
+    def rowCount(self, parent=QModelIndex()) -> int:
+        return 0 if parent.isValid() else len(self._casos)
+
+    def data(self, indice, papel=Qt.ItemDataRole.DisplayRole):
+        from abbychess import busca as bs
+
+        caso = self.caso(indice.row())
+        if caso is None:
+            return None
+        if papel == Qt.ItemDataRole.DisplayRole:
+            onde = "notação" if caso.etiqueta == bs.NOTACAO else "prosa"
+            return (f"p. {caso.pagina + 1}, l. {caso.linha} · {onde}: "
+                    f"{caso.antes} → {caso.depois}")
+        if papel == Qt.ItemDataRole.CheckStateRole:
+            return (Qt.CheckState.Checked if self._marcas[indice.row()]
+                    else Qt.CheckState.Unchecked)
+        if papel == Qt.ItemDataRole.ToolTipRole and not caso.aplicavel:
+            return f"Sem tradução ainda: {caso.motivo}"
+        if papel == PAPEL_DO_ALVO:
+            return caso
+        return None
+
+    def flags(self, indice):
+        caso = self.caso(indice.row())
+        if caso is None:
+            return Qt.ItemFlag.NoItemFlags
+        if not caso.aplicavel:
+            return Qt.ItemFlag.ItemIsSelectable    # à vista, sem marcar
+        return (Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+                | Qt.ItemFlag.ItemIsUserCheckable)
+
+    def setData(self, indice, valor, papel=Qt.ItemDataRole.EditRole) -> bool:
+        if papel != Qt.ItemDataRole.CheckStateRole:
+            return False
+        marcado = Qt.CheckState(valor) == Qt.CheckState.Checked
+        return self.marcar([indice.row()], marcado)
+
+    def marcar(self, linhas, marcado: bool) -> bool:
+        mudou = False
+        for linha in linhas:
+            caso = self.caso(linha)
+            if caso is not None and caso.aplicavel and bool(self._marcas[linha]) != marcado:
+                self._marcas[linha] = 1 if marcado else 0
+                mudou = True
+        if mudou:
+            linhas = sorted(linhas)
+            self.dataChanged.emit(self.index(linhas[0]), self.index(linhas[-1]),
+                                  [Qt.ItemDataRole.CheckStateRole])
+            self.marcas_mudaram.emit()
+        return mudou
+
+
+class _VistaDaPrevia(QListView):
+    """A lista da prévia: Espaço marca ou desmarca os selecionados, Enter aplica, Shift+Enter
+    (e o duplo clique) leva ao caso."""
 
     def __init__(self, painel: "PainelDeResultados"):
         super().__init__()
         self._painel = painel
+        self.setAccessibleName("Prévia da substituição")
+        self.setUniformItemSizes(True)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.doubleClicked.connect(painel._ir_ao_caso)
 
     def keyPressEvent(self, evento):
-        if (evento.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and self._painel.na_previa
-                and self._painel.botao_aplicar.isEnabled()):
-            self._painel._aplicar()
+        tecla, mods = evento.key(), evento.modifiers()
+        if tecla in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if mods & Qt.KeyboardModifier.ShiftModifier:
+                self._painel._ir_ao_caso(self.currentIndex())
+            elif self._painel.botao_aplicar.isEnabled():
+                self._painel._aplicar()
+            return
+        if tecla == Qt.Key.Key_Space:
+            linhas = sorted({i.row() for i in self.selectedIndexes()}
+                            or ({self.currentIndex().row()} if self.currentIndex().isValid()
+                                else set()))
+            modelo = self._painel.modelo_da_previa
+            marcados = [modelo._marcas[k] for k in linhas if modelo.caso(k).aplicavel]
+            modelo.marcar(linhas, not all(marcados) if marcados else True)
             return
         super().keyPressEvent(evento)

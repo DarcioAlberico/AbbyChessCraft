@@ -355,6 +355,11 @@ class HistoricoDoProjeto:
     def bytes(self) -> int:
         return self._total
 
+    @property
+    def passos(self) -> int:
+        """Quantas transações o Ctrl+Z ainda alcança."""
+        return len(self._desfazer)
+
     def toca(self, pid: int) -> bool:
         """Alguma transação do desfazer ou do refazer muda a página `pid` (o lote não a
         sobrescreve: o Ctrl+Z dela seria recusado, §11)."""

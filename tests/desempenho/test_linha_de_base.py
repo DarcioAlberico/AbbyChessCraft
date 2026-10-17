@@ -369,3 +369,23 @@ def _maior_no_fim(atrasos, instantes, fim_do_lote) -> dict:
 def test_o_que_ainda_nao_existe(medidas):
     medidas["buscar_regex_no_livro"] = {"estado": "não existe", "alvo_p95_ms": 1000}
     medidas["montar_indice_da_busca"] = {"estado": "não existe", "alvo_p95_ms": 2000}
+
+
+def test_clique_numa_palavra_do_documento(ambiente, medidas):
+    """CA-6.1 [desempenho]: do clique numa palavra do Documento ao destaque dos glifos dela na
+    Imagem e ao glifo no Inspetor (o tratamento do clique, na thread da interface)."""
+    app, janela = ambiente
+    janela.ir_para_pagina(PAGINAS[1])
+    janela.pintar_texto()
+    gids = [g for g in janela.pagina.gids if janela.texto.posicao_do_gid(g) is not None]
+    passo = max(1, len(gids) // 40)
+    alvos = gids[::passo]
+
+    def clicar(i):
+        gid = alvos[i % len(alvos)]
+        janela.texto.glifo_clicado.emit(gid, janela.texto.palavra_de(gid))
+
+    medidas["clique_no_documento"] = {
+        **cronometrar(clicar), "alvo_ms": 50,
+        "como": "o sinal do clique numa palavra do Documento (o destaque na Imagem, o glifo no "
+                "Inspetor, o Documento e a Linha seguindo), página 21 reconhecida"}

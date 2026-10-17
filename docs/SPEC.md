@@ -438,6 +438,10 @@ deixa a ordem como estava.
   fora do léxico com ondulado; virtual com pontilhado; aguardando leitura em cinza; manual e
   revisado sem realce.
 - Fonte Segoe UI Symbol por padrão; corpo pelo zoom do painel.
+- *Nota do passo A3*: até o layout do passo F dar a função das áreas e os parágrafos, o
+  Documento mostra uma linha impressa por parágrafo (refluir juntaria título e corpo), as
+  margens pela regra do cabeçalho corrido da exportação, e o glifo que ninguém leu como □
+  com o fundo da baixa confiança.
 
 ### 6.2 Sincronia
 

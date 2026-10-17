@@ -227,6 +227,18 @@ class ControladorDePagina:
         pagina.diagramas = self.diagramas
         return tx.montar(pagina, com_os_nao_lidos=True)
 
+    def gids_de_margem(self) -> frozenset:
+        """Os glifos do cabeçalho e do rodapé corridos da página, pela regra da exportação
+        (`exportar.margens_corridas`: a faixa, o vão e o número da página), até o layout do
+        passo F dar a função às áreas."""
+        if self.modelo is None or self.imagem is None:
+            return frozenset()
+        from abbychess import exportar as ex
+
+        lidos = [b for b in self.modelo.boxes if b.entry.char]
+        indices = ex.margens_corridas({0: ([b.entry for b in lidos], self.imagem.height)})[0]
+        return frozenset(lidos[i].gid for i in indices if i < len(lidos))
+
     def gids_virtuais(self) -> frozenset:
         """Os gids dos glifos virtuais (sem caixa) da página."""
         if self.modelo is None:

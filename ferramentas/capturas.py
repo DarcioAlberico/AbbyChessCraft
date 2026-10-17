@@ -90,7 +90,7 @@ def main() -> int:
         janela = JanelaPrincipal()
         janela.resize(1366, 768)
         janela.show()
-        janela.usar(projeto, pg.FonteDePaginas(projeto.fonte), leitor)
+        janela.usar(projeto, pg.fonte_do_projeto(projeto), leitor)   # endireitada, como abre
         janela.ir_para_pagina(args.indice)
         janela.pagina.reconhecer()
         _esperar(app, janela)

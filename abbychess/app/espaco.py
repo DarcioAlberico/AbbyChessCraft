@@ -231,6 +231,7 @@ class EspacoDeTrabalho:
         em 1920; 558 e 500 em 1366)."""
         largura = self.width()
         self._altura_da_linha()
+        self.texto.definir_corpo_padrao(10 if largura < LARGURA_DA_GAVETA else 11)
         inspetor = TAMANHOS[1920 if largura >= LARGURA_DA_GAVETA else 1366][3]
         paginas = TAMANHOS[1920][0] if self.doca_paginas.isVisible() else 0
         self.resizeDocks([self.doca_inspetor], [inspetor], Qt.Orientation.Horizontal)
@@ -347,10 +348,10 @@ class EspacoDeTrabalho:
     def _documento_clicado(self, gid: int, gids: list) -> None:
         """O clique numa palavra do Documento: os glifos dela destacados na Imagem (CA-6.1) e
         o glifo clicado no Glifo do Inspetor (ação explícita)."""
-        self._palavra_do_documento(gids)
         if self.pagina.indice_de(gid) is not None:
             self.inspetor.mostrar("glifo")
             self.pagina.escolher(gid)            # a Linha e o cursor seguem pelo atual_mudou
+        self._palavra_do_documento(gids)        # depois: o atual_mudou apaga o contorno velho
 
     def _palavra_do_documento(self, gids: list) -> None:
         """O cursor do Documento numa palavra: ela destacada na Imagem e na Linha; com Seguir,

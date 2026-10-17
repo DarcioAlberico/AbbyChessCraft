@@ -105,9 +105,9 @@ def montar(janela) -> None:
     j.acao_seguir.setChecked(True)
     imagem_e_glifo = [j.visor, j.treino]        # o zoom vale também com o foco no treino
     com_o_documento = [*imagem_e_glifo, j.texto]   # e, no Documento, muda o corpo
-    j.acao_ajustar = acao(j, "zoom_pagina", j.zoom_padrao,
-                          texto="Página inteira (no Documento, o corpo padrão)",
+    j.acao_ajustar = acao(j, "zoom_pagina", j.zoom_padrao, texto="Página inteira",
                           widgets=com_o_documento, barra=barra)
+    j.acao_ajustar.setToolTip("Página inteira na Imagem; no Documento, o corpo padrão (Ctrl+0)")
     j.acao_zoom_mais = acao(j, "zoom_mais", j.aproximar, texto="Aproximar",
                             widgets=com_o_documento)
     j.acao_zoom_menos = acao(j, "zoom_menos", j.afastar, texto="Afastar",
@@ -250,6 +250,8 @@ def atualizar(janela) -> None:
     j.acao_diagramas.setEnabled(tem)
     for q in (j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila):
         q.setEnabled(tem)
+    for q in (j.acao_realce, j.acao_margens):     # sem página reconhecida, nada a realçar
+        q.setEnabled(tem and bool(p.boxes))
     desfazer = p.historico.proximo_a_desfazer
     refazer = p.historico.proximo_a_refazer
     j.acao_desfazer.setEnabled(editar and desfazer is not None)

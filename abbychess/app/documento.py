@@ -31,6 +31,8 @@ from PySide6.QtGui import (QColor, QFont, QFontMetrics, QGuiApplication, QImage,
                            QTextDocument, QTextImageFormat)
 from PySide6.QtWidgets import QTextEdit
 
+from core.lado_a_jogar import NAO_REVISADO
+
 from abbychess import grade as gd
 from abbychess import texto as tx
 from abbychess.app import estilo
@@ -43,6 +45,7 @@ CORPO_MINIMO, CORPO_MAXIMO = 7, 28
 #: As funções em cinza pequeno, que Ctrl+Shift+H oculta.
 MARGENS = {"cabecalho", "rodape", "numero_de_pagina"}
 FUNDO_DE_BAIXA_CONFIANCA = QColor(255, 226, 184)
+FUNDO_DO_ATUAL = QColor(190, 220, 255)
 #: A figurina de cada peça no desenho do diagrama.
 FIGURINAS = {"K": "♔", "Q": "♕", "R": "♖", "B": "♗", "N": "♘", "P": "♙",
              "k": "♚", "q": "♛", "r": "♜", "b": "♝", "n": "♞", "p": "♟"}
@@ -123,6 +126,8 @@ class VistaDoDocumento(QTextEdit):
         self._clicando = False                  # o cursor do press: o release avisa
         self._entrada = None                     # o que a última montagem recebeu
         self._formatos: Dict[tuple, QTextCharFormat] = {}   # os do realce, por montagem
+        self._gid_atual: Optional[int] = None
+        self.corpo_padrao = CORPO_PADRAO
         self.cursorPositionChanged.connect(self._cursor_mudou)
 
     # ------------------------------------------------------------------
@@ -130,10 +135,13 @@ class VistaDoDocumento(QTextEdit):
     # ------------------------------------------------------------------
     def montar(self, documento: Optional[tx.Documento], diagramas: Sequence = (),
                estados: Optional[Dict[int, str]] = None, desconhecidos: Iterable[int] = (),
-               virtuais: Iterable[int] = (), matriz: Optional[np.ndarray] = None) -> None:
-        """O documento da página. Sem documento (página não lida), fica vazio."""
+               virtuais: Iterable[int] = (), matriz: Optional[np.ndarray] = None,
+               margens: Iterable[int] = ()) -> None:
+        """O documento da página; sem documento (a página não reconhecida), o aviso.
+        `margens`: os glifos do cabeçalho e do rodapé corridos, em cinza pequeno (a linha
+        toda de margem; Ctrl+Shift+H a oculta), até as áreas terem função (passo F)."""
         self._entrada = (documento, list(diagramas), dict(estados or {}), set(desconhecidos),
-                         set(virtuais), matriz)
+                         set(virtuais), matriz, set(margens))
         lugar = self._lugar()
         rolagem = self.verticalScrollBar().value()
         novo = QTextDocument(self)
@@ -142,6 +150,10 @@ class VistaDoDocumento(QTextEdit):
         self._formatos = {}
         if documento is not None:
             self._preencher(novo, *self._entrada)
+        else:
+            aviso = QTextCharFormat()
+            aviso.setForeground(estilo.CINZA)
+            QTextCursor(novo).insertText("Página não reconhecida: F5 reconhece.", aviso)
         antigo = self.document()
         # O documento padrão do QTextEdit é do controle de texto, que o apaga no setDocument; o
         # nosso anterior (filho da vista) sai aqui, ou cada montagem o deixaria vivo.
@@ -151,6 +163,7 @@ class VistaDoDocumento(QTextEdit):
             self.setDocument(novo)
             self._voltar_ao_lugar(lugar)
             self.verticalScrollBar().setValue(rolagem)
+            self.marcar_atual(self._gid_atual)
         finally:
             self._movendo = False
         if apagar:
@@ -204,7 +217,8 @@ class VistaDoDocumento(QTextEdit):
         if self._entrada is not None:
             self.montar(*self._entrada)
 
-    def _preencher(self, doc, documento, diagramas, estados, desconhecidos, virtuais, matriz):
+    def _preencher(self, doc, documento, diagramas, estados, desconhecidos, virtuais, matriz,
+                   margens=frozenset()):
         normal = tx._normalizador(tx.IMPRESSO)
         self._diagramas = {d.id: d for d in diagramas}
         numero = {d.id: k for k, d in enumerate(sorted(diagramas, key=lambda d: (d.caixa[1], d.caixa[0])),
@@ -223,11 +237,20 @@ class VistaDoDocumento(QTextEdit):
                                    numero.get(bloco.diagrama_id, 0), matriz)
                 continue
             base = self._formato_do_caractere(bloco.funcao)
-            for n_linha, linha in enumerate(bloco.linhas):
-                if n_linha:
+            de_margem = self._formato_do_caractere("cabecalho")
+            escritas = 0
+            for linha in bloco.linhas:
+                gids = [g for p in linha.palavras for g in p.gids]
+                margem = bool(gids) and all(g in margens for g in gids)
+                if margem and not self.mostrar_margens:
+                    for g in gids:                  # a Linha ainda acha a linha dela
+                        self._linha_do_gid[g] = gids
+                    continue
+                if escritas:
                     cursor.insertBlock(self._formato_do_bloco(bloco.funcao, continua=True))
-                self._linha(cursor, linha, documento, base, normal, estados, desconhecidos,
-                            virtuais)
+                escritas += 1
+                self._linha(cursor, linha, documento, de_margem if margem else base, normal,
+                            estados, desconhecidos, virtuais)
 
     def _linha(self, cursor, linha, documento, base, normal, estados, desconhecidos,
                virtuais) -> None:
@@ -277,7 +300,9 @@ class VistaDoDocumento(QTextEdit):
         cursor.insertImage(formato)
         mono = QTextCharFormat()
         mono.setFont(QFont(MONO, max(CORPO_MINIMO, self.corpo - 2)))
-        cursor.insertText(" " + diagrama.linha_de_texto(numero), mono)
+        # No Documento, só o estado de §6.1, embaixo: o "não revisado" é da exportação.
+        linha = diagrama.linha_de_texto(numero).replace(f"; {NAO_REVISADO}", "")
+        cursor.insertText(" " + linha, mono)
         estado = QTextCharFormat()
         estado.setForeground(estilo.CINZA)
         cursor.insertText(f" {estado_do_diagrama(diagrama)}", estado)
@@ -420,6 +445,13 @@ class VistaDoDocumento(QTextEdit):
         self.realce = bool(sim)
         self.remontar()
 
+    def definir_corpo_padrao(self, corpo: int) -> None:
+        """O corpo padrão da janela de agora; o corpo muda junto se o usuário não o mudou."""
+        if self.corpo == self.corpo_padrao and corpo != self.corpo:
+            self.corpo = corpo
+            self.remontar()
+        self.corpo_padrao = corpo
+
     def alternar_margens(self, mostrar: Optional[bool] = None) -> None:
         """Ctrl+Shift+H: mostra ou oculta cabeçalhos, rodapés e números de página (`mostrar`,
         o estado da ação marcável; sem ele, o contrário do de agora)."""
@@ -428,7 +460,7 @@ class VistaDoDocumento(QTextEdit):
 
     def mudar_corpo(self, passo: int) -> None:
         """O zoom do Documento: o corpo do texto (passo 0 volta ao padrão)."""
-        corpo = CORPO_PADRAO if passo == 0 else self.corpo + passo
+        corpo = self.corpo_padrao if passo == 0 else self.corpo + passo
         corpo = max(CORPO_MINIMO, min(CORPO_MAXIMO, corpo))
         if corpo != self.corpo:
             self.corpo = corpo
@@ -469,6 +501,35 @@ class VistaDoDocumento(QTextEdit):
         diagrama = self._diagramas.get(diagrama_id)
         if diagrama is not None and diagrama.lido:
             QGuiApplication.clipboard().setText(diagrama.fen)
+
+    def marcar_atual(self, gid: Optional[int]) -> None:
+        """O glifo atual da fila (§6.2: destacado nos dois), com fundo próprio que vale sem
+        o foco no Documento (o cursor de texto só aparece com ele)."""
+        self._gid_atual = gid
+        posicao = None if gid is None else self.posicao_do_gid(gid)
+        if posicao is None:
+            self.setExtraSelections([])
+            return
+        fim = posicao + 1
+        while fim < posicao + 8 and self._gid_no_caractere(fim) == gid:
+            fim += 1                            # um glifo de mais de um caractere
+        destaque = QTextEdit.ExtraSelection()
+        destaque.format.setBackground(FUNDO_DO_ATUAL)
+        destaque.format.setFontUnderline(True)
+        destaque.format.setUnderlineColor(estilo.AZUL)
+        cursor = QTextCursor(self.document())
+        cursor.setPosition(posicao)
+        cursor.setPosition(fim, QTextCursor.MoveMode.KeepAnchor)
+        destaque.cursor = cursor
+        self.setExtraSelections([destaque])
+
+    def _gid_no_caractere(self, posicao: int) -> Optional[int]:
+        bloco = self.document().findBlock(posicao)
+        mapa = bloco.userData() if bloco.isValid() else None
+        i = posicao - bloco.position()
+        if isinstance(mapa, _MapaDoBloco) and 0 <= i < len(mapa.gids) and mapa.gids[i] >= 0:
+            return mapa.gids[i]
+        return None
 
     def ids_dos_diagramas(self) -> Set[str]:
         ids, bloco = set(), self.document().begin()

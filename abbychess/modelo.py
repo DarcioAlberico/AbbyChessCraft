@@ -101,8 +101,10 @@ class Box:
 class GlifoVirtual:
     """O caractere que falta na página: não tem caixa, não ensina, não entra na leitura.
 
-    Entra no documento depois do glifo `depois_de` (ou no começo da linha, com `None`),
-    na mesma palavra ou, com `palavra_nova`, numa palavra nova.
+    Entra no documento depois do glifo `depois_de` (um box, ou outro virtual: as letras
+    digitadas em sequência se encadeiam), ou antes do box `antes_de` (a letra que faltou no
+    começo de uma palavra, D1), ou, sem os dois, no começo da primeira linha; na mesma
+    palavra ou, com `palavra_nova`, numa palavra nova.
     """
 
     gid: int
@@ -110,15 +112,18 @@ class GlifoVirtual:
     depois_de: Optional[int]
     palavra_nova: bool = False
     zona_id: Optional[str] = None
+    antes_de: Optional[int] = None
 
     def para_json(self) -> list:
-        return [self.gid, self.char, self.depois_de, int(self.palavra_nova), self.zona_id]
+        bruto = [self.gid, self.char, self.depois_de, int(self.palavra_nova), self.zona_id]
+        return bruto + [self.antes_de] if self.antes_de is not None else bruto
 
     @classmethod
     def de_json(cls, bruto) -> "GlifoVirtual":
-        gid, char, depois_de, palavra_nova, zona_id = bruto
+        gid, char, depois_de, palavra_nova, zona_id = bruto[:5]
+        antes_de = bruto[5] if len(bruto) > 5 else None
         return cls(int(gid), str(char), None if depois_de is None else int(depois_de),
-                   bool(palavra_nova), zona_id)
+                   bool(palavra_nova), zona_id, None if antes_de is None else int(antes_de))
 
 
 # ----------------------------------------------------------------------
@@ -137,7 +142,10 @@ class Decisoes:
         """Todo gid de box que alguma decisão referencia (os dos virtuais não são boxes)."""
         usados = set(self.quebras) | set(self.paragrafo_antes) | set(self.hifen_de_quebra)
         usados |= {g for par in self.juncoes for g in par}
-        usados |= {v.depois_de for v in self.virtuais if v.depois_de is not None}
+        virtuais = {v.gid for v in self.virtuais}
+        usados |= {v.depois_de for v in self.virtuais
+                   if v.depois_de is not None and v.depois_de not in virtuais}
+        usados |= {v.antes_de for v in self.virtuais if v.antes_de is not None}
         return usados
 
     def reescrever(self, sucessores: Dict[int, List[int]]) -> Tuple["Decisoes", List[str]]:
@@ -176,6 +184,12 @@ class Decisoes:
                 juncoes.add((na, nb))
         virtuais = []
         for v in self.virtuais:
+            if v.antes_de is not None and v.antes_de in sucessores:
+                novo = primeiro(v.antes_de)
+                if novo is None:
+                    caidas.append(f"glifo virtual '{v.char}' antes do glifo {v.antes_de} "
+                                  "(o glifo saiu; o virtual foi para o começo da linha)")
+                v = replace(v, antes_de=novo)
             if v.depois_de is None or v.depois_de not in sucessores:
                 virtuais.append(v)
                 continue

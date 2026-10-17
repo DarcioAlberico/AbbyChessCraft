@@ -29,8 +29,8 @@ def montar(janela) -> None:
     j.acao_sair = acao(j, "sair", j.close, texto="Sair")
     j.acao_cancelar_lote = acao(j, "cancelar_lote", livro.cancelar, texto="Cancelar o lote")
     j.acao_retomar_lote = acao(j, "retomar_lote", j.retomar_lote, texto="Retomar o lote")
-    j.acao_desfazer = acao(j, "desfazer", p.desfazer)
-    j.acao_refazer = acao(j, "refazer", p.refazer)
+    j.acao_desfazer = acao(j, "desfazer", j.desfazer)
+    j.acao_refazer = acao(j, "refazer", j.refazer)
     barra.addSeparator()
 
     # --- Página e livro ------------------------------------------------------------
@@ -171,7 +171,8 @@ def montar(janela) -> None:
                                widgets=[j.visor, campo]) for id_, d in bordas]
     for q in (j.acao_ensinar, j.acao_so_corrigir, j.acao_descartar, *j.acoes_das_bordas):
         campo.teclas.ligar(q)                   # no campo, a tecla é dele (exceção 6, §3.4)
-    j.acao_paleta = acao(j, "paleta", t.abrir_paleta, texto="Símbolos…", widgets=[t])
+    j.acao_paleta = acao(j, "paleta", j.abrir_paleta, texto="Símbolos…", widgets=[t, j.texto])
+    _documento(j)
     palavra = j.verificacao.campo
     j.acao_corrigir_palavra = acao(j, "corrigir_palavra", j.verificacao.pedir_corrigir,
                                    widgets=[j.verificacao])
@@ -185,6 +186,25 @@ def montar(janela) -> None:
                             widgets=[j.verificacao])
 
     _menus(j)
+
+
+def _documento(j) -> None:
+    """As teclas da edição no Documento (§6.3, §6.4, passo D1). Enter, Shift+Enter, Ctrl+Z e
+    Ctrl+Y são do `QTextEdit`: a vista as entrega às ações (a exceção "redireciona")."""
+    acao, d = teclado.acao, j.texto
+    j.acao_confirmar = acao(j, "confirmar_e_avancar",
+                            lambda: j.confirmar_no_documento(avancar=True), widgets=[d])
+    j.acao_confirmar_sem_avancar = acao(j, "confirmar_sem_avancar", j.confirmar_no_documento,
+                                        widgets=[d])
+    j.acao_ensinar_no_documento = acao(j, "ensinar_no_documento",
+                                       lambda: j.confirmar_no_documento(ensinar=True),
+                                       widgets=[d])
+    j.acoes_das_figurinas = [acao(j, id_, lambda _=False, f=f: j.inserir_figurina(f), widgets=[d])
+                             for id_, f in (("figurina_rei", "♔"), ("figurina_dama", "♕"),
+                                            ("figurina_torre", "♖"), ("figurina_bispo", "♗"),
+                                            ("figurina_cavalo", "♘"), ("figurina_peao", "♙"))]
+    for q in (j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_desfazer, j.acao_refazer):
+        d.teclas.ligar(q)
 
 
 def _menus(j) -> None:

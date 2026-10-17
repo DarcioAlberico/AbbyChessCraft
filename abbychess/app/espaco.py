@@ -423,8 +423,11 @@ class EspacoDeTrabalho:
     def fechar_sobreposicao(self) -> None:
         """Esc: fecha o que está por cima, na ordem da §3.4 (regra 4): a seleção do modo de
         marcar, depois Resultados (a busca e os menus, que vêm antes, fecham sozinhos com o
-        Esc). Nunca cancela tarefa."""
-        if self.pagina.selecao:
+        Esc). Nunca cancela tarefa. Com uma sessão de edição aberta no Documento, o Esc a
+        restaura (§6.3)."""
+        if self.texto.tem_sessao:
+            self.texto.restaurar()
+        elif self.pagina.selecao:
             self.pagina.limpar_selecao()
         elif self.doca_resultados.isVisible():
             foco = QApplication.focusWidget()       # antes do hide, que já move o foco

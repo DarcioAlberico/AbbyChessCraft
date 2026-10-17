@@ -38,6 +38,7 @@ from PySide6.QtWidgets import QApplication, QInputDialog, QMainWindow
 from abbychess import avisos as av
 from abbychess.app import acoes, dialogos
 from abbychess.app.desenho import DesenhoDaJanela
+from abbychess.app.edicao_na_janela import EdicaoNoDocumento
 from abbychess.app.espaco import EspacoDeTrabalho
 from abbychess.app.lote_na_janela import LoteNaJanela
 from abbychess.app.dialogo_diagrama import DialogoDeDiagrama
@@ -57,7 +58,8 @@ log = logging.getLogger(__name__)
 TITULO = "AbbyChessCraft"
 
 
-class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, QMainWindow):
+class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoDocumento,
+                      QMainWindow):
     #: Da thread do gravador: a página `indice` não gravou (o erro).
     falha_de_gravacao = Signal(object, object)
 
@@ -143,6 +145,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, QMainWind
 
         self.texto = VistaDoDocumento()         # o Documento (§6.1), só leitura até o D1
         self.texto.glifo_clicado.connect(self._documento_clicado)
+        self.texto.sessao_confirmada.connect(self._sessao_do_documento)
         self.texto.cursor_na_palavra.connect(self._palavra_do_documento)
         # O texto da página é refeito uma vez, um instante depois da última mudança: montar
         # o documento leva dezenas de ms, e um Enter muda a página duas vezes (o glifo e,
@@ -171,6 +174,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, QMainWind
                              ("lote_progresso", self._lote_progrediu),
                              ("lote_terminou", self._lote_terminou),
                              ("resultado", self._resultado),
+                             ("sessao_recusada", self._sessao_recusada),
+                             ("estrutural", self.linha.avisar),
                              ("pagina_do_lote", self._pagina_do_lote),
                              ("acoes_mudaram", self._acoes_mudaram),
                              ("lote_mudou", self._acoes_mudaram),

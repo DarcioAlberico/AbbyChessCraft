@@ -31,7 +31,7 @@ def imagem(tmp_path):
 @pytest.fixture
 def laco(tmp_path, monkeypatch):
     monkeypatch.setattr(sl, "_baixar_a_prioridade", lambda: None)   # não a do pytest
-    monkeypatch.setenv("ABBY_FALSO_MS_POR_GLIFO", "5")
+    monkeypatch.setenv("ABBY_FALSO_MS_POR_GLIFO", "3")
     entrada, saida = queue.Queue(), queue.Queue()
     laco = sl._Laco(entrada, saida, "tests.leitor_falso:criar", tmp_path / "padroes", Limiares())
     thread = threading.Thread(target=laco.rodar, daemon=True)

@@ -1,4 +1,4 @@
-"""CA-4.3 (parte do 1b): máquina de estados sobre os gids, as decisões e `montar()`.
+"""CA-4.3: máquina de estados sobre os gids, as decisões e `montar()` (D1: editar_palavra).
 
 Uma página sintética de 900×400 com 1 a 60 glifos (cada um, dois traços de tinta com um vão,
 para o `dividir` ter onde cortar). As regras do 1b: dividir, juntar, marcar, quebrar,
@@ -26,6 +26,7 @@ from core.box_model import BoxEntry
 
 from abbychess import edicao as ed
 from abbychess import pagina as pg
+from abbychess import sessao as ss
 from abbychess import texto as tx
 from abbychess.modelo import Box, Pagina, foto, gid_de, reconciliar
 
@@ -47,6 +48,39 @@ def _pagina_sintetica(n: int):
     pagina = Pagina(pid=7, indice=3, boxes=[Box(gid_de(7, i), b) for i, b in enumerate(boxes)],
                     estado="reconhecida", proximo_n=n)
     return imagem, pagina
+
+
+def sessao_de_uma_palavra(pagina, i, acao, c):
+    """As unidades e o texto novo de uma edição numa palavra da página (ou None)."""
+    texto, unidades = ss.texto_e_unidades(pagina)
+    glifos = [k for k, u in enumerate(unidades) if u.glifo]
+    if not glifos:
+        return None
+    k = glifos[i % len(glifos)]
+    a, b = ss.palavras_em(unidades, k, k + 1)
+    if acao == "juntar":
+        if b >= len(unidades) or unidades[b].tipo != ss.ESPACO:
+            return None
+        b = ss.palavras_em(unidades, b + 1, b + 1)[1]
+    trecho, onde = texto[a:b], k - a
+    novo = {"trocar": trecho[:onde] + c + trecho[onde + 1:],
+            "apagar": trecho[:onde] + trecho[onde + 1:],
+            "inserir": trecho[:onde + 1] + c + trecho[onde + 1:],
+            "juntar": trecho.replace(" ", "", 1),
+            "nada": trecho}[acao]
+    if not novo.strip():
+        return None
+    return unidades[a:b], novo
+
+
+def editar_uma_palavra(pagina, i, acao, c):
+    sessao = sessao_de_uma_palavra(pagina, i, acao, c)
+    if sessao is None:
+        return
+    try:
+        ss.editar(pagina, *sessao)
+    except ss.Recusa:
+        pass
 
 
 class MaquinaDaPagina(RuleBasedStateMachine):
@@ -154,6 +188,13 @@ class MaquinaDaPagina(RuleBasedStateMachine):
             dif = ed.descartar(self.pagina, gid)
             self._preservou(antes, dif.removidos)
 
+    @rule(i=st.integers(0, 10_000), acao=st.sampled_from(["trocar", "apagar", "inserir",
+                                                         "juntar", "nada"]),
+          c=st.sampled_from("xz1"))
+    def editar_palavra(self, i, acao, c):
+        """D1: uma sessão do Documento numa palavra (§6.3), pela sessão sem Qt."""
+        editar_uma_palavra(self.pagina, i, acao, c)
+
     @rule(i=st.integers(0, 10_000))
     def dividir_pela_janela(self, i):
         if self.pagina.boxes:
@@ -227,6 +268,8 @@ class _ProjetoNaMemoria:
 
     class dados:
         nome = "Maquina"
+        idioma = "pt"
+        notacao = "letras"
 
     def __init__(self, pagina):
         self.pagina = pagina
@@ -379,6 +422,15 @@ class MaquinaDoControlador(RuleBasedStateMachine):
             boxes, decisoes, estado = self.inicial
             assert self.ctl.modelo.boxes == boxes
             assert self.ctl.modelo.decisoes == decisoes and self.ctl.modelo.estado == estado
+
+    @rule(i=st.integers(0, 10_000), acao=st.sampled_from(["trocar", "apagar", "inserir",
+                                                         "juntar", "nada"]),
+          c=st.sampled_from("xz1"))
+    def editar_palavra(self, i, acao, c):
+        """D1: a sessão do Documento pelo controlador (um passo do desfazer)."""
+        sessao = sessao_de_uma_palavra(self.ctl.modelo, i, acao, c)
+        if sessao is not None:
+            self.ctl.confirmar_sessao(*sessao)
 
     @rule()
     def desfazer(self):

@@ -117,11 +117,14 @@ def test_o_corpo_muda_com_limites_e_volta_ao_padrao(app):
     assert v.corpo == 11
 
 
-def test_e_somente_leitura(app):
+def test_digitar_abre_uma_sessao_e_restaurar_a_desfaz(app):
+    """Desde o D1 o Documento é editável: digitar abre a sessão (§6.3), e restaurar a desfaz."""
     v = _vista(app)
     v.setFocus()
     QTest.keyClicks(v, "zzz")
-    assert v.toPlainText() == "Cap\nab c\nde"
+    assert v.tem_sessao and v.toPlainText() == "zzzCap\nab c\nde"
+    v.restaurar()
+    assert not v.tem_sessao and v.toPlainText() == "Cap\nab c\nde"
 
 
 def test_o_diagrama_entra_com_o_desenho_a_linha_o_estado_e_copiar_fen(app):

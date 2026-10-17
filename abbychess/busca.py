@@ -6,14 +6,16 @@
   legenda ganha a dela no passo H) e os glifos (para a busca por glifo). O FEN de cada
   diagrama lido entra no fim, numa linha dele, sem gid. Montar o texto de uma página custa
   ~17 ms (o agrupamento em linhas do core); o livro inteiro é montado em paralelo, em
-  processos (`construir`), em segundo plano ao abrir o projeto. Nada vai para o disco.
+  processos abertos com o programa (`PoolDoIndice`, `construir`), em segundo plano ao abrir
+  o projeto. Nada vai para o disco.
 - **A busca** (`buscar`): o pacote `regex` (compatível com `re`), Unicode, `concurrent=True`
-  (solta o GIL: a janela continua respondendo) e um tempo-limite por página; o primeiro que
-  estoura aborta a busca inteira (`PadraoLento`). As classes de xadrez (`\\L` lance, `\\P`
+  (solta o GIL: a janela continua respondendo) e um tempo-limite por casamento; o primeiro
+  que estoura aborta a busca inteira (`PadraoLento`). As classes de xadrez (`\\L` lance, `\\P`
   peça, `\\C` casa, `\\V` valoração) são expandidas antes de compilar (`expandir_classes`),
-  e a expansão vira a dica do campo. **Figurina = letra**: no texto literal, a peça de um
-  lance casa com a figurina e com as letras (do idioma do livro e do inglês): "Cf3" acha
-  "♘f3" e "Nf3".
+  e a expansão vira a dica do campo; elas não seguem o "ignorar maiúsculas" (B, o bispo,
+  não é b, a coluna). **Figurina = letra**: no texto literal, a peça de um lance (a letra
+  seguida de uma casa) casa com a figurina e com as letras do idioma do livro e do inglês:
+  "Cf3" acha "♘f3" e "Nf3".
 - **A busca por glifo** (`buscar_glifos`): caractere, fonte e faixa de confiança.
 """
 
@@ -22,6 +24,7 @@ from __future__ import annotations
 import json
 import os
 import re as _re
+import threading
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -146,16 +149,28 @@ def _margens_pelas_linhas(pagina: Pagina, texto: str, gids: Sequence[Optional[in
     return saida
 
 
-def _indexar_arquivo(argumentos) -> Optional[PaginaIndexada]:
-    """No processo do pool: a página gravada (o JSON v2), indexada."""
-    caminho, idioma, versao = argumentos
+def _indexar_tarefa(tarefa) -> Optional[PaginaIndexada]:
+    """No processo do pool (ou na thread, sem pool): a página indexada. `tarefa` é (fonte,
+    idioma, versão), a fonte o caminho do JSON v2 ou a própria `Pagina` (a que está na
+    memória, como instantâneo, e a v1, lida sem migrar)."""
+    fonte, idioma, versao = tarefa
+    if isinstance(fonte, Pagina):
+        return indexar_pagina(fonte, idioma, versao=versao)
     from abbychess.projeto import _pagina_de_json
 
     try:
-        pagina = _pagina_de_json(json.loads(Path(caminho).read_text(encoding="utf-8")))
+        pagina = _pagina_de_json(json.loads(Path(fonte).read_text(encoding="utf-8")))
     except (OSError, ValueError, KeyError, TypeError):
         return None
     return indexar_pagina(pagina, idioma, versao=versao)
+
+
+def _aquecer(_n: int) -> int:
+    """No processo novo do pool: os módulos da indexação já carregados (o core, ~0,4 s)."""
+    from core import notacao  # noqa: F401
+
+    from abbychess import projeto, sessao, texto  # noqa: F401
+    return os.getpid()
 
 
 def processos_para_indexar() -> int:
@@ -164,26 +179,70 @@ def processos_para_indexar() -> int:
     return max(1, min(6, (os.cpu_count() or 2) - 2))
 
 
-def construir(arquivos: Mapping[int, Tuple[str, int]], idioma: str = "pt", *,
-              paralelo: bool = True, cancelado: Callable[[], bool] = lambda: False,
-              ao_indexar: Optional[Callable[[PaginaIndexada], None]] = None
-              ) -> Dict[int, PaginaIndexada]:
-    """O índice das páginas gravadas: `arquivos` é índice -> (o JSON da página, a versão
-    dela no histórico). Com `paralelo`, num pool de processos aberto só para isso (montar o
-    texto de 230 páginas leva ~5,5 s num processo e ~1,4 s em 6)."""
-    saida: Dict[int, PaginaIndexada] = {}
-    tarefas = [(caminho, idioma, versao) for _i, (caminho, versao) in sorted(arquivos.items())]
-    if not tarefas:
-        return saida
-    if not paralelo or len(tarefas) < 8:
-        resultados: Iterable = map(_indexar_arquivo, tarefas)
-        pool = None
-    else:
+class PoolDoIndice:
+    """Os processos que montam o índice, abertos com o programa (`aquecer`, numa thread: abrir
+    e importar custa ~0,75 s, que assim não fica no caminho de abrir o projeto) e fechados
+    depois do primeiro índice (`liberar`: parados, eles ocupariam memória à toa); o próximo
+    projeto aberto os abre de novo."""
+
+    def __init__(self):
+        self._pool: Optional[ProcessPoolExecutor] = None
+        self._trava = threading.Lock()
+        self._pronto = threading.Event()
+
+    def aquecer(self) -> None:
+        """Abre os processos e carrega os módulos neles, numa thread (volta na hora)."""
+        threading.Thread(target=self._abrir, name="pool-do-indice", daemon=True).start()
+
+    def _abrir(self) -> Optional[ProcessPoolExecutor]:
         import multiprocessing
 
-        pool = ProcessPoolExecutor(min(processos_para_indexar(), len(tarefas) // 4 or 1),
-                                   mp_context=multiprocessing.get_context("spawn"))
-        resultados = pool.map(_indexar_arquivo, tarefas, chunksize=4)
+        with self._trava:
+            if self._pool is None:
+                n = processos_para_indexar()
+                self._pool = ProcessPoolExecutor(n, mp_context=multiprocessing.get_context("spawn"))
+                try:
+                    list(self._pool.map(_aquecer, range(n)))
+                except Exception:               # o pool quebrado: o índice monta sem ele
+                    self._pool.shutdown(wait=False, cancel_futures=True)
+                    self._pool = None
+            self._pronto.set()
+            return self._pool
+
+    def obter(self) -> Optional[ProcessPoolExecutor]:
+        """O pool aberto (abre agora, se não foi aquecido)."""
+        return self._abrir()
+
+    def liberar(self) -> None:
+        with self._trava:
+            pool, self._pool = self._pool, None
+            self._pronto.clear()
+        if pool is not None:
+            pool.shutdown(wait=False, cancel_futures=True)
+
+
+def construir(fontes: Mapping[int, Tuple[object, int]], idioma: str = "pt", *,
+              paralelo: bool = True, cancelado: Callable[[], bool] = lambda: False,
+              ao_indexar: Optional[Callable[[PaginaIndexada], None]] = None,
+              pool: Optional[PoolDoIndice] = None) -> Dict[int, PaginaIndexada]:
+    """O índice das páginas: `fontes` é índice -> (o JSON v2 da página, ou a `Pagina`; a
+    versão dela no histórico). Com `paralelo`, num pool de processos (`pool`, o aquecido
+    com o programa; sem ele, um aberto só para isso): montar o texto de 230 páginas leva
+    ~5,5 s num processo e ~1,2 s em 6 já abertos."""
+    saida: Dict[int, PaginaIndexada] = {}
+    tarefas = [(fonte, idioma, versao) for _i, (fonte, versao) in sorted(fontes.items())]
+    if not tarefas:
+        return saida
+    proprio = None
+    if not paralelo or len(tarefas) < 8:
+        resultados: Iterable = map(_indexar_tarefa, tarefas)
+    else:
+        executor = pool.obter() if pool is not None else None
+        if executor is None:
+            proprio = PoolDoIndice()
+            executor = proprio.obter()
+        resultados = (executor.map(_indexar_tarefa, tarefas, chunksize=4) if executor is not None
+                      else map(_indexar_tarefa, tarefas))
     try:
         for indexada in resultados:
             if cancelado():
@@ -193,8 +252,8 @@ def construir(arquivos: Mapping[int, Tuple[str, int]], idioma: str = "pt", *,
                 if ao_indexar is not None:
                     ao_indexar(indexada)
     finally:
-        if pool is not None:
-            pool.shutdown(wait=False, cancel_futures=True)
+        if proprio is not None:
+            proprio.liberar()
     return saida
 
 
@@ -207,16 +266,21 @@ def _classe_de_pecas(idioma: str) -> str:
 
 
 def classes(idioma: str) -> Dict[str, str]:
-    """A expansão de cada classe de xadrez (§7.1), para o idioma do livro."""
+    """A expansão de cada classe de xadrez (§7.1), para o idioma do livro. Cada uma fica
+    fora do "ignorar maiúsculas" (`(?-i:...)`: B, o bispo, não é b, a coluna), e o lance e a
+    casa não começam nem terminam no meio de uma palavra ("the5", "a43")."""
     pecas = regex.escape(_classe_de_pecas(idioma))
-    lance = (rf"(?:[{pecas}]?[a-h]?[1-8]?[-x]?[a-h][1-8](?:=[{pecas}])?|O-O(?:-O)?|0-0(?:-0)?)"
-             r"[+#]?")
-    valoracao = r"(?:\+-|-\+|!!|\?\?|!\?|\?!|[±∓⩲⩱=∞!?])"
-    return {"L": lance, "P": f"[{pecas}]", "C": "[a-h][1-8]", "V": valoracao}
+    lance = (rf"(?-i:(?<!\w)(?:[{pecas}]?[a-h]?[1-8]?[-x]?[a-h][1-8](?:=[{pecas}])?"
+             r"|O-O(?:-O)?|0-0(?:-0)?)[+#]?(?![\w+#]))")
+    casa = r"(?-i:(?<![a-wyz0-9])[a-h][1-8](?![0-9]))"
+    valoracao = (r"(?-i:(?:\+-|-\+|\+=|=\+|!!|\?\?|!\?|\?!|‼|⁇|⁉|⁈|[±∓⩲⩱∞□!?]"
+                 r"|(?<!\w)=(?!\w)))")
+    return {"L": lance, "P": f"(?-i:[{pecas}])", "C": casa, "V": valoracao}
 
 
 DESCRICOES = {"L": "lance (Cf3, exd5, O-O, e8=D+)", "P": "peça (figurinas e letras do idioma)",
-              "C": "casa (a1 a h8)", "V": "valoração (± ∓ ⩲ ⩱ += -+ ! ? !? ?!)"}
+              "C": "casa (a1 a h8)",
+              "V": "valoração (± ∓ ⩲ ⩱ +- -+ += =+ = ∞ ! ? !! ?? !? ?! □)"}
 
 
 class PadraoInvalido(ValueError):
@@ -229,7 +293,8 @@ class PadraoLento(Exception):
 
 def expandir_classes(padrao: str, idioma: str) -> Tuple[str, str]:
     """O padrão com `\\L`, `\\P`, `\\C` e `\\V` expandidos (fora de `[...]`; dentro, `\\P`
-    vira as peças e `\\C`, `a-h1-8`), e a dica com a expansão das que apareceram."""
+    vira as peças e `\\C`, `a-h1-8`), e a dica com a expansão das que apareceram. `\\P{...}`
+    (a propriedade Unicode do `regex`) fica como está."""
     expansao = classes(idioma)
     saida: List[str] = []
     usadas: List[str] = []
@@ -238,7 +303,8 @@ def expandir_classes(padrao: str, idioma: str) -> Tuple[str, str]:
         c = padrao[k]
         if c == "\\" and k + 1 < len(padrao):
             proximo = padrao[k + 1]
-            if proximo in expansao:
+            propriedade = proximo == "P" and padrao[k + 2:k + 3] == "{"
+            if proximo in expansao and not propriedade:
                 if dentro:
                     if proximo == "P":
                         saida.append(regex.escape(_classe_de_pecas(idioma)))
@@ -256,7 +322,16 @@ def expandir_classes(padrao: str, idioma: str) -> Tuple[str, str]:
             continue
         if c == "[" and not dentro:
             dentro = True
-        elif c == "]" and dentro and saida and saida[-1] != "[":
+            saida.append(c)
+            k += 1
+            if padrao[k:k + 1] == "^":         # "[^" e o "]" logo depois são literais
+                saida.append("^")
+                k += 1
+            if padrao[k:k + 1] == "]":
+                saida.append("]")
+                k += 1
+            continue
+        if c == "]" and dentro:
             dentro = False
         saida.append(c)
         k += 1
@@ -264,28 +339,37 @@ def expandir_classes(padrao: str, idioma: str) -> Tuple[str, str]:
     return "".join(saida), dica
 
 
+#: A peça de um lance no texto literal: a letra seguida de uma casa (com a desambiguação
+#: e a captura: "Cf3", "C1e2", "Cbd7", "Cxe5").
+_DEPOIS_DA_PECA = _re.compile(r"[a-h]?[1-8]?x?[a-h][1-8]")
+
+
 def _figurina_igual_a_letra(texto: str, idioma: str) -> str:
     """O texto literal como regex, com a peça de cada lance (a letra seguida de casa, ou a
     figurina) trocada pela classe das formas dela: a figurina branca e a preta, a letra do
-    idioma e a do inglês."""
+    idioma e a do inglês (menos quando a do inglês é outra peça no idioma: em português, o R
+    do inglês é a torre e o R do livro é o rei)."""
     pecas, ingles = PECAS.get(idioma, PECAS["en"]), PECAS["en"]
     saida: List[str] = []
     for k, c in enumerate(texto):
-        seguinte = texto[k + 1:k + 2]
         papel = None
         if c in BRANCAS:
             papel = BRANCAS.index(c)
         elif c in PRETAS:
             papel = PRETAS.index(c)
-        elif c in pecas and (seguinte in "abcdefghx" and seguinte != ""):
-            papel = pecas.index(c)
-        elif c in ingles and (seguinte in "abcdefghx" and seguinte != ""):
-            papel = ingles.index(c)
+        elif _DEPOIS_DA_PECA.match(texto, k + 1):
+            if c in pecas:
+                papel = pecas.index(c)
+            elif c in ingles:
+                papel = ingles.index(c)
         if papel is None:
             saida.append(regex.escape(c))
-        else:
-            formas = {BRANCAS[papel], PRETAS[papel], pecas[papel], ingles[papel]}
-            saida.append("[" + "".join(regex.escape(f) for f in sorted(formas)) + "]")
+            continue
+        formas = {BRANCAS[papel], PRETAS[papel], pecas[papel]}
+        letra_inglesa = ingles[papel]
+        if letra_inglesa not in pecas or pecas.index(letra_inglesa) == papel:
+            formas.add(letra_inglesa)
+        saida.append("(?-i:[" + "".join(regex.escape(f) for f in sorted(formas)) + "])")
     return "".join(saida)
 
 
@@ -298,7 +382,8 @@ LIVRO, PAGINA, INTERVALO, SELECAO = "livro", "pagina", "intervalo", "selecao"
 
 @dataclass(frozen=True)
 class Opcoes:
-    """O que a barra pede. `selecao` é (página, início, fim) no texto do índice;
+    """O que a barra pede. `selecao` é (página, gid do primeiro glifo, gid do último): a
+    posição no texto sai do índice da página na hora da busca, que pode tê-la refeito;
     `intervalo`, (primeira, última) inclusive, em índices de página."""
 
     texto: str
@@ -350,7 +435,9 @@ def compilar(opcoes: Opcoes):
         padrao = regex.escape(opcoes.texto)
     if opcoes.palavra_inteira:
         padrao = rf"(?<!\w)(?:{padrao})(?!\w)"
-    bandeiras = regex.UNICODE | regex.VERSION0 | (0 if opcoes.maiusculas else regex.IGNORECASE)
+    # MULTILINE: `^` e `$` em cada linha impressa da página.
+    bandeiras = (regex.UNICODE | regex.VERSION0 | regex.MULTILINE
+                 | (0 if opcoes.maiusculas else regex.IGNORECASE))
     try:
         return regex.compile(padrao, bandeiras), dica
     except regex.error as erro:
@@ -369,13 +456,16 @@ def _paginas_do_escopo(paginas: Mapping[int, PaginaIndexada], opcoes: Opcoes) ->
 
 def buscar(paginas: Mapping[int, PaginaIndexada], opcoes: Opcoes,
            cancelado: Callable[[], bool] = lambda: False,
-           tempo_limite: float = TEMPO_LIMITE) -> Resultado:
+           tempo_limite: float = TEMPO_LIMITE, expressao=None) -> Resultado:
     """As ocorrências, em ordem de página e posição. `PadraoInvalido` se a regex não
-    compila; `PadraoLento` no primeiro tempo-limite estourado. `cancelado()` é consultado
-    entre as páginas (digitar de novo cancela a busca anterior)."""
+    compila; `PadraoLento` no primeiro tempo-limite estourado, que conta cada casamento (um
+    `search` por vez: o trabalho de anotar as ocorrências e a espera pelo GIL ficam fora).
+    `cancelado()` é consultado entre as páginas (digitar de novo cancela a busca anterior).
+    `expressao`: a já compilada (`compilar`)."""
     if not opcoes.texto:
         return Resultado()
-    expressao, _dica = compilar(opcoes)
+    if expressao is None:
+        expressao, _dica = compilar(opcoes)
     resultado = Resultado()
     for indice in _paginas_do_escopo(paginas, opcoes):
         if cancelado():
@@ -384,17 +474,40 @@ def buscar(paginas: Mapping[int, PaginaIndexada], opcoes: Opcoes,
         pagina = paginas[indice]
         resultado.paginas_buscadas += 1
         inicio, fim = 0, len(pagina.texto)
-        if opcoes.escopo == SELECAO and opcoes.selecao is not None:
-            inicio, fim = opcoes.selecao[1], opcoes.selecao[2]
-        try:
-            for casado in expressao.finditer(pagina.texto, inicio, fim, concurrent=True,
-                                             timeout=tempo_limite):
-                ocorrencia = _ocorrencia(pagina, casado.start(), casado.end())
-                if ocorrencia is not None and ocorrencia.etiqueta in opcoes.onde:
-                    resultado.ocorrencias.append(ocorrencia)
-        except TimeoutError as erro:
-            raise PadraoLento(f"padrão lento demais (página {indice + 1})") from erro
+        if opcoes.escopo == SELECAO:
+            trecho = _trecho_da_selecao(pagina, opcoes.selecao)
+            if trecho is None:
+                continue
+            inicio, fim = trecho
+        posicao = inicio
+        while posicao <= fim:
+            try:
+                casado = expressao.search(pagina.texto, posicao, fim, concurrent=True,
+                                          timeout=tempo_limite)
+            except TimeoutError as erro:
+                raise PadraoLento(f"padrão lento demais (página {indice + 1})") from erro
+            if casado is None:
+                break
+            if casado.end() == casado.start():  # o casamento vazio: adiante, sem ocorrência
+                posicao = casado.end() + 1
+                continue
+            ocorrencia = _ocorrencia(pagina, casado.start(), casado.end())
+            if ocorrencia is not None and ocorrencia.etiqueta in opcoes.onde:
+                resultado.ocorrencias.append(ocorrencia)
+            posicao = casado.end()
     return resultado
+
+
+def _trecho_da_selecao(pagina: PaginaIndexada, selecao) -> Optional[Tuple[int, int]]:
+    """(início, fim) no texto da página da seleção (página, gid do primeiro, gid do último)."""
+    if selecao is None:
+        return None
+    _pagina, primeiro, ultimo = selecao
+    if primeiro not in pagina.gids or ultimo not in pagina.gids:
+        return None
+    inicio = pagina.gids.index(primeiro)
+    fim = len(pagina.gids) - pagina.gids[::-1].index(ultimo)
+    return (inicio, fim) if inicio < fim else None
 
 
 def _ocorrencia(pagina: PaginaIndexada, inicio: int, fim: int) -> Optional[Ocorrencia]:

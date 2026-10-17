@@ -19,6 +19,17 @@ from tests.test_documento_edicao import _escrever, _janela_do_modulo, j  # noqa:
 
 @pytest.fixture
 def jb(j):  # noqa: F811
+    """A janela do módulo com a barra de busca fechada e as opções no padrão."""
+    from abbychess import busca as bs
+
+    b = j.barra_de_busca
+    j.fechar_busca()
+    b.escolher_escopo(bs.LIVRO)
+    b.intervalo.clear()
+    for botao in (b.maiusculas, b.palavra, b.regex, b.figurina):
+        botao.setChecked(False)
+    j._selecao_congelada = None
+    b.relogio.stop()
     return j
 
 
@@ -132,3 +143,83 @@ def test_a_busca_por_glifo_vai_para_resultados(jb, monkeypatch):
     assert "Glifos 'a'" in lista.item(0).text() and lista.count() == 3
     lista.itemActivated.emit(lista.item(2))
     assert jb.pagina.atual == pagina.boxes[3].gid
+
+
+# ----------------------------------------------------------------------
+# As revisões do passo B
+# ----------------------------------------------------------------------
+
+def test_enter_logo_depois_de_digitar_vai_a_ocorrencia_desta_busca(jb):
+    pagina = _pagina_lida(jb, "casa velha casa")
+    _buscar(jb, "casa")
+    b = jb.barra_de_busca
+    b.campo.setText("velha")                              # e o Enter antes da espera
+    QTest.keyClick(b.campo, Qt.Key.Key_Return)
+    _ate(lambda: b.contador.text() == "1 de 1")
+    assert jb.texto.gid_no_cursor() == pagina.boxes[4].gid
+
+
+def test_ctrl_f_com_a_aba_padroes_volta_ao_documento(jb):
+    _pagina_lida(jb, "casa")
+    jb.vista.setCurrentWidget(jb.padroes)
+    jb.localizar()
+    assert jb.vista.currentWidget() is jb.painel_do_documento and jb.barra_de_busca.isVisible()
+
+
+def test_a_selecao_longa_vira_o_escopo_selecao_e_fica_congelada(jb):
+    from abbychess import busca as bs
+
+    _pagina_lida(jb, "casa velha casa e mais casa no fim da linha comprida")
+    cursor = jb.texto.textCursor()
+    cursor.setPosition(0)
+    cursor.setPosition(44, cursor.MoveMode.KeepAnchor)    # mais de 40 caracteres
+    jb.texto.setTextCursor(cursor)
+    jb.localizar()
+    b = jb.barra_de_busca
+    assert b.escopo.currentData() == bs.SELECAO
+    _buscar(jb, "casa")
+    assert b.contador.text() == "3"
+    jb.proxima_ocorrencia()                               # o cursor anda: a seleção fica
+    _buscar(jb, "casa")
+    assert b.contador.text() == "1 de 3"                  # (e a ocorrência atual continua)
+
+
+def test_f3_com_a_barra_fechada_abre_e_vai_a_primeira(jb):
+    _pagina_lida(jb, "casa velha casa")
+    _buscar(jb, "casa")
+    jb.fechar_busca()
+    jb.proxima_ocorrencia()
+    _ate(lambda: jb.barra_de_busca.contador.text() == "1 de 2")
+
+
+def test_o_intervalo_invalido_aparece_na_barra(jb):
+    from abbychess import busca as bs
+
+    _pagina_lida(jb, "casa")
+    b = jb.barra_de_busca
+    jb.localizar()
+    b.escolher_escopo(bs.INTERVALO)
+    b.intervalo.setText("abc")
+    _buscar(jb, "casa")
+    assert b.contador.text() == "erro" and "Intervalo" in b.contador.toolTip()
+
+
+def test_ca_7_3_o_padrao_lento_aborta_com_o_aviso(jb, monkeypatch):
+    from abbychess import busca as bs
+
+    _pagina_lida(jb, "a" * 60 + "!")
+    monkeypatch.setattr(bs, "TEMPO_LIMITE", 0.0001)
+    _buscar(jb, r"(\w+)+$", regex=True)
+    assert jb.barra_de_busca.contador.text() == "erro"
+    assert "lento demais" in jb.statusBar().currentMessage()
+
+
+def test_o_aviso_que_cita_a_pagina_e_o_glifo_leva_ate_ele(jb):
+    from abbychess.app.busca_na_janela import lugar_do_aviso
+
+    pagina = _pagina_lida(jb, "casa")
+    e = pagina.boxes[2].entry
+    texto = f"Página 1, decisões que não seguiram os glifos relidos: quebra em ({e.x1 + 2}, {e.y1 + 2})."
+    assert lugar_do_aviso(texto) == (0, e.x1 + 2, e.y1 + 2)
+    jb.resultados.aviso_escolhido.emit(0, e.x1 + 2, e.y1 + 2)
+    assert jb.pagina.atual == pagina.boxes[2].gid

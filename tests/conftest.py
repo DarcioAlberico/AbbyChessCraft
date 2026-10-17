@@ -22,6 +22,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # A suíte rápida abre os projetos sem o servidor de leitura (um processo por abertura): os
 # testes do servidor (`-m processo`) o ligam com `ABBY_SERVIDOR=1` e o leitor falso.
 os.environ.setdefault("ABBY_SERVIDOR", "0")
+# O índice da busca sem o pool de processos (cada janela aberta nos testes abriria 6).
+os.environ.setdefault("ABBY_INDICE_PARALELO", "0")
 # O offscreen não acha as fontes do sistema: sem elas o texto sai em quadrados largos, e as
 # medidas de largura dos painéis (CA-3.2, o Inspetor de 296 px) não valem como no programa.
 if os.name == "nt":

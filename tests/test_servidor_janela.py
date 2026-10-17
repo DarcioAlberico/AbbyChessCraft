@@ -293,3 +293,25 @@ def test_ca_11_7_sem_servidor_pronto_o_glifo_fica_aguardando_sem_prender_a_fila(
     finally:
         janela.close()
 
+
+
+def test_f3_atravessa_as_paginas_e_o_documento_vai_a_ocorrencia(app, janela_do_livro):  # noqa: F811
+    """A revisão de produto do passo B (M2): a ocorrência de outra página abre no Documento já
+    montado, com o cursor nela."""
+    j = janela_do_livro
+    j.livro.reconhecer([0, 1, 2], refazer=False)        # o leitor falso lê tudo como "x"
+    _ate(app, lambda: not j.livro.lote_rodando, 60)
+    j.localizar()
+    j.barra_de_busca.campo.setText("x")
+    j.barra_de_busca.relogio.stop()
+    j._buscar()
+    _ate(app, lambda: j.busca.ultimo_resultado is not None, 30)
+    parado = lambda: not j.busca.buscando and not j.barra_de_busca.relogio.isActive()  # noqa: E731
+    _ate(app, parado, 30)                                # (o lote rearma a busca ao gravar)
+    ocorrencias = j.busca.ultimo_resultado.ocorrencias
+    primeira_da_seguinte = next(o for o in ocorrencias if o.pagina != j.pagina.indice)
+    for _ in range(ocorrencias.index(primeira_da_seguinte) + 1):
+        j.proxima_ocorrencia()
+        _ate(app, parado, 30)
+    assert j.pagina.indice == primeira_da_seguinte.pagina
+    assert j.texto.gid_no_cursor() == primeira_da_seguinte.gids[0]

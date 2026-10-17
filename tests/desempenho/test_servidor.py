@@ -46,6 +46,8 @@ def ambiente(tmp_path_factory):
     if not _PDF:
         pytest.skip("o PDF do Xadrez Vitorioso não está nesta máquina")
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    indice_paralelo = os.environ.get("ABBY_INDICE_PARALELO")
+    os.environ["ABBY_INDICE_PARALELO"] = "1"            # o índice da busca como no programa
     from PySide6.QtWidgets import QApplication, QMessageBox
 
     from abbychess import pagina as pg
@@ -73,6 +75,10 @@ def ambiente(tmp_path_factory):
     yield app, janela
     janela.close()
     QMessageBox.question = pergunta_original
+    if indice_paralelo is None:
+        os.environ.pop("ABBY_INDICE_PARALELO", None)
+    else:
+        os.environ["ABBY_INDICE_PARALELO"] = indice_paralelo
 
 
 def _rss_mb(processos) -> float:
@@ -115,8 +121,23 @@ def test_atraso_e_memoria_durante_o_lote(ambiente, medidas):
     temporizador = QTimer()
     temporizador.setInterval(16)
     temporizador.timeout.connect(tique)
+    # CA-11.1 com a busca no roteiro (passo B): uma busca a cada 2 s durante o lote, alternando
+    # dois textos (cada uma refaz no índice as páginas que o lote já gravou).
+    buscas, textos = [], ["e", "casa"]
+
+    def buscar():
+        janela.localizar()
+        janela.barra_de_busca.campo.setText(textos[len(buscas) % 2])
+        janela.barra_de_busca.relogio.stop()
+        janela._buscar()
+        buscas.append(time.perf_counter())
+
+    relogio_da_busca = QTimer()
+    relogio_da_busca.setInterval(2000)
+    relogio_da_busca.timeout.connect(buscar)
     lote.CondutorDoLote._gravar = gravar
     temporizador.start()
+    relogio_da_busca.start()
     inicio = time.perf_counter()
     try:
         janela.livro.reconhecer(LOTE, refazer=True)      # o caminho do menu, sem o diálogo
@@ -124,6 +145,7 @@ def test_atraso_e_memoria_durante_o_lote(ambiente, medidas):
     finally:
         fim = time.perf_counter()
         temporizador.stop()
+        relogio_da_busca.stop()
         lote.CondutorDoLote._gravar = gravar_original
     k = max(range(len(atrasos)), key=atrasos.__getitem__)
     perto = min(gravacoes, key=lambda g: abs(g[0] - instantes[k]))
@@ -134,7 +156,9 @@ def test_atraso_e_memoria_durante_o_lote(ambiente, medidas):
         "disparos": len(atrasos), "duracao_s": round(fim - inicio, 1),
         "alvo_p99_ms": 50,
         "acoes_durante_o_lote": "todas valem (passo E): o lote lê no servidor e grava na "
-                                "interface entre um comando e outro",
+                                "interface entre um comando e outro; desde o B, uma busca a "
+                                "cada 2 s (Localizar) durante o lote",
+        "buscas_durante_o_lote": len(buscas),
         "maior_atraso": {"ms": round(atrasos[k], 1),
                          "segundos_da_gravacao_mais_perto": round(instantes[k] - perto[0], 3),
                          "gravacao_mais_perto_ms": round(perto[1], 1)},

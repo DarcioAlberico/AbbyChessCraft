@@ -211,15 +211,18 @@ class CondutorDoLote:
     def _ler(self, indice: int) -> None:
         p = self.p
         projeto, fonte, leitor, servidor = p.projeto, p.fonte, p.leitor, p._servidor_para_pedir()
-        modelo = projeto.carregar_modelo(indice)
-        zonas = list(modelo.zonas) if modelo is not None else projeto.carregar_zonas(indice)
-        marcados = (pg.a_manter_na_releitura(modelo.boxes, modelo.estado in LIDAS)
-                    if modelo is not None else [])                         # §4.6
-        pid = modelo.pid if modelo is not None else None
+        # Na janela, só o pid e a versão (sem ler o JSON da página: isso, e o que o §4.6
+        # mantém, vão para a thread da leitura). Uma mudança do usuário depois daqui sobe a
+        # versão, e `_mudou_durante` a pega.
+        pid = projeto.pid_da_pagina(indice)
         pedida = _Pedida(indice, pid, p.historico.versao(pid), time.perf_counter())
         self.em_leitura = indice
 
         def ler(cancelado) -> sl.PaginaLida:
+            modelo = projeto.carregar_modelo(indice)
+            zonas = list(modelo.zonas) if modelo is not None else projeto.carregar_zonas(indice)
+            marcados = (pg.a_manter_na_releitura(modelo.boxes, modelo.estado in LIDAS)
+                        if modelo is not None else [])                     # §4.6
             imagem = fonte.pagina(indice)
             if servidor is None:
                 return sl.ler_pagina(imagem, zonas, marcados, leitor, cancelado=cancelado)
@@ -230,7 +233,14 @@ class CondutorDoLote:
             if not self._valendo():
                 return
             self._voltou(pedida, resultado)
-            self._seguinte()
+            # Com o servidor, a página seguinte começa num passo à parte do laço de eventos: a
+            # janela responde entre gravar esta e preparar aquela. Sem ele, a leitura é uma
+            # tarefa da fila, que já dá a vez.
+            agendar = getattr(self.p.executar, "na_interface", None)
+            if agendar is None or servidor is None:
+                self._seguinte()
+            else:
+                agendar(self._seguinte)
 
         if servidor is None:
             self._ler_na_fila(indice, ler, voltou)

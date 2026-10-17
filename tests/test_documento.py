@@ -376,3 +376,29 @@ def test_x_height_na_linha(app, tmp_path, sim, largura, altura):  # noqa: F811
         assert x_height * j.linha.escala >= 12, (x_height, j.linha.escala)
     finally:
         j.close()
+
+
+def test_o_ultimo_glifo_de_uma_linha_visual_quebrada_e_clicavel(app):
+    """Uma palavra longa sem espaço quebra no meio: o glifo do fim de cada linha visual também
+    se acha pelo clique."""
+    gids = list(range(100, 220))
+    chars = {g: "m" for g in gids}
+    v = _vista(app, _doc(_bloco("b0", "texto", [gids]), chars=chars))
+    v.resize(260, 400)
+    v.show()
+    app.processEvents()
+    fins = []
+    for g in gids:
+        cursor = v.textCursor()
+        cursor.setPosition(v.posicao_do_gid(g))
+        depois = v.textCursor()
+        depois.setPosition(v.posicao_do_gid(g) + 1)
+        if v.cursorRect(depois).y() != v.cursorRect(cursor).y():
+            fins.append(g)
+    assert fins                                            # a palavra quebrou
+    for g in fins:
+        cursor = v.textCursor()
+        cursor.setPosition(v.posicao_do_gid(g))
+        ponto = v.cursorRect(cursor).center() + QPoint(3, 0)
+        assert v.gid_no_ponto(ponto) == g
+    v.close()

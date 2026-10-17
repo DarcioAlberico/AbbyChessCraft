@@ -27,6 +27,16 @@ MEDIDAS = RAIZ / "docs" / "medidas"
 README = RAIZ / "README.md"
 INICIO, FIM = "<!-- medidas:inicio -->", "<!-- medidas:fim -->"
 LIVROS = ("xv", "yusupov", "darcy")
+#: Os passos na ordem do roadmap (as tabelas seguem esta ordem, não a alfabética).
+ORDEM_DOS_PASSOS = ("0", "1a", "1b", "2a", "2b", "a1", "a2", "a3", "e", "d1", "b", "d2", "c", "i",
+                    "f", "g", "h", "j", "k", "l")
+
+
+def _na_ordem(passo: str):
+    """A chave de ordenação de um passo ("D1", "d1", "passo-d1"...): a do roadmap."""
+    nome = str(passo).lower().removeprefix("passo-").removeprefix("passo ")
+    return (ORDEM_DOS_PASSOS.index(nome) if nome in ORDEM_DOS_PASSOS else len(ORDEM_DOS_PASSOS),
+            nome)
 _FATIA = re.compile(r"\d{4}-\d{2}-\d{2}-fatia-(?P<livro>[^-]+)-passo-(?P<passo>[^-]+)"
                     r"(?:-(?P<hora>\d{6}))?\.json")
 _NOMES = {"ligacao_da_legenda": "a ligação da legenda ao diagrama",
@@ -165,7 +175,8 @@ def _fatia() -> list:
             if chave not in mais_recente or ordem > mais_recente[chave][0]:
                 mais_recente[chave] = (ordem, arquivo)
     linhas = []
-    for (livro, passo), (_, arquivo) in sorted(mais_recente.items()):
+    for (livro, passo), (_, arquivo) in sorted(mais_recente.items(),
+                                               key=lambda i: (i[0][0], _na_ordem(i[0][1]))):
         dados = json.loads(arquivo.read_text(encoding="utf-8"))
         paginas = ", ".join(sorted(dados.get("paginas", {})))
         if dados.get("gestos") is None:
@@ -198,7 +209,7 @@ def _por_passo() -> list:
     da linha de base: as mesmas metas, a medida mais nova de cada passo."""
     _, base = _ultimo("linha-de-base")
     passos = sorted({c["passo"] for a in MEDIDAS.glob("*-passo-*.json")
-                     if (c := _PASSO.fullmatch(a.name))})
+                     if (c := _PASSO.fullmatch(a.name))}, key=_na_ordem)
     if base is None or not passos:
         return []
     metas = (("troca_de_pagina", "p95_ms", "Troca de página, p95"),
@@ -275,7 +286,8 @@ def _repeticoes() -> list:
               "alta):", "",
               "| Código | Commit | Rodada | " + " | ".join(r for _, _, r in _METAS_REPETIDAS) + " |",
               "|---|---|---|" + "---|" * len(_METAS_REPETIDAS)]
-    for (passo, condicao), rodadas in sorted(grupos.items()):
+    for (passo, condicao), rodadas in sorted(grupos.items(),
+                                             key=lambda i: (_na_ordem(i[0][0]), i[0][1])):
         rodadas.sort(key=lambda r: r[0])
         commits = sorted({d["ambiente"].get("commit") for _, d in rodadas})
         valores = []

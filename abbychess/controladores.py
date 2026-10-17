@@ -1226,6 +1226,49 @@ class ControladorDaBusca:
         total = p.fonte.total if p.fonte is not None else 0
         return max(0, total - len(self.indice))
 
+    def lidos_por(self, amostras, ao_terminar) -> None:
+        """Os glifos do livro lidos pelas `amostras` (os nomes, relativos à pasta dos
+        padrões), numa thread, pelo índice com as páginas que mudaram já refeitas (§8.3):
+        `ao_terminar({página: [gids]})` na interface (não é chamado se outro projeto abriu).
+        Antes de o índice ficar pronto, todas as páginas lidas são lidas na thread."""
+        amostras = set(amostras)
+        projeto = self.pagina.projeto
+        if projeto is None:
+            return
+        geracao = self._geracao
+        if self.pronto.is_set():
+            leitura, refazer, carregar, _velhas = self._paginas_a_refazer()
+            indice = dict(self.indice)
+        else:
+            historico = self.pagina.historico
+            leitura, refazer, indice = 0, {}, {}
+            carregar = {i: historico.versao(projeto.pid_da_pagina(i))
+                        for i in projeto.paginas_lidas()}
+
+        def rodar():
+            refeitas = {}
+            try:
+                refeitas = self._refazer(refazer, carregar, lambda: geracao == self._geracao)
+            except Exception:
+                log.exception("a procura dos glifos lidos pelas amostras falhou")
+            indice.update(refeitas)
+            achados = {}
+            for i, indexada in indice.items():
+                gids = [g for g, a in indexada.amostras if a in amostras]
+                if gids:
+                    achados[i] = gids
+
+            def fim():
+                self._em_refazer.pop(leitura, None)
+                if geracao != self._geracao:
+                    return
+                if leitura:
+                    self._guardar(leitura, refeitas)
+                ao_terminar(achados)
+            self._na_interface(fim)
+
+        threading.Thread(target=rodar, name="lidos-pelas-amostras", daemon=True).start()
+
     def glifos(self, char: str, fontes=None, minima: float = 0.0, maxima: float = 1.0,
                ao_terminar=None) -> None:
         """A busca por glifo (§7.1), numa thread, no índice com as páginas que mudaram já

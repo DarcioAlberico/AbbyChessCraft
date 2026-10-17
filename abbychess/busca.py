@@ -66,6 +66,8 @@ class PaginaIndexada:
     glifos: Tuple[Tuple[int, str, str, float], ...] = ()
     pid: Optional[int] = None
     versao: int = 0
+    #: (gid, amostra) dos glifos lidos por um padrão do livro (a procedência, §8.3).
+    amostras: Tuple[Tuple[int, str], ...] = ()
 
     def etiqueta(self, posicao: int) -> str:
         return _ETIQUETA_DO_CODIGO.get(self.etiquetas[posicao], PROSA)
@@ -114,8 +116,9 @@ def indexar_pagina(pagina: Pagina, idioma: str = "pt", margens: Optional[Iterabl
             gids.extend([None] * len(linha))
     glifos = tuple((b.gid, b.entry.char, str(b.entry.source), float(b.entry.confidence))
                    for b in pagina.boxes)
+    amostras = tuple((b.gid, b.amostra) for b in pagina.boxes if b.amostra)
     return PaginaIndexada(pagina.indice, "".join(partes), tuple(gids), "".join(etiquetas),
-                          glifos, pagina.pid, versao)
+                          glifos, pagina.pid, versao, amostras)
 
 
 #: A linha de margem (cabeçalho, rodapé, número de página) é curta e tem um número.

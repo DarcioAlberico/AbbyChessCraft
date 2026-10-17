@@ -355,9 +355,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         p.reconhecer()
 
     def esquecer(self, caminhos: list) -> None:
-        if self.leitor is not None and dialogos.confirmar(
-                self, "Esquecer padrões", f"Apagar {len(caminhos)} amostra(s) dos padrões "
-                "deste livro? A página atual será relida sem elas."):
+        if self.leitor is not None:              # sem pergunta: o Ctrl+Z desfaz (§8.3)
             self.pagina.esquecer(caminhos)
 
     def opcoes(self) -> None:

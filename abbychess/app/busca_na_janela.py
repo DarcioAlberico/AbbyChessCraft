@@ -27,6 +27,7 @@ SELECAO_LONGA = 40
 class BuscaNaJanela:
     def _montar_busca(self) -> None:
         self.busca = ControladorDaBusca(self.pagina)
+        self.pagina.lidos_pelas_amostras = self.busca.lidos_por   # o esquecer (§8.3)
         self.barra_de_busca = BarraDeBusca()
         self.painel_do_documento.layout().insertWidget(0, self.barra_de_busca)
         b = self.barra_de_busca

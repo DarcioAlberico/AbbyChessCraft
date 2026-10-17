@@ -3,6 +3,7 @@ Alt+↓ no livro), a fila recalculada só para os glifos tocados e o F6 pelo res
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -117,3 +118,59 @@ def test_o_f6_conta_pelo_resumo_sem_abrir_as_paginas(livro, monkeypatch):
     assert lv.anterior_com_pendentes(projeto, limiares, 0) == 2
     mais_baixo = type(limiares)(**{**vars(limiares), "revisao": 0.35})
     assert lv.pendentes_por_pagina(projeto, mais_baixo) == {0: 2, 2: 1}   # outro limiar
+
+
+def test_ca_8_4_esquecer_devolve_a_fila_os_lidos_no_livro_e_desfazer_os_tira(livro):
+    """Uma amostra que leu 30 glifos em 3 páginas (uma verificada): esquecê-la devolve os 30
+    à fila (a verificada volta a em_revisao); desfazer os tira de novo."""
+    import time
+
+    import numpy as np
+
+    from abbychess.controladores import ControladorDaBusca
+    from abbychess.modelo import EM_REVISAO, VERIFICADA
+
+    projeto, ctl, fila = livro
+    caminho = ctl.leitor.ensinar(np.full((30, 18), 255, np.uint8), "e", origem="teste")
+    nome = Path(caminho).resolve().relative_to(Path(projeto.pasta_de_padroes).resolve()).as_posix()
+    for indice in range(3):
+        pagina = projeto.pagina_para_editar(indice)
+        pagina.boxes = [Box(gid_de(pagina.pid, 100 + n),
+                            BoxEntry("e", 20 + 22 * n, 100, 38 + 22 * n, 130, 0.97, "livro"),
+                            amostra=nome) for n in range(10)] + list(pagina.boxes)
+        pagina.estado = VERIFICADA if indice == 1 else pagina.estado
+        projeto.salvar_modelo(pagina)
+    ctl.ir_para(0)
+    fila_da_interface = []
+    ctl.executar.na_interface = fila_da_interface.append
+    busca = ControladorDaBusca(ctl, paralelo=False)
+    ctl.lidos_pelas_amostras = busca.lidos_por
+    busca.abrir()
+
+    def esperar(condicao):
+        fim = time.monotonic() + 20
+        while not condicao() and time.monotonic() < fim:
+            while fila_da_interface:
+                fila_da_interface.pop(0)()
+            time.sleep(0.01)
+        assert condicao()
+    esperar(busca.pronto.is_set)
+
+    def da_amostra():
+        return sum(1 for i in range(3) for b in projeto.carregar_modelo(i).boxes
+                   if b.entry.source == "livro" and b.amostra == nome)
+
+    def na_fila():
+        return sum(1 for i in range(3) for b in projeto.carregar_modelo(i).boxes
+                   if b.gid % 1000 >= 100 and b.entry.source == "none" and b.entry.char == "e")
+    assert da_amostra() == 30 and na_fila() == 0
+    ctl.esquecer([caminho])
+    ctl.executar.tudo()
+    esperar(lambda: na_fila() == 30)
+    assert da_amostra() == 0 and projeto.carregar_modelo(1).estado == EM_REVISAO
+    assert len(ctl.historico.proxima_a_desfazer().paginas) == 3      # uma transação só
+    ctl.desfazer()
+    ctl.executar.tudo()
+    assert na_fila() == 0 and da_amostra() == 30
+    assert projeto.carregar_modelo(1).estado == VERIFICADA
+    assert Path(caminho).exists()                        # a amostra voltou

@@ -101,10 +101,10 @@ class Box:
 class GlifoVirtual:
     """O caractere que falta na página: não tem caixa, não ensina, não entra na leitura.
 
-    Entra no documento depois do glifo `depois_de` (um box, ou outro virtual: as letras
-    digitadas em sequência se encadeiam), ou antes do box `antes_de` (a letra que faltou no
-    começo de uma palavra, D1), ou, sem os dois, no começo da primeira linha; na mesma
-    palavra ou, com `palavra_nova`, numa palavra nova.
+    Entra no documento logo depois do glifo `depois_de` (um box, ou outro virtual: as letras
+    digitadas em sequência se encadeiam), ou logo antes do glifo `antes_de` (a letra que
+    faltou no começo de uma palavra, D1), ou, sem os dois, no começo da primeira linha da
+    página; na mesma palavra ou, com `palavra_nova`, numa palavra nova.
     """
 
     gid: int
@@ -145,7 +145,8 @@ class Decisoes:
         virtuais = {v.gid for v in self.virtuais}
         usados |= {v.depois_de for v in self.virtuais
                    if v.depois_de is not None and v.depois_de not in virtuais}
-        usados |= {v.antes_de for v in self.virtuais if v.antes_de is not None}
+        usados |= {v.antes_de for v in self.virtuais
+                   if v.antes_de is not None and v.antes_de not in virtuais}
         return usados
 
     def reescrever(self, sucessores: Dict[int, List[int]]) -> Tuple["Decisoes", List[str]]:
@@ -188,7 +189,7 @@ class Decisoes:
                 novo = primeiro(v.antes_de)
                 if novo is None:
                     caidas.append(f"glifo virtual '{v.char}' antes do glifo {v.antes_de} "
-                                  "(o glifo saiu; o virtual foi para o começo da linha)")
+                                  "(o glifo saiu; o virtual foi para o começo da página)")
                 v = replace(v, antes_de=novo)
             if v.depois_de is None or v.depois_de not in sucessores:
                 virtuais.append(v)
@@ -196,7 +197,7 @@ class Decisoes:
             novo = ultimo(v.depois_de)
             if novo is None:
                 caidas.append(f"glifo virtual '{v.char}' depois do glifo {v.depois_de} "
-                              "(o glifo saiu; o virtual foi para o começo da linha)")
+                              "(o glifo saiu; o virtual foi para o começo da página)")
             virtuais.append(replace(v, depois_de=novo))
         quebras = mapear(self.quebras, primeiro, "palavra nova antes")
         # Dois glifos fundidos podem levar uma quebra e uma junção à mesma fronteira (a

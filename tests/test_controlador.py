@@ -303,3 +303,25 @@ def test_trocar_de_projeto_solta_o_lote_preso(dois_projetos):
     ctl.ligar(b, pg.FonteDePaginas(b.fonte),
               LeitorDoLivro(b.pasta_de_padroes, limiares=b.dados.limiares))
     assert not ctl.lote_rodando
+
+
+def test_a_sessao_do_documento_na_fila_avisa_quando_entra(dois_projetos):
+    """D1 (a revisão de código, achado 9): com a fila presa, a sessão confirmada espera a vez
+    dela, e a janela só reposiciona o cursor (`depois`) quando a edição entrou."""
+    from abbychess import sessao as ss
+
+    a, _b = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    ctl.reconhecer()
+    executor.tudo()
+    texto, unidades = ss.texto_e_unidades(ctl.modelo)
+    inicio, fim = ss.palavras_em(unidades, 0, 0)
+    executor.em_voo = False                            # uma leitura em voo prende a fila
+    entrou = []
+    ctl.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim],
+                         depois=lambda: entrou.append(ss.texto_e_unidades(ctl.modelo)[0]))
+    assert entrou == [] and executor.fila
+    executor.em_voo = None
+    executor.tudo()
+    assert len(entrou) == 1 and entrou[0].startswith("x" + texto[inicio:fim])

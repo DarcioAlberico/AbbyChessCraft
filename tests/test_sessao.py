@@ -157,3 +157,94 @@ def test_ca_6_7_so_os_tokens_mudados_e_so_no_modo_figurinas():
 def test_alinhar_prefere_a_substituicao_e_a_esquerda():
     assert ss.alinhar("ab", "xb") == [(0, 0), (1, 1)]
     assert ss.alinhar("aa", "aaa") == [(None, 0), (0, 1), (1, 2)]
+
+
+# ----------------------------------------------------------------------
+# Os virtuais ficam onde o usuário os digitou (a revisão de código do D1)
+# ----------------------------------------------------------------------
+
+def test_o_virtual_cuja_ancora_sai_fica_no_lugar():
+    p = _pagina("x ab", "cd")
+    _editar(p, "ab", "abz")                               # o z depois do b
+    _editar(p, "abz", "az")                               # e o b sai
+    assert _texto(p) == "x az\ncd"
+    p = _pagina("q bc")
+    _editar(p, "bc", "abc")                               # o a antes do b
+    _editar(p, "abc", "ac")
+    assert _texto(p) == "q ac"
+
+
+def test_inserir_antes_de_um_virtual_da_mesma_ancora():
+    p = _pagina("ab")
+    _editar(p, "ab", "axb")
+    _editar(p, "axb", "ayxb")
+    assert _texto(p) == "ayxb"
+    p = _pagina("ab")
+    _editar(p, "ab", "axyb")
+    _editar(p, "axyb", "axzyb")
+    assert _texto(p) == "axzyb"
+
+
+def test_uma_letra_antes_do_virtual_que_comeca_a_palavra():
+    p = _pagina("q bc")
+    _editar(p, "bc", "abc")
+    _editar(p, "q abc", "Q xabc")
+    assert _texto(p) == "Q xabc"
+
+
+def test_a_palavra_virtual_fica_quando_a_vizinha_sai():
+    p = _pagina("a c")
+    _editar(p, "a c", "a b c")                            # "b" é uma palavra virtual
+    _editar(p, "a b", "b")
+    assert _texto(p) == "b c"
+    p = _pagina("casa", "ab", "fim")
+    _editar(p, "ab", "abc")
+    _editar(p, "abc", "c")                                # sobra só o virtual na linha
+    assert _texto(p) == "casa c\nfim"                     # (uma linha só existe com boxes)
+
+
+@pytest.mark.parametrize("pagina, com_virtual, para", [
+    ("ab cd", "abx cd", "abxcd"),                         # juntar depois do virtual
+    ("ab", "abx", "ab x"),                                # o virtual vira palavra
+    ("ab", "axb", "ax b"),                                # partir depois do virtual
+    ("a b", "a xb", "ax b")])                             # partir antes dele
+def test_o_espaco_junto_de_um_virtual(pagina, com_virtual, para):
+    p = _pagina(pagina)
+    _editar(p, pagina, com_virtual)
+    assert len(p.decisoes.virtuais) == 1
+    _editar(p, com_virtual, para)
+    assert _texto(p) == para
+
+
+def test_uma_letra_no_meio_da_ligadura_e_do_passo_g():
+    p = _pagina("afb")
+    p.boxes[1] = Box(p.boxes[1].gid, BoxEntry("fi", 42, 20, 60, 50, 0.9, "net"))
+    with pytest.raises(ss.Recusa, match="dividir um glifo"):
+        _editar(p, "afib", "afxib")
+
+
+def test_o_que_ninguem_tocou_fica_com_o_glifo_dele():
+    p = _pagina("cassa")
+    texto, unidades = ss.texto_e_unidades(p)
+    segundo = p.boxes[3].gid
+    ss.editar(p, unidades, "casa", fixos=[(0, 0), (1, 1), (2, 2), (4, 3)])   # o 2º s apagado
+    assert _texto(p) == "casa" and segundo not in p.vivos and p.boxes[2].gid != segundo
+
+
+def test_enter_nao_revisa_o_nao_lido():
+    p = _pagina("ca?a")
+    p.boxes[2] = Box(p.boxes[2].gid, BoxEntry("", 64, 20, 82, 50, 0.0, "none"))
+    _editar(p, f"ca{tx.NAO_LIDO}a", f"ca{tx.NAO_LIDO}a")
+    assert not p.boxes[2].revisado and p.boxes[0].revisado
+
+
+def test_figurinas_com_pontuacao_e_o_token_igual_que_mudou_de_lugar():
+    assert ss.figurinas("(Cf3)", "pt") == "(♘f3)" and ss.figurinas("Cf3,", "pt") == "♘f3,"
+    assert ss.com_figurinas("Cf3 joga Cf3", "Cf3 joga xx", "pt", "figurinas") == "Cf3 joga ♘f3"
+
+
+def test_gid_no_cursor_da_letra_nova():
+    p = _pagina("csa")
+    _texto_, unidades = ss.texto_e_unidades(p)
+    assert ss.gid_no_cursor(unidades, "casa", 2) == ss.LETRA_NOVA
+    assert ss.gid_no_cursor(unidades, "casa", 1) == p.boxes[0].gid

@@ -558,3 +558,33 @@ def test_as_paginas_do_detalhe_vao_em_faixas_e_o_lote_limpo_nao_tem_detalhe():
     assert lote.tem_detalhe(parou)
     assert lote.resumo_do_fim(parou).startswith("Lote interrompido (o servidor de leitura parou): ")
 
+
+
+# ----------------------------------------------------------------------
+# O `lote.json` gravado numa thread (`_GravadorDoLote`)
+# ----------------------------------------------------------------------
+
+def test_o_gravador_do_lote_fica_com_o_mais_novo_e_apaga(tmp_path, monkeypatch):
+    import threading
+
+    from abbychess import gravacao as gv
+    from abbychess.controladores import _GravadorDoLote
+
+    arquivo = tmp_path / "lote.json"
+    liberar = threading.Event()
+    gravar_de_verdade = gv.gravar_json
+
+    def gravar_devagar(caminho, dados):
+        liberar.wait(5)                                   # a 1ª gravação fica presa aqui
+        gravar_de_verdade(caminho, dados)
+    monkeypatch.setattr(gv, "gravar_json", gravar_devagar)
+    gravador = _GravadorDoLote()
+    gravador.gravar(arquivo, {"paginas": [1]})
+    gravador.gravar(arquivo, {"paginas": [2]})
+    gravador.gravar(arquivo, {"paginas": [3]})            # o mais novo vence os do meio
+    liberar.set()
+    gravador.esperar()
+    assert json.loads(arquivo.read_text(encoding="utf-8")) == {"paginas": [3]}
+    gravador.gravar(arquivo, None)                        # o lote acabou: o arquivo sai
+    gravador.esperar()
+    assert not arquivo.exists()

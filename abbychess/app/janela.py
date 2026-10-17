@@ -276,6 +276,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         if not self._gravou_ou_perder(projeto):
             return False
         self._parar_tarefas()                   # o fim da tarefa em voo ainda entra
+        self.livro.esperar_a_gravacao()
         if not self._gravou_ou_perder(projeto):   # e o que ele entregou também é gravado
             self.pagina.ler_os_aguardando()     # ficou aberto: o que foi abandonado volta
             return False

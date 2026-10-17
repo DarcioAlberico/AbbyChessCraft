@@ -137,6 +137,9 @@ class ControladorDePagina:
         #: O glifo em revisão, os pulados e a seleção do modo de treino, por gid.
         self.atual: Optional[int] = None
         self.pulados: set = set()
+        #: Conta as sessões do Documento confirmadas: a chave do passo do desfazer de cada
+        #: uma, que o ensinar do Ctrl+Enter emenda.
+        self._numero_da_sessao = 0
         #: A ordem da fila de glifos (§8.1): "confianca" (o menos confiável primeiro, os
         #: pulados no fim) ou "leitura" (a ordem da página).
         self.ordem_da_fila = "confianca"
@@ -1066,13 +1069,15 @@ class ControladorDePagina:
         self._editar("Marcando", corpo, precisa_de_glifos=False)
 
     def confirmar_sessao(self, unidades, novo: str, *, ensinar_gid: Optional[int] = None,
-                         original: Optional[str] = None) -> None:
+                         original: Optional[str] = None, fixos=(), depois=None) -> None:
         """§6.3: a sessão do Documento confirmada (Enter, Shift+Enter, Ctrl+Enter, sair dela):
         as unidades originais dela e o texto de agora viram as operações da tabela, num passo
-        do desfazer, e todos os glifos dela ficam `revisado`. Sem mudança, é aceitar a
+        do desfazer, e os glifos dela com leitura ficam `revisado`. Sem mudança, é aceitar a
         palavra. O que é do passo G recusa tudo (`sessao_recusada`, com a mensagem); o que
         muda a estrutura avisa (`estrutural`). `ensinar_gid` (Ctrl+Enter) ensina o glifo sob o
-        cursor depois de confirmar."""
+        cursor no mesmo passo do desfazer (`ss.LETRA_NOVA`: uma letra digitada agora, que não
+        ensina). `fixos`: os pares que nenhuma edição tocou (`sessao.alinhar`). `depois()`
+        roda quando a edição entrou na página (na hora, ou na vez dela na fila)."""
         unidades = list(unidades)
         original = original if original is not None else "".join(u.texto for u in unidades)
         dados = self.projeto.dados if self.projeto is not None else None
@@ -1088,14 +1093,21 @@ class ControladorDePagina:
                 self.eventos.emitir("sessao_recusada", "a página mudou antes da confirmação")
                 return
             try:
-                plano = ss.planejar(unidades, novo)
+                plano = ss.planejar(unidades, novo, fixos)
             except ss.Recusa as recusa:
                 self.eventos.emitir("sessao_recusada", str(recusa))
-                self._avisar(f"Edição recusada: {recusa}. A palavra voltou ao que era.", 8000)
                 return
             antes = self._instantaneo()
             vivos_antes = set(pagina.vivos)
-            ss.aplicar(pagina, plano)
+            try:
+                ss.aplicar(pagina, plano)
+            except Exception:
+                # Nada da sessão fica pela metade: a página volta ao instantâneo (os gids já
+                # alocados não voltam: um gid nunca se repete).
+                pagina.boxes, pagina.decisoes = list(antes.pagina.boxes), antes.pagina.decisoes
+                log.exception("a sessão do Documento falhou ao aplicar")
+                self.eventos.emitir("sessao_recusada", "a edição falhou e foi desfeita")
+                return
             saiu = vivos_antes - pagina.vivos
             self.pulados -= saiu
             self.selecao -= saiu
@@ -1104,14 +1116,18 @@ class ControladorDePagina:
             palavra = " ".join(novo.split())
             descricao = (f"Editar '{palavra[:40]}'" if plano.muda
                          else f"Aceitar '{' '.join(original.split())[:40]}'")
-            self._mudou(pagina, indice, descricao, antes)
+            self._numero_da_sessao += 1
+            chave = ("sessao", self._numero_da_sessao)   # o Ctrl+Enter emenda nesta
+            self._mudou(pagina, indice, descricao, antes, juntar=chave)
             aviso = plano.estrutural()
             if plano.virtuais and self._tinta_sem_box(pagina, plano):
                 aviso += " · há tinta sem box aqui: Ctrl+M marca o quadro"
             if aviso:
                 self.eventos.emitir("estrutural", aviso)
             if ensinar_gid is not None:
-                self._ensinar_do_documento(ensinar_gid, virtuais)
+                self._ensinar_do_documento(ensinar_gid, chave)
+            if depois is not None:
+                depois()
         self._editar("Editando o texto", corpo)
 
     def _tinta_sem_box(self, pagina: Pagina, plano) -> bool:
@@ -1137,19 +1153,22 @@ class ControladorDePagina:
                 return True
         return False
 
-    def _ensinar_do_documento(self, gid: int, virtuais) -> None:
-        """Ctrl+Enter: o glifo sob o cursor, ensinado com o caractere dele."""
-        if gid in virtuais:
+    def _ensinar_do_documento(self, gid: int, chave) -> None:
+        """Ctrl+Enter: o glifo sob o cursor, ensinado com o caractere dele, no passo do
+        desfazer da edição (`chave`)."""
+        virtuais = {v.gid for v in self.modelo.decisoes.virtuais} if self.modelo else set()
+        if gid == ss.LETRA_NOVA or gid in virtuais:
             self._avisar("Glifo sem tinta não ensina.", 6000)
             return
-        if self.modelo is None or gid not in self.modelo.vivos:
+        if self.modelo is None or gid not in self.modelo.vivos or not self._pode_ler():
             return
         char = self.box(gid).char
         if not char:
             return
         self.escolher(gid)
         self.limpar_selecao()
-        self.ensinar(char)
+        self.ensinar_gids({char: [gid]}, f"Ensinar '{char}'",
+                          self._depois_de_ensinar(char, [gid]), juntar=chave)
 
     def _depois_de_editar(self, mostrar: int, descricao: str, antes: hs.Instantaneo,
                           mensagem: str, *, juntar=None, evento: str = "editar") -> None:

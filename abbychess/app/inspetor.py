@@ -25,15 +25,18 @@ DICAS = {
 class PainelDoInspetor(QWidget):
     #: O modo da fila escolhido no seletor.
     modo_escolhido = Signal(str)
+    #: O escopo escolhido no seletor ("pagina" ou "livro").
+    escopo_escolhido = Signal(str)
 
     def __init__(self, modos: Sequence[Tuple[str, str]], editores: Dict[str, QWidget],
-                 parent=None):
+                 parent=None, escopos: Sequence[Tuple[str, str]] = ()):
         super().__init__(parent)
         self.seletor = QToolButton()
         self.seletor.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.seletor.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
-        self.seletor.setAccessibleName("Modo da fila de revisão (F7 cicla)")
-        self.seletor.setToolTip("O que Alt+↓ e Alt+↑ percorrem (F7 cicla)")
+        self.seletor.setAccessibleName("Modo da fila de revisão (F7 cicla; Shift+F7, o escopo)")
+        self.seletor.setToolTip("O que Alt+↓ e Alt+↑ percorrem (F7 cicla o modo; Shift+F7 "
+                                "alterna a página e o livro)")
         menu = QMenu(self.seletor)
         grupo = QActionGroup(menu)
         self._modos: Dict[str, QAction] = {}
@@ -43,6 +46,16 @@ class PainelDoInspetor(QWidget):
             grupo.addAction(acao)
             acao.triggered.connect(lambda _=False, m=modo: self.modo_escolhido.emit(m))
             self._modos[modo] = acao
+        self._escopos: Dict[str, QAction] = {}
+        if escopos:
+            menu.addSeparator()
+            grupo_do_escopo = QActionGroup(menu)
+            for escopo, nome in escopos:
+                acao = menu.addAction(f"Escopo: {nome}")
+                acao.setCheckable(True)
+                grupo_do_escopo.addAction(acao)
+                acao.triggered.connect(lambda _=False, e=escopo: self.escopo_escolhido.emit(e))
+                self._escopos[escopo] = acao
         self.seletor.setMenu(menu)
         self.contador = QLabel("")
         self.contador.setAccessibleName("Posição na fila")
@@ -88,9 +101,11 @@ class PainelDoInspetor(QWidget):
     def editor(self) -> QWidget:
         return self.editores[self.atual()]
 
-    def mostrar_modo(self, modo: str, nome: str) -> None:
-        self.seletor.setText(nome + "  ▾")
+    def mostrar_modo(self, modo: str, nome: str, escopo: str = "", nome_do_escopo: str = "") -> None:
+        self.seletor.setText(nome + (f" · {nome_do_escopo}" if nome_do_escopo else "") + "  ▾")
         self._modos[modo].setChecked(True)
+        if escopo in self._escopos:
+            self._escopos[escopo].setChecked(True)
 
     def mostrar_contador(self, texto: str) -> None:
         self.contador.setText(texto)

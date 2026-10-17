@@ -1,0 +1,119 @@
+"""A revisão (SPEC §8, passo C), sem a janela: os modos e o escopo da fila (F7, Shift+F7,
+Alt+↓ no livro), a fila recalculada só para os glifos tocados e o F6 pelo resumo do livro."""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import pytest
+from core.box_model import BoxEntry
+
+from abbychess import livro as lv
+from abbychess.modelo import Box, gid_de
+
+
+def _escrever(projeto, indice, texto, confiancas):
+    """A página `indice` com uma letra por box (as confianças na ordem das letras)."""
+    pagina = projeto.pagina_para_editar(indice)
+    boxes, x, n = [], 20, 0
+    for palavra in texto.split(" "):
+        for letra in palavra:
+            boxes.append(Box(gid_de(pagina.pid, n),
+                             BoxEntry(letra, x, 20, x + 18, 50, confiancas[n], "net")))
+            n, x = n + 1, x + 22
+        x += 30
+    pagina.boxes, pagina.proximo_n, pagina.estado = boxes, n, "reconhecida"
+    projeto.salvar_modelo(pagina)
+    return pagina
+
+
+@pytest.fixture
+def livro(tmp_path):
+    """Três páginas: a 1 e a 3 com glifos a revisar (confiança abaixo de 0,90), a 2 sem."""
+    from abbychess.controladores import ControladorDaFila
+    from abbychess.projeto import ProjetoDeLivro
+    from tests.test_controlador import ExecutorManual, _controlador
+    from tests.test_livro import pdf_sintetico
+
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Três", pdf_sintetico(tmp_path))
+    _escrever(projeto, 0, "cab bca", [0.5, 0.2, 0.95, 0.3, 0.6, 0.4])
+    _escrever(projeto, 1, "abc", [0.99, 0.99, 0.99])
+    _escrever(projeto, 2, "ba ab", [0.7, 0.1, 0.95, 0.8])
+    ctl = _controlador(projeto, ExecutorManual())
+    verificador = SimpleNamespace(desconhecidas=[], posicao=0, andar=lambda p: None,
+                                  verificar=lambda: True)
+    fila = ControladorDaFila(ctl, verificador, SimpleNamespace(proximo_do_livro=lambda: None))
+    yield projeto, ctl, fila
+    projeto.fechar()
+
+
+def _letras(ctl, gids):
+    return "".join(ctl.modelo.box(g).entry.char for g in gids)
+
+
+def test_os_modos_ordenam_a_fila(livro):
+    projeto, ctl, fila = livro
+    fila.definir("confianca")
+    assert _letras(ctl, ctl.fila()) == "abacc"            # 0,2 0,3 0,4 0,5 0,6
+    fila.definir("leitura")
+    assert _letras(ctl, ctl.fila()) == "cabca"            # a ordem da página, sem o 0,95
+    fila.definir("caractere")
+    assert _letras(ctl, ctl.fila()) == "aabcc"            # pela leitura; em cada uma, a confiança
+    fila.ciclar()
+    assert fila.modo == "palavras"
+
+
+def test_no_escopo_livro_o_fim_da_pagina_leva_a_proxima_com_pendentes(livro):
+    projeto, ctl, fila = livro
+    fila.definir("leitura")
+    fila.definir_escopo("livro")
+    ctl.escolher(ctl.fila()[-1])
+    fila.andar(+1)                                        # a página 2 não tem pendentes
+    assert ctl.indice == 2 and ctl.atual == ctl.fila()[0]
+    fila.andar(-1)                                        # o começo da 3 volta ao fim da 1
+    assert ctl.indice == 0 and ctl.atual == ctl.fila()[-1]
+    assert fila.contador() == "5/5 · livro 8"
+    fila.alternar_escopo()                                # Shift+F7: só a página
+    fila.andar(+1)
+    assert ctl.indice == 0 and ctl.atual == ctl.fila()[0]
+
+
+def test_na_confianca_o_livro_segue_depois_de_pular_todos(livro):
+    projeto, ctl, fila = livro
+    fila.definir("confianca")
+    fila.definir_escopo("livro")
+    ctl.ir_ao_primeiro_pendente()
+    for _ in range(4):                                    # os 4 primeiros vão para o fim
+        fila.andar(+1)
+    assert ctl.indice == 0
+    fila.andar(+1)                                        # o quinto: todos pulados
+    assert ctl.indice == 2
+
+
+def test_a_fila_julga_de_novo_so_os_glifos_tocados(livro, monkeypatch):
+    from abbychess import controlador as cp
+    from abbychess import edicao as ed
+
+    projeto, ctl, fila = livro
+    ctl.fila()
+    julgados = []
+    original = cp.precisa_revisao
+    monkeypatch.setattr(cp, "precisa_revisao", lambda *a: (julgados.append(a), original(*a))[1])
+    ctl.fila()
+    assert julgados == []                                 # nada mudou
+    ed.corrigir(ctl.modelo, ctl.modelo.boxes[0].gid, "x")
+    ctl.fila()
+    assert len(julgados) == 1                             # só o corrigido
+
+
+def test_o_f6_conta_pelo_resumo_sem_abrir_as_paginas(livro, monkeypatch):
+    projeto, ctl, fila = livro
+    assert projeto.descarregar(10)
+    monkeypatch.setattr(projeto, "carregar_modelo", lambda i: (_ for _ in ()).throw(
+        AssertionError("abriu a página")))
+    limiares = ctl.leitor.limiares
+    assert lv.pendentes_por_pagina(projeto, limiares) == {0: 5, 2: 3}
+    assert lv.proxima_com_pendentes(projeto, limiares, 0) == 2
+    assert lv.anterior_com_pendentes(projeto, limiares, 0) == 2
+    mais_baixo = type(limiares)(**{**vars(limiares), "revisao": 0.35})
+    assert lv.pendentes_por_pagina(projeto, mais_baixo) == {0: 2, 2: 1}   # outro limiar

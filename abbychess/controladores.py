@@ -813,23 +813,42 @@ class ControladorDoLivro:
 
 
 class ControladorDaFila:
-    """A fila da revisão (§8.1): o modo, e o próximo e o anterior nele (Alt+↓ / Alt+↑, em
-    qualquer painel). O escopo livro (Shift+F7) é do passo C; aqui, a página."""
+    """A fila da revisão (§8.1): o modo, o escopo, e o próximo e o anterior nele (Alt+↓ /
+    Alt+↑, em qualquer painel). No escopo livro (Shift+F7), o fim da fila da página leva à
+    próxima página com pendentes (e o começo, à anterior), pelo resumo do `livro.json`; nas
+    palavras, à página seguinte; os diagramas são sempre os do livro."""
 
     #: (modo, nome no seletor do Inspetor), na ordem do F7.
     MODOS = (("confianca", "Confiança"), ("leitura", "Ordem de leitura"),
-             ("palavras", "Palavras desconhecidas"), ("diagramas", "Diagramas por conferir"))
+             ("caractere", "Por caractere"), ("palavras", "Palavras desconhecidas"),
+             ("diagramas", "Diagramas por conferir"))
     #: Os modos que andam pelos glifos (o Inspetor mostra o Glifo).
-    DE_GLIFOS = ("confianca", "leitura")
+    DE_GLIFOS = ("confianca", "leitura", "caractere")
+    #: (escopo, nome), na ordem do Shift+F7.
+    ESCOPOS = (("pagina", "página"), ("livro", "livro"))
 
     def __init__(self, pagina: ControladorDePagina, verificador: ControladorDeVerificacao,
                  conferencia: ControladorDeDiagramas):
         self.pagina, self.verificador, self.conferencia = pagina, verificador, conferencia
         self.eventos = pagina.eventos
         self.modo = "confianca"
+        self.escopo = "pagina"
 
     def nome(self, modo: Optional[str] = None) -> str:
         return dict(self.MODOS)[modo or self.modo]
+
+    def nome_do_escopo(self) -> str:
+        return dict(self.ESCOPOS)[self.escopo]
+
+    def definir_escopo(self, escopo: str) -> None:
+        if escopo not in dict(self.ESCOPOS):
+            raise ValueError(f"escopo da fila desconhecido: {escopo!r}")
+        self.escopo = escopo
+        self.eventos.emitir("modo_da_fila_mudou", self.modo)
+
+    def alternar_escopo(self) -> None:
+        """Shift+F7: a página ou o livro."""
+        self.definir_escopo("livro" if self.escopo == "pagina" else "pagina")
 
     def definir(self, modo: str) -> None:
         if modo not in dict(self.MODOS):
@@ -848,13 +867,70 @@ class ControladorDaFila:
     def andar(self, passo: int) -> None:
         """Alt+↓ (passo +1) e Alt+↑ (−1): o item seguinte ou o anterior no modo de agora.
         Nunca muda texto. Nos diagramas, os dois vão ao próximo por conferir: o conferido sai
-        da fila, e não há "anterior" a que voltar."""
+        da fila, e não há "anterior" a que voltar. No escopo livro, passar do fim (ou do
+        começo) da página leva à próxima (ou à anterior) com o que revisar."""
         if self.modo in self.DE_GLIFOS:
-            self.pagina.andar(passo)
+            if self.escopo == "livro" and self._na_ponta(passo):
+                self._outra_pagina(passo)
+            else:
+                self.pagina.andar(passo)
         elif self.modo == "palavras":
-            self.verificador.andar(passo)
+            v = self.verificador
+            total = len(v.desconhecidas)
+            na_ponta = not total or (v.posicao == total - 1 if passo > 0 else v.posicao == 0)
+            if self.escopo == "livro" and na_ponta:
+                self._outra_pagina_das_palavras(passo)
+            else:
+                v.andar(passo)
         else:
             self.conferencia.proximo_do_livro()
+
+    def _na_ponta(self, passo: int) -> bool:
+        """O atual é o último da fila da página (Alt+↓) ou o primeiro (Alt+↑), ou ela está
+        vazia: a próxima ida sai da página."""
+        p = self.pagina
+        fila = p.fila()
+        if not fila:
+            return True
+        if p.atual not in fila:
+            return False
+        if passo > 0:
+            if p.ordem_da_fila == "confianca":   # o Alt+↓ põe o atual no fim (os pulados)
+                return all(g in p.pulados or g == p.atual for g in fila)
+            return fila.index(p.atual) == len(fila) - 1
+        return fila.index(p.atual) == 0
+
+    def _outra_pagina(self, passo: int) -> None:
+        from abbychess import livro as lv
+
+        p = self.pagina
+        if p.projeto is None or p.leitor is None:
+            return
+        ir = lv.proxima_com_pendentes if passo > 0 else lv.anterior_com_pendentes
+        alvo = ir(p.projeto, p.leitor.limiares, p.indice)
+        if alvo is None or alvo == p.indice:
+            p.pulados = set()
+            p.ir_ao_primeiro_pendente()
+            p._avisar("Não há mais o que revisar no livro.", 5000)
+            return
+        p.ir_para(alvo)
+        fila = p.fila()
+        if fila:
+            p.escolher(fila[0] if passo > 0 else fila[-1])
+
+    def _outra_pagina_das_palavras(self, passo: int) -> None:
+        p = self.pagina
+        if p.projeto is None or p.fonte is None:
+            return
+        lidas = sorted(p.projeto.paginas_lidas())
+        if not lidas:
+            return
+        depois = [i for i in lidas if (i > p.indice if passo > 0 else i < p.indice)]
+        alvo = (depois[0] if passo > 0 else depois[-1]) if depois else \
+            (lidas[0] if passo > 0 else lidas[-1])
+        if alvo != p.indice:
+            p.ir_para(alvo)
+        self.verificador.verificar()
 
     def contador(self) -> str:
         """"12/204": a posição do item atual na fila do modo, e o tamanho dela."""
@@ -862,6 +938,12 @@ class ControladorDaFila:
         if self.modo in self.DE_GLIFOS:
             fila = p.fila()
             n = fila.index(p.atual) + 1 if p.atual in fila else 0
+            if self.escopo == "livro" and p.projeto is not None and p.leitor is not None:
+                from abbychess import livro as lv
+
+                outras = lv.pendentes_por_pagina(p.projeto, p.leitor.limiares)
+                total = sum(v for i, v in outras.items() if i != p.indice) + len(fila)
+                return f"{n}/{len(fila)} · livro {total}"
             return f"{n}/{len(fila)}"
         if self.modo == "palavras":
             total = len(self.verificador.desconhecidas)

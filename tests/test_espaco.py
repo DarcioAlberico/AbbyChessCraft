@@ -338,6 +338,8 @@ def test_f7_cicla_o_modo_e_o_editor_do_inspetor(app, lida, monkeypatch):
     assert j.fila.modo == "leitura" and j.pagina.ordem_da_fila == "leitura"
     assert fila(j) == sorted(fila(j), key=j.pagina.gids.index)       # na ordem da página
     QTest.keyClick(j.visor, Qt.Key.Key_F7)
+    assert j.fila.modo == "caractere" and j.inspetor.atual() == "glifo"   # passo C
+    QTest.keyClick(j.visor, Qt.Key.Key_F7)
     assert j.fila.modo == "palavras" and j.inspetor.atual() == "palavra"
     assert "Palavras" in j.inspetor.seletor.text()
     QTest.keyClick(j.visor, Qt.Key.Key_F7)

@@ -156,6 +156,11 @@ class ControladorDePagina:
         #: A ordem da fila de glifos (§8.1): "confianca" (o menos confiável primeiro, os
         #: pulados no fim) ou "leitura" (a ordem da página).
         self.ordem_da_fila = "confianca"
+        #: gid -> (o que decide, se ele vai para a fila): a fila julga de novo só os glifos
+        #: que mudaram (a leitura, a fonte, a confiança ou o revisado), e todos quando o
+        #: limiar muda.
+        self._pendencia: dict = {}
+        self._limiar_da_pendencia = None
         #: Na ordem de leitura: (página, posição na ordem da página) do último glifo mostrado,
         #: para a decisão seguir em frente mesmo quando o glifo sai (descartar, juntar).
         self._lugar_de_leitura = (-1, 0)
@@ -226,18 +231,45 @@ class ControladorDePagina:
         return self.projeto is not None and self.leitor is not None and self.fonte is not None
 
     def fila(self) -> List[int]:
-        """Os gids a revisar: do menos confiável ao mais, com os pulados no fim; ou, na ordem
-        de leitura (`ordem_da_fila`), na ordem da página. O glifo `revisado` (visto e aceito
-        no Documento, §6.3) não volta."""
+        """Os gids a revisar (§8.1): do menos confiável ao mais, com os pulados no fim; na
+        ordem de leitura (`ordem_da_fila`), na ordem da página; por caractere, agrupados pela
+        leitura (os sem leitura no fim) e, em cada grupo, do menos confiável ao mais. O glifo
+        `revisado` (visto e aceito no Documento, §6.3) não volta."""
         if self.leitor is None or self.modelo is None:
             return []
         boxes = self.modelo.boxes
-        indices = [i for i in pg.fila_de_revisao(self.modelo.entries(), self.leitor)
-                   if not boxes[i].revisado]
+        indices = self._pendentes()
         if self.ordem_da_fila == "leitura":
-            return [boxes[i].gid for i in sorted(indices)]
+            return [boxes[i].gid for i in indices]
+        if self.ordem_da_fila == "caractere":
+            indices = sorted(indices, key=lambda i: (boxes[i].entry.char or "\uffff",
+                                                     round(boxes[i].entry.confidence, 2), i))
+        else:
+            indices = sorted(indices, key=lambda i: (round(boxes[i].entry.confidence, 2), i))
         fila = [boxes[i].gid for i in indices]
         return [g for g in fila if g not in self.pulados] + [g for g in fila if g in self.pulados]
+
+    def _pendentes(self) -> List[int]:
+        """Os índices dos glifos que vão para a fila, na ordem da página. Só os glifos que
+        mudaram são julgados de novo (§8.1: a fila recalculada só para os gids tocados)."""
+        limiares = self.leitor.limiares
+        chave = limiares.revisao                 # o único limiar que decide a fila
+        anterior = self._pendencia if chave == self._limiar_da_pendencia else {}
+        nova, indices = {}, []
+        for i, box in enumerate(self.modelo.boxes):
+            e = box.entry
+            estado = (e.char, e.source, e.confidence, box.revisado)
+            visto = anterior.get(box.gid)
+            if visto is not None and visto[0] == estado:
+                pendente = visto[1]
+            else:
+                pendente = not box.revisado and precisa_revisao(e.char, e.source, e.confidence,
+                                                                limiares)
+            nova[box.gid] = (estado, pendente)
+            if pendente:
+                indices.append(i)
+        self._pendencia, self._limiar_da_pendencia = nova, chave
+        return indices
 
     def alvos(self) -> List[int]:
         """O que a decisão vale: a seleção inteira, ou só o glifo em revisão (por gid, na

@@ -97,6 +97,8 @@ class DesenhoDaJanela:
         self.treino.mostrar(p.matriz, p.box_atual(), p.posicao_do_atual())
         # A fila e a Imagem levam o Documento e a Linha ao glifo (§6.2).
         self.texto.ir_ao_gid(p.atual, rolar=True)   # §6.2: o Documento rola até o glifo
+        self.texto.marcar_atual(p.atual)            # e o marca, também sem o foco nele
+        self.visor.marcar_palavra_do_documento(None)    # o contorno do cursor ficaria velho
         self._mostrar_a_linha()
         # Seguir (Ctrl+Shift+L): o item atual fica visível, a 120 px da borda (§3.3).
         self.visor.selecionar(p.indice_de(p.atual), centralizar=self.acao_seguir.isChecked())
@@ -111,7 +113,7 @@ class DesenhoDaJanela:
         estados = {b.gid: gd.estado(b.entry, b.gid in na_fila) for b in p.modelo.boxes} \
             if p.modelo is not None else {}
         self.texto.montar(p.documento(), p.diagramas, estados, v.gids_desconhecidos(),
-                          p.gids_virtuais(), p.matriz)
+                          p.gids_virtuais(), p.matriz, p.gids_de_margem())
         self._mostrar_a_linha()
 
     def _selecao_mudou(self) -> None:

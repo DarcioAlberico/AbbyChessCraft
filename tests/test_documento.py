@@ -314,10 +314,11 @@ def test_o_zoom_no_documento_muda_o_corpo_e_nao_a_imagem(app, lida_a_mao):
     j.vista.setCurrentWidget(j.painel_do_documento)
     j.texto.setFocus()
     app.processEvents()
+    padrao = j.texto.corpo_padrao                         # 10 em 1366, 11 de 1600 em diante
     QTest.keyClick(j.texto, Qt.Key.Key_Equal, Qt.KeyboardModifier.ControlModifier)
-    assert j.texto.corpo == 12 and abs(j.visor.escala() - escala) < 1e-9
+    assert j.texto.corpo == padrao + 1 and abs(j.visor.escala() - escala) < 1e-9
     QTest.keyClick(j.texto, Qt.Key.Key_0, Qt.KeyboardModifier.ControlModifier)
-    assert j.texto.corpo == 11
+    assert j.texto.corpo == padrao
 
 
 def test_ctrl_shift_h_na_janela(app, lida_a_mao):
@@ -402,3 +403,30 @@ def test_o_ultimo_glifo_de_uma_linha_visual_quebrada_e_clicavel(app):
         ponto = v.cursorRect(cursor).center() + QPoint(3, 0)
         assert v.gid_no_ponto(ponto) == g
     v.close()
+
+
+def test_o_cabecalho_corrido_sai_em_cinza_e_ctrl_shift_h_o_oculta(app):
+    """Até o passo F, as margens vêm da regra da exportação (`gids_de_margem`)."""
+    v = _vista(app, _doc(_bloco("b0", "texto", [[9, 10, 11]], [[1, 2], [3]]), chars=CHARS),
+               margens={9, 10, 11})
+    cursor = v.textCursor()
+    cursor.setPosition(v.posicao_do_gid(10) + 1)
+    assert cursor.charFormat().foreground().color().name() == "#6e6e6e"   # o cinza
+    v.alternar_margens(False)
+    assert v.toPlainText() == "ab c" and v.linha_de(10) == [9, 10, 11]
+
+
+def test_o_glifo_atual_fica_marcado_no_documento_sem_o_foco(app, lida):  # noqa: F811
+    j = lida
+    j.pintar_texto()
+    j.inspetor.focar()                                     # o foco no Inspetor, como na fila
+    j.fila.andar(+1)
+    selecoes = j.texto.extraSelections()
+    assert len(selecoes) == 1
+    assert j.texto.gid_na_posicao(selecoes[0].cursor.selectionStart()) == atual(j)
+
+
+def test_a_pagina_nao_reconhecida_diz_no_documento(app, janela):  # noqa: F811
+    janela.pintar_texto()
+    assert "não reconhecida" in janela.texto.toPlainText()
+    assert not janela.acao_realce.isEnabled()

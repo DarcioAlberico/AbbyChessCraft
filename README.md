@@ -174,11 +174,13 @@ o modo "palavras desconhecidas"; Ctrl+I (ignorar a palavra) → Ctrl+Shift+I; Ct
 Desde o passo A3 a aba **Documento** mostra a página reconhecida como texto formatado, e não
 mais como texto puro:
 
-- **Uma linha impressa por parágrafo**, com as figurinas como impressas (♘). Os títulos em
-  negrito maior; cabeçalho, rodapé e número de página em cinza pequeno, e **Ctrl+Shift+H** (ou
-  "Cabeçalhos e rodapés", na barra do Documento) os oculta; as notas em corpo menor. Refluir
-  as linhas em parágrafos fica para o passo F, que acha os parágrafos: sem eles, o título e o
-  corpo da mesma área se juntariam.
+- **Uma linha impressa por parágrafo**, com as figurinas como impressas (♘). O **cabeçalho e
+  o rodapé corridos** (a linha curta na faixa de cima ou de baixo, separada do texto, com o
+  número da página: a mesma regra que os tira da exportação) saem em cinza pequeno, e
+  **Ctrl+Shift+H** (ou "Cabeçalhos e rodapés", na barra do Documento) os oculta. Os títulos
+  em negrito e as notas em corpo menor dependem da função das áreas, que só o layout do
+  passo F dá: até lá, o título sai como o corpo. Refluir as linhas em parágrafos também fica
+  para o F: sem os parágrafos, o título e o corpo da mesma área se juntariam.
 - **Os diagramas no lugar deles**, inteiros: o desenho da posição lida (o recorte da página,
   se ainda não lida), a linha do diagrama em monoespaçado, o estado (conferido, lido e não
   conferido, não lido; o "confiável pelos lances" de §6.1 vem com a validação pelos lances,
@@ -188,15 +190,18 @@ mais como texto puro:
   conhece (depois de a fila de palavras desconhecidas ter rodado na página), pontilhado no
   glifo virtual; o confirmado e o confiável sem realce.
 - **Ctrl++ e Ctrl+−** com o foco no Documento mudam o corpo do texto (Ctrl+0 volta ao
-  padrão); com o foco na Imagem, o zoom dela.
+  padrão: 10 numa janela de menos de 1600 px, para a linha caber na vista direita, e 11 de
+  1600 em diante); com o foco na Imagem, o zoom dela.
 - **É só leitura** até o passo D1, que traz a edição no Documento.
 
 **A sincronia**: o clique numa palavra do Documento a contorna (tracejado azul) na Imagem e
 leva o glifo clicado ao Inspetor; o cursor andando pelo Documento (as setas) contorna a
 palavra na Imagem, que rola até ela só com Seguir; o clique na Imagem e o Alt+↓ da fila
-levam o cursor do Documento ao glifo e o mostram. O contorno da palavra em verificação
-(cheio) é outro e fica. Uma edição ou a propagação montam o Documento de novo sem perder o
-lugar: o cursor e a seleção voltam aos mesmos glifos, e a rolagem fica.
+levam o cursor do Documento ao glifo e o mostram, com o glifo atual da fila em fundo azul-claro (também sem o
+foco no Documento). O contorno da palavra em verificação (cheio) é outro e fica. Uma edição
+ou a propagação montam o Documento de novo sem perder o lugar: o cursor e a seleção voltam
+aos mesmos glifos, e a rolagem fica; quando a fila anda (um Enter, o Alt+↓), o Documento
+vai junto até o glifo seguinte. A página não reconhecida diz isso no Documento.
 
 **A Linha** (**Ctrl+F5** a esconde e mostra), embaixo da Imagem e da vista direita: a linha
 do glifo atual ampliada, a imagem em cima e o texto lido embaixo, cada caractere sob o glifo
@@ -894,7 +899,8 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   para o passo F, com os parágrafos do layout; **editar** no Documento, para o D1. O **CA-F.1**
   (os gestos para levar a fatia ao gabarito, com o alvo de ≤ 85% da linha de base depois do
   A3) segue pendente: o replay conta contra as linhas de texto verificadas do gabarito, e
-  nenhuma está verificada ainda (`ferramentasotular.py`, ver "O que falta você fazer").
+  nenhuma está verificada ainda (`ferramentas
+otular.py`, ver "O que falta você fazer").
 - **O espaço de trabalho, desde o passo A2** (3 rodadas do commit `93c94a7`, pasta limpa).
   As medidas do A1 ficaram iguais: a troca no cache em 14 ms na mediana, fora do cache
   130–135; a pintura dos boxes, 12–13 no p95; a releitura, 15 na mediana; o Enter até a cor

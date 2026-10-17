@@ -232,6 +232,13 @@ class ControladorDeVerificacao:
         if self.desconhecidas:
             self.mostrar(self.posicao + passo)
 
+    def gids_desconhecidos(self) -> set:
+        """Os gids das palavras desconhecidas da última contagem (o ondulado do Documento)."""
+        if self.lexico is None:
+            return set()
+        return {self._gids[i] for d in self.desconhecidas for i in d.indices
+                if i < len(self._gids)}
+
     def gids_da_palavra(self, palavra: vf.Desconhecida) -> Optional[List[int]]:
         """Os gids da palavra, ou None se algum glifo dela saiu desde a contagem."""
         vivos = set(self.pagina.gids)

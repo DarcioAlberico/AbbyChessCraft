@@ -319,14 +319,23 @@ class EspacoDeTrabalho:
 
     def aproximar(self) -> None:
         """Ctrl++: aumenta o corpo do Documento, com o foco nele; senão aproxima a Imagem."""
-        self.texto.mudar_corpo(+1) if self._no_documento() else self.visor.zoom_mais()
+        if self._no_documento():
+            self.texto.mudar_corpo(+1)
+        else:
+            self.visor.zoom_mais()
 
     def afastar(self) -> None:
-        self.texto.mudar_corpo(-1) if self._no_documento() else self.visor.zoom_menos()
+        if self._no_documento():
+            self.texto.mudar_corpo(-1)
+        else:
+            self.visor.zoom_menos()
 
     def zoom_padrao(self) -> None:
         """Ctrl+0: o corpo padrão no Documento; a página inteira na Imagem."""
-        self.texto.mudar_corpo(0) if self._no_documento() else self.visor.zoom_pagina()
+        if self._no_documento():
+            self.texto.mudar_corpo(0)
+        else:
+            self.visor.zoom_pagina()
 
     # ------------------------------------------------------------------
     # A sincronia (§6.2): o Documento, a Imagem, a Linha e a fila
@@ -341,7 +350,7 @@ class EspacoDeTrabalho:
         self._palavra_do_documento(gids)
         if self.pagina.indice_de(gid) is not None:
             self.inspetor.mostrar("glifo")
-            self.pagina.escolher(gid)
+            self.pagina.escolher(gid)            # a Linha e o cursor seguem pelo atual_mudou
 
     def _palavra_do_documento(self, gids: list) -> None:
         """O cursor do Documento numa palavra: ela destacada na Imagem e na Linha; com Seguir,
@@ -350,8 +359,8 @@ class EspacoDeTrabalho:
         if not indices:
             return
         caixa = vf.caixa_da_palavra(self.pagina.boxes, indices)
-        self.visor.marcar_palavra(caixa)
-        if self.acao_seguir.isChecked():
+        self.visor.marcar_palavra_do_documento(caixa)
+        if self.acao_seguir.isChecked():        # só com Seguir a Imagem rola (§6.2)
             self.visor.mostrar_caixa(caixa)
         self._mostrar_a_linha(gids[0])
 
@@ -363,12 +372,25 @@ class EspacoDeTrabalho:
             self.linha.limpar()
             return
         linha = [g for g in self.texto.linha_de(gid) if p.indice_de(g) is not None]
+        if gid not in linha:
+            linha = self._linha_pela_geometria(gid)
         if not linha:
             self.linha.limpar()
             return
         boxes = p.boxes
         self.linha.mostrar(p.matriz, [boxes[p.indice_de(g)] for g in linha],
                            linha.index(gid) if gid in linha else None)
+
+    def _linha_pela_geometria(self, gid) -> list:
+        """Os glifos da altura do glifo (o centro de cada um dentro da faixa dele), da
+        esquerda para a direita: a linha quando o Documento ainda não a tem."""
+        p = self.pagina
+        indice = p.indice_de(gid)
+        if indice is None:
+            return []
+        boxes, alvo = p.boxes, p.boxes[indice]
+        na_faixa = [i for i, b in enumerate(boxes) if alvo.y1 <= (b.y1 + b.y2) / 2 <= alvo.y2]
+        return [p.gids[i] for i in sorted(na_faixa, key=lambda i: boxes[i].x1)]
 
     def painel_com_o_foco(self) -> int:
         """O número do Alt+N do painel com o foco (0: nenhum)."""

@@ -96,7 +96,7 @@ class DesenhoDaJanela:
             return
         self.treino.mostrar(p.matriz, p.box_atual(), p.posicao_do_atual())
         # A fila e a Imagem levam o Documento e a Linha ao glifo (§6.2).
-        self.texto.ir_ao_gid(p.atual, rolar=self.acao_seguir.isChecked())
+        self.texto.ir_ao_gid(p.atual, rolar=True)   # §6.2: o Documento rola até o glifo
         self._mostrar_a_linha()
         # Seguir (Ctrl+Shift+L): o item atual fica visível, a 120 px da borda (§3.3).
         self.visor.selecionar(p.indice_de(p.atual), centralizar=self.acao_seguir.isChecked())
@@ -110,12 +110,8 @@ class DesenhoDaJanela:
         na_fila = set(p.fila())
         estados = {b.gid: gd.estado(b.entry, b.gid in na_fila) for b in p.modelo.boxes} \
             if p.modelo is not None else {}
-        desconhecidos = set()
-        if v.lexico is not None and v._gids:
-            desconhecidos = {v._gids[i] for d in v.desconhecidas for i in d.indices
-                             if i < len(v._gids)}
-        self.texto.montar(p.documento(), p.diagramas, estados, desconhecidos, p.gids_virtuais(),
-                          p.matriz)
+        self.texto.montar(p.documento(), p.diagramas, estados, v.gids_desconhecidos(),
+                          p.gids_virtuais(), p.matriz)
         self._mostrar_a_linha()
 
     def _selecao_mudou(self) -> None:

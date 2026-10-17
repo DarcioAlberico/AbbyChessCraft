@@ -110,7 +110,8 @@ class VistaDoDocumento(QTextEdit):
         self.setTabChangesFocus(True)
         self.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse
                                      | Qt.TextInteractionFlag.TextSelectableByKeyboard
-                                     | Qt.TextInteractionFlag.LinksAccessibleByMouse)
+                                     | Qt.TextInteractionFlag.LinksAccessibleByMouse
+                                     | Qt.TextInteractionFlag.LinksAccessibleByKeyboard)
         self.setAccessibleName("Documento: o texto reconhecido da página")
         self.realce = True
         self.mostrar_margens = True
@@ -119,7 +120,9 @@ class VistaDoDocumento(QTextEdit):
         self._linha_do_gid: Dict[int, List[int]] = {}
         self._palavra_do_gid: Dict[int, List[int]] = {}
         self._movendo = False                   # o cursor posto pelo programa não avisa
+        self._clicando = False                  # o cursor do press: o release avisa
         self._entrada = None                     # o que a última montagem recebeu
+        self._formatos: Dict[tuple, QTextCharFormat] = {}   # os do realce, por montagem
         self.cursorPositionChanged.connect(self._cursor_mudou)
 
     # ------------------------------------------------------------------
@@ -131,21 +134,70 @@ class VistaDoDocumento(QTextEdit):
         """O documento da página. Sem documento (página não lida), fica vazio."""
         self._entrada = (documento, list(diagramas), dict(estados or {}), set(desconhecidos),
                          set(virtuais), matriz)
-        gid_do_cursor = self.gid_no_cursor()
+        lugar = self._lugar()
         rolagem = self.verticalScrollBar().value()
         novo = QTextDocument(self)
         novo.setDefaultFont(QFont(FONTE, self.corpo))
-        self._linha_do_gid, self._palavra_do_gid = {}, {}
+        self._linha_do_gid, self._palavra_do_gid, self._diagramas = {}, {}, {}
+        self._formatos = {}
         if documento is not None:
             self._preencher(novo, *self._entrada)
+        antigo = self.document()
+        # O documento padrão do QTextEdit é do controle de texto, que o apaga no setDocument; o
+        # nosso anterior (filho da vista) sai aqui, ou cada montagem o deixaria vivo.
+        apagar = antigo is not novo and antigo.parent() is self
         self._movendo = True
         try:
             self.setDocument(novo)
-            if gid_do_cursor is not None:
-                self.ir_ao_gid(gid_do_cursor, rolar=False)
+            self._voltar_ao_lugar(lugar)
             self.verticalScrollBar().setValue(rolagem)
         finally:
             self._movendo = False
+        if apagar:
+            antigo.deleteLater()                # com as imagens dos diagramas e os formatos
+
+    def _lugar(self):
+        """O cursor e a âncora da seleção, como (gid, deslocamento no glifo) cada."""
+        cursor = self.textCursor()
+        return (self._gid_e_deslocamento(cursor.anchor()),
+                self._gid_e_deslocamento(cursor.position()))
+
+    def _gid_e_deslocamento(self, posicao: int):
+        if self.document().isEmpty():
+            return None
+        bloco = self.document().findBlock(posicao)
+        mapa = bloco.userData() if bloco.isValid() else None
+        if not isinstance(mapa, _MapaDoBloco):
+            return None
+        i = posicao - bloco.position()
+        if 0 <= i < len(mapa.gids) and mapa.gids[i] >= 0:
+            gid = mapa.gids[i]
+            return gid, i - mapa.gids.index(gid)
+        if 0 < i <= len(mapa.gids) and mapa.gids[i - 1] >= 0:   # o fim de um glifo
+            gid = mapa.gids[i - 1]
+            return gid, i - mapa.gids.index(gid)
+        return None
+
+    def _voltar_ao_lugar(self, lugar) -> None:
+        ancora, posicao = lugar
+        destino = self._posicao_de(posicao)
+        if destino is None:
+            return
+        cursor = self.textCursor()
+        inicio = self._posicao_de(ancora)
+        if inicio is not None and inicio != destino:
+            cursor.setPosition(inicio)
+            cursor.setPosition(destino, QTextCursor.MoveMode.KeepAnchor)
+        else:
+            cursor.setPosition(destino)
+        self.setTextCursor(cursor)
+
+    def _posicao_de(self, gid_e_deslocamento) -> Optional[int]:
+        if gid_e_deslocamento is None:
+            return None
+        gid, deslocamento = gid_e_deslocamento
+        inicio = self.posicao_do_gid(gid)
+        return None if inicio is None else inicio + deslocamento
 
     def remontar(self) -> None:
         """A mesma página, com o realce, as margens ou o corpo de agora."""
@@ -267,12 +319,9 @@ class VistaDoDocumento(QTextEdit):
         if not self.realce or not (desconhecido or virtual
                                    or estado in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO)):
             return base
-        chave = (id(base), estado, desconhecido, virtual)
-        cache = getattr(self, "_formatos", None)
-        if cache is None or cache[0] is not base:
-            cache = self._formatos = (base, {})
-        if chave in cache[1]:
-            return cache[1][chave]
+        chave = (id(base), estado, desconhecido, virtual)   # o base é o do bloco, vivo até o fim
+        if chave in self._formatos:
+            return self._formatos[chave]
         formato = QTextCharFormat(base)
         if estado in (gd.PENDENTE, gd.SEM_LEITURA):
             formato.setBackground(FUNDO_DE_BAIXA_CONFIANCA)
@@ -284,7 +333,7 @@ class VistaDoDocumento(QTextEdit):
         elif virtual:
             formato.setUnderlineStyle(QTextCharFormat.UnderlineStyle.DotLine)
             formato.setUnderlineColor(estilo.AZUL)
-        cache[1][chave] = formato
+        self._formatos[chave] = formato
         return formato
 
     # ------------------------------------------------------------------
@@ -303,13 +352,24 @@ class VistaDoDocumento(QTextEdit):
 
     def gid_no_ponto(self, ponto) -> Optional[int]:
         """O glifo sob o ponto do clique: o cursor cai entre dois caracteres, e o lado do
-        ponto diz qual (à esquerda da posição do cursor, o de antes)."""
+        ponto diz qual (à esquerda da posição do cursor, o de antes). Um ponto fora do
+        caractere (o branco depois do fim da linha) não é glifo."""
         cursor = self.cursorForPosition(ponto)
         posicao = cursor.position()
         if ponto.x() < self.cursorRect(cursor).x() and posicao > 0:
             posicao -= 1
-        gid = self.gid_na_posicao(posicao)
-        return gid
+        bloco = self.document().findBlock(posicao)
+        mapa = bloco.userData() if bloco.isValid() else None
+        i = posicao - bloco.position()
+        if not isinstance(mapa, _MapaDoBloco) or not 0 <= i < len(mapa.gids) or mapa.gids[i] < 0:
+            return None
+        antes, depois = QTextCursor(self.document()), QTextCursor(self.document())
+        antes.setPosition(posicao)
+        depois.setPosition(posicao + 1)
+        esquerda, direita = self.cursorRect(antes), self.cursorRect(depois)
+        if direita.y() != esquerda.y() or not esquerda.x() - 2 <= ponto.x() <= direita.x() + 2:
+            return None
+        return mapa.gids[i]
 
     def gid_no_cursor(self) -> Optional[int]:
         if self.document().isEmpty():
@@ -372,16 +432,23 @@ class VistaDoDocumento(QTextEdit):
     # Eventos
     # ------------------------------------------------------------------
     def _cursor_mudou(self) -> None:
-        if self._movendo:
+        if self._movendo or self._clicando:     # o clique avisa uma vez, no release
             return
         gid = self.gid_no_cursor()
         if gid is not None:
             self.cursor_na_palavra.emit(self.palavra_de(gid))
 
+    def mousePressEvent(self, evento):
+        self._clicando = evento.button() == Qt.MouseButton.LeftButton
+        super().mousePressEvent(evento)
+
     def mouseReleaseEvent(self, evento):
+        clicando, self._clicando = self._clicando, False
         super().mouseReleaseEvent(evento)
         if evento.button() != Qt.MouseButton.LeftButton:
             return
+        if clicando and self.textCursor().hasSelection():
+            self._cursor_mudou()                # um arraste que selecionou: o cursor avisa
         ancora = self.anchorAt(evento.position().toPoint())
         if ancora.startswith("copiar-fen:"):
             self.copiar_fen(ancora.split(":", 1)[1])

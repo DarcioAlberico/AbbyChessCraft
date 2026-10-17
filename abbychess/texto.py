@@ -27,6 +27,7 @@ que vinha do core já assim). Os dois passam por `core.notacao.normalizar_saida`
 
 from __future__ import annotations
 
+import copy
 import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -84,8 +85,6 @@ def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
     """O documento da página (função pura do que está gravado nela). O texto e a exportação
     só têm os glifos lidos; a vista do Documento (`com_os_nao_lidos`) mostra também os que
     ninguém leu, como `NAO_LIDO`, para o realce deles (§6.1)."""
-    import copy
-
     from core.notacao import palavras_da_pagina
 
     lidos = [b for b in pagina.boxes if b.entry.char or com_os_nao_lidos]

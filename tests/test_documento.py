@@ -65,13 +65,17 @@ def test_o_mapa_leva_cada_posicao_ao_gid_e_volta(app):
     assert v.gid_na_posicao(v.posicao_do_gid(2) + 1) == 2   # no espaço depois: o anterior
 
 
-def test_o_mapa_fica_no_bloco_e_nao_em_formatos(app):
+def test_montar_de_novo_nao_deixa_documentos_vivos(app):
+    """Cada montagem é um QTextDocument novo; o anterior (com as imagens dos diagramas e a
+    coleção de formatos) tem de sair, ou a memória cresce a cada mudança da página."""
+    from PySide6.QtCore import QCoreApplication, QEvent
+    from PySide6.QtGui import QTextDocument
+
     v = _vista(app)
-    # Montar de novo não acumula formatos: a coleção do documento é a de um documento novo.
-    antes = len(v.document().allFormats())
     for _ in range(20):
         v.remontar()
-    assert len(v.document().allFormats()) == antes
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    assert len(v.findChildren(QTextDocument)) <= 2         # o de agora (e o padrão do Qt)
 
 
 def test_ctrl_shift_h_oculta_as_margens_e_o_realce_desliga(app):
@@ -120,7 +124,9 @@ def test_e_somente_leitura(app):
     assert v.toPlainText() == "Cap\nab c\nde"
 
 
-def test_o_diagrama_entra_inteiro_com_a_linha_o_estado_e_copiar_fen(app):
+def test_o_diagrama_entra_com_o_desenho_a_linha_o_estado_e_copiar_fen(app):
+    """O diagrama no lugar dele (a atomicidade numa seleção que o cruza é do D1, com a
+    edição: o Documento é só leitura até lá)."""
     from core.diagrama_modelo import Casa
 
     from abbychess.diagramas import DiagramaLido
@@ -164,7 +170,7 @@ def test_ca_6_1_clicar_numa_palavra_destaca_os_glifos_dela_na_imagem(app, lida_a
     alvo = j.pagina.gids[4]
     palavra = j.texto.palavra_de(alvo)
     _clicar_no_gid(app, j, alvo)
-    destaque = j.visor._palavra                            # o destaque gravado no item
+    destaque = j.visor._palavra_do_documento               # o destaque gravado no item
     escolhidos = [boxes(j)[j.pagina.indice_de(g)] for g in palavra]
     esperado = (min(b.x1 for b in escolhidos), min(b.y1 for b in escolhidos),
                 max(b.x2 for b in escolhidos), max(b.y2 for b in escolhidos))
@@ -203,15 +209,86 @@ def test_ca_6_5_montar_de_novo_mantem_o_cursor_e_a_rolagem(app, lida_a_mao):
     assert j.texto.gid_no_cursor() == alvo and barra.value() == rolagem
 
 
-def test_o_cursor_no_documento_destaca_a_palavra_e_mostra_a_linha(app, lida_a_mao):
+def _caixa_de(j, gids):
+    escolhidos = [boxes(j)[j.pagina.indice_de(g)] for g in gids]
+    return (min(b.x1 for b in escolhidos), min(b.y1 for b in escolhidos),
+            max(b.x2 for b in escolhidos), max(b.y2 for b in escolhidos))
+
+
+def test_o_cursor_no_documento_destaca_a_palavra_certa_e_mostra_a_linha(app, lida_a_mao):
     j = lida_a_mao
     j.texto.setFocus()
     j.texto.ir_ao_gid(j.pagina.gids[0], rolar=False)
     QTest.keyClick(j.texto, Qt.Key.Key_Down)               # a linha seguinte
     app.processEvents()
     gid = j.texto.gid_no_cursor()
-    assert gid is not None and j.visor._palavra is not None
-    assert j.linha._boxes and j.linha._recorte is not None
+    x1, y1, x2, y2 = _caixa_de(j, j.texto.palavra_de(gid))
+    r = j.visor._palavra_do_documento.rect()
+    assert abs(r.left() - (x1 - 4)) < 1 and abs(r.right() - (x2 + 4)) < 1
+    linha = [j.pagina.gids[j.pagina.boxes.index(b)] for b in j.linha._boxes]
+    assert gid in linha and linha == j.texto.linha_de(gid)
+
+
+def test_o_cursor_do_documento_nao_apaga_a_palavra_em_verificacao(app, lida_a_mao):
+    from core import lexico
+
+    j = lida_a_mao
+    j.verificador.lexico = lexico.Lexico(palavras={"abc"})
+    j.fila.definir("palavras")
+    contorno = j.visor._palavra
+    assert contorno is not None
+    j.texto.setFocus()
+    j.texto.ir_ao_gid(j.pagina.gids[0], rolar=False)
+    QTest.keyClick(j.texto, Qt.Key.Key_Down)
+    app.processEvents()
+    assert j.visor._palavra is contorno and j.visor._palavra_do_documento is not None
+
+
+def test_sem_seguir_o_cursor_do_documento_nao_rola_a_imagem(app, lida_a_mao):
+    j = lida_a_mao
+    j.visor.definir_zoom(4.0)                              # a página maior que a vista
+    barra = j.visor.verticalScrollBar()
+    for seguir, deve_rolar in ((False, False), (True, True)):
+        j.acao_seguir.setChecked(seguir)
+        barra.setValue(0)
+        j.texto.setFocus()
+        j.texto.ir_ao_gid(j.pagina.gids[0], rolar=False)
+        QTest.keyClick(j.texto, Qt.Key.Key_Down)           # para a última linha, lá embaixo
+        app.processEvents()
+        assert (barra.value() > 0) is deve_rolar, seguir
+
+
+def test_o_clique_no_branco_depois_da_linha_nao_escolhe_glifo(app, lida_a_mao):
+    j = lida_a_mao
+    j.texto.resize(600, 300)
+    antes = atual(j)
+    fim = j.texto.posicao_do_gid(j.texto.linha_de(j.pagina.gids[0])[-1]) + 1
+    cursor = j.texto.textCursor()
+    cursor.setPosition(fim)
+    ponto = j.texto.cursorRect(cursor).center() + QPoint(200, 0)
+    QTest.mouseClick(j.texto.viewport(), Qt.MouseButton.LeftButton, pos=ponto)
+    app.processEvents()
+    assert atual(j) == antes
+
+
+def test_a_linha_sem_o_mapa_do_documento_vem_da_geometria(app, lida):  # noqa: F811
+    j = lida
+    j.texto._linha_do_gid = {}                             # o instante antes de montar
+    j._mostrar_a_linha()
+    linha = [j.pagina.gids[j.pagina.boxes.index(b)] for b in j.linha._boxes]
+    assert atual(j) in linha and len(linha) > 1
+
+
+def test_montar_de_novo_mantem_a_selecao(app, lida_a_mao):
+    j = lida_a_mao
+    cursor = j.texto.textCursor()
+    inicio = j.texto.posicao_do_gid(j.pagina.gids[1])
+    cursor.setPosition(inicio)
+    cursor.setPosition(inicio + 5, cursor.MoveMode.KeepAnchor)
+    j.texto.setTextCursor(cursor)
+    selecionado = j.texto.textCursor().selectedText()
+    j.pintar_texto()
+    assert j.texto.textCursor().selectedText() == selecionado
 
 
 def test_ctrl_f5_esconde_e_mostra_a_linha(app, lida):  # noqa: F811

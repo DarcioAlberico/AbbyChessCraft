@@ -116,8 +116,8 @@ Paralelos, só com git e worktrees e com arquivos disjuntos:
    - Até o texto ser verificado, as medidas de texto ficam "pendentes"; as de estrutura e
      de diagrama ficam "provisórias" até a revisão e a conferência dos FEN (spec §15.2).
      **Prazo**: as etapas do usuário não bloqueiam os passos 1a a A2; o texto e os FEN das
-     p. 21–27 do Xadrez Vitorioso têm de estar verificados antes do fechamento do A3, que é o
-     primeiro passo julgado pelo CA-F.1.
+     p. 21–27 do Xadrez Vitorioso têm de estar verificados antes do fechamento do D1, que é o
+     primeiro passo julgado pelo CA-F.1 (até a versão 0.7, o A3).
 7. **Medidas**:
    - `ferramentas/medir.py`, `tests/desempenho/` e `docs/medidas/maquina.json`;
    - o snapshot `tests/dados/fatia/xv-i020-026-inicial.zip`, `ferramentas/replay_fatia.py` e o
@@ -287,7 +287,8 @@ lote rodando" é do passo E, o primeiro que deixa medir isso.
 Pendência do A2: a cláusula da Linha do CA-3.2 (a x-height ≥ 12 px na Linha, em 1366×768 e
 1280×720) entra com a Linha (Ctrl+F5).
 
-**Verificação.** CA-6.1 e CA-6.5; o CA-F.1 com alvo de ≤ 85%; o CA-F.2 (informativo).
+**Verificação.** CA-6.1 e CA-6.5; o CA-F.2 (informativo). (O CA-F.1 com alvo de ≤ 85% saiu
+na versão 0.8: o A3 é só leitura, e o replay mediria o mesmo que no A2.)
 
 ## Passo E — Servidor de leitura (§11, §4.6)
 
@@ -513,3 +514,7 @@ aviso.
   congelamento da coleta de lixo saiu (`ABBY_CONGELAR=1` religa); os passos seguintes medem
   3 rodadas (sem o A/B do congelamento) e o Enter até a cor mudar, com o painel de texto à
   parte (`texto_da_pagina`); o Reler pendentes entrou no desfazer.
+- **0.8 (2026-10-16)** (revisão de produto do A3, `docs/revisoes/passo-a3.md`, com o sim do
+  usuário): o prazo da verificação do texto e dos FEN da fatia passou do fechamento do A3
+  ao do D1, e o alvo de ≤ 85% do CA-F.1 depois do A3 saiu (o A3 é só leitura; o replay não
+  ganha comando mais barato com ele); o D1 é o primeiro passo julgado pelo CA-F.1.

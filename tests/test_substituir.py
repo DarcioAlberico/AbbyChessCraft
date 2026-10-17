@@ -299,3 +299,24 @@ def test_a_troca_que_nao_cabe_avisa_os_passos_do_desfazer_que_sairam(sub):
     _aplicar(s, _previa(s, eventos, "outra", "OUTRA"))
     ctl.executar.tudo()
     assert eventos["feitas"][-1][4] == 1 and ctl.historico.passos == 1
+
+
+def test_a_previa_le_a_pagina_que_uma_busca_em_voo_esta_refazendo(sub):
+    projeto, ctl, s, escrever, eventos = sub
+    escrever(2, "casa nova")
+    s.busca.marcar_velha(2)                              # o lote releu a página 3
+    leitura, *_ = s.busca._paginas_a_refazer()           # uma busca a levou, e não acabou
+    assert 2 in s.busca.fora_de_dia()
+    assert [p.indice for p in _previa(s, eventos, "casa", "lata")] == [0, 1, 2]
+    s.busca._em_refazer.pop(leitura)
+
+
+def test_substituir_avisa_a_ocorrencia_fora_do_onde(sub):
+    projeto, ctl, s, escrever, eventos = sub
+    escrever(2, "joga Cf3")
+    ctl.ir_para(2)
+    feito = s.na_pagina(bs.Opcoes("Cf3", escopo=bs.PAGINA, maiusculas=True), "Nf3", sb.PROSA,
+                        posicao=5)
+    assert feito is None and "em notação ficaram fora" in eventos["erros"][-1]
+    feito = s.na_pagina(bs.Opcoes("Cf3", escopo=bs.PAGINA), "Cf3", sb.NOTACAO, posicao=5)
+    assert feito == []                                   # já está como o substituto

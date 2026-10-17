@@ -909,6 +909,8 @@ class ControladorDaBusca:
         self._velhas: set = set()
         self._leitura = 0                       # conta as leituras das páginas a refazer
         self._lida_em: dict = {}                # página -> a leitura que a pôs no índice
+        #: leitura em voo -> as páginas que ela leva para refazer (fora de dia até o fim).
+        self._em_refazer: dict = {}
         self._pendente = None                   # a busca pedida antes de o índice ficar pronto
         self.ultimo_resultado = None
         self.eventos.ligar("pagina_reconhecida", self.marcar_velha)
@@ -940,6 +942,7 @@ class ControladorDaBusca:
         self._busca += 1
         geracao = self._geracao
         self.indice, self._velhas, self._pendente, self._lida_em = {}, set(), None, {}
+        self._em_refazer = {}
         self.ultimo_resultado = None
         self.pronto.clear()
         projeto = self.pagina.projeto
@@ -1094,7 +1097,16 @@ class ControladorDaBusca:
             self.indice.pop(i, None)            # deixou de ser reconhecida (o desfazer do F5)
         velhas, self._velhas = self._velhas & set(refazer) | self._velhas & set(carregar), set()
         self._leitura += 1
+        self._em_refazer[self._leitura] = set(refazer) | set(carregar)
         return self._leitura, refazer, carregar, velhas
+
+    def fora_de_dia(self) -> set:
+        """As páginas que o índice ainda não tem como estão: as relidas e as que uma busca
+        em voo leva para refazer."""
+        fora = set(self._velhas)
+        for paginas in self._em_refazer.values():
+            fora |= paginas
+        return fora
 
     def _guardar(self, leitura: int, refeitas: dict) -> None:
         """As páginas refeitas entram no índice, se ainda são lidas e se nenhuma leitura mais
@@ -1109,6 +1121,7 @@ class ControladorDaBusca:
 
     def _fim(self, numero: int, geracao: int, leitura: int, refeitas: dict, velhas: set,
              resultado, erro) -> None:
+        self._em_refazer.pop(leitura, None)
         if numero == self._em_voo:
             self._em_voo = -1
         if geracao != self._geracao:
@@ -1154,6 +1167,7 @@ class ControladorDaBusca:
                 refeitas = None
 
             def fim():
+                self._em_refazer.pop(leitura, None)
                 if geracao != self._geracao:
                     return
                 if refeitas is None:            # falhou: as relidas voltam a velhas
@@ -1245,12 +1259,12 @@ class ControladorDaSubstituicao:
         """Índice -> a página no índice da busca, se ela está em dia (a versão no histórico,
         e não relida desde então); as outras (None) são lidas de qualquer jeito."""
         projeto, historico, busca = self.pagina.projeto, self.pagina.historico, self.busca
-        em_dia = {}
+        fora, em_dia = busca.fora_de_dia(), {}
         for i in indices:
             indexada = busca.indice.get(i)
             versao = historico.versao(projeto.pid_da_pagina(i))
             em_dia[i] = (indexada if indexada is not None and indexada.versao == versao
-                         and i not in busca._velhas else None)
+                         and i not in fora else None)
         return em_dia
 
     # ------------------------------------------------------------------
@@ -1327,7 +1341,6 @@ class ControladorDaSubstituicao:
         `posicao` não há o que trocar (o casamento já está como o substituto: quem chama
         segue para o próximo); None se nada foi feito (o aviso já saiu)."""
         from abbychess import busca as bs
-        from abbychess import substituir as sb
 
         pc = self.pagina
         if pc.modelo is None or pc.projeto is None:
@@ -1342,25 +1355,37 @@ class ControladorDaSubstituicao:
         casos = previa.casos
         if posicao is not None:
             casos = [c for c in casos if c.inicio <= posicao < c.fim][:1]
-            if not casos:
+            if not casos and self._ja_trocado(previa.texto, expressao, trocar, posicao):
                 return []
+            if not casos:
+                self.eventos.emitir("substituicao_falhou", "Não substituído: "
+                                    + self._por_que_fora(previa, alvo) + ".")
+                return None
         bons = [c for c in casos if c.aplicavel]
         if not bons:
-            if casos:
-                motivo = casos[0].motivo
-            elif previa.fora:
-                motivo = (f"{previa.fora} ocorrência(s) em {_outro_onde(alvo)} ficaram fora "
-                          "(escolha Notação ou Ambos)" if alvo == sb.PROSA else
-                          f"{previa.fora} ocorrência(s) em {_outro_onde(alvo)} ficaram fora "
-                          "(escolha Prosa ou Ambos)")
-            else:
-                motivo = "nada a substituir aqui"
+            motivo = casos[0].motivo if casos else self._por_que_fora(previa, alvo)
             self.eventos.emitir("substituicao_falhou", f"Não substituído: {motivo}.")
             return None
         previa.geracao = pc.geracao
         self.aplicar({pc.indice: bons}, _descricao(bons), {pc.indice: previa},
                      sem_traducao=len(casos) - len(bons))
         return bons
+
+    @staticmethod
+    def _ja_trocado(texto: str, expressao, trocar, posicao: int) -> bool:
+        """O casamento que começa em `posicao` já está como o substituto."""
+        casado = expressao.search(texto, posicao)
+        return casado is not None and casado.start() == posicao and trocar(casado) == casado.group()
+
+    @staticmethod
+    def _por_que_fora(previa, alvo: str) -> str:
+        from abbychess import substituir as sb
+
+        if not previa.fora:
+            return "nada a substituir aqui"
+        escolha = "Notação ou Ambos" if alvo == sb.PROSA else "Prosa ou Ambos"
+        return (f"{previa.fora} ocorrência(s) em {_outro_onde(alvo)} ficaram fora "
+                f"(escolha {escolha})")
 
     def aplicar(self, aceitos, descricao: str, previas, sem_traducao: int = 0) -> None:
         """Os casos aceitos (página -> casos), das `previas` (página -> `Previa`, com a

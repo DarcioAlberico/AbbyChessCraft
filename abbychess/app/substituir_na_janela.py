@@ -68,8 +68,18 @@ class SubstituirNaJanela:
         opcoes = replace(self._opcoes(), escopo=escopo if escopo in (bs.PAGINA, bs.SELECAO)
                          else bs.PAGINA)
         modelo, alvo = self._alvo_e_substituto()
+        try:
+            expressao, trocar = self.substituicao._preparar(opcoes, modelo)
+        except bs.PadraoInvalido as erro:
+            self._substituicao_falhou(f"Regex inválida: {erro}")
+            return
         for _vez in range(len(self._ocorrencias)):
             o = self._ocorrencias[self._posicao]
+            if self.substituicao._ja_trocado(o.trecho, expressao, trocar, o.coluna):
+                # Já está como o substituto ("casa" -> "Casa" sem o Aa), nesta página ou
+                # noutra: a próxima, sem ir até ela.
+                self._posicao = (self._posicao + 1) % len(self._ocorrencias)
+                continue
             if o.pagina != self.pagina.indice:
                 self._ir_a_ocorrencia(self._posicao)
                 return

@@ -1286,8 +1286,9 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   prévia): o caso comum é "rn" → "m" (e "m" → "rn"), que espera o juntar e o dividir glifos;
   uma troca editorial em que duas letras viram uma ("casa" → "lar") também. As figurinas não
   entram sozinhas no texto substituído (o §6.4 é da digitação). Uma troca no livro inteiro
-  pode ocupar quase todo o desfazer (~43 MB em 230 páginas e 28 mil casos; num livro de 800
-  páginas com uma troca tão comum, passa dos 50 MB e fica sozinha no desfazer).
+  pode ocupar quase todo o desfazer (~43 MB em 230 páginas e 28 mil casos; a partir de ~270
+  páginas com uma troca tão comum, passa dos 50 MB e fica sozinha no desfazer: os passos de
+  antes saem, e a barra de status diz quantos).
 - **A edição no Documento, desde o D1**: o que é do passo G (k letras por 1, 1 por k, o
   parágrafo, os estilos) é recusado com aviso; o Ctrl+T com uma edição do texto ainda na fila
   pede para tentar de novo depois que ela entrar; num projeto com páginas lidas antes do D1,

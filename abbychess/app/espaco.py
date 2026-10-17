@@ -33,6 +33,7 @@ from abbychess import gravacao as gv
 from abbychess import verificacao as vf
 from abbychess.modelo import LIDAS
 from abbychess.app import visor as vs
+from abbychess.app.confirmacao import BarraDeConfirmacao
 from abbychess.app.inspetor import PainelDoInspetor
 from abbychess.app.linha import FaixaDaLinha
 from abbychess.app.painel_paginas import NOMES_DOS_ESTADOS, PainelDePaginas
@@ -121,11 +122,13 @@ class EspacoDeTrabalho:
         self.divisor.addWidget(self.visor)
         self.divisor.addWidget(self.vista)
         self.linha = FaixaDaLinha()
+        self.confirmacao = BarraDeConfirmacao()      # a pergunta do Ctrl+T (§8.4)
         centro = QWidget()
         caixa = QVBoxLayout(centro)
         caixa.setContentsMargins(0, 0, 0, 0)
         caixa.setSpacing(4)
         caixa.addWidget(self.divisor, 1)
+        caixa.addWidget(self.confirmacao)
         caixa.addWidget(self.linha)
         self.setCentralWidget(centro)
         self.arranjo = "lado_a_lado"
@@ -426,8 +429,10 @@ class EspacoDeTrabalho:
         """Esc: fecha o que está por cima, na ordem da §3.4 (regra 4): a seleção do modo de
         marcar, depois Resultados (a busca e os menus, que vêm antes, fecham sozinhos com o
         Esc). Nunca cancela tarefa. Com uma sessão de edição aberta no Documento, o Esc a
-        restaura (§6.3)."""
-        if self._barra_de_busca_com_o_foco():
+        restaura (§6.3). A pergunta do Ctrl+T, se aberta, fecha antes de tudo (só ela)."""
+        if self.confirmacao.aberta:
+            self.confirmacao.recusar()
+        elif self._barra_de_busca_com_o_foco():
             self.fechar_busca()
         elif self.texto.tem_sessao:
             self.texto.restaurar()

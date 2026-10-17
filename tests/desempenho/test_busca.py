@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import re
-import tempfile
 import threading
 import time
 import zipfile
@@ -37,11 +36,12 @@ PADRAO = r"(?<=\w)1(?=\w)"
 
 
 @pytest.fixture(scope="module")
-def livro_de_230():
-    """Os JSON v2 das 7 páginas da fatia, copiados até 230 (cada cópia com o índice dela)."""
+def livro_de_230(tmp_path_factory):
+    """Os JSON v2 das 7 páginas da fatia, copiados até 230 (cada cópia com o índice dela),
+    numa pasta que o pytest apaga."""
     from abbychess.projeto import ProjetoDeLivro
 
-    pasta = Path(tempfile.mkdtemp())
+    pasta = tmp_path_factory.mktemp("livro_de_230")
     with zipfile.ZipFile(SNAPSHOT) as z:
         z.extractall(pasta / "fatia")
     projeto = ProjetoDeLivro.abrir(next(p.parent for p in (pasta / "fatia").rglob("projeto.json")))

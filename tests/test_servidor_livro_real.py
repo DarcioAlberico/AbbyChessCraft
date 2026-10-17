@@ -9,8 +9,6 @@ fatia, medidas no processo (`medir.py`, `replay_fatia.py`), com o programa, que 
 
 from __future__ import annotations
 
-import tempfile
-from pathlib import Path
 
 import pytest
 
@@ -26,14 +24,14 @@ def _como(boxes):
             for b in boxes]
 
 
-def test_a_pagina_e_os_recortes_lidos_pelo_filho_sao_os_lidos_no_processo():
+def test_a_pagina_e_os_recortes_lidos_pelo_filho_sao_os_lidos_no_processo(tmp_path):
     if not _PDF:
         pytest.skip("o PDF do Xadrez Vitorioso não está nesta máquina")
     from abbychess import pagina as pg
     from abbychess import servidor_de_leitura as sl
     from abbychess.projeto import ProjetoDeLivro
 
-    projeto = ProjetoDeLivro.criar(Path(tempfile.mkdtemp()), "Equivalência", _PDF[0])
+    projeto = ProjetoDeLivro.criar(tmp_path, "Equivalência", _PDF[0])
     servidor = sl.ServidorDeLeitura(projeto.pasta_de_padroes, projeto.dados.limiares,
                                     fabrica=sl.FABRICA_PADRAO)
     try:

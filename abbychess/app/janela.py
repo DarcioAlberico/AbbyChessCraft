@@ -335,13 +335,13 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
                 self.visor.ir_ao_fim()
 
     def verificar_pagina(self) -> None:
-        """Ctrl+T: com glifos a revisar, pergunta antes de marcar a página como verificada
-        (a confirmação na barra é do passo C)."""
+        """Ctrl+T: com glifos a revisar, pergunta na barra (§8.4: Enter aceita, Esc não
+        marca e fecha só a pergunta) antes de marcar a página como verificada."""
         pendentes = len(self.pagina.fila()) if self.pagina.modelo is not None else 0
-        if pendentes and not dialogos.confirmar(
-                self, "Página verificada", f"A página tem {pendentes} glifo(s) a revisar. "
-                "Marcá-la como verificada assim mesmo, com eles como estão?\n\n(Marcar um "
-                "glifo à mão, que era o Ctrl+T, agora é Ctrl+M.)"):
+        if pendentes:
+            self.confirmacao.perguntar(
+                f"Aceitar {pendentes} pendente(s) como estão e marcar a página como "
+                "verificada? Enter aceita · Esc não marca", self.pagina.verificar)
             return
         self.pagina.verificar()
 

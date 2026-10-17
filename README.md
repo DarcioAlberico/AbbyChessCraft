@@ -250,6 +250,33 @@ O Documento se edita como um editor de texto, e cada edição vira o que ela é 
   preta, ♚♛♜♝♞♟), e **F2** abre a paleta de símbolos no cursor.
 - **O diagrama não se apaga**: uma seleção que o cruza apaga o texto e o diagrama fica.
 
+### Localizar (passo B)
+
+**Ctrl+F** abre a barra no topo da vista direita (com a seleção do Documento como texto) e
+busca enquanto você digita:
+
+- **Aa** separa maiúsculas e minúsculas; **ab|** acha só a palavra inteira; **.\*** liga a
+  expressão regular, com as classes de xadrez **`\L`** (lance: Cf3, exd5, O-O, e8=D+),
+  **`\P`** (peça: as figurinas e as letras do idioma do livro), **`\C`** (casa: a1 a h8) e
+  **`\V`** (valoração: ± ∓ ⩲ ⩱ +- -+ ! ? !? ?!); a expansão delas aparece na dica do campo.
+  **♘=C** (figurina = letra) faz "Cf3" achar também "♘f3" e "Nf3".
+- **O escopo**: o livro, a página aberta, a seleção do Documento ou um intervalo de páginas
+  ("3-10"). **Onde**: prosa, notação, FEN (o do diagrama lido), legendas (a partir do passo
+  H) e cabeçalhos e rodapés.
+- **F3** e **Shift+F3** (ou Enter e Shift+Enter na barra) vão à próxima e à anterior, dando a
+  volta no livro; a ocorrência atual fica em laranja no Documento e contornada na Imagem, as
+  outras da página em amarelo. **Alt+Enter** manda todas para **Resultados** (página, linha e
+  o trecho, com o casamento em negrito; Enter ou duplo clique leva até ela), e a gaveta das
+  páginas ganha a coluna **Ach.** com a contagem de cada página. **Esc** fecha a barra.
+- A regex inválida aparece na barra ("erro", com a mensagem na dica); um padrão lento demais
+  (como `(\w+)+$` num texto longo) aborta a busca inteira no primeiro meio segundo de uma
+  página, com o aviso. A janela continua respondendo durante a busca.
+- **Editar › Buscar glifo…**: caractere, fonte (rede, base global, livro, manual, sem
+  leitura) e faixa de confiança; a lista vai para Resultados (a Galeria é do passo C).
+- **O índice** é montado ao abrir o projeto, em segundo plano (em processos à parte), e não vai
+  para o disco; o que você edita, o F5 e o lote refazem as páginas deles antes da busca
+  seguinte. As páginas não reconhecidas ficam fora (a barra de status diz quantas).
+
 ### A página: zoom e navegação
 
 Desde o passo A1 o visor desenha os boxes num item só, e só o pedaço da tela que mudou: a
@@ -956,11 +983,12 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | `abbychess/livro.py` | O lote síncrono das ferramentas e dos testes, e a fila de revisão do livro todo |
 | `abbychess/servidor_de_leitura.py` | O servidor de leitura (§11): o processo filho com os modelos globais, a vez entre glifos, os deltas dos padrões, a queda e o fechamento |
 | `abbychess/sessao.py` | A sessão de edição do Documento sem Qt (§6.3): alinhar, planejar (ou recusar o que é do passo G), aplicar; as figurinas (§6.4) |
+| `abbychess/busca.py` | Localizar sem Qt (§7.1, §7.3): o índice das páginas (montado em processos), a busca com o `regex` e o tempo-limite, as classes `\L` `\P` `\C` `\V`, figurina = letra, a busca por glifo |
 | `abbychess/ancoragem.py` | Onde os glifos virtuais da sessão ficam (a âncora de cada um, como o usuário os digitou) e as palavras que a montagem do core parte ou junta quando um box sai |
 | `abbychess/lote.py` | O lote da janela (`CondutorDoLote`): decide, lê pelo servidor e grava na thread da interface; cancelar, retomar, `.antes-do-lote/` |
 | `abbychess/exportar.py` | PDF pesquisável, DOCX e EPUB a partir das páginas gravadas, pelo core do PyBoxEditor, sem o cabeçalho e o rodapé corridos |
 | `abbychess/historico.py` | O desfazer do projeto: transações por gid (o que cada ação mudou, por página), a pré-condição, o limite de 50 MB, a propagação que emenda o Enter |
-| `abbychess/app/` | A interface PySide6 (a edição no Documento: `documento.py` e `edicao_na_janela.py`): a janela (só liga sinais aos controladores e desenha), `acoes.py` (menus e atalhos), `dialogos.py`, o executor com fila (`trabalho.py`), visor da página, painéis de treino, padrões e verificação, opções, conferência de diagramas |
+| `abbychess/app/` | A interface PySide6 (a edição no Documento: `documento.py` e `edicao_na_janela.py`; Localizar: `barra_de_busca.py` e `busca_na_janela.py`): a janela (só liga sinais aos controladores e desenha), `acoes.py` (menus e atalhos), `dialogos.py`, o executor com fila (`trabalho.py`), visor da página, painéis de treino, padrões e verificação, opções, conferência de diagramas |
 | `tests/` | O núcleo e a janela, sem depender do modelo global |
 | `docs/ANALISE_PYBOXEDITOR.md` | O que o PyBoxEditor oferece a este projeto |
 | `docs/SPEC.md` | A especificação da aplicação completa (v0.4, aprovada nas revisões) |
@@ -1174,6 +1202,12 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   treino, os padrões, as opções, o reconhecimento do livro em lote e a fila do livro; no
   Projeto, a exportação; o editor de áreas, a verificação de texto e a leitura e
   conferência dos diagramas.
+- **Localizar, desde o passo B**: figurina = letra vale no texto literal (com a regex ligada,
+  use `\P`); o cabeçalho e o rodapé do índice saem de uma regra simples das linhas da página
+  (a primeira e a última, curtas, com número, separadas do texto), e não da regra completa
+  da exportação; a legenda ganha a etiqueta dela no passo H; a busca por glifo mostra uma
+  lista em Resultados até a Galeria do passo C; buscar antes de o índice ficar pronto espera
+  por ele (a barra de status mostra o progresso).
 - **A edição no Documento, desde o D1**: o que é do passo G (k letras por 1, 1 por k, o
   parágrafo, os estilos) é recusado com aviso; o Ctrl+T com uma edição do texto ainda na fila
   pede para tentar de novo depois que ela entrar; num projeto com páginas lidas antes do D1,

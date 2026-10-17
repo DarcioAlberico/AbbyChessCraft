@@ -500,6 +500,12 @@ class ProjetoDeLivro:
     # ------------------------------------------------------------------
     # Páginas (modelo v2, §4.3)
     # ------------------------------------------------------------------
+    def arquivo_da_pagina(self, indice: int) -> Optional[Path]:
+        """O JSON v2 gravado da página (None se ela não foi gravada, ou é v1): o índice da
+        busca o lê fora do cache (§7.3)."""
+        with self._trava_do_livro:
+            return self._arquivo_v2_de(indice)
+
     def modelo_em_memoria(self, indice: int) -> Optional[Pagina]:
         """A página do cache, sem ler o disco (None se ela não está na memória)."""
         with self._trava_do_cache:

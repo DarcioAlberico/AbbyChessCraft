@@ -1,4 +1,4 @@
-"""Os outros controladores da janela (SPEC §14.1): áreas, verificação, diagramas e livro.
+"""Os outros controladores da janela (SPEC §14.1): áreas, verificação, diagramas, livro e busca.
 
 Cada um trabalha sobre a página aberta do `ControladorDePagina` e fala pelos mesmos
 `Eventos`. Os que acrescentam:
@@ -6,7 +6,8 @@ Cada um trabalha sobre a página aberta do `ControladorDePagina` e fala pelos me
 - `ControladorDeLayout`: `layout_mudou`;
 - `ControladorDeVerificacao`: `palavra_mudou` (a palavra desconhecida a mostrar, ou nenhuma);
 - `ControladorDeDiagramas`: `conferir(indice)` (a janela abre a conferência);
-- `ControladorDoLivro`: `projeto_aberto`, `lote_mudou`.
+- `ControladorDoLivro`: `projeto_aberto`, `lote_mudou`;
+- `ControladorDaBusca`: `busca_terminou`, `busca_falhou`, `indice_mudou`.
 
 Sem Qt. Os diálogos (que intervalo ler, onde exportar) são da janela; aqui chegam as
 respostas.
@@ -868,3 +869,208 @@ class ControladorDaFila:
             return "0"
         resumo = p.projeto.resumo_do_livro()
         return str(sum(r.get("diagramas_por_conferir", 0) for r in resumo.values()))
+
+
+# ----------------------------------------------------------------------
+# Localizar (§7.1, §7.3, passo B)
+# ----------------------------------------------------------------------
+
+class ControladorDaBusca:
+    """O índice das páginas e a busca, fora da thread da interface.
+
+    O índice é montado em segundo plano ao abrir o projeto (`abrir`: em processos, quando o
+    livro tem páginas para isso, `busca.construir`); a página que o usuário editou (a versão
+    dela no histórico mudou), a que o F5 ou o lote leu (`pagina_reconhecida`,
+    `pagina_do_lote`) e a reconhecida depois são refeitas antes de cada busca. A busca roda
+    numa thread (`concurrent=True` no `regex`: a janela continua respondendo); uma busca nova
+    cancela a anterior entre as páginas. Os resultados voltam pela fila da interface
+    (`executar.na_interface`) e saem nos eventos:
+
+    - `busca_terminou(resultado)` (um `busca.Resultado`);
+    - `busca_falhou(mensagem)` (a regex inválida, o padrão lento demais);
+    - `indice_mudou(feitas, total)` enquanto o índice é montado (e `total, total` no fim).
+    """
+
+    def __init__(self, pagina: ControladorDePagina, paralelo: Optional[bool] = None):
+        self.pagina = pagina
+        self.eventos = pagina.eventos
+        self.paralelo = (os.environ.get("ABBY_INDICE_PARALELO", "1") != "0"
+                         if paralelo is None else paralelo)
+        self.indice: dict = {}
+        self.pronto = threading.Event()
+        self._geracao = 0
+        self._busca = 0
+        self._velhas: set = set()
+        self._pendente = None                   # a busca pedida antes de o índice ficar pronto
+        self.ultimo_resultado = None
+        self.eventos.ligar("pagina_reconhecida", self.marcar_velha)
+        self.eventos.ligar("pagina_do_lote", self.marcar_velha)
+
+    @property
+    def idioma(self) -> str:
+        projeto = self.pagina.projeto
+        return projeto.dados.idioma if projeto is not None else "pt"
+
+    def _na_interface(self, funcao) -> None:
+        chamar = getattr(self.pagina.executar, "na_interface", None)
+        if chamar is None:
+            funcao()
+        else:
+            chamar(funcao)
+
+    # ------------------------------------------------------------------
+    def abrir(self) -> None:
+        """O projeto aberto: o índice antigo sai e o novo começa a ser montado."""
+        from abbychess import busca as bs
+
+        self._geracao += 1
+        self._busca += 1
+        geracao = self._geracao
+        self.indice, self._velhas, self._pendente = {}, set(), None
+        self.ultimo_resultado = None
+        self.pronto.clear()
+        projeto = self.pagina.projeto
+        if projeto is None:
+            return
+        historico, idioma = self.pagina.historico, self.idioma
+        arquivos, na_memoria = {}, {}
+        for indice in projeto.paginas_lidas():
+            pid = projeto.pid_da_pagina(indice)
+            versao = historico.versao(pid)
+            modelo = projeto.modelo_em_memoria(indice)
+            caminho = None if modelo is not None else projeto.arquivo_da_pagina(indice)
+            if caminho is None:                 # na memória (talvez sem gravar) ou v1
+                na_memoria[indice] = (modelo.instantaneo() if modelo is not None else None,
+                                      versao)
+            else:
+                arquivos[indice] = (str(caminho), versao)
+        total = len(arquivos) + len(na_memoria)
+        paralelo = self.paralelo
+
+        def montar():
+            feitas = [0]
+
+            def contar(_indexada):
+                feitas[0] += 1
+                if feitas[0] % 10 == 0:
+                    self._na_interface(lambda n=feitas[0]: self._progresso(geracao, n, total))
+            vale = lambda: geracao == self._geracao      # noqa: E731
+            indice = bs.construir(arquivos, idioma, paralelo=paralelo,
+                                  cancelado=lambda: not vale(), ao_indexar=contar)
+            for i, (instantaneo, versao) in na_memoria.items():
+                if not vale():
+                    return
+                pagina = instantaneo if instantaneo is not None else projeto.carregar_modelo(i)
+                if pagina is not None:
+                    indice[i] = bs.indexar_pagina(pagina, idioma, versao=versao)
+            self._na_interface(lambda: self._indice_pronto(geracao, indice))
+
+        threading.Thread(target=montar, name="indice-da-busca", daemon=True).start()
+
+    def _progresso(self, geracao: int, feitas: int, total: int) -> None:
+        if geracao == self._geracao and not self.pronto.is_set():
+            self.eventos.emitir("indice_mudou", feitas, total)
+
+    def _indice_pronto(self, geracao: int, indice: dict) -> None:
+        if geracao != self._geracao:
+            return
+        self.indice = indice
+        self.pronto.set()
+        self.eventos.emitir("indice_mudou", len(indice), len(indice))
+        if self._pendente is not None:
+            opcoes, self._pendente = self._pendente, None
+            self.buscar(opcoes)
+
+    def marcar_velha(self, indice: int) -> None:
+        """A página foi lida de novo (F5 ou lote): refeita antes da próxima busca."""
+        self._velhas.add(int(indice))
+
+    def cancelar(self) -> None:
+        self._busca += 1
+        self._pendente = None
+
+    # ------------------------------------------------------------------
+    def buscar(self, opcoes) -> None:
+        """Busca em segundo plano; o fim vem em `busca_terminou` ou `busca_falhou`. Antes de
+        o índice ficar pronto, a busca espera por ele."""
+        from abbychess import busca as bs
+
+        self._busca += 1
+        if not self.pronto.is_set():
+            self._pendente = opcoes
+            return
+        try:
+            bs.compilar(opcoes)                 # o erro da regex, na hora, sem thread
+        except bs.PadraoInvalido as erro:
+            self.eventos.emitir("busca_falhou", f"Regex inválida: {erro}")
+            return
+        numero, geracao = self._busca, self._geracao
+        refazer, carregar = self._paginas_a_refazer()
+        projeto, idioma = self.pagina.projeto, self.idioma
+        indice = dict(self.indice)
+
+        def rodar():
+            vale = lambda: numero == self._busca and geracao == self._geracao   # noqa: E731
+            for i, (pagina, versao) in refazer.items():
+                indice[i] = bs.indexar_pagina(pagina, idioma, versao=versao)
+            for i, versao in carregar.items():
+                if not vale():
+                    return
+                pagina = projeto.carregar_modelo(i)
+                if pagina is not None:
+                    indice[i] = bs.indexar_pagina(pagina, idioma, versao=versao)
+            try:
+                resultado = bs.buscar(indice, opcoes, cancelado=lambda: not vale())
+                erro = None
+            except bs.PadraoLento as lento:
+                resultado, erro = None, f"Busca abortada: {lento}."
+            self._na_interface(lambda: self._fim(numero, geracao, indice, resultado, erro))
+
+        threading.Thread(target=rodar, name="busca", daemon=True).start()
+
+    def _paginas_a_refazer(self):
+        """As páginas do índice que mudaram: as editadas (a versão no histórico) e as na
+        memória, como instantâneo (a interface pode mudá-las durante a busca); as relidas e
+        as que entraram no livro depois, para carregar na thread."""
+        projeto, historico = self.pagina.projeto, self.pagina.historico
+        refazer, carregar = {}, {}
+        lidas = set(projeto.paginas_lidas())
+        for i in sorted(lidas):
+            pid = projeto.pid_da_pagina(i)
+            versao = historico.versao(pid)
+            indexada = self.indice.get(i)
+            if indexada is not None and indexada.versao == versao and i not in self._velhas:
+                continue
+            modelo = projeto.modelo_em_memoria(i)
+            if modelo is not None:
+                refazer[i] = (modelo.instantaneo(), versao)
+            else:
+                carregar[i] = versao
+        for i in [i for i in self.indice if i not in lidas]:
+            self.indice.pop(i, None)            # deixou de ser reconhecida (o desfazer do F5)
+        self._velhas.clear()
+        return refazer, carregar
+
+    def _fim(self, numero: int, geracao: int, indice: dict, resultado, erro) -> None:
+        if geracao != self._geracao:
+            return
+        self.indice.update(indice)              # as páginas refeitas na thread ficam
+        if numero != self._busca:               # uma busca mais nova já foi pedida
+            return
+        if erro is not None:
+            self.eventos.emitir("busca_falhou", erro)
+            return
+        self.ultimo_resultado = resultado
+        self.eventos.emitir("busca_terminou", resultado)
+
+    def nao_reconhecidas(self) -> int:
+        """Quantas páginas do livro ficaram fora da busca (não reconhecidas)."""
+        p = self.pagina
+        total = p.fonte.total if p.fonte is not None else 0
+        return max(0, total - len(self.indice))
+
+    def glifos(self, char: str, fontes=None, minima: float = 0.0, maxima: float = 1.0):
+        """A busca por glifo (§7.1), no índice como está."""
+        from abbychess import busca as bs
+
+        return bs.buscar_glifos(self.indice, char, fontes, minima, maxima)

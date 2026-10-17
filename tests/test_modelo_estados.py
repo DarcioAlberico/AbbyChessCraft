@@ -11,7 +11,7 @@ ela não tocou, e uma quebra e uma junção nunca valem na mesma fronteira. Do D
 confirmada (sem recusa) deixa na página o texto digitado, e a âncora de todo virtual é um box
 vivo ou outro virtual.
 
-Suíte rápida: `derandomize=True`, `max_examples=120`. A camada noturna roda 5.000.
+Suíte rápida: `derandomize=True`, `max_examples=100`. A camada noturna roda 5.000.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from abbychess import texto as tx
 from abbychess.modelo import Box, Pagina, foto, gid_de, reconciliar
 
 LARGURA, ALTURA = 900, 400
-EXEMPLOS = 5000 if os.environ.get("ABBY_NOTURNO") == "1" else 120
+EXEMPLOS = 5000 if os.environ.get("ABBY_NOTURNO") == "1" else 100
 
 
 def _pagina_sintetica(n: int):

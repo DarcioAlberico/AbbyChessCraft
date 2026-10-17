@@ -38,7 +38,8 @@ from abbychess import pagina as pg
 from abbychess import procedencia
 from abbychess import servidor_de_leitura as sl
 from abbychess.controlador import TEMPO_DO_PEDIDO
-from abbychess.modelo import IOU_DA_RELEITURA, LIDAS, VERIFICADA, proximo_estado, reconciliar
+from abbychess.modelo import (IOU_DA_RELEITURA, LIDAS, VERIFICADA, descrever_caidas,
+                              proximo_estado, reconciliar)
 
 log = logging.getLogger(__name__)
 
@@ -327,11 +328,12 @@ class CondutorDoLote:
         pagina = projeto.pagina_para_editar(indice)
         if self.refazer and pagina.estado in LIDAS and not projeto.somente_leitura:
             projeto.guardar_antes_do_lote(pagina)                         # §4.6
+        de_antes = list(pagina.boxes)
         novos, dif = reconciliar(pagina.boxes, lida.boxes, pagina.alocar, procedencia.amostra_de,
                                  iou_minimo=IOU_DA_RELEITURA)
         pagina.aplicar(dif, novos)
         if dif.caidas:
-            self.resultado.caidas[indice] = list(dif.caidas)
+            self.resultado.caidas[indice] = descrever_caidas(dif.caidas, de_antes)
         pagina.tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
         pagina.diagramas = dg.mesclar(lida.diagramas, dg.para_caixas(pagina.tabuleiros,
                                                                      pagina.diagramas))
@@ -397,8 +399,9 @@ def detalhe_do_fim(resultado: ResultadoDoLote) -> str:
         linhas.append("Para reler depois (mudadas por você nesta sessão, ou enquanto o lote "
                       f"as lia): {_paginas(resultado.reler_depois)}.")
     if resultado.falhas:
-        linhas.append("Falharam: " + "; ".join(f"{i + 1} ({motivo.splitlines()[0]})"
-                                              for i, motivo in resultado.falhas.items()) + ".")
+        linhas.append("Falharam: " + "; ".join(
+            f"{i + 1} ({(motivo.splitlines() or ['sem motivo'])[0]})"
+            for i, motivo in resultado.falhas.items()) + ".")
     for indice, caidas in resultado.caidas.items():
         linhas.append(f"Página {indice + 1}, decisões que não seguiram os glifos relidos: "
                       + "; ".join(caidas) + ".")

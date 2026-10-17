@@ -54,7 +54,7 @@ from abbychess import texto as tx
 from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL, precisa_revisao
 from abbychess.modelo import (IOU_DA_RELEITURA, LIDAS, NAO_RECONHECIDA, VERIFICADA, Diferenca,
-                              Pagina, proximo_estado, reconciliar)
+                              Pagina, descrever_caidas, proximo_estado, reconciliar)
 
 log = logging.getLogger(__name__)
 
@@ -613,13 +613,14 @@ class ControladorDePagina:
             if lida is None:
                 return
             lidos = lida.diagramas
+            de_antes = list(pagina.boxes)
             novos, dif = reconciliar(pagina.boxes, lida.boxes, pagina.alocar,
                                      procedencia.amostra_de, iou_minimo=IOU_DA_RELEITURA)
             pagina.aplicar(dif, novos)
             if dif.caidas:                      # §4.6: o que não pôde seguir os glifos novos
                 self.eventos.emitir("resultado", "Reconhecer a página", (
                     f"Página {indice + 1}: decisões que não puderam seguir os glifos relidos: "
-                    + "; ".join(dif.caidas)))
+                    + "; ".join(descrever_caidas(dif.caidas, de_antes))))
             pagina.tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
             # A conferência de antes vale mais que a releitura do mesmo tabuleiro.
             pagina.diagramas = dg.mesclar(lidos, dg.para_caixas(pagina.tabuleiros,

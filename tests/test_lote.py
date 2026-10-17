@@ -385,7 +385,8 @@ def test_o_que_falta_retomar_fica_no_projeto_e_volta_ao_reabrir(ctl, projeto):
     ctl.cancelar()
     ctl.executor.tudo()
     arquivo = projeto.pasta / ARQUIVO_DO_LOTE
-    assert json.loads(arquivo.read_text(encoding="utf-8")) == {"paginas": [1, 2], "refazer": True}
+    assert json.loads(arquivo.read_text(encoding="utf-8")) == {
+        "paginas": [1, 2], "refazer": True, "reler_depois": []}
     p = ctl.pagina                                        # reabre o projeto
     ctl.usar(projeto, p.fonte, p.leitor)
     assert ctl.restante == ([1, 2], True) and ctl.pode_retomar
@@ -419,3 +420,72 @@ def test_o_servidor_que_desiste_para_o_lote_e_retomar_vale_ao_reabrir(ctl, proje
     servidor_falso.entregar(fila, esperar_por=1)
     servidor_falso.entregar(fila, esperar_por=1)
     assert ctl.fins[-1].lidas == [0, 1] and ctl.restante is None
+
+
+def test_g1_fechar_com_o_lote_ativo_guarda_o_ponto_e_nao_rele_nada(ctl, projeto,
+                                                                  com_servidor):
+    """Rodada 3: fechar no meio do lote (a resposta da página em curso nunca chega à janela)
+    deixa em `lote.json` só o que falta; um arquivo de um lote anterior não volta."""
+    from abbychess.controladores import ARQUIVO_DO_LOTE
+    from tests import servidor_falso
+
+    servidor, fila = com_servidor
+    arquivo = projeto.pasta / ARQUIVO_DO_LOTE
+    arquivo.write_text(json.dumps({"paginas": [0, 1, 2], "refazer": True}), encoding="utf-8")
+    lidas = []
+    ctl.eventos.ligar("pagina_do_lote", lidas.append)
+    ctl.reconhecer([0, 1, 2], refazer=True)
+    servidor_falso.entregar(fila, esperar_por=1)          # a página 1 entrou
+    servidor.segurar.clear()                              # a 2 fica no servidor
+    servidor_falso.entregar(fila)
+    p = ctl.pagina
+    ctl.usar(projeto, p.fonte, p.leitor)                  # fecha e reabre no meio
+    servidor.segurar.set()
+    assert ctl.restante == ([1, 2], True)
+    fila = servidor_falso.ligar(p, servidor_falso.ServidorFalso(projeto.pasta_de_padroes,
+                                                                projeto.dados.limiares))
+    ctl.retomar()
+    servidor_falso.entregar(fila, esperar_por=1)
+    servidor_falso.entregar(fila, esperar_por=1)
+    assert lidas == [0, 1, 2] and not arquivo.exists()   # cada página uma vez
+
+
+def test_retomar_so_le_as_de_reler_depois_com_a_confirmacao(ctl, projeto):
+    p = ctl.pagina
+    ctl.reconhecer([0, 1], refazer=False)
+    ctl.executor.tudo()
+    p.escolher(p.gids[0])
+    p.corrigir("R")                                       # a 0, aberta e mudada
+    ctl.reconhecer([0, 1], refazer=True)
+    ctl.executor.tudo()
+    assert ctl.fins[-1].reler_depois == [0] and ctl.reler_depois == [0]
+    assert ctl.restante is None and ctl.pode_retomar
+    lidas = []
+    ctl.eventos.ligar("pagina_do_lote", lidas.append)
+    ctl.retomar()                                         # sem a confirmação: nada a ler
+    ctl.executor.tudo()
+    assert lidas == [] and ctl.reler_depois == [0]
+    p.ir_para(1)                                          # a 0 não está mais aberta
+    ctl.retomar(com_reler_depois=True)
+    ctl.executor.tudo()
+    assert lidas == [0] and ctl.reler_depois == [] and not ctl.pode_retomar
+
+
+def test_o_detalhe_do_fim_aguenta_o_motivo_vazio():
+    from abbychess import lote
+
+    resultado = lote.ResultadoDoLote(falhas={3: ""}, caidas={1: ["quebra do glifo 'a'"]})
+    texto = lote.detalhe_do_fim(resultado)
+    assert "4 (sem motivo)" in texto and "Página 2" in texto
+
+
+def test_a_decisao_que_cai_e_descrita_pelo_glifo_e_nao_pelo_gid():
+    from core.box_model import BoxEntry
+
+    from abbychess.modelo import Box, descrever_caidas, gid_de
+
+    gid = gid_de(7, 3)
+    caidas = descrever_caidas([f"quebra do glifo {gid} (o glifo saiu)"],
+                              [Box(gid, BoxEntry("k", 40, 50, 60, 80, 0.9, "rede"))])
+    assert caidas == ["quebra do glifo 'k' em (40, 50) (o glifo saiu)"]
+

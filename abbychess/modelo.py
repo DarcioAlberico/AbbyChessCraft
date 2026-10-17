@@ -467,6 +467,22 @@ def _caixa(e: BoxEntry) -> tuple:
     return (e.x1, e.y1, e.x2, e.y2)
 
 
+def descrever_caidas(caidas: Sequence[str], boxes: Sequence[Box]) -> List[str]:
+    """As decisões que caíram, com o glifo dito como o usuário o vê (o caractere e a posição
+    na página), e não pelo gid, que ele não vê em lugar nenhum."""
+    import re
+
+    por_gid = {b.gid: b.entry for b in boxes}
+
+    def glifo(casou) -> str:
+        e = por_gid.get(int(casou.group(0)))
+        if e is None:
+            return casou.group(0)
+        return f"'{e.char or '?'}' em ({e.x1}, {e.y1})"
+
+    return [re.sub(r"\d+", glifo, texto) for texto in caidas]
+
+
 def _celulas(e: BoxEntry, lado: int = 64):
     for cx in range(e.x1 // lado, e.x2 // lado + 1):
         for cy in range(e.y1 // lado, e.y2 // lado + 1):

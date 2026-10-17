@@ -147,8 +147,12 @@ class Projeto:
     fonte: str
     criado: str
     limiares: Limiares = field(default_factory=Limiares)
-    #: O idioma da prosa, que escolhe o léxico da verificação de texto.
+    #: O idioma da prosa, que escolhe o léxico da verificação de texto e as letras das
+    #: peças nos lances (pt: R D T B C; en: K Q R B N).
     idioma: str = "pt"
+    #: Como o livro escreve as peças nos lances: "figurinas" (♘f3) ou "letras" (Cf3). No
+    #: modo figurinas, a letra digitada num lance vira figurina ao confirmar (§6.4).
+    notacao: str = "figurinas"
     versao: int = VERSAO
     #: O SHA-256 dos primeiros 4 MB da fonte e o tamanho dela, que a reconhecem se ela for
     #: movida (o tamanho separa dois arquivos de começo igual e evita ler os outros).
@@ -974,7 +978,8 @@ class ProjetoDeLivro:
         tabuleiros = len(pagina.tabuleiros)
         conferidos = sum(1 for d in pagina.diagramas if d.conferido)
         return {"pid": pagina.pid, "estado": pagina.estado,
-                **resumo_das_confiancas(pagina.entries(), self.dados.limiares),
+                **resumo_das_confiancas(pagina.entries(), self.dados.limiares,
+                                        [b.revisado for b in pagina.boxes]),
                 "diagramas": tabuleiros,
                 "diagramas_por_conferir": max(0, tabuleiros - conferidos)}
 
@@ -1013,7 +1018,8 @@ def com_ids_de_diagramas(diagramas):
     return com_ids(diagramas)
 
 
-def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares) -> dict:
+def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares,
+                          revisados: Optional[Sequence[bool]] = None) -> dict:
     """Os boxes da página em `confirmados`, `sem_leitura` e o histograma do resto.
 
     O histograma tem faixas de 0,01 (a chave é o centésimo de baixo; 100 é a confiança
@@ -1023,17 +1029,19 @@ def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares) -> dict
     """
     from abbychess.leitor import FONTE_NENHUMA, FONTES_CONFIRMADAS, precisa_revisao
 
-    confirmados = sem_leitura = 0
+    confirmados = sem_leitura = pendentes = 0
     histograma: Dict[int, int] = {}
-    for b in boxes:
-        if b.source in FONTES_CONFIRMADAS:
+    revisados = revisados or [False] * len(boxes)
+    for b, revisado in zip(boxes, revisados):
+        if not revisado and precisa_revisao(b.char, b.source, b.confidence, limiares):
+            pendentes += 1
+        if b.source in FONTES_CONFIRMADAS or revisado:      # o revisado é aceito (§6.3)
             confirmados += 1
         elif not b.char or b.source == FONTE_NENHUMA:
             sem_leitura += 1
         else:
             faixa = _faixa(b.confidence)
             histograma[faixa] = histograma.get(faixa, 0) + 1
-    pendentes = sum(1 for b in boxes if precisa_revisao(b.char, b.source, b.confidence, limiares))
     return {"boxes": len(boxes), "pendentes": pendentes, "confirmados": confirmados,
             "sem_leitura": sem_leitura,
             "histograma": {str(k): histograma[k] for k in sorted(histograma)}}

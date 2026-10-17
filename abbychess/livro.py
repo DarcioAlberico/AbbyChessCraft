@@ -131,7 +131,8 @@ def pendentes_por_pagina(projeto: ProjetoDeLivro, limiares: Limiares) -> Dict[in
     contagem = {}
     for indice in projeto.paginas_lidas():
         try:
-            boxes = projeto.carregar_pagina(indice) or []
+            modelo = projeto.carregar_modelo(indice)
+            boxes = [b.entry for b in modelo.boxes if not b.revisado] if modelo else []
         except (OSError, ValueError, json.JSONDecodeError) as erro:
             log.warning("a página %d gravada não abriu: %s", indice + 1, erro)
             continue

@@ -113,9 +113,9 @@ def _widgets_do_escopo(janela):
             "documento": {janela.texto}, "galeria": set()}
 
 
-#: (ação, escopo) que só passam a valer quando o Documento fica editável (passo D1): a
-#: paleta insere símbolos, e o Documento é só leitura até lá.
-_SO_DEPOIS_DA_EDICAO = {("paleta", "documento")}
+#: (ação, escopo) que só passam a valer depois (nenhum, desde que o Documento ficou editável
+#: no D1).
+_SO_DEPOIS_DA_EDICAO: set = set()
 
 
 def test_os_atalhos_registrados_sao_exatamente_os_do_yaml_ate_o_passo(janela):

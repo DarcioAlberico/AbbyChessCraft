@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import List, Optional, Sequence
 
 import numpy as np
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
@@ -35,6 +35,19 @@ class FaixaDaLinha(QWidget):
         self._boxes: List = []
         self._atual: Optional[int] = None
         self.escala = 0.0
+        #: O aviso não modal de uma edição que mudou a estrutura (§6.3), por alguns segundos.
+        self.aviso = ""
+        self._relogio_do_aviso = QTimer(self)
+        self._relogio_do_aviso.setSingleShot(True)
+        self._relogio_do_aviso.timeout.connect(lambda: self.avisar(""))
+
+    def avisar(self, texto: str, ms: int = 6000) -> None:
+        """"2 glifo(s) tirado(s) · Ctrl+Z desfaz", no canto da faixa; vazio apaga."""
+        self.aviso = texto
+        self.setToolTip(texto)
+        if texto:
+            self._relogio_do_aviso.start(ms)
+        self.update()
 
     def mostrar(self, matriz: Optional[np.ndarray], boxes: Sequence, atual: Optional[int]) -> None:
         """Os `boxes` da linha (BoxEntry, na ordem dela) e o índice do atual entre eles."""
@@ -92,4 +105,15 @@ class FaixaDaLinha(QWidget):
             pintor.drawText(QRectF(gx1 - 8, base, gx2 - gx1 + 16, ALTURA_DO_TEXTO),
                             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
                             b.char or "□")
+        self._pintar_o_aviso(pintor)
         pintor.end()
+
+    def _pintar_o_aviso(self, pintor) -> None:
+        if not self.aviso:
+            return
+        pintor.setFont(QFont(FONTE, 9))
+        largura = pintor.fontMetrics().horizontalAdvance(self.aviso) + 12
+        caixa = QRectF(self.width() - largura - MARGEM, MARGEM, largura, 18)
+        pintor.fillRect(caixa, QColor(255, 248, 220))
+        pintor.setPen(QColor(90, 70, 0))
+        pintor.drawText(caixa, Qt.AlignmentFlag.AlignCenter, self.aviso)

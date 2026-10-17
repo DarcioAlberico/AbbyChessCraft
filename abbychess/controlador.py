@@ -50,6 +50,7 @@ from abbychess import historico as hs
 from abbychess import pagina as pg
 from abbychess import procedencia
 from abbychess import servidor_de_leitura as sl
+from abbychess import sessao as ss
 from abbychess import texto as tx
 from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL, precisa_revisao
@@ -210,11 +211,13 @@ class ControladorDePagina:
 
     def fila(self) -> List[int]:
         """Os gids a revisar: do menos confiável ao mais, com os pulados no fim; ou, na ordem
-        de leitura (`ordem_da_fila`), na ordem da página."""
+        de leitura (`ordem_da_fila`), na ordem da página. O glifo `revisado` (visto e aceito
+        no Documento, §6.3) não volta."""
         if self.leitor is None or self.modelo is None:
             return []
         boxes = self.modelo.boxes
-        indices = pg.fila_de_revisao(self.modelo.entries(), self.leitor)
+        indices = [i for i in pg.fila_de_revisao(self.modelo.entries(), self.leitor)
+                   if not boxes[i].revisado]
         if self.ordem_da_fila == "leitura":
             return [boxes[i].gid for i in sorted(indices)]
         fila = [boxes[i].gid for i in indices]
@@ -1061,6 +1064,67 @@ class ControladorDePagina:
                                    f"Glifo marcado{extra}. Digite o caractere e Enter.",
                                    evento="marcar")
         self._editar("Marcando", corpo, precisa_de_glifos=False)
+
+    def confirmar_sessao(self, unidades, novo: str, *, ensinar_gid: Optional[int] = None,
+                         original: Optional[str] = None) -> None:
+        """§6.3: a sessão do Documento confirmada (Enter, Shift+Enter, Ctrl+Enter, sair dela):
+        as unidades originais dela e o texto de agora viram as operações da tabela, num passo
+        do desfazer, e todos os glifos dela ficam `revisado`. Sem mudança, é aceitar a
+        palavra. O que é do passo G recusa tudo (`sessao_recusada`, com a mensagem); o que
+        muda a estrutura avisa (`estrutural`). `ensinar_gid` (Ctrl+Enter) ensina o glifo sob o
+        cursor depois de confirmar."""
+        unidades = list(unidades)
+        original = original if original is not None else "".join(u.texto for u in unidades)
+        dados = self.projeto.dados if self.projeto is not None else None
+        if dados is not None:
+            novo = ss.com_figurinas(novo, original, dados.idioma, dados.notacao)
+        indice = self.indice
+
+        def corpo():
+            pagina = self.modelo
+            virtuais = {v.gid for v in pagina.decisoes.virtuais}
+            if indice != self.indice or any(u.glifo and u.gid not in pagina.vivos | virtuais
+                                             for u in unidades):
+                self.eventos.emitir("sessao_recusada", "a página mudou antes da confirmação")
+                return
+            try:
+                plano = ss.planejar(unidades, novo)
+            except ss.Recusa as recusa:
+                self.eventos.emitir("sessao_recusada", str(recusa))
+                self._avisar(f"Edição recusada: {recusa}. A palavra voltou ao que era.", 8000)
+                return
+            antes = self._instantaneo()
+            vivos_antes = set(pagina.vivos)
+            ss.aplicar(pagina, plano)
+            saiu = vivos_antes - pagina.vivos
+            self.pulados -= saiu
+            self.selecao -= saiu
+            if self.atual in saiu:
+                self.atual = None
+            palavra = " ".join(novo.split())
+            descricao = (f"Editar '{palavra[:40]}'" if plano.muda
+                         else f"Aceitar '{' '.join(original.split())[:40]}'")
+            self._mudou(pagina, indice, descricao, antes)
+            aviso = plano.estrutural()
+            if aviso:
+                self.eventos.emitir("estrutural", aviso)
+            if ensinar_gid is not None:
+                self._ensinar_do_documento(ensinar_gid, virtuais)
+        self._editar("Editando o texto", corpo)
+
+    def _ensinar_do_documento(self, gid: int, virtuais) -> None:
+        """Ctrl+Enter: o glifo sob o cursor, ensinado com o caractere dele."""
+        if gid in virtuais:
+            self._avisar("Glifo sem tinta não ensina.", 6000)
+            return
+        if self.modelo is None or gid not in self.modelo.vivos:
+            return
+        char = self.box(gid).char
+        if not char:
+            return
+        self.escolher(gid)
+        self.limpar_selecao()
+        self.ensinar(char)
 
     def _depois_de_editar(self, mostrar: int, descricao: str, antes: hs.Instantaneo,
                           mensagem: str, *, juntar=None, evento: str = "editar") -> None:

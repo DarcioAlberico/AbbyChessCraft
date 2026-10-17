@@ -370,7 +370,8 @@ def aplicar(pagina: Pagina, plano: Plano) -> None:
     for gid in plano.sair:
         if gid not in virtuais:
             ed.descartar(pagina, gid)
-    _como_digitado(pagina, plano)
+    if plano.sair:                              # só o glifo tirado deixa um vão na página
+        _como_digitado(pagina, plano)
     ed.revisar(pagina, plano.revisar - virtuais)
 
 

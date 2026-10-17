@@ -347,7 +347,8 @@ class CondutorDoLote:
         pagina.estado = proximo_estado(pagina.estado, "reconhecer")
         p._gravar(pagina)
         self.resultado.lidas.append(indice)
-        self.resultado.pendentes[indice] = pg.resumir(pagina.entries(), p.leitor).pendentes
+        self.resultado.pendentes[indice] = pg.resumir(
+            [b.entry for b in pagina.boxes if not b.revisado], p.leitor).pendentes
         self.resultado.diagramas[indice] = sum(d.lido for d in pagina.diagramas)
         if indice == p.indice and p.modelo is None and p.imagem is not None:
             p.modelo = pagina                   # a página aberta nasceu agora, no lote

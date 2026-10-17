@@ -996,7 +996,13 @@ class ProjetoDeLivro:
                 **resumo_das_confiancas(pagina.entries(), self.dados.limiares,
                                         [b.revisado for b in pagina.boxes]),
                 "diagramas": tabuleiros,
-                "diagramas_por_conferir": max(0, tabuleiros - conferidos)}
+                "diagramas_por_conferir": max(0, tabuleiros - conferidos),
+                # Alguma figurina lida (o modo "livro" das peças, §6.4, sem abrir as páginas).
+                "figurinas": any(b.entry.char in FIGURINAS_LIDAS for b in pagina.boxes)}
+
+
+#: As figurinas que a leitura escreve (brancas e pretas).
+FIGURINAS_LIDAS = frozenset("♔♕♖♗♘♙♚♛♜♝♞♟")
 
 
 def _pagina_para_json(pagina: Pagina) -> dict:

@@ -423,3 +423,28 @@ def test_o_ctrl_t_espera_a_sessao_na_fila_e_fechar_aplica_na_hora(dois_projetos)
     texto, unidades = ss.texto_e_unidades(ctl.modelo)
     ctl.confirmar_sessao(unidades[inicio:fim + 1], "y" + texto[inicio:fim + 1], agora=True)
     assert ss.texto_e_unidades(ctl.modelo)[0].startswith("y")
+
+
+def test_o_modo_como_o_livro_olha_o_resumo_das_paginas_lidas(tmp_path):
+    """A revisão de produto do D1: uma página sem figurinas num livro de figurinas segue o
+    livro, pelo resumo do `livro.json` (sem abrir as páginas)."""
+    from abbychess import sessao as ss
+    from tests.test_livro import pdf_sintetico
+
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
+    try:
+        executor = ExecutorManual()
+        ctl = _controlador(projeto, executor)
+        ctl.reconhecer()
+        executor.tudo()
+        assert ctl._modo_das_pecas("livro", ctl.modelo) == "letras"
+        texto, unidades = ss.texto_e_unidades(ctl.modelo)
+        inicio, fim = ss.palavras_em(unidades, 0, 0)
+        ctl.confirmar_sessao(unidades[inicio:fim], "♘" + texto[inicio + 1:fim])
+        executor.tudo()
+        ctl.ir_para(1)
+        ctl._livro_tem_figurinas = None                # como ao abrir o projeto
+        assert ctl._modo_das_pecas("livro", ctl.modelo) == "figurinas"
+        assert ctl._modo_das_pecas("letras", ctl.modelo) == "letras"
+    finally:
+        projeto.fechar()

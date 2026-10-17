@@ -76,14 +76,29 @@ class Documento:
 # Montar
 # ----------------------------------------------------------------------
 
-def montar(pagina: Pagina) -> Documento:
-    """O documento da página (função pura do que está gravado nela)."""
+#: Como o glifo que ninguém leu aparece no documento da vista (`com_os_nao_lidos`).
+NAO_LIDO = "□"
+
+
+def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
+    """O documento da página (função pura do que está gravado nela). O texto e a exportação
+    só têm os glifos lidos; a vista do Documento (`com_os_nao_lidos`) mostra também os que
+    ninguém leu, como `NAO_LIDO`, para o realce deles (§6.1)."""
+    import copy
+
     from core.notacao import palavras_da_pagina
 
-    lidos = [b for b in pagina.boxes if b.entry.char]
-    chars = {b.gid: b.entry.char for b in lidos}
+    lidos = [b for b in pagina.boxes if b.entry.char or com_os_nao_lidos]
+    entries = []
+    for b in lidos:
+        if b.entry.char:
+            entries.append(b.entry)
+        else:
+            vazio = copy.copy(b.entry)
+            vazio.char = NAO_LIDO
+            entries.append(vazio)
+    chars = {b.gid: e.char for b, e in zip(lidos, entries)}
     chars.update({v.gid: v.char for v in pagina.decisoes.virtuais})
-    entries = [b.entry for b in lidos]
     linhas: List[List[List[int]]] = []
     topos: List[int] = []
     for linha in (palavras_da_pagina(entries) if entries else []):
@@ -91,11 +106,11 @@ def montar(pagina: Pagina) -> Documento:
         palavras = [p for p in palavras if p]
         if palavras:
             linhas.append(palavras)
-            topos.append(min(lidos[s.indice].entry.y1 for p in linha for s in p.simbolos))
+            topos.append(min(entries[s.indice].y1 for p in linha for s in p.simbolos))
     linhas = _aplicar_decisoes(linhas, pagina.decisoes)
     texto_das_linhas = [" ".join("".join(chars[g] for g in p) for p in ln) for ln in linhas]
 
-    por_gid = {b.gid: b.entry for b in lidos}
+    por_gid = {b.gid: e for b, e in zip(lidos, entries)}
     zonas_de_texto = [z for z in pagina.zonas if z.tipo == "texto"]
     zona_da_linha = [_zona_da_linha(ln, por_gid, zonas_de_texto) for ln in linhas]
     # Um parágrafo antes de qualquer glifo da linha começa o bloco nessa linha (o

@@ -1,9 +1,11 @@
 """O Documento (SPEC §6.1, §6.2): a página reconhecida, montada num `QTextDocument`.
 
-- **De onde vem**: do documento derivado (`abbychess.texto.montar`), no modo `impresso`
-  (♘ como impresso). Cada bloco do documento vira um parágrafo, com as linhas refluídas; os
-  títulos em título, cabeçalho, rodapé e número de página em cinza pequeno (Ctrl+Shift+H os
-  oculta), as notas em corpo menor.
+- **De onde vem**: do documento derivado (`abbychess.texto.montar`, com os glifos que
+  ninguém leu como □), no modo `impresso` (♘ como impresso). Cada linha impressa é um
+  parágrafo: refluir as linhas em parágrafos pede os parágrafos do layout (passo F); sem
+  eles, o título e o corpo da mesma área se juntariam. Os títulos em título; cabeçalho,
+  rodapé e número de página em cinza pequeno (Ctrl+Shift+H os oculta); as notas em corpo
+  menor.
 - **O mapa posição → gid** fica no `QTextBlockUserData` de cada parágrafo (uma lista com o
   gid de cada caractere, -1 nos espaços), não num `QTextCharFormat` por glifo: a coleção de
   formatos do documento não libera e vazaria a cada montagem (§6.2).
@@ -169,36 +171,47 @@ class VistaDoDocumento(QTextEdit):
                                    numero.get(bloco.diagrama_id, 0), matriz)
                 continue
             base = self._formato_do_caractere(bloco.funcao)
-            gids: List[int] = []
-            corrida, formato_da_corrida = [], None
-
-            def escrever():
-                if corrida:
-                    cursor.insertText("".join(corrida), formato_da_corrida)
-                    corrida.clear()
-
             for n_linha, linha in enumerate(bloco.linhas):
-                gids_da_linha = [g for p in linha.palavras for g in p.gids]
-                for n_palavra, palavra in enumerate(linha.palavras):
-                    if n_linha or n_palavra:
-                        if formato_da_corrida is not base:
-                            escrever()
-                            formato_da_corrida = base
-                        corrida.append(" ")
-                        gids.append(-1)
-                    for g in palavra.gids:
-                        self._linha_do_gid[g] = gids_da_linha
-                        self._palavra_do_gid[g] = list(palavra.gids)
-                        letras = normal(documento.chars.get(g, "")) or "□"
-                        formato = self._formato_do_glifo(base, estados.get(g), g in desconhecidos,
-                                                         g in virtuais)
-                        if formato is not formato_da_corrida:
-                            escrever()
-                            formato_da_corrida = formato
-                        corrida.append(letras)
-                        gids.extend([g] * len(letras))
-            escrever()
-            cursor.block().setUserData(_MapaDoBloco(gids))
+                if n_linha:
+                    cursor.insertBlock(self._formato_do_bloco(bloco.funcao, continua=True))
+                self._linha(cursor, linha, documento, base, normal, estados, desconhecidos,
+                            virtuais)
+
+    def _linha(self, cursor, linha, documento, base, normal, estados, desconhecidos,
+               virtuais) -> None:
+        """Uma linha impressa num parágrafo, com o mapa dos gids dele. O texto entra em
+        corridas do mesmo formato (uma inserção por corrida, não por glifo)."""
+        gids: List[int] = []
+        corrida: List[str] = []
+        formato_da_corrida = None
+
+        def escrever():
+            if corrida:
+                cursor.insertText("".join(corrida), formato_da_corrida)
+                corrida.clear()
+
+        gids_da_linha = [g for p in linha.palavras for g in p.gids]
+        for n_palavra, palavra in enumerate(linha.palavras):
+            if n_palavra:
+                if formato_da_corrida is not base:
+                    escrever()
+                    formato_da_corrida = base
+                corrida.append(" ")
+                gids.append(-1)
+            for g in palavra.gids:
+                self._linha_do_gid[g] = gids_da_linha
+                self._palavra_do_gid[g] = list(palavra.gids)
+                char = documento.chars.get(g, "")
+                letras = tx.NAO_LIDO if char == tx.NAO_LIDO else (normal(char) or tx.NAO_LIDO)
+                formato = self._formato_do_glifo(base, estados.get(g), g in desconhecidos,
+                                                 g in virtuais)
+                if formato is not formato_da_corrida:
+                    escrever()
+                    formato_da_corrida = formato
+                corrida.append(letras)
+                gids.extend([g] * len(letras))
+        escrever()
+        cursor.block().setUserData(_MapaDoBloco(gids))
 
     def _por_diagrama(self, doc, cursor, diagrama, numero: int, matriz) -> None:
         if diagrama is None:
@@ -227,11 +240,12 @@ class VistaDoDocumento(QTextEdit):
         texto = cursor.block().text()
         cursor.block().setUserData(_MapaDoBloco([-1] * len(texto), diagrama.id))
 
-    def _formato_do_bloco(self, funcao: str) -> QTextBlockFormat:
+    def _formato_do_bloco(self, funcao: str, continua: bool = False) -> QTextBlockFormat:
+        """O parágrafo de uma linha: o espaço maior fica entre os blocos (`continua`: a linha
+        seguinte do mesmo bloco, junto da anterior)."""
         formato = QTextBlockFormat()
-        formato.setBottomMargin(self.corpo * 0.6)
-        if funcao == "titulo":
-            formato.setTopMargin(self.corpo * 0.6)
+        if not continua:
+            formato.setTopMargin(self.corpo * (0.9 if funcao == "titulo" else 0.5))
         return formato
 
     def _formato_do_caractere(self, funcao: str) -> QTextCharFormat:
@@ -286,6 +300,16 @@ class VistaDoDocumento(QTextEdit):
             if 0 <= k < len(mapa.gids) and mapa.gids[k] >= 0:
                 return mapa.gids[k]
         return None
+
+    def gid_no_ponto(self, ponto) -> Optional[int]:
+        """O glifo sob o ponto do clique: o cursor cai entre dois caracteres, e o lado do
+        ponto diz qual (à esquerda da posição do cursor, o de antes)."""
+        cursor = self.cursorForPosition(ponto)
+        posicao = cursor.position()
+        if ponto.x() < self.cursorRect(cursor).x() and posicao > 0:
+            posicao -= 1
+        gid = self.gid_na_posicao(posicao)
+        return gid
 
     def gid_no_cursor(self) -> Optional[int]:
         if self.document().isEmpty():
@@ -364,7 +388,7 @@ class VistaDoDocumento(QTextEdit):
             return
         if self.textCursor().hasSelection():
             return
-        gid = self.gid_na_posicao(self.cursorForPosition(evento.position().toPoint()).position())
+        gid = self.gid_no_ponto(evento.position().toPoint())
         if gid is not None:
             self.glifo_clicado.emit(gid, self.palavra_de(gid))
 

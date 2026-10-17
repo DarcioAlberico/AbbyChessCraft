@@ -209,6 +209,8 @@ def _por_passo() -> list:
              ("atraso_durante_o_lote", "p99_ms", "Atraso no lote, p99"),
              ("memoria_total_com_o_lote", "rss_pico_mb", "Memória com o lote (MB)"),
              ("pintura_dos_boxes", "p95_ms", "Pintura de 2.000 boxes, p95"),
+             ("texto_da_pagina", "p95_ms", "Montar o Documento, p95"),
+             ("clique_no_documento", "p95_ms", "Clique no Documento, p95"),
              ("clique_no_box", "p95_ms", "Clique acha o box, p95"))
     colunas = [("linha de base", base)]
     for passo in passos:

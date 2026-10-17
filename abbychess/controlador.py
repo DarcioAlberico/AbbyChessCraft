@@ -219,12 +219,13 @@ class ControladorDePagina:
         return tx.texto(tx.montar(pagina), pagina.diagramas, modo=tx.SAN)
 
     def documento(self):
-        """O documento derivado da página (§4.2), para o painel Documento; None sem leitura."""
+        """O documento derivado da página (§4.2), para o painel Documento, com os glifos que
+        ninguém leu (o realce os mostra); None sem página reconhecida."""
         if self.modelo is None or not (self.modelo.boxes or self.modelo.tabuleiros):
             return None
         pagina = self.modelo.instantaneo()
         pagina.diagramas = self.diagramas
-        return tx.montar(pagina)
+        return tx.montar(pagina, com_os_nao_lidos=True)
 
     def gids_virtuais(self) -> frozenset:
         """Os gids dos glifos virtuais (sem caixa) da página."""

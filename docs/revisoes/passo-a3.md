@@ -126,3 +126,18 @@ a chave do cache das margens só olhava os gids, e corrigir o número da página
 deixava a margem velha. A chave passou a ter o texto, a posição de cada glifo lido e a altura
 da página (`271d582`), com o teste de invalidação (que falha com a chave antiga) e o de
 "Nada reconhecido".
+
+A rodada 4 fechou como aceita sem nova revisão ampla, pela condição que ela mesma pôs (a
+chave do cache corrigida, com o teste de invalidação).
+
+## Revisão de produto, rodada 2
+
+Completude 9 · Fidelidade das medidas 8 · Clareza para o usuário 9 · Produtividade 8 ·
+Design 8 — **aceita**. As observações dela: o README liga a queda do clique (de 10 a 2,5 ms)
+à Linha sem busca linear; as palavras sozinhas no fim das linhas em 1366 se resolvem com o
+refluxo do passo F; o fundo do glifo atual sobre um □ fica para o passo K (no roadmap).
+
+**Fechamento.** As duas revisões aceitaram: código na rodada 4, produto na 2. A tag
+`passo-a3` fica no commit que grava este registro. As medidas de desempenho são as 3 rodadas
+e o portão do `271d582`; a qualidade, do `271d582`, e a fatia, do `b8ebe2a`. O CA-F.1 fica
+para o D1 (roadmap 0.8).

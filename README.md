@@ -894,7 +894,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 - **O Documento, desde o passo A3** (3 rodadas do commit `271d582`, pasta limpa). O clique
   numa palavra do Documento (um clique de verdade, com o contorno na Imagem, o glifo no
   Inspetor, o cursor e a Linha seguindo) leva 2,5 ms na mediana e 2,8 no p95 (alvo de 50,
-  CA-6.1). Montar o Documento, que roda 150 ms depois da última mudança da página e fora do
+  CA-6.1; na primeira medida, 10 ms: a Linha procurava cada glifo dela na página inteira). Montar o Documento, que roda 150 ms depois da última mudança da página e fora do
   Enter, passou de ~22 ms (o texto puro, até o A2) a 31 na mediana e 32–33 no p95, pelos
   formatos do realce, os desenhos dos diagramas e as margens corridas (em cache). **Duas
   medidas subiram em relação ao A2**: o Enter até o fim da propagação, de 72–73 ms na

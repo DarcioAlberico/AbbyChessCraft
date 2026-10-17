@@ -97,6 +97,10 @@ class Box:
                    Estilo.de_json(estilo), bool(revisado))
 
 
+#: As figurinas que a leitura escreve (brancas e pretas): o modo das peças nos lances (§6.4).
+FIGURINAS = frozenset("♔♕♖♗♘♙♚♛♜♝♞♟")
+
+
 @dataclass(frozen=True, slots=True)
 class GlifoVirtual:
     """O caractere que falta na página: não tem caixa, não ensina, não entra na leitura.

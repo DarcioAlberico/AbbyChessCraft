@@ -143,8 +143,9 @@ class VistaDoDocumento(QTextEdit):
     cursor_na_palavra = Signal(list)
     #: A sessão confirmada: as unidades originais, o texto de agora, se avança à próxima
     #: duvidosa, o gid a ensinar (Ctrl+Enter, ou None), o último glifo da sessão e os pares
-    #: (no original, no novo) que nenhuma edição tocou, e se ela termina no fim de uma linha.
-    sessao_confirmada = Signal(list, str, bool, object, object, list, bool)
+    #: (no original, no novo) que nenhuma edição tocou, se ela termina no fim de uma linha e
+    #: se aplica sem a fila (`agora`: fechar o projeto).
+    sessao_confirmada = Signal(list, str, bool, object, object, list, bool, bool)
     #: A sessão abriu ou fechou, ou o Ctrl+Y (a palavra do Esc) passou a valer ou deixou de
     #: valer: as ações Desfazer e Refazer mudam (§6.3: elas valem na sessão).
     sessao_mudou = Signal()
@@ -774,7 +775,7 @@ class VistaDoDocumento(QTextEdit):
         a, b = self._sessao
         return a <= posicao <= b + len(self.document().toPlainText()) - len(self._texto0)
 
-    def confirmar(self, avancar: bool = False, ensinar: bool = False) -> None:
+    def confirmar(self, avancar: bool = False, ensinar: bool = False, agora: bool = False) -> None:
         """Enter (`avancar`), Shift+Enter, Ctrl+Enter (`ensinar`), ou sair da sessão. Sem
         sessão, é aceitar a palavra sob o cursor (Enter numa palavra sem mudança)."""
         if self.document().isEmpty() or not self._unidades:
@@ -799,7 +800,7 @@ class VistaDoDocumento(QTextEdit):
         self.marca_ao_confirmar = _marca(self.toPlainText(), posicao)
         self._avisar_da_sessao()
         self.sessao_confirmada.emit(list(unidades), novo, avancar, alvo, ultimo, fixos,
-                                    self._no_fim_da_linha(b))
+                                    self._no_fim_da_linha(b), agora)
 
     def restaurar(self) -> None:
         """Esc (ou Ctrl+Z na sessão): a palavra volta ao que era; Ctrl+Y a reaplica."""
@@ -830,7 +831,7 @@ class VistaDoDocumento(QTextEdit):
         self._avisar_da_sessao()
         ultimo = next((u.gid for u in reversed(unidades) if u.glifo), None)
         self.sessao_confirmada.emit(unidades, novo, False, None, ultimo, fixos,
-                                    self._no_fim_da_linha(b))
+                                    self._no_fim_da_linha(b), False)
 
     def ir_a_proxima_duvidosa(self, depois_de: int) -> bool:
         """O cursor no começo da próxima palavra com um glifo duvidoso (pendente, sem

@@ -253,6 +253,50 @@ class PadroesDoLivro:
         self._gravar_meta()
         self._carregar()
 
+    # ------------------------------------------------------------------
+    # Os deltas do servidor de leitura (§11): a interface grava e esquece; o servidor só
+    # passa a ler (ou a não ler) com a amostra, sem tocar no disco.
+    # ------------------------------------------------------------------
+    def incluir(self, caminho: str | Path, altura_relativa: Optional[float] = None) -> bool:
+        """Passa a ler com a amostra já gravada em `caminho` (falso se o arquivo não abre)."""
+        caminho = Path(caminho)
+        if caminho in self._caminhos:
+            return True
+        imagem = _ler_png(caminho)
+        if imagem is None:
+            return False
+        v = _vetor(imagem)
+        self._X = np.vstack([self._X, v[None, :]])
+        self._normas = np.append(self._normas, float(v @ v))
+        self._chars = self._chars + [folder_to_char(caminho.parent.name)]
+        self._caminhos = self._caminhos + [caminho]
+        self._proporcoes = np.append(self._proporcoes, np.float32(_proporcao(imagem)))
+        self._alturas = np.append(self._alturas, np.float32(
+            np.nan if altura_relativa is None else altura_relativa))
+        return True
+
+    def excluir(self, caminho: str | Path) -> None:
+        """Deixa de ler com a amostra (o arquivo, quem apaga é a interface)."""
+        caminho = Path(caminho)
+        manter = [i for i, c in enumerate(self._caminhos) if Path(c) != caminho]
+        if len(manter) == len(self._caminhos):
+            return
+        self._X = self._X[manter] if manter else np.zeros((0, LADO * LADO), np.float32)
+        self._normas = self._normas[manter]
+        self._chars = [self._chars[i] for i in manter]
+        self._caminhos = [self._caminhos[i] for i in manter]
+        self._proporcoes = self._proporcoes[manter]
+        self._alturas = self._alturas[manter]
+
+    def altura_de(self, caminho: str | Path) -> Optional[float]:
+        """A altura relativa gravada da amostra (para o delta que vai ao servidor)."""
+        caminho = Path(caminho)
+        try:
+            altura = self._meta.get(self._chave(caminho), {}).get("altura")
+        except ValueError:
+            return None
+        return None if altura is None else float(altura)
+
     def guardar(self, caminho: str | Path) -> Amostra:
         """O arquivo do padrão e os metadados dele, para voltar com `restaurar`."""
         caminho = Path(caminho).resolve()

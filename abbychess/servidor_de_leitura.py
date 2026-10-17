@@ -406,6 +406,16 @@ class ServidorDeLeitura:
     # ------------------------------------------------------------------
     def _abrir(self) -> None:
         self.pronto.clear()
+        # As filas do filho que caiu: sem o `cancel_join_thread`, a thread que alimenta a
+        # entrada velha (com pedidos no buffer, que ninguém mais lê) prende a saída do
+        # programa no `join` do multiprocessing.
+        for fila in (getattr(self, "_entrada", None), getattr(self, "_saida", None)):
+            if fila is not None:
+                try:
+                    fila.close()
+                    fila.cancel_join_thread()
+                except (OSError, ValueError):
+                    pass
         self._entrada = self._contexto.Queue()
         self._saida = self._contexto.Queue()
         self.processo = self._contexto.Process(

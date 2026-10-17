@@ -189,7 +189,8 @@ def montar(janela) -> None:
 
 def _menus(j) -> None:
     menu = j.menuBar().addMenu("&Projeto")
-    for acao in (j.acao_novo, j.acao_abrir, None, j.acao_exportar, None, j.acao_sair):
+    for acao in (j.acao_novo, j.acao_abrir, None, j.acao_exportar, None,
+                 j.acao_cancelar_lote, j.acao_retomar_lote, None, j.acao_sair):
         menu.addSeparator() if acao is None else menu.addAction(acao)
     menu = j.menuBar().addMenu("&Editar")
     menu.addAction(j.acao_desfazer)
@@ -212,7 +213,7 @@ def _menus(j) -> None:
         menu.addSeparator() if acao is None else menu.addAction(acao)
     j.menu_ferramentas = j.menuBar().addMenu("&Ferramentas")
     for acao in (j.acao_modo_treino, j.acao_areas, j.acao_areas_auto, j.acao_verificar, None,
-                 j.acao_lote, j.acao_cancelar_lote, j.acao_retomar_lote, None,
+                 j.acao_lote, None,
                  j.acao_opcoes):
         j.menu_ferramentas.addSeparator() if acao is None else j.menu_ferramentas.addAction(acao)
     menu = j.menuBar().addMenu("Aj&uda")

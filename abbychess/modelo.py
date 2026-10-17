@@ -349,9 +349,16 @@ class Pagina:
         return diferenca
 
 
+#: Na releitura da página (o F5 e o lote, §4.6), o glifo que mudou um pouco de caixa
+#: continua o mesmo (o gid e as decisões dele) se a interseção sobre a união das caixas,
+#: a de antes e a de agora, for ao menos esta.
+IOU_DA_RELEITURA = 0.6
+
+
 def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
                 amostra_de=lambda entry: None,
-                estados: Optional[Dict[int, int]] = None) -> Tuple[List[Box], Diferenca]:
+                estados: Optional[Dict[int, int]] = None, *,
+                iou_minimo: Optional[float] = None) -> Tuple[List[Box], Diferenca]:
     """Os `Box` da lista `depois` (os `BoxEntry` que a janela de hoje edita por índice),
     com os gids de `antes` onde dá e gids novos onde não dá, e a `Diferenca` entre as duas.
 
@@ -362,6 +369,9 @@ def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
 
     1. O mesmo objeto `BoxEntry` é o mesmo glifo (mudado, se o estado mudou).
     2. Senão, a mesma caixa é o mesmo glifo (o desfazer de hoje devolve cópias).
+    2½. Com `iou_minimo` (a releitura da página inteira, §4.6), o que sobra casa um a um
+       com o que saiu, pela maior interseção sobre a união das caixas, se ela for ao menos
+       `iou_minimo`: a segmentação de novo mexe um pixel aqui e ali, e o glifo é o mesmo.
     3. O que sobra de `depois` nasce com gid novo, e é sucessor de cada glifo de `antes`
        que saiu e com o qual ele se sobrepõe em mais da metade da área de um dos dois
        (dividir, juntar, marcar um quadro). Um glifo que saiu sem ninguém por cima saiu
@@ -410,6 +420,25 @@ def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
                          None)
             if velho is not None:
                 manter(i, velho, entry, estados.get(velho.gid, foto(velho.entry)))
+    if iou_minimo is not None and any(s is None for s in saida):   # 2½. pela sobreposição
+        celulas: Dict[tuple, List[Box]] = {}       # só os vizinhos, não a página inteira
+        for b in antes:
+            if b.gid not in usados:
+                for celula in _celulas(b.entry):
+                    celulas.setdefault(celula, []).append(b)
+        pares = []
+        for i, entry in enumerate(depois):
+            if saida[i] is None:
+                vistos = {}
+                for celula in _celulas(entry):
+                    for velho in celulas.get(celula, ()):
+                        vistos[velho.gid] = velho
+                pares.extend((iou, i, velho) for velho in vistos.values()
+                             if (iou := _iou(velho.entry, entry)) >= iou_minimo)
+        pares.sort(key=lambda par: -par[0])
+        for _iou_do_par, i, velho in pares:
+            if saida[i] is None and velho.gid not in usados:
+                manter(i, velho, depois[i], estados.get(velho.gid, foto(velho.entry)))
     saidos = [b for b in antes if b.gid not in usados]
     for i, entry in enumerate(depois):                       # 3. nascidos
         if saida[i] is not None:
@@ -436,6 +465,22 @@ def foto(entry: BoxEntry) -> int:
 
 def _caixa(e: BoxEntry) -> tuple:
     return (e.x1, e.y1, e.x2, e.y2)
+
+
+def _celulas(e: BoxEntry, lado: int = 64):
+    for cx in range(e.x1 // lado, e.x2 // lado + 1):
+        for cy in range(e.y1 // lado, e.y2 // lado + 1):
+            yield cx, cy
+
+
+def _iou(a: BoxEntry, b: BoxEntry) -> float:
+    largura = min(a.x2, b.x2) - max(a.x1, b.x1)
+    altura = min(a.y2, b.y2) - max(a.y1, b.y1)
+    if largura <= 0 or altura <= 0:
+        return 0.0
+    inter = largura * altura
+    uniao = (a.x2 - a.x1) * (a.y2 - a.y1) + (b.x2 - b.x1) * (b.y2 - b.y1) - inter
+    return inter / max(uniao, 1)
 
 
 def _sobrepoe(a: BoxEntry, b: BoxEntry) -> bool:

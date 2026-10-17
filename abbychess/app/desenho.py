@@ -203,5 +203,4 @@ class DesenhoDaJanela:
 
     def _progredir(self, feito: int, total: int) -> None:
         self.progresso.setRange(0, max(total, 1))
-        self.progresso.setValue(feito)
-        self.rotulo_do_lote.setText(f"lote {feito}/{total}")
+        self.progresso.setValue(feito)              # o rótulo do lote é de `_lote_progrediu`

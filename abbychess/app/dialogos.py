@@ -150,14 +150,21 @@ def intervalo_do_lote(janela, projeto, total: int) -> Optional[Tuple[List[int], 
         QMessageBox.warning(janela, "Reconhecer o livro", str(erro))
         return None
     refazer = False
+    from abbychess.modelo import VERIFICADA
+
     lidas = livro.ja_lidas(projeto, indices)
+    verificadas = [i for i in lidas if projeto.estado_da_pagina(i) == VERIFICADA]
+    lidas = [i for i in lidas if i not in verificadas]      # essas o lote pula sempre
     if lidas:
         botoes = QMessageBox.StandardButton
+        pulam = (f" ({len(verificadas)} verificada(s), que o lote pula sempre)"
+                 if verificadas else "")
         resposta = QMessageBox.question(
             janela, "Reconhecer o livro",
-            f"{len(lidas)} das {len(indices)} páginas já foram reconhecidas. Reconhecer "
-            "essas de novo?\n\nSim descarta os boxes delas e as correções só desta "
-            "ocorrência (os padrões ficam). Não as pula e lê só as outras.",
+            f"{len(lidas)} das {len(indices)} páginas já foram reconhecidas{pulam}. Ler "
+            "essas de novo?\n\nSim as lê de novo mantendo as correções manuais e os glifos "
+            "revisados; a página de antes fica em Página › Voltar ao estado antes do lote. "
+            "Não as pula e lê só as outras.",
             botoes.Yes | botoes.No | botoes.Cancel, botoes.No)
         if resposta == botoes.Cancel:
             return None

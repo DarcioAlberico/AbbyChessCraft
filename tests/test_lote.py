@@ -375,3 +375,47 @@ def test_voltar_ao_antes_do_lote_durante_a_releitura_nao_e_sobrescrito(ctl, proj
     entregar(fila, esperar_por=1)
     assert ctl.fins[-1].reler_depois == [0] and p.historico.versao(p.modelo.pid) == 1
 
+
+def test_o_que_falta_retomar_fica_no_projeto_e_volta_ao_reabrir(ctl, projeto):
+    from abbychess.controladores import ARQUIVO_DO_LOTE
+
+    ctl.reconhecer([0, 1, 2], refazer=True)
+    fim = ctl.executor.comecar()
+    fim()
+    ctl.cancelar()
+    ctl.executor.tudo()
+    arquivo = projeto.pasta / ARQUIVO_DO_LOTE
+    assert json.loads(arquivo.read_text(encoding="utf-8")) == {"paginas": [1, 2], "refazer": True}
+    p = ctl.pagina                                        # reabre o projeto
+    ctl.usar(projeto, p.fonte, p.leitor)
+    assert ctl.restante == ([1, 2], True) and ctl.pode_retomar
+    ctl.retomar()
+    ctl.executor.tudo()
+    assert ctl.fins[-1].lidas == [1, 2]
+    assert not arquivo.exists() and ctl.restante is None
+
+
+def test_o_servidor_que_desiste_para_o_lote_e_retomar_vale_ao_reabrir(ctl, projeto,
+                                                                      com_servidor):
+    from tests import servidor_falso
+
+    servidor, fila = com_servidor
+    servidor.segurar.clear()
+    ctl.reconhecer([0, 1], refazer=True)
+    servidor.derrubar()                                   # a segunda queda
+    servidor_falso.entregar(fila, esperar_por=1)
+    resultado = ctl.fins[-1]
+    assert resultado.servidor_parou and not resultado.falhas and resultado.lidas == []
+    assert ctl.restante == ([0, 1], True)
+    assert not ctl.pode_retomar                           # "Não": o servidor está parado
+    ctl.retomar()
+    assert not ctl.lote_rodando
+    novo = servidor_falso.ServidorFalso(projeto.pasta_de_padroes, projeto.dados.limiares)
+    p = ctl.pagina                                        # "Sim": o projeto reabre
+    ctl.usar(projeto, p.fonte, p.leitor)
+    fila = servidor_falso.ligar(p, novo)
+    assert ctl.pode_retomar
+    ctl.retomar()
+    servidor_falso.entregar(fila, esperar_por=1)
+    servidor_falso.entregar(fila, esperar_por=1)
+    assert ctl.fins[-1].lidas == [0, 1] and ctl.restante is None

@@ -41,8 +41,9 @@ def respostas(monkeypatch):
     """O que os diálogos respondem; o teste muda antes de agir."""
     estado = {"intervalo": "1-3", "pergunta": SIM, "perguntas": 0, "arquivo": ""}
 
-    def pergunta(*_a, **_k):
+    def pergunta(*a, **_k):
         estado["perguntas"] += 1
+        estado["texto"] = a[2] if len(a) > 2 else ""
         return estado["pergunta"]
 
     monkeypatch.setattr(QMessageBox, "question", pergunta)
@@ -138,3 +139,22 @@ def test_exportar_epub_pela_janela(app, janela, respostas, tmp_path):
     with zipfile.ZipFile(destino) as z:
         assert z.namelist()[0] == "mimetype"
     assert "Exportado em saida.epub" in janela.statusBar().currentMessage()
+
+
+def test_a_pergunta_do_lote_diz_que_as_correcoes_ficam_e_conta_as_verificadas_a_parte(
+        app, janela, respostas):
+    from abbychess.modelo import VERIFICADA
+
+    respostas["intervalo"] = "1-3"
+    janela.reconhecer_livro()
+    _esperar(app, janela)
+    janela.projeto.descarregar(10)
+    pagina = janela.projeto.carregar_modelo(2)
+    pagina.estado = VERIFICADA
+    janela.projeto.salvar_modelo(pagina)
+    respostas["perguntas"], respostas["pergunta"] = 0, NAO
+    janela.reconhecer_livro()
+    _esperar(app, janela)
+    texto = respostas["texto"]
+    assert "2 das 3" in texto and "1 verificada" in texto
+    assert "mantendo as correções manuais" in texto and "Voltar ao estado antes do lote" in texto

@@ -187,7 +187,7 @@ class PoolDoIndice:
     """Os processos que montam o índice, abertos com o programa (`aquecer`, numa thread: abrir
     e importar custa ~0,75 s, que assim não fica no caminho de abrir o projeto) e fechados
     quando o último índice que os usa termina (`obter` e `devolver` contam os usos: parados,
-    eles ocupariam ~600 MB à toa), ou depois de `OCIOSO` s sem projeto aberto; o próximo
+    eles ocupariam ~300 MB à toa), ou depois de `OCIOSO` s sem projeto aberto; o próximo
     projeto aberto os abre de novo (o alvo de 2 s do índice vale para o primeiro projeto)."""
 
     def __init__(self):
@@ -234,11 +234,14 @@ class PoolDoIndice:
     def devolver(self) -> None:
         """O fim de um uso; o último fecha os processos (as tarefas de outro uso nunca são
         canceladas por este)."""
-        with self._trava:
-            self._usos = max(0, self._usos - 1)
-            ultimo = self._usos == 0
-        if ultimo:
-            self.liberar()
+        with self._trava:                       # o último tira o pool na mesma trava: um
+            self._usos = max(0, self._usos - 1)  # obter() que vem depois abre outro
+            pool = None
+            if self._usos == 0:
+                pool, self._pool = self._pool, None
+                self._pronto.clear()
+        if pool is not None:
+            pool.shutdown(wait=False, cancel_futures=True)
 
     def liberar(self) -> None:
         """Fecha os processos agora."""

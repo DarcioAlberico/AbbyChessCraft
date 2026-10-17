@@ -90,6 +90,8 @@ class BuscaNaJanela:
         self._ocorrencias, self._posicao, self._ida_pendente = [], None, None
         self._mandar_para_resultados = False
         self._congelar_selecao(None)
+        if self.statusBar().currentMessage().startswith("Buscando glifos"):
+            self.statusBar().clearMessage()     # a de outro projeto não volta mais
         self.texto.destacar_busca([])
         self.paginas.mostrar_ocorrencias(None)
         self.texto.setFocus(Qt.FocusReason.OtherFocusReason)

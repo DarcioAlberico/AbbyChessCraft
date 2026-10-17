@@ -178,36 +178,41 @@ def _aplicar_decisoes(linhas: List[List[List[int]]], decisoes: Decisoes) -> List
                 juntas.append(list(p))
         saida.append(juntas)
     # Os virtuais, na ordem das decisões: cada um logo depois (ou logo antes) da âncora dele,
-    # que é um box ou outro virtual; a âncora virtual entra antes dele. Dois na mesma âncora:
-    # o mais novo fica junto dela (foi digitado ali). Um virtual sem âncora na página, ou
-    # num ciclo, vai para o começo da primeira linha.
+    # que é um box ou outro virtual; a âncora virtual entra antes dele (uma pilha, não a
+    # recursão: a cadeia pode ser longa). Dois na mesma âncora: o mais novo fica junto dela
+    # (foi digitado ali). Um virtual sem âncora na página, ou num ciclo, vai para o começo
+    # da primeira linha.
     por_gid = {v.gid: v for v in decisoes.virtuais}
     postos: Set[int] = set()
-    em_curso: Set[int] = set()
 
-    def por(v) -> None:
-        if v.gid in postos:
-            return
-        antes = v.antes_de is not None and v.depois_de is None
-        ancora = v.antes_de if antes else v.depois_de
-        if ancora in por_gid and ancora not in postos:
-            if ancora in em_curso:              # um ciclo: sem âncora
-                postos.add(v.gid)
-                _inserir_virtual(saida, v, None)
-                return
-            em_curso.add(v.gid)
-            por(por_gid[ancora])
-            em_curso.discard(v.gid)
-            if v.gid in postos:
-                return
+    def ancora_de(v) -> Optional[int]:
+        return v.antes_de if v.antes_de is not None and v.depois_de is None else v.depois_de
+
+    def por(v, sem_ancora: bool = False) -> None:
         postos.add(v.gid)
-        if antes:
+        if sem_ancora:
+            _inserir_virtual(saida, v, None)
+        elif v.antes_de is not None and v.depois_de is None:
             _inserir_antes(saida, v)
         else:
             _inserir_virtual(saida, v, v.depois_de)
 
-    for v in decisoes.virtuais:
-        por(v)
+    for primeiro in decisoes.virtuais:
+        pilha, na_pilha = [primeiro], {primeiro.gid}
+        while pilha:
+            v = pilha[-1]
+            if v.gid in postos:
+                pilha.pop()
+                continue
+            ancora = ancora_de(v)
+            if ancora in por_gid and ancora not in postos:
+                if ancora in na_pilha:          # um ciclo: este fica sem âncora
+                    por(pilha.pop(), sem_ancora=True)
+                    continue
+                pilha.append(por_gid[ancora])
+                na_pilha.add(ancora)
+                continue
+            por(pilha.pop())
     return saida
 
 

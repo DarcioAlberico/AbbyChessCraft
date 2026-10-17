@@ -207,7 +207,11 @@ def como_digitado(pagina: Pagina, sequencia, na_sessao: Set[int],
     linhas: Dict[Tuple[int, int], List[int]] = {}
     for (b, n, _k), gids in sorted(montadas.items()):  # os boxes de cada linha, em ordem
         linhas.setdefault((b, n), []).extend(g for g in gids if g in boxes)
+    # Só as linhas da sessão (as que tinham um glifo dela antes): as outras não mudaram.
+    da_sessao = {antes[g][:2] for g in na_sessao if g in antes}
     for linha in linhas.values():               # as palavras de fora, como eram
+        if not any(antes.get(g, (None, None))[:2] in da_sessao for g in linha):
+            continue
         for a, b in zip(linha, linha[1:]):
             if a in na_sessao or b in na_sessao or a not in antes or b not in antes:
                 continue

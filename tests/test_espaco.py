@@ -381,6 +381,8 @@ def test_na_ordem_de_leitura_decidir_segue_para_o_pendente_seguinte(app, lida):
 def test_ctrl_t_verifica_a_pagina_e_editar_a_devolve_a_revisao(app, lida):
     j = lida
     QTest.keyClick(j.visor, Qt.Key.Key_T, Qt.KeyboardModifier.ControlModifier)
+    if j.confirmacao.aberta:                             # com pendentes, a pergunta na barra
+        QTest.keyClick(j.confirmacao.aceitar, Qt.Key.Key_Return)
     assert j.pagina.modelo.estado == md.VERIFICADA
     assert "verificada" in j.rotulo_da_pagina.text()
     j.pagina.desfazer()
@@ -674,11 +676,21 @@ def test_os_editores_cabem_no_inspetor_de_296_px(app, lida, editor):
 
 
 def test_ctrl_t_com_pendentes_pergunta_e_o_nao_deixa_a_pagina(app, lida, monkeypatch):
+    """§8.4 e CA-8.5: a pergunta na barra (sem diálogo); o Esc fecha só ela, e a barra de
+    busca aberta fica."""
     j = lida
-    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.No)
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: pytest.fail("diálogo"))
     assert fila(j)
+    j.localizar()                                        # a busca aberta
     QTest.keyClick(j.visor, Qt.Key.Key_T, Qt.KeyboardModifier.ControlModifier)
+    assert j.confirmacao.aberta and f"Aceitar {len(fila(j))} pendente" in j.confirmacao.pergunta.text()
+    QTest.keyClick(QApplication.focusWidget() or j.confirmacao, Qt.Key.Key_Escape)
+    assert not j.confirmacao.aberta and not j.barra_de_busca.isHidden()
     assert j.pagina.modelo.estado != md.VERIFICADA
+    QTest.keyClick(j.visor, Qt.Key.Key_T, Qt.KeyboardModifier.ControlModifier)
+    j.fechar_sobreposicao()                              # o Esc pela ação da janela
+    assert not j.confirmacao.aberta and not j.barra_de_busca.isHidden()
+    j.fechar_busca()
 
 
 def test_f9_em_1366_abre_a_gaveta_de_150_sem_estreitar_a_imagem(app, janela):

@@ -575,7 +575,32 @@ cabeçalho também.
   imagem, cada página vira uma página de PDF a 300 dpi.
 - **DOCX** e **EPUB**: pelos escritores do PyBoxEditor (`core.exportar`), com a fonte dos
   símbolos embutida. Os parágrafos saem do vão entre as linhas, a hifenização no fim de linha
-  é desfeita e as figurinas saem como impressas.
+  é desfeita e as figurinas saem como impressas. O idioma do arquivo é o do texto do livro
+  (o que a camada do PDF diz, ou o do projeto).
+
+**O PDF nascido digital sai da própria camada de texto.** No DOCX e no EPUB, a página cuja
+camada a régua do `core.pdf_nativo` aceita (texto tipográfico, não OCR de fábrica nem figurina
+em imagem) sai dela, e não dos boxes: as letras e figurinas que o autor escreveu (inclusive a
+codificação "SP" do ChessBase das edições da Quality Chess), o negrito da linha principal, as
+colunas na ordem, o cabeçalho corrente fora e o FEN exato dos diagramas compostos em fonte. O
+lado a jogar que a revisão conferiu num diagrama do projeto passa para o diagrama da camada. As
+outras páginas saem dos boxes, como antes. Nas pp. 1 e 6–8 do *Odds & Ends* (Quality Chess,
+2012), as quatro páginas vieram da camada, sem um erro de letra, contra uns 90 `O` no lugar de
+`o`, colunas embaralhadas e o `13.♕b3 0–0–0` cortado como rodapé na exportação pelos boxes.
+
+**Pelos boxes**, a exportação também:
+
+- monta as linhas **coluna a coluna** (`exportar._Leitura`): o que atravessa a calha (o título
+  centrado) é uma faixa sozinha, e as figuras entram no trecho da coluna delas;
+- acerta a **caixa** das letras que só mudam de tamanho (`o O`, `c C`, `s S`, `v V`, `w W`,
+  `x X`, `z Z`) pela altura na linha, e o `X` de captura (`♖Xf2` → `♖xf2`);
+- tira do texto as **coordenadas** do tabuleiro (o número sozinho à esquerda, a letra sozinha
+  embaixo), e só elas: a legenda colada embaixo fica;
+- não trata como rodapé a linha que tem **lances**.
+
+Nos dois caminhos, o diagrama sem lado lido ganha o do **último lance antes dele**, quando a peça
+que o fez está na casa de chegada e o texto depois do diagrama continua a numeração
+(`10.♘xc4` → `10...`); e o parágrafo que a paginação partiu volta a ser um.
 
 **Os diagramas na exportação.** O diagrama conferido, ou que o porteiro do PyBoxEditor
 (`core.diagrama.confiavel`) aprovou, sai redesenhado do FEN pela fonte de diagrama
@@ -1352,9 +1377,12 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   painel de Resultados ganha itens que abrem a página no passo B, com a busca).
 - **Voltar ao estado antes do lote não se desfaz**, e vale para a última releitura de cada
   página pelo lote com "refazer" (a cópia de uma releitura substitui a da anterior).
-- **Os parágrafos exportados saem do vão entre linhas.** Recuo de primeira linha, títulos,
-  cabeçalho e rodapé de página não são reconhecidos: o cabeçalho corrido entra como
-  parágrafo, e uma página de duas colunas sai na ordem de leitura, mas sem marcar a coluna.
+- **Os parágrafos exportados pelos boxes saem do vão entre linhas.** Recuo de primeira
+  linha, títulos e negrito não são reconhecidos (pela camada do PDF, são); a frase que passa
+  de uma coluna para a outra sai em dois parágrafos.
+- **Pela camada do PDF, a correção feita nos boxes não entra.** O texto vem do PDF, que já é
+  o do autor; só o lado a jogar conferido na revisão passa. As páginas que o ChessBase imprime
+  com a prosa em imagem (pp. 94 em diante do *Odds & Ends*) a régua manda aos boxes.
 - **A camada do PDF pesquisável supõe página sem rotação.** Página com `/Rotate` no PDF
   recebe o texto nas coordenadas da página renderizada, que não batem com as da página
   girada.

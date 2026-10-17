@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from pathlib import Path
 from typing import List, Optional, Sequence
 
@@ -471,6 +472,45 @@ class ControladorDeDiagramas:
 # O livro: abrir, o lote, a revisão entre páginas e a exportação
 # ----------------------------------------------------------------------
 
+class _GravadorDoLote:
+    """Grava `lote.json` numa thread (o mais novo vence); `esperar` antes de ler ou no fim."""
+
+    def __init__(self):
+        self._trava = threading.Lock()
+        self._pendente = None
+        self._thread: Optional[threading.Thread] = None
+
+    def gravar(self, arquivo, dados) -> None:
+        with self._trava:
+            self._pendente = (arquivo, dados)
+            if self._thread is None:
+                self._thread = threading.Thread(target=self._rodar, name="lote-json", daemon=True)
+                self._thread.start()
+
+    def _rodar(self) -> None:
+        from abbychess import gravacao as gv
+
+        while True:
+            with self._trava:
+                pendente, self._pendente = self._pendente, None
+                if pendente is None:
+                    self._thread = None
+                    return
+            arquivo, dados = pendente
+            try:
+                if dados is None:
+                    gv.apagar(arquivo)
+                else:
+                    gv.gravar_json(arquivo, dados)
+            except OSError as erro:
+                log.warning("o lote a retomar não foi gravado: %s", erro)
+
+    def esperar(self, limite: float = 10.0) -> None:
+        thread = self._thread
+        if thread is not None:
+            thread.join(limite)
+
+
 class ControladorDoLivro:
     """O projeto aberto e o que vale para o livro inteiro."""
 
@@ -487,6 +527,7 @@ class ControladorDoLivro:
         self._reler_depois_antes: List[int] = []
         #: "Abrir sem o servidor" nesta sessão (os modelos não carregaram no filho).
         self.sem_servidor = False
+        self._gravador_do_lote = _GravadorDoLote()
         self.eventos.ligar("pagina_reconhecida", self._saiu_de_reler_depois)
         self.eventos.ligar("pagina_verificada", self._saiu_de_reler_depois)
         #: O servidor cujo `modelos_prontos` já foi emitido (uma vez por servidor).
@@ -600,7 +641,7 @@ class ControladorDoLivro:
         condutor = self._condutor
         if condutor is not None and feitas:     # o ponto, a cada página (G1 da rodada 3)
             self._guardar(list(condutor.restante), condutor.refazer,
-                          self._reler_depois_de(condutor))
+                          self._reler_depois_de(condutor), agora=False)
         self.eventos.emitir("lote_progresso", feitas, total, estimativa)
 
     def _fim_do_lote(self, condutor, resultado) -> None:
@@ -632,30 +673,28 @@ class ControladorDoLivro:
         p = self.pagina
         return Path(p.projeto.pasta) / ARQUIVO_DO_LOTE if p.projeto is not None else None
 
-    def _guardar(self, faltam: Sequence[int], refazer: bool, reler_depois: Sequence[int]) -> None:
+    def _guardar(self, faltam: Sequence[int], refazer: bool, reler_depois: Sequence[int], *,
+                 agora: bool = True) -> None:
         """O que o lote deixou para retomar, na memória e em `lote.json`. É gravado ao começar
-        o lote e a cada página (fechar o projeto no meio do lote não perde o ponto, nem deixa
-        valer o arquivo de um lote anterior), e no fim."""
-        from abbychess import gravacao as gv
-
+        o lote, a cada página (numa thread, `agora=False`: o fsync não fica na janela) e no
+        fim; fechar o projeto no meio do lote não perde o ponto, nem deixa valer o arquivo
+        de um lote anterior."""
         self.restante = (list(faltam), bool(refazer)) if faltam else None
         self.reler_depois = list(reler_depois)
         arquivo, projeto = self._arquivo_do_lote(), self.pagina.projeto
         if arquivo is None or projeto.somente_leitura:
             return
-        try:
-            if not faltam and not reler_depois:
-                gv.apagar(arquivo)
-            else:
-                gv.gravar_json(arquivo, {"paginas": [int(i) for i in faltam],
-                                         "refazer": bool(refazer),
-                                         "reler_depois": [int(i) for i in reler_depois]})
-        except OSError as erro:
-            log.warning("o lote a retomar não foi gravado: %s", erro)
+        dados = None if not faltam and not reler_depois else {
+            "paginas": [int(i) for i in faltam], "refazer": bool(refazer),
+            "reler_depois": [int(i) for i in reler_depois]}
+        self._gravador_do_lote.gravar(arquivo, dados)
+        if agora:
+            self._gravador_do_lote.esperar()
 
     def _ler_restante(self) -> None:
         import json
 
+        self._gravador_do_lote.esperar()
         self.restante, self.reler_depois = None, []
         arquivo = self._arquivo_do_lote()
         if arquivo is None or not arquivo.is_file():

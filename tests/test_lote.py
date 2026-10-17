@@ -29,9 +29,15 @@ from tests.test_controlador import ExecutorManual
 from tests.test_livro import pdf_sintetico
 
 
+@pytest.fixture(scope="module")
+def _pdf(tmp_path_factory):
+    """O PDF de três páginas, um para o módulo (os projetos só o leem)."""
+    return pdf_sintetico(tmp_path_factory.mktemp("pdf"))
+
+
 @pytest.fixture
-def projeto(tmp_path):
-    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Lote", pdf_sintetico(tmp_path))
+def projeto(tmp_path, _pdf):
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Lote", _pdf)
     yield projeto
     projeto.fechar()
 

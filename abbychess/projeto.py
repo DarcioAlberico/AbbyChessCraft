@@ -715,6 +715,15 @@ class ProjetoDeLivro:
         pagina = self.carregar_modelo(indice)
         return pagina is not None and self._arquivo_antes_do_lote(pagina.pid).is_file()
 
+    def pid_da_pagina(self, indice: int) -> Optional[int]:
+        """O pid da página sem ler o JSON dela: o do modelo em memória, ou o do livro."""
+        with self._trava_do_cache:
+            em_cache = self._modelos.get(indice)
+        if em_cache is not None:
+            return em_cache.pid
+        with self._trava_do_livro:
+            return self._pid_de(indice)
+
     def data_antes_do_lote(self, indice: int) -> Optional[datetime]:
         """Quando a cópia de antes do lote foi feita (a hora do arquivo), ou None."""
         pagina = self.carregar_modelo(indice)

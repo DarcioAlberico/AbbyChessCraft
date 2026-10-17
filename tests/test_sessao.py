@@ -199,8 +199,9 @@ def test_a_palavra_virtual_fica_quando_a_vizinha_sai():
     assert _texto(p) == "b c"
     p = _pagina("casa", "ab", "fim")
     _editar(p, "ab", "abc")
-    _editar(p, "abc", "c")                                # sobra só o virtual na linha
+    plano = _editar(p, "abc", "c")                        # sobra só o virtual na linha
     assert _texto(p) == "casa c\nfim"                     # (uma linha só existe com boxes)
+    assert "a linha ficou sem glifos" in plano.estrutural()
 
 
 @pytest.mark.parametrize("pagina, com_virtual, para", [
@@ -248,3 +249,14 @@ def test_gid_no_cursor_da_letra_nova():
     _texto_, unidades = ss.texto_e_unidades(p)
     assert ss.gid_no_cursor(unidades, "casa", 2) == ss.LETRA_NOVA
     assert ss.gid_no_cursor(unidades, "casa", 1) == p.boxes[0].gid
+
+
+@pytest.mark.parametrize("de, para, onde, letra", [
+    ("ganhaxtempos", "ganhar tempos", 5, "r"), ("conc1uir", "concl uir", 4, "l"),
+    ("casx", "casa ", 3, "a")])
+def test_trocar_a_letra_e_partir_corrige_o_glifo_sem_tirar_o_box(de, para, onde, letra):
+    p = _pagina(de)
+    gid = p.boxes[onde].gid
+    plano = _editar(p, de, para)
+    assert plano.corrigir == {gid: letra} and not plano.sair and not p.decisoes.virtuais
+    assert _texto(p) == para.strip()

@@ -11,7 +11,7 @@ ela não tocou, e uma quebra e uma junção nunca valem na mesma fronteira. Do D
 confirmada (sem recusa) deixa na página o texto digitado, e a âncora de todo virtual é um box
 vivo ou outro virtual.
 
-Suíte rápida: `derandomize=True`, `max_examples=150`. A camada noturna roda 5.000.
+Suíte rápida: `derandomize=True`, `max_examples=120`. A camada noturna roda 5.000.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from abbychess import texto as tx
 from abbychess.modelo import Box, Pagina, foto, gid_de, reconciliar
 
 LARGURA, ALTURA = 900, 400
-EXEMPLOS = 5000 if os.environ.get("ABBY_NOTURNO") == "1" else 150
+EXEMPLOS = 5000 if os.environ.get("ABBY_NOTURNO") == "1" else 120
 
 
 def _pagina_sintetica(n: int):
@@ -53,7 +53,7 @@ def _pagina_sintetica(n: int):
 
 
 ACOES = ["trocar", "apagar", "inserir", "inserir_antes", "comeco", "espaco", "palavra",
-         "juntar", "nada"]
+         "trocar_e_partir", "juntar", "nada"]
 
 
 def _trecho(pagina, i, acao, c):
@@ -70,7 +70,7 @@ def _trecho(pagina, i, acao, c):
             return None
         b = ss.palavras_em(unidades, b + 1, b + 1)[1]
     trecho, onde = texto[a:b], k - a
-    if acao == "espaco" and (onde + 1 >= len(trecho) or trecho[onde + 1] == " "):
+    if acao in ("espaco", "trocar_e_partir") and (onde + 1 >= len(trecho) or trecho[onde + 1] == " "):
         return None                             # um espaço na borda não parte nada
     novo = {"trocar": trecho[:onde] + c + trecho[onde + 1:],
             "apagar": trecho[:onde] + trecho[onde + 1:],
@@ -79,6 +79,7 @@ def _trecho(pagina, i, acao, c):
             "comeco": c + trecho,
             "espaco": trecho[:onde + 1] + " " + trecho[onde + 1:],
             "palavra": trecho + " " + c,
+            "trocar_e_partir": trecho[:onde] + c + " " + trecho[onde + 1:],
             "juntar": trecho.replace(" ", "", 1),
             "nada": trecho}[acao]
     if not novo.strip():
@@ -102,16 +103,19 @@ def editar_uma_palavra(pagina, i, acao, c):
         return
     texto, unidades, a, b, novo = trecho
     try:
-        ss.editar(pagina, unidades[a:b], novo)
+        plano = ss.editar(pagina, unidades[a:b], novo)
     except ss.Recusa:
         return
+    if acao != "apagar":                         # um box só sai se a letra dele foi apagada
+        assert not plano.sair
     esperado = texto[:a] + novo + texto[b:]
     agora, unidades_agora = ss.texto_e_unidades(pagina)
     ficaram = pagina.vivos
     antes = [tuple(g for g in linha if g in ficaram) for linha in _linhas_dos_boxes(unidades)]
-    if [linha for linha in antes if linha] != _linhas_dos_boxes(unidades_agora):
-        # Tirar um box mudou como o core agrupa as linhas da página (as linhas são dela): os
-        # caracteres ficam os digitados.
+    if not ficaram or [linha for linha in antes if linha] != _linhas_dos_boxes(unidades_agora):
+        # Tirar um box mudou como o core agrupa as linhas da página (as linhas são dela), ou
+        # a página ficou sem box nenhum (sem linhas; os virtuais sem âncora vão ao começo):
+        # os caracteres ficam os digitados.
         assert sorted(agora.replace(" ", "").replace("\n", "")) == \
             sorted(esperado.replace(" ", "").replace("\n", ""))
     elif not all(antes):

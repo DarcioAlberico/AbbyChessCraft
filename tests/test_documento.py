@@ -466,3 +466,39 @@ def test_o_documento_mostra_o_estado_e_a_exportacao_o_nao_revisado(app):
     d = DiagramaLido((0, 0, 100, 100), casas, lado="w", id="d0")
     assert NAO_REVISADO in d.linha_de_texto(1)
     assert NAO_REVISADO not in d.linha_de_texto(1, com_ressalva=False)
+
+
+def test_as_margens_seguem_o_texto_e_a_posicao_dos_glifos(app):
+    """O cache das margens corridas muda quando muda o que a regra lê: o caractere do número
+    da página (os mesmos gids) e a posição de um glifo."""
+    from PIL import Image
+
+    from abbychess.controlador import ControladorDePagina, Eventos, ExecutorSincrono
+    from abbychess.modelo import Box, Pagina
+    from core.box_model import BoxEntry
+
+    def pagina(numero: str, topo_do_cabecalho: int):
+        boxes = [Box(1, BoxEntry(numero, 100, topo_do_cabecalho, 120, topo_do_cabecalho + 30))]
+        for k in range(30):                                # o corpo: linhas de 40 em 40 px
+            y = 400 + k * 40
+            boxes += [Box(100 + k * 10 + n, BoxEntry(c, 100 + n * 25, y, 120 + n * 25, y + 30))
+                      for n, c in enumerate("texto")]
+        return Pagina(pid=0, indice=0, boxes=boxes)
+
+    p = ControladorDePagina(Eventos(), ExecutorSincrono())
+    p.imagem = Image.new("L", (2000, 2800), 255)
+    p.modelo = pagina("12", 60)
+    assert 1 in p.gids_de_margem()                         # "12": o número da página
+    p.modelo = pagina("lz", 60)                            # os mesmos gids, outro texto
+    assert 1 not in p.gids_de_margem()
+    p.modelo = pagina("12", 60)
+    assert 1 in p.gids_de_margem()
+    p.modelo = pagina("12", 1300)                          # no meio da página: não é margem
+    assert 1 not in p.gids_de_margem()
+
+
+def test_a_pagina_reconhecida_e_vazia_diz_nada_reconhecido(app, janela, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(type(janela.pagina), "reconhecida", property(lambda self: True))
+    monkeypatch.setattr(janela.pagina, "documento", lambda: None)
+    janela.pintar_texto()
+    assert janela.texto.toPlainText() == "Nada reconhecido nesta página."

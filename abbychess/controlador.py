@@ -1228,14 +1228,11 @@ class ControladorDePagina:
         return "figurinas" if self._livro_tem_figurinas else "letras"
 
     def _figurinas_nas_paginas_lidas(self) -> bool:
+        """Pelo resumo das páginas no `livro.json` (sem abrir nenhuma; uma página gravada
+        antes do D1 não tem o campo e conta quando for gravada de novo)."""
         if self.projeto is None:
             return False
-        for indice in self.projeto.paginas_lidas():
-            modelo = self.projeto.carregar_modelo(indice)
-            if modelo is not None and ss.modo_da_pagina(
-                    "livro", (b.entry.char for b in modelo.boxes)) == "figurinas":
-                return True
-        return False
+        return any(r.get("figurinas") for r in self.projeto.resumo_do_livro().values())
 
     def _tinta_sem_box(self, pagina: Pagina, plano) -> bool:
         """Há tinta sem box onde uma letra que faltou entrou (a letra que a segmentação não

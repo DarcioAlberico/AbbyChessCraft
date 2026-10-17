@@ -678,24 +678,24 @@ Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (commit 76ba432; má
 
 Desempenho por passo, em ms ou MB (uma rodada cada, a do portão, que roda no mesmo processo depois dos testes `livro_real` e por isso não é a condição das rodadas repetidas; quanto o mesmo código varia, e o que se conclui, está nelas, abaixo):
 
-| Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) | 2a (`2026-10-16-passo-2a.json`) | 2b (`2026-10-16-passo-2b.json`) | a1 (`2026-10-16-passo-a1.json`) | a2 (`2026-10-16-passo-a2.json`) | a3 (`2026-10-17-passo-a3.json`) | e (`2026-10-17-passo-e.json`) | d1 (`2026-10-17-passo-d1.json`) |
+| Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) | 2a (`2026-10-16-passo-2a.json`) | 2b (`2026-10-16-passo-2b.json`) | a1 (`2026-10-16-passo-a1.json`) | a2 (`2026-10-16-passo-a2.json`) | a3 (`2026-10-17-passo-a3.json`) | e (`2026-10-17-passo-e.json`) | d1 (`2026-10-17-passo-d1-094555.json`) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,89 | 15,21 | 16,04 | 14,5 | 16,74 | 17,94 |
-| Troca fora do cache, p95 | — | — | — | — | — | 147,1 | 144,68 | 145,27 | 146,97 | 145,49 |
-| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 23,68 | 26,63 | 26,8 | 22,41 | 26,12 | 31,33 |
-| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 16,92 | 20,23 | 20,88 | 20,15 | 44,48 | 47,55 |
+| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,89 | 15,21 | 16,04 | 14,5 | 16,74 | 17,44 |
+| Troca fora do cache, p95 | — | — | — | — | — | 147,1 | 144,68 | 145,27 | 146,97 | 147,86 |
+| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 23,68 | 26,63 | 26,8 | 22,41 | 26,12 | 29,66 |
+| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 16,92 | 20,23 | 20,88 | 20,15 | 44,48 | 45,03 |
 | Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 | 164 | 8 | 8 | 8 | 8 | 8 | 8 |
 | Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 12,9 | 22 | 12 | 9,5 | 2,2 | 2,3 |
-| Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1654 | 1793 | 1799 | 1823 | 2050 | 2060 |
-| Releitura com o lote, p95 | — | — | — | — | — | — | — | — | 124,11 | 104,55 |
-| Atraso no lote falso (51 p.), p99 | — | — | — | — | — | — | — | — | 14,1 | 2,4 |
-| Gravar uma página do lote, p95 | — | — | — | — | — | — | — | — | 17,6 | 17,8 |
-| Lote com servidor (s/p.) | — | — | — | — | — | — | — | — | 8,33 | 8,14 |
-| Lote sem servidor (s/p.) | — | — | — | — | — | — | — | — | 8,26 | 8,27 |
-| Pintura de 2.000 boxes, p95 | — | — | — | — | — | 11,5 | 13,14 | 13,2 | 13,12 | 13,39 |
-| Montar o Documento, p95 | — | — | — | — | 25,61 | 22,72 | 25,97 | 31,78 | 39,82 | 32,7 |
-| Clique no Documento, p95 | — | — | — | — | — | — | — | 2,84 | 3,25 | 3,17 |
-| Clique acha o box, p95 | — | — | — | — | — | 0,0016 | 0,0016 | 0,0016 | 0,0017 | 0,0015 |
+| Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1654 | 1793 | 1799 | 1823 | 2050 | 2053 |
+| Releitura com o lote, p95 | — | — | — | — | — | — | — | — | 124,11 | 113,34 |
+| Atraso no lote falso (51 p.), p99 | — | — | — | — | — | — | — | — | 14,1 | 2,8 |
+| Gravar uma página do lote, p95 | — | — | — | — | — | — | — | — | 17,6 | 19,2 |
+| Lote com servidor (s/p.) | — | — | — | — | — | — | — | — | 8,33 | 8,34 |
+| Lote sem servidor (s/p.) | — | — | — | — | — | — | — | — | 8,26 | 8,52 |
+| Pintura de 2.000 boxes, p95 | — | — | — | — | — | 11,5 | 13,14 | 13,2 | 13,12 | 13,27 |
+| Montar o Documento, p95 | — | — | — | — | 25,61 | 22,72 | 25,97 | 31,78 | 39,82 | 34,81 |
+| Clique no Documento, p95 | — | — | — | — | — | — | — | 2,84 | 3,25 | 3,46 |
+| Clique acha o box, p95 | — | — | — | — | — | 0,0016 | 0,0016 | 0,0016 | 0,0017 | 0,0017 |
 
 Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter do passo 0 ao 1b tem duas faixas no mesmo código (perto de 110–130 e de 180–235; no 2a, uma só, perto de 90); o atraso no lote tem duas faixas sempre (perto de 8–10 e de 21). Desde o 2b o congelamento é desligado (`ABBY_CONGELAR=1` liga): as duas linhas do 2b rodam o mesmo programa (o rótulo `sem_congelar` é do roteiro de medida), e a coluna do Enter mede até a cor mudar (até o 2a, até o fim da propagação). Desde o A1 a troca é no cache de páginas (a vizinha já pré-carregada); a de fora do cache tem coluna própria. Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
 
@@ -712,7 +712,7 @@ Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem 
 | passo a2 | 93c94a7 | completa | 14,17; 14,23; 14,32 | 15,4; 14,95; 14,81 | 129,93; 135,18; 133,2 | 21,26; 20,83; 21,43 | 27,75; 26,56; 24,42 | 14,93; 14,74; 15,49 | 19,82; 20,77; 19,94 | 9,5; 9,5; 22,2 | — |
 | passo a3 | 271d582 | completa | 14,27; 14,12; 14,09 | 14,63; 15,36; 14,46 | 128,43; 129,36; 128,24 | 29,97; 21,33; 21,24 | 37,04; 22,94; 22,86 | 14,09; 14,6; 14,42 | 17,25; 19,34; 19,16 | 21; 9,4; 9,7 | — |
 | passo e | 9c759e2 | completa | 14,51; 14,42; 14,56 | 19,08; 17,73; 19,45 | 134,01; 134,1; 133,4 | 23,93; 23,92; 23,99 | 25,85; 28,95; 29,18 | 38,97; 38,73; 38,97 | 43,78; 42,3; 45,41 | 2,2; 2,2; 2,2 | 105,28; 64,42; 65,99 |
-| passo d1 | dd38d99 | completa | 14,85; 15,64; 15,41 | 18,86; 19,14; 20,7 | 135,49; 136,69; 139,62 | 24,06; 24,78; 33,52 | 29,52; 31,54; 36,59 | 38,49; 38,28; 37,78 | 45,01; 43,93; 42,4 | 2,3; 2,2; 2,4 | 84,02; 75,62; 97,44 |
+| passo d1 | c955dff | completa | 15,21; 14,99; 14,91 | 19,92; 19,05; 17,88 | 133,54; 133,05; 134,86 | 24,63; 33,33; 24,89 | 30,22; 36,06; 27,03 | 35,51; 38,84; 38,67 | 41,52; 44,55; 43,99 | 2,2; 2,2; 2,2 | 117,22; 66,18; 73,22 |
 | passo 1b sem congelar | 1519d8f | completa | 169,84; 175,66; 170,16 | 192,25; 202,72; 196,29 | — | 123,14; 126,27; 144,94 | 199,91; 203,93; 234,95 | 124,11; 123,85; 140,89 | 142,6; 150,72; 233,54 | 14,4; 15,5; 16,3 | — |
 | passo 2a sem congelar | d19c858 | completa | 174,66; 175,73; 178,05 | 188,01; 188,63; 188,4 | — | 82,23; 82,43; 82,52 | 91,7; 89,92; 92,03 | 73,15; 70,64; 75,29 | 88,33; 91,91; 92,78 | 11,7; 20,8; 21,5 | — |
 | passo 2b sem congelar | 6f863c3 | completa | 153,56; 153,19; 157,37 | 173,65; 165,46; 168,14 | — | 20,55; 20,57; 21,47 | 24,01; 27,01; 27,08 | 14,4; 13,82; 14,5 | 16,9; 16,99; 18,83 | 22,3; 9,1; 9,8 | — |
@@ -721,9 +721,9 @@ Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: ca
 
 | Livro | Commit | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por diagrama | Lado certo | Ordem | CER do corpo | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| xv | dd38d99 | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 3 (+10 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-| yusupov | dd38d99 | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 13 | 3/3 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-| darcy | dd38d99 | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| xv | c955dff | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 3 (+10 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| yusupov | c955dff | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 13 | 3/3 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| darcy | c955dff | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 
 Ainda não medido: a ligação da legenda ao diagrama, no passo H (a leitura de hoje não liga legenda a diagrama); precisão e revocação por função de bloco, no passo F (a leitura de hoje não classifica blocos); a validação do FEN pelos lances, no passo H.
 
@@ -749,6 +749,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | xv | 5ba8ba0 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 433,6 s |
 | xv | 9c759e2 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 434,5 s |
 | xv | dd38d99 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 440,9 s |
+| xv | c955dff | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 446,5 s |
 | yusupov | bb0b7e5 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23 s |
 | yusupov | 0ebbf9c | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,1 s |
 | yusupov | 3bf1ad3 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,4 s |
@@ -766,6 +767,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | yusupov | 5ba8ba0 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23 s |
 | yusupov | 9c759e2 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,1 s |
 | yusupov | dd38d99 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 22,9 s |
+| yusupov | c955dff | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 22,9 s |
 | darcy | bb0b7e5 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,5 s |
 | darcy | 0ebbf9c | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,7 s |
 | darcy | 3bf1ad3 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,8 s |
@@ -783,6 +785,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | darcy | 5ba8ba0 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,6 s |
 | darcy | 9c759e2 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 24 s |
 | darcy | dd38d99 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 24,5 s |
+| darcy | c955dff | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 24,4 s |
 
 Fatia (`ferramentas\replay_fatia.py`; **erros** são as diferenças do snapshot contra o gabarito, o N da medida humana):
 
@@ -797,7 +800,7 @@ Fatia (`ferramentas\replay_fatia.py`; **erros** são as diferenças do snapshot 
 | xv | A2 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-16-fatia-xv-passo-A2-204155.json` |
 | xv | A3 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-A3.json` |
 | xv | E | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-E.json` |
-| xv | D1 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-D1.json` |
+| xv | D1 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-D1-101106.json` |
 <!-- medidas:fim -->
 
 O replay da fatia (os gestos para levar as p. 21–27 ao gabarito) é
@@ -1010,6 +1013,27 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   (21, 15 e 19–21 ms na mediana). A qualidade dos três livros e a fatia, medidas no
   `4e974a5`, não mudaram (o passo não mexe na leitura; a correção depois dele só muda quando
   a pré-carga roda e os atalhos de zoom).
+- **A edição no Documento, desde o passo D1** (3 rodadas e o portão do commit `c955dff`,
+  pasta limpa; a primeira bateria, do `dd38d99`, antes das revisões, está em
+  `docs/medidas/2026-10-17-primeira-rodada-d1*.json`). A troca, a releitura, o lote (8,1–8,5
+  s por página, com e sem o servidor) e a memória (2029–2053 MB) ficaram iguais às do E.
+  **O Enter até a cor mudar** ficou com a mesma mediana (24–25 ms em 2 das 3 rodadas), mas o
+  p95 subiu ~3 ms em todas as medidas (27–36, contra 26–29 no E; alvo de 100), e uma rodada
+  saiu alta por igual (33 na mediana), como a "rodada alta" já vista no A1 e no A3; até o fim
+  da propagação, 88–95 na mediana (84 no E). É um custo pequeno e real, não investigado.
+  **Montar o Documento** ficou em 32 ms na mediana (31 no E), mas o p95 subiu para 40–42 nas
+  rodadas (32–33 no E), com máximos de 69–70: a vista guarda a unidade de cada caractere a
+  cada montagem (`_guardar_as_unidades`, um laço em Python), para a sessão comparar.
+  **O pico durante o lote** caiu de 132–137 ms para 92–105: a volta de cada página do lote
+  saiu da janela (o `lote.json` numa thread e a página seguinte num passo à parte do laço de
+  eventos), como o E deixou para o D1; o p99 segue em 2,2. **A edição em si** (informativo,
+  medido pela revisão de produto na janela, fora da bateria, numa página de 1.890 glifos):
+  uma tecla na sessão custa ~0,5 ms; confirmar uma palavra, 40–47 ms (a montagem do
+  Documento é quase tudo); colar a página inteira por cima com 20 letras trocadas e
+  confirmar, ~135 ms, e com toda palavra mudada, ~350 ms. **A suíte rápida** ficou em 56–60 s
+  (o limite da §15.1 é 60): o passo seguinte que acrescentar testes de janela tem de medir.
+  O **CA-F.1** não foi julgado: o texto e os FEN das p. 21–27 do Xadrez Vitorioso ainda não
+  foram verificados (a fatia segue "gestos pendentes"; ver "O que falta você fazer").
 - **O servidor de leitura, desde o passo E** (3 rodadas e o portão do commit `9c759e2`,
   pasta limpa). **Desde o E as medidas rodam como o programa abre o projeto**: a janela só
   com os padrões do livro e os modelos no servidor; até o A3, os modelos ficavam na própria

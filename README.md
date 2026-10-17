@@ -289,7 +289,7 @@ você digita:
   5 minutos se nenhum projeto for aberto); não vai para o disco. 230 páginas levam 1,4–1,5 s
   com os processos já abertos (o alvo é 2 s), e 1,7–2,4 s pela janela com o servidor de
   leitura subindo junto. Com os processos por abrir (o projeto aberto logo ao abrir o
-  programa, ou o segundo projeto da sessão), 2,0–2,3 s. O que você edita, o F5 e o lote
+  programa, ou o segundo projeto da sessão), 2,0–2,9 s. O que você edita, o F5 e o lote
   refazem as páginas deles antes da busca seguinte, e o livro v1 é lido sem migrar. As
   páginas não reconhecidas ficam fora (a barra de status diz quantas, no escopo do livro).
 - **Os Avisos** que citam uma página (como as decisões que não seguiram os glifos relidos,
@@ -1227,8 +1227,8 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   lista em Resultados até a Galeria do passo C; buscar antes de o índice ficar pronto espera
   por ele (a barra de status mostra o progresso). O índice de 230 páginas cumpre os 2 s só
   com os processos já abertos (o primeiro projeto, aberto um pouco depois do programa); o
-  projeto aberto junto com o programa, e o segundo da sessão, levam 2,0–2,3 s (CA-7.1, uma
-  limitação conhecida).
+  projeto aberto junto com o programa, e o segundo da sessão, levam 2,0–2,9 s, e pela janela
+  o índice chega a 2,4 s (CA-7.1, uma limitação conhecida).
 - **A edição no Documento, desde o D1**: o que é do passo G (k letras por 1, 1 por k, o
   parágrafo, os estilos) é recusado com aviso; o Ctrl+T com uma edição do texto ainda na fila
   pede para tentar de novo depois que ela entrar; num projeto com páginas lidas antes do D1,

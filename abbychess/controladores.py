@@ -1151,12 +1151,15 @@ class ControladorDaBusca:
                 achados = bs.buscar_glifos(indice, char, fontes, minima, maxima)
             except Exception:
                 log.exception("a busca por glifo falhou")
-                self._velhas |= velhas
+                refeitas = None
 
             def fim():
                 if geracao != self._geracao:
                     return
-                self._guardar(leitura, refeitas)
+                if refeitas is None:            # falhou: as relidas voltam a velhas
+                    self._velhas |= velhas
+                else:
+                    self._guardar(leitura, refeitas)
                 if ao_terminar is not None:
                     ao_terminar(achados)
             self._na_interface(fim)

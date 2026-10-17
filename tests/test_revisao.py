@@ -222,3 +222,16 @@ def test_o_aviso_de_ensino_diz_o_efeito_e_o_conflito(livro):
     ctl.leitor.ensinar(recorte, "o", origem="teste")
     efeito, conflito = ctl.aviso_de_ensino("e")
     assert "amostra(s) de 'o'" in conflito
+
+
+def test_ca_8_5_todas_as_transicoes_do_4_4():
+    """Cada par (estado, evento) da tabela, e todo par fora dela deixa o estado como está."""
+    from abbychess import modelo as md
+
+    eventos = {e for _s, e in md._TRANSICOES}
+    for estado in md.ESTADOS:
+        for evento in eventos:
+            esperado = md._TRANSICOES.get((estado, evento), estado)
+            assert md.proximo_estado(estado, evento) == esperado, (estado, evento)
+    assert md.proximo_estado(md.VERIFICADA, "esquecer_padrao") == md.EM_REVISAO
+    assert md.proximo_estado(md.RECONHECIDA, "verificar") == md.VERIFICADA

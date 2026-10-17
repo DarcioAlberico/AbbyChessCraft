@@ -102,11 +102,12 @@ letra solta em campo de texto, Ctrl+Alt e ligação nativa encoberta sem exceç�
      ir para outra é descartada, com aviso.
 4. Na página seguinte, o livro já lê com os padrões ensinados.
 5. A aba **Padrões** da vista direita mostra cada amostra por caractere e permite esquecer as
-   erradas (Alt+3 cicla as abas).
+   erradas (Alt+3 cicla as abas; ver "A revisão (passo C)").
 6. **Ctrl+T** marca a página como verificada e abre a próxima não verificada (desde o A2).
-   Com glifos ainda a revisar, ele pergunta antes. Uma edição depois a devolve a "em
-   revisão"; o Ctrl+Z desfaz a marca. (Até o A1, o Ctrl+T era o modo de treino, que agora
-   é o Ctrl+M.)
+   Com glifos ainda a revisar, ele pergunta na barra, acima da faixa Linha: "Aceitar 12
+   pendente(s)…? Enter aceita · Esc não marca" (o Esc fecha só a pergunta). Uma edição
+   depois a devolve a "em revisão"; o Ctrl+Z desfaz a marca. (Até o A1, o Ctrl+T era o
+   modo de treino, que agora é o Ctrl+M.)
 7. **Clicar num diagrama** abre a conferência (ver abaixo).
 
 Os boxes na página (desde o passo A1): **o que chama o olho é o que falta revisar.** Cada
@@ -133,8 +134,9 @@ Desde o passo A2 a janela é a do FineReader:
   **Padrões**. Até 1280 px de largura o padrão é o empilhado.
 - O **Inspetor** é um editor só, o do item atual: **Glifo** (o treino) ou **Palavra** (a
   verificação de texto). No cabeçalho, a **fila**: o modo (confiança, ordem de leitura,
-  palavras desconhecidas, diagramas por conferir) e a posição nela. **F7** passa ao modo
-  seguinte, e o seletor escolhe um. O Alt+↓ leva o foco ao campo do Inspetor, de qualquer
+  por caractere, palavras desconhecidas, diagramas por conferir), o escopo (página ou livro)
+  e a posição nela. **F7** passa ao modo seguinte, **Shift+F7** alterna o escopo, e o
+  seletor escolhe os dois. O Alt+↓ leva o foco ao campo do Inspetor, de qualquer
   painel. No modo "diagramas por conferir", o Inspetor continua no Glifo (o editor de
   Diagrama é do passo H) e o Alt+↓, que só anda para a frente, abre a conferência do
   próximo. O editor só troca por um clique num item ou pelo modo da
@@ -282,8 +284,8 @@ você digita:
   segundo, com o aviso. A janela continua respondendo durante a busca (o atraso de um evento
   fica em ~2 ms). Buscar uma regex num livro de 230 páginas leva ~13 ms.
 - **Editar › Buscar glifo…**: caractere, fonte (rede, base global, livro, manual, sem
-  leitura) e faixa de confiança; a lista vai para Resultados (a Galeria é do passo C). Ela
-  roda em segundo plano, como a busca.
+  leitura) e faixa de confiança; os glifos achados abrem na **Galeria** (desde o passo C).
+  Ela roda em segundo plano, como a busca.
 - **O índice** é montado ao abrir o projeto, em segundo plano, nos processos que o programa
   abre ao começar (6 processos, ~290 MB, fechados quando o índice fica pronto, ou depois de
   5 minutos se nenhum projeto for aberto); não vai para o disco. 230 páginas levam 1,4–1,5 s
@@ -336,6 +338,36 @@ você digita:
   páginas (também em segundo plano, com o progresso; a fila de comandos espera), e prende a
   janela por ~0,4 s ao trocá-las; o Ctrl+Z leva ~0,5 s. Essa transação ocupa ~43 MB dos 50 MB
   do desfazer: os passos mais antigos que não cabem saem, e a barra de status diz quantos.
+
+### A revisão (passo C)
+
+- **A fila** (o seletor no cabeçalho do Inspetor): os modos confiança, ordem de leitura,
+  **por caractere** (os pendentes agrupados pela leitura e, em cada grupo, do menos
+  confiável ao mais), palavras desconhecidas e diagramas por conferir. **Shift+F7** passa do
+  escopo da página ao do **livro**: o Alt+↓ no último pendente da página abre a próxima
+  página com pendentes (e o Alt+↑ no primeiro, a anterior), pelo resumo do `livro.json`, sem
+  abrir as páginas; nas palavras, a página seguinte; o contador diz "3/12 · livro 410". A
+  fila julga de novo só os glifos que mudaram. O **F6** também conta pelo resumo.
+- **A Galeria** (a terceira aba da vista direita; Editar › Galeria do caractere, ou a busca
+  por glifo): a grade dos recortes dos glifos lidos como o caractere do glifo atual, da
+  página ou do livro, do menos confiável ao mais, com a página e a confiança na dica. As
+  setas, Shift e Ctrl+A selecionam; **digitar um caractere** o aplica à seleção, em quantas
+  páginas forem, num passo do desfazer (sem ensinar); **Enter** ensina a seleção, uma amostra
+  por glifo, com a leitura de cada um; **Shift+Enter** só corrige (a leitura fica, `manual`,
+  sem padrão novo). O duplo clique leva ao glifo. Os recortes chegam em segundo plano.
+- **A aba Padrões**: o campo acha o caractere; cada amostra diz a página de onde veio,
+  quantos glifos do livro ela leu, a altura relativa e o efeito (negrito e itálico, desde o
+  passo I); o duplo clique (ou Ir à origem) abre a página no glifo de origem. **Esquecer**
+  (o botão, ou Delete) não pergunta: as amostras saem, e os glifos que elas leram, no livro
+  inteiro, voltam à fila (a leitura fica, sem a fonte que a dava), pelo índice da busca e em
+  segundo plano; uma página verificada atingida volta a "em revisão", com aviso nos Avisos. O
+  Ctrl+Z desfaz tudo num passo: as amostras voltam e os glifos saem da fila de novo.
+- **Ao ensinar**, embaixo do campo do Glifo: o efeito ("Enter ensina 'l' · 23 iguais nesta
+  página", os glifos da página com a mesma leitura dele; no escopo livro, também quantos no
+  livro) e, em laranja, o **conflito** quando o glifo está perto de amostras de outro
+  caractere ("⚠ este glifo está a 0,04 de 14 amostra(s) de '1'"). A margem fica nas Opções do
+  livro ("Avisar conflito a menos de", 0,10 por padrão, na escala da distância do k-NN / 2000).
+- **Ctrl+T** com pendentes pergunta na barra, sem diálogo (ver o treino, acima).
 
 ### A página: zoom e navegação
 
@@ -1047,7 +1079,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | `abbychess/modelo.py` | O modelo da página: `Box` com gid, decisões, `Diferenca`, `Pagina` (e o instantâneo dela), o estado da página e a reconciliação da página relida (F5, lote) |
 | `abbychess/edicao.py` | As edições por gid (dividir, juntar, marcar, ajustar, corrigir, descartar, quebrar e juntar palavras, glifo virtual), cada uma com os sucessores, sem mudar nada no lugar |
 | `abbychess/controlador.py` | O `ControladorDePagina`: a página aberta, a fila, a seleção, o desfazer e os comandos da janela, por gid e sem Qt |
-| `abbychess/controladores.py` | Os controladores das áreas, da verificação, dos diagramas e do livro (abrir, lote, F6, exportar) |
+| `abbychess/controladores.py` | Os controladores das áreas, da verificação, dos diagramas, do livro (abrir, lote, F6, exportar), da fila (os modos e o escopo), da busca e da substituição |
 | `abbychess/gravador.py` | O gravador das páginas: uma thread, instantâneos imutáveis, coalescência de meio segundo |
 | `abbychess/texto.py` | O documento derivado da página (`montar`) e o texto dele, nos modos impresso e SAN |
 | `abbychess/procedencia.py` | De que amostra do livro veio cada leitura |
@@ -1067,7 +1099,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | `abbychess/lote.py` | O lote da janela (`CondutorDoLote`): decide, lê pelo servidor e grava na thread da interface; cancelar, retomar, `.antes-do-lote/` |
 | `abbychess/exportar.py` | PDF pesquisável, DOCX e EPUB a partir das páginas gravadas, pelo core do PyBoxEditor, sem o cabeçalho e o rodapé corridos |
 | `abbychess/historico.py` | O desfazer do projeto: transações por gid (o que cada ação mudou, por página), a pré-condição, o limite de 50 MB, a propagação que emenda o Enter |
-| `abbychess/app/` | A interface PySide6 (a edição no Documento: `documento.py` e `edicao_na_janela.py`; Localizar: `barra_de_busca.py` e `busca_na_janela.py`; Substituir: `substituir_na_janela.py`): a janela (só liga sinais aos controladores e desenha), `acoes.py` (menus e atalhos), `dialogos.py`, o executor com fila (`trabalho.py`), visor da página, painéis de treino, padrões e verificação, opções, conferência de diagramas |
+| `abbychess/app/` | A interface PySide6 (a edição no Documento: `documento.py` e `edicao_na_janela.py`; Localizar: `barra_de_busca.py` e `busca_na_janela.py`; Substituir: `substituir_na_janela.py`; a Galeria: `galeria.py` e `galeria_na_janela.py`; a pergunta do Ctrl+T: `confirmacao.py`): a janela (só liga sinais aos controladores e desenha), `acoes.py` (menus e atalhos), `dialogos.py`, o executor com fila (`trabalho.py`), visor da página, painéis de treino, padrões e verificação, opções, conferência de diagramas |
 | `tests/` | O núcleo e a janela, sem depender do modelo global |
 | `docs/ANALISE_PYBOXEDITOR.md` | O que o PyBoxEditor oferece a este projeto |
 | `docs/SPEC.md` | A especificação da aplicação completa (v0.4, aprovada nas revisões) |
@@ -1219,8 +1251,8 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   25 do livro de referência) passa em 1366×768 e em 1280×720. O Shift+F10 e a tecla Menu
   vêm do Windows como pedido de menu de contexto; o teste confere que cada painel abre o
   menu nesse pedido, não a tecla em si. A gaveta de Páginas é refeita do `livro.json` a cada
-  troca de página e meio segundo depois de uma rajada de edições: o desempenho com 230
-  páginas (CA-8.3) é do passo C. Com ela aberta (o padrão de um projeto novo numa janela de
+  troca de página e meio segundo depois de uma rajada de edições; com 230 páginas, ela fica
+  pronta ~0,1 s depois de abrir o projeto (CA-8.3, desde o passo C). Com ela aberta (o padrão de um projeto novo numa janela de
   1600 px ou mais), a troca no cache passa de ~11 para ~16 ms na mediana (medida da revisão
   de produto, fora do protocolo); as medidas oficiais rodam com ela fechada.
 - **A memória do desfazer está no alvo** para correções de um glifo (é o que a medida faz:
@@ -1281,11 +1313,18 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   treino, os padrões, as opções, o reconhecimento do livro em lote e a fila do livro; no
   Projeto, a exportação; o editor de áreas, a verificação de texto e a leitura e
   conferência dos diagramas.
+- **A revisão, desde o passo C**: no escopo livro, a fila das palavras desconhecidas passa
+  à página seguinte, uma a uma (o léxico não tem resumo no `livro.json`); o "iguais nesta
+  página" do aviso de ensino conta os glifos com a mesma leitura, e não os de forma
+  parecida; a Galeria do livro tira os recortes de cada página da fonte (a primeira vez,
+  ~0,15 s por página, em segundo plano); o efeito das amostras (negrito, itálico) chega no
+  passo I; o glifo devolvido à fila por um esquecer fica com a leitura e sem a fonte (a
+  busca por glifo o mostra em "sem leitura").
 - **Localizar, desde o passo B**: figurina = letra vale no texto literal (com a regex ligada,
   use `\P`); o cabeçalho e o rodapé do índice saem de uma regra simples das linhas da página
   (a primeira e a última, curtas, com número, separadas do texto), e não da regra completa
-  da exportação; a legenda ganha a etiqueta dela no passo H; a busca por glifo mostra uma
-  lista em Resultados até a Galeria do passo C; buscar antes de o índice ficar pronto espera
+  da exportação; a legenda ganha a etiqueta dela no passo H; buscar antes de o índice ficar
+  pronto espera
   por ele (a barra de status mostra o progresso). O índice de 230 páginas cumpre os 2 s só
   com os processos já abertos (o primeiro projeto, aberto um pouco depois do programa); o
   projeto aberto junto com o programa, e o segundo da sessão, levam 2,0–2,9 s, e pela janela

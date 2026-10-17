@@ -7,6 +7,8 @@ lê o estado dos controladores e desenha; nenhum decide nada.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from abbychess import avisos as av
@@ -125,9 +127,52 @@ class DesenhoDaJanela:
         self.visor.marcar_selecao({p.indice_de(g) for g in p.selecao} - {None})
         self.treino.mostrar_selecao(len(p.alvos()) if p.selecao else 0)
 
+    def _aviso_de_ensino(self, *_):
+        """O efeito e o conflito de ensinar o caractere do campo (§8.3); no escopo livro da
+        fila, também quantos glifos do livro têm a mesma leitura (pelo índice da busca)."""
+        p = self.pagina
+        efeito, conflito = p.aviso_de_ensino(self.treino.campo.text())
+        livro = ""
+        if efeito and self.fila.escopo == "livro" and p.atual is not None:
+            i = p.indice_de(p.atual)
+            lida = p.modelo.boxes[i].entry.char if i is not None else ""
+            n = self.busca.contar_leitura(lida) if lida else 0
+            livro = f" · {n} no livro" if n else ""
+        self.treino.mostrar_aviso_de_ensino(efeito, conflito, livro)
+
     def _padroes_mudaram(self) -> None:
-        if self.leitor is not None:
-            self.padroes.atualizar(self.leitor.padroes_por_caractere())
+        """A aba Padrões: as amostras, com a origem, a altura, o efeito e quantos glifos do
+        livro cada uma leu (pelo índice da busca, §8.3)."""
+        if self.leitor is None:
+            return
+        from abbychess.leitor import origem_de
+
+        padroes = self.leitor.padroes
+        pasta = Path(self.projeto.pasta_de_padroes).resolve() if self.projeto else None
+        lidos = self.busca.lidos_por_amostra() if hasattr(self, "busca") else {}
+        detalhes = {}
+        for arquivos in self.leitor.padroes_por_caractere().values():
+            for arquivo in arquivos:
+                meta = padroes.meta_de(arquivo)
+                try:
+                    nome = Path(arquivo).resolve().relative_to(pasta).as_posix() if pasta else ""
+                except ValueError:
+                    nome = ""
+                detalhes[str(arquivo)] = {"origem": origem_de(meta.get("origem", "")),
+                                          "altura": meta.get("altura"),
+                                          "efeito": meta.get("efeito"),
+                                          "lidos": lidos.get(nome, 0)}
+        self.padroes.atualizar(self.leitor.padroes_por_caractere(), detalhes)
+
+    def ir_a_origem(self, pagina: int, gid) -> None:
+        """A página e o glifo de onde a amostra veio (a aba Padrões, "ir para")."""
+        if self.fonte is None or not 0 <= pagina < self.fonte.total:
+            return
+        if pagina != self.pagina.indice:
+            self.ir_para_pagina(pagina)
+            self.pintar_texto()
+        if gid is not None and gid in set(self.pagina.gids):
+            self.pagina.escolher(gid)
 
     def _layout_mudou(self) -> None:
         self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual)

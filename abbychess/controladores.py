@@ -1226,6 +1226,20 @@ class ControladorDaBusca:
         total = p.fonte.total if p.fonte is not None else 0
         return max(0, total - len(self.indice))
 
+    def contar_leitura(self, char: str) -> int:
+        """Quantos glifos do livro têm a leitura `char`, pelo índice de agora."""
+        return sum(1 for indexada in self.indice.values() for g in indexada.glifos
+                   if g[1] == char)
+
+    def lidos_por_amostra(self) -> dict:
+        """Amostra (o nome) -> quantos glifos do livro ela leu, pelo índice de agora (sem
+        refazer as páginas: a aba Padrões o mostra como está)."""
+        contagem: dict = {}
+        for indexada in self.indice.values():
+            for _gid, amostra in indexada.amostras:
+                contagem[amostra] = contagem.get(amostra, 0) + 1
+        return contagem
+
     def lidos_por(self, amostras, ao_terminar) -> None:
         """Os glifos do livro lidos pelas `amostras` (os nomes, relativos à pasta dos
         padrões), numa thread, pelo índice com as páginas que mudaram já refeitas (§8.3):

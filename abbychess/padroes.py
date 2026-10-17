@@ -116,6 +116,20 @@ def _nome_limpo(origem: str) -> str:
     return f"{limpo[:70]}_{uuid.uuid4().hex[:8]}" if limpo else uuid.uuid4().hex
 
 
+def conflito_nas_distancias(distancias, chars, cabe, char: str, margem: float
+                            ) -> Optional[Tuple[str, int, float]]:
+    """O caractere diferente de `char` com mais amostras a menos de `margem` (no empate,
+    a mais perto), quantas são e a maior distância delas; None se nenhuma."""
+    perto: Dict[str, List[float]] = {}
+    for d, c, ok in zip(distancias, chars, cabe):
+        if ok and c != char and d <= margem:
+            perto.setdefault(c, []).append(float(d))
+    if not perto:
+        return None
+    outro = min(perto, key=lambda c: (-len(perto[c]), min(perto[c])))
+    return outro, len(perto[outro]), max(perto[outro])
+
+
 class PadroesDoLivro:
     """Os padrões ensinados para um livro, consultáveis assim que gravados."""
 
@@ -201,6 +215,25 @@ class PadroesDoLivro:
         d = float(distancias[i])
         return Resposta(self._chars[i], max(0.0, 1.0 - d / ESCALA_DA_CONFIANCA), d,
                         self._caminhos[i])
+
+    def conflito(self, recorte: np.ndarray, char: str, altura_relativa: Optional[float],
+                 margem: float) -> Optional[Tuple[str, int, float]]:
+        """§8.3: o outro caractere de que o glifo está perto ao ser ensinado como `char`:
+        (caractere, quantas amostras dele a menos de `margem`, a maior dessas distâncias),
+        na escala `distância / ESCALA_DA_CONFIANCA`, com as travas de proporção e altura de
+        `ler`; None sem conflito."""
+        if not self.total or recorte is None or recorte.size == 0:
+            return None
+        v = _vetor(recorte)
+        d2 = self._normas + float(v @ v) - 2.0 * (self._X @ v)
+        distancias = np.sqrt(np.maximum(d2, 0.0)) / ESCALA_DA_CONFIANCA
+        razao = self._proporcoes / _proporcao(recorte)
+        cabe = (razao <= PROPORCAO_MAXIMA) & (razao * PROPORCAO_MAXIMA >= 1.0)
+        if altura_relativa is not None:
+            maior = np.maximum(self._alturas, altura_relativa)
+            cabe &= np.isnan(self._alturas) | (np.abs(self._alturas - altura_relativa)
+                                               <= self.tolerancia_de_altura * maior)
+        return conflito_nas_distancias(distancias, self._chars, cabe, char, margem)
 
     def instantaneo(self) -> "PadroesDoLivro":
         """Os padrões de agora, para ler fora da thread da interface enquanto ela ensina
@@ -312,6 +345,14 @@ class PadroesDoLivro:
         self._meta[caminho.relative_to(self.pasta.resolve()).as_posix()] = dict(amostra.meta)
         self._gravar_meta()
         self._carregar()
+
+    def meta_de(self, caminho: str | Path) -> dict:
+        """Os metadados gravados da amostra (a altura relativa, a origem; o efeito, desde o
+        passo I), ou {}."""
+        try:
+            return dict(self._meta.get(self._chave(Path(caminho)), {}))
+        except ValueError:
+            return {}
 
     def por_caractere(self) -> Dict[str, List[Path]]:
         resultado: Dict[str, List[Path]] = {}

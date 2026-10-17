@@ -139,6 +139,10 @@ class Limiares:
     rede: float = 0.80
     base: float = 0.30
     revisao: float = 0.90
+    #: A margem do aviso de conflito ao ensinar (§8.3), na escala das distâncias do k-NN
+    #: do livro (`distância / 2000`): o glifo mais perto que isto de amostras de outro
+    #: caractere é avisado.
+    conflito: float = 0.10
 
 
 @dataclass

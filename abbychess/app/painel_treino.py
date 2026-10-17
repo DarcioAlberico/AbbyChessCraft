@@ -26,6 +26,7 @@ setas das bordas ficam com o campo (a exceção 6 de §3.4), que dispara a açã
 
 from __future__ import annotations
 
+import html
 from typing import Optional
 
 import numpy as np
@@ -38,6 +39,9 @@ from core.box_model import BoxEntry
 
 from abbychess.app import cores, estilo, teclado
 from abbychess.app.imagens import ampliado, pixmap_de_cinza
+
+#: O aviso de conflito (§8.3), em laranja escuro (legível no fundo claro).
+LARANJA_ESCURO = estilo.LARANJA.darker(140).name()
 
 #: Figurinas e símbolos que os livros de xadrez imprimem e o teclado não tem.
 PALETA = [
@@ -173,6 +177,10 @@ class PainelDeTreino(QWidget):
         self.contexto.setStyleSheet("background: white; border: 1px solid #999;")
 
         self.leitura = QLabel("Abra um projeto e reconheça uma página.")
+        #: O efeito e o conflito de ensinar o que está no campo (§8.3).
+        self.aviso_de_ensino = QLabel("")
+        self.aviso_de_ensino.setWordWrap(True)
+        self.aviso_de_ensino.setAccessibleName("O efeito de ensinar e o aviso de conflito")
         self.leitura.setWordWrap(True)
 
         self.campo = _CampoDoCaractere()
@@ -272,6 +280,7 @@ class PainelDeTreino(QWidget):
         caixa.addWidget(self.leitura)
         caixa.addWidget(self.selecao)
         caixa.addWidget(self.campo)
+        caixa.addWidget(self.aviso_de_ensino)
         caixa.addWidget(botao_ensinar)
         caixa.addWidget(botao_corrigir)
         caixa.addWidget(botao_descartar)
@@ -287,6 +296,14 @@ class PainelDeTreino(QWidget):
         self.habilitar(False)
 
     # ------------------------------------------------------------------
+    def mostrar_aviso_de_ensino(self, efeito: str, conflito: str, livro: str = "") -> None:
+        """O efeito ("Enter ensina 'l' · 23 iguais nesta página · 410 no livro") e, em
+        laranja, o conflito ("⚠ este glifo está a 0,08 de 14 amostras de '1'")."""
+        partes = [html.escape(efeito + livro)] if efeito else []
+        if conflito:
+            partes.append(f"<span style='color:{LARANJA_ESCURO}'>⚠ {html.escape(conflito)}</span>")
+        self.aviso_de_ensino.setText("<br>".join(partes))
+
     def mostrar(self, pagina: np.ndarray, box: BoxEntry, posicao: str) -> None:
         """Mostra o box em revisão e põe a leitura atual no campo, selecionada."""
         self._pagina, self._box = pagina, box

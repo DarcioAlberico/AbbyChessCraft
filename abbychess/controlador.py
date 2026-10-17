@@ -1469,6 +1469,35 @@ class ControladorDePagina:
     #: `lidos_pelas_amostras(nomes, ao_terminar)`, com `ao_terminar({página: [gids]})`.
     lidos_pelas_amostras = None
 
+    def aviso_de_ensino(self, char: str) -> Tuple[str, str]:
+        """§8.3, ao digitar o caractere do glifo atual: o efeito ("Enter ensina 'l' · 23
+        iguais nesta página": os glifos da página com a mesma leitura dele) e o conflito
+        ("este glifo está a 0,08 de 14 amostras de '1'", ou "")."""
+        if not char or self.modelo is None or self.atual is None or self.leitor is None:
+            return "", ""
+        i = self.indice_de(self.atual)
+        if i is None:
+            return "", ""
+        entradas = self.modelo.entries()
+        lida = entradas[i].char
+        iguais = sum(1 for k, e in enumerate(entradas) if k != i and lida and e.char == lida)
+        efeito = f"Enter ensina '{char}'" + (f" · {iguais} iguais nesta página" if iguais else "")
+        conflito = ""
+        if self.imagem is not None:
+            from core import proporcao
+            from abbychess.leitor import altura_relativa
+
+            recorte = pg.recorte(self.imagem, entradas[i])
+            referencia = proporcao.altura_de_referencia(entradas)
+            achado = self.leitor.padroes.conflito(recorte, char,
+                                                  altura_relativa(recorte, referencia),
+                                                  self.leitor.limiares.conflito)
+            if achado is not None:
+                outro, n, distancia = achado
+                conflito = (f"este glifo está a {distancia:.2f} de {n} amostra(s) de "
+                            f"'{outro}'".replace(".", ","))
+        return efeito, conflito
+
     def _nome_da_amostra(self, caminho) -> str:
         """O nome da amostra como o `Box.amostra` o guarda (relativo à pasta dos padrões)."""
         caminho = Path(caminho)

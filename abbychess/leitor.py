@@ -19,9 +19,10 @@ outra decisão, explícita.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -231,6 +232,18 @@ def congelar_para_a_coleta_de_lixo() -> int:
     gc.collect()
     gc.freeze()
     return gc.get_freeze_count()
+
+
+_ORIGEM = re.compile(r"_p(\d{4,})_b\d+(?:_g([0-9a-f]+))?$")
+
+
+def origem_de(origem: str) -> Optional[Tuple[int, Optional[int]]]:
+    """(índice da página, gid ou None) da amostra, pelo nome de origem (`nome_de_origem`);
+    None se o nome não diz."""
+    casado = _ORIGEM.search(origem or "")
+    if casado is None:
+        return None
+    return int(casado.group(1)) - 1, (int(casado.group(2), 16) if casado.group(2) else None)
 
 
 def nome_de_origem(projeto_nome: str, pagina: int, indice_box: int,

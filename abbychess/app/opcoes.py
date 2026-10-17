@@ -20,6 +20,9 @@ ROTULOS = {
               "A trava de altura continua valendo."),
     "rede": ("Rede global aceita acima de", "O NEURAL_THRESHOLD do PyBoxEditor."),
     "base": ("Base global aceita acima de", "O LEARNER_THRESHOLD_NEURAL do PyBoxEditor."),
+    "conflito": ("Avisar conflito a menos de", "Ao ensinar, o Inspetor avisa quando o glifo "
+                 "está mais perto que isto (a distância do k-NN / 2000) de amostras de outro "
+                 "caractere."),
 }
 
 

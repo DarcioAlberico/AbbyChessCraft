@@ -174,3 +174,51 @@ def test_ca_8_4_esquecer_devolve_a_fila_os_lidos_no_livro_e_desfazer_os_tira(liv
     assert na_fila() == 0 and da_amostra() == 30
     assert projeto.carregar_modelo(1).estado == VERIFICADA
     assert Path(caminho).exists()                        # a amostra voltou
+
+
+# ----------------------------------------------------------------------
+# O aviso de conflito e o efeito ao ensinar (§8.3, CA-8.6)
+# ----------------------------------------------------------------------
+
+def test_ca_8_6_o_conflito_numa_matriz_montada_a_mao():
+    import numpy as np
+
+    from abbychess.padroes import conflito_nas_distancias
+
+    distancias = np.array([0.05, 0.08, 0.30, 0.02, 0.09])
+    chars = ["1", "1", "1", "l", "I"]
+    cabe = [True, True, True, True, True]
+    assert conflito_nas_distancias(distancias, chars, cabe, "l", 0.10) == ("1", 2, 0.08)
+    assert conflito_nas_distancias(distancias, chars, cabe, "l", 0.04) is None
+    assert conflito_nas_distancias(distancias, chars, [False] * 5, "l", 0.10) is None
+    assert conflito_nas_distancias(distancias, chars, cabe, "1", 0.10) == ("l", 1, 0.02)
+
+
+def test_ca_8_6_o_conflito_nos_padroes_do_livro(tmp_path):
+    import numpy as np
+
+    from abbychess.padroes import PadroesDoLivro
+
+    padroes = PadroesDoLivro(tmp_path / "padroes")
+    barra = np.full((30, 12), 255, np.uint8)
+    barra[:, 5:7] = 0
+    for k in range(3):
+        padroes.ensinar(barra, "1", None, f"o{k}")
+    quadrado = np.zeros((30, 12), np.uint8)
+    assert padroes.conflito(barra, "l", None, 0.10)[:2] == ("1", 3)
+    assert padroes.conflito(barra, "1", None, 0.10) is None      # o mesmo caractere
+    assert padroes.conflito(quadrado, "l", None, 0.01) is None   # longe
+
+
+def test_o_aviso_de_ensino_diz_o_efeito_e_o_conflito(livro):
+    from abbychess import pagina as pg
+
+    projeto, ctl, fila = livro
+    fila.definir("leitura")
+    ctl.escolher(ctl.modelo.boxes[0].gid)                 # o primeiro "c" (há outro)
+    efeito, conflito = ctl.aviso_de_ensino("e")
+    assert efeito == "Enter ensina 'e' · 1 iguais nesta página" and conflito == ""
+    recorte = pg.recorte(ctl.imagem, ctl.modelo.boxes[0].entry)
+    ctl.leitor.ensinar(recorte, "o", origem="teste")
+    efeito, conflito = ctl.aviso_de_ensino("e")
+    assert "amostra(s) de 'o'" in conflito

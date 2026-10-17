@@ -727,8 +727,8 @@ O passo 0 está fechado como código: as ferramentas, os gabaritos com a estrutu
 medidas de hoje. As etapas abaixo são suas. Elas **não bloqueiam os passos 1a a A2**,
 porque a linha de base pode ser medida de novo a qualquer momento no worktree da tag
 `passo-0` (acima). Mas o **texto e os FEN das p. 21–27 do Xadrez Vitorioso têm de estar
-verificados antes do fechamento do A3**, o primeiro passo julgado pelos gestos da fatia
-(sem eles, o número não existe). Enquanto isso, as medidas de texto ficam "pendentes" e as
+verificados antes do fechamento do D1**, o primeiro passo julgado pelos gestos da fatia
+(sem eles, o número não existe; até a versão 0.7 do roadmap o prazo era o A3). Enquanto isso, as medidas de texto ficam "pendentes" e as
 de diagrama e estrutura, "provisórias", e o README diz isso em cada tabela.
 
 **A ordem importa para a conferência cega.** Se você faz tudo sozinho, comece por ela: gere
@@ -897,10 +897,11 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   rodada do A1. É a terceira bateria com uma rodada assim (A1 `4e974a5`, A2 `1da748e`, A3), em
   geral logo depois do portão; não foi investigado. **Refluir as linhas em parágrafos** fica
   para o passo F, com os parágrafos do layout; **editar** no Documento, para o D1. O **CA-F.1**
-  (os gestos para levar a fatia ao gabarito, com o alvo de ≤ 85% da linha de base depois do
-  A3) segue pendente: o replay conta contra as linhas de texto verificadas do gabarito, e
-  nenhuma está verificada ainda (`ferramentas
-otular.py`, ver "O que falta você fazer").
+  (os gestos para levar a fatia ao gabarito) segue pendente: o replay conta contra as linhas
+  de texto verificadas do gabarito, e nenhuma está verificada ainda
+  (`ferramentas\rotular.py`, ver "O que falta você fazer"). Pela versão 0.8 do roadmap, o
+  alvo de ≤ 85% depois do A3 saiu (o A3 é só leitura e não traz comando mais barato ao
+  replay: o número seria o do A2), e o prazo da verificação passou ao fechamento do D1.
 - **O espaço de trabalho, desde o passo A2** (3 rodadas do commit `93c94a7`, pasta limpa).
   As medidas do A1 ficaram iguais: a troca no cache em 14 ms na mediana, fora do cache
   130–135; a pintura dos boxes, 12–13 no p95; a releitura, 15 na mediana; o Enter até a cor

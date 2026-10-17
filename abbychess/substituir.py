@@ -18,7 +18,8 @@ ensinado nem marcado como revisado.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import difflib
+from dataclasses import dataclass, field
 from typing import Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 import regex
@@ -60,12 +61,18 @@ class Caso:
 
 @dataclass
 class Previa:
-    """Os casos de uma página, com o texto dela quando foram calculados (aplicar confere que
-    a página não mudou desde então)."""
+    """Os casos de uma página, com o texto dela quando foram calculados. `lida` é a página
+    como a prévia a leu (aplicar edita uma cópia dela e confere que a página não mudou desde
+    então), `carimbo`, o arquivo dela na leitura (`projeto.carimbo`), `geracao`, o projeto;
+    `fora`, os casamentos que ficaram fora porque tocam palavras de outro "onde"."""
 
     indice: int
     texto: str
     casos: List[Caso]
+    lida: Optional[Pagina] = None
+    carimbo: Optional[tuple] = None
+    geracao: Optional[int] = None
+    fora: int = field(default=0)
 
 
 def substituto(modelo: str, regex_ligada: bool) -> Callable[[object], str]:
@@ -118,21 +125,28 @@ def casos_da_pagina(indexada: bs.PaginaIndexada, unidades: Sequence[ss.Unidade],
                     trocar: Callable[[object], str], alvo: str = PROSA,
                     onde: FrozenSet[str] = frozenset(bs.ETIQUETAS),
                     trecho: Optional[Tuple[int, int]] = None,
-                    tempo_limite: float = bs.TEMPO_LIMITE) -> List[Caso]:
+                    tempo_limite: Optional[float] = None,
+                    fora: Optional[List[int]] = None) -> List[Caso]:
     """Os casos da página: os casamentos em palavras de `alvo` (e de `onde`, o filtro da
     busca), juntados quando tocam as mesmas palavras. `trecho`: só dentro dele (a
-    seleção). `PadraoLento` se um casamento passa do tempo-limite."""
+    seleção). `PadraoLento` se um casamento passa do tempo-limite (`busca.TEMPO_LIMITE`, se
+    não vier). `fora`, se vier, ganha quantos casamentos ficaram fora por tocar palavras de
+    outro "onde" (a notação, com Prosa; a prosa, com Notação)."""
     texto = "".join(u.texto for u in unidades)
     if not indexada.texto.startswith(texto):
         raise ValueError("o índice da página não é o das unidades dela")
     permitidas = ETIQUETAS_DO_ALVO[alvo] & onde
+    substituiveis = ETIQUETAS_DO_ALVO[AMBOS] & onde
     inicio, fim = trecho if trecho is not None else (0, len(texto))
     trocas: List[Tuple[int, int, str]] = []
     for casado in bs.casamentos(indexada, expressao, inicio, min(fim, len(texto)),
-                                tempo_limite, indice=indexada.indice):
+                                bs.TEMPO_LIMITE if tempo_limite is None else tempo_limite,
+                                indice=indexada.indice):
         a, b = casado.start(), casado.end()
         etiquetas = {indexada.etiqueta(k) for k in range(a, b) if not texto[k].isspace()}
         if not etiquetas or not etiquetas <= permitidas:
+            if fora is not None and etiquetas and etiquetas <= substituiveis:
+                fora[0] += 1
             continue
         novo = trocar(casado)
         if novo != texto[a:b]:
@@ -159,7 +173,7 @@ def _juntar_em_casos(indexada, unidades, texto: str, trocas) -> List[Caso]:
         try:
             ss.planejar(unidades[de:ate], depois, fim_de_linha=fim_de_linha)
         except ss.Recusa as recusa:
-            motivo = str(recusa)
+            motivo = _motivo(texto[de:ate], depois, str(recusa))
         gids = tuple(dict.fromkeys(u.gid for u in unidades[de:ate] if u.glifo))
         primeiro = next((k for k in range(grupo[0][0], grupo[0][1]) if not texto[k].isspace()),
                         grupo[0][0])
@@ -167,6 +181,17 @@ def _juntar_em_casos(indexada, unidades, texto: str, trocas) -> List[Caso]:
                           bs.NOTACAO if indexada.etiqueta(primeiro) == bs.NOTACAO else bs.PROSA,
                           texto.count("\n", 0, de) + 1, gids, len(grupo), motivo))
     return casos
+
+
+def _motivo(antes: str, depois: str, recusa: str) -> str:
+    """O motivo da recusa com o trecho que a causou ("'sa' → 'r': este tipo de edição chega
+    numa próxima versão (juntar glifos); corrija no Documento")."""
+    trechos = [(antes[i1:i2], depois[j1:j2]) for op, i1, i2, j1, j2
+               in difflib.SequenceMatcher(None, antes, depois, autojunk=False).get_opcodes()
+               if op != "equal"]
+    de, para = next(((a, b) for a, b in trechos if a and b and len(a) != len(b)),
+                    trechos[0] if trechos else (antes, depois))
+    return f"'{de}' → '{para}': {recusa}; corrija no Documento"
 
 
 def _trocado(texto: str, de: int, ate: int, grupo) -> str:
@@ -186,7 +211,9 @@ def aplicar_na_pagina(pagina: Pagina, casos: Sequence[Caso]) -> ss.Plano:
     fixos: List[Tuple[int, int]] = []
     posicao = j = 0
     for caso in sorted(casos, key=lambda c: c.inicio):
-        if caso.inicio < posicao or texto[caso.inicio:caso.fim] != caso.antes:
+        # As mesmas palavras inteiras: "casas" começa com "casa", mas não é o caso "casa".
+        if (caso.inicio < posicao or texto[caso.inicio:caso.fim] != caso.antes
+                or ss.palavras_em(unidades, caso.inicio, caso.fim) != (caso.inicio, caso.fim)):
             raise ss.Recusa("a página mudou desde a prévia")
         for i in range(posicao, caso.inicio):
             fixos.append((i, j + i - posicao))

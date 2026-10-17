@@ -74,7 +74,7 @@ def test_ca_7_2_substituir_todas_no_livro_e_um_ctrl_z(tmp_path, medidas):
         busca = ControladorDaBusca(ctl, paralelo=False)
         sub = ControladorDaSubstituicao(ctl, busca)
         previas, feitas = [], []
-        ctl.eventos.ligar("previa_pronta", previas.append)
+        ctl.eventos.ligar("previa_pronta", lambda lista, _fora: previas.append(lista))
         ctl.eventos.ligar("substituicao_feita", lambda *a: feitas.append(a))
         originais = {i: projeto.carregar_modelo(i).instantaneo() for i in range(PAGINAS)}
 
@@ -86,7 +86,7 @@ def test_ca_7_2_substituir_todas_no_livro_e_um_ctrl_z(tmp_path, medidas):
         casos = sum(len(c) for c in aceitos.values())
         assert len(aceitos) == PAGINAS and casos > 10 * PAGINAS
 
-        sub.aplicar(aceitos, "Substituir")
+        sub.aplicar(aceitos, "Substituir", {p.indice: p for p in previas[0]})
         inicio = time.perf_counter()
         fim = executor.comecar()                         # as cópias, na thread do executor
         t_copias = time.perf_counter() - inicio
@@ -96,15 +96,19 @@ def test_ca_7_2_substituir_todas_no_livro_e_um_ctrl_z(tmp_path, medidas):
         assert feitas[-1][:2] == (casos, PAGINAS) and not feitas[-1][2]
         transacao = ctl.historico.proxima_a_desfazer()
         assert len(transacao.paginas) == PAGINAS          # uma transação só
+        desfazer_mb = ctl.historico.bytes / 2**20
 
         inicio = time.perf_counter()
         ctl.desfazer()                                    # um Ctrl+Z
         executor.tudo()
         t_desfazer = time.perf_counter() - inicio
         for i in range(PAGINAS):                          # todas voltaram
-            agora = projeto.carregar_modelo(i)
-            assert all(hs.igual(a, b) for a, b in zip(agora.boxes, originais[i].boxes))
-            assert len(agora.boxes) == len(originais[i].boxes)
+            agora, antes = projeto.carregar_modelo(i), originais[i]
+            assert all(hs.igual(a, b) for a, b in zip(agora.boxes, antes.boxes))
+            assert len(agora.boxes) == len(antes.boxes)
+            assert agora.decisoes == antes.decisoes and agora.estado == antes.estado
+            assert list(agora.zonas) == list(antes.zonas)
+            assert [d.lado for d in agora.diagramas] == [d.lado for d in antes.diagramas]
         ctl.refazer()
         executor.tudo()
         assert sum(1 for i in range(PAGINAS)
@@ -114,7 +118,8 @@ def test_ca_7_2_substituir_todas_no_livro_e_um_ctrl_z(tmp_path, medidas):
     medidas["substituir_no_livro"] = {
         "paginas": PAGINAS, "casos": casos, "previa_s": round(t_previa, 2),
         "copias_s": round(t_copias, 2), "trocar_na_interface_ms": round(t_trocar * 1000),
-        "desfazer_ms": round(t_desfazer * 1000),
+        "desfazer_ms": round(t_desfazer * 1000), "desfazer_mb": round(desfazer_mb, 1),
+        "limite_do_desfazer_mb": round(hs.LIMITE_DE_MEMORIA / 2**20),
         "como": "'e' -> 'E' (Aa ligado, Prosa) nas 230 páginas: a prévia numa thread, as cópias "
                 "na thread do executor, trocar as páginas e registrar a transação na interface, "
                 "e um Ctrl+Z (sem alvo na SPEC; o CA-7.2 é que um Ctrl+Z volta todas)"}

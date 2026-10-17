@@ -109,10 +109,21 @@ def sub(livro_escrito):  # noqa: F811
     projeto, ctl, busca, escrever, eventos = livro_escrito
     s = ControladorDaSubstituicao(ctl, busca)
     eventos.update(previas=[], feitas=[], erros=[])
-    ctl.eventos.ligar("previa_pronta", eventos["previas"].append)
+    ctl.eventos.ligar("previa_pronta", lambda previas, fora: eventos["previas"].append(previas))
     ctl.eventos.ligar("substituicao_feita", lambda *a: eventos["feitas"].append(a))
     ctl.eventos.ligar("substituicao_falhou", eventos["erros"].append)
     return projeto, ctl, s, escrever, eventos
+
+
+def _aplicar(s, previas, descricao="Substituir"):
+    s.aplicar({p.indice: p.casos for p in previas}, descricao, {p.indice: p for p in previas})
+
+
+def _previa(s, eventos, padrao, modelo, alvo=sb.PROSA, **opcoes):
+    antes = len(eventos["previas"])
+    assert s.previa(bs.Opcoes(padrao, escopo=bs.LIVRO, **opcoes), modelo, alvo)
+    _esperar(lambda: len(eventos["previas"]) > antes)
+    return eventos["previas"][-1]
 
 
 def _textos(projeto):
@@ -126,7 +137,7 @@ def test_ca_7_5_fora_da_pagina_so_aplica_depois_da_previa(sub):
     previas = eventos["previas"][-1]
     assert [p.indice for p in previas] == [0, 1]
     assert _textos(projeto) == ["casa velha", "outra casa", "fim"]   # nada aplicado ainda
-    s.aplicar({p.indice: p.casos for p in previas}, "Substituir 2 ocorrências")
+    _aplicar(s, previas)
     ctl.executar.tudo()
     assert _textos(projeto) == ["lata velha", "outra lata", "fim"]
     assert eventos["feitas"][-1][:2] == (2, 2)
@@ -136,7 +147,7 @@ def test_ca_7_2_um_ctrl_z_volta_todas_as_paginas(sub):
     projeto, ctl, s, escrever, eventos = sub
     s.previa(bs.Opcoes("a", escopo=bs.LIVRO), "o", sb.PROSA)
     _esperar(lambda: eventos["previas"])
-    s.aplicar({p.indice: p.casos for p in eventos["previas"][-1]}, "Substituir")
+    _aplicar(s, eventos["previas"][-1])
     ctl.executar.tudo()
     assert _textos(projeto) == ["coso velho", "outro coso", "fim"]
     ctl.desfazer()
@@ -164,10 +175,10 @@ def test_a_pagina_editada_depois_da_previa_aplica_na_de_agora_ou_fica_de_fora(su
     s.previa(bs.Opcoes("casa", escopo=bs.LIVRO), "lata", sb.PROSA)
     _esperar(lambda: eventos["previas"])
     escrever(1, "nada aqui")                             # a página 2 mudou
-    s.aplicar({p.indice: p.casos for p in eventos["previas"][-1]}, "Substituir")
+    _aplicar(s, eventos["previas"][-1])
     ctl.executar.tudo()
     assert _textos(projeto) == ["lata velha", "nada aqui", "fim"]
-    casos, paginas, falhas, _sem = eventos["feitas"][-1]
+    casos, paginas, falhas, _sem, _saidos = eventos["feitas"][-1]
     assert (casos, paginas) == (1, 1) and 1 in falhas
 
 
@@ -175,3 +186,116 @@ def test_o_substituto_invalido_nao_monta_a_previa(sub):
     projeto, ctl, s, escrever, eventos = sub
     assert not s.previa(bs.Opcoes("(c)asa", regex=True), r"\2", sb.PROSA)
     assert "não existe" in eventos["erros"][-1]
+
+
+# ----------------------------------------------------------------------
+# As revisões do passo D2
+# ----------------------------------------------------------------------
+
+def test_aplicar_confere_as_palavras_inteiras():
+    p = _pagina("uma casa velha")
+    casos = _casos(p, "casa", "casas")
+    copia, texto = _depois(p, casos)
+    assert texto == "uma casas velha"
+    with pytest.raises(ss.Recusa):                       # "casas" começa com "casa"
+        sb.aplicar_na_pagina(copia, casos)
+
+
+def test_a_previa_velha_nao_aplica_duas_vezes(sub):
+    projeto, ctl, s, escrever, eventos = sub
+    previas = _previa(s, eventos, "casa", "casas")
+    ctl.ir_para(0)
+    s.na_pagina(bs.Opcoes("casa", escopo=bs.PAGINA), "casas", sb.PROSA)   # Todas na página
+    ctl.executar.tudo()
+    _aplicar(s, previas)                                 # e depois a prévia de antes
+    ctl.executar.tudo()
+    assert _textos(projeto) == ["casas velha", "outra casas", "fim"]
+    assert 0 in eventos["feitas"][-1][2]                 # a página 1 ficou de fora
+
+
+def test_areas_e_estado_mudados_depois_da_previa_ficam(sub):
+    from abbychess.zonas import Zona
+
+    projeto, ctl, s, escrever, eventos = sub
+    previas = _previa(s, eventos, "casa", "lata")
+    pagina = projeto.pagina_para_editar(1)
+    pagina.zonas = [Zona("texto", 0, 0, 300, 100)]       # uma área desenhada no meio
+    projeto.salvar_modelo(pagina)
+    _aplicar(s, previas)
+    ctl.executar.tudo()
+    assert _textos(projeto) == ["lata velha", "outra lata", "fim"]
+    assert len(projeto.carregar_modelo(1).zonas) == 1
+    ctl.desfazer()
+    ctl.executar.tudo()
+    assert _textos(projeto)[1] == "outra casa" and len(projeto.carregar_modelo(1).zonas) == 1
+
+
+def test_o_arquivo_mudado_fora_do_cache_nao_e_adotado(sub):
+    import json
+
+    from abbychess.projeto import _pagina_para_json
+
+    projeto, ctl, s, escrever, eventos = sub
+    assert projeto.descarregar(10)
+    with projeto._trava_do_cache:                        # a página 2 sai da memória
+        projeto._modelos.pop(1, None)
+    previas = _previa(s, eventos, "casa", "lata")
+    assert next(p for p in previas if p.indice == 1).carimbo is not None
+    nova = escrever(1, "nada aqui")                      # o lote gravou outra coisa nela
+    assert projeto.descarregar(10)
+    arquivo = projeto.arquivo_da_pagina(1)
+    arquivo.write_text(json.dumps(_pagina_para_json(nova)) + " ", encoding="utf-8")
+    with projeto._trava_do_cache:
+        projeto._modelos.pop(1, None)
+    _aplicar(s, previas)
+    ctl.executar.tudo()
+    assert _textos(projeto) == ["lata velha", "nada aqui", "fim"]
+    assert 1 in eventos["feitas"][-1][2]
+
+
+def test_o_padrao_lento_aborta_a_previa(sub, monkeypatch):
+    projeto, ctl, s, escrever, eventos = sub
+    escrever(2, "a" * 300 + "!")
+    monkeypatch.setattr(bs, "TEMPO_LIMITE", 0.01)
+    assert s.previa(bs.Opcoes(r"(\w+)+$", escopo=bs.LIVRO, regex=True), "x", sb.PROSA)
+    _esperar(lambda: eventos["erros"])
+    assert "abortada" in eventos["erros"][-1]
+
+
+def test_o_que_ficou_fora_do_onde_e_contado(sub):
+    projeto, ctl, s, escrever, eventos = sub
+    escrever(2, "joga Cf3")
+    s.busca.marcar_velha(2)                              # como o lote avisa
+    fora = []
+    ctl.eventos.ligar("previa_pronta", lambda previas, n: fora.append(n))
+    _previa(s, eventos, "Cf3", "Nf3", maiusculas=True)
+    assert eventos["previas"][-1] == [] and fora[-1] == 1
+    ctl.ir_para(2)
+    s.na_pagina(bs.Opcoes("Cf3", escopo=bs.PAGINA, maiusculas=True), "Nf3", sb.PROSA)
+    assert "1 ocorrência(s) em notação" in eventos["erros"][-1]
+
+
+def test_a_previa_so_le_as_paginas_que_o_indice_diz(sub, monkeypatch):
+    projeto, ctl, s, escrever, eventos = sub
+    lidas = []
+    ler = projeto.ler_sem_migrar
+    monkeypatch.setattr(projeto, "ler_sem_migrar", lambda i: (lidas.append(i), ler(i))[1])
+    _previa(s, eventos, "outra", "OUTRA")
+    assert lidas == [1]
+
+
+def test_o_motivo_sem_traducao_nomeia_o_trecho():
+    p = _pagina("uma casa")
+    [caso] = _casos(p, "casa", "lar")
+    assert caso.motivo.startswith("'sa' → 'r'") or caso.motivo.startswith("'as' → 'r'")
+
+
+def test_a_troca_que_nao_cabe_avisa_os_passos_do_desfazer_que_sairam(sub):
+    projeto, ctl, s, escrever, eventos = sub
+    ctl.ir_para(0)
+    s.na_pagina(bs.Opcoes("casa", escopo=bs.PAGINA), "lata", sb.PROSA)    # um passo antes
+    ctl.executar.tudo()
+    ctl.historico.limite = 1                             # nada mais cabe junto
+    _aplicar(s, _previa(s, eventos, "outra", "OUTRA"))
+    ctl.executar.tudo()
+    assert eventos["feitas"][-1][4] == 1 and ctl.historico.passos == 1

@@ -306,26 +306,36 @@ você digita:
   a regex não tem é erro na barra); sem ela, o texto vai como está. **Prosa | Notação |
   Ambos** (o padrão é Prosa, que inclui as legendas e os cabeçalhos): a Prosa nunca toca uma
   palavra de notação, e a Notação nunca toca a prosa; o FEN é pesquisável, mas nunca
-  substituído. O filtro **Onde** da busca também vale.
+  substituído. O filtro **Onde** da busca também vale. Quando nada fica para trocar porque
+  as ocorrências estão no outro "onde" ("Cf3" → "Nf3" com Prosa), a barra diz quantas ficaram
+  fora e qual escolher.
 - **Substituir** (ou Enter no campo) troca a ocorrência atual, se ela está na página aberta,
-  e vai à próxima; se ela está noutra página, vai até ela primeiro. **Todas** (ou Ctrl+Enter
-  no campo), no escopo Página ou Seleção, troca direto. No Livro ou num intervalo, monta
-  sempre a **prévia** em Resultados: um caso por linha (página, linha, prosa ou notação, as
-  palavras antes → depois), cada um com a caixa marcada; o botão **Aplicar N** (ou Enter na
-  lista) aplica só os marcados, e o duplo clique leva ao caso.
+  e vai à próxima; se ela está noutra página, vai até ela primeiro; as que já estão como o
+  substituto ("casa" → "Casa" sem o Aa) são puladas, e no fim a barra diz "Nada mais a
+  substituir". **Todas** (ou Ctrl+Enter no campo), no escopo Página ou Seleção, troca direto.
+  No Livro ou num intervalo, monta sempre a **prévia** em Resultados, com **todos** os casos:
+  um por linha (página, linha, prosa ou notação, as palavras antes → depois), cada um com a
+  caixa marcada. Espaço marca ou desmarca os selecionados (Shift e Ctrl+A selecionam vários),
+  **Aplicar N** (ou Enter na lista) aplica os marcados, e Shift+Enter ou o duplo clique leva
+  ao caso. Uma prévia que fica velha (outra substituição mudou as páginas) sai da tela.
 - Cada caso é a menor sequência de palavras que um ou mais casamentos tocam. A troca segue a
   tabela da edição no Documento (§6.3): uma letra trocada fica `manual`, uma letra que sobra
-  tira o glifo dela, uma que falta vira glifo virtual; o que é do passo G (k glifos virando
-  uma letra, como "sa" → "r" em "casa" → "lar", ou uma letra virando k, como "m" → "rn")
-  aparece na prévia desmarcado e desabilitado, com o motivo na dica, e na página aberta fica
-  de fora, com o aviso. Substituir não ensina nem marca nada como revisado.
+  tira o glifo dela, uma que falta vira glifo virtual; as correções de leitura comuns têm
+  tradução ("cassa" → "casa", "ivro" → "livro", "conc1uir" → "concluir", "casas" → "casa").
+  Só o que é do passo G fica de fora: duas letras virando uma, ou uma virando duas, no mesmo
+  trecho ("rn" → "m", "m" → "rn", e também "casa" → "lar", onde "sa" vira "r"). Esse caso
+  aparece na prévia desmarcado e desabilitado, com o trecho e o motivo na dica, e na página
+  aberta fica de fora, com o aviso. Substituir não ensina nem marca nada como revisado.
 - Tudo o que uma vez Substituir ou Todas trocou, mesmo no livro inteiro, é **um passo** do
   desfazer: um Ctrl+Z volta todas as páginas. Uma página editada entre a prévia e o Aplicar
-  recebe a troca na versão de agora, se as palavras ainda são as mesmas; senão fica de fora,
-  com o motivo nos Avisos.
-- Num livro de 230 páginas, trocar "e" por "E" (28.693 casos) leva ~9 s de prévia, em segundo
-  plano, com o progresso na barra de status, mais ~9 s para editar as cópias das páginas, e
-  prende a janela por ~0,7 s ao trocá-las; o Ctrl+Z leva ~0,5 s.
+  recebe a troca na versão de agora, se as palavras de cada caso ainda são as mesmas; senão
+  fica de fora, com o motivo nos Avisos.
+- A prévia lê só as páginas em que o índice da busca acha o padrão (~40 ms cada). Num livro
+  de 230 páginas, trocar "e" por "E" (28.693 casos, todas as páginas) leva ~9 s de prévia, em
+  segundo plano, com o progresso na barra de status, mais ~9 s para editar as cópias das
+  páginas (também em segundo plano, com o progresso; a fila de comandos espera), e prende a
+  janela por ~0,4 s ao trocá-las; o Ctrl+Z leva ~0,5 s. Essa transação ocupa ~43 MB dos 50 MB
+  do desfazer: os passos mais antigos que não cabem saem, e a barra de status diz quantos.
 
 ### A página: zoom e navegação
 
@@ -1272,11 +1282,12 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   com os processos já abertos (o primeiro projeto, aberto um pouco depois do programa); o
   projeto aberto junto com o programa, e o segundo da sessão, levam 2,0–2,9 s, e pela janela
   o índice chega a 2,4 s (CA-7.1, uma limitação conhecida).
-- **Substituir, desde o passo D2**: o que é do passo G fica de fora (aparece desabilitado na
-  prévia), e isso inclui trocar uma palavra por outra mais curta ou mais longa quando a
-  diferença cai no meio dela ("casa" → "lar"); a troca no fim da palavra tem tradução
-  ("casas" → "casa", "casa" → "casas"). As figurinas não entram sozinhas no texto
-  substituído (o §6.4 é da digitação). A prévia lê as páginas uma a uma (~40 ms cada).
+- **Substituir, desde o passo D2**: o que é do passo G fica de fora (desabilitado na
+  prévia): o caso comum é "rn" → "m" (e "m" → "rn"), que espera o juntar e o dividir glifos;
+  uma troca editorial em que duas letras viram uma ("casa" → "lar") também. As figurinas não
+  entram sozinhas no texto substituído (o §6.4 é da digitação). Uma troca no livro inteiro
+  pode ocupar quase todo o desfazer (~43 MB em 230 páginas e 28 mil casos; num livro de 800
+  páginas com uma troca tão comum, passa dos 50 MB e fica sozinha no desfazer).
 - **A edição no Documento, desde o D1**: o que é do passo G (k letras por 1, 1 por k, o
   parágrafo, os estilos) é recusado com aviso; o Ctrl+T com uma edição do texto ainda na fila
   pede para tentar de novo depois que ela entrar; num projeto com páginas lidas antes do D1,

@@ -315,6 +315,14 @@ class BuscaNaJanela:
         self.mostrar_resultados()
 
     def _resultado_escolhido(self, alvo) -> None:
+        from abbychess import substituir as sb
+
+        if isinstance(alvo, sb.Caso):           # um caso da prévia da substituição
+            self._ir_a_pagina_ja_montada(alvo.pagina)
+            if alvo.gids and alvo.gids[0] in set(self.pagina.gids):
+                self.texto.ir_ao_gid(alvo.gids[0])
+                self.visor.marcar_palavra(self._caixa_dos_gids(alvo.gids))
+            return
         if isinstance(alvo, bs.Ocorrencia):
             if alvo in self._ocorrencias:
                 self._ir_a_ocorrencia(self._ocorrencias.index(alvo))

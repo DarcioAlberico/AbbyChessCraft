@@ -179,10 +179,27 @@ def _aplicar_decisoes(linhas: List[List[List[int]]], decisoes: Decisoes) -> List
         saida.append(juntas)
     ultimo: Dict[Optional[int], int] = {}                     # virtuais, na ordem em que
     for v in decisoes.virtuais:                               # foram digitados: o segundo
-        depois = ultimo.get(v.depois_de, v.depois_de)         # depois do mesmo glifo vem
-        _inserir_virtual(saida, v, depois)                    # depois do primeiro
+        if v.antes_de is not None and v.depois_de is None:    # depois do mesmo glifo vem
+            _inserir_antes(saida, v)                          # depois do primeiro
+            continue
+        depois = ultimo.get(v.depois_de, v.depois_de)
+        _inserir_virtual(saida, v, depois)
         ultimo[v.depois_de] = v.gid
     return saida
+
+
+def _inserir_antes(linhas: List[List[List[int]]], v) -> None:
+    """O virtual antes do box `antes_de`: na palavra dele ou, com `palavra_nova`, numa
+    palavra nova logo antes dela; sem o box, no começo da primeira linha."""
+    for linha in linhas:
+        for k, p in enumerate(linha):
+            if v.antes_de in p:
+                if v.palavra_nova:
+                    linha.insert(k, [v.gid])
+                else:
+                    p.insert(p.index(v.antes_de), v.gid)
+                return
+    _inserir_virtual(linhas, v, None)
 
 
 def _inserir_virtual(linhas: List[List[List[int]]], v, depois: Optional[int]) -> None:

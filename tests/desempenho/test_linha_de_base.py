@@ -381,11 +381,25 @@ def test_clique_numa_palavra_do_documento(ambiente, medidas):
     passo = max(1, len(gids) // 40)
     alvos = gids[::passo]
 
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+
+    texto = janela.texto
+    janela.vista.setCurrentWidget(janela.painel_do_documento)
+    janela.show()
+    app.processEvents()
+
+    def por_a_vista(i):
+        texto.ir_ao_gid(alvos[i % len(alvos)])             # fora do tempo medido
+
     def clicar(i):
         gid = alvos[i % len(alvos)]
-        janela.texto.glifo_clicado.emit(gid, janela.texto.palavra_de(gid))
+        cursor = texto.textCursor()
+        cursor.setPosition(texto.posicao_do_gid(gid) + 1)
+        ponto = texto.cursorRect(cursor).center() - QPoint(2, 0)
+        QTest.mouseClick(texto.viewport(), Qt.MouseButton.LeftButton, pos=ponto)
 
     medidas["clique_no_documento"] = {
-        **cronometrar(clicar), "alvo_ms": 50,
-        "como": "o sinal do clique numa palavra do Documento (o destaque na Imagem, o glifo no "
-                "Inspetor, o Documento e a Linha seguindo), página 21 reconhecida"}
+        **cronometrar(clicar, antes=por_a_vista), "alvo_ms": 50,
+        "como": "QTest.mouseClick numa palavra do Documento: o destaque na Imagem, o glifo no "
+                "Inspetor, o Documento e a Linha seguindo; página 21 reconhecida"}

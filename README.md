@@ -181,7 +181,8 @@ mais como texto puro:
   corpo da mesma área se juntariam.
 - **Os diagramas no lugar deles**, inteiros: o desenho da posição lida (o recorte da página,
   se ainda não lida), a linha do diagrama em monoespaçado, o estado (conferido, lido e não
-  conferido, não lido) e **Copiar FEN**.
+  conferido, não lido; o "confiável pelos lances" de §6.1 vem com a validação pelos lances,
+  passo H) e **Copiar FEN** (também pelo teclado: Tab até ele e Enter).
 - **O realce** ("Realce", na barra do Documento): fundo laranja-claro no que vai para a
   revisão e no que ninguém leu (que aparece como □), ondulado vermelho no que o léxico não
   conhece (depois de a fila de palavras desconhecidas ter rodado na página), pontilhado no
@@ -190,11 +191,12 @@ mais como texto puro:
   padrão); com o foco na Imagem, o zoom dela.
 - **É só leitura** até o passo D1, que traz a edição no Documento.
 
-**A sincronia**: o clique numa palavra do Documento a destaca na Imagem e leva o glifo
-clicado ao Inspetor; o cursor andando pelo Documento (as setas) destaca a palavra na Imagem,
-que rola até ela com Seguir; o clique na Imagem e o Alt+↓ da fila levam o cursor do
-Documento ao glifo. Uma edição ou a propagação montam o Documento de novo sem perder o lugar:
-o cursor volta ao mesmo glifo, e a rolagem fica.
+**A sincronia**: o clique numa palavra do Documento a contorna (tracejado azul) na Imagem e
+leva o glifo clicado ao Inspetor; o cursor andando pelo Documento (as setas) contorna a
+palavra na Imagem, que rola até ela só com Seguir; o clique na Imagem e o Alt+↓ da fila
+levam o cursor do Documento ao glifo e o mostram. O contorno da palavra em verificação
+(cheio) é outro e fica. Uma edição ou a propagação montam o Documento de novo sem perder o
+lugar: o cursor e a seleção voltam aos mesmos glifos, e a rolagem fica.
 
 **A Linha** (**Ctrl+F5** a esconde e mostra), embaixo da Imagem e da vista direita: a linha
 do glifo atual ampliada, a imagem em cima e o texto lido embaixo, cada caractere sob o glifo

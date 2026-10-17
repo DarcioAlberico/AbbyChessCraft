@@ -45,6 +45,9 @@ class FaixaDaLinha(QWidget):
         y1 = max(0, min(b.y1 for b in boxes) - 4)
         x2 = min(matriz.shape[1], max(b.x2 for b in boxes) + 6)
         y2 = min(matriz.shape[0], max(b.y2 for b in boxes) + 4)
+        if x2 <= x1 or y2 <= y1:                # a caixa fora da página: nada a mostrar
+            self.limpar()
+            return
         self._recorte = pixmap_de_cinza(matriz[y1:y2, x1:x2])
         self._origem = (x1, y1)
         self._boxes = list(boxes)

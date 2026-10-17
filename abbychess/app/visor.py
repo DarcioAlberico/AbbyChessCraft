@@ -34,7 +34,7 @@ from core.box_model import BoxEntry
 
 from abbychess import grade as gd
 from abbychess import zonas as zn
-from abbychess.app import cores
+from abbychess.app import cores, estilo
 from abbychess.app.item_dos_boxes import ItemDosBoxes
 
 
@@ -113,6 +113,9 @@ class VisorDePagina(QGraphicsView):
         #: O arraste de uma área em curso: (índice, bordas, ponto inicial).
         self._arraste = None
         self._palavra: Optional[QGraphicsRectItem] = None
+        #: O contorno da palavra sob o cursor do Documento (§6.2): outro item, para não
+        #: apagar o da palavra em verificação.
+        self._palavra_do_documento: Optional[QGraphicsRectItem] = None
 
     # ------------------------------------------------------------------
     def mostrar_pagina(self, pixmap: QPixmap) -> None:
@@ -123,6 +126,7 @@ class VisorDePagina(QGraphicsView):
         self._marcados, self._marcados_indices, self._quadro = [], set(), None
         self._zonas, self._zona_sel, self._zonas_itens, self._arraste = [], None, [], None
         self._palavra = None
+        self._palavra_do_documento = None
         cena.addPixmap(pixmap)
         cena.setSceneRect(QRectF(pixmap.rect()))
         self.item_dos_boxes = ItemDosBoxes(pixmap.width(), pixmap.height())
@@ -406,6 +410,23 @@ class VisorDePagina(QGraphicsView):
         self._palavra = self.scene().addRect(x1 - 6, y1 - 6, x2 - x1 + 12, y2 - y1 + 12, caneta)
         self._palavra.setZValue(13)
         self.ensureVisible(self._palavra, 150, 150)
+
+    def marcar_palavra_do_documento(self, caixa) -> None:
+        """Contorna (tracejado) a palavra sob o cursor do Documento, sem rolar: quem rola é o
+        Seguir (`mostrar_caixa`)."""
+        if self._palavra_do_documento is not None:
+            self.scene().removeItem(self._palavra_do_documento)
+            self._palavra_do_documento = None
+        if caixa is None:
+            return
+        x1, y1, x2, y2 = caixa
+        caneta = QPen(estilo.AZUL)
+        caneta.setCosmetic(True)
+        caneta.setWidthF(2)
+        caneta.setStyle(Qt.PenStyle.DashLine)
+        self._palavra_do_documento = self.scene().addRect(x1 - 4, y1 - 4, x2 - x1 + 8,
+                                                          y2 - y1 + 8, caneta)
+        self._palavra_do_documento.setZValue(12)
 
     def menu_do_box(self, indice: int, coluna: int) -> QMenu:
         """O menu de edição do box, com a coluna onde o botão direito caiu."""

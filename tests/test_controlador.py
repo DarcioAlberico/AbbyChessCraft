@@ -325,3 +325,22 @@ def test_a_sessao_do_documento_na_fila_avisa_quando_entra(dois_projetos):
     executor.em_voo = None
     executor.tudo()
     assert len(entrou) == 1 and entrou[0].startswith("x" + texto[inicio:fim])
+
+
+def test_a_sessao_que_nao_pode_rodar_e_recusada(dois_projetos):
+    """A revisão do D1 (rodada 2, achado 3): sem a imagem da página, a sessão não roda, e a
+    janela ouve `sessao_recusada` para montar o Documento de novo do modelo."""
+    from abbychess import sessao as ss
+
+    a, _b = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    ctl.reconhecer()
+    executor.tudo()
+    texto, unidades = ss.texto_e_unidades(ctl.modelo)
+    inicio, fim = ss.palavras_em(unidades, 0, 0)
+    recusas = []
+    ctl.eventos.ligar("sessao_recusada", recusas.append)
+    ctl.imagem = None
+    ctl.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim])
+    assert recusas and ss.texto_e_unidades(ctl.modelo)[0] == texto

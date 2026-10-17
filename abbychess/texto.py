@@ -177,29 +177,37 @@ def _aplicar_decisoes(linhas: List[List[List[int]]], decisoes: Decisoes) -> List
             else:
                 juntas.append(list(p))
         saida.append(juntas)
-    # Os virtuais: cada um logo depois (ou logo antes) da âncora dele, que é um box ou outro
-    # virtual; o que se ancora num virtual espera ele entrar. Um virtual sem âncora na
-    # página (ou num ciclo) vai para o começo da primeira linha.
+    # Os virtuais, na ordem das decisões: cada um logo depois (ou logo antes) da âncora dele,
+    # que é um box ou outro virtual; a âncora virtual entra antes dele. Dois na mesma âncora:
+    # o mais novo fica junto dela (foi digitado ali). Um virtual sem âncora na página, ou
+    # num ciclo, vai para o começo da primeira linha.
+    por_gid = {v.gid: v for v in decisoes.virtuais}
     postos: Set[int] = set()
-    faltam = list(decisoes.virtuais)
-    gids_virtuais = {v.gid for v in faltam}
-    while faltam:
-        resto = []
-        for v in faltam:
-            ancora = v.antes_de if v.antes_de is not None and v.depois_de is None else v.depois_de
-            if ancora in gids_virtuais and ancora not in postos:
-                resto.append(v)
-                continue
-            if v.antes_de is not None and v.depois_de is None:
-                _inserir_antes(saida, v)
-            else:
-                _inserir_virtual(saida, v, v.depois_de)
-            postos.add(v.gid)
-        if len(resto) == len(faltam):           # um ciclo: não há âncora a esperar
-            for v in resto:
+    em_curso: Set[int] = set()
+
+    def por(v) -> None:
+        if v.gid in postos:
+            return
+        antes = v.antes_de is not None and v.depois_de is None
+        ancora = v.antes_de if antes else v.depois_de
+        if ancora in por_gid and ancora not in postos:
+            if ancora in em_curso:              # um ciclo: sem âncora
+                postos.add(v.gid)
                 _inserir_virtual(saida, v, None)
-            break
-        faltam = resto
+                return
+            em_curso.add(v.gid)
+            por(por_gid[ancora])
+            em_curso.discard(v.gid)
+            if v.gid in postos:
+                return
+        postos.add(v.gid)
+        if antes:
+            _inserir_antes(saida, v)
+        else:
+            _inserir_virtual(saida, v, v.depois_de)
+
+    for v in decisoes.virtuais:
+        por(v)
     return saida
 
 

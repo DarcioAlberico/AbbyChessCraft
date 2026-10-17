@@ -564,13 +564,16 @@ class ControladorDePagina:
         so_leves = getattr(self.executar, "so_leves", None)
         return so_leves() if so_leves is not None else not getattr(self.executar, "ocupado", False)
 
-    def _editar(self, titulo: str, corpo, *, precisa_de_glifos: bool = True) -> None:
+    def _editar(self, titulo: str, corpo, *, precisa_de_glifos: bool = True,
+                nao_rodou=None) -> None:
         """Uma edição: na hora, se nada prende o leitor (`_agora`); senão na fila, e `corpo()`
         roda na vez dela, se a página ainda é a mesma (se não é, avisa que a edição foi
-        descartada)."""
+        descartada). `nao_rodou()`, se o corpo não rodou."""
         if self._agora():
             if self._pode_editar(precisa_de_glifos):
                 corpo()
+            elif nao_rodou is not None:
+                nao_rodou()
             return
         indice = self.indice
 
@@ -580,6 +583,9 @@ class ControladorDePagina:
                              "antes da vez dele na fila.", 8000)
             elif self._pode_editar(precisa_de_glifos):
                 corpo()
+                return None
+            if nao_rodou is not None:
+                nao_rodou()
             return None
         self.tarefa(titulo, preparar, falhou=self._falhou(titulo))
 
@@ -1128,7 +1134,10 @@ class ControladorDePagina:
                 self._ensinar_do_documento(ensinar_gid, chave)
             if depois is not None:
                 depois()
-        self._editar("Editando o texto", corpo)
+        # A edição que não rodou (a página sem imagem, ou outra na vez dela): o Documento
+        # volta ao modelo.
+        self._editar("Editando o texto", corpo, nao_rodou=lambda: self.eventos.emitir(
+            "sessao_recusada", "a página não pode ser editada agora"))
 
     def _tinta_sem_box(self, pagina: Pagina, plano) -> bool:
         """Há tinta sem box onde uma letra que faltou entrou (a letra que a segmentação não

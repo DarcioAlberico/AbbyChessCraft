@@ -944,6 +944,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | `abbychess/livro.py` | O lote síncrono das ferramentas e dos testes, e a fila de revisão do livro todo |
 | `abbychess/servidor_de_leitura.py` | O servidor de leitura (§11): o processo filho com os modelos globais, a vez entre glifos, os deltas dos padrões, a queda e o fechamento |
 | `abbychess/sessao.py` | A sessão de edição do Documento sem Qt (§6.3): alinhar, planejar (ou recusar o que é do passo G), aplicar; as figurinas (§6.4) |
+| `abbychess/ancoragem.py` | Onde os glifos virtuais da sessão ficam (a âncora de cada um, como o usuário os digitou) e as palavras que a montagem do core parte ou junta quando um box sai |
 | `abbychess/lote.py` | O lote da janela (`CondutorDoLote`): decide, lê pelo servidor e grava na thread da interface; cancelar, retomar, `.antes-do-lote/` |
 | `abbychess/exportar.py` | PDF pesquisável, DOCX e EPUB a partir das páginas gravadas, pelo core do PyBoxEditor, sem o cabeçalho e o rodapé corridos |
 | `abbychess/historico.py` | O desfazer do projeto: transações por gid (o que cada ação mudou, por página), a pré-condição, o limite de 50 MB, a propagação que emenda o Enter |
@@ -1141,7 +1142,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 - **A edição no Documento, desde o D1**: o que é do passo G (k letras por 1, 1 por k, o
   parágrafo, os estilos) é recusado com aviso; apagar a quebra de linha impressa entre duas
   palavras não as junta, e uma linha que perde todos os boxes some, com o glifo virtual que
-  sobrou indo para a linha vizinha (as linhas são da página). A posição que a Linha e os
+  sobrou indo para a linha vizinha (as linhas são da página; a Linha avisa). A posição que a Linha e os
   Avisos dão de um glifo é em pixels da página.
 - **O lote não volta às páginas que já leu.** O padrão ensinado durante o lote vale nas
   páginas que ele começar depois (desde o passo E); as que ele já leu só mudam lidas de novo

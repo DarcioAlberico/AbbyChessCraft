@@ -73,6 +73,8 @@ def alinhar(original: str, novo: str, fixos: Sequence[Tuple[int, int]] = ()
     lacunas o mais à esquerda possível. `fixos`: pares que já se sabe que são o mesmo
     caractere (o que nenhuma edição tocou); o alinhamento passa por eles, e só os vãos entre
     eles são alinhados (os fixos fora de ordem ou de faixa são ignorados)."""
+    if not fixos and len(original) * len(novo) > CELULAS_SEM_ANCORAS:
+        fixos = _trechos_longos_iguais(original, novo)
     pares: List[Tuple[Optional[int], Optional[int]]] = []
     i0 = j0 = 0
     for i, j in sorted(fixos):
@@ -85,6 +87,18 @@ def alinhar(original: str, novo: str, fixos: Sequence[Tuple[int, int]] = ()
     pares += [(None if a is None else a + i0, None if b is None else b + j0)
               for a, b in _levenshtein(original[i0:], novo[j0:])]
     return pares
+
+
+#: Acima disto (caracteres do original × do novo), sem fixos, o alinhamento se ancora nos
+#: trechos longos iguais: colar a página inteira por cima custaria segundos no Levenshtein.
+CELULAS_SEM_ANCORAS = 250_000
+#: O menor trecho igual que vira âncora (um trecho curto pode casar no lugar errado).
+TRECHO_MINIMO = 12
+
+
+def _trechos_longos_iguais(original: str, novo: str) -> List[Tuple[int, int]]:
+    blocos = difflib.SequenceMatcher(None, original, novo, autojunk=False).get_matching_blocks()
+    return [(b.a + k, b.b + k) for b in blocos if b.size >= TRECHO_MINIMO for k in range(b.size)]
 
 
 def _troca(a: str, b: str) -> int:
@@ -154,23 +168,39 @@ class Plano:
     #: `aplicar` deixou uma linha impressa só com virtuais: ela some (as linhas vêm dos
     #: boxes), e eles vão para a linha vizinha.
     linha_sem_boxes: bool = False
+    #: Uma quebra de linha impressa foi apagada: ela fica (as linhas são da página).
+    linha_mantida: bool = False
+    #: As palavras antes e depois da sessão, para o aviso ("casas → casa: ...").
+    de: str = ""
+    para: str = ""
 
     @property
     def muda(self) -> bool:
         return self.texto_mudou or bool(self.corrigir or self.sair or self.quebrar
                                         or self.juntar or self.virtuais)
 
-    def estrutural(self) -> str:
-        """O aviso não modal da Linha para o que muda a estrutura (§6.3), ou ""."""
+    def estrutural(self, *extras: str) -> str:
+        """O aviso não modal da Linha para o que muda a estrutura (§6.3: "rn → m: 2 glifos
+        juntados · Ctrl+Z desfaz"), ou "". `extras` entram antes do "Ctrl+Z desfaz"."""
         partes = []
         if self.sair:
-            partes.append(f"{len(self.sair)} glifo(s) tirado(s)")
+            n = len(self.sair)
+            partes.append(f"{n} glifo tirado" if n == 1 else f"{n} glifos tirados")
         letras = sum(len(t) for t, _a, _n in self.virtuais)
         if letras:
-            partes.append(f"{letras} glifo(s) virtual(is)")
+            partes.append(f"{letras} glifo virtual" if letras == 1 else f"{letras} glifos virtuais")
         if self.linha_sem_boxes:
             partes.append("a linha ficou sem glifos: o resto dela foi para a vizinha")
-        return " · ".join(partes + ["Ctrl+Z desfaz"]) if partes else ""
+        if self.linha_mantida:
+            partes.append("a quebra de linha fica (juntar linhas chega numa próxima versão)")
+        if not partes:
+            return ""
+        de, para = _curto(self.de), _curto(self.para)
+        return f"{de} → {para}: " + " · ".join(partes + list(extras) + ["Ctrl+Z desfaz"])
+
+
+def _curto(texto: str, limite: int = 30) -> str:
+    return texto if len(texto) <= limite else texto[:limite - 1] + "…"
 
 
 def _normalizar(novo: str) -> str:
@@ -204,7 +234,8 @@ def planejar(unidades: Sequence[Unidade], novo: str,
     pares = alinhar(original, novo, fixos)
     _recusar_o_que_e_do_passo_g(unidades, novo, pares)
 
-    plano = Plano(linha=_linha_original(unidades), texto_mudou=original != novo)
+    plano = Plano(linha=_linha_original(unidades), texto_mudou=original != novo,
+                  de=" ".join(original.split()), para=" ".join(novo.split()))
     itens = plano.itens
     letras_do_gid: Dict[int, List[str]] = {}
     for i, j in pares:
@@ -231,6 +262,9 @@ def planejar(unidades: Sequence[Unidade], novo: str,
             plano.sair.add(gid)
         elif depois != antes:
             plano.corrigir[gid] = depois
+    _recusar_o_hifen_de_fim_de_linha(unidades, plano.sair)
+    plano.linha_mantida = any(unidades[i].tipo == LINHA and (j is None or novo[j] != " ")
+                              for i, j in pares if i is not None)
     ficam = [gid for item, gid in itens if item == "glifo"]
     if len(ficam) != len(set(ficam)):           # uma letra no meio de "fi": dividir o glifo
         raise Recusa(f"{PROXIMA_VERSAO} (dividir um glifo)")
@@ -265,6 +299,20 @@ def _recusar_o_que_e_do_passo_g(unidades, novo, pares) -> None:
             trecho.append((i, j))
     if trecho:
         checar(trecho)
+
+
+#: Os hífens que partem uma palavra no fim da linha impressa.
+HIFENS = "-‐‑"
+
+
+def _recusar_o_hifen_de_fim_de_linha(unidades, sair) -> None:
+    """Apagar o hífen do fim de uma linha impressa é juntar as duas metades da palavra
+    (§6.3, "hífen de fim de linha apagado"): isso é do passo G, e sem ele o box do hífen sairia
+    e a palavra continuaria partida."""
+    for k, u in enumerate(unidades):
+        if (u.glifo and u.gid in sair and u.texto in HIFENS
+                and k + 1 < len(unidades) and unidades[k + 1].tipo == LINHA):
+            raise Recusa(f"{PROXIMA_VERSAO} (juntar a palavra partida pelo hífen)")
 
 
 def _palavras_originais(unidades) -> Dict[int, int]:
@@ -480,6 +528,18 @@ def figurinas(token: str, idioma: str) -> str:
     if promocao:
         promocao = "=" + FIGURINAS_BRANCAS[pecas.index(promocao[1])]
     return f"{antes}{numero or ''}{figura}{resto}{promocao or ''}{sinais}{depois}"
+
+
+#: As figurinas que a leitura escreve (brancas e pretas).
+TODAS_AS_FIGURINAS = frozenset("♔♕♖♗♘♙♚♛♜♝♞♟")
+
+
+def modo_da_pagina(modo: str, chars) -> str:
+    """O modo do livro (§6.4) para a página: "livro" vira "figurinas" se algum glifo dela foi
+    lido como figurina, e "letras" se nenhum; os outros modos ficam."""
+    if modo != "livro":
+        return modo
+    return "figurinas" if any(c in TODAS_AS_FIGURINAS for c in chars) else "letras"
 
 
 def com_figurinas(novo: str, original: str, idioma: str, modo: str) -> str:

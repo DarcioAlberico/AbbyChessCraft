@@ -146,6 +146,9 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         self.texto = VistaDoDocumento()         # o Documento (§6.1), só leitura até o D1
         self.texto.glifo_clicado.connect(self._documento_clicado)
         self.texto.sessao_confirmada.connect(self._sessao_do_documento)
+        self.texto.sessao_mudou.connect(self._acoes_mudaram)
+        self.texto.sem_duvidosas.connect(self._sem_duvidosas)
+        self.pagina.antes_de_sair_da_pagina = self.confirmar_a_sessao_aberta
         self.texto.cursor_na_palavra.connect(self._palavra_do_documento)
         # O texto da página é refeito uma vez, um instante depois da última mudança: montar
         # o documento leva dezenas de ms, e um Enter muda a página duas vezes (o glifo e,
@@ -175,7 +178,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
                              ("lote_terminou", self._lote_terminou),
                              ("resultado", self._resultado),
                              ("sessao_recusada", self._sessao_recusada),
-                             ("estrutural", self.linha.avisar),
+                             ("estrutural", self._aviso_estrutural),
                              ("pagina_do_lote", self._pagina_do_lote),
                              ("acoes_mudaram", self._acoes_mudaram),
                              ("lote_mudou", self._acoes_mudaram),
@@ -273,6 +276,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         de mexer nas tarefas: falso quando o usuário prefere não fechar (e perder as
         mudanças dela), e aí nada mudou."""
         projeto = self.projeto
+        self.confirmar_a_sessao_aberta()
         if not self._gravou_ou_perder(projeto):
             return False
         self._parar_tarefas()                   # o fim da tarefa em voo ainda entra

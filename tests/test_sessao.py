@@ -82,7 +82,7 @@ def test_o_glifo_apagado_sai_da_pagina():
     x = p.boxes[3].gid
     plano = _editar(p, "casxa", "casa")
     assert plano.sair == {x} and x not in p.vivos and _texto(p) == "casa"
-    assert "1 glifo(s) tirado(s)" in plano.estrutural()
+    assert plano.estrutural() == "casxa → casa: 1 glifo tirado · Ctrl+Z desfaz"
 
 
 @pytest.mark.parametrize("de, para", [("csa", "casa"), ("asa", "casa"), ("cas", "casa")])
@@ -90,7 +90,7 @@ def test_a_letra_que_faltou_vira_glifo_virtual(de, para):
     p = _pagina(f"a {de} b")
     plano = _editar(p, de, para)
     assert len(p.decisoes.virtuais) == 1 and _texto(p) == f"a {para} b"
-    assert "1 glifo(s) virtual(is)" in plano.estrutural()
+    assert ": 1 glifo virtual · Ctrl+Z desfaz" in plano.estrutural()
 
 
 def test_varias_letras_seguidas_e_a_palavra_nova():
@@ -260,3 +260,40 @@ def test_trocar_a_letra_e_partir_corrige_o_glifo_sem_tirar_o_box(de, para, onde,
     plano = _editar(p, de, para)
     assert plano.corrigir == {gid: letra} and not plano.sair and not p.decisoes.virtuais
     assert _texto(p) == para.strip()
+
+
+def test_apagar_o_hifen_de_fim_de_linha_e_do_passo_g():
+    p = _pagina("exem-", "plo")
+    antes = p.instantaneo()
+    with pytest.raises(ss.Recusa, match="hífen"):
+        _editar(p, "exem-\nplo", "exemplo")
+    assert [b.gid for b in p.boxes] == [b.gid for b in antes.boxes]
+
+
+def test_apagar_a_quebra_de_linha_avisa_que_ela_fica():
+    p = _pagina("casa", "velha")
+    plano = _editar(p, "casa\nvelha", "casavelha")
+    assert _texto(p) == "casa\nvelha" and "a quebra de linha fica" in plano.estrutural()
+
+
+def test_o_modo_como_o_livro_olha_as_figurinas_da_pagina():
+    assert ss.modo_da_pagina("livro", "Cf3 e5") == "letras"
+    assert ss.modo_da_pagina("livro", ["♘", "f", "3"]) == "figurinas"
+    assert ss.modo_da_pagina("letras", "♘") == "letras"
+
+
+def test_colar_a_pagina_inteira_alinha_pelos_trechos_iguais():
+    """A revisão de produto do D1 (m7): sem fixos, um texto longo se ancora nos trechos
+    longos iguais; só as letras trocadas viram trocas."""
+    import random
+
+    r = random.Random(1)
+    original = " ".join("".join(r.choice("abcdefgh") for _ in range(r.randint(2, 8)))
+                        for _ in range(150))
+    novo = list(original)
+    for k in r.sample([i for i, c in enumerate(original) if c != " "], 10):
+        novo[k] = "x"
+    novo = "".join(novo)
+    pares = ss.alinhar(original, novo)
+    trocas = [(i, j) for i, j in pares if i is not None and j is not None and original[i] != novo[j]]
+    assert len(trocas) == 10 and all(i == j for i, j in pares)

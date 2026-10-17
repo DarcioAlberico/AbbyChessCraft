@@ -418,6 +418,16 @@ class PainelDeTreino(QWidget):
         self.menu_da_paleta = menu              # os testes escolhem sem abrir
         menu.popup(self.campo.mapToGlobal(self.campo.rect().bottomLeft()))
 
+    def inserir_figurina(self, branca: str) -> None:
+        """Ctrl+Shift+peça no campo: a figurina; o mesmo atalho de novo alterna a cor."""
+        from abbychess.app.documento import PRETA_DA_BRANCA
+
+        preta = PRETA_DA_BRANCA[branca]
+        if self.campo.text() in (branca, preta):
+            self.campo.setText(preta if self.campo.text() == branca else branca)
+        else:
+            self.campo.insert(branca)
+
     def _inserir(self, simbolo: str) -> None:
         self.campo.insert(simbolo)
         self.campo.setFocus()

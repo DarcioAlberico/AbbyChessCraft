@@ -59,6 +59,8 @@ def test_o_interativo_passa_na_frente_da_proxima_pagina_do_lote(laco, imagem):
     respostas = _respostas(laco, 4)
     assert all(ok for ok, _ in respostas.values())
     assert laco.ordem.index(9) < laco.ordem.index(2)
+    # A vez entre glifos: o interativo termina dentro da página 1 do lote, e não depois dela.
+    assert laco.ordem.index(1) < laco.ordem.index(9) and laco.fins.index(9) < laco.fins.index(1)
     lida = respostas[9][1]
     assert {b.char for b in lida.boxes} == {leitor_falso.LETRA}
 
@@ -76,15 +78,24 @@ def test_o_delta_vale_no_pedido_seguinte_e_o_apagado_sai(laco):
     assert _respostas(laco, 1)[2] == (True, 0)
 
 
-def test_cancelar_para_a_pagina_do_lote_e_a_que_nao_comecou(laco, imagem):
+def test_cancelar_para_a_pagina_do_lote_e_a_que_nao_comecou_tambem_responde(laco, imagem):
     laco.entrada.put(("pedido", 1, sl.LOTE, "ler_pagina", (imagem, [], [])))
     laco.entrada.put(("pedido", 2, sl.LOTE, "ler_pagina", (imagem, [], [])))
     time.sleep(0.03)
     laco.entrada.put(("cancelar", 1))
     laco.entrada.put(("cancelar", 2))
-    respostas = _respostas(laco, 1)                       # o 2 sai da fila sem resposta
-    assert respostas[1] == (False, "cancelado")
-    assert 2 not in laco.ordem
+    respostas = _respostas(laco, 2)                       # quem pediu sempre recebe resposta
+    assert respostas == {1: (False, sl.CANCELADO), 2: (False, sl.CANCELADO)}
+    assert 2 not in laco.ordem and not laco.cancelados
+
+
+def test_o_cancelamento_que_chega_depois_do_fim_nao_fica_guardado(laco):
+    laco.entrada.put(("pedido", 1, sl.INTERATIVO, "pid", None))
+    _respostas(laco, 1)
+    laco.entrada.put(("cancelar", 1))
+    laco.entrada.put(("pedido", 2, sl.INTERATIVO, "pid", None))
+    _respostas(laco, 1)
+    assert not laco.cancelados
 
 
 def test_a_operacao_que_falha_volta_como_erro_e_o_laco_segue(laco):

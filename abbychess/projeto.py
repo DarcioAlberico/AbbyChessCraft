@@ -713,8 +713,13 @@ class ProjetoDeLivro:
     def voltar_ao_antes_do_lote(self, indice: int) -> Pagina:
         """Põe de volta a página copiada antes do lote (o JSON idêntico ao copiado), e a
         cópia sai. O gravador grava antes o que tem pendente: senão, a gravação dele passaria
-        por cima da página restaurada."""
-        self.descarregar(10)
+        por cima da página restaurada; se ele não grava, nada muda (`OSError`). No projeto
+        só para leitura, também não."""
+        if self.somente_leitura:
+            raise OSError("o projeto está aberto só para leitura")
+        if not self.descarregar(10):
+            raise OSError("há páginas que não puderam ser gravadas (veja a barra de status); "
+                          "nada foi mudado")
         with self._trava_do_livro:
             pid = self._pid_de(indice)
             if pid is None:

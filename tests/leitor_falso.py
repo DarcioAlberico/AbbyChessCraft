@@ -4,6 +4,7 @@
 lugar da cadeia global, uma leitura fixa ("x", fonte `neural`, confiança 0,5) depois de um
 atraso por glifo (`ABBY_FALSO_MS_POR_GLIFO`, 10 ms por padrão: 15 glifos, ~150 ms por
 página sintética). Assim o teste sabe que a leitura veio do servidor e o lote tem duração.
+`ABBY_FALSO_ATRASO_AO_ABRIR` faz o filho demorar a ficar pronto, como os modelos de verdade.
 """
 
 from __future__ import annotations
@@ -25,4 +26,6 @@ class LeitorFalso(LeitorDoLivro):
 
 
 def criar(pasta_de_padroes, limiares):
+    # `ABBY_FALSO_ATRASO_AO_ABRIR` segundos "carregando os modelos" (o servidor não pronto).
+    time.sleep(float(os.environ.get("ABBY_FALSO_ATRASO_AO_ABRIR", "0")))
     return LeitorFalso(pasta_de_padroes, limiares=limiares)

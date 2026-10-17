@@ -35,7 +35,7 @@ def pasta(tmp_path):
 def servidor(pasta):
     avisos = []
     s = sl.ServidorDeLeitura(pasta, Limiares(), fabrica=FABRICA,
-                             ao_avisar=lambda titulo, texto: avisos.append(texto))
+                             ao_avisar=lambda titulo, texto, desistiu: avisos.append(texto))
     s.avisos = avisos
     assert s.pronto.wait(60), "o filho não ficou pronto"
     yield s
@@ -136,3 +136,18 @@ def test_o_filho_de_um_pai_com_qt_nao_carrega_o_qt(tmp_path):
                            capture_output=True, text=True, timeout=120, cwd=raiz,
                            env={**os.environ, "PYTHONPATH": str(raiz)})
     assert saida.stdout.strip() == "[]", saida.stderr
+
+
+def test_cancelar_antes_de_o_filho_ficar_pronto_responde_cancelado(pasta, imagem):
+    """O ✕ do lote com os modelos ainda carregando: o pedido que não começou responde
+    "cancelado" na vez dele (antes, saía da fila sem resposta, e o lote ficava preso)."""
+    s = sl.ServidorDeLeitura(pasta, Limiares(), fabrica=FABRICA)
+    try:
+        pedido = s.pedir("ler_pagina", (imagem, [], []), prioridade=sl.LOTE)
+        s.cancelar(pedido)
+        with pytest.raises(sl.Cancelado):
+            s.esperar(pedido, 30)
+        assert not s._pendentes
+    finally:
+        s.fechar()
+

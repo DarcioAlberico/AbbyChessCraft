@@ -287,6 +287,10 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
         """Cancela o lote, tira da fila o que não começou e espera a tarefa em andamento
         (o resultado dela ainda entra, antes de o projeto fechar)."""
         self.livro.cancelar()
+        if self.pagina.servidor is not None:
+            # A tarefa em curso que espera o servidor termina já ("cancelado"), sem a janela
+            # ficar congelada esperando uma leitura que não vai entrar.
+            self.pagina.servidor.abandonar_pendentes()
         if self.executor.ocupado:
             self.executor.esvaziar()
             self.statusBar().showMessage("Esperando a tarefa em andamento terminar…")

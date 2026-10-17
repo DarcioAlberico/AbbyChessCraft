@@ -27,7 +27,7 @@ from abbychess import lote as lt
 from abbychess import servidor_de_leitura as sl
 from abbychess import verificacao as vf
 from abbychess import zonas as zn
-from abbychess.controlador import ControladorDePagina
+from abbychess.controlador import TEMPO_DO_PEDIDO, ControladorDePagina
 from abbychess.leitor import LeitorDoLivro, congelar_para_a_coleta_de_lixo
 
 log = logging.getLogger(__name__)
@@ -79,6 +79,8 @@ class ControladorDeLayout:
         if p.boxes:
             self._automaticas_prontas(zn.automaticas(p.boxes, p.tabuleiros, largura, altura))
             return
+        if p.servidor_parado():
+            return
         indice = p.indice
 
         def preparar():
@@ -88,12 +90,15 @@ class ControladorDeLayout:
             servidor = p._servidor_para_pedir()
 
             def trabalho(_progresso):
-                if servidor is not None:              # o árbitro dos colados é o global
-                    return servidor.chamar("automaticas", imagem)
-                return sl.automaticas(imagem, leitor)
+                if servidor is None:
+                    return sl.automaticas(imagem, leitor)
+                try:                                  # o árbitro dos colados é o global
+                    return servidor.chamar("automaticas", imagem, timeout=TEMPO_DO_PEDIDO)
+                except sl.Cancelado:                  # o projeto fechou
+                    return None
 
             def pronto(zonas):
-                if p.indice == indice:
+                if zonas is not None and p.indice == indice:
                     self._automaticas_prontas(zonas)
             return trabalho, pronto
 
@@ -386,6 +391,8 @@ class ControladorDeDiagramas:
         if not any(not d.lido and not d.erro for d in diagramas):
             self._abrir(indice)
             return
+        if p.servidor_parado():
+            return
         pagina_indice = p.indice
 
         def preparar():
@@ -400,11 +407,17 @@ class ControladorDeDiagramas:
             servidor = p._servidor_para_pedir()
 
             def trabalho(_progresso):
-                if servidor is not None:
-                    return servidor.chamar("ler_diagramas", (imagem, caixas, boxes))
-                return sl.ler_diagramas(imagem, caixas, boxes, leitor)
+                if servidor is None:
+                    return sl.ler_diagramas(imagem, caixas, boxes, leitor)
+                try:
+                    return servidor.chamar("ler_diagramas", (imagem, caixas, boxes),
+                                           timeout=TEMPO_DO_PEDIDO)
+                except sl.Cancelado:                  # o projeto fechou
+                    return None
 
             def pronto(lidos):
+                if lidos is None:
+                    return
                 # Na página que pediu, mesmo que o usuário tenha ido a outra.
                 novos = dg.para_caixas(pagina.tabuleiros, pagina.diagramas)
                 for lido in lidos:
@@ -492,8 +505,8 @@ class ControladorDoLivro:
                     leitor = LeitorDoLivro(pasta, limiares=limiares, aguardar=True)
                     servidor = sl.ServidorDeLeitura(
                         pasta, limiares,
-                        ao_avisar=lambda titulo, texto: self._do_servidor(
-                            servidor, "servidor_caiu", texto),
+                        ao_avisar=lambda titulo, texto, desistiu: self._do_servidor(
+                            servidor, "servidor_caiu", (texto, desistiu)),
                         ao_ficar_pronto=lambda estado: self._do_servidor(
                             servidor, "modelos_prontos", estado))
                     return leitor, servidor
@@ -530,10 +543,12 @@ class ControladorDoLivro:
                 return
             self._modelos_avisados = servidor
             self.eventos.emitir("modelos_prontos", valor)
+            self.pagina.ler_os_aguardando()     # o que a página aberta deixou esperando
         else:
             # O primeiro tombo só vai para os Avisos; no segundo o servidor desistiu, e a
             # janela oferece reabrir o projeto (§11).
-            self.eventos.emitir(evento, valor, servidor.desistiu)
+            texto, desistiu = valor             # o `desistiu` da hora do aviso
+            self.eventos.emitir(evento, texto, desistiu)
 
     def usar(self, projeto, fonte, leitor, servidor=None) -> None:
         """O projeto com o leitor pronto: abre a última página lida (ou a primeira)."""

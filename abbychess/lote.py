@@ -37,6 +37,7 @@ from abbychess import diagramas as dg
 from abbychess import pagina as pg
 from abbychess import procedencia
 from abbychess import servidor_de_leitura as sl
+from abbychess.controlador import TEMPO_DO_PEDIDO
 from abbychess.modelo import LIDAS, VERIFICADA, proximo_estado, reconciliar
 
 log = logging.getLogger(__name__)
@@ -186,9 +187,11 @@ class CondutorDoLote:
         return None
 
     def _aberta_e_suja(self, indice: int) -> bool:
-        """A página aberta com mudança do usuário nesta sessão: um passo dela no desfazer ou
-        no refazer (toda edição, F5 ou desfazer entra lá; sobrescrevê-la faria o Ctrl+Z dela
-        ser recusado). A gravação pendente sozinha não conta: pode ser a do próprio lote."""
+        """Antes de ler: a página aberta com mudança do usuário nesta sessão, um passo dela no
+        desfazer ou no refazer (toda edição, F5 ou desfazer entra lá; sobrescrevê-la faria o
+        Ctrl+Z dela ser recusado). A gravação pendente sozinha não conta: pode ser a do
+        próprio lote. As fechadas com passos assim são lidas (§11 só protege a aberta); o que
+        protege qualquer página é `_mudou_durante`: a mudança enquanto ela era lida."""
         p = self.p
         modelo = p.modelo
         return modelo is not None and p.indice == indice and p.historico.toca(modelo.pid)
@@ -229,13 +232,16 @@ class CondutorDoLote:
         if cancelado():
             raise sl.Cancelado
         pedido = self._pedido = servidor.pedir("ler_pagina", argumentos, prioridade=sl.LOTE)
-        cancelou_em = None
+        cancelou_em, pedido_em = None, time.monotonic()
         while not pedido.feito.wait(VOLTA_DA_ESPERA):
             if cancelado() and cancelou_em is None:
                 servidor.cancelar(pedido)
                 cancelou_em = time.monotonic()
             if cancelou_em is not None and time.monotonic() - cancelou_em > PRAZO_DO_CANCELAMENTO:
                 raise sl.Cancelado
+            if time.monotonic() - pedido_em > TEMPO_DO_PEDIDO:     # um filho travado
+                servidor.cancelar(pedido)
+                raise TimeoutError(f"o servidor não leu a página em {TEMPO_DO_PEDIDO:.0f} s")
         lida = servidor.esperar(pedido, 0)
         sl.registrar_procedencia(lida.boxes, lida.amostras)
         return lida

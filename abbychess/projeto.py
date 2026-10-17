@@ -706,9 +706,10 @@ class ProjetoDeLivro:
                        _pagina_para_json(pagina.instantaneo()))
 
     def tem_antes_do_lote(self, indice: int) -> bool:
-        with self._trava_do_livro:
-            pid = self._pid_de(indice)
-        return pid is not None and self._arquivo_antes_do_lote(pid).is_file()
+        # O pid do modelo (em memória), e não o do `livro.json`: logo depois do lote, a
+        # página ainda está com o gravador, e o livro não a tem.
+        pagina = self.carregar_modelo(indice)
+        return pagina is not None and self._arquivo_antes_do_lote(pagina.pid).is_file()
 
     def voltar_ao_antes_do_lote(self, indice: int) -> Pagina:
         """Põe de volta a página copiada antes do lote (o JSON idêntico ao copiado), e a

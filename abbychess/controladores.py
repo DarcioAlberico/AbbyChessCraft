@@ -632,10 +632,11 @@ class ControladorDoLivro:
             p._avisar("Esta página não tem cópia de antes do lote.", 6000)
             return
         try:
-            p.projeto.voltar_ao_antes_do_lote(p.indice)
+            pagina = p.projeto.voltar_ao_antes_do_lote(p.indice)
         except OSError as erro:
             p.eventos.emitir("aviso", "Voltar ao estado antes do lote", str(erro))
             return
+        p.historico.tocar(pagina.pid)
         p.ir_para(p.indice, visita=False)
         self.eventos.emitir("acoes_mudaram")
         p._avisar(f"A página {p.indice + 1} voltou ao estado de antes do lote.", 8000)

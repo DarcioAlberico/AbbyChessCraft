@@ -1,0 +1,56 @@
+{
+ "data": "2026-10-17",
+ "rotulo": "servidor-sozinho-e-parcial",
+ "exitstatus": 0,
+ "metas_ausentes": [
+  "troca_de_pagina",
+  "enter_ensinar",
+  "releitura_de_um_glifo",
+  "memoria_do_desfazer"
+ ],
+ "ordem": "os testes do módulo dividem a janela e os padrões, em ordem fixa: o Enter ensina antes do lote, e o lote lê com esses padrões",
+ "ambiente": {
+  "objetos_congelados": 0,
+  "maquina": "DESKTOP-E025G20",
+  "maquina_cadastrada": true,
+  "cpu": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
+  "ram_gb": 15.9,
+  "python": "3.13.2",
+  "pyside6": "6.11.1",
+  "pymupdf": "1.26.6",
+  "torch": "2.14.0+cpu",
+  "threads_do_torch": 6,
+  "commit": "5ba8ba0",
+  "arvore_suja": false,
+  "arquivos_sujos": []
+ },
+ "medidas": {
+  "atraso_durante_o_lote": {
+   "paginas": 20,
+   "p99_ms": 2.2,
+   "p95_ms": 2.1,
+   "max_ms": 285.7,
+   "disparos": 9991,
+   "duracao_s": 162.1,
+   "alvo_p99_ms": 50,
+   "acoes_durante_o_lote": "todas valem (passo E): o lote lê no servidor e grava na interface entre um comando e outro",
+   "como": "pelo servidor de leitura (desde o E): a leitura no filho, com a prioridade abaixo do normal; a interface reconcilia e entrega cada página ao gravador. Até o A3, o lote lia numa thread do processo da interface"
+  },
+  "memoria_total_com_o_lote": {
+   "rss_pico_mb": 1616,
+   "alvo_mb": 2560,
+   "interface_no_fim_mb": 447,
+   "servidor_no_fim_mb": 962,
+   "como": "pico da soma do RSS da interface e do servidor durante um lote de 20 páginas (desde o E, dois processos)"
+  },
+  "releitura_com_o_lote": {
+   "p50_ms": 51.05,
+   "p95_ms": 133.59,
+   "max_ms": 491.15,
+   "n": 30,
+   "alvo_p95_ms": 150,
+   "lote_rodando_no_fim": true,
+   "como": "Alt+→/← alternados num glifo da página aberta: a interface o deixa aguardando e o servidor o lê entre um glifo e outro do lote (de outras páginas); do comando ao glifo lido, com o laço de eventos girando"
+  }
+ }
+}

@@ -277,10 +277,13 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         de mexer nas tarefas: falso quando o usuário prefere não fechar (e perder as
         mudanças dela), e aí nada mudou."""
         projeto = self.projeto
-        self.confirmar_a_sessao_aberta(agora=True)
         if not self._gravou_ou_perder(projeto):
             return False
         self._parar_tarefas()                   # o fim da tarefa em voo ainda entra
+        # A sessão aberta do Documento entra agora, depois da tarefa em voo (um F5 dela que
+        # entrasse depois passaria por cima) e sem a fila, que acabou de ser esvaziada.
+        self.pagina.aplicar_as_sessoes_na_fila()
+        self.confirmar_a_sessao_aberta(agora=True)
         self.livro.esperar_a_gravacao()
         if not self._gravou_ou_perder(projeto):   # e o que ele entregou também é gravado
             self.pagina.ler_os_aguardando()     # ficou aberto: o que foi abandonado volta

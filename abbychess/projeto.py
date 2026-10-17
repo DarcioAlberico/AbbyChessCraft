@@ -74,7 +74,7 @@ from abbychess import gravacao as gv
 from abbychess import procedencia
 from abbychess.gravador import Gravador
 from abbychess import zonas as zn
-from abbychess.modelo import (GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
+from abbychess.modelo import (FIGURINAS, GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
                               Box, Decisoes,
                               Pagina, foto, gid_de, proximo_estado, reconciliar)
 from abbychess.zonas import Zona
@@ -998,11 +998,7 @@ class ProjetoDeLivro:
                 "diagramas": tabuleiros,
                 "diagramas_por_conferir": max(0, tabuleiros - conferidos),
                 # Alguma figurina lida (o modo "livro" das peças, §6.4, sem abrir as páginas).
-                "figurinas": any(b.entry.char in FIGURINAS_LIDAS for b in pagina.boxes)}
-
-
-#: As figurinas que a leitura escreve (brancas e pretas).
-FIGURINAS_LIDAS = frozenset("♔♕♖♗♘♙♚♛♜♝♞♟")
+                "figurinas": any(b.entry.char in FIGURINAS for b in pagina.boxes)}
 
 
 def _pagina_para_json(pagina: Pagina) -> dict:

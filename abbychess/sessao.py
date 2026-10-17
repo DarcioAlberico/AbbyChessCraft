@@ -32,7 +32,7 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from abbychess import ancoragem as ag
 from abbychess import edicao as ed
-from abbychess.modelo import Pagina
+from abbychess.modelo import FIGURINAS, Pagina
 
 GLIFO, VIRTUAL, ESPACO, LINHA, OUTRO = "glifo", "virtual", "espaco", "linha", "outro"
 #: O que a vista põe no lugar da quebra de parágrafo; o colar de várias linhas também a traz
@@ -126,21 +126,20 @@ def _levenshtein(original: str, novo: str) -> List[Tuple[Optional[int], Optional
     """O alinhamento de menor custo; grande demais, só numa faixa em volta da diagonal."""
     n, m = len(original), len(novo)
     infinito = n + m + 1
-    custo = [[infinito] * (m + 1) for _ in range(n + 1)]
-    for i in range(n + 1):
-        custo[i][0] = i
-    for j in range(m + 1):
-        custo[0][j] = j
     faixa = abs(n - m) + FOLGA_DA_FAIXA if n * m > CELULAS_SEM_ANCORAS else None
+    # Cada linha guarda só as colunas dela (a faixa inteira, ou só ela): fora, infinito.
+    custo: List[Dict[int, int]] = [dict(enumerate(range(m + 1)))]
     for i in range(1, n + 1):
         if faixa is None:
             colunas = range(1, m + 1)
         else:
             centro = i * m // n
             colunas = range(max(1, centro - faixa), min(m, centro + faixa) + 1)
+        anterior, linha = custo[i - 1], {0: i}
         for j in colunas:
-            custo[i][j] = min(custo[i - 1][j - 1] + _troca(original[i - 1], novo[j - 1]),
-                              custo[i - 1][j] + 1, custo[i][j - 1] + 1)
+            linha[j] = min(anterior.get(j - 1, infinito) + _troca(original[i - 1], novo[j - 1]),
+                           anterior.get(j, infinito) + 1, linha.get(j - 1, infinito) + 1)
+        custo.append(linha)
     pares: List[Tuple[Optional[int], Optional[int]]] = []
     i, j = n, m
     while i or j:
@@ -551,16 +550,12 @@ def figurinas(token: str, idioma: str) -> str:
     return f"{antes}{numero or ''}{figura}{resto}{promocao or ''}{sinais}{depois}"
 
 
-#: As figurinas que a leitura escreve (brancas e pretas).
-TODAS_AS_FIGURINAS = frozenset("♔♕♖♗♘♙♚♛♜♝♞♟")
-
-
 def modo_da_pagina(modo: str, chars) -> str:
     """O modo do livro (§6.4) para a página: "livro" vira "figurinas" se algum glifo dela foi
     lido como figurina, e "letras" se nenhum; os outros modos ficam."""
     if modo != "livro":
         return modo
-    return "figurinas" if any(c in TODAS_AS_FIGURINAS for c in chars) else "letras"
+    return "figurinas" if any(c in FIGURINAS for c in chars) else "letras"
 
 
 def com_figurinas(novo: str, original: str, idioma: str, modo: str) -> str:

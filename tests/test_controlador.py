@@ -415,10 +415,10 @@ def test_o_ctrl_t_espera_a_sessao_na_fila_e_fechar_aplica_na_hora(dois_projetos)
     executor.em_voo = False                            # uma leitura em voo prende a fila
     ctl.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim])
     ctl.verificar()
-    assert ctl.modelo.estado != "verificada" and ctl._sessoes_na_fila == 1
+    assert ctl.modelo.estado != "verificada" and len(ctl._sessoes_na_fila) == 1
     executor.em_voo = None
     executor.tudo()
-    assert ctl._sessoes_na_fila == 0
+    assert not ctl._sessoes_na_fila
     executor.em_voo = False
     texto, unidades = ss.texto_e_unidades(ctl.modelo)
     ctl.confirmar_sessao(unidades[inicio:fim + 1], "y" + texto[inicio:fim + 1], agora=True)
@@ -448,3 +448,25 @@ def test_o_modo_como_o_livro_olha_o_resumo_das_paginas_lidas(tmp_path):
         assert ctl._modo_das_pecas("letras", ctl.modelo) == "letras"
     finally:
         projeto.fechar()
+
+
+def test_fechar_aplica_as_sessoes_que_esperavam_na_fila(dois_projetos):
+    """A revisão do D1: a sessão confirmada que esperava a vez na fila entra ao fechar o
+    projeto (a fila vai ser esvaziada), e só uma vez."""
+    from abbychess import sessao as ss
+
+    a, _b = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    ctl.reconhecer()
+    executor.tudo()
+    texto, unidades = ss.texto_e_unidades(ctl.modelo)
+    inicio, fim = ss.palavras_em(unidades, 0, 0)
+    executor.em_voo = False
+    ctl.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim])
+    ctl.aplicar_as_sessoes_na_fila()
+    assert ss.texto_e_unidades(ctl.modelo)[0].startswith("x" + texto[inicio:fim])
+    executor.em_voo = None
+    executor.tudo()                                    # a tarefa da fila não aplica de novo
+    assert ss.texto_e_unidades(ctl.modelo)[0].startswith("x" + texto[inicio:fim])
+    assert not ss.texto_e_unidades(ctl.modelo)[0].startswith("xx")

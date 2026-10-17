@@ -144,14 +144,15 @@ class ControladorDePagina:
         #: Chamado antes de sair da página aberta (outra página, o Ctrl+T): a janela confirma
         #: ali a sessão aberta do Documento (§6.3), que não pode ficar para depois.
         self.antes_de_sair_da_pagina: Optional[Callable[[], None]] = None
-        #: O livro tem figurinas lidas (o modo "livro" das peças, §6.4): procurado uma vez por
-        #: projeto nas páginas lidas; None ainda não procurado.
+        #: O livro tem figurinas lidas (o modo "livro" das peças, §6.4): o "sim" fica guardado
+        #: até outro projeto; sem ele (None), o resumo das páginas é consultado de novo.
         self._livro_tem_figurinas: Optional[bool] = None
         #: (box, virtual, letra): o box marcado ao lado da letra virtual. Se o usuário o
         #: confirma com essa letra (Enter ou Shift+Enter), o virtual sai no mesmo passo.
         self._letra_que_faltava: Optional[Tuple[int, int, str]] = None
-        #: As sessões do Documento confirmadas que esperam a vez na fila (o Ctrl+T espera).
-        self._sessoes_na_fila = 0
+        #: As sessões do Documento confirmadas que esperam a vez na fila, como [corpo, já
+        #: rodou?] (o Ctrl+T espera; fechar o projeto as aplica na hora).
+        self._sessoes_na_fila: List[list] = []
         #: A ordem da fila de glifos (§8.1): "confianca" (o menos confiável primeiro, os
         #: pulados no fim) ou "leitura" (a ordem da página).
         self.ordem_da_fila = "confianca"
@@ -312,6 +313,8 @@ class ControladorDePagina:
         """O projeto aberto, a fonte das páginas e o leitor (os modelos já carregados; ou,
         com o `servidor`, só os padrões do livro). O servidor do projeto anterior fecha."""
         self._livro_tem_figurinas = None
+        self._sessoes_na_fila = []              # a fila do projeto anterior foi esvaziada
+        self._letra_que_faltava = None
         if self.servidor is not None and self.servidor is not servidor:
             self.servidor.fechar()
         self.servidor = servidor
@@ -1191,17 +1194,34 @@ class ControladorDePagina:
         if agora:                               # fechar o projeto: a fila vai ser esvaziada
             corpo()
             return
-        na_fila = not self._agora()
-        self._sessoes_na_fila += na_fila
+        if self._agora():
+            self._editar("Editando o texto", corpo, so_nesta_pagina=False,
+                         nao_rodou=lambda: self.eventos.emitir(
+                             "sessao_recusada", "a página não pode ser editada agora"))
+            return
+        espera = [corpo, False]
+        self._sessoes_na_fila.append(espera)
 
         def rodar(funcao):
             def rodando():
-                self._sessoes_na_fila -= na_fila
+                if espera[1]:                   # já aplicada (fechar o projeto)
+                    return
+                espera[1] = True
+                self._sessoes_na_fila.remove(espera)
                 funcao()
             return rodando
         self._editar("Editando o texto", rodar(corpo), so_nesta_pagina=False,
                      nao_rodou=rodar(lambda: self.eventos.emitir(
                          "sessao_recusada", "a página não pode ser editada agora")))
+
+    def aplicar_as_sessoes_na_fila(self) -> None:
+        """Fechar o projeto (a fila vai ser esvaziada): as sessões do Documento que esperavam
+        a vez entram agora, em vez de se perder."""
+        for espera in list(self._sessoes_na_fila):
+            if not espera[1]:
+                espera[1] = True
+                self._sessoes_na_fila.remove(espera)
+                espera[0]()
 
     def _tirar_a_letra_que_faltava(self, pagina: Pagina, gids, char: str) -> None:
         """O box marcado ao lado da letra virtual foi confirmado com a letra dela: ele é a
@@ -1223,8 +1243,8 @@ class ControladorDePagina:
         if not self._livro_tem_figurinas and pagina is not None:
             if ss.modo_da_pagina("livro", (b.entry.char for b in pagina.boxes)) == "figurinas":
                 self._livro_tem_figurinas = True
-        if self._livro_tem_figurinas is None:
-            self._livro_tem_figurinas = self._figurinas_nas_paginas_lidas()
+        if not self._livro_tem_figurinas:       # o "não" não fica guardado: o lote lê mais
+            self._livro_tem_figurinas = self._figurinas_nas_paginas_lidas() or None
         return "figurinas" if self._livro_tem_figurinas else "letras"
 
     def _figurinas_nas_paginas_lidas(self) -> bool:

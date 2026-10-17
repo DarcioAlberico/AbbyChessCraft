@@ -8,7 +8,7 @@ from __future__ import annotations
 
 class EdicaoNoDocumento:
     def _sessao_do_documento(self, unidades, novo, avancar, ensinar_gid, ultimo, fixos,
-                             fim_de_linha=False) -> None:
+                             fim_de_linha=False, agora=False) -> None:
         """A sessão confirmada: o controlador aplica; quando a edição entra na página (na
         hora, ou na vez dela na fila), o Documento é montado de novo do modelo e o cursor fica
         onde estava ao confirmar (o texto montado é o digitado: sair da sessão para outra
@@ -24,20 +24,14 @@ class EdicaoNoDocumento:
                 self.texto.ir_a_marca(marca)
         self.pagina.confirmar_sessao(unidades, novo, ensinar_gid=ensinar_gid, fixos=fixos,
                                      depois=entrou, fim_de_linha=fim_de_linha,
-                                     agora=self._sessao_ja)
-
-    _sessao_ja = False
+                                     agora=agora)
 
     def confirmar_a_sessao_aberta(self, agora: bool = False) -> None:
         """Antes de sair da página (outra página, o Ctrl+T, fechar o projeto): a sessão aberta
         do Documento confirma agora, na página dela (§6.3), em vez de se perder. `agora`:
         sem a fila (ao fechar o projeto, que a esvazia)."""
         if self.texto.tem_sessao:
-            self._sessao_ja = agora
-            try:
-                self.texto.confirmar(avancar=False)
-            finally:
-                self._sessao_ja = False
+            self.texto.confirmar(avancar=False, agora=agora)
 
     def _sessao_recusada(self, motivo: str) -> None:
         self._aviso_estrutural(f"Edição recusada: {motivo}")

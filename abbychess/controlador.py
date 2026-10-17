@@ -44,6 +44,7 @@ from typing import Callable, Dict, List, Optional, Sequence
 import numpy as np
 from core.box_model import BoxEntry
 
+from abbychess import ancoragem as ag
 from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import historico as hs
@@ -140,6 +141,9 @@ class ControladorDePagina:
         #: Conta as sessões do Documento confirmadas: a chave do passo do desfazer de cada
         #: uma, que o ensinar do Ctrl+Enter emenda.
         self._numero_da_sessao = 0
+        #: Chamado antes de sair da página aberta (outra página, o Ctrl+T): a janela confirma
+        #: ali a sessão aberta do Documento (§6.3), que não pode ficar para depois.
+        self.antes_de_sair_da_pagina: Optional[Callable[[], None]] = None
         #: A ordem da fila de glifos (§8.1): "confianca" (o menos confiável primeiro, os
         #: pulados no fim) ou "leitura" (a ordem da página).
         self.ordem_da_fila = "confianca"
@@ -325,6 +329,8 @@ class ControladorDePagina:
         que andam no histórico de visitas sem mudá-lo."""
         if self.fonte is None or not 0 <= indice < self.fonte.total:
             return False
+        if indice != self.indice and self.antes_de_sair_da_pagina is not None:
+            self.antes_de_sair_da_pagina()
         try:
             imagem, matriz = self.cache.pagina(indice)
         except OSError as erro:
@@ -478,6 +484,8 @@ class ControladorDePagina:
     def verificar(self) -> None:
         """Ctrl+T: a página está verificada (§4.4), e a próxima página não verificada abre.
         Entra no desfazer; uma edição depois a devolve a `em_revisao`."""
+        if self.antes_de_sair_da_pagina is not None:   # a sessão aberta entra antes
+            self.antes_de_sair_da_pagina()
         if self.modelo is None or self.modelo.estado not in LIDAS:
             self._avisar("Reconheça a página antes de marcá-la como verificada (F5).", 6000)
             return
@@ -565,10 +573,11 @@ class ControladorDePagina:
         return so_leves() if so_leves is not None else not getattr(self.executar, "ocupado", False)
 
     def _editar(self, titulo: str, corpo, *, precisa_de_glifos: bool = True,
-                nao_rodou=None) -> None:
+                nao_rodou=None, so_nesta_pagina: bool = True) -> None:
         """Uma edição: na hora, se nada prende o leitor (`_agora`); senão na fila, e `corpo()`
         roda na vez dela, se a página ainda é a mesma (se não é, avisa que a edição foi
-        descartada). `nao_rodou()`, se o corpo não rodou."""
+        descartada; com `so_nesta_pagina=False`, roda assim mesmo: o corpo sabe a página
+        dele). `nao_rodou()`, se o corpo não rodou."""
         if self._agora():
             if self._pode_editar(precisa_de_glifos):
                 corpo()
@@ -578,7 +587,11 @@ class ControladorDePagina:
         indice = self.indice
 
         def preparar():
-            if self.indice != indice:
+            if self.indice != indice and not so_nesta_pagina:
+                if self.pronto:
+                    corpo()
+                    return None
+            elif self.indice != indice:
                 self._avisar(f"{titulo}: descartado, porque a página mudou (era a {indice + 1}) "
                              "antes da vez dele na fila.", 8000)
             elif self._pode_editar(precisa_de_glifos):
@@ -1069,9 +1082,13 @@ class ControladorDePagina:
             self._seguir(dif)
             tirados = len(dif.removidos)
             extra = f", no lugar de {tirados} box(es) de dentro" if tirados else ""
-            self._depois_de_editar(dif.novos[0].gid, "Marcar glifo", antes,
-                                   f"Glifo marcado{extra}. Digite o caractere e Enter.",
-                                   evento="marcar")
+            novo = dif.novos[0].gid
+            letra = ag.absorver_virtual(pagina, novo)
+            if letra:                           # a letra que faltava, digitada no Documento
+                mensagem = f"Glifo marcado{extra}, com a letra '{letra}' que faltava ali."
+            else:
+                mensagem = f"Glifo marcado{extra}. Digite o caractere e Enter."
+            self._depois_de_editar(novo, "Marcar glifo", antes, mensagem, evento="marcar")
         self._editar("Marcando", corpo, precisa_de_glifos=False)
 
     def confirmar_sessao(self, unidades, novo: str, *, ensinar_gid: Optional[int] = None,
@@ -1087,15 +1104,18 @@ class ControladorDePagina:
         unidades = list(unidades)
         original = original if original is not None else "".join(u.texto for u in unidades)
         dados = self.projeto.dados if self.projeto is not None else None
+        indice, pagina = self.indice, self.modelo
         if dados is not None:
-            novo = ss.com_figurinas(novo, original, dados.idioma, dados.notacao)
-        indice = self.indice
+            modo = ss.modo_da_pagina(dados.notacao, (b.entry.char for b in pagina.boxes)
+                                     if pagina is not None else ())
+            novo = ss.com_figurinas(novo, original, dados.idioma, modo)
 
         def corpo():
-            pagina = self.modelo
+            # A página da sessão, mesmo que o usuário já tenha ido a outra (a sessão confirma
+            # ao sair da página, e a edição pode esperar a vez dela na fila).
+            aberta = pagina is self.modelo
             virtuais = {v.gid for v in pagina.decisoes.virtuais}
-            if indice != self.indice or any(u.glifo and u.gid not in pagina.vivos | virtuais
-                                             for u in unidades):
+            if any(u.glifo and u.gid not in pagina.vivos | virtuais for u in unidades):
                 self.eventos.emitir("sessao_recusada", "a página mudou antes da confirmação")
                 return
             try:
@@ -1103,7 +1123,7 @@ class ControladorDePagina:
             except ss.Recusa as recusa:
                 self.eventos.emitir("sessao_recusada", str(recusa))
                 return
-            antes = self._instantaneo()
+            antes = Antes(pagina.instantaneo(), self.padroes())
             vivos_antes = set(pagina.vivos)
             try:
                 ss.aplicar(pagina, plano)
@@ -1115,29 +1135,34 @@ class ControladorDePagina:
                 self.eventos.emitir("sessao_recusada", "a edição falhou e foi desfeita")
                 return
             saiu = vivos_antes - pagina.vivos
-            self.pulados -= saiu
-            self.selecao -= saiu
-            if self.atual in saiu:
-                self.atual = None
+            if aberta:
+                self.pulados -= saiu
+                self.selecao -= saiu
+                if self.atual in saiu:
+                    self.atual = None
             palavra = " ".join(novo.split())
             descricao = (f"Editar '{palavra[:40]}'" if plano.muda
                          else f"Aceitar '{' '.join(original.split())[:40]}'")
             self._numero_da_sessao += 1
             chave = ("sessao", self._numero_da_sessao)   # o Ctrl+Enter emenda nesta
             self._mudou(pagina, indice, descricao, antes, juntar=chave)
-            aviso = plano.estrutural()
-            if plano.virtuais and self._tinta_sem_box(pagina, plano):
-                aviso += " · há tinta sem box aqui: Ctrl+M marca o quadro"
+            tinta = aberta and bool(plano.virtuais) and self._tinta_sem_box(pagina, plano)
+            aviso = plano.estrutural(*(["há tinta sem box aqui: Ctrl+M marca o quadro"]
+                                       if tinta else []))
             if aviso:
                 self.eventos.emitir("estrutural", aviso)
-            if ensinar_gid is not None:
+            if aberta and ensinar_gid is not None:
                 self._ensinar_do_documento(ensinar_gid, chave)
-            if depois is not None:
+            if aberta and depois is not None:
                 depois()
         # A edição que não rodou (a página sem imagem, ou outra na vez dela): o Documento
         # volta ao modelo.
-        self._editar("Editando o texto", corpo, nao_rodou=lambda: self.eventos.emitir(
-            "sessao_recusada", "a página não pode ser editada agora"))
+        if pagina is None:
+            self.eventos.emitir("sessao_recusada", "a página não pode ser editada agora")
+            return
+        self._editar("Editando o texto", corpo, so_nesta_pagina=False,
+                     nao_rodou=lambda: self.eventos.emitir(
+                         "sessao_recusada", "a página não pode ser editada agora"))
 
     def _tinta_sem_box(self, pagina: Pagina, plano) -> bool:
         """Há tinta sem box onde uma letra que faltou entrou (a letra que a segmentação não

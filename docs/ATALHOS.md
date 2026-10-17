@@ -108,12 +108,12 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Confirmar a palavra e ir à próxima duvidosa | Enter | Enter | documento | D1 |
 | Confirmar a palavra sem avançar | Shift+Enter | Shift+Enter | documento | D1 |
 | Confirmar e ensinar o glifo sob o cursor | Ctrl+Enter | Ctrl+Enter | documento | D1 |
-| Figurina ♔ (repetir alterna para ♚) | Ctrl+Shift+K | Ctrl+Shift+K | documento, galeria | D1 |
-| Figurina ♕ (repetir alterna para ♛) | Ctrl+Shift+Q | Ctrl+Shift+Q | documento, galeria | D1 |
-| Figurina ♖ (repetir alterna para ♜) | Ctrl+Shift+R | Ctrl+Shift+R | documento, galeria | D1 |
-| Figurina ♗ (repetir alterna para ♝) | Ctrl+Shift+B | Ctrl+Shift+B | documento, galeria | D1 |
-| Figurina ♘ (repetir alterna para ♞) | Ctrl+Shift+N | Ctrl+Shift+N | documento, galeria | D1 |
-| Figurina ♙ (repetir alterna para ♟) | Ctrl+Shift+P | Ctrl+Shift+P | documento, galeria | D1 |
+| Figurina ♔ (repetir alterna para ♚) | Ctrl+Shift+K | Ctrl+Shift+K | documento, glifo, galeria | D1 |
+| Figurina ♕ (repetir alterna para ♛) | Ctrl+Shift+Q | Ctrl+Shift+Q | documento, glifo, galeria | D1 |
+| Figurina ♖ (repetir alterna para ♜) | Ctrl+Shift+R | Ctrl+Shift+R | documento, glifo, galeria | D1 |
+| Figurina ♗ (repetir alterna para ♝) | Ctrl+Shift+B | Ctrl+Shift+B | documento, glifo, galeria | D1 |
+| Figurina ♘ (repetir alterna para ♞) | Ctrl+Shift+N | Ctrl+Shift+N | documento, glifo, galeria | D1 |
+| Figurina ♙ (repetir alterna para ♟) | Ctrl+Shift+P | Ctrl+Shift+P | documento, glifo, galeria | D1 |
 | Itálico | Ctrl+I | Ctrl+I | documento | G |
 | Mostrar ou ocultar cabeçalhos e rodapés | Ctrl+Shift+H | Ctrl+Shift+H | documento | A3 |
 | Negrito | Ctrl+B | Ctrl+B | documento | G |

@@ -199,7 +199,8 @@ def _documento(j) -> None:
     j.acao_ensinar_no_documento = acao(j, "ensinar_no_documento",
                                        lambda: j.confirmar_no_documento(ensinar=True),
                                        widgets=[d])
-    j.acoes_das_figurinas = [acao(j, id_, lambda _=False, f=f: j.inserir_figurina(f), widgets=[d])
+    j.acoes_das_figurinas = [acao(j, id_, lambda _=False, f=f: j.inserir_figurina(f),
+                                  widgets=[d, j.treino])
                              for id_, f in (("figurina_rei", "♔"), ("figurina_dama", "♕"),
                                             ("figurina_torre", "♖"), ("figurina_bispo", "♗"),
                                             ("figurina_cavalo", "♘"), ("figurina_peao", "♙"))]
@@ -215,6 +216,14 @@ def _menus(j) -> None:
     menu = j.menuBar().addMenu("&Editar")
     menu.addAction(j.acao_desfazer)
     menu.addAction(j.acao_refazer)
+    menu.addSeparator()                         # a sessão do Documento (§6.3)
+    for acao in (j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_ensinar_no_documento):
+        menu.addAction(acao)
+    menu.addSeparator()
+    menu.addAction(j.acao_paleta)
+    figurinas = menu.addMenu("Figurinas")
+    for acao in j.acoes_das_figurinas:
+        figurinas.addAction(acao)
     menu = j.menuBar().addMenu("P&ágina")
     for acao in (j.acao_anterior, j.acao_seguinte, j.acao_primeira, j.acao_ultima,
                  j.acao_ir_para, j.acao_voltar_visita, j.acao_avancar_visita, None,
@@ -284,6 +293,10 @@ def atualizar(janela) -> None:
         q.setEnabled(tem and bool(p.boxes))
     desfazer = p.historico.proximo_a_desfazer
     refazer = p.historico.proximo_a_refazer
+    if j.texto.tem_sessao:                      # na sessão, o Ctrl+Z é dela (§6.3)
+        desfazer = "a palavra"
+    if j.texto.pode_reaplicar:                  # depois do Esc, o Ctrl+Y a reaplica
+        refazer = "a palavra"
     j.acao_desfazer.setEnabled(editar and desfazer is not None)
     j.acao_refazer.setEnabled(editar and refazer is not None)
     j.acao_desfazer.setText(f"Desfazer: {desfazer}" if desfazer else "Desfazer")

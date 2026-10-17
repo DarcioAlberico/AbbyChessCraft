@@ -313,12 +313,12 @@ acoes:
   - {id: negrito, descricao: Negrito, escopo: [documento], padrao: Ctrl+B, desde_passo: G}
   - {id: italico, descricao: Itálico, escopo: [documento], padrao: Ctrl+I, desde_passo: G}
   - {id: sublinhado, descricao: Sublinhado, escopo: [documento], padrao: Ctrl+U, desde_passo: G}
-  - {id: figurina_rei, descricao: Figurina ♔ (repetir alterna para ♚), escopo: [documento, galeria], padrao: Ctrl+Shift+K, desde_passo: D1}
-  - {id: figurina_dama, descricao: Figurina ♕ (repetir alterna para ♛), escopo: [documento, galeria], padrao: Ctrl+Shift+Q, desde_passo: D1}
-  - {id: figurina_torre, descricao: Figurina ♖ (repetir alterna para ♜), escopo: [documento, galeria], padrao: Ctrl+Shift+R, desde_passo: D1}
-  - {id: figurina_bispo, descricao: Figurina ♗ (repetir alterna para ♝), escopo: [documento, galeria], padrao: Ctrl+Shift+B, desde_passo: D1}
-  - {id: figurina_cavalo, descricao: Figurina ♘ (repetir alterna para ♞), escopo: [documento, galeria], padrao: Ctrl+Shift+N, desde_passo: D1}
-  - {id: figurina_peao, descricao: Figurina ♙ (repetir alterna para ♟), escopo: [documento, galeria], padrao: Ctrl+Shift+P, desde_passo: D1}
+  - {id: figurina_rei, descricao: Figurina ♔ (repetir alterna para ♚), escopo: [documento, glifo, galeria], padrao: Ctrl+Shift+K, desde_passo: D1}
+  - {id: figurina_dama, descricao: Figurina ♕ (repetir alterna para ♛), escopo: [documento, glifo, galeria], padrao: Ctrl+Shift+Q, desde_passo: D1}
+  - {id: figurina_torre, descricao: Figurina ♖ (repetir alterna para ♜), escopo: [documento, glifo, galeria], padrao: Ctrl+Shift+R, desde_passo: D1}
+  - {id: figurina_bispo, descricao: Figurina ♗ (repetir alterna para ♝), escopo: [documento, glifo, galeria], padrao: Ctrl+Shift+B, desde_passo: D1}
+  - {id: figurina_cavalo, descricao: Figurina ♘ (repetir alterna para ♞), escopo: [documento, glifo, galeria], padrao: Ctrl+Shift+N, desde_passo: D1}
+  - {id: figurina_peao, descricao: Figurina ♙ (repetir alterna para ♟), escopo: [documento, glifo, galeria], padrao: Ctrl+Shift+P, desde_passo: D1}
 
   # --- Modo Áreas ----------------------------------------------------------------------
   - {id: funcao_texto, descricao: "Função da zona: texto", escopo: [imagem_areas], padrao: T, desde_passo: F}

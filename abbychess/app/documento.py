@@ -59,6 +59,8 @@ CORPO_MINIMO, CORPO_MAXIMO = 7, 28
 MARGENS = {"cabecalho", "rodape", "numero_de_pagina"}
 FUNDO_DE_BAIXA_CONFIANCA = QColor(255, 226, 184)
 FUNDO_DO_ATUAL = QColor(190, 220, 255)
+#: O fundo das palavras da sessão aberta: o texto ainda não confirmado (§6.3).
+FUNDO_DA_SESSAO = QColor(255, 246, 200)
 #: A figurina de cada peça no desenho do diagrama.
 FIGURINAS = {"K": "♔", "Q": "♕", "R": "♖", "B": "♗", "N": "♘", "P": "♙",
              "k": "♚", "q": "♛", "r": "♜", "b": "♝", "n": "♞", "p": "♟"}
@@ -125,6 +127,11 @@ class VistaDoDocumento(QTextEdit):
     #: duvidosa, o gid a ensinar (Ctrl+Enter, ou None), o último glifo da sessão e os pares
     #: (no original, no novo) que nenhuma edição tocou.
     sessao_confirmada = Signal(list, str, bool, object, object, list)
+    #: A sessão abriu ou fechou, ou o Ctrl+Y (a palavra do Esc) passou a valer ou deixou de
+    #: valer: as ações Desfazer e Refazer mudam (§6.3: elas valem na sessão).
+    sessao_mudou = Signal()
+    #: O Enter não achou palavra duvidosa depois do cursor nesta página.
+    sem_duvidosas = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -148,6 +155,7 @@ class VistaDoDocumento(QTextEdit):
         self._entrada = None                     # o que a última montagem recebeu
         self._formatos: Dict[tuple, QTextCharFormat] = {}   # os do realce, por montagem
         self._gid_atual: Optional[int] = None
+        self._destaque_do_atual: list = []
         self.corpo_padrao = CORPO_PADRAO
         #: As teclas que a vista entrega às ações (Enter, Shift+Enter, Ctrl+Z, Ctrl+Y): a
         #: exceção "redireciona" do YAML.
@@ -168,6 +176,10 @@ class VistaDoDocumento(QTextEdit):
         self._restaurada: Optional[tuple] = None
         self._duvidosos: Set[int] = set()
         self._ultima_figurina: Optional[tuple] = None
+        self._estado_da_sessao = (False, False)
+        #: Onde o cursor estava ao confirmar (no texto de agora, que é o que a página terá
+        #: depois de confirmar): ele volta ali depois de montar de novo.
+        self.posicao_ao_confirmar = 0
         self.cursorPositionChanged.connect(self._cursor_mudou)
 
     # ------------------------------------------------------------------
@@ -222,6 +234,7 @@ class VistaDoDocumento(QTextEdit):
         novo.contentsChange.connect(self._texto_mudou)
         if apagar:
             antigo.deleteLater()                # com as imagens dos diagramas e os formatos
+        self._avisar_da_sessao()
 
     def _guardar_as_unidades(self, virtuais) -> None:
         """A unidade de cada caractere do documento montado (a sessão compara com ele)."""
@@ -574,6 +587,7 @@ class VistaDoDocumento(QTextEdit):
             _u, _t, _f, a, b = self._restaurada
             if not a <= self.textCursor().position() <= b:
                 self._restaurada = None
+                self._avisar_da_sessao()
         gid = self.gid_no_cursor()
         if gid is not None:
             self.cursor_na_palavra.emit(self.palavra_de(gid))
@@ -609,8 +623,9 @@ class VistaDoDocumento(QTextEdit):
         o foco no Documento (o cursor de texto só aparece com ele)."""
         self._gid_atual = gid
         posicao = None if gid is None else self.posicao_do_gid(gid)
+        self._destaque_do_atual = []
         if posicao is None:
-            self.setExtraSelections([])
+            self._pintar_os_destaques()
             return
         fim = posicao + 1
         while fim < posicao + 8 and self._gid_no_caractere(fim) == gid:
@@ -623,7 +638,23 @@ class VistaDoDocumento(QTextEdit):
         cursor.setPosition(posicao)
         cursor.setPosition(fim, QTextCursor.MoveMode.KeepAnchor)
         destaque.cursor = cursor
-        self.setExtraSelections([destaque])
+        self._destaque_do_atual = [destaque]
+        self._pintar_os_destaques()
+
+    def _pintar_os_destaques(self) -> None:
+        """O glifo atual e, com uma sessão aberta, as palavras dela em amarelo-claro."""
+        destaques = list(self._destaque_do_atual)
+        if self._sessao is not None:
+            a, b = self._sessao
+            sessao = QTextEdit.ExtraSelection()
+            sessao.format.setBackground(FUNDO_DA_SESSAO)
+            cursor = QTextCursor(self.document())
+            cursor.setPosition(a)
+            cursor.setPosition(min(b + len(self.toPlainText()) - len(self._texto0),
+                                   len(self.toPlainText())), QTextCursor.MoveMode.KeepAnchor)
+            sessao.cursor = cursor
+            destaques.insert(0, sessao)
+        self.setExtraSelections(destaques)
 
     def _gid_no_caractere(self, posicao: int) -> Optional[int]:
         bloco = self.document().findBlock(posicao)
@@ -665,6 +696,7 @@ class VistaDoDocumento(QTextEdit):
         if atual == antes:
             self._sessao = None
             self._origem = list(range(len(antes)))
+            self._avisar_da_sessao()
             return
         inicio = 0
         limite = min(len(atual), len(antes))
@@ -678,9 +710,18 @@ class VistaDoDocumento(QTextEdit):
             self._numero_da_sessao += 1
         self._sessao = (a, b)
         self._restaurada = None
+        self._avisar_da_sessao()
         if any(u.tipo == ss.OUTRO for u in self._unidades[a:b]):
             # Um diagrama tocado: confirma já (o texto apagado sai, o diagrama volta).
             self._confirmar_depois()
+
+    def _avisar_da_sessao(self) -> None:
+        if self._sessao is not None or self._estado_da_sessao[0]:
+            self._pintar_os_destaques()
+        estado = (self.tem_sessao, self.pode_reaplicar)
+        if estado != self._estado_da_sessao:
+            self._estado_da_sessao = estado
+            self.sessao_mudou.emit()
 
     def _confirmar_depois(self) -> None:
         """Confirma a sessão aberta agora no próximo giro do laço de eventos, se ela ainda
@@ -732,6 +773,8 @@ class VistaDoDocumento(QTextEdit):
         alvo = ss.gid_no_cursor(unidades, novo, posicao - a, fixos) if ensinar else None
         ultimo = next((u.gid for u in reversed(unidades) if u.glifo), None)
         self._sessao, self._restaurada = None, None
+        self.posicao_ao_confirmar = posicao
+        self._avisar_da_sessao()
         self.sessao_confirmada.emit(list(unidades), novo, avancar, alvo, ultimo, fixos)
 
     def restaurar(self) -> None:
@@ -745,17 +788,21 @@ class VistaDoDocumento(QTextEdit):
         if entrada is not None:
             self.montar(*entrada)
         self._restaurada = restaurada
+        self._avisar_da_sessao()
 
     def esquecer_a_restaurada(self) -> None:
         """O Ctrl+Z e o Ctrl+Y do projeto: o Ctrl+Y não reaplica mais a palavra do Esc."""
         self._restaurada = None
+        self._avisar_da_sessao()
 
     def reaplicar(self) -> None:
         """Ctrl+Y depois do Esc: a sessão restaurada, confirmada como estava."""
         if not self.pode_reaplicar:
             return
-        unidades, novo, fixos, _a, _b = self._restaurada
+        unidades, novo, fixos, a, _b = self._restaurada
         self._restaurada = None
+        self.posicao_ao_confirmar = a + len(novo)   # o fim da palavra reaplicada
+        self._avisar_da_sessao()
         ultimo = next((u.gid for u in reversed(unidades) if u.glifo), None)
         self.sessao_confirmada.emit(unidades, novo, False, None, ultimo, fixos)
 
@@ -774,7 +821,19 @@ class VistaDoDocumento(QTextEdit):
                 self.setTextCursor(cursor)
                 self.ensureCursorVisible()
                 return True
+        self.sem_duvidosas.emit()
         return False
+
+    def ir_a_posicao(self, posicao: int) -> None:
+        """O cursor na posição (sem avisar: foi o programa), dentro do documento."""
+        anterior, self._movendo = self._movendo, True
+        try:
+            cursor = self.textCursor()
+            cursor.setPosition(max(0, min(posicao, len(self.toPlainText()))))
+            self.setTextCursor(cursor)
+            self.ensureCursorVisible()
+        finally:
+            self._movendo = anterior
 
     def ir_ao_fim_do_gid(self, gid: Optional[int]) -> None:
         posicao = None if gid is None else self.posicao_do_gid(gid)

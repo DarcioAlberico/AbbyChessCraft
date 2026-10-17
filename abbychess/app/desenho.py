@@ -114,7 +114,9 @@ class DesenhoDaJanela:
             if p.modelo is not None else {}
         aviso = ("Nada reconhecido nesta página." if p.reconhecida
                  else "Página não reconhecida: F5 reconhece.")
-        self.texto.montar(p.documento(), p.diagramas, estados, v.gids_desconhecidos(),
+        # A palavra fora do léxico que o usuário aceitou (Enter: revisada) não é mais duvidosa.
+        revisados = {b.gid for b in p.modelo.boxes if b.revisado} if p.modelo is not None else set()
+        self.texto.montar(p.documento(), p.diagramas, estados, v.gids_desconhecidos() - revisados,
                           p.gids_virtuais(), p.matriz, p.gids_de_margem(), aviso)
         self._mostrar_a_linha()
 

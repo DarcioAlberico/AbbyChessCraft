@@ -344,3 +344,32 @@ def test_a_sessao_que_nao_pode_rodar_e_recusada(dois_projetos):
     ctl.imagem = None
     ctl.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim])
     assert recusas and ss.texto_e_unidades(ctl.modelo)[0] == texto
+
+
+@pytest.mark.parametrize("na_fila", [False, True])
+def test_sair_da_pagina_confirma_a_sessao_na_pagina_dela(tmp_path, na_fila):
+    """A revisão de produto do D1 (M3): trocar de página com a sessão aberta a confirma
+    antes, na página dela, também quando a edição espera a vez na fila."""
+    from abbychess import sessao as ss
+    from tests.test_livro import pdf_sintetico
+
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
+    try:
+        executor = ExecutorManual()
+        ctl = _controlador(projeto, executor)
+        ctl.reconhecer()
+        executor.tudo()
+        pagina = ctl.modelo
+        texto, unidades = ss.texto_e_unidades(pagina)
+        inicio, fim = ss.palavras_em(unidades, 0, 0)
+        novo = "x" + texto[inicio:fim]
+        ctl.antes_de_sair_da_pagina = lambda: ctl.confirmar_sessao(unidades[inicio:fim], novo)
+        if na_fila:
+            executor.em_voo = False                    # uma leitura em voo prende a fila
+        assert ctl.ir_para(1) and ctl.indice == 1
+        executor.em_voo = None
+        executor.tudo()
+        assert ss.texto_e_unidades(pagina)[0].startswith(novo)
+        assert pagina.pid in {p for t in ctl.historico._desfazer for p in t.paginas}
+    finally:
+        projeto.fechar()

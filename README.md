@@ -234,7 +234,8 @@ O Documento se edita como um editor de texto, e cada edição vira o que ela é 
   Colar (só o texto; o tab vira espaço), arrastar e o IME dão o mesmo resultado que digitar.
   Numa palavra com letras repetidas, sai o glifo da letra que você apagou ("cassa": o
   Backspace no segundo "s" tira o segundo). As edições que mudam a estrutura (glifo tirado,
-  glifo virtual) avisam na Linha ("1 glifo(s) tirado(s) · Ctrl+Z desfaz").
+  glifo virtual) avisam na Linha e na barra de status ("casxa → casa: 1 glifo tirado · Ctrl+Z
+  desfaz").
 - **Ainda não** (passo G): trocar duas letras por uma ("rn" → "m", que é juntar os glifos) ou
   uma por duas ("m" → "rn", dividir, e também uma letra no meio de uma ligadura como "fi").
   A sessão é recusada, a palavra volta ao que era, e a Linha diz "este tipo de edição chega
@@ -242,7 +243,8 @@ O Documento se edita como um editor de texto, e cada edição vira o que ela é 
 - **As figurinas** (§6.4): num lance que você digitou, a letra da peça vira figurina ao
   confirmar, quando o livro é de figurinas ("Cf3" → "♘f3" em português; "Nf3" → "♘f3" em
   inglês; "(Cf3)," → "(♘f3),"). O lance que ficou igual e no mesmo lugar não muda. **Opções ›
-  Peças nos lances** escolhe figurinas ou letras para o livro.
+  Peças nos lances** escolhe figurinas, letras ou, o padrão, **como o livro**: figurinas se a
+  página tem figurinas lidas, letras se não tem.
   **Ctrl+Shift+K/Q/R/B/N/P** inserem ♔♕♖♗♘♙ no cursor (o mesmo atalho de novo alterna para a
   preta, ♚♛♜♝♞♟), e **F2** abre a paleta de símbolos no cursor.
 - **O diagrama não se apaga**: uma seleção que o cruza apaga o texto e o diagrama fica.
@@ -521,9 +523,10 @@ programa sabe quem veio de quem. O que muda para você:
 - **O estado de cada página** é gravado desde já, mas a janela ainda não o mostra (a
   galeria de páginas é do passo C).
 - **O texto da página** (o Documento, a busca e as exportações de hoje) sai de um
-  documento montado das páginas (`abbychess.texto.montar`), com as decisões que você tomar
-  a partir do passo D1 (espaço a mais ou a menos, o caractere que falta, parágrafo). Hoje
-  ele sai igual ao de antes, conferido pelos testes de caracterização.
+  documento montado das páginas (`abbychess.texto.montar`), com as decisões que você toma
+  editando no Documento desde o passo D1 (espaço a mais ou a menos, o caractere que falta;
+  o parágrafo é do passo G). Sem edições, ele sai igual ao de antes, conferido pelos testes
+  de caracterização.
 
 ### A página torta
 
@@ -1016,7 +1019,8 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   fim do engasgo). Gravar a página custa 18–22 ms no p95; o resto vem do que a mesma volta
   faz na janela (o `lote.json` e preparar a página seguinte: carregar o modelo dela e o que o
   §4.6 mantém). Na prática, a cada página do lote (~8 s) um comando pode passar de 100 ms;
-  tirar isso da thread da janela fica para o D1, que edita durante o lote. Com o leitor falso, 51 páginas
+  tirar isso da thread da janela ficou para o D1, que edita durante o lote (e o fez: ver o
+  item do D1). Com o leitor falso, 51 páginas
   sintéticas, uma a cada ~200 ms: p99 de 7,6–14 ms. **A releitura de um glifo com o lote
   rodando** (CA-11.7, do Alt+seta ao glifo lido pelo servidor) ficou em 40–46 ms na mediana
   e 64–124 no p95 (124 no portão; alvo de 150), com máximos de até 364 ms. Na primeira
@@ -1061,7 +1065,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   A3, antes das correções da revisão de produto, estão em
   `docs/medidas/2026-10-16-primeira-rodada-a3*.json` e `…-segunda-rodada-a3*.json`.
   **Refluir as linhas em parágrafos** fica para o passo F, com os parágrafos do layout;
-  **editar** no Documento, para o D1. O **CA-F.1** (os gestos para levar a fatia ao
+  **editar** no Documento veio no D1. O **CA-F.1** (os gestos para levar a fatia ao
   gabarito) segue pendente: o replay conta contra as linhas de texto verificadas do gabarito,
   e nenhuma está verificada ainda (`ferramentas\rotular.py`, ver "O que falta você fazer").
   Pela versão 0.8 do roadmap, o alvo de ≤ 85% depois do A3 saiu (o A3 é só leitura e não

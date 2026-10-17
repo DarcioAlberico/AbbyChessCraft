@@ -24,11 +24,12 @@ ROTULOS = {
 
 
 #: Como o livro escreve as peças nos lances (§6.4): o valor e o rótulo.
-NOTACOES = (("figurinas", "Figurinas (♘f3)"), ("letras", "Letras (Cf3)"))
+NOTACOES = (("livro", "Como o livro (figurinas se a página tem)"), ("figurinas", "Figurinas (♘f3)"),
+            ("letras", "Letras (Cf3)"))
 
 
 class DialogoDeOpcoes(QDialog):
-    def __init__(self, limiares: Limiares, parent=None, notacao: str = "figurinas"):
+    def __init__(self, limiares: Limiares, parent=None, notacao: str = "livro"):
         super().__init__(parent)
         self.setWindowTitle("Opções do livro")
         formulario = QFormLayout(self)

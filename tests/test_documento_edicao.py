@@ -17,6 +17,7 @@ from PySide6.QtWidgets import QApplication
 
 from abbychess import diagramas as dg
 from abbychess.leitor import FONTE_MANUAL
+from abbychess.app.documento import FUNDO_DA_SESSAO
 from abbychess.modelo import Box
 
 from tests.test_documento import app  # noqa: F401 (fixture)
@@ -208,7 +209,8 @@ def test_o_aviso_estrutural_vai_para_a_linha(j):
     _por_o_cursor(j, 3, 4)
     _tecla(j, Qt.Key.Key_Delete)
     _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
-    assert "1 glifo(s) tirado(s) · Ctrl+Z desfaz" == j.linha.aviso
+    assert j.linha.aviso == "casxa → casa: 1 glifo tirado · Ctrl+Z desfaz"
+    assert j.statusBar().currentMessage() == j.linha.aviso
 
 
 def test_sair_da_sessao_confirma(j):
@@ -435,3 +437,87 @@ def test_desfazer_a_edicao_tira_o_revisado(j):
     assert all(b.revisado for b in pagina.boxes)
     j.desfazer()
     assert not any(b.revisado for b in pagina.boxes)
+
+
+# ----------------------------------------------------------------------
+# A revisão de produto do D1
+# ----------------------------------------------------------------------
+
+def test_ctrl_z_e_ctrl_y_da_sessao_pelo_teclado_com_o_historico_vazio(j):
+    pagina = _escrever(j, "casa velha")
+    _por_o_cursor(j, 4)
+    QTest.keyClicks(j.texto, "s")
+    assert j.acao_desfazer.isEnabled() and j.acao_desfazer.text() == "Desfazer: a palavra"
+    _tecla(j, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+    assert _texto(j) == "casa velha" and not j.texto.tem_sessao
+    assert j.acao_refazer.isEnabled()
+    _tecla(j, Qt.Key.Key_Y, Qt.KeyboardModifier.ControlModifier)
+    assert _texto(j) == "casas velha" and len(pagina.decisoes.virtuais) == 1
+
+
+def test_sair_da_sessao_deixa_o_cursor_onde_ele_foi(j):
+    _escrever(j, "um dois quatro")
+    _por_o_cursor(j, 2)
+    QTest.keyClicks(j.texto, "x")                         # "umx dois quatro"
+    _por_o_cursor(j, 11)                                  # em "quatro", depois do "qu"
+    QApplication.processEvents()
+    QApplication.processEvents()
+    assert not j.texto.tem_sessao and j.texto.textCursor().position() == 11
+    QTest.keyClicks(j.texto, "y")
+    assert _texto(j) == "umx dois quyatro"
+
+
+def test_shift_enter_deixa_o_cursor_depois_da_letra_digitada(j):
+    _escrever(j, "csa")
+    _por_o_cursor(j, 1)
+    QTest.keyClicks(j.texto, "a")
+    _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    assert _texto(j) == "casa" and j.texto.textCursor().position() == 2
+
+
+def test_enter_na_ultima_duvidosa_avisa(j):
+    pagina = _escrever(j, "casa velha")
+    for b in pagina.boxes:
+        b.entry.confidence = 0.1
+    j.pintar_texto()
+    _por_o_cursor(j, 7)                                   # em "velha", a última
+    _tecla(j, Qt.Key.Key_Return)
+    assert "Nenhuma palavra duvidosa depois desta" in j.linha.aviso
+
+
+def test_a_palavra_fora_do_lexico_aceita_deixa_de_ser_duvidosa(j, monkeypatch):
+    pagina = _escrever(j, "casa xpto")
+    xpto = {b.gid for b in pagina.boxes[4:]}
+    monkeypatch.setattr(j.verificador, "gids_desconhecidos", lambda: set(xpto))
+    j.pintar_texto()
+    assert xpto <= j.texto._duvidosos
+    _por_o_cursor(j, 6)
+    _tecla(j, Qt.Key.Key_Return)                          # aceita "xpto"
+    j.pintar_texto()
+    assert not xpto & j.texto._duvidosos
+
+
+def test_a_sessao_aberta_aparece_e_o_menu_editar_tem_a_edicao(j):
+    _escrever(j, "casa velha")
+    _por_o_cursor(j, 4)
+    QTest.keyClicks(j.texto, "s")
+    assert any(s.format.background().color() == FUNDO_DA_SESSAO for s in j.texto.extraSelections())
+    _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    assert not any(s.format.background().color() == FUNDO_DA_SESSAO
+                   for s in j.texto.extraSelections())
+    for acao in (j.acao_confirmar, j.acao_paleta):        # no menu Editar
+        assert any(getattr(o, "title", lambda: "")() == "&Editar" for o in acao.associatedObjects())
+
+
+def test_ctrl_shift_n_no_campo_do_glifo(j):
+    pagina = _escrever(j, "casa")
+    j.pagina.escolher(pagina.boxes[0].gid)
+    QApplication.processEvents()
+    j.treino.campo.setFocus()
+    QApplication.processEvents()
+    assert j.treino.campo.isEnabled() and j.treino.campo.hasFocus()
+    j.treino.campo.clear()
+    j.inserir_figurina("♘")
+    assert j.treino.campo.text() == "♘"
+    j.inserir_figurina("♘")
+    assert j.treino.campo.text() == "♞"

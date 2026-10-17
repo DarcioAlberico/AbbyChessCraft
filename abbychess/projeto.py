@@ -150,9 +150,10 @@ class Projeto:
     #: O idioma da prosa, que escolhe o léxico da verificação de texto e as letras das
     #: peças nos lances (pt: R D T B C; en: K Q R B N).
     idioma: str = "pt"
-    #: Como o livro escreve as peças nos lances: "figurinas" (♘f3) ou "letras" (Cf3). No
-    #: modo figurinas, a letra digitada num lance vira figurina ao confirmar (§6.4).
-    notacao: str = "figurinas"
+    #: Como o livro escreve as peças nos lances: "figurinas" (♘f3), "letras" (Cf3) ou
+    #: "livro" (como a página: figurinas se ela tem figurinas lidas). No modo figurinas, a
+    #: letra digitada num lance vira figurina ao confirmar (§6.4).
+    notacao: str = "livro"
     versao: int = VERSAO
     #: O SHA-256 dos primeiros 4 MB da fonte e o tamanho dela, que a reconhecem se ela for
     #: movida (o tamanho separa dois arquivos de começo igual e evita ler os outros).

@@ -15,6 +15,7 @@ respostas.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from pathlib import Path
 from typing import List, Optional, Sequence
@@ -23,7 +24,7 @@ from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import exportar as ex
 from abbychess import livro
-from abbychess import pagina as pg
+from abbychess import servidor_de_leitura as sl
 from abbychess import verificacao as vf
 from abbychess import zonas as zn
 from abbychess.controlador import ControladorDePagina
@@ -87,10 +88,12 @@ class ControladorDeLayout:
             if p.indice != indice or p.imagem is None:
                 return None
             imagem, leitor = p.imagem, p.leitor
+            servidor = p._servidor_para_pedir()
 
             def trabalho(_progresso):
-                bruta = pg.segmentar_pagina(imagem, leitor)
-                return zn.automaticas(bruta.boxes, bruta.tabuleiros, largura, altura)
+                if servidor is not None:              # o árbitro dos colados é o global
+                    return servidor.chamar("automaticas", imagem)
+                return sl.automaticas(imagem, leitor)
 
             def pronto(zonas):
                 if p.indice == indice:
@@ -397,8 +400,12 @@ class ControladorDeDiagramas:
             imagem, leitor, boxes = p.imagem, p.leitor, pagina.entries()
             caixas = [atuais[i].caixa for i in por_ler]
 
+            servidor = p._servidor_para_pedir()
+
             def trabalho(_progresso):
-                return dg.ler_diagramas(imagem, caixas, classificar=leitor.arbitro, boxes=boxes)
+                if servidor is not None:
+                    return servidor.chamar("ler_diagramas", (imagem, caixas, boxes))
+                return sl.ler_diagramas(imagem, caixas, boxes, leitor)
 
             def pronto(lidos):
                 # Na página que pediu, mesmo que o usuário tenha ido a outra.
@@ -461,40 +468,81 @@ class ControladorDoLivro:
         self.eventos = pagina.eventos
         #: O pedido de cancelar o lote em andamento, ou None sem lote.
         self._cancelar: Optional[threading.Event] = None
+        #: O servidor cujo `modelos_prontos` já foi emitido (uma vez por servidor).
+        self._modelos_avisados = None
 
     @property
     def lote_rodando(self) -> bool:
         return self._cancelar is not None
 
     def abrir(self, projeto, fonte) -> None:
-        """Liga o projeto (a fonte já aberta) e carrega os modelos fora da interface; ao fim,
-        `projeto_aberto(leitor)` e a última página lida aparece."""
+        """Liga o projeto (a fonte já aberta) e prepara a leitura fora da interface; ao fim,
+        `projeto_aberto(leitor)` e a última página lida aparece.
+
+        Com o servidor de leitura (§11, o padrão; `ABBY_SERVIDOR=0` o desliga), a interface
+        fica só com os padrões do livro e o filho carrega os modelos: a navegação já vale, e
+        `modelos_prontos(estado)` vem quando ele termina. Sem servidor, os modelos carregam
+        aqui (numa thread) e `modelos_prontos` vem logo depois de `projeto_aberto`."""
         p = self.pagina
         self._cancelar = None
         p.ligar(projeto, fonte, None)
+        com_servidor = os.environ.get("ABBY_SERVIDOR", "1") != "0"
 
         def preparar():
             def trabalho(_progresso):
-                leitor = LeitorDoLivro.com_modelos_globais(projeto.pasta_de_padroes,
-                                                           limiares=projeto.dados.limiares)
+                pasta, limiares = projeto.pasta_de_padroes, projeto.dados.limiares
+                if com_servidor:
+                    leitor = LeitorDoLivro(pasta, limiares=limiares, aguardar=True)
+                    servidor = sl.ServidorDeLeitura(
+                        pasta, limiares,
+                        ao_avisar=lambda titulo, texto: self._do_servidor(
+                            servidor, "servidor_caiu", texto),
+                        ao_ficar_pronto=lambda estado: self._do_servidor(
+                            servidor, "modelos_prontos", estado))
+                    return leitor, servidor
+                leitor = LeitorDoLivro.com_modelos_globais(pasta, limiares=limiares)
                 log.info("congelados para a coleta de lixo: %d objetos",
                          congelar_para_a_coleta_de_lixo())
-                return leitor
+                return leitor, None
 
-            def pronto(leitor):
+            def pronto(resultado):
+                leitor, servidor = resultado
                 if p.projeto is not projeto:
+                    if servidor is not None:
+                        servidor.fechar()
                     return                          # outro projeto foi aberto antes
-                self.usar(projeto, fonte, leitor)
+                self.usar(projeto, fonte, leitor, servidor)
                 self.eventos.emitir("projeto_aberto", leitor)
+                if servidor is None:
+                    self.eventos.emitir("modelos_prontos", sl.estado_do_leitor(leitor))
+                elif servidor.estado is not None:   # ficou pronto antes de chegar aqui
+                    self._servidor_disse(servidor, "modelos_prontos", servidor.estado)
             return trabalho, pronto
 
         p.tarefa("Carregando os modelos", preparar, falhou=p._falhou("Carregar os modelos"))
 
-    def usar(self, projeto, fonte, leitor) -> None:
+    def _do_servidor(self, servidor, evento: str, valor) -> None:
+        """Da thread ouvinte do servidor: o evento vai à thread da interface."""
+        self.pagina.executar.na_interface(lambda: self._servidor_disse(servidor, evento, valor))
+
+    def _servidor_disse(self, servidor, evento: str, valor) -> None:
+        if self.pagina.servidor is not servidor:
+            return                              # de um servidor que já não é o do projeto
+        if evento == "modelos_prontos":
+            if self._modelos_avisados is servidor:
+                return
+            self._modelos_avisados = servidor
+            self.eventos.emitir("modelos_prontos", valor)
+        else:
+            # O primeiro tombo só vai para os Avisos; no segundo o servidor desistiu, e a
+            # janela oferece reabrir o projeto (§11).
+            self.eventos.emitir(evento, valor, servidor.desistiu)
+
+    def usar(self, projeto, fonte, leitor, servidor=None) -> None:
         """O projeto com o leitor pronto: abre a última página lida (ou a primeira)."""
         p = self.pagina
         self._cancelar = None
-        p.ligar(projeto, fonte, leitor)
+        p.ligar(projeto, fonte, leitor, servidor)
         lidas = projeto.paginas_lidas()
         p.ir_para(lidas[-1] if lidas else 0)
 

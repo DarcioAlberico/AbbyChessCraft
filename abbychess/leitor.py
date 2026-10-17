@@ -32,6 +32,9 @@ FONTE_LIVRO = "livro"
 FONTE_LIVRO_FRACO = "livro?"
 FONTE_MANUAL = "manual"
 FONTE_NENHUMA = "none"
+#: Ainda não lido: o leitor da interface só tem os padrões do livro, e o resto espera o
+#: servidor de leitura (SPEC §11; o estado de desenho `grade.AGUARDANDO`).
+FONTE_AGUARDANDO = ""
 
 #: Fontes que o usuário decidiu ou confirmou, e que a revisão não volta a mostrar.
 FONTES_CONFIRMADAS = {FONTE_LIVRO, FONTE_MANUAL}
@@ -78,7 +81,8 @@ class LeitorDoLivro:
     """
 
     def __init__(self, pasta_de_padroes: str | Path, *, limiares: Optional[Limiares] = None,
-                 ocr=None, rede=None, base=None, easyocr: bool = False):
+                 ocr=None, rede=None, base=None, easyocr: bool = False,
+                 aguardar: bool = False):
         self.pasta_de_padroes = Path(pasta_de_padroes)
         self.limiares = limiares or Limiares()
         # O limiar do livro é uma confiança na escala 1 - d/2000; o padrão o
@@ -90,6 +94,9 @@ class LeitorDoLivro:
         self.rede = rede
         self.base = base
         self._leitor_easyocr = None if easyocr else _SemEasyOCR()
+        #: O leitor da interface com servidor (§11): o que os padrões do livro não leem fica
+        #: "aguardando leitura" (`FONTE_AGUARDANDO`), e não "ninguém leu".
+        self.aguardar = aguardar
 
     @classmethod
     def com_modelos_globais(cls, pasta_de_padroes: str | Path, *,
@@ -150,7 +157,7 @@ class LeitorDoLivro:
 
     def _ler_global(self, recorte, altura_de_referencia) -> Leitura:
         if self.ocr is None:
-            return Leitura("", FONTE_NENHUMA, 0.0)
+            return Leitura("", FONTE_AGUARDANDO if self.aguardar else FONTE_NENHUMA, 0.0)
         leitura = self.ocr.fallback_chain_detalhado(
             recorte, predictor=self.rede, learner=self.base, reader=self._leitor_easyocr,
             neural_threshold=self.limiares.rede, learner_threshold=self.limiares.base,

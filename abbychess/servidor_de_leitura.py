@@ -97,7 +97,7 @@ def ler_pagina(imagem, zonas, marcados, leitor, *, progresso=None,
 
 
 def reler_boxes(imagem, boxes, leitor, *, so_pendentes: bool, progresso=None):
-    """Lê de novo os boxes (cópias) e devolve `(resumo, amostras)`."""
+    """Lê de novo os boxes (cópias) e devolve `(boxes, amostras, resumo)`."""
     from abbychess import pagina as pg
     from abbychess import procedencia
 
@@ -114,6 +114,24 @@ def ler_diagramas(imagem, caixas, boxes, leitor) -> list:
     from abbychess import diagramas as dg
 
     return dg.ler_diagramas(imagem, caixas, classificar=leitor.arbitro, boxes=boxes)
+
+
+def automaticas(imagem, leitor) -> list:
+    """As áreas que a segmentação sugere numa página ainda sem boxes (o árbitro dos glifos
+    colados é o leitor global)."""
+    from abbychess import pagina as pg
+    from abbychess import zonas as zn
+
+    largura, altura = imagem.size
+    bruta = pg.segmentar_pagina(imagem, leitor)
+    return zn.automaticas(bruta.boxes, bruta.tabuleiros, largura, altura)
+
+
+def estado_do_leitor(leitor) -> dict:
+    """O que a abertura diz dos modelos (a rede carregou? quantas referências globais?)."""
+    base = getattr(leitor, "base", None)
+    return {"rede": getattr(leitor, "rede", None) is not None,
+            "base": getattr(base, "total", 0) if base is not None else 0}
 
 
 def leitor_global(pasta_de_padroes, limiares):
@@ -163,7 +181,7 @@ class _Laco:
         _baixar_a_prioridade()
         ler_original = self.leitor.ler
         self.leitor.ler = lambda recorte, **k: self._ler_com_vez(ler_original, recorte, **k)
-        self.saida.put(("pronto", os.getpid()))
+        self.saida.put(("pronto", os.getpid(), estado_do_leitor(self.leitor)))
         while not self.sair:
             self._receber(bloquear=not (self.interativos or self.lotes))
             if self.interativos:
@@ -247,6 +265,8 @@ class _Laco:
         if operacao == "ler_diagramas":
             imagem, caixas, boxes = argumentos
             return ler_diagramas(imagem, caixas, boxes, leitor)
+        if operacao == "automaticas":
+            return automaticas(argumentos, leitor)
         if operacao == "ordem":
             return list(self.ordem)
         if operacao == "padroes":                  # os testes conferem os deltas
@@ -290,7 +310,8 @@ class ServidorDeLeitura:
     """O filho, visto da interface: pedir, esperar, cancelar, mandar os deltas, fechar."""
 
     def __init__(self, pasta_de_padroes, limiares, *, fabrica: Optional[str] = None,
-                 ao_avisar: Optional[Callable[[str, str], None]] = None):
+                 ao_avisar: Optional[Callable[[str, str], None]] = None,
+                 ao_ficar_pronto: Optional[Callable[[dict], None]] = None):
         self.pasta, self.limiares = pasta_de_padroes, limiares
         self.fabrica = fabrica or os.environ.get("ABBY_FABRICA_DE_LEITOR") or FABRICA_PADRAO
         self.ao_avisar = ao_avisar or (lambda titulo, texto: log.warning("%s: %s", titulo, texto))
@@ -299,6 +320,10 @@ class ServidorDeLeitura:
         self._pendentes: Dict[int, Pedido] = {}
         self._trava = threading.RLock()
         self.pronto = threading.Event()
+        #: O estado dos modelos do filho (`estado_do_leitor`), quando ele fica pronto; e
+        #: `ao_ficar_pronto(estado)`, chamado na thread ouvinte (só na primeira vez).
+        self.estado: Optional[dict] = None
+        self.ao_ficar_pronto = ao_ficar_pronto
         self.reinicios = 0
         self.desistiu = False
         self._fechando = False
@@ -381,7 +406,14 @@ class ServidorDeLeitura:
                 continue
             tipo = mensagem[0]
             if tipo == "pronto":
+                primeira = self.estado is None
+                self.estado = mensagem[2]
                 self.pronto.set()
+                if primeira and self.ao_ficar_pronto is not None:
+                    try:
+                        self.ao_ficar_pronto(self.estado)
+                    except Exception:  # quem ouve falhou: o ouvinte continua
+                        log.exception("o aviso de servidor pronto falhou")
             elif tipo == "resposta":
                 _, id_, ok, resultado = mensagem
                 with self._trava:

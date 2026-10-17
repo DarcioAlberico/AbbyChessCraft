@@ -373,3 +373,53 @@ def test_sair_da_pagina_confirma_a_sessao_na_pagina_dela(tmp_path, na_fila):
         assert pagina.pid in {p for t in ctl.historico._desfazer for p in t.paginas}
     finally:
         projeto.fechar()
+
+
+@pytest.mark.parametrize("letra, sai", [("x", True), (",", False)])
+def test_o_box_marcado_confirmado_com_a_letra_que_faltava_tira_o_virtual(dois_projetos, letra, sai):
+    """A revisão do D1: o virtual sai só quando o usuário confirma o box marcado ao lado
+    dele com a letra dele (a vírgula marcada ali fica vírgula, e o virtual fica)."""
+    from abbychess import sessao as ss
+
+    a, _b = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    ctl.reconhecer()
+    executor.tudo()
+    texto, unidades = ss.texto_e_unidades(ctl.modelo)
+    inicio, fim = ss.palavras_em(unidades, 0, 0)
+    ctl.confirmar_sessao(unidades[inicio:fim], texto[inicio:fim] + "x")
+    executor.tudo()
+    [virtual] = [v.gid for v in ctl.modelo.decisoes.virtuais]
+    box = ctl.modelo.boxes[0].gid
+    ctl.escolher(box)
+    ctl._letra_que_faltava = (box, virtual, "x")       # como o `marcar` deixa
+    ctl.corrigir(letra)
+    executor.tudo()
+    assert (virtual not in {v.gid for v in ctl.modelo.decisoes.virtuais}) == sai
+    assert ctl.box(box).char == letra
+
+
+def test_o_ctrl_t_espera_a_sessao_na_fila_e_fechar_aplica_na_hora(dois_projetos):
+    """A revisão do D1: com a edição do texto na fila, o Ctrl+T espera (senão a edição a
+    devolveria a em revisão); `agora` (fechar o projeto) aplica sem a fila."""
+    from abbychess import sessao as ss
+
+    a, _b = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    ctl.reconhecer()
+    executor.tudo()
+    texto, unidades = ss.texto_e_unidades(ctl.modelo)
+    inicio, fim = ss.palavras_em(unidades, 0, 0)
+    executor.em_voo = False                            # uma leitura em voo prende a fila
+    ctl.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim])
+    ctl.verificar()
+    assert ctl.modelo.estado != "verificada" and ctl._sessoes_na_fila == 1
+    executor.em_voo = None
+    executor.tudo()
+    assert ctl._sessoes_na_fila == 0
+    executor.em_voo = False
+    texto, unidades = ss.texto_e_unidades(ctl.modelo)
+    ctl.confirmar_sessao(unidades[inicio:fim + 1], "y" + texto[inicio:fim + 1], agora=True)
+    assert ss.texto_e_unidades(ctl.modelo)[0].startswith("y")

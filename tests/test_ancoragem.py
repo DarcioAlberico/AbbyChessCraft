@@ -55,18 +55,17 @@ def test_vizinhos_de_fora(linhas, sessao, dependentes, esperado):
     assert (antes, depois) == tuple(None if k is None else g[k] for k in esperado)
 
 
-def test_o_box_marcado_absorve_a_letra_que_faltava():
-    """A revisão de produto do D1 (m3): o Ctrl+M sobre a tinta sem box não duplica a letra."""
+def test_o_virtual_vizinho_do_box_marcado():
+    """A revisão do D1: o box marcado sobre a tinta sem box acha a letra virtual ao lado
+    dele (quem decide se é ela é o usuário, no Glifo)."""
     from core.box_model import BoxEntry
 
-    from abbychess import sessao as ss
     from abbychess.modelo import Box
-    from tests.test_sessao import _editar, _texto
+    from tests.test_sessao import _editar
 
     p = _pagina("cs")
     _editar(p, "cs", "cas")                              # o "a" virtual
+    virtual = p.decisoes.virtuais[0].gid
     novo = Box(p.alocar(), BoxEntry("o", 39, 20, 41, 50, 0.5, "net"))   # o quadro marcado
     p.boxes = [p.boxes[0], novo, p.boxes[1]]
-    assert ag.absorver_virtual(p, novo.gid) == "a"
-    assert _texto(p) == "cas" and not p.decisoes.virtuais and p.box(novo.gid).entry.char == "a"
-    assert ss.texto_e_unidades(p)[1][1].tipo == ss.GLIFO
+    assert ag.virtual_vizinho(p, novo.gid) == (virtual, "a")

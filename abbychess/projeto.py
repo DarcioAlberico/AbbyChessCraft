@@ -151,7 +151,7 @@ class Projeto:
     #: peças nos lances (pt: R D T B C; en: K Q R B N).
     idioma: str = "pt"
     #: Como o livro escreve as peças nos lances: "figurinas" (♘f3), "letras" (Cf3) ou
-    #: "livro" (como a página: figurinas se ela tem figurinas lidas). No modo figurinas, a
+    #: "livro" (como o livro: figurinas se ele tem figurinas lidas). No modo figurinas, a
     #: letra digitada num lance vira figurina ao confirmar (§6.4).
     notacao: str = "livro"
     versao: int = VERSAO
@@ -500,6 +500,11 @@ class ProjetoDeLivro:
     # ------------------------------------------------------------------
     # Páginas (modelo v2, §4.3)
     # ------------------------------------------------------------------
+    def modelo_em_memoria(self, indice: int) -> Optional[Pagina]:
+        """A página do cache, sem ler o disco (None se ela não está na memória)."""
+        with self._trava_do_cache:
+            return self._modelos.get(indice)
+
     def carregar_modelo(self, indice: int) -> Optional[Pagina]:
         """A página no modelo v2, ou `None` se nada foi gravado dela. Uma página v1 é
         migrada e gravada aqui, na primeira leitura (§4.3)."""

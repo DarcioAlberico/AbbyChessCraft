@@ -24,7 +24,7 @@ ROTULOS = {
 
 
 #: Como o livro escreve as peças nos lances (§6.4): o valor e o rótulo.
-NOTACOES = (("livro", "Como o livro (figurinas se a página tem)"), ("figurinas", "Figurinas (♘f3)"),
+NOTACOES = (("livro", "Como o livro (figurinas se ele tem)"), ("figurinas", "Figurinas (♘f3)"),
             ("letras", "Letras (Cf3)"))
 
 

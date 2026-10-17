@@ -70,6 +70,24 @@ PRETA_DA_BRANCA = dict(zip("♔♕♖♗♘♙", "♚♛♜♝♞♟"))
 BRANCA_DA_PRETA = {p: b for b, p in PRETA_DA_BRANCA.items()}
 
 
+def _marca(texto: str, posicao: int):
+    """A posição como (letras antes dela, logo depois de um espaço?)."""
+    antes = texto[:posicao]
+    return (sum(1 for c in antes if not c.isspace()), bool(antes) and antes[-1].isspace())
+
+
+def _posicao_da_marca(texto: str, marca) -> int:
+    letras, depois_de_espaco = marca
+    k, vistas = 0, 0
+    while k < len(texto) and vistas < letras:
+        vistas += not texto[k].isspace()
+        k += 1
+    if depois_de_espaco:                        # o cursor estava no começo da palavra seguinte
+        while k < len(texto) and texto[k].isspace():
+            k += 1
+    return k
+
+
 class _MapaDoBloco(QTextBlockUserData):
     """O gid de cada caractere do parágrafo (-1 onde não há glifo) e, se o parágrafo é um
     diagrama, o id dele."""
@@ -125,8 +143,8 @@ class VistaDoDocumento(QTextEdit):
     cursor_na_palavra = Signal(list)
     #: A sessão confirmada: as unidades originais, o texto de agora, se avança à próxima
     #: duvidosa, o gid a ensinar (Ctrl+Enter, ou None), o último glifo da sessão e os pares
-    #: (no original, no novo) que nenhuma edição tocou.
-    sessao_confirmada = Signal(list, str, bool, object, object, list)
+    #: (no original, no novo) que nenhuma edição tocou, e se ela termina no fim de uma linha.
+    sessao_confirmada = Signal(list, str, bool, object, object, list, bool)
     #: A sessão abriu ou fechou, ou o Ctrl+Y (a palavra do Esc) passou a valer ou deixou de
     #: valer: as ações Desfazer e Refazer mudam (§6.3: elas valem na sessão).
     sessao_mudou = Signal()
@@ -177,9 +195,10 @@ class VistaDoDocumento(QTextEdit):
         self._duvidosos: Set[int] = set()
         self._ultima_figurina: Optional[tuple] = None
         self._estado_da_sessao = (False, False)
-        #: Onde o cursor estava ao confirmar (no texto de agora, que é o que a página terá
-        #: depois de confirmar): ele volta ali depois de montar de novo.
-        self.posicao_ao_confirmar = 0
+        #: Onde o cursor estava ao confirmar, como (letras antes dele, logo depois de um
+        #: espaço?): o texto montado de novo é o digitado, mas com os espaços e as linhas
+        #: da página, e a contagem de letras não muda com eles.
+        self.marca_ao_confirmar = (0, False)
         self.cursorPositionChanged.connect(self._cursor_mudou)
 
     # ------------------------------------------------------------------
@@ -733,6 +752,10 @@ class VistaDoDocumento(QTextEdit):
                 self.confirmar(avancar=False)
         QTimer.singleShot(0, confirmar)
 
+    def _no_fim_da_linha(self, b: int) -> bool:
+        """O trecho [a, b) do texto da montagem acaba numa quebra de linha impressa."""
+        return b < len(self._unidades) and self._unidades[b].tipo == ss.LINHA
+
     def _fixos(self, a: int, b: int) -> List[tuple]:
         """Os pares (no original, no novo) da sessão [a, b) que nenhuma edição tocou."""
         if self._origem is None:
@@ -773,9 +796,10 @@ class VistaDoDocumento(QTextEdit):
         alvo = ss.gid_no_cursor(unidades, novo, posicao - a, fixos) if ensinar else None
         ultimo = next((u.gid for u in reversed(unidades) if u.glifo), None)
         self._sessao, self._restaurada = None, None
-        self.posicao_ao_confirmar = posicao
+        self.marca_ao_confirmar = _marca(self.toPlainText(), posicao)
         self._avisar_da_sessao()
-        self.sessao_confirmada.emit(list(unidades), novo, avancar, alvo, ultimo, fixos)
+        self.sessao_confirmada.emit(list(unidades), novo, avancar, alvo, ultimo, fixos,
+                                    self._no_fim_da_linha(b))
 
     def restaurar(self) -> None:
         """Esc (ou Ctrl+Z na sessão): a palavra volta ao que era; Ctrl+Y a reaplica."""
@@ -799,12 +823,14 @@ class VistaDoDocumento(QTextEdit):
         """Ctrl+Y depois do Esc: a sessão restaurada, confirmada como estava."""
         if not self.pode_reaplicar:
             return
-        unidades, novo, fixos, a, _b = self._restaurada
+        unidades, novo, fixos, a, b = self._restaurada
         self._restaurada = None
-        self.posicao_ao_confirmar = a + len(novo)   # o fim da palavra reaplicada
+        texto = self.toPlainText()                  # o fim da palavra reaplicada
+        self.marca_ao_confirmar = _marca(texto[:a] + novo, a + len(novo))
         self._avisar_da_sessao()
         ultimo = next((u.gid for u in reversed(unidades) if u.glifo), None)
-        self.sessao_confirmada.emit(unidades, novo, False, None, ultimo, fixos)
+        self.sessao_confirmada.emit(unidades, novo, False, None, ultimo, fixos,
+                                    self._no_fim_da_linha(b))
 
     def ir_a_proxima_duvidosa(self, depois_de: int) -> bool:
         """O cursor no começo da próxima palavra com um glifo duvidoso (pendente, sem
@@ -823,6 +849,10 @@ class VistaDoDocumento(QTextEdit):
                 return True
         self.sem_duvidosas.emit()
         return False
+
+    def ir_a_marca(self, marca) -> None:
+        """O cursor na posição de `_marca` no texto de agora."""
+        self.ir_a_posicao(_posicao_da_marca(self.toPlainText(), marca))
 
     def ir_a_posicao(self, posicao: int) -> None:
         """O cursor na posição (sem avisar: foi o programa), dentro do documento."""

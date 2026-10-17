@@ -236,7 +236,8 @@ def _por_passo() -> list:
              ("substituir_no_livro", "trocar_na_interface_ms",
               "Substituir no livro: a janela presa (230 p.)"),
              ("substituir_no_livro", "desfazer_ms", "Substituir no livro: o Ctrl+Z (230 p.)"),
-             ("substituir_no_livro", "desfazer_mb", "Substituir no livro: o desfazer (MB)"))
+             ("substituir_no_livro", "desfazer_mb", "Substituir no livro: o desfazer (MB)"),
+             ("abrir_ao_painel_de_paginas", "p95_ms", "Abrir ao painel de Páginas (230 p.), p95"))
     colunas = [("linha de base", base)]
     for passo in passos:
         arquivo, dados = _ultimo(f"passo-{passo}")

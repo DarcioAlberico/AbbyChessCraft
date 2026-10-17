@@ -92,3 +92,13 @@ def test_a_aba_padroes_filtra_vai_a_origem_e_esquece_com_delete(app, tmp_path): 
     item.setSelected(True)
     QTest.keyClick(painel.amostras, Qt.Key.Key_Delete)
     assert esquecidas == [[str(arquivos[0])]]
+
+
+def test_ca_8_2_shift_f7_alterna_o_escopo_da_fila(jb):  # noqa: F811
+    _uns(jb, 3)
+    assert jb.fila.escopo == "pagina"
+    QTest.keyClick(jb.visor, Qt.Key.Key_F7, Qt.KeyboardModifier.ShiftModifier)
+    assert jb.fila.escopo == "livro" and "livro" in jb.inspetor.seletor.text()
+    assert "livro" in jb.inspetor.contador.text()
+    QTest.keyClick(jb.visor, Qt.Key.Key_F7, Qt.KeyboardModifier.ShiftModifier)
+    assert jb.fila.escopo == "pagina" and "livro" not in jb.inspetor.seletor.text()

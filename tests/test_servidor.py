@@ -122,3 +122,17 @@ def test_a_interface_nao_importa_torch_para_ler_pelo_servidor():
                            env={**__import__("os").environ, "QT_QPA_PLATFORM": "offscreen"},
                            timeout=120)
     assert saida.stdout.strip() == "False", saida.stderr
+
+
+def test_o_filho_de_um_pai_com_qt_nao_carrega_o_qt(tmp_path):
+    """§11: o filho importa só o servidor e o leitor (o pai, como a janela, tem o Qt)."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    raiz = Path(__file__).resolve().parents[1]
+    saida = subprocess.run([sys.executable, "-m", "tests.app_falso", str(tmp_path / "padroes")],
+                           capture_output=True, text=True, timeout=120, cwd=raiz,
+                           env={**os.environ, "PYTHONPATH": str(raiz)})
+    assert saida.stdout.strip() == "[]", saida.stderr

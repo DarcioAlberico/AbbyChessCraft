@@ -208,6 +208,7 @@ def _por_passo() -> list:
              ("memoria_do_desfazer", "estimado_300x20_mb", "Desfazer (MB)"),
              ("atraso_durante_o_lote", "p99_ms", "Atraso no lote, p99"),
              ("memoria_total_com_o_lote", "rss_pico_mb", "Memória com o lote (MB)"),
+             ("releitura_com_o_lote", "p95_ms", "Releitura com o lote, p95"),
              ("pintura_dos_boxes", "p95_ms", "Pintura de 2.000 boxes, p95"),
              ("texto_da_pagina", "p95_ms", "Montar o Documento, p95"),
              ("clique_no_documento", "p95_ms", "Clique no Documento, p95"),
@@ -238,7 +239,8 @@ _METAS_REPETIDAS = (("troca_de_pagina", "p50_ms", "Troca, p50"),
                     ("enter_ensinar", "p95_ms", "Enter, p95"),
                     ("releitura_de_um_glifo", "p50_ms", "Releitura, p50"),
                     ("releitura_de_um_glifo", "p95_ms", "Releitura, p95"),
-                    ("atraso_durante_o_lote", "p99_ms", "Atraso no lote, p99"))
+                    ("atraso_durante_o_lote", "p99_ms", "Atraso no lote, p99"),
+                    ("releitura_com_o_lote", "p95_ms", "Releitura com o lote, p95"))
 
 
 def _repeticoes() -> list:

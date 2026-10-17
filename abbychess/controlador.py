@@ -239,8 +239,10 @@ class ControladorDePagina:
 
         lidos = [b for b in self.modelo.boxes if b.entry.char]
         # A regra olha as linhas inteiras da página (~20 ms numa página cheia): o resultado
-        # fica até os glifos lidos mudarem (corrigir um caractere não muda a margem).
-        chave = (self.indice, tuple(b.gid for b in lidos))
+        # fica enquanto o que ela lê não muda (o texto, a posição de cada glifo lido e a
+        # altura da página); montar a chave custa uma fração de milissegundo.
+        chave = (self.indice, self.imagem.height,
+                 tuple((b.gid, b.entry.char, b.entry.x1, b.entry.y1, b.entry.y2) for b in lidos))
         if self._margens[0] != chave:
             indices = ex.margens_corridas({0: ([b.entry for b in lidos], self.imagem.height)})[0]
             self._margens = (chave, frozenset(lidos[i].gid for i in indices if i < len(lidos)))

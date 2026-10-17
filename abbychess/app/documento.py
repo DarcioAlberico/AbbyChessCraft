@@ -150,9 +150,9 @@ class VistaDoDocumento(QTextEdit):
         if documento is not None:
             self._preencher(novo, *self._entrada[:-1])
         else:
-            aviso = QTextCharFormat()
-            aviso.setForeground(estilo.CINZA)
-            QTextCursor(novo).insertText(self._entrada[-1], aviso)
+            formato = QTextCharFormat()
+            formato.setForeground(estilo.CINZA)
+            QTextCursor(novo).insertText(self._entrada[-1], formato)
         antigo = self.document()
         # O documento padrão do QTextEdit é do controle de texto, que o apaga no setDocument; o
         # nosso anterior (filho da vista) sai aqui, ou cada montagem o deixaria vivo.

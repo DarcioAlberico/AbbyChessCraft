@@ -91,20 +91,66 @@ devolve os aguardando abandonados; voltar ao antes do lote sobe a versão da pá
 cópia logo depois do lote); o lote sem cancelamento tem o prazo dos pedidos; o teste do
 laço síncrono (que falha com a versão recursiva).
 
-## As medidas (commit `5ba8ba0`, pasta limpa)
+## A primeira bateria (commit `5ba8ba0`)
 
-- Portão: 17 passaram; `docs/medidas/2026-10-17-passo-e.json`.
-- 3 rodadas (`repeticao-e`), na ordem:
-  - atraso no lote: p99 2,2; 2,2; 2,2 ms (A3: 21,0; 9,4; 9,7), máximo 129; 119; 123;
-  - releitura com o lote: mediana 46; 55; 52 e p95 78; 102; 90 (portão 103; alvo 150);
-  - memória somada com o lote: 2173; 2177; 2175 MB nas rodadas completas, 1616 com o
-    módulo do servidor sozinho (`…-servidor-sozinho-e-parcial.json`): o processo de teste
-    guarda os modelos que o módulo anterior carregou na janela;
-  - duração do lote de 20 páginas: 163 s (A3: 88): o projeto sem padrões; as mesmas
-    páginas sem servidor levam os mesmos 8,1 s cada (medida à parte, com `gc.freeze` e sem
-    a prioridade baixa também, sem mudança);
-  - Enter até a cor: mediana 21,6; 30,6; 21,9 e p95 26,4; 36,9; 23,4 (a segunda rodada
-    deslocada por igual, como no A1 e no A3);
-  - troca no cache 13,8; 13,7; 14,2; fora do cache 127,8; 127,7; 127,2; releitura 14,4;
-    14,4; 14,5; montar o Documento p95 31,0; 34,4; 34,1; clique no Documento p95 3,4; 3,1; 3,2.
+Portão e 3 rodadas com a linha de base ainda **sem** o servidor (os modelos na janela do
+teste), renomeadas para `docs/medidas/2026-10-17-primeira-rodada-e*.json`: o atraso no lote
+já em p99 de 2,2 ms, a releitura com o lote em p95 de 78–103, a memória somada em 2173–2177
+(inflada pelos modelos que a linha de base carregava no processo de teste), o lote em 163 s
+(o projeto sem padrões; sem servidor, as mesmas páginas levaram os mesmos 8,1 s, numa medida
+à parte que a revisão de produto pediu em JSON). Uma segunda bateria, sobre o `ea6a19d`, foi
+parada no meio pela rodada 3 de código (descartada), e uma terceira, sobre o `567c6e8`, achou
+a releitura com o lote em p95 de 205 ms numa das 4 medidas (a segmentação da página do lote
+não dava a vez) e foi descartada depois da correção.
+
+## Revisão de produto, rodada 1
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Produto, design e medição | Completude 6 · Fidelidade das medidas 5 · Clareza 6 · Produtividade 7 · Design 7 | volta |
+
+| Achado | Correção |
+|---|---|
+| **M1** Retomar não funcionava depois de o servidor desistir (o "Sim" de reabrir zerava o restante; o "Não" falhava em laço) | o que falta fica em `lote.json` e volta ao reabrir; Retomar desligado com o servidor parado; a queda não conta como falha (`servidor_parou`) |
+| **M2** A pergunta do lote dizia que "Sim" descarta as correções | o texto do §4.6 e as verificadas contadas à parte |
+| **M3** A §4.6 pela metade: sem a transferência por IoU ≥ 0,6 nem a lista em Resultados | `reconciliar(iou_minimo=0,6)` no F5 e no lote; o que caiu vai aos Avisos; teste com o glifo que muda 2 px |
+| **M4** A linha de base media sem o servidor | ela abre o projeto com o servidor, como o programa; o JSON diz a configuração |
+| **M5** Números sem JSON: o lote com e sem servidor, o pico na gravação, a qualidade pelo filho | `lote_com_e_sem_servidor`, `maior_atraso` com a gravação mais perto, `gravar_pagina_do_lote`, e um teste `livro_real` de que o filho lê como o processo |
+| m1–m14 | a memória sem os modelos do módulo anterior; as rodadas na condição real; as faixas do README; os campos velhos dos JSON; o lote com o leitor falso; o traço-ponto; o rótulo do lote com um dono só; Cancelar e Retomar no menu Projeto; a data da cópia de antes do lote; Retomar e reler depois guardados no projeto; o tempo de gravar medido; a barra de carregamento dos modelos; abrir sem servidor quando os modelos não carregam; a mensagem do fim curta, com o detalhe nos Avisos |
+
+## Rodadas 3 a 5 (código, sobre as correções do produto)
+
+Rodada 3: Correção 7 · Simplicidade 8 · Testes 7 — volta: fechar com o lote ativo não
+atualizava o `lote.json` (e o de um lote anterior voltaria). Agora ele é gravado ao começar
+o lote e a cada página; as páginas para reler depois ficam numa lista à parte, e Retomar só
+as lê com a confirmação; "abrir sem servidor" é uma opção da sessão; o motivo vazio; Retomar
+desliga com o servidor parado; as decisões que caem dizem o glifo, e não o gid (`aae64c8`).
+
+Rodada 4: Correção 8 · Simplicidade 8 · Testes 8 — **aceita**, com menores que entraram
+(`567c6e8`): Retomar força as páginas confirmadas uma a uma, sem mudar o "refazer" do que
+faltou; só os números que são glifos viram descrição; o diálogo sem nada que tenha faltado;
+o F5 e o Ctrl+T tiram a página da lista.
+
+Rodada 5 (sobre a página do lote numa thread do filho, `6c61ed7`): Correção 8 · Simplicidade
+8 · Testes 8 — **aceita**; os menores entraram (`9c759e2`): o acordar perdido (o laço olha o
+`no_lote`, e não o `is_alive()`), o cancelar tardio, o que não é recebido durante um F5 na
+docstring, e o teste do cancelar e do sair no meio da segmentação.
+
+## As medidas finais (commit `9c759e2`, pasta limpa)
+
+- Portão: 20 passaram; `docs/medidas/2026-10-17-passo-e.json`.
+- 3 rodadas (`repeticao-e`), na ordem, e o portão por último entre colchetes:
+  - atraso no lote: p99 2,2; 2,2; 2,2 [2,2] ms, máximo 136,8; 134,4; 137,1 [132,3], a
+    ~0,13 s de uma gravação de página;
+  - atraso no lote com o leitor falso (51 páginas): p99 7,6; 12,8; 9,0 [14,1];
+  - gravar uma página do lote na janela: p95 21,9; 22,1; 19,5 [17,6];
+  - releitura com o lote: mediana 41,7; 40,4; 41,0 [46,1] e p95 105,3; 64,4; 66,0 [124,1]
+    (alvo 150);
+  - releitura sem o lote (pelo servidor): mediana 39,0; 38,7; 39,0 [37,0];
+  - memória somada com o lote: 2028; 1959; 2027 [2050] MB (servidor ~1010);
+  - lote de 20 páginas: 162,4; 162,7; 163,3 [161,3] s; com e sem servidor, as mesmas 5
+    páginas: 8,17/8,23; 8,21/8,24; 8,16/8,21 [8,33/8,26] s por página;
+  - Enter até a cor: mediana 23,9; 23,9; 24,0 [23,9]; troca no cache 14,5; 14,4; 14,6;
+    fora do cache 134,0; 134,1; 133,4; montar o Documento p95 31,8; 33,5; 32,4 [39,8];
+    clique no Documento p95 3,4; 3,3; 3,3.
 - Qualidade (`medir.py`, os três livros) e fatia (`--passo E`): iguais às do A3.

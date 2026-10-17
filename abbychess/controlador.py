@@ -831,10 +831,11 @@ class ControladorDePagina:
         e emenda a `transacao` da edição que os criou, para o refazer os trazer já lidos.
         Sem ela (a página abriu, os modelos ficaram prontos, um desfazer os trouxe de volta),
         a leitura entra fora do desfazer: ela não é decisão de ninguém, e a pré-condição do
-        desfazer a aceita (`historico.lido_depois`). Com o servidor carregando ou parado, os
-        glifos ficam aguardando (os modelos prontos os pedem)."""
+        desfazer a aceita (`historico.lido_depois`). Com o servidor carregando (ou reabrindo
+        depois de uma queda), o pedido espera na fila do filho; parado, os glifos ficam
+        aguardando."""
         servidor = self.servidor
-        if servidor is None or servidor.parado or not servidor.pronto.is_set() \
+        if servidor is None or servidor.parado \
                 or pagina is not self.modelo or indice != self.indice:
             return
         antes = tuple(pagina.boxes)

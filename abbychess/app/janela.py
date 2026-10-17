@@ -306,6 +306,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, QMainWindow):
             return False
         self._parar_tarefas()                   # o fim da tarefa em voo ainda entra
         if not self._gravou_ou_perder(projeto):   # e o que ele entregou também é gravado
+            self.pagina.ler_os_aguardando()     # ficou aberto: o que foi abandonado volta
             return False
         self.gravar_espaco()
         self.abrir_avisos_do_projeto(None)

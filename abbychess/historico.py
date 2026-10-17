@@ -290,6 +290,11 @@ class HistoricoDoProjeto:
     def versao(self, pid: Optional[int]) -> int:
         return self._versoes.get(pid, 0) if pid is not None else 0
 
+    def tocar(self, pid: int) -> None:
+        """A página mudou por fora do desfazer, por um comando do usuário (voltar ao estado
+        antes do lote): o lote que a lê agora não grava por cima."""
+        self._versoes[pid] = self._versoes.get(pid, 0) + 1
+
     def _mudou(self, transacao: Transacao) -> None:
         for pid in transacao.paginas:
             self._versoes[pid] = self._versoes.get(pid, 0) + 1

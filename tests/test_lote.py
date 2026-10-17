@@ -341,3 +341,37 @@ def test_com_o_servidor_parado_os_comandos_avisam_e_nao_leem(ctl, projeto, com_s
     p.reler_pendentes()
     assert len(servidor.pedidos) == pedidos and not ctl.executor.fila
     assert sum("Reabra o projeto" in m for m in mensagens) == 2
+
+
+def test_o_lote_sincrono_de_centenas_de_paginas_nao_aninha_a_pilha(projeto, monkeypatch):
+    """O executor síncrono (as ferramentas) termina cada página dentro da chamada que a
+    pediu: o laço do condutor não pode se aninhar, ou um livro grande estouraria a pilha."""
+    from abbychess import lote
+    from abbychess import servidor_de_leitura as sl
+
+    monkeypatch.setattr(lote.sl, "ler_pagina", lambda *a, **k: sl.PaginaLida([], [], [], None))
+    monkeypatch.setattr(projeto, "guardar_antes_do_lote", lambda pagina: None)   # o disco, não
+    pagina = ControladorDePagina(Eventos())
+    pagina.ligar(projeto, pg.FonteDePaginas(projeto.fonte),
+                 LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
+    fins = []
+    condutor = lote.CondutorDoLote(pagina, [0, 1, 2] * 84, refazer=True, ao_fim=fins.append)
+    condutor.comecar()
+    assert len(fins[0].lidas) == 252
+
+
+def test_voltar_ao_antes_do_lote_durante_a_releitura_nao_e_sobrescrito(ctl, projeto,
+                                                                       com_servidor):
+    from tests.servidor_falso import entregar
+
+    servidor, fila = com_servidor
+    p = ctl.pagina
+    ctl.reconhecer([0], refazer=True)                    # a cópia de antes
+    entregar(fila, esperar_por=1)
+    servidor.segurar.clear()
+    ctl.reconhecer([0], refazer=True)                    # outro lote, relendo a 0
+    ctl.voltar_ao_antes_do_lote()
+    servidor.segurar.set()
+    entregar(fila, esperar_por=1)
+    assert ctl.fins[-1].reler_depois == [0] and p.historico.versao(p.modelo.pid) == 1
+

@@ -129,7 +129,7 @@ Desde o passo A2 a janela é a do FineReader:
 
 - **Imagem e vista direita** dividem o meio, lado a lado (Ctrl+F7) ou empilhadas
   (Ctrl+Shift+F7); **Ctrl+F6** deixa só a Imagem e **Ctrl+F8** só a vista direita. A vista
-  direita tem as abas **Documento** (até o passo A3, o texto reconhecido de antes) e
+  direita tem as abas **Documento** (ver abaixo) e
   **Padrões**. Até 1280 px de largura o padrão é o empilhado.
 - O **Inspetor** é um editor só, o do item atual: **Glifo** (o treino) ou **Palavra** (a
   verificação de texto). No cabeçalho, a **fila**: o modo (confiança, ordem de leitura,
@@ -168,6 +168,37 @@ Desde o passo A2 a janela é a do FineReader:
 Shift+seta e Ctrl+Shift+seta; F7 (verificação) → F7 cicla o modo da fila, e a verificação é
 o modo "palavras desconhecidas"; Ctrl+I (ignorar a palavra) → Ctrl+Shift+I; Ctrl+Shift+P
 (Padrões) → Alt+3.
+
+### O Documento e a Linha
+
+Desde o passo A3 a aba **Documento** mostra a página reconhecida como texto formatado, e não
+mais como texto puro:
+
+- **Uma linha impressa por parágrafo**, com as figurinas como impressas (♘). Os títulos em
+  negrito maior; cabeçalho, rodapé e número de página em cinza pequeno, e **Ctrl+Shift+H** (ou
+  "Cabeçalhos e rodapés", na barra do Documento) os oculta; as notas em corpo menor. Refluir
+  as linhas em parágrafos fica para o passo F, que acha os parágrafos: sem eles, o título e o
+  corpo da mesma área se juntariam.
+- **Os diagramas no lugar deles**, inteiros: o desenho da posição lida (o recorte da página,
+  se ainda não lida), a linha do diagrama em monoespaçado, o estado (conferido, lido e não
+  conferido, não lido) e **Copiar FEN**.
+- **O realce** ("Realce", na barra do Documento): fundo laranja-claro no que vai para a
+  revisão e no que ninguém leu (que aparece como □), ondulado vermelho no que o léxico não
+  conhece (depois de a fila de palavras desconhecidas ter rodado na página), pontilhado no
+  glifo virtual; o confirmado e o confiável sem realce.
+- **Ctrl++ e Ctrl+−** com o foco no Documento mudam o corpo do texto (Ctrl+0 volta ao
+  padrão); com o foco na Imagem, o zoom dela.
+- **É só leitura** até o passo D1, que traz a edição no Documento.
+
+**A sincronia**: o clique numa palavra do Documento a destaca na Imagem e leva o glifo
+clicado ao Inspetor; o cursor andando pelo Documento (as setas) destaca a palavra na Imagem,
+que rola até ela com Seguir; o clique na Imagem e o Alt+↓ da fila levam o cursor do
+Documento ao glifo. Uma edição ou a propagação montam o Documento de novo sem perder o lugar:
+o cursor volta ao mesmo glifo, e a rolagem fica.
+
+**A Linha** (**Ctrl+F5** a esconde e mostra), embaixo da Imagem e da vista direita: a linha
+do glifo atual ampliada, a imagem em cima e o texto lido embaixo, cada caractere sob o glifo
+dele, e o glifo atual contornado.
 
 ### A página: zoom e navegação
 
@@ -389,7 +420,7 @@ programa sabe quem veio de quem. O que muda para você:
   nome o gid do glifo de onde saiu.
 - **O estado de cada página** é gravado desde já, mas a janela ainda não o mostra (a
   galeria de páginas é do passo C).
-- **O texto da página** (o painel de texto, a busca e as exportações de hoje) sai de um
+- **O texto da página** (o Documento, a busca e as exportações de hoje) sai de um
   documento montado das páginas (`abbychess.texto.montar`), com as decisões que você tomar
   a partir do passo D1 (espaço a mais ou a menos, o caractere que falta, parágrafo). Hoje
   ele sai igual ao de antes, conferido pelos testes de caracterização.

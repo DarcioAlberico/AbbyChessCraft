@@ -30,8 +30,6 @@ import re
 from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
-from abbychess import ancoragem as ag
-from abbychess import edicao as ed
 from abbychess.modelo import FIGURINAS, Pagina
 
 GLIFO, VIRTUAL, ESPACO, LINHA, OUTRO = "glifo", "virtual", "espaco", "linha", "outro"
@@ -468,6 +466,11 @@ def aplicar(pagina: Pagina, plano: Plano) -> None:
     """O plano na página: as letras, as fronteiras, as letras novas (virtuais), os virtuais
     que saem, as âncoras de todos como ficaram no texto, e só então os boxes que saem (já
     não são âncora de ninguém)."""
+    # Aqui, e não no topo: `edicao` traz o core de segmentação (cv2, numpy), que o índice da
+    # busca, num processo à parte, não precisa (§7.3).
+    from abbychess import ancoragem as ag
+    from abbychess import edicao as ed
+
     virtuais = {v.gid for v in pagina.decisoes.virtuais}
     for gid, char in plano.corrigir.items():
         if gid in virtuais:

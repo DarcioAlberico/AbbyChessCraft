@@ -425,7 +425,9 @@ class EspacoDeTrabalho:
         marcar, depois Resultados (a busca e os menus, que vêm antes, fecham sozinhos com o
         Esc). Nunca cancela tarefa. Com uma sessão de edição aberta no Documento, o Esc a
         restaura (§6.3)."""
-        if self.texto.tem_sessao:
+        if self._barra_de_busca_com_o_foco():
+            self.fechar_busca()
+        elif self.texto.tem_sessao:
             self.texto.restaurar()
         elif self.pagina.selecao:
             self.pagina.limpar_selecao()

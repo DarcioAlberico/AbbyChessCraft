@@ -61,6 +61,9 @@ FUNDO_DE_BAIXA_CONFIANCA = QColor(255, 226, 184)
 FUNDO_DO_ATUAL = QColor(190, 220, 255)
 #: O fundo das palavras da sessão aberta: o texto ainda não confirmado (§6.3).
 FUNDO_DA_SESSAO = QColor(255, 246, 200)
+#: As ocorrências da busca na página (§7.1), e a atual.
+FUNDO_DA_BUSCA = QColor(255, 232, 130)
+FUNDO_DA_OCORRENCIA = QColor(255, 170, 70)
 #: A figurina de cada peça no desenho do diagrama.
 FIGURINAS = {"K": "♔", "Q": "♕", "R": "♖", "B": "♗", "N": "♘", "P": "♙",
              "k": "♚", "q": "♛", "r": "♜", "b": "♝", "n": "♞", "p": "♟"}
@@ -175,6 +178,9 @@ class VistaDoDocumento(QTextEdit):
         self._formatos: Dict[tuple, QTextCharFormat] = {}   # os do realce, por montagem
         self._gid_atual: Optional[int] = None
         self._destaque_do_atual: list = []
+        #: As ocorrências da busca nesta página, em gids, e a atual (o índice nelas).
+        self._busca: List[tuple] = []
+        self._busca_atual: Optional[int] = None
         self.corpo_padrao = CORPO_PADRAO
         #: As teclas que a vista entrega às ações (Enter, Shift+Enter, Ctrl+Z, Ctrl+Y): a
         #: exceção "redireciona" do YAML.
@@ -674,7 +680,44 @@ class VistaDoDocumento(QTextEdit):
                                    len(self.toPlainText())), QTextCursor.MoveMode.KeepAnchor)
             sessao.cursor = cursor
             destaques.insert(0, sessao)
+        destaques[0:0] = self._destaques_da_busca()
         self.setExtraSelections(destaques)
+
+    def destacar_busca(self, trechos, atual: Optional[int] = None) -> None:
+        """As ocorrências da busca nesta página (cada uma, os gids dela) em amarelo, e a
+        `atual` em laranja; elas seguem os gids quando a página é montada de novo."""
+        self._busca = [tuple(t) for t in trechos if t]
+        self._busca_atual = atual
+        self._pintar_os_destaques()
+
+    def _destaques_da_busca(self) -> list:
+        if not self._busca:
+            return []
+        lugar: Dict[int, tuple] = {}            # gid -> (posição, caracteres)
+        bloco = self.document().begin()
+        while bloco.isValid():
+            mapa = bloco.userData()
+            if isinstance(mapa, _MapaDoBloco):
+                for k, gid in enumerate(mapa.gids):
+                    if gid >= 0:
+                        inicio, n = lugar.get(gid, (bloco.position() + k, 0))
+                        lugar[gid] = (inicio, n + 1)
+            bloco = bloco.next()
+        saida = []
+        for n, gids in enumerate(self._busca):
+            if gids[0] not in lugar or gids[-1] not in lugar:
+                continue
+            inicio = lugar[gids[0]][0]
+            fim = sum(lugar[gids[-1]])
+            destaque = QTextEdit.ExtraSelection()
+            destaque.format.setBackground(FUNDO_DA_OCORRENCIA if n == self._busca_atual
+                                          else FUNDO_DA_BUSCA)
+            cursor = QTextCursor(self.document())
+            cursor.setPosition(inicio)
+            cursor.setPosition(max(inicio, fim), QTextCursor.MoveMode.KeepAnchor)
+            destaque.cursor = cursor
+            saida.append(destaque)
+        return saida
 
     def _gid_no_caractere(self, posicao: int) -> Optional[int]:
         bloco = self.document().findBlock(posicao)

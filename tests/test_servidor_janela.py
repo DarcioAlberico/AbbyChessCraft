@@ -170,6 +170,13 @@ def test_ca_11_1_e_11_2_durante_o_lote_navegar_e_ensinar_valem_na_hora(app, jane
     assert p.box(p.gids[0]).char == "a"                  # na hora, sem esperar o lote
     assert j.pagina.ir_para(1) and p.indice == 1         # navegar também
     feitas_ao_ensinar = len(p.projeto.paginas_lidas())
+    # A busca também (passo B): as páginas que o lote já leu entram nela.
+    j.localizar()
+    j.barra_de_busca.campo.setText("x")
+    j.barra_de_busca.relogio.stop()
+    j._buscar()
+    _ate(app, lambda: j.busca.ultimo_resultado is not None, 30)
+    assert j.busca.ultimo_resultado.ocorrencias and j.livro.lote_rodando
     _ate(app, lambda: not j.livro.lote_rodando, 180)
     [resultado] = j.fins
     assert len(resultado.lidas) + len(resultado.puladas) == 50 and not resultado.falhas

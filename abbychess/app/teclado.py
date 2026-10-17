@@ -22,7 +22,7 @@ from PySide6.QtGui import QAction, QKeySequence
 from abbychess import atalhos
 
 #: O passo do roadmap do programa: as ações do YAML até ele têm atalho.
-PASSO = "D1"
+PASSO = "B"
 #: O perfil de teclado (o FineReader e a escolha em Opções são do passo K).
 PERFIL = "padrao"
 

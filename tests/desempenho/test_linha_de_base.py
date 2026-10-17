@@ -327,11 +327,6 @@ def _memoria_do_historico(app, janela) -> dict:
                     "que o ruído do coletor de lixo"}
 
 
-def test_o_que_ainda_nao_existe(medidas):
-    medidas["buscar_regex_no_livro"] = {"estado": "não existe", "alvo_p95_ms": 1000}
-    medidas["montar_indice_da_busca"] = {"estado": "não existe", "alvo_p95_ms": 2000}
-
-
 def test_clique_numa_palavra_do_documento(ambiente, medidas):
     """CA-6.1 [desempenho]: do clique numa palavra do Documento ao destaque dos glifos dela na
     Imagem e ao glifo no Inspetor (o tratamento do clique, na thread da interface)."""

@@ -25,6 +25,11 @@ def montar(janela) -> None:
     j.acao_novo = acao(j, "novo_projeto", j.novo_projeto, texto="Novo projeto…", barra=barra)
     j.acao_abrir = acao(j, "abrir_projeto", j.abrir_projeto, texto="Abrir projeto…", barra=barra)
     j.acao_exportar = acao(j, "exportar", j.exportar, texto="Exportar…")
+    j.acao_localizar = acao(j, "localizar", j.localizar, texto="Localizar…")
+    j.acao_proxima_ocorrencia = acao(j, "proxima_ocorrencia", j.proxima_ocorrencia)
+    j.acao_ocorrencia_anterior = acao(j, "ocorrencia_anterior", j.ocorrencia_anterior)
+    j.acao_todas_em_resultados = acao(j, "todas_em_resultados", j.todas_em_resultados)
+    j.acao_buscar_glifo = teclado.sem_atalho(j, "Buscar glifo…", j.buscar_glifo)
     j.acao_opcoes = acao(j, "opcoes", j.opcoes, texto="Opções…")
     j.acao_sair = acao(j, "sair", j.close, texto="Sair")
     j.acao_cancelar_lote = acao(j, "cancelar_lote", livro.cancelar, texto="Cancelar o lote")
@@ -216,6 +221,10 @@ def _menus(j) -> None:
     menu = j.menuBar().addMenu("&Editar")
     menu.addAction(j.acao_desfazer)
     menu.addAction(j.acao_refazer)
+    menu.addSeparator()                         # localizar (§7.1)
+    for acao in (j.acao_localizar, j.acao_proxima_ocorrencia, j.acao_ocorrencia_anterior,
+                 j.acao_todas_em_resultados, j.acao_buscar_glifo):
+        menu.addAction(acao)
     menu.addSeparator()                         # a sessão do Documento (§6.3)
     for acao in (j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_ensinar_no_documento):
         menu.addAction(acao)
@@ -283,6 +292,9 @@ def atualizar(janela) -> None:
                                     and p.projeto.tem_antes_do_lote(p.indice))
     j.acao_proximo_do_livro.setEnabled(tem)
     j.acao_exportar.setEnabled(tem)
+    for q in (j.acao_localizar, j.acao_proxima_ocorrencia, j.acao_ocorrencia_anterior,
+              j.acao_todas_em_resultados, j.acao_buscar_glifo):
+        q.setEnabled(tem)
     j.acao_areas.setEnabled(tem)
     j.acao_areas_auto.setEnabled(editar and j.acao_areas.isChecked())
     j.acao_verificar.setEnabled(tem and bool(p.boxes))

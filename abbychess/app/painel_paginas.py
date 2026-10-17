@@ -58,16 +58,19 @@ class PainelDePaginas(QWidget):
         self.lista.setAccessibleName("Páginas do livro")
         self.lista.setRootIsDecorated(False)
         self.lista.setUniformRowHeights(True)
-        self.lista.setHeaderLabels(["Pág.", "Est.", "Rev.", "Diag."])
+        self.lista.setHeaderLabels(["Pág.", "Est.", "Rev.", "Diag.", "Ach."])
         self.lista.headerItem().setToolTip(1, "O estado da página (passe o mouse no símbolo)")
         self.lista.headerItem().setToolTip(2, "Glifos a revisar")
         self.lista.headerItem().setToolTip(3, "Diagramas por conferir")
+        self.lista.headerItem().setToolTip(4, "Ocorrências da busca (Ctrl+F)")
         self.lista.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.lista.itemActivated.connect(self._abrir_item)
         self.lista.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.lista.customContextMenuRequested.connect(self._menu)
-        for coluna, largura in enumerate((34, 28, 34, 32)):    # cabem nos 130 px da gaveta
+        for coluna, largura in enumerate((34, 28, 34, 32, 30)):    # cabem nos 130 px da gaveta
             self.lista.setColumnWidth(coluna, largura)
+        self.lista.setColumnHidden(4, True)     # só com uma busca (§7.1)
+        self._contagem = None
 
         #: O progresso do lote (passo E): as páginas feitas, e o tempo estimado na dica.
         self.lote = QProgressBar()
@@ -125,10 +128,25 @@ class PainelDePaginas(QWidget):
                 item.setForeground(1, cor)
                 apagada = estado == md.NAO_RECONHECIDA      # o que ainda não foi lido, atenuado
                 item.setForeground(0, estilo.CINZA if apagada else self.palette().text())
+        self._pintar_contagem()
         self._filtrar()
         if atual is not None:
             self.marcar_atual(atual)
         self.lista.setUpdatesEnabled(True)
+
+    def mostrar_ocorrencias(self, contagem) -> None:
+        """A contagem da busca por página (§7.1), na coluna "Ach."; None a esconde."""
+        self._contagem = contagem
+        self.lista.setColumnHidden(4, contagem is None)
+        self._pintar_contagem()
+
+    def _pintar_contagem(self) -> None:
+        for i in range(self.lista.topLevelItemCount()):
+            item = self.lista.topLevelItem(i)
+            n = (self._contagem or {}).get(i, 0)
+            if item.text(4) != (str(n) if n else ""):
+                item.setText(4, str(n) if n else "")
+                item.setTextAlignment(4, Qt.AlignmentFlag.AlignRight)
 
     def marcar_atual(self, indice: int) -> None:
         """A página aberta fica escolhida (sem abrir de novo)."""

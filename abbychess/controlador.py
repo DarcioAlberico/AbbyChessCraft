@@ -120,6 +120,8 @@ class ControladorDePagina:
         #: Na ordem de leitura: (página, posição na ordem da página) do último glifo mostrado,
         #: para a decisão seguir em frente mesmo quando o glifo sai (descartar, juntar).
         self._lugar_de_leitura = (-1, 0)
+        #: (chave, gids) da última conta das margens corridas (`gids_de_margem`).
+        self._margens: tuple = (None, frozenset())
         self.selecao: set = set()
         #: O desfazer do projeto (§14.2), da sessão.
         self.historico = hs.HistoricoDoProjeto()
@@ -236,8 +238,13 @@ class ControladorDePagina:
         from abbychess import exportar as ex
 
         lidos = [b for b in self.modelo.boxes if b.entry.char]
-        indices = ex.margens_corridas({0: ([b.entry for b in lidos], self.imagem.height)})[0]
-        return frozenset(lidos[i].gid for i in indices if i < len(lidos))
+        # A regra olha as linhas inteiras da página (~20 ms numa página cheia): o resultado
+        # fica até os glifos lidos mudarem (corrigir um caractere não muda a margem).
+        chave = (self.indice, tuple(b.gid for b in lidos))
+        if self._margens[0] != chave:
+            indices = ex.margens_corridas({0: ([b.entry for b in lidos], self.imagem.height)})[0]
+            self._margens = (chave, frozenset(lidos[i].gid for i in indices if i < len(lidos)))
+        return self._margens[1]
 
     def gids_virtuais(self) -> frozenset:
         """Os gids dos glifos virtuais (sem caixa) da página."""

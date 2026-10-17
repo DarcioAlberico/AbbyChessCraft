@@ -342,8 +342,13 @@ class EspacoDeTrabalho:
     # A sincronia (§6.2): o Documento, a Imagem, a Linha e a fila
     # ------------------------------------------------------------------
     def _indices(self, gids) -> list:
-        p = self.pagina
-        return [i for i in (p.indice_de(g) for g in gids) if i is not None]
+        indice = self._indice_por_gid()
+        return [indice[g] for g in gids if g in indice]
+
+    def _indice_por_gid(self) -> dict:
+        """gid → posição na lista de boxes, montado uma vez por chamada (o `indice_de` do
+        controlador procura na lista inteira, e a Linha pede um por glifo)."""
+        return {g: i for i, g in enumerate(self.pagina.gids)}
 
     def _documento_clicado(self, gid: int, gids: list) -> None:
         """O clique numa palavra do Documento: os glifos dela destacados na Imagem (CA-6.1) e
@@ -372,21 +377,22 @@ class EspacoDeTrabalho:
         if not self.linha.isVisible() or gid is None or p.matriz is None:
             self.linha.limpar()
             return
-        linha = [g for g in self.texto.linha_de(gid) if p.indice_de(g) is not None]
+        indice = self._indice_por_gid()
+        linha = [g for g in self.texto.linha_de(gid) if g in indice]
         if gid not in linha:
-            linha = self._linha_pela_geometria(gid)
+            linha = self._linha_pela_geometria(gid, indice)
         if not linha:
             self.linha.limpar()
             return
         boxes = p.boxes
-        self.linha.mostrar(p.matriz, [boxes[p.indice_de(g)] for g in linha],
+        self.linha.mostrar(p.matriz, [boxes[indice[g]] for g in linha],
                            linha.index(gid) if gid in linha else None)
 
-    def _linha_pela_geometria(self, gid) -> list:
+    def _linha_pela_geometria(self, gid, indice_por_gid: dict) -> list:
         """Os glifos da altura do glifo (o centro de cada um dentro da faixa dele), da
         esquerda para a direita: a linha quando o Documento ainda não a tem."""
         p = self.pagina
-        indice = p.indice_de(gid)
+        indice = indice_por_gid.get(gid)
         if indice is None:
             return []
         boxes, alvo = p.boxes, p.boxes[indice]

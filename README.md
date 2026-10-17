@@ -1018,7 +1018,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   `docs/medidas/2026-10-17-primeira-rodada-d1*.json`). A troca, a releitura, o lote (8,1–8,5
   s por página, com e sem o servidor) e a memória (2029–2053 MB) ficaram iguais às do E.
   **O Enter até a cor mudar** ficou com a mesma mediana (24–25 ms em 2 das 3 rodadas), mas o
-  p95 subiu ~3 ms em todas as medidas (27–36, contra 26–29 no E; alvo de 100), e uma rodada
+  p95 subiu ~3 ms em 3 das 4 medidas (27–36, contra 26–29 no E; alvo de 100), e uma rodada
   saiu alta por igual (33 na mediana), como a "rodada alta" já vista no A1 e no A3; até o fim
   da propagação, 88–95 na mediana (84 no E). É um custo pequeno e real, não investigado.
   **Montar o Documento** ficou em 32 ms na mediana (31 no E), mas o p95 subiu para 40–42 nas
@@ -1026,7 +1026,8 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   cada montagem (`_guardar_as_unidades`, um laço em Python), para a sessão comparar.
   **O pico durante o lote** caiu de 132–137 ms para 92–105: a volta de cada página do lote
   saiu da janela (o `lote.json` numa thread e a página seguinte num passo à parte do laço de
-  eventos), como o E deixou para o D1; o p99 segue em 2,2. **A edição em si** (informativo,
+  eventos), como o E deixou para o D1; o p99 segue em 2,2, e com o leitor falso caiu de
+  7,6–14,1 para 2,8–4,5. **A edição em si** (informativo,
   medido pela revisão de produto na janela, fora da bateria, numa página de 1.890 glifos):
   uma tecla na sessão custa ~0,5 ms; confirmar uma palavra, 40–47 ms (a montagem do
   Documento é quase tudo); colar a página inteira por cima com 20 letras trocadas e
@@ -1174,7 +1175,10 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   Projeto, a exportação; o editor de áreas, a verificação de texto e a leitura e
   conferência dos diagramas.
 - **A edição no Documento, desde o D1**: o que é do passo G (k letras por 1, 1 por k, o
-  parágrafo, os estilos) é recusado com aviso; apagar a quebra de linha impressa entre duas
+  parágrafo, os estilos) é recusado com aviso; o Ctrl+T com uma edição do texto ainda na fila
+  pede para tentar de novo depois que ela entrar; num projeto com páginas lidas antes do D1,
+  o modo das peças "como o livro" só vê as figurinas delas quando forem gravadas de novo
+  (escolha "Figurinas" nas Opções); apagar a quebra de linha impressa entre duas
   palavras não as junta, e uma linha que perde todos os boxes some, com o glifo virtual que
   sobrou indo para a linha vizinha (as linhas são da página; a Linha avisa). A posição que a Linha e os
   Avisos dão de um glifo é em pixels da página.

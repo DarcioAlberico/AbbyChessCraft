@@ -227,9 +227,10 @@ def test_desfazer_o_reconhecimento_volta_a_pagina_de_antes(app, janela):
     janela.treino.campo.setText("Z")
     janela.treino.pedir_so_corrigir()
     corrigida = _caixas(boxes(janela))
-    janela.reconhecer()                  # o F5 de novo apaga a correção
+    janela.reconhecer()                  # o F5 de novo mantém a correção manual (§4.6)
     _esperar(app, janela)
-    assert boxes(janela)[0].char != "Z"
+    assert boxes(janela)[0].char == "Z"
+    assert janela.pagina.historico.proximo_a_desfazer == "Reconhecer a página"
     janela.pagina.desfazer()
     assert _caixas(boxes(janela)) == corrigida
 

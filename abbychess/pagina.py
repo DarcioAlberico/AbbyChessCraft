@@ -611,6 +611,18 @@ def criar_box(imagem: Image.Image, boxes: List[BoxEntry], area: Caixa,
     return indice
 
 
+def a_manter_na_releitura(boxes, lida: bool) -> List[BoxEntry]:
+    """Os glifos que reconhecer de novo não troca (§4.6), como cópias dos `BoxEntry`: numa
+    página ainda não lida, os marcados à mão (todos os boxes dela); numa lida, os que o usuário
+    decidiu (fonte `manual`) ou viu e aceitou (`revisado`). `boxes` são os `Box` do modelo.
+    As decisões dos outros passam aos glifos novos pela sobreposição (`modelo.reconciliar`)."""
+    from abbychess.edicao import copia
+    from abbychess.leitor import FONTE_MANUAL
+
+    return [copia(b.entry) for b in boxes
+            if not lida or b.entry.source == FONTE_MANUAL or b.revisado]
+
+
 def manter_marcados(segmentados: List[BoxEntry], marcados: List[BoxEntry]) -> List[BoxEntry]:
     """Os boxes da segmentação com os glifos marcados à mão no lugar dos de baixo.
 

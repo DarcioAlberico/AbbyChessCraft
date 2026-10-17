@@ -18,7 +18,6 @@ Sem Qt.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from typing import Callable, Dict, Iterable, List, Optional
@@ -127,19 +126,32 @@ def pendentes_da_pagina(boxes: List[BoxEntry], limiares: Limiares) -> int:
 
 
 def pendentes_por_pagina(projeto: ProjetoDeLivro, limiares: Limiares) -> Dict[int, int]:
-    """Quantos glifos faltam revisar em cada página gravada, só as que têm algum."""
+    """Quantos glifos faltam revisar em cada página gravada, só as que têm algum: pelo
+    resumo de cada página no `livro.json` (o histograma das confianças dá os pendentes de
+    qualquer limiar), sem abrir as páginas (§8.1, CA-8.3)."""
+    from abbychess.projeto import pendentes_pelo_histograma
+
     contagem = {}
-    for indice in projeto.paginas_lidas():
+    for indice, resumo in projeto.resumo_do_livro().items():
         try:
-            modelo = projeto.carregar_modelo(indice)
-            boxes = [b.entry for b in modelo.boxes if not b.revisado] if modelo else []
-        except (OSError, ValueError, json.JSONDecodeError) as erro:
-            log.warning("a página %d gravada não abriu: %s", indice + 1, erro)
-            continue
-        n = pendentes_da_pagina(boxes, limiares)
+            n = pendentes_pelo_histograma(resumo, limiares.revisao)
+        except (KeyError, TypeError, ValueError):   # um resumo antigo, sem o histograma
+            n = int(resumo.get("pendentes", 0) or 0)
         if n:
             contagem[indice] = n
     return contagem
+
+
+def anterior_com_pendentes(projeto: ProjetoDeLivro, limiares: Limiares, antes_de: int
+                           ) -> Optional[int]:
+    """A página gravada com glifo a revisar antes de `antes_de` (dá a volta no livro)."""
+    pendentes = sorted(pendentes_por_pagina(projeto, limiares))
+    if not pendentes:
+        return None
+    ordem = ([i for i in reversed(pendentes) if i < antes_de]
+             + [i for i in reversed(pendentes) if i > antes_de]
+             + ([antes_de] if antes_de in pendentes else []))
+    return ordem[0]
 
 
 def proxima_com_pendentes(projeto: ProjetoDeLivro, limiares: Limiares, depois_de: int

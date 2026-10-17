@@ -131,8 +131,10 @@ class EspacoDeTrabalho:
         self.arranjo = "lado_a_lado"
 
         self.inspetor = PainelDoInspetor(ControladorDaFila.MODOS,
-                                         {"glifo": self.treino, "palavra": self.verificacao})
+                                         {"glifo": self.treino, "palavra": self.verificacao},
+                                         escopos=ControladorDaFila.ESCOPOS)
         self.inspetor.modo_escolhido.connect(self.fila.definir)
+        self.inspetor.escopo_escolhido.connect(self.fila.definir_escopo)
         self.inspetor.setMinimumWidth(240)
         self.doca_inspetor = _doca(self, "Inspetor", "doca_inspetor", self.inspetor,
                                    Qt.DockWidgetArea.RightDockWidgetArea)
@@ -461,10 +463,12 @@ class EspacoDeTrabalho:
         self.atualizar_fila()
 
     def atualizar_fila(self) -> None:
-        self.inspetor.mostrar_modo(self.fila.modo, self.fila.nome())
-        contador = self.fila.contador() if self.pagina.pronto else ""
+        f = self.fila
+        self.inspetor.mostrar_modo(f.modo, f.nome(), f.escopo, f.nome_do_escopo())
+        contador = f.contador() if self.pagina.pronto else ""
         self.inspetor.mostrar_contador(contador)
-        self.rotulo_da_fila.setText(f"fila: {self.fila.nome().lower()} {contador}".rstrip())
+        escopo = " (livro)" if f.escopo == "livro" else ""
+        self.rotulo_da_fila.setText(f"fila: {f.nome().lower()}{escopo} {contador}".rstrip())
 
     def atualizar_paginas(self, seguir: bool = False) -> None:
         """A gaveta com o `livro.json` de agora; `seguir`: a página aberta mudou, e a gaveta

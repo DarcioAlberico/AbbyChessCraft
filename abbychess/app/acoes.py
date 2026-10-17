@@ -83,6 +83,8 @@ def montar(janela) -> None:
                                    texto="Anterior da fila")
     j.acao_ciclar_fila = acao(j, "ciclar_modo_da_fila", j.fila.ciclar,
                               texto="Modo seguinte da fila")
+    j.acao_escopo_da_fila = acao(j, "alternar_escopo_da_fila", j.fila.alternar_escopo,
+                                 texto="Escopo da fila: página ou livro")
     j.acao_diagramas = acao(j, "proximo_diagrama", lambda: j.conferencia.proximo_do_livro(),
                             texto="Próximo diagrama por conferir")
     j.acao_diagramas.setToolTip("O próximo diagrama do livro ainda não conferido (o desta "
@@ -240,7 +242,7 @@ def _menus(j) -> None:
                  j.acao_reconhecer, j.acao_reler, j.acao_verificada, j.acao_antes_do_lote,
                  None,
                  j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
-                 j.acao_proximo_do_livro, j.acao_diagramas):
+                 j.acao_escopo_da_fila, j.acao_proximo_do_livro, j.acao_diagramas):
         menu.addSeparator() if acao is None else menu.addAction(acao)
     menu = j.menuBar().addMenu("E&xibir")
     for acao in (j.acao_lado_a_lado, j.acao_empilhado, j.acao_so_imagem, j.acao_so_vista,
@@ -301,7 +303,8 @@ def atualizar(janela) -> None:
     j.acao_areas_auto.setEnabled(editar and j.acao_areas.isChecked())
     j.acao_verificar.setEnabled(tem and bool(p.boxes))
     j.acao_diagramas.setEnabled(tem)
-    for q in (j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila):
+    for q in (j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
+              j.acao_escopo_da_fila):
         q.setEnabled(tem)
     for q in (j.acao_realce, j.acao_margens):     # sem página reconhecida, nada a realçar
         q.setEnabled(tem and bool(p.boxes))

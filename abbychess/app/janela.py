@@ -347,8 +347,10 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
     def opcoes(self) -> None:
         if not self.pagina.pronto:
             return
-        dialogo = DialogoDeOpcoes(self.projeto.dados.limiares, self)
+        dialogo = DialogoDeOpcoes(self.projeto.dados.limiares, self,
+                                  notacao=self.projeto.dados.notacao)
         if dialogo.exec() == DialogoDeOpcoes.DialogCode.Accepted:
+            self.pagina.definir_notacao(dialogo.notacao())
             self.pagina.aplicar_limiares(dialogo.limiares())
 
     def reconhecer_livro(self) -> None:

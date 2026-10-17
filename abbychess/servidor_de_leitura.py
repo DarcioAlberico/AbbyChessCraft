@@ -182,6 +182,10 @@ class _Laco:
     a segmentação da página do lote, que não tem glifos no meio (~0,5 s numa página cheia),
     também dá a vez, e a releitura de um glifo não espera por ela. Os deltas dos padrões e
     os limiares entram assim que chegam, entre um glifo e outro (sob a mesma trava).
+
+    Durante um interativo longo (um F5), a thread principal não recebe nada: o "cancelar"
+    do lote, os deltas e o "sair" esperam o fim dele (a página do lote fica parada em
+    `_livre`; fechar o projeto no meio de um F5 depende do `terminate` de `fechar`).
     """
 
     def __init__(self, entrada, saida, fabrica: str, pasta_de_padroes, limiares):
@@ -219,7 +223,10 @@ class _Laco:
             self._trabalhador.join(5)
 
     def _no_lote(self) -> bool:
-        return self._trabalhador is not None and self._trabalhador.is_alive()
+        # O `no_lote`, que o trabalhador zera antes de acordar o laço, e não o `is_alive()`:
+        # a thread ainda viva logo depois do `_acordar.set()` deixaria a página seguinte
+        # parada na fila (o acordar consumido e o laço bloqueado esperando mensagem).
+        return self.no_lote is not None
 
     def _receber(self, bloquear: bool) -> None:
         while True:
@@ -284,6 +291,7 @@ class _Laco:
                 self._atender(mensagem)
             finally:
                 self.no_lote = None
+                self.cancelados.discard(mensagem[1])   # um cancelar que chegou no fim
                 self._acordar.set()                # o laço começa a página seguinte
 
         self._trabalhador = threading.Thread(target=rodar, name="pagina-do-lote", daemon=True)

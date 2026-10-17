@@ -299,11 +299,25 @@ sempre com as pastas do projeto.
   página) abre a conferência no próximo diagrama do livro ainda não conferido, a começar
   pela página aberta.
 - **Reconhecer o livro** (Ctrl+Shift+F5) lê um intervalo de páginas ("26-27, 30"; vazio é o
-  livro inteiro) em segundo plano, com os padrões do livro, lê os diagramas em FEN como o F5
-  e grava cada página no projeto assim que ela termina. O diagrama já conferido não é relido. A barra mostra a página em que o lote está. Enquanto ele roda, o Glifo do Inspetor e as ações de reconhecer e reler ficam desligadas, e editar a página (dividir, juntar ou marcar pelo visor, desfazer, esquecer padrões, as opções) é recusado na hora, com aviso na barra: cancele o lote ou espere ele acabar. Ver as páginas continua valendo. Se o intervalo tem
-  páginas já lidas, ele pergunta: Sim as lê de novo (os boxes e as correções só desta
-  ocorrência saem, os padrões ficam), Não as pula. **Cancelar o lote** para ao fim da leitura
-  em curso; a página interrompida fica como estava e as já gravadas ficam.
+  livro inteiro) com os padrões do livro, lê os diagramas em FEN como o F5 e grava cada
+  página assim que ela termina. O diagrama já conferido não é relido. **Desde o passo E a
+  janela inteira continua valendo durante o lote**: ele lê no servidor de leitura (abaixo) e
+  a janela só grava cada página que volta, entre um comando seu e outro. Dá para ensinar,
+  corrigir, dividir, desfazer, mudar as opções e apertar F5 noutra página; o F5 passa na
+  frente da próxima página do lote, e o padrão ensinado no meio vale nas páginas que o lote
+  começar depois. A gaveta de Páginas mostra a barra do andamento, e a barra de status as
+  páginas feitas e o tempo estimado. As páginas **verificadas** são sempre puladas. Se o
+  intervalo tem páginas já lidas, ele pergunta: Sim as lê de novo, **mantendo as correções
+  manuais e os glifos revisados** (como o F5, §4.6), Não as pula. A **página aberta em que
+  você mexeu nesta sessão** (algum passo dela no desfazer) não é sobrescrita, nem a que você
+  mudar (aberta ou não) enquanto o lote a lê: ficam para "reler depois", e a mensagem do fim
+  e os Avisos dizem quais (abra e aperte F5, ou rode o lote nelas depois). A que você
+  verificar (Ctrl+T) enquanto o lote a lê continua verificada. Antes de reler uma página já lida, o lote guarda
+  como ela estava em `paginas/.antes-do-lote/`, e **Página › Voltar ao estado antes do lote**
+  a devolve (o que mudou nela depois do lote se perde; não entra no desfazer). **Cancelar o
+  lote** (o ✕ da barra ou o menu) para a página em leitura no glifo seguinte; ela fica como
+  estava, as já gravadas ficam, e **Ferramentas › Retomar o lote** continua de onde parou,
+  sem ler nenhuma página duas vezes.
 - **Próxima página com pendentes** (F6, no menu Página) é a fila de revisão do livro todo: mostra o pendente
   desta página e, quando ela acaba, abre a próxima página gravada que ainda tem glifo a
   revisar, dando a volta no livro.
@@ -339,6 +353,31 @@ página. Com o número em "ignorar", o F5 pelas áreas deu 2.111 boxes, os 2.113
 inteira menos o "28". A verificação achou 40 palavras em 0,7 s, com o léxico já carregado
 (0,6 s na primeira vez), entre elas "Cava1o", "desenvover", "maIoria" e "ganhartempos";
 corrigir "Cava1o" para "Cavalo" trocou só o glifo do "1".
+
+### O servidor de leitura (passo E)
+
+Os modelos globais do PyBoxEditor (a rede e a base, ~1 GB na memória) ficam num **processo
+filho**, aberto com o projeto, e não mais na janela. Ele faz toda leitura que não sai dos
+padrões do livro: o F5, o Reler pendentes, o lote, os diagramas, as áreas automáticas e a
+leitura de um glifo depois de dividir, juntar, ajustar ou marcar. O que muda para você:
+
+- **O projeto abre na hora.** A barra diz "Carregando os modelos no servidor de leitura…";
+  as páginas já abrem e o Enter já ensina. O F5 pedido antes de os modelos ficarem prontos
+  espera por eles.
+- **Aguardando leitura.** A janela só tem os padrões do livro. O glifo que eles não leem
+  (depois de dividir, por exemplo) aparece em cinza tracejado, "aguardando leitura", e
+  recebe a leitura do servidor em seguida, num passo só do desfazer com a edição.
+- **Os padrões vão junto.** O que você ensina ou esquece é mandado ao servidor antes do
+  pedido seguinte; uma página do lote em andamento passa a usá-lo a partir do glifo
+  seguinte.
+- **Se o servidor cair**, ele é aberto de novo sozinho e os pedidos em curso são refeitos;
+  isso fica nos Avisos (⚠ na barra). Se cair de novo, a janela avisa e oferece reabrir o
+  projeto; o lote para, e Retomar o lote continua depois.
+- **A memória** é a dos dois processos somados (a medida "Memória com o lote" soma os dois).
+
+`ABBY_SERVIDOR=0` faz a janela ler sem o servidor, com os modelos nela mesma (é o que a
+suíte rápida usa); `ABBY_FABRICA_DE_LEITOR=modulo:funcao` troca o leitor do filho (os testes
+usam um leitor falso, sem torch).
 
 ### Exportar
 
@@ -406,8 +445,8 @@ tenta de novo (até 5 tentativas ao todo, a cada 50 ms). Os `.tmp` que uma queda
   esperando mais a cada vez. **Fechar a janela grava o que falta antes de fechar.** Se
   alguma página não grava, ele pergunta se fecha mesmo assim e perde as mudanças dela;
   "Não" deixa a janela aberta, com tudo na memória, para você liberar o disco e fechar de
-  novo. Fechar com o lote rodando cancela o lote e espera a página em leitura terminar (ela
-  é gravada; pode levar alguns segundos).
+  novo. Fechar com o lote rodando cancela o lote: a página em leitura para no glifo
+  seguinte e fica como estava, e o servidor de leitura fecha em até 5 s.
 
 **O modelo v2 (passo 1b).** Cada glifo tem agora uma identidade que não muda (`gid`): a
 página tem um número próprio (`pid`), que reordenar ou inserir páginas não muda, e cada
@@ -581,45 +620,47 @@ Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (commit 76ba432; má
 
 Desempenho por passo, em ms ou MB (uma rodada cada, a do portão, que roda no mesmo processo depois dos testes `livro_real` e por isso não é a condição das rodadas repetidas; quanto o mesmo código varia, e o que se conclui, está nelas, abaixo):
 
-| Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) | 2a (`2026-10-16-passo-2a.json`) | 2b (`2026-10-16-passo-2b.json`) | a1 (`2026-10-16-passo-a1.json`) | a2 (`2026-10-16-passo-a2.json`) | a3 (`2026-10-17-passo-a3.json`) |
-|---|---|---|---|---|---|---|---|---|
-| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,89 | 15,21 | 16,04 | 14,5 |
-| Troca fora do cache, p95 | — | — | — | — | — | 147,1 | 144,68 | 145,27 |
-| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 23,68 | 26,63 | 26,8 | 22,41 |
-| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 16,92 | 20,23 | 20,88 | 20,15 |
-| Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 | 164 | 8 | 8 | 8 | 8 |
-| Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 12,9 | 22 | 12 | 9,5 |
-| Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1654 | 1793 | 1799 | 1823 |
-| Pintura de 2.000 boxes, p95 | — | — | — | — | — | 11,5 | 13,14 | 13,2 |
-| Montar o Documento, p95 | — | — | — | — | 25,61 | 22,72 | 25,97 | 31,78 |
-| Clique no Documento, p95 | — | — | — | — | — | — | — | 2,84 |
-| Clique acha o box, p95 | — | — | — | — | — | 0,0016 | 0,0016 | 0,0016 |
+| Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) | 2a (`2026-10-16-passo-2a.json`) | 2b (`2026-10-16-passo-2b.json`) | a1 (`2026-10-16-passo-a1.json`) | a2 (`2026-10-16-passo-a2.json`) | a3 (`2026-10-17-passo-a3.json`) | e (`2026-10-17-passo-e.json`) |
+|---|---|---|---|---|---|---|---|---|---|
+| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,89 | 15,21 | 16,04 | 14,5 | 15,08 |
+| Troca fora do cache, p95 | — | — | — | — | — | 147,1 | 144,68 | 145,27 | 138,88 |
+| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 23,68 | 26,63 | 26,8 | 22,41 | 22,42 |
+| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 16,92 | 20,23 | 20,88 | 20,15 | 20,17 |
+| Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 | 164 | 8 | 8 | 8 | 8 | 8 |
+| Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 12,9 | 22 | 12 | 9,5 | 2,2 |
+| Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1654 | 1793 | 1799 | 1823 | 2177 |
+| Releitura com o lote, p95 | — | — | — | — | — | — | — | — | 103,05 |
+| Pintura de 2.000 boxes, p95 | — | — | — | — | — | 11,5 | 13,14 | 13,2 | 12,92 |
+| Montar o Documento, p95 | — | — | — | — | 25,61 | 22,72 | 25,97 | 31,78 | 31,59 |
+| Clique no Documento, p95 | — | — | — | — | — | — | — | 2,84 | 3,11 |
+| Clique acha o box, p95 | — | — | — | — | — | 0,0016 | 0,0016 | 0,0016 | 0,0015 |
 
 Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter do passo 0 ao 1b tem duas faixas no mesmo código (perto de 110–130 e de 180–235; no 2a, uma só, perto de 90); o atraso no lote tem duas faixas sempre (perto de 8–10 e de 21). Desde o 2b o congelamento é desligado (`ABBY_CONGELAR=1` liga): as duas linhas do 2b rodam o mesmo programa (o rótulo `sem_congelar` é do roteiro de medida), e a coluna do Enter mede até a cor mudar (até o 2a, até o fim da propagação). Desde o A1 a troca é no cache de páginas (a vizinha já pré-carregada); a de fora do cache tem coluna própria. Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
 
-| Código | Commit | Rodada | Troca, p50 | Troca, p95 | Fora do cache, p50 | Enter, p50 | Enter, p95 | Releitura, p50 | Releitura, p95 | Atraso no lote, p99 |
-|---|---|---|---|---|---|---|---|---|---|---|
-| passo 0 | 25e81b1 | completa | 169,76; 174,14; 171,68 | 192,19; 190,98; 192,11 | — | 104,33; 104,61; 104,66 | 177,63; 179,72; 179,81 | 107,34; 107,54; 105,85 | 124,76; 129,43; 142,69 | 21,4; 8,7; 8,3 |
-| passo 0 | 25e81b1 | só do lote, sem os padrões | — | — | — | — | — | — | — | 19,9; 7,7; 7,1 |
-| passo 1a | 315db35 | completa | 180,73; 183,85; 180,22 | 195,04; 198,16; 196,84 | — | 149,4; 114,34; 113,81 | 191,17; 190,97; 190,82 | 133,34; 111,81; 111,19 | 165,4; 150,71; 141,33 | 20,8; 21,3; 8,7 |
-| passo 1a | 3bf1ad3 | só do lote, sem os padrões | — | — | — | — | — | — | — | 7,5; 20,5; 7,7 |
-| passo 1b | 1519d8f | completa | 170,01; 166,11; 167,1 | 184,66; 192,26; 182,72 | — | 125,37; 140,8; 125,31 | 149,77; 149,56; 139,9 | 131,89; 139,62; 131,52 | 154,31; 159,37; 158,59 | 17,7; 15; 16,6 |
-| passo 1b sem congelar | 1519d8f | completa | 169,84; 175,66; 170,16 | 192,25; 202,72; 196,29 | — | 123,14; 126,27; 144,94 | 199,91; 203,93; 234,95 | 124,11; 123,85; 140,89 | 142,6; 150,72; 233,54 | 14,4; 15,5; 16,3 |
-| passo 2a | d19c858 | completa | 162,65; 167,54; 171,97 | 180,58; 191,56; 190,65 | — | 91,38; 82,94; 83,67 | 95,14; 115,58; 90,57 | 74,82; 74,92; 74,59 | 85,61; 90,63; 106,11 | 10,2; 10,1; 21,6 |
-| passo 2a sem congelar | d19c858 | completa | 174,66; 175,73; 178,05 | 188,01; 188,63; 188,4 | — | 82,23; 82,43; 82,52 | 91,7; 89,92; 92,03 | 73,15; 70,64; 75,29 | 88,33; 91,91; 92,78 | 11,7; 20,8; 21,5 |
-| passo 2b | 6f863c3 | completa | 157,59; 153,58; 153,66 | 189,56; 171,05; 174,1 | — | 20,85; 21,1; 20,62 | 25,5; 26,13; 25,7 | 13,33; 13,59; 15,26 | 15,65; 16,1; 19,15 | 20,2; 22; 21,8 |
-| passo 2b sem congelar | 6f863c3 | completa | 153,56; 153,19; 157,37 | 173,65; 165,46; 168,14 | — | 20,55; 20,57; 21,47 | 24,01; 27,01; 27,08 | 14,4; 13,82; 14,5 | 16,9; 16,99; 18,83 | 22,3; 9,1; 9,8 |
-| passo a1 | 538adae | completa | 14,06; 14,02; 14,12 | 14,65; 14,28; 14,52 | 132,15; 130,39; 132,9 | 20,63; 20,62; 20,82 | 25,86; 22,97; 25,86 | 14,63; 14,5; 14,76 | 21,54; 17,03; 19,82 | 10,4; 22; 22 |
-| passo a2 | 93c94a7 | completa | 14,17; 14,23; 14,32 | 15,4; 14,95; 14,81 | 129,93; 135,18; 133,2 | 21,26; 20,83; 21,43 | 27,75; 26,56; 24,42 | 14,93; 14,74; 15,49 | 19,82; 20,77; 19,94 | 9,5; 9,5; 22,2 |
-| passo a3 | 271d582 | completa | 14,27; 14,12; 14,09 | 14,63; 15,36; 14,46 | 128,43; 129,36; 128,24 | 29,97; 21,33; 21,24 | 37,04; 22,94; 22,86 | 14,09; 14,6; 14,42 | 17,25; 19,34; 19,16 | 21; 9,4; 9,7 |
+| Código | Commit | Rodada | Troca, p50 | Troca, p95 | Fora do cache, p50 | Enter, p50 | Enter, p95 | Releitura, p50 | Releitura, p95 | Atraso no lote, p99 | Releitura com o lote, p95 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| passo 0 | 25e81b1 | completa | 169,76; 174,14; 171,68 | 192,19; 190,98; 192,11 | — | 104,33; 104,61; 104,66 | 177,63; 179,72; 179,81 | 107,34; 107,54; 105,85 | 124,76; 129,43; 142,69 | 21,4; 8,7; 8,3 | — |
+| passo 0 | 25e81b1 | só do lote, sem os padrões | — | — | — | — | — | — | — | 19,9; 7,7; 7,1 | — |
+| passo 1a | 315db35 | completa | 180,73; 183,85; 180,22 | 195,04; 198,16; 196,84 | — | 149,4; 114,34; 113,81 | 191,17; 190,97; 190,82 | 133,34; 111,81; 111,19 | 165,4; 150,71; 141,33 | 20,8; 21,3; 8,7 | — |
+| passo 1a | 3bf1ad3 | só do lote, sem os padrões | — | — | — | — | — | — | — | 7,5; 20,5; 7,7 | — |
+| passo 1b | 1519d8f | completa | 170,01; 166,11; 167,1 | 184,66; 192,26; 182,72 | — | 125,37; 140,8; 125,31 | 149,77; 149,56; 139,9 | 131,89; 139,62; 131,52 | 154,31; 159,37; 158,59 | 17,7; 15; 16,6 | — |
+| passo 1b sem congelar | 1519d8f | completa | 169,84; 175,66; 170,16 | 192,25; 202,72; 196,29 | — | 123,14; 126,27; 144,94 | 199,91; 203,93; 234,95 | 124,11; 123,85; 140,89 | 142,6; 150,72; 233,54 | 14,4; 15,5; 16,3 | — |
+| passo 2a | d19c858 | completa | 162,65; 167,54; 171,97 | 180,58; 191,56; 190,65 | — | 91,38; 82,94; 83,67 | 95,14; 115,58; 90,57 | 74,82; 74,92; 74,59 | 85,61; 90,63; 106,11 | 10,2; 10,1; 21,6 | — |
+| passo 2a sem congelar | d19c858 | completa | 174,66; 175,73; 178,05 | 188,01; 188,63; 188,4 | — | 82,23; 82,43; 82,52 | 91,7; 89,92; 92,03 | 73,15; 70,64; 75,29 | 88,33; 91,91; 92,78 | 11,7; 20,8; 21,5 | — |
+| passo 2b | 6f863c3 | completa | 157,59; 153,58; 153,66 | 189,56; 171,05; 174,1 | — | 20,85; 21,1; 20,62 | 25,5; 26,13; 25,7 | 13,33; 13,59; 15,26 | 15,65; 16,1; 19,15 | 20,2; 22; 21,8 | — |
+| passo 2b sem congelar | 6f863c3 | completa | 153,56; 153,19; 157,37 | 173,65; 165,46; 168,14 | — | 20,55; 20,57; 21,47 | 24,01; 27,01; 27,08 | 14,4; 13,82; 14,5 | 16,9; 16,99; 18,83 | 22,3; 9,1; 9,8 | — |
+| passo a1 | 538adae | completa | 14,06; 14,02; 14,12 | 14,65; 14,28; 14,52 | 132,15; 130,39; 132,9 | 20,63; 20,62; 20,82 | 25,86; 22,97; 25,86 | 14,63; 14,5; 14,76 | 21,54; 17,03; 19,82 | 10,4; 22; 22 | — |
+| passo a2 | 93c94a7 | completa | 14,17; 14,23; 14,32 | 15,4; 14,95; 14,81 | 129,93; 135,18; 133,2 | 21,26; 20,83; 21,43 | 27,75; 26,56; 24,42 | 14,93; 14,74; 15,49 | 19,82; 20,77; 19,94 | 9,5; 9,5; 22,2 | — |
+| passo a3 | 271d582 | completa | 14,27; 14,12; 14,09 | 14,63; 15,36; 14,46 | 128,43; 129,36; 128,24 | 29,97; 21,33; 21,24 | 37,04; 22,94; 22,86 | 14,09; 14,6; 14,42 | 17,25; 19,34; 19,16 | 21; 9,4; 9,7 | — |
+| passo e | 5ba8ba0 | completa | 13,77; 13,71; 14,15 | 15,07; 14,88; 15,99 | 127,79; 127,67; 127,24 | 21,55; 30,57; 21,87 | 26,39; 36,89; 23,35 | 14,43; 14,39; 14,52 | 19,6; 18,6; 20,27 | 2,2; 2,2; 2,2 | 77,8; 101,71; 90,04 |
 
 Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
 
 | Livro | Commit | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por diagrama | Lado certo | Ordem | CER do corpo | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| xv | 271d582 | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 3 (+10 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-| yusupov | 271d582 | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 13 | 3/3 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-| darcy | 271d582 | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| xv | 5ba8ba0 | 9 | 0,875 / 1 | 7/7 (1) | 6 | 833 (2 pág.) | 3 (+10 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 1/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| yusupov | 5ba8ba0 | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 13 | 3/3 | pendente (provisório: 0) | pendente (provisório: 0/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| darcy | 5ba8ba0 | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 
 Ainda não medido: a ligação da legenda ao diagrama, no passo H (a leitura de hoje não liga legenda a diagrama); precisão e revocação por função de bloco, no passo F (a leitura de hoje não classifica blocos); a validação do FEN pelos lances, no passo H.
 
@@ -642,6 +683,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | xv | f058c02 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 444,2 s |
 | xv | 34001f8 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 435,3 s |
 | xv | 271d582 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 434,3 s |
+| xv | 5ba8ba0 | 0,875 / 1 | 7/7 (1) | 6 | 3 | 0 | 1/5 | 433,6 s |
 | yusupov | bb0b7e5 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23 s |
 | yusupov | 0ebbf9c | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,1 s |
 | yusupov | 3bf1ad3 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,4 s |
@@ -656,6 +698,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | yusupov | f058c02 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,7 s |
 | yusupov | 34001f8 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,2 s |
 | yusupov | 271d582 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,4 s |
+| yusupov | 5ba8ba0 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23 s |
 | darcy | bb0b7e5 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,5 s |
 | darcy | 0ebbf9c | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,7 s |
 | darcy | 3bf1ad3 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,8 s |
@@ -670,6 +713,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | darcy | f058c02 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 24,2 s |
 | darcy | 34001f8 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,8 s |
 | darcy | 271d582 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,9 s |
+| darcy | 5ba8ba0 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,6 s |
 
 Fatia (`ferramentas\replay_fatia.py`; **erros** são as diferenças do snapshot contra o gabarito, o N da medida humana):
 
@@ -683,6 +727,7 @@ Fatia (`ferramentas\replay_fatia.py`; **erros** são as diferenças do snapshot 
 | xv | A1 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-16-fatia-xv-passo-A1.json` |
 | xv | A2 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-16-fatia-xv-passo-A2-204155.json` |
 | xv | A3 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-A3.json` |
+| xv | E | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-E.json` |
 <!-- medidas:fim -->
 
 O replay da fatia (os gestos para levar as p. 21–27 ao gabarito) é
@@ -835,7 +880,9 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | `abbychess/leitor.py` | A ordem da leitura: padrões do livro, depois a cadeia global |
 | `abbychess/pagina.py` | Segmentar, separar diagramas, ler, ensinar, propagar, dividir e juntar boxes, montar o texto |
 | `abbychess/diagramas.py` | Ler cada tabuleiro em FEN, o lado a jogar (pela legenda nos boxes), a conferência, as amostras no projeto e o FEN no texto |
-| `abbychess/livro.py` | O lote de páginas, com cancelamento, e a fila de revisão do livro todo |
+| `abbychess/livro.py` | O lote síncrono das ferramentas e dos testes, e a fila de revisão do livro todo |
+| `abbychess/servidor_de_leitura.py` | O servidor de leitura (§11): o processo filho com os modelos globais, a vez entre glifos, os deltas dos padrões, a queda e o fechamento |
+| `abbychess/lote.py` | O lote da janela (`CondutorDoLote`): decide, lê pelo servidor e grava na thread da interface; cancelar, retomar, `.antes-do-lote/` |
 | `abbychess/exportar.py` | PDF pesquisável, DOCX e EPUB a partir das páginas gravadas, pelo core do PyBoxEditor, sem o cabeçalho e o rodapé corridos |
 | `abbychess/historico.py` | O desfazer do projeto: transações por gid (o que cada ação mudou, por página), a pré-condição, o limite de 50 MB, a propagação que emenda o Enter |
 | `abbychess/app/` | A interface PySide6: a janela (só liga sinais aos controladores e desenha), `acoes.py` (menus e atalhos), `dialogos.py`, o executor com fila (`trabalho.py`), visor da página, painéis de treino, padrões e verificação, opções, conferência de diagramas |
@@ -891,6 +938,28 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   (21, 15 e 19–21 ms na mediana). A qualidade dos três livros e a fatia, medidas no
   `4e974a5`, não mudaram (o passo não mexe na leitura; a correção depois dele só muda quando
   a pré-carga roda e os atalhos de zoom).
+- **O servidor de leitura, desde o passo E** (3 rodadas e o portão do commit `5ba8ba0`,
+  pasta limpa). **O atraso da interface durante o lote** caiu para p99 de 2,2 ms nas 3
+  rodadas e no portão (alvo de 50; até o A3, as duas faixas de ~9 e ~21 ms), agora com todas
+  as ações valendo; o máximo ficou em 116–129 ms (no A3, 96–103), e numa rodada do módulo
+  sozinho em 286 ms, nos instantes em que a janela grava uma página que voltou. **A
+  releitura de um glifo com o lote rodando** (CA-11.7, do Alt+seta ao glifo lido pelo
+  servidor, entre um glifo e outro do lote) ficou em 46–55 ms na mediana e 78–104 no p95
+  (portão: 103; o módulo sozinho: 134), abaixo do alvo de 150 mas perto dele. **A memória
+  somada** (a janela e o servidor) foi de 1616 MB com o módulo do servidor sozinho (janela
+  ~450, servidor ~960); nas rodadas completas deu 2173–2177, porque o processo de teste
+  ainda guarda os modelos globais que o módulo anterior carregou na própria janela, coisa
+  que o programa não faz (alvo de 2560). **O lote de 20 páginas levou 162–164 s** (A3: 88),
+  mas não pelo servidor: o projeto da medida nova não tem padrões (no A3, o lote lia com os
+  padrões que os testes do Enter tinham ensinado, e a leitura pelo padrão pula a cadeia
+  global), e as mesmas páginas lidas na própria janela, sem servidor, levam os mesmos 8,1 s
+  cada (medida à parte; o `gc.freeze` no filho e tirar a prioridade baixa e o limite de
+  threads não mudaram nada). As outras medidas ficaram como no A3: a troca no cache (14 ms
+  na mediana), fora do cache (127–128), a releitura sem o lote (14–15), montar o Documento
+  (31–34 no p95); o clique no Documento subiu de 2,8 para 3,1–3,4 ms no p95. O Enter até a
+  cor ficou em 21–22 ms na mediana em 2 rodadas e no portão; **a segunda rodada** teve 30,6
+  na mediana e 36,9 no p95, o mesmo deslocamento por igual já visto no A1 e no A3 (não
+  investigado). A qualidade dos três livros e a fatia, no `5ba8ba0`, ficaram iguais às do A3.
 - **O Documento, desde o passo A3** (3 rodadas do commit `271d582`, pasta limpa). O clique
   numa palavra do Documento (um clique de verdade, com o contorno na Imagem, o glifo no
   Inspetor, o cursor e a Linha seguindo) leva 2,5 ms na mediana e 2,8 no p95 (alvo de 50,
@@ -951,8 +1020,8 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   das 3 sem ele caíram na faixa de ~21 ms (com ele, 1 de 3), o que é a variação de sempre
   dessa medida, e uma das rodadas com ele estava perturbada (um pico de 935 ms no lote).
   `ABBY_CONGELAR=1` o religa, para medir de novo.
-- **O atraso da interface durante o lote** tem duas faixas no p99 (perto de 9 e de 22 ms),
-  como em todos os passos, abaixo do alvo de 50 ms. O máximo ficou em 128–154 ms nas 6
+- **O atraso da interface durante o lote, até o A3,** tinha duas faixas no p99 (perto de 9 e
+  de 22 ms), abaixo do alvo de 50 ms (desde o E, ver o item do servidor de leitura). O máximo ficou em 128–154 ms nas 6
   rodadas (até o 1b, 85–105; desde o 2a o lote do teste passa pelo controlador do livro, que
   grava o pendente antes de começar e recarrega a página aberta no fim). No 2a, uma rodada
   com o instante de cada atraso (`docs/medidas/2026-10-16-pico-do-lote-2a-parcial.json`,
@@ -993,10 +1062,14 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   treino, os padrões, as opções, o reconhecimento do livro em lote e a fila do livro; no
   Projeto, a exportação; o editor de áreas, a verificação de texto e a leitura e
   conferência dos diagramas.
-- **O lote não aprende sozinho.** Ele lê com os padrões que existem quando começa; ensinar
-  durante o lote não é possível (a edição é recusada com aviso enquanto ele roda), e o que
-  se ensina depois só vale para as páginas lidas de novo ou com Ctrl+R. O lote grava as
-  páginas na thread dele, e não pelo gravador; o servidor de leitura do passo E muda isso.
+- **O lote não volta às páginas que já leu.** O padrão ensinado durante o lote vale nas
+  páginas que ele começar depois (desde o passo E); as que ele já leu só mudam lidas de novo
+  (F5, Ctrl+R ou outro lote).
+- **"Reler depois" não é uma lista guardada.** As páginas abertas em que você mexeu, e que o
+  lote por isso não sobrescreveu, aparecem na mensagem do fim e nos Avisos; não há um
+  comando que releia só elas (rode o lote no intervalo delas).
+- **Voltar ao estado antes do lote não se desfaz**, e vale para a última releitura de cada
+  página pelo lote com "refazer" (a cópia de uma releitura substitui a da anterior).
 - **Os parágrafos exportados saem do vão entre linhas.** Recuo de primeira linha, títulos,
   cabeçalho e rodapé de página não são reconhecidos: o cabeçalho corrido entra como
   parágrafo, e uma página de duas colunas sai na ordem de leitura, mas sem marcar a coluna.
@@ -1014,7 +1087,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   notação ("xd", "O...Qf") também aparecem.
 - **O desfazer é da sessão.** Fechar o projeto o esquece, e ele guarda até 50 MB pela
   estimativa dele (as ações mais antigas saem). Ficam fora dele o reconhecimento em lote
-  (que ganha "voltar ao estado antes do lote" no passo E) e as amostras de diagrama
+  (que tem **Página › Voltar ao estado antes do lote** desde o passo E) e as amostras de diagrama
   guardadas na conferência (a conferência em si se desfaz). Depois de um lote que releu
   uma página, o Ctrl+Z das ações de antes nela é recusado (os glifos mudaram), e a pergunta
   da recusa deixa tirá-las do caminho.

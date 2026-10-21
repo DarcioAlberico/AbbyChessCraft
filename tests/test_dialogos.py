@@ -49,6 +49,7 @@ def test_novo_projeto_guarda_idioma_e_intervalo_no_mesmo_fluxo(tmp_path, monkeyp
         assert projeto.dados.idioma == "en"
         assert projeto.dados.extras["intervalo_do_corpo"] == [1, 2]
         assert projeto.dados.extras["amostra_guiada_pendente"] is True
+        assert projeto.dados.extras[dialogos.livro.CHAVE_DOS_CANDIDATOS_DA_AMOSTRA] == [1, 2]
         reaberto = ProjetoDeLivro.abrir(projeto.pasta)
         try:
             assert reaberto.dados.idioma == "en"
@@ -58,4 +59,29 @@ def test_novo_projeto_guarda_idioma_e_intervalo_no_mesmo_fluxo(tmp_path, monkeyp
     finally:
         projeto.fechar()
     assert valores["ultima_fonte"] == str(fonte.parent)
+
+
+def test_texto_nativo_parcial_deixa_so_as_recusadas_para_a_amostra(tmp_path, monkeypatch):
+    fonte = pdf_sintetico(tmp_path)
+    janela = SimpleNamespace(
+        config=SimpleNamespace(value=lambda _chave, padrao: padrao, setValue=lambda *_: None),
+        statusBar=lambda: SimpleNamespace(showMessage=lambda *_: None))
+    monkeypatch.setattr(dialogos.QFileDialog, "getOpenFileName",
+                        lambda *_a, **_k: (str(fonte), ""))
+    monkeypatch.setattr(dialogos.QFileDialog, "getExistingDirectory",
+                        lambda *_a, **_k: str(tmp_path / "projetos"))
+    monkeypatch.setattr(dialogos.DialogoDeNovoProjeto, "obter",
+                        lambda *_a, **_k: dialogos.OpcoesDoNovoProjeto("Parcial", "pt", (0, 2)))
+    monkeypatch.setattr(dialogos.nativo, "oferta", lambda *_a, **_k: dialogos.nativo.Oferta(2, 3))
+    monkeypatch.setattr(dialogos.QMessageBox, "question",
+                        lambda *_a, **_k: dialogos.QMessageBox.StandardButton.Yes)
+    monkeypatch.setattr(dialogos.nativo, "importar",
+                        lambda *_a, **_k: dialogos.nativo.Resultado((0, 2), (1,)))
+
+    projeto = dialogos.novo_projeto(janela)
+    try:
+        assert projeto.dados.extras["amostra_guiada_pendente"] is True
+        assert projeto.dados.extras[dialogos.livro.CHAVE_DOS_CANDIDATOS_DA_AMOSTRA] == [1]
+    finally:
+        projeto.fechar()
 

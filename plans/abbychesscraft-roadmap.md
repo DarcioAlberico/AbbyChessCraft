@@ -381,8 +381,11 @@ intervalo do corpo, sem repetir índice. As amostras guardam negrito/itálico e,
 efeito do glifo é conhecido, o k-NN exclui amostras de efeito diferente; o metadado também
 segue no delta para o servidor (CA-9.3). Em 2026-10-21, a régua pública de `core.negrito`
 passou a medir as palavras da página; o efeito fica no `Box`, acompanha F5 e lote, é gravado
-na amostra ensinada e filtra a propagação k-NN. A medição do itálico e o fluxo guiado de
-Ctrl+N, com servidor e cartão Saúde, continuam pendentes, além de CA-9.1/9.4/9.5.
+na amostra ensinada e filtra a propagação k-NN. O CA-9.5 também passou: o Ctrl+N oferece a
+camada aprovada por `core.pdf_nativo`; aceitá-la cria páginas confirmadas no modelo sem
+pedido ao servidor, enquanto as recusadas ficam para OCR. A medição do itálico e o restante
+do fluxo guiado de Ctrl+N, com amostra pelo servidor e cartão Saúde, continuam pendentes,
+além de CA-9.1/9.4.
 
 **Tarefas.**
 1. O livro novo guiado:

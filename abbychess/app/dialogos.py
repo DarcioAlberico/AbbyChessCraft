@@ -36,6 +36,7 @@ def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
         janela, "Pasta onde guardar o projeto (sem acentos no caminho)", padrao)
     if not pasta_mae:
         return None
+    importadas = ()
     try:
         projeto = ProjetoDeLivro.criar(pasta_mae, nome, fonte)
     except ProjetoInvalido as erro:
@@ -50,6 +51,7 @@ def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes) == QMessageBox.StandardButton.Yes:
             resultado = nativo.importar(projeto)
+            importadas = resultado.importadas
             janela.statusBar().showMessage(
                 f"Texto nativo usado em {len(resultado.importadas)} página(s); "
                 f"{len(resultado.recusadas)} ficaram para OCR.", 12000)
@@ -58,6 +60,9 @@ def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
         # continua novo e o caminho de OCR de sempre permanece disponível.
         QMessageBox.warning(janela, "Texto nativo",
                             f"A camada de texto não pôde ser usada ({erro}). O OCR continua disponível.")
+    if not importadas:
+        projeto.dados.extras["amostra_guiada_pendente"] = True
+        projeto.salvar()
     config.setValue("pasta_dos_projetos", pasta_mae)
     return projeto
 

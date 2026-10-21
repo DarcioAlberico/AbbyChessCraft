@@ -18,6 +18,7 @@ import json
 
 import pytest
 
+from abbychess import livro as lv
 from abbychess import pagina as pg
 from abbychess.controlador import ControladorDePagina, Eventos
 from abbychess.controladores import ControladorDoLivro
@@ -65,6 +66,37 @@ def _sem_hora(dados: bytes) -> dict:
 def _hash(projeto, indice) -> str:
     pid = projeto._pid_de(indice)
     return hashlib.sha256(projeto._arquivo_v2(pid).read_bytes()).hexdigest()
+
+
+def test_ca_9_4_o_projeto_novo_le_a_amostra_e_guarda_a_saude(ctl, projeto):
+    projeto.dados.extras.update(amostra_guiada_pendente=True, intervalo_do_corpo=[0, 2])
+    projeto.salvar()
+    terminou = []
+    ctl.eventos.ligar("amostra_terminou", lambda paginas: terminou.append(tuple(paginas)))
+
+    assert ctl.iniciar_amostra_guiada()
+    assert not ctl.iniciar_amostra_guiada()       # uma abertura não agenda a amostra duas vezes
+    ctl.executor.tudo()
+
+    assert terminou == [(0, 1, 2)]
+    saude = lv.saude(projeto, padroes=4)
+    assert saude.paginas == (0, 1, 2)
+    assert saude.pendentes_antes == saude.pendentes_agora > 0
+    assert saude.padroes == 4 and not saude.pode_reconhecer_o_livro
+
+
+def test_amostra_cancelada_fica_pendente_para_a_proxima_abertura(ctl, projeto):
+    projeto.dados.extras.update(amostra_guiada_pendente=True, intervalo_do_corpo=[0, 2])
+    projeto.salvar()
+    terminou = []
+    ctl.eventos.ligar("amostra_terminou", lambda paginas: terminou.append(tuple(paginas)))
+
+    assert ctl.iniciar_amostra_guiada()
+    ctl.cancelar()
+    ctl.executor.tudo()
+
+    assert terminou == []
+    assert projeto.dados.extras["amostra_guiada_pendente"] is True
 
 
 def test_o_lote_le_e_grava_as_paginas_e_a_aberta_aparece(ctl, projeto):

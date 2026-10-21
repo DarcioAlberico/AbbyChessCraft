@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from typing import Callable, Dict, Iterable, List, Optional
 
 from core.box_model import BoxEntry
@@ -40,6 +41,35 @@ Progresso = Callable[[int, int], None]
 #: O usuário cancelou o lote; as páginas já gravadas ficam (a do servidor e a daqui são a
 #: mesma: o cancelamento chega pela leitura).
 Cancelado = sl.Cancelado
+
+CHAVE_DA_AMOSTRA = "paginas_da_amostra_guiada"
+CHAVE_DOS_PENDENTES_INICIAIS = "pendentes_iniciais_da_amostra"
+CHAVE_DO_LIMIAR_DA_SAUDE = "limiar_de_pendentes_da_amostra"
+
+
+@dataclass(frozen=True)
+class SaudeDoLivro:
+    paginas: tuple[int, ...]
+    pendentes_antes: int
+    pendentes_agora: int
+    padroes: int
+    limiar: int
+
+    @property
+    def pode_reconhecer_o_livro(self) -> bool:
+        return bool(self.paginas) and self.pendentes_agora <= self.limiar
+
+
+def saude(projeto: ProjetoDeLivro, padroes: int = 0) -> SaudeDoLivro:
+    """O cartão Saúde derivado do projeto; não abre páginas, só lê ``livro.json``."""
+    extras = projeto.dados.extras
+    paginas = tuple(int(i) for i in extras.get(CHAVE_DA_AMOSTRA, ()))
+    iniciais = extras.get(CHAVE_DOS_PENDENTES_INICIAIS, {}) or {}
+    resumo = projeto.resumo_do_livro()
+    antes = sum(int(iniciais.get(str(i), iniciais.get(i, 0)) or 0) for i in paginas)
+    agora = sum(int(resumo.get(i, {}).get("pendentes", 0) or 0) for i in paginas)
+    limiar = int(extras.get(CHAVE_DO_LIMIAR_DA_SAUDE, max(3, round(antes * 0.1))) or 0)
+    return SaudeDoLivro(paginas, antes, agora, int(padroes), limiar)
 
 
 def interpretar_intervalo(texto: str, total: int) -> List[int]:

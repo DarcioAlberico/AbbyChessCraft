@@ -17,6 +17,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import (QApplication, QFileDialog, QInputDialog, QMenu,  # noqa: E402
                                QMessageBox)
 
+from abbychess import livro as lv  # noqa: E402
 from abbychess import pagina as pg  # noqa: E402
 from abbychess.app.janela import JanelaPrincipal  # noqa: E402
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro  # noqa: E402
@@ -72,6 +73,22 @@ def test_menu_ferramentas_tem_o_lote_e_o_projeto_a_exportacao(janela):
     projeto = next(m for m in janela.menuBar().findChildren(QMenu) if m.title() == "&Projeto")
     assert "Exportar…" in [a.text() for a in projeto.actions()]
     assert janela.acao_lote.isEnabled() and not janela.acao_cancelar_lote.isEnabled()
+
+
+def test_cartao_de_saude_mostra_a_evolucao_e_oferece_o_lote(janela):
+    chamadas = []
+    janela.paginas.reconhecer_livro.disconnect()
+    janela.paginas.reconhecer_livro.connect(lambda: chamadas.append(True))
+
+    janela.paginas.mostrar_saude(lv.SaudeDoLivro((0, 1, 2), 40, 3, 12, 4))
+
+    assert janela.paginas.saude.isHidden() is False
+    assert janela.paginas.amostra_da_saude.text() == "Amostra: 3 páginas"
+    assert janela.paginas.pendentes_da_saude.text() == "Pendentes: 40 → 3"
+    assert janela.paginas.padroes_da_saude.text() == "Padrões ensinados: 12"
+    assert janela.paginas.botao_reconhecer_livro.isDefault()
+    janela.paginas.botao_reconhecer_livro.click()
+    assert chamadas == [True]
 
 
 def test_lote_reconhece_o_intervalo_e_mostra_a_pagina_atual(app, janela, respostas):

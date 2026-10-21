@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 from abbychess import avisos as av
 from abbychess import grade as gd
+from abbychess import livro as lv
 from abbychess import verificacao as vf
 from abbychess.app import acoes, cores
 from abbychess.app.imagens import pixmap_da_pagina
@@ -116,6 +117,12 @@ class DesenhoDaJanela:
             if p.modelo is not None else {}
         aviso = ("Nada reconhecido nesta página." if p.reconhecida
                  else "Página não reconhecida: F5 reconhece.")
+        if not p.reconhecida and p.projeto is not None:
+            saude = lv.saude(p.projeto, p.leitor.arquivos_de_padrao() if p.leitor else 0)
+            if saude.paginas:
+                aviso = (f"Saúde do livro\n\nAmostra: {len(saude.paginas)} página(s)\n"
+                         f"Pendentes: {saude.pendentes_antes} → {saude.pendentes_agora}\n"
+                         f"Padrões ensinados: {saude.padroes}\n\n{aviso}")
         # A palavra fora do léxico que o usuário aceitou (Enter: revisada) não é mais duvidosa.
         revisados = {b.gid for b in p.modelo.boxes if b.revisado} if p.modelo is not None else set()
         self.texto.montar(p.documento(), p.diagramas, estados, v.gids_desconhecidos() - revisados,

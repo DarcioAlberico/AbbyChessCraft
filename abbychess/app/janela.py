@@ -181,6 +181,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
                              ("recusa", self._recusa),
                              ("projeto_aberto", self._projeto_aberto),
                              ("modelos_prontos", self._modelos_prontos),
+                             ("amostra_terminou", self._amostra_terminou),
                              ("servidor_caiu", self._servidor_caiu),
                              ("lote_progresso", self._lote_progrediu),
                              ("lote_terminou", self._lote_terminou),

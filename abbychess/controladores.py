@@ -534,6 +534,8 @@ class ControladorDoLivro:
         self.eventos.ligar("pagina_verificada", self._saiu_de_reler_depois)
         #: O servidor cujo `modelos_prontos` já foi emitido (uma vez por servidor).
         self._modelos_avisados = None
+        #: As três páginas do primeiro treino enquanto o lote delas está rodando.
+        self._amostra_guiada: Optional[tuple[int, ...]] = None
 
     @property
     def lote_rodando(self) -> bool:
@@ -639,6 +641,23 @@ class ControladorDoLivro:
         self.eventos.emitir("acoes_mudaram")
         condutor.comecar()
 
+    def iniciar_amostra_guiada(self) -> bool:
+        """Começa uma vez as páginas 10/50/90% do corpo de um projeto novo."""
+        from abbychess import livro as lv
+
+        p = self.pagina
+        if not p.pronto or not p.projeto.dados.extras.get("amostra_guiada_pendente"):
+            return False
+        inicio, fim = p.projeto.dados.extras.get("intervalo_do_corpo", (0, p.fonte.total - 1))
+        inicio, fim = max(0, int(inicio)), min(p.fonte.total - 1, int(fim))
+        indices = tuple(lv.paginas_da_amostra(range(inicio, fim + 1)))
+        p.projeto.dados.extras["amostra_guiada_pendente"] = False
+        p.projeto.dados.extras[lv.CHAVE_DA_AMOSTRA] = list(indices)
+        p.projeto.salvar()
+        self._amostra_guiada = indices
+        self.reconhecer(indices, refazer=False)
+        return True
+
     def _progrediu(self, feitas: int, total: int, estimativa: Optional[float]) -> None:
         condutor = self._condutor
         if condutor is not None and feitas:     # o ponto, a cada página (G1 da rodada 3)
@@ -649,6 +668,9 @@ class ControladorDoLivro:
     def _fim_do_lote(self, condutor, resultado) -> None:
         if self._condutor is not condutor:
             return                              # de um lote largado (outro projeto)
+        era_amostra = self._amostra_guiada is not None
+        paginas_da_amostra = self._amostra_guiada or ()
+        self._amostra_guiada = None
         self._condutor = None
         self.pagina.lote_rodando = False
         # O que faltou (cancelado, ou o servidor parou) e as páginas para reler depois ficam
@@ -663,6 +685,23 @@ class ControladorDoLivro:
         self.eventos.emitir("lote_mudou")
         self.eventos.emitir("acoes_mudaram")
         self.eventos.emitir("lote_terminou", mensagem, resultado)
+        if era_amostra:
+            from abbychess import livro as lv
+
+            completa = (not resultado.cancelado and not resultado.servidor_parou
+                        and not resultado.falhas
+                        and set(paginas_da_amostra) <= set(resultado.lidas + resultado.puladas))
+            extras = self.pagina.projeto.dados.extras
+            extras["amostra_guiada_pendente"] = not completa
+            if completa:
+                resumo = self.pagina.projeto.resumo_do_livro()
+                extras[lv.CHAVE_DOS_PENDENTES_INICIAIS] = {
+                    str(i): int(resumo.get(i, {}).get("pendentes", 0) or 0)
+                    for i in paginas_da_amostra
+                }
+            self.pagina.projeto.salvar()
+            if completa:
+                self.eventos.emitir("amostra_terminou", paginas_da_amostra)
         detalhe = " Detalhes em Avisos (⚠)." if lt.tem_detalhe(resultado) else ""
         self.pagina._avisar(mensagem + detalhe, 15000)
 

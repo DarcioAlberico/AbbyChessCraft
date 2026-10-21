@@ -1,0 +1,61 @@
+"""O fluxo compacto de criação do livro (§9.1)."""
+
+from types import SimpleNamespace
+
+import pytest
+
+from abbychess.app import dialogos
+from abbychess.projeto import ProjetoDeLivro
+from tests.test_livro import pdf_sintetico
+
+
+@pytest.mark.parametrize(("texto", "total", "esperado"), [
+    ("", 12, (0, 11)),
+    ("5-10", 20, (4, 9)),
+    ("7", 20, (6, 6)),
+])
+def test_intervalo_do_corpo(texto, total, esperado):
+    assert dialogos.intervalo_do_corpo(texto, total) == esperado
+
+
+def test_intervalo_do_corpo_recusa_paginas_descontinuas():
+    with pytest.raises(ValueError, match="contínuo"):
+        dialogos.intervalo_do_corpo("2-4, 8", 10)
+
+
+def test_novo_projeto_guarda_idioma_e_intervalo_no_mesmo_fluxo(tmp_path, monkeypatch):
+    fonte = pdf_sintetico(tmp_path)
+    destino = tmp_path / "projetos"
+    valores = {}
+
+    class Config:
+        def value(self, chave, padrao):
+            return padrao
+
+        def setValue(self, chave, valor):
+            valores[chave] = valor
+
+    janela = SimpleNamespace(config=Config(), statusBar=lambda: SimpleNamespace(showMessage=lambda *_: None))
+    monkeypatch.setattr(dialogos.QFileDialog, "getOpenFileName",
+                        lambda *_a, **_k: (str(fonte), ""))
+    monkeypatch.setattr(dialogos.QFileDialog, "getExistingDirectory",
+                        lambda *_a, **_k: str(destino))
+    monkeypatch.setattr(dialogos.DialogoDeNovoProjeto, "obter",
+                        lambda *_a, **_k: dialogos.OpcoesDoNovoProjeto("Meu livro", "en", (1, 2)))
+    monkeypatch.setattr(dialogos.nativo, "oferta", lambda *_a, **_k: dialogos.nativo.Oferta(0, 0))
+
+    projeto = dialogos.novo_projeto(janela)
+    try:
+        assert projeto.dados.idioma == "en"
+        assert projeto.dados.extras["intervalo_do_corpo"] == [1, 2]
+        assert projeto.dados.extras["amostra_guiada_pendente"] is True
+        reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+        try:
+            assert reaberto.dados.idioma == "en"
+            assert reaberto.dados.extras["intervalo_do_corpo"] == [1, 2]
+        finally:
+            reaberto.fechar()
+    finally:
+        projeto.fechar()
+    assert valores["ultima_fonte"] == str(fonte.parent)
+

@@ -1,4 +1,4 @@
-"""O painel de treino: o glifo em revisão, a linha em volta e o que fazer com ele.
+"""O painel de treino: o glifo em revisão e o que fazer com ele.
 
 É o diálogo de treino de padrões do FineReader, adaptado a livros de xadrez:
 
@@ -33,7 +33,7 @@ import numpy as np
 from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMenu,
-                               QPushButton, QSizePolicy, QToolButton, QVBoxLayout, QWidget)
+                               QPushButton, QToolButton, QVBoxLayout, QWidget)
 
 from core.box_model import BoxEntry
 
@@ -168,14 +168,6 @@ class PainelDeTreino(QWidget):
         self.glifo.setMinimumHeight(150)
         self.glifo.setStyleSheet("background: white; border: 1px solid #999;")
 
-        self.contexto = QLabel()
-        self.contexto.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # O mínimo explícito: o do pixmap (escalado pela largura do rótulo) faria o Glifo
-        # crescer com ele e passar do Inspetor.
-        self.contexto.setMinimumSize(1, 70)
-        self.contexto.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.contexto.setStyleSheet("background: white; border: 1px solid #999;")
-
         self.leitura = QLabel("Abra um projeto e reconheça uma página.")
         #: O efeito e o conflito de ensinar o que está no campo (§8.3).
         self.aviso_de_ensino = QLabel("")
@@ -275,8 +267,6 @@ class PainelDeTreino(QWidget):
         caixa.setContentsMargins(4, 4, 4, 4)    # cabe no Inspetor de 296 px (§3.1)
         caixa.addWidget(QLabel("<b>Glifo</b>"))
         caixa.addWidget(self.glifo)
-        caixa.addWidget(QLabel("<b>Na linha</b>"))
-        caixa.addWidget(self.contexto)
         caixa.addWidget(self.leitura)
         caixa.addWidget(self.selecao)
         caixa.addWidget(self.campo)
@@ -308,7 +298,6 @@ class PainelDeTreino(QWidget):
         """Mostra o box em revisão e põe a leitura atual no campo, selecionada."""
         self._pagina, self._box = pagina, box
         self._definir_corte(None)
-        self.contexto.setPixmap(self._contexto(pagina, box))
         fonte = NOMES_DAS_FONTES.get(box.source, box.source or "sem leitura")
         lido = box.char if box.char else "—"
         confianca = f"{box.confidence:.2f}".replace(".", ",")
@@ -324,7 +313,6 @@ class PainelDeTreino(QWidget):
         self._pagina, self._box = None, None
         self._definir_corte(None)
         self.glifo.clear()
-        self.contexto.clear()
         self.campo.clear()
         self.leitura.setText(mensagem)
         self.habilitar(False)
@@ -347,24 +335,6 @@ class PainelDeTreino(QWidget):
                              f"{caracteres} caracteres")
 
     # ------------------------------------------------------------------
-    def _contexto(self, pagina: np.ndarray, box: BoxEntry):
-        """A faixa da linha em volta do box, com ele marcado."""
-        altura = max(box.y2 - box.y1, 1)
-        y1 = max(0, box.y1 - altura)
-        y2 = min(pagina.shape[0], box.y2 + altura)
-        x1 = max(0, box.x1 - 18 * altura)
-        x2 = min(pagina.shape[1], box.x2 + 18 * altura)
-        pixmap = pixmap_de_cinza(pagina[y1:y2, x1:x2]).copy()
-        pintor = QPainter(pixmap)
-        caneta = QPen(cores.SELECIONADO)
-        caneta.setWidth(2)
-        pintor.setPen(caneta)
-        pintor.drawRect(box.x1 - x1 - 2, box.y1 - y1 - 2, box.x2 - box.x1 + 3, box.y2 - box.y1 + 3)
-        pintor.end()
-        largura = max(self.contexto.width() - 8, 200)
-        return pixmap.scaled(largura, 90, Qt.AspectRatioMode.KeepAspectRatio,
-                             Qt.TransformationMode.SmoothTransformation)
-
     def _desenhar_glifo(self) -> None:
         box = self._box
         recorte = self._pagina[box.y1:box.y2, box.x1:box.x2]

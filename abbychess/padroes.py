@@ -80,6 +80,21 @@ TOLERANCIA_DE_ALTURA = 0.20
 PROPORCAO_MAXIMA = 1.6
 
 
+def _efeito(valor) -> Optional[Tuple[bool, bool]]:
+    """Normaliza o efeito conhecido para ``(negrito, italico)``.
+
+    ``None`` significa que o efeito ainda não foi medido. Aceitar tanto o ``Estilo`` do
+    modelo quanto uma sequência curta mantém este módulo independente do modelo da página.
+    Sublinhado é uma decisão editorial, não um efeito de impressão reconhecido.
+    """
+    if valor is None:
+        return None
+    if hasattr(valor, "negrito"):
+        return bool(valor.negrito), bool(valor.italico)
+    itens = list(valor)
+    return bool(itens[0]) if itens else False, bool(itens[1]) if len(itens) > 1 else False
+
+
 @dataclass(frozen=True)
 class Amostra:
     """Um padrão guardado inteiro, para o desfazer apagá-lo e o refazer devolvê-lo."""
@@ -148,7 +163,7 @@ class PadroesDoLivro:
                                            if arquivo.is_file() else {})
         except ValueError:
             self._meta = {}
-        vetores, chars, alturas, proporcoes, caminhos = [], [], [], [], []
+        vetores, chars, alturas, proporcoes, efeitos, caminhos = [], [], [], [], [], []
         subpastas = self.pasta.iterdir() if self.pasta.is_dir() else ()
         for pasta in sorted(p for p in subpastas if p.is_dir()):
             char = folder_to_char(pasta.name)
@@ -159,13 +174,16 @@ class PadroesDoLivro:
                 vetores.append(_vetor(imagem))
                 chars.append(char)
                 proporcoes.append(_proporcao(imagem))
-                alturas.append(self._meta.get(self._chave(png), {}).get("altura", np.nan))
+                meta = self._meta.get(self._chave(png), {})
+                alturas.append(meta.get("altura", np.nan))
+                efeitos.append(_efeito(meta.get("efeito")))
                 caminhos.append(png)
         self._X = (np.stack(vetores) if vetores else np.zeros((0, LADO * LADO), np.float32))
         self._normas = (self._X * self._X).sum(axis=1)
         self._chars, self._caminhos = chars, caminhos
         self._alturas = np.array(alturas, dtype=np.float32)
         self._proporcoes = np.array(proporcoes, dtype=np.float32)
+        self._efeitos = efeitos
 
     def _chave(self, caminho: Path) -> str:
         return caminho.relative_to(self.pasta).as_posix()
@@ -187,7 +205,8 @@ class PadroesDoLivro:
     def total(self) -> int:
         return len(self._chars)
 
-    def ler(self, recorte: np.ndarray, altura_relativa: Optional[float] = None) -> Resposta:
+    def ler(self, recorte: np.ndarray, altura_relativa: Optional[float] = None,
+            efeito=None) -> Resposta:
         """O padrão mais próximo cuja altura combina, se estiver perto o bastante.
 
         Sem altura relativa (página sem referência) a trava de altura não roda.
@@ -209,6 +228,12 @@ class PadroesDoLivro:
             cabe = np.isnan(alturas) | (np.abs(alturas - altura_relativa)
                                         <= self.tolerancia_de_altura * maior)
             candidatos = candidatos[cabe]
+        efeito = _efeito(efeito)
+        if efeito is not None and candidatos.size:
+            # Padrões antigos, sem efeito, continuam utilizáveis. Quando ambos os lados
+            # são conhecidos, porém, pesos diferentes nunca chegam a ser vizinhos.
+            candidatos = np.array([i for i in candidatos
+                                   if self._efeitos[int(i)] in (None, efeito)], dtype=int)
         if not candidatos.size:
             return Resposta("", 0.0, float(distancias.min()), None)
         i = int(candidatos[np.argmin(distancias[candidatos])])
@@ -246,10 +271,11 @@ class PadroesDoLivro:
         foto._X, foto._normas = self._X, self._normas
         foto._chars, foto._caminhos = list(self._chars), list(self._caminhos)
         foto._alturas, foto._proporcoes = self._alturas, self._proporcoes
+        foto._efeitos = list(self._efeitos)
         return foto
 
     def ensinar(self, recorte: np.ndarray, char: str, altura_relativa: Optional[float] = None,
-                origem: str = "") -> Path:
+                origem: str = "", efeito=None) -> Path:
         """Grava o recorte no tamanho original e o torna consultável na hora."""
         if not char:
             raise ValueError("O caractere ensinado não pode ser vazio.")
@@ -260,9 +286,11 @@ class PadroesDoLivro:
         if not ok:
             raise OSError(f"O recorte de '{char}' não pôde ser codificado em PNG.")
         gv.gravar_bytes(caminho, png.tobytes())
+        efeito = _efeito(efeito)
         self._meta[self._chave(caminho)] = {
             "altura": None if altura_relativa is None else round(float(altura_relativa), 4),
             "origem": origem,
+            **({"efeito": [int(v) for v in efeito]} if efeito is not None else {}),
         }
         self._gravar_meta()
         v = _vetor(cinza)
@@ -275,6 +303,7 @@ class PadroesDoLivro:
         self._proporcoes = np.append(self._proporcoes, np.float32(_proporcao(cinza)))
         self._alturas = np.append(self._alturas, np.float32(
             np.nan if altura_relativa is None else altura_relativa))
+        self._efeitos = self._efeitos + [efeito]
         return caminho
 
     def esquecer(self, caminho: str | Path) -> None:
@@ -290,7 +319,8 @@ class PadroesDoLivro:
     # Os deltas do servidor de leitura (§11): a interface grava e esquece; o servidor só
     # passa a ler (ou a não ler) com a amostra, sem tocar no disco.
     # ------------------------------------------------------------------
-    def incluir(self, caminho: str | Path, altura_relativa: Optional[float] = None) -> bool:
+    def incluir(self, caminho: str | Path, altura_relativa: Optional[float] = None,
+                efeito=None) -> bool:
         """Passa a ler com a amostra já gravada em `caminho` (falso se o arquivo não abre)."""
         caminho = Path(caminho)
         if caminho in self._caminhos:
@@ -306,6 +336,7 @@ class PadroesDoLivro:
         self._proporcoes = np.append(self._proporcoes, np.float32(_proporcao(imagem)))
         self._alturas = np.append(self._alturas, np.float32(
             np.nan if altura_relativa is None else altura_relativa))
+        self._efeitos = self._efeitos + [_efeito(efeito)]
         return True
 
     def excluir(self, caminho: str | Path) -> None:
@@ -320,6 +351,7 @@ class PadroesDoLivro:
         self._caminhos = [self._caminhos[i] for i in manter]
         self._proporcoes = self._proporcoes[manter]
         self._alturas = self._alturas[manter]
+        self._efeitos = [self._efeitos[i] for i in manter]
 
     def altura_de(self, caminho: str | Path) -> Optional[float]:
         """A altura relativa gravada da amostra (para o delta que vai ao servidor)."""
@@ -329,6 +361,13 @@ class PadroesDoLivro:
         except ValueError:
             return None
         return None if altura is None else float(altura)
+
+    def efeito_de(self, caminho: str | Path) -> Optional[Tuple[bool, bool]]:
+        """O efeito de impressão gravado da amostra, para o delta do servidor."""
+        try:
+            return _efeito(self._meta.get(self._chave(Path(caminho)), {}).get("efeito"))
+        except ValueError:
+            return None
 
     def guardar(self, caminho: str | Path) -> Amostra:
         """O arquivo do padrão e os metadados dele, para voltar com `restaurar`."""

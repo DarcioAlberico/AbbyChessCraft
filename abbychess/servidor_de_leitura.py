@@ -246,8 +246,10 @@ class _Laco:
                 with self._trava:                  # não no meio do glifo do lote
                     for caminho in apagados:
                         self.leitor.padroes.excluir(caminho)
-                    for caminho, altura in criados:
-                        self.leitor.padroes.incluir(caminho, altura)
+                    for criado in criados:
+                        caminho, altura, *resto = criado
+                        self.leitor.padroes.incluir(caminho, altura,
+                                                    resto[0] if resto else None)
             elif tipo == "limiares":
                 with self._trava:
                     self.leitor.trocar_limiares(mensagem[1])
@@ -479,10 +481,10 @@ class ServidorDeLeitura:
             self._concluir(pedido, False, CANCELADO)
 
     def enviar_padroes(self, criados, apagados) -> None:
-        """Os deltas dos padrões: `criados` [(caminho, altura)], `apagados` [caminho]."""
+        """Deltas: `criados` tem `(caminho, altura[, efeito])`; `apagados`, caminhos."""
         if criados or apagados:
             with self._trava:
-                self._entrada.put(("padroes", [(str(c), a) for c, a in criados],
+                self._entrada.put(("padroes", [(str(item[0]), *item[1:]) for item in criados],
                                    [str(c) for c in apagados]))
 
     def trocar_limiares(self, limiares) -> None:

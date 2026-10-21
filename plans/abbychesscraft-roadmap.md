@@ -383,7 +383,8 @@ segue no delta para o servidor (CA-9.3). Em 2026-10-21, a régua pública de `co
 passou a medir as palavras da página; o efeito fica no `Box`, acompanha F5 e lote, é gravado
 na amostra ensinada e filtra a propagação k-NN. O CA-9.5 também passou: o Ctrl+N oferece a
 camada aprovada por `core.pdf_nativo`; aceitá-la cria páginas confirmadas no modelo sem
-pedido ao servidor, enquanto as recusadas ficam para OCR. O fluxo guiado de Ctrl+N agora
+pedido ao servidor, enquanto as recusadas ficam para OCR e são as únicas candidatas à
+amostra guiada quando a camada é parcial. O fluxo guiado de Ctrl+N agora
 reúne nome, idioma e intervalo contínuo do corpo em um único formulário; escolhe e reconhece
 automaticamente as três páginas da amostra dentro desse intervalo, abre a fila por caractere e
 mostra a evolução dos pendentes e dos padrões no cartão Saúde, na gaveta e no estado vazio

@@ -43,6 +43,7 @@ Progresso = Callable[[int, int], None]
 Cancelado = sl.Cancelado
 
 CHAVE_DA_AMOSTRA = "paginas_da_amostra_guiada"
+CHAVE_DOS_CANDIDATOS_DA_AMOSTRA = "candidatos_da_amostra_guiada"
 CHAVE_DOS_PENDENTES_INICIAIS = "pendentes_iniciais_da_amostra"
 CHAVE_DO_LIMIAR_DA_SAUDE = "limiar_de_pendentes_da_amostra"
 

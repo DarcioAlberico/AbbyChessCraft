@@ -130,9 +130,11 @@ def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
         # continua novo e o caminho de OCR de sempre permanece disponível.
         QMessageBox.warning(janela, "Texto nativo",
                             f"A camada de texto não pôde ser usada ({erro}). O OCR continua disponível.")
-    if not importadas:
-        projeto.dados.extras["amostra_guiada_pendente"] = True
-        projeto.salvar()
+    inicio, fim = opcoes.intervalo
+    candidatos = [i for i in range(inicio, fim + 1) if i not in set(importadas)]
+    projeto.dados.extras["amostra_guiada_pendente"] = bool(candidatos)
+    projeto.dados.extras[livro.CHAVE_DOS_CANDIDATOS_DA_AMOSTRA] = candidatos
+    projeto.salvar()
     config.setValue("pasta_dos_projetos", pasta_mae)
     return projeto
 

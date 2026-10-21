@@ -648,9 +648,17 @@ class ControladorDoLivro:
         p = self.pagina
         if not p.pronto or not p.projeto.dados.extras.get("amostra_guiada_pendente"):
             return False
-        inicio, fim = p.projeto.dados.extras.get("intervalo_do_corpo", (0, p.fonte.total - 1))
-        inicio, fim = max(0, int(inicio)), min(p.fonte.total - 1, int(fim))
-        indices = tuple(lv.paginas_da_amostra(range(inicio, fim + 1)))
+        extras = p.projeto.dados.extras
+        candidatos = extras.get(lv.CHAVE_DOS_CANDIDATOS_DA_AMOSTRA)
+        if candidatos is None:                  # projeto criado antes desta chave
+            inicio, fim = extras.get("intervalo_do_corpo", (0, p.fonte.total - 1))
+            candidatos = range(max(0, int(inicio)), min(p.fonte.total - 1, int(fim)) + 1)
+        candidatos = [int(i) for i in candidatos if 0 <= int(i) < p.fonte.total]
+        indices = tuple(lv.paginas_da_amostra(candidatos))
+        if not indices:
+            extras["amostra_guiada_pendente"] = False
+            p.projeto.salvar()
+            return False
         p.projeto.dados.extras["amostra_guiada_pendente"] = False
         p.projeto.dados.extras[lv.CHAVE_DA_AMOSTRA] = list(indices)
         p.projeto.salvar()

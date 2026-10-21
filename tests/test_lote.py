@@ -99,6 +99,23 @@ def test_amostra_cancelada_fica_pendente_para_a_proxima_abertura(ctl, projeto):
     assert projeto.dados.extras["amostra_guiada_pendente"] is True
 
 
+def test_amostra_guiada_usa_apenas_as_paginas_que_ficaram_para_ocr(ctl, projeto):
+    projeto.dados.extras.update(
+        amostra_guiada_pendente=True,
+        candidatos_da_amostra_guiada=[1, 2],
+        intervalo_do_corpo=[0, 2],
+    )
+    projeto.salvar()
+    terminou = []
+    ctl.eventos.ligar("amostra_terminou", lambda paginas: terminou.append(tuple(paginas)))
+
+    assert ctl.iniciar_amostra_guiada()
+    ctl.executor.tudo()
+
+    assert terminou == [(1, 2)]
+    assert projeto.paginas_lidas() == [1, 2]
+
+
 def test_o_lote_le_e_grava_as_paginas_e_a_aberta_aparece(ctl, projeto):
     ctl.reconhecer([0, 1, 2], refazer=False)
     assert ctl.lote_rodando

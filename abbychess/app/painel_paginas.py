@@ -12,10 +12,12 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QHeaderView, QMenu, QProgressBar,
-                               QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QGroupBox, QHeaderView, QLabel,
+                               QMenu, QProgressBar, QPushButton, QTreeWidget, QTreeWidgetItem,
+                               QVBoxLayout, QWidget)
 
 from abbychess import modelo as md
+from abbychess.livro import SaudeDoLivro
 from abbychess.app import estilo
 
 #: O símbolo e a cor de cada estado na coluna estreita (a cor não carrega o sentido sozinha).
@@ -41,6 +43,8 @@ class PainelDePaginas(QWidget):
     abrir = Signal(int)
     #: Os índices a reconhecer em lote ("Reconhecer as selecionadas").
     reconhecer = Signal(list)
+    #: O livro inteiro, a partir do cartão Saúde do livro.
+    reconhecer_livro = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -81,6 +85,19 @@ class PainelDePaginas(QWidget):
         self.lista.setColumnHidden(4, True)     # só com uma busca (§7.1)
         self._contagem = None
 
+        self.saude = QGroupBox("Saúde do livro")
+        caixa_da_saude = QVBoxLayout(self.saude)
+        caixa_da_saude.setContentsMargins(6, 6, 6, 6)
+        self.amostra_da_saude = QLabel()
+        self.pendentes_da_saude = QLabel()
+        self.padroes_da_saude = QLabel()
+        self.botao_reconhecer_livro = QPushButton("Reconhecer o livro")
+        self.botao_reconhecer_livro.clicked.connect(self.reconhecer_livro)
+        for widget in (self.amostra_da_saude, self.pendentes_da_saude,
+                       self.padroes_da_saude, self.botao_reconhecer_livro):
+            caixa_da_saude.addWidget(widget)
+        self.saude.hide()
+
         #: O progresso do lote (passo E): as páginas feitas, e o tempo estimado na dica.
         self.lote = QProgressBar()
         self.lote.setAccessibleName("Progresso do lote")
@@ -90,6 +107,7 @@ class PainelDePaginas(QWidget):
 
         caixa = QVBoxLayout(self)
         caixa.setContentsMargins(2, 2, 2, 2)
+        caixa.addWidget(self.saude)
         caixa.addWidget(self.filtro)
         caixa.addWidget(self.lote)
         caixa.addWidget(self.lista, 1)
@@ -102,6 +120,27 @@ class PainelDePaginas(QWidget):
 
     def esconder_lote(self) -> None:
         self.lote.hide()
+
+    def mostrar_saude(self, saude: SaudeDoLivro) -> None:
+        """Mostra o progresso da amostra e destaca quando já vale reconhecer o livro."""
+        if not saude.paginas:
+            self.saude.hide()
+            return
+        n = len(saude.paginas)
+        self.amostra_da_saude.setText(f"Amostra: {n} página{'s' if n != 1 else ''}")
+        self.pendentes_da_saude.setText(
+            f"Pendentes: {saude.pendentes_antes} → {saude.pendentes_agora}")
+        self.padroes_da_saude.setText(f"Padrões ensinados: {saude.padroes}")
+        pronto = saude.pode_reconhecer_o_livro
+        self.botao_reconhecer_livro.setDefault(pronto)
+        self.botao_reconhecer_livro.setProperty("pronto", pronto)
+        self.botao_reconhecer_livro.setToolTip(
+            "A amostra atingiu o limiar; reconheça o livro inteiro."
+            if pronto else
+            f"Revise a amostra até restarem no máximo {saude.limiar} pendentes.")
+        self.botao_reconhecer_livro.style().unpolish(self.botao_reconhecer_livro)
+        self.botao_reconhecer_livro.style().polish(self.botao_reconhecer_livro)
+        self.saude.show()
 
     # ------------------------------------------------------------------
     def mostrar(self, total: int, resumo: Dict[int, dict], atual: Optional[int]) -> None:

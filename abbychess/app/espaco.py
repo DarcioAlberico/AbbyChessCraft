@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QDockWidget, QLabel, QMess
 
 from abbychess import avisos as av
 from abbychess import gravacao as gv
+from abbychess import livro as lv
 from abbychess import verificacao as vf
 from abbychess.modelo import LIDAS
 from abbychess.app import visor as vs
@@ -144,6 +145,7 @@ class EspacoDeTrabalho:
         self.paginas = PainelDePaginas()
         self.paginas.abrir.connect(self.ir_para_pagina)
         self.paginas.reconhecer.connect(lambda indices: self.livro.reconhecer(indices, False))
+        self.paginas.reconhecer_livro.connect(self.reconhecer_livro)
         self.doca_paginas = _doca(self, "Páginas", "doca_paginas", self.paginas,
                                   Qt.DockWidgetArea.LeftDockWidgetArea)
         self.doca_paginas.hide()
@@ -483,6 +485,8 @@ class EspacoDeTrabalho:
             return
         self.paginas.mostrar(p.fonte.total, p.projeto.resumo_do_livro(),
                              p.indice if seguir else None)
+        self.paginas.mostrar_saude(
+            lv.saude(p.projeto, p.leitor.arquivos_de_padrao() if p.leitor else 0))
 
     def atualizar_barra(self) -> None:
         p = self.pagina

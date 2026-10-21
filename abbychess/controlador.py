@@ -49,6 +49,7 @@ from abbychess import ancoragem as ag
 from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import historico as hs
+from abbychess import modelo as md
 from abbychess import pagina as pg
 from abbychess import procedencia
 from abbychess import servidor_de_leitura as sl
@@ -690,8 +691,13 @@ class ControladorDePagina:
                 return
             lidos = lida.diagramas
             de_antes = list(pagina.boxes)
+            estilos = {id(entry): md.Estilo(negrito=negrito)
+                       for entry, negrito in zip(lida.boxes, lida.negritos)
+                       if negrito is not None}
             novos, dif = reconciliar(pagina.boxes, lida.boxes, pagina.alocar,
-                                     procedencia.amostra_de, iou_minimo=IOU_DA_RELEITURA)
+                                     procedencia.amostra_de,
+                                     estilo_de=lambda entry: estilos.get(id(entry)),
+                                     iou_minimo=IOU_DA_RELEITURA)
             pagina.aplicar(dif, novos)
             if dif.caidas:                      # §4.6: o que não pôde seguir os glifos novos
                 self.eventos.emitir("resultado", "Reconhecer a página", (
@@ -843,7 +849,7 @@ class ControladorDePagina:
                     i = onde[gid]
                     lidos[i] = ed.copia(antes[i].entry)
                     pg.ensinar(imagem, lidos, i, char, leitor, projeto, indice,
-                               propagar=False, gid=gid)
+                               propagar=False, gid=gid, efeito=antes[i].estilo)
         except Exception as erro:        # disco cheio, antivírus: nada do Enter fica
             for caminho in self.padroes() - antes_inst.padroes:
                 try:
@@ -880,7 +886,8 @@ class ControladorDePagina:
                 e.char, e.source, e.confidence, limiares))
 
             def trabalho(_progresso):
-                return pg.propagar_padroes(imagem, lidos, foto_do_leitor)
+                return pg.propagar_padroes(imagem, lidos, foto_do_leitor,
+                                           efeitos=[b.estilo for b in antes])
 
             def pronto(resolvidos: int):
                 if transacao.invalidada:

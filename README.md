@@ -1342,8 +1342,9 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   à página seguinte, uma a uma (o léxico não tem resumo no `livro.json`); o "iguais nesta
   página" do aviso de ensino conta os glifos com a mesma leitura, e não os de forma
   parecida; a Galeria do livro tira os recortes de cada página da fonte (a primeira vez,
-  ~0,15 s por página, em segundo plano); o efeito das amostras (negrito, itálico) chega no
-  passo I; o glifo devolvido à fila por um esquecer fica com a leitura e sem a fonte (a
+  ~0,15 s por página, em segundo plano); desde o passo I, o negrito medido por palavra fica
+  no glifo, é guardado na amostra ensinada e separa os vizinhos do k-NN (a medição do
+  itálico ainda está pendente); o glifo devolvido à fila por um esquecer fica com a leitura e sem a fonte (a
   busca por glifo o mostra em "sem leitura").
 - **Localizar, desde o passo B**: figurina = letra vale no texto literal (com a regex ligada,
   use `\P`); o cabeçalho e o rodapé do índice saem de uma regra simples das linhas da página

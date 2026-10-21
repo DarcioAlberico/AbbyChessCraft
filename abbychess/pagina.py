@@ -378,6 +378,48 @@ def recorte(imagem, box: BoxEntry) -> np.ndarray:
                                              if isinstance(imagem, Image.Image) else imagem), box)
 
 
+def efeitos_de_impressao(imagem: Image.Image, boxes: Sequence[BoxEntry]) -> List[Optional[bool]]:
+    """O negrito de cada glifo, medido por palavra com a régua pública do core.
+
+    O resultado usa ``None`` quando a palavra não tem tinta suficiente para uma decisão e
+    ``False``/``True`` quando o efeito é conhecido. A referência é a página inteira: a régua
+    compara a espessura de cada caractere com as outras ocorrências dele, como
+    :mod:`core.negrito` exige. Itálico será acrescentado quando o core expuser essa medida.
+    """
+    from collections import defaultdict
+    from math import isnan
+
+    from core import negrito
+    from core.notacao import palavras_da_pagina
+
+    if not boxes:
+        return []
+    medidas = [negrito.espessura(recorte(imagem, box)) for box in boxes]
+    amostras = defaultdict(list)
+    for box, medida in zip(boxes, medidas):
+        if box.char and medida is not None and not isnan(medida):
+            amostras[box.char].append(medida)
+    referencia = negrito.referencia(amostras)
+
+    palavras = []
+    for linha in palavras_da_pagina(list(boxes)):
+        for palavra in linha:
+            indices = [simbolo.indice for simbolo in palavra.simbolos]
+            glifos = [(boxes[i].char, medidas[i]) for i in indices
+                      if boxes[i].char and medidas[i] is not None and not isnan(medidas[i])]
+            peso = negrito.relativo(glifos, referencia) if len(glifos) >= 2 else None
+            palavras.append((indices, peso))
+    normal = negrito.escala([peso for _indices, peso in palavras if peso is not None])
+    efeitos: List[Optional[bool]] = [None] * len(boxes)
+    for indices, peso in palavras:
+        if peso is None:
+            continue
+        forte = negrito.e_negrito(peso, normal)
+        for i in indices:
+            efeitos[i] = forte
+    return efeitos
+
+
 def ler_boxes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorDoLivro, *,
               so_pendentes: bool = False, progresso: Optional[Progresso] = None,
               cancelado: Callable[[], bool] = lambda: False) -> ResumoDaLeitura:
@@ -456,7 +498,7 @@ def fila_de_revisao(boxes: List[BoxEntry], leitor: LeitorDoLivro) -> List[int]:
 
 def ensinar(imagem: Image.Image, boxes: List[BoxEntry], indice: int, char: str,
             leitor: LeitorDoLivro, projeto: ProjetoDeLivro, pagina: int, *,
-            propagar: bool = True, gid: Optional[int] = None) -> int:
+            propagar: bool = True, gid: Optional[int] = None, efeito=None) -> int:
     """Ensina o box como `char` neste livro e propaga o padrão pela página.
 
     O box ensinado vira manual. Com `propagar`, os boxes ainda pendentes são
@@ -474,7 +516,7 @@ def ensinar(imagem: Image.Image, boxes: List[BoxEntry], indice: int, char: str,
     if gid is None:
         gid = projeto.gid_do_box(pagina, boxes, indice)
     leitor.ensinar(recorte(imagem, box), char, altura_de_referencia=referencia,
-                   origem=nome_de_origem(projeto.dados.nome, pagina, indice, gid))
+                   origem=nome_de_origem(projeto.dados.nome, pagina, indice, gid), efeito=efeito)
     box.char, box.source, box.confidence = char, FONTE_MANUAL, 1.0
     procedencia.registrar(box, procedencia.NENHUMA)     # é a origem do padrão, não cópia
     return propagar_padroes(imagem, boxes, leitor) if propagar else 0
@@ -482,7 +524,7 @@ def ensinar(imagem: Image.Image, boxes: List[BoxEntry], indice: int, char: str,
 
 def ensinar_varios(imagem: Image.Image, boxes: List[BoxEntry], indices: List[int], char: str,
                    leitor: LeitorDoLivro, projeto: ProjetoDeLivro, pagina: int, *,
-                   gids: Optional[dict] = None) -> int:
+                   gids: Optional[dict] = None, efeitos: Optional[Sequence] = None) -> int:
     """Ensina vários boxes como o mesmo `char` e propaga uma vez só no fim.
 
     É a seleção do modo de treino: o usuário marca as ocorrências que a leitura
@@ -492,11 +534,13 @@ def ensinar_varios(imagem: Image.Image, boxes: List[BoxEntry], indices: List[int
     """
     for indice in sorted(set(indices)):
         ensinar(imagem, boxes, indice, char, leitor, projeto, pagina, propagar=False,
-                gid=None if gids is None else gids[indice])
-    return propagar_padroes(imagem, boxes, leitor)
+                gid=None if gids is None else gids[indice],
+                efeito=None if efeitos is None else efeitos[indice])
+    return propagar_padroes(imagem, boxes, leitor, efeitos=efeitos)
 
 
-def propagar_padroes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorDoLivro) -> int:
+def propagar_padroes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorDoLivro, *,
+                     efeitos: Optional[Sequence] = None) -> int:
     """Aplica os padrões do livro aos boxes pendentes, sem a cadeia global.
 
     Um padrão novo só muda o que o k-NN do livro responde; a rede e a base
@@ -507,10 +551,11 @@ def propagar_padroes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorD
     pagina = np.asarray(imagem.convert("L"))
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
     resolvidos = 0
-    for box in boxes:
+    for i, box in enumerate(boxes):
         if not precisa_revisao(box.char, box.source, box.confidence, leitor.limiares):
             continue
-        leitura = leitor.ler_pelo_livro(vertical.recorte_de_pe(pagina, box), referencia)
+        efeito = None if efeitos is None else efeitos[i]
+        leitura = leitor.ler_pelo_livro(vertical.recorte_de_pe(pagina, box), referencia, efeito)
         if leitura.char:
             box.char, box.source, box.confidence = leitura.char, leitura.fonte, leitura.confianca
             procedencia.registrar(box, leitura.amostra)

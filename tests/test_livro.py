@@ -13,8 +13,10 @@ import zipfile
 from pathlib import Path
 
 import fitz
+import numpy as np
 import pytest
 from PIL import Image
+from core.box_model import BoxEntry
 
 from abbychess import exportar as ex
 from abbychess import livro
@@ -74,6 +76,15 @@ def test_amostra_escolhe_inicio_meio_e_fim_do_corpo():
     assert livro.paginas_da_amostra(range(20, 220)) == [40, 120, 199]
     assert livro.paginas_da_amostra([7, 5, 6]) == [5, 6, 7]
     assert livro.paginas_da_amostra([5, 5, 6]) == [5, 6]
+
+
+def test_negrito_e_medido_por_palavra_com_a_referencia_da_pagina(monkeypatch):
+    boxes = [BoxEntry("a", x, 0, x + 8, 20) for x in (0, 10, 40, 50)]
+    pesos = {0: 1.0, 10: 1.0, 40: 2.0, 50: 2.0}
+    monkeypatch.setattr(pg, "recorte", lambda _imagem, box: np.array([[box.x1]]))
+    monkeypatch.setattr("core.negrito.espessura", lambda imagem: pesos[int(imagem[0, 0])])
+
+    assert pg.efeitos_de_impressao(Image.new("L", (80, 30)), boxes) == [False, False, True, True]
 
 
 @pytest.mark.parametrize("texto", ["0-2", "4-9", "a-b", "1..2"])

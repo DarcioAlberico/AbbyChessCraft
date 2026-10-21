@@ -76,6 +76,8 @@ class PaginaLida:
     tabuleiros: list
     escala: Optional[float]
     diagramas: list = field(default_factory=list)
+    #: ``True``/``False`` quando o negrito foi medido; ``None`` quando faltou medida.
+    negritos: list = field(default_factory=list)
 
 
 def ler_pagina(imagem, zonas, marcados, leitor, *, progresso=None,
@@ -94,8 +96,9 @@ def ler_pagina(imagem, zonas, marcados, leitor, *, progresso=None,
         raise Cancelado
     lidos = dg.ler_diagramas(imagem, segmentada.tabuleiros, escala=segmentada.escala,
                              classificar=leitor.arbitro, boxes=segmentada.boxes)
+    negritos = pg.efeitos_de_impressao(imagem, segmentada.boxes)
     return PaginaLida(segmentada.boxes, [procedencia.amostra_de(b) for b in segmentada.boxes],
-                      list(segmentada.tabuleiros), segmentada.escala, lidos)
+                      list(segmentada.tabuleiros), segmentada.escala, lidos, negritos)
 
 
 def reler_boxes(imagem, boxes, leitor, *, so_pendentes: bool, progresso=None):

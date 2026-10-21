@@ -22,7 +22,9 @@ from PIL import Image
 from core.box_model import BoxEntry
 
 from abbychess import exportar as ex
+from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
+from abbychess.modelo import Box, Pagina
 from abbychess.projeto import ProjetoDeLivro
 
 
@@ -122,6 +124,19 @@ def test_as_colunas_nao_se_misturam_na_linha():
 def test_o_titulo_que_atravessa_a_calha_vem_primeiro():
     textos = [b.texto for b in ex.paragrafos(_duas_colunas(titulo="Games"))]
     assert textos[0] == "Games"
+
+
+def test_o_documento_tambem_le_uma_coluna_inteira_antes_da_seguinte():
+    entries = _duas_colunas(titulo="Games")
+    pagina = Pagina(1, 0, boxes=[Box(i, entry) for i, entry in enumerate(entries)],
+                    proximo_n=len(entries))
+
+    linhas = tx.texto(tx.montar(pagina)).splitlines()
+
+    assert linhas[0] == "Games"
+    assert not any(linha != linha.upper() and linha != linha.lower() for linha in linhas[1:])
+    assert "as brancas jogam e ganham 00" in linhas[1]
+    assert linhas.index(f"{FRASES[5]} 11") < linhas.index(f"{FRASES[3].upper()} 00")
 
 
 # ----------------------------------------------------------------------

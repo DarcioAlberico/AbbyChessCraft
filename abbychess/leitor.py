@@ -32,13 +32,14 @@ from abbychess.projeto import Limiares, nome_de_pasta
 FONTE_LIVRO = "livro"
 FONTE_LIVRO_FRACO = "livro?"
 FONTE_MANUAL = "manual"
+FONTE_NATIVA = "nativa"
 FONTE_NENHUMA = "none"
 #: Ainda não lido: o leitor da interface só tem os padrões do livro, e o resto espera o
 #: servidor de leitura (SPEC §11; o estado de desenho `grade.AGUARDANDO`).
 FONTE_AGUARDANDO = ""
 
 #: Fontes que o usuário decidiu ou confirmou, e que a revisão não volta a mostrar.
-FONTES_CONFIRMADAS = {FONTE_LIVRO, FONTE_MANUAL}
+FONTES_CONFIRMADAS = {FONTE_LIVRO, FONTE_MANUAL, FONTE_NATIVA}
 
 
 @dataclass

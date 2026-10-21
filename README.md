@@ -50,7 +50,10 @@ letra solta em campo de texto, Ctrl+Alt e ligação nativa encoberta sem exceç�
 
 ## O fluxo de treino
 
-1. **Novo projeto** (Ctrl+N) liga um PDF ou uma imagem a uma pasta de projeto do livro.
+1. **Novo projeto** (Ctrl+N) liga um PDF ou uma imagem a uma pasta de projeto do livro. Se a
+   régua conservadora do `core.pdf_nativo` encontra texto tipográfico confiável no PDF, o
+   programa oferece importá-lo: aceitando, cria essas páginas diretamente e não pede OCR ao
+   servidor; as páginas recusadas pela régua continuam disponíveis para o F5 ou o lote.
 2. **Reconhecer página** (F5) segmenta a página, separa os diagramas do texto, lê cada glifo
    e lê cada diagrama em FEN, que entra no texto reconhecido da página.
 3. O **Inspetor**, à direita, mostra o glifo menos confiável, ampliado e na linha em que

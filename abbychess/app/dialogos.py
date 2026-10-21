@@ -9,6 +9,7 @@ from typing import List, Optional, Tuple
 from PySide6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
 
 from abbychess import livro
+from abbychess import nativo
 from abbychess import pagina as pg
 from abbychess.projeto import ProjetoDeLivro, ProjetoInvalido
 
@@ -40,6 +41,23 @@ def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
     except ProjetoInvalido as erro:
         QMessageBox.warning(janela, "Novo projeto", str(erro))
         return None
+    try:
+        camada = nativo.oferta(fonte)
+        if camada.disponivel and QMessageBox.question(
+                janela, "Texto nativo encontrado",
+                (f"O PDF tem texto tipográfico confiável em {camada.aceitas} de "
+                 f"{camada.amostradas} página(s) examinada(s). Usar esse texto sem OCR?"),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes) == QMessageBox.StandardButton.Yes:
+            resultado = nativo.importar(projeto)
+            janela.statusBar().showMessage(
+                f"Texto nativo usado em {len(resultado.importadas)} página(s); "
+                f"{len(resultado.recusadas)} ficaram para OCR.", 12000)
+    except (OSError, ValueError) as erro:
+        # A oferta é uma otimização segura: se a camada não abre ou não monta, o projeto
+        # continua novo e o caminho de OCR de sempre permanece disponível.
+        QMessageBox.warning(janela, "Texto nativo",
+                            f"A camada de texto não pôde ser usada ({erro}). O OCR continua disponível.")
     config.setValue("pasta_dos_projetos", pasta_mae)
     return projeto
 

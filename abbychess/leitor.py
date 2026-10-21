@@ -137,21 +137,24 @@ class LeitorDoLivro:
     # ------------------------------------------------------------------
     # Ler
     # ------------------------------------------------------------------
-    def ler_pelo_livro(self, recorte: np.ndarray, altura_de_referencia: Optional[float] = None
+    def ler_pelo_livro(self, recorte: np.ndarray, altura_de_referencia: Optional[float] = None,
+                       efeito=None
                        ) -> Leitura:
         """Só os padrões do livro. É o que basta para propagar um padrão novo."""
-        resposta = self.padroes.ler(recorte, altura_relativa(recorte, altura_de_referencia))
+        resposta = self.padroes.ler(recorte, altura_relativa(recorte, altura_de_referencia),
+                                    efeito)
         if resposta.char:
             return Leitura(resposta.char, FONTE_LIVRO, resposta.confianca,
                            self.padroes.relativo(resposta.caminho))
         return Leitura("", FONTE_NENHUMA, 0.0)
 
-    def ler(self, recorte: np.ndarray, *, altura_de_referencia: Optional[float] = None
+    def ler(self, recorte: np.ndarray, *, altura_de_referencia: Optional[float] = None,
+            efeito=None
             ) -> Leitura:
         """A leitura do recorte de um glifo, em pé e escuro sobre claro."""
         if recorte is None or recorte.size == 0:
             return Leitura("", FONTE_NENHUMA, 0.0)
-        pelo_livro = self.ler_pelo_livro(recorte, altura_de_referencia)
+        pelo_livro = self.ler_pelo_livro(recorte, altura_de_referencia, efeito)
         if pelo_livro.char:
             return pelo_livro
         return self._ler_global(recorte, altura_de_referencia)
@@ -174,10 +177,11 @@ class LeitorDoLivro:
     # Ensinar e esquecer
     # ------------------------------------------------------------------
     def ensinar(self, recorte: np.ndarray, char: str, *,
-                altura_de_referencia: Optional[float] = None, origem: str = "") -> Path:
+                altura_de_referencia: Optional[float] = None, origem: str = "",
+                efeito=None) -> Path:
         """Grava o recorte como padrão de `char` neste livro. Vale na hora."""
         return self.padroes.ensinar(recorte, char,
-                                    altura_relativa(recorte, altura_de_referencia), origem)
+                                    altura_relativa(recorte, altura_de_referencia), origem, efeito)
 
     def esquecer(self, caminho: str | Path) -> None:
         """Apaga um padrão do livro; a leitura seguinte já não o usa."""

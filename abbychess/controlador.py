@@ -984,8 +984,9 @@ class ControladorDePagina:
         agora = self.padroes()
         criados, apagados = agora - self._enviados, self._enviados - agora
         if criados or apagados:
-            altura = self.leitor.padroes.altura_de
-            self.servidor.enviar_padroes([(c, altura(c)) for c in sorted(criados)],
+            padroes = self.leitor.padroes
+            self.servidor.enviar_padroes([(c, padroes.altura_de(c), padroes.efeito_de(c))
+                                          for c in sorted(criados)],
                                          sorted(apagados))
             self._enviados = agora
 

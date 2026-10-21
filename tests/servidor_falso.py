@@ -96,8 +96,9 @@ class ServidorFalso:
     def enviar_padroes(self, criados, apagados) -> None:
         for caminho in apagados:
             self.leitor.padroes.excluir(caminho)
-        for caminho, altura in criados:
-            self.leitor.padroes.incluir(caminho, altura)
+        for criado in criados:
+            caminho, altura, *resto = criado
+            self.leitor.padroes.incluir(caminho, altura, resto[0] if resto else None)
 
     def trocar_limiares(self, limiares) -> None:
         self.leitor.trocar_limiares(limiares)

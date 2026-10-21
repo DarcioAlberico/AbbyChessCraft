@@ -407,6 +407,12 @@ uma régua pública do core; CA-9.1 também continua pendente.
 
 ## Passo F — Layout (§5)
 
+**Execução iniciada em 2026-10-21, ramo `passo-i-treino`.** A ordem de leitura em colunas
+foi separada em `abbychess.layout.OrdemDeLeitura` para o Documento. Ele agora forma linhas
+dentro de cada trecho e lê uma coluna inteira antes da seguinte, preservando faixas
+transversais como títulos. A exportação ainda conserva a implementação anterior até a
+equivalência dos casos de caracterização permitir unificar as duas.
+
 **Contexto.**
 - `core/livro.py` do PyBoxEditor já tem colunas, parágrafos com recuo,
   `retirar_cabecalhos` e tabelas.

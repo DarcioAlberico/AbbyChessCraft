@@ -34,6 +34,7 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
 
+from abbychess.layout import OrdemDeLeitura
 from abbychess.modelo import Decisoes, Pagina
 
 IMPRESSO = "impresso"
@@ -104,12 +105,15 @@ def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
     chars.update({v.gid: v.char for v in pagina.decisoes.virtuais})
     linhas: List[List[List[int]]] = []
     topos: List[int] = []
-    for linha in (palavras_da_pagina(entries) if entries else []):
-        palavras = [[lidos[s.indice].gid for s in p.simbolos] for p in linha]
-        palavras = [p for p in palavras if p]
-        if palavras:
-            linhas.append(palavras)
-            topos.append(min(entries[s.indice].y1 for p in linha for s in p.simbolos))
+    ordem = OrdemDeLeitura.da_pagina(entries)
+    for _chave, indices in ordem.trechos(entries):
+        trecho = [entries[i] for i in indices]
+        for linha in palavras_da_pagina(trecho):
+            palavras = [[lidos[indices[s.indice]].gid for s in p.simbolos] for p in linha]
+            palavras = [p for p in palavras if p]
+            if palavras:
+                linhas.append(palavras)
+                topos.append(min(trecho[s.indice].y1 for p in linha for s in p.simbolos))
     linhas = _aplicar_decisoes(linhas, pagina.decisoes)
     texto_das_linhas = [" ".join("".join(chars[g] for g in p) for p in ln) for ln in linhas]
 

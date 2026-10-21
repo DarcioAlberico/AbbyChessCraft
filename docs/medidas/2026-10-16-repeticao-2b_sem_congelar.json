@@ -15,23 +15,24 @@
   "pymupdf": "1.26.6",
   "torch": "2.14.0+cpu",
   "threads_do_torch": 6,
-  "commit": "b5c5142",
-  "arvore_suja": true
+  "commit": "6f863c3",
+  "arvore_suja": false,
+  "arquivos_sujos": []
  },
  "medidas": {
   "troca_de_pagina": {
-   "p50_ms": 147.7,
-   "p95_ms": 179.4,
-   "max_ms": 236.63,
+   "p50_ms": 153.56,
+   "p95_ms": 173.65,
+   "max_ms": 208.89,
    "n": 30,
    "alvo_no_cache_ms": 150,
    "alvo_fora_ms": 600,
    "como": "mesmo processo, alternando 2 páginas lidas; hoje não há cache, então este número vale para 'no cache'. 'Fora do cache' (processo novo) não foi medido pelo método e fica para o passo A1."
   },
   "enter_ensinar": {
-   "p50_ms": 32.75,
-   "p95_ms": 43.81,
-   "max_ms": 44.78,
+   "p50_ms": 20.55,
+   "p95_ms": 24.01,
+   "max_ms": 27.3,
    "n": 30,
    "alvo_ms": 100,
    "padroes_no_livro": [
@@ -42,23 +43,30 @@
    "como": "desde o 2b: QTest.keyClick(Enter) no campo, com o caractere lido do primeiro pendente (conferir a leitura), até a cor mudar (a parte síncrona: o glifo manual, a amostra gravada); a propagação vai para a fila e não entra. Até o 2a, era até o fim da propagação (ver enter_ate_o_fim_da_propagacao)"
   },
   "enter_ate_o_fim_da_propagacao": {
-   "p50_ms": 82.28,
-   "p95_ms": 100.78,
-   "max_ms": 112.18,
+   "p50_ms": 70.95,
+   "p95_ms": 80.03,
+   "max_ms": 81.98,
    "n": 30,
    "como": "o mesmo Enter, até a propagação acabar (o que o 2a media como Enter)"
   },
   "enter_com_propagacao_lenta": {
-   "p50_ms": 19.78,
-   "p95_ms": 24.76,
+   "p50_ms": 18.36,
+   "p95_ms": 23.34,
    "n": 10,
    "alvo_ms": 100,
    "como": "o segundo Enter, com a propagação do primeiro presa (1 s), até a cor mudar"
   },
+  "texto_da_pagina": {
+   "p50_ms": 22.19,
+   "p95_ms": 28.02,
+   "max_ms": 28.06,
+   "n": 30,
+   "como": "refazer o painel de texto da página (montar o documento e pôr no painel), que desde o 2b roda 150 ms depois da última mudança, e não dentro do Enter nem da releitura"
+  },
   "releitura_de_um_glifo": {
-   "p50_ms": 16.19,
-   "p95_ms": 20.06,
-   "max_ms": 22.45,
+   "p50_ms": 14.4,
+   "p95_ms": 16.9,
+   "max_ms": 17.5,
    "n": 30,
    "alvo_ms": 150,
    "com_o_lote": "impossível hoje: o lote ocupa o executor"
@@ -66,28 +74,29 @@
   "memoria_do_desfazer": {
    "boxes_por_pagina": 1450,
    "alvo_mb": 50,
-   "acoes": 60,
-   "preso_pelo_historico_bytes": -171474,
-   "bytes_por_acao": -2858,
-   "estimado_300x20_mb": -16.4,
-   "rss_delta_bytes_informativo": 4337664,
-   "como": "tracemalloc ligado antes de 60 ações reais (3 páginas já visitadas × 20): o que é liberado ao esvaziar o histórico, por ação, extrapolado para 300 páginas × 20 ações"
+   "acoes": 300,
+   "preso_pelo_historico_bytes": 419939,
+   "bytes_por_acao": 1400,
+   "estimado_300x20_mb": 8.0,
+   "estimativa_do_historico_300x20_mb": 6.9,
+   "rss_delta_bytes_informativo": 5742592,
+   "como": "tracemalloc ligado antes de 300 ações reais (3 páginas já visitadas × 100): o que é liberado ao esvaziar o histórico, por ação, extrapolado para 300 páginas × 20 ações; e a estimativa que o próprio histórico faz (`HistoricoDoProjeto.bytes`, a que o limite de 50 MB usa). Desde o 2b, 100 ações por página: com 20, o histórico prendia menos que o ruído do coletor de lixo"
   },
   "atraso_durante_o_lote": {
    "paginas": 20,
-   "p99_ms": 21.3,
-   "p95_ms": 13.0,
-   "max_ms": 124.1,
-   "disparos": 5314,
-   "duracao_s": 91.9,
+   "p99_ms": 22.3,
+   "p95_ms": 14.0,
+   "max_ms": 128.2,
+   "disparos": 5150,
+   "duracao_s": 89.8,
    "alvo_p99_ms": 50,
    "acoes_durante_o_lote": "editar, desfazer, esquecer e os limiares são recusados com aviso; F5 e Ctrl+R ficam desligados (passo 2a)",
    "como": "pelo controlador do livro (desde o 2a): inclui gravar o pendente antes do lote e recarregar a página aberta no fim; até o 1b, o lote rodava direto no executor, sem as duas coisas",
    "maior_atraso_no_fim_do_lote": {
-    "ms": 124.1,
+    "ms": 128.2,
     "segundos_depois_do_fim": 0.13,
     "no_fim": true,
-    "maior_antes_do_fim_ms": 105.3
+    "maior_antes_do_fim_ms": 99.3
    }
   },
   "memoria_total_com_o_lote": {

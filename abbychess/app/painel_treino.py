@@ -7,33 +7,41 @@
 - **Shift+Enter** corrige só esta ocorrência, sem gravar padrão. Serve para o
   glifo borrado que não deve ensinar nada.
 - **Del** tira o box da página: sujeira, pedaço de moldura, traço de diagrama.
-- **Tab** pula para o próximo da fila sem decidir.
+- **Alt+↓** passa ao próximo da fila sem decidir; **Alt+↑** volta (em qualquer painel).
 - **Ctrl+D** divide o box em dois glifos, no ponto clicado no recorte ampliado
   ou, sem clique, no vão da tinta. **Ctrl+J** junta com o box seguinte da
-  linha e **Ctrl+Shift+J** com o anterior. **Alt+seta** move a borda direita
-  ou a de baixo; **Alt+Shift+seta**, a esquerda ou a de cima.
+  linha e **Ctrl+Shift+J** com o anterior. **Shift+seta** move a borda direita
+  ou a de baixo; **Ctrl+Shift+seta**, a esquerda ou a de cima.
 
-No modo de treino (Ctrl+T) o arraste na página desenha o quadro de um glifo, e
+No modo de marcar (Ctrl+M) o arraste na página desenha o quadro de um glifo, e
 Ctrl+clique junta boxes numa seleção: Enter ensina todos com o mesmo caractere.
 Esc esvazia a seleção.
 
-A paleta insere figurinas e símbolos de avaliação, que o teclado não tem.
+A paleta (F2) insere figurinas e símbolos de avaliação, que o teclado não tem.
+
+As teclas são as ações da janela (`app/teclado.py`, de `docs/atalhos.yaml`): o painel só
+oferece os comandos (`pedir_*`). No campo do caractere, Enter, Shift+Enter, Delete e as
+setas das bordas ficam com o campo (a exceção 6 de §3.4), que dispara a ação delas.
 """
 
 from __future__ import annotations
 
+import html
 from typing import Optional
 
 import numpy as np
 from PySide6.QtCore import QEvent, Qt, Signal
-from PySide6.QtGui import QFont, QKeySequence, QPainter, QPen, QShortcut
-from PySide6.QtWidgets import (QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QPixmap
+from PySide6.QtWidgets import (QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMenu,
                                QPushButton, QSizePolicy, QToolButton, QVBoxLayout, QWidget)
 
 from core.box_model import BoxEntry
 
-from abbychess.app import cores
+from abbychess.app import cores, estilo, teclado
 from abbychess.app.imagens import ampliado, pixmap_de_cinza
+
+#: O aviso de conflito (§8.3), em laranja escuro (legível no fundo claro).
+LARANJA_ESCURO = estilo.LARANJA.darker(140).name()
 
 #: Figurinas e símbolos que os livros de xadrez imprimem e o teclado não tem.
 PALETA = [
@@ -68,11 +76,31 @@ NOMES_DAS_FONTES = {
 }
 
 
-class _CampoDoCaractere(QLineEdit):
-    """Enter ensina, Shift+Enter só corrige; o resto é edição normal."""
+def _amostra_do_traco(traco) -> QPixmap:
+    """Um retângulo pequeno com o traço e o preenchimento do estado, para a legenda."""
+    pixmap = QPixmap(30, 16)
+    pixmap.fill(QColor(255, 255, 255))
+    pintor = QPainter(pixmap)
+    caneta = QPen(traco.cor)
+    caneta.setWidthF(traco.largura)
+    caneta.setStyle(traco.estilo)
+    pintor.setPen(caneta)
+    if traco.preenchimento:
+        cor = QColor(traco.cor)
+        cor.setAlpha(traco.preenchimento)
+        pintor.setBrush(cor)
+    pintor.drawRect(3, 3, 24, 10)
+    pintor.end()
+    return pixmap
 
-    ensinar = Signal()
-    so_corrigir = Signal()
+
+class _CampoDoCaractere(QLineEdit):
+    """O caractere do glifo. Enter, Shift+Enter, Delete e as setas das bordas disparam as
+    ações ligadas em `teclas`; o resto é edição normal."""
+
+    def __init__(self):
+        super().__init__()
+        self.teclas = teclado.AcoesDaTecla()
 
     def event(self, evento):
         # O Ctrl+Z e o Ctrl+Y são da janela (desfazer a página), não do campo: sem
@@ -82,14 +110,12 @@ class _CampoDoCaractere(QLineEdit):
                 or evento.matches(QKeySequence.StandardKey.Redo)):
             evento.ignore()
             return True
+        if self.teclas.sobrepor(evento):
+            return True
         return super().event(evento)
 
     def keyPressEvent(self, evento):
-        if evento.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            if evento.modifiers() & Qt.KeyboardModifier.ShiftModifier:
-                self.so_corrigir.emit()
-            else:
-                self.ensinar.emit()
+        if self.teclas.disparar(evento):
             return
         super().keyPressEvent(evento)
 
@@ -127,8 +153,6 @@ class PainelDeTreino(QWidget):
     ajustar = Signal(int, int, int, int)
     #: A coluna do corte escolhida no recorte, para o visor marcá-la.
     corte_mudou = Signal(object)
-    #: Esc: esvaziar a seleção do modo de treino.
-    limpar_selecao = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -146,11 +170,17 @@ class PainelDeTreino(QWidget):
 
         self.contexto = QLabel()
         self.contexto.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.contexto.setMinimumHeight(70)
+        # O mínimo explícito: o do pixmap (escalado pela largura do rótulo) faria o Glifo
+        # crescer com ele e passar do Inspetor.
+        self.contexto.setMinimumSize(1, 70)
         self.contexto.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.contexto.setStyleSheet("background: white; border: 1px solid #999;")
 
         self.leitura = QLabel("Abra um projeto e reconheça uma página.")
+        #: O efeito e o conflito de ensinar o que está no campo (§8.3).
+        self.aviso_de_ensino = QLabel("")
+        self.aviso_de_ensino.setWordWrap(True)
+        self.aviso_de_ensino.setAccessibleName("O efeito de ensinar e o aviso de conflito")
         self.leitura.setWordWrap(True)
 
         self.campo = _CampoDoCaractere()
@@ -158,39 +188,43 @@ class PainelDeTreino(QWidget):
         self.campo.setFont(fonte)
         self.campo.setPlaceholderText("caractere")
         self.campo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.campo.ensinar.connect(self._ensinar)
-        self.campo.so_corrigir.connect(self._so_corrigir)
 
-        botao_ensinar = QPushButton("Ensinar padrão  (Enter)")
+        botao_ensinar = QPushButton("Ensinar (Enter)")
+        botao_ensinar.setToolTip("Ensina o glifo como padrão deste livro e relê a página")
         botao_ensinar.setDefault(True)
-        botao_ensinar.clicked.connect(self._ensinar)
-        botao_corrigir = QPushButton("Só esta ocorrência  (Shift+Enter)")
-        botao_corrigir.clicked.connect(self._so_corrigir)
-        botao_descartar = QPushButton("Não é caractere  (Del)")
-        botao_descartar.clicked.connect(self._descartar)
+        botao_ensinar.clicked.connect(self.pedir_ensinar)
+        botao_corrigir = QPushButton("Só esta (Shift+Enter)")
+        botao_corrigir.setToolTip("Corrige só esta ocorrência, sem gravar padrão")
+        botao_corrigir.clicked.connect(self.pedir_so_corrigir)
+        botao_descartar = QPushButton("Não é caractere (Del)")
+        botao_descartar.clicked.connect(self.pedir_descartar)
         botao_anterior = QPushButton("◀ Anterior")
+        botao_anterior.setToolTip("O anterior da fila (Alt+↑)")
         botao_anterior.clicked.connect(self.anterior.emit)
-        botao_pular = QPushButton("Pular ▶  (Tab)")
+        botao_pular = QPushButton("Pular ▶")
+        botao_pular.setToolTip("Pula para o próximo da fila, sem decidir (Alt+↓)")
         botao_pular.clicked.connect(self.pular.emit)
-        botao_dividir = QPushButton("Dividir  (Ctrl+D)")
+        botao_dividir = QPushButton("Dividir")
         botao_dividir.setToolTip("Divide o box em dois glifos, na linha vermelha do recorte "
-                                 "ou, sem ela, no vão da tinta.")
-        botao_dividir.clicked.connect(self._dividir)
+                                 "ou, sem ela, no vão da tinta (Ctrl+D).")
+        botao_dividir.clicked.connect(self.pedir_dividir)
         botao_juntar_antes = QPushButton("◀ Juntar")
         botao_juntar_antes.setToolTip("Junta com o box anterior da linha (Ctrl+Shift+J).")
-        botao_juntar_antes.clicked.connect(lambda: self._juntar(-1))
+        botao_juntar_antes.clicked.connect(lambda: self.pedir_juntar(-1))
         botao_juntar_depois = QPushButton("Juntar ▶")
         botao_juntar_depois.setToolTip("Junta com o box seguinte da linha (Ctrl+J).")
-        botao_juntar_depois.clicked.connect(lambda: self._juntar(+1))
+        botao_juntar_depois.clicked.connect(lambda: self.pedir_juntar(+1))
         self._botoes = [botao_ensinar, botao_corrigir, botao_descartar, botao_anterior, botao_pular,
                         botao_dividir, botao_juntar_antes, botao_juntar_depois]
+        for botao in self._botoes:              # o teclado é o do campo: o Tab não para neles
+            botao.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         editar = QHBoxLayout()
         editar.addWidget(botao_juntar_antes)
         editar.addWidget(botao_dividir)
         editar.addWidget(botao_juntar_depois)
-        dica_das_bordas = QLabel("Bordas: Alt+seta move a direita ou a de baixo; "
-                                 "Alt+Shift+seta, a esquerda ou a de cima.")
+        dica_das_bordas = QLabel("Bordas: Shift+seta move a direita ou a de baixo; "
+                                 "Ctrl+Shift+seta, a esquerda ou a de cima.")
         dica_das_bordas.setWordWrap(True)
         dica_das_bordas.setStyleSheet("color: #555;")
 
@@ -198,7 +232,7 @@ class PainelDeTreino(QWidget):
         navegar.addWidget(botao_anterior)
         navegar.addWidget(botao_pular)
 
-        paleta = QGroupBox("Símbolos")
+        paleta = QGroupBox("Símbolos  (F2)")
         grade = QGridLayout(paleta)
         grade.setSpacing(2)
         for i, simbolo in enumerate(PALETA):
@@ -215,15 +249,30 @@ class PainelDeTreino(QWidget):
         self.selecao = QLabel("")
         self.selecao.setWordWrap(True)
         self.fila = QLabel("")
+        self.fila.setWordWrap(True)
         self.padroes = QLabel("")
+        self.padroes.setWordWrap(True)
 
-        legenda = QGroupBox("Cores dos boxes")
+        legenda = QGroupBox("Os boxes na página")
         caixa_legenda = QVBoxLayout(legenda)
-        for cor, texto in cores.LEGENDA:
-            linha = QLabel(f'<span style="color:{cor.name()}">■</span> {texto}')
-            caixa_legenda.addWidget(linha)
+        amostras = [(estilo.traco(estado, origem), texto)
+                    for estado, origem, texto in estilo.LEGENDA]
+        amostras += [(estilo.Traco(cores.DIAGRAMA, 2.5, Qt.PenStyle.DashLine),
+                      "Diagrama (fora do texto)"),
+                     (estilo.Traco(cores.MARCADO, 2.5, Qt.PenStyle.SolidLine),
+                      "Na seleção (Ctrl+clique)")]
+        for traco, texto in amostras:
+            linha = QHBoxLayout()
+            amostra = QLabel()
+            amostra.setPixmap(_amostra_do_traco(traco))
+            linha.addWidget(amostra)
+            rotulo = QLabel(texto)
+            rotulo.setWordWrap(True)
+            linha.addWidget(rotulo, 1)
+            caixa_legenda.addLayout(linha)
 
         caixa = QVBoxLayout(self)
+        caixa.setContentsMargins(4, 4, 4, 4)    # cabe no Inspetor de 296 px (§3.1)
         caixa.addWidget(QLabel("<b>Glifo</b>"))
         caixa.addWidget(self.glifo)
         caixa.addWidget(QLabel("<b>Na linha</b>"))
@@ -231,6 +280,7 @@ class PainelDeTreino(QWidget):
         caixa.addWidget(self.leitura)
         caixa.addWidget(self.selecao)
         caixa.addWidget(self.campo)
+        caixa.addWidget(self.aviso_de_ensino)
         caixa.addWidget(botao_ensinar)
         caixa.addWidget(botao_corrigir)
         caixa.addWidget(botao_descartar)
@@ -243,21 +293,17 @@ class PainelDeTreino(QWidget):
         caixa.addWidget(legenda)
         caixa.addStretch(1)
 
-        for tecla, acao in ((QKeySequence.StandardKey.Delete, self._descartar),
-                            (QKeySequence("Tab"), self.pular.emit),
-                            (QKeySequence("Shift+Tab"), self.anterior.emit),
-                            (QKeySequence("Ctrl+D"), self._dividir),
-                            (QKeySequence("Esc"), self.limpar_selecao.emit),
-                            (QKeySequence("Ctrl+J"), lambda: self._juntar(+1)),
-                            (QKeySequence("Ctrl+Shift+J"), lambda: self._juntar(-1)),
-                            *self._atalhos_das_bordas()):
-            atalho = QShortcut(tecla, self)
-            atalho.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
-            atalho.activated.connect(acao)
-
         self.habilitar(False)
 
     # ------------------------------------------------------------------
+    def mostrar_aviso_de_ensino(self, efeito: str, conflito: str, livro: str = "") -> None:
+        """O efeito ("Enter ensina 'l' · 23 iguais nesta página · 410 no livro") e, em
+        laranja, o conflito ("⚠ este glifo está a 0,08 de 14 amostras de '1'")."""
+        partes = [html.escape(efeito + livro)] if efeito else []
+        if conflito:
+            partes.append(f"<span style='color:{LARANJA_ESCURO}'>⚠ {html.escape(conflito)}</span>")
+        self.aviso_de_ensino.setText("<br>".join(partes))
+
     def mostrar(self, pagina: np.ndarray, box: BoxEntry, posicao: str) -> None:
         """Mostra o box em revisão e põe a leitura atual no campo, selecionada."""
         self._pagina, self._box = pagina, box
@@ -265,8 +311,10 @@ class PainelDeTreino(QWidget):
         self.contexto.setPixmap(self._contexto(pagina, box))
         fonte = NOMES_DAS_FONTES.get(box.source, box.source or "sem leitura")
         lido = box.char if box.char else "—"
-        self.leitura.setText(f"{posicao}<br>Leitura: <b style='font-size:16pt'>{lido}</b> "
-                             f"&nbsp;({fonte}, confiança {box.confidence:.2f})")
+        confianca = f"{box.confidence:.2f}".replace(".", ",")
+        linhas = ([posicao] if posicao else []) + [
+            f"Leitura: <b style='font-size:16pt'>{lido}</b> &nbsp;({fonte}, confiança {confianca})"]
+        self.leitura.setText("<br>".join(linhas))
         self.campo.setText(box.char)
         self.campo.selectAll()
         self.habilitar(True)                    # antes do foco: num campo desligado o Qt o
@@ -348,26 +396,54 @@ class PainelDeTreino(QWidget):
             self._definir_corte(box.x1 + round(fracao * (box.x2 - box.x1)))
             self.campo.setFocus()
 
-    def _atalhos_das_bordas(self):
-        """Alt+seta move a borda direita ou a de baixo; com Shift, a oposta."""
-        for tecla, (dx, dy) in (("Left", (-1, 0)), ("Right", (1, 0)),
-                                ("Up", (0, -1)), ("Down", (0, 1))):
-            yield (QKeySequence(f"Alt+{tecla}"),
-                   lambda dx=dx, dy=dy: self._ajustar(0, 0, dx, dy))
-            yield (QKeySequence(f"Alt+Shift+{tecla}"),
-                   lambda dx=dx, dy=dy: self._ajustar(dx, dy, 0, 0))
-
-    def _dividir(self) -> None:
+    # ------------------------------------------------------------------
+    # Os comandos que as ações da janela (e os botões) pedem; valem com um glifo mostrado.
+    # ------------------------------------------------------------------
+    def pedir_dividir(self) -> None:
         if self._ativo:
             self.dividir.emit(self.corte)
 
-    def _juntar(self, passo: int) -> None:
+    def pedir_juntar(self, passo: int) -> None:
         if self._ativo:
             self.juntar.emit(passo)
 
-    def _ajustar(self, esquerda: int, cima: int, direita: int, baixo: int) -> None:
+    def pedir_ajustar(self, esquerda: int, cima: int, direita: int, baixo: int) -> None:
         if self._ativo:
             self.ajustar.emit(esquerda, cima, direita, baixo)
+
+    def pedir_ensinar(self) -> None:
+        if self._ativo and (texto := self._texto()):
+            self.ensinar.emit(texto)
+
+    def pedir_so_corrigir(self) -> None:
+        if self._ativo and (texto := self._texto()):
+            self.so_corrigir.emit(texto)
+
+    def pedir_descartar(self) -> None:
+        if self._ativo:
+            self.descartar.emit()
+
+    def abrir_paleta(self) -> None:
+        """F2: a paleta como menu, no campo; o símbolo escolhido entra no cursor."""
+        if not self._ativo:
+            return
+        menu = QMenu(self)
+        menu.setFont(QFont(FONTE_DE_SIMBOLOS, 12))
+        for simbolo in PALETA:
+            menu.addAction(f"{simbolo}   {NOMES_DOS_SIMBOLOS.get(simbolo, '')}",
+                           lambda s=simbolo: self._inserir(s))
+        self.menu_da_paleta = menu              # os testes escolhem sem abrir
+        menu.popup(self.campo.mapToGlobal(self.campo.rect().bottomLeft()))
+
+    def inserir_figurina(self, branca: str) -> None:
+        """Ctrl+Shift+peça no campo: a figurina; o mesmo atalho de novo alterna a cor."""
+        from abbychess.app.documento import PRETA_DA_BRANCA
+
+        preta = PRETA_DA_BRANCA[branca]
+        if self.campo.text() in (branca, preta):
+            self.campo.setText(preta if self.campo.text() == branca else branca)
+        else:
+            self.campo.insert(branca)
 
     def _inserir(self, simbolo: str) -> None:
         self.campo.insert(simbolo)
@@ -376,15 +452,3 @@ class PainelDeTreino(QWidget):
     def _texto(self) -> Optional[str]:
         texto = self.campo.text()
         return texto if texto.strip() else None
-
-    def _ensinar(self) -> None:
-        if self._ativo and (texto := self._texto()):
-            self.ensinar.emit(texto)
-
-    def _so_corrigir(self) -> None:
-        if self._ativo and (texto := self._texto()):
-            self.so_corrigir.emit(texto)
-
-    def _descartar(self) -> None:
-        if self._ativo:
-            self.descartar.emit()

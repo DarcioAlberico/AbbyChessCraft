@@ -63,7 +63,7 @@ Toda meta de tempo é um **alvo**; o **corte** que reprova é alvo × 1,2 (§15.
 | Atraso de evento da interface durante o lote | p99 ≤ 50 ms, com as ações funcionando |
 | Memória do desfazer (300 páginas × 20 ações) | ≤ 50 MB |
 | Memória total com o lote rodando | ≤ 2,5 GB |
-| Gestos para levar as p. 21–27 ao gabarito (replay, CA-F.1) | ≤ 85% da linha de base depois do A3; ≤ 70% depois do D1 |
+| Gestos para levar as p. 21–27 ao gabarito (replay, CA-F.1) | ≤ 70% da linha de base depois do D1 |
 
 O número de hoje de cada meta não fica aqui: ele está no JSON da medida
 (`docs/medidas/`) e na tabela que `ferramentas/resumo_medidas.py` gera no README
@@ -202,7 +202,7 @@ Regras:
    palavra e avança. Ensinar fora do Glifo e da Galeria é **Ctrl+Enter**.
 6. Exceção documentada: no campo de 1 caractere do Glifo, Shift+seta e Ctrl+Shift+seta movem
    as bordas e Del descarta o box (`ShortcutOverride` aceito), porque não há texto para
-   selecionar nem apagar à direita. (Hoje o Del do treino não dispara com o foco no campo:
+   selecionar nem apagar à direita. (Até o A1 o Del do treino não disparava com o foco no campo, o que o A2 corrigiu:
    achado da tabela de atalhos no passo 0.)
 
 Extrato do perfil padrão, com o que muda em relação a hoje:
@@ -438,6 +438,10 @@ deixa a ordem como estava.
   fora do léxico com ondulado; virtual com pontilhado; aguardando leitura em cinza; manual e
   revisado sem realce.
 - Fonte Segoe UI Symbol por padrão; corpo pelo zoom do painel.
+- *Nota do passo A3*: até o layout do passo F dar a função das áreas e os parágrafos, o
+  Documento mostra uma linha impressa por parágrafo (refluir juntaria título e corpo), as
+  margens pela regra do cabeçalho corrido da exportação, e o glifo que ninguém leu como □
+  com o fundo da baixa confiança.
 
 ### 6.2 Sincronia
 
@@ -457,12 +461,14 @@ deixa a ordem como estava.
 - A cada `contentsChange`, o texto atual da sessão é **realinhado** contra o original
   (Levenshtein; desempate: substituição antes de inserir+apagar; alinhamento à esquerda),
   então teclas, IME, painel de emojis, colar, arrastar e autocompletar dão o mesmo resultado.
+  Os caracteres que nenhum `contentsChange` tocou ficam com o glifo deles, e só os vãos entre
+  eles são realinhados (D1: apagar o segundo "s" de "cassa" tira o segundo glifo).
 - A sessão **confirma** ao sair dela (cursor ou clique fora), com Enter (e avança à próxima
   palavra duvidosa) ou Shift+Enter (sem avançar), como **um passo** do desfazer. Esc
   **restaura** a sessão (e Ctrl+Y a reaplica). Depois de confirmar, o bloco é
   **re-renderizado do modelo**.
 - **Enter numa palavra sem mudança** a aceita: os glifos ficam `revisado` e saem da fila
-  (como o Skip do FineReader).
+  (como o Skip do FineReader). Só os que têm leitura (D1): o □ e o aguardando ficam na fila.
 - Mapeamento dos trechos alinhados:
 
 | Trecho | Vira | Passo |
@@ -906,8 +912,9 @@ filtrado por `passo ≤ atual`, rodam na linha de base e depois; o que nenhum co
 corrige entra com o custo fixo de "impossível" declarado no catálogo. A linha de base é
 sempre medida com o código da tag `passo-0` (o replay chama o núcleo, que muda); duas
 medidas só se comparam com o mesmo snapshot, catálogo e versões dos gabaritos. O total
-`gestos` (com os impossíveis) é ≤ 85% da linha de base depois do passo A3, e ≤ 70% depois
-do passo D1.
+`gestos` (com os impossíveis) é ≤ 70% da linha de base depois do passo D1. (Até a versão
+0.8 do roadmap havia também ≤ 85% depois do A3; saiu porque o A3 é só leitura e não muda o
+custo de nenhum comando.)
 **CA-F.2** (informativo, não reprova) Tempo humano pelo protocolo
 `docs/medidas/protocolo-fatia.md`: o mesmo snapshot; o tempo vem do registro de gestos da
 aplicação (`ABBY_REGISTRO_DE_EVENTOS`, somado por `ferramentas/tempo_da_fatia.py`),

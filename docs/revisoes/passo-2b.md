@@ -108,3 +108,84 @@ Correção 9 · Simplicidade 8 · Testes 9 — **aceita**.
 - Qualidade (`medir.py`, os três livros) e fatia (`replay_fatia.py --passo 2b`): iguais às
   do 2a; só o tempo do lote (xv 460 → 447 s) e a marca de árvore suja (o README e este
   registro, sem código) diferem.
+
+## Revisão de produto, rodada 1
+
+| Revisor | Notas | Veredito |
+|---|---|---|
+| Produto e medição | Completude 8 · Fidelidade das medidas 7 · Clareza para o usuário 7 · Produtividade 7 | volta |
+
+O revisor rodou a janela com cenários próprios (offscreen, a propagação presa) e achou:
+
+| Achado | Correção |
+|---|---|
+| **M1** Quando a propagação resolvia o glifo mostrado, o painel pulava e apagava o que o usuário tinha digitado | o painel só avança sozinho se o glifo foi posto pela fila (não escolhido por clique ou Tab) e o campo não foi editado (`atual_resolvido`); três testes (avança, digitando fica, escolhido fica) |
+| **M2** "Desfazer um ensinar devolve as repetições à fila" falhava depois de um Ctrl+R (fora do desfazer) | o Reler pendentes entra no desfazer; o refazer de um Enter desfeito com a propagação descartada roda a propagação de novo; testes |
+| **M3** Uma recusa travava o desfazer inteiro | a recusa pergunta se tira a ação do desfazer, para chegar às anteriores; teste |
+| **M4** A árvore suja de todas as medidas não estava declarada | os JSON passam a listar os arquivos sujos (`arquivos_sujos`); as medidas foram refeitas com a pasta limpa (abaixo) |
+| **M5** A comparação 2a → 2b da releitura não mede o mesmo (o texto da página saiu do tempo medido) | o teste mede o painel de texto à parte (`texto_da_pagina`) e o README diz a mudança de método |
+| m1–m8 | os textos do congelamento, da tabela e da memória (README); a propagação não cobre mais a mensagem do Enter na barra; o refazer propaga de novo; a recusa é uma pergunta, uma vez por Ctrl+Z |
+
+A janela passou de 500 linhas com isso; o desenho foi para um mixin (`app/desenho.py`,
+`DesenhoDaJanela`), com a mesma regra do CA-14.1 (teste ampliado).
+
+## Rodada 4 (código, sobre as correções do produto)
+
+Correção 8 · Simplicidade 8 · Testes 8 — **aceita**. Os dois furos que ela deixou entraram
+junto: o refazer que repropaga decide depois de abrir a página da transação (teste de refazer
+de outra página), e `mostrar` direto zera o "escolhido" (só `escolher` o liga).
+
+## Medidas finais (commit `6f863c3`)
+
+Refeitas depois das correções do produto, com a pasta limpa nas 6 rodadas e no portão
+(`arquivos_sujos` vazio nos JSON). O congelamento já estava desligado: as 6 rodadas rodam o
+mesmo programa (`repeticao-2b` e `repeticao-2b_sem_congelar` só diferem no rótulo do
+roteiro).
+
+- Portão: 9 passaram; `docs/medidas/2026-10-16-passo-2b.json`.
+- Enter até a cor mudar: mediana 20,6–21,5 ms, p95 24,0–27,1 (alvo de 100; o critério do 2b,
+  ≤ 100 em 2 de 3, passa nas 6).
+- Enter até o fim da propagação: mediana 70,9–73,8 ms (2a: 82,9–91,4; não sobe).
+- Releitura: mediana 13,3–15,3 ms, p95 15,7–19,2 (2a: 74,6–74,9 na mediana; não sobe). O
+  painel de texto, que saiu desse tempo, foi medido à parte: 22,1–22,2 ms na mediana, p95
+  22,4–28,7 (`texto_da_pagina`).
+- Com uma propagação lenta em curso: o segundo Enter, p95 19,0–29,9 ms.
+- Memória do desfazer (300 × 20): 8,0 MB pelo `tracemalloc` em 5 das 6 rodadas (numa, −9,6,
+  o ruído do coletor), 6,9 MB pela estimativa do histórico (≤ 50: passa).
+- Troca de página: mediana 153,2–157,6 ms. Atraso no lote: p99 9,1–22,3, máximo
+  127,5–154,4 ms; o lote de 20 páginas, 85,7–93,2 s.
+- Qualidade (`medir.py`) e fatia: iguais às do 2a. Essas quatro medidas rodaram com
+  `abbychess/verificacao.py` e `tests/test_verificacao.py` sujos, mudados por outra sessão
+  do usuário durante elas (a lista está nos JSON); a verificação de texto não entra na
+  leitura nem na fatia.
+
+As 6 rodadas de `b5c5142` (acima), que sustentam a saída do congelamento, estão em
+`docs/medidas/2026-10-16-congelamento-2b-com*.json` e `-sem*.json` (o nome tira-as das
+rodadas repetidas da tabela, que agora são as do `6f863c3`).
+
+## Revisão de produto, rodada 2
+
+Completude 9 · Fidelidade das medidas 7 · Clareza 8 · Produtividade 8 — volta, por dois furos
+de fidelidade, sem código do produto:
+
+| Achado | Correção |
+|---|---|
+| **N1** A tabela do portão publicava 0,2 MB para a memória do desfazer (ruído) | o ruído era o gravador, que grava noutra thread entre as duas leituras do `tracemalloc`; o teste o descarrega antes de cada uma; o portão (commit `badede5`) e duas rodadas só da memória deram 8,0–8,1 MB, e a estimativa do histórico 6,9–7,3 |
+| **N2** Os JSON do A/B do congelamento tinham saído de `docs/medidas` | de volta, como `congelamento-2b-*` (do 31e7774), citados no README e aqui |
+| n1 O painel do glifo escolhido não mostrava a leitura que a propagação deu | ele fica e é mostrado de novo, com a leitura nova (se o campo não foi editado); teste |
+| n2 A pergunta da recusa dizia "desfazer" também no refazer | diz a pilha certa |
+| n3 O rótulo "sem congelar" nas linhas do 2b | o texto da tabela explica; os próximos passos medem 3 rodadas sem o A/B (roadmap 0.7) |
+
+O portão do `badede5` substituiu o do `6f863c3` (a diferença é o teste de memória e o
+painel do glifo escolhido, fora do caminho medido do Enter, da releitura e da troca).
+
+## Revisão de produto, rodada 3
+
+Completude 9 · Fidelidade das medidas 8 · Clareza para o usuário 9 · Produtividade 9 —
+**aceita**. Os dois menores dela entraram no README: uma das rodadas só de memória foi
+medida no `b291e91` (outra sessão, só a verificação), não no `badede5`; e o portão do
+`6f863c3`, que deu 0,2 MB, está no commit `84b3ce6`.
+
+**Fechamento.** As duas revisões aceitaram: código na rodada 4, produto na 3. A tag
+`passo-2b` fica no commit que grava este registro. As medidas de desempenho são as 6 rodadas
+do `6f863c3` e o portão do `badede5`; a qualidade e a fatia, do `6f863c3`.

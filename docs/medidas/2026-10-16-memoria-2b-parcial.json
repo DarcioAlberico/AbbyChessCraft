@@ -1,6 +1,6 @@
 {
  "data": "2026-10-16",
- "rotulo": "memoria-2b-sem-parcial",
+ "rotulo": "memoria-2b-parcial",
  "exitstatus": 0,
  "metas_ausentes": [
   "troca_de_pagina",
@@ -19,40 +19,41 @@
   "pymupdf": "1.26.6",
   "torch": "2.14.0+cpu",
   "threads_do_torch": 6,
-  "commit": "1f1ea5c",
-  "arvore_suja": true
+  "commit": "badede5",
+  "arvore_suja": false,
+  "arquivos_sujos": []
  },
  "medidas": {
   "memoria_do_desfazer": {
    "boxes_por_pagina": 1450,
    "alvo_mb": 50,
    "acoes": 300,
-   "preso_pelo_historico_bytes": 424720,
+   "preso_pelo_historico_bytes": 424735,
    "bytes_por_acao": 1416,
    "estimado_300x20_mb": 8.1,
    "estimativa_do_historico_300x20_mb": 7.3,
-   "rss_delta_bytes_informativo": 30281728,
+   "rss_delta_bytes_informativo": 29933568,
    "como": "tracemalloc ligado antes de 300 ações reais (3 páginas já visitadas × 100): o que é liberado ao esvaziar o histórico, por ação, extrapolado para 300 páginas × 20 ações; e a estimativa que o próprio histórico faz (`HistoricoDoProjeto.bytes`, a que o limite de 50 MB usa). Desde o 2b, 100 ações por página: com 20, o histórico prendia menos que o ruído do coletor de lixo"
   },
   "atraso_durante_o_lote": {
    "paginas": 20,
-   "p99_ms": 17.9,
-   "p95_ms": 13.2,
-   "max_ms": 155.0,
-   "disparos": 9753,
-   "duracao_s": 166.8,
+   "p99_ms": 11.1,
+   "p95_ms": 6.4,
+   "max_ms": 153.2,
+   "disparos": 10668,
+   "duracao_s": 173.5,
    "alvo_p99_ms": 50,
    "acoes_durante_o_lote": "editar, desfazer, esquecer e os limiares são recusados com aviso; F5 e Ctrl+R ficam desligados (passo 2a)",
    "como": "pelo controlador do livro (desde o 2a): inclui gravar o pendente antes do lote e recarregar a página aberta no fim; até o 1b, o lote rodava direto no executor, sem as duas coisas",
    "maior_atraso_no_fim_do_lote": {
-    "ms": 155.0,
+    "ms": 153.2,
     "segundos_depois_do_fim": 0.16,
     "no_fim": true,
-    "maior_antes_do_fim_ms": 96.4
+    "maior_antes_do_fim_ms": 95.3
    }
   },
   "memoria_total_com_o_lote": {
-   "rss_pico_mb": 1553,
+   "rss_pico_mb": 1550,
    "alvo_mb": 2560,
    "como": "pico do RSS do processo único durante um lote de 20 páginas"
   }

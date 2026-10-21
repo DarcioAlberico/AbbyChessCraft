@@ -27,6 +27,16 @@ MEDIDAS = RAIZ / "docs" / "medidas"
 README = RAIZ / "README.md"
 INICIO, FIM = "<!-- medidas:inicio -->", "<!-- medidas:fim -->"
 LIVROS = ("xv", "yusupov", "darcy")
+#: Os passos na ordem do roadmap (as tabelas seguem esta ordem, não a alfabética).
+ORDEM_DOS_PASSOS = ("0", "1a", "1b", "2a", "2b", "a1", "a2", "a3", "e", "d1", "b", "d2", "c", "i",
+                    "f", "g", "h", "j", "k", "l")
+
+
+def _na_ordem(passo: str):
+    """A chave de ordenação de um passo ("D1", "d1", "passo-d1"...): a do roadmap."""
+    nome = str(passo).lower().removeprefix("passo-").removeprefix("passo ")
+    return (ORDEM_DOS_PASSOS.index(nome) if nome in ORDEM_DOS_PASSOS else len(ORDEM_DOS_PASSOS),
+            nome)
 _FATIA = re.compile(r"\d{4}-\d{2}-\d{2}-fatia-(?P<livro>[^-]+)-passo-(?P<passo>[^-]+)"
                     r"(?:-(?P<hora>\d{6}))?\.json")
 _NOMES = {"ligacao_da_legenda": "a ligação da legenda ao diagrama",
@@ -165,7 +175,8 @@ def _fatia() -> list:
             if chave not in mais_recente or ordem > mais_recente[chave][0]:
                 mais_recente[chave] = (ordem, arquivo)
     linhas = []
-    for (livro, passo), (_, arquivo) in sorted(mais_recente.items()):
+    for (livro, passo), (_, arquivo) in sorted(mais_recente.items(),
+                                               key=lambda i: (i[0][0], _na_ordem(i[0][1]))):
         dados = json.loads(arquivo.read_text(encoding="utf-8"))
         paginas = ", ".join(sorted(dados.get("paginas", {})))
         if dados.get("gestos") is None:
@@ -198,15 +209,35 @@ def _por_passo() -> list:
     da linha de base: as mesmas metas, a medida mais nova de cada passo."""
     _, base = _ultimo("linha-de-base")
     passos = sorted({c["passo"] for a in MEDIDAS.glob("*-passo-*.json")
-                     if (c := _PASSO.fullmatch(a.name))})
+                     if (c := _PASSO.fullmatch(a.name))}, key=_na_ordem)
     if base is None or not passos:
         return []
     metas = (("troca_de_pagina", "p95_ms", "Troca de página, p95"),
+             ("troca_fora_do_cache", "p95_ms", "Troca fora do cache, p95"),
              ("enter_ensinar", "p95_ms", "Enter, p95"),
              ("releitura_de_um_glifo", "p95_ms", "Releitura, p95"),
              ("memoria_do_desfazer", "estimado_300x20_mb", "Desfazer (MB)"),
              ("atraso_durante_o_lote", "p99_ms", "Atraso no lote, p99"),
-             ("memoria_total_com_o_lote", "rss_pico_mb", "Memória com o lote (MB)"))
+             ("memoria_total_com_o_lote", "rss_pico_mb", "Memória com o lote (MB)"),
+             ("releitura_com_o_lote", "p95_ms", "Releitura com o lote, p95"),
+             ("atraso_durante_o_lote_falso", "p99_ms", "Atraso no lote falso (51 p.), p99"),
+             ("gravar_pagina_do_lote", "p95_ms", "Gravar uma página do lote, p95"),
+             ("lote_com_e_sem_servidor", "com_servidor_s_por_pagina", "Lote com servidor (s/p.)"),
+             ("lote_com_e_sem_servidor", "sem_servidor_s_por_pagina", "Lote sem servidor (s/p.)"),
+             ("pintura_dos_boxes", "p95_ms", "Pintura de 2.000 boxes, p95"),
+             ("texto_da_pagina", "p95_ms", "Montar o Documento, p95"),
+             ("clique_no_documento", "p95_ms", "Clique no Documento, p95"),
+             ("clique_no_box", "p95_ms", "Clique acha o box, p95"),
+             ("montar_indice_da_busca", "p95_ms", "Montar o índice da busca (230 p.), p95"),
+             ("buscar_regex_no_livro", "p95_ms", "Buscar regex no livro (230 p.), p95"),
+             ("atraso_durante_a_busca", "p99_ms", "Atraso durante a busca, p99"),
+             ("atraso_durante_o_aborto", "p99_ms", "Atraso durante o aborto, p99"),
+             ("indice_pela_janela", "max_ms", "Índice pela janela (230 p.), máx."),
+             ("substituir_no_livro", "trocar_na_interface_ms",
+              "Substituir no livro: a janela presa (230 p.)"),
+             ("substituir_no_livro", "desfazer_ms", "Substituir no livro: o Ctrl+Z (230 p.)"),
+             ("substituir_no_livro", "desfazer_mb", "Substituir no livro: o desfazer (MB)"),
+             ("abrir_ao_painel_de_paginas", "p95_ms", "Abrir ao painel de Páginas (230 p.), p95"))
     colunas = [("linha de base", base)]
     for passo in passos:
         arquivo, dados = _ultimo(f"passo-{passo}")
@@ -228,11 +259,13 @@ _REPETICAO = re.compile(r"(?P<data>\d{4}-\d{2}-\d{2})-repeticao-(?P<passo>[^-]+)
                         r"(?P<parcial>-parcial)?(?:-(?P<hora>\d{6}))?\.json")
 _METAS_REPETIDAS = (("troca_de_pagina", "p50_ms", "Troca, p50"),
                     ("troca_de_pagina", "p95_ms", "Troca, p95"),
+                    ("troca_fora_do_cache", "p50_ms", "Fora do cache, p50"),
                     ("enter_ensinar", "p50_ms", "Enter, p50"),
                     ("enter_ensinar", "p95_ms", "Enter, p95"),
                     ("releitura_de_um_glifo", "p50_ms", "Releitura, p50"),
                     ("releitura_de_um_glifo", "p95_ms", "Releitura, p95"),
-                    ("atraso_durante_o_lote", "p99_ms", "Atraso no lote, p99"))
+                    ("atraso_durante_o_lote", "p99_ms", "Atraso no lote, p99"),
+                    ("releitura_com_o_lote", "p95_ms", "Releitura com o lote, p95"))
 
 
 def _repeticoes() -> list:
@@ -255,13 +288,16 @@ def _repeticoes() -> list:
               "`ABBY_SEM_CONGELAR=1`), o p95 do Enter do passo 0 ao 1b tem duas faixas no mesmo "
               "código (perto de 110–130 e de 180–235; no 2a, uma só, perto de 90); o atraso no "
               "lote tem duas faixas sempre (perto de 8–10 e de 21). Desde o 2b o congelamento é "
-              "desligado (`ABBY_CONGELAR=1` liga), e a coluna do Enter mede até a cor mudar "
-              "(até o 2a, até o fim da propagação). "
+              "desligado (`ABBY_CONGELAR=1` liga): as duas linhas do 2b rodam o mesmo programa (o "
+              "rótulo `sem_congelar` é do roteiro de medida), e a coluna do Enter mede até a "
+              "cor mudar (até o 2a, até o fim da propagação). Desde o A1 a troca é no cache de páginas "
+              "(a vizinha já pré-carregada); a de fora do cache tem coluna própria. "
               "Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair "
               "alta):", "",
               "| Código | Commit | Rodada | " + " | ".join(r for _, _, r in _METAS_REPETIDAS) + " |",
               "|---|---|---|" + "---|" * len(_METAS_REPETIDAS)]
-    for (passo, condicao), rodadas in sorted(grupos.items()):
+    for (passo, condicao), rodadas in sorted(grupos.items(),
+                                             key=lambda i: (_na_ordem(i[0][0]), i[0][1])):
         rodadas.sort(key=lambda r: r[0])
         commits = sorted({d["ambiente"].get("commit") for _, d in rodadas})
         valores = []

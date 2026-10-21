@@ -19,9 +19,10 @@ outra decisão, explícita.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -32,6 +33,9 @@ FONTE_LIVRO = "livro"
 FONTE_LIVRO_FRACO = "livro?"
 FONTE_MANUAL = "manual"
 FONTE_NENHUMA = "none"
+#: Ainda não lido: o leitor da interface só tem os padrões do livro, e o resto espera o
+#: servidor de leitura (SPEC §11; o estado de desenho `grade.AGUARDANDO`).
+FONTE_AGUARDANDO = ""
 
 #: Fontes que o usuário decidiu ou confirmou, e que a revisão não volta a mostrar.
 FONTES_CONFIRMADAS = {FONTE_LIVRO, FONTE_MANUAL}
@@ -78,7 +82,8 @@ class LeitorDoLivro:
     """
 
     def __init__(self, pasta_de_padroes: str | Path, *, limiares: Optional[Limiares] = None,
-                 ocr=None, rede=None, base=None, easyocr: bool = False):
+                 ocr=None, rede=None, base=None, easyocr: bool = False,
+                 aguardar: bool = False):
         self.pasta_de_padroes = Path(pasta_de_padroes)
         self.limiares = limiares or Limiares()
         # O limiar do livro é uma confiança na escala 1 - d/2000; o padrão o
@@ -90,6 +95,9 @@ class LeitorDoLivro:
         self.rede = rede
         self.base = base
         self._leitor_easyocr = None if easyocr else _SemEasyOCR()
+        #: O leitor da interface com servidor (§11): o que os padrões do livro não leem fica
+        #: "aguardando leitura" (`FONTE_AGUARDANDO`), e não "ninguém leu".
+        self.aguardar = aguardar
 
     @classmethod
     def com_modelos_globais(cls, pasta_de_padroes: str | Path, *,
@@ -129,28 +137,31 @@ class LeitorDoLivro:
     # ------------------------------------------------------------------
     # Ler
     # ------------------------------------------------------------------
-    def ler_pelo_livro(self, recorte: np.ndarray, altura_de_referencia: Optional[float] = None
+    def ler_pelo_livro(self, recorte: np.ndarray, altura_de_referencia: Optional[float] = None,
+                       efeito=None
                        ) -> Leitura:
         """Só os padrões do livro. É o que basta para propagar um padrão novo."""
-        resposta = self.padroes.ler(recorte, altura_relativa(recorte, altura_de_referencia))
+        resposta = self.padroes.ler(recorte, altura_relativa(recorte, altura_de_referencia),
+                                    efeito)
         if resposta.char:
             return Leitura(resposta.char, FONTE_LIVRO, resposta.confianca,
                            self.padroes.relativo(resposta.caminho))
         return Leitura("", FONTE_NENHUMA, 0.0)
 
-    def ler(self, recorte: np.ndarray, *, altura_de_referencia: Optional[float] = None
+    def ler(self, recorte: np.ndarray, *, altura_de_referencia: Optional[float] = None,
+            efeito=None
             ) -> Leitura:
         """A leitura do recorte de um glifo, em pé e escuro sobre claro."""
         if recorte is None or recorte.size == 0:
             return Leitura("", FONTE_NENHUMA, 0.0)
-        pelo_livro = self.ler_pelo_livro(recorte, altura_de_referencia)
+        pelo_livro = self.ler_pelo_livro(recorte, altura_de_referencia, efeito)
         if pelo_livro.char:
             return pelo_livro
         return self._ler_global(recorte, altura_de_referencia)
 
     def _ler_global(self, recorte, altura_de_referencia) -> Leitura:
         if self.ocr is None:
-            return Leitura("", FONTE_NENHUMA, 0.0)
+            return Leitura("", FONTE_AGUARDANDO if self.aguardar else FONTE_NENHUMA, 0.0)
         leitura = self.ocr.fallback_chain_detalhado(
             recorte, predictor=self.rede, learner=self.base, reader=self._leitor_easyocr,
             neural_threshold=self.limiares.rede, learner_threshold=self.limiares.base,
@@ -166,10 +177,11 @@ class LeitorDoLivro:
     # Ensinar e esquecer
     # ------------------------------------------------------------------
     def ensinar(self, recorte: np.ndarray, char: str, *,
-                altura_de_referencia: Optional[float] = None, origem: str = "") -> Path:
+                altura_de_referencia: Optional[float] = None, origem: str = "",
+                efeito=None) -> Path:
         """Grava o recorte como padrão de `char` neste livro. Vale na hora."""
         return self.padroes.ensinar(recorte, char,
-                                    altura_relativa(recorte, altura_de_referencia), origem)
+                                    altura_relativa(recorte, altura_de_referencia), origem, efeito)
 
     def esquecer(self, caminho: str | Path) -> None:
         """Apaga um padrão do livro; a leitura seguinte já não o usa."""
@@ -224,6 +236,18 @@ def congelar_para_a_coleta_de_lixo() -> int:
     gc.collect()
     gc.freeze()
     return gc.get_freeze_count()
+
+
+_ORIGEM = re.compile(r"_p(\d{4,})_b\d+(?:_g([0-9a-f]+))?$")
+
+
+def origem_de(origem: str) -> Optional[Tuple[int, Optional[int]]]:
+    """(índice da página, gid ou None) da amostra, pelo nome de origem (`nome_de_origem`);
+    None se o nome não diz."""
+    casado = _ORIGEM.search(origem or "")
+    if casado is None:
+        return None
+    return int(casado.group(1)) - 1, (int(casado.group(2), 16) if casado.group(2) else None)
 
 
 def nome_de_origem(projeto_nome: str, pagina: int, indice_box: int,

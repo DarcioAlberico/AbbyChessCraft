@@ -49,6 +49,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Refazer | Ctrl+Y / Ctrl+Shift+Z | Ctrl+Y / Ctrl+Shift+Z | global | A2 |
 | Refazer as áreas automáticas | — | — | global | A2 |
 | Reler os pendentes | Ctrl+R | Ctrl+R | global | A2 |
+| Retomar o lote cancelado de onde parou | — | — | global | E |
 | Sair | Ctrl+Q | Ctrl+Q | global | A2 |
 | Seguir o item atual nos dois painéis | Ctrl+Shift+L | Ctrl+Shift+L | global | A1 |
 | Substituir | Ctrl+H | Ctrl+H | global | D2 |
@@ -62,10 +63,10 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 
 | Ação | Padrão | FineReader | Escopo | Desde |
 |---|---|---|---|---|
-| 100% | Ctrl+8 | Ctrl+8 | imagem | A1 |
-| Afastar (Imagem) ou diminuir o corpo (Documento) | Ctrl+- | Ctrl+- | imagem, documento | A1 |
-| Aproximar (Imagem) ou aumentar o corpo (Documento) | Ctrl+= / Ctrl++ | Ctrl+= / Ctrl++ | imagem, documento | A1 |
-| Largura da página | Ctrl+9 | Ctrl+9 | imagem | A1 |
+| 100% | Ctrl+8 | Ctrl+8 | imagem, glifo | A1 |
+| Afastar (Imagem) ou diminuir o corpo (Documento) | Ctrl+- | Ctrl+- | imagem, documento, glifo | A1 |
+| Aproximar (Imagem) ou aumentar o corpo (Documento) | Ctrl+= / Ctrl++ | Ctrl+= / Ctrl++ | imagem, documento, glifo | A1 |
+| Largura da página | Ctrl+9 | Ctrl+9 | imagem, glifo | A1 |
 | Mostrar a origem das leituras nos boxes | V | V | imagem | A1 |
 | Mover a borda de baixo para baixo | Shift+Down | Shift+Down | imagem, campo_glifo | A2 |
 | Mover a borda de baixo para cima | Shift+Up | Shift+Up | imagem, campo_glifo | A2 |
@@ -75,10 +76,10 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Mover a borda direita para a esquerda | Shift+Left | Shift+Left | imagem, campo_glifo | A2 |
 | Mover a borda esquerda para a direita | Ctrl+Shift+Right | Ctrl+Shift+Right | imagem, campo_glifo | A2 |
 | Mover a borda esquerda para a esquerda | Ctrl+Shift+Left | Ctrl+Shift+Left | imagem, campo_glifo | A2 |
-| Página inteira (Imagem) ou corpo padrão (Documento) | Ctrl+0 | Ctrl+0 | imagem, documento | A1 |
+| Página inteira (Imagem) ou corpo padrão (Documento) | Ctrl+0 | Ctrl+0 | imagem, documento, glifo | A1 |
 | Rolar uma tela (e virar para a página anterior no topo) | PgUp | PgUp | imagem | A1 |
 | Rolar uma tela (e virar para a página seguinte no fim) | PgDn | PgDn | imagem | A1 |
-| Zoom no item atual | Ctrl+7 | Ctrl+7 | imagem | A1 |
+| Zoom no item atual | Ctrl+7 | Ctrl+7 | imagem, glifo | A1 |
 
 ## imagem_areas
 
@@ -107,12 +108,12 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Confirmar a palavra e ir à próxima duvidosa | Enter | Enter | documento | D1 |
 | Confirmar a palavra sem avançar | Shift+Enter | Shift+Enter | documento | D1 |
 | Confirmar e ensinar o glifo sob o cursor | Ctrl+Enter | Ctrl+Enter | documento | D1 |
-| Figurina ♔ (repetir alterna para ♚) | Ctrl+Shift+K | Ctrl+Shift+K | documento, galeria | D1 |
-| Figurina ♕ (repetir alterna para ♛) | Ctrl+Shift+Q | Ctrl+Shift+Q | documento, galeria | D1 |
-| Figurina ♖ (repetir alterna para ♜) | Ctrl+Shift+R | Ctrl+Shift+R | documento, galeria | D1 |
-| Figurina ♗ (repetir alterna para ♝) | Ctrl+Shift+B | Ctrl+Shift+B | documento, galeria | D1 |
-| Figurina ♘ (repetir alterna para ♞) | Ctrl+Shift+N | Ctrl+Shift+N | documento, galeria | D1 |
-| Figurina ♙ (repetir alterna para ♟) | Ctrl+Shift+P | Ctrl+Shift+P | documento, galeria | D1 |
+| Figurina ♔ (repetir alterna para ♚) | Ctrl+Shift+K | Ctrl+Shift+K | documento, glifo, galeria | D1 |
+| Figurina ♕ (repetir alterna para ♛) | Ctrl+Shift+Q | Ctrl+Shift+Q | documento, glifo, galeria | D1 |
+| Figurina ♖ (repetir alterna para ♜) | Ctrl+Shift+R | Ctrl+Shift+R | documento, glifo, galeria | D1 |
+| Figurina ♗ (repetir alterna para ♝) | Ctrl+Shift+B | Ctrl+Shift+B | documento, glifo, galeria | D1 |
+| Figurina ♘ (repetir alterna para ♞) | Ctrl+Shift+N | Ctrl+Shift+N | documento, glifo, galeria | D1 |
+| Figurina ♙ (repetir alterna para ♟) | Ctrl+Shift+P | Ctrl+Shift+P | documento, glifo, galeria | D1 |
 | Itálico | Ctrl+I | Ctrl+I | documento | G |
 | Mostrar ou ocultar cabeçalhos e rodapés | Ctrl+Shift+H | Ctrl+Shift+H | documento | A3 |
 | Negrito | Ctrl+B | Ctrl+B | documento | G |
@@ -141,5 +142,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Ação | Padrão | FineReader | Escopo | Desde |
 |---|---|---|---|---|
 | Adicionar ao dicionário do livro | Ctrl+Shift+D | Ctrl+Shift+D | palavra | A2 |
+| Corrigir a palavra | Enter | Enter | palavra | A2 |
+| Corrigir a palavra e ensinar os glifos dela | Ctrl+Enter | Ctrl+Enter | palavra | A2 |
 | Ignorar a palavra | Ctrl+Shift+I | Ctrl+Shift+I | palavra | A2 |
 

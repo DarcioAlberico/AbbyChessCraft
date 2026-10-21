@@ -1,0 +1,247 @@
+{
+ "data": "2026-10-17",
+ "rotulo": "passo-d2",
+ "exitstatus": 0,
+ "metas_ausentes": [],
+ "ordem": "cada módulo tem a janela e o projeto dele, em ordem fixa: na linha de base o Enter ensina antes da releitura; o lote (desde o E, em test_servidor.py) lê num projeto novo, sem padrões",
+ "configuracao": "desde o passo E, a janela com o servidor de leitura (o leitor real no filho), como o programa abre o projeto",
+ "ambiente": {
+  "objetos_congelados": 0,
+  "maquina": "DESKTOP-E025G20",
+  "maquina_cadastrada": true,
+  "cpu": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
+  "ram_gb": 15.9,
+  "python": "3.13.2",
+  "pyside6": "6.11.1",
+  "pymupdf": "1.26.6",
+  "torch": "2.14.0+cpu",
+  "threads_do_torch": 6,
+  "commit": "6a6564a",
+  "arvore_suja": false,
+  "arquivos_sujos": []
+ },
+ "medidas": {
+  "montar_indice_da_busca": {
+   "p50_ms": 1371.24,
+   "p95_ms": 1430.76,
+   "max_ms": 1430.76,
+   "n": 10,
+   "paginas": 230,
+   "processos": 6,
+   "alvo_p95_ms": 2000,
+   "com_os_processos_por_abrir_ms": {
+    "p50_ms": 2238.47,
+    "p95_ms": 2291.68,
+    "max_ms": 2291.68,
+    "n": 3
+   },
+   "como": "as 7 páginas da fatia (JSON v2) copiadas até 230, montadas por `busca.construir` nos processos já abertos (o programa os abre ao começar, `PoolDoIndice.aquecer`); à parte, abrindo os processos a cada vez (o projeto aberto logo ao abrir o programa)"
+  },
+  "buscar_regex_no_livro": {
+   "p50_ms": 13.59,
+   "p95_ms": 15.07,
+   "max_ms": 15.5,
+   "n": 30,
+   "paginas": 230,
+   "ocorrencias": 2356,
+   "alvo_p95_ms": 1000,
+   "como": "`busca.buscar` de '(?<=\\\\w)1(?=\\\\w)' no índice de 230 páginas, na thread do teste; o resultado igual ao do `re` no texto concatenado"
+  },
+  "atraso_durante_a_busca": {
+   "p99_ms": 1.8,
+   "max_ms": 42.3,
+   "disparos": 262,
+   "duracao_s": 4.26,
+   "alvo_p99_ms": 100,
+   "como": "um QTimer de 16 ms na thread da interface enquanto outra thread busca '(?:\\\\w{3,}\\\\s+){2,}\\\\w+' 40 vezes seguidas no índice de 230 páginas"
+  },
+  "atraso_durante_o_aborto": {
+   "p99_ms": 1.2,
+   "max_ms": 1.2,
+   "disparos": 31,
+   "abortou_em_s": 0.5,
+   "alvo_p99_ms": 100,
+   "como": "(\\w+)+$ numa página de uma palavra de 2.999 letras e um '!', com o tempo-limite real (0,5 s); um QTimer de 16 ms na thread da interface"
+  },
+  "indice_pela_janela": {
+   "ms": [
+    2257,
+    1747,
+    1812
+   ],
+   "max_ms": 2257,
+   "mediana_ms": 1812,
+   "paginas": 230,
+   "alvo_p95_ms": 2000,
+   "portao": "na mediana (a primeira janela de cada série é a mais lenta; o pior caso fica nas limitações do CA-7.1)",
+   "como": "JanelaPrincipal com o servidor (a fábrica de verdade, carregando os modelos ao mesmo tempo) e os processos do índice já abertos: do abrir_caminho ao busca.pronto, 3 vezes (uma janela nova por vez)"
+  },
+  "troca_de_pagina": {
+   "p50_ms": 15.38,
+   "p95_ms": 18.6,
+   "max_ms": 19.66,
+   "n": 30,
+   "alvo_no_cache_ms": 150,
+   "como": "mesmo processo, alternando 2 páginas lidas, as duas no cache (desde o A1)"
+  },
+  "troca_fora_do_cache": {
+   "p50_ms": 139.29,
+   "p95_ms": 153.78,
+   "max_ms": 172.65,
+   "n": 12,
+   "alvo_ms": 600,
+   "como": "mesmo processo, o cache de páginas e o de pixmaps esvaziados antes de cada troca (o processo novo, com a primeira carga do PDF, não está nesta medida)"
+  },
+  "enter_ensinar": {
+   "p50_ms": 24.49,
+   "p95_ms": 32.23,
+   "max_ms": 32.39,
+   "n": 30,
+   "alvo_ms": 100,
+   "padroes_no_livro": [
+    0,
+    35
+   ],
+   "caracteres_novos": 7,
+   "como": "desde o 2b: QTest.keyClick(Enter) no campo, com o caractere lido do primeiro pendente (conferir a leitura), até a cor mudar (a parte síncrona: o glifo manual, a amostra gravada); a propagação vai para a fila e não entra. Até o 2a, era até o fim da propagação (ver enter_ate_o_fim_da_propagacao)"
+  },
+  "enter_ate_o_fim_da_propagacao": {
+   "p50_ms": 89.48,
+   "p95_ms": 111.77,
+   "max_ms": 153.09,
+   "n": 30,
+   "como": "o mesmo Enter, até a propagação acabar (o que o 2a media como Enter)"
+  },
+  "enter_com_propagacao_lenta": {
+   "p50_ms": 22.7,
+   "p95_ms": 26.06,
+   "n": 10,
+   "alvo_ms": 100,
+   "como": "o segundo Enter, com a propagação do primeiro presa (1 s), até a cor mudar"
+  },
+  "texto_da_pagina": {
+   "p50_ms": 33.51,
+   "p95_ms": 34.88,
+   "max_ms": 36.24,
+   "n": 30,
+   "como": "refazer o painel de texto da página (montar o documento e pôr no painel), que desde o 2b roda 150 ms depois da última mudança, e não dentro do Enter nem da releitura"
+  },
+  "releitura_de_um_glifo": {
+   "p50_ms": 43.55,
+   "p95_ms": 51.44,
+   "max_ms": 53.03,
+   "n": 30,
+   "alvo_ms": 150,
+   "pelo_servidor": 30,
+   "como": "Alt+→/← alternados num glifo, do comando à leitura dele (pelos padrões na janela, ou pelo servidor, sem o lote; com o lote: releitura_com_o_lote)"
+  },
+  "memoria_do_desfazer": {
+   "boxes_por_pagina": 1450,
+   "alvo_mb": 50,
+   "acoes": 300,
+   "preso_pelo_historico_bytes": 419818,
+   "bytes_por_acao": 1399,
+   "estimado_300x20_mb": 8.0,
+   "estimativa_do_historico_300x20_mb": 6.9,
+   "rss_delta_bytes_informativo": 7049216,
+   "como": "tracemalloc ligado antes de 300 ações reais (3 páginas já visitadas × 100): o que é liberado ao esvaziar o histórico, por ação, extrapolado para 300 páginas × 20 ações; e a estimativa que o próprio histórico faz (`HistoricoDoProjeto.bytes`, a que o limite de 50 MB usa). Desde o 2b, 100 ações por página: com 20, o histórico prendia menos que o ruído do coletor de lixo"
+  },
+  "clique_no_documento": {
+   "p50_ms": 2.92,
+   "p95_ms": 3.43,
+   "max_ms": 3.87,
+   "n": 30,
+   "alvo_ms": 50,
+   "como": "QTest.mouseClick numa palavra do Documento: o destaque na Imagem, o glifo no Inspetor, o Documento e a Linha seguindo; página 21 reconhecida"
+  },
+  "atraso_durante_o_lote": {
+   "paginas": 20,
+   "p99_ms": 2.5,
+   "p95_ms": 1.9,
+   "max_ms": 101.4,
+   "disparos": 10625,
+   "duracao_s": 171.8,
+   "alvo_p99_ms": 50,
+   "acoes_durante_o_lote": "todas valem (passo E): o lote lê no servidor e grava na interface entre um comando e outro; desde o B, uma busca a cada 2 s (Localizar) durante o lote",
+   "buscas_durante_o_lote": 85,
+   "maior_atraso": {
+    "ms": 101.4,
+    "segundos_da_gravacao_mais_perto": 0.137,
+    "gravacao_mais_perto_ms": 19.4
+   },
+   "como": "pelo servidor de leitura (desde o E): a leitura no filho, com a prioridade abaixo do normal; a interface reconcilia e entrega cada página ao gravador. Até o A3, o lote lia numa thread do processo da interface"
+  },
+  "gravar_pagina_do_lote": {
+   "p50_ms": 15.6,
+   "p95_ms": 22.0,
+   "max_ms": 23.7,
+   "n": 20,
+   "como": "o que a janela faz com cada página que volta do servidor (a cópia de antes, reconciliar os gids, o resumo, entregar ao gravador), na thread da interface"
+  },
+  "memoria_total_com_o_lote": {
+   "rss_pico_mb": 2468,
+   "alvo_mb": 2560,
+   "interface_no_fim_mb": 1236,
+   "servidor_no_fim_mb": 1018,
+   "como": "pico da soma do RSS da interface e do servidor durante um lote de 20 páginas (desde o E, dois processos)"
+  },
+  "releitura_com_o_lote": {
+   "p50_ms": 46.31,
+   "p95_ms": 111.17,
+   "max_ms": 197.81,
+   "n": 30,
+   "alvo_p95_ms": 150,
+   "lote_rodando_no_fim": true,
+   "como": "Alt+→/← alternados num glifo da página aberta: a interface o deixa aguardando e o servidor o lê entre um glifo e outro do lote (de outras páginas); do comando ao glifo lido, com o laço de eventos girando"
+  },
+  "lote_com_e_sem_servidor": {
+   "paginas": [
+    21,
+    22,
+    23,
+    24,
+    25
+   ],
+   "padroes_no_livro": 0,
+   "com_servidor_s_por_pagina": 8.71,
+   "sem_servidor_s_por_pagina": 8.71,
+   "como": "o lote com o servidor (do pedido à resposta, com a página renderizada) e `ler_pagina` na própria janela com o leitor real, nas mesmas páginas"
+  },
+  "atraso_durante_o_lote_falso": {
+   "paginas": 51,
+   "p99_ms": 4.6,
+   "p95_ms": 2.1,
+   "max_ms": 6.1,
+   "disparos": 488,
+   "duracao_s": 7.8,
+   "alvo_p99_ms": 50,
+   "buscas_durante_o_lote": 3,
+   "como": "o lote de 51 páginas sintéticas pelo servidor com o leitor falso (10 ms por glifo, ~200 ms por página): a janela grava uma página a cada ~200 ms; desde o B, uma busca a cada 2 s (Localizar) durante o lote"
+  },
+  "substituir_no_livro": {
+   "paginas": 230,
+   "casos": 28693,
+   "previa_s": 9.02,
+   "copias_s": 9.66,
+   "trocar_na_interface_ms": 371,
+   "desfazer_ms": 563,
+   "desfazer_mb": 43.4,
+   "limite_do_desfazer_mb": 50,
+   "como": "'e' -> 'E' (Aa ligado, Prosa) nas 230 páginas: a prévia numa thread, as cópias na thread do executor, trocar as páginas e registrar a transação na interface, e um Ctrl+Z (sem alvo na SPEC; o CA-7.2 é que um Ctrl+Z volta todas)"
+  },
+  "pintura_dos_boxes": {
+   "p95_ms": 13.46,
+   "max_ms": 15.82,
+   "n": 60,
+   "alvo_ms": 33,
+   "boxes": 2000,
+   "como": "paint() do item numa QImage 1920×1080, 10 zooms de 5% a 800% × 6"
+  },
+  "clique_no_box": {
+   "p95_ms": 0.0017,
+   "n": 1000,
+   "alvo_ms": 2,
+   "como": "ItemDosBoxes.no_ponto (o que o visor chama no clique), 1.000 pontos de semente fixa, metade no meio de um box"
+  }
+ }
+}

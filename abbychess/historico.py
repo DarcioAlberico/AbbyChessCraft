@@ -28,6 +28,7 @@ import sys
 from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, Sequence, Tuple
 
+from abbychess.leitor import FONTE_MANUAL
 from abbychess.modelo import Box, Decisoes, Pagina
 
 #: O que o desfazer do projeto guarda, no máximo (estimado); as mais antigas saem.
@@ -184,11 +185,24 @@ def igual(a: Optional[Box], b: Optional[Box]) -> bool:
             and a.revisado == b.revisado and a.entry.as_state() == b.entry.as_state())
 
 
+def lido_depois(atual: Optional[Box], esperado: Optional[Box]) -> bool:
+    """O glifo esperado estava "aguardando leitura" (§11) e o atual é ele mesmo, só que lido
+    pelo servidor depois: a leitura que chega não é uma decisão, e não impede o desfazer."""
+    if atual is None or esperado is None or atual.gid != esperado.gid:
+        return False
+    e, a = esperado.entry, atual.entry
+    return (not e.char and not e.source and a.source != FONTE_MANUAL
+            and (a.x1, a.y1, a.x2, a.y2) == (e.x1, e.y1, e.x2, e.y2)
+            and atual.estilo == esperado.estilo and atual.revisado == esperado.revisado)
+
+
 def conferir(m: MudancaDaPagina, pagina: Optional[Pagina], *, para_tras: bool) -> None:
-    """Levanta `Recusa` se a página não está como a transação a deixou (nos gids dela)."""
+    """Levanta `Recusa` se a página não está como a transação a deixou (nos gids dela). O
+    glifo que estava aguardando leitura e foi lido depois conta como igual."""
     esperado = m.depois if para_tras else m.antes
     atuais = {b.gid: b for b in pagina.boxes} if pagina is not None else {}
-    mudados = [gid for gid, box in esperado.items() if not igual(atuais.get(gid), box)]
+    mudados = [gid for gid, box in esperado.items()
+               if not igual(atuais.get(gid), box) and not lido_depois(atuais.get(gid), box)]
     if mudados:
         raise Recusa(f"{len(mudados)} glifo(s) da página {m.indice + 1} mudaram depois "
                      "(por outra ação, que não passou por este desfazer)")
@@ -228,8 +242,19 @@ def aplicar(m: MudancaDaPagina, pagina: Pagina, *, para_tras: bool) -> None:
             d, quebras=d.quebras & vivos, paragrafo_antes=d.paragrafo_antes & vivos,
             hifen_de_quebra=d.hifen_de_quebra & vivos,
             juncoes=frozenset(j for j in d.juncoes if set(j) <= vivos),
-            virtuais=tuple(v for v in d.virtuais
-                           if v.depois_de is None or v.depois_de in vivos))
+            virtuais=_virtuais_ancorados(d.virtuais, vivos))
+
+
+def _virtuais_ancorados(virtuais, vivos) -> tuple:
+    """Os virtuais cujas âncoras ainda estão na página (um box vivo ou um virtual que fica)."""
+    ficam = tuple(virtuais)
+    while True:
+        gids = vivos | {v.gid for v in ficam}
+        filtrados = tuple(v for v in ficam if (v.depois_de is None or v.depois_de in gids)
+                          and (v.antes_de is None or v.antes_de in gids))
+        if len(filtrados) == len(ficam):
+            return filtrados
+        ficam = filtrados
 
 
 def _na_ordem(ordem: List[int], alvo: Sequence[int]) -> List[int]:
@@ -269,6 +294,21 @@ class HistoricoDoProjeto:
         #: transação -> a estimativa dela, calculada uma vez (o total anda junto).
         self._tamanho: Dict[int, int] = {}
         self._total = 0
+        #: pid -> quantas vezes uma ação do usuário mudou a página (registrar, emendar,
+        #: desfazer, refazer): o lote compara antes e depois de ler (§11).
+        self._versoes: Dict[int, int] = {}
+
+    def versao(self, pid: Optional[int]) -> int:
+        return self._versoes.get(pid, 0) if pid is not None else 0
+
+    def tocar(self, pid: int) -> None:
+        """A página mudou por fora do desfazer, por um comando do usuário (voltar ao estado
+        antes do lote): o lote que a lê agora não grava por cima."""
+        self._versoes[pid] = self._versoes.get(pid, 0) + 1
+
+    def _mudou(self, transacao: Transacao) -> None:
+        for pid in transacao.paginas:
+            self._versoes[pid] = self._versoes.get(pid, 0) + 1
 
     def _medir(self, transacao: Transacao) -> None:
         self._total -= self._tamanho.get(id(transacao), 0)
@@ -281,6 +321,7 @@ class HistoricoDoProjeto:
     def registrar(self, transacao: Transacao) -> Transacao:
         """Uma transação nova, que apaga o que havia para refazer. Uma com a mesma chave
         `juntar` da última se junta a ela (e é a última que volta)."""
+        self._mudou(transacao)
         ultima = self._desfazer[-1] if self._desfazer else None
         if (transacao.juntar is not None and ultima is not None and not self._refazer
                 and ultima.juntar == transacao.juntar and not ultima.invalidada):
@@ -304,6 +345,7 @@ class HistoricoDoProjeto:
 
     def emendou(self, transacao: Transacao) -> None:
         """A transação cresceu (a propagação a emendou): a estimativa é refeita."""
+        self._mudou(transacao)
         if id(transacao) in self._tamanho:
             self._medir(transacao)
             while self._total > self.limite and len(self._desfazer) > 1:
@@ -312,6 +354,16 @@ class HistoricoDoProjeto:
     @property
     def bytes(self) -> int:
         return self._total
+
+    @property
+    def passos(self) -> int:
+        """Quantas transações o Ctrl+Z ainda alcança."""
+        return len(self._desfazer)
+
+    def toca(self, pid: int) -> bool:
+        """Alguma transação do desfazer ou do refazer muda a página `pid` (o lote não a
+        sobrescreve: o Ctrl+Z dela seria recusado, §11)."""
+        return any(pid in t.paginas for t in (*self._desfazer, *self._refazer))
 
     def proxima_a_desfazer(self) -> Optional[Transacao]:
         return self._desfazer[-1] if self._desfazer else None
@@ -332,9 +384,20 @@ class HistoricoDoProjeto:
     def desfeita(self) -> None:
         """A última foi desfeita (com sucesso): vai para o refazer."""
         self._refazer.append(self._desfazer.pop())
+        self._mudou(self._refazer[-1])
 
     def refeita(self) -> None:
         self._desfazer.append(self._refazer.pop())
+        self._mudou(self._desfazer[-1])
+
+    def descartar_desfazer(self) -> None:
+        """Tira a próxima a desfazer sem aplicá-la (a que foi recusada)."""
+        if self._desfazer:
+            self._esquecer(self._desfazer.pop())
+
+    def descartar_refazer(self) -> None:
+        if self._refazer:
+            self._esquecer(self._refazer.pop())
 
     def limpar(self) -> None:
         self._desfazer.clear()

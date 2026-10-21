@@ -110,11 +110,8 @@ def localizar_fonte(janela, projeto: ProjetoDeLivro) -> bool:
             QMessageBox.warning(janela, "Abrir projeto", str(erro))
 
 
-def avisos_da_abertura(janela, projeto: ProjetoDeLivro, leitor) -> None:
-    """O que a abertura achou e o usuário precisa saber: rede ausente, migração, fonte movida."""
-    if leitor.rede is None:
-        QMessageBox.warning(janela, "Modelo", "A rede de glifos do PyBoxEditor não "
-                            "carregou. A leitura usa só os padrões e a base global.")
+def avisos_da_abertura(janela, projeto: ProjetoDeLivro) -> None:
+    """O que a abertura achou e o usuário precisa saber: migração, fonte movida."""
     if projeto.migrado:
         QMessageBox.information(
             janela, "Abrir projeto",
@@ -127,9 +124,17 @@ def avisos_da_abertura(janela, projeto: ProjetoDeLivro, leitor) -> None:
             f"gravado e foi achada (o mesmo arquivo, pelo conteúdo) em:\n{projeto.fonte}"
             + ("\n\nComo o projeto é só para leitura, isso vale nesta sessão, e a "
                "busca se repete a cada abertura." if projeto.somente_leitura else ""))
+
+
+def avisos_dos_modelos(janela, estado: dict, padroes: int) -> None:
+    """Os modelos globais carregaram (no servidor de leitura, §11, ou aqui): a rede ausente
+    e o resumo na barra."""
+    if not estado.get("rede"):
+        QMessageBox.warning(janela, "Modelo", "A rede de glifos do PyBoxEditor não "
+                            "carregou. A leitura usa só os padrões e a base global.")
     janela.statusBar().showMessage(
-        f"Projeto aberto. Base global com {leitor.base.total if leitor.base else 0} "
-        f"referências; {leitor.arquivos_de_padrao()} padrões deste livro.", 8000)
+        f"Modelos prontos. Base global com {estado.get('base', 0)} referências; "
+        f"{padroes} padrões deste livro.", 8000)
 
 
 def intervalo_do_lote(janela, projeto, total: int) -> Optional[Tuple[List[int], bool]]:
@@ -145,19 +150,47 @@ def intervalo_do_lote(janela, projeto, total: int) -> Optional[Tuple[List[int], 
         QMessageBox.warning(janela, "Reconhecer o livro", str(erro))
         return None
     refazer = False
+    from abbychess.modelo import VERIFICADA
+
     lidas = livro.ja_lidas(projeto, indices)
+    verificadas = [i for i in lidas if projeto.estado_da_pagina(i) == VERIFICADA]
+    lidas = [i for i in lidas if i not in verificadas]      # essas o lote pula sempre
     if lidas:
         botoes = QMessageBox.StandardButton
+        pulam = (f" ({len(verificadas)} verificada(s), que o lote pula sempre)"
+                 if verificadas else "")
         resposta = QMessageBox.question(
             janela, "Reconhecer o livro",
-            f"{len(lidas)} das {len(indices)} páginas já foram reconhecidas. Reconhecer "
-            "essas de novo?\n\nSim descarta os boxes delas e as correções só desta "
-            "ocorrência (os padrões ficam). Não as pula e lê só as outras.",
+            f"{len(lidas)} das {len(indices)} páginas já foram reconhecidas{pulam}. Ler "
+            "essas de novo?\n\nSim as lê de novo mantendo as correções manuais e os glifos "
+            "revisados; a página de antes fica em Página › Voltar ao estado antes do lote. "
+            "Não as pula e lê só as outras.",
             botoes.Yes | botoes.No | botoes.Cancel, botoes.No)
         if resposta == botoes.Cancel:
             return None
         refazer = resposta == botoes.Yes
     return indices, refazer
+
+
+def reler_depois(janela, paginas, *, faltou: bool) -> Optional[bool]:
+    """Retomar o lote com páginas que ele não sobrescreveu: lê-las também? None é cancelar.
+    Sem nada que tenha faltado do lote, a pergunta é só "ler essas?" (Sim ou Cancelar)."""
+    botoes = QMessageBox.StandardButton
+    lista = ", ".join(str(i + 1) for i in paginas)
+    efeito = ("Sim as lê de novo, a aberta também: as correções manuais e os glifos revisados "
+              "ficam, as outras mudanças delas saem, e o Ctrl+Z delas deixa de valer.")
+    if faltou:
+        texto = (f"O lote não sobrescreveu as páginas {lista}, porque você as mudou. Ler essas "
+                 f"também?\n\n{efeito} Não lê só o que faltou do lote.")
+        opcoes, padrao = botoes.Yes | botoes.No | botoes.Cancel, botoes.No
+    else:
+        texto = (f"O lote não sobrescreveu as páginas {lista}, porque você as mudou. Ler "
+                 f"essas agora?\n\n{efeito}")
+        opcoes, padrao = botoes.Yes | botoes.Cancel, botoes.Cancel
+    resposta = QMessageBox.question(janela, "Retomar o lote", texto, opcoes, padrao)
+    if resposta == botoes.Cancel:
+        return None
+    return resposta == botoes.Yes
 
 
 def destino_da_exportacao(janela, projeto) -> Optional[Path]:

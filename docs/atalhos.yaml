@@ -14,7 +14,8 @@
 #   sem_atalho        perfis em que a ação existe só por menu ou botão
 #   desde_passo       o passo do roadmap em que a ação passa a estar registrada
 #   excecoes          encobrimentos declarados: tecla, widget, tipo e motivo
-#                     tipo "redireciona": o widget cede a tecla (ShortcutOverride ignorado)
+#                     tipo "redireciona": o widget entrega à ação a tecla que seria dele (ignora o
+#                       ShortcutOverride, ou o aceita e dispara a ação no keyPressEvent)
 #                     tipo "substitui": o atalho toma o lugar da ligação nativa de propósito
 
 versao: 1
@@ -73,6 +74,8 @@ acoes:
   - {id: sair, descricao: Sair, escopo: [global], padrao: Ctrl+Q, desde_passo: A2}
   - {id: cancelar_lote, descricao: Cancelar o lote (também o ✕ da barra de status),
      escopo: [global], sem_atalho: [padrao, finereader], desde_passo: A2}
+  - {id: retomar_lote, descricao: Retomar o lote cancelado de onde parou, escopo: [global],
+     sem_atalho: [padrao, finereader], desde_passo: E}
 
   # --- Editar --------------------------------------------------------------------
   - id: desfazer
@@ -151,14 +154,14 @@ acoes:
     padrao: Alt+Down
     desde_passo: A2
     excecoes:
-      - {tecla: Alt+Down, widget: combobox, tipo: substitui, motivo: "a caixa de zoom tem ClickFocus e abre com F4 ou clique"}
+      - {tecla: Alt+Down, widget: combobox, tipo: substitui, motivo: "o filtro da gaveta de Páginas abre a lista com F4 ou clique; Alt+↓ é da fila em qualquer painel (§8.1)"}
   - id: anterior_da_fila
     descricao: Item anterior da fila
     escopo: [global]
     padrao: Alt+Up
     desde_passo: A2
     excecoes:
-      - {tecla: Alt+Up, widget: combobox, tipo: substitui, motivo: "a caixa de zoom tem ClickFocus e abre com F4 ou clique"}
+      - {tecla: Alt+Up, widget: combobox, tipo: substitui, motivo: "o filtro da gaveta de Páginas fecha a lista com Esc ou clique; Alt+↑ é da fila (§8.1)"}
   - {id: ciclar_modo_da_fila, descricao: Ciclar o modo da fila, escopo: [global], padrao: F7,
      finereader: Ctrl+Shift+F7, desde_passo: A2}
   - {id: alternar_escopo_da_fila, descricao: Alternar o escopo da fila (página ou livro), escopo: [global],
@@ -200,15 +203,15 @@ acoes:
     excecoes:
       - {tecla: Ctrl+Shift+Tab, widget: tabwidget, tipo: substitui, motivo: "perfil FineReader: as abas da vista direita trocam com Alt+3"}
   - {id: seguir, descricao: Seguir o item atual nos dois painéis, escopo: [global], padrao: Ctrl+Shift+L, desde_passo: A1}
-  - {id: zoom_mais, descricao: Aproximar (Imagem) ou aumentar o corpo (Documento), escopo: [imagem, documento],
+  - {id: zoom_mais, descricao: Aproximar (Imagem) ou aumentar o corpo (Documento), escopo: [imagem, documento, glifo],
      padrao: [Ctrl+=, Ctrl++], desde_passo: A1}
-  - {id: zoom_menos, descricao: Afastar (Imagem) ou diminuir o corpo (Documento), escopo: [imagem, documento],
+  - {id: zoom_menos, descricao: Afastar (Imagem) ou diminuir o corpo (Documento), escopo: [imagem, documento, glifo],
      padrao: Ctrl+-, desde_passo: A1}
-  - {id: zoom_pagina, descricao: Página inteira (Imagem) ou corpo padrão (Documento), escopo: [imagem, documento],
+  - {id: zoom_pagina, descricao: Página inteira (Imagem) ou corpo padrão (Documento), escopo: [imagem, documento, glifo],
      padrao: Ctrl+0, desde_passo: A1}
-  - {id: zoom_largura, descricao: Largura da página, escopo: [imagem], padrao: Ctrl+9, desde_passo: A1}
-  - {id: zoom_100, descricao: 100%, escopo: [imagem], padrao: Ctrl+8, desde_passo: A1}
-  - {id: zoom_item, descricao: Zoom no item atual, escopo: [imagem], padrao: Ctrl+7, desde_passo: A1}
+  - {id: zoom_largura, descricao: Largura da página, escopo: [imagem, glifo], padrao: Ctrl+9, desde_passo: A1}
+  - {id: zoom_100, descricao: 100%, escopo: [imagem, glifo], padrao: Ctrl+8, desde_passo: A1}
+  - {id: zoom_item, descricao: Zoom no item atual, escopo: [imagem, glifo], padrao: Ctrl+7, desde_passo: A1}
   - {id: mostrar_origem, descricao: Mostrar a origem das leituras nos boxes, escopo: [imagem], padrao: V, desde_passo: A1}
 
   # --- Ferramentas ---------------------------------------------------------------
@@ -224,14 +227,14 @@ acoes:
     padrao: Enter
     desde_passo: A2
     excecoes:
-      - {tecla: Enter, widget: lineedit, tipo: redireciona, motivo: "o campo trata o Enter (keyPressEvent)"}
+      - {tecla: Enter, widget: lineedit, tipo: redireciona, motivo: "o campo do caractere fica com o Enter e dispara a ação (exceção 6 de §3.4)"}
   - id: so_corrigir
     descricao: Corrigir só esta ocorrência
     escopo: [campo_glifo]
     padrao: Shift+Enter
     desde_passo: A2
     excecoes:
-      - {tecla: Shift+Enter, widget: lineedit, tipo: redireciona, motivo: "o campo trata o Shift+Enter (keyPressEvent)"}
+      - {tecla: Shift+Enter, widget: lineedit, tipo: redireciona, motivo: "o campo do caractere fica com o Shift+Enter e dispara a ação (exceção 6 de §3.4)"}
   - id: descartar_box
     descricao: Não é caractere (descartar o box)
     escopo: [glifo]
@@ -277,6 +280,15 @@ acoes:
   - {id: paleta, descricao: Paleta de símbolos no cursor, escopo: [documento, glifo, galeria], padrao: F2, desde_passo: A2}
 
   # --- Inspetor: Palavra (a verificação) ---------------------------------------------
+  - id: corrigir_palavra
+    descricao: Corrigir a palavra
+    escopo: [palavra]
+    padrao: Enter
+    desde_passo: A2
+    excecoes:
+      - {tecla: Enter, widget: lineedit, tipo: redireciona, motivo: "o campo da palavra fica com o Enter e dispara a ação"}
+  - {id: corrigir_e_ensinar_palavra, descricao: Corrigir a palavra e ensinar os glifos dela,
+     escopo: [palavra], padrao: Ctrl+Enter, desde_passo: A2}
   - {id: ignorar_palavra, descricao: Ignorar a palavra, escopo: [palavra], padrao: Ctrl+Shift+I, desde_passo: A2}
   - {id: adicionar_ao_lexico, descricao: Adicionar ao dicionário do livro, escopo: [palavra], padrao: Ctrl+Shift+D, desde_passo: A2}
 
@@ -301,12 +313,12 @@ acoes:
   - {id: negrito, descricao: Negrito, escopo: [documento], padrao: Ctrl+B, desde_passo: G}
   - {id: italico, descricao: Itálico, escopo: [documento], padrao: Ctrl+I, desde_passo: G}
   - {id: sublinhado, descricao: Sublinhado, escopo: [documento], padrao: Ctrl+U, desde_passo: G}
-  - {id: figurina_rei, descricao: Figurina ♔ (repetir alterna para ♚), escopo: [documento, galeria], padrao: Ctrl+Shift+K, desde_passo: D1}
-  - {id: figurina_dama, descricao: Figurina ♕ (repetir alterna para ♛), escopo: [documento, galeria], padrao: Ctrl+Shift+Q, desde_passo: D1}
-  - {id: figurina_torre, descricao: Figurina ♖ (repetir alterna para ♜), escopo: [documento, galeria], padrao: Ctrl+Shift+R, desde_passo: D1}
-  - {id: figurina_bispo, descricao: Figurina ♗ (repetir alterna para ♝), escopo: [documento, galeria], padrao: Ctrl+Shift+B, desde_passo: D1}
-  - {id: figurina_cavalo, descricao: Figurina ♘ (repetir alterna para ♞), escopo: [documento, galeria], padrao: Ctrl+Shift+N, desde_passo: D1}
-  - {id: figurina_peao, descricao: Figurina ♙ (repetir alterna para ♟), escopo: [documento, galeria], padrao: Ctrl+Shift+P, desde_passo: D1}
+  - {id: figurina_rei, descricao: Figurina ♔ (repetir alterna para ♚), escopo: [documento, glifo, galeria], padrao: Ctrl+Shift+K, desde_passo: D1}
+  - {id: figurina_dama, descricao: Figurina ♕ (repetir alterna para ♛), escopo: [documento, glifo, galeria], padrao: Ctrl+Shift+Q, desde_passo: D1}
+  - {id: figurina_torre, descricao: Figurina ♖ (repetir alterna para ♜), escopo: [documento, glifo, galeria], padrao: Ctrl+Shift+R, desde_passo: D1}
+  - {id: figurina_bispo, descricao: Figurina ♗ (repetir alterna para ♝), escopo: [documento, glifo, galeria], padrao: Ctrl+Shift+B, desde_passo: D1}
+  - {id: figurina_cavalo, descricao: Figurina ♘ (repetir alterna para ♞), escopo: [documento, glifo, galeria], padrao: Ctrl+Shift+N, desde_passo: D1}
+  - {id: figurina_peao, descricao: Figurina ♙ (repetir alterna para ♟), escopo: [documento, glifo, galeria], padrao: Ctrl+Shift+P, desde_passo: D1}
 
   # --- Modo Áreas ----------------------------------------------------------------------
   - {id: funcao_texto, descricao: "Função da zona: texto", escopo: [imagem_areas], padrao: T, desde_passo: F}

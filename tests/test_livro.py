@@ -70,6 +70,12 @@ def test_intervalo_em_numeros_de_pagina():
     assert livro.interpretar_intervalo("3-2 3", 5) == [1, 2]
 
 
+def test_amostra_escolhe_inicio_meio_e_fim_do_corpo():
+    assert livro.paginas_da_amostra(range(20, 220)) == [40, 120, 199]
+    assert livro.paginas_da_amostra([7, 5, 6]) == [5, 6, 7]
+    assert livro.paginas_da_amostra([5, 5, 6]) == [5, 6]
+
+
 @pytest.mark.parametrize("texto", ["0-2", "4-9", "a-b", "1..2"])
 def test_intervalo_fora_do_livro_e_recusado(texto):
     with pytest.raises(ValueError):
@@ -115,7 +121,7 @@ def test_lote_pula_as_ja_lidas_sem_refazer(projeto, fonte, leitor):
 
     refeito = livro.reconhecer_paginas(projeto, fonte, leitor, [1], refazer=True)
     assert refeito.lidas == [1]
-    assert projeto.carregar_pagina(1)[0].source != FONTE_MANUAL
+    assert projeto.carregar_pagina(1)[0].source == FONTE_MANUAL      # §4.6: a correção fica
 
 
 def test_cancelar_para_entre_paginas_e_guarda_as_feitas(projeto, fonte, leitor):

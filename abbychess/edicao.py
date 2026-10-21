@@ -183,17 +183,79 @@ def paragrafo(pagina: Pagina, gid: int) -> Diferenca:
 
 
 def virtual(pagina: Pagina, char: str, depois_de: Optional[int], *,
-            palavra_nova: bool = False) -> Tuple[Diferenca, int]:
-    """O caractere que falta, depois do glifo `depois_de` (ou no começo, com `None`).
-    Ganha um gid da página, como os boxes, mas não tem caixa. Devolve o gid dele."""
+            palavra_nova: bool = False, antes_de: Optional[int] = None) -> Tuple[Diferenca, int]:
+    """O caractere que falta, logo depois do glifo `depois_de`, ou logo antes do glifo
+    `antes_de` (um box ou outro virtual, cada um), ou no começo (com os dois `None`). Ganha
+    um gid da página, como os boxes, mas não tem caixa. Devolve o gid dele."""
     if not char:
         raise ValueError("O glifo virtual precisa de um caractere.")
-    if depois_de is not None:
-        _vivo(pagina, depois_de)
+    _vivo_ou_virtual(pagina, depois_de)
+    _vivo_ou_virtual(pagina, antes_de)
     gid = pagina.alocar()
     d = pagina.decisoes
-    novo = GlifoVirtual(gid, char, depois_de, palavra_nova)
+    novo = GlifoVirtual(gid, char, depois_de, palavra_nova, antes_de=antes_de)
     return _decidir(pagina, replace(d, virtuais=d.virtuais + (novo,))), gid
+
+
+def trocar_virtual(pagina: Pagina, gid: int, char: str) -> Diferenca:
+    """Outro caractere no glifo virtual."""
+    if not char:
+        raise ValueError("O glifo virtual precisa de um caractere.")
+    d = pagina.decisoes
+    if gid not in {v.gid for v in d.virtuais}:
+        raise ValueError(f"O glifo {gid} não é virtual.")
+    return _decidir(pagina, replace(d, virtuais=tuple(
+        replace(v, char=char) if v.gid == gid else v for v in d.virtuais)))
+
+
+def apagar_virtual(pagina: Pagina, gid: int) -> Diferenca:
+    """Tira o glifo virtual; os ancorados nele (depois ou antes) passam ao lugar dele."""
+    d = pagina.decisoes
+    saiu = next((v for v in d.virtuais if v.gid == gid), None)
+    if saiu is None:
+        raise ValueError(f"O glifo {gid} não é virtual.")
+    virtuais = []
+    for v in d.virtuais:
+        if v.gid == gid:
+            continue
+        if v.depois_de == gid or (v.antes_de == gid and v.depois_de is None):
+            v = replace(v, depois_de=saiu.depois_de, antes_de=saiu.antes_de,
+                        palavra_nova=v.palavra_nova or saiu.palavra_nova)
+        virtuais.append(v)
+    return _decidir(pagina, replace(d, virtuais=tuple(virtuais)))
+
+
+def ancorar(pagina: Pagina, ancoras) -> Diferenca:
+    """Os virtuais em lugares novos: `ancoras` é gid -> (depois_de, antes_de, palavra_nova),
+    cada âncora um box ou outro virtual (ou `None`)."""
+    d = pagina.decisoes
+    gids = {v.gid for v in d.virtuais}
+    for gid, (depois_de, antes_de, _nova) in ancoras.items():
+        if gid not in gids:
+            raise ValueError(f"O glifo {gid} não é virtual.")
+        _vivo_ou_virtual(pagina, depois_de)
+        _vivo_ou_virtual(pagina, antes_de)
+    virtuais = tuple(replace(v, depois_de=ancoras[v.gid][0], antes_de=ancoras[v.gid][1],
+                             palavra_nova=bool(ancoras[v.gid][2])) if v.gid in ancoras else v
+                     for v in d.virtuais)
+    return _decidir(pagina, replace(d, virtuais=virtuais))
+
+
+def revisar(pagina: Pagina, gids) -> Diferenca:
+    """Os glifos vistos e aceitos (§6.3: confirmar é revisar): saem da fila, sem trocar a
+    fonte da leitura."""
+    alvos = set(gids)
+    boxes = [replace(b, revisado=True) if b.gid in alvos and not b.revisado else b
+             for b in pagina.boxes]
+    mudados = {a.gid for a, b in zip(pagina.boxes, boxes) if a is not b}
+    if not mudados:
+        return Diferenca()
+    return pagina.aplicar(Diferenca(mudados=mudados), boxes)
+
+
+def _vivo_ou_virtual(pagina: Pagina, gid: Optional[int]) -> None:
+    if gid is not None and gid not in {v.gid for v in pagina.decisoes.virtuais}:
+        _vivo(pagina, gid)
 
 
 def _vivo(pagina: Pagina, gid: int) -> None:

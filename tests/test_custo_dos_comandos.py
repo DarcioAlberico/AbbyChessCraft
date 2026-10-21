@@ -1,6 +1,7 @@
-"""CA-F.1: o custo declarado dos comandos do passo 0 é o que a interface de hoje pede.
+"""CA-F.1: o custo declarado dos comandos é o que a interface de hoje pede.
 
-Cada comando de `ferramentas/replay/comandos.yaml` com `passo: "0"` é executado na
+Cada comando de `ferramentas/replay/comandos.yaml` com `passo: "0"` (e, desde o D1, os do
+Documento: `espaco_no_documento` e `corrigir_no_documento`) é executado na
 janela com eventos reais (QTest), e um filtro de eventos conta os gestos: cada
 `KeyPress` e `MouseButtonPress` espontâneo (o que sobe para o widget pai chega como não
 espontâneo e não conta de novo), mais cada `Shortcut` disparado (a tecla de um atalho não
@@ -33,6 +34,8 @@ from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # n
 app = test_janela.app
 janela = test_janela.janela
 CUSTO = {c["id"]: c["custo"] for c in rf.carregar_catalogo()["comandos"] if str(c["passo"]) == "0"}
+CUSTO_D1 = {c["id"]: c["custo"] for c in rf.carregar_catalogo()["comandos"]
+            if str(c["passo"]) == "D1"}
 
 
 class _Contador(QObject):
@@ -140,7 +143,7 @@ def test_reler_pendentes(app, janela, contador):
     _pronta(app, janela)
     mostrar(janela, 0)
     janela.treino.campo.setText("a")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     _esperar(app, janela)
     outro = next(i for i, b in enumerate(boxes(janela)) if b.char == "a" and i != 0)
     boxes(janela)[outro].char, boxes(janela)[outro].source = "", "none"   # volta a pendente
@@ -217,7 +220,7 @@ def test_marcar_glifo(app, janela, contador):
     a, b = boxes(janela)[0], boxes(janela)[1]
     porta = janela.visor.viewport()
     contador.gestos = 0
-    QTest.keyClick(janela.treino.campo, Qt.Key.Key_T, Qt.KeyboardModifier.ControlModifier)
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_M, Qt.KeyboardModifier.ControlModifier)
     inicio, fim = _no_visor(janela, a.x1 - 4, b.y1 - 4), _no_visor(janela, b.x2 + 1, a.y2 + 4)
     QTest.mousePress(porta, Qt.MouseButton.LeftButton, pos=inicio)
     QTest.mouseMove(porta, fim)
@@ -288,3 +291,57 @@ def test_conferir_um_diagrama(app, janela_com_diagrama, contador):
     _esperar(app, janela_d)
     assert contador.gestos == CUSTO["fechar_diagrama"]
     assert janela_d.pagina.diagramas[0].conferido
+
+
+# ----------------------------------------------------------------------
+# Os comandos do Documento (passo D1)
+# ----------------------------------------------------------------------
+
+def _clicar_no_documento(janela, posicao: int) -> None:
+    """Um clique no Documento que põe o cursor na posição (entre dois caracteres)."""
+    from PySide6.QtGui import QTextCursor
+
+    texto = janela.texto
+    cursor = QTextCursor(texto.document())
+    cursor.setPosition(posicao)
+    QTest.mouseClick(texto.viewport(), Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier,
+                     texto.cursorRect(cursor).center())
+    QApplication.processEvents()
+
+
+def test_os_comandos_do_documento_estao_no_catalogo_sem_estimativa():
+    comandos = [c for c in rf.carregar_catalogo()["comandos"] if str(c["passo"]) == "D1"]
+    assert {c["id"] for c in comandos} == {"espaco_no_documento", "corrigir_no_documento"}
+    assert not any("conferir_no_passo" in c for c in comandos)       # conferidos aqui
+
+
+def test_espaco_no_documento(app, janela, contador):
+    """Um clique no ponto e o espaço; a palavra confirma ao sair dela (o gesto seguinte)."""
+    j = _pronta(app, janela)
+    j.vista.setCurrentWidget(j.painel_do_documento)
+    app.processEvents()
+    segundo = j.pagina.gids[1]
+    contador.gestos = 0
+    _clicar_no_documento(j, j.texto.posicao_do_gid(segundo))
+    QTest.keyClick(j.texto, Qt.Key.Key_Space)
+    assert contador.gestos == CUSTO_D1["espaco_no_documento"]
+    j.texto.confirmar()                                   # o clique fora, que já é o próximo
+    assert segundo in j.pagina.modelo.decisoes.quebras
+
+
+def test_corrigir_no_documento(app, janela, contador):
+    """Um clique depois do caractere errado, Backspace e o certo; sem ensinar."""
+    j = _pronta(app, janela)
+    j.vista.setCurrentWidget(j.painel_do_documento)
+    app.processEvents()
+    primeiro = j.pagina.gids[0]
+    contador.gestos = 0
+    _clicar_no_documento(j, j.texto.posicao_do_gid(primeiro) + 1)
+    QTest.keyClick(j.texto, Qt.Key.Key_Backspace)
+    QTest.keyClicks(j.texto, "z")
+    assert contador.gestos == CUSTO_D1["corrigir_no_documento"]
+    j.texto.confirmar()
+    caixa = j.pagina.box(primeiro)
+    assert (caixa.char, caixa.source) == ("z", FONTE_MANUAL)
+    assert "z" not in j.leitor.padroes_por_caractere()    # corrigir não ensina
+

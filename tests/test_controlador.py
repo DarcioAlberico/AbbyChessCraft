@@ -295,21 +295,6 @@ def test_espaco_na_correcao_separa_a_palavra_e_desfaz_junto(dois_projetos):
     assert ctl.modelo.decisoes.quebras == frozenset()   # a letra e o espaço, um Ctrl+Z
 
 
-def test_lote_nao_comeca_se_o_gravador_nao_descarrega(dois_projetos, monkeypatch):
-    from abbychess.controladores import ControladorDoLivro
-
-    a, _ = dois_projetos
-    executor = ExecutorManual()
-    ctl = _controlador(a, executor)
-    avisos = []
-    ctl.eventos.ligar("aviso", lambda titulo, texto: avisos.append(texto))
-    monkeypatch.setattr(a, "descarregar", lambda limite=None: False)
-    ControladorDoLivro(ctl).reconhecer([0], refazer=False)
-    executor.tudo()
-    assert avisos and "não começou" in avisos[0]
-    assert not ctl.lote_rodando and a.paginas_lidas() == []
-
-
 def test_trocar_de_projeto_solta_o_lote_preso(dois_projetos):
     a, b = dois_projetos
     executor = ExecutorManual()
@@ -318,3 +303,170 @@ def test_trocar_de_projeto_solta_o_lote_preso(dois_projetos):
     ctl.ligar(b, pg.FonteDePaginas(b.fonte),
               LeitorDoLivro(b.pasta_de_padroes, limiares=b.dados.limiares))
     assert not ctl.lote_rodando
+
+
+def test_a_sessao_do_documento_na_fila_avisa_quando_entra(dois_projetos):
+    """D1 (a revisão de código, achado 9): com a fila presa, a sessão confirmada espera a vez
+    dela, e a janela só reposiciona o cursor (`depois`) quando a edição entrou."""
+    from abbychess import sessao as ss
+
+    a, _b = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    ctl.reconhecer()
+    executor.tudo()
+    texto, unidades = ss.texto_e_unidades(ctl.modelo)
+    inicio, fim = ss.palavras_em(unidades, 0, 0)
+    executor.em_voo = False                            # uma leitura em voo prende a fila
+    entrou = []
+    ctl.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim],
+                         depois=lambda: entrou.append(ss.texto_e_unidades(ctl.modelo)[0]))
+    assert entrou == [] and executor.fila
+    executor.em_voo = None
+    executor.tudo()
+    assert len(entrou) == 1 and entrou[0].startswith("x" + texto[inicio:fim])
+
+
+def test_a_sessao_que_nao_pode_rodar_e_recusada(dois_projetos):
+    """A revisão do D1 (rodada 2, achado 3): sem a imagem da página, a sessão não roda, e a
+    janela ouve `sessao_recusada` para montar o Documento de novo do modelo."""
+    from abbychess import sessao as ss
+
+    a, _b = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    ctl.reconhecer()
+    executor.tudo()
+    texto, unidades = ss.texto_e_unidades(ctl.modelo)
+    inicio, fim = ss.palavras_em(unidades, 0, 0)
+    recusas = []
+    ctl.eventos.ligar("sessao_recusada", recusas.append)
+    ctl.imagem = None
+    ctl.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim])
+    assert recusas and ss.texto_e_unidades(ctl.modelo)[0] == texto
+
+
+@pytest.mark.parametrize("na_fila", [False, True])
+def test_sair_da_pagina_confirma_a_sessao_na_pagina_dela(tmp_path, na_fila):
+    """A revisão de produto do D1 (M3): trocar de página com a sessão aberta a confirma
+    antes, na página dela, também quando a edição espera a vez na fila."""
+    from abbychess import sessao as ss
+    from tests.test_livro import pdf_sintetico
+
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
+    try:
+        executor = ExecutorManual()
+        ctl = _controlador(projeto, executor)
+        ctl.reconhecer()
+        executor.tudo()
+        pagina = ctl.modelo
+        texto, unidades = ss.texto_e_unidades(pagina)
+        inicio, fim = ss.palavras_em(unidades, 0, 0)
+        novo = "x" + texto[inicio:fim]
+        ctl.antes_de_sair_da_pagina = lambda: ctl.confirmar_sessao(unidades[inicio:fim], novo)
+        if na_fila:
+            executor.em_voo = False                    # uma leitura em voo prende a fila
+        assert ctl.ir_para(1) and ctl.indice == 1
+        executor.em_voo = None
+        executor.tudo()
+        assert ss.texto_e_unidades(pagina)[0].startswith(novo)
+        assert pagina.pid in {p for t in ctl.historico._desfazer for p in t.paginas}
+    finally:
+        projeto.fechar()
+
+
+@pytest.mark.parametrize("letra, sai", [("x", True), (",", False)])
+def test_o_box_marcado_confirmado_com_a_letra_que_faltava_tira_o_virtual(dois_projetos, letra, sai):
+    """A revisão do D1: o virtual sai só quando o usuário confirma o box marcado ao lado
+    dele com a letra dele (a vírgula marcada ali fica vírgula, e o virtual fica)."""
+    from abbychess import sessao as ss
+
+    a, _b = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    ctl.reconhecer()
+    executor.tudo()
+    texto, unidades = ss.texto_e_unidades(ctl.modelo)
+    inicio, fim = ss.palavras_em(unidades, 0, 0)
+    ctl.confirmar_sessao(unidades[inicio:fim], texto[inicio:fim] + "x")
+    executor.tudo()
+    [virtual] = [v.gid for v in ctl.modelo.decisoes.virtuais]
+    box = ctl.modelo.boxes[0].gid
+    ctl.escolher(box)
+    ctl._letra_que_faltava = (box, virtual, "x")       # como o `marcar` deixa
+    ctl.corrigir(letra)
+    executor.tudo()
+    assert (virtual not in {v.gid for v in ctl.modelo.decisoes.virtuais}) == sai
+    assert ctl.box(box).char == letra
+
+
+def test_o_ctrl_t_espera_a_sessao_na_fila_e_fechar_aplica_na_hora(dois_projetos):
+    """A revisão do D1: com a edição do texto na fila, o Ctrl+T espera (senão a edição a
+    devolveria a em revisão); `agora` (fechar o projeto) aplica sem a fila."""
+    from abbychess import sessao as ss
+
+    a, _b = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    ctl.reconhecer()
+    executor.tudo()
+    texto, unidades = ss.texto_e_unidades(ctl.modelo)
+    inicio, fim = ss.palavras_em(unidades, 0, 0)
+    executor.em_voo = False                            # uma leitura em voo prende a fila
+    ctl.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim])
+    ctl.verificar()
+    assert ctl.modelo.estado != "verificada" and len(ctl._sessoes_na_fila) == 1
+    executor.em_voo = None
+    executor.tudo()
+    assert not ctl._sessoes_na_fila
+    executor.em_voo = False
+    texto, unidades = ss.texto_e_unidades(ctl.modelo)
+    ctl.confirmar_sessao(unidades[inicio:fim + 1], "y" + texto[inicio:fim + 1], agora=True)
+    assert ss.texto_e_unidades(ctl.modelo)[0].startswith("y")
+
+
+def test_o_modo_como_o_livro_olha_o_resumo_das_paginas_lidas(tmp_path):
+    """A revisão de produto do D1: uma página sem figurinas num livro de figurinas segue o
+    livro, pelo resumo do `livro.json` (sem abrir as páginas)."""
+    from abbychess import sessao as ss
+    from tests.test_livro import pdf_sintetico
+
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
+    try:
+        executor = ExecutorManual()
+        ctl = _controlador(projeto, executor)
+        ctl.reconhecer()
+        executor.tudo()
+        assert ctl._modo_das_pecas("livro", ctl.modelo) == "letras"
+        texto, unidades = ss.texto_e_unidades(ctl.modelo)
+        inicio, fim = ss.palavras_em(unidades, 0, 0)
+        ctl.confirmar_sessao(unidades[inicio:fim], "♘" + texto[inicio + 1:fim])
+        executor.tudo()
+        ctl.ir_para(1)
+        ctl._livro_tem_figurinas = None                # como ao abrir o projeto
+        assert ctl._modo_das_pecas("livro", ctl.modelo) == "figurinas"
+        assert ctl._modo_das_pecas("letras", ctl.modelo) == "letras"
+    finally:
+        projeto.fechar()
+
+
+def test_fechar_aplica_as_sessoes_que_esperavam_na_fila(dois_projetos):
+    """A revisão do D1: a sessão confirmada que esperava a vez na fila entra ao fechar o
+    projeto (a fila vai ser esvaziada), e só uma vez."""
+    from abbychess import sessao as ss
+
+    a, _b = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    ctl.reconhecer()
+    executor.tudo()
+    texto, unidades = ss.texto_e_unidades(ctl.modelo)
+    inicio, fim = ss.palavras_em(unidades, 0, 0)
+    executor.em_voo = False
+    ctl.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim])
+    ctl.aplicar_as_sessoes_na_fila()
+    assert ss.texto_e_unidades(ctl.modelo)[0].startswith("x" + texto[inicio:fim])
+    executor.em_voo = None
+    executor.tudo()                                    # a tarefa da fila não aplica de novo
+    assert ss.texto_e_unidades(ctl.modelo)[0].startswith("x" + texto[inicio:fim])
+    assert not ss.texto_e_unidades(ctl.modelo)[0].startswith("xx")

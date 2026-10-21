@@ -372,6 +372,14 @@ aviso.
 
 ## Passo I — Treino (§9)
 
+**Execução iniciada em 2026-10-20, ramo `passo-i-treino`.** O texto desfaz as
+ligaduras tipográficas (`ﬁ`, `ﬂ`, `ﬀ`, `ﬃ`, `ﬄ`) nos modos impresso e SAN; o
+Documento mantém o mesmo gid nas letras que vieram do único glifo. Uma amostra
+ensinada como `ﬁ` foi lida como um box e exportada como `fi` nos dois modos
+(CA-9.2). `livro.paginas_da_amostra` escolhe as páginas a 10%, 50% e 90% do
+intervalo do corpo, sem repetir índice. Ainda falta ligar a amostra ao fluxo
+guiado de Ctrl+N, ao cartão Saúde e ao servidor, além de CA-9.1/9.3/9.4/9.5.
+
 **Tarefas.**
 1. O livro novo guiado:
    - amostra de 3 páginas pelo servidor;

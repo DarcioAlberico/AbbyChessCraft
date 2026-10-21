@@ -65,6 +65,13 @@ def test_o_mapa_leva_cada_posicao_ao_gid_e_volta(app):
     assert v.gid_na_posicao(v.posicao_do_gid(2) + 1) == 2   # no espaço depois: o anterior
 
 
+def test_as_duas_letras_da_ligadura_apontam_para_o_mesmo_gid(app):
+    v = _vista(app, _doc(_bloco("b0", "texto", [[1, 2]]), chars={1: "ﬁ", 2: "m"}))
+    assert v.toPlainText() == "fim"
+    assert v.gid_na_posicao(0) == v.gid_na_posicao(1) == 1
+    assert v.gid_na_posicao(2) == 2
+
+
 def test_montar_de_novo_nao_deixa_documentos_vivos(app):
     """Cada montagem é um QTextDocument novo; o anterior (com as imagens dos diagramas e a
     coleção de formatos) tem de sair, ou a memória cresce a cada mudança da página."""

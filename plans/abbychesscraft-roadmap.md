@@ -379,9 +379,10 @@ ensinada como `ﬁ` foi lida como um box e exportada como `fi` nos dois modos
 (CA-9.2). `livro.paginas_da_amostra` escolhe as páginas a 10%, 50% e 90% do
 intervalo do corpo, sem repetir índice. As amostras guardam negrito/itálico e, quando o
 efeito do glifo é conhecido, o k-NN exclui amostras de efeito diferente; o metadado também
-segue no delta para o servidor (CA-9.3). Ainda falta medir e aplicar os efeitos pelo
-`core.negrito`, ligar a amostra ao fluxo guiado de Ctrl+N, ao cartão Saúde e ao servidor,
-além de CA-9.1/9.4/9.5.
+segue no delta para o servidor (CA-9.3). Em 2026-10-21, a régua pública de `core.negrito`
+passou a medir as palavras da página; o efeito fica no `Box`, acompanha F5 e lote, é gravado
+na amostra ensinada e filtra a propagação k-NN. A medição do itálico e o fluxo guiado de
+Ctrl+N, com servidor e cartão Saúde, continuam pendentes, além de CA-9.1/9.4/9.5.
 
 **Tarefas.**
 1. O livro novo guiado:

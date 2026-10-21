@@ -377,6 +377,7 @@ IOU_DA_RELEITURA = 0.6
 def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
                 amostra_de=lambda entry: None,
                 estados: Optional[Dict[int, int]] = None, *,
+                estilo_de=lambda entry: None,
                 iou_minimo: Optional[float] = None) -> Tuple[List[Box], Diferenca]:
     """Os `Box` da lista `depois` (os `BoxEntry` que a janela de hoje edita por índice),
     com os gids de `antes` onde dá e gids novos onde não dá, e a `Diferenca` entre as duas.
@@ -416,11 +417,13 @@ def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
             amostra = None if mudou else velho.amostra
         else:
             amostra = registrada or None    # "" = lido, mas não por um padrão do livro
-        if entry is velho.entry and amostra == velho.amostra:
+        estilo = estilo_de(entry)
+        estilo = velho.estilo if estilo is None else estilo
+        if entry is velho.entry and amostra == velho.amostra and estilo == velho.estilo:
             saida[i] = velho                # o caso comum: nada a copiar
         else:
-            saida[i] = replace(velho, entry=entry, amostra=amostra)
-        if mudou:
+            saida[i] = replace(velho, entry=entry, amostra=amostra, estilo=estilo)
+        if mudou or estilo != velho.estilo:
             dif.mudados.add(velho.gid)
 
     for i, entry in enumerate(depois):                       # 1. o mesmo objeto
@@ -462,7 +465,8 @@ def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
     for i, entry in enumerate(depois):                       # 3. nascidos
         if saida[i] is not None:
             continue
-        novo = Box(alocar(), entry, amostra_de(entry) or None)
+        novo = Box(alocar(), entry, amostra_de(entry) or None,
+                   estilo_de(entry) or SEM_ESTILO)
         saida[i] = novo
         dif.novos.append(novo)
     for velho in saidos:

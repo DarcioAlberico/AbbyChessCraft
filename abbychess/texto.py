@@ -40,6 +40,10 @@ IMPRESSO = "impresso"
 SAN = "san"
 MODOS = (IMPRESSO, SAN)
 
+#: Ligaduras tipográficas que ocupam um box, mas têm mais de uma letra no texto.
+#: O Documento repete o gid do box para cada letra resultante.
+LIGADURAS = {"ﬀ": "ff", "ﬁ": "fi", "ﬂ": "fl", "ﬃ": "ffi", "ﬄ": "ffl"}
+
 _FIM_DE_FRASE = re.compile(r"[.:!?]\s*$")
 
 
@@ -286,10 +290,13 @@ def normalizar(char: str, modo: str) -> str:
 def _normalizador(modo: str):
     from core.notacao import FIGURINAS, normalizar_saida
 
+    def sem_ligadura(char: str) -> str:
+        return "".join(LIGADURAS.get(c, c) for c in char)
+
     if modo == SAN:
-        return lambda c: FIGURINAS.get(c) or normalizar_saida(c)
+        return lambda c: FIGURINAS.get(c) or normalizar_saida(sem_ligadura(c))
     if modo == IMPRESSO:
-        return normalizar_saida
+        return lambda c: normalizar_saida(sem_ligadura(c))
     raise ValueError(f"modo desconhecido {modo!r}")
 
 

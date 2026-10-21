@@ -71,6 +71,19 @@ def interpretar_intervalo(texto: str, total: int) -> List[int]:
     return sorted(paginas)
 
 
+def paginas_da_amostra(indices: Iterable[int]) -> List[int]:
+    """Três páginas representativas de um intervalo: 10%, 50% e 90%.
+
+    `indices` são índices do PDF, já sem capa e sumário. Num intervalo de até
+    três páginas, todas entram. O mesmo índice nunca entra duas vezes.
+    """
+    paginas = sorted(set(indices))
+    if len(paginas) <= 3:
+        return paginas
+    ultima = len(paginas) - 1
+    return [paginas[round(ultima * fracao)] for fracao in (0.1, 0.5, 0.9)]
+
+
 def ja_lidas(projeto: ProjetoDeLivro, indices: Iterable[int]) -> List[int]:
     """Quais destas páginas já têm boxes gravados no projeto."""
     lidas = set(projeto.paginas_lidas())

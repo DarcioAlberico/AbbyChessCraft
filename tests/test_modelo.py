@@ -214,6 +214,13 @@ def test_modos_impresso_e_san():
         tx.texto(doc, modo="outro")
 
 
+def test_ligadura_do_box_sai_desfeita_nos_dois_modos():
+    p = _pagina(_e(0, "ﬁ"), _e(22, "m"))
+    doc = tx.montar(p)
+    assert tx.texto(doc, modo=tx.IMPRESSO) == "fim"
+    assert tx.texto(doc, modo=tx.SAN) == "fim"
+
+
 def test_o_virtual_entra_logo_depois_da_ancora_dele():
     """D1: a âncora diz o lugar exato. O segundo depois do mesmo glifo entra logo depois
     dele (antes do primeiro: foi digitado ali); a sequência se encadeia um no outro."""

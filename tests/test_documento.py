@@ -16,7 +16,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QPoint, Qt  # noqa: E402
 from PySide6.QtGui import QTextCharFormat  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication, QLabel  # noqa: E402
 
 from abbychess import texto as tx  # noqa: E402
 from abbychess.app.documento import VistaDoDocumento  # noqa: E402
@@ -316,6 +316,13 @@ def test_a_linha_mostra_a_linha_do_glifo_atual(app, lida):  # noqa: F811
     assert j.linha._boxes and atual(j) in [j.pagina.gids[j.pagina.boxes.index(b)]
                                          for b in j.linha._boxes]
     assert j.linha.escala > 0
+
+
+def test_o_inspetor_usa_a_faixa_linha_sem_duplicar_o_recorte_na_linha(app, lida):  # noqa: F811
+    j = lida
+    rotulos = [rotulo.text() for rotulo in j.treino.findChildren(QLabel)]
+    assert "<b>Na linha</b>" not in rotulos
+    assert j.linha._boxes and j.linha.isVisible()
 
 
 def test_o_zoom_no_documento_muda_o_corpo_e_nao_a_imagem(app, lida_a_mao):

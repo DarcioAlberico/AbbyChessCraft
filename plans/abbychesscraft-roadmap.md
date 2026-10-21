@@ -387,8 +387,9 @@ pedido ao servidor, enquanto as recusadas ficam para OCR. O fluxo guiado de Ctrl
 escolhe e reconhece automaticamente as três páginas da amostra, abre a fila por caractere e
 mostra a evolução dos pendentes e dos padrões no cartão Saúde, na gaveta e no estado vazio
 do Documento; o cartão também oferece o lote completo e o destaca ao atingir o limiar
-(CA-9.4). A medição do itálico e a Linha no Inspetor Glifo continuam pendentes, além de
-CA-9.1.
+(CA-9.4). A faixa Linha única substituiu o antigo recorte “Na linha” do Inspetor Glifo e
+continua sincronizada com a fila e o Documento. A medição do itálico em imagens OCR aguarda
+uma régua pública do core; CA-9.1 também continua pendente.
 
 **Tarefas.**
 1. O livro novo guiado:

@@ -76,7 +76,7 @@ def test_enter_ensina_e_resolve_as_repeticoes(app, janela):
     pendentes_antes = len(fila(janela))
 
     janela.treino.campo.setText("a")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     _esperar(app, janela)
 
     assert boxes(janela)[0].source == FONTE_MANUAL
@@ -92,7 +92,7 @@ def test_shift_enter_corrige_sem_gravar_padrao(app, janela):
     _esperar(app, janela)
     mostrar(janela, 1)
     janela.treino.campo.setText("b")
-    janela.treino._so_corrigir()
+    janela.treino.pedir_so_corrigir()
     assert (boxes(janela)[1].char, boxes(janela)[1].source) == ("b", FONTE_MANUAL)
     assert janela.leitor.padroes_por_caractere() == {}
 
@@ -104,7 +104,7 @@ def test_descartar_tira_o_box_e_mantem_os_pulados_coerentes(app, janela):
     mostrar(janela, 3)
     janela.pagina.andar(+1)            # pula o 3
     mostrar(janela, 0)
-    janela.treino._descartar()           # tira o 0: o pulado vira o 2
+    janela.treino.pedir_descartar()           # tira o 0: o pulado vira o 2
     assert len(boxes(janela)) == total - 1
     assert pulados(janela) == {2}
 
@@ -123,7 +123,7 @@ def test_esquecer_rele_a_pagina_sem_o_padrao(app, janela):
     _esperar(app, janela)
     mostrar(janela, 0)
     janela.treino.campo.setText("a")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     _esperar(app, janela)
 
     janela.pagina.esquecer([str(p) for p in janela.leitor.padroes_por_caractere()["a"]])
@@ -140,7 +140,7 @@ def _colar_os_dois_primeiros(app, janela):
     _esperar(app, janela)
     a, b = boxes(janela)[0], boxes(janela)[1]
     mostrar(janela, 0)
-    janela.treino._juntar(+1)
+    janela.treino.pedir_juntar(+1)
     return a, b
 
 
@@ -151,7 +151,7 @@ def test_ctrl_j_junta_com_o_seguinte_e_remapeia_os_pulados(app, janela):
     mostrar(janela, 5)
     janela.pagina.andar(+1)            # pula o 5
     mostrar(janela, 1)
-    janela.treino._juntar(-1)            # junta o 1 com o 0: o pulado vira o 4
+    janela.treino.pedir_juntar(-1)            # junta o 1 com o 0: o pulado vira o 4
     assert len(boxes(janela)) == total - 1
     assert atual(janela) == 0
     assert pulados(janela) == {4}
@@ -163,7 +163,7 @@ def test_juntar_sem_vizinho_na_linha_nao_muda_nada(app, janela):
     _esperar(app, janela)
     total = len(boxes(janela))
     mostrar(janela, 0)
-    janela.treino._juntar(-1)
+    janela.treino.pedir_juntar(-1)
     assert len(boxes(janela)) == total
     assert "anterior" in janela.statusBar().currentMessage()
 
@@ -186,7 +186,7 @@ def test_dividir_no_ponto_clicado_do_recorte(app, janela):
     assert a.x2 <= janela.treino.corte <= b.x1
     assert janela.visor._corte is not None  # a linha do corte também aparece na página
 
-    janela.treino._dividir()
+    janela.treino.pedir_dividir()
 
     assert len(boxes(janela)) == total + 1
     assert (boxes(janela)[0].x1, boxes(janela)[0].x2) == (a.x1, a.x2)
@@ -202,15 +202,15 @@ def test_dividir_remapeia_os_pulados_e_ensina_cada_parte(app, janela):
     mostrar(janela, 4)
     janela.pagina.andar(+1)            # pula o 4
     mostrar(janela, 0)
-    janela.treino._dividir()             # corte pela tinta; o pulado vira o 5
+    janela.treino.pedir_dividir()             # corte pela tinta; o pulado vira o 5
     assert pulados(janela) == {5}
 
     janela.treino.campo.setText("a")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     _esperar(app, janela)
     mostrar(janela, 1)
     janela.treino.campo.setText("b")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     _esperar(app, janela)
     assert set(janela.leitor.padroes_por_caractere()) == {"a", "b"}
 
@@ -231,9 +231,9 @@ def test_alt_seta_move_as_bordas(app, janela):
     mostrar(janela, 0)
     x1, y1, x2, y2 = (boxes(janela)[0].x1, boxes(janela)[0].y1,
                       boxes(janela)[0].x2, boxes(janela)[0].y2)
-    janela.treino._ajustar(0, 0, 1, 0)   # Alt+→: borda direita
-    janela.treino._ajustar(-1, 0, 0, 0)  # Alt+Shift+←: borda esquerda
-    janela.treino._ajustar(0, -1, 0, 0)  # Alt+Shift+↑: borda de cima
+    janela.treino.pedir_ajustar(0, 0, 1, 0)   # Shift+→: borda direita
+    janela.treino.pedir_ajustar(-1, 0, 0, 0)  # Ctrl+Shift+←: borda esquerda
+    janela.treino.pedir_ajustar(0, -1, 0, 0)  # Ctrl+Shift+↑: borda de cima
     b = boxes(janela)[0]
     assert (b.x1, b.y1, b.x2, b.y2) == (x1 - 1, y1 - 1, x2 + 1, y2)
     assert atual(janela) == 0
@@ -247,7 +247,7 @@ def _no_visor(janela, x, y):
 
 def test_ferramentas_tem_o_modo_de_treino_e_as_opcoes(janela):
     textos = [a.text() for a in janela.menu_ferramentas.actions()]
-    assert "Modo de treino (Ctrl+T)" in textos and "Opções…" in textos
+    assert "Marcar glifo à mão (Ctrl+M)" in textos and "Opções…" in textos
     assert janela.acao_modo_treino.isCheckable()
 
 
@@ -276,7 +276,7 @@ def test_modo_treino_arraste_marca_um_glifo_e_enter_o_ensina(app, janela):
     assert (novo.x1, novo.x2) == (a.x1, b.x2)
 
     janela.treino.campo.setText("ab")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     _esperar(app, janela)
     assert "ab" in janela.leitor.padroes_por_caractere()
 
@@ -300,7 +300,7 @@ def test_ctrl_clique_seleciona_e_enter_ensina_todos(app, janela):
     assert "3 glifos" in janela.treino.selecao.text()
 
     janela.treino.campo.setText("a")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     _esperar(app, janela)
 
     assert len(janela.leitor.padroes_por_caractere()["a"]) == 3
@@ -316,7 +316,13 @@ def test_ctrl_clique_de_novo_tira_da_selecao_e_esc_esvazia(app, janela):
     janela.pagina.alternar_na_selecao(6)
     janela.pagina.alternar_na_selecao(3)
     assert selecao(janela) == {0, 6}
-    janela.treino.limpar_selecao.emit()
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+
+    janela.show()                                            # o atalho da janela vale
+    janela.activateWindow()                                  # com ela à mostra
+    app.processEvents()
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_Escape)   # o Esc da janela
     assert selecao(janela) == set() and janela.treino.selecao.text() == ""
 
 
@@ -327,7 +333,7 @@ def test_opcoes_gravam_os_limiares_e_refazem_a_fila(app, janela):
     _esperar(app, janela)
     mostrar(janela, 0)
     janela.treino.campo.setText("a")
-    janela.treino._ensinar()
+    janela.treino.pedir_ensinar()
     _esperar(app, janela)
     assert sum(b.source == FONTE_LIVRO for b in boxes(janela)) == 4
 
@@ -372,7 +378,7 @@ def test_editar_nao_grava_na_hora_e_fechar_grava(app, janela):
     janela.projeto.gravador.atraso = 30       # nada grava sozinho durante o teste
     mostrar(janela, 1)
     janela.treino.campo.setText("q")
-    janela.treino._so_corrigir()
+    janela.treino.pedir_so_corrigir()
     projeto = janela.projeto
     assert projeto.sujas                      # entregue ao gravador, ainda não gravado
     janela.close()
@@ -396,7 +402,7 @@ def test_falha_de_gravacao_aparece_na_barra(app, janela, monkeypatch):
     try:
         mostrar(janela, 1)
         janela.treino.campo.setText("q")
-        janela.treino._so_corrigir()
+        janela.treino.pedir_so_corrigir()
         janela.projeto.descarregar(5)
         fim = time.monotonic() + 5
         while ("não foi gravada" not in janela.statusBar().currentMessage()
@@ -448,7 +454,7 @@ def test_fechar_com_pagina_que_nao_grava_pergunta_e_pode_ficar_aberta(app, janel
     monkeypatch.setattr(gv, "gravar_json", falhar)
     mostrar(janela, 1)
     janela.treino.campo.setText("q")
-    janela.treino._so_corrigir()
+    janela.treino.pedir_so_corrigir()
     evento = QCloseEvent()
     janela.closeEvent(evento)                          # "Não": fica aberta
     assert not evento.isAccepted() and janela.projeto is not None
@@ -538,18 +544,18 @@ def test_depois_do_enter_e_do_f5_o_foco_fica_no_campo_do_caractere(app, janela):
     assert set(janela.leitor.padroes_por_caractere()) == {"a", "b"}
 
 
-def test_durante_o_lote_editar_e_recusado_na_hora(app, janela):
+def test_durante_o_lote_editar_vale_na_hora(app, janela):
+    """Passo E: o lote grava entre um comando e outro; nada é recusado."""
     janela.reconhecer()
     _esperar(app, janela)
     janela.pagina.lote_rodando = True
     try:
         mostrar(janela, 0)
-        janela.treino.campo.setText("z")
         janela.pagina.corrigir("z")
-        assert "recusado" in janela.statusBar().currentMessage()
-        assert not janela.executor.ocupado               # nada ficou na fila
+        assert janela.pagina.box(janela.pagina.gids[0]).char == "z"
+        assert janela.acao_reconhecer.isEnabled() and janela.acao_reler.isEnabled()
         janela.pagina.desfazer()
-        assert not janela.executor.ocupado
+        assert janela.pagina.box(janela.pagina.gids[0]).char != "z"
     finally:
         janela.pagina.lote_rodando = False
 
@@ -576,8 +582,58 @@ def test_alt_seta_redesenha_a_caixa_no_visor(app, janela):
     janela.reconhecer()
     _esperar(app, janela)
     mostrar(janela, 0)
-    janela.treino._ajustar(0, 0, 1, 0)   # Alt+→: borda direita
-    janela.treino._ajustar(0, 0, 0, 1)   # Alt+↓: borda de baixo
+    janela.treino.pedir_ajustar(0, 0, 1, 0)   # Shift+→: borda direita
+    janela.treino.pedir_ajustar(0, 0, 0, 1)   # Shift+↓: borda de baixo
     b = boxes(janela)[0]
-    retangulo = janela.visor._itens_dos_boxes[0].rect()
-    assert (retangulo.width(), retangulo.height()) == (b.x2 - b.x1, b.y2 - b.y1)
+    assert janela.visor.item_dos_boxes.grade.caixas[0] == (b.x1, b.y1, b.x2, b.y2)
+
+
+
+def _enter_com_propagacao_presa(app, janela, monkeypatch):
+    import threading
+
+    from abbychess import pagina as pg
+
+    solto = threading.Event()
+    original = pg.propagar_padroes
+    monkeypatch.setattr(pg, "propagar_padroes",
+                        lambda *a, **k: (solto.wait(10), original(*a, **k))[1])
+    janela.reconhecer()
+    _esperar(app, janela)
+    mostrar(janela, 0)                                    # o primeiro "a"
+    janela.treino.campo.setText("a")
+    janela.treino.pedir_ensinar()                              # a propagação, presa
+    return solto
+
+
+def test_propagacao_que_resolve_o_glifo_mostrado_avanca_se_nada_foi_digitado(app, janela,
+                                                                          monkeypatch):
+    solto = _enter_com_propagacao_presa(app, janela, monkeypatch)
+    mostrar(janela, 3)                                    # outro "a", posto (não escolhido)
+    mostrado = janela.pagina.atual
+    solto.set()
+    _esperar(app, janela)
+    assert janela.pagina.atual != mostrado               # ele se resolveu: o painel anda
+
+
+def test_propagacao_nao_tira_o_glifo_em_que_o_usuario_digita(app, janela, monkeypatch):
+    from PySide6.QtTest import QTest
+
+    solto = _enter_com_propagacao_presa(app, janela, monkeypatch)
+    mostrar(janela, 3)                                    # um "a" que a propagação resolve
+    mostrado = janela.pagina.atual
+    janela.treino.campo.clear()
+    QTest.keyClicks(janela.treino.campo, "q")             # o usuário começou a digitar
+    solto.set()
+    _esperar(app, janela)
+    assert janela.pagina.atual == mostrado and janela.treino.campo.text() == "q"
+
+
+def test_propagacao_nao_tira_o_glifo_escolhido_por_clique(app, janela, monkeypatch):
+    solto = _enter_com_propagacao_presa(app, janela, monkeypatch)
+    janela.pagina.clicar(3)                               # um "a", escolhido por clique
+    escolhido = janela.pagina.atual
+    solto.set()
+    _esperar(app, janela)
+    assert janela.pagina.atual == escolhido
+    assert janela.treino.campo.text() == "a"              # e com a leitura nova, não a velha

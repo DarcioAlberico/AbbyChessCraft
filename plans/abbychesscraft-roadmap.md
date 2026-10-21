@@ -116,8 +116,8 @@ Paralelos, só com git e worktrees e com arquivos disjuntos:
    - Até o texto ser verificado, as medidas de texto ficam "pendentes"; as de estrutura e
      de diagrama ficam "provisórias" até a revisão e a conferência dos FEN (spec §15.2).
      **Prazo**: as etapas do usuário não bloqueiam os passos 1a a A2; o texto e os FEN das
-     p. 21–27 do Xadrez Vitorioso têm de estar verificados antes do fechamento do A3, que é o
-     primeiro passo julgado pelo CA-F.1.
+     p. 21–27 do Xadrez Vitorioso têm de estar verificados antes do fechamento do D1, que é o
+     primeiro passo julgado pelo CA-F.1 (até a versão 0.7, o A3).
 7. **Medidas**:
    - `ferramentas/medir.py`, `tests/desempenho/` e `docs/medidas/maquina.json`;
    - o snapshot `tests/dados/fatia/xv-i020-026-inicial.zip`, `ferramentas/replay_fatia.py` e o
@@ -266,6 +266,9 @@ lote rodando" é do passo E, o primeiro que deixa medir isso.
 - CA-3.7: o teste de dados mais o da janela, só no perfil padrão, `desde_passo ≤ A2`.
 - CA-4.2 (parte do A2) e CA-8.2 (a parte do Alt+↓).
 - `ferramentas/capturas.py` nasce aqui; capturas para a revisão de design.
+- Pendência do A1: em `docs/atalhos.yaml`, a exceção do `proximo_da_fila` cita o widget
+  `combobox` para a caixa de zoom, que é um `QSpinBox`; acertar o widget ao montar o teste da
+  janela do CA-3.7.
 
 ## Passo A3 — Documento e sincronia (§6.1, §6.2)
 
@@ -281,7 +284,11 @@ lote rodando" é do passo E, o primeiro que deixa medir isso.
 4. Sincronia nos dois sentidos e com a fila; Seguir.
 5. Atualização por eventos, sem perder o cursor.
 
-**Verificação.** CA-6.1 e CA-6.5; o CA-F.1 com alvo de ≤ 85%; o CA-F.2 (informativo).
+Pendência do A2: a cláusula da Linha do CA-3.2 (a x-height ≥ 12 px na Linha, em 1366×768 e
+1280×720) entra com a Linha (Ctrl+F5).
+
+**Verificação.** CA-6.1 e CA-6.5; o CA-F.2 (informativo). (O CA-F.1 com alvo de ≤ 85% saiu
+na versão 0.8: o A3 é só leitura, e o replay mediria o mesmo que no A2.)
 
 ## Passo E — Servidor de leitura (§11, §4.6)
 
@@ -365,6 +372,17 @@ aviso.
 
 ## Passo I — Treino (§9)
 
+**Execução iniciada em 2026-10-20, ramo `passo-i-treino`.** O texto desfaz as
+ligaduras tipográficas (`ﬁ`, `ﬂ`, `ﬀ`, `ﬃ`, `ﬄ`) nos modos impresso e SAN; o
+Documento mantém o mesmo gid nas letras que vieram do único glifo. Uma amostra
+ensinada como `ﬁ` foi lida como um box e exportada como `fi` nos dois modos
+(CA-9.2). `livro.paginas_da_amostra` escolhe as páginas a 10%, 50% e 90% do
+intervalo do corpo, sem repetir índice. As amostras guardam negrito/itálico e, quando o
+efeito do glifo é conhecido, o k-NN exclui amostras de efeito diferente; o metadado também
+segue no delta para o servidor (CA-9.3). Ainda falta medir e aplicar os efeitos pelo
+`core.negrito`, ligar a amostra ao fluxo guiado de Ctrl+N, ao cartão Saúde e ao servidor,
+além de CA-9.1/9.4/9.5.
+
 **Tarefas.**
 1. O livro novo guiado:
    - amostra de 3 páginas pelo servidor;
@@ -440,6 +458,21 @@ aviso.
 3. Os estados vazios.
 4. `accessibleName`.
 5. O perfil FineReader e a reatribuição de atalhos em Opções.
+6. Pendências do A1 (revisão de produto):
+   - os tokens de estado do A1 (Okabe-Ito) não dão o contraste de 3:1 do CA-13.2 contra o
+     papel (o laranja do pendente, 1,8:1 contra o cinza 230; o roxo, 2,45; o verde-azulado,
+     2,74): escolher variantes mais escuras, mantendo os traços distintos;
+   - a seleção ainda é um traço amarelo único (§3.3 pede contorno duplo), e os diagramas
+     usam a paleta antiga (`cores.py`): passar aos tokens;
+   - a conversão do pixmap da página seguinte roda na thread da interface, 400 ms depois de
+     trocar (p50 18 ms, máximo 93): fazer a `QImage` na thread da pré-carga.
+   - em zoom baixo (22%), o fundo laranja dos boxes pendentes cobre a letra (revisão de
+     produto do A2): só o contorno abaixo de ~40%;
+   - o fundo azul-claro do glifo atual no Documento é discreto sobre um □ (revisão de produto
+     do A3): um tom mais forte;
+   - folhear depressa páginas nunca vistas: a pré-carga adiada chega tarde (parado 0,25 s
+     por página, ~403 ms por troca); cancelar ou adiar a pré-carga quando outra página já foi
+     pedida.
 
 **Verificação.** CA-13.1, CA-13.2 e CA-13.3; CA-3.3 e CA-3.7 nos dois perfis.
 
@@ -490,3 +523,11 @@ aviso.
   desempenho do 2b foi refeito (o p95 da releitura já está no alvo; o do Enter ≤ 100 ms em 2
   de 3 rodadas; a memória do desfazer ≤ 50 MB); o 2b religa o painel de treino logo depois
   da parte síncrona do Enter.
+- **0.7 (2026-10-16)** (fechamento do passo 2b, `docs/revisoes/passo-2b.md`): o
+  congelamento da coleta de lixo saiu (`ABBY_CONGELAR=1` religa); os passos seguintes medem
+  3 rodadas (sem o A/B do congelamento) e o Enter até a cor mudar, com o painel de texto à
+  parte (`texto_da_pagina`); o Reler pendentes entrou no desfazer.
+- **0.8 (2026-10-16)** (revisão de produto do A3, `docs/revisoes/passo-a3.md`, com o sim do
+  usuário): o prazo da verificação do texto e dos FEN da fatia passou do fechamento do A3
+  ao do D1, e o alvo de ≤ 85% do CA-F.1 depois do A3 saiu (o A3 é só leitura; o replay não
+  ganha comando mais barato com ele); o D1 é o primeiro passo julgado pelo CA-F.1.

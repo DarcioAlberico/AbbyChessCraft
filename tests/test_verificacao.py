@@ -84,6 +84,23 @@ def test_letras_de_mais_ou_de_menos_pedem_dividir_ou_juntar(boxes, lex):
     assert "".join(boxes[i].char for i in palavra.indices) == "bca"
 
 
+def test_glifo_lido_com_duas_letras_pode_ficar_com_uma(boxes):
+    boxes[0].char, boxes[1].char = "♕f", "f8"         # ♔f8 lido como ♕ff8
+    mudados = vf.corrigir(boxes, [0, 1], "♔f8")
+    assert mudados == [(0, "♔")] and boxes[1].char == "f8"
+    boxes[0].char, boxes[1].char = "fi", "x"
+    assert vf.repartir(boxes, [0, 1], "fx") == ["f", "x"]
+
+
+def test_reparticao_sem_jeito_unico_e_recusada(boxes):
+    boxes[0].char, boxes[1].char = "ab", "cd"
+    with pytest.raises(ValueError, match="mais de um jeito"):
+        vf.repartir(boxes, [0, 1], "xyz")              # x|yz ou xy|z
+    boxes[0].char = "a"                                # glifo de uma letra não ganha outra
+    with pytest.raises(ValueError, match="Divida ou junte"):
+        vf.repartir(boxes, [0, 1], "abcde")
+
+
 def test_espaco_digitado_e_palavra_nova_antes_do_glifo(boxes, lex):
     palavra = vf.desconhecidas(boxes, lex)[0]
     assert vf.quebras(boxes, palavra.indices, " b  ca ") == [1]
@@ -122,6 +139,37 @@ def test_adicionar_grava_o_dicionario_do_livro(boxes, lex, tmp_path):
     assert not vf.adicionar(lex, "bca", arquivo)  # já estava
     relido = vf.carregar_lexico("xx", arquivo)
     assert relido.conhece("bca") and not relido.sinaliza  # idioma sem lista não acusa nada
+
+
+def test_nome_com_iniciais_entra_no_dicionario(tmp_path):
+    from core.box_model import BoxEntry
+
+    def linha(texto):
+        saida, x = [], 0
+        for c in texto:
+            if c == " ":
+                x += 12
+                continue
+            saida.append(BoxEntry(char=c, x1=x, y1=0, x2=x + 8, y2=12))
+            x += 9
+        return saida
+
+    assert vf.formas_para_o_dicionario("L.Shamkovich") == ["L.Shamkovich", "Shamkovich"]
+    assert vf.formas_para_o_dicionario("L. Shamkovich") == ["L.Shamkovich", "Shamkovich"]
+    assert vf.formas_para_o_dicionario("J.R.Capablanca,") == ["J.R.Capablanca", "Capablanca"]
+    assert vf.formas_para_o_dicionario("Bca") == ["Bca"]
+
+    arquivo = tmp_path / "lexico.txt"
+    lex = lexico.Lexico(palavras={"jogou"})
+    colado, separado = linha("L.Shamkovich jogou"), linha("L. Shamkovich jogou")
+    assert [d.palavra for d in vf.desconhecidas(colado, lex)] == ["L.Shamkovich"]
+    assert [d.palavra for d in vf.desconhecidas(separado, lex)] == ["Shamkovich"]
+    assert vf.adicionar(lex, "L. Shamkovich", arquivo)
+    assert arquivo.read_text(encoding="utf-8") == "l.shamkovich\nshamkovich\n"
+    assert vf.desconhecidas(colado, lex) == [] and vf.desconhecidas(separado, lex) == []
+    assert not vf.adicionar(lex, "L.Shamkovich", arquivo)  # já estava
+    assert not vf.adicionar(lex, "L.2", arquivo)
+    assert vf.carregar_lexico("xx", arquivo).conhece("L.Shamkovich")
 
 
 def test_recorte_da_palavra_tem_a_palavra_e_folga(imagem, boxes, lex):

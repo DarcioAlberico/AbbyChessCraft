@@ -27,9 +27,10 @@ que vinha do core já assim). Os dois passam por `core.notacao.normalizar_saida`
 
 from __future__ import annotations
 
+import copy
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
 
@@ -38,6 +39,10 @@ from abbychess.modelo import Decisoes, Pagina
 IMPRESSO = "impresso"
 SAN = "san"
 MODOS = (IMPRESSO, SAN)
+
+#: Ligaduras tipográficas que ocupam um box, mas têm mais de uma letra no texto.
+#: O Documento repete o gid do box para cada letra resultante.
+LIGADURAS = {"ﬀ": "ff", "ﬁ": "fi", "ﬂ": "fl", "ﬃ": "ffi", "ﬄ": "ffl"}
 
 _FIM_DE_FRASE = re.compile(r"[.:!?]\s*$")
 
@@ -76,14 +81,27 @@ class Documento:
 # Montar
 # ----------------------------------------------------------------------
 
-def montar(pagina: Pagina) -> Documento:
-    """O documento da página (função pura do que está gravado nela)."""
+#: Como o glifo que ninguém leu aparece no documento da vista (`com_os_nao_lidos`).
+NAO_LIDO = "□"
+
+
+def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
+    """O documento da página (função pura do que está gravado nela). O texto e a exportação
+    só têm os glifos lidos; a vista do Documento (`com_os_nao_lidos`) mostra também os que
+    ninguém leu, como `NAO_LIDO`, para o realce deles (§6.1)."""
     from core.notacao import palavras_da_pagina
 
-    lidos = [b for b in pagina.boxes if b.entry.char]
-    chars = {b.gid: b.entry.char for b in lidos}
+    lidos = [b for b in pagina.boxes if b.entry.char or com_os_nao_lidos]
+    entries = []
+    for b in lidos:
+        if b.entry.char:
+            entries.append(b.entry)
+        else:
+            vazio = copy.copy(b.entry)
+            vazio.char = NAO_LIDO
+            entries.append(vazio)
+    chars = {b.gid: e.char for b, e in zip(lidos, entries)}
     chars.update({v.gid: v.char for v in pagina.decisoes.virtuais})
-    entries = [b.entry for b in lidos]
     linhas: List[List[List[int]]] = []
     topos: List[int] = []
     for linha in (palavras_da_pagina(entries) if entries else []):
@@ -91,11 +109,11 @@ def montar(pagina: Pagina) -> Documento:
         palavras = [p for p in palavras if p]
         if palavras:
             linhas.append(palavras)
-            topos.append(min(lidos[s.indice].entry.y1 for p in linha for s in p.simbolos))
+            topos.append(min(entries[s.indice].y1 for p in linha for s in p.simbolos))
     linhas = _aplicar_decisoes(linhas, pagina.decisoes)
     texto_das_linhas = [" ".join("".join(chars[g] for g in p) for p in ln) for ln in linhas]
 
-    por_gid = {b.gid: b.entry for b in lidos}
+    por_gid = {b.gid: e for b, e in zip(lidos, entries)}
     zonas_de_texto = [z for z in pagina.zonas if z.tipo == "texto"]
     zona_da_linha = [_zona_da_linha(ln, por_gid, zonas_de_texto) for ln in linhas]
     # Um parágrafo antes de qualquer glifo da linha começa o bloco nessa linha (o
@@ -163,17 +181,63 @@ def _aplicar_decisoes(linhas: List[List[List[int]]], decisoes: Decisoes) -> List
             else:
                 juntas.append(list(p))
         saida.append(juntas)
-    ultimo: Dict[Optional[int], int] = {}                     # virtuais, na ordem em que
-    for v in decisoes.virtuais:                               # foram digitados: o segundo
-        depois = ultimo.get(v.depois_de, v.depois_de)         # depois do mesmo glifo vem
-        _inserir_virtual(saida, v, depois)                    # depois do primeiro
-        ultimo[v.depois_de] = v.gid
+    # Os virtuais, na ordem das decisões: cada um logo depois (ou logo antes) da âncora dele,
+    # que é um box ou outro virtual; a âncora virtual entra antes dele (uma pilha, não a
+    # recursão: a cadeia pode ser longa). Dois na mesma âncora: o mais novo fica junto dela
+    # (foi digitado ali). Um virtual sem âncora na página, ou num ciclo, vai para o começo
+    # da primeira linha.
+    por_gid = {v.gid: v for v in decisoes.virtuais}
+    postos: Set[int] = set()
+
+    def ancora_de(v) -> Optional[int]:
+        return v.antes_de if v.antes_de is not None and v.depois_de is None else v.depois_de
+
+    def por(v, sem_ancora: bool = False) -> None:
+        postos.add(v.gid)
+        if sem_ancora:
+            _inserir_virtual(saida, v, None)
+        elif v.antes_de is not None and v.depois_de is None:
+            _inserir_antes(saida, v)
+        else:
+            _inserir_virtual(saida, v, v.depois_de)
+
+    for primeiro in decisoes.virtuais:
+        pilha, na_pilha = [primeiro], {primeiro.gid}
+        while pilha:
+            v = pilha[-1]
+            if v.gid in postos:
+                pilha.pop()
+                continue
+            ancora = ancora_de(v)
+            if ancora in por_gid and ancora not in postos:
+                if ancora in na_pilha:          # um ciclo: este fica sem âncora
+                    por(pilha.pop(), sem_ancora=True)
+                    continue
+                pilha.append(por_gid[ancora])
+                na_pilha.add(ancora)
+                continue
+            por(pilha.pop())
     return saida
 
 
+def _inserir_antes(linhas: List[List[List[int]]], v) -> None:
+    """O virtual antes do glifo `antes_de` (um box ou outro virtual): na palavra dele ou,
+    com `palavra_nova`, numa palavra nova logo antes dela; sem ele, no começo da primeira
+    linha."""
+    for linha in linhas:
+        for k, p in enumerate(linha):
+            if v.antes_de in p:
+                if v.palavra_nova:
+                    linha.insert(k, [v.gid])
+                else:
+                    p.insert(p.index(v.antes_de), v.gid)
+                return
+    _inserir_virtual(linhas, v, None)
+
+
 def _inserir_virtual(linhas: List[List[List[int]]], v, depois: Optional[int]) -> None:
-    """O virtual `v` depois do glifo `depois` (o âncora dele, ou o último virtual já posto
-    nesse âncora), ou no começo da primeira linha."""
+    """O virtual `v` logo depois do glifo `depois` (um box ou outro virtual), ou no começo
+    da primeira linha."""
     if depois is not None:
         for linha in linhas:
             for k, p in enumerate(linha):
@@ -226,10 +290,13 @@ def normalizar(char: str, modo: str) -> str:
 def _normalizador(modo: str):
     from core.notacao import FIGURINAS, normalizar_saida
 
+    def sem_ligadura(char: str) -> str:
+        return "".join(LIGADURAS.get(c, c) for c in char)
+
     if modo == SAN:
-        return lambda c: FIGURINAS.get(c) or normalizar_saida(c)
+        return lambda c: FIGURINAS.get(c) or normalizar_saida(sem_ligadura(c))
     if modo == IMPRESSO:
-        return normalizar_saida
+        return lambda c: normalizar_saida(sem_ligadura(c))
     raise ValueError(f"modo desconhecido {modo!r}")
 
 

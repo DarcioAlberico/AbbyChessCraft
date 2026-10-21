@@ -36,7 +36,7 @@ def test_ferramentas_tem_o_editor_de_areas_e_a_verificacao(janela):  # noqa: F81
     textos = [a.text() for a in janela.menu_ferramentas.actions()]
     assert any("Editor de áreas" in t for t in textos)
     assert any("Verificação de texto" in t for t in textos)
-    assert janela.acao_verificar.shortcut().toString() == "F7"
+    assert janela.acao_ciclar_fila.shortcut().toString() == "F7"      # a fila de palavras é um modo
 
 
 def test_editor_de_areas_e_modo_de_treino_se_excluem(janela):  # noqa: F811
@@ -112,13 +112,13 @@ def test_verificar_anda_pelas_desconhecidas_e_corrige(app, janela):  # noqa: F81
     _ler_a_mao(app, janela)
     janela.verificador.lexico = lexico.Lexico(palavras={"abc", "cab"})
     janela.verificar_texto()
-    assert janela.abas.currentWidget() is janela.verificacao
+    assert janela.inspetor.atual() == "palavra"
     assert [d.palavra for d in janela.verificador.desconhecidas] == ["bca"]
     assert janela.verificacao.campo.text() == "bca"
     assert not janela.verificacao.recorte.pixmap().isNull()
 
     janela.verificacao.campo.setText("abc")
-    janela.verificacao._corrigir()
+    janela.verificacao.pedir_corrigir()
     assert janela.verificador.desconhecidas == []
     assert "Nenhuma" in janela.verificacao.posicao.text()
     assert [b.char for b in boxes(janela)[-3:]] == ["a", "b", "c"]
@@ -131,7 +131,7 @@ def test_corrigir_e_ensinar_grava_o_padrao(app, janela):  # noqa: F811
     janela.verificador.lexico = lexico.Lexico(palavras={"abc", "cab"})
     janela.verificar_texto()
     janela.verificacao.campo.setText("aca")
-    janela.verificacao._ensinar()
+    janela.verificacao.pedir_ensinar()
     _esperar(app, janela)
     assert "a" in janela.leitor.padroes_por_caractere()
 
@@ -166,5 +166,5 @@ def test_clique_no_glifo_abre_o_treino(app, janela):  # noqa: F811
     _, x1, x2 = janela.verificacao._glifos[1]
     assert janela.verificacao.glifo_em((x1 + x2) / 2) == palavra.indices[1]
     janela.verificacao._clicar((x1 + x2) / 2, 0)
-    assert janela.abas.currentWidget() is janela.treino
+    assert janela.inspetor.atual() == "glifo"
     assert atual(janela) == palavra.indices[1]

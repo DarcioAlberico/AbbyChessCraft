@@ -13,11 +13,12 @@
 # comando que muda de tecla num passo ganha uma entrada nova com aquele `passo`.
 #
 # Os custos dos comandos de passos futuros (`conferir_no_passo`) são estimativas: o teste
-# só confere comandos que já existem. Quando o passo os conferir, a versão do catálogo
+# só confere comandos que já existem. Versão 5 (passo D1): os dois comandos do Documento
+# conferidos (`espaco_no_documento`, `corrigir_no_documento`), com os custos de antes. Quando o passo os conferir, a versão do catálogo
 # sobe, e a linha de base é medida de novo no worktree da tag `passo-0` com o catálogo
 # novo (o `comparar` recusa catálogos diferentes).
 
-versao: 4
+versao: 5
 
 # O que conta como um gesto (a regra do filtro de eventos do teste).
 convencao_de_gestos: >-
@@ -69,6 +70,19 @@ comandos:
     corrige: falta
     custo: 4
     gestos: [Ctrl+T (modo de treino), arrastar o quadro, digitar o caractere, Shift+Enter]
+  # Desde o A2: o Del vale com o foco no campo (a exceção 6 de §3.4), e marcar um glifo à mão
+  # passou do Ctrl+T ao Ctrl+M. Os custos não mudam; o descartar direto da fila (o glifo já
+  # mostrado, 1 gesto) pede ao replay uma regra "da fila" para sobras, como a do ensinar.
+  - id: descartar_box
+    passo: A2
+    corrige: sobra
+    custo: 2
+    gestos: [clique no box, Del (o foco fica no campo do caractere)]
+  - id: marcar_glifo
+    passo: A2
+    corrige: falta
+    custo: 4
+    gestos: [Ctrl+M (marcar glifo à mão), arrastar o quadro, digitar o caractere, Shift+Enter]
   - id: dividir_glifo
     passo: "0"
     corrige: divisao
@@ -101,13 +115,11 @@ comandos:
     gestos: [Ctrl+Enter (conferido)]
   - id: espaco_no_documento
     passo: D1
-    conferir_no_passo: D1
     corrige: espaco
     custo: 2
     gestos: [clique no ponto do Documento, espaço ou Backspace (confirma ao sair da palavra)]
   - id: corrigir_no_documento
     passo: D1
-    conferir_no_passo: D1
     corrige: substituicao
     custo: 3
     gestos: [clique depois do caractere errado no Documento, Backspace, digitar o certo]

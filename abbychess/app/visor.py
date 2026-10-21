@@ -13,6 +13,12 @@ a move e o das bordas a estica; Del apaga a selecionada e as teclas 1 a 4
 trocam o tipo (texto, diagrama, imagem, ignorar). É outro modo, separado do de
 treino: os dois usam o arraste, e um liga só com o outro desligado. A
 geometria está em `abbychess.zonas`; aqui só se desenha e se emite.
+
+**Desde o passo A1** (§3.3): os boxes são um item só (`ItemDosBoxes`), com os estados de
+§13; o zoom vai de 5% a 800% (página inteira, largura, 100%, o item atual, e os passos de
+Ctrl+roda e Ctrl++/−), e em "página inteira" e "largura" segue o redimensionamento; as
+barras ficam sempre visíveis; o espaço e o botão do meio arrastam a página em qualquer
+modo; PgUp e PgDn rolam uma tela e, no fim, pedem a página vizinha (`pagina_vizinha`).
 """
 
 from __future__ import annotations
@@ -20,14 +26,16 @@ from __future__ import annotations
 from typing import List, Optional
 
 from PySide6.QtCore import QRectF, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QPixmap
+from PySide6.QtGui import QBrush, QColor, QContextMenuEvent, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (QGraphicsItem, QGraphicsLineItem, QGraphicsRectItem,
                                QGraphicsScene, QGraphicsView, QMenu)
 
 from core.box_model import BoxEntry
 
+from abbychess import grade as gd
 from abbychess import zonas as zn
-from abbychess.app import cores
+from abbychess.app import cores, estilo
+from abbychess.app.item_dos_boxes import ItemDosBoxes
 
 
 class VisorDePagina(QGraphicsView):
@@ -54,6 +62,17 @@ class VisorDePagina(QGraphicsView):
     zona_apagada = Signal(int)
     #: Editor de áreas: a área e o tipo novo.
     zona_tipo = Signal(int, str)
+    #: O zoom mudou: a escala (1 = 100%) e o limite alcançado ("máximo", "mínimo" ou "").
+    zoom_mudou = Signal(float, str)
+    #: PgDn no fim da página (+1) ou PgUp no topo (-1): a página vizinha.
+    pagina_vizinha = Signal(int)
+
+    #: Os limites do zoom (§3.3).
+    ESCALA_MINIMA = 0.05
+    ESCALA_MAXIMA = 8.0
+    #: O passo do Ctrl++ / Ctrl+− e o da roda.
+    PASSO_DO_ZOOM = 1.25
+    PASSO_DA_RODA = 1.15
 
     #: Menor lado, em pixels da página, para o arraste contar como quadro.
     MENOR_QUADRO = 3
@@ -67,10 +86,18 @@ class VisorDePagina(QGraphicsView):
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setBackgroundBrush(QBrush(QColor(90, 90, 90)))
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        #: Os itens que não são boxes e saem a cada `mostrar_boxes` (os tabuleiros).
         self._itens: List[QGraphicsRectItem] = []
-        #: O item de cada box, na ordem de `_boxes` (para repintar só alguns).
-        self._itens_dos_boxes: List[QGraphicsRectItem] = []
+        #: O item único dos boxes (CA-3.4).
+        self.item_dos_boxes: Optional[ItemDosBoxes] = None
         self._boxes: List[BoxEntry] = []
+        #: "pagina", "largura" (o zoom segue o tamanho da janela) ou None (escala fixa).
+        self.modo_zoom: Optional[str] = "pagina"
+        #: O arraste da página com o espaço ou o botão do meio: o último ponto.
+        self._panorama = None
+        self._espaco = False
         self._selecionado: Optional[int] = None
         self._destaque: Optional[QGraphicsRectItem] = None
         self._corte: Optional[QGraphicsLineItem] = None
@@ -86,6 +113,9 @@ class VisorDePagina(QGraphicsView):
         #: O arraste de uma área em curso: (índice, bordas, ponto inicial).
         self._arraste = None
         self._palavra: Optional[QGraphicsRectItem] = None
+        #: O contorno da palavra sob o cursor do Documento (§6.2): outro item, para não
+        #: apagar o da palavra em verificação.
+        self._palavra_do_documento: Optional[QGraphicsRectItem] = None
 
     # ------------------------------------------------------------------
     def mostrar_pagina(self, pixmap: QPixmap) -> None:
@@ -96,10 +126,21 @@ class VisorDePagina(QGraphicsView):
         self._marcados, self._marcados_indices, self._quadro = [], set(), None
         self._zonas, self._zona_sel, self._zonas_itens, self._arraste = [], None, [], None
         self._palavra = None
+        self._palavra_do_documento = None
         cena.addPixmap(pixmap)
         cena.setSceneRect(QRectF(pixmap.rect()))
-        self.resetTransform()
-        self.fitInView(cena.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+        self.item_dos_boxes = ItemDosBoxes(pixmap.width(), pixmap.height())
+        self.item_dos_boxes.setZValue(1)
+        cena.addItem(self.item_dos_boxes)
+        # A escala passa de uma página à outra; nos modos, ela se refaz pela página nova. A
+        # página nova começa no topo (o PgUp no topo pede o fim, e a janela o põe depois).
+        if self.modo_zoom == "largura":
+            self.verticalScrollBar().setValue(0)
+        if self.modo_zoom is not None:
+            self._aplicar_modo()
+        else:
+            self.zoom_mudou.emit(self.escala(), "")
+        self.ir_ao_topo()
 
     def mostrar_boxes(self, boxes: List[BoxEntry], pendentes: set, tabuleiros=(),
                       cores_dos_tabuleiros=None) -> None:
@@ -110,7 +151,7 @@ class VisorDePagina(QGraphicsView):
         if self._destaque is not None:
             cena.removeItem(self._destaque)
             self._destaque = None
-        self._itens, self._boxes, self._itens_dos_boxes = [], boxes, []
+        self._itens, self._boxes = [], boxes
         self._tabuleiros = [tuple(t) for t in tabuleiros]
         for i, (x1, y1, x2, y2) in enumerate(self._tabuleiros):
             caneta = QPen(cores_dos_tabuleiros[i] if cores_dos_tabuleiros else cores.DIAGRAMA)
@@ -121,39 +162,122 @@ class VisorDePagina(QGraphicsView):
             item.setPen(caneta)
             cena.addItem(item)
             self._itens.append(item)
-        for i, b in enumerate(boxes):
-            item = QGraphicsRectItem(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1)
-            self._pintar(item, b, i in pendentes)
-            cena.addItem(item)
-            self._itens.append(item)
-            self._itens_dos_boxes.append(item)
+        if self.item_dos_boxes is not None:
+            self.item_dos_boxes.trocar(boxes, [gd.estado(b, i in pendentes)
+                                               for i, b in enumerate(boxes)])
         self.marcar_selecao(self._marcados_indices)
         if self._selecionado is not None and self._selecionado < len(boxes):
             self.selecionar(self._selecionado, centralizar=False)
 
-    @staticmethod
-    def _pintar(item: QGraphicsRectItem, b: BoxEntry, pendente: bool) -> None:
-        cor = cores.cor_do_box(b.char, b.source, pendente)
-        caneta = QPen(cor)
-        caneta.setCosmetic(True)
-        caneta.setWidthF(1.2)
-        item.setPen(caneta)
-        preenchimento = QColor(cor)
-        preenchimento.setAlpha(40 if pendente or not b.char else 0)
-        item.setBrush(QBrush(preenchimento))
-
     def repintar_boxes(self, boxes: List[BoxEntry], pendentes: set, indices) -> bool:
-        """Repinta só os boxes `indices`, com a caixa e a cor de agora (a lista é a mesma:
-        nenhum entrou nem saiu). Falso, sem mudar nada, se a lista não é a desenhada (aí é
-        `mostrar_boxes`)."""
-        if len(boxes) != len(self._itens_dos_boxes):
+        """Repinta só os boxes `indices`, com a caixa e o estado de agora (a lista é a
+        mesma: nenhum entrou nem saiu). Falso, sem mudar nada, se a lista não é a desenhada
+        (aí é `mostrar_boxes`)."""
+        item = self.item_dos_boxes
+        if item is None or len(boxes) != len(item.grade.caixas):
             return False
-        for i in indices:
-            b, item = boxes[i], self._itens_dos_boxes[i]
-            item.setRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1)   # o Alt+seta muda a caixa
-            self._pintar(item, b, i in pendentes)
+        item.atualizar({i: gd.estado(boxes[i], i in pendentes) for i in indices}, boxes)
         self._boxes = boxes
         return True
+
+    def definir_origem(self, sim: bool) -> None:
+        """V: os aceitos na cor da origem da leitura (livro, rede, manual)."""
+        if self.item_dos_boxes is not None:
+            self.item_dos_boxes.definir_origem(sim)
+
+    # ------------------------------------------------------------------
+    # Zoom (§3.3)
+    # ------------------------------------------------------------------
+    def escala(self) -> float:
+        return self.transform().m11()
+
+    def _escalar(self, nova: float, modo: Optional[str] = None, *, avisar: bool = True) -> None:
+        """`avisar`: o limite vai à barra ("zoom máximo"); o ajuste da página inteira ou da
+        largura ao redimensionar não avisa."""
+        limite = ""
+        if nova >= self.ESCALA_MAXIMA:
+            nova, limite = self.ESCALA_MAXIMA, "máximo"
+        elif nova <= self.ESCALA_MINIMA:
+            nova, limite = self.ESCALA_MINIMA, "mínimo"
+        fator = nova / max(self.escala(), 1e-9)
+        if abs(fator - 1) > 1e-6:
+            self.scale(fator, fator)
+        self.modo_zoom = modo
+        self.zoom_mudou.emit(self.escala(), limite if avisar else "")
+
+    def zoom_mais(self) -> None:
+        self._escalar(self.escala() * self.PASSO_DO_ZOOM)
+
+    def zoom_menos(self) -> None:
+        self._escalar(self.escala() / self.PASSO_DO_ZOOM)
+
+    def zoom_100(self) -> None:
+        self._escalar(1.0)
+
+    def definir_zoom(self, escala: float) -> None:
+        self._escalar(escala)
+
+    def zoom_pagina(self) -> None:
+        self.modo_zoom = "pagina"
+        self._aplicar_modo()
+
+    def zoom_largura(self) -> None:
+        self.modo_zoom = "largura"
+        self._aplicar_modo()
+
+    def zoom_item(self) -> None:
+        """Ctrl+7: o item atual (o box em revisão) ocupa a vista, com folga em volta."""
+        if self._selecionado is None or not 0 <= self._selecionado < len(self._boxes):
+            return
+        b = self._boxes[self._selecionado]
+        lado = max(b.x2 - b.x1, b.y2 - b.y1, 8)
+        alvo = QRectF(b.x1 - 3 * lado, b.y1 - 2 * lado, (b.x2 - b.x1) + 6 * lado,
+                      (b.y2 - b.y1) + 4 * lado)
+        vista = self.viewport().rect()
+        self._escalar(min(vista.width() / alvo.width(), vista.height() / alvo.height()))
+        self.centerOn(alvo.center())
+
+    def _aplicar_modo(self) -> None:
+        cena = self.scene().sceneRect()
+        vista = self.viewport().rect()
+        if cena.isEmpty() or vista.width() < 40 or vista.height() < 40:
+            return                              # sem tamanho útil (a doca recolhida): nada
+        if self.modo_zoom == "largura":
+            nova = (vista.width() - 4) / cena.width()
+        else:
+            nova = min((vista.width() - 4) / cena.width(), (vista.height() - 4) / cena.height())
+        modo = self.modo_zoom
+        barra = self.verticalScrollBar()
+        fracao = barra.value() / barra.maximum() if barra.maximum() > 0 else 0.0
+        self._escalar(nova, modo, avisar=False)
+        if modo == "largura":                   # a mesma altura da página, na escala nova
+            barra.setValue(round(fracao * barra.maximum()))
+        else:
+            self.centerOn(cena.center())
+
+    def resizeEvent(self, evento):
+        super().resizeEvent(evento)
+        if self.modo_zoom is not None:
+            self._aplicar_modo()
+
+    # ------------------------------------------------------------------
+    # Rolagem (§3.3)
+    # ------------------------------------------------------------------
+    def rolar_tela(self, passo: int) -> None:
+        """PgDn (+1) e PgUp (-1): uma tela; no fim (ou no topo), a página vizinha."""
+        barra = self.verticalScrollBar()
+        if passo > 0 and barra.value() >= barra.maximum():
+            self.pagina_vizinha.emit(+1)
+        elif passo < 0 and barra.value() <= barra.minimum():
+            self.pagina_vizinha.emit(-1)
+        else:
+            barra.setValue(barra.value() + passo * barra.pageStep())
+
+    def ir_ao_topo(self) -> None:
+        self.verticalScrollBar().setValue(self.verticalScrollBar().minimum())
+
+    def ir_ao_fim(self) -> None:
+        self.verticalScrollBar().setValue(self.verticalScrollBar().maximum())
 
     def selecionar(self, indice: Optional[int], centralizar: bool = True) -> None:
         cena = self.scene()
@@ -287,6 +411,23 @@ class VisorDePagina(QGraphicsView):
         self._palavra.setZValue(13)
         self.ensureVisible(self._palavra, 150, 150)
 
+    def marcar_palavra_do_documento(self, caixa) -> None:
+        """Contorna (tracejado) a palavra sob o cursor do Documento, sem rolar: quem rola é o
+        Seguir (`mostrar_caixa`)."""
+        if self._palavra_do_documento is not None:
+            self.scene().removeItem(self._palavra_do_documento)
+            self._palavra_do_documento = None
+        if caixa is None:
+            return
+        x1, y1, x2, y2 = caixa
+        caneta = QPen(estilo.AZUL)
+        caneta.setCosmetic(True)
+        caneta.setWidthF(2)
+        caneta.setStyle(Qt.PenStyle.DashLine)
+        self._palavra_do_documento = self.scene().addRect(x1 - 4, y1 - 4, x2 - x1 + 8,
+                                                          y2 - y1 + 8, caneta)
+        self._palavra_do_documento.setZValue(12)
+
     def menu_do_box(self, indice: int, coluna: int) -> QMenu:
         """O menu de edição do box, com a coluna onde o botão direito caiu."""
         menu = QMenu(self)
@@ -302,10 +443,9 @@ class VisorDePagina(QGraphicsView):
 
     # ------------------------------------------------------------------
     def _box_em(self, ponto) -> Optional[int]:
-        x, y = ponto.x(), ponto.y()
-        achados = [(b.width * b.height, i) for i, b in enumerate(self._boxes)
-                   if b.x1 <= x <= b.x2 and b.y1 <= y <= b.y2]
-        return min(achados)[1] if achados else None
+        if self.item_dos_boxes is None:
+            return None
+        return self.item_dos_boxes.no_ponto(ponto.x(), ponto.y())
 
     def _pega(self) -> float:
         """A tolerância das bordas em pixels da página, na escala atual."""
@@ -354,6 +494,12 @@ class VisorDePagina(QGraphicsView):
         self.viewport().setCursor(forma)
 
     def mousePressEvent(self, evento):
+        botao = evento.button()
+        if botao == Qt.MouseButton.MiddleButton or (
+                self._espaco and botao == Qt.MouseButton.LeftButton):
+            self._panorama = evento.position()      # arrasta a página, em qualquer modo
+            self.viewport().setCursor(Qt.CursorShape.ClosedHandCursor)
+            return
         if self.modo_areas:
             if evento.button() == Qt.MouseButton.LeftButton:
                 self.apertar_no_editor_de_areas(self.mapToScene(evento.position().toPoint()))
@@ -378,6 +524,13 @@ class VisorDePagina(QGraphicsView):
         super().mousePressEvent(evento)
 
     def mouseMoveEvent(self, evento):
+        if self._panorama is not None:
+            delta = evento.position() - self._panorama
+            self._panorama = evento.position()
+            barra_h, barra_v = self.horizontalScrollBar(), self.verticalScrollBar()
+            barra_h.setValue(barra_h.value() - int(delta.x()))
+            barra_v.setValue(barra_v.value() - int(delta.y()))
+            return
         if self.modo_areas and self._arraste is not None:
             self.previa_do_arraste(self.mapToScene(evento.position().toPoint()))
             return
@@ -417,6 +570,10 @@ class VisorDePagina(QGraphicsView):
             self.zona_arrastada.emit(indice, bordas, dx, dy)
 
     def mouseReleaseEvent(self, evento):
+        if self._panorama is not None:
+            self._panorama = None
+            self._cursor_do_modo()
+            return
         if evento.button() == Qt.MouseButton.LeftButton and self._arraste is not None:
             self.soltar_arraste(self.mapToScene(evento.position().toPoint()))
             return
@@ -441,6 +598,11 @@ class VisorDePagina(QGraphicsView):
                                      int(retangulo.right()) + 1, int(retangulo.bottom()) + 1)
 
     def keyPressEvent(self, evento):
+        tecla = evento.key()
+        if tecla == Qt.Key.Key_Space and not evento.isAutoRepeat():
+            self._espaco = True
+            self.viewport().setCursor(Qt.CursorShape.OpenHandCursor)
+            return
         if self.modo_areas and self._zona_sel is not None:
             tecla = evento.key()
             if tecla in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
@@ -454,6 +616,20 @@ class VisorDePagina(QGraphicsView):
                 self.zona_escolhida.emit(-1)
                 return
         super().keyPressEvent(evento)
+
+    def focusOutEvent(self, evento):
+        # O espaço solto fora do visor (Alt+Tab, um diálogo) não chega aqui: sem isto, o
+        # próximo clique arrastaria a página em vez de escolher o box.
+        self._espaco, self._panorama = False, None
+        self._cursor_do_modo()
+        super().focusOutEvent(evento)
+
+    def keyReleaseEvent(self, evento):
+        if evento.key() == Qt.Key.Key_Space and not evento.isAutoRepeat():
+            self._espaco = False
+            self._cursor_do_modo()
+            return
+        super().keyReleaseEvent(evento)
 
     def soltar_quadro(self, inicio, fim) -> None:
         """O fim do arraste no modo de treino: quadro novo, ou clique num box."""
@@ -473,6 +649,9 @@ class VisorDePagina(QGraphicsView):
                    for x1, y1, x2, y2 in getattr(self, "_tabuleiros", ()))
 
     def contextMenuEvent(self, evento):
+        if evento.reason() == QContextMenuEvent.Reason.Keyboard:
+            self._menu_pelo_teclado()           # Shift+F10 e a tecla Menu (§3.2)
+            return
         ponto = self.mapToScene(evento.pos())
         if self.modo_areas:
             indice = zn.zona_em(self._zonas, ponto.x(), ponto.y())
@@ -483,17 +662,48 @@ class VisorDePagina(QGraphicsView):
             return
         indice = self._box_em(ponto)
         if indice is None:
+            self.menu_da_vista().exec(evento.globalPos())
             return
         self.box_clicado.emit(indice)
         self.menu_do_box(indice, int(ponto.x())).exec(evento.globalPos())
 
+    def _menu_pelo_teclado(self) -> None:
+        """O menu do box em revisão, no meio dele; sem box, o da vista, no meio dela."""
+        indice = self._selecionado
+        if indice is not None and 0 <= indice < len(self._boxes) and not self.modo_areas:
+            b = self._boxes[indice]
+            centro = self.mapFromScene((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)
+            self.menu_do_box(indice, (b.x1 + b.x2) // 2).exec(
+                self.viewport().mapToGlobal(centro))
+            return
+        self.menu_da_vista().exec(self.viewport().mapToGlobal(self.viewport().rect().center()))
+
+    #: As ações da janela (pelo id do YAML) que o menu da vista oferece.
+    ACOES_DO_MENU = ("zoom_pagina", "zoom_largura", "zoom_100", "zoom_item", "zoom_mais",
+                     "zoom_menos", "mostrar_origem")
+
+    def mostrar_caixa(self, caixa) -> None:
+        """Rola a vista até a caixa (da página), a 120 px da borda se couber (Seguir)."""
+        x1, y1, x2, y2 = caixa
+        self.ensureVisible(QRectF(x1, y1, x2 - x1, y2 - y1), 120, 120)
+
+    def menu_da_vista(self) -> QMenu:
+        """O zoom e a origem, das ações que a janela pôs no visor."""
+        menu = QMenu(self)
+        por_id = {a.objectName(): a for a in self.actions()}
+        for id_ in self.ACOES_DO_MENU:
+            if id_ in por_id:
+                menu.addAction(por_id[id_])
+        return menu
+
     def wheelEvent(self, evento):
-        if evento.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            fator = 1.15 if evento.angleDelta().y() > 0 else 1 / 1.15
-            self.scale(fator, fator)
+        modificadores = evento.modifiers()
+        if modificadores & Qt.KeyboardModifier.ControlModifier:
+            fator = self.PASSO_DA_RODA if evento.angleDelta().y() > 0 else 1 / self.PASSO_DA_RODA
+            self._escalar(self.escala() * fator)        # ancorado no cursor (a âncora da vista)
+            return
+        if modificadores & Qt.KeyboardModifier.ShiftModifier:
+            barra = self.horizontalScrollBar()
+            barra.setValue(barra.value() - evento.angleDelta().y())
             return
         super().wheelEvent(evento)
-
-    def ajustar(self) -> None:
-        self.resetTransform()
-        self.fitInView(self.scene().sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)

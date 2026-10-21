@@ -118,8 +118,11 @@ def pytest_sessionfinish(session, exitstatus):
     destino = destino_da_medida(hoje, rotulo, MEDIDAS)
     dados = {"data": hoje, "rotulo": rotulo, "exitstatus": int(exitstatus),
              "metas_ausentes": faltam,
-             "ordem": "os testes do módulo dividem a janela e os padrões, em ordem fixa: o "
-                      "Enter ensina antes do lote, e o lote lê com esses padrões",
+             "ordem": "cada módulo tem a janela e o projeto dele, em ordem fixa: na linha "
+                      "de base o Enter ensina antes da releitura; o lote (desde o E, em "
+                      "test_servidor.py) lê num projeto novo, sem padrões",
+             "configuracao": "desde o passo E, a janela com o servidor de leitura (o leitor "
+                             "real no filho), como o programa abre o projeto",
              "ambiente": _ambiente(), "medidas": _coletadas}
     destino.write_text(json.dumps(dados, ensure_ascii=False, indent=1) + "\n",
                        encoding="utf-8", newline="\n")

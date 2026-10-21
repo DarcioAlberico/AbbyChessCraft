@@ -28,7 +28,6 @@ _PDF = sorted(PASTA_DOS_PDFS.glob("Xadrez Vitorioso*/*.pdf"))
 PAGINAS = [20, 21, 22]
 #: As ações da medida da memória do desfazer em cada página.
 ACOES_POR_PAGINA = 100
-LOTE = list(range(20, 40))          # 20 páginas para a memória total (§15.3)
 
 
 @pytest.fixture(scope="module")
@@ -38,10 +37,9 @@ def ambiente(tmp_path_factory):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication, QMessageBox
 
-    from abbychess import livro
     from abbychess import pagina as pg
+    from abbychess import servidor_de_leitura as sl
     from abbychess.app.janela import JanelaPrincipal
-    from abbychess import leitor as leitor_mod
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
 
@@ -49,26 +47,37 @@ def ambiente(tmp_path_factory):
     pergunta_original = QMessageBox.question
     QMessageBox.question = staticmethod(lambda *a, **k: QMessageBox.StandardButton.Yes)
     projeto = ProjetoDeLivro.criar(tmp_path_factory.mktemp("livros"), "Linha de base", _PDF[0])
-    leitor = LeitorDoLivro.com_modelos_globais(projeto.pasta_de_padroes,
-                                               limiares=projeto.dados.limiares)
+    limiares = projeto.dados.limiares
     fonte = pg.fonte_do_projeto(projeto)
-    # Como a janela faz ao abrir (desde o 1b): logo depois de carregar os modelos, com o
-    # projeto e a fonte abertos e nenhuma página lida ainda.
-    congelar = getattr(leitor_mod, "congelar_para_a_coleta_de_lixo", None)
-    if congelar is not None:
-        congelar()
-    livro.reconhecer_paginas(projeto, fonte, leitor, PAGINAS)
+    # Desde o passo E, como o programa abre o projeto: a janela só com os padrões do livro e
+    # os modelos no servidor de leitura (§15.3), e as páginas lidas pelo lote, por ele.
+    servidor = sl.ServidorDeLeitura(projeto.pasta_de_padroes, limiares,
+                                    fabrica=sl.FABRICA_PADRAO)
+    assert servidor.pronto.wait(300), "o servidor não carregou os modelos"
     janela = JanelaPrincipal()
     janela.resize(1600, 1000)
-    janela.usar(projeto, fonte, leitor)
+    janela.usar(projeto, fonte, LeitorDoLivro(projeto.pasta_de_padroes, limiares=limiares,
+                                              aguardar=True), servidor)
+    janela.livro.reconhecer(PAGINAS, refazer=False)
+    _ate(app, lambda: not janela.livro.lote_rodando, 600)
     janela.ir_para_pagina(PAGINAS[0])
     yield app, janela
     janela.close()
     QMessageBox.question = pergunta_original
 
 
+def _ate(app, condicao, limite: float) -> None:
+    fim = time.monotonic() + limite
+    while not condicao() and time.monotonic() < fim:
+        app.processEvents()
+        time.sleep(0.002)
+    app.processEvents()
+    assert condicao(), "a condição não chegou no prazo"
+
+
 def test_troca_de_pagina(ambiente, medidas):
-    """De `ir_para_pagina` ao visor pintado numa QImage 1600×1000. Hoje não há cache."""
+    """De `ir_para_pagina` ao visor pintado numa QImage 1600×1000, alternando 2 páginas lidas:
+    desde o A1 as duas estão no cache (a página renderizada e o pixmap)."""
     from PySide6.QtGui import QImage, QPainter
 
     app, janela = ambiente
@@ -82,10 +91,35 @@ def test_troca_de_pagina(ambiente, medidas):
 
     resultado = cronometrar(trocar)
     medidas["troca_de_pagina"] = {
-        **resultado, "alvo_no_cache_ms": 150, "alvo_fora_ms": 600,
-        "como": "mesmo processo, alternando 2 páginas lidas; hoje não há cache, então este "
-                "número vale para 'no cache'. 'Fora do cache' (processo novo) não foi medido "
-                "pelo método e fica para o passo A1."}
+        **resultado, "alvo_no_cache_ms": 150,
+        "como": "mesmo processo, alternando 2 páginas lidas, as duas no cache (desde o A1)"}
+
+
+def test_troca_de_pagina_fora_do_cache(ambiente, medidas):
+    """A mesma troca com o cache esvaziado antes de cada uma: renderizar e endireitar a
+    página, convertê-la para o visor e desenhar os boxes (§2: ≤ 600 ms)."""
+    from PySide6.QtGui import QImage, QPainter
+
+    app, janela = ambiente
+    imagem = QImage(1600, 1000, QImage.Format.Format_ARGB32)
+
+    def esvaziar(_i):
+        janela.pagina.cache.esperar()
+        with janela.pagina.cache._trava:
+            janela.pagina.cache._paginas.clear()
+        janela._pixmaps.clear()
+
+    def trocar(i):
+        janela.ir_para_pagina(PAGINAS[i % 2])
+        pintor = QPainter(imagem)
+        janela.visor.render(pintor)
+        pintor.end()
+
+    resultado = cronometrar(trocar, antes=esvaziar, aquecimentos=2, repeticoes=12)
+    medidas["troca_fora_do_cache"] = {
+        **resultado, "alvo_ms": 600,
+        "como": "mesmo processo, o cache de páginas e o de pixmaps esvaziados antes de cada "
+                "troca (o processo novo, com a primeira carga do PDF, não está nesta medida)"}
 
 
 def test_enter_ensinar(ambiente, medidas):
@@ -193,15 +227,36 @@ def test_enter_com_uma_propagacao_lenta_em_curso(ambiente, medidas):
 
 
 def test_releitura_de_um_glifo(ambiente, medidas):
-    """Ajustar uma borda relê o glifo com a cadeia global, na thread da interface."""
+    """Ajustar uma borda relê o glifo: pelos padrões do livro na janela e, se eles não o
+    leem, pelo servidor (desde o E; o tempo vai até a leitura dele chegar)."""
+    from abbychess import pagina as pg
+
     app, janela = ambiente
     janela.ir_para_pagina(PAGINAS[1])
     mostrar(janela, 0)
+    p = janela.pagina
+    gid = p.atual
     lados = [(0, 0, 1, 0), (0, 0, -1, 0)]
+    pelo_servidor = []
 
-    resultado = cronometrar(lambda i: janela.pagina.ajustar(*lados[i % 2]))
-    medidas["releitura_de_um_glifo"] = {**resultado, "alvo_ms": 150,
-                                        "com_o_lote": "impossível hoje: o lote ocupa o executor"}
+    def reler(i):
+        p.escolher(gid)
+        p.ajustar(*lados[i % 2])
+        pelo_servidor.append(pg.aguardando(p.box(gid)))
+        _ate(app, lambda: not pg.aguardando(p.box(gid)), 30)
+
+    resultado = cronometrar(reler)
+    # O texto da página é refeito um instante depois da última mudança (desde o 2b), fora do
+    # tempo acima: o que ele custa na interface, à parte.
+    medidas["texto_da_pagina"] = {
+        **cronometrar(lambda i: janela.pintar_texto()),
+        "como": "refazer o painel de texto da página (montar o documento e pôr no painel), "
+                "que desde o 2b roda 150 ms depois da última mudança, e não dentro do Enter "
+                "nem da releitura"}
+    medidas["releitura_de_um_glifo"] = {
+        **resultado, "alvo_ms": 150, "pelo_servidor": sum(pelo_servidor[-resultado["n"]:]),
+        "como": "Alt+→/← alternados num glifo, do comando à leitura dele (pelos padrões na "
+                "janela, ou pelo servidor, sem o lote; com o lote: releitura_com_o_lote)"}
 
 
 def test_memoria_do_desfazer(ambiente, medidas):
@@ -241,13 +296,18 @@ def _memoria_do_historico(app, janela) -> dict:
             for k in range(ACOES_POR_PAGINA):
                 mostrar(janela, k)
                 janela.treino.campo.setText("y")
-                janela.treino._so_corrigir()
+                janela.treino.pedir_so_corrigir()
                 acoes += 1
+        # O gravador (outra thread, que o `tracemalloc` também vê) termina antes de cada
+        # leitura: sem isso, o que ele aloca e solta entre as duas era maior que o que o
+        # histórico prende (rodadas do 2b com −9,6 e 0,2 MB).
+        janela.projeto.descarregar(10)
         gc.collect()
         cheio, _ = tracemalloc.get_traced_memory()
         rss_cheio = processo.memory_info().rss
         estimativa = janela.pagina.historico.bytes
         janela.pagina.historico.limpar()
+        janela.projeto.descarregar(10)
         gc.collect()
         vazio, _ = tracemalloc.get_traced_memory()
     finally:
@@ -267,67 +327,35 @@ def _memoria_do_historico(app, janela) -> dict:
                     "que o ruído do coletor de lixo"}
 
 
-def test_atraso_e_memoria_durante_o_lote(ambiente, medidas):
-    """Um QTimer de 16 ms durante um lote de 20 páginas: o atraso e o pico de RSS."""
-    import psutil
-    from PySide6.QtCore import QTimer
-
+def test_clique_numa_palavra_do_documento(ambiente, medidas):
+    """CA-6.1 [desempenho]: do clique numa palavra do Documento ao destaque dos glifos dela na
+    Imagem e ao glifo no Inspetor (o tratamento do clique, na thread da interface)."""
     app, janela = ambiente
-    atrasos, rss = [], []
-    ultimo = [time.perf_counter()]
-    processo = psutil.Process()
+    janela.ir_para_pagina(PAGINAS[1])
+    janela.pintar_texto()
+    gids = [g for g in janela.pagina.gids if janela.texto.posicao_do_gid(g) is not None]
+    passo = max(1, len(gids) // 40)
+    alvos = gids[::passo]
 
-    def tique():
-        agora = time.perf_counter()
-        atrasos.append((agora - ultimo[0]) * 1000 - 16)
-        instantes.append(agora)
-        ultimo[0] = agora
-        rss.append(processo.memory_info().rss)
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
 
-    instantes, fim_do_lote = [], []
+    texto = janela.texto
+    janela.vista.setCurrentWidget(janela.painel_do_documento)
+    janela.show()
+    app.processEvents()
 
-    def lote_mudou():
-        if not janela.livro.lote_rodando:
-            fim_do_lote.append(time.perf_counter())
+    def por_a_vista(i):
+        texto.ir_ao_gid(alvos[i % len(alvos)])             # fora do tempo medido
 
-    janela.eventos.ligar("lote_mudou", lote_mudou)
-    temporizador = QTimer()
-    temporizador.setInterval(16)
-    temporizador.timeout.connect(tique)
-    temporizador.start()
-    inicio = time.perf_counter()
-    janela.livro.reconhecer(LOTE, refazer=True)      # o caminho do menu, sem o diálogo
-    _esperar(app, janela, limite=1500)
-    temporizador.stop()
-    medidas["atraso_durante_o_lote"] = {
-        "paginas": len(LOTE), "p99_ms": round(percentil(atrasos, 0.99), 1),
-        "p95_ms": round(p95(atrasos), 1), "max_ms": round(max(atrasos), 1),
-        "disparos": len(atrasos), "duracao_s": round(time.perf_counter() - inicio, 1),
-        "alvo_p99_ms": 50,
-        "acoes_durante_o_lote": "editar, desfazer, esquecer e os limiares são recusados com "
-                                "aviso; F5 e Ctrl+R ficam desligados (passo 2a)",
-        "como": "pelo controlador do livro (desde o 2a): inclui gravar o pendente antes do "
-                "lote e recarregar a página aberta no fim; até o 1b, o lote rodava direto no "
-                "executor, sem as duas coisas",
-        "maior_atraso_no_fim_do_lote": _maior_no_fim(atrasos, instantes, fim_do_lote)}
-    medidas["memoria_total_com_o_lote"] = {
-        "rss_pico_mb": round(max(rss) / 2**20) if rss else None, "alvo_mb": 2560,
-        "como": f"pico do RSS do processo único durante um lote de {len(LOTE)} páginas"}
+    def clicar(i):
+        gid = alvos[i % len(alvos)]
+        cursor = texto.textCursor()
+        cursor.setPosition(texto.posicao_do_gid(gid) + 1)
+        ponto = texto.cursorRect(cursor).center() - QPoint(2, 0)
+        QTest.mouseClick(texto.viewport(), Qt.MouseButton.LeftButton, pos=ponto)
 
-
-def _maior_no_fim(atrasos, instantes, fim_do_lote) -> dict:
-    """Onde caiu o maior atraso: no fim do lote (até 1 s depois do aviso de fim, quando a
-    página aberta é recarregada) ou no meio dele."""
-    if not atrasos or not fim_do_lote:
-        return {}
-    k = max(range(len(atrasos)), key=atrasos.__getitem__)
-    distancia = instantes[k] - fim_do_lote[0]
-    return {"ms": round(atrasos[k], 1), "segundos_depois_do_fim": round(distancia, 2),
-            "no_fim": -0.05 <= distancia <= 1.0,
-            "maior_antes_do_fim_ms": round(max((a for a, t in zip(atrasos, instantes)
-                                                if t < fim_do_lote[0]), default=0), 1)}
-
-
-def test_o_que_ainda_nao_existe(medidas):
-    medidas["buscar_regex_no_livro"] = {"estado": "não existe", "alvo_p95_ms": 1000}
-    medidas["montar_indice_da_busca"] = {"estado": "não existe", "alvo_p95_ms": 2000}
+    medidas["clique_no_documento"] = {
+        **cronometrar(clicar, antes=por_a_vista), "alvo_ms": 50,
+        "como": "QTest.mouseClick numa palavra do Documento: o destaque na Imagem, o glifo no "
+                "Inspetor, o Documento e a Linha seguindo; página 21 reconhecida"}

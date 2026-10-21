@@ -214,13 +214,23 @@ def test_modos_impresso_e_san():
         tx.texto(doc, modo="outro")
 
 
-def test_virtuais_no_mesmo_glifo_ficam_na_ordem_em_que_foram_digitados():
+def test_ligadura_do_box_sai_desfeita_nos_dois_modos():
+    p = _pagina(_e(0, "ﬁ"), _e(22, "m"))
+    doc = tx.montar(p)
+    assert tx.texto(doc, modo=tx.IMPRESSO) == "fim"
+    assert tx.texto(doc, modo=tx.SAN) == "fim"
+
+
+def test_o_virtual_entra_logo_depois_da_ancora_dele():
+    """D1: a âncora diz o lugar exato. O segundo depois do mesmo glifo entra logo depois
+    dele (antes do primeiro: foi digitado ali); a sequência se encadeia um no outro."""
     p = _pagina(*_linha("abc"))
     a = p.boxes[0].gid
-    p.decisoes = Decisoes(virtuais=(GlifoVirtual(p.alocar(), "X", a), GlifoVirtual(p.alocar(), "Y", a),
-                                    GlifoVirtual(p.alocar(), "1", None),
-                                    GlifoVirtual(p.alocar(), "2", None)))
-    assert tx.texto(tx.montar(p)) == "12aXYbc"
+    x = p.alocar()
+    p.decisoes = Decisoes(virtuais=(GlifoVirtual(x, "X", a), GlifoVirtual(p.alocar(), "Y", a),
+                                    GlifoVirtual(p.alocar(), "Z", x),
+                                    GlifoVirtual(p.alocar(), "1", None)))
+    assert tx.texto(tx.montar(p)) == "1aYXZbc"
 
 
 def test_quebrar_desfaz_a_juncao_que_termina_no_glifo():

@@ -74,7 +74,7 @@ from abbychess import gravacao as gv
 from abbychess import procedencia
 from abbychess.gravador import Gravador
 from abbychess import zonas as zn
-from abbychess.modelo import (GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
+from abbychess.modelo import (FIGURINAS, GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
                               Box, Decisoes,
                               Pagina, foto, gid_de, proximo_estado, reconciliar)
 from abbychess.zonas import Zona
@@ -87,6 +87,8 @@ log = logging.getLogger(__name__)
 ARQUIVO_DO_PROJETO = "projeto.json"
 PASTA_DE_PADROES = "padroes"
 PASTA_DE_PAGINAS = "paginas"
+#: A página como estava antes de o lote com "refazer" a reler (§4.6), uma por pid.
+PASTA_ANTES_DO_LOTE = ".antes-do-lote"
 #: As páginas que só têm glifos marcados à mão no modo de treino, sem o F5.
 ARQUIVO_DAS_MARCADAS = "marcadas.json"
 PASTA_DE_ZONAS = "zonas"
@@ -137,6 +139,10 @@ class Limiares:
     rede: float = 0.80
     base: float = 0.30
     revisao: float = 0.90
+    #: A margem do aviso de conflito ao ensinar (§8.3), na escala das distâncias do k-NN
+    #: do livro (`distância / 2000`): o glifo mais perto que isto de amostras de outro
+    #: caractere é avisado.
+    conflito: float = 0.10
 
 
 @dataclass
@@ -145,8 +151,13 @@ class Projeto:
     fonte: str
     criado: str
     limiares: Limiares = field(default_factory=Limiares)
-    #: O idioma da prosa, que escolhe o léxico da verificação de texto.
+    #: O idioma da prosa, que escolhe o léxico da verificação de texto e as letras das
+    #: peças nos lances (pt: R D T B C; en: K Q R B N).
     idioma: str = "pt"
+    #: Como o livro escreve as peças nos lances: "figurinas" (♘f3), "letras" (Cf3) ou
+    #: "livro" (como o livro: figurinas se ele tem figurinas lidas). No modo figurinas, a
+    #: letra digitada num lance vira figurina ao confirmar (§6.4).
+    notacao: str = "livro"
     versao: int = VERSAO
     #: O SHA-256 dos primeiros 4 MB da fonte e o tamanho dela, que a reconhecem se ela for
     #: movida (o tamanho separa dois arquivos de começo igual e evita ler os outros).
@@ -340,9 +351,10 @@ class ProjetoDeLivro:
             self._gravador = Gravador(self._gravar_instantaneo, ao_falhar=self._falhou)
         return self._gravador
 
-    def agendar(self, pagina: Pagina) -> bool:
+    def agendar(self, pagina: Pagina, resumo: Optional[dict] = None) -> bool:
         """A página mudou: o gravador a grava em até meio segundo. Em só leitura, recusa
-        (devolve falso e nada é gravado)."""
+        (devolve falso e nada é gravado). `resumo`: o de `resumo_do_modelo`, se quem chama
+        já o calculou fora da interface (substituir no livro inteiro)."""
         if self.somente_leitura:
             return False
         with self._trava_do_cache:              # sem a trava do livro: não espera o disco
@@ -353,7 +365,8 @@ class ProjetoDeLivro:
             self._guardar_no_cache(pagina, foto=False)
             instantaneo = pagina.instantaneo()
             # O resumo vale já para quem pergunta (F6, o lote, "lidas"), antes da gravação.
-            self._a_gravar[pagina.indice] = (instantaneo, self._resumo_do_modelo(instantaneo))
+            self._a_gravar[pagina.indice] = (instantaneo, resumo if resumo is not None
+                                             else self._resumo_do_modelo(instantaneo))
             self.gravador.agendar(pagina.pid, instantaneo)
         return True
 
@@ -493,6 +506,66 @@ class ProjetoDeLivro:
     # ------------------------------------------------------------------
     # Páginas (modelo v2, §4.3)
     # ------------------------------------------------------------------
+    def arquivo_da_pagina(self, indice: int) -> Optional[Path]:
+        """O JSON v2 gravado da página (None se ela não foi gravada, ou é v1): o índice da
+        busca o lê fora do cache (§7.3)."""
+        with self._trava_do_livro:
+            return self._arquivo_v2_de(indice)
+
+    def ler_sem_migrar(self, indice: int) -> Optional[Pagina]:
+        """A página como está, sem passar pelo cache e sem migrar a v1 (o índice da busca,
+        numa thread: §11, um escritor só): o instantâneo da que está na memória, a v1 lida
+        como v2, ou o JSON v2 gravado; None se nada foi gravado dela."""
+        modelo = self.modelo_em_memoria(indice)
+        if modelo is not None:
+            return modelo.instantaneo()
+        if self._tem_v1(indice):
+            with self._trava_do_livro:          # a interface pode migrá-la agora
+                if self._tem_v1(indice):
+                    return self._ler_v1(indice)
+            modelo = self.modelo_em_memoria(indice)     # migrada: na memória, ou no v2
+            if modelo is not None:
+                return modelo.instantaneo()
+        arquivo = self.arquivo_da_pagina(indice)
+        if arquivo is None:
+            return None
+        try:
+            return _pagina_de_json(json.loads(arquivo.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            return None
+
+    def carimbo(self, indice: int) -> Optional[tuple]:
+        """O (arquivo, tamanho, mtime) do JSON v2 da página, tomado antes de `ler_sem_migrar`:
+        `adotar` sabe por ele se o arquivo mudou desde a leitura."""
+        arquivo = self.arquivo_da_pagina(indice)
+        if arquivo is None:
+            return None
+        try:
+            estado = arquivo.stat()
+        except OSError:
+            return None
+        return (str(arquivo), estado.st_size, estado.st_mtime_ns)
+
+    def adotar(self, pagina: Pagina, carimbo: Optional[tuple]) -> Optional[Pagina]:
+        """A página lida fora do cache (`ler_sem_migrar` do JSON, numa thread) entra nele
+        como a viva, se nada a mudou desde a leitura: nenhuma outra entrou no cache e o
+        arquivo tem o mesmo `carimbo`. Devolve a do cache (a adotada, ou a que já estava lá),
+        ou None (leia com `pagina_para_editar`). Só a interface adota."""
+        with self._trava_do_livro:
+            em_cache = self.modelo_em_memoria(pagina.indice)
+            if em_cache is not None:
+                return em_cache
+            if (carimbo is None or self._tem_v1(pagina.indice)
+                    or self.carimbo(pagina.indice) != carimbo):
+                return None
+            self._guardar_no_cache(pagina, foto_nova=True)
+            return pagina
+
+    def modelo_em_memoria(self, indice: int) -> Optional[Pagina]:
+        """A página do cache, sem ler o disco (None se ela não está na memória)."""
+        with self._trava_do_cache:
+            return self._modelos.get(indice)
+
     def carregar_modelo(self, indice: int) -> Optional[Pagina]:
         """A página no modelo v2, ou `None` se nada foi gravado dela. Uma página v1 é
         migrada e gravada aqui, na primeira leitura (§4.3)."""
@@ -690,6 +763,67 @@ class ProjetoDeLivro:
             elif mudou:
                 pagina.estado = proximo_estado(pagina.estado, "editar")
             self.salvar_modelo(pagina)
+
+    # ------------------------------------------------------------------
+    # Antes do lote (§4.6)
+    # ------------------------------------------------------------------
+    def _arquivo_antes_do_lote(self, pid: int) -> Path:
+        return self.pasta / PASTA_DE_PAGINAS / PASTA_ANTES_DO_LOTE / f"p{pid}.json"
+
+    def guardar_antes_do_lote(self, pagina: Pagina) -> None:
+        """A página como está agora, antes de o lote com "refazer" a reler: o lote não entra
+        no desfazer, e "Voltar ao estado antes do lote" a restaura."""
+        gv.gravar_json(self._arquivo_antes_do_lote(pagina.pid),
+                       _pagina_para_json(pagina.instantaneo()))
+
+    def tem_antes_do_lote(self, indice: int) -> bool:
+        # O pid do modelo (em memória), e não o do `livro.json`: logo depois do lote, a
+        # página ainda está com o gravador, e o livro não a tem.
+        pagina = self.carregar_modelo(indice)
+        return pagina is not None and self._arquivo_antes_do_lote(pagina.pid).is_file()
+
+    def pid_da_pagina(self, indice: int) -> Optional[int]:
+        """O pid da página sem ler o JSON dela: o do modelo em memória, ou o do livro."""
+        with self._trava_do_cache:
+            em_cache = self._modelos.get(indice)
+        if em_cache is not None:
+            return em_cache.pid
+        with self._trava_do_livro:
+            return self._pid_de(indice)
+
+    def data_antes_do_lote(self, indice: int) -> Optional[datetime]:
+        """Quando a cópia de antes do lote foi feita (a hora do arquivo), ou None."""
+        pagina = self.carregar_modelo(indice)
+        if pagina is None:
+            return None
+        arquivo = self._arquivo_antes_do_lote(pagina.pid)
+        try:
+            return datetime.fromtimestamp(arquivo.stat().st_mtime)
+        except OSError:
+            return None
+
+    def voltar_ao_antes_do_lote(self, indice: int) -> Pagina:
+        """Põe de volta a página copiada antes do lote (o JSON idêntico ao copiado), e a
+        cópia sai. O gravador grava antes o que tem pendente: senão, a gravação dele passaria
+        por cima da página restaurada; se ele não grava, nada muda (`OSError`). No projeto
+        só para leitura, também não."""
+        if self.somente_leitura:
+            raise OSError("o projeto está aberto só para leitura")
+        if not self.descarregar(10):
+            raise OSError("há páginas que não puderam ser gravadas (veja a barra de status); "
+                          "nada foi mudado")
+        with self._trava_do_livro:
+            pid = self._pid_de(indice)
+            if pid is None:
+                raise OSError(f"a página {indice + 1} não tem cópia de antes do lote")
+            copia = self._arquivo_antes_do_lote(pid)
+            dados = copia.read_bytes()
+            gv.gravar_bytes(self._arquivo_v2(pid), dados)
+            pagina = _pagina_de_json(json.loads(dados.decode("utf-8")))
+            self._guardar_no_cache(pagina, foto_nova=True)
+            self._atualizar_livro(indice, self._resumo_do_modelo(pagina))
+            gv.apagar(copia)
+            return pagina
 
     def carregar_pagina(self, indice: int) -> Optional[List[BoxEntry]]:
         """Os boxes gravados da página, ou `None` se ela ainda não foi lida nem marcada.
@@ -916,13 +1050,20 @@ class ProjetoDeLivro:
             gv.gravar_json(self.pasta / ARQUIVO_DO_LIVRO, novo)
             self._livro = novo                  # o cache só muda depois de gravado
 
+    def resumo_do_modelo(self, pagina: Pagina) -> dict:
+        """O resumo da página no `livro.json` (sem mudar nada: vale numa thread)."""
+        return self._resumo_do_modelo(pagina)
+
     def _resumo_do_modelo(self, pagina: Pagina) -> dict:
         tabuleiros = len(pagina.tabuleiros)
         conferidos = sum(1 for d in pagina.diagramas if d.conferido)
         return {"pid": pagina.pid, "estado": pagina.estado,
-                **resumo_das_confiancas(pagina.entries(), self.dados.limiares),
+                **resumo_das_confiancas(pagina.entries(), self.dados.limiares,
+                                        [b.revisado for b in pagina.boxes]),
                 "diagramas": tabuleiros,
-                "diagramas_por_conferir": max(0, tabuleiros - conferidos)}
+                "diagramas_por_conferir": max(0, tabuleiros - conferidos),
+                # Alguma figurina lida (o modo "livro" das peças, §6.4, sem abrir as páginas).
+                "figurinas": any(b.entry.char in FIGURINAS for b in pagina.boxes)}
 
 
 def _pagina_para_json(pagina: Pagina) -> dict:
@@ -959,7 +1100,8 @@ def com_ids_de_diagramas(diagramas):
     return com_ids(diagramas)
 
 
-def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares) -> dict:
+def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares,
+                          revisados: Optional[Sequence[bool]] = None) -> dict:
     """Os boxes da página em `confirmados`, `sem_leitura` e o histograma do resto.
 
     O histograma tem faixas de 0,01 (a chave é o centésimo de baixo; 100 é a confiança
@@ -969,17 +1111,19 @@ def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares) -> dict
     """
     from abbychess.leitor import FONTE_NENHUMA, FONTES_CONFIRMADAS, precisa_revisao
 
-    confirmados = sem_leitura = 0
+    confirmados = sem_leitura = pendentes = 0
     histograma: Dict[int, int] = {}
-    for b in boxes:
-        if b.source in FONTES_CONFIRMADAS:
+    revisados = revisados or [False] * len(boxes)
+    for b, revisado in zip(boxes, revisados):
+        if not revisado and precisa_revisao(b.char, b.source, b.confidence, limiares):
+            pendentes += 1
+        if b.source in FONTES_CONFIRMADAS or revisado:      # o revisado é aceito (§6.3)
             confirmados += 1
         elif not b.char or b.source == FONTE_NENHUMA:
             sem_leitura += 1
         else:
             faixa = _faixa(b.confidence)
             histograma[faixa] = histograma.get(faixa, 0) + 1
-    pendentes = sum(1 for b in boxes if precisa_revisao(b.char, b.source, b.confidence, limiares))
     return {"boxes": len(boxes), "pendentes": pendentes, "confirmados": confirmados,
             "sem_leitura": sem_leitura,
             "histograma": {str(k): histograma[k] for k in sorted(histograma)}}

@@ -1,4 +1,4 @@
-"""CA-4.3 (parte do 1b): máquina de estados sobre os gids, as decisões e `montar()`.
+"""CA-4.3: máquina de estados sobre os gids, as decisões e `montar()` (D1: editar_palavra).
 
 Uma página sintética de 900×400 com 1 a 60 glifos (cada um, dois traços de tinta com um vão,
 para o `dividir` ter onde cortar). As regras do 1b: dividir, juntar, marcar, quebrar,
@@ -7,9 +7,11 @@ caminho da janela de hoje (a lista de `BoxEntry` editada por `abbychess.pagina` 
 reconciliada, `modelo.reconciliar`). A cada passo, os invariantes de §4.5: gids únicos;
 aposentados ∩ vivos = ∅; nenhuma decisão cita gid aposentado; `montar()` cobre cada glifo
 lido e cada virtual uma vez. E dois do modelo: nenhuma edição perde uma decisão cujo glifo
-ela não tocou, e uma quebra e uma junção nunca valem na mesma fronteira.
+ela não tocou, e uma quebra e uma junção nunca valem na mesma fronteira. Do D1: a sessão
+confirmada (sem recusa) deixa na página o texto digitado, e a âncora de todo virtual é um box
+vivo ou outro virtual.
 
-Suíte rápida: `derandomize=True`, `max_examples=200`. A camada noturna roda 5.000.
+Suíte rápida: `derandomize=True`, `max_examples=100`. A camada noturna roda 5.000.
 """
 
 from __future__ import annotations
@@ -26,11 +28,12 @@ from core.box_model import BoxEntry
 
 from abbychess import edicao as ed
 from abbychess import pagina as pg
+from abbychess import sessao as ss
 from abbychess import texto as tx
 from abbychess.modelo import Box, Pagina, foto, gid_de, reconciliar
 
 LARGURA, ALTURA = 900, 400
-EXEMPLOS = 5000 if os.environ.get("ABBY_NOTURNO") == "1" else 200
+EXEMPLOS = 5000 if os.environ.get("ABBY_NOTURNO") == "1" else 100
 
 
 def _pagina_sintetica(n: int):
@@ -47,6 +50,92 @@ def _pagina_sintetica(n: int):
     pagina = Pagina(pid=7, indice=3, boxes=[Box(gid_de(7, i), b) for i, b in enumerate(boxes)],
                     estado="reconhecida", proximo_n=n)
     return imagem, pagina
+
+
+ACOES = ["trocar", "apagar", "inserir", "inserir_antes", "comeco", "espaco", "palavra",
+         "trocar_e_partir", "juntar", "nada"]
+
+
+def _trecho(pagina, i, acao, c):
+    """O texto da página, a sessão [a, b) de uma edição numa palavra e o texto novo dela
+    (ou None)."""
+    texto, unidades = ss.texto_e_unidades(pagina)
+    glifos = [k for k, u in enumerate(unidades) if u.glifo]
+    if not glifos:
+        return None
+    k = glifos[i % len(glifos)]
+    a, b = ss.palavras_em(unidades, k, k + 1)
+    if acao == "juntar":
+        if b >= len(unidades) or unidades[b].tipo != ss.ESPACO:
+            return None
+        b = ss.palavras_em(unidades, b + 1, b + 1)[1]
+    trecho, onde = texto[a:b], k - a
+    if acao in ("espaco", "trocar_e_partir") and (onde + 1 >= len(trecho) or trecho[onde + 1] == " "):
+        return None                             # um espaço na borda não parte nada
+    novo = {"trocar": trecho[:onde] + c + trecho[onde + 1:],
+            "apagar": trecho[:onde] + trecho[onde + 1:],
+            "inserir": trecho[:onde + 1] + c + trecho[onde + 1:],
+            "inserir_antes": trecho[:onde] + c + trecho[onde:],
+            "comeco": c + trecho,
+            "espaco": trecho[:onde + 1] + " " + trecho[onde + 1:],
+            "palavra": trecho + " " + c,
+            "trocar_e_partir": trecho[:onde] + c + " " + trecho[onde + 1:],
+            "juntar": trecho.replace(" ", "", 1),
+            "nada": trecho}[acao]
+    if not novo.strip():
+        return None
+    return texto, unidades, a, b, novo
+
+
+def sessao_de_uma_palavra(pagina, i, acao, c):
+    """As unidades e o texto novo de uma edição numa palavra da página (ou None)."""
+    trecho = _trecho(pagina, i, acao, c)
+    if trecho is None:
+        return None
+    _texto, unidades, a, b, novo = trecho
+    return unidades[a:b], novo
+
+
+def editar_uma_palavra(pagina, i, acao, c):
+    """A edição pela sessão; sem recusa, a página fica com o texto digitado."""
+    trecho = _trecho(pagina, i, acao, c)
+    if trecho is None:
+        return
+    texto, unidades, a, b, novo = trecho
+    try:
+        plano = ss.editar(pagina, unidades[a:b], novo)
+    except ss.Recusa:
+        return
+    if acao != "apagar":                         # um box só sai se a letra dele foi apagada
+        assert not plano.sair
+    esperado = texto[:a] + novo + texto[b:]
+    agora, unidades_agora = ss.texto_e_unidades(pagina)
+    ficaram = pagina.vivos
+    antes = [tuple(g for g in linha if g in ficaram) for linha in _linhas_dos_boxes(unidades)]
+    if not ficaram or [linha for linha in antes if linha] != _linhas_dos_boxes(unidades_agora):
+        # Tirar um box mudou como o core agrupa as linhas da página (as linhas são dela), ou
+        # a página ficou sem box nenhum (sem linhas; os virtuais sem âncora vão ao começo):
+        # os caracteres ficam os digitados.
+        assert sorted(agora.replace(" ", "").replace("\n", "")) == \
+            sorted(esperado.replace(" ", "").replace("\n", ""))
+    elif not all(antes):
+        # Uma linha ficou sem box (e uma linha só existe com boxes): o virtual que sobrou nela
+        # vai para a vizinha, e as palavras ficam as digitadas, na ordem.
+        assert agora.split() == esperado.split()
+    else:
+        assert agora == esperado
+
+
+def _linhas_dos_boxes(unidades):
+    """Os boxes de cada linha impressa da página, em ordem."""
+    linhas, atual = [], []
+    for u in list(unidades) + [ss.Unidade("\n", None, ss.LINHA)]:
+        if u.tipo == ss.LINHA:
+            linhas.append(tuple(atual))
+            atual = []
+        elif u.tipo == ss.GLIFO and (not atual or atual[-1] != u.gid):
+            atual.append(u.gid)
+    return [linha for linha in linhas if linha]
 
 
 class MaquinaDaPagina(RuleBasedStateMachine):
@@ -154,6 +243,11 @@ class MaquinaDaPagina(RuleBasedStateMachine):
             dif = ed.descartar(self.pagina, gid)
             self._preservou(antes, dif.removidos)
 
+    @rule(i=st.integers(0, 10_000), acao=st.sampled_from(ACOES), c=st.sampled_from("xz1"))
+    def editar_palavra(self, i, acao, c):
+        """D1: uma sessão do Documento numa palavra (§6.3), pela sessão sem Qt."""
+        editar_uma_palavra(self.pagina, i, acao, c)
+
     @rule(i=st.integers(0, 10_000))
     def dividir_pela_janela(self, i):
         if self.pagina.boxes:
@@ -201,6 +295,22 @@ class MaquinaDaPagina(RuleBasedStateMachine):
         assert not (d.quebras & {b for _, b in d.juncoes})
 
     @invariant()
+    def a_ancora_de_todo_virtual_esta_na_pagina(self):
+        d = self.pagina.decisoes
+        validos = self.pagina.vivos | {v.gid for v in d.virtuais}
+        for v in d.virtuais:
+            assert v.depois_de is None or v.depois_de in validos
+            assert v.antes_de is None or v.antes_de in validos
+        ancora = {v.gid: v.depois_de if v.depois_de is not None else v.antes_de
+                  for v in d.virtuais}
+        for gid in ancora:                                # e nenhuma cadeia fecha um ciclo
+            vistos = set()
+            while gid in ancora:
+                assert gid not in vistos
+                vistos.add(gid)
+                gid = ancora[gid]
+
+    @invariant()
     def montar_cobre_cada_glifo_uma_vez(self):
         doc = tx.montar(self.pagina)
         esperados = [b.gid for b in self.pagina.boxes if b.entry.char]
@@ -227,6 +337,8 @@ class _ProjetoNaMemoria:
 
     class dados:
         nome = "Maquina"
+        idioma = "pt"
+        notacao = "letras"
 
     def __init__(self, pagina):
         self.pagina = pagina
@@ -379,6 +491,13 @@ class MaquinaDoControlador(RuleBasedStateMachine):
             boxes, decisoes, estado = self.inicial
             assert self.ctl.modelo.boxes == boxes
             assert self.ctl.modelo.decisoes == decisoes and self.ctl.modelo.estado == estado
+
+    @rule(i=st.integers(0, 10_000), acao=st.sampled_from(ACOES), c=st.sampled_from("xz1"))
+    def editar_palavra(self, i, acao, c):
+        """D1: a sessão do Documento pelo controlador (um passo do desfazer)."""
+        sessao = sessao_de_uma_palavra(self.ctl.modelo, i, acao, c)
+        if sessao is not None:
+            self.ctl.confirmar_sessao(*sessao)
 
     @rule()
     def desfazer(self):

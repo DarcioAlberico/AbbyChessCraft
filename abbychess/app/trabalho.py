@@ -19,7 +19,7 @@ import traceback
 from collections import deque
 from typing import Any, Callable, List, Optional
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
+from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, Signal, Slot
 
 log = logging.getLogger(__name__)
 
@@ -55,6 +55,8 @@ class Executor(QObject):
     fila_mudou = Signal(list)
     #: (feito, total) da tarefa que roda.
     progresso = Signal(int, int)
+    #: Uma função a chamar na thread da interface (`na_interface`).
+    _chamar = Signal(object)
 
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
@@ -67,6 +69,21 @@ class Executor(QObject):
         #: A tarefa que roda é leve.
         self._leve = False
         self.titulo = ""
+        # Um método do executor (que mora na thread da interface), e não uma lambda: assim a
+        # ligação é enfileirada quando o sinal vem de outra thread.
+        self._chamar.connect(self._chamar_aqui, Qt.ConnectionType.QueuedConnection)
+
+    def na_interface(self, funcao: Callable[[], None]) -> None:
+        """Chama `funcao` na thread da interface (de qualquer thread: o sinal enfileira). O
+        servidor de leitura avisa assim, da thread ouvinte dele (§11)."""
+        self._chamar.emit(funcao)
+
+    @Slot(object)
+    def _chamar_aqui(self, funcao) -> None:
+        try:
+            funcao()
+        except Exception:  # um aviso que falhou não derruba o laço do Qt
+            log.exception("a chamada na interface falhou")
 
     @property
     def ocupado(self) -> bool:

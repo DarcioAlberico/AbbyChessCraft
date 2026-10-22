@@ -19,6 +19,7 @@ from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication, QLabel  # noqa: E402
 
 from abbychess import texto as tx  # noqa: E402
+from abbychess.modelo import Estilo  # noqa: E402
 from abbychess.app.documento import VistaDoDocumento  # noqa: E402
 
 from tests.janela_util import atual, boxes, fila  # noqa: E402
@@ -111,6 +112,22 @@ def test_o_desconhecido_tem_ondulado_e_o_virtual_pontilhado(app):
     assert sublinhado(4) == QTextCharFormat.UnderlineStyle.WaveUnderline
     assert sublinhado(5) == QTextCharFormat.UnderlineStyle.DotLine
     assert sublinhado(1) == QTextCharFormat.UnderlineStyle.NoUnderline
+
+
+def test_estilos_persistidos_aparecem_e_a_selecao_devolve_os_gids(app):
+    doc = tx.Documento((_bloco("b0", "texto", [[1, 2, 3]]),), CHARS,
+                       {1: Estilo(negrito=True), 2: Estilo(italico=True),
+                        3: Estilo(sublinhado=True)})
+    v = _vista(app, doc)
+    cursor = v.textCursor()
+    cursor.setPosition(0)
+    cursor.setPosition(2, cursor.MoveMode.KeepAnchor)
+    v.setTextCursor(cursor)
+    assert v.gids_selecionados() == [1, 2]
+    for gid, propriedade in ((1, "fontWeight"), (2, "fontItalic"), (3, "fontUnderline")):
+        cursor.setPosition(v.posicao_do_gid(gid) + 1)
+        valor = getattr(cursor.charFormat(), propriedade)()
+        assert bool(valor)
 
 
 def test_o_corpo_muda_com_limites_e_volta_ao_padrao(app):

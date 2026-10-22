@@ -455,12 +455,17 @@ legenda entram no Documento e sobrevivem ao F5, ao desfazer e ao JSON.
 ## Passo G — Edição completa (§6.3, linhas G)
 
 **Tarefas.**
-1. Os trechos que faltam:
-   - k → 1, que junta os boxes;
-   - 1 → k, que divide pela tinta, ou faz uma caixa de k caracteres.
-2. Ctrl+Shift+Enter (parágrafo) e o hífen de quebra.
-3. Ctrl+B/I/U e os estilos no Documento.
-4. A prévia de substituição passa a habilitar esses casos.
+1. ~~Os trechos que faltam:~~
+   - ~~k → 1, que junta os boxes;~~
+   - ~~1 → k, que divide pela tinta, ou faz uma caixa de k caracteres.~~
+2. ~~Ctrl+Shift+Enter (parágrafo) e o hífen de quebra.~~
+3. ~~Ctrl+B/I/U e os estilos no Documento.~~
+4. ~~A prévia de substituição passa a habilitar esses casos.~~
+
+**Concluído em 2026-10-21.** As operações estruturais conservam sucessores e desfazer;
+a divisão usa os vãos da tinta e cai para uma caixa multicaractere quando não há corte
+confiável. Parágrafos e estilos ficam no modelo persistido, aparecem no Documento e os
+mesmos casos são aplicáveis pela prévia de substituição.
 
 **Verificação.** CA-6.4 completo e CA-6.6.
 

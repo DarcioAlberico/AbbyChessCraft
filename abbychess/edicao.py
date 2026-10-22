@@ -23,7 +23,7 @@ from core.box_model import BoxEntry
 
 from abbychess import pagina as pg
 from abbychess import procedencia
-from abbychess.modelo import Box, Decisoes, Diferenca, GlifoVirtual, Pagina
+from abbychess.modelo import Box, Decisoes, Diferenca, Estilo, GlifoVirtual, Pagina
 
 
 def _novos(pagina: Pagina, entries, de: int, ate: int) -> List[Box]:
@@ -53,6 +53,72 @@ def juntar(pagina: Pagina, imagem, gid_a: int, gid_b: int, leitor=None) -> Difer
     dif = Diferenca(removidos=set(velhos), novos=[novo],
                     sucessores={g: [novo.gid] for g in velhos})
     return pagina.aplicar(dif, boxes)
+
+
+def juntar_varios(pagina: Pagina, gids: Sequence[int], char: str) -> Diferenca:
+    """Junta boxes contíguos numa caixa manual, para a edição ``k -> 1`` do Documento."""
+    if len(gids) < 2 or not char:
+        raise ValueError("A junção estrutural exige dois boxes e um caractere.")
+    indices = [pagina.indice_de(g) for g in gids]
+    if indices != list(range(min(indices), max(indices) + 1)):
+        raise ValueError("Só é possível juntar boxes contíguos.")
+    antigos = [pagina.boxes[i] for i in indices]
+    entries = [copia(b.entry) for b in antigos]
+    while len(entries) > 1:
+        pg.juntar(None, entries, 0, 1)  # sem leitor: a correção manual vem logo abaixo
+    pg.confirmar(entries, 0, char)
+    estilos = [b.estilo for b in antigos]
+    estilo = estilos[0] if all(e == estilos[0] for e in estilos) else Estilo()
+    novo = Box(pagina.alocar(), entries[0], estilo=estilo, revisado=True)
+    inicio, fim = indices[0], indices[-1] + 1
+    boxes = pagina.boxes[:inicio] + [novo] + pagina.boxes[fim:]
+    dif = Diferenca(removidos=set(gids), novos=[novo],
+                    sucessores={g: [novo.gid] for g in gids})
+    return pagina.aplicar(dif, boxes)
+
+
+def dividir_em(pagina: Pagina, imagem, gid: int, chars: str, leitor=None) -> Diferenca:
+    """Divide um box em ``len(chars)`` partes pela tinta; sem cortes, guarda a ligadura."""
+    if len(chars) < 2:
+        raise ValueError("A divisão estrutural exige mais de um caractere.")
+    i = pagina.indice_de(gid)
+    antigo = pagina.boxes[i]
+    entries = [copia(antigo.entry)]
+    if imagem is not None:
+        try:
+            while len(entries) < len(chars):
+                # O maior pedaço ainda é o candidato mais provável a conter outro vão.
+                k = max(range(len(entries)), key=lambda n: ((entries[n].x2 - entries[n].x1)
+                                                             * (entries[n].y2 - entries[n].y1)))
+                pg.dividir(imagem, entries, k, None)
+        except ValueError:
+            entries = [copia(antigo.entry)]
+    if len(entries) == len(chars):
+        for k, char in enumerate(chars):
+            pg.confirmar(entries, k, char)
+        partes = [Box(pagina.alocar(), e, estilo=antigo.estilo, revisado=True) for e in entries]
+        dif = Diferenca(removidos={gid}, novos=partes,
+                        sucessores={gid: [b.gid for b in partes]})
+        return pagina.aplicar(dif, pagina.boxes[:i] + partes + pagina.boxes[i + 1:])
+    # Tinta colada (ou imagem indisponível): uma caixa com vários caracteres, não ensinável.
+    pg.confirmar(entries, 0, chars)
+    novo = Box(pagina.alocar(), entries[0], estilo=antigo.estilo, revisado=True)
+    dif = Diferenca(removidos={gid}, novos=[novo], sucessores={gid: [novo.gid]})
+    return pagina.aplicar(dif, pagina.boxes[:i] + [novo] + pagina.boxes[i + 1:])
+
+
+def estilizar(pagina: Pagina, gids: Sequence[int], campo: str) -> Diferenca:
+    """Alterna um campo de :class:`Estilo` nos boxes indicados."""
+    if campo not in ("negrito", "italico", "sublinhado"):
+        raise ValueError(f"Estilo desconhecido: {campo}")
+    gids = list(dict.fromkeys(gids))
+    if not gids:
+        raise ValueError("Selecione ao menos um glifo.")
+    valor = not all(getattr(pagina.box(g).estilo, campo) for g in gids)
+    alvo = set(gids)
+    boxes = [replace(b, estilo=replace(b.estilo, **{campo: valor})) if b.gid in alvo else b
+             for b in pagina.boxes]
+    return pagina.aplicar(Diferenca(mudados=alvo), boxes)
 
 
 def marcar(pagina: Pagina, imagem, area, leitor=None) -> Diferenca:

@@ -74,6 +74,7 @@ class Documento:
     blocos: Tuple[Bloco, ...]
     #: gid -> o caractere (os dos boxes como lidos, e os dos glifos virtuais).
     chars: Dict[int, str] = field(default_factory=dict)
+    estilos: Dict[int, object] = field(default_factory=dict)
 
     def gids(self) -> List[int]:
         """Os gids do documento, na ordem dele (cada um uma vez)."""
@@ -164,7 +165,8 @@ def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
     fechar()
     for did in antes_da_linha.get(len(linhas), []):
         blocos.append(Bloco(f"b{len(blocos)}", None, "diagrama", diagrama_id=did))
-    return Documento(tuple(_na_ordem_das_zonas(blocos, pagina.zonas)), chars)
+    return Documento(tuple(_na_ordem_das_zonas(blocos, pagina.zonas)), chars,
+                     {b.gid: b.estilo for b in lidos})
 
 
 def _aplicar_decisoes(linhas: List[List[List[int]]], decisoes: Decisoes) -> List[List[List[int]]]:

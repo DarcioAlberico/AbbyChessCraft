@@ -597,8 +597,12 @@ def _opf(m: Metadados, idioma: str, msg: Dict[str, str], manifesto: List[str],
     titulo = limpo(m.titulo).strip() or "Livro"
     dc = [f'<dc:identifier id="pub-id">{e(m.identificador_do_livro())}</dc:identifier>',
           f"<dc:title>{e(titulo)}</dc:title>", f"<dc:language>{e(idioma)}</dc:language>",
-          # A edição impressa de onde vêm as páginas da `page-list` (EPUBCheck, OPF-066).
-          f"<dc:source>{e(m.fonte or titulo)}</dc:source>"]
+          # A edição impressa de onde vêm as páginas da `page-list` (EPUBCheck, OPF-066),
+          # refinada como fonte da paginação (`source-of`), que é o que o Ace pede
+          # (epub-pagesource). O `a11y:pageBreakSource` também satisfaz o Ace, mas o
+          # EPUBCheck 5.4 o recusa (OPF-027): fica de fora.
+          f'<dc:source id="pub-fonte">{e(m.fonte or titulo)}</dc:source>',
+          '<meta refines="#pub-fonte" property="source-of">pagination</meta>']
     dc += [f"<dc:creator>{e(a)}</dc:creator>" for a in m.autores if a]
     if m.editora:
         dc.append(f"<dc:publisher>{e(m.editora)}</dc:publisher>")
@@ -626,8 +630,10 @@ def _opf(m: Metadados, idioma: str, msg: Dict[str, str], manifesto: List[str],
              f'<meta property="schema:accessibilitySummary">{e(msg["resumo"])}</meta>']
     capa = '<meta name="cover" content="capa-imagem"/>' if tem_capa else ""
     return ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            # O idioma também no `<package>` (o Ace: epub-lang), além do `dc:language`.
             '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" '
-            'unique-identifier="pub-id" prefix="schema: http://schema.org/">\n'
+            f'unique-identifier="pub-id" xml:lang="{e(idioma, aspas=True)}" '
+            'prefix="schema: http://schema.org/">\n'
             '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">\n'
             + "\n".join(dc) + "\n"
             f'<meta property="dcterms:modified">{modificado}</meta>\n'
@@ -802,6 +808,40 @@ def conferir(caminho: str | Path) -> List[str]:
                 elif el.find(".//x:li", _NS) is None:
                     problemas.append(f"o {tipo} do nav está vazio")
     return problemas
+
+
+def ace(caminho: str | Path) -> Optional[List[str]]:
+    """As violações de acessibilidade que o Ace by DAISY acha, se ele estiver configurado
+    (`ABBY_ACE`: o caminho do executável `ace`, ou `ace.cmd` no Windows); `None` sem ele.
+
+    Cada violação vem como "[impacto] arquivo: regra — descrição". O Ace roda num Chrome
+    sem janela (Puppeteer) e leva alguns segundos; o relatório dele vai a uma pasta
+    temporária, que some depois."""
+    import json
+    import subprocess
+
+    executavel = os.environ.get("ABBY_ACE")
+    if not executavel or not Path(executavel).is_file():
+        return None
+    with tempfile.TemporaryDirectory(prefix="ace-") as pasta:
+        subprocess.run([executavel, "--force", "--silent", "-o", pasta, str(caminho)],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace",
+                       timeout=600, check=False)
+        relatorio = Path(pasta) / "report.json"
+        if not relatorio.is_file():
+            return ["o Ace não produziu relatório"]
+        dados = json.loads(relatorio.read_text(encoding="utf-8"))
+    violacoes = []
+    for documento in dados.get("assertions", []):
+        alvo = documento.get("earl:testSubject", {}).get("url", "")
+        for teste in documento.get("assertions", []):
+            resultado = teste.get("earl:result", {})
+            if resultado.get("earl:outcome") == "pass":
+                continue
+            regra = teste.get("earl:test", {})
+            violacoes.append(f"[{regra.get('earl:impact', '?')}] {alvo}: "
+                             f"{regra.get('dct:title', '?')} — {resultado.get('dct:description', '')}")
+    return violacoes
 
 
 def epubcheck(caminho: str | Path) -> Optional[List[str]]:

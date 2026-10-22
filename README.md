@@ -645,8 +645,15 @@ aprova o EPUB da fatia do Xadrez Vitorioso sem erro nem advertência; para rodá
 
 ```powershell
 $env:ABBY_EPUBCHECK = "C:\tools\epubcheck-5.4.0\epubcheck.jar"
+$env:ABBY_ACE = "C:\tools\ace-1.4.6\node_modules\.bin\ace.cmd"
 .venv\Scripts\python.exe -m pytest -q tests/test_epub.py
 ```
+
+A **acessibilidade** é conferida pelo Ace by DAISY 1.4.6 (`epub.ace`, com `ABBY_ACE`): o EPUB
+da fatia e os sintéticos passam sem violação. O OPF declara o idioma também no `<package>` e a
+edição impressa de onde vêm as páginas (`dc:source` refinado como `source-of pagination`).
+Os campos de certificação (`a11y:certifiedBy`, `dcterms:conformsTo`) ficam de fora de
+propósito: ninguém certificou o livro.
 
 Depois de cada exportação, o **relatório** vai a Resultados / Avisos: páginas, títulos,
 margens tiradas, diagramas recortados e o motivo, páginas não verificadas, glifos pendentes

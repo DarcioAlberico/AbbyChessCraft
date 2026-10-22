@@ -218,7 +218,7 @@ def test_o_opf_tem_a_fonte_impressa_e_recusa_data_fora_do_formato(tmp_path):
     destino = tmp_path / "a.epub"
     epub.escrever(_livro(), destino, epub.Metadados("L", data="maio de 2012"))
     opf = _ler(destino)[0]["OEBPS/content.opf"].decode("utf-8")
-    assert "<dc:source>L</dc:source>" in opf and "<dc:date>" not in opf
+    assert '<dc:source id="pub-fonte">L</dc:source>' in opf and "<dc:date>" not in opf
 
 
 def test_conferir_acusa_id_repetido_e_toc_vazio(tmp_path):
@@ -264,3 +264,27 @@ def test_o_epubcheck_aprova_o_livro_com_capa_fonte_e_recortes(tmp_path):
             "A Book & <More>", idioma=idioma, autores=("A",), data="2012-05", capa=capa))
         assert epub.conferir(destino) == []
         assert epub.epubcheck(destino) == []
+
+@pytest.mark.skipif(not os.environ.get("ABBY_ACE"),
+                    reason="o Ace by DAISY não está configurado (ABBY_ACE)")
+def test_o_ace_nao_acha_violacao(tmp_path):
+    destino = tmp_path / "livro.epub"
+    epub.escrever(_livro(), destino, epub.Metadados("A Book", idioma="en", autores=("A",),
+                                                    capa=_png(90)),
+                  numeros={0: 10, 1: 11, 2: 12})
+    assert epub.ace(destino) == []
+
+
+def test_o_opf_declara_o_idioma_e_a_fonte_da_paginacao(tmp_path):
+    destino = tmp_path / "a.epub"
+    epub.escrever(_livro(), destino, epub.Metadados("L", idioma="en", fonte="1st ed., 2012"))
+    opf = _ler(destino)[0]["OEBPS/content.opf"].decode("utf-8")
+    assert 'xml:lang="en"' in opf
+    assert '<dc:source id="pub-fonte">1st ed., 2012</dc:source>' in opf
+    assert '<meta refines="#pub-fonte" property="source-of">pagination</meta>' in opf
+    assert "pageBreakSource" not in opf                  # o EPUBCheck 5.4 o recusa
+
+
+def test_ace_sem_configuracao_e_none(tmp_path, monkeypatch):
+    monkeypatch.delenv("ABBY_ACE", raising=False)
+    assert epub.ace(tmp_path / "x.epub") is None

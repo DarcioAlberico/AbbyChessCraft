@@ -55,8 +55,64 @@ FUNCOES_DE_MARGEM = ("cabecalho", "numero_de_pagina", "rodape")
 NAO_MEDIDO = {
     "ligacao_da_legenda": "passo H (a leitura de hoje não liga legenda a diagrama)",
     "precisao_e_revocacao_por_funcao": "passo F (a leitura de hoje não classifica blocos)",
-    "validacao_pelos_lances": "passo H",
 }
+
+#: As perturbações do CA-10.1: quantas e a semente.
+PERTURBACOES, SEMENTE = 100, 1234
+
+
+def validacao_pelos_lances(gabaritos: dict, n: int = PERTURBACOES, semente: int = SEMENTE) -> dict:
+    """O CA-10.1 sobre os FEN e os `lances_seguintes` do gabarito, sem PDF.
+
+    Os verdadeiros são os diagramas com lances; as perturbadas, `n` versões deles (uma peça
+    trocada, tirada ou movida, só posições legais, `semente`). **Afetada** é a perturbada
+    que toca uma casa usada por um lance da linha (`lances.casas_dos_lances`): de onde sai,
+    aonde chega, o caminho e a torre do roque. A detecção é a fração das afetadas que a
+    validação não dá como confiável.
+
+    A precisão de "confiável pelos lances" sobre as perturbadas só pode ser 1,0 se nenhuma
+    sair confiável; uma perturbação longe de todos os lances não muda nenhum deles, e
+    nenhuma validação pelos lances a vê. Por isso as confiáveis vão em duas contas, as
+    afetadas (um erro da validação) e as não afetadas (fora do alcance dela)."""
+    from abbychess import lances as lc
+
+    verdadeiros = []
+    for nome, g in sorted(gabaritos.items()):
+        for d in g.get("diagramas", []):
+            if d.get("lances_seguintes"):
+                vez = d["lado"] if d.get("lado") in ("w", "b") else "w"
+                verdadeiros.append((f"{nome}/{d['id']}", d["fen"].split()[0], vez,
+                                    list(d["lances_seguintes"])))
+
+    def valida(pecas, vez, sans):
+        linha = [lc.Lance(s, s, 1 if k == 0 else None, vez == "b" and k == 0)
+                 for k, s in enumerate(sans)]
+        return lc.validar(pecas, linha)
+
+    certos = [valida(p, v, s) for _, p, v, s in verdadeiros]
+    perturbadas = lc.perturbacoes([(p, v) for _, p, v, _ in verdadeiros], n, semente)
+    afetadas = detectadas = confiaveis_afetadas = confiaveis_nao_afetadas = 0
+    for p in perturbadas:
+        _, pecas, vez, sans = verdadeiros[p.origem]
+        confiavel = valida(p.pecas, vez, sans).confiavel
+        if lc.afetada(p, lc.casas_dos_lances(pecas, vez, sans)):
+            afetadas += 1
+            detectadas += not confiavel
+            confiaveis_afetadas += confiavel
+        else:
+            confiaveis_nao_afetadas += confiavel
+    confiaveis_certos = sum(v.confiavel for v in certos)
+    return {
+        "verdadeiros": len(verdadeiros),
+        "verdadeiros_confiaveis": confiaveis_certos,
+        "perturbadas": len(perturbadas), "semente": semente,
+        "afetadas": afetadas, "detectadas": detectadas,
+        "deteccao": _razao(detectadas, afetadas),
+        "confiaveis_afetadas": confiaveis_afetadas,
+        "confiaveis_nao_afetadas": confiaveis_nao_afetadas,
+        "diagramas": [{"id": nome, "estado": v.estado if v else "", "aviso": v.aviso if v else ""}
+                      for (nome, *_), v in zip(verdadeiros, certos)],
+    }
 
 
 def iou(a, b) -> float:
@@ -346,7 +402,9 @@ def _medir(livro: str, pdf: Path, indices, pasta: Path) -> dict:
                           for i, g in gabaritos.items()},
             "gabaritos_revisados": f"{sum(1 for p in paginas.values() if p['estrutura_revisada'])}"
                                    f"/{len(paginas)}",
-            "nao_medido": NAO_MEDIDO, "resumo": resumo, "paginas": paginas}
+            "nao_medido": NAO_MEDIDO, "resumo": resumo, "paginas": paginas,
+            "validacao_pelos_lances": validacao_pelos_lances(
+                {f"i{i:03d}": g for i, g in gabaritos.items()})}
 
 
 def _sha_do_gabarito(livro: str, indice: int) -> str:

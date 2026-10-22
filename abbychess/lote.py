@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Sequence
 
 from abbychess import diagramas as dg
+from abbychess import lances as lc
 from abbychess import pagina as pg
 from abbychess import procedencia
 from abbychess import servidor_de_leitura as sl
@@ -358,8 +359,9 @@ class CondutorDoLote:
         if dif.caidas:
             self.resultado.caidas[indice] = descrever_caidas(dif.caidas, de_antes)
         pagina.tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
-        pagina.diagramas = dg.mesclar(lida.diagramas, dg.para_caixas(pagina.tabuleiros,
-                                                                     pagina.diagramas))
+        pagina.diagramas = dg.com_ids(dg.mesclar(lida.diagramas, dg.para_caixas(pagina.tabuleiros,
+                                                                     pagina.diagramas)))
+        pagina.diagramas = lc.validar_pagina(pagina, projeto.dados.idioma)
         pagina.estado = proximo_estado(pagina.estado, "reconhecer")
         p._gravar(pagina)
         self.resultado.lidas.append(indice)

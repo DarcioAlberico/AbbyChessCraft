@@ -461,6 +461,8 @@ def _figura(imagem: Image.Image, caixa: Tuple[int, int, int, int],
 def _aviso_do_recorte(diagrama: DiagramaLido) -> str:
     if not diagrama.lido:
         return f"diagrama não lido: {diagrama.erro or 'recorte da página'}"
+    if diagrama.validacao is not None and not diagrama.validacao.confiavel:
+        return f"posição não conferida: {diagrama.validacao.aviso}"
     return f"posição não conferida e sem a confiança do porteiro: {diagrama.motivo}"
 
 

@@ -49,6 +49,7 @@ from abbychess import ancoragem as ag
 from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import historico as hs
+from abbychess import lances as lc
 from abbychess import modelo as md
 from abbychess import pagina as pg
 from abbychess import procedencia
@@ -304,6 +305,17 @@ class ControladorDePagina:
         pagina = self.modelo.instantaneo()
         pagina.diagramas = self.diagramas
         return tx.montar(pagina, com_os_nao_lidos=True)
+
+    def linhas_dos_diagramas(self) -> List[List[lc.Lance]]:
+        """A primeira linha de lances do texto que segue cada diagrama (§10), na ordem de
+        `diagramas`, para a conferência validar a posição enquanto ela é corrigida."""
+        if self.modelo is None or not self.modelo.tabuleiros:
+            return []
+        pagina = self.modelo.instantaneo()
+        pagina.diagramas = dg.com_ids(self.diagramas)
+        idioma = self.projeto.dados.idioma if self.projeto is not None else "pt"
+        textos = lc.textos_depois(tx.montar(pagina))
+        return [lc.primeira_linha(textos.get(d.id, ""), idioma) for d in pagina.diagramas]
 
     def gids_de_margem(self) -> frozenset:
         """Os glifos do cabeçalho e do rodapé corridos da página, pela regra da exportação
@@ -1795,6 +1807,7 @@ class ControladorDePagina:
         pagina.zonas = zn.com_ids(pagina.zonas)
         pagina.diagramas = dg.com_ids(pagina.diagramas)
         pagina.zonas = zn.vincular_legendas(pagina.zonas, pagina.diagramas)
+        pagina.diagramas = lc.validar_pagina(pagina, self.projeto.dados.idioma)
         transacao = self.historico.registrar(hs.Transacao(
             descricao, {pagina.pid: hs.mudanca(antes.pagina, pagina.instantaneo())},
             amostras_criadas=criados, juntar=juntar))

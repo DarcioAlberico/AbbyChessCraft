@@ -250,3 +250,29 @@ def _texto(janela) -> str:
     """O painel de texto, sem esperar o relógio que o refaz depois da última mudança."""
     janela.pintar_texto()
     return janela.texto.toPlainText()
+
+
+def test_a_conferencia_valida_pelos_lances_e_oferece_o_roque_inferido(app):
+    import numpy as np
+
+    from abbychess import lances as lc
+    from tests.test_diagramas import _lido
+
+    linha = lc.primeira_linha("12.O-O-O Cxd4 13.Cxd4", "pt")
+    dialogo = dd.DialogoDeDiagrama(np.full((600, 800), 255, np.uint8), [_lido()], 0,
+                                   linhas=[linha])
+    try:
+        assert any(a.startswith("Confiável pelos lances") for a in dialogo.avisos_do_diagrama())
+        assert "KQkq" in dialogo.roque_inferido.text()
+        assert dialogo.fen.text().split()[2] == "-"           # inferido não é afirmado
+        assert "[SetUp \"1\"]" in dialogo.pgn() and "12. O-O-O Nxd4" in dialogo.pgn()
+
+        dialogo.btn_roque_inferido.click()
+        assert dialogo.fen.text().split()[2] == "KQkq"
+        assert not dialogo.btn_roque_inferido.isEnabled()
+
+        _clicar_na_casa(dialogo, 7, 0, Qt.MouseButton.RightButton)      # tira a torre de a1
+        assert any("12.O-O-O do texto não é legal aqui" in a
+                   for a in dialogo.avisos_do_diagrama())
+    finally:
+        dialogo.close()

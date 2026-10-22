@@ -132,8 +132,11 @@ def imagem_do_diagrama(diagrama, matriz: Optional[np.ndarray]) -> QImage:
 
 
 def estado_do_diagrama(diagrama) -> str:
+    validacao = getattr(diagrama, "validacao", None)
     if diagrama.conferido:
         return "conferido"
+    if diagrama.lido and validacao is not None:
+        return "confiável pelos lances" if validacao.confiavel else validacao.aviso
     if diagrama.lido:
         return "lido, não conferido"
     return "não lido"

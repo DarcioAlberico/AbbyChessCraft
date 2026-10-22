@@ -471,13 +471,43 @@ mesmos casos são aplicáveis pela prévia de substituição.
 
 ## Passo H — Diagramas (§10)
 
+**Execução iniciada em 2026-10-22, ramo `passo-i-treino`.** `abbychess.lances` lê a primeira
+linha de lances do texto que segue cada diagrama (até o próximo diagrama ou título, sem
+legenda nem margens), com as letras do idioma do livro (`Cf3` em português) e as figurinas;
+a linha começa no primeiro lance numerado, aceita a prosa no meio e para na variante (o
+parêntese, o ponto e vírgula, o número que volta). A validação joga a linha no FEN lido com
+`python-chess`: o lance ilegal ou ambíguo, o `x` que não captura, o `+`/`#` que não dá
+xeque/mate e o lado do número contra o da legenda dão o aviso ("3.Cf3 do texto não é legal
+aqui"); todos legais dão **confiável pelos lances**. A validação é derivada como o lado pela
+legenda: refeita em `_mudou`, no lote, na substituição pelo livro e na leitura dos
+diagramas, gravada no diagrama e usada por `confiavel`: o lance ilegal tira a confiança do
+porteiro, mas a linha legal não anula a dúvida dele (um lance só passa em muitas posições
+erradas). Quando nem a legenda nem quem conferiu disseram o lado, o número do primeiro
+lance (`10...`) o diz, com a procedência própria (`lances`), e o FEN, o texto e o PGN
+concordam. O texto de um diagrama ainda por ler não cai no anterior. A conferência revalida
+a cada casa corrigida. Pendente da revisão: desmarcar todos os roques na conferência ainda
+deixa o inferido valer na validação (o modelo não guarda `roque_informado`).
+
+O roque inferido (rei e torre nas casas iniciais) é usado só para validar e aparece na
+conferência com o botão "Usar"; o FEN e a exportação continuam sem ele até alguém marcar
+(CA-10.3). O PGN por diagrama (Copiar PGN na conferência) parte do FEN com `SetUp`, leva os
+lances validados com os NAGs e declara só o roque conferido ou jogado pelo próprio texto.
+
+CA-10.1 em `ferramentas/medir.py` (`validacao_pelos_lances`, também no JSON da medição),
+sobre os gabaritos do Xadrez Vitorioso: os 2 diagramas com lances saem confiáveis; das 100
+perturbações (semente 1234), 23 tocam uma casa usada pela linha e as 23 são detectadas
+(1,0 ≥ 0,6), nenhuma afetada sai confiável. As 73 não afetadas que saem confiáveis estão
+fora do alcance de qualquer validação pelos lances; a precisão 1,0 "nas perturbadas" do
+CA-10.1 só é atingível lida sobre as afetadas — **decisão pendente do usuário** sobre a
+redação do critério.
+
 **Tarefas.**
 1. O editor Diagrama no Inspetor, com a Imagem dando zoom no diagrama, PgUp e PgDn pelo
    livro, e F8.
 2. A aba Diagramas.
-3. A validação pelos lances, com o gerador de perturbações.
-4. O roque inferido.
-5. O PGN por diagrama.
+3. ~~A validação pelos lances, com o gerador de perturbações.~~
+4. ~~O roque inferido.~~
+5. ~~O PGN por diagrama.~~
 
 **Verificação.** CA-10.1, CA-10.2 e CA-10.3; CA-3.2 (cláusula do tabuleiro).
 

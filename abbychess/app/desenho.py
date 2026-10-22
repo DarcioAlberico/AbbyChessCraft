@@ -212,6 +212,10 @@ class DesenhoDaJanela:
         self.registrar_aviso(av.AVISO, titulo, texto)
         QMessageBox.warning(self, titulo, texto)
 
+    def _relatorio(self, titulo: str, texto: str) -> None:
+        """Um relatório (o da exportação, §12.2): vai a Resultados / Avisos, sem diálogo."""
+        self.registrar_aviso(av.AVISO, titulo, texto)
+
     def _gravacao_falhou(self, indice, erro) -> None:
         """CA-4.2 (A2): a falha de gravação vai para Avisos, além da barra."""
         pagina = f"A página {indice + 1}" if indice is not None else "Uma página"

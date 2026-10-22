@@ -291,4 +291,4 @@ def test_sem_paginas_lidas_nao_exporta(projeto, tmp_path):
     with pytest.raises(ex.NadaParaExportar):
         ex.exportar(projeto, tmp_path / "x.epub")
     with pytest.raises(ValueError, match="não suportado"):
-        ex.formato_do_caminho(tmp_path / "x.txt")
+        ex.formato_do_caminho(tmp_path / "x.rtf")

@@ -1,4 +1,4 @@
-"""Exportar o livro reconhecido: PDF pesquisável, DOCX e EPUB.
+"""Exportar o livro reconhecido: PDF pesquisável, DOCX, EPUB, TXT e PGN.
 
 Os escritores são os do PyBoxEditor, e não cópias:
 
@@ -60,7 +60,7 @@ DPI_DA_LEITURA = 300
 #: parágrafo. É o `core.pagina.SALTO_DE_PARAGRAFO` (0,6 além do passo).
 SALTO_DE_PARAGRAFO = 1.6
 
-FORMATOS = ("pdf", "docx", "epub")
+FORMATOS = ("pdf", "docx", "epub", "txt", "pgn")
 
 #: Quando ler a página da camada de texto do PDF: "auto" (quando a régua do
 #: `core.pdf_nativo` aceita a página) ou "nunca" (sempre dos boxes do projeto).
@@ -110,9 +110,154 @@ class NadaParaExportar(ValueError):
     """Nenhuma das páginas pedidas foi reconhecida."""
 
 
+@dataclass(frozen=True)
+class Opcoes:
+    """As opções da exportação (§12.1). O padrão é o livro limpo: sem margens corridas,
+    o texto refluído, os diagramas confiáveis desenhados."""
+
+    #: Cabeçalhos, rodapés e números de página ficam no texto.
+    manter_margens: bool = False
+    #: Só as páginas verificadas (§4.4).
+    so_verificadas: bool = False
+    #: Os diagramas confiáveis redesenhados do FEN; falso, todos como recorte da página.
+    desenhar_diagramas: bool = True
+    #: No TXT, uma marca `[p. N]` no começo de cada página.
+    marcas_de_pagina: bool = False
+
+
+@dataclass
+class Relatorio:
+    """O que a exportação fez e deixou de fora (§12.2), com a página de cada item."""
+
+    formato: str = ""
+    paginas: List[int] = field(default_factory=list)
+    da_camada: List[int] = field(default_factory=list)
+    caracteres: int = 0
+    titulos: List[Tuple[int, str]] = field(default_factory=list)
+    #: Página -> os textos de cabeçalho, rodapé e número de página tirados.
+    margens: Dict[int, List[str]] = field(default_factory=dict)
+    desenhados: int = 0
+    #: (página, motivo) de cada diagrama que saiu como recorte.
+    recortados: List[Tuple[int, str]] = field(default_factory=list)
+    nao_verificadas: List[int] = field(default_factory=list)
+    #: Página -> glifos pendentes de revisão.
+    pendentes: Dict[int, int] = field(default_factory=dict)
+    #: No PGN: (página, número do diagrama, motivo) dos que ficaram de fora, e quantos entraram.
+    fora_do_pgn: List[Tuple[int, int, str]] = field(default_factory=list)
+    no_pgn: int = 0
+    #: No PDF pesquisável, o resumo dele (o relatório por item é dos outros formatos).
+    resumo_do_pdf: str = ""
+
+    def resumo(self) -> str:
+        """Uma linha, para a barra de status."""
+        if self.formato == "pdf":
+            return self.resumo_do_pdf
+        if self.formato == "pgn":
+            partes = [f"{self.no_pgn} diagrama(s) com a posição e os lances"]
+            if self.fora_do_pgn:
+                partes.append(f"{len(self.fora_do_pgn)} de fora (ver Resultados)")
+            return "; ".join(partes) + "."
+        partes = [f"{len(self.paginas)} página(s), {self.caracteres} caracteres"]
+        if self.titulos:
+            partes.append(f"{len(self.titulos)} título(s)")
+        partes.append(f"{self.desenhados} diagrama(s) desenhado(s) do FEN e "
+                      f"{len(self.recortados)} como recorte")
+        if self.da_camada:
+            partes.append(f"{len(self.da_camada)} página(s) lida(s) da camada de texto do PDF")
+        tiradas = sum(len(v) for v in self.margens.values())
+        if tiradas:
+            partes.append(f"{tiradas} linha(s) de cabeçalho/rodapé tirada(s)")
+        if self.nao_verificadas:
+            partes.append(f"{len(self.nao_verificadas)} página(s) não verificada(s)")
+        return "; ".join(partes) + "."
+
+    def texto(self) -> str:
+        """O relatório inteiro, uma linha por item, com a página (para Resultados)."""
+        linhas = [self.resumo()]
+        for pagina, titulo in self.titulos:
+            linhas.append(f"p. {pagina + 1}: título “{titulo}”")
+        for pagina, textos in sorted(self.margens.items()):
+            for t in textos:
+                linhas.append(f"p. {pagina + 1}: margem tirada “{t}”")
+        for pagina, motivo in self.recortados:
+            linhas.append(f"p. {pagina + 1}: diagrama como recorte ({motivo})")
+        for pagina, numero, motivo in self.fora_do_pgn:
+            linhas.append(f"p. {pagina + 1}: diagrama {numero} fora do PGN ({motivo})")
+        if self.nao_verificadas:
+            linhas.append("Páginas não verificadas: "
+                          + ", ".join(str(i + 1) for i in self.nao_verificadas))
+        com_pendentes = {i: n for i, n in sorted(self.pendentes.items()) if n}
+        if com_pendentes:
+            linhas.append("Glifos pendentes: " + ", ".join(
+                f"p. {i + 1} ({n})" for i, n in com_pendentes.items()))
+        return "\n".join(linhas)
+
+
 # ----------------------------------------------------------------------
 # Das páginas gravadas ao intermediário do PyBoxEditor
 # ----------------------------------------------------------------------
+
+#: As funções de área que não são o texto do livro: saem da exportação, salvo com a opção
+#: de manter cabeçalhos e rodapés (§12.1). `ignorar` sai sempre.
+FUNCOES_DE_MARGEM = ("cabecalho", "rodape", "numero_de_pagina")
+FORA_DA_EXPORTACAO = FUNCOES_DE_MARGEM + ("ignorar",)
+
+
+@dataclass
+class Estrutura:
+    """O que o Documento (§4.2) sabe de cada box da página, para a exportação ler (§12.1).
+
+    A montagem das linhas e dos parágrafos continua a desta exportação (a caixa pela
+    altura, os trechos de coluna, as coordenadas), que tem casos medidos; a estrutura diz
+    o que ela não tinha como saber: a função da área (título, margens, nota, legenda,
+    ignorar), o negrito e o itálico do glifo, o parágrafo pedido e o hífen de quebra.
+    Chaveada pelo `id` do `BoxEntry`, para sobreviver aos filtros da lista de boxes."""
+
+    funcoes: Dict[int, str] = field(default_factory=dict)
+    negrito: set = field(default_factory=set)
+    italico: set = field(default_factory=set)
+    paragrafo_antes: set = field(default_factory=set)
+    hifen_de_quebra: set = field(default_factory=set)
+    #: Os boxes numa área desenhada pelo usuário com função de texto (não de margem): a
+    #: regra das margens corridas (`margens_corridas`) não os tira.
+    protegidos: set = field(default_factory=set)
+    #: Os `BoxEntry` da estrutura, vivos enquanto ela viver: as chaves são `id()`.
+    vivos: list = field(default_factory=list)
+
+    def funcao(self, b: BoxEntry) -> str:
+        return self.funcoes.get(id(b), "texto")
+
+    @classmethod
+    def da_pagina(cls, pagina) -> Tuple[List[BoxEntry], "Estrutura"]:
+        """Os boxes lidos da página do modelo (`modelo.Pagina`) e a estrutura deles; sem
+        modelo, nada."""
+        from abbychess import zonas as zn
+
+        if pagina is None:
+            return [], cls()
+        lidos = [b for b in pagina.boxes if b.entry.char]
+        areas = [z for z in pagina.zonas if z.tipo in (zn.TEXTO, zn.IGNORAR)]
+        estrutura = cls(vivos=[b.entry for b in lidos])
+        decisoes = pagina.decisoes
+        for b in lidos:
+            e = b.entry
+            cx, cy = (e.x1 + e.x2) / 2, (e.y1 + e.y2) / 2
+            area = next((z for z in areas if z.contem(cx, cy)), None)
+            if area is not None:
+                funcao = "ignorar" if area.tipo == zn.IGNORAR else area.funcao or "texto"
+                estrutura.funcoes[id(e)] = funcao
+                if not area.automatica and funcao not in FORA_DA_EXPORTACAO:
+                    estrutura.protegidos.add(id(e))
+            if b.estilo.negrito:
+                estrutura.negrito.add(id(e))
+            if b.estilo.italico:
+                estrutura.italico.add(id(e))
+            if b.gid in decisoes.paragrafo_antes:
+                estrutura.paragrafo_antes.add(id(e))
+            if b.gid in decisoes.hifen_de_quebra:
+                estrutura.hifen_de_quebra.add(id(e))
+        return list(estrutura.vivos), estrutura
+
 
 @dataclass
 class _Linha:
@@ -122,6 +267,13 @@ class _Linha:
     indices: List[int] = field(default_factory=list)
     #: O trecho de leitura (faixa, coluna) da linha; ver `_Leitura`.
     trecho: Tuple[int, int] = (0, 0)
+    #: Da `Estrutura`: a função da área da linha, se ela pede parágrafo, se termina num
+    #: hífen de quebra decidido, e os trechos `(início, fim)` em negrito e em itálico.
+    funcao: str = "texto"
+    paragrafo: bool = False
+    hifen: bool = False
+    negrito: List[Tuple[int, int]] = field(default_factory=list)
+    italico: List[Tuple[int, int]] = field(default_factory=list)
 
 
 def palavras(boxes: Sequence[BoxEntry]) -> List[List[Tuple[str, List[int]]]]:
@@ -292,16 +444,57 @@ def _caixa_pela_altura(boxes: Sequence[BoxEntry], indices: Sequence[int]) -> Dic
     return trocas
 
 
-def _linhas(boxes: Sequence[BoxEntry], leitura: Optional[_Leitura] = None) -> List[_Linha]:
+def _linhas(boxes: Sequence[BoxEntry], leitura: Optional[_Leitura] = None,
+            estrutura: Optional[Estrutura] = None) -> List[_Linha]:
     linhas = []
     for trecho, linha in _palavras_por_trecho(boxes, leitura):
         indices = [i for _, grupo in linha for i in grupo]
         texto = " ".join(t for t, _ in linha if t).strip()
         if not texto or not indices:
             continue
-        linhas.append(_Linha(texto, min(boxes[i].y1 for i in indices),
-                             max(boxes[i].y2 for i in indices), indices, trecho))
+        nova = _Linha(texto, min(boxes[i].y1 for i in indices),
+                      max(boxes[i].y2 for i in indices), indices, trecho)
+        if estrutura is not None:
+            _com_a_estrutura(nova, linha, boxes, estrutura)
+        linhas.append(nova)
     return linhas
+
+
+def _com_a_estrutura(linha: _Linha, palavras_da_linha, boxes: Sequence[BoxEntry],
+                     estrutura: Estrutura) -> None:
+    """A função, o parágrafo, o hífen e os estilos da linha, pela `Estrutura`."""
+    entradas = [boxes[i] for i in linha.indices]
+    funcoes = [estrutura.funcao(b) for b in entradas]
+    linha.funcao = max(set(funcoes), key=funcoes.count)
+    linha.paragrafo = id(entradas[0]) in estrutura.paragrafo_antes
+    linha.hifen = id(entradas[-1]) in estrutura.hifen_de_quebra and linha.texto.endswith("-")
+    for nome, marcados in (("negrito", estrutura.negrito), ("italico", estrutura.italico)):
+        trechos: List[Tuple[int, int]] = []
+        posicao = 0
+        for texto, grupo in palavras_da_linha:
+            if not texto:
+                continue
+            if len(texto) == len(grupo):            # um caractere por glifo: letra a letra
+                for k, i in enumerate(grupo):
+                    if id(boxes[i]) in marcados:
+                        trechos.append((posicao + k, posicao + k + 1))
+            elif all(id(boxes[i]) in marcados for i in grupo):
+                trechos.append((posicao, posicao + len(texto)))
+            posicao += len(texto) + 1
+        setattr(linha, nome, _unir_trechos(trechos, linha.texto))
+
+
+def _unir_trechos(trechos: Sequence[Tuple[int, int]], texto: str = "") -> List[Tuple[int, int]]:
+    """Os trechos ordenados, com os encostados (ou separados só por um espaço de `texto`)
+    num só. Uma letra não marcada entre dois trechos continua de fora."""
+    saida: List[Tuple[int, int]] = []
+    for inicio, fim in sorted(trechos):
+        if saida and (inicio <= saida[-1][1] or (
+                inicio == saida[-1][1] + 1 and texto[saida[-1][1]:inicio] == " ")):
+            saida[-1] = (saida[-1][0], max(saida[-1][1], fim))
+        else:
+            saida.append((inicio, fim))
+    return saida
 
 
 # ----------------------------------------------------------------------
@@ -413,6 +606,37 @@ def _juntar_linhas(textos: Sequence[str]) -> str:
     return saida
 
 
+def _juntar(linhas: Sequence[_Linha]) -> Tuple[str, List[Tuple[int, int]], List[Tuple[int, int]]]:
+    """O texto do parágrafo e os trechos em negrito e em itálico, já no texto juntado.
+
+    O hífen de quebra decidido no Documento (§6.3) sai sempre; o não decidido sai pela
+    regra de `_juntar_linhas` (letra antes, minúscula depois)."""
+    texto, negrito, italico = "", [], []
+    anterior: Optional[_Linha] = None
+    for linha in linhas:
+        if anterior is None:
+            base = 0
+        elif anterior.hifen or (texto.endswith("-") and len(texto) > 1 and texto[-2].isalpha()
+                                and linha.texto[:1].islower()):
+            texto = texto[:-1]
+            base = len(texto)
+            # O trecho que acabava no hífen não pode cobrir a letra da linha seguinte.
+            negrito = [(a, min(b, base)) for a, b in negrito if a < base]
+            italico = [(a, min(b, base)) for a, b in italico if a < base]
+        else:
+            texto += " "
+            base = len(texto)
+        texto += linha.texto
+        negrito += [(base + a, base + b) for a, b in linha.negrito]
+        italico += [(base + a, base + b) for a, b in linha.italico]
+        anterior = linha
+
+    def cortados(trechos):
+        return _unir_trechos([(a, min(b, len(texto))) for a, b in trechos if a < len(texto)],
+                             texto)
+    return texto, cortados(negrito), cortados(italico)
+
+
 def paragrafos(boxes: Sequence[BoxEntry], cortes: Sequence[int] = ()) -> List[Paragrafo]:
     """Os parágrafos da página: linhas seguidas, cortadas onde o vão cresce.
 
@@ -424,10 +648,15 @@ def paragrafos(boxes: Sequence[BoxEntry], cortes: Sequence[int] = ()) -> List[Pa
 
 
 def _paragrafos_por_trecho(boxes: Sequence[BoxEntry], cortes: Sequence[int] = (),
-                           leitura: Optional[_Leitura] = None
+                           leitura: Optional[_Leitura] = None,
+                           estrutura: Optional[Estrutura] = None
                            ) -> List[Tuple[Tuple[int, int], Paragrafo]]:
-    """Os parágrafos de `paragrafos`, cada um com o trecho de leitura em que começa."""
-    linhas = _linhas(boxes, leitura)
+    """Os parágrafos de `paragrafos`, cada um com o trecho de leitura em que começa.
+
+    Com a `Estrutura`, também abre parágrafo onde a função da área muda (o título, a
+    nota, a legenda) e onde o Documento pediu (`paragrafo_antes`); a linha de área
+    `titulo` sai como título de capítulo (o `<h1>` do sumário)."""
+    linhas = _linhas(boxes, leitura, estrutura)
     if not linhas:
         return []
     passos = [b.topo - a.topo for a, b in zip(linhas, linhas[1:])
@@ -440,13 +669,19 @@ def _paragrafos_por_trecho(boxes: Sequence[BoxEntry], cortes: Sequence[int] = ()
         # parágrafo, como voltar para cima.
         if (salto <= 0 or linha.trecho != anterior.trecho
                 or (passo and salto > SALTO_DE_PARAGRAFO * passo)
-                or any(anterior.pe <= y < linha.topo for y in cortes)):
+                or any(anterior.pe <= y < linha.topo for y in cortes)
+                or linha.funcao != anterior.funcao or linha.paragrafo):
             grupos.append([linha])
         else:
             grupos[-1].append(linha)
-    return [(g[0].trecho, Paragrafo(_juntar_linhas([linha.texto for linha in g]),
-                                    topo=g[0].topo, pe=g[-1].pe))
-            for g in grupos]
+    saida = []
+    for g in grupos:
+        texto, negrito, italico = _juntar(g)
+        titulo = g[0].funcao == "titulo"
+        saida.append((g[0].trecho, Paragrafo(texto, titulo=titulo, nivel=1 if titulo else 2,
+                                             negrito=negrito, italico=italico,
+                                             topo=g[0].topo, pe=g[-1].pe)))
+    return saida
 
 
 def _figura(imagem: Image.Image, caixa: Tuple[int, int, int, int],
@@ -456,6 +691,10 @@ def _figura(imagem: Image.Image, caixa: Tuple[int, int, int, int],
     recorte.save(dados, format="PNG")
     return Figura(png=dados.getvalue(), largura=recorte.width, altura=recorte.height,
                   origem="recorte", caixa=tuple(caixa), casas_de_largura=8.0, aviso=aviso)
+
+
+#: O aviso do diagrama recortado porque as opções pediram recortes (§12.1).
+RECORTE_PEDIDO = "recorte pedido nas opções da exportação"
 
 
 def _aviso_do_recorte(diagrama: DiagramaLido) -> str:
@@ -552,23 +791,32 @@ def _sem_coordenadas(boxes: Sequence[BoxEntry],
 def pagina_extraida(indice: int, boxes: Sequence[BoxEntry],
                     tabuleiros: Sequence[Tuple[int, int, int, int]] = (),
                     imagem: Optional[Image.Image] = None,
-                    diagramas: Sequence[DiagramaLido] = ()) -> PaginaExtraida:
+                    diagramas: Sequence[DiagramaLido] = (),
+                    estrutura: Optional[Estrutura] = None,
+                    manter_margens: bool = False,
+                    desenhar_diagramas: bool = True) -> PaginaExtraida:
     """A página gravada no formato que os escritores do PyBoxEditor pedem.
 
     Os diagramas entram na altura em que estão, quando há a imagem: os lidos
-    com confiança, redesenhados do FEN; os outros, como recorte da página.
+    com confiança, redesenhados do FEN; os outros, como recorte da página. Com a
+    `Estrutura` do Documento, as áreas de margem e as de ignorar saem (as de margem
+    ficam com `manter_margens`), e títulos, estilos e parágrafos seguem o Documento.
     """
     cortes = [t[1] for t in tabuleiros] if imagem is not None else []
     texto = _sem_coordenadas([b for b in boxes if b.char], tabuleiros)
+    if estrutura is not None:
+        fora = ("ignorar",) if manter_margens else FORA_DA_EXPORTACAO
+        texto = [b for b in texto if estrutura.funcao(b) not in fora]
     leitura = _Leitura.da_pagina(texto)
-    com_trecho = _paragrafos_por_trecho(texto, cortes, leitura)
+    com_trecho = _paragrafos_por_trecho(texto, cortes, leitura, estrutura)
     blocos: list = [p for _trecho, p in com_trecho]
     figuras = []
     if imagem is not None:
         # Cada figura no trecho da coluna dela, e na altura dela dentro do trecho:
         # só pela altura, o diagrama da esquerda caía entre os parágrafos da direita.
         figuras = [(leitura.chave((d.caixa[0] + d.caixa[2]) / 2, d.caixa[1]), d.caixa[1],
-                    figura_do_diagrama(imagem, d))
+                    figura_do_diagrama(imagem, d) if desenhar_diagramas
+                    else _figura(imagem, d.caixa, RECORTE_PEDIDO))
                    for d in para_caixas(tabuleiros, diagramas)]
         ordem = [(trecho, p.topo or 0, p) for trecho, p in com_trecho] + figuras
         blocos = [b for _t, _y, b in sorted(ordem, key=lambda item: (item[0], item[1]))]
@@ -582,28 +830,46 @@ def pagina_extraida(indice: int, boxes: Sequence[BoxEntry],
 def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePaginas],
                        indices: Optional[Iterable[int]] = None, *,
                        progresso: Optional[Progresso] = None,
-                       camada: str = "auto") -> List[PaginaExtraida]:
+                       camada: str = "auto", opcoes: Optional[Opcoes] = None,
+                       relatorio: Optional[Relatorio] = None) -> List[PaginaExtraida]:
     """
     As páginas reconhecidas do projeto, as de `indices` ou todas.
 
     Com `camada="auto"`, a página cuja camada de texto o `core.pdf_nativo` aceita
-    sai dela, e as outras dos boxes. Depois, as duas passadas de livro, sobre as
-    páginas dos dois caminhos: o parágrafo que a paginação partiu volta a ser um, e
-    o diagrama sem lado lido ganha o do lance antes dele, conferido no tabuleiro e
-    no lance seguinte.
+    sai dela, e as outras dos boxes, com a `Estrutura` do Documento de cada uma (§12.1:
+    as funções das áreas, os estilos, o parágrafo e o hífen decididos). A regra das
+    margens corridas só adivinha nas páginas cujas áreas não dizem cabeçalho nem
+    rodapé. Depois, as duas passadas de livro, sobre as páginas dos dois caminhos: o
+    parágrafo que a paginação partiu volta a ser um, e o diagrama sem lado lido ganha o
+    do lance antes dele, conferido no tabuleiro e no lance seguinte. O `relatorio`, se
+    vier, recebe o que saiu e o que ficou de fora (§12.2).
     """
     from core import pdf_nativo
 
+    from abbychess.modelo import VERIFICADA
+
+    opcoes = opcoes or Opcoes()
+    relatorio = relatorio if relatorio is not None else Relatorio()
     if camada not in CAMADA:
         raise ValueError(f"camada inválida: {camada!r} (use um de {CAMADA})")
     lidas = set(projeto.paginas_lidas())
     alvo = sorted(lidas if indices is None else lidas.intersection(indices))
+    estados = {i: r.get("estado") for i, r in projeto.resumo_do_livro().items()}
+    if opcoes.so_verificadas:
+        alvo = [i for i in alvo if estados.get(i) == VERIFICADA]
     if not alvo:
-        raise NadaParaExportar("Nenhuma página reconhecida para exportar.")
+        raise NadaParaExportar("Nenhuma página reconhecida para exportar."
+                               if not opcoes.so_verificadas else
+                               "Nenhuma página verificada para exportar.")
     nativas = paginas_da_camada(projeto, alvo) if camada == "auto" else {}
     pelos_boxes = [i for i in alvo if i not in nativas]
-    lidos = {i: [b for b in (projeto.carregar_pagina(i) or []) if b.char] for i in pelos_boxes}
-    tirar = margens_corridas({i: (lidos[i], _altura_da_pagina(projeto, i)) for i in pelos_boxes})
+    lidos, estruturas = {}, {}
+    for i in pelos_boxes:
+        lidos[i], estruturas[i] = Estrutura.da_pagina(projeto.carregar_modelo(i))
+    # A regra das margens corridas olha o livro inteiro, como sempre (o título corrido das
+    # pares casa com o das ímpares); só não tira o que o usuário marcou como texto.
+    tirar = {} if opcoes.manter_margens else margens_corridas(
+        {i: (lidos[i], _altura_da_pagina(projeto, i)) for i in pelos_boxes})
     paginas = []
     for feitas, indice in enumerate(alvo, start=1):
         if indice in nativas:
@@ -611,14 +877,61 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
         else:
             tabuleiros = projeto.carregar_tabuleiros(indice)
             imagem = fonte.pagina(indice) if fonte is not None and tabuleiros else None
-            texto = [b for k, b in enumerate(lidos[indice]) if k not in tirar[indice]]
+            fora = {k for k in tirar.get(indice, set())
+                    if id(lidos[indice][k]) not in estruturas[indice].protegidos}
+            texto = [b for k, b in enumerate(lidos[indice]) if k not in fora]
+            _margens_no_relatorio(relatorio, indice, lidos[indice], fora, estruturas[indice],
+                                  opcoes.manter_margens)
             paginas.append(pagina_extraida(indice, texto, tabuleiros, imagem,
-                                           projeto.carregar_diagramas(indice)))
+                                           projeto.carregar_diagramas(indice),
+                                           estrutura=estruturas[indice],
+                                           manter_margens=opcoes.manter_margens,
+                                           desenhar_diagramas=opcoes.desenhar_diagramas))
         if progresso:
             progresso(feitas, len(alvo))
     pdf_nativo.juntar_entre_paginas(paginas)
     pdf_nativo.lados_pelos_lances(paginas)
+    _paginas_no_relatorio(relatorio, projeto, paginas, estados, nativas)
     return paginas
+
+
+def _margens_no_relatorio(relatorio: Relatorio, indice: int, boxes: Sequence[BoxEntry],
+                          adivinhados: set, estrutura: Estrutura, manter: bool) -> None:
+    """As linhas de margem que saíram da página: as adivinhadas e as das áreas."""
+    if manter:
+        return
+    tirados = [b for k, b in enumerate(boxes)
+               if k in adivinhados or estrutura.funcao(b) in FUNCOES_DE_MARGEM]
+    if tirados:
+        textos = [ln.texto for ln in _linhas(tirados, _Leitura())]
+        relatorio.margens.setdefault(indice, []).extend(textos)
+
+
+def _paginas_no_relatorio(relatorio: Relatorio, projeto: ProjetoDeLivro,
+                          paginas: Sequence[PaginaExtraida], estados: dict,
+                          nativas: dict) -> None:
+    from abbychess.modelo import VERIFICADA
+
+    resumo = projeto.resumo_do_livro()
+    for pagina in paginas:
+        i = pagina.numero
+        relatorio.paginas.append(i)
+        relatorio.caracteres += pagina.caracteres
+        if i in nativas:
+            relatorio.da_camada.append(i)
+        if estados.get(i) != VERIFICADA:
+            relatorio.nao_verificadas.append(i)
+        pendentes = resumo.get(i, {}).get("pendentes")
+        if pendentes:
+            relatorio.pendentes[i] = int(pendentes)
+        for bloco in pagina.blocos:
+            if isinstance(bloco, Paragrafo) and bloco.titulo and bloco.nivel == 1:
+                relatorio.titulos.append((i, bloco.texto))
+            elif isinstance(bloco, Figura):
+                if bloco.origem == "render":
+                    relatorio.desenhados += 1
+                else:
+                    relatorio.recortados.append((i, bloco.aviso or "recorte da página"))
 
 
 def paginas_da_camada(projeto: ProjetoDeLivro, indices: Sequence[int]) -> Dict[int, PaginaExtraida]:
@@ -963,6 +1276,123 @@ def _gravar_pdf(doc, caminho: Path) -> None:
 # Uma porta só
 # ----------------------------------------------------------------------
 
+def _gravar_texto(caminho: Path, texto: str) -> Path:
+    """Grava ao lado e troca no fim: uma exportação que falha não estraga a anterior."""
+    import tempfile
+
+    caminho = Path(caminho)
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporario = tempfile.mkstemp(prefix=f".{caminho.stem}-", suffix=".tmp",
+                                      dir=caminho.parent)
+    try:
+        arquivo = os.fdopen(fd, "w", encoding="utf-8", newline="\n")
+    except BaseException:
+        os.close(fd)
+        Path(temporario).unlink(missing_ok=True)
+        raise
+    try:
+        with arquivo:
+            arquivo.write(texto)
+        os.replace(temporario, caminho)
+    except BaseException:
+        Path(temporario).unlink(missing_ok=True)
+        raise
+    return caminho
+
+
+def _linha_do_diagrama(figura: Figura) -> str:
+    """O diagrama no texto puro: o FEN e o lado dito, ou o recorte e o motivo."""
+    from core import lado_a_jogar
+
+    if figura.fen:
+        lado = lado_a_jogar.marca(figura.lado_a_jogar, figura.lado_origem or "")
+        pendente = f"; {lado_a_jogar.NAO_REVISADO}" if figura.revisao_pendente else ""
+        return f"[Diagrama: {figura.fen} — {lado}{pendente}]"
+    return f"[Diagrama: {figura.aviso or 'recorte da página'}]"
+
+
+def texto_do_livro(paginas: Sequence[PaginaExtraida], *, marcas_de_pagina: bool = False) -> str:
+    """O TXT (§12.1): um parágrafo por bloco, linha em branco entre eles, o título como
+    está, o diagrama numa linha com o FEN. Cabeçalho corrido nunca entra por acidente: o
+    texto é o mesmo das páginas exportadas, que já saíram sem as margens."""
+    blocos = []
+    for pagina in paginas:
+        if marcas_de_pagina:
+            blocos.append(f"[p. {pagina.numero + 1}]")
+        for bloco in pagina.blocos:
+            if isinstance(bloco, Figura):
+                blocos.append(_linha_do_diagrama(bloco))
+            elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
+                blocos.append(bloco.texto.strip())
+    return "\n\n".join(blocos) + ("\n" if blocos else "")
+
+
+def pgn_do_livro(projeto: ProjetoDeLivro, indices: Optional[Iterable[int]] = None,
+                 relatorio: Optional[Relatorio] = None,
+                 opcoes: Optional[Opcoes] = None) -> str:
+    """O PGN (§10, §12.1): uma partida por diagrama, da posição dele (`SetUp`/`FEN`) e com
+    os lances do texto que passaram na validação, com a página e o número do diagrama.
+
+    Entram os diagramas conferidos (a posição é a de quem conferiu; os lances, só os que
+    passaram) e os confiáveis pelos lances, sempre com a posição legal; os outros vão ao
+    `relatorio` com o motivo, para serem conferidos e exportados de novo."""
+    from abbychess import lances as lc
+    from abbychess.diagramas import em_ordem
+    from abbychess.modelo import VERIFICADA
+
+    relatorio = relatorio if relatorio is not None else Relatorio()
+    lidas = set(projeto.paginas_lidas())
+    alvo = sorted(lidas if indices is None else lidas.intersection(indices))
+    if opcoes is not None and opcoes.so_verificadas:
+        estados = {i: r.get("estado") for i, r in projeto.resumo_do_livro().items()}
+        alvo = [i for i in alvo if estados.get(i) == VERIFICADA]
+    if not alvo:
+        raise NadaParaExportar("Nenhuma página reconhecida para exportar.")
+    partidas = []
+    for i in alvo:
+        modelo = projeto.carregar_modelo(i)
+        if modelo is None or not modelo.tabuleiros:
+            continue
+        relatorio.paginas.append(i)
+        diagramas = para_caixas(em_ordem(modelo.tabuleiros), modelo.diagramas)
+        for numero, d in enumerate(diagramas, start=1):
+            motivo = _fora_do_pgn(d)
+            if motivo:
+                relatorio.fora_do_pgn.append((i, numero, motivo))
+                continue
+            try:
+                partidas.append(lc.pgn_do_diagrama(d, {
+                    "Event": projeto.dados.nome, "Site": "?", "Round": "?",
+                    "Annotator": "AbbyChessCraft",
+                    "Page": str(i + 1), "Diagram": str(numero)}))
+            except ValueError as erro:          # uma posição que o python-chess recusa
+                relatorio.fora_do_pgn.append((i, numero, f"o PGN não saiu ({erro})"))
+                continue
+            relatorio.no_pgn += 1
+    return "\n\n".join(partidas) + ("\n" if partidas else "")
+
+
+def _fora_do_pgn(d: DiagramaLido) -> str:
+    """Por que o diagrama não entra no PGN; vazio se entra."""
+    import chess
+
+    if not d.lido:
+        return d.erro or "não lido"
+    try:
+        legal = chess.Board(d.fen).is_valid()
+    except ValueError:
+        legal = False
+    if not legal:
+        return "a posição não é legal"
+    if d.conferido:
+        return ""
+    if d.validacao is not None and not d.validacao.confiavel:
+        return d.validacao.aviso
+    if d.validacao is not None and d.validacao.confiavel:
+        return ""
+    return "nem conferido nem confiável pelos lances"
+
+
 def formato_do_caminho(caminho: str | Path) -> str:
     formato = Path(caminho).suffix.lower().lstrip(".")
     if formato not in FORMATOS:
@@ -973,10 +1403,22 @@ def formato_do_caminho(caminho: str | Path) -> str:
 
 def exportar(projeto: ProjetoDeLivro, caminho: str | Path,
              indices: Optional[Iterable[int]] = None, *,
-             progresso: Optional[Progresso] = None) -> str:
+             progresso: Optional[Progresso] = None, opcoes: Optional[Opcoes] = None) -> str:
     """Exporta no formato da extensão de `caminho` e devolve o resumo para a tela."""
+    return exportar_com_relatorio(projeto, caminho, indices, progresso=progresso,
+                                  opcoes=opcoes)[0]
+
+
+def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
+                           indices: Optional[Iterable[int]] = None, *,
+                           progresso: Optional[Progresso] = None,
+                           opcoes: Optional[Opcoes] = None) -> Tuple[str, Relatorio]:
+    """Exporta e devolve `(resumo, relatório)`: o resumo vai à barra, o relatório aos
+    Resultados (§12.2)."""
     formato = formato_do_caminho(caminho)
     caminho = Path(caminho)
+    opcoes = opcoes or Opcoes()
+    relatorio = Relatorio(formato=formato)
     if formato == "pdf":
         resumo = exportar_pdf_pesquisavel(projeto, caminho, indices, progresso=progresso)
         partes = [f"{resumo.paginas} página(s), {resumo.caracteres} caracteres na camada"]
@@ -988,18 +1430,18 @@ def exportar(projeto: ProjetoDeLivro, caminho: str | Path,
             partes.append(f"{resumo.fens} diagrama(s) com o FEN pesquisável")
         if resumo.sem_glifo:
             partes.append(f"{resumo.sem_glifo} sem glifo na fonte")
-        return "; ".join(partes) + "."
+        relatorio.resumo_do_pdf = "; ".join(partes) + "."
+        return relatorio.resumo_do_pdf, relatorio
+    if formato == "pgn":
+        _gravar_texto(caminho, pgn_do_livro(projeto, indices, relatorio, opcoes))
+        return relatorio.resumo(), relatorio
     fonte = pg.fonte_do_projeto(projeto)
-    paginas = paginas_do_projeto(projeto, fonte, indices, progresso=progresso)
-    escrever = exportar_docx if formato == "docx" else exportar_epub
-    escrever(paginas, caminho, titulo=projeto.dados.nome,
-             idioma=idioma_do_arquivo(idioma_do_livro(projeto)))
-    figuras = [b for p in paginas for b in p.blocos if isinstance(b, Figura)]
-    desenhados = sum(f.origem == "render" for f in figuras)
-    da_camada = sum(getattr(p, "leitura", "") == "camada" for p in paginas)
-    resumo = (f"{len(paginas)} página(s), {sum(p.caracteres for p in paginas)} caracteres, "
-              f"{desenhados} diagrama(s) desenhado(s) do FEN e "
-              f"{len(figuras) - desenhados} como recorte")
-    if da_camada:
-        resumo += f"; {da_camada} página(s) lida(s) da camada de texto do PDF"
-    return resumo + "."
+    paginas = paginas_do_projeto(projeto, fonte, indices, progresso=progresso,
+                                 opcoes=opcoes, relatorio=relatorio)
+    if formato == "txt":
+        _gravar_texto(caminho, texto_do_livro(paginas, marcas_de_pagina=opcoes.marcas_de_pagina))
+    else:
+        escrever = exportar_docx if formato == "docx" else exportar_epub
+        escrever(paginas, caminho, titulo=projeto.dados.nome,
+                 idioma=idioma_do_arquivo(idioma_do_livro(projeto)))
+    return relatorio.resumo(), relatorio

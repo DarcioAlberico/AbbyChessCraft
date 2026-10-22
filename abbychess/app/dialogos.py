@@ -17,7 +17,8 @@ from abbychess.projeto import ProjetoDeLivro, ProjetoInvalido
 
 FILTRO_DE_LIVROS = "Livros (*.pdf *.png *.jpg *.jpeg *.tif *.tiff *.bmp)"
 FILTROS_DE_EXPORTACAO = {"PDF pesquisável (*.pdf)": ".pdf", "Word (*.docx)": ".docx",
-                         "EPUB (*.epub)": ".epub"}
+                         "EPUB (*.epub)": ".epub", "Texto (*.txt)": ".txt",
+                         "PGN dos diagramas (*.pgn)": ".pgn"}
 
 IDIOMAS = (("Português", "pt"), ("English", "en"), ("Español", "es"),
            ("Deutsch", "de"), ("Français", "fr"))

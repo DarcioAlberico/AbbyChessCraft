@@ -667,7 +667,12 @@ Estado das tarefas depois da rodada 2:
   `Opcoes` na interface.
 - 3: sumário, `page-list` e marcos feitos; faltam os bookmarks do PDF e os links internos
   conferidos ("Solution on page N"), que pedem o número impresso de cada página.
-- 6: conferência interna feita, EPUBCheck opcional; faltam Ace e os testes de leitores.
+- 6: conferência interna feita; **EPUBCheck 5.4.0** (oficial, w3c/epubcheck, em`nC:\tools\epubcheck-5.4.0`) aprova sem erro nem advertência o EPUB da fatia do Xadrez
+  Vitorioso e três sintéticos (capa JPEG e PNG, fonte de símbolos, inglês, alemão,
+  subtítulos, recortes, página vazia, capítulo partido). O único erro que ele achou (o
+  marco do sumário apontava o `nav` fora da espinha, RSC-011) foi corrigido e o `conferir`
+  passou a acusá-lo; `tests/test_epub.py` roda o EPUBCheck quando `ABBY_EPUBCHECK` aponta o
+  jar. Faltam Ace e os testes de leitores.
 - 7: deduplicação e divisão por capítulo feitas; falta a otimização sem perda das imagens.
 - 9: o EPUB não usa mais o escritor do core; o DOCX ainda é o `core.exportar.para_docx`.
 

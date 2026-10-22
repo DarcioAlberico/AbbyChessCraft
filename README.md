@@ -622,7 +622,13 @@ arquivo de fato tem; e imagens repetidas guardadas uma vez só. Os metadados vê
 ```
 
 Depois de gravar, o arquivo é relido e conferido (pacote, manifesto, XML e cada link); com
-`ABBY_EPUBCHECK` apontando o `epubcheck.jar`, `epub.epubcheck` roda o EPUBCheck também.
+`ABBY_EPUBCHECK` apontando o `epubcheck.jar`, `epub.epubcheck` roda o EPUBCheck também. O EPUBCheck 5.4.0
+aprova o EPUB da fatia do Xadrez Vitorioso sem erro nem advertência; para rodá-lo nos testes:
+
+```powershell
+$env:ABBY_EPUBCHECK = "C:\tools\epubcheck-5.4.0\epubcheck.jar"
+.venv\Scripts\python.exe -m pytest -q tests/test_epub.py
+```
 
 Depois de cada exportação, o **relatório** vai a Resultados / Avisos: páginas, títulos,
 margens tiradas, diagramas recortados e o motivo, páginas não verificadas, glifos pendentes

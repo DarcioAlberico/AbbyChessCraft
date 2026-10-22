@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import zipfile
 from types import SimpleNamespace
 
@@ -251,3 +252,15 @@ def test_metadados_nulos_e_capa_fora_da_pasta(tmp_path):
     m = ex.metadados_do_projeto(SimpleNamespace(pasta=projeto_dir,
                                                 dados=SimpleNamespace(nome="T")), "pt-BR")
     assert m.editora == "" and m.autores == ("A",) and m.capa is None
+
+@pytest.mark.skipif(not os.environ.get("ABBY_EPUBCHECK"),
+                    reason="o EPUBCheck não está configurado (ABBY_EPUBCHECK)")
+def test_o_epubcheck_aprova_o_livro_com_capa_fonte_e_recortes(tmp_path):
+    jpeg = io.BytesIO()
+    Image.new("RGB", (30, 45), (40, 80, 120)).save(jpeg, format="JPEG")
+    for idioma, capa in (("en", jpeg.getvalue()), ("pt-BR", _png(90))):
+        destino = tmp_path / f"livro-{idioma}.epub"
+        epub.escrever(_livro(), destino, epub.Metadados(
+            "A Book & <More>", idioma=idioma, autores=("A",), data="2012-05", capa=capa))
+        assert epub.conferir(destino) == []
+        assert epub.epubcheck(destino) == []

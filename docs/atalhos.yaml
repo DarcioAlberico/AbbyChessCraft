@@ -52,7 +52,7 @@ nativos:
             Shift+Up, Shift+Down, Shift+Home, Shift+End, Shift+PgUp, Shift+PgDn, Ctrl+Left,
             Ctrl+Right, Ctrl+Up, Ctrl+Down, Ctrl+Home, Ctrl+End, Ctrl+Shift+Left,
             Ctrl+Shift+Right, Ctrl+Shift+Up, Ctrl+Shift+Down, Ctrl+Shift+Home, Ctrl+Shift+End,
-            Backspace, Delete, Enter, Shift+Enter]
+            Backspace, Delete, Enter, Shift+Enter, Ctrl+Shift+Enter]
   graphicsview:
     perde: [Left, Right, Up, Down, PgUp, PgDn, Home, End]
   listview:
@@ -314,7 +314,13 @@ acoes:
     excecoes:
       - {tecla: Shift+Enter, widget: textedit, tipo: redireciona, motivo: "a sessão de edição trata o Shift+Enter (§6.3)"}
   - {id: ensinar_no_documento, descricao: Confirmar e ensinar o glifo sob o cursor, escopo: [documento], padrao: Ctrl+Enter, desde_passo: D1}
-  - {id: novo_paragrafo, descricao: Novo parágrafo antes da palavra, escopo: [documento], padrao: Ctrl+Shift+Enter, desde_passo: G}
+  - id: novo_paragrafo
+    descricao: Novo parágrafo antes da palavra
+    escopo: [documento]
+    padrao: Ctrl+Shift+Enter
+    desde_passo: G
+    excecoes:
+      - {tecla: Ctrl+Shift+Enter, widget: textedit, tipo: redireciona, motivo: "o Documento grava a decisão de parágrafo em vez de inserir uma quebra livre"}
   - {id: ocultar_cabecalhos, descricao: Mostrar ou ocultar cabeçalhos e rodapés, escopo: [documento], padrao: Ctrl+Shift+H, desde_passo: A3}
   - {id: negrito, descricao: Negrito, escopo: [documento], padrao: Ctrl+B, desde_passo: G}
   - {id: italico, descricao: Itálico, escopo: [documento], padrao: Ctrl+I, desde_passo: G}

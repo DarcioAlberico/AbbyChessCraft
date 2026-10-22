@@ -412,7 +412,7 @@ class VistaDoDocumento(QTextEdit):
                 char = documento.chars.get(g, "")
                 letras = tx.NAO_LIDO if char == tx.NAO_LIDO else (normal(char) or tx.NAO_LIDO)
                 formato = self._formato_do_glifo(base, estados.get(g), g in desconhecidos,
-                                                 g in virtuais)
+                                                 g in virtuais, documento.estilos.get(g))
                 if formato is not formato_da_corrida:
                     escrever()
                     formato_da_corrida = formato
@@ -471,16 +471,24 @@ class VistaDoDocumento(QTextEdit):
         return formato
 
     def _formato_do_glifo(self, base: QTextCharFormat, estado: Optional[str], desconhecido: bool,
-                          virtual: bool) -> QTextCharFormat:
+                          virtual: bool, estilo_do_glifo=None) -> QTextCharFormat:
         """O formato do glifo pelo realce; o `base` (o mesmo objeto) quando não há realce, para
         as corridas de texto seguido ficarem numa inserção só."""
-        if not self.realce or not (desconhecido or virtual
-                                   or estado in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO)):
+        tem_estilo = estilo_do_glifo is not None and any((estilo_do_glifo.negrito,
+                                                          estilo_do_glifo.italico,
+                                                          estilo_do_glifo.sublinhado))
+        if not tem_estilo and (not self.realce or not (desconhecido or virtual
+                or estado in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO))):
             return base
-        chave = (id(base), estado, desconhecido, virtual)   # o base é o do bloco, vivo até o fim
+        chave = (id(base), estado, desconhecido, virtual, estilo_do_glifo)
         if chave in self._formatos:
             return self._formatos[chave]
         formato = QTextCharFormat(base)
+        if tem_estilo:
+            formato.setFontWeight(QFont.Weight.Bold if estilo_do_glifo.negrito
+                                  else QFont.Weight.Normal)
+            formato.setFontItalic(estilo_do_glifo.italico)
+            formato.setFontUnderline(estilo_do_glifo.sublinhado)
         if estado in (gd.PENDENTE, gd.SEM_LEITURA):
             formato.setBackground(FUNDO_DE_BAIXA_CONFIANCA)
         elif estado == gd.AGUARDANDO:
@@ -507,6 +515,25 @@ class VistaDoDocumento(QTextEdit):
             if 0 <= k < len(mapa.gids) and mapa.gids[k] >= 0:
                 return mapa.gids[k]
         return None
+
+    def gids_selecionados(self) -> List[int]:
+        """Gids cobertos pela seleção; sem seleção, os da palavra sob o cursor."""
+        cursor = self.textCursor()
+        if not cursor.hasSelection():
+            gid = self.gid_na_posicao(cursor.position())
+            return list(self._palavra_do_gid.get(gid, [])) if gid is not None else []
+        inicio, fim = sorted((cursor.anchor(), cursor.position()))
+        gids = []
+        for posicao in range(inicio, fim):
+            gid = self.gid_na_posicao(posicao)
+            if gid is not None and gid not in gids:
+                gids.append(gid)
+        return gids
+
+    def primeiro_gid_da_palavra(self) -> Optional[int]:
+        gid = self.gid_na_posicao(self.textCursor().position())
+        palavra = self._palavra_do_gid.get(gid, []) if gid is not None else []
+        return palavra[0] if palavra else gid
 
     def gid_no_ponto(self, ponto) -> Optional[int]:
         """O glifo sob o ponto do clique: o cursor cai entre dois caracteres, e o lado do

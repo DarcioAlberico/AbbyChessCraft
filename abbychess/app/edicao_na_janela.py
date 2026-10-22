@@ -1,4 +1,4 @@
-"""A edição no Documento vista da janela (SPEC §6.3, §6.4, passo D1): a sessão confirmada,
+"""A edição no Documento vista da janela (SPEC §6.3 e §6.4): a sessão confirmada,
 a recusa, o desfazer e o refazer que olham a sessão aberta, a paleta e as figurinas. Um
 mixin da `JanelaPrincipal`, como `EspacoDeTrabalho`.
 """
@@ -84,3 +84,13 @@ class EdicaoNoDocumento:
             self.treino.inserir_figurina(figurina)
         else:
             self.texto.inserir_figurina(figurina)
+
+    def novo_paragrafo(self) -> None:
+        gid = self.texto.primeiro_gid_da_palavra()
+        self.confirmar_a_sessao_aberta()
+        self.pagina.novo_paragrafo(gid)
+
+    def alternar_estilo(self, campo: str) -> None:
+        gids = self.texto.gids_selecionados()
+        self.confirmar_a_sessao_aberta()
+        self.pagina.alternar_estilo(gids, campo)

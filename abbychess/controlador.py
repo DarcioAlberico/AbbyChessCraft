@@ -1282,7 +1282,7 @@ class ControladorDePagina:
             antes = Antes(pagina.instantaneo(), self.padroes())
             vivos_antes = set(pagina.vivos)
             try:
-                ss.aplicar(pagina, plano)
+                ss.aplicar(pagina, plano, self.imagem if aberta else None, self.leitor)
             except Exception:
                 # Nada da sessão fica pela metade: a página volta ao instantâneo (os gids já
                 # alocados não voltam: um gid nunca se repete).
@@ -1338,6 +1338,30 @@ class ControladorDePagina:
         self._editar("Editando o texto", rodar(corpo), so_nesta_pagina=False,
                      nao_rodou=rodar(lambda: self.eventos.emitir(
                          "sessao_recusada", "a página não pode ser editada agora")))
+
+    def novo_paragrafo(self, gid: Optional[int]) -> None:
+        """Começa um parágrafo antes do glifo indicado, num passo do desfazer."""
+        if gid is None or self.modelo is None:
+            return
+
+        def corpo():
+            antes = Antes(self.modelo.instantaneo(), self.padroes())
+            ed.paragrafo(self.modelo, gid)
+            self._mudou(self.modelo, self.indice, "Novo parágrafo", antes)
+        self._editar("Criando parágrafo", corpo)
+
+    def alternar_estilo(self, gids: Sequence[int], campo: str) -> None:
+        """Alterna negrito, itálico ou sublinhado na seleção do Documento."""
+        gids = [g for g in dict.fromkeys(gids)
+                if self.modelo is not None and g in self.modelo.vivos]
+        if not gids or self.modelo is None:
+            return
+
+        def corpo():
+            antes = Antes(self.modelo.instantaneo(), self.padroes())
+            ed.estilizar(self.modelo, gids, campo)
+            self._mudou(self.modelo, self.indice, f"Alternar {campo}", antes)
+        self._editar(f"Aplicando {campo}", corpo)
 
     def aplicar_as_sessoes_na_fila(self) -> None:
         """Fechar o projeto (a fila vai ser esvaziada): as sessões do Documento que esperavam

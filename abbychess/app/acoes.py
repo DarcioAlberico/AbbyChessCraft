@@ -223,12 +223,19 @@ def _documento(j) -> None:
     j.acao_ensinar_no_documento = acao(j, "ensinar_no_documento",
                                        lambda: j.confirmar_no_documento(ensinar=True),
                                        widgets=[d])
+    j.acao_novo_paragrafo = acao(j, "novo_paragrafo", j.novo_paragrafo, widgets=[d])
+    j.acao_negrito = acao(j, "negrito", lambda: j.alternar_estilo("negrito"), widgets=[d])
+    j.acao_italico = acao(j, "italico", lambda: j.alternar_estilo("italico"), widgets=[d])
+    j.acao_sublinhado = acao(j, "sublinhado", lambda: j.alternar_estilo("sublinhado"),
+                             widgets=[d])
     j.acoes_das_figurinas = [acao(j, id_, lambda _=False, f=f: j.inserir_figurina(f),
                                   widgets=[d, j.treino])
                              for id_, f in (("figurina_rei", "♔"), ("figurina_dama", "♕"),
                                             ("figurina_torre", "♖"), ("figurina_bispo", "♗"),
                                             ("figurina_cavalo", "♘"), ("figurina_peao", "♙"))]
-    for q in (j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_desfazer, j.acao_refazer):
+    for q in (j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_novo_paragrafo,
+              j.acao_negrito, j.acao_italico, j.acao_sublinhado,
+              j.acao_desfazer, j.acao_refazer):
         d.teclas.ligar(q)
 
 
@@ -246,7 +253,9 @@ def _menus(j) -> None:
                  j.acao_galeria):
         menu.addAction(acao)
     menu.addSeparator()                         # a sessão do Documento (§6.3)
-    for acao in (j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_ensinar_no_documento):
+    for acao in (j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_ensinar_no_documento,
+                 j.acao_novo_paragrafo, j.acao_negrito, j.acao_italico,
+                 j.acao_sublinhado):
         menu.addAction(acao)
     menu.addSeparator()
     menu.addAction(j.acao_paleta)

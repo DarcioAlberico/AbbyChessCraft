@@ -10,8 +10,10 @@ from __future__ import annotations
 import pytest
 
 from abbychess import pagina as pg
+from abbychess import edicao as ed
 from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL, LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro
+from abbychess.modelo import Box, Pagina
 
 from tests.test_treino_por_livro import _pagina_sintetica
 
@@ -73,6 +75,16 @@ def test_dividir_sem_coluna_corta_no_vao_da_tinta(imagem, leitor):
     pg.dividir(imagem, boxes, 0, leitor)
     assert _caixa(boxes[0]) == _caixa(a)
     assert _caixa(boxes[1]) == _caixa(b)
+
+
+def test_divisao_do_documento_usa_os_vaos_e_grava_letras_manuais(imagem, leitor):
+    boxes, a, b = _colar_ab(imagem, leitor)
+    pagina = Pagina(1, 0, [Box((1 << 20) + i, entry) for i, entry in enumerate(boxes)],
+                    proximo_n=len(boxes))
+    gid = pagina.boxes[0].gid
+    dif = ed.dividir_em(pagina, imagem, gid, "ab", leitor)
+    assert [box.entry.char for box in dif.novos] == ["a", "b"]
+    assert [_caixa(box.entry) for box in dif.novos] == [_caixa(a), _caixa(b)]
 
 
 def test_dividir_fora_do_box_ou_no_branco_e_recusado(imagem, leitor):

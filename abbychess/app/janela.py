@@ -199,7 +199,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
                              ("palavra_mudou", self.atualizar_fila),
                              ("mensagem", self._mensagem),
                              ("falha", self._falha),
-                             ("aviso", self._aviso)):
+                             ("aviso", self._aviso),
+                             ("relatorio", self._relatorio)):
             e.ligar(nome, funcao)
         self.executor.ocupado_mudou.connect(self._ocupado_mudou)
         self.executor.fila_mudou.connect(self._fila_mudou)

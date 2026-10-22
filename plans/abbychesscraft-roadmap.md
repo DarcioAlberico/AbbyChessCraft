@@ -605,16 +605,43 @@ Critérios de aceite acrescentados à exportação:
 8. Saída reprodutível com `SOURCE_DATE_EPOCH`: mesmos dados geram bytes idênticos, inclusive
    ordem do ZIP, UUID, datas, nomes e deduplicação de recursos.
 
+**Execução iniciada em 2026-10-22, ramo `passo-i-treino`.** A exportação dos boxes passou
+a ler a estrutura do Documento (`exportar.Estrutura`): a função da área de cada glifo
+(título vira `<h1>`/Heading 1 e entra no sumário; as áreas de cabeçalho, rodapé e número de
+página saem; a regra das margens corridas continua olhando o livro inteiro, mas não tira o que
+o usuário marcou como texto; `ignorar` sai sempre), o negrito e o itálico do glifo (trechos do texto do parágrafo), o parágrafo pedido
+e o hífen de quebra decidido. A montagem das linhas continua a da exportação (caixa pela
+altura, trechos de coluna, coordenadas), que tem casos medidos; unificá-la com a
+`OrdemDeLeitura` do Documento continua esperando a equivalência da caracterização (passo
+F). A junção entre páginas é a de `core.pdf_nativo`. Novos formatos: **TXT** (um parágrafo
+por bloco, o diagrama numa linha com FEN e lado, marcas `[p. N]` opcionais) e **PGN** (uma
+partida por diagrama conferido ou confiável pelos lances, com `Page` e `Diagram`, os NAGs e
+os de fora no relatório; CA-12.2 testado). `Opcoes` traz manter margens, só verificadas,
+diagramas como recorte e marcas de página (ainda sem diálogo). O `Relatorio` (páginas,
+títulos, margens tiradas, diagramas recortados com o motivo, não verificadas, pendentes,
+fora do PGN) vai a Resultados / Avisos depois de cada exportação. Da revisão de código: o
+estilo não passa do hífen tirado nem cobre letra não marcada entre dois trechos; o PGN recusa
+posição ilegal mesmo conferida, e um diagrama estranho não derruba o arquivo; só verificadas
+vale também no PGN e lê o estado pelo resumo do livro, sem carregar os modelos. CA-12.6 testado (EPUB e
+DOCX iguais byte a byte com o mesmo `SOURCE_DATE_EPOCH`).
+
 **Tarefas.**
-1. A exportação passa a ler o Documento estruturado e faz a junção entre páginas.
-2. Metadados, capa, idioma das mensagens e opções por formato.
+1. ~~A exportação passa a ler o Documento estruturado e faz a junção entre páginas.~~
+   (Falta "manter quebras de linha e hífens", que depende de os escritores do core
+   aceitarem a quebra dentro do parágrafo.)
+2. Metadados, capa, idioma das mensagens e opções por formato (o diálogo das `Opcoes`).
 3. TOC semântico, `page-list`, landmarks, bookmarks e links internos.
-4. TXT e PGN, com validação e relatório do que ficou de fora.
+4. ~~TXT e PGN, com validação e relatório do que ficou de fora.~~
 5. Pré-visualização em HTML do conteúdo e do relatório antes de gravar.
 6. Validação automática (EPUBCheck, Ace, referências internas e smoke tests de leitores).
 7. Deduplicação/otimização de recursos e divisão dos XHTML por capítulo e tamanho.
-8. `SOURCE_DATE_EPOCH` e pacote byte a byte reprodutível.
+8. ~~`SOURCE_DATE_EPOCH` e pacote byte a byte reprodutível.~~
 9. Sair dos privados do core.
+
+As tarefas 2, 3 e 7 pedem mudar o escritor de EPUB, que é o do core (`core.exportar.para_epub`:
+um XHTML por página, "Sumário" e "Página" em português, `accessibilityHazard` fixo). Editar o
+core é antipadrão deste roadmap; a decisão (um escritor próprio aqui, ou a mudança no core
+com o sim do usuário, como no ramo `epub-preciso`) fica para o começo da próxima rodada.
 
 **Verificação.** CA-12.1 a CA-12.6; CA-5.3 (parte da exportação).
 

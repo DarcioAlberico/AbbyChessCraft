@@ -596,6 +596,23 @@ cabeçalho também.
   (a do Darcy Lima lê "hb7" onde está "♗b7") é apagada antes; página com texto visível
   próprio fica sem a nossa camada, para a busca não achar tudo duas vezes. Com fonte em
   imagem, cada página vira uma página de PDF a 300 dpi.
+**Desde o passo J a exportação lê a estrutura do Documento** (`exportar.Estrutura`): a área
+de título sai como título de capítulo (`<h1>` no EPUB, Heading 1 no DOCX, e entra no
+sumário); as áreas de cabeçalho, rodapé e número de página saem (a regra acima continua
+valendo, mas não tira o que você marcou como área de texto) e a de ignorar sai sempre; o negrito e o itálico do glifo,
+o parágrafo pedido (Ctrl+Shift+Enter) e o hífen de quebra decidido no Documento valem no
+arquivo. **Projeto › Exportar** também escreve:
+
+- **TXT**: um parágrafo por bloco, com linha em branco entre eles, e cada diagrama numa linha
+  com o FEN e o lado a jogar (ou o motivo do recorte);
+- **PGN**: uma partida por diagrama conferido ou confiável pelos lances, partindo da posição
+  (`SetUp`/`FEN`) com os lances do texto que passaram na validação, os NAGs e as etiquetas
+  `Page` e `Diagram`. Os diagramas que ficaram de fora vão ao relatório, com o motivo.
+
+Depois de cada exportação, o **relatório** vai a Resultados / Avisos: páginas, títulos,
+margens tiradas, diagramas recortados e o motivo, páginas não verificadas, glifos pendentes
+e os diagramas fora do PGN, cada item com a página.
+
 - **DOCX** e **EPUB**: pelos escritores do PyBoxEditor (`core.exportar`), com a fonte dos
   símbolos embutida. Os parágrafos saem do vão entre as linhas, a hifenização no fim de linha
   é desfeita e as figurinas saem como impressas. O idioma do arquivo é o do texto do livro

@@ -1037,16 +1037,20 @@ class ControladorDoLivro:
         p._avisar(f"Página {proxima + 1}: {len(p.fila())} a revisar.", 6000)
 
     def exportar(self, destino: Path) -> None:
-        """Escreve as páginas reconhecidas em PDF pesquisável, DOCX ou EPUB (pelo sufixo)."""
+        """Escreve as páginas reconhecidas em PDF pesquisável, DOCX, EPUB, TXT ou PGN (pelo sufixo)."""
         p = self.pagina
         projeto = p.projeto
 
         def preparar():
             def trabalho(progresso):
-                return ex.exportar(projeto, destino, progresso=progresso)
+                return ex.exportar_com_relatorio(projeto, destino, progresso=progresso)
 
-            def pronto(resumo: str):
+            def pronto(resultado):
+                resumo, relatorio = resultado
                 p._avisar(f"Exportado em {destino.name}: {resumo}", 15000)
+                # O relatório inteiro vai a Resultados / Avisos (§12.2), sem diálogo.
+                self.eventos.emitir("relatorio", f"Exportação: {destino.name}",
+                                    relatorio.texto())
             return trabalho, pronto
 
         p.tarefa(f"Exportando {destino.suffix[1:].upper()}", preparar,

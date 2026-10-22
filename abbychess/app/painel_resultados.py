@@ -36,6 +36,14 @@ PAPEL_DO_ALVO = Qt.ItemDataRole.UserRole + 2
 LIMITE_DE_LINHAS = 2000
 
 
+
+#: O tipo do aviso no item da lista (para repintar quando o tema muda).
+PAPEL_DO_TIPO = Qt.ItemDataRole.UserRole + 20
+
+
+def _cor_do_aviso(tipo: str):
+    return estilo.cor("erro") if tipo == av.ERRO else estilo.cor("aviso")
+
 class _DelegadoHtml(QStyledItemDelegate):
     """Desenha a linha pelo HTML dela (o casamento em negrito)."""
 
@@ -138,10 +146,17 @@ class PainelDeResultados(QTabWidget):
 
     def acrescentar(self, aviso: av.Aviso) -> None:
         item = QListWidgetItem(("⛔ " if aviso.tipo == av.ERRO else "⚠ ") + aviso.linha())
-        item.setForeground(estilo.VERMELHAO if aviso.tipo == av.ERRO else estilo.LARANJA.darker(140))
+        item.setData(PAPEL_DO_TIPO, aviso.tipo)
+        item.setForeground(_cor_do_aviso(aviso.tipo))
         item.setToolTip(aviso.texto)
         self.avisos.addItem(item)
         self.avisos.scrollToBottom()
+
+    def repintar(self) -> None:
+        """O tema mudou: os avisos na cor do tema novo."""
+        for i in range(self.avisos.count()):
+            item = self.avisos.item(i)
+            item.setForeground(_cor_do_aviso(item.data(PAPEL_DO_TIPO)))
 
     def _ativado(self, item: QListWidgetItem) -> None:
         alvo = item.data(PAPEL_DO_ALVO)
@@ -215,7 +230,8 @@ class PainelDeResultados(QTabWidget):
             depois = o.trecho[o.coluna + tamanho:o.coluna + tamanho + 60]
             local = f"p. {o.pagina + 1}, l. {o.linha}"
             item = QListWidgetItem(f"{local}: {antes}{casado}{depois}")
-            item.setData(PAPEL_DO_HTML, f"<span style='color:gray'>{local}:</span> "
+            secundario = estilo.hex_de("texto_secundario")
+            item.setData(PAPEL_DO_HTML, f"<span style='color:{secundario}'>{local}:</span> "
                                         f"{html.escape(antes)}<b>{html.escape(casado)}</b>"
                                         f"{html.escape(depois)}")
             item.setData(PAPEL_DO_ALVO, o)

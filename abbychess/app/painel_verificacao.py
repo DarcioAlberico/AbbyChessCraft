@@ -28,9 +28,10 @@ from PySide6.QtWidgets import (QGridLayout, QLabel, QLineEdit, QPushButton, QSiz
 from core.box_model import BoxEntry
 
 from abbychess import verificacao as vf
-from abbychess.app import cores, teclado
+from abbychess.app import teclado
 from abbychess.app.imagens import pixmap_de_cinza
 from abbychess.app.painel_treino import FONTE_DE_SIMBOLOS
+from abbychess.app import estilo
 
 #: Altura do recorte da palavra no painel, em pixels de tela.
 ALTURA_DO_RECORTE = 110
@@ -91,7 +92,8 @@ class PainelDeVerificacao(QWidget):
         self.recorte.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.recorte.setMinimumSize(1, ALTURA_DO_RECORTE + 20)   # o pixmap não alarga o painel
         self.recorte.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.recorte.setStyleSheet("background: white; border: 1px solid #999;")
+        self.recorte.setStyleSheet(f"background: {estilo.PAPEL.name()}; "    # papel
+                                   f"border: 1px solid {estilo.BORDA_DO_PAPEL.name()};")
         self.recorte.setToolTip("Clique num glifo para abri-lo no Glifo.")
         self.recorte.clicado.connect(self._clicar)
 
@@ -127,7 +129,7 @@ class PainelDeVerificacao(QWidget):
                       "nunca aparece aqui. Um espaço separa a palavra em duas; com letras de "
                       "mais ou de menos, clique no glifo e divida ou junte no Glifo.")
         dica.setWordWrap(True)
-        dica.setStyleSheet("color: #666;")
+        estilo.papel(dica, "dica")
 
         caixa = QVBoxLayout(self)
         caixa.setContentsMargins(4, 4, 4, 4)
@@ -177,7 +179,7 @@ class PainelDeVerificacao(QWidget):
         self._glifos = []
         for i in palavra.indices:
             b = boxes[i]
-            cor = cores.SEM_LEITURA if not b.char else cores.PALAVRA
+            cor = estilo.VERMELHAO if not b.char else estilo.PALAVRA
             caneta = QPen(cor)
             caneta.setWidthF(1.5)
             pintor.setPen(caneta)

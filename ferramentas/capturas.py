@@ -68,6 +68,8 @@ def main() -> int:
     analisador.add_argument("--indice", type=int, default=25)
     analisador.add_argument("--pdf")
     analisador.add_argument("--saida", default=str(RAIZ / "capturas"))
+    analisador.add_argument("--tema", choices=("claro", "escuro"), default="claro",
+                            help="o tema da interface (§13); a página e o Documento não invertem")
     args = analisador.parse_args()
 
     from PySide6.QtWidgets import QApplication
@@ -78,6 +80,9 @@ def main() -> int:
     from abbychess.projeto import ProjetoDeLivro
 
     app = QApplication.instance() or QApplication([])
+    from abbychess.app import estilo
+
+    estilo.aplicar(app, args.tema)
     from PySide6.QtGui import QFont
     app.setFont(QFont("Segoe UI", 9))           # a fonte do Windows, não a de reserva
     saida = Path(args.saida)
@@ -114,7 +119,7 @@ def main() -> int:
             janela.atualizar_paginas()
             janela.pintar_texto()
             app.processEvents()
-            caminho = saida / f"{nome}.png"
+            caminho = saida / f"{nome}-{args.tema}.png"
             janela.grab().save(str(caminho))
             print(caminho)
         janela.pagina.projeto.descarregar(10)

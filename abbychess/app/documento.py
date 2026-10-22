@@ -40,7 +40,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Set
 
 import numpy as np
 from PySide6.QtCore import QRectF, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import (QColor, QFont, QFontMetrics, QGuiApplication, QImage, QPainter, QPen,
+from PySide6.QtGui import (QFont, QFontMetrics, QGuiApplication, QImage, QPainter, QPen,
                            QTextBlockFormat, QTextBlockUserData, QTextCharFormat, QTextCursor,
                            QTextDocument, QTextImageFormat)
 from PySide6.QtWidgets import QMenu, QTextEdit
@@ -57,13 +57,13 @@ CORPO_PADRAO = 11
 CORPO_MINIMO, CORPO_MAXIMO = 7, 28
 #: As funções em cinza pequeno, que Ctrl+Shift+H oculta.
 MARGENS = {"cabecalho", "rodape", "numero_de_pagina"}
-FUNDO_DE_BAIXA_CONFIANCA = QColor(255, 226, 184)
-FUNDO_DO_ATUAL = QColor(190, 220, 255)
+FUNDO_DE_BAIXA_CONFIANCA = estilo.FUNDO_DE_BAIXA_CONFIANCA
+FUNDO_DO_ATUAL = estilo.FUNDO_DO_ATUAL
 #: O fundo das palavras da sessão aberta: o texto ainda não confirmado (§6.3).
-FUNDO_DA_SESSAO = QColor(255, 246, 200)
+FUNDO_DA_SESSAO = estilo.FUNDO_DA_SESSAO
 #: As ocorrências da busca na página (§7.1), e a atual.
-FUNDO_DA_BUSCA = QColor(255, 232, 130)
-FUNDO_DA_OCORRENCIA = QColor(255, 170, 70)
+FUNDO_DA_BUSCA = estilo.FUNDO_DA_BUSCA
+FUNDO_DA_OCORRENCIA = estilo.FUNDO_DA_OCORRENCIA
 #: A figurina de cada peça no desenho do diagrama.
 FIGURINAS = {"K": "♔", "Q": "♕", "R": "♖", "B": "♗", "N": "♘", "P": "♙",
              "k": "♚", "q": "♛", "r": "♜", "b": "♝", "n": "♞", "p": "♟"}
@@ -106,14 +106,14 @@ def imagem_do_diagrama(diagrama, matriz: Optional[np.ndarray]) -> QImage:
     if not diagrama.lido:
         if matriz is None:
             imagem = QImage(8 * LADO_DA_CASA, 8 * LADO_DA_CASA, QImage.Format.Format_RGB32)
-            imagem.fill(QColor(240, 240, 240))
+            imagem.fill(estilo.FUNDO_SEM_IMAGEM)
             return imagem
         x1, y1, x2, y2 = (int(v) for v in diagrama.caixa)
         recorte = pixmap_de_cinza(matriz[max(0, y1):y2, max(0, x1):x2]).toImage()
         return recorte.scaledToHeight(8 * LADO_DA_CASA, Qt.TransformationMode.SmoothTransformation)
     lado = LADO_DA_CASA
     imagem = QImage(8 * lado + 2, 8 * lado + 2, QImage.Format.Format_RGB32)
-    imagem.fill(QColor(255, 255, 255))
+    imagem.fill(estilo.PAPEL)
     pintor = QPainter(imagem)
     pintor.setRenderHint(QPainter.RenderHint.Antialiasing)
     pintor.setFont(QFont(FONTE, int(lado * 0.62)))
@@ -121,11 +121,11 @@ def imagem_do_diagrama(diagrama, matriz: Optional[np.ndarray]) -> QImage:
         linha, coluna = divmod(n, 8)
         retangulo = QRectF(1 + coluna * lado, 1 + linha * lado, lado, lado)
         if (linha + coluna) % 2:
-            pintor.fillRect(retangulo, QColor(181, 196, 166))
+            pintor.fillRect(retangulo, estilo.CASA_ESCURA_DO_DOCUMENTO)
         if casa.simbolo:
-            pintor.setPen(QColor(0, 0, 0))
+            pintor.setPen(estilo.TINTA)
             pintor.drawText(retangulo, Qt.AlignmentFlag.AlignCenter, FIGURINAS.get(casa.simbolo, "?"))
-    pintor.setPen(QPen(QColor(90, 90, 90)))
+    pintor.setPen(QPen(estilo.MOLDURA_DO_TABULEIRO))
     pintor.drawRect(QRectF(0.5, 0.5, 8 * lado + 1, 8 * lado + 1))
     pintor.end()
     return imagem
@@ -160,6 +160,7 @@ class VistaDoDocumento(QTextEdit):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        estilo.papel_de_papel(self)             # o livro é papel nos dois temas (§13)
         self.setReadOnly(True)                  # editável quando há página (montar)
         self.setUndoRedoEnabled(False)          # o desfazer é do projeto (§6.3)
         self.setAcceptRichText(False)           # colar e arrastar trazem só o texto

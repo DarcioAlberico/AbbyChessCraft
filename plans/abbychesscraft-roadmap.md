@@ -725,10 +725,34 @@ Estado das tarefas depois da rodada 2:
 
 **Verificação.** CA-12.1 a CA-12.6; CA-5.3 (parte da exportação).
 
+**Fechado em 2026-10-22, a pedido do usuário, com estas pendências:** os testes em leitores
+de verdade (Calibre, Thorium, móvel), que pedem quem os abra; os links para "Diagrama N" e
+para capítulos; "manter quebras de linha e hífens" como opção; a otimização sem perda das
+imagens; o golden normalizado do CA-12.1 e o `opcoes.yaml` do CA-12.3 (as opções estão
+testadas uma a uma, não pela diferença declarada); as aspas curvas do core (PD-07), que os
+escritores próprios não aplicam. Os gabaritos do EPUB (EPUBCheck 5.4.0 e Ace 1.4.6) passam
+sem violação, erro ou advertência.
+
 ## Passo K — Aparência e teclado (§13, §3.4)
 
+**Execução iniciada em 2026-10-22, ramo `passo-i-treino`.** Rodada 1: `app/estilo.py` tem
+todos os tokens (`app/cores.py` saiu) e nenhuma cor literal sobra em `app/` (varredura por
+AST, CA-13.3). Há os do papel, que nunca invertem (a página, a Linha, o Documento, os
+tabuleiros), e os da interface, que seguem o tema do sistema (`Tema` claro e escuro: paleta
+Qt e folha de estilo; os rótulos de dica, aviso, erro e acerto têm um papel pintado pelo
+tema; o `colorSchemeChanged` troca tudo sem reiniciar). Os estados foram escurecidos na
+mesma matiz até ≥ 3:1 contra o papel do gabarito (255) e contra o cinza 230 (CA-13.2, com
+o traço de cada estado distinto: o `rede` ganhou um tracejado próprio). Das pendências do
+A1: a seleção tem contorno duplo; os diagramas usam os tokens; abaixo de 40% de zoom os
+boxes pendentes são só contorno; o glifo atual no Documento tem um azul mais forte. O
+`ferramentas/capturas.py` ganhou `--tema`. Da revisão de código: o que guardava cor da interface (a gaveta de
+Páginas, os avisos em Resultados) é pintado de novo quando o tema muda (`estilo.avisos`),
+as cores de estado sobre a interface escura são clareadas até 4,5:1 (`estilo.na_interface`),
+os avisos de conflito e o erro da busca usam a cor do tema, e a varredura de cor literal pega
+também `#rgb` e cores por nome.
+
 **Tarefas.**
-1. Tokens completos e o tema claro e escuro.
+1. ~~Tokens completos e o tema claro e escuro.~~
 2. Os ícones (§18.5).
 3. Os estados vazios.
 4. `accessibleName`.

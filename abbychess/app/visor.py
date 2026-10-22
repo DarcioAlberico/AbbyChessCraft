@@ -34,7 +34,7 @@ from core.box_model import BoxEntry
 
 from abbychess import grade as gd
 from abbychess import zonas as zn
-from abbychess.app import cores, estilo
+from abbychess.app import estilo
 from abbychess.app.item_dos_boxes import ItemDosBoxes
 
 
@@ -88,7 +88,7 @@ class VisorDePagina(QGraphicsView):
         self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-        self.setBackgroundBrush(QBrush(QColor(90, 90, 90)))
+        self.setBackgroundBrush(QBrush(estilo.FUNDO_DA_IMAGEM))
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         #: Os itens que não são boxes e saem a cada `mostrar_boxes` (os tabuleiros).
@@ -157,7 +157,7 @@ class VisorDePagina(QGraphicsView):
         self._itens, self._boxes = [], boxes
         self._tabuleiros = [tuple(t) for t in tabuleiros]
         for i, (x1, y1, x2, y2) in enumerate(self._tabuleiros):
-            caneta = QPen(cores_dos_tabuleiros[i] if cores_dos_tabuleiros else cores.DIAGRAMA)
+            caneta = QPen(cores_dos_tabuleiros[i] if cores_dos_tabuleiros else estilo.DIAGRAMA_POR_LER)
             caneta.setCosmetic(True)
             caneta.setWidthF(2.5)
             caneta.setStyle(Qt.PenStyle.DashLine)
@@ -305,11 +305,18 @@ class VisorDePagina(QGraphicsView):
             return
         b = self._boxes[indice]
         margem = 3
-        caneta = QPen(cores.SELECIONADO)
-        caneta.setCosmetic(True)
-        caneta.setWidthF(3)
-        self._destaque = cena.addRect(b.x1 - margem, b.y1 - margem,
-                                      b.x2 - b.x1 + 2 * margem, b.y2 - b.y1 + 2 * margem, caneta)
+        retangulo = QRectF(b.x1 - margem, b.y1 - margem,
+                           b.x2 - b.x1 + 2 * margem, b.y2 - b.y1 + 2 * margem)
+        # Contorno duplo (§3.3): o escuro por fora, que aparece no papel e na ilustração,
+        # e o amarelo por dentro; o de dentro é filho, e sai junto.
+        fora = QPen(estilo.CONTORNO_DA_SELECAO)
+        fora.setCosmetic(True)
+        fora.setWidthF(5)
+        self._destaque = cena.addRect(retangulo, fora)
+        dentro = QPen(estilo.SELECIONADO)
+        dentro.setCosmetic(True)
+        dentro.setWidthF(2.5)
+        QGraphicsRectItem(retangulo, self._destaque).setPen(dentro)
         self._destaque.setZValue(10)
         if centralizar:
             self.ensureVisible(self._destaque, 120, 120)
@@ -321,7 +328,7 @@ class VisorDePagina(QGraphicsView):
             cena.removeItem(item)
         self._marcados = []
         self._marcados_indices = {i for i in indices if 0 <= i < len(self._boxes)}
-        caneta = QPen(cores.MARCADO)
+        caneta = QPen(estilo.MARCADO)
         caneta.setCosmetic(True)
         caneta.setWidthF(2.5)
         for i in sorted(self._marcados_indices):
@@ -366,7 +373,7 @@ class VisorDePagina(QGraphicsView):
         if not self.modo_areas:
             return
         for i, z in enumerate(self._zonas):
-            cor = cores.COR_DA_FUNCAO.get(z.funcao, cores.COR_DA_ZONA[z.tipo])
+            cor = estilo.COR_DA_FUNCAO.get(z.funcao, estilo.COR_DA_ZONA[z.tipo])
             caneta = QPen(cor)
             caneta.setCosmetic(True)
             caneta.setWidthF(3.5 if i == self._zona_sel else 2)
@@ -409,7 +416,7 @@ class VisorDePagina(QGraphicsView):
         if coluna is None or indice is None or not 0 <= indice < len(self._boxes):
             return
         b = self._boxes[indice]
-        caneta = QPen(cores.SELECIONADO)
+        caneta = QPen(estilo.SELECIONADO)
         caneta.setCosmetic(True)
         caneta.setWidthF(2)
         self._corte = self.scene().addLine(coluna, b.y1 - 4, coluna, b.y2 + 4, caneta)
@@ -423,7 +430,7 @@ class VisorDePagina(QGraphicsView):
         if caixa is None:
             return
         x1, y1, x2, y2 = caixa
-        caneta = QPen(cores.PALAVRA)
+        caneta = QPen(estilo.PALAVRA)
         caneta.setCosmetic(True)
         caneta.setWidthF(3)
         self._palavra = self.scene().addRect(x1 - 6, y1 - 6, x2 - x1 + 12, y2 - y1 + 12, caneta)
@@ -560,7 +567,7 @@ class VisorDePagina(QGraphicsView):
             ponto = self.mapToScene(evento.position().toPoint())
             retangulo = QRectF(self._inicio, ponto).normalized()
             if self._quadro is None:
-                caneta = QPen(cores.COR_DA_ZONA[zn.TEXTO] if self.modo_areas else cores.MARCADO)
+                caneta = QPen(estilo.COR_DA_ZONA[zn.TEXTO] if self.modo_areas else estilo.MARCADO)
                 caneta.setCosmetic(True)
                 caneta.setWidthF(1.5)
                 caneta.setStyle(Qt.PenStyle.DashLine)

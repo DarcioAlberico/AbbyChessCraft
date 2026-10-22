@@ -37,11 +37,8 @@ from PySide6.QtWidgets import (QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLin
 
 from core.box_model import BoxEntry
 
-from abbychess.app import cores, estilo, teclado
+from abbychess.app import estilo, teclado
 from abbychess.app.imagens import ampliado, pixmap_de_cinza
-
-#: O aviso de conflito (§8.3), em laranja escuro (legível no fundo claro).
-LARANJA_ESCURO = estilo.LARANJA.darker(140).name()
 
 #: Figurinas e símbolos que os livros de xadrez imprimem e o teclado não tem.
 PALETA = [
@@ -79,11 +76,13 @@ NOMES_DAS_FONTES = {
 def _amostra_do_traco(traco) -> QPixmap:
     """Um retângulo pequeno com o traço e o preenchimento do estado, para a legenda."""
     pixmap = QPixmap(30, 16)
-    pixmap.fill(QColor(255, 255, 255))
+    pixmap.fill(estilo.PAPEL)
     pintor = QPainter(pixmap)
     caneta = QPen(traco.cor)
     caneta.setWidthF(traco.largura)
     caneta.setStyle(traco.estilo)
+    if traco.padrao:
+        caneta.setDashPattern(list(traco.padrao))
     pintor.setPen(caneta)
     if traco.preenchimento:
         cor = QColor(traco.cor)
@@ -166,7 +165,8 @@ class PainelDeTreino(QWidget):
         self.glifo.clicado.connect(self._clicar_no_glifo)
         self.glifo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.glifo.setMinimumHeight(150)
-        self.glifo.setStyleSheet("background: white; border: 1px solid #999;")
+        self.glifo.setStyleSheet(f"background: {estilo.PAPEL.name()}; "      # papel
+                                 f"border: 1px solid {estilo.BORDA_DO_PAPEL.name()};")
 
         self.leitura = QLabel("Abra um projeto e reconheça uma página.")
         #: O efeito e o conflito de ensinar o que está no campo (§8.3).
@@ -218,7 +218,7 @@ class PainelDeTreino(QWidget):
         dica_das_bordas = QLabel("Bordas: Shift+seta move a direita ou a de baixo; "
                                  "Ctrl+Shift+seta, a esquerda ou a de cima.")
         dica_das_bordas.setWordWrap(True)
-        dica_das_bordas.setStyleSheet("color: #555;")
+        estilo.papel(dica_das_bordas, "dica")
 
         navegar = QHBoxLayout()
         navegar.addWidget(botao_anterior)
@@ -249,9 +249,9 @@ class PainelDeTreino(QWidget):
         caixa_legenda = QVBoxLayout(legenda)
         amostras = [(estilo.traco(estado, origem), texto)
                     for estado, origem, texto in estilo.LEGENDA]
-        amostras += [(estilo.Traco(cores.DIAGRAMA, 2.5, Qt.PenStyle.DashLine),
+        amostras += [(estilo.Traco(estilo.DIAGRAMA_POR_LER, 2.5, Qt.PenStyle.DashLine),
                       "Diagrama (fora do texto)"),
-                     (estilo.Traco(cores.MARCADO, 2.5, Qt.PenStyle.SolidLine),
+                     (estilo.Traco(estilo.MARCADO, 2.5, Qt.PenStyle.SolidLine),
                       "Na seleção (Ctrl+clique)")]
         for traco, texto in amostras:
             linha = QHBoxLayout()
@@ -291,7 +291,9 @@ class PainelDeTreino(QWidget):
         laranja, o conflito ("⚠ este glifo está a 0,08 de 14 amostras de '1'")."""
         partes = [html.escape(efeito + livro)] if efeito else []
         if conflito:
-            partes.append(f"<span style='color:{LARANJA_ESCURO}'>⚠ {html.escape(conflito)}</span>")
+            # A cor de aviso do tema de agora (legível no claro e no escuro).
+            partes.append(f"<span style='color:{estilo.hex_de('aviso')}'>⚠ "
+                          f"{html.escape(conflito)}</span>")
         self.aviso_de_ensino.setText("<br>".join(partes))
 
     def mostrar(self, pagina: np.ndarray, box: BoxEntry, posicao: str) -> None:
@@ -326,7 +328,7 @@ class PainelDeTreino(QWidget):
     def mostrar_selecao(self, quantos: int) -> None:
         """Quantos boxes a seleção tem; com mais de um, Enter ensina todos."""
         self.selecao.setText(
-            f"<b style='color:{cores.MARCADO.name()}'>Seleção: {quantos} glifos.</b> Enter "
+            f"<b style='color:{estilo.MARCADO.name()}'>Seleção: {quantos} glifos.</b> Enter "
             "ensina todos com o mesmo caractere; Esc esvazia." if quantos > 1 else "")
 
     def mostrar_contagens(self, pendentes: int, total: int, padroes: int, caracteres: int) -> None:
@@ -343,7 +345,7 @@ class PainelDeTreino(QWidget):
             pixmap = pixmap.copy()
             coluna = (self.corte - box.x1) * pixmap.width() / max(box.x2 - box.x1, 1)
             pintor = QPainter(pixmap)
-            caneta = QPen(cores.SELECIONADO)
+            caneta = QPen(estilo.SELECIONADO)
             caneta.setWidth(2)
             pintor.setPen(caneta)
             pintor.drawLine(round(coluna), 0, round(coluna), pixmap.height())

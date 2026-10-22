@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QHBoxLayout, QLabel
                                QVBoxLayout, QWidget)
 
 from abbychess.app.imagens import pixmap_de_cinza
+from abbychess.app import estilo
 
 #: O lado do recorte na grade, em pixels.
 LADO = 56
@@ -153,7 +154,7 @@ class PainelDaGaleria(QWidget):
         self.dica = QLabel("Digite um caractere: aplica à seleção · Enter ensina · Shift+Enter "
                            "só corrige · Ctrl+A seleciona tudo · duplo clique vai ao glifo")
         self.dica.setWordWrap(True)
-        self.dica.setStyleSheet("color: #555;")
+        estilo.papel(self.dica, "dica")
         cima = QHBoxLayout()
         cima.addWidget(self.titulo, 1)
         cima.addWidget(self.escopo)

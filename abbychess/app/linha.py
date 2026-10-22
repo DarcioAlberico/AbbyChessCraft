@@ -12,11 +12,11 @@ from typing import List, Optional, Sequence
 
 import numpy as np
 from PySide6.QtCore import QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
+from PySide6.QtGui import QFont, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
-from abbychess.app import cores
 from abbychess.app.imagens import pixmap_de_cinza
+from abbychess.app import estilo
 
 FONTE = "Segoe UI Symbol"
 #: A altura da parte do texto, embaixo da imagem.
@@ -73,9 +73,9 @@ class FaixaDaLinha(QWidget):
 
     def paintEvent(self, _evento):
         pintor = QPainter(self)
-        pintor.fillRect(self.rect(), QColor(255, 255, 255))
+        pintor.fillRect(self.rect(), estilo.PAPEL)
         if self._recorte is None or self._recorte.isNull():
-            pintor.setPen(QColor(120, 120, 120))
+            pintor.setPen(estilo.TINTA_SECUNDARIA)
             pintor.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
                             "A linha do glifo atual aparece aqui (Ctrl+F5 esconde).")
             pintor.end()
@@ -96,12 +96,12 @@ class FaixaDaLinha(QWidget):
             gx1 = esquerda + (b.x1 - ox) * self.escala
             gx2 = esquerda + (b.x2 - ox) * self.escala
             if n == self._atual:
-                caneta = QPen(cores.SELECIONADO)
+                caneta = QPen(estilo.SELECIONADO)
                 caneta.setWidthF(2)
                 pintor.setPen(caneta)
                 pintor.drawRect(QRectF(gx1 - 1, MARGEM + (b.y1 - oy) * self.escala - 1,
                                        gx2 - gx1 + 2, (b.y2 - b.y1) * self.escala + 2))
-            pintor.setPen(QColor(0, 0, 0) if b.char else QColor(200, 0, 0))
+            pintor.setPen(estilo.TINTA if b.char else estilo.VERMELHAO)
             pintor.drawText(QRectF(gx1 - 8, base, gx2 - gx1 + 16, ALTURA_DO_TEXTO),
                             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
                             b.char or "□")
@@ -114,6 +114,6 @@ class FaixaDaLinha(QWidget):
         pintor.setFont(QFont(FONTE, 9))
         largura = pintor.fontMetrics().horizontalAdvance(self.aviso) + 12
         caixa = QRectF(self.width() - largura - MARGEM, MARGEM, largura, 18)
-        pintor.fillRect(caixa, QColor(255, 248, 220))
-        pintor.setPen(QColor(90, 70, 0))
+        pintor.fillRect(caixa, estilo.FUNDO_DO_GLIFO_DA_LINHA)
+        pintor.setPen(estilo.TINTA_DO_GLIFO_DA_LINHA)
         pintor.drawText(caixa, Qt.AlignmentFlag.AlignCenter, self.aviso)

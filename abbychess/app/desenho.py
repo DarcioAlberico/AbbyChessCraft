@@ -15,8 +15,9 @@ from abbychess import avisos as av
 from abbychess import grade as gd
 from abbychess import livro as lv
 from abbychess import verificacao as vf
-from abbychess.app import acoes, cores
+from abbychess.app import acoes
 from abbychess.app.imagens import pixmap_da_pagina
+from abbychess.app import estilo
 
 
 class DesenhoDaJanela:
@@ -78,7 +79,7 @@ class DesenhoDaJanela:
         if mudados is None or not self.visor.repintar_boxes(p.boxes, pendentes, mudados):
             diagramas = p.diagramas
             self.visor.mostrar_boxes(p.boxes, pendentes, [d.caixa for d in diagramas],
-                                     [cores.cor_do_diagrama(d) for d in diagramas])
+                                     [estilo.cor_do_diagrama(d) for d in diagramas])
         self._selecao_mudou()
         self.relogio_do_texto.start()
         self.relogio_das_paginas.start()        # o estado e os pendentes, na gaveta

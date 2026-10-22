@@ -676,8 +676,22 @@ Estado das tarefas depois da rodada 2:
   arquivo não travam a exportação de PDF, TXT e PGN; a capa é validada (PNG, JPEG, GIF, WebP,
   até 20 MB), não é recopiada sobre si mesma, a de outra extensão não fica órfã e, se a
   gravação falhar, vale a de antes.
-- 3: sumário, `page-list` e marcos feitos; faltam os bookmarks do PDF e os links internos
-  conferidos ("Solution on page N"), que pedem o número impresso de cada página.
+- 3: feita (rodada 5). O número impresso de cada página sai das margens que a exportação já
+  reconhece (`exportar.numeros_impressos`: o deslocamento número − posição mais votado, com ao
+  menos duas páginas de acordo, vale para o livro todo; na fatia do Xadrez Vitorioso dá 21–27,
+  como o gabarito). Ele vira o rótulo da `page-list` do EPUB e o rótulo das páginas do PDF, e
+  as referências do texto ("página 23", "on page 23", "Seite 23", por idioma) viram link para
+  a âncora daquela página quando ela está no livro exportado (as outras ficam texto). O PDF
+  pesquisável ganha os marcadores pelos títulos do Documento; o sumário e os rótulos que o PDF
+  original já tinha ficam. Exportar sobre o próprio arquivo de origem é recusado. Links para
+  "Diagrama N" e para capítulos ficam para depois. Da revisão de código: o deslocamento vale por
+  trechos de páginas seguidas (o encarte que o livro não numera muda o número dali em diante);
+  as páginas sem número (de rosto) ganham romanos no PDF e `[N]` no EPUB, sem colidir com um
+  impresso, e a primeira regra de rótulo está sempre na página 0 (senão o PDF fica inválido);
+  os rótulos do original são lidos antes do `select`, que os apagava; o caminho do PDF não
+  paga mais a comparação n² das margens e carrega cada modelo uma vez; citação de outra obra
+  ("Fine, p. 3", "(Informator 45, p. 12)") não vira link; os marcadores não derrubam a
+  exportação.
 - 6: conferência interna feita; **EPUBCheck 5.4.0** (oficial, w3c/epubcheck, em`nC:\tools\epubcheck-5.4.0`) aprova sem erro nem advertência o EPUB da fatia do Xadrez
   Vitorioso e três sintéticos (capa JPEG e PNG, fonte de símbolos, inglês, alemão,
   subtítulos, recortes, página vazia, capítulo partido). O único erro que ele achou (o

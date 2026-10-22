@@ -168,6 +168,8 @@ class Escrito:
     reutilizadas: int = 0
     #: Diagramas sem FEN (recortes): sem alternativa textual suficiente.
     sem_fen: int = 0
+    #: As referências a página impressa que viraram link.
+    links: int = 0
 
 
 def mensagens(idioma: str) -> Dict[str, str]:
@@ -178,35 +180,77 @@ def mensagens(idioma: str) -> Dict[str, str]:
 # O texto de um parágrafo
 # ----------------------------------------------------------------------
 
-def xhtml_do_texto(paragrafo: Paragrafo, simbolos: str) -> str:
-    """O texto com `<strong>`, `<em>` e o `<span class="s">` dos símbolos, sem aninhar
-    errado: a marcação abre e fecha por trecho de mesmo estilo."""
+def xhtml_do_texto(paragrafo: Paragrafo, simbolos: str,
+                   links: Sequence[Tuple[int, int, str]] = ()) -> str:
+    """O texto com `<strong>`, `<em>`, o `<span class="s">` dos símbolos e os `<a>` de
+    `links` (`(início, fim, href)`), sem aninhar errado: a marcação abre e fecha por trecho
+    de mesmo estilo, e o link fica por fora."""
     texto = paragrafo.texto
     if not texto:
         return ""
     # Tirar caracteres mudaria os trechos de estilo: os proibidos viram espaço.
     texto = _FORA_DO_XML.sub(" ", texto)
-    marcas = [[False, False, c in simbolos] for c in texto]
+    marcas = [[False, False, c in simbolos, -1] for c in texto]
     for k, trechos in ((0, paragrafo.negrito), (1, paragrafo.italico)):
         for inicio, fim in trechos or ():
             for i in range(max(0, inicio), min(fim, len(texto))):
                 marcas[i][k] = True
+    for n, (inicio, fim, _href) in enumerate(links):
+        for i in range(max(0, inicio), min(fim, len(texto))):
+            marcas[i][3] = n
     saida, i = [], 0
     while i < len(texto):
         j = i
         while j < len(texto) and marcas[j] == marcas[i]:
             j += 1
         pedaco = html.escape(texto[i:j], quote=False)
-        negrito, italico, simbolo = marcas[i]
+        negrito, italico, simbolo, link = marcas[i]
         if simbolo:
             pedaco = f'<span class="s">{pedaco}</span>'
         if italico:
             pedaco = f"<em>{pedaco}</em>"
         if negrito:
             pedaco = f"<strong>{pedaco}</strong>"
+        if link >= 0:
+            pedaco = f'<a href="{html.escape(links[link][2], quote=True)}">{pedaco}</a>'
         saida.append(pedaco)
         i = j
     return "".join(saida)
+
+
+#: As referências a uma página impressa, por idioma: "página 23", "on page 23", "p. 23".
+#: O número é o grupo 1. Só viram link quando a página existe no livro exportado.
+REFERENCIAS = {
+    "pt": re.compile(r"\b(?:p[áa]gina|p[áa]g\.|p\.)\s*(\d{1,4})\b", re.IGNORECASE),
+    "en": re.compile(r"\b(?:page|p\.)\s*(\d{1,4})\b", re.IGNORECASE),
+    "es": re.compile(r"\b(?:p[áa]gina|p[áa]g\.|p\.)\s*(\d{1,4})\b", re.IGNORECASE),
+    "de": re.compile(r"\b(?:Seite|S\.)\s*(\d{1,4})\b"),
+    "fr": re.compile(r"\b(?:page|p\.)\s*(\d{1,4})\b", re.IGNORECASE),
+}
+
+
+def referencias(texto: str, idioma: str, alvos: Dict[int, str]) -> List[Tuple[int, int, str]]:
+    """`(início, fim, href)` das referências do texto a páginas impressas que estão em
+    `alvos` (número impresso -> href da âncora); as outras ficam como texto."""
+    padrao = REFERENCIAS.get((idioma or "pt").split("-")[0].lower(), REFERENCIAS["en"])
+    saida = []
+    for achado in padrao.finditer(texto):
+        if _citacao(texto, achado.start()):
+            continue
+        href = alvos.get(int(achado.group(1)))
+        if href:
+            saida.append((achado.start(), achado.end(), href))
+    return saida
+
+
+def _citacao(texto: str, inicio: int) -> bool:
+    """A referência é a página de outra obra: "(Informator 45, p. 12)", "Fine, p. 3" —
+    vem depois de uma vírgula, dentro de parênteses ainda abertos, ou logo depois de um
+    nome com vírgula."""
+    antes = texto[:inicio].rstrip()
+    if not antes.endswith(","):
+        return False
+    return antes.count("(") > antes.count(")") or bool(re.search(r"[A-ZÀ-Ý][\w.'-]*,$", antes))
 
 
 #: A procedência do lado a jogar nos idiomas sem a frase do core (`lado_a_jogar.marca`, que
@@ -269,10 +313,19 @@ class _Capitulo:
     titulos: List[Tuple[int, str, str]] = field(default_factory=list)
     #: (número impresso da página no arquivo, âncora) das páginas que começam aqui.
     paginas: List[Tuple[int, str]] = field(default_factory=list)
+    #: As referências a página que viraram link neste capítulo.
+    links: int = 0
 
 
 def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbolos: str,
-               msg: Dict[str, str], idioma: str, limite: int) -> List[_Capitulo]:
+               msg: Dict[str, str], idioma: str, limite: int,
+               rotulos: Optional[Dict[int, int]] = None,
+               alvos: Optional[Dict[int, str]] = None) -> List[_Capitulo]:
+    """Os capítulos. `rotulos` dá o número impresso de cada página (índice -> número; sem
+    ele, a posição no PDF), e `alvos` o href da âncora de cada número impresso, para as
+    referências do texto virarem link."""
+    rotulos = rotulos or {}
+    alvos = alvos or {}
     capitulos = [_Capitulo("capitulo-001.xhtml")]
     numero_do_titulo = 0
 
@@ -284,14 +337,18 @@ def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbo
     vistas: set = set()
 
     def ancorar(numero: int) -> None:
-        """A âncora da página no capítulo em que o primeiro bloco dela cai."""
+        """A âncora da página no capítulo em que o primeiro bloco dela cai; o rótulo é o
+        número impresso, quando se sabe."""
         ancora = f"pg{numero}"
         if ancora in vistas:                    # a mesma página duas vezes: uma âncora só
             return
         vistas.add(ancora)
-        atual.paginas.append((numero, ancora))
+        # Com a paginação conhecida, a página sem número impresso (as de rosto) não leva o
+        # número da posição, que colidiria com um impresso: vai entre colchetes.
+        rotulo = rotulos.get(numero - 1, f"[{numero}]" if rotulos else numero)
+        atual.paginas.append((rotulo, ancora))
         atual.partes.append(f'<span epub:type="pagebreak" role="doc-pagebreak" '
-                            f'id="{ancora}" aria-label="{numero}"></span>')
+                            f'id="{ancora}" aria-label="{rotulo}"></span>')
 
     for pagina in paginas:
         if atual.tamanho > limite:
@@ -313,7 +370,9 @@ def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbo
                 atual.partes.append(f'<figure class="{classe}"><img src="../{nome}" '
                                     f'alt="{alt}"/></figure>')
             elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
-                corpo = xhtml_do_texto(bloco, simbolos)
+                links = [] if bloco.titulo else referencias(bloco.texto, idioma, alvos)
+                atual.links += len(links)
+                corpo = xhtml_do_texto(bloco, simbolos, links)
                 if bloco.titulo:
                     numero_do_titulo += 1
                     nivel = 1 if bloco.nivel == 1 else 2
@@ -414,8 +473,12 @@ def tipo_da_imagem(dados: bytes) -> Tuple[str, str]:
 
 
 def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: Metadados, *,
-             limite_do_capitulo: int = LIMITE_DO_CAPITULO) -> Escrito:
-    """Escreve o EPUB em `caminho` (ao lado e troca no fim: a falha não estraga o anterior)."""
+             limite_do_capitulo: int = LIMITE_DO_CAPITULO,
+             numeros: Optional[Dict[int, int]] = None) -> Escrito:
+    """Escreve o EPUB em `caminho` (ao lado e troca no fim: a falha não estraga o anterior).
+
+    `numeros` é o número impresso de cada página (índice -> número): vira o rótulo da
+    página na `page-list` e o alvo das referências do texto ("ver a página 23")."""
     from core.exportar import agora, data_no_zip, fonte_dos_simbolos, instante
 
     idioma = metadados.idioma or "pt-BR"
@@ -478,7 +541,16 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
                          'media-type="application/xhtml+xml"/>')
         espinha.append('<itemref idref="capa"/>')
 
-    capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo)
+    # Duas passadas: a primeira diz em que capítulo cai cada página, e a segunda escreve as
+    # referências já com o arquivo certo.
+    numeros = numeros or {}
+    capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
+                           numeros)
+    if numeros:
+        alvos = {rotulo: f"{c.nome}#{ancora}" for c in capitulos for rotulo, ancora in c.paginas}
+        capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
+                               numeros, alvos)
+    escrito.links = sum(c.links for c in capitulos)
     if not capitulos:
         raise ValueError("Nada para escrever no EPUB: as páginas não têm texto nem diagrama.")
     escrito.capitulos = len(capitulos)

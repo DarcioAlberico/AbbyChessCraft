@@ -1036,14 +1036,30 @@ class ControladorDoLivro:
         p.ir_para(proxima)
         p._avisar(f"Página {proxima + 1}: {len(p.fila())} a revisar.", 6000)
 
-    def exportar(self, destino: Path) -> None:
-        """Escreve as páginas reconhecidas em PDF pesquisável, DOCX, EPUB, TXT ou PGN (pelo sufixo)."""
+    def exportar(self, destino: Path, opcoes: Optional["ex.Opcoes"] = None,
+                 metadados: Optional[dict] = None, capa: Optional[Path] = None) -> None:
+        """Escreve as páginas reconhecidas em PDF pesquisável, DOCX, EPUB, TXT ou PGN (pelo
+        sufixo), com as `opcoes` do diálogo. Os `metadados` do formulário vão antes para o
+        `metadados.json` do projeto (com a `capa` copiada para a pasta); num projeto só de
+        leitura, ou se a gravação falhar, valem só nesta exportação, sem a capa nova."""
         p = self.pagina
         projeto = p.projeto
+        if metadados is not None:
+            try:
+                metadados = ex.gravar_metadados(projeto, metadados, capa)
+            except (OSError, ValueError) as erro:   # SomenteLeitura é um OSError
+                nova = " A capa nova ficou de fora; vale a de antes." if capa is not None else ""
+                p._avisar(f"Os metadados não foram gravados no projeto ({erro}); valem só "
+                          f"nesta exportação.{nova}", 10000)
+                try:
+                    metadados = ex.normalizar_metadados(metadados)
+                except ValueError:
+                    metadados = None            # o arquivo, como estava
 
         def preparar():
             def trabalho(progresso):
-                return ex.exportar_com_relatorio(projeto, destino, progresso=progresso)
+                return ex.exportar_com_relatorio(projeto, destino, progresso=progresso,
+                                                 opcoes=opcoes, metadados=metadados)
 
             def pronto(resultado):
                 resumo, relatorio = resultado

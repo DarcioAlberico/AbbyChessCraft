@@ -37,7 +37,7 @@ TENTATIVAS = 5
 ESPERA = 0.05
 SUFIXO_TEMPORARIO = ".tmp"
 #: Os temporários que `limpar_temporarios` apaga: só os que esta gravação cria.
-EXTENSOES_GRAVADAS = (".json", ".txt", ".png")
+EXTENSOES_GRAVADAS = (".json", ".txt", ".png", ".jpg", ".jpeg", ".gif", ".webp")
 
 Caminho = Union[str, Path]
 

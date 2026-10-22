@@ -663,8 +663,14 @@ metadados obrigatórios); o OPF ganhou `dc:source` e recusa data fora de AAAA-MM
 sai igual no Windows e no Linux.
 
 Estado das tarefas depois da rodada 2:
-- 2: metadados, capa e idioma das mensagens feitos; falta o formulário e o diálogo das
-  `Opcoes` na interface.
+- 2: feita (rodada 3). Depois do arquivo, o diálogo da exportação (`app/dialogo_exportacao.py`)
+  pergunta as `Opcoes` (cada uma habilitada só no formato que a usa, lembradas em`nQSettings) e, no EPUB e no DOCX, os metadados; o formulário vai ao `metadados.json` (atômico,
+  a capa copiada para a pasta do projeto) e volta preenchido; em projeto só de leitura vale só
+  naquela exportação. O DOCX passou a levar o título e os autores dos metadados. Da revisão
+  de código: as chaves escritas à mão no `metadados.json` ficam ao gravar; metadados ruins no
+  arquivo não travam a exportação de PDF, TXT e PGN; a capa é validada (PNG, JPEG, GIF, WebP,
+  até 20 MB), não é recopiada sobre si mesma, a de outra extensão não fica órfã e, se a
+  gravação falhar, vale a de antes.
 - 3: sumário, `page-list` e marcos feitos; faltam os bookmarks do PDF e os links internos
   conferidos ("Solution on page N"), que pedem o número impresso de cada página.
 - 6: conferência interna feita; **EPUBCheck 5.4.0** (oficial, w3c/epubcheck, em`nC:\tools\epubcheck-5.4.0`) aprova sem erro nem advertência o EPUB da fatia do Xadrez

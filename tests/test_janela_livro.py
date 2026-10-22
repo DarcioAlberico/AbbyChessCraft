@@ -8,6 +8,7 @@ trocados por respostas fixas.
 from __future__ import annotations
 
 import os
+import json
 import zipfile
 
 import pytest
@@ -52,6 +53,20 @@ def respostas(monkeypatch):
                         lambda *a, **k: (estado["intervalo"], True))
     monkeypatch.setattr(QFileDialog, "getSaveFileName",
                         lambda *a, **k: (estado["arquivo"], "EPUB (*.epub)"))
+
+    # O diálogo da exportação: `estado["exportacao"]` preenche o formulário, e ele aceita.
+    from PySide6.QtWidgets import QDialog
+
+    from abbychess.app.dialogo_exportacao import DialogoDeExportacao
+
+    def exec_(dialogo):
+        estado["dialogo"] = dialogo
+        preencher = estado.get("exportacao")
+        if preencher is not None:
+            preencher(dialogo)
+        return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(DialogoDeExportacao, "exec", exec_)
     return estado
 
 
@@ -149,13 +164,28 @@ def test_exportar_epub_pela_janela(app, janela, respostas, tmp_path):
     janela.reconhecer_livro()
     _esperar(app, janela)
     respostas["arquivo"] = str(tmp_path / "saida")  # sem extensão: vale o filtro
+
+    def preencher(dialogo):
+        dialogo.autores.setText("Yasser Seirawan; Jeremy Silman")
+        dialogo.data.setText("2012-05")
+    respostas["exportacao"] = preencher
     janela.exportar()
     _esperar(app, janela)
     destino = tmp_path / "saida.epub"
     assert destino.is_file()
     with zipfile.ZipFile(destino) as z:
         assert z.namelist()[0] == "mimetype"
+        opf = z.read("OEBPS/content.opf").decode("utf-8")
+    assert "<dc:creator>Jeremy Silman</dc:creator>" in opf and "<dc:date>2012-05</dc:date>" in opf
     assert "Exportado em saida.epub" in janela.statusBar().currentMessage()
+    # O formulário ficou no projeto: a próxima exportação já o traz preenchido.
+    gravado = json.loads((janela.projeto.pasta / "metadados.json").read_text(encoding="utf-8"))
+    assert gravado == {"autores": ["Yasser Seirawan", "Jeremy Silman"], "data": "2012-05"}
+    respostas["exportacao"] = None
+    janela.exportar()
+    _esperar(app, janela)
+    assert respostas["dialogo"].autores.text() == "Yasser Seirawan; Jeremy Silman"
+    assert respostas["dialogo"].marcas.isEnabled() is False      # é do TXT
 
 
 def test_a_pergunta_do_lote_diz_que_as_correcoes_ficam_e_conta_as_verificadas_a_parte(

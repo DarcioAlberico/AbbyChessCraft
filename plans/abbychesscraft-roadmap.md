@@ -697,7 +697,13 @@ Estado das tarefas depois da rodada 2:
   subtítulos, recortes, página vazia, capítulo partido). O único erro que ele achou (o
   marco do sumário apontava o `nav` fora da espinha, RSC-011) foi corrigido e o `conferir`
   passou a acusá-lo; `tests/test_epub.py` roda o EPUBCheck quando `ABBY_EPUBCHECK` aponta o
-  jar. Faltam Ace e os testes de leitores.
+  jar. **Ace by DAISY 1.4.6** (oficial, `@daisy/ace`, instalado em `C:\tools\ace-1.4.6` com o
+  sim do usuário) achou duas violações sérias no OPF (sem `xml:lang` no `<package>`; páginas
+  sem a fonte da paginação declarada) e nenhuma nos capítulos nem no `nav`; corrigidas (o
+  `dc:source` refinado como `source-of pagination`: o `a11y:pageBreakSource` também satisfaz o
+  Ace, mas o EPUBCheck 5.4 o recusa, OPF-027). Agora os dois validadores aprovam a fatia e os
+  três sintéticos sem violação, erro ou advertência, e `tests/test_epub.py` roda o Ace quando
+  `ABBY_ACE` aponta o executável. Faltam os testes em leitores (Calibre, Thorium, móvel).
 - 7: deduplicação e divisão por capítulo feitas; falta a otimização sem perda das imagens.
 - 9: feita (rodada 6). O DOCX também tem escritor próprio (`abbychess/escritor_docx.py`, pelo
   python-docx): títulos nos estilos Heading 1/2, negrito e itálico, a fonte dos símbolos, os

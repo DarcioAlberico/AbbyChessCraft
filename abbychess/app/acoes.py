@@ -159,6 +159,21 @@ def montar(janela) -> None:
                             "mover e na borda para esticar. 1-4 trocam o tipo, Del apaga.")
     j.acao_areas_auto = acao(j, "areas_automaticas", j.areas.automaticas,
                              texto="Refazer as áreas automáticas")
+    j.acao_reconhecer_zona = acao(j, "reconhecer_zona", j.areas.reconhecer_atual,
+                                  widgets=[j.visor])
+    j.acao_ordenar_areas = acao(j, "ordenar_areas", j.areas.iniciar_ordenacao,
+                                widgets=[j.visor])
+    j.acao_salvar_modelo_areas = acao(j, "salvar_modelo_areas", j.areas.salvar_modelo,
+                                      widgets=[j.visor])
+    j.acao_aplicar_modelo_areas = acao(j, "aplicar_modelo_areas", j.aplicar_modelo_de_areas,
+                                       widgets=[j.visor])
+    funcoes = (("funcao_texto", "texto"), ("funcao_titulo", "titulo"),
+               ("funcao_cabecalho", "cabecalho"), ("funcao_rodape", "rodape"),
+               ("funcao_numero", "numero_de_pagina"), ("funcao_nota", "nota"),
+               ("funcao_legenda", "legenda"), ("funcao_diagrama", "diagrama"),
+               ("funcao_ignorar", "ignorar"))
+    j.acoes_das_funcoes = [acao(j, id_, lambda _=False, f=f: j.areas.trocar_funcao_atual(f),
+                                widgets=[j.visor]) for id_, f in funcoes]
 
     # --- O Glifo e a Palavra (escopos de painel) -----------------------------------------
     t, campo = j.treino, j.treino.campo
@@ -255,7 +270,10 @@ def _menus(j) -> None:
                  j.acao_zoom_mais, j.acao_zoom_menos, j.acao_origem, j.acao_seguir):
         menu.addSeparator() if acao is None else menu.addAction(acao)
     j.menu_ferramentas = j.menuBar().addMenu("&Ferramentas")
-    for acao in (j.acao_modo_treino, j.acao_areas, j.acao_areas_auto, j.acao_verificar, None,
+    for acao in (j.acao_modo_treino, j.acao_areas, j.acao_areas_auto,
+                 j.acao_reconhecer_zona, j.acao_ordenar_areas,
+                 j.acao_salvar_modelo_areas, j.acao_aplicar_modelo_areas,
+                 j.acao_verificar, None,
                  j.acao_lote, None,
                  j.acao_opcoes):
         j.menu_ferramentas.addSeparator() if acao is None else j.menu_ferramentas.addAction(acao)
@@ -304,6 +322,15 @@ def atualizar(janela) -> None:
     j.acao_galeria.setEnabled(tem and bool(p.boxes))
     j.acao_areas.setEnabled(tem)
     j.acao_areas_auto.setEnabled(editar and j.acao_areas.isChecked())
+    area_atual = editar and j.acao_areas.isChecked() and j.areas.atual is not None
+    j.acao_reconhecer_zona.setEnabled(area_atual)
+    j.acao_ordenar_areas.setEnabled(editar and j.acao_areas.isChecked() and bool(j.areas.zonas))
+    j.acao_salvar_modelo_areas.setEnabled(editar and j.acao_areas.isChecked()
+                                          and bool(j.areas.zonas))
+    j.acao_aplicar_modelo_areas.setEnabled(editar and j.acao_areas.isChecked()
+                                           and j.areas.modelo is not None)
+    for q in j.acoes_das_funcoes:
+        q.setEnabled(area_atual)
     j.acao_verificar.setEnabled(tem and bool(p.boxes))
     j.acao_diagramas.setEnabled(tem)
     for q in (j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,

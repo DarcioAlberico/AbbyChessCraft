@@ -23,6 +23,20 @@ def test_intervalo_do_corpo_recusa_paginas_descontinuas():
         dialogos.intervalo_do_corpo("2-4, 8", 10)
 
 
+@pytest.mark.parametrize(("paridade", "esperado"), [
+    ("Todas", [1, 2, 3, 4, 5]),
+    ("Páginas ímpares", [2, 4]),
+    ("Páginas pares", [1, 3, 5]),
+])
+def test_modelo_de_areas_filtra_intervalo_por_numero_visivel(monkeypatch, paridade, esperado):
+    monkeypatch.setattr(dialogos.QInputDialog, "getText",
+                        lambda *_a, **_k: ("2-6", True))
+    monkeypatch.setattr(dialogos.QInputDialog, "getItem",
+                        lambda *_a, **_k: (paridade, True))
+
+    assert dialogos.paginas_do_modelo_de_areas(None, 10) == esperado
+
+
 def test_novo_projeto_guarda_idioma_e_intervalo_no_mesmo_fluxo(tmp_path, monkeypatch):
     fonte = pdf_sintetico(tmp_path)
     destino = tmp_path / "projetos"

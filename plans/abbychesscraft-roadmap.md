@@ -429,6 +429,13 @@ títulos corridos repetidos e grava as zonas como `cabecalho`, `rodape` ou
 `numero_de_pagina`. A API antiga da exportação continua sendo um adaptador dessa mesma
 verdade, incluindo a remoção de poeira.
 
+**Concluído em 2026-10-21.** O classificador local também cobre título curto, isolado e
+centralizado, nota menor no pé e novo parágrafo por recuo. O modo Áreas mostra cor e nome da
+função, aceita T/H/C/R/P/N/L/D/X e menu de contexto, ordena por cliques com cancelamento
+por Esc, salva/aplica um modelo no intervalo inteiro, pares ou ímpares (recusando outra
+resolução) e relê somente a zona atual com Ctrl+Shift+R. Funções, ordem e ligação da
+legenda entram no Documento e sobrevivem ao F5, ao desfazer e ao JSON.
+
 **Contexto.**
 - `core/livro.py` do PyBoxEditor já tem colunas, parágrafos com recuo,
   `retirar_cabecalhos` e tabelas.
@@ -436,12 +443,12 @@ verdade, incluindo a remoção de poeira.
 - Ler os docstrings do core e registrar o que precisa de API pública.
 
 **Tarefas.**
-1. Completar o pipeline de §5.1, gravando zonas e funções; a divisão local de título,
-   número de página e legenda já está implementada.
+1. ~~Completar o pipeline de §5.1, gravando zonas e funções.~~
 2. ~~Persistir a ligação da legenda já identificada ao diagrama correspondente.~~
 3. ~~O cabeçalho aprendido por livro.~~
-4. A interface do modo Áreas: funções por letra, Ordenar, modelo de áreas e Ctrl+Shift+R.
-5. A transferência de §4.6 passa a carregar as funções de zona do layout novo.
+4. ~~A interface do modo Áreas: funções por letra, Ordenar, modelo de áreas e
+   Ctrl+Shift+R.~~
+5. ~~A transferência de §4.6 passa a carregar as funções de zona do layout novo.~~
 
 **Verificação.** CA-5.1, CA-5.2, CA-5.3 (parte do Documento), CA-5.4 e CA-5.5.
 

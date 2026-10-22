@@ -114,6 +114,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         self.visor.zona_arrastada.connect(self.areas.arrastar)
         self.visor.zona_apagada.connect(self.areas.apagar)
         self.visor.zona_tipo.connect(self.areas.trocar_tipo)
+        self.visor.zona_funcao.connect(self.areas.trocar_funcao)
+        self.visor.ordenacao_cancelada.connect(self.areas.cancelar_ordenacao)
         self.visor.zoom_mudou.connect(self._zoom_mudou)
         self.visor.pagina_vizinha.connect(self._pagina_vizinha)
         self._pixmaps = OrderedDict()
@@ -382,6 +384,14 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         escolha = dialogos.intervalo_do_lote(self, self.projeto, self.fonte.total)
         if escolha is not None:
             self.livro.reconhecer(*escolha)
+
+    def aplicar_modelo_de_areas(self) -> None:
+        """Aplica o modelo salvo a um intervalo, opcionalmente só nas pares ou ímpares."""
+        if self.fonte is None or self.areas.modelo is None:
+            return
+        indices = dialogos.paginas_do_modelo_de_areas(self, self.fonte.total)
+        if indices is not None:
+            self.areas.aplicar_modelo(indices)
 
     def exportar(self) -> None:
         """Escreve as páginas reconhecidas em PDF pesquisável, DOCX ou EPUB."""

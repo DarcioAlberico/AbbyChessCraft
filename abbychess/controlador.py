@@ -666,13 +666,26 @@ class ControladorDePagina:
         self.tarefa("Reconhecendo a página", lambda: self._preparar_reconhecer(indice),
                     falhou=self._falhou("Reconhecer página"))
 
-    def _preparar_reconhecer(self, indice: int):
+    def reconhecer_zona(self, zona) -> None:
+        """Ctrl+Shift+R: reconhece somente uma zona e conserva o restante da página."""
+        if not self._pode_ler() or self.servidor_parado():
+            return
+        indice = self.indice
+        self.tarefa("Reconhecendo a área",
+                    lambda: self._preparar_reconhecer(indice, zona),
+                    falhou=self._falhou("Reconhecer área"))
+
+    def _preparar_reconhecer(self, indice: int, zona=None):
         if indice != self.indice or not self._pode_ler(avisar=False):
             return None
         pagina = self._pagina_para_editar()
-        imagem, leitor, zonas = self.imagem, self.leitor, list(pagina.zonas)
+        imagem, leitor = self.imagem, self.leitor
+        zonas = [zona] if zona is not None else list(pagina.zonas)
         antes = self._instantaneo()
         marcados = pg.a_manter_na_releitura(pagina.boxes, pagina.estado in LIDAS)   # §4.6
+        if zona is not None:
+            marcados = [b for b in marcados
+                        if zona.contem((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)]
         servidor = self._servidor_para_pedir()
 
         def trabalho(progresso):
@@ -694,7 +707,15 @@ class ControladorDePagina:
             estilos = {id(entry): md.Estilo(negrito=negrito)
                        for entry, negrito in zip(lida.boxes, lida.negritos)
                        if negrito is not None}
-            novos, dif = reconciliar(pagina.boxes, lida.boxes, pagina.alocar,
+            depois = list(lida.boxes)
+            if zona is not None:
+                from core.services.box_service import BoxService
+
+                fora = [b.entry for b in pagina.boxes
+                        if not zona.contem((b.entry.x1 + b.entry.x2) / 2,
+                                          (b.entry.y1 + b.entry.y2) / 2)]
+                depois = BoxService.sort_boxes_reading_order(fora + depois)
+            novos, dif = reconciliar(pagina.boxes, depois, pagina.alocar,
                                      procedencia.amostra_de,
                                      estilo_de=lambda entry: estilos.get(id(entry)),
                                      iou_minimo=IOU_DA_RELEITURA)
@@ -703,13 +724,18 @@ class ControladorDePagina:
                 self.eventos.emitir("resultado", "Reconhecer a página", (
                     f"Página {indice + 1}: decisões que não puderam seguir os glifos relidos: "
                     + "; ".join(descrever_caidas(dif.caidas, de_antes))))
-            pagina.tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
+            tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
+            if zona is not None:
+                tabuleiros = [t for t in pagina.tabuleiros
+                              if not zona.contem((t[0] + t[2]) / 2, (t[1] + t[3]) / 2)] + tabuleiros
+            pagina.tabuleiros = tabuleiros
             # A conferência de antes vale mais que a releitura do mesmo tabuleiro.
             pagina.diagramas = dg.mesclar(lidos, dg.para_caixas(pagina.tabuleiros,
                                                                 pagina.diagramas))
             if pagina is self.modelo:
                 self.atual, self.pulados, self.selecao = None, set(), set()
-            self._mudou(pagina, indice, "Reconhecer a página", antes, evento="reconhecer")
+            descricao = "Reconhecer a área" if zona is not None else "Reconhecer a página"
+            self._mudou(pagina, indice, descricao, antes, evento="reconhecer")
             self.eventos.emitir("pagina_reconhecida", indice)
             if pagina is self.modelo:
                 self.ir_ao_primeiro_pendente()

@@ -65,6 +65,8 @@ class Bloco:
     funcao: str
     linhas: Tuple[Linha, ...] = ()
     diagrama_id: Optional[str] = None
+    #: Na legenda, o diagrama ao qual ela pertence.
+    referencia_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -146,7 +148,8 @@ def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
         if atual:
             zona = atual_zona
             blocos.append(Bloco(f"b{len(blocos)}", getattr(zona, "id", None) or None,
-                                getattr(zona, "funcao", "texto"), tuple(atual)))
+                                getattr(zona, "funcao", "texto"), tuple(atual),
+                                referencia_id=getattr(zona, "diagrama_id", None)))
             atual = []
 
     for j, ln in enumerate(linhas):

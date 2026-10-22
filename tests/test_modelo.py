@@ -205,6 +205,16 @@ def test_paragrafo_antes_e_areas_fazem_blocos_com_funcao_e_ordem():
     assert [len(b.linhas) for b in tx.montar(p).blocos] == [2, 1]
 
 
+def test_bloco_de_legenda_carrega_a_referencia_do_diagrama():
+    p = _pagina(*_linha("Diagrama 1"))
+    p.zonas = [Zona("texto", 0, 0, 400, 45, id="z0", funcao="legenda",
+                    diagrama_id="d0")]
+
+    [bloco] = tx.montar(p).blocos
+
+    assert bloco.funcao == "legenda" and bloco.referencia_id == "d0"
+
+
 def test_modos_impresso_e_san():
     p = _pagina(_e(0, "♘"), _e(22, "e"), _e(44, "4"), _e(66, "✝"))
     doc = tx.montar(p)

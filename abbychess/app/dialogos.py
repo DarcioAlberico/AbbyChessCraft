@@ -267,6 +267,30 @@ def intervalo_do_lote(janela, projeto, total: int) -> Optional[Tuple[List[int], 
     return indices, refazer
 
 
+def paginas_do_modelo_de_areas(janela, total: int) -> Optional[List[int]]:
+    """Intervalo e paridade em que aplicar um modelo de áreas."""
+    texto, ok = QInputDialog.getText(
+        janela, "Aplicar modelo de áreas",
+        f"Páginas (de 1 a {total}; por exemplo 5-20):", text=f"1-{total}")
+    if not ok:
+        return None
+    try:
+        indices = livro.interpretar_intervalo(texto, total)
+    except ValueError as erro:
+        QMessageBox.warning(janela, "Aplicar modelo de áreas", str(erro))
+        return None
+    escolha, ok = QInputDialog.getItem(
+        janela, "Aplicar modelo de áreas", "Aplicar a:",
+        ["Todas", "Páginas ímpares", "Páginas pares"], 0, False)
+    if not ok:
+        return None
+    if escolha == "Páginas ímpares":
+        indices = [i for i in indices if (i + 1) % 2 == 1]
+    elif escolha == "Páginas pares":
+        indices = [i for i in indices if (i + 1) % 2 == 0]
+    return indices
+
+
 def reler_depois(janela, paginas, *, faltou: bool) -> Optional[bool]:
     """Retomar o lote com páginas que ele não sobrescreveu: lê-las também? None é cancelar.
     Sem nada que tenha faltado do lote, a pergunta é só "ler essas?" (Sim ou Cancelar)."""

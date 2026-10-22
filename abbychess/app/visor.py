@@ -62,6 +62,9 @@ class VisorDePagina(QGraphicsView):
     zona_apagada = Signal(int)
     #: Editor de áreas: a área e o tipo novo.
     zona_tipo = Signal(int, str)
+    #: Editor de áreas: a área e a função semântica nova.
+    zona_funcao = Signal(int, str)
+    ordenacao_cancelada = Signal()
     #: O zoom mudou: a escala (1 = 100%) e o limite alcançado ("máximo", "mínimo" ou "").
     zoom_mudou = Signal(float, str)
     #: PgDn no fim da página (+1) ou PgUp no topo (-1): a página vizinha.
@@ -351,7 +354,7 @@ class VisorDePagina(QGraphicsView):
         if not self.modo_areas:
             return
         for i, z in enumerate(self._zonas):
-            cor = cores.COR_DA_ZONA[z.tipo]
+            cor = cores.COR_DA_FUNCAO.get(z.funcao, cores.COR_DA_ZONA[z.tipo])
             caneta = QPen(cor)
             caneta.setCosmetic(True)
             caneta.setWidthF(3.5 if i == self._zona_sel else 2)
@@ -361,7 +364,8 @@ class VisorDePagina(QGraphicsView):
             fundo.setAlpha(45 if i == self._zona_sel else 25)
             item = cena.addRect(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1, caneta, QBrush(fundo))
             item.setZValue(5)
-            rotulo = cena.addSimpleText(f"{i + 1} {zn.NOMES[z.tipo]}")
+            numero = z.ordem + 1 if z.ordem is not None else i + 1
+            rotulo = cena.addSimpleText(f"{numero} {zn.NOMES_DAS_FUNCOES[z.funcao]}")
             rotulo.setBrush(QBrush(cor))
             rotulo.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
             rotulo.setPos(z.x1 + 2, z.y1 + 2)
@@ -369,13 +373,16 @@ class VisorDePagina(QGraphicsView):
             self._zonas_itens += [item, rotulo]
 
     def menu_da_zona(self, indice: int) -> QMenu:
-        """O tipo da área e apagá-la, pelo botão direito."""
+        """A função da área e apagá-la, pelo botão direito."""
         menu = QMenu(self)
-        for numero, tipo in enumerate(zn.TIPOS, start=1):
-            acao = menu.addAction(f"{zn.NOMES[tipo]}\t{numero}")
+        teclas = {"texto": "T", "titulo": "H", "cabecalho": "C", "rodape": "R",
+                  "numero_de_pagina": "P", "nota": "N", "legenda": "L", "diagrama": "D",
+                  "ignorar": "X"}
+        for funcao in teclas:
+            acao = menu.addAction(f"{zn.NOMES_DAS_FUNCOES[funcao]}\t{teclas[funcao]}")
             acao.setCheckable(True)
-            acao.setChecked(self._zonas[indice].tipo == tipo)
-            acao.triggered.connect(lambda _=False, t=tipo: self.zona_tipo.emit(indice, t))
+            acao.setChecked(self._zonas[indice].funcao == funcao)
+            acao.triggered.connect(lambda _=False, f=funcao: self.zona_funcao.emit(indice, f))
         menu.addSeparator()
         menu.addAction("Apagar área\tDel").triggered.connect(
             lambda: self.zona_apagada.emit(indice))
@@ -612,9 +619,18 @@ class VisorDePagina(QGraphicsView):
             if tecla in numeros:
                 self.zona_tipo.emit(self._zona_sel, zn.TIPOS[numeros.index(tecla)])
                 return
-            if tecla == Qt.Key.Key_Escape:
-                self.zona_escolhida.emit(-1)
+            funcoes = {Qt.Key.Key_T: "texto", Qt.Key.Key_H: "titulo",
+                       Qt.Key.Key_C: "cabecalho", Qt.Key.Key_R: "rodape",
+                       Qt.Key.Key_P: "numero_de_pagina", Qt.Key.Key_N: "nota",
+                       Qt.Key.Key_L: "legenda", Qt.Key.Key_D: "diagrama",
+                       Qt.Key.Key_X: "ignorar"}
+            if tecla in funcoes and evento.modifiers() == Qt.KeyboardModifier.NoModifier:
+                self.zona_funcao.emit(self._zona_sel, funcoes[tecla])
                 return
+        if self.modo_areas and tecla == Qt.Key.Key_Escape:
+            self.ordenacao_cancelada.emit()
+            self.zona_escolhida.emit(-1)
+            return
         super().keyPressEvent(evento)
 
     def focusOutEvent(self, evento):

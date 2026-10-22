@@ -108,7 +108,7 @@ def _esperado_do_yaml():
 
 
 def _widgets_do_escopo(janela):
-    return {"imagem": {janela.visor}, "glifo": {janela.treino},
+    return {"imagem": {janela.visor}, "imagem_areas": {janela.visor}, "glifo": {janela.treino},
             "campo_glifo": {janela.treino.campo}, "palavra": {janela.verificacao},
             "documento": {janela.texto}, "galeria": set()}
 

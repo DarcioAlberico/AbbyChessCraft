@@ -85,6 +85,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 
 | Ação | Padrão | FineReader | Escopo | Desde |
 |---|---|---|---|---|
+| Aplicar modelo de áreas nesta página | — | — | imagem_areas | F |
 | Função da zona: cabeçalho | C | C | imagem_areas | F |
 | Função da zona: diagrama | D | D | imagem_areas | F |
 | Função da zona: ignorar | X | X | imagem_areas | F |
@@ -94,7 +95,9 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Função da zona: rodapé | R | R | imagem_areas | F |
 | Função da zona: texto | T | T | imagem_areas | F |
 | Função da zona: título | H | H | imagem_areas | F |
+| Ordenar áreas | — | — | imagem_areas | F |
 | Reconhecer só a zona escolhida | Ctrl+Shift+R | Ctrl+Shift+B | imagem_areas | F |
+| Salvar modelo de áreas | — | — | imagem_areas | F |
 | Tipo da zona: diagrama | — | Ctrl+2 | imagem_areas | K |
 | Tipo da zona: ignorar | — | Ctrl+5 | imagem_areas | K |
 | Tipo da zona: imagem | — | Ctrl+4 | imagem_areas | K |

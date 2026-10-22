@@ -165,6 +165,7 @@ class PainelDePaginas(QWidget):
             diagramas = r.get("diagramas_por_conferir", 0)
             item = self.lista.topLevelItem(i)
             simbolo, cor = SIMBOLOS_DOS_ESTADOS.get(estado, ("?", estilo.CINZA))
+            cor = estilo.na_interface(cor)
             for coluna, texto in enumerate((str(i + 1), simbolo,
                                             "" if pendentes is None else str(pendentes),
                                             str(diagramas) if diagramas else "")):
@@ -175,12 +176,20 @@ class PainelDePaginas(QWidget):
                 item.setToolTip(1, NOMES_DOS_ESTADOS.get(estado, estado))
                 item.setForeground(1, cor)
                 apagada = estado == md.NAO_RECONHECIDA      # o que ainda não foi lido, atenuado
-                item.setForeground(0, estilo.CINZA if apagada else self.palette().text())
+                if apagada:
+                    item.setForeground(0, estilo.cor("texto_secundario"))
+                else:                                   # a cor da paleta, que segue o tema
+                    item.setData(0, Qt.ItemDataRole.ForegroundRole, None)
         self._pintar_contagem()
         self._filtrar()
         if atual is not None:
             self.marcar_atual(atual)
         self.lista.setUpdatesEnabled(True)
+
+    def esquecer_as_cores(self) -> None:
+        """O tema mudou: a próxima atualização pinta de novo a coluna de estado e o número."""
+        for i in range(self.lista.topLevelItemCount()):
+            self.lista.topLevelItem(i).setData(1, Qt.ItemDataRole.UserRole, None)
 
     def mostrar_ocorrencias(self, contagem) -> None:
         """A contagem da busca por página (§7.1), na coluna "Ach."; None a esconde."""

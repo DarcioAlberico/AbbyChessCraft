@@ -15,6 +15,8 @@ from PySide6.QtGui import QAction, QActionGroup
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QMenu, QScrollArea, QStackedWidget,
                                QToolButton, QVBoxLayout, QWidget)
 
+from abbychess.app import estilo
+
 DICAS = {
     "glifo": "Alt+↓ pula · Ctrl+D divide · Ctrl+J junta · Shift+seta bordas · F2 símbolos",
     "palavra": "Enter corrige · Ctrl+Enter corrige e ensina · Alt+↓ pula · "
@@ -81,7 +83,7 @@ class PainelDoInspetor(QWidget):
             self._rolagens[nome] = rolagem
         self.dica = QLabel("")
         self.dica.setWordWrap(True)
-        self.dica.setStyleSheet("color: #555;")
+        estilo.papel(self.dica, "dica")
 
         caixa = QVBoxLayout(self)
         caixa.setContentsMargins(4, 4, 4, 4)

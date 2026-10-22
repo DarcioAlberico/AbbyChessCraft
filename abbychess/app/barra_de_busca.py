@@ -218,7 +218,7 @@ class BarraDeBusca(QWidget):
         return (max(0, min(a, b) - 1), max(0, max(a, b) - 1))
 
     def mostrar_contagem(self, atual: Optional[int], total: int) -> None:
-        self.contador.setStyleSheet("")
+        estilo.papel(self.contador, "")
         self.contador.setToolTip("")
         if total == 0:
             self.contador.setText("nada" if self.campo.text() else "")
@@ -229,7 +229,7 @@ class BarraDeBusca(QWidget):
 
     def mostrar_erro(self, mensagem: str) -> None:
         self.contador.setText("erro")
-        self.contador.setStyleSheet(f"color: {estilo.VERMELHAO.name()}")
+        estilo.papel(self.contador, "erro")
         self.contador.setToolTip(mensagem)
 
     def mostrar_dica(self, dica: str) -> None:

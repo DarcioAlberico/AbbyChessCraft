@@ -82,6 +82,8 @@ class ItemDosBoxes(QGraphicsItem):
             caneta.setCosmetic(True)
             caneta.setWidthF(t.largura)
             caneta.setStyle(t.estilo)
+            if t.padrao:
+                caneta.setDashPattern(list(t.padrao))
             pincel = None
             if t.preenchimento:
                 cor = QColor(t.cor)
@@ -104,8 +106,12 @@ class ItemDosBoxes(QGraphicsItem):
         for i in indices:
             por_estado.setdefault(self.estados[i], []).append(i)
         caixas = self.grade.caixas
+        # Em zoom baixo o preenchimento cobriria a letra (revisão do A2): só o contorno.
+        sem_preenchimento = escala < estilo.ZOOM_SEM_PREENCHIMENTO
         for estado, lista in por_estado.items():
             caneta, pincel = self._caneta(estado)
+            if sem_preenchimento:
+                pincel = None
             pintor.setPen(caneta)
             pintor.setBrush(pincel if pincel is not None else QBrush())
             pintor.drawRects([QRectF(c[0], c[1], c[2] - c[0], c[3] - c[1])

@@ -26,7 +26,7 @@ from dataclasses import replace
 from typing import Dict, List, Optional, Tuple
 
 from PySide6.QtCore import QRect, QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
+from PySide6.QtGui import QFont, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QGridLayout, QGroupBox,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton, QRadioButton,
                                QSizePolicy, QToolButton, QVBoxLayout, QWidget)
@@ -35,6 +35,7 @@ from core.tabuleiro_edicao import SIMBOLOS, TabuleiroEdicao
 
 from abbychess import lances
 from abbychess.diagramas import LADO_DA_LEGENDA, DiagramaLido, afirmar_lado
+from abbychess.app import estilo
 
 #: O lado de uma casa no Inspetor (o tabuleiro cabe nos 296 px de 1366, §3.1).
 LADO_CASA = 30
@@ -46,11 +47,11 @@ GLIFOS = {"K": "♔", "Q": "♕", "R": "♖", "B": "♗", "N": "♘", "P": "♙"
           "k": "♚", "q": "♛", "r": "♜", "b": "♝", "n": "♞", "p": "♟"}
 NOMES = {"K": "rei", "Q": "dama", "R": "torre", "B": "bispo", "N": "cavalo", "P": "peão"}
 
-CASA_CLARA, CASA_ESCURA = QColor("#F0D9B5"), QColor("#B58863")
-COR_CORRIGIDA = QColor(39, 174, 96, 90)    # verde: corrigida por você
-COR_ARBITRADA = QColor(192, 57, 43, 90)    # vermelho: trocada pela legalidade
-COR_DUVIDA = QColor(230, 126, 34, 90)      # laranja: leitura duvidosa
-COR_SELECAO = QColor(241, 196, 15)         # amarelo: a casa selecionada
+CASA_CLARA, CASA_ESCURA = estilo.CASA_CLARA, estilo.CASA_ESCURA
+COR_CORRIGIDA = estilo.CASA_CORRIGIDA      # verde: corrigida por você
+COR_ARBITRADA = estilo.CASA_ARBITRADA      # vermelho: trocada pela legalidade
+COR_DUVIDA = estilo.CASA_DUVIDOSA          # laranja: leitura duvidosa
+COR_SELECAO = estilo.SELECIONADO           # amarelo: a casa selecionada
 
 
 class TabuleiroConferivel(QWidget):
@@ -135,7 +136,7 @@ class TabuleiroConferivel(QWidget):
             pintor.fillRect(retangulo, CASA_CLARA if (casa.linha + casa.coluna) % 2 == 0
                             else CASA_ESCURA)
             if casa.simbolo:
-                pintor.setPen(Qt.GlobalColor.black)
+                pintor.setPen(estilo.TINTA)
                 pintor.drawText(QRectF(retangulo), Qt.AlignmentFlag.AlignCenter,
                                 GLIFOS[casa.simbolo])
 
@@ -539,14 +540,14 @@ class EditorDeDiagrama(QWidget):
                     if vez else "")
             self.origem_do_lado.setText("A página não diz. Escolha: até lá o FEN sai com "
                                         f"'w' marcado como assumido.{dica}")
-            self.origem_do_lado.setStyleSheet("color: #c0392b;")
+            estilo.papel(self.origem_do_lado, "erro")
         elif tabuleiro.lado_origem == LADO_DA_LEGENDA:
             trecho = f": “{d.lado_trecho}”" if d.lado_trecho else ""
             self.origem_do_lado.setText(f"Da legenda da página{trecho}. Confira.")
-            self.origem_do_lado.setStyleSheet("color: #e67e22;")
+            estilo.papel(self.origem_do_lado, "aviso")
         else:
             self.origem_do_lado.setText("Informado por você.")
-            self.origem_do_lado.setStyleSheet("")
+            estilo.papel(self.origem_do_lado, "")
 
         possiveis = tabuleiro.roques_possiveis()
         for letra, check in self.checks_roque.items():

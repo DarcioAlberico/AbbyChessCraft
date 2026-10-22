@@ -35,6 +35,7 @@ from abbychess import verificacao as vf
 from abbychess.modelo import LIDAS
 from abbychess.app import visor as vs
 from abbychess.app.confirmacao import BarraDeConfirmacao
+from abbychess.app import estilo
 from abbychess.app.inspetor import PainelDoInspetor
 from abbychess.app.linha import FaixaDaLinha
 from abbychess.app.painel_paginas import NOMES_DOS_ESTADOS, PainelDePaginas
@@ -170,6 +171,7 @@ class EspacoDeTrabalho:
         self.relogio_das_paginas.setInterval(500)
         self.relogio_das_paginas.timeout.connect(self.atualizar_paginas)
         self._montar_barra_de_status()
+        estilo.avisos().tema_mudou.connect(self._tema_mudou)
 
     def _montar_barra_de_status(self) -> None:
         barra = self.statusBar()
@@ -462,6 +464,12 @@ class EspacoDeTrabalho:
     # ------------------------------------------------------------------
     # A fila, a gaveta, a barra e os avisos
     # ------------------------------------------------------------------
+    def _tema_mudou(self, _nome: str) -> None:
+        """O tema do sistema mudou: o que guardou cor da interface é pintado de novo."""
+        self.paginas.esquecer_as_cores()
+        self.atualizar_paginas()
+        self.resultados.repintar()
+
     def _modo_da_fila_mudou(self, modo: str) -> None:
         """O modo da fila escolhe o editor do Inspetor: Palavra nas palavras, Diagrama nos
         diagramas (aberto pelo F8 ou por um clique), Glifo no resto."""

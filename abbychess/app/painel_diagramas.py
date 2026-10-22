@@ -14,9 +14,11 @@ from __future__ import annotations
 from typing import Callable, List, Optional, Sequence, Tuple
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QColor, QIcon, QImage, QPainter, QPixmap
+from PySide6.QtGui import QIcon, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QListView, QListWidget,
                                QListWidgetItem, QPushButton, QVBoxLayout, QWidget)
+
+from abbychess.app import estilo
 
 #: Os estados de um diagrama na aba, com o nome que ela mostra.
 NAO_LIDO, CONFERIDO, LANCE_ILEGAL = "nao_lido", "conferido", "lance_ilegal"
@@ -150,14 +152,14 @@ class PainelDeDiagramas(QWidget):
     def _icone(self, pagina: int, d) -> QIcon:
         lado = LADO_DA_MINIATURA
         tela = QPixmap(2 * lado + 4, lado)
-        tela.fill(QColor(255, 255, 255))
+        tela.fill(estilo.PAPEL)
         pintor = QPainter(tela)
         recorte = self._recorte(pagina, d.caixa) if self._recorte is not None else None
         if recorte is not None and not recorte.isNull():
             pintor.drawImage(0, 0, recorte.scaled(lado, lado, Qt.AspectRatioMode.KeepAspectRatio,
                                                   Qt.TransformationMode.SmoothTransformation))
         else:
-            pintor.fillRect(0, 0, lado, lado, QColor(235, 235, 235))
+            pintor.fillRect(0, 0, lado, lado, estilo.FUNDO_SEM_IMAGEM)
             pintor.drawText(0, 0, lado, lado, Qt.AlignmentFlag.AlignCenter, "recorte\nna Imagem")
         desenho: Optional[QImage] = self._desenho(d) if self._desenho is not None else None
         if desenho is not None and not desenho.isNull():

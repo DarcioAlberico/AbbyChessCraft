@@ -578,6 +578,18 @@ leitura de um glifo depois de dividir, juntar, ajustar ou marcar. O que muda par
 suíte rápida usa); `ABBY_FABRICA_DE_LEITOR=modulo:funcao` troca o leitor do filho (os testes
 usam um leitor falso, sem torch).
 
+### A aparência
+
+O programa segue o tema claro ou escuro do sistema e troca na hora quando ele muda. A página,
+a faixa Linha e o Documento continuam papel nos dois temas: o livro não inverte. Os estados
+dos boxes têm cor e traço próprios, com contraste de pelo menos 3:1 contra o papel; abaixo de
+40% de zoom os pendentes aparecem só com o contorno, e o glifo selecionado tem contorno duplo.
+Todas as cores estão em `abbychess/app/estilo.py`. As capturas de revisão saem nos dois temas:
+
+```powershell
+.venv\Scripts\python.exe ferramentas\capturas.py --livro xv --indice 25 --tema escuro
+```
+
 ### Exportar
 
 **Projeto › Exportar** (Ctrl+E) escreve as páginas já reconhecidas, com as correções, no

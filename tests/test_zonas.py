@@ -154,6 +154,18 @@ def test_vinculo_manual_de_legenda_nao_e_recalculado():
     assert zn.vincular_legendas([manual], diagramas)[0].diagrama_id == "d1"
 
 
+def test_funcao_de_margem_so_muda_zona_automatica_inteiramente_classificada():
+    boxes = _boxes_de("CABECALHO", 100, 20) + _boxes_de("corpo", 100, 100)
+    cabecalho = zn.Zona(zn.TEXTO, 90, 10, 190, 45, automatica=True)
+    corpo = zn.Zona(zn.TEXTO, 90, 90, 190, 125, automatica=True)
+    manual = zn.Zona(zn.TEXTO, 90, 10, 190, 45, automatica=False)
+    funcoes = {i: "cabecalho" for i in range(len("CABECALHO"))}
+
+    classificadas = zn.aplicar_funcoes_de_margem([cabecalho, corpo, manual], boxes, funcoes)
+
+    assert [z.funcao for z in classificadas] == ["cabecalho", "texto", "texto"]
+
+
 def test_ignorar_e_imagem_nao_geram_boxes(imagem):
     boxes = pg.segmentar(imagem)
     largura, altura = imagem.size

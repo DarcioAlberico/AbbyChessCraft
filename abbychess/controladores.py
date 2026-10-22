@@ -111,6 +111,7 @@ class ControladorDeLayout:
         p.tarefa("Achando as áreas", preparar, falhou=p._falhou("Áreas"))
 
     def _automaticas_prontas(self, zonas) -> None:
+        zonas = self._aprender_margens(zonas)
         self._trocar(zonas, None, "Áreas automáticas")
         tipos: dict = {}
         for z in zonas:
@@ -118,6 +119,27 @@ class ControladorDeLayout:
             tipos[nome] = tipos.get(nome, 0) + 1
         resumo = ", ".join(f"{n} {t}" for t, n in tipos.items()) or "nenhuma"
         self.pagina._avisar(f"Áreas automáticas: {resumo}. Corrija e aperte F5.", 10000)
+
+    def _aprender_margens(self, zonas):
+        """Dá função às margens atuais pelas repetições das páginas reconhecidas."""
+        p = self.pagina
+        if p.projeto is None or p.imagem is None:
+            return zonas
+        paginas = {}
+        for indice in p.projeto.paginas_lidas():
+            modelo = p.modelo if indice == p.indice else p.projeto.carregar_modelo(indice)
+            if modelo is None:
+                continue
+            lidos = [b.entry for b in modelo.boxes if b.entry.char]
+            # Todas as páginas do livro são renderizadas no mesmo DPI. A altura aberta
+            # evita renderizar as demais só para aprender a margem; pequenas variações de
+            # mídia não atravessam as faixas conservadoras de 10% e 3%.
+            paginas[indice] = (lidos, p.imagem.height)
+        if p.indice not in paginas:
+            lidos = [b.entry for b in (p.modelo.boxes if p.modelo else []) if b.entry.char]
+            paginas[p.indice] = (lidos, p.imagem.height)
+        funcoes = ex.funcoes_das_margens(paginas).get(p.indice, {})
+        return zn.aplicar_funcoes_de_margem(zonas, paginas[p.indice][0], funcoes)
 
     def desenhar(self, x1: int, y1: int, x2: int, y2: int) -> None:
         p = self.pagina

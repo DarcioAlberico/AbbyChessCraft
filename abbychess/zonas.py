@@ -356,6 +356,23 @@ def vincular_legendas(zonas: Sequence[Zona], diagramas: Sequence) -> List[Zona]:
     return saida
 
 
+def aplicar_funcoes_de_margem(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
+                              funcoes: dict) -> List[Zona]:
+    """Aplica cabeçalho/rodapé/número aprendidos pelo livro às zonas automáticas."""
+    saida = []
+    for zona in zonas:
+        if not zona.automatica or zona.tipo != TEXTO or zona.funcao not in (
+                "texto", "titulo", "cabecalho", "rodape", "numero_de_pagina"):
+            saida.append(zona)
+            continue
+        indices = [i for i, box in enumerate(boxes)
+                   if zona.contem((box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2)]
+        votos = [funcoes[i] for i in indices if i in funcoes]
+        funcao = votos[0] if indices and len(votos) == len(indices) and len(set(votos)) == 1 else None
+        saida.append(replace(zona, funcao=funcao) if funcao else zona)
+    return saida
+
+
 def _linhas(boxes: Sequence[BoxEntry]) -> List[List[int]]:
     """As linhas de texto, como caixas [x1, y1, x2, y2], de cima para baixo.
 

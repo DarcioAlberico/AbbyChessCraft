@@ -361,8 +361,24 @@ def margens_corridas(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]) -> Dict
     o nome dos autores nas pares e o título nas ímpares. A primeira linha de um
     capítulo novo não tem número nem se repete, e fica.
     """
+    funcoes, margens = _funcoes_das_margens(paginas)
+    return {i: set(margens[i].poeira) | set(funcoes[i]) for i in paginas}
+
+
+def funcoes_das_margens(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]) -> Dict[int, dict]:
+    """`{página: {indice_do_box: função}}` aprendido no conjunto do livro.
+
+    Ao contrário de :func:`margens_corridas`, poeira não aparece: ela não é cabeçalho
+    nem rodapé e requer uma zona `ignorar`, de outro tipo.
+    """
+    funcoes, _margens = _funcoes_das_margens(paginas)
+    return funcoes
+
+
+def _funcoes_das_margens(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]
+                          ) -> Tuple[Dict[int, dict], Dict[int, _Margem]]:
     margens = {i: _margem_da_pagina(boxes, altura) for i, (boxes, altura) in paginas.items()}
-    saida = {i: set(m.poeira) for i, m in margens.items()}
+    saida = {i: {} for i in paginas}
     from core import lado_a_jogar
 
     for i, margem in margens.items():
@@ -379,8 +395,11 @@ def margens_corridas(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]) -> Dict
                 for j, outra_margem in margens.items() if j != i
                 for outra, outro_lugar in outra_margem.candidatos)
             if numero or (repete and letras):
-                saida[i].update(linha.indices)
-    return saida
+                texto = linha.texto.strip()
+                funcao = ("numero_de_pagina" if re.fullmatch(r"\D*\d{1,4}\D*", texto)
+                          and not letras else lugar)
+                saida[i].update({indice: funcao for indice in linha.indices})
+    return saida, margens
 
 
 def _juntar_linhas(textos: Sequence[str]) -> str:

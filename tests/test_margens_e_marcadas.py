@@ -75,6 +75,20 @@ def test_titulo_que_se_repete_sai_mesmo_sem_numero():
     assert all(_tirados(paginas[i][0], tirar[i]) == "XADREZVITORIOSO" for i in (20, 22))
 
 
+def test_margens_aprendem_a_funcao_semantica_de_cada_linha():
+    paginas = {
+        20: (_linha("XADREZ VITORIOSO", 180) + _corpo(), ALTURA),
+        21: (_corpo(2900) + _linha("- 21 -", 3350), ALTURA),
+        22: (_linha("XADREZ VITORIOSO", 180) + _corpo(), ALTURA),
+    }
+
+    funcoes = ex.funcoes_das_margens(paginas)
+
+    assert set(funcoes[20].values()) == {"cabecalho"}
+    assert set(funcoes[21].values()) == {"numero_de_pagina"}
+    assert set(funcoes[22].values()) == {"cabecalho"}
+
+
 def test_titulo_de_capitulo_sem_numero_nem_repeticao_fica():
     paginas = {20: (_linha("CAPITULO UM", 180) + _corpo(), ALTURA),
                21: (_linha("OUTRA COISA BEM DIFERENTE", 180) + _corpo(), ALTURA)}

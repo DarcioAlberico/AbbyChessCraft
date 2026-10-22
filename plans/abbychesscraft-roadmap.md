@@ -423,6 +423,12 @@ Cada zona de `legenda` automática guarda também o `diagrama_id` estável (`dN`
 mais próximo com sobreposição horizontal. O vínculo nasce junto com os IDs, antes do
 histórico e da gravação, sobrevive ao ciclo JSON e não substitui uma ligação manual.
 
+A regra de margens da exportação agora expõe a função semântica por glifo. Ao criar as
+áreas automáticas, a página usa todas as páginas reconhecidas do livro para aprender
+títulos corridos repetidos e grava as zonas como `cabecalho`, `rodape` ou
+`numero_de_pagina`. A API antiga da exportação continua sendo um adaptador dessa mesma
+verdade, incluindo a remoção de poeira.
+
 **Contexto.**
 - `core/livro.py` do PyBoxEditor já tem colunas, parágrafos com recuo,
   `retirar_cabecalhos` e tabelas.
@@ -433,7 +439,7 @@ histórico e da gravação, sobrevive ao ciclo JSON e não substitui uma ligaç�
 1. Completar o pipeline de §5.1, gravando zonas e funções; a divisão local de título,
    número de página e legenda já está implementada.
 2. ~~Persistir a ligação da legenda já identificada ao diagrama correspondente.~~
-3. O cabeçalho aprendido por livro.
+3. ~~O cabeçalho aprendido por livro.~~
 4. A interface do modo Áreas: funções por letra, Ordenar, modelo de áreas e Ctrl+Shift+R.
 5. A transferência de §4.6 passa a carregar as funções de zona do layout novo.
 

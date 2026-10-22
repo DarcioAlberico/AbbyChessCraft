@@ -48,6 +48,9 @@ from core import lado_a_jogar
 from core.box_model import BoxEntry
 from core.tabuleiro_edicao import TabuleiroEdicao
 
+from abbychess import lances
+from abbychess.lances import Validacao
+
 Caixa = Tuple[int, int, int, int]
 
 #: Procedências do lado a jogar. Vazio quer dizer que ninguém disse.
@@ -107,6 +110,9 @@ class DiagramaLido:
     erro: str = ""
     #: Estável na página (`d0`, `d1`…): é o que o documento cita (§4.2). Vazio até gravar.
     id: str = ""
+    #: O que os lances do texto depois dele disseram (`lances.validar_pagina`); `None` sem
+    #: lances. Derivada do texto, refeita a cada edição.
+    validacao: Optional[Validacao] = None
 
     # ------------------------------------------------------------------
     @property
@@ -115,7 +121,22 @@ class DiagramaLido:
 
     @property
     def confiavel(self) -> bool:
-        return self.lido and (self.conferido or not self.motivo)
+        """Conferido; ou com a confiança do porteiro e sem lance ilegal no texto.
+
+        A linha legal não anula a dúvida do porteiro: um lance só ("veja 3.e4") passa
+        em muitas posições erradas, e o diagrama duvidoso sairia redesenhado do FEN."""
+        if not self.lido:
+            return False
+        if self.conferido:
+            return True
+        if self.validacao is not None and not self.validacao.confiavel:
+            return False
+        return not self.motivo
+
+    @property
+    def roque_inferido(self) -> str:
+        """O roque que rei e torre nas casas iniciais sugerem; nunca vai ao FEN (CA-10.3)."""
+        return lances.roque_inferido(self.fen) if self.lido else ""
 
     @property
     def fen(self) -> str:
@@ -126,6 +147,9 @@ class DiagramaLido:
 
     def marca_do_lado(self) -> str:
         """`brancas a jogar (assumido: a página não diz)` e as outras procedências."""
+        if self.lado in lado_a_jogar.LADOS and self.lado_origem == lances.LADO_DOS_LANCES:
+            cor = "brancas" if self.lado == "w" else "pretas"
+            return f"{cor} a jogar (pelo número do lance do texto, {self.lado_trecho})"
         return lado_a_jogar.marca(self.lado, self.lado_origem if self.lado else "")
 
     def linha_de_texto(self, numero: int, *, com_ressalva: bool = True) -> str:
@@ -194,6 +218,7 @@ class DiagramaLido:
             "conferido": self.conferido,
             "motivo": self.motivo,
             "erro": self.erro,
+            **({"validacao": self.validacao.para_json()} if self.validacao else {}),
         }
 
     @classmethod
@@ -216,7 +241,8 @@ class DiagramaLido:
                    lados_de_rotulo=tuple(bruto.get("lados_de_rotulo", ())),
                    conferido=bool(bruto.get("conferido", False)),
                    motivo=bruto.get("motivo", ""), erro=bruto.get("erro", ""),
-                   id=str(bruto.get("id") or ""))
+                   id=str(bruto.get("id") or ""),
+                   validacao=Validacao.de_json(bruto.get("validacao")))
 
 
 def com_ids(diagramas: Sequence[DiagramaLido]) -> List[DiagramaLido]:

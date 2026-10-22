@@ -20,6 +20,7 @@ despacham cliques e teclas.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -31,6 +32,7 @@ from PySide6.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QDialog, Q
 
 from core.tabuleiro_edicao import SIMBOLOS, TabuleiroEdicao
 
+from abbychess import lances
 from abbychess.app.imagens import pixmap_de_cinza
 from abbychess.diagramas import LADO_DA_LEGENDA, DiagramaLido, afirmar_lado
 
@@ -210,11 +212,13 @@ class DialogoDeDiagrama(QDialog):
     conferido = Signal(int, object, bool)
 
     def __init__(self, matriz: np.ndarray, diagramas: List[DiagramaLido], indice: int = 0,
-                 parent=None):
+                 parent=None, linhas: Optional[List[List[lances.Lance]]] = None):
         super().__init__(parent)
         self.setWindowTitle("Conferir diagrama")
         self.matriz = matriz
         self.diagramas = list(diagramas)
+        #: A primeira linha de lances do texto depois de cada diagrama (§10).
+        self.linhas = list(linhas or [])
         self.atual = indice
         #: Um tabuleiro por diagrama, criado na primeira visita: ir e voltar não perde edição.
         self.tabuleiros: Dict[int, TabuleiroEdicao] = {}
@@ -256,10 +260,14 @@ class DialogoDeDiagrama(QDialog):
         self.fen.setFont(QFont("Consolas", 10))
         copiar = QPushButton("Copiar FEN")
         copiar.clicked.connect(lambda: QApplication.clipboard().setText(self.fen.text()))
+        copiar_pgn = QPushButton("Copiar PGN")
+        copiar_pgn.setToolTip("A posição e os lances do texto que passaram na validação")
+        copiar_pgn.clicked.connect(lambda: QApplication.clipboard().setText(self.pgn()))
         linha_fen = QHBoxLayout()
         linha_fen.addWidget(QLabel("FEN:"))
         linha_fen.addWidget(self.fen, 1)
         linha_fen.addWidget(copiar)
+        linha_fen.addWidget(copiar_pgn)
 
         self.avisos = QLabel()
         self.avisos.setWordWrap(True)
@@ -341,13 +349,25 @@ class DialogoDeDiagrama(QDialog):
         caixa.addWidget(lado)
 
         roque = QGroupBox("Roque")
-        linha_roque = QHBoxLayout(roque)
+        coluna_roque = QVBoxLayout(roque)
+        linha_roque = QHBoxLayout()
         self.checks_roque: Dict[str, QCheckBox] = {}
         for letra, texto in (("K", "O-O ♔"), ("Q", "O-O-O ♔"), ("k", "O-O ♚"), ("q", "O-O-O ♚")):
             check = QCheckBox(texto)
             check.clicked.connect(lambda _=False, letra=letra: self._mudar_roque(letra))
             linha_roque.addWidget(check)
             self.checks_roque[letra] = check
+        coluna_roque.addLayout(linha_roque)
+        linha_inferido = QHBoxLayout()
+        self.roque_inferido = QLabel()
+        self.roque_inferido.setWordWrap(True)
+        self.btn_roque_inferido = QPushButton("Usar")
+        self.btn_roque_inferido.setToolTip("Marca o roque que rei e torre nas casas iniciais "
+                                           "sugerem. Sem isto, o FEN sai sem roque.")
+        self.btn_roque_inferido.clicked.connect(self._usar_roque_inferido)
+        linha_inferido.addWidget(self.roque_inferido, 1)
+        linha_inferido.addWidget(self.btn_roque_inferido)
+        coluna_roque.addLayout(linha_inferido)
         caixa.addWidget(roque)
 
         self.check_inteiro = QCheckBox("Conferi as 64 casas: guardar todas como\namostras do livro")
@@ -371,6 +391,24 @@ class DialogoDeDiagrama(QDialog):
     def _mudar_roque(self, letra: str) -> None:
         self.tabuleiro().alternar_roque(letra)
         self._mostrar()
+
+    def _usar_roque_inferido(self) -> None:
+        tabuleiro = self.tabuleiro()
+        tabuleiro.definir_roque(lances.roque_inferido(tabuleiro.fen()))
+        self._mostrar()
+
+    # ------------------------------------------------------------------
+    def validacao(self) -> Optional[lances.Validacao]:
+        """A validação pelos lances da posição como está agora no editor (§10)."""
+        linha = self.linhas[self.atual] if self.atual < len(self.linhas) else []
+        tabuleiro = self.tabuleiro()
+        lado = tabuleiro.lado if tabuleiro.lado_origem != "convencao" else None
+        return lances.validar(tabuleiro.fen(), linha, lado=lado, roque=tabuleiro.roque)
+
+    def pgn(self) -> str:
+        """O PGN da posição do editor e dos lances validados (`lances.pgn_do_diagrama`)."""
+        d = self.diagrama.conferir(self.tabuleiro(), conferido=self.diagrama.conferido)
+        return lances.pgn_do_diagrama(replace(d, validacao=self.validacao()))
 
     def _desfazer(self) -> None:
         if self.tabuleiro().desfazer():
@@ -432,6 +470,11 @@ class DialogoDeDiagrama(QDialog):
         for letra, check in self.checks_roque.items():
             check.setChecked(letra in tabuleiro.roque)
             check.setEnabled(letra in possiveis)
+        inferido = lances.roque_inferido(tabuleiro.fen())
+        self.roque_inferido.setText(f"Inferido: {inferido} (rei e torre nas casas iniciais; "
+                                    "não vai ao FEN sem você marcar)" if inferido
+                                    else "Nenhum roque inferido.")
+        self.btn_roque_inferido.setEnabled(bool(inferido) and inferido != tabuleiro.roque)
         for simbolo, botao in self.botoes_paleta.items():
             botao.setChecked(self.posicao.pincel == simbolo)
         self.btn_vazia.setChecked(self.posicao.pincel == "")
@@ -451,6 +494,13 @@ class DialogoDeDiagrama(QDialog):
                           "do lado das pretas, a posição sai girada 180°.")
         if d.motivo and not d.conferido:
             avisos.append(f"O leitor não confia nesta leitura: {d.motivo}. Confira casa a casa.")
+        validacao = self.validacao()
+        if validacao is not None and validacao.confiavel:
+            avisos.append(f"Confiável pelos lances: os {validacao.total} lance(s) do texto "
+                          "depois do diagrama são legais nesta posição.")
+        elif validacao is not None:
+            avisos.append(f"{validacao.aviso[:1].upper()}{validacao.aviso[1:]} "
+                          f"({validacao.legais} de {validacao.total} lances passaram).")
         avisos.extend(tabuleiro.avisos())
         legenda = []
         if any(c.corrigida for c in tabuleiro.casas):

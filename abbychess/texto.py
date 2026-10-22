@@ -328,6 +328,13 @@ def texto(documento: Documento, diagramas: Sequence = (), modo: str = IMPRESSO) 
     return "\n".join(saida)
 
 
+def texto_do_bloco(documento: Documento, bloco: Bloco, modo: str = IMPRESSO) -> str:
+    """O texto de um bloco de texto: uma linha impressa por linha."""
+    normal = _normalizador(modo)
+    return "\n".join(" ".join("".join(normal(documento.chars[g]) for g in p.gids)
+                              for p in linha.palavras) for linha in bloco.linhas)
+
+
 def pagina_avulsa(entries, diagramas=(), zonas=()) -> Pagina:
     """Uma `Pagina` com gids provisórios, para montar o texto de uma lista de `BoxEntry`
     (o adaptador do passo 1b: a janela e a exportação ainda trabalham com listas)."""

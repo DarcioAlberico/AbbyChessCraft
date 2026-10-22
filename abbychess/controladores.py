@@ -26,6 +26,7 @@ from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import exportar as ex
 from abbychess import historico as hs
+from abbychess import lances as lc
 from abbychess import livro
 from abbychess import lote as lt
 from abbychess import servidor_de_leitura as sl
@@ -553,7 +554,8 @@ class ControladorDeDiagramas:
                     for i, d in enumerate(novos):
                         if d.caixa == lido.caixa and not d.lido:
                             novos[i] = lido
-                pagina.diagramas = novos
+                pagina.diagramas = dg.com_ids(novos)
+                pagina.diagramas = lc.validar_pagina(pagina, p.projeto.dados.idioma)
                 p._gravar(pagina)
                 if pagina is p.modelo:
                     self.eventos.emitir("glifos_mudaram", None)
@@ -1714,6 +1716,8 @@ class ControladorDaSubstituicao:
         fontes = {i: previas[i].lida for i in aceitos}
         carimbos = {i: previas[i].carimbo for i in aceitos}
 
+        idioma = pc.projeto.dados.idioma
+
         def preparar():
             projeto = pc.projeto
             for i in aceitos:
@@ -1729,7 +1733,7 @@ class ControladorDaSubstituicao:
                     copia = fontes[i].instantaneo()
                     try:
                         sb.aplicar_na_pagina(copia, casos)
-                        _depois_de_editar(copia, fontes[i])
+                        _depois_de_editar(copia, fontes[i], idioma)
                         feitas[i] = (copia, hs.mudanca(fontes[i], copia.instantaneo()),
                                      projeto.resumo_do_modelo(copia))
                     except ss.Recusa as recusa:
@@ -1778,7 +1782,7 @@ class ControladorDaSubstituicao:
                     falhas[i] = (str(erro) if isinstance(erro, ss.Recusa)
                                  else f"a substituição falhou: {erro}")
                     continue
-                _depois_de_editar(viva, antes)
+                _depois_de_editar(viva, antes, self.pagina.projeto.dados.idioma)
                 mudanca, resumo = hs.mudanca(antes, viva.instantaneo()), None
             transacao.paginas[viva.pid] = mudanca
             mudadas.append((viva, resumo))
@@ -1809,7 +1813,7 @@ def _outro_onde(alvo: str) -> str:
     return "notação" if alvo == sb.PROSA else "prosa"
 
 
-def _depois_de_editar(pagina, antes) -> None:
+def _depois_de_editar(pagina, antes, idioma: str = "pt") -> None:
     """O que toda edição faz depois (como `ControladorDePagina._mudou`): o estado (§4.4), o
     lado dos diagramas pela legenda, os ids das áreas e dos diagramas."""
     from abbychess.modelo import proximo_estado
@@ -1821,6 +1825,7 @@ def _depois_de_editar(pagina, antes) -> None:
     pagina.zonas = zn.com_ids(list(pagina.zonas))
     pagina.diagramas = dg.com_ids(list(pagina.diagramas))
     pagina.zonas = zn.vincular_legendas(pagina.zonas, pagina.diagramas)
+    pagina.diagramas = lc.validar_pagina(pagina, idioma)
 
 
 def _mesma_pagina(viva, lida) -> bool:

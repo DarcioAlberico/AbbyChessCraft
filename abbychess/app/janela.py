@@ -468,7 +468,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
             self.pagina.tirar_do_desfazer(refazer)
 
     def _abrir_conferencia(self, indice: int) -> DialogoDeDiagrama:
-        dialogo = DialogoDeDiagrama(self.pagina.matriz, self.pagina.diagramas, indice, self)
+        dialogo = DialogoDeDiagrama(self.pagina.matriz, self.pagina.diagramas, indice, self,
+                                    linhas=self.pagina.linhas_dos_diagramas())
         dialogo.conferido.connect(self.conferencia.aplicar)
         self.dialogo_diagrama = dialogo
         dialogo.open()

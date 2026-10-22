@@ -622,7 +622,10 @@ no EPUB e no DOCX, os metadados do livro: título, autores e assuntos (separados
 editora, data (AAAA, AAAA-MM ou AAAA-MM-DD), direitos, identificador, edição impressa e a
 capa, que é copiada para a pasta do projeto. O formulário fica em `metadados.json` na pasta
 do projeto e volta preenchido na próxima exportação; num projeto só de leitura ele vale só
-naquela exportação. O arquivo também pode ser escrito à mão:
+naquela exportação. **Pré-visualizar…** mostra, sem gravar nada, o que a exportação
+escreveria com as opções do diálogo: o relatório inteiro e as primeiras 30 páginas, com o
+mesmo texto por parágrafo do arquivo e os diagramas com o texto alternativo (o PGN aparece
+como texto; o PDF não tem prévia). O arquivo também pode ser escrito à mão:
 
 ```json
 {"autores": ["Jacob Aagaard"], "editora": "Quality Chess", "data": "2012",

@@ -1036,6 +1036,34 @@ class ControladorDoLivro:
         p.ir_para(proxima)
         p._avisar(f"Página {proxima + 1}: {len(p.fila())} a revisar.", 6000)
 
+    def previa(self, formato: str, opcoes: Optional["ex.Opcoes"], metadados: Optional[dict],
+               pronto, falhou=None) -> None:
+        """A pré-visualização da exportação (§12.2), fora da interface: `pronto` recebe o
+        HTML. Nada é gravado (nem os metadados do formulário)."""
+        p = self.pagina
+        projeto = p.projeto
+
+        def preparar():
+            def trabalho(progresso):
+                return ex.previa(projeto, formato, opcoes=opcoes, metadados=metadados,
+                                 progresso=progresso)[0]
+
+            def chegou(html: str):
+                if p.projeto is projeto:
+                    pronto(html)
+                elif falhou is not None:
+                    falhou("o projeto mudou")
+            return trabalho, chegou
+
+        aviso = p._falhou("Pré-visualizar")
+
+        def falha(mensagem: str) -> None:
+            aviso(mensagem)
+            if falhou is not None:
+                falhou(mensagem)
+
+        p.tarefa(f"Pré-visualizando {formato.upper()}", preparar, falhou=falha)
+
     def exportar(self, destino: Path, opcoes: Optional["ex.Opcoes"] = None,
                  metadados: Optional[dict] = None, capa: Optional[Path] = None) -> None:
         """Escreve as páginas reconhecidas em PDF pesquisável, DOCX, EPUB, TXT ou PGN (pelo

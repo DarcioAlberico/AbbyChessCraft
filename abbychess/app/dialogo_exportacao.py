@@ -1,5 +1,5 @@
 """O diálogo da exportação (SPEC §12.1): as opções e os metadados do livro, depois de escolher
-o arquivo e antes de escrever.
+o arquivo e antes de escrever, com a pré-visualização (§12.2) do que sairia.
 
 As opções valem conforme o formato: o PDF pesquisável guarda a página inteira (nenhuma opção
 de texto vale); o PGN só olha as páginas verificadas; as marcas de página são do TXT. Os
@@ -17,7 +17,7 @@ from typing import Optional
 
 from PySide6.QtWidgets import (QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
                                QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
-                               QPushButton, QVBoxLayout, QWidget)
+                               QPushButton, QTextBrowser, QVBoxLayout, QWidget)
 
 from abbychess import exportar as ex
 
@@ -44,6 +44,11 @@ class DialogoDeExportacao(QDialog):
         self.pasta = Path(pasta_do_projeto)
         self.capa_escolhida: Optional[Path] = None
         self.capa_atual = str(metadados.get("capa", "") or "")
+        #: Quem faz a prévia: `(formato, opcoes, metadados)`; ela chega por `mostrar_previa`.
+        self.ao_previsualizar = None
+        self.janela_da_previa: Optional[JanelaDaPrevia] = None
+        #: Falso depois de fechar: a prévia que chegar tarde não abre janela nenhuma.
+        self.vivo = True
 
         self.manter_margens = QCheckBox("Manter cabeçalhos, rodapés e números de página")
         self.so_verificadas = QCheckBox("Só as páginas verificadas")
@@ -112,6 +117,13 @@ class DialogoDeExportacao(QDialog):
         botoes = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                   QDialogButtonBox.StandardButton.Cancel)
         botoes.button(QDialogButtonBox.StandardButton.Ok).setText("Exportar")
+        self.btn_previa = botoes.addButton("Pré-visualizar…",
+                                           QDialogButtonBox.ButtonRole.ActionRole)
+        self.btn_previa.setToolTip("O que a exportação escreveria, com estas opções, e o "
+                                   "relatório, sem gravar nada")
+        self.btn_previa.setEnabled(formato != "pdf")
+        self.btn_previa.clicked.connect(self.previsualizar)
+        self.btn_exportar = botoes.button(QDialogButtonBox.StandardButton.Ok)
         botoes.accepted.connect(self._aceitar)
         botoes.rejected.connect(self.reject)
         corpo = QVBoxLayout(self)
@@ -155,6 +167,45 @@ class DialogoDeExportacao(QDialog):
     def escolha(self) -> Escolha:
         return Escolha(self.opcoes(), self.metadados(), self.capa_escolhida)
 
+    def previsualizar(self) -> None:
+        """Pede a prévia com o que está no diálogo agora; ela abre quando chegar."""
+        try:
+            metadados = self.metadados()
+        except ValueError as erro:
+            QMessageBox.warning(self, "Metadados", str(erro))
+            return
+        if self.ao_previsualizar is not None:
+            # Exportar espera a prévia: as duas vão na mesma fila de tarefas.
+            self.btn_previa.setEnabled(False)
+            self.btn_exportar.setEnabled(False)
+            self.btn_previa.setText("Pré-visualizando…")
+            self.ao_previsualizar(self.formato, self.opcoes(),
+                                  metadados if self.formato in COM_METADADOS else None)
+
+    def previa_falhou(self, _mensagem: str = "") -> None:
+        """A prévia não saiu (o aviso já foi): os botões voltam."""
+        if not self.vivo:
+            return
+        self.btn_previa.setEnabled(True)
+        self.btn_exportar.setEnabled(True)
+        self.btn_previa.setText("Pré-visualizar…")
+
+    def mostrar_previa(self, html: str) -> None:
+        if not self.vivo:                       # chegou depois de fechar: fica de fora
+            return
+        self.previa_falhou()
+        if self.janela_da_previa is None:
+            self.janela_da_previa = JanelaDaPrevia(self)
+        self.janela_da_previa.mostrar(html)
+
+    def done(self, resultado: int) -> None:
+        """Ao fechar (Exportar ou Cancelar), a prévia fecha junto e a que chegar tarde
+        é ignorada."""
+        self.vivo = False
+        if self.janela_da_previa is not None:
+            self.janela_da_previa.close()
+        super().done(resultado)
+
     def _aceitar(self) -> None:
         try:
             self.metadados()
@@ -163,6 +214,29 @@ class DialogoDeExportacao(QDialog):
             self.data.setFocus()
             return
         self.accept()
+
+
+class JanelaDaPrevia(QDialog):
+    """A prévia em HTML (§12.2), ao lado do diálogo: não grava nada, e pode ficar aberta
+    enquanto as opções mudam (Pré-visualizar de novo a refaz)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Pré-visualização da exportação")
+        self.resize(760, 820)
+        self.navegador = QTextBrowser()
+        self.navegador.setOpenLinks(False)
+        self.navegador.setAccessibleName("Pré-visualização da exportação")
+        fechar = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        fechar.rejected.connect(self.close)
+        corpo = QVBoxLayout(self)
+        corpo.addWidget(self.navegador, 1)
+        corpo.addWidget(fechar)
+
+    def mostrar(self, html: str) -> None:
+        self.navegador.setHtml(html)
+        self.show()
+        self.raise_()
 
 
 def _lista(valor) -> list:
@@ -204,8 +278,17 @@ def perguntar(janela, projeto, destino: Path) -> Optional[Escolha]:
     formato = ex.formato_do_caminho(destino)
     dialogo = DialogoDeExportacao(janela, formato, opcoes_lembradas(janela.config),
                                   ex.ler_metadados(projeto), projeto.pasta, projeto.dados.nome)
-    if dialogo.exec() != QDialog.DialogCode.Accepted:
-        return None
-    escolha = dialogo.escolha()
+
+    def previsualizar(formato_, opcoes, metadados):
+        janela.livro.previa(formato_, opcoes, metadados, dialogo.mostrar_previa,
+                            dialogo.previa_falhou)
+    dialogo.ao_previsualizar = previsualizar
+    try:
+        if dialogo.exec() != QDialog.DialogCode.Accepted:
+            return None
+        escolha = dialogo.escolha()
+    finally:
+        dialogo.ao_previsualizar = None         # sem ciclo, e a memória da prévia sai
+        dialogo.deleteLater()
     lembrar_opcoes(janela.config, escolha.opcoes)
     return escolha

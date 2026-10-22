@@ -632,7 +632,12 @@ DOCX iguais byte a byte com o mesmo `SOURCE_DATE_EPOCH`).
 2. Metadados, capa, idioma das mensagens e opções por formato (o diálogo das `Opcoes`).
 3. TOC semântico, `page-list`, landmarks, bookmarks e links internos.
 4. ~~TXT e PGN, com validação e relatório do que ficou de fora.~~
-5. Pré-visualização em HTML do conteúdo e do relatório antes de gravar.
+5. ~~Pré-visualização em HTML do conteúdo e do relatório antes de gravar.~~ (Rodada 4: o
+   botão Pré-visualizar do diálogo da exportação; `exportar.previa` pelo mesmo caminho e
+   opções, `abbychess/previa.py` com a marcação do EPUB e as imagens dentro do HTML, as 30
+   primeiras páginas e o relatório inteiro; CA-12.4 e CA-12.5 testados. Da revisão de código: a
+   prévia que chega depois de fechar o diálogo é ignorada, fechar o diálogo fecha a prévia e
+   libera a memória, Exportar espera a prévia em curso, e a prévia do TXT é o próprio TXT.)
 6. Validação automática (EPUBCheck, Ace, referências internas e smoke tests de leitores).
 7. Deduplicação/otimização de recursos e divisão dos XHTML por capítulo e tamanho.
 8. ~~`SOURCE_DATE_EPOCH` e pacote byte a byte reprodutível.~~

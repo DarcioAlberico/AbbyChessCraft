@@ -178,7 +178,7 @@ def mensagens(idioma: str) -> Dict[str, str]:
 # O texto de um parágrafo
 # ----------------------------------------------------------------------
 
-def _xhtml_do_texto(paragrafo: Paragrafo, simbolos: str) -> str:
+def xhtml_do_texto(paragrafo: Paragrafo, simbolos: str) -> str:
     """O texto com `<strong>`, `<em>` e o `<span class="s">` dos símbolos, sem aninhar
     errado: a marcação abre e fecha por trecho de mesmo estilo."""
     texto = paragrafo.texto
@@ -313,7 +313,7 @@ def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbo
                 atual.partes.append(f'<figure class="{classe}"><img src="../{nome}" '
                                     f'alt="{alt}"/></figure>')
             elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
-                corpo = _xhtml_do_texto(bloco, simbolos)
+                corpo = xhtml_do_texto(bloco, simbolos)
                 if bloco.titulo:
                     numero_do_titulo += 1
                     nivel = 1 if bloco.nivel == 1 else 2
@@ -403,7 +403,7 @@ def lista_do_sumario(titulos: Sequence[Tuple[str, int, str, str]]) -> str:
 # Escrever
 # ----------------------------------------------------------------------
 
-def _tipo_da_imagem(dados: bytes) -> Tuple[str, str]:
+def tipo_da_imagem(dados: bytes) -> Tuple[str, str]:
     if dados[:3] == b"\xff\xd8\xff":
         return "image/jpeg", ".jpg"
     if dados[:6] in (b"GIF87a", b"GIF89a"):
@@ -436,7 +436,7 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
             if soma in por_hash:
                 escrito.reutilizadas += 1
             else:
-                tipo, extensao = _tipo_da_imagem(bloco.png)
+                tipo, extensao = tipo_da_imagem(bloco.png)
                 nome = f"imagens/{soma[:20]}{extensao}"
                 por_hash[soma] = nome
                 arquivos.append((f"OEBPS/{nome}", bloco.png))
@@ -466,7 +466,7 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
     espinha = []
     tem_capa = metadados.capa is not None
     if tem_capa:
-        tipo, extensao = _tipo_da_imagem(metadados.capa)
+        tipo, extensao = tipo_da_imagem(metadados.capa)
         arquivos.append((f"OEBPS/imagens/capa{extensao}", metadados.capa))
         manifesto.append(f'<item id="capa-imagem" href="imagens/capa{extensao}" '
                          f'media-type="{tipo}" properties="cover-image"/>')

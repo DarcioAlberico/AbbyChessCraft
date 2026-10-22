@@ -455,14 +455,90 @@ equivalência dos casos de caracterização permitir unificar as duas.
 
 ## Passo J — Exportação (§12.1–12.3)
 
+### Auditoria do EPUB real — Aagaard, 2026-10-21
+
+Artefato auditado: `a-matter-of-endgame-technique-jacob-aagaard.epub`, 19.367.892 bytes,
+SHA-256 `1AD8C9CAC636EC70A5AACB5BAF7F167B97E60D53F32F0707F7CFC746FBB5CB9B`. O pacote básico
+está correto: `mimetype` é a primeira entrada e não está comprimida; os 898 XHTML são XML
+válido; não há imagem referenciada ausente; o OPF declara EPUB 3 e idioma `en`. A fonte de
+símbolos de xadrez está incorporada e 2.589 dos 2.636 diagramas têm FEN no texto alternativo.
+
+O artefato revelou estas lacunas, que entram no escopo dos passos F, G, H e J:
+
+- **OCR e texto (P0, todos os formatos):** aparecem nomes destruídos (`S k Mi hal Kr`),
+  trocas recorrentes de `I/l` e `0/O` (`lt is`, `ln the`, `6o.`), palavras erradas
+  (`rwists`), espaços dentro da palavra (`unnec. essary`), pontuação convertida em apóstrofo
+  e cabeçalho/rodapé no corpo (`pawn moves 95`). Foram contados ao menos 143 `lt is` e 103
+  `ln ...`; isto pede relatório pré-exportação por léxico, confusões recorrentes, palavra
+  partida e trecho de baixa confiança, com ação para voltar à página e corrigir em lote.
+- **Parágrafos entre páginas (P0, EPUB/DOCX/TXT):** cada página física virou um documento;
+  há 439 limites cujo último parágrafo não termina em pontuação e 18 continuações fortes
+  começando em minúscula. O intermediário deve juntar parágrafos que atravessam a página,
+  desfazer hífen de quebra e conservar a página original como âncora, não como quebra
+  editorial obrigatória.
+- **Estrutura (P0/P1):** os 8.825 parágrafos saíram com zero `h1`–`h6`, zero `strong`/`em`,
+  zero tabelas e zero links. Funções de zona precisam produzir títulos, subtítulos, notas,
+  legendas, tabelas e estilos inline no Documento; EPUB e DOCX devem consumir essa mesma
+  estrutura, sem remontá-la diretamente dos boxes.
+- **Sumário e navegação (P1):** o `nav.xhtml` tem 898 itens planos chamados “Página N”, em
+  português num livro inglês. Gerar TOC hierárquico pelos títulos reais; mover as páginas
+  físicas para um `epub:type="page-list"`; acrescentar landmarks (capa, sumário, corpo,
+  índice) e preservar âncoras de página. “Solution onpage N”, índice e referências a
+  diagramas/capítulos devem virar links internos conferidos.
+- **Granularidade (P1):** 898 arquivos no spine tornam navegação e manutenção ruins. Gerar
+  XHTML por capítulo/seção, com divisão por limite de tamanho, em vez de um por página;
+  manter `epub:type="pagebreak"` para a correspondência com o impresso.
+- **Diagramas (P0/P1):** 47 imagens têm apenas `alt="Diagrama"` e não têm FEN; 53 figuras
+  não têm legenda. Antes de exportar, listar diagramas não lidos/não conferidos; quando não
+  houver FEN, produzir alternativa útil (estado, lado a jogar, legenda e aviso) sem afirmar
+  no OPF que texto alternativo suficiente existe. Ligar legenda, solução e PGN ao diagrama.
+- **Metadados e capa (P1):** o OPF não tem `dc:creator`, `dc:publisher`, `dc:date`,
+  `dc:subject` nem `cover-image`, embora o autor esteja no título. Adicionar formulário e
+  extração assistida desses campos, identificador configurável, capa real, direitos e
+  idioma das mensagens geradas. Não codificar “Sumário”, “Página” e o resumo de
+  acessibilidade em português quando `dc:language` for outro.
+- **Acessibilidade (P1):** recalcular `accessModeSufficient` e
+  `accessibilityFeature=alternativeText` a partir do que foi realmente exportado; não usar
+  `hazard=none` sem verificação. Imagens informativas ganham alternativa específica;
+  decorativas, `alt=""`; títulos, tabelas, notas, landmarks e ordem de leitura usam HTML
+  semântico. Rodar Ace by DAISY além do EPUBCheck.
+- **Tamanho (P2):** há 2.636 PNG; 157 são cópias byte a byte, desperdiçando cerca de
+  958.719 bytes. Deduplicar pelo hash, reutilizar o mesmo recurso, aplicar otimização
+  lossless e dimensões responsivas; conservar resolução suficiente para peças e texto.
+- **Apresentação (P2):** trocar larguras inline em `pt` por classes/CSS responsivo; estilos
+  distintos para título, corpo, nota, legenda, variante e notação; `break-inside: avoid`
+  onde fizer sentido; tema que respeite modo escuro e tamanho de fonte do leitor.
+
+Critérios de aceite acrescentados à exportação:
+
+1. EPUBCheck sem erro; Ace sem violação séria; abrir e navegar em Calibre, Thorium e ao
+   menos um leitor móvel. O teste verifica manifest/spine/referências e `mimetype`.
+2. TOC contém os capítulos esperados, `page-list` contém as páginas e nenhum item genérico
+   “Página N” ocupa o TOC principal quando há títulos.
+3. Zero imagem informativa com alternativa genérica; todo diagrama com FEN expõe FEN, lado
+   e estado, e os não lidos aparecem no relatório.
+4. Uma fixture que cruza página, tem título, itálico/negrito, nota, tabela, referência a
+   solução e diagrama produz estrutura equivalente em EPUB e DOCX e texto limpo em TXT.
+5. PDF pesquisável recebe metadados, bookmarks pelos mesmos títulos, camada na ordem do
+   Documento e FEN pesquisável; a opção de preservar paginação não reintroduz cabeçalhos.
+6. PGN inclui apenas diagramas/linhas validados, com vínculo à página e relatório dos que
+   ficaram de fora; TXT tem opção de marcas de página, nunca cabeçalho corrido por acidente.
+7. O relatório de exportação conta páginas, capítulos, palavras sinalizadas, diagramas
+   lidos/não lidos, imagens reutilizadas, links quebrados e itens omitidos, com destino para
+   cada correção na interface.
+8. Saída reprodutível com `SOURCE_DATE_EPOCH`: mesmos dados geram bytes idênticos, inclusive
+   ordem do ZIP, UUID, datas, nomes e deduplicação de recursos.
+
 **Tarefas.**
-1. A exportação passa a ler o Documento.
-2. As opções.
-3. TXT e PGN.
-4. A pré-visualização em HTML.
-5. O relatório.
-6. `SOURCE_DATE_EPOCH`.
-7. Sair dos privados do core.
+1. A exportação passa a ler o Documento estruturado e faz a junção entre páginas.
+2. Metadados, capa, idioma das mensagens e opções por formato.
+3. TOC semântico, `page-list`, landmarks, bookmarks e links internos.
+4. TXT e PGN, com validação e relatório do que ficou de fora.
+5. Pré-visualização em HTML do conteúdo e do relatório antes de gravar.
+6. Validação automática (EPUBCheck, Ace, referências internas e smoke tests de leitores).
+7. Deduplicação/otimização de recursos e divisão dos XHTML por capítulo e tamanho.
+8. `SOURCE_DATE_EPOCH` e pacote byte a byte reprodutível.
+9. Sair dos privados do core.
 
 **Verificação.** CA-12.1 a CA-12.6; CA-5.3 (parte da exportação).
 

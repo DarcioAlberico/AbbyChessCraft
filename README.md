@@ -632,6 +632,13 @@ como texto; o PDF não tem prévia). O arquivo também pode ser escrito à mão:
  "assuntos": ["Xadrez", "Finais"], "direitos": "© 2012", "capa": "capa.jpg"}
 ```
 
+O **número impresso** de cada página é tirado das margens (o deslocamento entre o número
+do cabeçalho ou rodapé e a posição no PDF, quando ao menos duas páginas concordam): no EPUB
+ele é o rótulo da lista de páginas e o alvo dos links ("ver a página 23", "on page 23"
+viram link quando a página está no livro exportado); no **PDF pesquisável** ele vira o rótulo
+de cada página, e os títulos do Documento viram os **marcadores** (o sumário e os rótulos que o
+PDF original já trazia ficam).
+
 Depois de gravar, o arquivo é relido e conferido (pacote, manifesto, XML e cada link); com
 `ABBY_EPUBCHECK` apontando o `epubcheck.jar`, `epub.epubcheck` roda o EPUBCheck também. O EPUBCheck 5.4.0
 aprova o EPUB da fatia do Xadrez Vitorioso sem erro nem advertência; para rodá-lo nos testes:

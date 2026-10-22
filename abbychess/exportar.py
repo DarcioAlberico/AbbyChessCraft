@@ -153,6 +153,11 @@ class Relatorio:
     capitulos: int = 0
     imagens_reutilizadas: int = 0
     problemas_do_arquivo: List[str] = field(default_factory=list)
+    #: Índice da página -> o número impresso nela (`numeros_impressos`), quando se sabe.
+    numeros_impressos: Dict[int, int] = field(default_factory=dict)
+    #: No EPUB, as referências a página que viraram link; no PDF, os marcadores.
+    links: int = 0
+    marcadores: int = 0
 
     def resumo(self) -> str:
         """Uma linha, para a barra de status."""
@@ -177,6 +182,12 @@ class Relatorio:
             partes.append(f"{len(self.nao_verificadas)} página(s) não verificada(s)")
         if self.capitulos:
             partes.append(f"{self.capitulos} capítulo(s)")
+        if self.links:
+            partes.append(f"{self.links} referência(s) a página com link")
+        if self.numeros_impressos and self.formato == "epub":
+            primeira = min(self.numeros_impressos)
+            partes.append(f"página impressa {self.numeros_impressos[primeira]} na posição "
+                          f"{primeira + 1} do PDF")
         if self.imagens_reutilizadas:
             partes.append(f"{self.imagens_reutilizadas} imagem(ns) reaproveitada(s)")
         if self.problemas_do_arquivo:
@@ -882,9 +893,14 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
     for i in pelos_boxes:
         lidos[i], estruturas[i] = Estrutura.da_pagina(projeto.carregar_modelo(i))
     # A regra das margens corridas olha o livro inteiro, como sempre (o título corrido das
-    # pares casa com o das ímpares); só não tira o que o usuário marcou como texto.
-    tirar = {} if opcoes.manter_margens else margens_corridas(
+    # pares casa com o das ímpares); só não tira o que o usuário marcou como texto. As
+    # mesmas margens dão o número impresso de cada página (os rótulos e os links do EPUB).
+    funcoes, margens = _funcoes_das_margens(
         {i: (lidos[i], _altura_da_pagina(projeto, i)) for i in pelos_boxes})
+    tirar = {} if opcoes.manter_margens else {
+        i: set(margens[i].poeira) | set(funcoes[i]) for i in pelos_boxes}
+    relatorio.numeros_impressos = numeros_impressos(
+        {i: (lidos[i], estruturas[i]) for i in pelos_boxes}, funcoes, alvo)
     paginas = []
     for feitas, indice in enumerate(alvo, start=1):
         if indice in nativas:
@@ -908,6 +924,94 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
     pdf_nativo.lados_pelos_lances(paginas)
     _paginas_no_relatorio(relatorio, projeto, paginas, estados, nativas)
     return paginas
+
+
+#: Quantas páginas precisam concordar no deslocamento para o número impresso valer.
+CONCORDANCIA_DOS_NUMEROS = 2
+
+
+def numeros_impressos(paginas: Dict[int, Tuple[Sequence[BoxEntry], "Estrutura"]],
+                      funcoes: Dict[int, dict],
+                      todas: Optional[Iterable[int]] = None) -> Dict[int, int]:
+    """`{índice da página: número impresso}`, pelos números das margens.
+
+    Os candidatos são os números nas linhas de margem: as que a regra das margens achou
+    (`funcoes`, índice do box -> função) e as das áreas de cabeçalho, rodapé e número de
+    página da `Estrutura`. Cada número dá um **deslocamento** (número − índice); cada página
+    fica com o seu deslocamento mais votado no livro (o OCR erra números, "2l", e um
+    cabeçalho tem outros, "Problema 41"). A paginação vale **por trechos**: páginas
+    seguidas com o mesmo deslocamento, ao menos `CONCORDANCIA_DOS_NUMEROS`, formam um
+    trecho, e cada página das pedidas (`todas`, ou as de `paginas`) recebe o do último
+    trecho que começa nela ou antes (o encarte de fotos que o livro não numera muda o
+    deslocamento dali em diante). Número ≤ 0 não sai. Sem trecho, `{}`."""
+    from collections import Counter
+
+    por_pagina: Dict[int, set] = {}
+    for indice, (boxes, estrutura) in paginas.items():
+        das_margens = funcoes.get(indice, {})
+        margem = [b for k, b in enumerate(boxes) if k in das_margens
+                  or estrutura.funcao(b) in FUNCOES_DE_MARGEM]
+        vistos = set()
+        for linha in _linhas(margem, _Leitura()) if margem else []:
+            for numero in _NUMERO_DE_PAGINA.findall(linha.texto):
+                vistos.add(int(numero) - indice)
+        if vistos:
+            por_pagina[indice] = vistos
+    votos: Counter = Counter(d for vistos in por_pagina.values() for d in vistos)
+    escolhido = {i: max(sorted(v), key=lambda d: votos[d]) for i, v in por_pagina.items()}
+    trechos: List[Tuple[int, int]] = []           # (primeira página, deslocamento)
+    corrida: List[int] = []
+
+    def fechar() -> None:
+        if len(corrida) >= CONCORDANCIA_DOS_NUMEROS:
+            trechos.append((corrida[0], escolhido[corrida[0]]))
+
+    for i in sorted(escolhido):
+        if corrida and escolhido[i] != escolhido[corrida[-1]]:
+            fechar()
+            corrida = []
+        corrida.append(i)
+    fechar()
+    if not trechos:
+        return {}
+    saida = {}
+    for i in sorted(todas if todas is not None else paginas):
+        deslocamento = trechos[0][1]
+        for comeco, d in trechos:
+            if comeco <= i:
+                deslocamento = d
+        if i + deslocamento >= 1:
+            saida[i] = i + deslocamento
+    return saida
+
+
+def _funcoes_dos_candidatos(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]) -> Dict[int, dict]:
+    """As linhas candidatas a margem de cada página (posição, vão e tamanho), sem a
+    comparação entre páginas de `_funcoes_das_margens`: para achar o número impresso basta
+    o número delas, e a comparação custa n² no livro."""
+    saida = {}
+    for i, (boxes, altura) in paginas.items():
+        margem = _margem_da_pagina(boxes, altura)
+        saida[i] = {k: lugar for linha, lugar in margem.candidatos for k in linha.indices}
+    return saida
+
+
+def titulos_das_paginas(projeto: ProjetoDeLivro, indices: Sequence[int],
+                        estruturas: Optional[dict] = None) -> List[Tuple[int, str]]:
+    """`[(índice da página, título)]` das áreas de título do Documento, na ordem do livro:
+    os marcadores do PDF pesquisável (§12.1). `estruturas` (índice -> `Estrutura.da_pagina`)
+    poupa carregar os modelos de novo."""
+    saida = []
+    for indice in indices:
+        entries, estrutura = (estruturas[indice] if estruturas is not None
+                              else Estrutura.da_pagina(projeto.carregar_modelo(indice)))
+        do_titulo = [b for b in entries if estrutura.funcao(b) == "titulo"]
+        if not do_titulo:
+            continue
+        for _trecho, paragrafo in _paragrafos_por_trecho(do_titulo, (), _Leitura(), estrutura):
+            if paragrafo.titulo and paragrafo.texto.strip():
+                saida.append((indice, paragrafo.texto.strip()))
+    return saida
 
 
 def _margens_no_relatorio(relatorio: Relatorio, indice: int, boxes: Sequence[BoxEntry],
@@ -1058,7 +1162,8 @@ def exportar_epub(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
 
     metadados = metadados or epub.Metadados(titulo=titulo, idioma=idioma,
                                             autores=(autor,) if autor else ())
-    escrito = epub.escrever(paginas, caminho, metadados)
+    numeros = relatorio.numeros_impressos if relatorio is not None else None
+    escrito = epub.escrever(paginas, caminho, metadados, numeros=numeros)
     problemas = epub.conferir(caminho)
     for problema in problemas:
         log.warning("EPUB %s: %s", caminho, problema)
@@ -1066,6 +1171,7 @@ def exportar_epub(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
         relatorio.capitulos = escrito.capitulos
         relatorio.imagens_reutilizadas = escrito.reutilizadas
         relatorio.problemas_do_arquivo = problemas
+        relatorio.links = escrito.links
     return Path(caminho)
 
 
@@ -1231,6 +1337,12 @@ class ResumoDoPdf:
     sem_glifo: int = 0
     #: Diagramas com o FEN na camada de texto.
     fens: int = 0
+    #: Os marcadores (o sumário do PDF) pelos títulos do Documento, e os que o PDF original
+    #: já tinha e ficaram (o sumário do editor vale mais que o nosso).
+    marcadores: int = 0
+    marcadores_do_original: int = 0
+    #: As páginas ganharam o número impresso como rótulo (o "23" que o leitor mostra).
+    rotulos: bool = False
 
 
 def _texto_visivel(page) -> bool:
@@ -1395,8 +1507,11 @@ def exportar_pdf_pesquisavel(projeto: ProjetoDeLivro, caminho: str | Path,
         raise NadaParaExportar("Nenhuma página reconhecida para exportar.")
     resumo = ResumoDoPdf()
     fontes = _fontes()
+    tinha_rotulos = False
     if projeto.fonte_e_pdf:
         doc = fitz.open(projeto.fonte)
+        # O `select` apaga os rótulos de página do original: o que ele tinha é lido antes.
+        tinha_rotulos = bool(doc.get_page_labels())
         doc.select(alvo)
     else:
         doc = fitz.open()
@@ -1432,6 +1547,10 @@ def exportar_pdf_pesquisavel(projeto: ProjetoDeLivro, caminho: str | Path,
             if progresso:
                 progresso(feitas, len(alvo))
         try:
+            _marcar_o_pdf(doc, projeto, alvo, resumo, tinha_rotulos)
+        except Exception as erro:  # noqa: BLE001 — sem marcadores o PDF continua bom
+            log.warning("os marcadores e os rótulos do PDF não saíram (%s)", erro)
+        try:
             doc.subset_fonts()
         except Exception as erro:  # sem subset o arquivo só fica maior
             log.info("as fontes do PDF não foram reduzidas (%s)", erro)
@@ -1439,6 +1558,53 @@ def exportar_pdf_pesquisavel(projeto: ProjetoDeLivro, caminho: str | Path,
     finally:
         doc.close()
     return resumo
+
+
+def _marcar_o_pdf(doc, projeto: ProjetoDeLivro, alvo: Sequence[int], resumo: ResumoDoPdf,
+                  tinha_rotulos: bool = False) -> None:
+    """Os marcadores pelos títulos do Documento e os rótulos pelo número impresso.
+
+    O sumário e os rótulos que o PDF original já trazia ficam: são do editor, e um
+    sumário refeito pelo OCR seria pior. Sem título nenhum, o PDF sai sem marcadores. Os
+    modelos são carregados uma vez só para as duas coisas."""
+    posicao = {indice: k for k, indice in enumerate(alvo)}
+    lidos = {indice: Estrutura.da_pagina(projeto.carregar_modelo(indice)) for indice in alvo}
+    # Depois do `select`, os marcadores das páginas que ficaram de fora já saíram.
+    original = [m for m in doc.get_toc() if m[2] > 0]
+    if original:
+        resumo.marcadores_do_original = len(original)
+    else:
+        titulos = titulos_das_paginas(projeto, alvo, lidos)
+        if titulos:
+            doc.set_toc([[1, titulo, posicao[indice] + 1] for indice, titulo in titulos])
+            resumo.marcadores = len(titulos)
+    if tinha_rotulos:
+        return
+    # A altura de cada página sai do próprio PDF aberto (a 300 dpi, como os boxes).
+    funcoes = _funcoes_dos_candidatos(
+        {i: (lidos[i][0], round(doc[posicao[i]].rect.height * DPI_DA_LEITURA / 72))
+         for i in alvo})
+    numeros = numeros_impressos(lidos, funcoes, alvo)
+    if not numeros:
+        return
+    regras: List[dict] = []
+    anterior: Optional[int] = None
+    for indice in alvo:
+        numero = numeros.get(indice)
+        if numero is None:
+            # Sem número (as páginas de rosto, antes do 1): romanos, a partir do i. A
+            # primeira regra tem de estar na página 0, ou o rótulo do PDF fica inválido.
+            if anterior is not None or not regras:
+                regras.append({"startpage": posicao[indice], "prefix": "", "style": "r",
+                               "firstpagenum": 1})
+            anterior = None
+            continue
+        if anterior is None or numero != anterior + 1:
+            regras.append({"startpage": posicao[indice], "prefix": "", "style": "D",
+                           "firstpagenum": numero})
+        anterior = numero
+    doc.set_page_labels(regras)
+    resumo.rotulos = True
 
 
 def _gravar_pdf(doc, caminho: Path) -> None:
@@ -1569,6 +1735,14 @@ def _fora_do_pgn(d: DiagramaLido) -> str:
     return "nem conferido nem confiável pelos lances"
 
 
+def _mesmo_arquivo(a: Path, b: Path) -> bool:
+    """Os dois caminhos são o mesmo arquivo (maiúsculas, nomes 8.3, links e hardlinks)."""
+    try:
+        return a.exists() and b.exists() and os.path.samefile(a, b)
+    except OSError:
+        return False
+
+
 def formato_do_caminho(caminho: str | Path) -> str:
     formato = Path(caminho).suffix.lower().lstrip(".")
     if formato not in FORMATOS:
@@ -1623,6 +1797,8 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
     Resultados (§12.2). `metadados` troca o `metadados.json` (o formulário não gravado)."""
     formato = formato_do_caminho(caminho)
     caminho = Path(caminho)
+    if _mesmo_arquivo(caminho, Path(projeto.fonte)):
+        raise ValueError("O destino é o próprio arquivo de origem do livro: escolha outro nome.")
     opcoes = opcoes or Opcoes()
     relatorio = Relatorio(formato=formato)
     if formato == "pdf":
@@ -1636,6 +1812,14 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
             partes.append(f"{resumo.fens} diagrama(s) com o FEN pesquisável")
         if resumo.sem_glifo:
             partes.append(f"{resumo.sem_glifo} sem glifo na fonte")
+        if resumo.marcadores:
+            partes.append(f"{resumo.marcadores} marcador(es) pelos títulos")
+        if resumo.marcadores_do_original:
+            partes.append(f"o sumário do PDF original ficou ({resumo.marcadores_do_original} "
+                          "marcadores)")
+        if resumo.rotulos:
+            partes.append("páginas com o número impresso como rótulo")
+        relatorio.marcadores = resumo.marcadores
         relatorio.resumo_do_pdf = "; ".join(partes) + "."
         return relatorio.resumo_do_pdf, relatorio
     if formato == "pgn":

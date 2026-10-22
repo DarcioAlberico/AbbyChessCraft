@@ -25,6 +25,7 @@ from typing import List, Optional, Sequence
 from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import exportar as ex
+from abbychess import historico as hs
 from abbychess import livro
 from abbychess import lote as lt
 from abbychess import servidor_de_leitura as sl
@@ -51,6 +52,8 @@ class ControladorDeLayout:
         self.eventos = pagina.eventos
         #: A área escolhida (posição na lista), ou None.
         self.atual: Optional[int] = None
+        self._ordenacao: Optional[List[int]] = None
+        self.modelo: Optional[zn.ModeloDeAreas] = None
         pagina.eventos.ligar("pagina_trocou", self._pagina_trocou)
 
     @property
@@ -59,6 +62,7 @@ class ControladorDeLayout:
 
     def _pagina_trocou(self) -> None:
         self.atual = None
+        self._ordenacao = None
         self.eventos.emitir("layout_mudou")
 
     def _trocar(self, zonas: Sequence[zn.Zona], atual: Optional[int], descricao: str,
@@ -156,8 +160,20 @@ class ControladorDeLayout:
         p._avisar(f"Área {len(zonas)} de texto criada. 2 diagrama, 3 imagem, 4 ignorar.", 6000)
 
     def escolher(self, indice: int) -> None:
+        if self._ordenacao is not None and 0 <= indice < len(self.zonas):
+            if indice not in self._ordenacao:
+                self._ordenacao.append(indice)
+            if len(self._ordenacao) == len(self.zonas):
+                self._trocar(zn.ordenar(self.zonas, self._ordenacao), indice, "Ordenar áreas")
+                self._ordenacao = None
+            else:
+                self.atual = indice
+                self.eventos.emitir("layout_mudou")
+                self.eventos.emitir("acoes_mudaram")
+            return
         self.atual = indice if 0 <= indice < len(self.zonas) else None
         self.eventos.emitir("layout_mudou")
+        self.eventos.emitir("acoes_mudaram")
 
     def arrastar(self, indice: int, bordas: str, dx: int, dy: int) -> None:
         p = self.pagina
@@ -185,6 +201,91 @@ class ControladorDeLayout:
         zn.trocar_tipo(zonas, indice, tipo)
         self._trocar(zonas, indice, "Trocar o tipo da área")
         self.pagina._avisar(f"Área {indice + 1}: {zn.NOMES[tipo].lower()}.", 5000)
+
+    def trocar_funcao(self, indice: int, funcao: str) -> None:
+        zonas = self.zonas
+        if not 0 <= indice < len(zonas):
+            return
+        zn.trocar_funcao(zonas, indice, funcao)
+        self._trocar(zonas, indice, "Trocar a função da área")
+        self.pagina._avisar(f"Área {indice + 1}: {funcao.replace('_', ' ')}.", 5000)
+
+    def trocar_funcao_atual(self, funcao: str) -> None:
+        if self.atual is not None:
+            self.trocar_funcao(self.atual, funcao)
+
+    def iniciar_ordenacao(self) -> None:
+        if not self.zonas:
+            return
+        self._ordenacao = []
+        self.atual = None
+        self.eventos.emitir("layout_mudou")
+        self.pagina._avisar("Ordenar áreas: clique em cada uma na ordem de leitura; Esc cancela.",
+                            8000)
+
+    def cancelar_ordenacao(self) -> None:
+        if self._ordenacao is not None:
+            self._ordenacao = None
+            self.atual = None
+            self.eventos.emitir("layout_mudou")
+            self.pagina._avisar("Ordenação cancelada.", 4000)
+
+    def salvar_modelo(self) -> None:
+        p = self.pagina
+        if p.imagem is None or not self.zonas:
+            return
+        largura, altura = p.imagem.size
+        self.modelo = zn.ModeloDeAreas(largura, altura, tuple(self.zonas))
+        p._avisar(f"Modelo salvo com {len(self.zonas)} área(s).", 5000)
+
+    def aplicar_modelo_aqui(self) -> None:
+        p = self.pagina
+        if self.modelo is None or p.imagem is None:
+            return
+        try:
+            zonas = self.modelo.aplicar(*p.imagem.size)
+        except ValueError as erro:
+            p._avisar(f"Modelo não aplicado: {erro}", 7000)
+            return
+        self._trocar(zonas, None, "Aplicar modelo de áreas")
+
+    def aplicar_modelo(self, indices: Sequence[int]) -> None:
+        """Aplica o modelo a um intervalo já filtrado (todos, pares ou ímpares).
+
+        Páginas de outra resolução são recusadas; todas as aceitas formam um único passo
+        do desfazer do projeto.
+        """
+        p, modelo = self.pagina, self.modelo
+        if modelo is None or p.projeto is None or p.fonte is None:
+            return
+        mudancas, recusadas = {}, []
+        for indice in sorted(set(indices)):
+            if not 0 <= indice < p.fonte.total:
+                continue
+            largura, altura = p.fonte.pagina(indice).size
+            try:
+                zonas = modelo.aplicar(largura, altura)
+            except ValueError:
+                recusadas.append(indice + 1)
+                continue
+            pagina = p.projeto.pagina_para_editar(indice)
+            antes = pagina.instantaneo()
+            pagina.zonas = zonas
+            pagina.zonas = zn.vincular_legendas(zn.com_ids(pagina.zonas), pagina.diagramas)
+            mudancas[pagina.pid] = hs.mudanca(antes, pagina.instantaneo())
+            p.projeto.agendar(pagina)
+        if mudancas:
+            p.historico.registrar(hs.Transacao("Aplicar modelo de áreas", mudancas))
+            p.eventos.emitir("acoes_mudaram")
+            if p.modelo is not None and p.modelo.pid in mudancas:
+                self.atual = None
+                p.eventos.emitir("layout_mudou")
+        complemento = f"; recusadas por resolução: {recusadas}" if recusadas else ""
+        p._avisar(f"Modelo aplicado a {len(mudancas)} página(s){complemento}.", 8000)
+
+    def reconhecer_atual(self) -> None:
+        if self.atual is not None and 0 <= self.atual < len(self.zonas):
+            self.pagina.reconhecer_zona(self.zonas[self.atual])
 
 
 # ----------------------------------------------------------------------

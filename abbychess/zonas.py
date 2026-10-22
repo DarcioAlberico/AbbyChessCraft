@@ -47,6 +47,11 @@ NOMES = {TEXTO: "Texto", DIAGRAMA: "Diagrama", IMAGEM: "Imagem", IGNORAR: "Ignor
 #: rodapé, número de página, nota ou legenda.
 FUNCOES = ("texto", "titulo", "cabecalho", "rodape", "numero_de_pagina", "nota", "legenda",
            "diagrama", "figura", "tabela", "ignorar")
+NOMES_DAS_FUNCOES = {
+    "texto": "Texto", "titulo": "Título", "cabecalho": "Cabeçalho", "rodape": "Rodapé",
+    "numero_de_pagina": "Nº de página", "nota": "Nota", "legenda": "Legenda",
+    "diagrama": "Diagrama", "figura": "Figura", "tabela": "Tabela", "ignorar": "Ignorar",
+}
 #: O tipo que cada função dá à área.
 TIPO_DA_FUNCAO = {"texto": TEXTO, "titulo": TEXTO, "cabecalho": TEXTO, "rodape": TEXTO,
                   "numero_de_pagina": TEXTO, "nota": TEXTO, "legenda": TEXTO,
@@ -70,12 +75,29 @@ VAO_ENTRE_BLOCOS = 1.2
 DISTANCIA_DA_LEGENDA = 4.0
 #: O corpo de um título é pelo menos 1,3 vez o corpo do texto (SPEC §5.1).
 RAZAO_DO_TITULO = 1.3
+RAZAO_DA_NOTA = 0.82
+RECUO_DE_PARAGRAFO = 1.2
 
 _INICIO_DA_LEGENDA = re.compile(r"^\s*(?:diagrama|diagram|teste|test|\d+)\b", re.IGNORECASE)
 _TEXTO_DA_LEGENDA = re.compile(r"\b(?:jogam?|joga|to\s+play|moves?)\b", re.IGNORECASE)
 _NUMERO_DE_PAGINA = re.compile(r"^\s*(?:p(?:ág(?:ina)?|age)?\.?\s*)?\d+\s*$", re.IGNORECASE)
 
 Caixa = Tuple[int, int, int, int]
+
+
+@dataclass(frozen=True)
+class ModeloDeAreas:
+    """Zonas de uma página que podem ser reaplicadas somente na mesma resolução."""
+
+    largura: int
+    altura: int
+    zonas: Tuple["Zona", ...]
+
+    def aplicar(self, largura: int, altura: int) -> List["Zona"]:
+        if (largura, altura) != (self.largura, self.altura):
+            raise ValueError("A resolução da página é diferente da resolução do modelo.")
+        # IDs pertencem à página de origem; a página de destino ganha os seus.
+        return com_ids([replace(z, id="", diagrama_id=None) for z in self.zonas])
 
 
 @dataclass(frozen=True)
@@ -219,6 +241,23 @@ def trocar_tipo(zonas: List[Zona], indice: int, tipo: str) -> None:
                             diagrama_id=None)
 
 
+def trocar_funcao(zonas: List[Zona], indice: int, funcao: str) -> None:
+    """Troca a função e deriva dela o tipo da zona."""
+    if funcao not in FUNCOES:
+        raise ValueError(f"Função de área desconhecida: {funcao!r}")
+    zonas[indice] = replace(zonas[indice], tipo=TIPO_DA_FUNCAO[funcao], funcao=funcao,
+                            diagrama_id=(zonas[indice].diagrama_id
+                                         if funcao == "legenda" else None))
+
+
+def ordenar(zonas: Sequence[Zona], indices: Sequence[int]) -> List[Zona]:
+    """Grava a ordem escolhida; cada zona deve aparecer exatamente uma vez."""
+    if sorted(indices) != list(range(len(zonas))):
+        raise ValueError("A ordem deve conter cada área exatamente uma vez.")
+    posicao = {indice: ordem for ordem, indice in enumerate(indices)}
+    return [replace(zona, ordem=posicao[i]) for i, zona in enumerate(zonas)]
+
+
 # ----------------------------------------------------------------------
 # Áreas automáticas
 # ----------------------------------------------------------------------
@@ -261,7 +300,6 @@ def classificar_funcoes(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
     do livro. Quando os boxes ainda não foram lidos, as regras que dependem de texto apenas
     não disparam.
     """
-    del largura  # reservado para as regras de alinhamento do restante do passo F
     diagramas = [z for z in zonas if z.funcao == "diagrama"]
     alturas = [b.y2 - b.y1 for b in boxes if b.char]
     corpo = median(alturas) if alturas else float(escala)
@@ -281,6 +319,13 @@ def classificar_funcoes(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
             funcao = "legenda"
         elif dentro and median(b.y2 - b.y1 for b in dentro) >= RAZAO_DO_TITULO * corpo:
             funcao = "titulo"
+        elif texto and len(texto) <= 80 and abs((zona.x1 + zona.x2) / 2 - largura / 2) <= 0.1 * largura \
+                and _isolada(zona, zonas, escala):
+            funcao = "titulo"
+        elif (dentro and zona.y1 >= 0.7 * altura
+              and median(b.y2 - b.y1 for b in dentro) <= RAZAO_DA_NOTA * corpo
+              and _isolada(zona, zonas, escala)):
+            funcao = "nota"
         saida.append(replace(zona, funcao=funcao))
     return saida
 
@@ -324,6 +369,12 @@ def _vizinha_do_diagrama(zona: Zona, diagrama: Zona, escala: float) -> bool:
         return False
     distancia = max(diagrama.y1 - zona.y2, zona.y1 - diagrama.y2, 0)
     return distancia <= DISTANCIA_DA_LEGENDA * escala
+
+
+def _isolada(zona: Zona, zonas: Sequence[Zona], escala: float) -> bool:
+    outras = [z for z in zonas if z is not zona and z.tipo == TEXTO]
+    distancia = min((max(z.y1 - zona.y2, zona.y1 - z.y2, 0) for z in outras), default=float("inf"))
+    return distancia >= 1.5 * escala
 
 
 def vincular_legendas(zonas: Sequence[Zona], diagramas: Sequence) -> List[Zona]:
@@ -399,7 +450,9 @@ def _blocos(linhas: List[List[int]], escala: float) -> List[Caixa]:
         alvo = None
         for bloco in blocos:
             vao = linha[1] - bloco[3]
-            if vao <= escala * VAO_ENTRE_BLOCOS and min(linha[2], bloco[2]) > max(linha[0], bloco[0]):
+            recuo = linha[0] - bloco[0]
+            if (vao <= escala * VAO_ENTRE_BLOCOS and recuo < escala * RECUO_DE_PARAGRAFO
+                    and min(linha[2], bloco[2]) > max(linha[0], bloco[0])):
                 alvo = bloco
         if alvo is None:
             blocos.append(list(linha))

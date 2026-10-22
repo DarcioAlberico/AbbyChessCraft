@@ -166,6 +166,44 @@ def test_funcao_de_margem_so_muda_zona_automatica_inteiramente_classificada():
     assert [z.funcao for z in classificadas] == ["cabecalho", "texto", "texto"]
 
 
+def test_titulo_centralizado_e_nota_menor_no_pe_sao_classificados():
+    boxes = (_boxes_de("Um titulo", 360, 100)
+             + _boxes_de("corpo normal bastante longo", 100, 300, altura=12)
+             + _boxes_de("nota curta", 100, 850, altura=7))
+    zonas = zn.automaticas(boxes, [], 800, 1000, escala=10)
+
+    assert [z.funcao for z in zonas] == ["titulo", "texto", "nota"]
+
+
+def test_recuo_da_primeira_linha_abre_outro_bloco():
+    boxes = (_boxes_de("primeiro paragrafo", 100, 100)
+             + _boxes_de("continua aqui", 100, 120)
+             + _boxes_de("novo paragrafo", 120, 140))
+
+    zonas = zn.automaticas(boxes, [], 800, 1000, escala=10)
+
+    assert len(zonas) == 2
+
+
+def test_modelo_de_areas_conserva_funcoes_e_recusa_outra_resolucao():
+    original = zn.Zona(zn.TEXTO, 10, 20, 100, 80, id="z9", funcao="titulo", ordem=2)
+    modelo = zn.ModeloDeAreas(800, 1000, (original,))
+
+    [aplicada] = modelo.aplicar(800, 1000)
+
+    assert aplicada.funcao == "titulo" and aplicada.ordem == 2 and aplicada.id == "z0"
+    with pytest.raises(ValueError, match="resolução"):
+        modelo.aplicar(801, 1000)
+
+
+def test_ordenar_exige_todas_as_areas_uma_vez():
+    zonas = [zn.Zona(zn.TEXTO, i * 20, 0, i * 20 + 10, 10) for i in range(4)]
+    ordenadas = zn.ordenar(zonas, [3, 2, 1, 0])
+    assert [z.ordem for z in ordenadas] == [3, 2, 1, 0]
+    with pytest.raises(ValueError):
+        zn.ordenar(zonas, [0, 1, 1, 3])
+
+
 def test_ignorar_e_imagem_nao_geram_boxes(imagem):
     boxes = pg.segmentar(imagem)
     largura, altura = imagem.size

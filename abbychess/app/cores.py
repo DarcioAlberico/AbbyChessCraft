@@ -21,6 +21,15 @@ COR_DA_ZONA = {
     "ignorar": QColor(127, 140, 141),
 }
 
+COR_DA_FUNCAO = {
+    "texto": QColor(46, 134, 222), "titulo": QColor(52, 73, 94),
+    "cabecalho": QColor(142, 68, 173), "rodape": QColor(125, 60, 152),
+    "numero_de_pagina": QColor(91, 44, 111), "nota": QColor(22, 160, 133),
+    "legenda": QColor(243, 156, 18), "diagrama": QColor(39, 174, 96),
+    "figura": QColor(211, 84, 0), "tabela": QColor(192, 57, 43),
+    "ignorar": QColor(127, 140, 141),
+}
+
 
 def cor_do_diagrama(diagrama) -> QColor:
     """Tracejado do tabuleiro: cinza por ler, laranja a conferir, azul confiável, roxo conferido."""

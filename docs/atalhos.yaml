@@ -219,6 +219,12 @@ acoes:
   - {id: modo_areas, descricao: Editor de áreas, escopo: [global], padrao: Ctrl+Shift+A, desde_passo: A2}
   - {id: areas_automaticas, descricao: Refazer as áreas automáticas, escopo: [global],
      sem_atalho: [padrao, finereader], desde_passo: A2}
+  - {id: ordenar_areas, descricao: Ordenar áreas, escopo: [imagem_areas],
+     sem_atalho: [padrao, finereader], desde_passo: F}
+  - {id: salvar_modelo_areas, descricao: Salvar modelo de áreas, escopo: [imagem_areas],
+     sem_atalho: [padrao, finereader], desde_passo: F}
+  - {id: aplicar_modelo_areas, descricao: Aplicar modelo de áreas nesta página, escopo: [imagem_areas],
+     sem_atalho: [padrao, finereader], desde_passo: F}
 
   # --- Inspetor: Glifo (o treino) --------------------------------------------------
   - id: ensinar

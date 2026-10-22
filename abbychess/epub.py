@@ -490,6 +490,9 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
         manifesto.append(f'<item id="c{n}" href="texto/{c.nome}" '
                          'media-type="application/xhtml+xml"/>')
         espinha.append(f'<itemref idref="c{n}"/>')
+    # O marco do sumário aponta o nav: fora da espinha, é RSC-011 no EPUBCheck. Fora da
+    # leitura corrida (`linear="no"`), o leitor não o mostra entre a capa e o texto.
+    espinha.append('<itemref idref="nav" linear="no"/>')
 
     momento = instante()
     opf = _opf(metadados, idioma, msg, manifesto, espinha, agora(momento),
@@ -650,9 +653,12 @@ def conferir(caminho: str | Path) -> List[str]:
         refs = opf.findall(".//opf:spine/opf:itemref", _NS)
         if not refs:
             problemas.append("a espinha está vazia")
+        na_espinha = set()
         for ref in refs:
             if ref.get("idref") not in itens:
                 problemas.append(f"o itemref {ref.get('idref')} não está no manifesto")
+            else:
+                na_espinha.add(_resolver(base, itens[ref.get("idref")].get("href") or "")[0])
         navs = [i for i in itens.values() if "nav" in (i.get("properties") or "").split()]
         if len(navs) != 1:
             problemas.append(f"o manifesto tem {len(navs)} nav (precisa de um)")
@@ -690,6 +696,11 @@ def conferir(caminho: str | Path) -> List[str]:
                         problemas.append(f"{nome}: link quebrado {link}")
                     elif fragmento and alvo in ids and fragmento not in ids[alvo]:
                         problemas.append(f"{nome}: âncora inexistente {link}")
+                    elif (el.tag == "{http://www.w3.org/1999/xhtml}a"
+                          and no_manifesto[alvo] == "application/xhtml+xml"
+                          and alvo not in na_espinha):
+                        # O que o EPUBCheck chama RSC-011.
+                        problemas.append(f"{nome}: link para fora da espinha {link}")
         for nome, tipo in sorted(no_manifesto.items()):
             if tipo == "text/css" and nome in nomes:
                 for link in _URL_DO_CSS.findall(z.read(nome).decode("utf-8", "replace")):

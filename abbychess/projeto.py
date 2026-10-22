@@ -838,6 +838,25 @@ class ProjetoDeLivro:
         pagina = self.carregar_modelo(indice)
         return [tuple(t) for t in pagina.tabuleiros] if pagina is not None else []
 
+    def ler_sem_guardar(self, indice: int) -> Optional[Pagina]:
+        """A página para só ler (a aba Diagramas percorre o livro): a do cache, se estiver
+        lá (pode ter o que ainda não foi gravado), ou a do JSON, **sem entrar no cache** (a
+        leitura do livro não despeja as páginas abertas). Uma página v1 não é migrada aqui:
+        vai por `carregar_modelo`."""
+        with self._trava_do_cache:
+            em_cache = self._modelos.get(indice)
+        if em_cache is not None:
+            return em_cache
+        if self._tem_v1(indice):
+            return self.carregar_modelo(indice)
+        arquivo = self._arquivo_v2_de(indice)
+        if arquivo is None:
+            return None
+        try:
+            return _pagina_de_json(json.loads(arquivo.read_text(encoding="utf-8")))
+        except (OSError, ValueError):           # gravada agora mesmo pelo gravador: na próxima
+            return None
+
     def carregar_diagramas(self, indice: int) -> List["DiagramaLido"]:
         """Os diagramas lidos da página, ou lista vazia se nenhum foi lido."""
         pagina = self.carregar_modelo(indice)

@@ -90,6 +90,14 @@ def montar(janela) -> None:
                             texto="Próximo diagrama por conferir")
     j.acao_diagramas.setToolTip("O próximo diagrama do livro ainda não conferido (o desta "
                                 "página primeiro); também abre com um clique no diagrama.")
+    # O editor Diagrama do Inspetor (§10): valem com o foco dentro dele.
+    editor = [j.editor_diagrama]
+    j.acao_conferir_diagrama = acao(j, "conferir_diagrama", j.editor_diagrama.confirmar,
+                                    widgets=editor)
+    j.acao_diagrama_anterior = acao(j, "diagrama_anterior", lambda: j.editor_diagrama.ir(-1),
+                                    widgets=editor)
+    j.acao_diagrama_seguinte = acao(j, "diagrama_seguinte", lambda: j.editor_diagrama.ir(+1),
+                                    widgets=editor)
     j.acao_verificar = teclado.sem_atalho(j, "Verificação de texto (fila de palavras)",
                                           lambda: j.fila.definir("palavras"))
 
@@ -353,7 +361,9 @@ def atualizar(janela) -> None:
         desfazer = "a palavra"
     if j.texto.pode_reaplicar:                  # depois do Esc, o Ctrl+Y a reaplica
         refazer = "a palavra"
-    j.acao_desfazer.setEnabled(editar and desfazer is not None)
-    j.acao_refazer.setEnabled(editar and refazer is not None)
+    # Com o editor Diagrama aberto, o Ctrl+Z dele (o do tabuleiro) vale sem histórico.
+    no_diagrama = j.editor_diagrama.aberto and j.editor_diagrama.isVisible()
+    j.acao_desfazer.setEnabled(editar and (desfazer is not None or no_diagrama))
+    j.acao_refazer.setEnabled(editar and (refazer is not None or no_diagrama))
     j.acao_desfazer.setText(f"Desfazer: {desfazer}" if desfazer else "Desfazer")
     j.acao_refazer.setText(f"Refazer: {refazer}" if refazer else "Refazer")

@@ -28,7 +28,6 @@ em `app/espaco.py`; os diálogos, em `app/dialogos.py`.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from collections import OrderedDict
 
@@ -41,10 +40,10 @@ from abbychess.app.busca_na_janela import BuscaNaJanela
 from abbychess.app.galeria_na_janela import GaleriaNaJanela
 from abbychess.app.substituir_na_janela import SubstituirNaJanela
 from abbychess.app.desenho import DesenhoDaJanela
+from abbychess.app.diagramas_na_janela import DiagramasNaJanela
 from abbychess.app.edicao_na_janela import EdicaoNoDocumento
 from abbychess.app.espaco import EspacoDeTrabalho
 from abbychess.app.lote_na_janela import LoteNaJanela
-from abbychess.app.dialogo_diagrama import DialogoDeDiagrama
 from abbychess.app.documento import VistaDoDocumento
 from abbychess.app.opcoes import DialogoDeOpcoes
 from abbychess.app.painel_padroes import PainelDePadroes
@@ -61,8 +60,8 @@ log = logging.getLogger(__name__)
 TITULO = "AbbyChessCraft"
 
 
-class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoDocumento,
-                      BuscaNaJanela, SubstituirNaJanela, GaleriaNaJanela, QMainWindow):
+class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, LoteNaJanela,
+                      EdicaoNoDocumento, BuscaNaJanela, SubstituirNaJanela, GaleriaNaJanela, QMainWindow):
     #: Da thread do gravador: a página `indice` não gravou (o erro).
     falha_de_gravacao = Signal(object, object)
 
@@ -71,7 +70,6 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         self.setWindowTitle(TITULO)
         self.resize(1500, 950)
         self.config = QSettings("AbbyChessCraft", "AbbyChessCraft")
-        self.dialogo_diagrama: Optional[DialogoDeDiagrama] = None
 
         self.executor = Executor(self)
         self.eventos = Eventos()
@@ -127,6 +125,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         self._pre_pixmap.setSingleShot(True)
         self._pre_pixmap.setInterval(400)
         self._pre_pixmap.timeout.connect(self._pre_converter)
+        self._montar_diagramas()                # o editor Diagrama e a aba (§10)
 
         self.treino = PainelDeTreino()
         self.treino.ensinar.connect(p.ensinar)
@@ -172,6 +171,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         e = self.eventos
         for nome, funcao in (("pagina_trocou", self._pagina_trocou),
                              ("glifos_mudaram", self._glifos_mudaram),
+                             ("glifos_mudaram", self._sincronizar_conferencia),
                              ("atual_mudou", self._atual_mudou),
                              ("selecao_mudou", self._selecao_mudou),
                              ("padroes_mudaram", self._padroes_mudaram),
@@ -466,14 +466,6 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         if dialogos.confirmar(self, "Desfazer", texto + f"\n\nTirar esta ação do {pilha} e "
                               "continuar com as outras?"):
             self.pagina.tirar_do_desfazer(refazer)
-
-    def _abrir_conferencia(self, indice: int) -> DialogoDeDiagrama:
-        dialogo = DialogoDeDiagrama(self.pagina.matriz, self.pagina.diagramas, indice, self,
-                                    linhas=self.pagina.linhas_dos_diagramas())
-        dialogo.conferido.connect(self.conferencia.aplicar)
-        self.dialogo_diagrama = dialogo
-        dialogo.open()
-        return dialogo
 
     def closeEvent(self, evento):
         self.config.setValue("geometria", self.saveGeometry())

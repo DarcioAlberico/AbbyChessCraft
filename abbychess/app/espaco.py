@@ -116,6 +116,8 @@ class EspacoDeTrabalho:
         self.vista.setDocumentMode(True)
         self.vista.addTab(self.painel_do_documento, "Documento")
         self.vista.addTab(self.padroes, "Padrões")
+        self.vista.addTab(self.painel_diagramas, "Diagramas")
+        self.vista.currentChanged.connect(self._aba_mudou)
         self.divisor = QSplitter(Qt.Orientation.Horizontal)
         self.divisor.setObjectName("divisor")
         self.divisor.setChildrenCollapsible(False)
@@ -135,7 +137,8 @@ class EspacoDeTrabalho:
         self.arranjo = "lado_a_lado"
 
         self.inspetor = PainelDoInspetor(ControladorDaFila.MODOS,
-                                         {"glifo": self.treino, "palavra": self.verificacao},
+                                         {"glifo": self.treino, "palavra": self.verificacao,
+                                          "diagrama": self.editor_diagrama},
                                          escopos=ControladorDaFila.ESCOPOS)
         self.inspetor.modo_escolhido.connect(self.fila.definir)
         self.inspetor.escopo_escolhido.connect(self.fila.definir_escopo)
@@ -460,9 +463,12 @@ class EspacoDeTrabalho:
     # A fila, a gaveta, a barra e os avisos
     # ------------------------------------------------------------------
     def _modo_da_fila_mudou(self, modo: str) -> None:
-        """O modo da fila escolhe o editor do Inspetor: Palavra nas palavras, Glifo no resto."""
+        """O modo da fila escolhe o editor do Inspetor: Palavra nas palavras, Diagrama nos
+        diagramas (aberto pelo F8 ou por um clique), Glifo no resto."""
         if modo == "palavras":
             self.verificar_texto()
+        elif modo == "diagramas" and self.editor_diagrama.aberto:
+            self.inspetor.mostrar("diagrama")
         else:
             self.inspetor.mostrar("glifo")
             self.visor.marcar_palavra(None)

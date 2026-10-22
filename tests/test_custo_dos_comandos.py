@@ -251,15 +251,13 @@ def janela_com_diagrama(app, tmp_path, monkeypatch):
     j.usar(projeto, pg.FonteDePaginas(projeto.fonte),
            LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
     yield j
-    if j.dialogo_diagrama is not None:
-        j.dialogo_diagrama.close()
     j.close()
 
 
 @test_janela_diagramas.sem_modelo
 def test_conferir_um_diagrama(app, janela_com_diagrama, contador):
     """Abrir com um clique no diagrama, corrigir uma casa, conferir com Ctrl+Enter."""
-    from abbychess.app import dialogo_diagrama as dd
+    from abbychess.app import editor_diagrama as dd
 
     janela_d = _pronta(app, janela_com_diagrama)
     x1, y1, x2, y2 = janela_d.pagina.diagramas[0].caixa
@@ -267,8 +265,8 @@ def test_conferir_um_diagrama(app, janela_com_diagrama, contador):
     QTest.mouseClick(janela_d.visor.viewport(), Qt.MouseButton.LeftButton,
                      Qt.KeyboardModifier.NoModifier, _no_visor(janela_d, (x1 + x2) / 2, (y1 + y2) / 2))
     _esperar(app, janela_d)
-    dialogo = janela_d.dialogo_diagrama
-    assert isinstance(dialogo, dd.DialogoDeDiagrama)
+    dialogo = janela_d.editor_diagrama
+    assert isinstance(dialogo, dd.EditorDeDiagrama) and dialogo.aberto
     assert contador.gestos == CUSTO["abrir_diagrama"]
 
     contador.gestos = 0

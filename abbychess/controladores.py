@@ -500,6 +500,57 @@ class ControladorDeDiagramas:
         if p.ir_para(proxima):
             self.conferir()
 
+    def vizinho_do_livro(self, passo: int) -> None:
+        """PgDn (+1) na ponta da página: o primeiro diagrama da próxima página que tem algum;
+        PgUp (−1): o último da anterior. Não dá a volta no livro."""
+        p = self.pagina
+        if not p.pronto:
+            return
+        resumo = p.projeto.resumo_do_livro()
+        com = sorted(i for i, r in resumo.items() if r.get("diagramas", 0) > 0)
+        if passo > 0:
+            alvo = next((i for i in com if i > p.indice), None)
+        else:
+            alvo = next((i for i in reversed(com) if i < p.indice), None)
+        if alvo is None:
+            p._avisar(f"Não há diagrama {'depois' if passo > 0 else 'antes'} deste no livro.",
+                      5000)
+            return
+        if not p.ir_para(alvo):
+            p._avisar(f"A página {alvo + 1} não abriu.", 5000)
+            return
+        self.conferir(0 if passo > 0 else max(0, len(p.diagramas) - 1))
+
+    def do_livro(self, pronto) -> None:
+        """Os diagramas de todas as páginas que têm algum, fora da interface: `pronto` recebe
+        [(índice da página, [DiagramaLido])] (a aba Diagramas), um por tabuleiro, os por ler
+        também (`para_caixas`, a mesma lista de `ControladorDePagina.diagramas`: o índice do
+        item é o da conferência). Lê sem passar pelo cache de páginas (`ler_sem_guardar`)."""
+        p = self.pagina
+        if p.projeto is None:
+            return
+        projeto = p.projeto
+
+        def preparar():
+            com = sorted(i for i, r in projeto.resumo_do_livro().items()
+                         if r.get("diagramas", 0) > 0)
+
+            def trabalho(_progresso):
+                saida = []
+                for i in com:
+                    pagina = projeto.ler_sem_guardar(i)
+                    if pagina is not None:
+                        saida.append((i, dg.para_caixas(pagina.tabuleiros, pagina.diagramas)))
+                return saida
+
+            def chegou(paginas):
+                if p.projeto is projeto:
+                    pronto(paginas)
+            return trabalho, chegou
+
+        p.tarefa("Lendo os diagramas do livro", preparar,
+                 falhou=p._falhou("Diagramas do livro"))
+
     def clicado(self, x: int, y: int) -> None:
         indice = dg.diagrama_em(self.pagina.diagramas, x, y)
         if indice is not None:
@@ -565,19 +616,36 @@ class ControladorDeDiagramas:
         p.executar("Lendo os diagramas", preparar, falhou=p._falhou("Ler os diagramas"))
 
     def _abrir(self, indice: int) -> None:
-        d = self.pagina.diagramas[indice]
+        diagramas = self.pagina.diagramas
+        if not 0 <= indice < len(diagramas):
+            self.pagina._avisar("O diagrama pedido não está mais na página.", 6000)
+            return
+        d = diagramas[indice]
         if not d.lido:
             self.pagina._avisar(f"O diagrama não foi lido: {d.erro}", 8000)
             return
         self.eventos.emitir("conferir", indice)
 
-    def aplicar(self, indice: int, tabuleiro, tudo: bool) -> None:
-        """Grava o diagrama conferido, refaz o texto e guarda as amostras no projeto."""
+    def aplicar(self, caixa, tabuleiro, tudo: bool) -> bool:
+        """Grava o diagrama conferido, refaz o texto e guarda as amostras no projeto.
+
+        O diagrama é achado pela `caixa`, não pelo índice: entre abrir a conferência e
+        conferir, um F5, um desfazer ou a edição de áreas podem ter mudado a lista. Devolve
+        se gravou (falso: sem página, projeto só leitura, ou o diagrama sumiu)."""
         p = self.pagina
         if p.modelo is None:
-            return
-        antes = p._instantaneo()
+            return False
+        if p.projeto.somente_leitura:
+            p._avisar("Projeto aberto só para leitura: a conferência não é gravada.", 6000)
+            return False
         diagramas = p.diagramas
+        indice = next((i for i, d in enumerate(diagramas)
+                       if tuple(d.caixa) == tuple(caixa)), None)
+        if indice is None:
+            p._avisar("O diagrama mudou na página (F5, desfazer ou áreas): reabra a "
+                      "conferência.", 8000)
+            return False
+        antes = p._instantaneo()
         diagramas[indice] = diagramas[indice].conferir(tabuleiro)
         p.modelo.diagramas = diagramas
         p._mudou(p.modelo, p.indice, f"Conferir o diagrama {indice + 1}", antes)
@@ -593,6 +661,7 @@ class ControladorDeDiagramas:
             else:
                 mensagem += f"; {len(caminhos)} amostra(s) guardadas no projeto"
         p._avisar(mensagem, 8000)
+        return True
 
 
 # ----------------------------------------------------------------------

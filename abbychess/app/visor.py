@@ -240,6 +240,18 @@ class VisorDePagina(QGraphicsView):
         self._escalar(min(vista.width() / alvo.width(), vista.height() / alvo.height()))
         self.centerOn(alvo.center())
 
+    def enquadrar(self, caixa, folga: float = 0.12) -> None:
+        """A caixa (da página) ocupa a vista, com `folga` em volta (o diagrama em conferência,
+        §10). O zoom fica livre: Ctrl+roda, PgUp/PgDn e as barras continuam valendo."""
+        x1, y1, x2, y2 = caixa
+        largura, altura = max(x2 - x1, 8), max(y2 - y1, 8)
+        alvo = QRectF(x1 - folga * largura, y1 - folga * altura,
+                      largura * (1 + 2 * folga), altura * (1 + 2 * folga))
+        vista = self.viewport().rect()
+        if vista.width() >= 40 and vista.height() >= 40:
+            self._escalar(min(vista.width() / alvo.width(), vista.height() / alvo.height()))
+        self.centerOn(alvo.center())
+
     def _aplicar_modo(self) -> None:
         cena = self.scene().sceneRect()
         vista = self.viewport().rect()

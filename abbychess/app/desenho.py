@@ -32,6 +32,7 @@ class DesenhoDaJanela:
         self.visor.mostrar_pagina(self._pixmap(p.indice, p.imagem))
         self._pre_carga.start()                 # a seguinte, depois desta pintada
         self._pre_pixmap.start()                # e o pixmap dela, quando a pré-carga a tiver
+        self._fechar_conferencia()              # os diagramas em edição eram da outra
         self.verificacao.limpar("Escolha a fila de palavras desconhecidas (F7) para verificar "
                                 "o texto.")
         self._layout_mudou()

@@ -170,6 +170,10 @@ acoes:
      sem_atalho: [padrao], finereader: Ctrl+F7, desde_passo: K}
   - {id: proximo_diagrama, descricao: Próximo diagrama por conferir do livro, escopo: [global], padrao: F8,
      finereader: Ctrl+F8, desde_passo: A1}
+  - {id: conferir_diagrama, descricao: Diagrama conferido (grava e vai ao próximo por conferir),
+     escopo: [diagrama], padrao: Ctrl+Enter, desde_passo: H}
+  - {id: diagrama_anterior, descricao: O diagrama anterior do livro, escopo: [diagrama], padrao: PgUp, desde_passo: H}
+  - {id: diagrama_seguinte, descricao: O diagrama seguinte do livro, escopo: [diagrama], padrao: PgDn, desde_passo: H}
 
   # --- Exibir: arranjos, painéis, zoom -------------------------------------------
   - {id: arranjo_so_imagem, descricao: Só a Imagem, escopo: [global], padrao: Ctrl+F6, finereader: F6, desde_passo: A2}

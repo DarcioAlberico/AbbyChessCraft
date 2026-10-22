@@ -1,4 +1,4 @@
-"""O Inspetor (SPEC §3.1): um editor só, o do item atual.
+"""O Inspetor (SPEC §3.1): um editor só, o do item atual (Glifo, Palavra ou Diagrama).
 
 No cabeçalho, o seletor da fila (um `QToolButton` com menu, não um combo: o Alt+↓ é da
 fila) e o contador; no meio, o editor (Glifo, o treino; Palavra, a verificação); no rodapé,
@@ -19,6 +19,8 @@ DICAS = {
     "glifo": "Alt+↓ pula · Ctrl+D divide · Ctrl+J junta · Shift+seta bordas · F2 símbolos",
     "palavra": "Enter corrige · Ctrl+Enter corrige e ensina · Alt+↓ pula · "
                "Ctrl+Shift+I ignora a palavra · Ctrl+Shift+D dicionário",
+    "diagrama": "letra da peça escreve · Delete esvazia · Ctrl+Enter conferido · "
+                "PgUp/PgDn diagrama anterior/seguinte do livro · F8 próximo por conferir",
 }
 
 
@@ -90,7 +92,7 @@ class PainelDoInspetor(QWidget):
 
     # ------------------------------------------------------------------
     def mostrar(self, nome: str) -> None:
-        """Mostra o editor `nome` ("glifo", "palavra")."""
+        """Mostra o editor `nome` ("glifo", "palavra", "diagrama")."""
         self.pilha.setCurrentWidget(self._rolagens[nome])
         self.dica.setText(DICAS.get(nome, ""))
 

@@ -418,19 +418,39 @@ boxes, sem reler o tabuleiro, e o Ctrl+Z da edição o desfaz junto. O conferido
 informado na revisão não mudam.
 
 **Clicar no diagrama** (ou **Ferramentas › Próximo diagrama por conferir**, F8, que abre o
-próximo por conferir do livro) mostra o recorte impresso e a posição lida lado a lado, na mesma escala, a
-posição desenhada pela fonte de diagrama do PyBoxEditor:
+próximo por conferir do livro) abre o **editor Diagrama no Inspetor** (passo H; antes era um
+diálogo). A Imagem dá zoom no diagrama impresso e continua navegável: zoom, rolagem e o resto
+da janela valem enquanto se confere. No Inspetor fica a posição lida, desenhada pela fonte de
+diagrama do PyBoxEditor:
 
 - clique seleciona a casa; a letra da peça a põe (maiúscula branca, minúscula preta); Delete,
   Backspace ou espaço a esvaziam; as setas andam pelas casas; o botão direito esvazia;
 - com uma peça escolhida na paleta, o clique pinta, e clicar de novo alterna com vazia;
 - verde é casa corrigida por você, vermelho trocada pela legalidade, laranja leitura duvidosa;
 - o lado a jogar começa sem escolha quando a página não diz; o roque só oferece o que a
-  posição comporta; Ctrl+Z e Ctrl+Y desfazem e refazem;
+  posição comporta; com o foco no editor, Ctrl+Z e Ctrl+Y desfazem e refazem as casas;
+- **o roque inferido** (rei e torre nas casas iniciais) aparece com o botão "Usar o
+  inferido"; ele não vai ao FEN, nem à exportação, sem você marcar;
 - os avisos dizem o que o leitor desconfia (o porteiro do PyBoxEditor), o que a posição tem de
-  impossível e que, sem coordenadas impressas, a orientação é suposta;
-- **Conferido** (Ctrl+Enter) grava o FEN, passa ao próximo por conferir e, no último, fecha.
-  PgUp e PgDown andam entre os diagramas da página. Fechar sem conferir não leva nada.
+  impossível, que, sem coordenadas impressas, a orientação é suposta, e o que os lances do
+  texto dizem (abaixo), refeito a cada casa corrigida;
+- **Conferido** (Ctrl+Enter) grava o FEN e passa ao próximo por conferir (o F8). PgUp e PgDn
+  andam pelos diagramas do livro: no fim da página, o primeiro da próxima página com
+  diagrama. Sair sem conferir não leva nada. Os botões FEN e PGN copiam a posição e o PGN.
+
+**A validação pelos lances** (`abbychess.lances`, passo H). A primeira linha de lances do
+texto depois de cada diagrama (até o próximo diagrama ou título, sem legenda nem margens; as
+letras do idioma do livro, `Cf3` em português, e as figurinas) é jogada na posição lida. O
+lance ilegal ou ambíguo, o `x` que não captura e o `+`/`#` que não dá xeque/mate dão o aviso
+("3.Cf3 do texto não é legal aqui") e tiram a confiança da leitura; todos legais dão
+**confiável pelos lances**, que não anula a dúvida do porteiro. Quando ninguém disse o lado,
+o número do primeiro lance (`10...`) o diz. O PGN por diagrama parte do FEN (`SetUp`) e leva
+os lances que passaram.
+
+**A aba Diagramas** (vista direita) mostra os diagramas do livro numa grade: o recorte (das
+páginas já abertas), a posição desenhada e o estado, com os filtros por conferir, lidos sem
+confiança, confiáveis pelos lances e conferidos. Enter ou duplo clique abre o diagrama no
+editor.
 
 O diagrama conferido não é relido: reconhecer a página de novo, pelo F5 ou pelo lote, mantém
 a conferência do tabuleiro que está no mesmo lugar. Uma página gravada antes desta leitura

@@ -149,3 +149,11 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Corrigir a palavra e ensinar os glifos dela | Ctrl+Enter | Ctrl+Enter | palavra | A2 |
 | Ignorar a palavra | Ctrl+Shift+I | Ctrl+Shift+I | palavra | A2 |
 
+## diagrama
+
+| Ação | Padrão | FineReader | Escopo | Desde |
+|---|---|---|---|---|
+| Diagrama conferido (grava e vai ao próximo por conferir) | Ctrl+Enter | Ctrl+Enter | diagrama | H |
+| O diagrama anterior do livro | PgUp | PgUp | diagrama | H |
+| O diagrama seguinte do livro | PgDn | PgDn | diagrama | H |
+

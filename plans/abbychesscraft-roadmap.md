@@ -501,10 +501,28 @@ fora do alcance de qualquer validação pelos lances; a precisão 1,0 "nas pertu
 CA-10.1 só é atingível lida sobre as afetadas — **decisão pendente do usuário** sobre a
 redação do critério.
 
+A conferência deixou de ser um diálogo modal: é o editor Diagrama do Inspetor
+(`app/editor_diagrama.py`). A Imagem enquadra o diagrama impresso (`VisorDePagina.enquadrar`)
+e continua com zoom e rolagem livres (CA-10.2, testado). Ctrl+Enter confere e vai ao próximo
+por conferir (o F8, também no fim da página); PgUp/PgDn andam pelos diagramas do livro,
+atravessando páginas sem dar a volta; os três estão no `docs/atalhos.yaml` com o escopo
+`diagrama` (`desde_passo: H`), e o Ctrl+Z com o foco no editor desfaz as casas, não a página.
+A aba Diagramas da vista direita (`app/painel_diagramas.py`) lê os diagramas do livro fora da
+interface e os mostra em grade (recorte das páginas na memória, posição desenhada e estado),
+com os filtros por conferir, lidos sem confiança, confiáveis pelos lances e conferidos; Enter
+abre no editor. O recorte das páginas nunca abertas fica de fora: converter o livro inteiro
+para a aba seria trabalho longo. Da revisão de código: a conferência grava pela caixa do
+diagrama (nunca no diagrama errado depois de um F5, desfazer ou edição de áreas) e só marca
+"conferido" se gravou; o editor acompanha as mudanças da página ou fecha; reabrir na mesma
+página mantém as casas em edição; sem casa a desfazer, o Ctrl+Z no editor desfaz a página
+(a conferência); a aba lê o livro sem passar pelo cache de páginas.
+
+**Concluído em 2026-10-22**, salvo a decisão pendente sobre a redação do CA-10.1.
+
 **Tarefas.**
-1. O editor Diagrama no Inspetor, com a Imagem dando zoom no diagrama, PgUp e PgDn pelo
-   livro, e F8.
-2. A aba Diagramas.
+1. ~~O editor Diagrama no Inspetor, com a Imagem dando zoom no diagrama, PgUp e PgDn pelo
+   livro, e F8.~~
+2. ~~A aba Diagramas.~~
 3. ~~A validação pelos lances, com o gerador de perturbações.~~
 4. ~~O roque inferido.~~
 5. ~~O PGN por diagrama.~~

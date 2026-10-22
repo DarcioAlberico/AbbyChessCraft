@@ -52,17 +52,29 @@ class EdicaoNoDocumento:
         self.linha.avisar(texto)
         self.statusBar().showMessage(texto, 8000)
 
+    def _no_editor_de_diagrama(self) -> bool:
+        """O foco está no editor Diagrama do Inspetor (o desfazer é o do tabuleiro, §10)."""
+        foco = self.focusWidget()
+        editor = self.editor_diagrama
+        return foco is not None and (foco is editor or editor.isAncestorOf(foco))
+
     def desfazer(self) -> None:
-        """Ctrl+Z: com uma sessão aberta no Documento, ela volta ao que era (Ctrl+Y a
-        reaplica); senão, o desfazer do projeto."""
-        if self.texto.tem_sessao:
+        """Ctrl+Z: com o foco no editor Diagrama, a última casa editada (sem casa a desfazer,
+        vale o da página, como desfazer a conferência); com uma sessão
+        aberta no Documento, ela volta ao que era (Ctrl+Y a reaplica); senão, o desfazer do
+        projeto."""
+        if self._no_editor_de_diagrama() and self.editor_diagrama.pode_desfazer:
+            self.editor_diagrama.desfazer()
+        elif self.texto.tem_sessao:
             self.texto.restaurar()
         else:
             self.texto.esquecer_a_restaurada()
             self.pagina.desfazer()
 
     def refazer(self) -> None:
-        if self.texto.pode_reaplicar:
+        if self._no_editor_de_diagrama() and self.editor_diagrama.pode_refazer:
+            self.editor_diagrama.refazer()
+        elif self.texto.pode_reaplicar:
             self.texto.reaplicar()
         else:
             self.pagina.refazer()

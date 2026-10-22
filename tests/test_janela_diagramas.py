@@ -1,4 +1,6 @@
-"""A conferência dos diagramas pela janela, sem tela: clique, correção, lado e gravação."""
+"""A conferência dos diagramas pela janela, sem tela: clique, correção, lado e gravação.
+
+Desde o passo H a conferência é o editor Diagrama do Inspetor (§10), não um diálogo."""
 
 from __future__ import annotations
 
@@ -10,13 +12,13 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QPoint, Qt  # noqa: E402
+from PySide6.QtCore import QPoint, QRectF, Qt  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 from abbychess import diagramas as dg  # noqa: E402
 from abbychess import pagina as pg  # noqa: E402
-from abbychess.app import dialogo_diagrama as dd  # noqa: E402
+from abbychess.app import editor_diagrama as dd  # noqa: E402
 from abbychess.app.janela import JanelaPrincipal  # noqa: E402
 from abbychess.leitor import LeitorDoLivro  # noqa: E402
 from abbychess.projeto import ProjetoDeLivro  # noqa: E402
@@ -43,8 +45,6 @@ def janela(app, tmp_path, monkeypatch):
     j.usar(projeto, pg.FonteDePaginas(projeto.fonte),
           LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
     yield j
-    if j.dialogo_diagrama is not None:
-        j.dialogo_diagrama.close()
     j.close()
 
 
@@ -54,13 +54,13 @@ def _reconhecida(app, janela):
     return janela
 
 
-def _clicar_no_diagrama(app, janela) -> dd.DialogoDeDiagrama:
+def _clicar_no_diagrama(app, janela) -> dd.EditorDeDiagrama:
     x1, y1, x2, y2 = janela.pagina.diagramas[0].caixa
     janela.visor.diagrama_clicado.emit((x1 + x2) // 2, (y1 + y2) // 2)
     _esperar(app, janela)
-    dialogo = janela.dialogo_diagrama
-    assert dialogo is not None and dialogo.isVisible()
-    return dialogo
+    editor = janela.editor_diagrama
+    assert editor.aberto and janela.inspetor.atual() == "diagrama"
+    return editor
 
 
 def _clicar_na_casa(dialogo, linha: int, coluna: int, botao=Qt.MouseButton.LeftButton):
@@ -81,11 +81,22 @@ def test_reconhecer_le_o_diagrama_e_poe_o_fen_no_texto(app, janela):
     assert gravado["diagramas"][0]["fen"] == d.fen
 
 
-def test_clique_abre_o_recorte_e_a_posicao_na_mesma_escala(app, janela):
-    dialogo = _clicar_no_diagrama(app, _reconhecida(app, janela))
+def _vista(janela):
+    return janela.visor.mapToScene(janela.visor.viewport().rect()).boundingRect()
+
+
+def test_clique_abre_o_editor_e_a_imagem_enquadra_o_impresso(app, janela):
+    janela.resize(1366, 768)
+    janela.show()
+    _reconhecida(app, janela)
+    janela.visor.zoom_pagina()
+    escala_da_pagina = janela.visor.escala()
+    dialogo = _clicar_no_diagrama(app, janela)
     lado = 8 * dd.LADO_CASA
-    assert dialogo.recorte.pixmap().size().toTuple() == (lado, lado)
     assert dialogo.posicao.size().toTuple() == (lado, lado)
+    x1, y1, x2, y2 = janela.pagina.diagramas[0].caixa
+    assert _vista(janela).contains(QRectF(x1, y1, x2 - x1, y2 - y1))
+    assert janela.visor.escala() > escala_da_pagina
     assert dialogo.fen.text() == FEN + " w - - 0 1"
     # Sem legenda, nenhum lado vem escolhido e o aviso diz que o 'w' é suposição.
     assert not dialogo.radio_brancas.isChecked() and not dialogo.radio_pretas.isChecked()
@@ -107,7 +118,7 @@ def test_corrigir_casa_a_casa_escolher_o_lado_e_conferir(app, janela):
 
     dialogo.confirmar()
 
-    assert not dialogo.isVisible()                       # era o único diagrama
+    assert dialogo.diagrama.conferido                    # era o único diagrama
     d = janela.pagina.diagramas[0]
     assert d.conferido and d.fen == esperado
     assert "pretas a jogar (informado na revisão)" in _texto(janela)
@@ -124,7 +135,9 @@ def test_paleta_pinta_e_desfazer_volta(app, janela):
     assert dialogo.tabuleiro().casa(5, 0).simbolo == "n"
     _clicar_na_casa(dialogo, 5, 0)                       # de novo: alterna para vazia
     assert dialogo.tabuleiro().casa(5, 0).simbolo is None
-    QTest.keyClick(dialogo, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+    # Com o foco no editor, o Ctrl+Z (o desfazer da janela) é o do tabuleiro, não o da página.
+    dialogo.posicao.setFocus()
+    janela.acao_desfazer.trigger()
     assert dialogo.tabuleiro().casa(5, 0).simbolo == "n"
 
 
@@ -132,7 +145,7 @@ def test_fechar_sem_conferir_nao_leva_nada(app, janela):
     dialogo = _clicar_no_diagrama(app, _reconhecida(app, janela))
     _clicar_na_casa(dialogo, 4, 4)
     QTest.keyClicks(dialogo.posicao, "Q")
-    dialogo.reject()
+    dialogo.fechar()
     assert not janela.pagina.diagramas[0].conferido
     assert janela.pagina.diagramas[0].fen == FEN + " w - - 0 1"
 
@@ -253,14 +266,12 @@ def _texto(janela) -> str:
 
 
 def test_a_conferencia_valida_pelos_lances_e_oferece_o_roque_inferido(app):
-    import numpy as np
-
     from abbychess import lances as lc
     from tests.test_diagramas import _lido
 
     linha = lc.primeira_linha("12.O-O-O Cxd4 13.Cxd4", "pt")
-    dialogo = dd.DialogoDeDiagrama(np.full((600, 800), 255, np.uint8), [_lido()], 0,
-                                   linhas=[linha])
+    dialogo = dd.EditorDeDiagrama()
+    dialogo.abrir([_lido()], 0, [linha])
     try:
         assert any(a.startswith("Confiável pelos lances") for a in dialogo.avisos_do_diagrama())
         assert "KQkq" in dialogo.roque_inferido.text()
@@ -276,3 +287,100 @@ def test_a_conferencia_valida_pelos_lances_e_oferece_o_roque_inferido(app):
                    for a in dialogo.avisos_do_diagrama())
     finally:
         dialogo.close()
+
+# ----------------------------------------------------------------------
+# O editor no Inspetor e a aba Diagramas (passo H)
+# ----------------------------------------------------------------------
+
+def test_ca_10_2_com_a_conferencia_aberta_a_imagem_aceita_zoom_e_rolagem(app, janela):
+    janela.resize(1366, 768)
+    janela.show()
+    editor = _clicar_no_diagrama(app, _reconhecida(app, janela))
+    visor = janela.visor
+    antes = visor.escala()
+    visor.zoom_mais()
+    assert visor.escala() > antes
+    barra = visor.verticalScrollBar()
+    if barra.maximum() > 0:
+        valor = barra.value()
+        visor.rolar_tela(+1 if valor < barra.maximum() else -1)
+        assert barra.value() != valor
+    # A conferência continua onde estava, sem gravar nada.
+    assert editor.aberto and janela.inspetor.atual() == "diagrama"
+    assert not janela.pagina.diagramas[0].conferido
+
+
+def test_pgdn_na_ponta_do_livro_avisa_e_fica(app, janela):
+    editor = _clicar_no_diagrama(app, _reconhecida(app, janela))
+    editor.ir(+1)
+    assert editor.aberto and editor.atual == 0
+    assert "Não há diagrama depois deste no livro" in janela.statusBar().currentMessage()
+
+
+def test_estado_e_filtros_da_aba():
+    from abbychess import lances as lc
+    from abbychess.app import painel_diagramas as pd
+    from tests.test_diagramas import _lido
+
+    lido, conferido = _lido(), replace(_lido(), conferido=True)
+    duvidoso = replace(_lido(), motivo="casa duvidosa")
+    ilegal = replace(_lido(), validacao=lc.Validacao(lc.ILEGAL, 2, 0, "1.Cd2 do texto não é "
+                                                     "legal aqui"))
+    pelos = replace(_lido(), validacao=lc.Validacao(lc.CONFIAVEL, 2, 2))
+    por_ler = dg.DiagramaLido((0, 0, 10, 10))
+    estados = [pd.estado(d) for d in (lido, conferido, duvidoso, ilegal, pelos, por_ler)]
+    assert estados == [pd.CONFIAVEL, pd.CONFERIDO, pd.SEM_CONFIANCA, pd.LANCE_ILEGAL,
+                       pd.PELOS_LANCES, pd.NAO_LIDO]
+    todos = (lido, conferido, duvidoso, ilegal, pelos, por_ler)
+    assert [pd.passa(d, "conferidos") for d in todos] == [False, True, False, False, False, False]
+    assert [pd.passa(d, "sem_confianca") for d in todos] == [False, False, True, True, False, False]
+    assert [pd.passa(d, "por_conferir") for d in todos] == [True, False, True, True, True, True]
+
+
+def test_aba_diagramas_lista_o_livro_e_abre_no_editor(app, janela):
+    _reconhecida(app, janela)
+    janela.vista.setCurrentWidget(janela.painel_diagramas)
+    _esperar(app, janela)
+    painel = janela.painel_diagramas
+    assert painel.itens() == [(0, 0)]                     # por conferir
+    assert "1 de 1" in painel.contador.text()
+
+    painel.definir_filtro("conferidos")
+    assert painel.itens() == []
+    painel.definir_filtro("todos")
+    painel.grade.itemActivated.emit(painel.grade.item(0))
+    _esperar(app, janela)
+    assert janela.editor_diagrama.aberto and janela.inspetor.atual() == "diagrama"
+
+    janela.editor_diagrama.radio_brancas.click()
+    janela.editor_diagrama.confirmar()
+    _esperar(app, janela)
+    painel.definir_filtro("conferidos")
+    assert painel.itens() == [(0, 0)]
+
+def test_reabrir_na_mesma_pagina_mantem_o_que_estava_em_edicao(app, janela):
+    editor = _clicar_no_diagrama(app, _reconhecida(app, janela))
+    _clicar_na_casa(editor, 4, 4)
+    QTest.keyClicks(editor.posicao, "Q")
+    janela.conferencia.conferir(0)                     # outro clique, o F8, a aba
+    _esperar(app, janela)
+    assert editor.tabuleiro().casa(4, 4).simbolo == "Q"
+
+
+def test_aplicar_num_diagrama_que_sumiu_nao_grava(app, janela):
+    editor = _clicar_no_diagrama(app, _reconhecida(app, janela))
+    assert janela.conferencia.aplicar((1, 1, 2, 2), editor.tabuleiro(), False) is False
+    assert not janela.pagina.diagramas[0].conferido
+    assert "reabra" in janela.statusBar().currentMessage()
+
+
+def test_ctrl_z_sem_casa_editada_desfaz_a_conferencia_e_o_editor_acompanha(app, janela):
+    editor = _clicar_no_diagrama(app, _reconhecida(app, janela))
+    editor.radio_brancas.click()
+    editor.confirmar()
+    assert janela.pagina.diagramas[0].conferido and editor.diagrama.conferido
+    editor.posicao.setFocus()
+    janela.acao_desfazer.trigger()
+    _esperar(app, janela)
+    assert not janela.pagina.diagramas[0].conferido
+    assert editor.aberto and not editor.diagrama.conferido     # sincronizado, não fechado

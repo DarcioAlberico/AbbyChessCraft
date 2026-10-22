@@ -1,9 +1,9 @@
 """Exportar o livro reconhecido: PDF pesquisável, DOCX, EPUB, TXT e PGN.
 
-Os escritores são os do PyBoxEditor, e não cópias:
+O que vem do PyBoxEditor e o que é desta aplicação:
 
-- **DOCX** sai por `core.exportar.para_docx`, e o **EPUB** pelo escritor próprio
-  (`abbychess.epub`, desde o passo J); os dois pedem a lista de
+- **DOCX** e **EPUB** saem pelos escritores próprios (`abbychess.escritor_docx` e
+  `abbychess.epub`, desde o passo J; os do core deixaram de ser usados); os dois pedem a lista de
   `core.pagina.PaginaExtraida`. O que este módulo faz é montar essa
   lista a partir das páginas gravadas no projeto: as linhas pelo
   `core.notacao.palavras_da_pagina` (o mesmo que monta o texto do painel), os
@@ -49,6 +49,7 @@ from core.pagina import Figura, PaginaExtraida, Paragrafo
 
 from abbychess import pagina as pg
 from abbychess.diagramas import DiagramaLido, para_caixas
+from abbychess.layout import _coluna_de
 from abbychess.projeto import ProjetoDeLivro
 
 log = logging.getLogger(__name__)
@@ -410,8 +411,6 @@ class _Leitura:
 
     def chave(self, x: float, y: float) -> Tuple[int, int]:
         """A faixa (2k+1 a k-ésima que atravessa; 2k o que fica antes dela) e a coluna."""
-        from core.pagina import _coluna_de
-
         if not self.colunas:
             return (0, 0)
         faixa = 2 * len(self.faixas)
@@ -1146,10 +1145,26 @@ def _altura_da_pagina(projeto: ProjetoDeLivro, indice: int) -> int:
 
 
 def exportar_docx(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
-                  titulo: str, autor: str = "", idioma: str = "pt-BR") -> Path:
-    from core.exportar import para_docx
+                  titulo: str, autor: str = "", idioma: str = "pt-BR",
+                  metadados=None, relatorio: Optional["Relatorio"] = None) -> Path:
+    """O DOCX pelo escritor próprio (`abbychess.escritor_docx`): títulos nos estilos de
+    título, estilos, diagramas com o texto alternativo, marcadores de página e hiperlinks
+    internos, metadados. Depois de gravar, `escritor_docx.conferir` lê o arquivo; o que
+    ele acusar vai ao `relatorio`."""
+    from abbychess import epub
+    from abbychess import escritor_docx
 
-    return Path(para_docx(paginas, str(caminho), titulo=titulo, autor=autor, idioma=idioma))
+    metadados = metadados or epub.Metadados(titulo=titulo, idioma=idioma,
+                                            autores=(autor,) if autor else ())
+    numeros = relatorio.numeros_impressos if relatorio is not None else None
+    escrito = escritor_docx.escrever(paginas, caminho, metadados, numeros=numeros)
+    problemas = escritor_docx.conferir(caminho)
+    for problema in problemas:
+        log.warning("DOCX %s: %s", caminho, problema)
+    if relatorio is not None:
+        relatorio.links = escrito.links
+        relatorio.problemas_do_arquivo = problemas
+    return Path(caminho)
 
 
 def exportar_epub(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
@@ -1447,8 +1462,31 @@ def _escrever_box(page, b: BoxEntry, escala: float, fontes, resumo) -> None:
     resumo.caracteres += len(char)
 
 
+def _origem_do_texto(angulo: int, x1: float, y1: float, x2: float, y2: float):
+    """Onde a linha de base começa, para cada ângulo do box: a 90° o texto sobe da base,
+    a 270° desce do topo. A regra de `core.searchable_pdf`, aqui para não depender de um
+    privado do core."""
+    import fitz
+
+    if angulo % 360 == 90:
+        return fitz.Point(x2, y2)
+    if angulo % 360 == 270:
+        return fitz.Point(x1, y1)
+    return fitz.Point(x1, y2)
+
+
+def _corpo_que_preenche(fonte, texto: str, largura_alvo: float, altura_alvo: float) -> float:
+    """O corpo que faz o texto ocupar a largura do box (a seleção no leitor de PDF cai
+    sobre o caractere certo). A regra de `core.searchable_pdf`, aqui para não depender de
+    um privado do core."""
+    corpo = max(altura_alvo, 1.0)
+    largura = fonte.text_length(texto, fontsize=corpo)
+    if largura > 0 and largura_alvo > 0:
+        corpo *= largura_alvo / largura
+    return max(1.0, min(corpo, altura_alvo * 3.0))
+
+
 def _escrever(page, b: BoxEntry, texto: str, nome: str, metrica, escala: float) -> None:
-    from core.searchable_pdf import _corpo_que_preenche, _origem_do_texto
 
     x1, y1, x2, y2 = b.x1 * escala, b.y1 * escala, b.x2 * escala, b.y2 * escala
     angulo = (b.angulo or 0) % 360
@@ -1834,8 +1872,8 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
         return relatorio.resumo(), relatorio
     meta = metadados_do_projeto(projeto, idioma, metadados)
     if formato == "docx":
-        exportar_docx(paginas, caminho, titulo=meta.titulo, autor="; ".join(meta.autores),
-                      idioma=idioma)
+        exportar_docx(paginas, caminho, titulo=meta.titulo, idioma=idioma, metadados=meta,
+                      relatorio=relatorio)
     else:
         exportar_epub(paginas, caminho, titulo=meta.titulo, idioma=idioma, metadados=meta,
                       relatorio=relatorio)

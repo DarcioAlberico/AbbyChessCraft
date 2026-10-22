@@ -699,7 +699,23 @@ Estado das tarefas depois da rodada 2:
   passou a acusá-lo; `tests/test_epub.py` roda o EPUBCheck quando `ABBY_EPUBCHECK` aponta o
   jar. Faltam Ace e os testes de leitores.
 - 7: deduplicação e divisão por capítulo feitas; falta a otimização sem perda das imagens.
-- 9: o EPUB não usa mais o escritor do core; o DOCX ainda é o `core.exportar.para_docx`.
+- 9: feita (rodada 6). O DOCX também tem escritor próprio (`abbychess/escritor_docx.py`, pelo
+  python-docx): títulos nos estilos Heading 1/2, negrito e itálico, a fonte dos símbolos, os
+  diagramas com o texto alternativo do EPUB no `descr`, um marcador `pgN` no começo de cada
+  página e hiperlink interno para ele nas referências `página N`, as propriedades pelos
+  metadados, o idioma no estilo base, e o zip regravado com a data de `SOURCE_DATE_EPOCH`
+  (os mesmos bytes, CA-12.6); `escritor_docx.conferir` relê o arquivo (pacote, XML, imagens,
+  marcadores, hiperlinks). Os três privados do core que a exportação usava (`_coluna_de`,
+  `_corpo_que_preenche`, `_origem_do_texto`) viraram funções daqui. A aplicação não usa mais
+  escritor nem privado do core. Na fatia do Xadrez Vitorioso o DOCX sai e a conferência não
+  acusa nada. Da revisão de código, o que o escritor do core fazia e tinha ficado de fora
+  voltou, pelas funções públicas dele: a fonte dos símbolos embutida e ofuscada (ECMA-376
+  §15.2.13) e nos quatro atributos de fonte, o desenho da página (Georgia 11, justificado,
+  recuo, margens de 2,2 cm), cada página impressa começando numa página nova, a largura do
+  diagrama pelo tamanho da casa e a legenda visível do diagrama não revisado (PD-21, também
+  no EPUB como `<figcaption>`); saíram a miniatura e a data de impressão do modelo do
+  python-docx; o DOCX é conferido antes de substituir o anterior. As aspas curvas do core
+  (PD-07) não foram trazidas: o texto sai como lido.
 
 **Verificação.** CA-12.1 a CA-12.6; CA-5.3 (parte da exportação).
 

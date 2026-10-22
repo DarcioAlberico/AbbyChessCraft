@@ -46,7 +46,9 @@ def test_ca_12_4_previa_e_docx_tem_o_mesmo_texto_por_paragrafo(projeto, fonte, l
     texto, _ = ex.previa(projeto, "docx")
     destino = tmp_path / "livro.docx"
     ex.exportar(projeto, destino)
-    docx = [p.text.strip() for p in Document(str(destino)).paragraphs if p.text.strip()]
+    # A legenda do diagrama (estilo Caption) é a ressalva dele, como o alt na prévia.
+    docx = [p.text.strip() for p in Document(str(destino)).paragraphs
+            if p.text.strip() and p.style.name != "Caption"]
     previa = _paragrafos_do_html(texto)
     assert previa and previa == docx
 

@@ -652,9 +652,13 @@ Depois de cada exportação, o **relatório** vai a Resultados / Avisos: página
 margens tiradas, diagramas recortados e o motivo, páginas não verificadas, glifos pendentes
 e os diagramas fora do PGN, cada item com a página.
 
-- **DOCX** (e o EPUB até o passo J): pelos escritores do PyBoxEditor (`core.exportar`), com a fonte dos
+- **DOCX**: desde o passo J pelo escritor próprio (`abbychess/escritor_docx.py`): títulos nos
+  estilos de título do Word, negrito e itálico, os diagramas com o FEN no texto alternativo,
+  um marcador por página impressa e hiperlink nas referências `página N`, os metadados nas
+  propriedades e os mesmos bytes com o mesmo `SOURCE_DATE_EPOCH`. (Até o passo J, DOCX e EPUB
+  saíam pelos escritores do PyBoxEditor, `core.exportar`, com a fonte dos
   símbolos embutida. Os parágrafos saem do vão entre as linhas, a hifenização no fim de linha
-  é desfeita e as figurinas saem como impressas. O idioma do arquivo é o do texto do livro
+  é desfeita e as figurinas saem como impressas.) O idioma do arquivo é o do texto do livro
   (o que a camada do PDF diz, ou o do projeto).
 
 **O PDF nascido digital sai da própria camada de texto.** No DOCX e no EPUB, a página cuja

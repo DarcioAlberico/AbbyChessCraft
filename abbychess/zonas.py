@@ -25,6 +25,7 @@ criar, mover e esticar uma área está em funções puras, testadas sem tela.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, replace
 from statistics import median
 from typing import Iterable, List, Optional, Sequence, Tuple
@@ -64,6 +65,15 @@ FOLGA_DO_BLOCO = 0.4
 
 #: Um vão maior que isto entre duas linhas, em alturas de linha, começa outro bloco.
 VAO_ENTRE_BLOCOS = 1.2
+
+#: Uma legenda fica encostada ao diagrama; a especificação admite acima ou abaixo.
+DISTANCIA_DA_LEGENDA = 4.0
+#: O corpo de um título é pelo menos 1,3 vez o corpo do texto (SPEC §5.1).
+RAZAO_DO_TITULO = 1.3
+
+_INICIO_DA_LEGENDA = re.compile(r"^\s*(?:diagrama|diagram|teste|test|\d+)\b", re.IGNORECASE)
+_TEXTO_DA_LEGENDA = re.compile(r"\b(?:jogam?|joga|to\s+play|moves?)\b", re.IGNORECASE)
+_NUMERO_DE_PAGINA = re.compile(r"^\s*(?:p(?:ág(?:ina)?|age)?\.?\s*)?\d+\s*$", re.IGNORECASE)
 
 Caixa = Tuple[int, int, int, int]
 
@@ -231,7 +241,82 @@ def automaticas(boxes: Sequence[BoxEntry], tabuleiros: Iterable[Caixa],
                               largura, altura))
         except ValueError:
             continue
-    return com_ids([replace(z, automatica=True) for z in zonas])
+    zonas = com_ids([replace(z, automatica=True) for z in zonas])
+    return classificar_funcoes(zonas, boxes, largura, altura, escala)
+
+
+def classificar_funcoes(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
+                        largura: int, altura: int, escala: float) -> List[Zona]:
+    """Classifica as zonas automáticas sem alterar uma zona desenhada pelo usuário.
+
+    Esta é a etapa local do pipeline de layout: legenda, número de página e título.
+    Cabeçalhos corridos dependem de aprender repetições entre páginas e ficam na etapa
+    do livro. Quando os boxes ainda não foram lidos, as regras que dependem de texto apenas
+    não disparam.
+    """
+    del largura  # reservado para as regras de alinhamento do restante do passo F
+    diagramas = [z for z in zonas if z.funcao == "diagrama"]
+    alturas = [b.y2 - b.y1 for b in boxes if b.char]
+    corpo = median(alturas) if alturas else float(escala)
+    saida: List[Zona] = []
+    for zona in zonas:
+        if not zona.automatica or zona.tipo != TEXTO:
+            saida.append(zona)
+            continue
+        dentro = [b for b in boxes if zona.contem((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)]
+        texto = _texto_dos_boxes(dentro)
+        funcao = "texto"
+        if texto and _NUMERO_DE_PAGINA.fullmatch(texto) and (
+                zona.y1 < 0.15 * altura or zona.y2 > 0.85 * altura):
+            funcao = "numero_de_pagina"
+        elif texto and _parece_legenda(texto) and any(
+                _vizinha_do_diagrama(zona, diagrama, escala) for diagrama in diagramas):
+            funcao = "legenda"
+        elif dentro and median(b.y2 - b.y1 for b in dentro) >= RAZAO_DO_TITULO * corpo:
+            funcao = "titulo"
+        saida.append(replace(zona, funcao=funcao))
+    return saida
+
+
+def _texto_dos_boxes(boxes: Sequence[BoxEntry]) -> str:
+    """Texto suficiente para classificar uma zona, preservando espaços aproximados."""
+    lidos = [b for b in boxes if b.char]
+    if not lidos:
+        return ""
+    altura = median(b.y2 - b.y1 for b in lidos)
+    linhas: List[List[BoxEntry]] = []
+    for box in sorted(lidos, key=lambda b: (b.y1 + b.y2) / 2):
+        meio = (box.y1 + box.y2) / 2
+        for linha in reversed(linhas[-3:]):
+            topo, pe = min(b.y1 for b in linha), max(b.y2 for b in linha)
+            if topo <= meio <= pe or box.y1 <= (topo + pe) / 2 <= box.y2:
+                linha.append(box)
+                break
+        else:
+            linhas.append([box])
+    textos = []
+    for linha in sorted(linhas, key=lambda itens: min(b.y1 for b in itens)):
+        partes = []
+        anterior = None
+        for box in sorted(linha, key=lambda b: b.x1):
+            if anterior is not None and box.x1 - anterior.x2 > 0.6 * altura:
+                partes.append(" ")
+            partes.append(box.char)
+            anterior = box
+        textos.append("".join(partes))
+    return " ".join(textos).strip()
+
+
+def _parece_legenda(texto: str) -> bool:
+    return bool(_INICIO_DA_LEGENDA.search(texto) or _TEXTO_DA_LEGENDA.search(texto))
+
+
+def _vizinha_do_diagrama(zona: Zona, diagrama: Zona, escala: float) -> bool:
+    sobreposicao = min(zona.x2, diagrama.x2) - max(zona.x1, diagrama.x1)
+    if sobreposicao <= 0:
+        return False
+    distancia = max(diagrama.y1 - zona.y2, zona.y1 - diagrama.y2, 0)
+    return distancia <= DISTANCIA_DA_LEGENDA * escala
 
 
 def _linhas(boxes: Sequence[BoxEntry]) -> List[List[int]]:

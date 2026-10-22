@@ -1744,6 +1744,7 @@ class ControladorDePagina:
         # o que vai para o disco (e o desfazer compara com o que a página tem).
         pagina.zonas = zn.com_ids(pagina.zonas)
         pagina.diagramas = dg.com_ids(pagina.diagramas)
+        pagina.zonas = zn.vincular_legendas(pagina.zonas, pagina.diagramas)
         transacao = self.historico.registrar(hs.Transacao(
             descricao, {pagina.pid: hs.mudanca(antes.pagina, pagina.instantaneo())},
             amostras_criadas=criados, juntar=juntar))

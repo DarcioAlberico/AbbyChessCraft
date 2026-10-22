@@ -419,6 +419,10 @@ faixa da margem, e `legenda` pelo texto e pela proximidade de um diagrama. Zonas
 pelo usuário nunca são reclassificadas. Cabeçalho e rodapé continuam pendentes porque a
 regra correta aprende repetições entre páginas do livro.
 
+Cada zona de `legenda` automática guarda também o `diagrama_id` estável (`dN`) do tabuleiro
+mais próximo com sobreposição horizontal. O vínculo nasce junto com os IDs, antes do
+histórico e da gravação, sobrevive ao ciclo JSON e não substitui uma ligação manual.
+
 **Contexto.**
 - `core/livro.py` do PyBoxEditor já tem colunas, parágrafos com recuo,
   `retirar_cabecalhos` e tabelas.
@@ -428,7 +432,7 @@ regra correta aprende repetições entre páginas do livro.
 **Tarefas.**
 1. Completar o pipeline de §5.1, gravando zonas e funções; a divisão local de título,
    número de página e legenda já está implementada.
-2. Persistir a ligação da legenda já identificada ao diagrama correspondente.
+2. ~~Persistir a ligação da legenda já identificada ao diagrama correspondente.~~
 3. O cabeçalho aprendido por livro.
 4. A interface do modo Áreas: funções por letra, Ordenar, modelo de áreas e Ctrl+Shift+R.
 5. A transferência de §4.6 passa a carregar as funções de zona do layout novo.

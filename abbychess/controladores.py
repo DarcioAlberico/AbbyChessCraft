@@ -1697,6 +1697,7 @@ def _depois_de_editar(pagina, antes) -> None:
                                               pagina.entries())
     pagina.zonas = zn.com_ids(list(pagina.zonas))
     pagina.diagramas = dg.com_ids(list(pagina.diagramas))
+    pagina.zonas = zn.vincular_legendas(pagina.zonas, pagina.diagramas)
 
 
 def _mesma_pagina(viva, lida) -> bool:

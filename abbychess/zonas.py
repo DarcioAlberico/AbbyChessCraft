@@ -93,6 +93,8 @@ class Zona:
     ordem: Optional[int] = None
     #: Veio das áreas automáticas (o layout pode dividi-la; a do usuário, não).
     automatica: bool = False
+    #: O diagrama `dN` ao qual esta legenda pertence; vazio nas outras funções.
+    diagrama_id: Optional[str] = None
 
     def __post_init__(self):
         if not self.funcao:
@@ -101,6 +103,8 @@ class Zona:
             raise ValueError(f"Função de área desconhecida: {self.funcao!r}")
         if TIPO_DA_FUNCAO[self.funcao] != self.tipo:
             raise ValueError(f"A função {self.funcao!r} não é de uma área do tipo {self.tipo!r}")
+        if self.funcao != "legenda" and self.diagrama_id is not None:
+            object.__setattr__(self, "diagrama_id", None)
 
     @property
     def caixa(self) -> Caixa:
@@ -111,7 +115,8 @@ class Zona:
 
     def como_dict(self) -> dict:
         return {"id": self.id, "tipo": self.tipo, "funcao": self.funcao, "caixa": list(self.caixa),
-                "ordem": self.ordem, "automatica": self.automatica}
+                "ordem": self.ordem, "automatica": self.automatica,
+                "diagrama_id": self.diagrama_id}
 
     @classmethod
     def de_dict(cls, dados: dict) -> "Zona":
@@ -124,7 +129,8 @@ class Zona:
         return cls(tipo, x1, y1, x2, y2, id=str(dados.get("id") or ""),
                    funcao=str(dados.get("funcao") or ""),
                    ordem=None if ordem is None else int(ordem),
-                   automatica=bool(dados.get("automatica", False)))
+                   automatica=bool(dados.get("automatica", False)),
+                   diagrama_id=str(dados.get("diagrama_id") or "") or None)
 
 
 def com_ids(zonas: Sequence[Zona]) -> List[Zona]:
@@ -209,7 +215,8 @@ def arrastar(zona: Zona, bordas: str, dx: float, dy: float, largura: int, altura
 def trocar_tipo(zonas: List[Zona], indice: int, tipo: str) -> None:
     if tipo not in TIPOS:
         raise ValueError(f"Tipo de área desconhecido: {tipo!r}")
-    zonas[indice] = replace(zonas[indice], tipo=tipo, funcao=FUNCAO_DO_TIPO[tipo])
+    zonas[indice] = replace(zonas[indice], tipo=tipo, funcao=FUNCAO_DO_TIPO[tipo],
+                            diagrama_id=None)
 
 
 # ----------------------------------------------------------------------
@@ -317,6 +324,36 @@ def _vizinha_do_diagrama(zona: Zona, diagrama: Zona, escala: float) -> bool:
         return False
     distancia = max(diagrama.y1 - zona.y2, zona.y1 - diagrama.y2, 0)
     return distancia <= DISTANCIA_DA_LEGENDA * escala
+
+
+def vincular_legendas(zonas: Sequence[Zona], diagramas: Sequence) -> List[Zona]:
+    """Liga cada legenda automática ao diagrama `dN` geometricamente mais próximo.
+
+    O vínculo usa os diagramas lidos, cuja caixa é a do tabuleiro, e por isso sobrevive
+    à reordenação das listas. Uma ligação manual existente é autoridade e é preservada.
+    """
+    ids = {d.id for d in diagramas if getattr(d, "id", "")}
+    saida = []
+    for zona in zonas:
+        if zona.funcao != "legenda":
+            saida.append(replace(zona, diagrama_id=None) if zona.diagrama_id else zona)
+            continue
+        if zona.diagrama_id in ids or not zona.automatica:
+            saida.append(zona)
+            continue
+        candidatos = []
+        for diagrama in diagramas:
+            if not getattr(diagrama, "id", ""):
+                continue
+            x1, y1, x2, y2 = diagrama.caixa
+            sobreposicao = min(zona.x2, x2) - max(zona.x1, x1)
+            if sobreposicao <= 0:
+                continue
+            distancia = max(y1 - zona.y2, zona.y1 - y2, 0)
+            candidatos.append((distancia, -sobreposicao, diagrama.id))
+        diagrama_id = min(candidatos)[2] if candidatos else None
+        saida.append(replace(zona, diagrama_id=diagrama_id))
+    return saida
 
 
 def _linhas(boxes: Sequence[BoxEntry]) -> List[List[int]]:

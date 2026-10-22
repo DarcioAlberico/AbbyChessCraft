@@ -14,6 +14,7 @@ from core.box_model import BoxEntry
 
 from abbychess import pagina as pg
 from abbychess import zonas as zn
+from abbychess.diagramas import DiagramaLido
 from abbychess.projeto import ProjetoDeLivro
 
 from tests.test_treino_por_livro import _pagina_sintetica
@@ -128,6 +129,29 @@ def test_classificacao_nao_altera_area_desenhada_pelo_usuario():
     classificadas = zn.classificar_funcoes([manual, diagrama], boxes, 500, 500, 10)
 
     assert classificadas[0].funcao == "texto"
+
+
+def test_legenda_automatica_fica_ligada_ao_diagrama_mais_proximo_e_persiste():
+    zonas = [
+        zn.Zona(zn.TEXTO, 100, 420, 300, 450, id="z0", funcao="legenda", automatica=True),
+        zn.Zona(zn.TEXTO, 500, 420, 700, 450, id="z1", funcao="legenda", automatica=True),
+    ]
+    diagramas = [DiagramaLido((100, 100, 300, 400), id="d0"),
+                 DiagramaLido((500, 100, 700, 400), id="d1")]
+
+    ligadas = zn.vincular_legendas(zonas, diagramas)
+    restauradas = [zn.Zona.de_dict(z.como_dict()) for z in ligadas]
+
+    assert [z.diagrama_id for z in restauradas] == ["d0", "d1"]
+
+
+def test_vinculo_manual_de_legenda_nao_e_recalculado():
+    manual = zn.Zona(zn.TEXTO, 100, 420, 300, 450, funcao="legenda",
+                     automatica=False, diagrama_id="d1")
+    diagramas = [DiagramaLido((100, 100, 300, 400), id="d0"),
+                 DiagramaLido((500, 100, 700, 400), id="d1")]
+
+    assert zn.vincular_legendas([manual], diagramas)[0].diagrama_id == "d1"
 
 
 def test_ignorar_e_imagem_nao_geram_boxes(imagem):

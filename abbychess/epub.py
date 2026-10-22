@@ -57,6 +57,12 @@ def limpo(texto: str) -> str:
     return _FORA_DO_XML.sub("", texto or "")
 
 
+def sem_proibidos(texto: str) -> str:
+    """O texto com os caracteres que o XML proíbe trocados por espaço: o comprimento fica,
+    e os trechos de estilo do parágrafo continuam valendo."""
+    return _FORA_DO_XML.sub(" ", texto or "")
+
+
 def _e(texto: str, aspas: bool = False) -> str:
     """Escapa para o XML, depois de tirar o que ele proíbe."""
     return html.escape(limpo(texto), quote=aspas)
@@ -189,7 +195,7 @@ def xhtml_do_texto(paragrafo: Paragrafo, simbolos: str,
     if not texto:
         return ""
     # Tirar caracteres mudaria os trechos de estilo: os proibidos viram espaço.
-    texto = _FORA_DO_XML.sub(" ", texto)
+    texto = sem_proibidos(texto)
     marcas = [[False, False, c in simbolos, -1] for c in texto]
     for k, trechos in ((0, paragrafo.negrito), (1, paragrafo.italico)):
         for inicio, fim in trechos or ():
@@ -367,8 +373,13 @@ def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbo
                 nome = imagens[id(bloco)]
                 classe = "diagrama" if bloco.fen else "diagrama recorte"
                 alt = _e(alternativo(bloco, msg, idioma), aspas=True)
+                # A ressalva do diagrama que ninguém conferiu fica à vista (PD-21), além do alt.
+                legenda = ''
+                if getattr(bloco, "revisao_pendente", False):
+                    ressalva = ([marca_do_lado(bloco, idioma)] if bloco.fen else []) + [msg["nao_revisado"]]
+                    legenda = f"<figcaption>{_e('; '.join(ressalva))}</figcaption>"
                 atual.partes.append(f'<figure class="{classe}"><img src="../{nome}" '
-                                    f'alt="{alt}"/></figure>')
+                                    f'alt="{alt}"/>{legenda}</figure>')
             elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
                 links = [] if bloco.titulo else referencias(bloco.texto, idioma, alvos)
                 atual.links += len(links)

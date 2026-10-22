@@ -2,8 +2,9 @@
 
 Os escritores são os do PyBoxEditor, e não cópias:
 
-- **DOCX e EPUB** saem por `core.exportar.para_docx` e `para_epub`, que pedem a
-  lista de `core.pagina.PaginaExtraida`. O que este módulo faz é montar essa
+- **DOCX** sai por `core.exportar.para_docx`, e o **EPUB** pelo escritor próprio
+  (`abbychess.epub`, desde o passo J); os dois pedem a lista de
+  `core.pagina.PaginaExtraida`. O que este módulo faz é montar essa
   lista a partir das páginas gravadas no projeto: as linhas pelo
   `core.notacao.palavras_da_pagina` (o mesmo que monta o texto do painel), os
   parágrafos pelo vão entre linhas. O diagrama lido e confiável (conferido, ou
@@ -147,6 +148,11 @@ class Relatorio:
     no_pgn: int = 0
     #: No PDF pesquisável, o resumo dele (o relatório por item é dos outros formatos).
     resumo_do_pdf: str = ""
+    #: No EPUB: os capítulos, as figuras que reaproveitaram uma imagem igual e o que a
+    #: conferência do arquivo escrito acusou (`epub.conferir`).
+    capitulos: int = 0
+    imagens_reutilizadas: int = 0
+    problemas_do_arquivo: List[str] = field(default_factory=list)
 
     def resumo(self) -> str:
         """Uma linha, para a barra de status."""
@@ -169,6 +175,13 @@ class Relatorio:
             partes.append(f"{tiradas} linha(s) de cabeçalho/rodapé tirada(s)")
         if self.nao_verificadas:
             partes.append(f"{len(self.nao_verificadas)} página(s) não verificada(s)")
+        if self.capitulos:
+            partes.append(f"{self.capitulos} capítulo(s)")
+        if self.imagens_reutilizadas:
+            partes.append(f"{self.imagens_reutilizadas} imagem(ns) reaproveitada(s)")
+        if self.problemas_do_arquivo:
+            partes.append(f"{len(self.problemas_do_arquivo)} problema(s) no arquivo "
+                          "(ver Resultados)")
         return "; ".join(partes) + "."
 
     def texto(self) -> str:
@@ -186,6 +199,8 @@ class Relatorio:
         if self.nao_verificadas:
             linhas.append("Páginas não verificadas: "
                           + ", ".join(str(i + 1) for i in self.nao_verificadas))
+        for problema in self.problemas_do_arquivo:
+            linhas.append(f"arquivo: {problema}")
         com_pendentes = {i: n for i, n in sorted(self.pendentes.items()) if n}
         if com_pendentes:
             linhas.append("Glifos pendentes: " + ", ".join(
@@ -1034,10 +1049,77 @@ def exportar_docx(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
 
 
 def exportar_epub(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
-                  titulo: str, autor: str = "", idioma: str = "pt-BR") -> Path:
-    from core.exportar import para_epub
+                  titulo: str, autor: str = "", idioma: str = "pt-BR",
+                  metadados=None, relatorio: Optional["Relatorio"] = None) -> Path:
+    """O EPUB pelo escritor próprio (`abbychess.epub`): capítulos, sumário pelos títulos,
+    lista de páginas, marcos, metadados e a acessibilidade do que foi escrito. Depois de
+    gravar, `epub.conferir` lê o arquivo; o que ele acusar vai ao `relatorio`."""
+    from abbychess import epub
 
-    return Path(para_epub(paginas, str(caminho), titulo=titulo, autor=autor, idioma=idioma))
+    metadados = metadados or epub.Metadados(titulo=titulo, idioma=idioma,
+                                            autores=(autor,) if autor else ())
+    escrito = epub.escrever(paginas, caminho, metadados)
+    problemas = epub.conferir(caminho)
+    for problema in problemas:
+        log.warning("EPUB %s: %s", caminho, problema)
+    if relatorio is not None:
+        relatorio.capitulos = escrito.capitulos
+        relatorio.imagens_reutilizadas = escrito.reutilizadas
+        relatorio.problemas_do_arquivo = problemas
+    return Path(caminho)
+
+
+#: O arquivo, na pasta do projeto, com os metadados do livro exportado (§12.1).
+ARQUIVO_DE_METADADOS = "metadados.json"
+
+
+def metadados_do_projeto(projeto: ProjetoDeLivro, idioma: str):
+    """Os metadados do EPUB: o título e o idioma do projeto e o que `metadados.json` disser
+    (`titulo`, `autores`, `editora`, `data`, `assuntos`, `direitos`, `identificador` e
+    `capa`, o caminho de uma imagem relativo à pasta do projeto). Sem o arquivo, só o
+    título e o idioma; um arquivo ilegível vira aviso no log e não para a exportação."""
+    import json
+
+    from abbychess import epub
+
+    dados: dict = {}
+    arquivo = Path(projeto.pasta) / ARQUIVO_DE_METADADOS
+    if arquivo.is_file():
+        try:
+            dados = json.loads(arquivo.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as erro:
+            log.warning("%s ilegível (%s): o EPUB sai só com o título.", arquivo, erro)
+    if not isinstance(dados, dict):
+        dados = {}
+
+    def texto(chave: str) -> str:
+        valor = dados.get(chave)
+        return str(valor).strip() if valor is not None else ""
+
+    def lista(valor) -> Tuple[str, ...]:
+        if isinstance(valor, str):
+            return (valor.strip(),) if valor.strip() else ()
+        if not isinstance(valor, (list, tuple)):
+            return ()
+        return tuple(str(v).strip() for v in valor if v is not None and str(v).strip())
+
+    capa = None
+    if texto("capa"):
+        pasta = Path(projeto.pasta).resolve()
+        arquivo_da_capa = (pasta / texto("capa")).resolve()
+        if pasta != arquivo_da_capa and pasta not in arquivo_da_capa.parents:
+            log.warning("A capa %s está fora da pasta do projeto: fica de fora.", texto("capa"))
+        else:
+            try:
+                capa = arquivo_da_capa.read_bytes()
+            except OSError as erro:
+                log.warning("A capa %s não foi lida (%s).", texto("capa"), erro)
+    return epub.Metadados(
+        titulo=texto("titulo") or projeto.dados.nome, idioma=idioma,
+        autores=lista(dados.get("autores") or dados.get("autor")),
+        editora=texto("editora"), data=texto("data"), assuntos=lista(dados.get("assuntos")),
+        direitos=texto("direitos"), identificador=texto("identificador"),
+        fonte=texto("fonte"), capa=capa)
 
 
 # ----------------------------------------------------------------------
@@ -1293,6 +1375,7 @@ def _gravar_texto(caminho: Path, texto: str) -> Path:
     try:
         with arquivo:
             arquivo.write(texto)
+        os.chmod(temporario, 0o644)             # o mkstemp nasce 0600
         os.replace(temporario, caminho)
     except BaseException:
         Path(temporario).unlink(missing_ok=True)
@@ -1438,10 +1521,12 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
     fonte = pg.fonte_do_projeto(projeto)
     paginas = paginas_do_projeto(projeto, fonte, indices, progresso=progresso,
                                  opcoes=opcoes, relatorio=relatorio)
+    idioma = idioma_do_arquivo(idioma_do_livro(projeto))
     if formato == "txt":
         _gravar_texto(caminho, texto_do_livro(paginas, marcas_de_pagina=opcoes.marcas_de_pagina))
+    elif formato == "docx":
+        exportar_docx(paginas, caminho, titulo=projeto.dados.nome, idioma=idioma)
     else:
-        escrever = exportar_docx if formato == "docx" else exportar_epub
-        escrever(paginas, caminho, titulo=projeto.dados.nome,
-                 idioma=idioma_do_arquivo(idioma_do_livro(projeto)))
+        exportar_epub(paginas, caminho, titulo=projeto.dados.nome, idioma=idioma,
+                      metadados=metadados_do_projeto(projeto, idioma), relatorio=relatorio)
     return relatorio.resumo(), relatorio

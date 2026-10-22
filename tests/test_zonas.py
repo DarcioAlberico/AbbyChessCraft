@@ -10,6 +10,8 @@ import json
 
 import pytest
 
+from core.box_model import BoxEntry
+
 from abbychess import pagina as pg
 from abbychess import zonas as zn
 from abbychess.projeto import ProjetoDeLivro
@@ -100,6 +102,32 @@ def test_areas_automaticas_reconhecem_a_mesma_coisa(imagem):
     zonas = zn.automaticas(segmentada.boxes, segmentada.tabuleiros, largura, altura)
     pelas_areas = zn.segmentar_com_zonas(imagem, zonas)
     assert pelas_areas.boxes == segmentada.boxes
+
+
+def _boxes_de(texto, x, y, altura=10, passo=8):
+    return [BoxEntry(c, x + i * passo, y, x + i * passo + 6, y + altura)
+            for i, c in enumerate(texto) if c != " "]
+
+
+def test_areas_automaticas_dividem_as_funcoes_de_legenda_numero_e_titulo():
+    boxes = (_boxes_de("CAPITULO", 320, 100, altura=20, passo=12)
+             + _boxes_de("texto normal bastante longo", 100, 250)
+             + _boxes_de("Diagrama 7 jogam pretas", 220, 630)
+             + _boxes_de("42", 390, 960))
+    zonas = zn.automaticas(boxes, [(200, 400, 600, 600)], 800, 1000, escala=10)
+
+    funcoes = {z.funcao for z in zonas}
+    assert {"titulo", "texto", "legenda", "numero_de_pagina", "diagrama"} <= funcoes
+
+
+def test_classificacao_nao_altera_area_desenhada_pelo_usuario():
+    boxes = _boxes_de("Diagrama 7", 100, 120)
+    manual = zn.Zona(zn.TEXTO, 90, 110, 220, 140, funcao="texto", automatica=False)
+    diagrama = zn.Zona(zn.DIAGRAMA, 90, 150, 250, 350, automatica=True)
+
+    classificadas = zn.classificar_funcoes([manual, diagrama], boxes, 500, 500, 10)
+
+    assert classificadas[0].funcao == "texto"
 
 
 def test_ignorar_e_imagem_nao_geram_boxes(imagem):

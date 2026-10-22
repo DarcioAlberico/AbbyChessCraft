@@ -413,6 +413,12 @@ dentro de cada trecho e lê uma coluna inteira antes da seguinte, preservando fa
 transversais como títulos. A exportação ainda conserva a implementação anterior até a
 equivalência dos casos de caracterização permitir unificar as duas.
 
+As zonas automáticas agora também são divididas por função quando há evidência local:
+`titulo` pelo corpo tipográfico de pelo menos 1,3×, `numero_de_pagina` pelo texto e pela
+faixa da margem, e `legenda` pelo texto e pela proximidade de um diagrama. Zonas desenhadas
+pelo usuário nunca são reclassificadas. Cabeçalho e rodapé continuam pendentes porque a
+regra correta aprende repetições entre páginas do livro.
+
 **Contexto.**
 - `core/livro.py` do PyBoxEditor já tem colunas, parágrafos com recuo,
   `retirar_cabecalhos` e tabelas.
@@ -420,9 +426,9 @@ equivalência dos casos de caracterização permitir unificar as duas.
 - Ler os docstrings do core e registrar o que precisa de API pública.
 
 **Tarefas.**
-1. O pipeline de §5.1, gravando zonas e funções; as zonas automáticas são divididas por
-   função.
-2. A legenda ligada ao diagrama.
+1. Completar o pipeline de §5.1, gravando zonas e funções; a divisão local de título,
+   número de página e legenda já está implementada.
+2. Persistir a ligação da legenda já identificada ao diagrama correspondente.
 3. O cabeçalho aprendido por livro.
 4. A interface do modo Áreas: funções por letra, Ordenar, modelo de áreas e Ctrl+Shift+R.
 5. A transferência de §4.6 passa a carregar as funções de zona do layout novo.

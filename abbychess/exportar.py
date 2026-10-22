@@ -1073,22 +1073,115 @@ def exportar_epub(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
 ARQUIVO_DE_METADADOS = "metadados.json"
 
 
-def metadados_do_projeto(projeto: ProjetoDeLivro, idioma: str):
-    """Os metadados do EPUB: o título e o idioma do projeto e o que `metadados.json` disser
-    (`titulo`, `autores`, `editora`, `data`, `assuntos`, `direitos`, `identificador` e
-    `capa`, o caminho de uma imagem relativo à pasta do projeto). Sem o arquivo, só o
-    título e o idioma; um arquivo ilegível vira aviso no log e não para a exportação."""
+#: Os campos de `metadados.json`, na ordem do formulário (§12.1).
+CAMPOS_DE_METADADOS = ("titulo", "autores", "editora", "data", "assuntos", "direitos",
+                       "identificador", "fonte", "capa")
+#: Os campos que são listas.
+LISTAS_DE_METADADOS = ("autores", "assuntos")
+#: A data que o EPUB aceita (`dc:date`).
+DATA_DOS_METADADOS = re.compile(r"\d{4}(-\d{2}(-\d{2})?)?")
+#: O nome da capa copiada para a pasta do projeto (a extensão é a da origem).
+NOME_DA_CAPA = "capa"
+
+
+def ler_metadados(projeto: ProjetoDeLivro) -> dict:
+    """O `metadados.json` do projeto como está, ou `{}` (sem arquivo, ou ilegível: aviso no
+    log, e a exportação segue só com o título)."""
     import json
 
+    arquivo = Path(projeto.pasta) / ARQUIVO_DE_METADADOS
+    if not arquivo.is_file():
+        return {}
+    try:
+        dados = json.loads(arquivo.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as erro:
+        log.warning("%s ilegível (%s): o EPUB sai só com o título.", arquivo, erro)
+        return {}
+    return dados if isinstance(dados, dict) else {}
+
+
+def normalizar_metadados(dados: dict) -> dict:
+    """Os campos conhecidos, sem espaços nas pontas, as listas como listas (um texto com
+    `;` vira lista) e sem os vazios. Levanta `ValueError` com a data fora de AAAA-MM-DD."""
+    saida: dict = {}
+    for campo in CAMPOS_DE_METADADOS:
+        valor = dados.get(campo)
+        if valor is None:
+            continue
+        if campo in LISTAS_DE_METADADOS:
+            if isinstance(valor, str):
+                itens = valor.split(";")
+            elif isinstance(valor, (list, tuple)):
+                itens = list(valor)
+            else:                               # um número, um objeto: vira um item
+                itens = [valor]
+            lista = [str(v).strip() for v in itens if v is not None and str(v).strip()]
+            if lista:
+                saida[campo] = lista
+        elif str(valor).strip():
+            saida[campo] = str(valor).strip()
+    if "data" in saida and not DATA_DOS_METADADOS.fullmatch(saida["data"]):
+        raise ValueError(f"A data {saida['data']!r} deve ser AAAA, AAAA-MM ou AAAA-MM-DD.")
+    return saida
+
+
+def gravar_metadados(projeto: ProjetoDeLivro, dados: dict,
+                     capa: Optional[Path] = None) -> dict:
+    """Grava o `metadados.json` (atômico, como todo arquivo do projeto) e devolve o que foi
+    gravado. `capa` é uma imagem escolhida fora do projeto: é copiada para a pasta dele
+    (`capa.<ext>`) e o campo passa a apontá-la. Recusa (`SomenteLeitura`) em projeto só
+    de leitura."""
+    from abbychess import gravacao as gv
+
+    novos = normalizar_metadados(dados)
+    pasta = Path(projeto.pasta)
+    # As chaves que o formulário não conhece (escritas à mão) ficam; as dele valem o que ele
+    # disse, e a vazia sai. O `autor` singular de antes dá lugar a `autores`.
+    gravado = {k: v for k, v in ler_metadados(projeto).items()
+               if k not in CAMPOS_DE_METADADOS and k != "autor"}
+    gravado.update(novos)
+    if capa is not None:
+        capa = Path(capa)
+        conteudo = capa.read_bytes()
+        _conferir_capa(conteudo)
+        extensao = capa.suffix.lower() if capa.suffix.lower() in EXTENSOES_DA_CAPA else ".png"
+        nome = f"{NOME_DA_CAPA}{extensao}"
+        destino = pasta / nome
+        if not destino.exists() or destino.resolve() != capa.resolve():
+            gv.gravar_bytes(destino, conteudo)
+        for velha in EXTENSOES_DA_CAPA:          # a capa de outra extensão não fica órfã
+            if velha != extensao and (pasta / f"{NOME_DA_CAPA}{velha}").is_file():
+                gv.apagar(pasta / f"{NOME_DA_CAPA}{velha}")
+        gravado["capa"] = nome
+    gv.gravar_json(pasta / ARQUIVO_DE_METADADOS, gravado)
+    return gravado
+
+
+#: As extensões de capa que o EPUB leva, e o tamanho máximo (a cópia é na hora de exportar).
+EXTENSOES_DA_CAPA = (".png", ".jpg", ".jpeg", ".gif", ".webp")
+TAMANHO_MAXIMO_DA_CAPA = 20 * 1024 * 1024
+
+
+def _conferir_capa(conteudo: bytes) -> None:
+    """Levanta `ValueError` se a capa não for PNG, JPEG, GIF ou WebP, ou passar do limite."""
+    if len(conteudo) > TAMANHO_MAXIMO_DA_CAPA:
+        raise ValueError(f"A capa tem {len(conteudo) // (1024 * 1024)} MB; o limite é "
+                         f"{TAMANHO_MAXIMO_DA_CAPA // (1024 * 1024)} MB.")
+    assinaturas = (conteudo[:8] == b"\x89PNG\r\n\x1a\n", conteudo[:3] == b"\xff\xd8\xff",
+                   conteudo[:6] in (b"GIF87a", b"GIF89a"),
+                   conteudo[:4] == b"RIFF" and conteudo[8:12] == b"WEBP")
+    if not any(assinaturas):
+        raise ValueError("A capa não é uma imagem PNG, JPEG, GIF ou WebP.")
+
+
+def metadados_do_projeto(projeto: ProjetoDeLivro, idioma: str, dados: Optional[dict] = None):
+    """Os metadados do EPUB: o título e o idioma do projeto e o que `metadados.json` disser
+    (`titulo`, `autores`, `editora`, `data`, `assuntos`, `direitos`, `identificador`,
+    `fonte` e `capa`, o caminho de uma imagem relativo à pasta do projeto). `dados` troca o
+    arquivo (o formulário de um projeto só de leitura). Sem nada, só o título e o idioma."""
     from abbychess import epub
 
-    dados: dict = {}
-    arquivo = Path(projeto.pasta) / ARQUIVO_DE_METADADOS
-    if arquivo.is_file():
-        try:
-            dados = json.loads(arquivo.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as erro:
-            log.warning("%s ilegível (%s): o EPUB sai só com o título.", arquivo, erro)
+    dados = ler_metadados(projeto) if dados is None else dados
     if not isinstance(dados, dict):
         dados = {}
 
@@ -1495,9 +1588,10 @@ def exportar(projeto: ProjetoDeLivro, caminho: str | Path,
 def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
                            indices: Optional[Iterable[int]] = None, *,
                            progresso: Optional[Progresso] = None,
-                           opcoes: Optional[Opcoes] = None) -> Tuple[str, Relatorio]:
+                           opcoes: Optional[Opcoes] = None,
+                           metadados: Optional[dict] = None) -> Tuple[str, Relatorio]:
     """Exporta e devolve `(resumo, relatório)`: o resumo vai à barra, o relatório aos
-    Resultados (§12.2)."""
+    Resultados (§12.2). `metadados` troca o `metadados.json` (o formulário não gravado)."""
     formato = formato_do_caminho(caminho)
     caminho = Path(caminho)
     opcoes = opcoes or Opcoes()
@@ -1524,9 +1618,12 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
     idioma = idioma_do_arquivo(idioma_do_livro(projeto))
     if formato == "txt":
         _gravar_texto(caminho, texto_do_livro(paginas, marcas_de_pagina=opcoes.marcas_de_pagina))
-    elif formato == "docx":
-        exportar_docx(paginas, caminho, titulo=projeto.dados.nome, idioma=idioma)
+        return relatorio.resumo(), relatorio
+    meta = metadados_do_projeto(projeto, idioma, metadados)
+    if formato == "docx":
+        exportar_docx(paginas, caminho, titulo=meta.titulo, autor="; ".join(meta.autores),
+                      idioma=idioma)
     else:
-        exportar_epub(paginas, caminho, titulo=projeto.dados.nome, idioma=idioma,
-                      metadados=metadados_do_projeto(projeto, idioma), relatorio=relatorio)
+        exportar_epub(paginas, caminho, titulo=meta.titulo, idioma=idioma, metadados=meta,
+                      relatorio=relatorio)
     return relatorio.resumo(), relatorio

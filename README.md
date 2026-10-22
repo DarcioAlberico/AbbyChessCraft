@@ -613,8 +613,16 @@ arquivo. **Projeto › Exportar** também escreve:
 (não por página), com a página impressa como âncora; o sumário pelos títulos, em dois
 níveis; a lista de páginas e os marcos (capa, sumário, começo do texto); as mensagens no
 idioma do livro ("Contents" num livro inglês); a acessibilidade declarada pelo que o
-arquivo de fato tem; e imagens repetidas guardadas uma vez só. Os metadados vêm de
-`metadados.json` na pasta do projeto, se existir:
+arquivo de fato tem; e imagens repetidas guardadas uma vez só.
+
+**Depois de escolher o arquivo, o diálogo da exportação** pergunta as opções (manter
+cabeçalhos e rodapés, só as páginas verificadas, diagramas redesenhados ou recortados, as
+marcas de página do TXT; cada uma só vale no formato que a usa, e a escolha é lembrada) e,
+no EPUB e no DOCX, os metadados do livro: título, autores e assuntos (separados por `;`),
+editora, data (AAAA, AAAA-MM ou AAAA-MM-DD), direitos, identificador, edição impressa e a
+capa, que é copiada para a pasta do projeto. O formulário fica em `metadados.json` na pasta
+do projeto e volta preenchido na próxima exportação; num projeto só de leitura ele vale só
+naquela exportação. O arquivo também pode ser escrito à mão:
 
 ```json
 {"autores": ["Jacob Aagaard"], "editora": "Quality Chess", "data": "2012",

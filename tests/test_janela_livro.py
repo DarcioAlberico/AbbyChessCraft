@@ -64,6 +64,7 @@ def respostas(monkeypatch):
         preencher = estado.get("exportacao")
         if preencher is not None:
             preencher(dialogo)
+        dialogo.done(QDialog.DialogCode.Accepted)        # como o exec de verdade termina
         return QDialog.DialogCode.Accepted
 
     monkeypatch.setattr(DialogoDeExportacao, "exec", exec_)
@@ -205,3 +206,36 @@ def test_a_pergunta_do_lote_diz_que_as_correcoes_ficam_e_conta_as_verificadas_a_
     texto = respostas["texto"]
     assert "2 das 3" in texto and "1 verificada" in texto
     assert "mantendo as correções manuais" in texto and "Voltar ao estado antes do lote" in texto
+
+
+def test_a_previa_que_chega_depois_de_fechar_o_dialogo_nao_abre_janela(app, janela, respostas,
+                                                                       tmp_path):
+    janela.reconhecer_livro()
+    _esperar(app, janela)
+    respostas["arquivo"] = str(tmp_path / "saida.epub")
+    respostas["exportacao"] = lambda dialogo: dialogo.previsualizar()
+    janela.exportar()                       # pede a prévia e fecha com Exportar
+    _esperar(app, janela)                   # a prévia chega, depois a exportação
+    dialogo = respostas["dialogo"]
+    assert dialogo.vivo is False and dialogo.janela_da_previa is None
+    assert (tmp_path / "saida.epub").is_file()
+
+
+def test_previa_pelo_controlador_chega_ao_dialogo(app, janela, tmp_path):
+    from abbychess import exportar as ex
+    from abbychess.app.dialogo_exportacao import DialogoDeExportacao
+
+    janela.reconhecer_livro()
+    _esperar(app, janela)
+    dialogo = DialogoDeExportacao(janela, "epub", ex.Opcoes(), {}, tmp_path, "Livro")
+    dialogo.ao_previsualizar = lambda f, o, m: janela.livro.previa(
+        f, o, m, dialogo.mostrar_previa, dialogo.previa_falhou)
+    dialogo.previsualizar()
+    assert not dialogo.btn_exportar.isEnabled()   # Exportar espera a prévia
+    _esperar(app, janela)
+    texto = dialogo.janela_da_previa.navegador.toPlainText()
+    # As páginas desta fixture não têm caracteres ensinados: a prévia mostra as marcas delas.
+    assert "Pré-visualização" in texto and "Relatório" in texto and "Página 3" in texto
+    assert dialogo.btn_exportar.isEnabled()
+    dialogo.reject()
+    assert not dialogo.janela_da_previa.isVisible()   # fechar o diálogo fecha a prévia

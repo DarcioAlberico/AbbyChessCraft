@@ -1577,6 +1577,35 @@ def formato_do_caminho(caminho: str | Path) -> str:
     return formato
 
 
+def previa(projeto: ProjetoDeLivro, formato: str, indices: Optional[Iterable[int]] = None, *,
+           opcoes: Optional[Opcoes] = None, metadados: Optional[dict] = None,
+           progresso: Optional[Progresso] = None) -> Tuple[str, Relatorio]:
+    """A pré-visualização (§12.2): `(html, relatório)` do que a exportação em `formato`
+    escreveria, pelo mesmo caminho e com as mesmas opções, sem gravar nada. O PDF
+    pesquisável não tem prévia: ele guarda as páginas como são."""
+    from abbychess import previa as pv
+
+    if formato not in FORMATOS or formato == "pdf":
+        raise ValueError(f"Sem pré-visualização para {formato.upper()}.")
+    opcoes = opcoes or Opcoes()
+    relatorio = Relatorio(formato=formato)
+    idioma = idioma_do_arquivo(idioma_do_livro(projeto))
+    titulo = metadados_do_projeto(projeto, idioma, metadados).titulo
+    if formato == "pgn":
+        texto = pgn_do_livro(projeto, indices, relatorio, opcoes)
+        return pv.html_do_texto(texto, relatorio.texto().splitlines(), titulo, idioma), relatorio
+    fonte = pg.fonte_do_projeto(projeto)
+    paginas = paginas_do_projeto(projeto, fonte, indices, progresso=progresso, opcoes=opcoes,
+                                 relatorio=relatorio)
+    linhas = relatorio.texto().splitlines()
+    if formato == "txt":                        # o TXT como ele sai, não o livro formatado
+        texto = texto_do_livro(paginas[:pv.LIMITE], marcas_de_pagina=opcoes.marcas_de_pagina)
+        if len(paginas) > pv.LIMITE:
+            texto += f"\n… e mais {len(paginas) - pv.LIMITE} página(s), que a exportação inclui.\n"
+        return pv.html_do_texto(texto, linhas, titulo, idioma), relatorio
+    return pv.html_do_livro(paginas, linhas, titulo, idioma), relatorio
+
+
 def exportar(projeto: ProjetoDeLivro, caminho: str | Path,
              indices: Optional[Iterable[int]] = None, *,
              progresso: Optional[Progresso] = None, opcoes: Optional[Opcoes] = None) -> str:

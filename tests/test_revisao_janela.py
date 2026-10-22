@@ -102,3 +102,37 @@ def test_ca_8_2_shift_f7_alterna_o_escopo_da_fila(jb):  # noqa: F811
     assert "livro" in jb.inspetor.contador.text()
     QTest.keyClick(jb.visor, Qt.Key.Key_F7, Qt.KeyboardModifier.ShiftModifier)
     assert jb.fila.escopo == "pagina" and "livro" not in jb.inspetor.seletor.text()
+
+
+def test_a_galeria_com_leituras_misturadas_e_um_passo_so(jb):  # noqa: F811
+    _uns(jb, 3)
+    from abbychess import busca as bs
+
+    achados = [bs.GlifoAchado(jb.pagina.indice, b.gid, b.entry.char, "net", 0.9)
+               for b in jb.pagina.modelo.boxes]                  # o "a" e os "1"
+    jb.mostrar_glifos_na_galeria(achados, "Glifos de qualquer caractere")
+    g = jb.galeria
+    passos = jb.pagina.historico.passos
+    g.vista.selectAll()
+    QTest.keyClick(g.vista, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    _ate(lambda: all(b.entry.source == "manual" for b in jb.pagina.modelo.boxes))
+    assert jb.pagina.historico.passos == passos + 1             # um passo do desfazer
+    assert sorted(b.entry.char for b in jb.pagina.modelo.boxes) == ["1", "1", "1", "a"]
+
+
+def test_trocar_de_pagina_fecha_a_pergunta_do_ctrl_t(jb, monkeypatch):  # noqa: F811
+    _uns(jb, 3)
+    marcadas = []
+    monkeypatch.setattr(jb.pagina, "fila", lambda: [1, 2])      # com pendentes: a pergunta
+    jb.pagina.verificar = lambda indice=None: marcadas.append(indice)
+    jb.verificar_pagina()
+    assert jb.confirmacao.aberta and "página 1" in jb.confirmacao.pergunta.text()
+    jb.eventos.emitir("pagina_trocou")                   # foi a outra página antes de responder
+    assert not jb.confirmacao.aberta
+    del jb.pagina.verificar
+    jb.verificar_pagina()                                # a pergunta leva o índice dela
+    jb.pagina.indice += 1                                # a página mudou sem o evento
+    jb.confirmacao._aceitar()
+    jb.pagina.indice -= 1
+    assert jb.pagina.modelo.estado != "verificada"       # a outra página não é marcada
+    assert marcadas == []

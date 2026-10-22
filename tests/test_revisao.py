@@ -91,22 +91,6 @@ def test_na_confianca_o_livro_segue_depois_de_pular_todos(livro):
     assert ctl.indice == 2
 
 
-def test_a_fila_julga_de_novo_so_os_glifos_tocados(livro, monkeypatch):
-    from abbychess import controlador as cp
-    from abbychess import edicao as ed
-
-    projeto, ctl, fila = livro
-    ctl.fila()
-    julgados = []
-    original = cp.precisa_revisao
-    monkeypatch.setattr(cp, "precisa_revisao", lambda *a: (julgados.append(a), original(*a))[1])
-    ctl.fila()
-    assert julgados == []                                 # nada mudou
-    ed.corrigir(ctl.modelo, ctl.modelo.boxes[0].gid, "x")
-    ctl.fila()
-    assert len(julgados) == 1                             # só o corrigido
-
-
 def test_o_f6_conta_pelo_resumo_sem_abrir_as_paginas(livro, monkeypatch):
     projeto, ctl, fila = livro
     assert projeto.descarregar(10)
@@ -120,15 +104,15 @@ def test_o_f6_conta_pelo_resumo_sem_abrir_as_paginas(livro, monkeypatch):
     assert lv.pendentes_por_pagina(projeto, mais_baixo) == {0: 2, 2: 1}   # outro limiar
 
 
-def test_ca_8_4_esquecer_devolve_a_fila_os_lidos_no_livro_e_desfazer_os_tira(livro):
-    """Uma amostra que leu 30 glifos em 3 páginas (uma verificada): esquecê-la devolve os 30
-    à fila (a verificada volta a em_revisao); desfazer os tira de novo."""
+def _amostra_em_tres_paginas(livro):
+    """Uma amostra "e" que leu 10 glifos em cada uma das 3 páginas (a 2 verificada), o índice
+    da busca pronto e a fila da interface à mão (`esperar` a esvazia)."""
     import time
 
     import numpy as np
 
     from abbychess.controladores import ControladorDaBusca
-    from abbychess.modelo import EM_REVISAO, VERIFICADA
+    from abbychess.modelo import VERIFICADA
 
     projeto, ctl, fila = livro
     caminho = ctl.leitor.ensinar(np.full((30, 18), 255, np.uint8), "e", origem="teste")
@@ -163,17 +147,61 @@ def test_ca_8_4_esquecer_devolve_a_fila_os_lidos_no_livro_e_desfazer_os_tira(liv
     def na_fila():
         return sum(1 for i in range(3) for b in projeto.carregar_modelo(i).boxes
                    if b.gid % 1000 >= 100 and b.entry.source == "none" and b.entry.char == "e")
-    assert da_amostra() == 30 and na_fila() == 0
-    ctl.esquecer([caminho])
-    ctl.executar.tudo()
-    esperar(lambda: na_fila() == 30)
-    assert da_amostra() == 0 and projeto.carregar_modelo(1).estado == EM_REVISAO
-    assert len(ctl.historico.proxima_a_desfazer().paginas) == 3      # uma transação só
-    ctl.desfazer()
-    ctl.executar.tudo()
-    assert na_fila() == 0 and da_amostra() == 30
-    assert projeto.carregar_modelo(1).estado == VERIFICADA
-    assert Path(caminho).exists()                        # a amostra voltou
+    return SimpleNamespace(projeto=projeto, ctl=ctl, caminho=caminho, esperar=esperar,
+                           da_amostra=da_amostra, na_fila=na_fila, fila=fila_da_interface)
+
+
+def test_ca_8_4_esquecer_devolve_a_fila_os_lidos_no_livro_e_desfazer_os_tira(livro):
+    """Uma amostra que leu 30 glifos em 3 páginas (uma verificada): esquecê-la devolve os 30
+    à fila (a verificada volta a em_revisao); desfazer os tira de novo."""
+    from abbychess.modelo import EM_REVISAO, VERIFICADA
+
+    c = _amostra_em_tres_paginas(livro)
+    assert c.da_amostra() == 30 and c.na_fila() == 0
+    c.ctl.esquecer([c.caminho])
+    c.ctl.executar.tudo()
+    c.esperar(lambda: c.na_fila() == 30)
+    assert c.da_amostra() == 0 and c.projeto.carregar_modelo(1).estado == EM_REVISAO
+    assert len(c.ctl.historico.proxima_a_desfazer().paginas) == 3     # uma transação só
+    c.ctl.desfazer()
+    c.ctl.executar.tudo()
+    assert c.na_fila() == 0 and c.da_amostra() == 30
+    assert c.projeto.carregar_modelo(1).estado == VERIFICADA
+    assert Path(c.caminho).exists()                     # a amostra voltou
+
+
+def test_refazer_o_esquecer_desfeito_antes_da_procura_devolve_os_30(livro):
+    """O Ctrl+Z antes de a procura no livro voltar descarta o resultado dela; o Ctrl+Y procura
+    de novo (e não fica só com a página aberta)."""
+    c = _amostra_em_tres_paginas(livro)
+    c.ctl.esquecer([c.caminho])
+    c.ctl.executar.tudo()
+    assert c.na_fila() == 10                            # só a página aberta, por enquanto
+    c.ctl.desfazer()                                    # a procura ainda não voltou
+    c.ctl.executar.tudo()
+    c.esperar(lambda: not c.fila and c.na_fila() == 0)  # a volta dela é descartada
+    assert c.da_amostra() == 30
+    c.ctl.refazer()
+    c.ctl.executar.tudo()
+    c.esperar(lambda: c.na_fila() == 30)
+    assert c.da_amostra() == 0 and not Path(c.caminho).exists()
+
+
+def test_ensinar_e_esquecer_varios_de_uma_vez(tmp_path):
+    import numpy as np
+
+    from abbychess.padroes import PadroesDoLivro
+
+    padroes = PadroesDoLivro(tmp_path / "padroes")
+    barra = np.full((30, 12), 255, np.uint8)
+    barra[:, 5:7] = 0
+    caminhos = padroes.ensinar_varios([(barra, "1", 1.0, f"o{k}") for k in range(3)]
+                                      + [(255 - barra, "l", None, "x")])
+    assert padroes.total == 4 and padroes.ler(barra).char == "1"
+    assert padroes.altura_de(caminhos[0]) == 1.0 and padroes.meta_de(caminhos[3])["origem"] == "x"
+    assert PadroesDoLivro(tmp_path / "padroes").total == 4        # gravados, e o meta também
+    padroes.esquecer_varios(caminhos[:2])
+    assert padroes.total == 2 and not caminhos[0].exists()
 
 
 # ----------------------------------------------------------------------

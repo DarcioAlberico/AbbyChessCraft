@@ -28,6 +28,8 @@ class DesenhoDaJanela:
 
     def _pagina_trocou(self) -> None:
         p = self.pagina
+        if self.confirmacao.aberta:             # a pergunta do Ctrl+T era da outra página
+            self.confirmacao.recusar()
         self.seletor.blockSignals(True)
         self.seletor.setMaximum(max(1, p.fonte.total))
         self.seletor.setValue(p.indice + 1)
@@ -187,14 +189,14 @@ class DesenhoDaJanela:
         if self.leitor is None or self.projeto is None:
             return
         padroes = self.leitor.padroes
-        pasta = Path(self.projeto.pasta_de_padroes).resolve()
+        pasta = Path(padroes.pasta)               # os arquivos são dela (sem resolver cada um)
         lidos = self.busca.lidos_por_amostra() if hasattr(self, "busca") else {}
         detalhes = {}
         for arquivos in self.leitor.padroes_por_caractere().values():
             for arquivo in arquivos:
                 meta = padroes.meta_de(arquivo)
                 try:
-                    nome = Path(arquivo).resolve().relative_to(pasta).as_posix() if pasta else ""
+                    nome = Path(arquivo).relative_to(pasta).as_posix()
                 except ValueError:
                     nome = ""
                 # (posição de agora, gid): pelo gid da amostra, que segue a página (§12.4).

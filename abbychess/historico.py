@@ -97,6 +97,9 @@ class Transacao:
     inteiras: Dict[int, tuple] = field(default_factory=dict)
     #: (antes, depois) dos `gids_movidos` do projeto, com as `inteiras`.
     movidos: Optional[tuple] = None
+    #: Os nomes das amostras que ela esqueceu (§8.3): o refazer de um esquecer desfeito antes
+    #: de a procura no livro voltar procura de novo.
+    esquecidas: frozenset = frozenset()
 
     def bytes(self) -> int:
         ordem = 0 if self.sequencia is None else sum(

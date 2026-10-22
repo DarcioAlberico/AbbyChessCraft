@@ -1,11 +1,14 @@
 """A Galeria vista da janela (SPEC §8.2, passo C): abrir a Galeria do caractere do glifo
 atual (da página ou do livro) ou de uma busca por glifo, tirar os recortes das páginas numa
 thread e aplicar o que o usuário pediu nela pelo controlador da página
-(`corrigir_no_livro`: várias páginas, um passo do desfazer). Um mixin da `JanelaPrincipal`.
+(`corrigir_no_livro`: várias páginas, um passo do desfazer). Também o resto da revisão vista
+da janela: o Ctrl+T com a pergunta na barra (§8.4) e o esquecer da aba Padrões (§8.3). Um
+mixin da `JanelaPrincipal`.
 """
 
 from __future__ import annotations
 
+import functools
 import logging
 import threading
 from collections import defaultdict
@@ -32,6 +35,24 @@ class GaleriaNaJanela:
         self._carga_da_galeria = 0
         self._galeria_pendente = None
         self.eventos.ligar("galeria_aplicada", self._galeria_aplicada)
+
+    # ------------------------------------------------------------------
+    def verificar_pagina(self) -> None:
+        """Ctrl+T: com glifos a revisar, pergunta na barra (§8.4: Enter aceita, Esc não
+        marca e fecha só a pergunta) antes de marcar a página como verificada."""
+        pendentes = len(self.pagina.fila()) if self.pagina.modelo is not None else 0
+        if pendentes:
+            indice = self.pagina.indice           # só a página da pergunta (§8.4)
+            self.confirmacao.perguntar(
+                f"Aceitar {pendentes} pendente(s) da página {indice + 1} como estão e marcá-la "
+                "como verificada? Enter aceita · Esc não marca",
+                functools.partial(self.pagina.verificar, indice))
+            return
+        self.pagina.verificar()
+
+    def esquecer(self, caminhos: list) -> None:
+        if self.leitor is not None:              # sem pergunta: o Ctrl+Z desfaz (§8.3)
+            self.pagina.esquecer(caminhos)
 
     # ------------------------------------------------------------------
     def abrir_galeria(self, char=None, escopo=None) -> None:
@@ -118,7 +139,7 @@ class GaleriaNaJanela:
         itens = self.galeria.selecionados()
         if not itens:
             return
-        self._galeria_pendente = ([(i.pagina, i.gid) for i in itens], char)
+        self._galeria_pendente = {(i.pagina, i.gid): char for i in itens}
         self.pagina.corrigir_no_livro(_por_pagina(itens), char)
 
     def _galeria_confirmar(self, ensinar: bool) -> None:
@@ -127,25 +148,23 @@ class GaleriaNaJanela:
         if not itens:
             return
         recortes = self.galeria.modelo.recortes
-        por_char = defaultdict(list)
-        for item in itens:
-            por_char[item.char].append(item)
         faltam = [i for i in itens if (i.pagina, i.gid) not in recortes]
         if ensinar and faltam:
             self.statusBar().showMessage(f"{len(faltam)} recorte(s) ainda carregando: tente "
                                          "de novo em um instante.", 6000)
             return
-        for char, grupo in por_char.items():
-            self._galeria_pendente = ([(i.pagina, i.gid) for i in grupo], char)
-            self.pagina.corrigir_no_livro(
-                _por_pagina(grupo), char,
-                recortes={(i.pagina, i.gid): recortes[(i.pagina, i.gid)] for i in grupo}
-                if ensinar else None)
+        leituras = {(i.pagina, i.gid): i.char for i in itens}   # cada um com a dele
+        self._galeria_pendente = leituras
+        self.pagina.corrigir_no_livro(
+            _por_pagina(itens), leituras,
+            recortes={chave: recortes[chave] for chave in leituras} if ensinar else None)
 
     def _galeria_aplicada(self, feitos: int, paginas: int, ensinou: bool) -> None:
         pendente, self._galeria_pendente = self._galeria_pendente, None
-        if pendente is not None:
-            self.galeria.modelo.trocar_leitura(*pendente)
+        if pendente:
+            for char in set(pendente.values()):
+                self.galeria.modelo.trocar_leitura(
+                    [chave for chave, c in pendente.items() if c == char], char)
         acao = "ensinado(s)" if ensinou else "corrigido(s)"
         self.statusBar().showMessage(f"Galeria: {feitos} glifo(s) {acao} em {paginas} "
                                      "página(s) · Ctrl+Z desfaz.", 8000)

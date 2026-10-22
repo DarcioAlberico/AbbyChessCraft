@@ -306,6 +306,67 @@ class PadroesDoLivro:
         self._efeitos = self._efeitos + [efeito]
         return caminho
 
+    def ensinar_varios(self, pedidos) -> List[Path]:
+        """Vários `ensinar` de uma vez, com os metadados gravados uma vez e a matriz crescida
+        uma vez (a Galeria ensina centenas): `pedidos` é [(recorte, char, altura, origem)],
+        com o efeito como quinto item opcional (sem ele, o efeito é desconhecido)."""
+        caminhos, vetores, efeitos = [], [], []
+        for pedido in pedidos:
+            recorte, char, altura_relativa, origem = pedido[:4]
+            efeito = _efeito(pedido[4] if len(pedido) > 4 else None)
+            if not char:
+                raise ValueError("O caractere ensinado não pode ser vazio.")
+            cinza = recorte if recorte.ndim == 2 else cv2.cvtColor(recorte, cv2.COLOR_RGB2GRAY)
+            caminho = self.pasta / char_to_folder(char) / f"{_nome_limpo(origem)}.png"
+            ok, png = cv2.imencode(".png", cinza)
+            if not ok:
+                raise OSError(f"O recorte de '{char}' não pôde ser codificado em PNG.")
+            gv.gravar_bytes(caminho, png.tobytes())
+            self._meta[self._chave(caminho)] = {
+                "altura": None if altura_relativa is None else round(float(altura_relativa), 4),
+                "origem": origem,
+                **({"efeito": [int(v) for v in efeito]} if efeito is not None else {}),
+            }
+            caminhos.append(caminho)
+            vetores.append((_vetor(cinza), char, _proporcao(cinza), altura_relativa))
+            efeitos.append(efeito)
+        if not caminhos:
+            return []
+        self._gravar_meta()
+        matriz = np.vstack([v for v, _c, _p, _a in vetores])
+        self._X = np.vstack([self._X, matriz])
+        self._normas = np.append(self._normas, np.einsum("ij,ij->i", matriz, matriz))
+        self._chars = self._chars + [c for _v, c, _p, _a in vetores]
+        self._caminhos = self._caminhos + caminhos
+        self._proporcoes = np.append(self._proporcoes,
+                                     np.array([p for _v, _c, p, _a in vetores], np.float32))
+        self._alturas = np.append(self._alturas, np.array(
+            [np.nan if a is None else a for _v, _c, _p, a in vetores], np.float32))
+        self._efeitos = self._efeitos + efeitos
+        return caminhos
+
+    def esquecer_varios(self, caminhos) -> None:
+        """Vários `esquecer` de uma vez: os arquivos saem, os metadados são gravados uma vez
+        e as linhas deles saem da matriz (sem reler os outros padrões)."""
+        raiz = self.pasta.resolve()
+        resolvidos = [Path(c).resolve() for c in caminhos]
+        for caminho in resolvidos:
+            if raiz not in caminho.parents:
+                raise ValueError(f"{caminho} não é um padrão deste livro.")
+        for caminho in resolvidos:
+            gv.apagar(caminho)
+            self._meta.pop(caminho.relative_to(raiz).as_posix(), None)
+        self._gravar_meta()
+        saem = set(resolvidos) | {Path(c) for c in caminhos}   # sem resolver a base inteira
+        manter = [i for i, c in enumerate(self._caminhos) if Path(c) not in saem]
+        self._X = self._X[manter] if manter else np.zeros((0, LADO * LADO), np.float32)
+        self._normas = self._normas[manter]
+        self._chars = [self._chars[i] for i in manter]
+        self._caminhos = [self._caminhos[i] for i in manter]
+        self._proporcoes = self._proporcoes[manter]
+        self._alturas = self._alturas[manter]
+        self._efeitos = [self._efeitos[i] for i in manter]
+
     def esquecer(self, caminho: str | Path) -> None:
         caminho = Path(caminho).resolve()
         if self.pasta.resolve() not in caminho.parents:
@@ -384,6 +445,21 @@ class PadroesDoLivro:
         self._meta[caminho.relative_to(self.pasta.resolve()).as_posix()] = dict(amostra.meta)
         self._gravar_meta()
         self._carregar()
+
+    def restaurar_varios(self, amostras) -> None:
+        """Vários `restaurar` de uma vez (o desfazer de um esquecer, o refazer de um ensinar
+        da Galeria): os metadados gravados e os padrões relidos uma vez só."""
+        raiz = self.pasta.resolve()
+        resolvidos = [(Path(a.caminho).resolve(), a) for a in amostras]
+        for caminho, _amostra in resolvidos:
+            if raiz not in caminho.parents:
+                raise ValueError(f"{caminho} não é um padrão deste livro.")
+        for caminho, amostra in resolvidos:
+            gv.gravar_bytes(caminho, amostra.png)
+            self._meta[caminho.relative_to(raiz).as_posix()] = dict(amostra.meta)
+        if resolvidos:
+            self._gravar_meta()
+            self._carregar()
 
     def meta_de(self, caminho: str | Path) -> dict:
         """Os metadados gravados da amostra (a altura relativa, a origem; o efeito, desde o

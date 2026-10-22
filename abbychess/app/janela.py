@@ -269,8 +269,9 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.setWindowTitle(f"{projeto.dados.nome}{so_leitura} — {TITULO}")
         self.livro.abrir(projeto, fonte)
         # O espaço e a gaveta já, pelo livro.json, sem esperar o leitor (§8.1, CA-8.3: o
-        # painel de Páginas com o livro todo logo ao abrir); `_projeto_aberto` os refaz.
+        # painel de Páginas com o livro todo logo ao abrir); `_projeto_aberto` só os atualiza.
         self._espaco_do_projeto_aberto()
+        self._espaco_ja_de = projeto
 
     def usar(self, projeto, fonte, leitor, servidor=None) -> None:
         """O projeto com o leitor já pronto (os testes e as medidas; a abertura passa por
@@ -285,7 +286,12 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self._limpar_previa()
         self.busca.abrir()                      # o índice da busca, em segundo plano (§7.3)
         self._padroes_mudaram()
-        self._espaco_do_projeto_aberto()
+        if getattr(self, "_espaco_ja_de", None) is self.projeto:
+            self.atualizar_paginas(seguir=True)  # o espaço já veio no trocar_projeto
+            self.atualizar_barra()
+            self.atualizar_fila()
+        else:
+            self._espaco_do_projeto_aberto()
         dialogos.avisos_da_abertura(self, self.projeto)
         servidor = self.pagina.servidor
         if servidor is not None and not servidor.pronto.is_set():
@@ -364,17 +370,6 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
             else:
                 self.visor.ir_ao_fim()
 
-    def verificar_pagina(self) -> None:
-        """Ctrl+T: com glifos a revisar, pergunta na barra (§8.4: Enter aceita, Esc não
-        marca e fecha só a pergunta) antes de marcar a página como verificada."""
-        pendentes = len(self.pagina.fila()) if self.pagina.modelo is not None else 0
-        if pendentes:
-            self.confirmacao.perguntar(
-                f"Aceitar {pendentes} pendente(s) como estão e marcar a página como "
-                "verificada? Enter aceita · Esc não marca", self.pagina.verificar)
-            return
-        self.pagina.verificar()
-
     def reconhecer(self) -> None:
         p = self.pagina
         if p.reconhecida and p.boxes and not dialogos.confirmar(
@@ -383,10 +378,6 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
                 "correções só desta ocorrência. Os padrões ensinados ficam. Continuar?"):
             return
         p.reconhecer()
-
-    def esquecer(self, caminhos: list) -> None:
-        if self.leitor is not None:              # sem pergunta: o Ctrl+Z desfaz (§8.3)
-            self.pagina.esquecer(caminhos)
 
     def opcoes(self) -> None:
         if not self.pagina.pronto:

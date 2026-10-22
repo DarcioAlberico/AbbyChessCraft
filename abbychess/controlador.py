@@ -1006,9 +1006,12 @@ class ControladorDePagina:
         posicao = fila.index(self.atual) if self.atual in fila else 0
         self.escolher(fila[(posicao + passo) % len(fila)])
 
-    def verificar(self) -> None:
+    def verificar(self, indice: Optional[int] = None) -> None:
         """Ctrl+T: a página está verificada (§4.4), e a próxima página não verificada abre.
-        Entra no desfazer; uma edição depois a devolve a `em_revisao`."""
+        Entra no desfazer; uma edição depois a devolve a `em_revisao`. Com `indice` (a
+        página de que a pergunta da barra falava), nada acontece se a aberta é outra."""
+        if indice is not None and indice != self.indice:
+            return
         if self.antes_de_sair_da_pagina is not None:   # a sessão aberta entra antes
             self.antes_de_sair_da_pagina()
         if self._sessoes_na_fila:
@@ -1640,52 +1643,59 @@ class ControladorDePagina:
             self.ir_ao_primeiro_pendente()
         self._editar("Corrigindo", corpo)
 
-    def corrigir_no_livro(self, alvos, char: str, recortes=None) -> None:
-        """A Galeria (§8.2): `char` nos glifos `alvos` (página -> gids), em quantas páginas
-        forem, num passo do desfazer e sem ensinar (digitar, Shift+Enter). Com `recortes`
-        ((página, gid) -> o recorte do glifo), cada um também é ensinado: uma amostra por
-        glifo (Enter). Os glifos ficam `manual`; a página editada sai de verificada."""
+    def corrigir_no_livro(self, alvos, char, recortes=None) -> None:
+        """A Galeria (§8.2): a leitura nos glifos `alvos` (página -> gids), em quantas páginas
+        forem, num passo do desfazer e sem ensinar (digitar, Shift+Enter). `char` é um
+        caractere para todos, ou {(página, gid): caractere} (cada glifo com o dele). Com
+        `recortes` ((página, gid) -> o recorte do glifo), cada um também é ensinado: uma
+        amostra por glifo (Enter), gravadas de uma vez. Os glifos ficam `manual`; a página
+        editada sai de verificada."""
         from core import proporcao
 
         from abbychess.leitor import nome_de_origem
 
         alvos = {int(i): list(g) for i, g in alvos.items() if g}
+        char_de = (char.get if isinstance(char, dict) else (lambda _chave: char))
         if not alvos or not char:
             return
 
         def corpo():
             n = sum(len(g) for g in alvos.values())
+            chars = {char_de((i, g)) for i, gids in alvos.items() for g in gids} - {None, ""}
+            nome = f"'{next(iter(chars))}'" if len(chars) == 1 else "as leituras"
             acao = "Ensinar" if recortes else "Corrigir para"
-            transacao = hs.Transacao(f"{acao} '{char}' ({n} glifo(s), Galeria)")
-            aberta, feitos = False, 0
+            transacao = hs.Transacao(f"{acao} {nome} ({n} glifo(s), Galeria)")
+            aberta, feitos, mudadas, pedidos = False, 0, [], []
             for indice, gids in sorted(alvos.items()):
                 if self.modelo is not None and indice == self.indice:
                     pagina, aberta = self.modelo, True
                 else:
                     pagina = self.projeto.pagina_para_editar(indice)
                 vivos = set(pagina.vivos)
-                gids = [g for g in gids if g in vivos]
+                gids = [g for g in gids if g in vivos and char_de((indice, g))]
                 if not gids:
                     continue
                 antes = pagina.instantaneo()
                 referencia = (proporcao.altura_de_referencia(pagina.entries())
                               if recortes else None)
                 for gid in gids:
+                    letra = char_de((indice, gid))
                     recorte = (recortes or {}).get((indice, gid))
                     if recorte is not None and self.leitor is not None:
-                        caminho = self.leitor.ensinar(
-                            recorte, char, altura_de_referencia=referencia,
-                            origem=nome_de_origem(self.projeto.dados.nome, indice,
-                                                  pagina.indice_de(gid), gid))
-                        transacao.amostras_criadas.append(self.leitor.padroes.guardar(caminho))
-                    ed.corrigir(pagina, gid, char)
+                        pedidos.append((recorte, letra, referencia, nome_de_origem(
+                            self.projeto.dados.nome, indice, pagina.indice_de(gid), gid)))
+                    ed.corrigir(pagina, gid, letra)
                     feitos += 1
                 pagina.estado = proximo_estado(pagina.estado, "editar")
-                transacao.paginas[pagina.pid] = hs.mudanca(antes, pagina.instantaneo())
-                self._gravar(pagina)
-            if not transacao.paginas:
+                mudadas.append((pagina, antes))
+            if not mudadas:
                 self._avisar("Os glifos escolhidos na Galeria saíram das páginas.", 6000)
                 return
+            for caminho in (self.leitor.ensinar_varios(pedidos) if pedidos else []):
+                transacao.amostras_criadas.append(self.leitor.padroes.guardar(caminho))
+            for pagina, antes in mudadas:
+                transacao.paginas[pagina.pid] = hs.mudanca(antes, pagina.instantaneo())
+                self._gravar(pagina)
             self.historico.registrar(transacao)
             if transacao.amostras_criadas:
                 self.eventos.emitir("padroes_mudaram")
@@ -2126,19 +2136,18 @@ class ControladorDePagina:
             transacao.invalidada = True
         for pagina in paginas.values():
             self._gravar(pagina)
+        # Cada lista de uma vez (os padrões relidos uma vez só, e não por amostra: desfazer o
+        # esquecer de 40 amostras levava ~0,6 s por amostra).
+        voltam, saem = ((transacao.amostras_criadas, transacao.amostras_apagadas) if refazer
+                        else (transacao.amostras_apagadas, transacao.amostras_criadas))
+        if voltam:
+            self.leitor.padroes.restaurar_varios(voltam)
+        existentes = [a.caminho for a in saem if a.caminho.exists()]
+        if existentes:
+            self.leitor.esquecer_varios(existentes)
         if refazer:
-            for amostra in transacao.amostras_criadas:
-                self.leitor.padroes.restaurar(amostra)
-            for amostra in transacao.amostras_apagadas:
-                if amostra.caminho.exists():
-                    self.leitor.esquecer(amostra.caminho)
             h.refeita()
         else:
-            for amostra in transacao.amostras_criadas:
-                if amostra.caminho.exists():
-                    self.leitor.esquecer(amostra.caminho)
-            for amostra in transacao.amostras_apagadas:
-                self.leitor.padroes.restaurar(amostra)
             h.desfeita()
         aberta = self.modelo is not None and self.modelo.pid in transacao.paginas
         posicoes = sorted(p for p in map(self.projeto.posicao_do_pid, transacao.paginas)
@@ -2150,6 +2159,11 @@ class ControladorDePagina:
             self.eventos.emitir("glifos_mudaram", None)
             self.eventos.emitir("selecao_mudou")
             self.ir_ao_primeiro_pendente()
+        if refazer and transacao.invalidada and transacao.esquecidas:
+            # Um esquecer desfeito antes de a procura no livro voltar: o refazer só trouxe o
+            # que a transação guardou (a página aberta); a procura roda de novo.
+            transacao.invalidada = False
+            self._procurar_no_livro(transacao)
         repropagar = refazer and transacao.invalidada and transacao.amostras_criadas
         if repropagar and self.modelo is not None and self.modelo.pid in transacao.paginas:
             # Um Enter cuja propagação foi descartada quando ele foi desfeito: ela roda de
@@ -2189,28 +2203,34 @@ class ControladorDePagina:
                 return None
             nomes = {self._nome_da_amostra(c) for c in caminhos}
             apagadas = [self.leitor.padroes.guardar(c) for c in caminhos]
-            for caminho in caminhos:
-                self.leitor.esquecer(caminho)
+            self.leitor.esquecer_varios(caminhos)      # recarrega os padrões uma vez só
             self.eventos.emitir("padroes_mudaram")
             transacao = hs.Transacao(f"Esquecer {len(caminhos)} amostra(s)",
-                                     amostras_apagadas=apagadas)
+                                     amostras_apagadas=apagadas, esquecidas=frozenset(nomes))
             self.historico.registrar(transacao)
-            devolvidos = {}
-            if self.modelo is not None:
-                n = self._devolver_a_fila(self.modelo, nomes, None, transacao)
-                if n:
-                    devolvidos[self.indice] = n
-            self.eventos.emitir("acoes_mudaram")
-            procurar = self.lidos_pelas_amostras
-            if procurar is None:
-                self._avisar_os_devolvidos(len(caminhos), devolvidos, completo=True)
-                return None
-            self._avisar(f"Esquecida(s) {len(caminhos)} amostra(s); procurando no livro os "
-                         "glifos que ela(s) leram…", 0)
-            procurar(nomes, lambda achados: self._devolver_no_livro(
-                nomes, achados, transacao, devolvidos, len(caminhos)))
+            self._procurar_no_livro(transacao)
             return None
         self.tarefa("Esquecendo padrões", preparar, falhou=self._falhou("Esquecer padrões"))
+
+    def _procurar_no_livro(self, transacao) -> None:
+        """Os glifos lidos pelas amostras que a `transacao` esqueceu voltam à fila: os da
+        página aberta na hora; os das outras quando a procura no livro volta, emendando a
+        transação. Também no refazer de um esquecer desfeito antes de ela voltar."""
+        nomes, quantas = set(transacao.esquecidas), len(transacao.amostras_apagadas)
+        devolvidos = {}
+        if self.modelo is not None:
+            n = self._devolver_a_fila(self.modelo, nomes, None, transacao)
+            if n:
+                devolvidos[self.indice] = n
+        self.eventos.emitir("acoes_mudaram")
+        procurar = self.lidos_pelas_amostras
+        if procurar is None:
+            self._avisar_os_devolvidos(quantas, devolvidos, completo=True)
+            return
+        self._avisar(f"Esquecida(s) {quantas} amostra(s); procurando no livro os glifos que "
+                     "ela(s) leram…", 0)
+        procurar(nomes, lambda achados: self._devolver_no_livro(
+            nomes, achados, transacao, devolvidos, quantas))
 
     #: Quem acha, no livro, os glifos lidos por umas amostras (o índice da busca):
     #: `lidos_pelas_amostras(nomes, ao_terminar)`, com `ao_terminar({página: [gids]})`.

@@ -218,6 +218,16 @@ class LeitorDoLivro:
         """Apaga um padrão do livro; a leitura seguinte já não o usa."""
         self.padroes.esquecer(caminho)
 
+    def esquecer_varios(self, caminhos) -> None:
+        """Vários padrões de uma vez (a aba Padrões): os padrões são relidos uma vez só."""
+        self.padroes.esquecer_varios(caminhos)
+
+    def ensinar_varios(self, pedidos) -> List[Path]:
+        """Vários `ensinar` de uma vez (a Galeria): [(recorte, char, altura de referência,
+        origem[, efeito])]; os metadados são gravados uma vez."""
+        return self.padroes.ensinar_varios(
+            [(p[0], p[1], altura_relativa(p[0], p[2]), *p[3:]) for p in pedidos])
+
     def padroes_por_caractere(self) -> Dict[str, List[Path]]:
         """Os arquivos de padrão deste livro, agrupados pelo caractere."""
         return self.padroes.por_caractere()

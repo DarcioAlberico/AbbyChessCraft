@@ -638,10 +638,38 @@ DOCX iguais byte a byte com o mesmo `SOURCE_DATE_EPOCH`).
 8. ~~`SOURCE_DATE_EPOCH` e pacote byte a byte reprodutível.~~
 9. Sair dos privados do core.
 
-As tarefas 2, 3 e 7 pedem mudar o escritor de EPUB, que é o do core (`core.exportar.para_epub`:
-um XHTML por página, "Sumário" e "Página" em português, `accessibilityHazard` fixo). Editar o
-core é antipadrão deste roadmap; a decisão (um escritor próprio aqui, ou a mudança no core
-com o sim do usuário, como no ramo `epub-preciso`) fica para o começo da próxima rodada.
+**Rodada 2 (2026-10-22): o escritor de EPUB próprio** (`abbychess/epub.py`, decisão do
+usuário: sem mexer no core). Lê as mesmas `PaginaExtraida` e escreve um XHTML por capítulo
+(o `<h1>`, partido também acima de 120 mil caracteres), com a página impressa como âncora
+`epub:type="pagebreak"`; o `nav` tem o sumário pelos títulos em dois níveis (sem título,
+pelas faixas de páginas), a `page-list` e os `landmarks` (capa, sumário, começo do texto); as
+mensagens saem no idioma do livro (pt, en, es, de, fr); os metadados vêm de
+`<projeto>/metadados.json` (autores, editora, data, assuntos, direitos, identificador, capa);
+a acessibilidade é calculada do que foi escrito (`alternativeText` e `accessModeSufficient`
+textual só com todo diagrama em FEN; `accessibilityHazard` `unknown`); o texto alternativo
+traz o FEN e o lado com a procedência; imagens iguais viram um recurso só. `epub.conferir`
+lê o arquivo escrito (pacote, manifesto, espinha, XML, cada link e âncora) e o que acusar
+vai ao relatório; `epub.epubcheck` roda o EPUBCheck quando `ABBY_EPUBCHECK` aponta o jar
+(não instalado aqui: baixá-lo pede o sim do usuário). Na fatia do Xadrez Vitorioso (pp.
+21–27, projeto da fatia) o EPUB, o TXT e o PGN saem e `conferir` não acusa nada; o
+relatório mostrou que a regra antiga das margens tira duas legendas de diagrama da p. 26
+como rodapé ("Diagrama 6. Jogam as brancas"), pendência para quando as legendas tiverem
+área. Da revisão de código: a fonte dos símbolos estava num `url()` errado (as figurinas
+não apareceriam) e o `conferir` não lia o CSS; os caracteres de controle do OCR saem antes
+de escrever o XML; livro vazio é recusado em vez de virar pacote inválido; a âncora da página
+cai no capítulo do primeiro bloco dela; o `conferir` passou a ler as árvores (ids e itens
+repetidos, links decodificados e só para itens do manifesto, `toc` e `page-list` vazios,
+metadados obrigatórios); o OPF ganhou `dc:source` e recusa data fora de AAAA-MM-DD; o zip
+sai igual no Windows e no Linux.
+
+Estado das tarefas depois da rodada 2:
+- 2: metadados, capa e idioma das mensagens feitos; falta o formulário e o diálogo das
+  `Opcoes` na interface.
+- 3: sumário, `page-list` e marcos feitos; faltam os bookmarks do PDF e os links internos
+  conferidos ("Solution on page N"), que pedem o número impresso de cada página.
+- 6: conferência interna feita, EPUBCheck opcional; faltam Ace e os testes de leitores.
+- 7: deduplicação e divisão por capítulo feitas; falta a otimização sem perda das imagens.
+- 9: o EPUB não usa mais o escritor do core; o DOCX ainda é o `core.exportar.para_docx`.
 
 **Verificação.** CA-12.1 a CA-12.6; CA-5.3 (parte da exportação).
 

@@ -609,11 +609,26 @@ arquivo. **Projeto › Exportar** também escreve:
   (`SetUp`/`FEN`) com os lances do texto que passaram na validação, os NAGs e as etiquetas
   `Page` e `Diagram`. Os diagramas que ficaram de fora vão ao relatório, com o motivo.
 
+**O EPUB tem escritor próprio** (`abbychess/epub.py`, passo J): um arquivo por capítulo
+(não por página), com a página impressa como âncora; o sumário pelos títulos, em dois
+níveis; a lista de páginas e os marcos (capa, sumário, começo do texto); as mensagens no
+idioma do livro ("Contents" num livro inglês); a acessibilidade declarada pelo que o
+arquivo de fato tem; e imagens repetidas guardadas uma vez só. Os metadados vêm de
+`metadados.json` na pasta do projeto, se existir:
+
+```json
+{"autores": ["Jacob Aagaard"], "editora": "Quality Chess", "data": "2012",
+ "assuntos": ["Xadrez", "Finais"], "direitos": "© 2012", "capa": "capa.jpg"}
+```
+
+Depois de gravar, o arquivo é relido e conferido (pacote, manifesto, XML e cada link); com
+`ABBY_EPUBCHECK` apontando o `epubcheck.jar`, `epub.epubcheck` roda o EPUBCheck também.
+
 Depois de cada exportação, o **relatório** vai a Resultados / Avisos: páginas, títulos,
 margens tiradas, diagramas recortados e o motivo, páginas não verificadas, glifos pendentes
 e os diagramas fora do PGN, cada item com a página.
 
-- **DOCX** e **EPUB**: pelos escritores do PyBoxEditor (`core.exportar`), com a fonte dos
+- **DOCX** (e o EPUB até o passo J): pelos escritores do PyBoxEditor (`core.exportar`), com a fonte dos
   símbolos embutida. Os parágrafos saem do vão entre as linhas, a hifenização no fim de linha
   é desfeita e as figurinas saem como impressas. O idioma do arquivo é o do texto do livro
   (o que a camada do PDF diz, ou o do projeto).

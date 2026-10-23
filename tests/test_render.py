@@ -137,6 +137,66 @@ def test_matar_o_pool_mata_o_filho_travado():
     assert _filhos_vivos(limite=5) == []                    # sem o kill, 30 s dormindo
 
 
+def _vivo(pid: int) -> bool:
+    """Se o processo `pid` ainda roda (Windows: `os.kill(pid, 0)` o mataria)."""
+    import ctypes
+    import os
+
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return False
+        return True
+    k32 = ctypes.windll.kernel32
+    alca = k32.OpenProcess(0x1000, False, pid)      # PROCESS_QUERY_LIMITED_INFORMATION
+    if not alca:
+        return False
+    try:
+        codigo = ctypes.c_ulong()
+        k32.GetExitCodeProcess(alca, ctypes.byref(codigo))
+        return codigo.value == 259                  # STILL_ACTIVE
+    finally:
+        k32.CloseHandle(alca)
+
+
+@pytest.mark.processo
+def test_os_filhos_do_pool_do_indice_morrem_com_o_programa_morto_a_forca(tmp_path):
+    """Os filhos do `PoolDoIndice` ficavam órfãos quando o programa morria sem fechar o pool
+    (12 achados parados desde a manhã): o vigia do pai os faz sair."""
+    import subprocess
+    import sys
+    import time
+    from pathlib import Path
+
+    import os
+
+    roteiro = tmp_path / "pai.py"
+    roteiro.write_text(
+        "import os\n"
+        "from abbychess import busca\n"
+        "from tests.test_render import _pid_do_filho\n"
+        "if __name__ == '__main__':\n"
+        "    pool = busca.PoolDoIndice().obter()\n"
+        "    print(' '.join(str(p) for p in set(pool.map(_pid_do_filho, range(16)))), flush=True)\n"
+        "    os._exit(0)\n", encoding="utf-8")
+    raiz = str(Path(__file__).resolve().parents[1])
+    saida = subprocess.run([sys.executable, str(roteiro)], capture_output=True, text=True,
+                           timeout=120, cwd=raiz, env={**os.environ, "PYTHONPATH": raiz})
+    pids = [int(p) for p in saida.stdout.split()]
+    assert pids, saida.stderr
+    fim = time.monotonic() + 10
+    while any(_vivo(p) for p in pids) and time.monotonic() < fim:
+        time.sleep(0.1)
+    assert [p for p in pids if _vivo(p)] == []
+
+
+def _pid_do_filho(_n: int) -> int:
+    import os
+
+    return os.getpid()
+
+
 @pytest.mark.processo
 def test_o_pdf_trocado_no_mesmo_lugar_e_lido_de_novo_e_o_ocioso_fecha(tmp_path):
     import time

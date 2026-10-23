@@ -226,10 +226,15 @@ class PoolDoIndice:
     def _abrir(self) -> Optional[ProcessPoolExecutor]:
         import multiprocessing
 
+        from abbychess.render import vigiar_o_pai
+
         with self._trava:
             if self._pool is None:
                 n = processos_para_indexar()
-                self._pool = ProcessPoolExecutor(n, mp_context=multiprocessing.get_context("spawn"))
+                # Sem o vigia, os filhos de um programa morto à força ficavam vivos (12 órfãos
+                # parados desde a manhã, achados em 2026-10-23).
+                self._pool = ProcessPoolExecutor(n, mp_context=multiprocessing.get_context("spawn"),
+                                                 initializer=vigiar_o_pai)
                 try:
                     list(self._pool.map(_aquecer, range(n)))
                 except Exception:               # o pool quebrado: o índice monta sem ele

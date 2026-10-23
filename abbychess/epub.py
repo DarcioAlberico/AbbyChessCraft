@@ -1060,18 +1060,34 @@ def calibre(caminho: str | Path) -> Optional[List[str]]:
                 xhtml = z.read(nome).decode("utf-8")
                 for href, texto in re.findall(r'<a [^>]*href="([^"]+)"[^>]*>(.*?)</a>', xhtml,
                                               re.S):
-                    if not re.match(r"[a-z][a-z0-9+.-]*:", href):
-                        do_texto.append(html.unescape(re.sub(r"<[^>]+>", "", texto)).strip())
+                    # O `<br/>` do `manter_quebras` é um espaço no texto do PDF; o link só de
+                    # imagem (sem texto) não tem o que casar.
+                    visivel = html.unescape(re.sub(r"<[^>]+>", "",
+                                                   re.sub(r"<br\s*/?>", " ", texto)))
+                    visivel = " ".join(visivel.split())
+                    if visivel and not re.match(r"[a-z][a-z0-9+.-]*:", href):
+                        do_texto.append(visivel)
     with tempfile.TemporaryDirectory(prefix="calibre-") as pasta:
         pdf = Path(pasta) / "livro.pdf"
-        saida = subprocess.run([executavel, str(caminho), str(pdf)], capture_output=True,
-                               text=True, encoding="utf-8", errors="replace", timeout=600)
-        if saida.returncode != 0 or not pdf.is_file():
-            ultimas = (saida.stdout + saida.stderr).strip().splitlines()[-3:]
-            return [f"o Calibre não converteu o EPUB (código {saida.returncode}): "
+        processo = subprocess.Popen([executavel, str(caminho), str(pdf)], stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                                    errors="replace")
+        try:
+            texto_da_saida, _ = processo.communicate(timeout=600)
+        except subprocess.TimeoutExpired:
+            # O `ebook-convert` abre filhos (`calibre-parallel`): a árvore inteira sai.
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(processo.pid)],
+                               capture_output=True, check=False)
+            processo.kill()
+            processo.communicate()
+            return ["o Calibre não converteu o EPUB em 600 s"]
+        if processo.returncode != 0 or not pdf.is_file():
+            ultimas = texto_da_saida.strip().splitlines()[-3:]
+            return [f"o Calibre não converteu o EPUB (código {processo.returncode}): "
                     + " | ".join(ultimas)]
         problemas += [f"o Calibre avisou: {linha.strip()}"
-                      for linha in (saida.stdout + saida.stderr).splitlines()
+                      for linha in texto_da_saida.splitlines()
                       if re.search(r"Traceback|Failed to|Could not|not found|Unknown link",
                                    linha)]
         with fitz.open(pdf) as doc:
@@ -1083,10 +1099,13 @@ def calibre(caminho: str | Path) -> Optional[List[str]]:
                     if not 0 <= link.get("page", -1) < doc.page_count:
                         fora += 1
                     no_pdf.append(" ".join(pagina.get_textbox(link["from"]).split()))
-    # Cada link do texto casa com um do PDF que contém o texto dele (a caixa do PDF pode
-    # levar a pontuação vizinha); os do sumário sobram, e tudo bem.
+    # Cada link do texto casa com um do PDF de texto igual, ou, sem ele, com o mais curto que
+    # contém o texto dele (a caixa do PDF pode levar a pontuação vizinha; "Diagrama 1" não
+    # gasta o "Diagrama 12" de outro link). Os do sumário sobram, e tudo bem.
     for texto in do_texto:
-        achado = next((k for k, t in enumerate(no_pdf) if texto and texto in t), None)
+        iguais = [k for k, t in enumerate(no_pdf) if t == texto]
+        contem = sorted((len(t), k) for k, t in enumerate(no_pdf) if texto in t)
+        achado = iguais[0] if iguais else (contem[0][1] if contem else None)
         if achado is None:
             problemas.append(f"o link \"{texto}\" não saiu como link no PDF do Calibre")
         else:

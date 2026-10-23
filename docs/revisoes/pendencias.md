@@ -22,6 +22,11 @@ sem editar o core e sem gabarito novo. Ramo `pendencias`, a partir da tag `passo
 | A exportação lê a página pela `OrdemDeLeitura` do Documento | F, J | `8a991b2` |
 | O teste do pool do índice (camada `processo`), quebrado desde o L | achado aqui | `13b3e91` |
 | A pré-carga renderiza o PDF num processo à parte (a interface não para mais ~85 ms) | K | `be40bab`, `8388a7a` |
+| Os processos do índice da busca morrem com o programa morto à força | achado aqui | `0c0918c` |
+| Corrigir um caractere não refaz a ordem de leitura nem as linhas (validar, 13,6 → 2,8 ms) | H, pendência daqui | `ad255a8` |
+| Manter as quebras na camada nativa devolve o hífen que o core tirou | J, pendência daqui | `12dd644` |
+| O itálico no OCR, com uma régua do AbbyChessCraft | I | `ad808fa` |
+| O EPUB conferido num leitor de verdade, o Calibre (`epub.calibre`) | J | `18af9f0` |
 
 ## A bissecção do lote
 
@@ -101,6 +106,72 @@ não responde é morto, o PDF trocado no mesmo lugar é lido de novo, e o filho 
 morre com o programa. Na suíte rápida ele fica desligado (`ABBY_RENDER_EM_PROCESSO=0`); nas
 medidas, ligado, como no programa.
 
+## Os processos órfãos do índice
+
+Doze processos `spawn` parados desde a manhã, filhos de dois programas já mortos: os do
+`PoolDoIndice`, seis por programa. No Windows, o `ProcessPoolExecutor` cujo pai morre sem o
+`atexit` deixa os filhos vivos, e eles ainda prendem a saída de quem abriu o pai (dois perfis
+em segundo plano não terminavam por isso). O vigia do pai do render (`render.vigiar_o_pai`)
+virou o `initializer` do pool do índice (`0c0918c`); o teste da camada `processo` mata o
+programa com `os._exit` e espera os filhos saírem.
+
+## Corrigir um caractere
+
+`texto.montar` leva 10–21 ms nas páginas da fatia, ~85% na ordem de leitura e nas linhas, que só
+leem a geometria (conferido pela árvore das funções do core); das palavras, o core só lê o
+caractere quando ele some na normalização (o box vazio ocupa espaço, mas não é símbolo) e nos
+números que ele remonta. `_linhas_da_pagina` guarda as linhas das últimas 16 páginas pela caixa,
+o ângulo e a moldura de cada glifo e só por esses caracteres (`ad255a8`). Validar a página pelos
+lances depois de corrigir uma letra, 105 correções na fatia: 2,8 ms na mediana (13,6 sem as
+linhas guardadas). O teste das trocas sorteadas não pegava a chave cega ao caractere (o
+"mutante" passava); seis trocas da p. 21 que mudam as palavras do core a pegam.
+
+## As quebras da camada nativa
+
+O core tira o hífen da palavra partida quando o dicionário diz que era quebra (o `lex` de
+`pdf_nativo.extrair`) e o hífen brando; ali a quebra não tinha onde voltar. Sem espaço nem hífen
+no começo da linha, e com letra dos dois lados, ela volta com o hífen, como impressa
+(`12dd644`). A exportação de hoje não passa o dicionário ao core, e o fitz entrega o hífen brando
+como "-": o caso é raro, mas o teste o roda pela camada de verdade.
+
+## O itálico
+
+O passo I deixou o itálico esperando uma régua pública do core, que não existe e que o contrato
+não deixa escrever lá. `pagina._italicos` mede aqui (`ad808fa`): por palavra, a inclinação mais
+comum das bordas quase verticais das letras (Sobel, janela de ±25°) contra a das palavras retas
+da página. Só as letras de pé contam, com 3 ou mais; itálico a 7° da referência, com o pico 2×
+o da vertical.
+
+O gabarito é o Odds & Ends, nascido digital: cada glifo segmentado da página renderizada ganha o
+rótulo do glifo da camada que contém o centro dele (itálico pela bandeira ou pelo nome da fonte,
+a regra do core). O primeiro desenho (o cisalhamento que concentra a tinta) marcava 6% das
+palavras retas ("½–½", "¥g7", "you", "were"); a borda com a janela de ±35°, "Wijk aan Zee" (a
+diagonal do Z). `ferramentas/medir_italico.py`, com a implementação final:
+
+| Páginas | Retas | Falsos itálicos | Itálicas | Achadas |
+|---|---|---|---|---|
+| Do ajuste (36) | 6.294 | 0 | 394 | 95,9% |
+| Fora do ajuste (60) | 11.647 | 0 | 433 | 95,8% |
+
+Na fatia do Xadrez Vitorioso, que não tem itálico, 0 das 1.436 palavras medidas. ~105 ms por
+página no lote (8,6 s). As perdidas são palavras sem haste ("over", "see") e a página quase toda
+em itálico com poucas retas. Não há livro escaneado com itálico e gabarito: a revocação no
+escaneado não foi medida. O falso itálico é o erro caro (o k-NN não compara amostras de efeitos
+diferentes), e por isso os limiares ficaram do lado da precisão.
+
+## O EPUB no Calibre
+
+O Calibre 9.14 está na máquina. `epub.calibre` (`ABBY_CALIBRE`, o `ebook-convert`) converte o
+EPUB em PDF pelo motor do leitor e acusa a conversão que falha, o aviso do Calibre e o link
+interno do texto que não sai como link no PDF (`18af9f0`). Sem problema nenhum nos EPUB da
+fatia (com e sem as quebras), das p. 1–12 do Odds & Ends (pela camada), dos golden do CA-12.1 e
+do CA-12.3 e do teste dos links. Visto nas páginas: os diagramas, as figurinas e os símbolos
+(⩲ ⩱ ∓ ⯹ ∞ ⇄), o negrito, e "Diagrama 1" e "capítulo 1" levando ao lugar certo. No Odds & Ends,
+três coisas da camada do core, não do leitor: as três linhas grandes da capa ("July 2011
+Newsletter", "By", "The QC Team") saem como três títulos; duas entradas do sumário saem num
+parágrafo só; a tabela de símbolos sai com o símbolo depois da descrição. Thorium e leitor de
+celular continuam por abrir.
+
 ## A revisão de código
 
 Uma rodada, de um revisor independente sobre os seis primeiros commits: nada grave. As quatro
@@ -108,6 +179,15 @@ observações, corrigidas em `0888053`: manter as quebras na camada nativa não 
 depois do hífen que o core guarda colado; "Diagrama 6.1" virava link para o 6, e o romano do
 capítulo valia em minúsculas; `png_otimizado` podia tirar a gestão de cor; o teste da matriz
 do cache não cobria o Enter nem a propagação.
+
+A segunda rodada, de outro revisor independente sobre `0c0918c..18af9f0`: nada grave (conferiu
+a chave das linhas contra o core, a conta dos índices do "-\n", os recortes do itálico e o pickle
+da `PaginaLida` sem os itálicos). Das quatro observações menores, três corrigidas no
+`epub.calibre`: o link sem texto, ou partido por `<br/>`, acusava em falso; "Diagrama 1" podia
+gastar o link "Diagrama 12" (agora casa primeiro o de texto igual); o tempo estourado deixava os
+filhos do `ebook-convert` vivos. A quarta fica: o `Estilo` tem duas pontas e não diz
+"desconhecido", e o itálico medido com o negrito por medir grava `negrito=False`; é raro (o
+itálico pede 3 letras, o negrito 2 glifos) e o k-NN só perde as amostras em negrito-itálico.
 
 ## As medidas
 
@@ -155,19 +235,23 @@ medida (509 → 440 s).
 ## O que continua pendente
 
 Precisa do usuário:
-- **CA-10.1** (passo H): a redação do critério (a precisão "nas perturbadas" só é atingível
-  lida sobre as afetadas).
-- **O itálico no OCR** (passo I): espera uma régua pública do core, e o contrato não deixa
-  editar o core.
+- **CA-10.1** (passo H): a redação. "A precisão de 'confiável pelos lances' é 1,0 nos dois
+  conjuntos" não passa nas perturbadas: a perturbação que nenhum lance do texto toca não muda
+  nenhum lance, e nenhuma validação pelos lances a vê (no Xadrez Vitorioso, 73 de 100 saem
+  confiáveis assim; das 23 afetadas, nenhuma). O `medir.py` já conta as duas: as confiáveis
+  afetadas (erro da validação) e as não afetadas (fora do alcance dela). Proposta: precisão 1,0
+  nos FEN do gabarito; nas perturbadas, a detecção ≥ 60% das afetadas, e as não afetadas fora da
+  conta.
 - **CA-9.1 e CA-F.1**: o texto e os FEN das p. 21–27 do Xadrez Vitorioso verificados.
-- **Os testes em leitores de verdade** (Calibre, Thorium, móvel) do EPUB (passo J).
+- **Os leitores que não estão na máquina** (Thorium, celular); o Calibre já confere.
 
-Ainda aqui:
-- **A página pedida na hora renderiza na thread da interface** (~85 ms parada, mais a medida da
-  inclinação na primeira visita): a interface a espera de qualquer jeito, mas o laço de eventos
-  não gira nesse tempo.
-- **Corrigir um caractere ainda monta o texto da página** para a validação pelos lances
-  (~25 ms); só confirmar a leitura deixou de montar.
-
-Decididos como estão: a medida da inclinação do grosso ao fino (K, espera gabarito); as metades
-do dividir herdando o estado da página e o diagrama aparado (L).
+Decididos como estão:
+- **A página pedida na hora renderiza na thread da interface** (~85 ms, mais a medida da
+  inclinação na primeira visita). Pelo processo à parte ela sairia ~25 ms mais tarde, e a
+  interface a espera de qualquer jeito; girar o laço de eventos nesse meio deixaria entrar
+  tecla, clique e a resposta do lote no meio do `ir_para`. O alvo (trocar para página fora do
+  cache, ≤ 600 ms) passa com folga.
+- A medida da inclinação do grosso ao fino (K, espera gabarito); as metades do dividir herdando
+  o estado da página e o diagrama aparado (L).
+- O que a camada do core faz no Odds & Ends (os títulos da capa, o sumário, a tabela de
+  símbolos): é do core, que o contrato não deixa editar.

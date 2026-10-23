@@ -486,7 +486,8 @@ erradas). Quando nem a legenda nem quem conferiu disseram o lado, o número do p
 lance (`10...`) o diz, com a procedência própria (`lances`), e o FEN, o texto e o PGN
 concordam. O texto de um diagrama ainda por ler não cai no anterior. A conferência revalida
 a cada casa corrigida. Pendente da revisão: desmarcar todos os roques na conferência ainda
-deixa o inferido valer na validação (o modelo não guarda `roque_informado`).
+deixa o inferido valer na validação (o modelo não guarda `roque_informado`). **Feito em
+2026-10-23** (`cf151d1`, ver "Pendências").
 
 O roque inferido (rei e torre nas casas iniciais) é usado só para validar e aparece na
 conferência com o botão "Usar"; o FEN e a exportação continuam sem ele até alguém marcar
@@ -725,6 +726,10 @@ Estado das tarefas depois da rodada 2:
 
 **Verificação.** CA-12.1 a CA-12.6; CA-5.3 (parte da exportação).
 
+Em 2026-10-23 (ver "Pendências") saíram todas as da lista abaixo, menos os testes em leitores:
+os links, as quebras, as imagens, o golden e o `opcoes.yaml`, as aspas, e também o realce da
+baixa confiança no DOCX, que a §12.1 pedia e a lista esquecia.
+
 **Fechado em 2026-10-22, a pedido do usuário, com estas pendências:** os testes em leitores
 de verdade (Calibre, Thorium, móvel), que pedem quem os abra; os links para "Diagrama N" e
 para capítulos; "manter quebras de linha e hífens" como opção; a otimização sem perda das
@@ -929,6 +934,27 @@ no L, então essas pioras não vêm do L. O registro tem os números. Tag `passo
    `pid` e o `livro.json` coerente.
 
 **Verificação.** CA-4.6; um CA por operação, escrito no início do passo e revisado.
+
+## Pendências (2026-10-23, ramo `pendencias`)
+
+Depois do L, o que os passos deixaram e dava para fazer sem o usuário, sem editar o core e sem
+gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
+
+- O lote voltou a 8,5 s por página (17,2 no L): desde o I (`2bbf0e7`), o negrito convertia a
+  página inteira para cinza a cada glifo.
+- O clique no Documento voltou a 3,7 ms (10,6 no L) e o Enter caiu para 38,8 (45,8): o aviso
+  de ensino do C e o Enter recortam da matriz do cache.
+- O roque desmarcado na conferência (H).
+- Da exportação (J, §12.1): os links para "Diagrama N" e "capítulo N", manter as quebras e os
+  hífens, realçar a baixa confiança no DOCX, as aspas curvas, o PNG sem perda, o golden do
+  CA-12.1 e o `opcoes.yaml` do CA-12.3.
+- A suíte rápida de 314 para 119 s, e dois bugs que isso e o portão mostraram (a troca de
+  perfil com uma janela apagada; o aviso de uma thread depois que a janela fechou).
+
+Continuam: CA-10.1 (a redação, decisão do usuário); o itálico no OCR (régua do core); CA-9.1 e
+CA-F.1 (o texto verificado); os testes do EPUB em leitores; o render do fitz num processo (K);
+unificar as linhas da exportação com a `OrdemDeLeitura` (F, J); a suíte abaixo de 60 s; o
+custo da validação pelos lances no Enter.
 
 ---
 

@@ -29,7 +29,7 @@ INICIO, FIM = "<!-- medidas:inicio -->", "<!-- medidas:fim -->"
 LIVROS = ("xv", "yusupov", "darcy")
 #: Os passos na ordem do roadmap (as tabelas seguem esta ordem, não a alfabética).
 ORDEM_DOS_PASSOS = ("0", "1a", "1b", "2a", "2b", "a1", "a2", "a3", "e", "d1", "b", "d2", "c", "i",
-                    "f", "g", "h", "j", "k", "l")
+                    "f", "g", "h", "j", "k", "l", "pendencias")
 
 
 def _na_ordem(passo: str):

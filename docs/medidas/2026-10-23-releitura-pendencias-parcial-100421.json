@@ -1,0 +1,41 @@
+{
+ "data": "2026-10-23",
+ "rotulo": "releitura-pendencias-parcial",
+ "exitstatus": 0,
+ "metas_ausentes": [
+  "troca_de_pagina",
+  "enter_ensinar",
+  "releitura_de_um_glifo",
+  "memoria_do_desfazer",
+  "atraso_durante_o_lote",
+  "memoria_total_com_o_lote"
+ ],
+ "ordem": "cada módulo tem a janela e o projeto dele, em ordem fixa: na linha de base o Enter ensina antes da releitura; o lote (desde o E, em test_servidor.py) lê num projeto novo, sem padrões",
+ "configuracao": "desde o passo E, a janela com o servidor de leitura (o leitor real no filho), como o programa abre o projeto",
+ "ambiente": {
+  "objetos_congelados": 0,
+  "maquina": "DESKTOP-E025G20",
+  "maquina_cadastrada": true,
+  "cpu": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
+  "ram_gb": 15.9,
+  "python": "3.13.2",
+  "pyside6": "6.11.1",
+  "pymupdf": "1.26.6",
+  "torch": "2.14.0+cpu",
+  "threads_do_torch": 6,
+  "commit": "0888053",
+  "arvore_suja": false,
+  "arquivos_sujos": []
+ },
+ "medidas": {
+  "releitura_com_o_lote": {
+   "p50_ms": 69.58,
+   "p95_ms": 152.71,
+   "max_ms": 153.44,
+   "n": 30,
+   "alvo_p95_ms": 150,
+   "lote_rodando_no_fim": true,
+   "como": "Alt+→/← alternados num glifo da página aberta: a interface o deixa aguardando e o servidor o lê entre um glifo e outro do lote (de outras páginas); do comando ao glifo lido, com o laço de eventos girando"
+  }
+ }
+}

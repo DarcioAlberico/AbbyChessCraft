@@ -359,13 +359,15 @@ TEXTOS_GUARDADOS = 8
 
 
 def _chave_do_texto(pagina) -> Optional[tuple]:
-    """O que o texto da página usa para ser montado (`texto.montar`): o caractere, a caixa e
-    o ângulo de cada glifo, as áreas, as decisões e os diagramas. A confiança e a fonte da
+    """O que o texto da página usa para ser montado (`texto.montar`): o caractere, a caixa, o
+    ângulo e a moldura de cada glifo, as áreas, as decisões e os diagramas. A confiança e a fonte da
     leitura não entram: confirmar uma leitura (o Enter mais comum) não muda o texto. `None`
     se algo não for comparável (aí o texto é montado sempre)."""
     try:
+        # `moldura`: o core faz da tabela emoldurada uma faixa só na ordem de leitura.
         chave = (tuple((b.gid, b.entry.char, b.entry.x1, b.entry.y1, b.entry.x2, b.entry.y2,
-                        b.entry.angulo) for b in pagina.boxes),
+                        b.entry.angulo, getattr(b.entry, "moldura", False))
+                       for b in pagina.boxes),
                  tuple(pagina.zonas), pagina.decisoes,
                  tuple((tuple(d.caixa), d.id) for d in pagina.diagramas))
         hash(chave)

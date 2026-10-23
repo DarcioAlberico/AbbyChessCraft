@@ -185,20 +185,50 @@ def test_o_dialogo_de_mover_recusa_a_referencia_que_se_move(app):
     d.deleteLater()
 
 
-def test_o_endireitar_comeca_no_medido_e_diz_o_que_se_perde(app, janela, monkeypatch):
+def test_o_endireitar_diz_o_que_o_ok_faz_conforme_a_caixa(app, janela, monkeypatch):
+    """No medido (o padrão), o OK só volta as páginas de ângulo à mão, e fica desligado sem
+    elas; com um ângulo, ele diz que a leitura se desfaz. A prévia segue a caixa."""
     vistos = {}
 
-    def perguntar_com(_j, _t, _n, linhas, ler, **opcoes):
-        vistos.update(linhas=dict(linhas[:1]), valor=ler(), ok=opcoes["ok"],
-                      previa=opcoes["efeito"]([0, 1, 2]))
+    def perguntar_com(janela_, titulo, total, linhas, ler, **opcoes):
+        d = dp.DialogoDasPaginas(janela_, titulo, total, linhas=linhas, **opcoes)
+        ok = d.botoes.button(QDialogButtonBox.StandardButton.Ok)
+        caixa = linhas[2][1]
+        vistos["medido"] = (ok.isEnabled(), ok.text(), d.previa.text(), ler())
+        caixa.setChecked(False)
+        vistos["a_mao"] = (ok.isEnabled(), ok.text(), d.previa.text())
+        d.deleteLater()
         return None
 
     monkeypatch.setattr(dp, "perguntar_com", perguntar_com)
     _ler(janela.projeto, 1)
     janela.endireitar_paginas([0, 1, 2])
-    assert vistos["valor"] is None                         # o medido: OK não muda nada
-    assert vistos["ok"] == "Endireitar e desfazer a leitura"
-    assert "a leitura de 1 página se desfaz" in vistos["previa"]
+    habilitado, _rotulo, previa, valor = vistos["medido"]
+    assert not habilitado and "nada muda" in previa and valor is None
+    habilitado, rotulo, previa = vistos["a_mao"]
+    assert habilitado and rotulo == "Endireitar e desfazer a leitura"
+    assert "A leitura de 1 página se desfaz" in previa
+    janela.pagina.endireitar_paginas([2], 1.5)                # uma com ângulo à mão
+    janela.endireitar_paginas([0, 1, 2])
+    habilitado, rotulo, previa, _valor = vistos["medido"]
+    assert habilitado and rotulo == "Voltar ao ângulo medido"
+    assert previa.startswith("1 página volta ao ângulo medido")
+
+
+def test_mover_para_onde_ja_estao_e_recusado_no_dialogo():
+    from abbychess.app.paginas_na_janela import _mover_vale
+
+    assert "já estão aí" in _mover_vale([25], 24)
+    assert "já estão aí" in _mover_vale([3, 4, 5], 2)
+    assert _mover_vale([3, 4, 5], 9) is None
+
+
+def test_o_aviso_de_dividir_conta_as_divididas(projeto, ctl):
+    avisos = []
+    ctl.eventos.ligar("mensagem", lambda texto, *_: avisos.append(texto))
+    ctl.dividir_paginas([1])
+    ctl.dividir_paginas([1, 2, 3, 4])                         # 1 e 2 são metades
+    assert avisos[-1].startswith("Feito: Dividir 2 páginas (2 páginas já eram metades")
 
 
 def test_os_botoes_do_qt_em_portugues(app):

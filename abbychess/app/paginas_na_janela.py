@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from typing import Optional, Sequence
 
-from PySide6.QtWidgets import QCheckBox, QFileDialog, QLabel
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QCheckBox, QFileDialog, QLabel
 
 from abbychess import sequencia as sq
 from abbychess.app import dialogo_paginas as dp
@@ -82,9 +83,12 @@ class PaginasNaJanela:
             self, "Inserir páginas", total, com_selecao=False,
             lugar="Depois da página", lugar_padrao=self.pagina.indice + 1,
             ok="Inserir",
-            explicacao=f"{'1 arquivo' if len(caminhos) == 1 else f'{len(caminhos)} arquivos'}."
-                       " Cada página vira uma página do livro; os arquivos são copiados para o "
-                       "projeto (o original pode sair do lugar). Ctrl+Z desfaz.")
+            explicacao=("1 arquivo. Cada página dele vira uma página do livro; ele é copiado "
+                        "para o projeto (o original pode sair do lugar). Ctrl+Z desfaz."
+                        if len(caminhos) == 1 else
+                        f"{len(caminhos)} arquivos. Cada página deles vira uma página do livro; "
+                        "eles são copiados para o projeto (os originais podem sair do lugar). "
+                        "Ctrl+Z desfaz."))
         if escolha is not None:
             self.pagina.inserir_paginas(caminhos, escolha[1] + 1)
 
@@ -143,7 +147,8 @@ class PaginasNaJanela:
                        "cada uma com os glifos dela. A que já é metade de uma divisão fica "
                        "como está. Ctrl+Z junta de novo.")
         if escolha is not None:
-            self.pagina.dividir_paginas(*escolha)
+            with _ocupado(self, "Dividindo as páginas…"):
+                self.pagina.dividir_paginas(*escolha)
 
     def endireitar_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         limite = self.pagina.ENDIREITAR_NO_MAXIMO
@@ -159,29 +164,49 @@ class PaginasNaJanela:
         medido.setChecked(True)
         nota = QLabel(f"Medido nesta página: {agora:.2f}°".replace(".", ","))
         lidas = set(self.projeto.paginas_lidas()) if self.projeto is not None else set()
+        # As com ângulo à mão: só elas mudam quando o pedido é o medido.
+        a_mao = ({i for i, e in enumerate(self.projeto.sequencia.entradas)
+                  if e.angulo is not None} if self.projeto is not None else set())
 
         def efeito(posicoes):
-            perdem = len(lidas.intersection(posicoes))
-            texto = (f"{sq.quantas_paginas(len(posicoes))} "
-                     f"{'é endireitada' if len(posicoes) == 1 else 'são endireitadas'}: "
-                     f"{dp.texto_da_selecao(posicoes)}.")
+            if medido.isChecked():
+                voltam = a_mao.intersection(posicoes)
+                texto = (f"{sq.quantas_paginas(len(voltam))} "
+                         f"{'volta' if len(voltam) == 1 else 'voltam'} ao ângulo medido; as "
+                         "outras ficam como estão.")
+                perdem = len(lidas.intersection(voltam))
+                rotulo = "Voltar ao ângulo medido"
+            else:
+                texto = (f"{sq.quantas_paginas(len(posicoes))} "
+                         f"{'é endireitada' if len(posicoes) == 1 else 'são endireitadas'} "
+                         f"em {angulo.value():.2f}°: {dp.texto_da_selecao(posicoes)}."
+                         .replace(".", ",", 1))
+                perdem = len(lidas.intersection(posicoes))
+                rotulo = "Endireitar e desfazer a leitura" if perdem else "Endireitar"
             if perdem:
-                texto += (f" Com um ângulo à mão, a leitura de {sq.quantas_paginas(perdem)} "
-                          "se desfaz (ficam os glifos marcados à mão).")
-            return texto
+                texto += (f" A leitura de {sq.quantas_paginas(perdem)} se desfaz (ficam os "
+                          "glifos marcados à mão).")
+            return texto, rotulo
+
+        def validar(posicoes, _depois_da):
+            if medido.isChecked() and not a_mao.intersection(posicoes):
+                return ("Nenhuma das escolhidas tem ângulo à mão: com o medido, nada muda. "
+                        "Desmarque a caixa para dar um ângulo.")
+            return None
 
         escolha = dp.perguntar_com(
             self, "Endireitar páginas", self._total(),
             [("Ângulo", angulo), ("", nota), ("", medido)],
             lambda: None if medido.isChecked() else angulo.value(),
-            selecao=self._selecao_de_agora(selecionadas), efeito=efeito,
-            ok="Endireitar e desfazer a leitura",
+            selecao=self._selecao_de_agora(selecionadas), efeito=efeito, validar=validar,
+            sinais=(medido.toggled, angulo.valueChanged),
             explicacao="O ângulo positivo gira a página no sentido anti-horário. Na página "
                        "lida, a leitura se desfaz: ficam só os glifos marcados à mão (a "
                        "leitura digitada ou aceita na revisão), girados com a página, e as "
                        "áreas que você desenhou; o F5 lê de novo. Ctrl+Z desfaz.")
         if escolha is not None:
-            self.pagina.endireitar_paginas(*escolha)
+            with _ocupado(self, "Endireitando as páginas…"):
+                self.pagina.endireitar_paginas(*escolha)
 
     def paginas_apagadas(self) -> None:
         apagadas = self.projeto.sequencia.apagadas if self.projeto is not None else ()
@@ -197,4 +222,24 @@ def _mover_vale(posicoes, depois_da: int):
     """Por que mover não vale (na linha da prévia, antes do OK), ou None."""
     if depois_da in posicoes:
         return "a página de referência é uma das que se movem: escolha outra"
+    if sorted(posicoes) == list(range(depois_da + 1, depois_da + 1 + len(posicoes))):
+        return "as páginas já estão aí: escolha outro lugar"
     return None
+
+
+class _ocupado:
+    """O cursor de espera e o aviso na barra durante uma operação longa na interface (dividir
+    ou endireitar o livro inteiro leva uns segundos)."""
+
+    def __init__(self, janela, aviso: str):
+        self.janela, self.aviso = janela, aviso
+
+    def __enter__(self):
+        self.janela.statusBar().showMessage(self.aviso)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        QApplication.processEvents()
+        return self
+
+    def __exit__(self, *_erro):
+        QApplication.restoreOverrideCursor()
+        return False

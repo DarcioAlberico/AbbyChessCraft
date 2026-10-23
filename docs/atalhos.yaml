@@ -138,6 +138,10 @@ acoes:
       - {tecla: PgDn, widget: graphicsview, tipo: substitui, motivo: "rola uma tela e vira a página no fim (§3.3)"}
   - {id: reconhecer_pagina, descricao: Reconhecer a página, escopo: [global], padrao: F5, finereader: Ctrl+F9, desde_passo: A2}
   - {id: reconhecer_livro, descricao: Reconhecer o livro (lote), escopo: [global], padrao: Ctrl+Shift+F5, desde_passo: A2}
+  - {id: girar_a_direita, descricao: Girar à direita (a página aberta ou as escolhidas na gaveta),
+     escopo: [global], sem_atalho: [padrao, finereader], desde_passo: L}
+  - {id: girar_a_esquerda, descricao: Girar à esquerda (a página aberta ou as escolhidas na gaveta),
+     escopo: [global], sem_atalho: [padrao, finereader], desde_passo: L}
   - {id: reler_pendentes, descricao: Reler os pendentes, escopo: [global], padrao: Ctrl+R, desde_passo: A2}
   - {id: reconhecer_zona, descricao: Reconhecer só a zona escolhida, escopo: [imagem_areas], padrao: Ctrl+Shift+R,
      finereader: Ctrl+Shift+B, desde_passo: F}

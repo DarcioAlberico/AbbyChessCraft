@@ -1468,8 +1468,10 @@ class ProjetoDeLivro:
             try:
                 for pid in entram:
                     entrada = nova.entrada_de(pid)
+                    do_pdf = (entrada is not None and entrada.fonte == sq.FONTE_DO_LIVRO
+                              and entrada.metade != "direita")
                     gv.gravar_json(self._arquivo_v2(pid), _pagina_para_json(
-                        paginas[pid], entrada.pagina if entrada is not None else None))
+                        paginas[pid], entrada.pagina if do_pdf else FORA_DO_PDF))
                     gravados.append(pid)
                 self.dados.sequencia = nova.para_json()
                 self.dados.proximo_pid = max([self.dados.proximo_pid, self._proximo_pid,
@@ -1586,6 +1588,12 @@ class ProjetoDeLivro:
                 # O perdedor de dois arquivos da mesma página (uma queda): o dono vale.
                 log.warning("p%d.json repete a página %d do PDF, que é da p%d: fica fora do "
                             "livro", pid, pagina.indice + 1, dono)
+                continue
+            if pagina.indice < 0:
+                # Uma inserida ou uma metade direita sem entrada: não se sabe a imagem dela, e
+                # apontá-la para uma página do PDF mostraria os glifos noutra imagem.
+                log.warning("p%d.json não é de uma página do PDF e saiu da sequência: fica "
+                            "fora do livro, no disco", pid)
                 continue
             orfaos.append(sq.Apagada(sq.Entrada(pid, sq.FONTE_DO_LIVRO, max(0, pagina.indice)),
                                      len(sequencia)))

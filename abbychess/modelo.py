@@ -700,14 +700,25 @@ def dividir(pagina: Pagina, corte: int, esquerda, direita, tamanho: Tuple[int, i
 
     de = geo.normalizar(pagina.geometria)
     metades = (geo.normalizar(esquerda), geo.normalizar(direita))
+    largura, altura = geo.tamanho_da_imagem(de, tamanho)
+    colunas = ((0, corte), (corte, largura))
 
     def lado(caixa) -> int:
         return 0 if caixa[0] + caixa[2] < 2 * corte else 1
 
     def na_metade(caixa, k: int):
-        """(a caixa na metade `k`, ou None, e a caixa na página endireitada inteira)."""
-        fonte = geo.para_a_fonte(tuple(caixa), de, tamanho)
-        return geo.recortar(fonte, metades[k], tamanho), fonte
+        """A caixa na metade `k`, nos pixels dela, ou None. As duas metades são recortes do
+        que se vê, com o mesmo giro: a conta é aparar na coluna do corte e, na direita,
+        deslocar (sem passar pela página inteira, que custava 3 s no livro dividido)."""
+        x1, y1, x2, y2 = caixa
+        de_x, ate_x = colunas[k]
+        x1, x2, y1, y2 = max(x1, de_x), min(x2, ate_x), max(y1, 0), min(y2, altura)
+        if x2 <= x1 or y2 <= y1:
+            return None
+        return (x1 - de_x, y1, x2 - de_x, y2)
+
+    def na_fonte(caixa):
+        return geo.para_a_fonte(tuple(caixa), de, tamanho)
 
     direita_pg = Pagina(pid=pid_novo, indice=pagina.indice + 1, estado=pagina.estado,
                         geometria=metades[1], tamanho=tamanho)
@@ -717,15 +728,19 @@ def dividir(pagina: Pagina, corte: int, esquerda, direita, tamanho: Tuple[int, i
     saidos = set()
     for lugar, box in enumerate(pagina.boxes):
         k = lado(_caixa(box.entry))
-        caixa, fonte = na_metade(_caixa(box.entry), k)
+        caixa = na_metade(_caixa(box.entry), k)
         if caixa is None:                      # fora da página: guardado na esquerda
-            fora.append((lugar, _na_caixa(box, fonte, box.entry.angulo + de[1])))
+            fora.append((lugar, _na_caixa(box, na_fonte(_caixa(box.entry)),
+                                          box.entry.angulo + de[1])))
             saidos.add(box.gid)
             continue
-        box = _na_caixa(box, caixa, box.entry.angulo)
         if k == 1:
             movidos[box.gid] = direita_pg.alocar()
-            box = replace(box, gid=movidos[box.gid])
+            x1, y1, x2, y2 = caixa
+            box = replace(box, gid=movidos[box.gid],
+                          entry=replace(box.entry, x1=x1, y1=y1, x2=x2, y2=y2))
+        elif caixa != _caixa(box.entry):     # a esquerda começa na origem: só a aparada
+            box = _na_caixa(box, caixa, box.entry.angulo)
         boxes[k].append(box)
     esquerda_d, direita_d = _dividir_decisoes(pagina.decisoes,
                                               {b.gid for b in pagina.boxes} - saidos,
@@ -733,24 +748,24 @@ def dividir(pagina: Pagina, corte: int, esquerda, direita, tamanho: Tuple[int, i
     tabuleiros: Tuple[list, list] = ([], [])
     for lugar, tabuleiro in enumerate(pagina.tabuleiros):
         k = lado(tabuleiro)
-        caixa, fonte = na_metade(tabuleiro, k)
+        caixa = na_metade(tabuleiro, k)
         if caixa is None:
-            areas_fora.append(("tabuleiro", lugar, fonte, False))
+            areas_fora.append(("tabuleiro", lugar, na_fonte(tabuleiro), False))
         else:
             tabuleiros[k].append(tuple(caixa))
     diagramas: Tuple[list, list] = ([], [])
     for lugar, diagrama in enumerate(pagina.diagramas):
         k = lado(diagrama.caixa)
-        caixa, fonte = na_metade(diagrama.caixa, k)
+        caixa = na_metade(diagrama.caixa, k)
         if caixa is None:
-            areas_fora.append(("diagrama", lugar, replace(diagrama, caixa=fonte), False))
+            areas_fora.append(("diagrama", lugar,
+                               replace(diagrama, caixa=na_fonte(diagrama.caixa)), False))
         else:
             diagramas[k].append(replace(diagrama, caixa=tuple(caixa)))
     zonas: Tuple[list, list] = ([], [])
     for zona in pagina.zonas:
-        fonte = geo.para_a_fonte(zona.caixa, de, tamanho)
         for k in (0, 1):
-            caixa = geo.recortar(fonte, metades[k], tamanho)
+            caixa = na_metade(zona.caixa, k)
             if caixa is None or min(caixa[2] - caixa[0], caixa[3] - caixa[1]) < MENOR_LADO:
                 continue
             ids = {d.id for d in diagramas[k]}

@@ -1925,12 +1925,12 @@ class ControladorDePagina:
                 if transacao.inteiras:
                     self.projeto.descarregar()
                 for pid, (velha, nova) in transacao.inteiras.items():
-                    viva = self.projeto.pagina_do_pid(pid)
+                    contador = self.projeto.proximo_n_de(pid)
                     for guardada in (velha, nova):
-                        if viva is not None and guardada is not None:
+                        if contador is not None and guardada is not None:
                             # Um gid nunca volta: a página que sai (a direita, no desfazer)
                             # leva o contador dela para quando voltar.
-                            guardada.proximo_n = max(guardada.proximo_n, viva.proximo_n)
+                            guardada.proximo_n = max(guardada.proximo_n, contador)
                     if not self.projeto.pagina_igual(pid, velha if refazer else nova):
                         posicao = self.projeto.posicao_do_pid(pid)
                         onde = "" if posicao is None else f" {posicao + 1}"

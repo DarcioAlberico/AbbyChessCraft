@@ -780,8 +780,10 @@ livro: `3-7, 12`, `ímpares`, `pares`, `todas` ou uma paridade num intervalo (`�
 - **Dividir** separa a página espelhada (duas páginas do livro numa imagem) em duas: a
   metade esquerda fica no lugar, a direita entra logo depois, cada uma com os glifos dela.
   As amostras ensinadas antes continuam achando o glifo de origem. Uma metade não se divide
-  de novo (na seleção, ela é pulada, e a barra avisa); o Ctrl+Z junta as duas. Dividir as
-  230 páginas lidas do Xadrez Vitorioso leva ~3 s.
+  de novo (na seleção, ela é pulada, e a barra avisa); o Ctrl+Z junta as duas. Divida o
+  livro espelhado antes de ler: é instantâneo (nada a gravar). O livro já lido leva uns
+  segundos, com o cursor de espera, porque as duas metades de cada página são gravadas
+  (os números estão em "As medidas do roadmap", linhas "Dividir o livro").
 
 Cada operação é um passo do **Ctrl+Z**. Elas ficam desligadas, com o motivo na dica, no
 projeto só para leitura, com o lote rodando, com uma tarefa em curso ou com o servidor lendo

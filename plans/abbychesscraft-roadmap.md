@@ -797,6 +797,27 @@ mudaria os ângulos gravados dos projetos novos: fica para quando houver gabarit
 
 ## Passo L — Editor de imagem e páginas (§12.4)
 
+**Início em 2026-10-22, ramo `passo-i-treino`.** As decisões do usuário: os glifos
+acompanham girar, cortar e dividir (endireitar à mão relê); a página inserida é copiada para
+o projeto; apagar guarda a página; cada operação entra no Ctrl+Z. O modelo e os CA-12.7 a
+12.16 estão em §12.4; a revisão de arquitetura do mesmo dia trocou o corte e a metade por um
+`quadro` inteiro, pôs a `geometria` dos boxes em cada JSON de página (a transformação
+preguiçosa, segura contra queda), fixou a ordem das gravações e a cadeia v1 → v2 → v3, e
+acrescentou os casos negativos.
+
+As rodadas:
+1. A sequência e todo dado chaveado por `pid`, sem operação nova e sem mudar o formato até o
+   último subpasso: (1a) o tipo `Sequencia` (posição ↔ `pid`) montado dos dados da v2, com
+   um adaptador índice → `pid` na borda da API; (1b) `_modelos`, `_a_gravar`, `livro.json`,
+   o índice da busca e `MudancaDaPagina` por `pid`, sem ler o `indice` do JSON de página;
+   (1c) renderizar pela entrada, `inclinacoes` e o lote por `pid`; (1d) `janela.json`, as
+   listas do `projeto.json`, a origem das amostras e as exportações pela sequência; (1e)
+   `VERSAO = 3`, `backup-v2/`, a cadeia v1 → v3, CA-12.7 e de novo CA-4.1 e CA-4.5. Um teste
+   por AST reprova método público do `ProjetoDeLivro` que ainda tome `indice`.
+2. Reordenar, apagar e inserir, com a seleção (CA-12.8 a 12.10, 12.15).
+3. Girar, cortar e dividir, com a `geometria` preguiçosa (CA-12.11 a 12.13, CA-4.6).
+4. Endireitar à mão e as imagens transformadas nas exportações (CA-12.14, 12.16).
+
 **Tarefas.**
 1. Dividir páginas espelhadas, girar, cortar e endireitar à mão, em páginas pares, ímpares
    ou num intervalo.

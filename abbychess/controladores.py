@@ -123,7 +123,8 @@ class ControladorDeLayout:
             nome = zn.NOMES[z.tipo].lower()
             tipos[nome] = tipos.get(nome, 0) + 1
         resumo = ", ".join(f"{n} {t}" for t, n in tipos.items()) or "nenhuma"
-        self.pagina._avisar(f"Áreas automáticas: {resumo}. Corrija e aperte F5.", 10000)
+        self.pagina._avisar(f"Áreas automáticas: {resumo}. Corrija e aperte "
+                            "{reconhecer_pagina}.", 10000)
 
     def _aprender_margens(self, zonas):
         """Dá função às margens atuais pelas repetições das páginas reconhecidas."""
@@ -642,7 +643,7 @@ class ControladorDeDiagramas:
         indice = next((i for i, d in enumerate(diagramas)
                        if tuple(d.caixa) == tuple(caixa)), None)
         if indice is None:
-            p._avisar("O diagrama mudou na página (F5, desfazer ou áreas): reabra a "
+            p._avisar("O diagrama mudou na página ({reconhecer_pagina}, desfazer ou áreas): reabra a "
                       "conferência.", 8000)
             return False
         antes = p._instantaneo()

@@ -535,4 +535,4 @@ def test_a_pagina_reconhecida_e_vazia_diz_nada_reconhecido(app, janela, monkeypa
     monkeypatch.setattr(type(janela.pagina), "reconhecida", property(lambda self: True))
     monkeypatch.setattr(janela.pagina, "documento", lambda: None)
     janela.pintar_texto()
-    assert janela.texto.toPlainText() == "Nada reconhecido nesta página."
+    assert janela.texto.toPlainText().startswith("Nada reconhecido nesta página.")

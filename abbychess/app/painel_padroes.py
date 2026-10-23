@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QListWidget, QLis
                                QPushButton, QSplitter, QVBoxLayout, QWidget)
 
 from abbychess.app.painel_treino import FONTE_DE_SIMBOLOS
+from abbychess.app import vazios
 
 
 class _GradeDeAmostras(QListWidget):
@@ -116,7 +117,9 @@ class PainelDePadroes(QWidget):
                 self.caracteres.setCurrentItem(item)
         self.caracteres.blockSignals(False)
         total = sum(len(v) for v in padroes.values())
-        self.resumo.setText(f"{total} amostras em {len(padroes)} caracteres")
+        self.resumo.setText(f"{total} amostras em {len(padroes)} caracteres" if total
+                            else vazios.SEM_PADROES)
+        self.resumo.setWordWrap(True)
         self._filtrar(self.busca.text())
         self._mostrar_amostras()
 

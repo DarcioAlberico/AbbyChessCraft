@@ -5,6 +5,7 @@ mixin da `JanelaPrincipal`, como `EspacoDeTrabalho`.
 
 from __future__ import annotations
 
+from abbychess.app import teclado
 
 class EdicaoNoDocumento:
     def _sessao_do_documento(self, unidades, novo, avancar, ensinar_gid, ultimo, fixos,
@@ -44,8 +45,9 @@ class EdicaoNoDocumento:
         self.treino.campo.selectAll()
 
     def _sem_duvidosas(self) -> None:
-        self._aviso_estrutural("Nenhuma palavra duvidosa depois desta na página · F6 vai à "
-                               "próxima página com pendentes")
+        self._aviso_estrutural(teclado.com_teclas(
+            "Nenhuma palavra duvidosa depois desta na página · {proxima_pagina_pendente} vai à "
+            "próxima página com pendentes"))
 
     def _aviso_estrutural(self, texto: str) -> None:
         """Na Linha e também na barra de status (a Linha pode estar escondida, Ctrl+F5)."""

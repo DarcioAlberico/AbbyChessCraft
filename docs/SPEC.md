@@ -948,6 +948,7 @@ volta. Registro em
 3. **Quem rotula os gabaritos** (o usuário, ou rotulagem assistida revisada por ele, com a
    conferência cega de §15.2).
 4. **Rolagem contínua do livro** no Documento: depois do passo G, ou não.
-5. **Ícones**: Lucide (ISC) embutido, ou os padrão do Qt.
+5. ~~**Ícones**: Lucide (ISC) embutido, ou os padrão do Qt.~~ Decidido no passo K
+   (2026-10-22): o Lucide 0.460.0 embutido, só os SVG usados, com a licença.
 6. **Revisor externo**: o Codex não está instalado; as revisões usam revisores independentes
    do ambiente até ele ser instalado e autenticado.

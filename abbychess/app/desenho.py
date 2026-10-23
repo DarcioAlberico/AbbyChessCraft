@@ -7,8 +7,10 @@ lê o estado dos controladores e desenha; nenhum decide nada.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from abbychess import avisos as av
@@ -18,6 +20,7 @@ from abbychess import verificacao as vf
 from abbychess.app import acoes
 from abbychess.app.imagens import pixmap_da_pagina
 from abbychess.app import estilo
+from abbychess.app import teclado, vazios
 
 
 class DesenhoDaJanela:
@@ -31,11 +34,16 @@ class DesenhoDaJanela:
         self.seletor.blockSignals(False)
         self.total_de_paginas.setText(f" de {p.fonte.total} ")
         self.visor.mostrar_pagina(self._pixmap(p.indice, p.imagem))
-        self._pre_carga.start()                 # a seguinte, depois desta pintada
+        # A seguinte, depois desta pintada. Folheando (outra troca há menos de 1 s: ninguém
+        # lê uma página nesse tempo), já: a página nunca vista leva ~470 ms para renderizar e
+        # medir, e o pedido seguinte chegava antes de uma pré-carga adiada acabar.
+        agora = time.monotonic()
+        self._pre_carga.setInterval(20 if agora - self._ultima_troca < 1.0 else 150)
+        self._ultima_troca = agora
+        self._pre_carga.start()
         self._pre_pixmap.start()                # e o pixmap dela, quando a pré-carga a tiver
         self._fechar_conferencia()              # os diagramas em edição eram da outra
-        self.verificacao.limpar("Escolha a fila de palavras desconhecidas (F7) para verificar "
-                                "o texto.")
+        self.verificacao.limpar(vazios.escolha_a_fila_de_palavras())
         self._layout_mudou()
         if self.visor.modo_areas and not p.zonas:
             self.areas.automaticas()
@@ -50,17 +58,21 @@ class DesenhoDaJanela:
         if guardado is not None and guardado[0] is imagem:
             self._pixmaps.move_to_end(indice)
             return guardado[1]
-        pixmap = pixmap_da_pagina(imagem)
+        cache = self.pagina.cache
+        preparada = cache.preparada(indice, imagem) if cache is not None else None
+        # A QImage feita na thread que renderizou: aqui só a cópia para o QPixmap.
+        pixmap = (QPixmap.fromImage(preparada.qimage) if preparada is not None
+                  else pixmap_da_pagina(imagem))
         self._pixmaps[indice] = (imagem, pixmap)
         while len(self._pixmaps) > 5:
             self._pixmaps.popitem(last=False)
         return pixmap
 
     def _pre_converter(self) -> None:
-        """Converte a página seguinte, se a pré-carga já a renderizou (fora do clique)."""
+        """Converte a próxima provável, se a pré-carga já a renderizou (fora do clique)."""
         p = self.pagina
-        if p.cache is not None and p.cache.tem(p.indice + 1):
-            self._pixmap(p.indice + 1, p.cache.pagina(p.indice + 1)[0])
+        if p.cache is not None and p.cache.tem(p.proxima_provavel):
+            self._pixmap(p.proxima_provavel, p.cache.pagina(p.proxima_provavel)[0])
 
     def _zoom_mudou(self, escala: float, limite: str) -> None:
         self.caixa_de_zoom.blockSignals(True)
@@ -94,10 +106,11 @@ class DesenhoDaJanela:
         self.atualizar_fila()
         if p.box_atual() is None:
             self.visor.selecionar(None)
-            self.treino.limpar("Esta página ainda não foi reconhecida. Aperte F5."
+            self.treino.limpar(vazios.pagina_nao_reconhecida()
                                if not p.boxes else
                                "Nada a revisar nesta página. Clique num box para corrigi-lo, "
-                               "ou vá para o próximo pendente do livro (F6).")
+                               + teclado.com_teclas("ou vá para o próximo pendente do livro "
+                                                    "({proxima_pagina_pendente})."))
             return
         self.treino.mostrar(p.matriz, p.box_atual(), p.posicao_do_atual())
         # A fila e a Imagem levam o Documento e a Linha ao glifo (§6.2).
@@ -117,8 +130,7 @@ class DesenhoDaJanela:
         na_fila = set(p.fila())
         estados = {b.gid: gd.estado(b.entry, b.gid in na_fila) for b in p.modelo.boxes} \
             if p.modelo is not None else {}
-        aviso = ("Nada reconhecido nesta página." if p.reconhecida
-                 else "Página não reconhecida: F5 reconhece.")
+        aviso = vazios.nada_reconhecido() if p.reconhecida else vazios.pagina_nao_reconhecida()
         if not p.reconhecida and p.projeto is not None:
             saude = lv.saude(p.projeto, p.leitor.arquivos_de_padrao() if p.leitor else 0)
             if saude.paginas:
@@ -200,6 +212,8 @@ class DesenhoDaJanela:
         acoes.atualizar(self)
 
     def _mensagem(self, texto: str, ms: int) -> None:
+        # Os controladores não têm Qt nem perfil: citam a tecla por `{id}`, trocada aqui.
+        texto = teclado.com_teclas(texto, so_conhecidas=True)
         if ms == 0 and self.executor.na_fila:   # o progresso não apaga a fila da barra
             texto += f" Na fila: {', '.join(self.executor.na_fila)}."
         self.statusBar().showMessage(texto, ms)

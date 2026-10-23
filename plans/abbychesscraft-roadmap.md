@@ -751,13 +751,33 @@ as cores de estado sobre a interface escura são clareadas até 4,5:1 (`estilo.n
 os avisos de conflito e o erro da busca usam a cor do tema, e a varredura de cor literal pega
 também `#rgb` e cores por nome.
 
+Rodada 2 (o resto do passo). Os ícones são do Lucide 0.460.0 (ISC; a decisão 5 de §18,
+escolhida pelo usuário): só os 25 SVG usados, com a licença, em `app/icones/`, pintados pela
+cor do texto do tema e refeitos quando ele muda. Os estados vazios (`app/vazios.py`) dizem o
+que fazer com a tecla do perfil em uso, e toda dica ou aviso que cita tecla a tira do perfil
+(`teclado.com_teclas`; as dicas das ações seguem a troca). CA-13.1 (`tests/test_acessibilidade.py`)
+cobre a janela e os diálogos, com os botões internos do Qt nomeados. O perfil FineReader
+entrou com as ações que só ele tem (Ctrl+F7, Alt+4, Ctrl+Tab, Ctrl+1…5), e
+**Ferramentas › Teclado…** escolhe o perfil e troca as teclas pelas regras do YAML, sem
+reiniciar, lembrado no `QSettings` (os testes usam um INI temporário). Desempenho: a
+`QImage` da página nasce na thread que a renderiza (a troca no cache, 23 → 13 ms); a trava
+da fonte cobre só o render do fitz, e a medida da inclinação (~370 ms) não segura mais o
+clique noutra página; a pré-carga segue o sentido do passo e, quem folheia (trocas a menos
+de 1 s), a tem já: parado 0,25 s em cada página nunca vista, ~390 → ~250 ms por troca
+(medido no Xadrez Vitorioso, offscreen).
+
+**Pendente.** O render do fitz segura o GIL (~80 ms por página nunca vista, a interface
+para nesse tempo durante a pré-carga); tirá-lo da interface pede um processo, como o
+servidor de leitura. A medida da inclinação (~370 ms) poderia buscar do grosso ao fino, mas
+mudaria os ângulos gravados dos projetos novos: fica para quando houver gabarito que a meça.
+
 **Tarefas.**
 1. ~~Tokens completos e o tema claro e escuro.~~
-2. Os ícones (§18.5).
-3. Os estados vazios.
-4. `accessibleName`.
-5. O perfil FineReader e a reatribuição de atalhos em Opções.
-6. Pendências do A1 (revisão de produto):
+2. ~~Os ícones (§18.5).~~
+3. ~~Os estados vazios.~~
+4. ~~`accessibleName`.~~
+5. ~~O perfil FineReader e a reatribuição de atalhos em Opções.~~
+6. ~~Pendências do A1 (revisão de produto):~~
    - os tokens de estado do A1 (Okabe-Ito) não dão o contraste de 3:1 do CA-13.2 contra o
      papel (o laranja do pendente, 1,8:1 contra o cinza 230; o roxo, 2,45; o verde-azulado,
      2,74): escolher variantes mais escuras, mantendo os traços distintos;

@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QLineEdit, QMenu,
 
 from abbychess import busca as bs
 from abbychess import substituir as sb
-from abbychess.app import estilo
+from abbychess.app import estilo, teclado
 
 ESCOPOS = ((bs.LIVRO, "Livro"), (bs.PAGINA, "Página"), (bs.SELECAO, "Seleção"),
            (bs.INTERVALO, "Intervalo"))
@@ -83,8 +83,10 @@ class BarraDeBusca(QWidget):
         self.contador = QLabel("")
         self.contador.setAccessibleName("Ocorrências")
         self.contador.setMinimumWidth(60)
-        anterior = self._acao_simples("▲", "Ocorrência anterior (Shift+F3)", self.anterior.emit)
-        seguinte = self._acao_simples("▼", "Próxima ocorrência (F3)", self.proxima.emit)
+        anterior = self._acao_simples("▲", "Ocorrência anterior ({ocorrencia_anterior})",
+                                      self.anterior.emit)
+        seguinte = self._acao_simples("▼", "Próxima ocorrência ({proxima_ocorrencia})",
+                                      self.proxima.emit)
         fechar = self._acao_simples("✕", "Fechar a barra (Esc)", self.fechar.emit)
         self.substituto = QLineEdit()
         self.substituto.setPlaceholderText("Substituir por")
@@ -149,10 +151,11 @@ class BarraDeBusca(QWidget):
         return botao
 
     def _acao_simples(self, texto: str, dica: str, funcao) -> QToolButton:
+        """`dica` cita teclas por `{id}`: segue o perfil e as trocas (`teclado.texto_vivo`)."""
         botao = QToolButton()
         botao.setText(texto)
-        botao.setToolTip(dica)
-        botao.setAccessibleName(dica)
+        teclado.texto_vivo(botao, "setToolTip", dica)
+        teclado.texto_vivo(botao, "setAccessibleName", dica)
         botao.setAutoRaise(True)
         botao.clicked.connect(funcao)
         return botao

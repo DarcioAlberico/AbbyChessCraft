@@ -47,6 +47,7 @@ ROXO_AVERMELHADO = QColor(150, 60, 120)
 CINZA = QColor(110, 110, 110)
 PRETO = QColor(0, 0, 0)
 BRANCO = QColor(255, 255, 255)
+TRANSPARENTE = QColor(0, 0, 0, 0)             # o fundo dos ícones rasterizados
 
 #: O papel de referência (o gabarito do Xadrez Vitorioso, índice 25) e um papel mais escuro.
 PAPEL = QColor(255, 255, 255)

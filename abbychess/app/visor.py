@@ -89,6 +89,8 @@ class VisorDePagina(QGraphicsView):
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setBackgroundBrush(QBrush(estilo.FUNDO_DA_IMAGEM))
+        #: O que a Imagem diz sem página (§13, estado vazio): sem livro aberto, a instrução.
+        self.mensagem_vazia = ""
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         #: Os itens que não são boxes e saem a cada `mostrar_boxes` (os tabuleiros).
@@ -121,7 +123,25 @@ class VisorDePagina(QGraphicsView):
         self._palavra_do_documento: Optional[QGraphicsRectItem] = None
 
     # ------------------------------------------------------------------
+    def definir_vazio(self, mensagem: str) -> None:
+        """Sem página na cena, a Imagem mostra `mensagem` (vazia: nada)."""
+        self.mensagem_vazia = mensagem
+        self.viewport().update()
+
+    def drawForeground(self, pintor: QPainter, retangulo: QRectF) -> None:
+        super().drawForeground(pintor, retangulo)
+        if not self.mensagem_vazia:             # com página, sai aqui: nada de varrer a cena
+            return
+        pintor.save()
+        pintor.resetTransform()                 # o texto na tela, não na página
+        pintor.setPen(estilo.PAPEL)
+        area = self.viewport().rect().adjusted(24, 24, -24, -24)
+        pintor.drawText(area, Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap,
+                        self.mensagem_vazia)
+        pintor.restore()
+
     def mostrar_pagina(self, pixmap: QPixmap) -> None:
+        self.mensagem_vazia = ""                # a página toma o lugar do estado vazio
         cena = self.scene()
         cena.clear()
         self._itens, self._boxes, self._selecionado, self._destaque = [], [], None, None

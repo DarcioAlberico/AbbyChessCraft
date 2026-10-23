@@ -25,6 +25,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("ABBY_SERVIDOR", "0")
 # O índice da busca sem o pool de processos (cada janela aberta nos testes abriria 6).
 os.environ.setdefault("ABBY_INDICE_PARALELO", "0")
+# A pré-carga renderiza aqui, e não no processo de render do programa (`abbychess.render`):
+# cada janela da suíte abriria um. Os testes dele o ligam; as medidas de desempenho também.
+os.environ.setdefault("ABBY_RENDER_EM_PROCESSO", "0")
 # O offscreen não acha as fontes do sistema: sem elas o texto sai em quadrados largos, e as
 # medidas de largura dos painéis (CA-3.2, o Inspetor de 296 px) não valem como no programa.
 if os.name == "nt":

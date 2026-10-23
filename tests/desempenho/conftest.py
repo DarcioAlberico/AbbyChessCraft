@@ -24,6 +24,21 @@ RAIZ = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(RAIZ / "ferramentas"))
 from comum import destino_da_medida, estado_do_git  # noqa: E402
 MEDIDAS = RAIZ / "docs" / "medidas"
+
+
+@pytest.fixture(autouse=True, scope="session")
+def render_como_o_programa():
+    """Como o programa: a pré-carga renderiza o PDF no processo de render (desde 2026-10-23).
+    A suíte rápida o desliga (tests/conftest.py); a medida mede o que o usuário tem. É uma
+    fixture, e não o ambiente no import, porque este conftest também é lido na coleta da
+    suíte rápida."""
+    antes = os.environ.get("ABBY_RENDER_EM_PROCESSO")
+    os.environ["ABBY_RENDER_EM_PROCESSO"] = "1"
+    yield
+    if antes is None:
+        os.environ.pop("ABBY_RENDER_EM_PROCESSO", None)
+    else:
+        os.environ["ABBY_RENDER_EM_PROCESSO"] = antes
 AQUECIMENTOS = 5
 REPETICOES = 30
 

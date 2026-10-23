@@ -169,10 +169,12 @@ class FonteDePaginas:
         """A página `indice`, endireitada quando a fonte foi aberta para isso."""
         return self.pagina_da_entrada(self.entrada(indice))
 
-    def pagina_da_entrada(self, entrada: "sq.Entrada") -> Image.Image:
+    def pagina_da_entrada(self, entrada: "sq.Entrada", renderizador=None) -> Image.Image:
         """A imagem da entrada (§12.4): a página da fonte endireitada inteira, depois o quadro
-        e o giro (`abbychess.geometria`: assim cortar e girar são contas inteiras)."""
-        imagem = self._da_fonte(entrada)
+        e o giro (`abbychess.geometria`: assim cortar e girar são contas inteiras). Com o
+        `renderizador` (`render.RenderEmProcesso`, o da pré-carga), a página do PDF é
+        renderizada no processo dele, sem segurar o GIL desta."""
+        imagem = self._da_fonte(entrada, renderizador)
         angulo = self.inclinacao_da_entrada(entrada, imagem)
         if abs(angulo) >= INCLINACAO_MINIMA:
             imagem = Image.fromarray(girar(np.asarray(imagem.convert("L")), angulo))
@@ -188,9 +190,14 @@ class FonteDePaginas:
             return self._da_fonte(entrada)
         return self.pagina_da_entrada(entrada)
 
-    def _da_fonte(self, entrada: "sq.Entrada") -> Image.Image:
-        """A página da fonte da entrada, como está no arquivo."""
+    def _da_fonte(self, entrada: "sq.Entrada", renderizador=None) -> Image.Image:
+        """A página da fonte da entrada, como está no arquivo. O `renderizador` só vale para
+        o PDF, e fora da trava (o fitz daqui não é tocado); sem resposta dele, renderiza aqui."""
         arquivo = self._arquivo(entrada.fonte)
+        if renderizador is not None and arquivo.e_pdf:
+            imagem = renderizador.renderizar(arquivo.caminho, entrada.pagina)
+            if imagem is not None:
+                return imagem
         with self._trava:
             return arquivo.pagina(entrada.pagina)
 
@@ -353,6 +360,10 @@ class _ArquivoDePaginas:
         elif sufixo not in EXTENSOES_DE_IMAGEM:
             raise OSError(f"Formato não suportado: {sufixo}")
 
+    @property
+    def e_pdf(self) -> bool:
+        return self._pdf is not None
+
     def tamanho(self, indice: int) -> Tuple[int, int]:
         """(largura, altura) da página renderizada, sem renderizar (a do `get_pixmap` do
         core: o retângulo da página na escala do DPI, arredondado como ele arredonda)."""
@@ -398,8 +409,13 @@ class CacheDePaginas:
     TAMANHO = 5
 
     def __init__(self, fonte: FonteDePaginas, tamanho: int = TAMANHO,
-                 preparar: Optional[Callable[[np.ndarray], object]] = None):
+                 preparar: Optional[Callable[[np.ndarray], object]] = None,
+                 renderizador=None):
         self.fonte = fonte
+        #: Onde a pré-carga renderiza o PDF (`render.RenderEmProcesso`): fora deste processo,
+        #: sem parar a interface. A página pedida na hora renderiza aqui (é mais rápido, e a
+        #: interface a espera de qualquer jeito).
+        self.renderizador = renderizador
         self.tamanho = tamanho
         self.preparar = preparar
         self._paginas: "OrderedDict[sq.Entrada, Tuple[Image.Image, np.ndarray]]" = OrderedDict()
@@ -427,7 +443,8 @@ class CacheDePaginas:
     def pagina(self, indice: int) -> Tuple[Image.Image, np.ndarray]:
         return self._da_entrada(self.fonte.entrada(indice))
 
-    def _da_entrada(self, entrada: "sq.Entrada") -> Tuple[Image.Image, np.ndarray]:
+    def _da_entrada(self, entrada: "sq.Entrada", renderizador=None
+                    ) -> Tuple[Image.Image, np.ndarray]:
         while True:
             with self._trava:
                 if entrada in self._paginas:
@@ -439,7 +456,8 @@ class CacheDePaginas:
                     break                       # esta thread renderiza
             aviso.wait()                        # outra renderiza: espera e olha de novo
         try:
-            imagem = self.fonte.pagina_da_entrada(entrada)
+            imagem = (self.fonte.pagina_da_entrada(entrada) if renderizador is None
+                      else self.fonte.pagina_da_entrada(entrada, renderizador))
             par = (imagem, np.asarray(imagem.convert("L")))
             preparada = None
             if self.preparar is not None:
@@ -504,7 +522,7 @@ class CacheDePaginas:
                     self._thread = None
                     return
             try:
-                self._da_entrada(entrada)
+                self._da_entrada(entrada, self.renderizador)
             except Exception:                   # a página que não renderiza: avisa na vez dela
                 log.warning("a pré-carga da página do pid %d falhou", entrada.pid,
                             exc_info=True)

@@ -26,9 +26,11 @@ from tests.desempenho.test_busca import PAGINAS, SNAPSHOT
 pytestmark = [pytest.mark.desempenho, pytest.mark.timeout(900)]
 
 
-def _livro_de_230(pasta):
+def _livro_de_230(pasta, pdf_do_tamanho_da_fatia: bool = False):
     """Um projeto com um PDF sintético de 231 páginas e 230 delas com os glifos das 7 da
-    fatia (cada cópia com pid e gids próprios)."""
+    fatia (cada cópia com pid e gids próprios). Com `pdf_do_tamanho_da_fatia`, as páginas
+    do PDF têm o tamanho das da fatia (os glifos caem dentro delas, como no livro; as
+    operações de página do passo L dependem disso)."""
     from abbychess.modelo import Box, Decisoes, gid_de
     from abbychess.projeto import ProjetoDeLivro
     from tests.test_livro import PAGINAS as LINHAS, pdf_sintetico
@@ -40,8 +42,19 @@ def _livro_de_230(pasta):
         modelos = [fatia.carregar_modelo(i) for i in fatia.paginas_lidas()]
     finally:
         fatia.fechar()
-    projeto = ProjetoDeLivro.criar(pasta / "livros", "Sintético",
-                                   pdf_sintetico(pasta, LINHAS * 77))
+    if pdf_do_tamanho_da_fatia:
+        import fitz
+
+        largura = max(b.entry.x2 for m in modelos for b in m.boxes) + 120
+        altura = max(b.entry.y2 for m in modelos for b in m.boxes) + 120
+        pdf = pasta / "do_tamanho_da_fatia.pdf"
+        with fitz.open() as documento:
+            for _ in range(PAGINAS + 1):
+                documento.new_page(width=largura * 72 / 300, height=altura * 72 / 300)
+            documento.save(str(pdf))
+    else:
+        pdf = pdf_sintetico(pasta, LINHAS * 77)
+    projeto = ProjetoDeLivro.criar(pasta / "livros", "Sintético", pdf)
     for k in range(PAGINAS):
         molde = modelos[k % len(modelos)]
         pagina = projeto.pagina_para_editar(k)

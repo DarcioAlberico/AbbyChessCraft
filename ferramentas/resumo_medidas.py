@@ -237,7 +237,13 @@ def _por_passo() -> list:
               "Substituir no livro: a janela presa (230 p.)"),
              ("substituir_no_livro", "desfazer_ms", "Substituir no livro: o Ctrl+Z (230 p.)"),
              ("substituir_no_livro", "desfazer_mb", "Substituir no livro: o desfazer (MB)"),
-             ("abrir_ao_painel_de_paginas", "p95_ms", "Abrir ao painel de Páginas (230 p.), p95"))
+             ("abrir_ao_painel_de_paginas", "p95_ms", "Abrir ao painel de Páginas (230 p.), p95"),
+             ("paginas_no_livro", "dividir_ms", "Dividir o livro lido (230 p.)"),
+             ("paginas_no_livro", "desfazer_dividir_ms", "Dividir o livro: o Ctrl+Z (230 p.)"),
+             ("paginas_no_livro", "dividir_sem_leitura_ms",
+              "Dividir o livro antes de ler (231 p.)"),
+             ("paginas_no_livro", "girar_ms", "Girar o livro lido (230 p.)"),
+             ("paginas_no_livro", "girar_uma_p95_ms", "Girar uma página, p95"))
     colunas = [("linha de base", base)]
     for passo in passos:
         arquivo, dados = _ultimo(f"passo-{passo}")

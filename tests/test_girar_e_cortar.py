@@ -78,12 +78,13 @@ def test_ca_12_11_girar_as_impares_leva_imagem_e_boxes(projeto, ctl):
         assert depois.keys() == recortes.keys()                       # os mesmos gids
         for gid, recorte in recortes.items():
             assert np.array_equal(depois[gid], np.rot90(recorte, k=k)), (i, gid)
-    # depois da sequência, o gravador leva os arquivos das páginas à geometria nova
+    # girar grava só a sequência (nenhum glifo sai): os arquivos ficam na geometria de antes,
+    # e cada página é levada ao giro quando é lida
     projeto.descarregar()
     for i in range(10):
         bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(i)}.json")
                            .read_text(encoding="utf-8"))
-        assert bruto["geometria"] == [None, 90 if i % 2 == 0 else 0]
+        assert bruto["geometria"] == [None, 0]
 
 
 def test_ca_12_11_noventa_duas_vezes_e_cento_e_oitenta_e_o_ctrl_z_volta(projeto, ctl):

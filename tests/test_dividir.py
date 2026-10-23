@@ -160,13 +160,20 @@ def test_a_divisao_sobrevive_a_reabrir(projeto, ctl):
 
 
 def test_dividir_uma_pagina_girada_divide_o_que_se_ve(projeto, ctl):
+    _gravar(projeto, ctl, 4)
     ctl.girar_paginas([4], 90)
     vista = _imagem(ctl, 4)
+    recortes = _recortes(ctl, projeto, 4)
+    gids = [b.gid for b in projeto.carregar_modelo(4).boxes]
     largura = vista.shape[1]
     ctl.dividir_paginas([4], 0.4)
     corte = round(0.4 * largura)
     assert np.array_equal(_imagem(ctl, 4), vista[:, :corte])
     assert np.array_equal(_imagem(ctl, 5), vista[:, corte:])
+    depois = {**_recortes(ctl, projeto, 4), **_recortes(ctl, projeto, 5)}
+    movidos = {int(v): n for v, n in projeto.dados.gids_movidos.items()}
+    for gid in gids:                                     # os mesmos pixels, girados ou não
+        assert depois[movidos.get(gid, gid)] == recortes[gid]
 
 
 def test_ca_4_6_nenhum_gid_se_repete_depois_de_dividir(projeto, ctl):

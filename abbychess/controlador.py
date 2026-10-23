@@ -384,8 +384,12 @@ class ControladorDePagina:
         self.geracao += 1
         self.lote_rodando = False               # o lote do projeto anterior não vale aqui
         self.projeto, self.fonte, self.leitor = projeto, fonte, leitor
-        #: As páginas renderizadas mais recentes e a pré-carga da seguinte (§14.1).
-        self.cache = (pg.CacheDePaginas(fonte, preparar=self.preparar_imagem)
+        #: As páginas renderizadas mais recentes e a pré-carga da seguinte (§14.1), que
+        #: renderiza o PDF num processo à parte (`render.do_programa`).
+        from abbychess import render
+
+        self.cache = (pg.CacheDePaginas(fonte, preparar=self.preparar_imagem,
+                                        renderizador=render.do_programa())
                       if fonte is not None else None)
         self._sentido = 1
         #: As páginas visitadas, para Alt+← e Alt+→ (§3.3), e onde se está nelas.

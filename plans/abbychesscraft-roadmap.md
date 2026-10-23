@@ -961,9 +961,17 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   cada página nunca vista (a maior parada, 13–14 ms).
 - A suíte rápida roda em paralelo (`-n auto`, pytest-xdist): ~32–39 s.
 
-Continuam: CA-10.1 (a redação, decisão do usuário); o itálico no OCR (régua do core); CA-9.1 e
-CA-F.1 (o texto verificado); os testes do EPUB em leitores; a página pedida na hora ainda
-renderiza na thread da interface.
+- O itálico no OCR (I), com uma régua do AbbyChessCraft (o core não tem): no Odds & Ends, 0
+  falsos em 17.941 palavras retas e ~96% das itálicas (`ferramentas/medir_italico.py`).
+- Corrigir um caractere não refaz a ordem de leitura nem as linhas (H): validar a página, 13,6
+  → 2,8 ms.
+- Manter as quebras na camada nativa devolve o hífen que o core tirou (J).
+- O EPUB conferido no Calibre (J, `epub.calibre`).
+- Os processos do índice da busca morrem com o programa morto à força.
+
+Continuam: CA-10.1 (a redação, decisão do usuário; a proposta está no registro); CA-9.1 e
+CA-F.1 (o texto verificado); o EPUB no Thorium e no celular. A página pedida na hora renderiza
+na thread da interface por decisão (o registro diz por quê).
 
 ---
 

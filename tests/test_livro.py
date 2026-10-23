@@ -259,7 +259,8 @@ def test_diagrama_entra_como_recorte_na_altura_dele(projeto, fonte):
         b.char = "a"
     meio = (boxes[0].y2 + max(b.y1 for b in boxes)) // 2
     pagina = ex.pagina_extraida(0, boxes, [(10, meio, 60, meio + 5)], imagem)
-    tipos = [type(b).__name__ for b in pagina.blocos]
+    tipos = ["Figura" if isinstance(b, ex.Figura) else "Paragrafo" if isinstance(b, ex.Paragrafo)
+             else type(b).__name__ for b in pagina.blocos]
     assert tipos == ["Paragrafo", "Figura", "Paragrafo"]
     assert pagina.diagramas == 1
     figura = next(b for b in pagina.blocos if isinstance(b, ex.Figura))

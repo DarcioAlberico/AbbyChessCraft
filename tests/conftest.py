@@ -82,6 +82,27 @@ def gravadores_descarregados():
                 pass
 
 
+@pytest.fixture(autouse=True, scope="module")
+def janelas_apagadas_no_fim_do_modulo():
+    """As janelas e os diálogos que os testes do módulo deixaram vivos (fechados, mas ainda
+    no Qt) são apagados no fim dele. Sem isto eles se acumulavam pela suíte inteira, e cada
+    troca de tema (`estilo.aplicar`, a folha de estilo da aplicação) refazia o estilo de
+    todos: os testes do tema levavam ~15 s cada, e a suíte, 310 s em vez de ~60 (§15.1).
+    Por ser autouse e de módulo, ela abre antes e fecha depois das fixtures do módulo."""
+    yield
+    from PySide6.QtCore import QCoreApplication, QEvent
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance()
+    if app is None:
+        return
+    for widget in app.topLevelWidgets():
+        widget.close()
+        widget.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    app.processEvents()
+
+
 def pytest_unconfigure(config):
     import shutil
 

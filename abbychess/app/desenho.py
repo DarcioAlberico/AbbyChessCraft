@@ -216,6 +216,11 @@ class DesenhoDaJanela:
             self.pintar_texto()
         if gid is not None and gid in set(self.pagina.gids):
             self.pagina.escolher(gid)
+        elif gid is not None and self.pagina.modelo is not None and gid in {
+                b.gid for _lugar, b in self.pagina.modelo.fora}:
+            self.statusBar().showMessage("O glifo de origem desta amostra saiu da página (o "
+                                         "corte o deixou de fora; tirar o corte o devolve).",
+                                         8000)
 
     def _layout_mudou(self) -> None:
         self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual)

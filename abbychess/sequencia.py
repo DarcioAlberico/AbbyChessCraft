@@ -48,10 +48,15 @@ class Entrada:
     giro: int = 0
     metade: Optional[str] = None
     angulo: Optional[float] = None
+    #: (largura, altura) da página da fonte renderizada: a conta dos boxes entre uma geometria
+    #: e outra (`geometria`) precisa dela; gravado quando a página ganha quadro ou giro.
+    tamanho: Optional[Tuple[int, int]] = None
 
     def __post_init__(self):
         if self.quadro is not None and not isinstance(self.quadro, tuple):
             object.__setattr__(self, "quadro", tuple(self.quadro))     # chave de cache: hashável
+        if self.tamanho is not None and not isinstance(self.tamanho, tuple):
+            object.__setattr__(self, "tamanho", tuple(self.tamanho))
         if self.pid < 0 or self.pagina < 0:
             raise ValueError(f"pid e página não negativos: {self.pid}, {self.pagina}")
         if self.giro not in GIROS:
@@ -81,17 +86,26 @@ class Entrada:
             bruto["metade"] = self.metade
         if self.angulo is not None:
             bruto["angulo"] = self.angulo
+        if self.tamanho is not None:
+            bruto["tamanho"] = list(self.tamanho)
         return bruto
 
     @classmethod
     def de_json(cls, bruto: Mapping) -> "Entrada":
         quadro = bruto.get("quadro")
         angulo = bruto.get("angulo")
+        tamanho = bruto.get("tamanho")
         return cls(pid=int(bruto["pid"]), fonte=str(bruto.get("fonte", FONTE_DO_LIVRO)),
                    pagina=int(bruto.get("pagina", 0)),
                    quadro=None if quadro is None else tuple(int(v) for v in quadro),
                    giro=int(bruto.get("giro", 0)), metade=bruto.get("metade"),
-                   angulo=None if angulo is None else float(angulo))
+                   angulo=None if angulo is None else float(angulo),
+                   tamanho=None if tamanho is None else tuple(int(v) for v in tamanho))
+
+    @property
+    def geometria(self) -> tuple:
+        """(quadro, giro): a geometria da imagem dela (`abbychess.geometria`)."""
+        return (self.quadro, self.giro)
 
 
 @dataclass(frozen=True)
@@ -408,5 +422,6 @@ def trechos_do_pdf(sequencia: Sequencia, posicoes: Iterable[int]) -> List[List[T
 
 
 def pids_da_selecao(sequencia: Sequencia, posicoes: Sequence[int]) -> List[int]:
-    """Os `pid` das posições (a operação guarda os pids, que não mudam no meio dela)."""
-    return [sequencia.pid_em(p) for p in posicoes]
+    """Os `pid` das posições, sem repetir (a operação guarda os pids, que não mudam no meio
+    dela; a posição repetida na seleção não gira nem corta a página duas vezes)."""
+    return list(dict.fromkeys(sequencia.pid_em(p) for p in posicoes))

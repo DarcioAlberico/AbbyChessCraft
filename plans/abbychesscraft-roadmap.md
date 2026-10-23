@@ -877,6 +877,19 @@ As rodadas:
    o motivo na dica; a janela segue a ordem nova (o seletor, o total, a gaveta, a busca, os
    resultados).
 3. Girar, cortar e dividir, com a `geometria` preguiçosa (CA-12.11 a 12.13, CA-4.6).
+   **(3a) feito**: a ordem da imagem passou a fonte → endireitar → quadro → giro (§12.4: a
+   conta exata); `abbychess/geometria.py` (as caixas entre geometrias), o `tamanho` da fonte
+   na entrada (sem renderizar), o JSON de página v3 (`geometria`, `tamanho`, `fora`) e
+   `modelo.reenquadrar` ao carregar e ao trocar a sequência; no controlador,
+   `girar_paginas`, `cortar_paginas` (as margens do que se vê) e `tirar_o_corte`, que gravam
+   só a sequência (o Ctrl+Z é a de antes); a página com boxes guarda o ângulo em que foi
+   lida; o glifo cortado fica guardado e volta, e também as áreas, os tabuleiros e os
+   diagramas (`areas_fora`); o `angulo` do glifo acompanha o giro. Ficam para a rodada 4:
+   endireitar à mão limpa os `fora` (eles estão na página endireitada pelo ângulo de antes);
+   o resumo do livro e o índice da busca contam os glifos guardados até a página ser
+   gravada; `tamanho_da_fonte` reabre o PDF a cada página (girar muitas de uma vez).
+   **(3b)**: dividir (a página nova, os
+   `gids_movidos`), o menu e os diálogos de girar, cortar e dividir.
 4. Endireitar à mão e as imagens transformadas nas exportações (CA-12.14, 12.16).
 
 **Tarefas.**

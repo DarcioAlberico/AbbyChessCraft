@@ -516,17 +516,17 @@ class ControladorDePagina:
         """As páginas das `posicoes` vão para depois da posição `depois_da` (-1: o começo)."""
         return self._mudar_sequencia(
             lambda s: s.mover(sq.pids_da_selecao(s, posicoes), depois_da),
-            f"Mover {len(set(posicoes))} página(s)")
+            f"Mover {sq.quantas_paginas(len(set(posicoes)))}")
 
     def apagar_paginas(self, posicoes: Sequence[int]) -> bool:
         """As páginas saem do livro para as apagadas (os JSON e as amostras ficam)."""
         return self._mudar_sequencia(lambda s: s.apagar(sq.pids_da_selecao(s, posicoes)),
-                                     f"Apagar {len(set(posicoes))} página(s)")
+                                     f"Apagar {sq.quantas_paginas(len(set(posicoes)))}")
 
     def restaurar_paginas(self, pids: Sequence[int]) -> bool:
         """As páginas apagadas voltam ao lugar de onde saíram, com o mesmo `pid`."""
         return self._mudar_sequencia(lambda s: s.restaurar(pids),
-                                     f"Restaurar {len(set(pids))} página(s)")
+                                     f"Restaurar {sq.quantas_paginas(len(set(pids)))}")
 
     def inserir_paginas(self, caminhos: Sequence, na_posicao: int) -> bool:
         """As páginas dos arquivos (PDF ou imagem, copiados para `inseridas/`) entram a partir
@@ -556,31 +556,37 @@ class ControladorDePagina:
                 sq.Apagada(e, na_posicao + k) for k, e in enumerate(novas)))
 
         return self._mudar_sequencia(lambda s: s.inserir(novas, na_posicao),
-                                     f"Inserir {len(novas)} página(s)", desfeita=desfeita)
+                                     f"Inserir {sq.quantas_paginas(len(novas))}",
+                                     desfeita=desfeita)
 
     def girar_paginas(self, posicoes: Sequence[int], graus: int) -> bool:
         """Gira as páginas `graus` (90, 180 ou 270) no sentido horário (§12.4). Os boxes vão
-        juntos, com conta exata, quando cada página é lida (`modelo.reenquadrar`); a página
-        com boxes guarda o ângulo de endireitar em que foi lida."""
+        juntos, com conta exata (`modelo.reenquadrar`); a página com boxes guarda o ângulo de
+        endireitar em que foi lida (`_aplicar_sequencia`, também no Ctrl+Z)."""
         graus %= 360
         if graus not in (90, 180, 270):
             self._avisar("Girar páginas: só 90°, 180° ou 270°.", 6000)
             return False
 
-        angulos = []
+        nota = []
 
         def fazer(s):
             nova = s
-            for pid in sq.pids_da_selecao(s, posicoes):
+            pids = sq.pids_da_selecao(s, posicoes)
+            for pid in pids:
                 e = nova.entrada_de(pid)
                 nova = nova.com_entrada(replace(e, giro=(e.giro + graus) % 360,
                                                 tamanho=e.tamanho or self._tamanho(e)))
-            angulos[:] = self._angulos_a_guardar(s, nova)
+            lidas = {self.projeto.pid_da_pagina(i) for i in self.projeto.paginas_lidas()}
+            if lidas.intersection(pids):
+                # Os glifos vão junto, mas a leitura (a ordem das linhas, o texto deitado) é a
+                # da posição de antes.
+                nota.append("a leitura é da posição de antes; F5 lê de novo")
             return nova
 
         sentido = {90: "à direita", 180: "de cabeça para baixo", 270: "à esquerda"}[graus]
-        return self._mudar_sequencia(fazer, f"Girar {len(set(posicoes))} página(s) {sentido}",
-                                     depois_de_gravar=lambda: self._guardar_os_angulos(angulos))
+        return self._mudar_sequencia(
+            fazer, f"Girar {sq.quantas_paginas(len(set(posicoes)))} {sentido}", nota=nota)
 
     def cortar_paginas(self, posicoes: Sequence[int], margens: Sequence[float]) -> bool:
         """Corta as páginas pelas margens `(esquerda, cima, direita, baixo)`, frações da imagem
@@ -609,7 +615,7 @@ class ControladorDePagina:
                     e, quadro=geo.quadro_da_vista(vista, e.geometria, tamanho), tamanho=tamanho))
             return nova
 
-        return self._mudar_sequencia(fazer, f"Cortar {len(set(posicoes))} página(s)")
+        return self._mudar_sequencia(fazer, f"Cortar {sq.quantas_paginas(len(set(posicoes)))}")
 
     def tirar_o_corte(self, posicoes: Sequence[int]) -> bool:
         """A página inteira de volta (o giro fica); os glifos guardados voltam. A metade de
@@ -624,14 +630,18 @@ class ControladorDePagina:
                 nova = nova.com_entrada(replace(e, quadro=None))
             return nova
 
-        return self._mudar_sequencia(fazer, f"Tirar o corte de {len(set(posicoes))} página(s)")
+        return self._mudar_sequencia(
+            fazer, f"Tirar o corte de {sq.quantas_paginas(len(set(posicoes)))}")
 
     def dividir_paginas(self, posicoes: Sequence[int], fracao: float = 0.5) -> bool:
         """Divide as páginas espelhadas (§12.4) na `fracao` da largura do que se vê: a metade
         esquerda fica com o `pid`, a direita entra logo depois com um `pid` novo, e os glifos
         dela ganham gids novos (`gids_movidos`, para as amostras acharem a origem). As páginas
         são gravadas inteiras com a sequência; o Ctrl+Z as junta de novo e aposenta o `pid`
-        novo. A metade de uma divisão não se divide de novo."""
+        novo. A metade de uma divisão não se divide de novo: na seleção, ela é pulada (com
+        aviso). Nada é medido aqui (seria um render por página, na thread da interface): a
+        direita recebe o ângulo guardado da página, e sem ele mede o mesmo, da mesma página
+        inteira, quando abrir."""
         from abbychess import geometria as geo
         from abbychess import modelo as md
 
@@ -639,18 +649,18 @@ class ControladorDePagina:
         if not 0 < fracao < 1:
             self._avisar("Dividir páginas: a divisão fica dentro da página.", 6000)
             return False
-        angulos, troca = [], {}
+        angulos, troca, nota = [], {}, []
 
         def fazer(s):
             projeto = self.projeto
             projeto.descarregar()               # nada do gravador chega depois da divisão
             movidos = dict(projeto.dados.gids_movidos)
-            nova, paginas = s, {}
+            nova, paginas, metades = s, {}, 0
             for pid in sq.pids_da_selecao(s, posicoes):
                 e = nova.entrada_de(pid)
                 if e.metade is not None:
-                    raise ValueError(f"a página {s.posicao_de(pid) + 1} já é a metade de uma "
-                                     "divisão")
+                    metades += 1
+                    continue
                 tamanho = e.tamanho or self._tamanho(e)
                 largura, altura = geo.tamanho_da_imagem(e.geometria, tamanho)
                 corte = round(fracao * largura)
@@ -674,12 +684,23 @@ class ControladorDePagina:
                     paginas[pid] = (pagina.instantaneo(), pagina_e)
                     paginas[pid_novo] = (None, pagina_d)
                     movidos.update({str(velho): novo for velho, novo in m.items()})
-                angulos.append((direita, self.fonte.inclinacao_da_entrada(e)))
+                    # Os boxes da direita estão no ângulo em que a página foi lida (o
+                    # guardado; sem ele, a direita mede o mesmo, da mesma página inteira).
+                    guardado = self.fonte.inclinacao_guardada(e)
+                    if guardado is not None:
+                        angulos.append((direita, guardado))
+            if metades and nova == s:
+                raise ValueError("as páginas escolhidas já são metades de uma divisão")
+            if metades:
+                nota.append(f"{sq.quantas_paginas(metades)} já "
+                            f"{'era metade' if metades == 1 else 'eram metades'}, e "
+                            f"{'ficou' if metades == 1 else 'ficaram'} como "
+                            f"{'estava' if metades == 1 else 'estavam'}")
             troca.update(paginas=paginas, movidos=(dict(projeto.dados.gids_movidos), movidos))
             return nova
 
-        return self._mudar_sequencia(fazer, f"Dividir {len(set(posicoes))} página(s)",
-                                     troca=troca,
+        return self._mudar_sequencia(fazer, f"Dividir {sq.quantas_paginas(len(set(posicoes)))}",
+                                     troca=troca, nota=nota,
                                      depois_de_gravar=lambda: self._guardar_os_angulos(angulos))
 
     #: O maior ângulo de endireitar à mão, em graus (para mais, girar de 90 em 90).
@@ -731,8 +752,8 @@ class ControladorDePagina:
             return nova
 
         como = "pelo ângulo medido" if angulo is None else f"em {angulo:g}°"
-        return self._mudar_sequencia(fazer, f"Endireitar {len(set(posicoes))} página(s) {como}",
-                                     troca=troca)
+        return self._mudar_sequencia(
+            fazer, f"Endireitar {sq.quantas_paginas(len(set(posicoes)))} {como}", troca=troca)
 
     def _tamanho(self, entrada) -> tuple:
         return tuple(self.fonte.tamanho_da_fonte(entrada))
@@ -740,38 +761,51 @@ class ControladorDePagina:
     def _angulos_a_guardar(self, antes, nova) -> list:
         """(entrada nova, ângulo) de cada página com boxes que muda de giro: ela fica no
         ângulo de endireitar em que foi lida (§12.4: um ângulo medido de novo, na página
-        girada, os tiraria do lugar). Só lê; `_guardar_os_angulos` grava."""
+        girada, os tiraria do lugar). Vale na operação e no Ctrl+Z e Ctrl+Y dela: a página
+        lida depois do giro desfeito guarda o ângulo do giro. Só lê; `_guardar_os_angulos`
+        grava."""
+        mudam = [e for e in nova.entradas
+                 if antes.entrada_de(e.pid) is not None
+                 and antes.entrada_de(e.pid).giro != e.giro]
+        if not mudam:
+            return []
+        # O guardado, sem medir (um render por página, na thread da interface): a página lida
+        # foi aberta e medida; a que ganhou boxes sem abrir não tem ângulo a guardar.
         com_dados = {self.projeto.pid_da_pagina(i) for i in self.projeto.resumo_do_livro()}
         angulos = []
-        for entrada in nova.entradas:
-            velha = antes.entrada_de(entrada.pid)
-            if entrada.pid in com_dados and velha is not None and velha.giro != entrada.giro:
-                angulos.append((entrada, self.fonte.inclinacao_da_entrada(velha)))
+        for e in mudam:
+            if e.pid in com_dados:
+                guardado = self.fonte.inclinacao_guardada(antes.entrada_de(e.pid))
+                if guardado is not None:
+                    angulos.append((e, guardado))
         return angulos
 
     def _guardar_os_angulos(self, angulos) -> None:
         """Grava os ângulos (a sequência nova já está gravada, e a página girada ainda não foi
         mostrada) e tira do cache a imagem endireitada por outro ângulo."""
-        for entrada, angulo in angulos:
-            try:
-                self.fonte.fixar_inclinacao(entrada, angulo)
-            except OSError:
-                # O ângulo vale na memória; numa outra sessão a página é medida de novo, e os
-                # boxes podem andar uns pixels.
-                log.warning("o ângulo da página p%d não foi gravado", entrada.pid,
-                            exc_info=True)
-            if self.cache is not None:
+        if not angulos:
+            return
+        try:
+            self.fonte.fixar_inclinacoes(angulos)
+        except OSError:
+            # O ângulo vale na memória; numa outra sessão a página é medida de novo, e os
+            # boxes podem andar uns pixels.
+            log.warning("os ângulos de %d página(s) não foram gravados", len(angulos),
+                        exc_info=True)
+        if self.cache is not None:
+            for entrada, _angulo in angulos:
                 self.cache.esquecer(entrada)
 
     def _mudar_sequencia(self, fazer, descricao: str, *, desfeita=None,
-                         depois_de_gravar=None, troca: Optional[dict] = None) -> bool:
+                         depois_de_gravar=None, troca: Optional[dict] = None,
+                         nota: Sequence[str] = ()) -> bool:
         """Uma operação de página: a sequência nova gravada, uma transação do desfazer com a
         de antes e a de depois (§14.2), e a janela seguindo a página aberta. `desfeita(antes)`
         é a sequência que o desfazer põe, quando não é a de antes (a do inserir);
         `depois_de_gravar()` roda com a sequência nova gravada, antes de mostrar a página.
         `troca`, que `fazer` preenche, traz as páginas trocadas inteiras (dividir):
         `paginas` (pid -> (instantâneo antes, a página nova)) e `movidos` (os `gids_movidos`
-        antes e depois)."""
+        antes e depois). `nota`, que `fazer` também preenche, vai no aviso de feito."""
         motivo = self.motivo_para_nao_mudar_as_paginas()
         if motivo is not None:
             self._avisar(motivo, 8000)
@@ -813,7 +847,8 @@ class ControladorDePagina:
             return False
         self.historico.registrar(transacao)
         self.eventos.emitir("acoes_mudaram")
-        self._avisar(f"{descricao}. Ctrl+Z desfaz.", 6000)
+        extra = "".join(f" ({n})" for n in nota)
+        self._avisar(f"Feito: {descricao}{extra}. Ctrl+Z desfaz.", 6000)
         return True
 
     def _aplicar_sequencia(self, nova: "sq.Sequencia", depois_de_gravar=None,
@@ -824,7 +859,9 @@ class ControladorDePagina:
         projeto = self.projeto
         aberta = projeto.sequencia.entrada_em(self.indice) if self.imagem is not None else None
         visitas = [projeto.pid_da_pagina(i) for i in self.visitas]
+        angulos = self._angulos_a_guardar(projeto.sequencia, nova)
         (gravar or projeto.gravar_sequencia)(nova)      # OSError: nada mudou
+        self._guardar_os_angulos(angulos)
         if depois_de_gravar is not None:
             depois_de_gravar()
         # As visitas pelo pid; a de agora é a que sobra até ela (a mesma página pode estar

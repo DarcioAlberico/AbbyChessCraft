@@ -909,6 +909,12 @@ As rodadas:
    sequência (o `livro.json` e a busca seguem a imagem); endireitar gira o `fora` junto; o
    tamanho da página da fonte sai do documento aberto uma vez.
 
+**Fechamento** (2026-10-23, `docs/revisoes/passo-l.md`): as revisões de código e de produto
+voltaram na rodada 1 (o ângulo no Ctrl+Z do giro, dividir medindo na thread da interface, o
+`backup-v2/` depois de inserir; dividir o livro preso 108 s, o padrão do endireitar, girar sem
+gesto único, a seleção sem paridade com intervalo, os textos); as correções e a ferramenta
+`ferramentas/capturas_paginas.py` entraram antes da rodada 2.
+
 **Tarefas.**
 1. Dividir páginas espelhadas, girar, cortar e endireitar à mão, em páginas pares, ímpares
    ou num intervalo.

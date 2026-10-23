@@ -1149,12 +1149,15 @@ def idioma_do_arquivo(idioma: str) -> str:
 
 
 def _altura_da_pagina(projeto: ProjetoDeLivro, indice: int) -> int:
-    """A altura da página lida, em pixels a 300 dpi: sem renderizá-la, na página do livro
-    intacta (a do PDF da entrada, §12.4); renderizada, nas outras (cortadas, giradas,
-    inseridas)."""
+    """A altura da página lida, em pixels a 300 dpi, sem renderizá-la: a do PDF da entrada,
+    na página do livro sem geometria (§12.4); a do quadro girado, nas outras (o tamanho da
+    fonte gravado na entrada, ou o da página inserida)."""
     entrada = projeto.sequencia.entrada_em(indice)
-    if entrada.fonte != sq.FONTE_DO_LIVRO or entrada.quadro is not None or entrada.giro:
-        return pg.fonte_do_projeto(projeto).original(indice).height
+    if not entrada.do_livro_sem_geometria:
+        from abbychess import geometria as geo
+
+        tamanho = entrada.tamanho or pg.fonte_do_projeto(projeto).tamanho_da_fonte(entrada)
+        return geo.tamanho_da_imagem(entrada.geometria, tamanho)[1]
     if projeto.fonte_e_pdf:
         import fitz
 
@@ -1572,8 +1575,7 @@ def exportar_pdf_pesquisavel(projeto: ProjetoDeLivro, caminho: str | Path,
     # A posição no livro -> a página do PDF (§12.4); a que não sai do original, a imagem.
     entradas = [projeto.sequencia.entrada_em(i) for i in alvo]
     imagens = {i for i, e in zip(alvo, entradas)
-               if not projeto.fonte_e_pdf or e.fonte != sq.FONTE_DO_LIVRO
-               or e.quadro is not None or e.giro}
+               if not projeto.fonte_e_pdf or not e.do_livro_sem_geometria}
     paginas_do_pdf = [e.pagina for e in entradas]
     #: O livro na ordem do PDF: o sumário e os rótulos do original ainda servem. Reordenado,
     #: eles saem e são refeitos pelos títulos e pelos números impressos do Documento.

@@ -6,6 +6,18 @@ import logging
 import sys
 
 
+def traduzir_o_qt(app) -> None:
+    """Os textos do próprio Qt (os botões padrão, os menus de contexto) em português, pela
+    tradução que vem com o PySide6; sem ela, ficam em inglês."""
+    from PySide6.QtCore import QLibraryInfo, QLocale, QTranslator
+
+    tradutor = QTranslator(app)
+    pasta = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    if tradutor.load(QLocale(QLocale.Language.Portuguese, QLocale.Country.Brazil), "qtbase",
+                     "_", pasta):
+        app.installTranslator(tradutor)
+
+
 def main(argv=None) -> int:
     argv = list(sys.argv if argv is None else argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -19,6 +31,7 @@ def main(argv=None) -> int:
     app = QApplication(argv)
     app.setApplicationName("AbbyChessCraft")
     app.setOrganizationName("AbbyChessCraft")
+    traduzir_o_qt(app)
     # O tema do sistema (§13), e de novo quando ele muda, sem reiniciar (CA-13.3).
     estilo.aplicar(app)
     estilo.acompanhar_o_sistema(app)

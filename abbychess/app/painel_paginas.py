@@ -38,6 +38,14 @@ NOMES_DOS_ESTADOS = {
 }
 
 
+#: As operações de página do menu de contexto (o texto, o método da janela que pergunta).
+OPERACOES_DA_GAVETA = (
+    ("Girar à direita", "girar_a_direita"), ("Girar à esquerda", "girar_a_esquerda"),
+    ("Girar…", "girar_paginas"), ("Cortar…", "cortar_paginas"),
+    ("Tirar o corte…", "tirar_o_corte"), ("Dividir…", "dividir_paginas"),
+    ("Endireitar…", "endireitar_paginas"))
+
+
 class PainelDePaginas(QWidget):
     #: O índice da página a abrir (Enter, duplo clique, "Abrir").
     abrir = Signal(int)
@@ -48,6 +56,8 @@ class PainelDePaginas(QWidget):
     #: As operações de página nas selecionadas (§12.4): mover (pergunta o lugar) e apagar.
     mover = Signal(list)
     apagar = Signal(list)
+    #: (o método da janela, as posições escolhidas): girar, cortar, dividir, endireitar.
+    operacao = Signal(str, list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -255,4 +265,10 @@ class PainelDePaginas(QWidget):
         apagar = menu.addAction(f"Apagar as selecionadas ({len(selecionadas)})…")
         apagar.setEnabled(bool(selecionadas) and self.paginas_mudam)
         apagar.triggered.connect(lambda: self.apagar.emit(self.selecionadas()))
+        menu.addSeparator()
+        for texto, metodo in OPERACOES_DA_GAVETA:
+            acao = menu.addAction(texto)
+            acao.setEnabled(bool(selecionadas) and self.paginas_mudam)
+            acao.triggered.connect(
+                lambda _=False, m=metodo: self.operacao.emit(m, self.selecionadas()))
         return menu

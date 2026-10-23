@@ -71,10 +71,15 @@ class Entrada:
             raise ValueError(f"fonte desconhecida: {self.fonte!r}")
 
     @property
+    def do_livro_sem_geometria(self) -> bool:
+        """A página do PDF do livro sem quadro nem giro: a imagem dela é a do PDF, endireitada
+        (o PDF pesquisável a tira do original; a medida da v2 vale nela)."""
+        return self.fonte == FONTE_DO_LIVRO and self.quadro is None and not self.giro
+
+    @property
     def do_livro_intacta(self) -> bool:
         """A página do PDF do livro como ele é (a camada de texto nativa vale nela, §12.1)."""
-        return (self.fonte == FONTE_DO_LIVRO and self.quadro is None and self.giro == 0
-                and not self.angulo)
+        return self.do_livro_sem_geometria and not self.angulo
 
     def para_json(self) -> dict:
         bruto: dict = {"pid": self.pid, "fonte": self.fonte, "pagina": self.pagina}
@@ -368,22 +373,35 @@ _PARES = {"pares", "par"}
 _IMPARES = {"impares", "ímpares", "impar", "ímpar"}
 _TODAS = {"todas", "tudo"}
 _PEDACO = re.compile(r"^\s*(\d+)\s*(?:[-–]\s*(\d+)\s*)?$")
+#: "ímpares 15-200", "pares de 3 a 9", "ímpares: 1-10".
+_PARIDADE = re.compile(r"^(pares|par|ímpares|impares|ímpar|impar)\s*(?:de\s+|:\s*)?(.+)$")
+
+
+def quantas_paginas(n: int) -> str:
+    """"1 página", "3 páginas": as mensagens das operações de página."""
+    return f"{n} página" if n == 1 else f"{n} páginas"
 
 
 def selecao(texto: str, total: int) -> List[int]:
     """As posições do livro (0 = a primeira), em ordem e sem repetir, que o texto pede:
     "todas", "pares", "ímpares" (pelo número da página no livro, que começa em 1), ou
-    intervalos e números separados por vírgula ("3-7, 12"). Um pedaço fora de 1..`total`, ao
-    contrário ou ilegível levanta `ValueError` com o motivo."""
+    intervalos e números separados por vírgula ("3-7, 12"); "ímpares 15-200" e "pares de 3
+    a 9" são as de uma paridade num intervalo. Um pedaço fora de 1..`total`, ao contrário
+    ou ilegível levanta `ValueError` com o motivo."""
     limpo = texto.strip().lower()
     if not limpo:
-        raise ValueError("diga quais páginas: todas, pares, ímpares ou 3-7, 12")
+        raise ValueError("diga quais páginas: todas, pares, ímpares, ímpares 15-200 ou 3-7, 12")
     if limpo in _TODAS:
         return list(range(total))
     if limpo in _PARES:
         return list(range(1, total, 2))         # as páginas 2, 4, 6…
     if limpo in _IMPARES:
         return list(range(0, total, 2))         # as páginas 1, 3, 5…
+    paridade = _PARIDADE.match(limpo)
+    if paridade is not None:
+        resto = 1 if paridade.group(1) in _PARES else 0
+        intervalo = re.sub(r"\s+a\s+", "-", paridade.group(2))
+        return [p for p in selecao(intervalo, total) if p % 2 == resto]
     posicoes = set()
     for pedaco in limpo.split(","):
         casou = _PEDACO.match(pedaco)

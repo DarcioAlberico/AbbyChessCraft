@@ -9,7 +9,7 @@ lugar ("depois da página N") é um número de 0 a N, em que 0 é o começo do l
 
 from __future__ import annotations
 
-from typing import Callable, List, Optional, Sequence, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple, Union
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog, QDialogButtonBox,
@@ -31,17 +31,37 @@ def texto_da_selecao(posicoes: Sequence[int]) -> str:
     return ", ".join(str(a) if a == b else f"{a}-{b}" for a, b in faixas)
 
 
+def efeito(um: str, varios: str) -> Callable[[List[int]], str]:
+    """A prévia no número certo: `um` para uma página, `varios` para mais (com `{N}`, quantas,
+    e `{PAGINAS}`, o texto da seleção)."""
+    def texto(posicoes: List[int]) -> str:
+        modelo = um if len(posicoes) == 1 else varios
+        return modelo.format(N=len(posicoes), PAGINAS=texto_da_selecao(posicoes))
+    return texto
+
+
+#: A largura mínima dos diálogos: a explicação e a prévia cabem em poucas linhas.
+LARGURA_DOS_DIALOGOS = 440
+
+
 class DialogoDasPaginas(QDialog):
     """Escolhe as páginas e, para mover e inserir, o lugar. `com_selecao=False` (inserir) só
     pergunta o lugar; `linhas` (rótulo, widget) são as perguntas da operação (girar, cortar,
-    dividir), depois das páginas."""
+    dividir), depois das páginas. `efeito` é a prévia: um modelo com `{N}` e `{PAGINAS}`, ou
+    uma função das posições; `validar(posições, depois_da)` diz por que a escolha não vale
+    (o OK fica desligado), ou None; `ok`, o texto do botão que confirma."""
 
     def __init__(self, parent, titulo: str, total: int, *, selecao: str = "",
                  com_selecao: bool = True, lugar: Optional[str] = None, lugar_padrao: int = 0,
-                 explicacao: str = "", efeito: str = "{N} página(s)",
-                 linhas: Sequence[Tuple[str, QWidget]] = ()):
+                 explicacao: str = "",
+                 efeito: Union[str, Callable[[List[int]], str]] = "{N} página(s)",
+                 linhas: Sequence[Tuple[str, QWidget]] = (),
+                 validar: Optional[Callable[[List[int], int], Optional[str]]] = None,
+                 ok: str = ""):
         super().__init__(parent)
         self.setWindowTitle(titulo)
+        self.setMinimumWidth(LARGURA_DOS_DIALOGOS)
+        self.validar = validar
         self.total = total
         self.efeito = efeito
         self.campo = QLineEdit(selecao)
@@ -65,12 +85,15 @@ class DialogoDasPaginas(QDialog):
             self.lugar.setValue(max(0, min(lugar_padrao, total)))
             self.lugar.setSpecialValueText("o começo do livro")
             self.lugar.setAccessibleName(lugar)
+            self.lugar.valueChanged.connect(self._conferir)
             formulario.addRow(lugar, self.lugar)
         for rotulo, widget in linhas:
             widget.setAccessibleName(rotulo)
             formulario.addRow(rotulo, widget)
         self.botoes = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                        QDialogButtonBox.StandardButton.Cancel)
+        if ok:
+            self.botoes.button(QDialogButtonBox.StandardButton.Ok).setText(ok)
         self.botoes.accepted.connect(self.accept)
         self.botoes.rejected.connect(self.reject)
         corpo = QVBoxLayout(self)
@@ -105,7 +128,14 @@ class DialogoDasPaginas(QDialog):
             estilo.papel(self.previa, "erro")
             ok.setEnabled(False)
             return
-        self.previa.setText(self.efeito.format(N=len(posicoes),
+        erro = self.validar(posicoes, self.depois_da()) if self.validar else None
+        if erro:
+            self.previa.setText(erro)
+            estilo.papel(self.previa, "erro")
+            ok.setEnabled(False)
+            return
+        self.previa.setText(self.efeito(posicoes) if callable(self.efeito) else
+                            self.efeito.format(N=len(posicoes),
                                                PAGINAS=texto_da_selecao(posicoes)))
         estilo.papel(self.previa, "dica")
         ok.setEnabled(True)
@@ -168,10 +198,12 @@ def descrever_apagada(apagada: "sq.Apagada") -> str:
     """Como a página apagada aparece na lista: de onde ela vem e onde ela estava."""
     e = apagada.entrada
     if e.fonte == sq.FONTE_DO_LIVRO:
-        origem = f"página {e.pagina + 1} do PDF do livro"
+        origem = f"p. {e.pagina + 1} do PDF"
+        if e.metade is not None:
+            origem += f" (metade {e.metade})"
     else:
-        origem = f"inserida (página {e.pagina + 1} de {e.fonte.split('/', 1)[1][:12]}…)"
-    return f"{origem} · estava depois da página {apagada.posicao} do livro" \
+        origem = f"inserida (p. {e.pagina + 1} de {e.fonte.split('/', 1)[1][:8]}…)"
+    return f"{origem} · estava depois da p. {apagada.posicao}" \
         if apagada.posicao else f"{origem} · estava no começo do livro"
 
 

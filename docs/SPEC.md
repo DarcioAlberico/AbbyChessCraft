@@ -824,20 +824,28 @@ A partir do L:
   `gids_movidos`; o nome do arquivo da amostra (com o número antigo da página) não é
   renomeado e não é usado para navegar. As amostras antigas sem `_g` vão à entrada
   `fonte="livro"` da página do nome (a metade esquerda, se ela foi dividida). Origem numa
-  página apagada: oferece restaurá-la; glifo cortado fora: "o glifo de origem saiu da
-  página".
+  página apagada: "a página de origem saiu do livro" (restaurar é por **Páginas
+  apagadas…**; oferecer na hora fica para depois, fechamento do L); glifo cortado fora: "o
+  glifo de origem saiu da página".
 - **Cada operação é uma transação do desfazer** (§14.2): a sequência antes e depois (aplica
   só se a sequência atual é a de depois) e a `Diferenca` de cada página cujos boxes mudaram.
   Desfazer uma divisão aposenta o `pid` novo (nunca reaproveitado) e tira os `gids_movidos`
   dela. A seleção (pares, ímpares, intervalo "3-7, 12") é resolvida em posições do livro na
-  hora da operação, e a operação inteira é uma transação. O desfazer não sobrevive a fechar
-  o projeto: depois de reabrir, o box tirado por um corte não volta (alargar o corte não o
-  devolve).
+  hora da operação, e a operação inteira é uma transação; "ímpares 15-200" e "pares de 3 a
+  9" pedem uma paridade num intervalo. O desfazer não sobrevive a fechar o projeto, mas o
+  glifo tirado por um corte fica guardado na página (`fora`): depois de reabrir, tirar o
+  corte ou um corte maior o devolve.
 - **O lote e o servidor de leitura**: o intervalo do lote é resolvido em `pid` ao começar, e
-  um `pid` apagado no meio é pulado; o pedido ao servidor leva a geometria, e a leitura que
-  chega com outra geometria é descartada e pedida de novo. Girar, cortar, dividir e
-  endireitar ficam desligados na página que o servidor está lendo. Em projeto só para
-  leitura, as operações de página ficam desligadas.
+  um `pid` apagado no meio é pulado. As operações de página (e o Ctrl+Z delas) ficam
+  desligadas, com o motivo na dica, enquanto o lote roda, uma tarefa está em curso ou o
+  servidor está lendo glifos da página (a leitura que chega grava a página de quando foi
+  pedida). Em projeto só para leitura, as operações de página ficam desligadas.
+- **Cortar e dividir são por números** (fechamento do L, 2026-10-23): as margens em
+  porcentagem do que se vê e a divisão em porcentagem da largura, conferidas na página
+  depois (o Ctrl+Z é imediato). Marcar o retângulo e a linha sobre a imagem, com prévia,
+  como no FineReader, fica para depois. Girar à direita e à esquerda são um gesto (o menu e a
+  gaveta), sem diálogo; a gaveta oferece todas as operações para as páginas escolhidas, e o
+  menu Página vale para as escolhidas na gaveta quando são mais de uma.
 
 **CA-12.7** (migração v3) Um projeto v2 de 60 páginas com 3 páginas editadas (uma com `pid`
 diferente do índice), páginas v1 ainda não migradas, `inclinacoes.json`, `janela.json` e as
@@ -868,7 +876,7 @@ imagem é `np.rot90(antes, k=-1)`; os boxes caem sobre os mesmos pixels (o recor
 é o de antes girado); os `gid` não mudam; 90° duas vezes dá o mesmo que 180°; o Ctrl+Z
 volta tudo. Uma queda injetada depois de gravar a sequência e antes dos JSON de página
 (CA-4.2) reabre com os boxes no lugar certo.
-**CA-12.12** (cortar) Cortar um intervalo com um retângulo: a imagem é o recorte exato; os
+**CA-12.12** (cortar) Cortar um intervalo pelas margens: a imagem é o recorte exato; os
 boxes de dentro são deslocados (mesmos pixels); os de fora ficam guardados na página
 (`fora`); o Ctrl+Z, e tirar o corte depois de gravar e reabrir, os devolvem com os `gid` de
 antes e no lugar da ordem de leitura. A amostra cuja origem foi cortada diz "o glifo de

@@ -277,12 +277,14 @@ def _citacao(texto: str, inicio: int) -> bool:
 #: "Diagrama 6", "Diagram 6", "Diagramm 6", "diagramme 6", "diag. 6": a referência a um
 #: diagrama numerado, em qualquer idioma (grupo 1). No começo de um parágrafo vizinho do
 #: diagrama, é a legenda que o numera (`LEGENDA`).
-DIAGRAMA = re.compile(r"\b(?:diagram(?:a|me|m)?|diag\.)\s*(\d{1,4})\b", re.IGNORECASE)
-LEGENDA = re.compile(r"\s*(?:diagram(?:a|me|m)?|diag\.)\s*(\d{1,4})\b", re.IGNORECASE)
+#: "Diagrama 6.1" e "Diagrama 6,2" são outra numeração (por capítulo): não são o 6.
+DIAGRAMA = re.compile(r"\b(?:diagram(?:a|me|m)?|diag\.)\s*(\d{1,4})\b(?![.,]\d)", re.IGNORECASE)
+LEGENDA = re.compile(r"\s*(?:diagram(?:a|me|m)?|diag\.)\s*(\d{1,4})\b(?![.,]\d)", re.IGNORECASE)
 #: "Capítulo 3", "Chapter III", "Kapitel 3", "chapitre 3": a referência a um capítulo
-#: (grupo 1, arábico ou romano). No começo de um título de capítulo, é o número dele.
-CAPITULO = re.compile(r"\b(?:cap[íi]tulo|chapter|kapitel|chapitre)\s+(\d{1,3}|[IVXLC]{1,7})\b",
-                      re.IGNORECASE)
+#: (grupo 1, arábico ou romano). No começo de um título de capítulo, é o número dele. O
+#: romano só em maiúsculas ("in chapter i" não é o capítulo 1). O "I" pronome depois de
+#: "chapter" ("the chapter I wrote") continua ambíguo: só vira link se houver capítulo I.
+CAPITULO = re.compile(r"\b(?i:cap[íi]tulo|chapter|kapitel|chapitre)\s+(\d{1,3}|[IVXLC]{1,7})\b")
 _ROMANOS = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100}
 
 
@@ -617,9 +619,10 @@ def aspas_curvas(texto: str) -> str:
 def png_otimizado(dados: bytes) -> bytes:
     """O mesmo PNG, menor quando dá, sem perder um pixel: em tons de cinza quando a imagem
     colorida não tem cor, em paleta quando tem até 256 cores, e com a compressão máxima.
-    Cada candidato é conferido pixel a pixel contra o original, e só fica o menor; o que
-    não é PNG, ou não abre, volta como veio. Os mesmos bytes de entrada dão os mesmos
-    de saída (CA-12.6)."""
+    Cada candidato gravado é lido de volta e conferido pixel a pixel contra o original, e só
+    fica o menor; o que não é PNG, não abre ou traz gestão de cor (perfil ICC, gama,
+    cromaticidade, sRGB: o Pillow não a regrava inteira) volta como veio. Os mesmos bytes
+    de entrada dão os mesmos de saída (CA-12.6)."""
     from PIL import Image
 
     if not dados.startswith(b"\x89PNG"):
@@ -629,9 +632,10 @@ def png_otimizado(dados: bytes) -> bytes:
             aberta.load()
             original = aberta.copy()
             info = {k: v for k, v in aberta.info.items() if k == "dpi"}
+            de_cor = {"icc_profile", "gamma", "chromaticity", "srgb"} & set(aberta.info)
     except Exception:                          # PNG estragado: o escritor decide
         return dados
-    if original.mode not in ("1", "L", "LA", "P", "RGB", "RGBA"):
+    if de_cor or original.mode not in ("1", "L", "LA", "P", "RGB", "RGBA"):
         return dados
     referencia = original.convert("RGBA").tobytes()
     candidatos = [original]
@@ -642,12 +646,14 @@ def png_otimizado(dados: bytes) -> bytes:
             candidatos.append(original.convert("RGBA").quantize(colors=256, method=Image.Quantize.FASTOCTREE))
     melhor = dados
     for candidato in candidatos:
-        if candidato.convert("RGBA").tobytes() != referencia:
-            continue                            # perderia algo: fica de fora
         saida = io.BytesIO()
         candidato.save(saida, format="PNG", optimize=True, **info)
-        if len(saida.getvalue()) < len(melhor):
-            melhor = saida.getvalue()
+        if len(saida.getvalue()) >= len(melhor):
+            continue
+        with Image.open(io.BytesIO(saida.getvalue())) as volta:
+            if volta.convert("RGBA").tobytes() != referencia:
+                continue                        # perderia algo: fica de fora
+        melhor = saida.getvalue()
     return melhor
 
 

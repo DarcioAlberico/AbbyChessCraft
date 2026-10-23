@@ -382,11 +382,7 @@ class CondutorDoLote:
                 and not projeto.somente_leitura:
             projeto.guardar_antes_do_lote(pagina)                         # §4.6
         de_antes = list(pagina.boxes)
-        from abbychess.modelo import Estilo
-
-        estilos = {id(entry): Estilo(negrito=negrito)
-                   for entry, negrito in zip(lida.boxes, lida.negritos)
-                   if negrito is not None}
+        estilos = lida.estilos()
         novos, dif = reconciliar(pagina.boxes, lida.boxes, pagina.alocar, procedencia.amostra_de,
                                  estilo_de=lambda entry: estilos.get(id(entry)),
                                  iou_minimo=IOU_DA_RELEITURA)

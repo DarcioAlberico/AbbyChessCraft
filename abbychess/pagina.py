@@ -644,7 +644,9 @@ def efeitos_de_impressao(imagem: Image.Image, boxes: Sequence[BoxEntry]) -> List
 
     if not boxes:
         return []
-    medidas = [negrito.espessura(recorte(imagem, box)) for box in boxes]
+    # A página em tons de cinza uma vez: convertê-la a cada glifo dobrava o tempo do lote.
+    pagina = np.asarray(imagem.convert("L")) if isinstance(imagem, Image.Image) else imagem
+    medidas = [negrito.espessura(recorte(pagina, box)) for box in boxes]
     amostras = defaultdict(list)
     for box, medida in zip(boxes, medidas):
         if box.char and medida is not None and not isnan(medida):

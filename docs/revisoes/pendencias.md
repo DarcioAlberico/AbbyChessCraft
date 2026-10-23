@@ -16,6 +16,8 @@ sem editar o core e sem gabarito novo. Ramo `pendencias`, a partir da tag `passo
 | A suíte rápida de 314 para 119 s; a troca de perfil de teclado com uma janela já apagada | achado aqui | `9b365df` |
 | As quatro observações da revisão de código | revisão | `0888053` |
 | O aviso de uma thread depois que a janela fechou | achado no portão | `a925137` |
+| A validação pelos lances guarda o texto depois dos diagramas (o Enter, 38,8 → ~25 ms) | custo do H, achado aqui | `9c98367` |
+| Os ícones rasterizados uma vez por tema (abrir a janela, 78 → 36 ms; a suíte, ~118 → ~102 s) | achado aqui | `e671d7c` |
 
 ## A bissecção do lote
 
@@ -39,17 +41,29 @@ negrito em si, 0,3 s. A Galeria recortava do mesmo jeito, numa thread.
 
 O perfil na janela (offscreen, xv pp. 20–22, sob o cProfile) mostrou o mesmo padrão no aviso de
 ensino do passo C (`aviso_de_ensino`): ~7 ms a cada glifo mostrado, para converter a página de
-novo; o Enter pagava o mesmo em `pg.ensinar`. O que mais pesa no Enter, porém, é a validação
-pelos lances do passo H, refeita em `_mudou`: ela monta o texto da página (~25 ms fora do
-perfil). Fica como está: o Enter segue abaixo dos 100 ms do alvo.
+novo; o Enter pagava o mesmo em `pg.ensinar`. O que mais pesava no Enter, porém, era a
+validação pelos lances do passo H, refeita em `_mudou`: ela montava o texto da página inteira
+(~25 ms fora do perfil). Não dá para pular a validação olhando só os glifos que mudaram: o
+lugar do diagrama no Documento depende de a linha anterior terminar a frase, e a divisão em
+palavras depende dos caracteres. O que dá é guardar o texto depois dos diagramas pela chave do
+que `texto.montar` usa (o caractere, a caixa e o ângulo de cada glifo, as áreas, as decisões e
+os diagramas), sem a confiança e a fonte: o Enter que confirma a leitura, o mais comum, não
+muda a chave (`9c98367`). Três rodadas de `test_enter_ensinar` no `9c98367`: 24,2, 26,5 e 24,9
+ms na mediana, 39,7 a 42,5 no p95 (`2026-10-23-enter-pendencias-parcial*.json`; no D2, 32,2 no
+p95).
 
 ## A suíte rápida
 
 Levava 314 s (limite de 60, §15.1). Os testes do tema levavam ~15 s cada na chamada e na
 desmontagem, e 3 s sozinhos: as janelas fechadas dos módulos anteriores continuavam vivas no
 Qt, e cada troca da folha de estilo refazia o estilo de todas. Uma fixture do conftest as apaga
-no fim de cada módulo: 119 s. Ainda passa do limite; o que sobra está espalhado (o mais lento,
-3 s). Apagar as janelas mostrou um bug do programa: a troca de perfil de teclado caía no
+no fim de cada módulo: 119 s. Depois, abrir uma janela caiu de 78 para 36 ms com os ícones
+rasterizados uma vez por tema (`e671d7c`): ~102 s. Ainda passa do limite, e o que sobra está
+espalhado por 1.555 testes (36 s de preparação, 50 de chamada, 10 de desmontagem; o mais lento,
+3 s; as esperas com `sleep`, as travas do gravador, os `fsync`). No D1 eram 56–60 s com bem
+menos testes. Baixar o passo da espera mais usada (`_esperar`, de 10 para 2 ms) ganhou 1,5 s e
+foi desfeito. Chegar aos 60 s pede uma decisão: separar os testes de janela num marcador
+próprio, ou rodar em paralelo (`pytest-xdist`, uma dependência nova). Apagar as janelas mostrou um bug do programa: a troca de perfil de teclado caía no
 ouvinte de uma janela já apagada ("Signal source has been deleted", que `teclado._apagado` não
 reconhecia).
 
@@ -90,7 +104,8 @@ medida (509 → 440 s).
 
 ## Verificação
 
-- Suíte rápida: 1553 passed, 2 skipped, em ~2 min.
+- Suíte rápida: 1553 passed, 2 skipped, em ~2 min no `2cbbdf6`; 1555 passed no `e671d7c`, em
+  ~100 s.
 - `ruff check --select E,F --line-length 110 abbychess tests`: limpo.
 - EPUBCheck 5.4.0 e Ace 1.4.6 (`ABBY_EPUBCHECK`, `ABBY_ACE`): aprovam o livro com os links novos
   e as quatro combinações do golden.
@@ -110,9 +125,10 @@ Trabalho grande, para um passo próprio:
   pede um processo, como o servidor de leitura.
 - **Unificar a montagem das linhas da exportação com a `OrdemDeLeitura`** do Documento (passos F
   e J), quando a caracterização mostrar a equivalência.
-- **A suíte rápida abaixo de 60 s**: 119 s hoje, sem um culpado só.
-- **O custo da validação pelos lances no Enter** (~25 ms): refeita a cada edição, monta o
-  texto da página inteira.
+- **A suíte rápida abaixo de 60 s**: ~102 s hoje, sem um culpado só; pede separar os testes de
+  janela ou rodar em paralelo.
+- **Corrigir um caractere ainda monta o texto da página** para a validação pelos lances
+  (~25 ms); só confirmar a leitura deixou de montar.
 
 Decididos como estão: a medida da inclinação do grosso ao fino (K, espera gabarito); as metades
 do dividir herdando o estado da página e o diagrama aparado (L).

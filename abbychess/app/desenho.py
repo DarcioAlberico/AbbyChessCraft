@@ -65,7 +65,7 @@ class DesenhoDaJanela:
         self.seletor.blockSignals(False)
         self.total_de_paginas.setText(f" de {total} ")
         # As ocorrências da busca e a prévia do substituir citam posições de antes.
-        if self.resultados.na_previa():
+        if self.resultados.na_previa:
             self.resultados.limpar_previa("A ordem do livro mudou: peça a prévia de novo.")
         else:
             self.resultados.mostrar_ocorrencias([], "A ordem do livro mudou: busque de novo.")

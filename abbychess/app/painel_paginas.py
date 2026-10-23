@@ -45,9 +45,14 @@ class PainelDePaginas(QWidget):
     reconhecer = Signal(list)
     #: O livro inteiro, a partir do cartão Saúde do livro.
     reconhecer_livro = Signal()
+    #: As operações de página nas selecionadas (§12.4): mover (pergunta o lugar) e apagar.
+    mover = Signal(list)
+    apagar = Signal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        #: As operações de página valem agora (a janela liga e desliga, como as do menu).
+        self.paginas_mudam = True
         self.filtro = QComboBox()
         self.filtro.setAccessibleName("Filtrar as páginas pelo estado")
         self.filtro.addItem("Todas as páginas", None)
@@ -243,4 +248,11 @@ class PainelDePaginas(QWidget):
         lote = menu.addAction(f"Reconhecer as selecionadas ({len(selecionadas)})")
         lote.setEnabled(bool(selecionadas))
         lote.triggered.connect(lambda: self.reconhecer.emit(self.selecionadas()))
+        menu.addSeparator()
+        mover = menu.addAction(f"Mover as selecionadas ({len(selecionadas)})…")
+        mover.setEnabled(bool(selecionadas) and self.paginas_mudam)
+        mover.triggered.connect(lambda: self.mover.emit(self.selecionadas()))
+        apagar = menu.addAction(f"Apagar as selecionadas ({len(selecionadas)})…")
+        apagar.setEnabled(bool(selecionadas) and self.paginas_mudam)
+        apagar.triggered.connect(lambda: self.apagar.emit(self.selecionadas()))
         return menu

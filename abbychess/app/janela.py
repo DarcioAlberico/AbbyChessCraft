@@ -37,6 +37,7 @@ from PySide6.QtWidgets import QApplication, QInputDialog, QMainWindow
 from abbychess import avisos as av
 from abbychess.app import acessibilidade, acoes, dialogo_exportacao, dialogos, teclado
 from abbychess.app.imagens import qimage_da_pagina
+from abbychess.app.paginas_na_janela import PaginasNaJanela
 from abbychess.app.busca_na_janela import BuscaNaJanela
 from abbychess.app.galeria_na_janela import GaleriaNaJanela
 from abbychess.app.substituir_na_janela import SubstituirNaJanela
@@ -69,7 +70,8 @@ def configuracao() -> QSettings:
 
 
 class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, LoteNaJanela,
-                      EdicaoNoDocumento, BuscaNaJanela, SubstituirNaJanela, GaleriaNaJanela, QMainWindow):
+                      EdicaoNoDocumento, BuscaNaJanela, SubstituirNaJanela, GaleriaNaJanela,
+                      PaginasNaJanela, QMainWindow):
     #: Da thread do gravador: a página `indice` não gravou (o erro).
     falha_de_gravacao = Signal(object, object)
 

@@ -870,8 +870,12 @@ As rodadas:
    o seletor e os resultados. A página apagada guarda a vizinha de antes (`depois_de`):
    restaurar todas juntas, ou da apagada mais nova para a mais velha, devolve a ordem exata;
    restaurar uma apagada mais velha antes de uma mais nova, que eram vizinhas, pode trocar as
-   duas de lugar. Desfazer um inserir põe as inseridas nas apagadas. **(2b)**: a interface
-   (o menu Página, os diálogos com a seleção, Páginas apagadas…) e o teste na janela.
+   duas de lugar. Desfazer um inserir põe as inseridas nas apagadas. **(2b) feito**: o menu
+   Página (Mover, Apagar, Inserir, Páginas apagadas…, sem tecla), o menu de contexto da
+   gaveta (mover e apagar as selecionadas), os diálogos (`app/dialogo_paginas.py`: a seleção
+   conferida enquanto se digita) e o mixin `app/paginas_na_janela.py`; as ações desligam com
+   o motivo na dica; a janela segue a ordem nova (o seletor, o total, a gaveta, a busca, os
+   resultados).
 3. Girar, cortar e dividir, com a `geometria` preguiçosa (CA-12.11 a 12.13, CA-4.6).
 4. Endireitar à mão e as imagens transformadas nas exportações (CA-12.14, 12.16).
 

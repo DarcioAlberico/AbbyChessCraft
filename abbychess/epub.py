@@ -1037,6 +1037,65 @@ def ace(caminho: str | Path) -> Optional[List[str]]:
     return violacoes
 
 
+def calibre(caminho: str | Path) -> Optional[List[str]]:
+    """Os problemas do EPUB aberto num leitor de verdade, o Calibre, se ele estiver
+    configurado (`ABBY_CALIBRE`: o caminho do `ebook-convert`); `None` sem ele.
+
+    O Calibre converte o EPUB em PDF pelo motor dele (o mesmo Chromium do leitor): a conversão
+    tem de acabar sem erro, e cada link interno do texto (os do `nav` à parte) tem de sair como
+    link para uma página do PDF. É o que dá para conferir sem olhar; o resto (a figura, a
+    fonte dos símbolos) se vê no PDF."""
+    import subprocess
+
+    import fitz
+
+    executavel = os.environ.get("ABBY_CALIBRE")
+    if not executavel or not Path(executavel).is_file():
+        return None
+    problemas: List[str] = []
+    do_texto: List[str] = []                    # o texto de cada link interno, fora do nav
+    with zipfile.ZipFile(caminho) as z:
+        for nome in z.namelist():
+            if nome.endswith(".xhtml") and not nome.endswith("nav.xhtml"):
+                xhtml = z.read(nome).decode("utf-8")
+                for href, texto in re.findall(r'<a [^>]*href="([^"]+)"[^>]*>(.*?)</a>', xhtml,
+                                              re.S):
+                    if not re.match(r"[a-z][a-z0-9+.-]*:", href):
+                        do_texto.append(html.unescape(re.sub(r"<[^>]+>", "", texto)).strip())
+    with tempfile.TemporaryDirectory(prefix="calibre-") as pasta:
+        pdf = Path(pasta) / "livro.pdf"
+        saida = subprocess.run([executavel, str(caminho), str(pdf)], capture_output=True,
+                               text=True, encoding="utf-8", errors="replace", timeout=600)
+        if saida.returncode != 0 or not pdf.is_file():
+            ultimas = (saida.stdout + saida.stderr).strip().splitlines()[-3:]
+            return [f"o Calibre não converteu o EPUB (código {saida.returncode}): "
+                    + " | ".join(ultimas)]
+        problemas += [f"o Calibre avisou: {linha.strip()}"
+                      for linha in (saida.stdout + saida.stderr).splitlines()
+                      if re.search(r"Traceback|Failed to|Could not|not found|Unknown link",
+                                   linha)]
+        with fitz.open(pdf) as doc:
+            no_pdf, fora = [], 0
+            for pagina in doc:
+                for link in pagina.get_links():
+                    if link.get("kind") != fitz.LINK_GOTO:
+                        continue
+                    if not 0 <= link.get("page", -1) < doc.page_count:
+                        fora += 1
+                    no_pdf.append(" ".join(pagina.get_textbox(link["from"]).split()))
+    # Cada link do texto casa com um do PDF que contém o texto dele (a caixa do PDF pode
+    # levar a pontuação vizinha); os do sumário sobram, e tudo bem.
+    for texto in do_texto:
+        achado = next((k for k, t in enumerate(no_pdf) if texto and texto in t), None)
+        if achado is None:
+            problemas.append(f"o link \"{texto}\" não saiu como link no PDF do Calibre")
+        else:
+            del no_pdf[achado]
+    if fora:
+        problemas.append(f"{fora} link(s) do PDF do Calibre levam para fora do livro")
+    return problemas
+
+
 def epubcheck(caminho: str | Path) -> Optional[List[str]]:
     """Os erros do EPUBCheck, se ele estiver configurado (`ABBY_EPUBCHECK`: o caminho do
     `epubcheck.jar`); `None` sem ele."""

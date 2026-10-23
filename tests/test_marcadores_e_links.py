@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import zipfile
 
 import fitz
+import pytest
 
 from core.box_model import BoxEntry
 from core.pagina import PaginaExtraida, Paragrafo
@@ -263,12 +265,37 @@ def test_o_epub_liga_diagramas_e_capitulos_e_a_legenda_nao_se_cita(tmp_path):
     assert "o diagrama 7 não" in segundo                       # sem alvo, fica texto
     assert "<p>Diagrama 2. Jogam as pretas</p>" in segundo     # a legenda não se cita
     assert escrito.links == 3
-    import os
-
     if os.environ.get("ABBY_EPUBCHECK"):
         assert epub.epubcheck(destino) == []
     if os.environ.get("ABBY_ACE"):
         assert epub.ace(destino) == []
+
+
+@pytest.mark.skipif(not os.environ.get("ABBY_CALIBRE"),
+                    reason="o Calibre não está configurado (ABBY_CALIBRE)")
+def test_no_calibre_os_links_do_texto_levam_ao_diagrama_e_ao_capitulo(tmp_path):
+    """Num leitor de verdade (o Calibre, pelo PDF que ele renderiza do EPUB)."""
+    paginas, _, _ = _livro_numerado()
+    destino = tmp_path / "a.epub"
+    epub.escrever(paginas, destino, epub.Metadados("L"), limite_do_capitulo=10)
+    assert epub.calibre(destino) == []
+    # O link que some do texto é acusado.
+    with zipfile.ZipFile(destino) as z:
+        partes = {n: z.read(n) for n in z.namelist()}
+    partes["OEBPS/texto/capitulo-002.xhtml"] = partes["OEBPS/texto/capitulo-002.xhtml"].replace(
+        b'href="capitulo-001.xhtml#dg1"', b'href="capitulo-009.xhtml#dg1"')
+    quebrado = tmp_path / "quebrado.epub"
+    with zipfile.ZipFile(quebrado, "w") as z:
+        for nome, dados in partes.items():
+            z.writestr(nome, dados, zipfile.ZIP_STORED if nome == "mimetype" else zipfile.ZIP_DEFLATED)
+    assert epub.calibre(quebrado) == [
+        "o Calibre avisou: Referenced file 'OEBPS/texto/capitulo-009.xhtml' not found",
+        'o link "Diagrama 1" não saiu como link no PDF do Calibre']
+
+
+def test_calibre_sem_configuracao_e_none(tmp_path, monkeypatch):
+    monkeypatch.delenv("ABBY_CALIBRE", raising=False)
+    assert epub.calibre(tmp_path / "x.epub") is None
 
 
 def test_o_docx_liga_diagramas_e_capitulos(tmp_path):

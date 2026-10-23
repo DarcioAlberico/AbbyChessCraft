@@ -50,7 +50,6 @@ from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import historico as hs
 from abbychess import lances as lc
-from abbychess import modelo as md
 from abbychess import pagina as pg
 from abbychess import procedencia
 from abbychess import servidor_de_leitura as sl
@@ -1149,9 +1148,7 @@ class ControladorDePagina:
                 return
             lidos = lida.diagramas
             de_antes = list(pagina.boxes)
-            estilos = {id(entry): md.Estilo(negrito=negrito)
-                       for entry, negrito in zip(lida.boxes, lida.negritos)
-                       if negrito is not None}
+            estilos = lida.estilos()
             depois = list(lida.boxes)
             if zona is not None:
                 from core.services.box_service import BoxService

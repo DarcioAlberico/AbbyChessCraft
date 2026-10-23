@@ -260,6 +260,28 @@ def selecao(texto: str, total: int) -> List[int]:
     return sorted(posicoes)
 
 
+def trechos_do_pdf(sequencia: Sequencia, posicoes: Iterable[int]) -> List[List[Tuple[int, int]]]:
+    """As posições cujas páginas são do PDF do livro, intactas, em trechos de `(página do
+    PDF, posição)` seguidos nos dois: no livro e no PDF. A camada de texto nativa junta o
+    parágrafo de uma página com o da seguinte **do pedido**; pedir trecho a trecho faz essa
+    junção só entre páginas vizinhas de verdade, e a de fora (`juntar_entre_paginas`) segue a
+    ordem do livro."""
+    trechos: List[List[Tuple[int, int]]] = []
+    anterior: Optional[Tuple[int, int]] = None
+    for posicao in sorted(set(posicoes)):
+        entrada = sequencia.entrada_em(posicao)
+        if not entrada.do_livro_intacta:
+            anterior = None
+            continue
+        par = (entrada.pagina, posicao)
+        if anterior is not None and par == (anterior[0] + 1, anterior[1] + 1):
+            trechos[-1].append(par)
+        else:
+            trechos.append([par])
+        anterior = par
+    return trechos
+
+
 def pids_da_selecao(sequencia: Sequencia, posicoes: Sequence[int]) -> List[int]:
     """Os `pid` das posições (a operação guarda os pids, que não mudam no meio dela)."""
     return [sequencia.pid_em(p) for p in posicoes]

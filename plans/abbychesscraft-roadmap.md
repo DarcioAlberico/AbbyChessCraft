@@ -830,6 +830,15 @@ As rodadas:
    livro. A chave de `inclinacoes.json` continua o índice do PDF na página do livro sem
    geometria: até a v3 o `pid` das páginas nunca editadas muda de uma sessão para outra, e a
    medida iria parar noutra página; passa a `pid` na rodada 1e.
+   (1d) a origem da amostra vem do `gid` dela (`ProjetoDeLivro.origem_da_amostra`: a
+   posição de agora, ou "saiu do livro"; a amostra antiga sem `gid` vai à primeira entrada
+   da página do PDF do nome); as exportações seguem a sequência: a camada de texto nativa e
+   a importação dela só na página do livro intacta, pela página do PDF da entrada e com o
+   número da posição; o PDF pesquisável seleciona as páginas do PDF na ordem do livro (e
+   recusa, até a rodada 4, a inserida, cortada ou girada); a altura vem da página do PDF da
+   entrada. O `janela.json` e as listas de páginas do `projeto.json` (o corpo, a amostra
+   guiada, a camada nativa, o lote a retomar) **foram para a 1e**: chaveá-los por `pid`
+   antes de todo `pid` ser gravado faria a página nunca editada abrir outra ao reabrir.
 2. Reordenar, apagar e inserir, com a seleção (CA-12.8 a 12.10, 12.15).
 3. Girar, cortar e dividir, com a `geometria` preguiçosa (CA-12.11 a 12.13, CA-4.6).
 4. Endireitar à mão e as imagens transformadas nas exportações (CA-12.14, 12.16).

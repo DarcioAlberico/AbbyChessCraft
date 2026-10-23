@@ -48,6 +48,7 @@ from core.box_model import BoxEntry
 from core.pagina import Figura, PaginaExtraida, Paragrafo
 
 from abbychess import pagina as pg
+from abbychess import sequencia as sq
 from abbychess.diagramas import DiagramaLido, para_caixas
 from abbychess.layout import _coluna_de
 from abbychess.projeto import ProjetoDeLivro
@@ -1066,16 +1067,30 @@ def paginas_da_camada(projeto: ProjetoDeLivro, indices: Sequence[int]) -> Dict[i
         return {}
     from core import pdf_nativo
 
-    try:
-        extracao = pdf_nativo.extrair(str(projeto.fonte), list(indices),
-                                      idioma=idioma_do_livro(projeto))
-    except Exception as erro:  # noqa: BLE001 — o livro sai dos boxes, e não falha
-        log.warning("A camada de texto do PDF não foi lida (%s: %s); as páginas saem dos boxes.",
-                    type(erro).__name__, erro)
+    # A posição no livro -> a página do PDF (§12.4): a camada só vale na página do livro sem
+    # quadro, giro nem ângulo à mão (as inseridas, cortadas e giradas saem dos boxes), e é
+    # pedida em trechos seguidos no livro e no PDF (`sequencia.trechos_do_pdf`): o core junta
+    # o parágrafo de uma página com o da seguinte do pedido.
+    trechos = sq.trechos_do_pdf(projeto.sequencia, indices)
+    if not trechos:
         return {}
-    paginas = {p.numero: p for p in extracao.paginas}
-    for indice, pagina in paginas.items():
-        _lado_da_revisao(pagina, projeto.carregar_diagramas(indice))
+    idioma = idioma_do_livro(projeto)
+    paginas = {}
+    for trecho in trechos:
+        do_pdf = dict(trecho)
+        try:
+            extracao = pdf_nativo.extrair(str(projeto.fonte), sorted(do_pdf), idioma=idioma)
+        except Exception as erro:  # noqa: BLE001 — o livro sai dos boxes, e não falha
+            log.warning("A camada de texto do PDF não foi lida (%s: %s); as páginas saem dos "
+                        "boxes.", type(erro).__name__, erro)
+            return {}
+        for pagina in extracao.paginas:
+            posicao = do_pdf.get(pagina.numero)
+            if posicao is None:
+                continue
+            pagina.numero = posicao         # o número que a exportação mostra é o do livro
+            _lado_da_revisao(pagina, projeto.carregar_diagramas(posicao))
+            paginas[posicao] = pagina
     return paginas
 
 
@@ -1134,12 +1149,17 @@ def idioma_do_arquivo(idioma: str) -> str:
 
 
 def _altura_da_pagina(projeto: ProjetoDeLivro, indice: int) -> int:
-    """A altura da página lida, em pixels a 300 dpi, sem renderizá-la."""
+    """A altura da página lida, em pixels a 300 dpi: sem renderizá-la, na página do livro
+    intacta (a do PDF da entrada, §12.4); renderizada, nas outras (cortadas, giradas,
+    inseridas)."""
+    entrada = projeto.sequencia.entrada_em(indice)
+    if entrada.fonte != sq.FONTE_DO_LIVRO or entrada.quadro is not None or entrada.giro:
+        return pg.fonte_do_projeto(projeto).original(indice).height
     if projeto.fonte_e_pdf:
         import fitz
 
         with fitz.open(projeto.fonte) as doc:
-            return round(doc[indice].rect.height * DPI_DA_LEITURA / 72)
+            return round(doc[entrada.pagina].rect.height * DPI_DA_LEITURA / 72)
     with Image.open(projeto.fonte) as imagem:
         return imagem.height
 
@@ -1546,16 +1566,33 @@ def exportar_pdf_pesquisavel(projeto: ProjetoDeLivro, caminho: str | Path,
     resumo = ResumoDoPdf()
     fontes = _fontes()
     tinha_rotulos = False
+    # A posição no livro -> a página do PDF (§12.4). As páginas inseridas, cortadas e
+    # giradas entram com a imagem delas na rodada 4 do passo L; até lá não há como fazê-las.
+    entradas = [projeto.sequencia.entrada_em(i) for i in alvo]
+    fora = [i + 1 for i, e in zip(alvo, entradas)
+            if e.fonte != sq.FONTE_DO_LIVRO or e.quadro is not None or e.giro]
+    if fora:
+        raise NadaParaExportar(
+            "O PDF pesquisável ainda não sai com páginas inseridas, cortadas ou giradas "
+            f"(páginas {', '.join(map(str, fora[:10]))}); exporte as outras.")
+    paginas_do_pdf = [e.pagina for e in entradas]
+    #: O livro na ordem do PDF: o sumário e os rótulos do original ainda servem. Reordenado,
+    #: eles saem e são refeitos pelos títulos e pelos números impressos do Documento.
+    na_ordem = paginas_do_pdf == sorted(paginas_do_pdf)
     if projeto.fonte_e_pdf:
         doc = fitz.open(projeto.fonte)
         # O `select` apaga os rótulos de página do original: o que ele tinha é lido antes.
-        tinha_rotulos = bool(doc.get_page_labels())
-        doc.select(alvo)
+        tinha_rotulos = na_ordem and bool(doc.get_page_labels())
+        doc.select(paginas_do_pdf)                  # o `select` aceita qualquer ordem
+        if not na_ordem:
+            doc.set_toc([])                         # o sumário do original, fora de ordem
     else:
         doc = fitz.open()
         # Com fonte em imagem, a página do PDF é a endireitada: a camada casa
-        # com ela sem girar nada.
-        imagem = pg.fonte_do_projeto(projeto).pagina(0)
+        # com ela sem girar nada. A imagem solta é uma página só.
+        if len(alvo) > 1:
+            raise NadaParaExportar("A fonte em imagem tem uma página só.")
+        imagem = pg.fonte_do_projeto(projeto).pagina(alvo[0])
         dados = io.BytesIO()
         imagem.save(dados, format="PNG")
         escala_img = 72.0 / DPI_DA_LEITURA

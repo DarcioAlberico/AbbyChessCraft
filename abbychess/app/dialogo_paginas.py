@@ -147,12 +147,14 @@ def campo_do_sentido() -> QComboBox:
     return campo
 
 
-def campo_de_porcentagem(valor: float, minimo: float, maximo: float, sufixo: str = " %"
-                         ) -> QDoubleSpinBox:
+def campo_de_porcentagem(valor: float, minimo: float, maximo: float, sufixo: str = " %", *,
+                         decimais: int = 1, passo: float = 1.0) -> QDoubleSpinBox:
+    """O campo de número; as casas antes do valor (o Qt arredonda o valor às casas de agora:
+    o ângulo medido de 0,65° viraria 0,7°, e dar OK sem mexer endireitaria a página)."""
     campo = QDoubleSpinBox()
+    campo.setDecimals(decimais)
     campo.setRange(minimo, maximo)
-    campo.setDecimals(1)
-    campo.setSingleStep(1.0)
+    campo.setSingleStep(passo)
     campo.setSuffix(sufixo)
     campo.setValue(valor)
     return campo

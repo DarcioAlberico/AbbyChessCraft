@@ -322,6 +322,10 @@ class _ArquivoDePaginas:
     def __init__(self, caminho: Path):
         self.caminho = Path(caminho)
         self._pdf = None
+        #: O documento do fitz aberto uma vez para os tamanhos (girar ou cortar muitas
+        #: páginas de uma vez pergunta o de cada uma), e os já perguntados.
+        self._documento = None
+        self._tamanhos: Dict[int, Tuple[int, int]] = {}
         self.total = 1
         sufixo = self.caminho.suffix.lower()
         if sufixo == ".pdf":
@@ -343,13 +347,16 @@ class _ArquivoDePaginas:
         if self._pdf is None:
             with Image.open(self.caminho) as imagem:
                 return imagem.size
-        import fitz
-        from core.services.pdf_service import DPI_PADRAO
+        if indice not in self._tamanhos:
+            import fitz
+            from core.services.pdf_service import DPI_PADRAO
 
-        with fitz.open(stream=self._pdf.pdf_bytes, filetype="pdf") as documento:
+            if self._documento is None:
+                self._documento = fitz.open(stream=self._pdf.pdf_bytes, filetype="pdf")
             escala = DPI_PADRAO / 72
-            retangulo = (documento[indice].rect * fitz.Matrix(escala, escala)).irect
-            return retangulo.width, retangulo.height
+            retangulo = (self._documento[indice].rect * fitz.Matrix(escala, escala)).irect
+            self._tamanhos[indice] = (retangulo.width, retangulo.height)
+        return self._tamanhos[indice]
 
     def pagina(self, indice: int) -> Image.Image:
         if not 0 <= indice < self.total:

@@ -15,6 +15,7 @@ Fora do portão, pular é aceito, para a suíte rodar numa máquina sem os livro
 from __future__ import annotations
 
 import os
+import weakref
 
 import pytest
 
@@ -44,6 +45,41 @@ def pytest_configure(config):
     config._abby_qsettings = pasta
     QSettings.setDefaultFormat(QSettings.Format.IniFormat)
     QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, pasta)
+    _anotar_os_gravadores()
+
+
+#: Os gravadores de página criados (fracos): `gravadores_descarregados` os descarrega no fim de
+#: cada teste.
+_GRAVADORES: list = []
+
+
+def _anotar_os_gravadores() -> None:
+    from abbychess import gravador as gr
+
+    original = gr.Gravador.__init__
+
+    def __init__(self, *args, **kwargs):
+        original(self, *args, **kwargs)
+        _GRAVADORES.append(weakref.ref(self))
+
+    gr.Gravador.__init__ = __init__
+
+
+@pytest.fixture(autouse=True)
+def gravadores_descarregados():
+    """O que o gravador de um projeto do teste tem pendente é gravado no fim dele, e não no
+    meio do teste seguinte (um teste que troca as funções de `gravacao` a veria passar)."""
+    inicio = len(_GRAVADORES)
+    yield
+    novos = _GRAVADORES[inicio:]
+    del _GRAVADORES[inicio:]
+    for referencia in novos:
+        gravador = referencia()
+        if gravador is not None:
+            try:
+                gravador.descarregar(2.0)
+            except Exception:  # noqa: BLE001 — o gravador de um teste que o quebrou de propósito
+                pass
 
 
 def pytest_unconfigure(config):

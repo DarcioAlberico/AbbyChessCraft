@@ -69,7 +69,6 @@ def test_ca_12_11_girar_as_impares_leva_imagem_e_boxes(projeto, ctl):
     for i in range(10):
         _gravar(projeto, i)
     antes = {i: (_imagem(ctl, i), _recortes(ctl, projeto, i)) for i in range(10)}
-    arquivos = {p.name: p.read_bytes() for p in (projeto.pasta / "paginas").glob("p*.json")}
     assert ctl.girar_paginas([0, 2, 4, 6, 8], 90)
     for i in range(10):
         imagem, recortes = antes[i]
@@ -79,9 +78,12 @@ def test_ca_12_11_girar_as_impares_leva_imagem_e_boxes(projeto, ctl):
         assert depois.keys() == recortes.keys()                       # os mesmos gids
         for gid, recorte in recortes.items():
             assert np.array_equal(depois[gid], np.rot90(recorte, k=k)), (i, gid)
-    # só a sequência foi gravada: os arquivos das páginas são os de antes
-    assert {p.name: p.read_bytes() for p in (projeto.pasta / "paginas").glob("p*.json")} \
-        == arquivos
+    # depois da sequência, o gravador leva os arquivos das páginas à geometria nova
+    projeto.descarregar()
+    for i in range(10):
+        bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(i)}.json")
+                           .read_text(encoding="utf-8"))
+        assert bruto["geometria"] == [None, 90 if i % 2 == 0 else 0]
 
 
 def test_ca_12_11_noventa_duas_vezes_e_cento_e_oitenta_e_o_ctrl_z_volta(projeto, ctl):
@@ -99,11 +101,13 @@ def test_ca_12_11_noventa_duas_vezes_e_cento_e_oitenta_e_o_ctrl_z_volta(projeto,
         {g: r.tobytes() for g, r in recortes.items()}
 
 
-def test_ca_12_11_reabrir_sem_gravar_as_paginas_os_boxes_estao_no_lugar(projeto, ctl):
+def test_ca_12_11_reabrir_sem_gravar_as_paginas_os_boxes_estao_no_lugar(projeto, ctl,
+                                                                       monkeypatch):
     """A queda depois de gravar a sequência e antes dos arquivos das páginas: a página é
     levada à geometria nova quando é lida (o arquivo dela diz a geometria de antes)."""
     _gravar(projeto, 1)
     recortes = _recortes(ctl, projeto, 1)
+    monkeypatch.setattr(projeto, "agendar", lambda *_a, **_k: True)   # a queda
     ctl.girar_paginas([1], 270)
     projeto.fechar()
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)

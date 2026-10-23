@@ -195,3 +195,13 @@ def test_girar_cortar_e_dividir_pelo_menu(app, janela, monkeypatch):
     assert projeto.sequencia.entrada_em(5).metade == "direita"
     janela.pagina.desfazer()
     assert janela.fonte.total == 60
+    monkeypatch.setattr(dp, "perguntar_com", lambda *_a, **_k: ([6], 1.25))
+    janela.acao_endireitar_paginas.trigger()
+    assert projeto.sequencia.entrada_em(6).angulo == 1.25
+
+
+def test_o_angulo_medido_nao_e_arredondado_no_dialogo(app):
+    """0,65° com uma casa viraria 0,7°, e dar OK sem mexer endireitaria a página."""
+    campo = dp.campo_de_porcentagem(0.65, -20.0, 20.0, "°", decimais=2, passo=0.1)
+    assert campo.value() == pytest.approx(0.65)
+    campo.deleteLater()

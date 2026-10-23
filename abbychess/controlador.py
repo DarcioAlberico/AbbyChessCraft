@@ -682,6 +682,58 @@ class ControladorDePagina:
                                      troca=troca,
                                      depois_de_gravar=lambda: self._guardar_os_angulos(angulos))
 
+    #: O maior ângulo de endireitar à mão, em graus (para mais, girar de 90 em 90).
+    ENDIREITAR_NO_MAXIMO = 20.0
+
+    def endireitar_paginas(self, posicoes: Sequence[int], angulo: Optional[float]) -> bool:
+        """Endireita as páginas à mão (§12.4, CA-12.14): o `angulo` (graus, anti-horário, como
+        `pagina.girar`) vence o medido; None volta ao medido. A leitura da página com glifos
+        se desfaz: ficam os marcados à mão (a leitura digitada, ou o glifo aceito na revisão),
+        girados em volta do centro, e as áreas do usuário; o resto sai, e a página vai a
+        `glifos_marcados` (`modelo.endireitar`). O Ctrl+Z devolve o ângulo e a página."""
+        from abbychess import modelo as md
+        from abbychess.leitor import FONTE_MANUAL
+
+        if angulo is not None:
+            angulo = round(float(angulo), 2)
+            if abs(angulo) > self.ENDIREITAR_NO_MAXIMO:
+                self._avisar(f"Endireitar páginas: no máximo {self.ENDIREITAR_NO_MAXIMO:g}° "
+                             "(para mais, gire a página).", 6000)
+                return False
+
+        def manter(box) -> bool:
+            return box.entry.source == FONTE_MANUAL or box.revisado
+
+        troca = {}
+
+        def fazer(s):
+            projeto = self.projeto
+            projeto.descarregar()
+            nova, paginas = s, {}
+            for pid in sq.pids_da_selecao(s, posicoes):
+                e = nova.entrada_de(pid)
+                if e.angulo == angulo:
+                    continue
+                tamanho = e.tamanho or self._tamanho(e)
+                outra = replace(e, angulo=angulo, tamanho=tamanho)
+                nova = nova.com_entrada(outra)
+                pagina = projeto.carregar_modelo(s.posicao_de(pid))
+                if pagina is None:
+                    continue                    # sem leitura: nada a medir nem a girar
+                delta = self.fonte.inclinacao_da_entrada(outra) - \
+                    self.fonte.inclinacao_da_entrada(e)
+                if delta:
+                    paginas[pid] = (pagina.instantaneo(),
+                                    md.endireitar(pagina, delta, tamanho, manter))
+            if paginas:
+                movidos = dict(projeto.dados.gids_movidos)
+                troca.update(paginas=paginas, movidos=(movidos, movidos))
+            return nova
+
+        como = "pelo ângulo medido" if angulo is None else f"em {angulo:g}°"
+        return self._mudar_sequencia(fazer, f"Endireitar {len(set(posicoes))} página(s) {como}",
+                                     troca=troca)
+
     def _tamanho(self, entrada) -> tuple:
         return tuple(self.fonte.tamanho_da_fonte(entrada))
 

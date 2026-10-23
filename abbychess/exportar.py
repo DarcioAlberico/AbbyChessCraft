@@ -1551,8 +1551,10 @@ def exportar_pdf_pesquisavel(projeto: ProjetoDeLivro, caminho: str | Path,
                              progresso: Optional[Progresso] = None) -> ResumoDoPdf:
     """O PDF com as páginas reconhecidas e a leitura do projeto como texto invisível.
 
-    Com fonte em PDF, as páginas são as do original, sem rasterizar; com fonte
-    em imagem, cada página vira uma página de PDF com a imagem a 300 dpi.
+    A página do PDF do livro sem quadro nem giro sai do original, sem rasterizar; as outras
+    (as inseridas, as cortadas e as giradas, §12.4 CA-12.16, e toda página de fonte em
+    imagem) viram uma página de PDF com a imagem da entrada a 300 dpi, a que se vê no
+    programa, e a camada casa com ela sem conta nenhuma.
 
     O projeto que endireita as páginas tem os boxes nas coordenadas da página
     endireitada; no PDF original eles voltam ao lugar da página torta.
@@ -1566,20 +1568,17 @@ def exportar_pdf_pesquisavel(projeto: ProjetoDeLivro, caminho: str | Path,
     resumo = ResumoDoPdf()
     fontes = _fontes()
     tinha_rotulos = False
-    # A posição no livro -> a página do PDF (§12.4). As páginas inseridas, cortadas e
-    # giradas entram com a imagem delas na rodada 4 do passo L; até lá não há como fazê-las.
+    fonte = pg.fonte_do_projeto(projeto)
+    # A posição no livro -> a página do PDF (§12.4); a que não sai do original, a imagem.
     entradas = [projeto.sequencia.entrada_em(i) for i in alvo]
-    fora = [i + 1 for i, e in zip(alvo, entradas)
-            if e.fonte != sq.FONTE_DO_LIVRO or e.quadro is not None or e.giro]
-    if fora:
-        raise NadaParaExportar(
-            "O PDF pesquisável ainda não sai com páginas inseridas, cortadas ou giradas "
-            f"(páginas {', '.join(map(str, fora[:10]))}); exporte as outras.")
+    imagens = {i for i, e in zip(alvo, entradas)
+               if not projeto.fonte_e_pdf or e.fonte != sq.FONTE_DO_LIVRO
+               or e.quadro is not None or e.giro}
     paginas_do_pdf = [e.pagina for e in entradas]
     #: O livro na ordem do PDF: o sumário e os rótulos do original ainda servem. Reordenado,
     #: eles saem e são refeitos pelos títulos e pelos números impressos do Documento.
     na_ordem = paginas_do_pdf == sorted(paginas_do_pdf)
-    if projeto.fonte_e_pdf:
+    if not imagens:
         doc = fitz.open(projeto.fonte)
         # O `select` apaga os rótulos de página do original: o que ele tinha é lido antes.
         tinha_rotulos = na_ordem and bool(doc.get_page_labels())
@@ -1587,29 +1586,19 @@ def exportar_pdf_pesquisavel(projeto: ProjetoDeLivro, caminho: str | Path,
         if not na_ordem:
             doc.set_toc([])                         # o sumário do original, fora de ordem
     else:
-        doc = fitz.open()
-        # Com fonte em imagem, a página do PDF é a endireitada: a camada casa
-        # com ela sem girar nada. A imagem solta é uma página só.
-        if len(alvo) > 1:
-            raise NadaParaExportar("A fonte em imagem tem uma página só.")
-        imagem = pg.fonte_do_projeto(projeto).pagina(alvo[0])
-        dados = io.BytesIO()
-        imagem.save(dados, format="PNG")
-        escala_img = 72.0 / DPI_DA_LEITURA
-        pagina = doc.new_page(width=imagem.width * escala_img, height=imagem.height * escala_img)
-        pagina.insert_image(pagina.rect, stream=dados.getvalue())
+        doc = _pdf_com_imagens(projeto, fonte, alvo, entradas, imagens)
     escala = 72.0 / DPI_DA_LEITURA
-    fonte = pg.fonte_do_projeto(projeto) if projeto.fonte_e_pdf else None
     try:
         for feitas, (page, indice) in enumerate(zip(doc, alvo), start=1):
-            if _texto_visivel(page):
+            if indice not in imagens and _texto_visivel(page):
                 resumo.com_texto_proprio.append(indice)
             else:
-                if _tirar_camada_invisivel(page):
+                if indice not in imagens and _tirar_camada_invisivel(page):
                     resumo.camadas_trocadas += 1
                 boxes = projeto.carregar_pagina(indice) or []
                 diagramas = projeto.carregar_diagramas(indice)
-                angulo = fonte.inclinacao(indice) if fonte is not None else 0.0
+                # A imagem da entrada já é a endireitada; a página do original, não.
+                angulo = 0.0 if indice in imagens else fonte.inclinacao(indice)
                 if angulo:
                     largura = round(page.rect.width / escala)
                     altura = round(page.rect.height / escala)
@@ -1633,6 +1622,39 @@ def exportar_pdf_pesquisavel(projeto: ProjetoDeLivro, caminho: str | Path,
     finally:
         doc.close()
     return resumo
+
+
+def _pdf_com_imagens(projeto: ProjetoDeLivro, fonte: pg.FonteDePaginas, alvo: Sequence[int],
+                     entradas: Sequence[sq.Entrada], imagens: set):
+    """O PDF novo, página a página: a do original (`insert_pdf`, sem rasterizar) ou a imagem
+    da entrada (as posições de `imagens`). O sumário do original não vem: os marcadores saem
+    dos títulos do Documento."""
+    import fitz
+
+    doc = fitz.open()
+    original = None
+    escala = 72.0 / DPI_DA_LEITURA
+    try:
+        if projeto.fonte_e_pdf:
+            original = fitz.open(projeto.fonte)
+        for indice, entrada in zip(alvo, entradas):
+            if indice not in imagens:
+                doc.insert_pdf(original, from_page=entrada.pagina, to_page=entrada.pagina,
+                               links=False, annots=False)
+                continue
+            imagem = fonte.pagina(indice)
+            dados = io.BytesIO()
+            imagem.save(dados, format="PNG", optimize=True)
+            pagina = doc.new_page(width=imagem.width * escala, height=imagem.height * escala)
+            pagina.insert_image(pagina.rect, stream=dados.getvalue())
+        doc.set_toc([])
+    except BaseException:
+        doc.close()
+        raise
+    finally:
+        if original is not None:
+            original.close()
+    return doc
 
 
 def _marcar_o_pdf(doc, projeto: ProjetoDeLivro, alvo: Sequence[int], resumo: ResumoDoPdf,

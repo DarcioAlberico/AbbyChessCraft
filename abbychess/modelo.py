@@ -826,3 +826,87 @@ def _dividir_decisoes(d: Decisoes, gids: Set[int], movidos: Dict[int, int],
         return g not in mapa
 
     return metade(na_esquerda, lambda g: g), metade(na_direita, mapa.__getitem__)
+
+
+def decisoes_dos_vivos(d: Decisoes, vivos: Set[int]) -> Decisoes:
+    """As decisões sem as que citam um glifo que saiu (o virtual cuja âncora saiu também)."""
+    if d.gids() <= vivos:
+        return d
+    ficam = tuple(d.virtuais)
+    while True:
+        gids = vivos | {v.gid for v in ficam}
+        filtrados = tuple(v for v in ficam if (v.depois_de is None or v.depois_de in gids)
+                          and (v.antes_de is None or v.antes_de in gids))
+        if len(filtrados) == len(ficam):
+            break
+        ficam = filtrados
+    return replace(d, quebras=d.quebras & vivos, paragrafo_antes=d.paragrafo_antes & vivos,
+                   hifen_de_quebra=d.hifen_de_quebra & vivos,
+                   juncoes=frozenset(j for j in d.juncoes if set(j) <= vivos), virtuais=ficam)
+
+
+def _girada_no_centro(caixa, delta: float, tamanho: Tuple[int, int]):
+    """A caixa da página endireitada inteira levada a outro ângulo de endireitar (`delta`
+    graus a mais, anti-horário, em volta do centro da página, como `pagina.girar`): o centro
+    dela gira, e o tamanho fica (a inclinação é pequena)."""
+    import math
+
+    x1, y1, x2, y2 = caixa
+    cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+    ox, oy = tamanho[0] / 2, tamanho[1] / 2
+    cosseno, seno = math.cos(math.radians(delta)), math.sin(math.radians(delta))
+    nx = cosseno * (cx - ox) + seno * (cy - oy) + ox
+    ny = -seno * (cx - ox) + cosseno * (cy - oy) + oy
+    dx, dy = round(nx - cx), round(ny - cy)
+    return (x1 + dx, y1 + dy, x2 + dx, y2 + dy)
+
+
+def endireitar(pagina: Pagina, delta: float, tamanho: Tuple[int, int], manter) -> Pagina:
+    """A página depois de endireitá-la à mão `delta` graus a mais (§12.4): a leitura dela se
+    desfaz. Ficam os glifos que `manter(box)` diz (os marcados à mão), com o centro girado em
+    volta do centro da página, e as áreas do usuário, do mesmo jeito; os outros glifos, as
+    áreas automáticas, os tabuleiros e os diagramas saem, com as decisões que os citavam. O
+    estado vai a `glifos_marcados` (ou a `nao_reconhecida`, sem glifo). O glifo que o giro
+    tira do quadro fica guardado (`fora`). Devolve uma página nova; a de entrada não muda."""
+    from abbychess import geometria as geo
+
+    de = geo.normalizar(pagina.geometria)
+
+    def girada(caixa_da_vista):
+        return _girada_no_centro(geo.para_a_fonte(tuple(caixa_da_vista), de, tamanho), delta,
+                                 tamanho)
+
+    # A ordem de leitura inteira, com os guardados no lugar deles (na página inteira, com o
+    # ângulo da fonte), como em `reenquadrar`; só os marcados à mão seguem.
+    inteira = [(b, geo.para_a_fonte(_caixa(b.entry), de, tamanho), b.entry.angulo + de[1])
+               for b in pagina.boxes]
+    for lugar, box in sorted(pagina.fora, key=lambda t: t[0]):
+        inteira.insert(min(lugar, len(inteira)), (box, _caixa(box.entry), box.entry.angulo))
+    boxes, fora = [], []
+    for lugar, (box, fonte, angulo) in enumerate((b, f, a) for b, f, a in inteira
+                                                 if manter(b)):
+        fonte = _girada_no_centro(fonte, delta, tamanho)
+        caixa = geo.da_fonte(fonte, de, tamanho)
+        if caixa is None:
+            fora.append((lugar, _na_caixa(box, fonte, angulo)))
+        else:
+            boxes.append(_na_caixa(box, caixa, angulo - de[1]))
+    zonas = []
+    for zona in pagina.zonas:
+        if zona.automatica:
+            continue
+        caixa = geo.recortar(girada(zona.caixa), de, tamanho)
+        if caixa is not None:
+            zonas.append(replace(zona, x1=caixa[0], y1=caixa[1], x2=caixa[2], y2=caixa[3],
+                                 diagrama_id=None))
+    areas_fora = tuple(
+        (tipo, lugar, replace(objeto, **dict(zip(("x1", "y1", "x2", "y2"), _girada_no_centro(
+            objeto.caixa, delta, tamanho)))), aparada)
+        for tipo, lugar, objeto, aparada in pagina.areas_fora
+        if tipo == "zona" and not objeto.automatica)
+    vivos = {b.gid for b in boxes} | {b.gid for _lugar, b in fora}
+    return Pagina(pid=pagina.pid, indice=pagina.indice, boxes=boxes, zonas=zonas,
+                  decisoes=decisoes_dos_vivos(pagina.decisoes, vivos),
+                  estado=GLIFOS_MARCADOS if boxes else NAO_RECONHECIDA,
+                  proximo_n=pagina.proximo_n, geometria=de, tamanho=tamanho,
+                  fora=tuple(fora), areas_fora=areas_fora)

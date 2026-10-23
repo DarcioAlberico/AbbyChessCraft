@@ -1,14 +1,15 @@
 """As operações de página vistas da janela (SPEC §12.4, passo L): os diálogos do menu Página e
 da gaveta, que perguntam e chamam os comandos do controlador (`mover_paginas`,
 `apagar_paginas`, `inserir_paginas`, `restaurar_paginas`, `girar_paginas`, `cortar_paginas`,
-`tirar_o_corte`, `dividir_paginas`). Um mixin da `JanelaPrincipal`, como `EspacoDeTrabalho`.
+`tirar_o_corte`, `dividir_paginas`, `endireitar_paginas`). Um mixin da `JanelaPrincipal`,
+como `EspacoDeTrabalho`.
 """
 
 from __future__ import annotations
 
 from typing import Optional, Sequence
 
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QCheckBox, QFileDialog
 
 from abbychess.app import dialogo_paginas as dp
 
@@ -109,6 +110,28 @@ class PaginasNaJanela:
                        "os glifos dela. Ctrl+Z junta de novo.")
         if escolha is not None:
             self.pagina.dividir_paginas(*escolha)
+
+    def endireitar_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
+        limite = self.pagina.ENDIREITAR_NO_MAXIMO
+        try:
+            agora = self.pagina.fonte.inclinacao(self.pagina.indice) if self.pagina.fonte else 0
+        except (OSError, IndexError):
+            agora = 0.0
+        angulo = dp.campo_de_porcentagem(agora, -limite, limite, "°", decimais=2, passo=0.1)
+        medido = QCheckBox("Usar o ângulo medido")
+        medido.toggled.connect(lambda sim: angulo.setEnabled(not sim))
+        escolha = dp.perguntar_com(
+            self, "Endireitar páginas", self._total(),
+            [("Ângulo", angulo), ("", medido)],
+            lambda: None if medido.isChecked() else angulo.value(),
+            selecao=self._selecao_de_agora(selecionadas),
+            efeito="{N} página(s) são endireitadas: {PAGINAS}.",
+            explicacao="O ângulo positivo gira a página no sentido anti-horário. A leitura "
+                       "das páginas se desfaz: ficam só os glifos marcados à mão (a leitura "
+                       "digitada ou aceita na revisão), girados com a página, e as áreas que "
+                       "você desenhou; o F5 lê de novo. Ctrl+Z desfaz.")
+        if escolha is not None:
+            self.pagina.endireitar_paginas(*escolha)
 
     def paginas_apagadas(self) -> None:
         apagadas = self.projeto.sequencia.apagadas if self.projeto is not None else ()

@@ -143,14 +143,40 @@ def test_o_pdf_pesquisavel_sai_na_ordem_do_livro(projeto, tmp_path):
     assert impressas == ["3", "1", "2"]                  # o texto impresso do PDF de cada uma
 
 
-def test_o_pdf_pesquisavel_recusa_por_ora_a_pagina_girada(projeto, tmp_path):
-    _ler(projeto, [(0, "a")])
+def test_ca_12_16_o_pdf_pesquisavel_usa_as_imagens_transformadas(projeto, tmp_path):
+    """A página girada e a inserida saem com a imagem da entrada, e a camada de texto em cima
+    do que se vê; a do original sem quadro nem giro continua do original."""
+    import fitz
+    import numpy as np
+    from PIL import Image
+
+    _ler(projeto, [(0, "a"), (1, "b")])
+    fonte = pg.fonte_do_projeto(projeto)
     e = projeto.sequencia.entrada_em(0)
+    largura, altura = fonte.tamanho_da_fonte(e)
     projeto._trocar_sequencia(projeto.sequencia.com_entrada(
-        Entrada(e.pid, "livro", e.pagina, giro=90,
-                tamanho=pg.fonte_do_projeto(projeto).tamanho_da_fonte(e))))
-    with pytest.raises(ex.NadaParaExportar, match="giradas"):
-        ex.exportar_pdf_pesquisavel(projeto, tmp_path / "x.pdf")
+        Entrada(e.pid, "livro", e.pagina, giro=90, tamanho=(largura, altura))))
+    caixa = projeto.carregar_pagina(0)[0]                  # o "a" na página girada
+    imagem = tmp_path / "solta.png"
+    Image.fromarray(np.full((400, 300), 255, np.uint8)).save(imagem)
+    inseridas = projeto.inserir_arquivo(imagem)
+    projeto.gravar_sequencia(projeto.sequencia.inserir(inseridas, 2))
+    projeto.salvar_pagina(2, [_box("c"), _box("c", x=20)])
+    saida = tmp_path / "pesquisavel.pdf"
+    ex.exportar_pdf_pesquisavel(projeto, saida)
+    escala = 72.0 / ex.DPI_DA_LEITURA
+    with fitz.open(str(saida)) as doc:
+        assert len(doc) == 3
+        girada, original, inserida = doc[0], doc[1], doc[2]
+        assert girada.rect.width == pytest.approx(altura * escala)
+        assert girada.rect.height == pytest.approx(largura * escala)
+        assert girada.get_images() and inserida.get_images()
+        palavra = next(w for w in girada.get_text("words") if w[4] == "aa")
+        assert palavra[0] == pytest.approx(caixa.x1 * escala, abs=1)
+        assert palavra[1] == pytest.approx(caixa.y1 * escala, abs=2)
+        assert "Pagina" in original.get_text()              # o texto do original, vetorial
+        assert inserida.rect.width == pytest.approx(300 * escala)
+        assert "cc" in inserida.get_text()
 
 
 def test_a_altura_vem_da_pagina_do_pdf_da_entrada(tmp_path):

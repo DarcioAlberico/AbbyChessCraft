@@ -223,11 +223,37 @@ A qualidade do Xadrez Vitorioso (`medir.py --indices 0,7,20-26`,
 `2026-10-23-qualidade-xv-100252.json`) é idêntica à do L em tudo, menos o tempo do lote da
 medida (509 → 440 s).
 
+O terceiro portão, no `a6555df` (esta rodada; `2026-10-23-passo-pendencias-181911.json`),
+aprovou (27 testes). Contra o segundo:
+
+| Medida | 2º portão | 3º portão |
+|---|---|---|
+| Texto da página, p50 / p95 | 36,9 / 42,1 | 17,5 / 22,5 |
+| Releitura com o lote, p95 (alvo 150) | 102,7 | 72,6 |
+| Montar o índice da busca, p50 | 1413 | 895 |
+| Enter até a cor mudar, p50 / p95 | 25,6 / 41,4 | 28,6 / 58,0 |
+| Lote com servidor, s por página | 8,6 | 9,0 |
+| Troca de página, p50 | 15,4 | 17,2 |
+| Clique no Documento, p50 | 3,8 | 4,6 |
+
+O texto da página é o efeito das linhas guardadas. O índice da busca também, mas só no teste:
+as 230 páginas dele são cópias das 7 da fatia, e a cache de cada processo acerta; num livro de
+verdade ela não acerta ali. O resto subiu 5–15% junto, inclusive o que esta rodada não tocou (a
+troca de página, o clique, o Enter que confirma a leitura, que não muda a chave das linhas): a
+máquina estava mais lenta nesta rodada. O itálico custa ~0,1 s dos 9,0 s do lote. A qualidade do
+Xadrez Vitorioso (`2026-10-23-qualidade-xv-180804.json`) é idêntica à de antes, menos o tempo
+do lote da medida (440 → 455 s). O itálico, `2026-10-23-italico.json`, repete os números de
+cima no `a6555df`.
+
 ## Verificação
 
 - Suíte rápida: 1553 passed, 2 skipped, em ~2 min no `2cbbdf6`; 1555 passed no `d29d399`, em
-  ~102 s em série e ~32 s com `-n auto`; 1559 passed no `8388a7a`, ~39 s com `-n auto`.
-- Camada `processo`: 32 passed no `8388a7a` (uma falhava desde o L, `13b3e91`).
+  ~102 s em série e ~32 s com `-n auto`; 1559 passed no `8388a7a`, ~39 s com `-n auto`;
+  1581 passed, 3 skipped no `a6555df`, ~40 s.
+- Camada `processo`: 32 passed no `8388a7a` (uma falhava desde o L, `13b3e91`); as de
+  `tests/test_render.py`, com a dos órfãos do índice, no `0c0918c`.
+- Calibre 9.14 (`ABBY_CALIBRE`): os testes dos links e os EPUB da fatia e do Odds & Ends, sem
+  problema, no `a6555df`.
 - `ruff check --select E,F --line-length 110 abbychess tests`: limpo.
 - EPUBCheck 5.4.0 e Ace 1.4.6 (`ABBY_EPUBCHECK`, `ABBY_ACE`): aprovam o livro com os links novos
   e as quatro combinações do golden.

@@ -913,7 +913,14 @@ As rodadas:
 voltaram na rodada 1 (o ângulo no Ctrl+Z do giro, dividir medindo na thread da interface, o
 `backup-v2/` depois de inserir; dividir o livro preso 108 s, o padrão do endireitar, girar sem
 gesto único, a seleção sem paridade com intervalo, os textos); as correções e a ferramenta
-`ferramentas/capturas_paginas.py` entraram antes da rodada 2.
+`ferramentas/capturas_paginas.py` entraram antes da rodada 2. A rodada 3 aceitou as duas, e
+nenhuma nota ficou abaixo de 8.
+
+O primeiro portão reprovou no CA-7.1 pela janela: o índice da busca levou 2,4 s, por uma
+regressão do passo F, que detectava as colunas duas vezes por página. Corrigido no core e aqui,
+o segundo portão (`071b8e5`) aprovou, com 2,0 s. O lote, o Enter e o clique no Documento
+pioraram desde o D2, o último portão medido antes deste. Medidos agora, deram o mesmo no K e
+no L, então essas pioras não vêm do L. O registro tem os números. Tag `passo-l`.
 
 **Tarefas.**
 1. Dividir páginas espelhadas, girar, cortar e endireitar à mão, em páginas pares, ímpares

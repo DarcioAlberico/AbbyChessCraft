@@ -253,14 +253,15 @@ atalhos registrados são exatamente as entradas com `desde_passo ≤ passo atual
 `sem_atalho: true` explícito; exceções de encobrimento (como o Ctrl+Tab do perfil
 FineReader) só passam declaradas no YAML com o motivo.
 
-## 4. O modelo de dados (versão 2)
+## 4. O modelo de dados (versão 2; a 3, com a sequência do livro, no passo L, §12.4)
 
 ### 4.1 Box e identidade
 
 - `Box` é **composição**: `Box(gid, entry: BoxEntry, amostra: str | None, estilo: Estilo,
   revisado: bool)`. O `BoxEntry` é do core e não é estendido.
 - **Página tem `pid` estável**, alocado por contador em `projeto.json` e nunca mudado por
-  reordenar ou inserir páginas; `livro.json` mapeia índice do PDF → `pid`.
+  reordenar ou inserir páginas. A partir do passo L, a sequência em `projeto.json` (§12.4)
+  dá a posição de cada `pid`, e `livro.json` é chaveado por `pid`.
 - `gid = (pid << 20) | n`, com `proximo_n` gravado no JSON da página. Só a interface aloca
   (escritor único, §11). Nunca reaproveitado.
 - As funções de edição de `pagina.py` devolvem `Diferenca(removidos: set[gid], novos:
@@ -299,7 +300,8 @@ FineReader) só passam declaradas no YAML com o motivo.
 ### 4.3 Persistência
 
 - `paginas/p<pid>.json` com `"versao": 2`: boxes (gid, amostra, estilo, revisado), decisões,
-  zonas, diagramas, estado, `proximo_n`.
+  zonas, diagramas, estado, `proximo_n`. A partir do passo L (`"versao": 3`): sem o índice
+  da página, e com a `geometria` (quadro e giro) em que os boxes estão (§12.4).
 - **Migração** (feita uma vez, ao fim do passo 1b): na primeira abertura v2 de um projeto
   v1, `paginas/`, `zonas/` e `projeto.json` são copiados para `backup-v1/`; o `pid` da página
   v1 é o índice dela; cada página v1 é migrada **e gravada** na primeira leitura.
@@ -318,8 +320,8 @@ FineReader) só passam declaradas no YAML com o motivo.
   (tuplas e cópias rasas; a partir do 2a, `Box` e `BoxEntry` não são mutados no lugar: a
   `Diferenca` troca os objetos) à thread de gravação, que serializa e grava, com coalescência de
   500 ms; fechar o projeto espera o gravador; em modo só leitura, recusa.
-- **`livro.json`** (cache derivado, recriado na migração e sempre que faltar): por página,
-  `pid`, estado, pendentes, o histograma das confianças (para
+- **`livro.json`** (cache derivado, recriado na migração e sempre que faltar): por página
+  (por `pid`, desde o passo L), estado, pendentes, o histograma das confianças (para
   recalcular sem reler quando os limiares mudam) e diagramas por conferir; mesmo gravador.
 
 ### 4.4 Estado da página
@@ -687,7 +689,9 @@ das que têm um lance do texto afetado pela perturbação (denominador calculado
   lote. Enquanto o servidor carrega ou atende, o box fica "aguardando leitura", sem bloquear.
 - **Escritor único**: o servidor devolve resultados pela fila (boxes sem gid); a interface
   aplica a regra de conflito, dá os gids, aplica §4.6 e grava pelo gravador.
-- **Conflito**: página aberta e suja não é sobrescrita; fica "reler depois".
+- **Conflito**: página aberta e suja não é sobrescrita; fica "reler depois". Desde o passo L,
+  a leitura de uma página cuja geometria mudou depois do pedido é descartada e pedida de
+  novo (§12.4).
 - **Padrões**: a interface manda ao servidor os **deltas** (amostra criada ou apagada),
   aplicados antes de cada página e de cada pedido interativo.
 - Lote: cancelar (✕ na barra ou Projeto › Cancelar lote; nunca o Esc), retomar do ponto,
@@ -732,11 +736,128 @@ registrada pelo servidor falso).
 
 - Com o mesmo `SOURCE_DATE_EPOCH`, duas exportações dão os mesmos bytes.
 
-### 12.4 Editor de imagem e operações de página (fase posterior)
+### 12.4 Editor de imagem e operações de página (passo L)
 
 - Dividir páginas espelhadas, girar, cortar, endireitar à mão, aplicados a pares, ímpares ou
   intervalo; apagar, reordenar e inserir páginas (com `pid` estável, §4.1;
   `inclinacoes.json` passa a ser chaveado por `pid`).
+
+**O modelo (decidido no início do passo L, 2026-10-22; revisado na mesma data).** Até o
+passo K o índice da página no PDF era ao mesmo tempo a identidade dela e a posição no livro.
+A partir do L:
+
+- **A sequência do livro** fica em `projeto.json` (`versao` 3): uma lista ordenada de
+  entradas `{pid, fonte, pagina, quadro, giro, metade, angulo}`. `fonte` é `"livro"` ou
+  `"inseridas/<sha256>.<ext>"`; `pagina`, o índice dentro dela; `quadro`, o retângulo
+  inteiro `[x0, y0, x1, y1]` em pixels da página da fonte renderizada no DPI do projeto
+  (nulo: a página inteira); `giro`, 0, 90, 180 ou 270 graus no sentido horário, aplicado
+  depois do quadro; `metade`, só um rótulo (`"esquerda"`, `"direita"` ou nulo) de quem veio
+  de uma divisão; `angulo`, o endireitar à mão, ou nulo para o medido. Cortar e dividir só
+  mudam o `quadro`: a composição fica fechada sob qualquer operação seguinte. **A posição no
+  livro é o índice na sequência**, e é ela que a interface mostra e as exportações seguem.
+  Todo dado de página (JSON, zonas, diagramas, inclinação, busca, `janela.json`,
+  `livro.json`, as listas de páginas do `projeto.json`, amostras) é chaveado por `pid`; o
+  número da página é derivado da sequência. O `indice` gravado nos JSON de página antigos
+  deixa de valer.
+- **Todas as páginas têm `pid`** desde a migração (as não editadas também), e o `pid` nunca
+  muda nem é reaproveitado: reordenar mexe só na sequência.
+- **A imagem da página** é: a página da fonte → `quadro` → `giro` → endireitar (o `angulo` à
+  mão, ou o medido). A inclinação medida é a da imagem já com quadro e giro, guardada em
+  `inclinacoes.json` por `pid` com a geometria em que foi medida; ela é medida de novo
+  quando a geometria muda **só em página sem boxes**: com boxes, o ângulo fica (girar boxes
+  por um ângulo medido de novo não seria conta exata).
+- **Os glifos acompanham a imagem**: girar, cortar e dividir levam os boxes, as zonas, os
+  diagramas e os tabuleiros com conta exata (o `gid` fica; no corte, o box que sai da área
+  sai da página como uma `Diferenca`). **Cada JSON de página grava a `geometria` (quadro e
+  giro) em que os boxes estão**; ao carregar, se ela difere da entrada da sequência, os
+  boxes são transformados nessa hora (como a migração da v1). Assim uma operação num
+  intervalo grava só a sequência, e uma queda no meio não deixa boxes no quadro errado.
+  Endireitar à mão desfaz a leitura da página (com pergunta): os glifos marcados à mão ficam,
+  girados em volta do centro; os outros, as zonas automáticas e os diagramas saem; o estado
+  vai a `glifos_marcados` (§4.4).
+- **Dividir** uma página espelhada dá duas entradas, cada uma com metade do `quadro` (no `x`
+  escolhido): a esquerda fica com o `pid`, a direita ganha um `pid` novo. Cada box vai para
+  a metade do centro dele; os que mudam de página ganham `gid` novo (do `pid` novo), e o
+  projeto guarda `gids_movidos` (velho → novo). As junções e os virtuais que ligam glifos das
+  duas metades se desfazem; as zonas são cortadas pela divisão. Uma metade não se divide de
+  novo.
+- **Inserir** copia o PDF ou a imagem para `inseridas/` (nome pelo SHA-256): o projeto não
+  depende do arquivo de fora. Cada página dele vira uma entrada com `pid` novo; a imagem
+  solta é lida no DPI dela (sem DPI, o do projeto); PDF cifrado é recusado com aviso.
+- **Apagar** tira a entrada da sequência para `apagadas` (com a posição de onde saiu): a
+  página some do livro, da busca, da fila e das exportações, mas o JSON e as amostras
+  ficam (a amostra continua ensinando); o Ctrl+Z e **Página › Páginas apagadas…** a
+  devolvem com o mesmo `pid`. Um `p<pid>.json` que não está na sequência nem em `apagadas`
+  (uma queda entre gravações) aparece em **Páginas apagadas…**.
+- **A ordem das gravações**: o contador de `pid` e a sequência são gravados antes de qualquer
+  arquivo de página.
+- **A amostra acha o glifo de origem** pelo `gid` dela: `pid = gid >> 20`, depois
+  `gids_movidos`; o nome do arquivo da amostra (com o número antigo da página) não é
+  renomeado e não é usado para navegar. As amostras antigas sem `_g` vão à entrada
+  `fonte="livro"` da página do nome (a metade esquerda, se ela foi dividida). Origem numa
+  página apagada: oferece restaurá-la; glifo cortado fora: "o glifo de origem saiu da
+  página".
+- **Cada operação é uma transação do desfazer** (§14.2): a sequência antes e depois (aplica
+  só se a sequência atual é a de depois) e a `Diferenca` de cada página cujos boxes mudaram.
+  Desfazer uma divisão aposenta o `pid` novo (nunca reaproveitado) e tira os `gids_movidos`
+  dela. A seleção (pares, ímpares, intervalo "3-7, 12") é resolvida em posições do livro na
+  hora da operação, e a operação inteira é uma transação. O desfazer não sobrevive a fechar
+  o projeto: depois de reabrir, o box tirado por um corte não volta (alargar o corte não o
+  devolve).
+- **O lote e o servidor de leitura**: o intervalo do lote é resolvido em `pid` ao começar, e
+  um `pid` apagado no meio é pulado; o pedido ao servidor leva a geometria, e a leitura que
+  chega com outra geometria é descartada e pedida de novo. Girar, cortar, dividir e
+  endireitar ficam desligados na página que o servidor está lendo. Em projeto só para
+  leitura, as operações de página ficam desligadas.
+
+**CA-12.7** (migração v3) Um projeto v2 de 60 páginas com 3 páginas editadas (uma com `pid`
+diferente do índice), páginas v1 ainda não migradas, `inclinacoes.json`, `janela.json` e as
+listas de páginas do `projeto.json` abre na v3: `backup-v2/` com os arquivos de antes; a
+sequência tem as 60 entradas na ordem do PDF; as editadas mantêm o `pid`, as v1 não
+migradas ficam com `pid` = índice, as outras ganham `pid` novos acima de todos;
+`inclinacoes.json`, `janela.json` e as listas passam a `pid`; todo `gid`, amostra, zona e
+diagrama fica igual; reabrir não migra de novo; copiar `backup-v2/` de volta reabre igual; um
+projeto v1 vai direto à v3 (CA-4.5 de novo). Só para leitura: a sequência é montada na
+memória e nada é gravado.
+**CA-12.8** (reordenar) Mover as posições 2–4 para depois da 10 só reescreve a sequência
+(nenhum JSON de página muda, pela data e pelo hash); o seletor, a gaveta de Páginas, a busca,
+a fila do livro e as exportações mostram a ordem nova; a página aberta e `janela.json` seguem
+o `pid`; o Ctrl+Z devolve a ordem, e o Ctrl+Z seguinte desfaz a edição de página feita antes
+da reordenação.
+**CA-12.9** (inserir) Inserir um PDF de 2 páginas e uma PNG depois da posição 5, e uma página
+antes da primeira, cria entradas com `pid` novos, copia os arquivos para `inseridas/` (o
+projeto abre igual com o original apagado) e cada página renderiza igual à fonte;
+reconhecer, ensinar e exportar funcionam nelas. Um PDF cifrado é recusado com aviso e nada
+muda.
+**CA-12.10** (apagar) Apagar as posições 3 e 7 tira as duas da sequência, da gaveta, da busca,
+da fila do livro, das contagens e das exportações; os JSON e as amostras continuam no disco;
+o Ctrl+Z, e depois de reabrir **Páginas apagadas…**, as devolvem no lugar, com os mesmos
+`pid` e boxes. Um `p<pid>.json` órfão aparece em **Páginas apagadas…**.
+**CA-12.11** (girar) Numa página sem endireitar (ângulo 0), girar 90° as ímpares de 1–10: cada
+imagem é `np.rot90(antes, k=-1)`; os boxes caem sobre os mesmos pixels (o recorte de cada um
+é o de antes girado); os `gid` não mudam; 90° duas vezes dá o mesmo que 180°; o Ctrl+Z
+volta tudo. Uma queda injetada depois de gravar a sequência e antes dos JSON de página
+(CA-4.2) reabre com os boxes no lugar certo.
+**CA-12.12** (cortar) Cortar um intervalo com um retângulo: a imagem é o recorte exato; os
+boxes de dentro são deslocados (mesmos pixels); os de fora saem como `removidos` da
+transação; o Ctrl+Z os devolve com os `gid` de antes. A amostra cuja origem foi cortada diz
+"o glifo de origem saiu da página".
+**CA-12.13** (dividir) Dividir uma página dupla (sintética, com texto nas duas metades): duas
+entradas no lugar dela, cada uma com a metade dos pixels; os boxes da direita têm `gid`
+novos e `gids_movidos`; a amostra ensinada antes, num glifo da direita, abre o glifo certo
+pelo "ir à origem"; a busca acha uma palavra de cada metade na página certa; dividir uma
+metade é recusado; o Ctrl+Z junta de novo e aposenta o `pid` novo.
+**CA-12.14** (endireitar à mão) O ângulo à mão vence o medido e é guardado por `pid`; a
+página vai a `glifos_marcados`, com os glifos marcados à mão girados em volta do centro; o
+Ctrl+Z devolve o ângulo e os boxes.
+**CA-12.15** (seleção) "pares", "ímpares" e "3-7, 12" resolvem para posições do livro (não do
+PDF), depois de uma reordenação também; a operação vale exatamente nelas, numa transação;
+com o lote rodando ou em projeto só para leitura, as operações ficam desligadas e nenhum
+arquivo muda.
+**CA-12.16** (exportar depois das operações) TXT, DOCX e EPUB seguem a sequência; o PDF
+pesquisável usa as imagens transformadas; a camada de texto nativa (§12.1) só vale nas
+entradas `fonte="livro"` com `giro` 0, sem `quadro` e com ângulo efetivo 0.
+**CA-4.6** vale também depois de dividir, de apagar e restaurar, e de inserir na posição 1.
 
 **CA-12.1** Golden normalizado: DOCX = `word/document.xml` em C14N sem `w:rsid*`, texto por
 parágrafo e estilo; EPUB = cada XHTML do spine em C14N (e o OPF sem `dc:identifier` e
@@ -797,8 +918,9 @@ reiniciar; uma varredura por AST não acha cor literal em `app/` fora de `estilo
 ### 14.2 Desfazer do projeto
 
 - `HistoricoDoProjeto` global de `Transacao(descricao, paginas: {pid: Diferenca(antes,
-  depois, por gid)}, amostras_criadas, amostras_apagadas)`; limite de 50 MB, descartando as
-  mais antigas.
+  depois, por gid)}, amostras_criadas, amostras_apagadas)`, e desde o passo L
+  `sequencia: (antes, depois)` nas operações de página (§12.4: aplica só se a sequência atual
+  é a de depois); limite de 50 MB, descartando as mais antigas.
 - **Pré-condição por gid**: desfazer só aplica se o estado atual de cada gid da diferença é
   igual ao `depois`; senão recusa, com aviso, sem aplicar nada. A versão da página não entra.
 - **A propagação de um Enter emenda o `depois`** da transação daquele Enter; desfazer com a

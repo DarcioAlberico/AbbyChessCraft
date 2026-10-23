@@ -702,8 +702,8 @@ class ControladorDePagina:
         sequencia = self.projeto.sequencia if self.projeto is not None else None
         ja_metades = {p for p in set(posicoes) if sequencia is not None
                       and 0 <= p < len(sequencia) and sequencia.entrada_em(p).metade}
-        return self._mudar_sequencia(fazer,
-                                     f"Dividir {sq.quantas_paginas(len(set(posicoes)) - len(ja_metades))}",
+        a_dividir = len(set(posicoes)) - len(ja_metades) or len(set(posicoes))
+        return self._mudar_sequencia(fazer, f"Dividir {sq.quantas_paginas(a_dividir)}",
                                      troca=troca, nota=nota,
                                      depois_de_gravar=lambda: self._guardar_os_angulos(angulos))
 

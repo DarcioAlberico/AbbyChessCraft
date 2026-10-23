@@ -250,3 +250,42 @@ def test_ir_a_origem_diz_que_o_glifo_saiu_da_pagina_ou_do_livro(app, janela):
     assert "saiu da página" in janela.statusBar().currentMessage()
     janela.ir_a_origem(None, gid)
     assert "saiu do livro" in janela.statusBar().currentMessage()
+
+
+def test_a_busca_le_a_pagina_girada_fora_da_memoria_na_geometria_da_entrada(projeto, ctl):
+    """Girar não regrava a página: o índice, que lê o arquivo, a leva ao giro (e à posição de
+    agora), e acha o mesmo texto que acharia com ela na memória."""
+    from abbychess import busca as bs
+
+    caixas = [BoxEntry(char=c, x1=40 + 14 * k, y1=60, x2=52 + 14 * k, y2=80, source="manual",
+                       confidence=1.0) for k, c in enumerate("ola")]
+    caixas += [BoxEntry(char=c, x1=40 + 14 * k, y1=400, x2=52 + 14 * k, y2=420,
+                        source="manual", confidence=1.0) for k, c in enumerate("mundo")]
+    projeto.salvar_pagina(3, caixas)
+    ctl.girar_paginas([3], 90)
+    ctl.mover_paginas([3], 9)                                  # e muda de lugar
+    posicao = projeto.posicao_do_pid(projeto.sequencia.entradas[9].pid)
+    na_memoria = bs._indexar_tarefa((projeto.carregar_modelo(posicao).instantaneo(), "pt", 0))
+    entrada = projeto.sequencia.entrada_em(posicao)
+    do_arquivo = bs._indexar_tarefa(((str(projeto.arquivo_da_pagina(posicao)), posicao,
+                                      entrada.geometria, entrada.tamanho), "pt", 0))
+    assert do_arquivo.texto == na_memoria.texto and do_arquivo.indice == posicao == 9
+
+
+def test_o_ctrl_z_da_divisao_pelo_carimbo_com_o_cache_vazio(projeto, ctl):
+    """O caminho rápido do desfazer (o arquivo como `trocar_paginas` o deixou): aceita a página
+    intocada e recusa a que mudou por fora."""
+    _ler(projeto, 2)
+    ctl.dividir_paginas([2])
+    with projeto._trava_do_cache:
+        projeto._modelos.clear()
+    assert ctl.desfazer() is None and len(projeto.sequencia) == 60   # intocada: desfaz
+    ctl.refazer()
+    with projeto._trava_do_cache:
+        projeto._modelos.clear()
+    arquivo = projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(3)}.json"
+    bruto = json.loads(arquivo.read_text(encoding="utf-8"))
+    bruto["estado"] = "verificada"                                  # mudou por fora
+    arquivo.write_text(json.dumps(bruto), encoding="utf-8")
+    ctl.desfazer()
+    assert len(projeto.sequencia) == 61                             # recusado

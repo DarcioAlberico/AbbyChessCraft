@@ -1350,7 +1350,11 @@ class ControladorDaBusca:
             if modelo is not None:              # na memória (talvez sem gravar): o instantâneo
                 fontes[indice] = (modelo.instantaneo(), versao)
             elif caminho is not None:
-                fontes[indice] = (str(caminho), versao)
+                # A posição e a geometria da entrada: o arquivo pode estar na de antes de um
+                # giro (que não regrava a página, §12.4).
+                entrada = projeto.sequencia.entrada_em(indice)
+                fontes[indice] = ((str(caminho), indice, entrada.geometria, entrada.tamanho),
+                                  versao)
             else:                               # v1: lida na thread, sem migrar
                 a_ler[indice] = versao
         total = len(fontes) + len(a_ler)

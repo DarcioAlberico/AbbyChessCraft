@@ -948,13 +948,16 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
 - Da exportação (J, §12.1): os links para "Diagrama N" e "capítulo N", manter as quebras e os
   hífens, realçar a baixa confiança no DOCX, as aspas curvas, o PNG sem perda, o golden do
   CA-12.1 e o `opcoes.yaml` do CA-12.3.
-- A suíte rápida de 314 para 119 s, e dois bugs que isso e o portão mostraram (a troca de
-  perfil com uma janela apagada; o aviso de uma thread depois que a janela fechou).
+- A suíte rápida de 314 para ~102 s (as janelas apagadas no fim de cada módulo; os ícones
+  rasterizados uma vez por tema), e dois bugs que isso e o portão mostraram (a troca de perfil
+  com uma janela apagada; o aviso de uma thread depois que a janela fechou).
+- O Enter que confirma a leitura não monta mais o texto da página para a validação pelos
+  lances: ~25 ms na mediana (38,8 antes).
 
 Continuam: CA-10.1 (a redação, decisão do usuário); o itálico no OCR (régua do core); CA-9.1 e
 CA-F.1 (o texto verificado); os testes do EPUB em leitores; o render do fitz num processo (K);
-unificar as linhas da exportação com a `OrdemDeLeitura` (F, J); a suíte abaixo de 60 s; o
-custo da validação pelos lances no Enter.
+unificar as linhas da exportação com a `OrdemDeLeitura` (F, J); a suíte abaixo de 60 s (pede
+separar os testes de janela ou rodar em paralelo, decisão do usuário).
 
 ---
 

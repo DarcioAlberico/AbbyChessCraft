@@ -1616,8 +1616,9 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   tabelas; o registro em `docs/revisoes/pendencias.md`). O lote voltou a 8,5 s por página e o
   clique no Documento a 3,7 ms. **A releitura de um glifo com o lote** passa do alvo de 150 ms
   no p95 numa parte das rodadas (206 no portão, 101–153 em três repetições; no L, 106–169):
-  com o lote duas vezes mais rápido, ela disputa o servidor com mais páginas. **O Enter**
-  (38,8 ms na mediana) ainda paga ~25 ms da validação pelos lances, que monta o texto da página
-  a cada edição. **A suíte rápida** leva ~2 min, acima dos 60 s da §15.1. Manter as quebras
+  com o lote duas vezes mais rápido, ela disputa o servidor com mais páginas. **O Enter** que
+  confirma a leitura ficou em ~25 ms na mediana (três rodadas do `9c98367`); o que corrige um
+  caractere ainda paga ~25 ms a mais, da validação pelos lances, que monta o texto da página.
+  **A suíte rápida** leva ~100 s, acima dos 60 s da §15.1. Manter as quebras
   numa página da camada nativa não devolve a quebra onde a camada tirou o hífen da palavra
   partida.

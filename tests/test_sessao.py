@@ -123,7 +123,8 @@ def test_ca_6_4_junta_ou_divide_os_boxes(de, para, boxes):
     plano = _editar(p, de, para)
     assert _texto(p) == para and len(p.boxes) == boxes
     assert plano.juntar_boxes if len(de) > len(para) else plano.dividir_boxes
-    assert "glifos juntados" in plano.estrutural() if len(de) > len(para) else "dividido" in plano.estrutural()
+    estrutural = plano.estrutural()
+    assert "glifos juntados" in estrutural if len(de) > len(para) else "dividido" in estrutural
 
 
 def test_sem_mudanca_so_revisa():

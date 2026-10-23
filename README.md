@@ -749,8 +749,8 @@ os três arquivos saíram em 1,5 s (PDF), 0,8 s (DOCX) e 0,5 s (EPUB).
 ### As páginas do livro: mover, apagar, inserir, girar, cortar, dividir (passo L)
 
 O menu **Página** tem **Mover páginas…**, **Apagar páginas…**, **Inserir páginas…**,
-**Páginas apagadas…**, **Girar páginas…**, **Cortar páginas…**, **Tirar o corte…** e
-**Dividir páginas…**; a gaveta de Páginas move e apaga as linhas selecionadas (menu de
+**Páginas apagadas…**, **Girar páginas…**, **Cortar páginas…**, **Tirar o corte…**,
+**Dividir páginas…** e **Endireitar páginas…**; a gaveta de Páginas move e apaga as linhas selecionadas (menu de
 contexto). As páginas se escolhem como texto, com o número de agora no livro: `3-7, 12`,
 `ímpares`, `pares` ou `todas`; o diálogo diz quantas o texto escolhe, ou o que está errado
 nele.
@@ -763,11 +763,15 @@ nele.
   antiga, voltam à ordem exata).
 - **Inserir** põe no livro as páginas de um PDF ou de imagens, copiadas para a pasta
   `inseridas/` do projeto (o arquivo de fora pode sumir depois). PDF com senha é recusado.
-  As inseridas são lidas, ensinadas e exportadas como as outras (o PDF pesquisável com elas
-  vem na rodada 4 do passo L).
+  As inseridas são lidas, ensinadas e exportadas como as outras; no PDF pesquisável, a
+  página inserida, cortada ou girada sai com a imagem que se vê no programa.
 - **Girar** gira de 90 em 90 graus; **cortar** tira margens (em porcentagem do que se vê).
   Os glifos, as áreas e os diagramas lidos vão junto, nos mesmos pixels; o que o corte deixa
   de fora fica guardado e volta com o Ctrl+Z ou com **Tirar o corte…**.
+- **Endireitar** gira a página por um ângulo à mão (até 20°, positivo no sentido
+  anti-horário), no lugar do medido. A leitura dela se desfaz: ficam os glifos de leitura
+  digitada ou aceitos na revisão, girados com a página, e as áreas desenhadas; o F5 lê o
+  resto de novo.
 - **Dividir** separa a página espelhada (duas páginas do livro numa imagem) em duas: a
   metade esquerda fica no lugar, a direita entra logo depois, cada uma com os glifos dela.
   As amostras ensinadas antes continuam achando o glifo de origem. Uma metade não se divide

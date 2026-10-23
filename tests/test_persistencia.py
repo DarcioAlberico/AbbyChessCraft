@@ -64,13 +64,19 @@ class _Sistema:
     def __init__(self, monkeypatch, chamada: str, vezes, *, parcial: bool = False):
         self.fds, self.chamadas = [], 0
         abrir_original, original = gv._abrir_fd, getattr(gv, chamada)
+        # Só a thread do teste: o gravador de um projeto de outro teste, que grave nesse
+        # meio-tempo, passa pelas funções de verdade (e não conta nem falha).
+        thread = threading.get_ident()
 
         def abrir(*args):
             fd = abrir_original(*args)
-            self.fds.append(fd)
+            if threading.get_ident() == thread:
+                self.fds.append(fd)
             return fd
 
         def falhar(*args):
+            if threading.get_ident() != thread:
+                return original(*args)
             self.chamadas += 1
             if vezes is None or self.chamadas <= vezes:
                 if parcial:

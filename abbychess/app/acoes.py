@@ -89,9 +89,12 @@ def montar(janela) -> None:
     j.acao_tirar_o_corte = teclado.sem_atalho(j, "Tirar o corte…", lambda: j.tirar_o_corte())
     j.acao_dividir_paginas = teclado.sem_atalho(j, "Dividir páginas…",
                                                 lambda: j.dividir_paginas())
+    j.acao_endireitar_paginas = teclado.sem_atalho(j, "Endireitar páginas…",
+                                                   lambda: j.endireitar_paginas())
     j.acoes_de_paginas = (j.acao_mover_paginas, j.acao_apagar_paginas, j.acao_inserir_paginas,
                           j.acao_paginas_apagadas, j.acao_girar_paginas, j.acao_cortar_paginas,
-                          j.acao_tirar_o_corte, j.acao_dividir_paginas)
+                          j.acao_tirar_o_corte, j.acao_dividir_paginas,
+                          j.acao_endireitar_paginas)
     barra.addSeparator()
 
     # --- A fila ----------------------------------------------------------------
@@ -355,8 +358,9 @@ def atualizar(janela) -> None:
              "Gira as páginas de 90 em 90 graus, com os glifos",
              "Corta as margens das páginas; os glifos de fora ficam guardados",
              "Devolve as páginas cortadas inteiras",
-             "Divide a página espelhada em duas")
-    valem = (True, True, True, apagadas, True, True, True, True)
+             "Divide a página espelhada em duas",
+             "Endireita as páginas por um ângulo à mão; a leitura delas se desfaz")
+    valem = (True, True, True, apagadas, True, True, True, True, True)
     for q, dica, vale in zip(j.acoes_de_paginas, dicas, valem):
         q.setEnabled(motivo is None and vale)
         q.setToolTip(dica if motivo is None else f"{dica}. {motivo}")

@@ -776,8 +776,10 @@ A partir do L:
   diagramas e os tabuleiros com conta exata (`abbychess.geometria`; o `gid` fica). **Cada
   JSON de página (versão 3) grava a `geometria` (quadro e giro) em que os boxes estão** e o
   tamanho da fonte; ao carregar, se ela difere da entrada da sequência, os boxes são levados
-  nessa hora (`modelo.reenquadrar`). Assim girar e cortar gravam só a sequência, o Ctrl+Z é
-  a sequência de antes, e uma queda no meio não deixa boxes no quadro errado. **O glifo que
+  nessa hora (`modelo.reenquadrar`). Assim o Ctrl+Z de girar e cortar é a sequência de
+  antes, e uma queda no meio não deixa boxes no quadro errado: a sequência é gravada
+  primeiro, e só depois as páginas gravadas vão ao gravador já levadas à geometria nova (o
+  arquivo, o `livro.json` e a busca seguem a imagem; rodada 4). **O glifo que
   não cabe no quadro fica guardado na página** (`fora`: o box na página endireitada inteira e
   o lugar dele na ordem de leitura): o Ctrl+Z, um quadro maior ou tirar o corte o devolvem,
   com o mesmo `gid`, mesmo depois de gravar e reabrir. As áreas são aparadas no quadro; o
@@ -786,7 +788,13 @@ A partir do L:
   ninguém a mexeu; o diagrama que volta com o id tomado ganha outro). O `angulo` do glifo
   (o do texto impresso) acompanha o giro. Endireitar à mão desfaz a leitura da página
   (com pergunta): os glifos marcados à mão ficam, girados em volta do centro; os outros, as
-  zonas automáticas e os diagramas saem; o estado vai a `glifos_marcados` (§4.4).
+  zonas automáticas e os diagramas saem; o estado vai a `glifos_marcados` (§4.4). **Marcado
+  à mão** é o glifo de leitura digitada (`source` manual) ou aceito na revisão (`revisado`):
+  o box não diz quem o desenhou, e são esses que o usuário decidiu (rodada 4, 2026-10-23).
+  O centro do glifo gira com a página e o tamanho fica (a inclinação é de poucos graus;
+  no máximo 20°, à mão); o que sai do quadro fica guardado (`fora`), girado também, e as
+  áreas do usuário giram do mesmo jeito. O ângulo à mão vai na entrada da sequência; a
+  página é trocada inteira com ela, como na divisão, e o Ctrl+Z devolve as duas.
 - **Dividir** uma página espelhada dá duas entradas, cada uma com metade do `quadro` (no `x`
   escolhido): a esquerda fica com o `pid`, a direita ganha um `pid` novo. Cada box vai para
   a metade do centro dele; os que mudam de página ganham `gid` novo (do `pid` novo), e o
@@ -878,7 +886,11 @@ PDF), depois de uma reordenação também; a operação vale exatamente nelas, n
 com o lote rodando ou em projeto só para leitura, as operações ficam desligadas e nenhum
 arquivo muda.
 **CA-12.16** (exportar depois das operações) TXT, DOCX e EPUB seguem a sequência; o PDF
-pesquisável usa as imagens transformadas; a camada de texto nativa (§12.1) só vale nas
+pesquisável usa as imagens transformadas (a página inserida, cortada ou girada vira uma
+página com a imagem da entrada a 300 dpi e a camada por cima, sem conta; a página do PDF do
+livro sem quadro nem giro continua do original, vetorial, com a camada levada ao lugar da
+página torta pelo ângulo, medido ou à mão; com uma página de imagem no meio, o sumário do
+original sai e os marcadores vêm dos títulos); a camada de texto nativa (§12.1) só vale nas
 entradas `fonte="livro"` com `giro` 0, sem `quadro` e com ângulo efetivo 0.
 **CA-4.6** vale também depois de dividir, de apagar e restaurar, e de inserir na posição 1.
 

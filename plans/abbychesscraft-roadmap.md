@@ -899,6 +899,15 @@ As rodadas:
    herdam o estado da página (a verificada continua verificada), e o diagrama que passa da
    divisão vai aparado com a leitura de antes.
 4. Endireitar à mão e as imagens transformadas nas exportações (CA-12.14, 12.16).
+   **Feito**: `modelo.endireitar` (ficam os glifos de leitura digitada ou aceitos na
+   revisão, com o centro girado; as áreas do usuário giram; o resto sai, e a página vai a
+   `glifos_marcados`) e `ControladorDePagina.endireitar_paginas` (o ângulo na entrada, a
+   página trocada inteira com a sequência, como dividir; até 20°; None volta ao medido);
+   **Página › Endireitar páginas…**; o PDF pesquisável monta, quando há página inserida,
+   cortada ou girada, um PDF novo com o original (`insert_pdf`) e a imagem da entrada nas
+   outras. As pendências da 3a: girar e cortar regravam as páginas pelo gravador depois da
+   sequência (o `livro.json` e a busca seguem a imagem); endireitar gira o `fora` junto; o
+   tamanho da página da fonte sai do documento aberto uma vez.
 
 **Tarefas.**
 1. Dividir páginas espelhadas, girar, cortar e endireitar à mão, em páginas pares, ímpares

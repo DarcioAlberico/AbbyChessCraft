@@ -1269,6 +1269,7 @@ class ProjetoDeLivro:
                           "no lugar para passar ao novo")
         with self._trava_do_livro:
             antes = (self.dados.sequencia, self.dados.proximo_pid)
+            velha = self.sequencia
             self.dados.sequencia = nova.para_json()
             self.dados.proximo_pid = max([self.dados.proximo_pid, self._proximo_pid,
                                           *(p + 1 for p in nova.todos_os_pids)])
@@ -1278,6 +1279,28 @@ class ProjetoDeLivro:
                 self.dados.sequencia, self.dados.proximo_pid = antes
                 raise
             self._trocar_sequencia(nova)
+            self._regravar_as_reenquadradas(velha, nova)
+
+    def _regravar_as_reenquadradas(self, velha: sq.Sequencia, nova: sq.Sequencia) -> None:
+        """As páginas gravadas cuja geometria mudou (girar, cortar e o desfazer deles) vão ao
+        gravador já levadas à geometria nova: o arquivo, o `livro.json` (as contagens sem os
+        glifos guardados fora do quadro) e a busca (que lê a da memória) seguem a imagem. A
+        sequência já está gravada antes: uma queda antes delas é a leitura preguiçosa que
+        resolve (`_na_geometria_da_entrada`)."""
+        for posicao, entrada in enumerate(nova.entradas):
+            antes = velha.entrada_de(entrada.pid)
+            if antes is None or antes.geometria == entrada.geometria:
+                continue
+            if self.modelo_em_memoria(posicao) is None and self._arquivo_v2_de(posicao) is None:
+                continue                            # nada gravado: nada a levar
+            try:
+                pagina = self.carregar_modelo(posicao)
+            except (OSError, ValueError, KeyError, TypeError) as erro:
+                log.warning("a página %d não foi levada à geometria nova: %s", posicao + 1,
+                            erro)
+                continue
+            if pagina is not None:
+                self.agendar(pagina)
 
     def inserir_arquivo(self, caminho: str | Path) -> List[sq.Entrada]:
         """Copia o PDF ou a imagem para `inseridas/` (o nome pelo SHA-256: o mesmo arquivo

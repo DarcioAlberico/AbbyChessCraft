@@ -13,10 +13,14 @@ from typing import Dict, List, Sequence, Tuple
 
 from core.box_model import BoxEntry
 
+#: Quanto da calha, de cada lado, não conta para um box atravessar: o `9` que abre a coluna
+#: da direita encosta na calha sem atravessá-la.
 MARGEM_DA_CALHA = 0.25
-# O Documento é refeito a cada edição e recebe páginas ainda incompletas. Exigimos mais
-# evidência que a exportação legada: três filas curtas aparecem por acaso depois de dividir
-# ou juntar boxes; seis mantêm esses rascunhos em uma coluna e ainda cobrem páginas reais.
+#: Filas de texto que cada coluna precisa ter para a página ser lida em colunas. Com três (a
+#: exportação até 2026-10-23), filas curtas apareciam por acaso depois de dividir ou juntar
+#: boxes, e páginas de diagramas viravam colunas que cortavam os tabuleiros (3 de 160
+#: páginas de 8 livros, `docs/revisoes/pendencias.md`); com seis, nenhuma página real perde
+#: as colunas que tem. O Documento e a exportação usam a mesma, e leem a página igual.
 FILAS_DE_COLUNA = 6
 ChaveDeLeitura = Tuple[int, int]
 
@@ -32,7 +36,19 @@ def _coluna_de(x: float, colunas: Sequence[Tuple[int, int]]) -> int:
 
 @dataclass(frozen=True)
 class OrdemDeLeitura:
-    """Colunas e faixas transversais de uma página, numa interface sem detalhes do core."""
+    """Colunas e faixas transversais de uma página, numa interface sem detalhes do core: a
+    ordem de leitura em trechos de uma coluna só, `(faixa, coluna)`, do Documento e da
+    exportação.
+
+    **As linhas se montam dentro de cada trecho.** O `core.notacao` monta a linha pela
+    altura, na ordem de leitura do `BoxService`; quando ela passa do pé de uma coluna para o
+    alto da seguinte, o caractere de cima "não está abaixo" da linha corrente e entra nela
+    (no Odds & Ends, `isfantastic:16...d3`, a linha de uma coluna colada à da outra).
+
+    O que atravessa a calha (o título centrado sobre as duas colunas) é uma faixa sozinha,
+    na altura dele; entre duas dessas, as colunas da esquerda para a direita. Página de uma
+    coluna é um trecho só. A mesma chave ordena as figuras da exportação (`chave` de um
+    ponto): o diagrama da coluna da esquerda fica entre os parágrafos dela."""
 
     colunas: Tuple[Tuple[int, int], ...] = ()
     faixas: Tuple[Tuple[float, float], ...] = ()

@@ -50,7 +50,7 @@ from core.pagina import Figura, PaginaExtraida, Paragrafo
 from abbychess import pagina as pg
 from abbychess import sequencia as sq
 from abbychess.diagramas import DiagramaLido, para_caixas
-from abbychess.layout import _coluna_de
+from abbychess.layout import OrdemDeLeitura
 from abbychess.projeto import ProjetoDeLivro
 
 log = logging.getLogger(__name__)
@@ -312,7 +312,7 @@ class _Linha:
     topo: int
     pe: int
     indices: List[int] = field(default_factory=list)
-    #: O trecho de leitura (faixa, coluna) da linha; ver `_Leitura`.
+    #: O trecho de leitura (faixa, coluna) da linha; ver `layout.OrdemDeLeitura`.
     trecho: Tuple[int, int] = (0, 0)
     #: Da `Estrutura`: a função da área da linha, se ela pede parágrafo, se termina num
     #: hífen de quebra decidido, e os trechos `(início, fim)` em negrito e em itálico.
@@ -336,17 +336,16 @@ def palavras(boxes: Sequence[BoxEntry]) -> List[List[Tuple[str, List[int]]]]:
     return [linha for _trecho, linha in _palavras_por_trecho(boxes)]
 
 
-def _palavras_por_trecho(boxes: Sequence[BoxEntry], leitura: Optional["_Leitura"] = None
+def _palavras_por_trecho(boxes: Sequence[BoxEntry], leitura: Optional[OrdemDeLeitura] = None
                          ) -> List[Tuple[Tuple[int, int], List[Tuple[str, List[int]]]]]:
     """As linhas de `palavras`, cada uma com o trecho de leitura em que está."""
     from core.notacao import normalizar_saida, palavras_da_pagina
 
-    leitura = leitura or _Leitura.da_pagina(boxes)
+    leitura = leitura or OrdemDeLeitura.da_pagina(boxes)
     saida = []
     for chave, trecho in leitura.trechos(boxes):
         parte = [boxes[i] for i in trecho]
-        for linha in palavras_da_pagina(
-                parte, leitura.deteccao if len(trecho) == len(boxes) else None):
+        for linha in palavras_da_pagina(parte, leitura.deteccao_do_trecho(trecho, boxes)):
             indices = [trecho[s.indice] for p in linha for s in p.simbolos]
             caixa = _caixa_pela_altura(boxes, indices)
             saida.append((chave, [(_captura_minuscula("".join(
@@ -363,100 +362,6 @@ _CAPTURA_MAIUSCULA = re.compile(r"(?<=[♔♕♖♗♘♚♛♜♝♞KQRBNa-h1-8
 def _captura_minuscula(palavra: str) -> str:
     """A captura sempre em minúscula: nenhum lance se escreve com `X`."""
     return _CAPTURA_MAIUSCULA.sub("x", palavra)
-
-
-#: Quanto da calha, de cada lado, não conta para um box atravessar: o `9` que
-#: abre a coluna da direita encosta na calha sem atravessá-la.
-MARGEM_DA_CALHA = 0.25
-
-#: Filas de texto que cada coluna precisa ter para a página ser lida em colunas.
-FILAS_DE_COLUNA = 3
-
-
-@dataclass
-class _Leitura:
-    """
-    A ordem de leitura da página em trechos de uma coluna só: (faixa, coluna).
-
-    **As linhas se montam dentro de cada trecho.** O `core.notacao` monta a linha
-    pela altura, na ordem de leitura do `BoxService`; quando ela passa do pé de uma
-    coluna para o alto da seguinte, o caractere de cima "não está abaixo" da linha
-    corrente e entra nela — no Odds & Ends, `isfantastic:16...d3` e
-    `♖hf820...♖df8`, a linha de uma coluna colada à da outra.
-
-    O que atravessa a calha (o título `Games` centrado sobre as duas colunas) é uma
-    faixa sozinha, na altura dele; entre duas dessas, as colunas da esquerda para a
-    direita. Página de uma coluna é um trecho só. A mesma chave ordena as figuras
-    (`chave` de um ponto), e é isso que põe o diagrama da coluna da esquerda entre
-    os parágrafos dela, e não entre os da direita da mesma altura.
-    """
-
-    colunas: List[Tuple[int, int]] = field(default_factory=list)
-    #: As faixas que atravessam, `[topo, pé]` em pixels, de cima para baixo.
-    faixas: List[List[float]] = field(default_factory=list)
-    #: A detecção do core sobre a página inteira, que o core reaproveita quando a página é
-    #: um trecho só (como em `layout.OrdemDeLeitura`).
-    deteccao: object = field(default=None, compare=False, repr=False)
-
-    @classmethod
-    def da_pagina(cls, boxes: Sequence[BoxEntry]) -> "_Leitura":
-        from core.services.box_service import BoxService
-
-        if len(boxes) < 2:
-            return cls()
-        deteccao = BoxService.detectar_colunas_e_transversais(list(boxes))
-        colunas = deteccao[0]
-        if len(colunas) < 2:
-            return cls(deteccao=deteccao)
-        altura = statistics.median(b.y2 - b.y1 for b in boxes)
-        # Uma coluna tem filas de texto: com uma linha só, o vão entre duas palavras
-        # passaria por calha e partiria a linha.
-        filas = [{round(((b.y1 + b.y2) / 2) / max(1.0, altura)) for b in boxes
-                  if a <= (b.x1 + b.x2) / 2 <= z} for a, z in colunas]
-        if min(len(f) for f in filas) < FILAS_DE_COLUNA:
-            return cls(deteccao=deteccao)
-        calhas = []
-        for a, b in zip(colunas, colunas[1:]):
-            largura = b[0] - a[1]
-            calhas.append((a[1] + MARGEM_DA_CALHA * largura, b[0] - MARGEM_DA_CALHA * largura,
-                           (a[1] + b[0]) / 2))
-        na_calha = sorted(
-            (b for b in boxes if b.y2 - b.y1 >= 0.5 * altura and any(
-                a < (b.x1 + b.x2) / 2 < z or b.x1 < meio < b.x2 for a, z, meio in calhas)),
-            key=lambda b: b.y1)
-        grupos: List[List[BoxEntry]] = []
-        for b in na_calha:
-            if grupos and b.y1 <= max(o.y2 for o in grupos[-1]):
-                grupos[-1].append(b)
-            else:
-                grupos.append([b])
-        # Um box sozinho na calha é ruído (um filete, um respingo) — a não ser que
-        # seja letra de título, bem maior que o texto.
-        unidas = [[min(o.y1 for o in g), max(o.y2 for o in g)] for g in grupos
-                  if len(g) >= 2 or max(o.y2 - o.y1 for o in g) >= 1.5 * altura]
-        return cls(list(colunas), unidas)
-
-    def chave(self, x: float, y: float) -> Tuple[int, int]:
-        """A faixa (2k+1 a k-ésima que atravessa; 2k o que fica antes dela) e a coluna."""
-        if not self.colunas:
-            return (0, 0)
-        faixa = 2 * len(self.faixas)
-        for k, (topo, pe) in enumerate(self.faixas):
-            if topo <= y <= pe:
-                faixa = 2 * k + 1
-                break
-            if y < topo:
-                faixa = 2 * k
-                break
-        return (faixa, 0 if faixa % 2 else _coluna_de(x, self.colunas))
-
-    def trechos(self, boxes: Sequence[BoxEntry]) -> List[Tuple[Tuple[int, int], List[int]]]:
-        """Os índices dos boxes por trecho, na ordem de leitura dos trechos."""
-        por_trecho: Dict[Tuple[int, int], List[int]] = {}
-        for i, b in enumerate(boxes):
-            por_trecho.setdefault(self.chave((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2),
-                                  []).append(i)
-        return [(chave, por_trecho[chave]) for chave in sorted(por_trecho)]
 
 
 def _caixa_pela_altura(boxes: Sequence[BoxEntry], indices: Sequence[int]) -> Dict[int, str]:
@@ -496,7 +401,7 @@ def _caixa_pela_altura(boxes: Sequence[BoxEntry], indices: Sequence[int]) -> Dic
     return trocas
 
 
-def _linhas(boxes: Sequence[BoxEntry], leitura: Optional[_Leitura] = None,
+def _linhas(boxes: Sequence[BoxEntry], leitura: Optional[OrdemDeLeitura] = None,
             estrutura: Optional[Estrutura] = None) -> List[_Linha]:
     linhas = []
     for trecho, linha in _palavras_por_trecho(boxes, leitura):
@@ -575,7 +480,7 @@ def _margem_da_pagina(boxes: Sequence[BoxEntry], altura: int) -> _Margem:
     margem = _Margem()
     # De cima para baixo, sem os trechos de coluna: o cabeçalho `Games 7`, com o
     # título numa coluna e o número na outra, é uma linha só, a primeira.
-    linhas = _linhas(boxes, _Leitura())
+    linhas = _linhas(boxes, OrdemDeLeitura())
     if not linhas or not altura:
         return margem
     poeira = [linha for linha in linhas if len(linha.texto.replace(" ", "")) <= 2 and (
@@ -777,7 +682,7 @@ def paragrafos(boxes: Sequence[BoxEntry], cortes: Sequence[int] = ()) -> List[Pa
 
 
 def _paragrafos_por_trecho(boxes: Sequence[BoxEntry], cortes: Sequence[int] = (),
-                           leitura: Optional[_Leitura] = None,
+                           leitura: Optional[OrdemDeLeitura] = None,
                            estrutura: Optional[Estrutura] = None,
                            manter_quebras: bool = False
                            ) -> List[Tuple[Tuple[int, int], Paragrafo]]:
@@ -938,7 +843,7 @@ def pagina_extraida(indice: int, boxes: Sequence[BoxEntry],
     if estrutura is not None:
         fora = ("ignorar",) if manter_margens else FORA_DA_EXPORTACAO
         texto = [b for b in texto if estrutura.funcao(b) not in fora]
-    leitura = _Leitura.da_pagina(texto)
+    leitura = OrdemDeLeitura.da_pagina(texto)
     com_trecho = _paragrafos_por_trecho(texto, cortes, leitura, estrutura, manter_quebras)
     blocos: list = [p for _trecho, p in com_trecho]
     figuras = []
@@ -1064,7 +969,7 @@ def numeros_impressos(paginas: Dict[int, Tuple[Sequence[BoxEntry], "Estrutura"]]
         margem = [b for k, b in enumerate(boxes) if k in das_margens
                   or estrutura.funcao(b) in FUNCOES_DE_MARGEM]
         vistos = set()
-        for linha in _linhas(margem, _Leitura()) if margem else []:
+        for linha in _linhas(margem, OrdemDeLeitura()) if margem else []:
             for numero in _NUMERO_DE_PAGINA.findall(linha.texto):
                 vistos.add(int(numero) - indice)
         if vistos:
@@ -1120,7 +1025,7 @@ def titulos_das_paginas(projeto: ProjetoDeLivro, indices: Sequence[int],
         do_titulo = [b for b in entries if estrutura.funcao(b) == "titulo"]
         if not do_titulo:
             continue
-        for _trecho, paragrafo in _paragrafos_por_trecho(do_titulo, (), _Leitura(), estrutura):
+        for _trecho, paragrafo in _paragrafos_por_trecho(do_titulo, (), OrdemDeLeitura(), estrutura):
             if paragrafo.titulo and paragrafo.texto.strip():
                 saida.append((indice, paragrafo.texto.strip()))
     return saida
@@ -1134,7 +1039,7 @@ def _margens_no_relatorio(relatorio: Relatorio, indice: int, boxes: Sequence[Box
     tirados = [b for k, b in enumerate(boxes)
                if k in adivinhados or estrutura.funcao(b) in FUNCOES_DE_MARGEM]
     if tirados:
-        textos = [ln.texto for ln in _linhas(tirados, _Leitura())]
+        textos = [ln.texto for ln in _linhas(tirados, OrdemDeLeitura())]
         relatorio.margens.setdefault(indice, []).extend(textos)
 
 

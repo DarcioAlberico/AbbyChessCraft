@@ -75,8 +75,15 @@ class Executor(QObject):
 
     def na_interface(self, funcao: Callable[[], None]) -> None:
         """Chama `funcao` na thread da interface (de qualquer thread: o sinal enfileira). O
-        servidor de leitura avisa assim, da thread ouvinte dele (§11)."""
-        self._chamar.emit(funcao)
+        servidor de leitura avisa assim, da thread ouvinte dele (§11). Com o executor já
+        apagado pelo Qt (a janela fechou com o índice da busca ou um recorte em curso), não
+        há interface onde chamar: o aviso é descartado, sem derrubar a thread que avisava."""
+        try:
+            self._chamar.emit(funcao)
+        except RuntimeError as erro:
+            if "deleted" not in str(erro):
+                raise
+            log.debug("aviso descartado: a interface já fechou (%s)", erro)
 
     @Slot(object)
     def _chamar_aqui(self, funcao) -> None:

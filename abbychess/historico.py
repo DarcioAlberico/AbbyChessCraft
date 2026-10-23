@@ -91,11 +91,21 @@ class Transacao:
     #: (antes, depois) da sequência do livro, nas operações de página (§12.4): desfazer só
     #: aplica se a sequência de agora é a de depois.
     sequencia: Optional[tuple] = None
+    #: As páginas trocadas inteiras com a sequência (dividir, §12.4): pid -> (instantâneo
+    #: antes, instantâneo depois); None é a página sem arquivo. Desfazer só aplica se cada
+    #: uma está como a operação a deixou.
+    inteiras: Dict[int, tuple] = field(default_factory=dict)
+    #: (antes, depois) dos `gids_movidos` do projeto, com as `inteiras`.
+    movidos: Optional[tuple] = None
 
     def bytes(self) -> int:
         ordem = 0 if self.sequencia is None else sum(
             (len(s.entradas) + len(s.apagadas)) * 96 for s in self.sequencia)
-        return (sum(m.bytes() for m in self.paginas.values()) + ordem
+        inteiras = sum(len(p.boxes) * BYTES_POR_GLIFO + BYTES_POR_ITEM
+                       for par in self.inteiras.values() for p in par if p is not None)
+        if self.movidos is not None:
+            inteiras += sum(len(m) for m in self.movidos) * 64
+        return (sum(m.bytes() for m in self.paginas.values()) + ordem + inteiras
                 + sum(len(a.png) for a in self.amostras_criadas + self.amostras_apagadas))
 
 

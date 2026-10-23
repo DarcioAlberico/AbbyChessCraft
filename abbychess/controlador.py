@@ -503,6 +503,9 @@ class ControladorDePagina:
                     "lugar para passar ao novo.")
         if self.lote_rodando:
             return "O lote está lendo o livro: espere-o terminar, ou cancele-o."
+        if self._em_leitura:
+            # A leitura que chega grava a página de quando foi pedida.
+            return "O servidor está lendo glifos da página: espere a leitura chegar."
         if not self._agora():
             # Uma tarefa (o F5, uma gravação da sessão) usa a posição de agora: mudar a
             # ordem no meio dela a faria gravar noutra página.
@@ -609,14 +612,75 @@ class ControladorDePagina:
         return self._mudar_sequencia(fazer, f"Cortar {len(set(posicoes))} página(s)")
 
     def tirar_o_corte(self, posicoes: Sequence[int]) -> bool:
-        """A página inteira de volta (o giro fica); os glifos guardados voltam."""
+        """A página inteira de volta (o giro fica); os glifos guardados voltam. A metade de
+        uma divisão não: o quadro dela é a divisão (o Ctrl+Z junta as metades)."""
         def fazer(s):
             nova = s
             for pid in sq.pids_da_selecao(s, posicoes):
-                nova = nova.com_entrada(replace(nova.entrada_de(pid), quadro=None))
+                e = nova.entrada_de(pid)
+                if e.metade is not None:
+                    raise ValueError(f"a página {s.posicao_de(pid) + 1} é a metade de uma "
+                                     "divisão; o Ctrl+Z da divisão junta as metades")
+                nova = nova.com_entrada(replace(e, quadro=None))
             return nova
 
         return self._mudar_sequencia(fazer, f"Tirar o corte de {len(set(posicoes))} página(s)")
+
+    def dividir_paginas(self, posicoes: Sequence[int], fracao: float = 0.5) -> bool:
+        """Divide as páginas espelhadas (§12.4) na `fracao` da largura do que se vê: a metade
+        esquerda fica com o `pid`, a direita entra logo depois com um `pid` novo, e os glifos
+        dela ganham gids novos (`gids_movidos`, para as amostras acharem a origem). As páginas
+        são gravadas inteiras com a sequência; o Ctrl+Z as junta de novo e aposenta o `pid`
+        novo. A metade de uma divisão não se divide de novo."""
+        from abbychess import geometria as geo
+        from abbychess import modelo as md
+
+        fracao = float(fracao)
+        if not 0 < fracao < 1:
+            self._avisar("Dividir páginas: a divisão fica dentro da página.", 6000)
+            return False
+        angulos, troca = [], {}
+
+        def fazer(s):
+            projeto = self.projeto
+            projeto.descarregar()               # nada do gravador chega depois da divisão
+            movidos = dict(projeto.dados.gids_movidos)
+            nova, paginas = s, {}
+            for pid in sq.pids_da_selecao(s, posicoes):
+                e = nova.entrada_de(pid)
+                if e.metade is not None:
+                    raise ValueError(f"a página {s.posicao_de(pid) + 1} já é a metade de uma "
+                                     "divisão")
+                tamanho = e.tamanho or self._tamanho(e)
+                largura, altura = geo.tamanho_da_imagem(e.geometria, tamanho)
+                corte = round(fracao * largura)
+                if not 0 < corte < largura:
+                    raise ValueError(f"a página {s.posicao_de(pid) + 1} é estreita demais")
+                pid_novo = projeto.novo_pid()
+                esquerda = replace(e, metade="esquerda", tamanho=tamanho,
+                                   quadro=geo.quadro_da_vista((0, 0, corte, altura),
+                                                              e.geometria, tamanho))
+                direita = replace(e, pid=pid_novo, metade="direita", tamanho=tamanho,
+                                  quadro=geo.quadro_da_vista((corte, 0, largura, altura),
+                                                             e.geometria, tamanho))
+                nova = nova.com_entrada(esquerda)
+                nova = nova.inserir([direita], nova.posicao_de(pid) + 1)
+                pagina = projeto.carregar_modelo(s.posicao_de(pid))
+                if pagina is None:
+                    paginas[pid] = paginas[pid_novo] = (None, None)
+                else:
+                    pagina_e, pagina_d, m = md.dividir(pagina, corte, esquerda.geometria,
+                                                       direita.geometria, tamanho, pid_novo)
+                    paginas[pid] = (pagina.instantaneo(), pagina_e)
+                    paginas[pid_novo] = (None, pagina_d)
+                    movidos.update({str(velho): novo for velho, novo in m.items()})
+                angulos.append((direita, self.fonte.inclinacao_da_entrada(e)))
+            troca.update(paginas=paginas, movidos=(dict(projeto.dados.gids_movidos), movidos))
+            return nova
+
+        return self._mudar_sequencia(fazer, f"Dividir {len(set(posicoes))} página(s)",
+                                     troca=troca,
+                                     depois_de_gravar=lambda: self._guardar_os_angulos(angulos))
 
     def _tamanho(self, entrada) -> tuple:
         return tuple(self.fonte.tamanho_da_fonte(entrada))
@@ -648,11 +712,14 @@ class ControladorDePagina:
                 self.cache.esquecer(entrada)
 
     def _mudar_sequencia(self, fazer, descricao: str, *, desfeita=None,
-                         depois_de_gravar=None) -> bool:
+                         depois_de_gravar=None, troca: Optional[dict] = None) -> bool:
         """Uma operação de página: a sequência nova gravada, uma transação do desfazer com a
         de antes e a de depois (§14.2), e a janela seguindo a página aberta. `desfeita(antes)`
         é a sequência que o desfazer põe, quando não é a de antes (a do inserir);
-        `depois_de_gravar()` roda com a sequência nova gravada, antes de mostrar a página."""
+        `depois_de_gravar()` roda com a sequência nova gravada, antes de mostrar a página.
+        `troca`, que `fazer` preenche, traz as páginas trocadas inteiras (dividir):
+        `paginas` (pid -> (instantâneo antes, a página nova)) e `movidos` (os `gids_movidos`
+        antes e depois)."""
         motivo = self.motivo_para_nao_mudar_as_paginas()
         if motivo is not None:
             self._avisar(motivo, 8000)
@@ -675,24 +742,37 @@ class ControladorDePagina:
             return False
         if desfeita is not None:
             antes = desfeita(antes)
+        transacao = hs.Transacao(descricao, sequencia=(antes, nova))
+        gravar = None
+        if troca:
+            novas = {pid: depois for pid, (_antes, depois) in troca["paginas"].items()}
+            transacao.inteiras = {
+                pid: (velha, None if depois is None else depois.instantaneo())
+                for pid, (velha, depois) in troca["paginas"].items()}
+            transacao.movidos = troca["movidos"]
+
+            def gravar(s):
+                self.projeto.trocar_paginas(s, novas, troca["movidos"][1])
         try:
-            self._aplicar_sequencia(nova, depois_de_gravar)
+            self._aplicar_sequencia(nova, depois_de_gravar, gravar)
         except OSError as erro:
             self.eventos.emitir("aviso", "Páginas", f"{descricao} não foi gravado ({erro}); "
                                 "nada mudou.")
             return False
-        self.historico.registrar(hs.Transacao(descricao, sequencia=(antes, nova)))
+        self.historico.registrar(transacao)
         self.eventos.emitir("acoes_mudaram")
         self._avisar(f"{descricao}. Ctrl+Z desfaz.", 6000)
         return True
 
-    def _aplicar_sequencia(self, nova: "sq.Sequencia", depois_de_gravar=None) -> None:
-        """Grava a sequência e leva a janela junto: as visitas e a página aberta pelo `pid`
-        (a apagada dá lugar à vizinha), e `sequencia_mudou` para quem guarda posições."""
+    def _aplicar_sequencia(self, nova: "sq.Sequencia", depois_de_gravar=None,
+                           gravar=None) -> None:
+        """Grava a sequência (com `gravar(nova)`, se dado: a das páginas trocadas inteiras) e
+        leva a janela junto: as visitas e a página aberta pelo `pid` (a apagada dá lugar à
+        vizinha), e `sequencia_mudou` para quem guarda posições."""
         projeto = self.projeto
         aberta = projeto.sequencia.entrada_em(self.indice) if self.imagem is not None else None
         visitas = [projeto.pid_da_pagina(i) for i in self.visitas]
-        projeto.gravar_sequencia(nova)          # OSError: nada mudou
+        (gravar or projeto.gravar_sequencia)(nova)      # OSError: nada mudou
         if depois_de_gravar is not None:
             depois_de_gravar()
         # As visitas pelo pid; a de agora é a que sobra até ela (a mesma página pode estar
@@ -1749,6 +1829,19 @@ class ControladorDePagina:
                 esperada = antes if refazer else depois
                 if self.projeto.sequencia != esperada:
                     raise hs.Recusa("a ordem do livro mudou depois (por outra ação)")
+                if transacao.inteiras:
+                    self.projeto.descarregar()
+                for pid, (velha, nova) in transacao.inteiras.items():
+                    viva = self.projeto.pagina_do_pid(pid)
+                    for guardada in (velha, nova):
+                        if viva is not None and guardada is not None:
+                            # Um gid nunca volta: a página que sai (a direita, no desfazer)
+                            # leva o contador dela para quando voltar.
+                            guardada.proximo_n = max(guardada.proximo_n, viva.proximo_n)
+                    if not self.projeto.pagina_igual(pid, velha if refazer else nova):
+                        posicao = self.projeto.posicao_do_pid(pid)
+                        onde = "" if posicao is None else f" {posicao + 1}"
+                        raise hs.Recusa(f"a página{onde} mudou depois (por outra ação)")
             for pid, m in transacao.paginas.items():
                 # Pelo pid (§12.4): a página pode ter mudado de posição desde a transação.
                 posicao = self.projeto.posicao_do_pid(pid)
@@ -1767,8 +1860,18 @@ class ControladorDePagina:
             return
         if transacao.sequencia is not None:
             antes, depois = transacao.sequencia
+            gravar = None
+            if transacao.inteiras:
+                from abbychess.modelo import viva
+
+                lado = 1 if refazer else 0
+                alvo = {pid: None if par[lado] is None else viva(par[lado])
+                        for pid, par in transacao.inteiras.items()}
+
+                def gravar(s):
+                    self.projeto.trocar_paginas(s, alvo, transacao.movidos[lado])
             try:
-                self._aplicar_sequencia(depois if refazer else antes)
+                self._aplicar_sequencia(depois if refazer else antes, gravar=gravar)
             except OSError as erro:
                 self.eventos.emitir("recusa", refazer, "A ordem do livro não foi gravada "
                                     f"({erro}); nada foi mudado.")

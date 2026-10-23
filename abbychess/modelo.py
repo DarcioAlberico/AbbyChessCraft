@@ -672,3 +672,157 @@ def _levar(itens, guardados, de, para, tamanho, *, caixa_de, com_caixa, chave, p
         if chave(item) and geo.para_a_fonte(vista, para, tamanho) != tuple(caixa):
             fora.append((lugar, com_caixa(item, caixa), True))
     return dentro, fora
+
+
+def viva(pagina: Pagina) -> Pagina:
+    """A página de um instantâneo (`Pagina.instantaneo`, com tuplas) como a que o cache e a
+    interface editam (com listas)."""
+    return replace(pagina, boxes=list(pagina.boxes), tabuleiros=list(pagina.tabuleiros),
+                   diagramas=list(pagina.diagramas), zonas=list(pagina.zonas))
+
+
+def dividir(pagina: Pagina, corte: int, esquerda, direita, tamanho: Tuple[int, int],
+            pid_novo: int) -> Tuple[Pagina, Pagina, Dict[int, int]]:
+    """Divide a página espelhada (§12.4) no `x = corte` da imagem que se vê (a da geometria
+    dela): devolve a página da esquerda (o mesmo `pid`, na geometria `esquerda`), a da
+    direita (`pid_novo`, na geometria `direita`) e os gids que mudaram de página (velho ->
+    novo).
+
+    Cada glifo vai para a metade do centro dele (aparado nela, se passa da divisão), e os da
+    direita ganham gids do `pid_novo`, na ordem de leitura. As áreas são cortadas pela
+    divisão (a lasca menor que `zonas.MENOR_LADO` some); o tabuleiro e o diagrama vão pela
+    metade do centro. As decisões vão com os glifos delas (a junção de duas metades se
+    desfaz), e o glifo virtual, com o glifo a que ele se prende. O que estava guardado fora do
+    quadro (`fora`, `areas_fora`) fica na esquerda, e o que não cabe em metade nenhuma (uma
+    caixa fora da página) vai para lá. A página não muda."""
+    from abbychess import geometria as geo
+    from abbychess.zonas import MENOR_LADO
+
+    de = geo.normalizar(pagina.geometria)
+    metades = (geo.normalizar(esquerda), geo.normalizar(direita))
+
+    def lado(caixa) -> int:
+        return 0 if caixa[0] + caixa[2] < 2 * corte else 1
+
+    def na_metade(caixa, k: int):
+        """(a caixa na metade `k`, ou None, e a caixa na página endireitada inteira)."""
+        fonte = geo.para_a_fonte(tuple(caixa), de, tamanho)
+        return geo.recortar(fonte, metades[k], tamanho), fonte
+
+    direita_pg = Pagina(pid=pid_novo, indice=pagina.indice + 1, estado=pagina.estado,
+                        geometria=metades[1], tamanho=tamanho)
+    boxes: Tuple[list, list] = ([], [])
+    fora, areas_fora = list(pagina.fora), list(pagina.areas_fora)
+    movidos: Dict[int, int] = {}
+    saidos = set()
+    for lugar, box in enumerate(pagina.boxes):
+        k = lado(_caixa(box.entry))
+        caixa, fonte = na_metade(_caixa(box.entry), k)
+        if caixa is None:                      # fora da página: guardado na esquerda
+            fora.append((lugar, _na_caixa(box, fonte, box.entry.angulo + de[1])))
+            saidos.add(box.gid)
+            continue
+        box = _na_caixa(box, caixa, box.entry.angulo)
+        if k == 1:
+            movidos[box.gid] = direita_pg.alocar()
+            box = replace(box, gid=movidos[box.gid])
+        boxes[k].append(box)
+    esquerda_d, direita_d = _dividir_decisoes(pagina.decisoes,
+                                              {b.gid for b in pagina.boxes} - saidos,
+                                              movidos, direita_pg)
+    tabuleiros: Tuple[list, list] = ([], [])
+    for lugar, tabuleiro in enumerate(pagina.tabuleiros):
+        k = lado(tabuleiro)
+        caixa, fonte = na_metade(tabuleiro, k)
+        if caixa is None:
+            areas_fora.append(("tabuleiro", lugar, fonte, False))
+        else:
+            tabuleiros[k].append(tuple(caixa))
+    diagramas: Tuple[list, list] = ([], [])
+    for lugar, diagrama in enumerate(pagina.diagramas):
+        k = lado(diagrama.caixa)
+        caixa, fonte = na_metade(diagrama.caixa, k)
+        if caixa is None:
+            areas_fora.append(("diagrama", lugar, replace(diagrama, caixa=fonte), False))
+        else:
+            diagramas[k].append(replace(diagrama, caixa=tuple(caixa)))
+    zonas: Tuple[list, list] = ([], [])
+    for zona in pagina.zonas:
+        fonte = geo.para_a_fonte(zona.caixa, de, tamanho)
+        for k in (0, 1):
+            caixa = geo.recortar(fonte, metades[k], tamanho)
+            if caixa is None or min(caixa[2] - caixa[0], caixa[3] - caixa[1]) < MENOR_LADO:
+                continue
+            ids = {d.id for d in diagramas[k]}
+            zonas[k].append(replace(zona, x1=caixa[0], y1=caixa[1], x2=caixa[2], y2=caixa[3],
+                                    diagrama_id=zona.diagrama_id
+                                    if zona.diagrama_id in ids else None))
+    esquerda_d, direita_d = (_virtuais_nas_zonas(d, z) for d, z in ((esquerda_d, zonas[0]),
+                                                                   (direita_d, zonas[1])))
+    esquerda_pg = Pagina(pid=pagina.pid, indice=pagina.indice, boxes=boxes[0],
+                         tabuleiros=tabuleiros[0], diagramas=diagramas[0], zonas=zonas[0],
+                         decisoes=esquerda_d, estado=pagina.estado,
+                         proximo_n=pagina.proximo_n, geometria=metades[0], tamanho=tamanho,
+                         fora=tuple(fora), areas_fora=tuple(areas_fora))
+    direita_pg.boxes, direita_pg.decisoes = boxes[1], direita_d
+    direita_pg.tabuleiros, direita_pg.diagramas = tabuleiros[1], diagramas[1]
+    direita_pg.zonas = zonas[1]
+    return esquerda_pg, direita_pg, movidos
+
+
+def _virtuais_nas_zonas(d: Decisoes, zonas) -> Decisoes:
+    """O virtual que cita uma área que não ficou nesta metade passa a não citar nenhuma."""
+    ids = {z.id for z in zonas}
+    virtuais = tuple(v if v.zona_id is None or v.zona_id in ids else replace(v, zona_id=None)
+                     for v in d.virtuais)
+    return d if virtuais == d.virtuais else replace(d, virtuais=virtuais)
+
+
+def _dividir_decisoes(d: Decisoes, gids: Set[int], movidos: Dict[int, int],
+                      direita: Pagina) -> Tuple[Decisoes, Decisoes]:
+    """As decisões da esquerda e as da direita (com os gids novos). O virtual vai com o box a
+    que a cadeia dele se prende (`depois_de`, senão `antes_de`); sem box, fica na esquerda.
+    Os virtuais da direita ganham gids da página dela."""
+    por_gid = {v.gid: v for v in d.virtuais}
+
+    def ancora(v: GlifoVirtual) -> Optional[int]:
+        vistos = set()
+        alvo = v.depois_de if v.depois_de is not None else v.antes_de
+        while alvo in por_gid and alvo not in vistos:
+            vistos.add(alvo)
+            de_la = por_gid[alvo]
+            alvo = de_la.depois_de if de_la.depois_de is not None else de_la.antes_de
+        return alvo if alvo in gids else None
+
+    virtuais_d = [v for v in d.virtuais if ancora(v) in movidos]
+    mapa = dict(movidos)
+    for v in virtuais_d:
+        mapa[v.gid] = direita.alocar()
+
+    def metade(no_lado, f) -> Decisoes:
+        def um(conjunto):
+            return frozenset(f(g) for g in conjunto if no_lado(g))
+
+        virtuais = []
+        for v in d.virtuais:
+            if not no_lado(v.gid):
+                continue
+            virtuais.append(replace(
+                v, gid=f(v.gid),
+                depois_de=f(v.depois_de) if v.depois_de is not None and no_lado(v.depois_de)
+                else None,
+                antes_de=f(v.antes_de) if v.antes_de is not None and no_lado(v.antes_de)
+                else None))
+        return Decisoes(quebras=um(d.quebras), paragrafo_antes=um(d.paragrafo_antes),
+                        hifen_de_quebra=um(d.hifen_de_quebra),
+                        juncoes=frozenset((f(a), f(b)) for a, b in d.juncoes
+                                          if no_lado(a) and no_lado(b)),
+                        virtuais=tuple(virtuais))
+
+    def na_direita(g: int) -> bool:
+        return g in mapa
+
+    def na_esquerda(g: int) -> bool:
+        return g not in mapa
+
+    return metade(na_esquerda, lambda g: g), metade(na_direita, mapa.__getitem__)

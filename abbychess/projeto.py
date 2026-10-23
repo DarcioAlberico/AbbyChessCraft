@@ -194,6 +194,9 @@ class Projeto:
     #: A sequência do livro (`sequencia.Sequencia.para_json`, §12.4), desde a v3. Nula num
     #: projeto da v2 aberto só para leitura (ela é montada na memória).
     sequencia: Optional[dict] = None
+    #: Os glifos que mudaram de página ao dividi-la (§12.4): gid velho -> gid novo (as chaves
+    #: em texto, como no JSON). A amostra ensinada antes acha o glifo de origem por aqui.
+    gids_movidos: Dict[str, int] = field(default_factory=dict)
 
 
 def sha_da_fonte(caminho: Path) -> str:
@@ -310,6 +313,9 @@ class ProjetoDeLivro:
             dados = Projeto(limiares=Limiares(**dos_limiares), extras=extras, **conhecidos)
             if not isinstance(dados.versao, int):
                 raise ValueError(f"versão {dados.versao!r}")
+            if not isinstance(dados.gids_movidos, dict):
+                log.warning("gids_movidos ilegível no projeto.json: ignorado")
+                dados.gids_movidos = {}
         except (ValueError, TypeError) as erro:
             raise ProjetoInvalido(f"{arquivo} está ilegível: {erro}") from erro
         if dados.versao > VERSAO:
@@ -1341,15 +1347,141 @@ class ProjetoDeLivro:
         pagina_do_nome, gid = lido
         sequencia = self.sequencia
         if gid is not None:
+            gid = self.gid_de_agora(gid)
             return sequencia.posicao_de(pid_de(gid)), gid
         guardado = self._posicoes_do_pdf
         if guardado is None or guardado[0] is not sequencia:   # uma vez por sequência
             posicoes: Dict[int, int] = {}
-            for posicao, entrada in enumerate(sequencia.entradas):
-                if entrada.fonte == sq.FONTE_DO_LIVRO:
-                    posicoes.setdefault(entrada.pagina, posicao)   # a primeira: a esquerda
+            for direita in (False, True):       # a metade esquerda, onde quer que esteja
+                for posicao, entrada in enumerate(sequencia.entradas):
+                    if entrada.fonte == sq.FONTE_DO_LIVRO and \
+                            (entrada.metade == "direita") == direita:
+                        posicoes.setdefault(entrada.pagina, posicao)
             guardado = self._posicoes_do_pdf = (sequencia, posicoes)
         return guardado[1].get(pagina_do_nome), None
+
+    def gid_de_agora(self, gid: int) -> int:
+        """O gid de hoje do glifo `gid` (o mesmo, ou o que ele ganhou ao mudar de página numa
+        divisão, pelos `gids_movidos`)."""
+        movidos = self.dados.gids_movidos
+        for _ in range(len(movidos) + 1):       # uma cadeia não volta, mas o arquivo é de fora
+            novo = _inteiro(movidos.get(str(gid)))
+            if novo is None or novo == gid:
+                break
+            gid = novo
+        return gid
+
+    def novo_pid(self) -> int:
+        """Um `pid` que nenhuma página teve (a metade direita de uma divisão). Gravado com a
+        sequência que o usa; perdido (nunca reaproveitado) se a operação não acontece."""
+        with self._trava_do_livro:
+            self.sequencia                      # o próximo pid vem dela
+            pid = self._proximo_pid
+            self._proximo_pid += 1
+            return pid
+
+    def pagina_do_pid(self, pid: int) -> Optional[Pagina]:
+        """A página `pid` como está (a do cache, ou a do arquivo, sem pô-la no cache); None
+        se nada foi gravado dela. Também a de fora da sequência."""
+        with self._trava_do_livro:
+            with self._trava_do_cache:
+                em_cache = self._modelos.get(pid)
+            if em_cache is not None:
+                return em_cache
+            arquivo = self._arquivo_v2(pid)
+            if not arquivo.is_file():
+                return None
+            return self._de_json(json.loads(arquivo.read_text(encoding="utf-8")))
+
+    def pagina_igual(self, pid: int, esperada: Optional[Pagina]) -> bool:
+        """A página `pid` está como `esperada` (None: sem arquivo)? Compara o que vai para o
+        JSON, sem a data, a posição e o contador de gids (o que se relê do disco é igual ao
+        que foi gravado, com os números arredondados do mesmo jeito)."""
+        atual = self.pagina_do_pid(pid)
+        if esperada is None:
+            # A página vazia que a interface criou na memória (um box desenhado e tirado) e
+            # nunca gravou vale a de antes.
+            return atual is None or (_vazia(atual) and not self._arquivo_v2(pid).is_file())
+        if atual is None:
+            return False
+        return _comparavel(atual) == _comparavel(esperada)
+
+    def trocar_paginas(self, nova: sq.Sequencia, paginas: Dict[int, Optional[Pagina]],
+                       gids_movidos: Dict[str, int]) -> None:
+        """A sequência nova com páginas trocadas inteiras (dividir e o desfazer dela, §12.4):
+        `paginas` é pid -> a página nova (None: o arquivo sai). A ordem das gravações: os
+        arquivos das páginas que entram na sequência, o `projeto.json` (a sequência, o
+        contador de `pid` e os `gids_movidos`), as outras páginas, e por último os arquivos que
+        saem. `OSError` até o `projeto.json`: nada mudou (os arquivos que entraram saem).
+        Depois dele a operação vale: a página que não grava fica com o gravador, que tenta de
+        novo e avisa, e o arquivo que não sai é avisado no log. Uma queda depois do
+        `projeto.json` e antes das páginas deixa a página de antes no disco, que a leitura leva
+        à geometria nova: nada se perde (o que passou à página nova fica também guardado fora
+        do quadro da outra)."""
+        if self.somente_leitura:
+            raise OSError("o projeto está aberto só para leitura")
+        if not self.sequencia_gravada:
+            raise OSError("o projeto ainda está no formato antigo")
+        pendentes = set(paginas) & self.sujas
+        if pendentes:
+            raise OSError("há página com gravação pendente: tente de novo")
+        with self._trava_do_livro:
+            atual = self.sequencia
+            entram = {pid for pid, pagina in paginas.items() if pagina is not None
+                      and atual.entrada_de(pid) is None and atual.apagada(pid) is None}
+            for pid, pagina in paginas.items():
+                if pagina is None:
+                    continue
+                pagina.indice = nova.posicao_de(pid) if nova.posicao_de(pid) is not None \
+                    else pagina.indice
+                velha = self.pagina_do_pid(pid)
+                if velha is not None:           # um gid nunca volta (o Ctrl+Z de uma divisão)
+                    pagina.proximo_n = max(pagina.proximo_n, velha.proximo_n)
+            antes = (self.dados.sequencia, self.dados.proximo_pid, self.dados.gids_movidos)
+            gravados = []
+            try:
+                for pid in entram:
+                    entrada = nova.entrada_de(pid)
+                    gv.gravar_json(self._arquivo_v2(pid), _pagina_para_json(
+                        paginas[pid], entrada.pagina if entrada is not None else None))
+                    gravados.append(pid)
+                self.dados.sequencia = nova.para_json()
+                self.dados.proximo_pid = max([self.dados.proximo_pid, self._proximo_pid,
+                                              *(p + 1 for p in nova.todos_os_pids)])
+                self.dados.gids_movidos = dict(gids_movidos)
+                self.salvar()
+            except BaseException:
+                self.dados.sequencia, self.dados.proximo_pid, self.dados.gids_movidos = antes
+                for pid in gravados:
+                    try:
+                        self._arquivo_v2(pid).unlink(missing_ok=True)
+                    except OSError:
+                        log.warning("p%d.json ficou (vai para as apagadas)", pid,
+                                    exc_info=True)
+                raise
+            with self._trava_do_cache:
+                for pid in paginas:             # a velha não é levada à geometria nova
+                    self._modelos.pop(pid, None)
+                    self._estados.pop(pid, None)
+            self._trocar_sequencia(nova)
+            for pid, pagina in paginas.items():
+                if pagina is None:
+                    continue
+                try:
+                    self._gravar(pagina)
+                except OSError:
+                    log.warning("a página p%d fica com o gravador", pid, exc_info=True)
+                    self.agendar(pagina)
+                else:
+                    self._guardar_no_cache(pagina, foto_nova=True)
+            for pid, pagina in paginas.items():
+                if pagina is None:
+                    try:
+                        self._arquivo_v2(pid).unlink(missing_ok=True)
+                        self._atualizar_livro(pid, None)
+                    except OSError:
+                        log.warning("p%d.json não saiu (vai para as apagadas)", pid,
+                                    exc_info=True)
 
     def posicao_do_pid(self, pid: int) -> Optional[int]:
         """A posição no livro da página `pid`, ou None (fora da sequência)."""
@@ -1567,10 +1699,13 @@ class ProjetoDeLivro:
             self._livro = bruto
         return self._livro
 
-    def _atualizar_livro(self, pid: int, resumo: dict) -> None:
+    def _atualizar_livro(self, pid: int, resumo: Optional[dict]) -> None:
+        """O resumo da página no `livro.json` (None: ela sai dele)."""
         with self._trava_do_livro:
             livro = self._carregar_livro()
             paginas = {**livro["paginas"], str(pid): resumo}
+            if resumo is None:
+                del paginas[str(pid)]
             novo = {"versao": livro["versao"],
                     "paginas": dict(sorted(paginas.items(), key=lambda kv: int(kv[0])))}
             gv.gravar_json(self.pasta / ARQUIVO_DO_LIVRO, novo)
@@ -1658,6 +1793,19 @@ def _pagina_de_json(bruto: dict) -> Pagina:
                   areas_fora=tuple((tipo, int(lugar), _area_de_json(tipo, objeto), bool(aparada))
                                    for tipo, lugar, objeto, aparada
                                    in bruto.get("areas_fora", [])))
+
+
+def _vazia(pagina: Pagina) -> bool:
+    return not (pagina.boxes or pagina.zonas or pagina.tabuleiros or pagina.diagramas
+                or pagina.fora or pagina.areas_fora or pagina.decisoes != Decisoes())
+
+
+def _comparavel(pagina: Pagina) -> str:
+    """A página como o JSON dela, sem o que não é conteúdo (`pagina_igual`)."""
+    bruto = _pagina_para_json(pagina, 0)
+    for chave in ("gravado_em", "indice", "proximo_n"):
+        bruto.pop(chave, None)
+    return json.dumps(bruto, sort_keys=True, ensure_ascii=False)
 
 
 def _area_para_json(tipo: str, objeto):

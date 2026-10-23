@@ -84,8 +84,14 @@ def montar(janela) -> None:
     j.acao_apagar_paginas = teclado.sem_atalho(j, "Apagar páginas…", lambda: j.apagar_paginas())
     j.acao_inserir_paginas = teclado.sem_atalho(j, "Inserir páginas…", j.inserir_paginas)
     j.acao_paginas_apagadas = teclado.sem_atalho(j, "Páginas apagadas…", j.paginas_apagadas)
+    j.acao_girar_paginas = teclado.sem_atalho(j, "Girar páginas…", lambda: j.girar_paginas())
+    j.acao_cortar_paginas = teclado.sem_atalho(j, "Cortar páginas…", lambda: j.cortar_paginas())
+    j.acao_tirar_o_corte = teclado.sem_atalho(j, "Tirar o corte…", lambda: j.tirar_o_corte())
+    j.acao_dividir_paginas = teclado.sem_atalho(j, "Dividir páginas…",
+                                                lambda: j.dividir_paginas())
     j.acoes_de_paginas = (j.acao_mover_paginas, j.acao_apagar_paginas, j.acao_inserir_paginas,
-                          j.acao_paginas_apagadas)
+                          j.acao_paginas_apagadas, j.acao_girar_paginas, j.acao_cortar_paginas,
+                          j.acao_tirar_o_corte, j.acao_dividir_paginas)
     barra.addSeparator()
 
     # --- A fila ----------------------------------------------------------------
@@ -300,7 +306,7 @@ def _menus(j) -> None:
     for acao in (j.acao_anterior, j.acao_seguinte, j.acao_primeira, j.acao_ultima,
                  j.acao_ir_para, j.acao_voltar_visita, j.acao_avancar_visita, None,
                  j.acao_reconhecer, j.acao_reler, j.acao_verificada, j.acao_antes_do_lote,
-                 None, *j.acoes_de_paginas, None,
+                 None, *j.acoes_de_paginas[:4], None, *j.acoes_de_paginas[4:], None,
                  j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
                  j.acao_escopo_da_fila, j.acao_proximo_do_livro, j.acao_diagramas):
         menu.addSeparator() if acao is None else menu.addAction(acao)
@@ -345,8 +351,13 @@ def atualizar(janela) -> None:
     dicas = ("Muda páginas de lugar (as escolhidas, depois de outra)",
              "Tira páginas do livro; elas ficam guardadas no projeto",
              "Põe páginas de um PDF ou de imagens no livro",
-             "Devolve ao livro as páginas apagadas")
-    for q, dica, vale in zip(j.acoes_de_paginas, dicas, (True, True, True, apagadas)):
+             "Devolve ao livro as páginas apagadas",
+             "Gira as páginas de 90 em 90 graus, com os glifos",
+             "Corta as margens das páginas; os glifos de fora ficam guardados",
+             "Devolve as páginas cortadas inteiras",
+             "Divide a página espelhada em duas")
+    valem = (True, True, True, apagadas, True, True, True, True)
+    for q, dica, vale in zip(j.acoes_de_paginas, dicas, valem):
         q.setEnabled(motivo is None and vale)
         q.setToolTip(dica if motivo is None else f"{dica}. {motivo}")
     j.paginas.paginas_mudam = motivo is None

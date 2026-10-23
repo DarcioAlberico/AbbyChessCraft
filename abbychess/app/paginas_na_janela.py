@@ -1,7 +1,7 @@
 """As operações de página vistas da janela (SPEC §12.4, passo L): os diálogos do menu Página e
 da gaveta, que perguntam e chamam os comandos do controlador (`mover_paginas`,
-`apagar_paginas`, `inserir_paginas`, `restaurar_paginas`). Um mixin da `JanelaPrincipal`,
-como `EspacoDeTrabalho`.
+`apagar_paginas`, `inserir_paginas`, `restaurar_paginas`, `girar_paginas`, `cortar_paginas`,
+`tirar_o_corte`, `dividir_paginas`). Um mixin da `JanelaPrincipal`, como `EspacoDeTrabalho`.
 """
 
 from __future__ import annotations
@@ -58,6 +58,57 @@ class PaginasNaJanela:
                        "sair do lugar). Ctrl+Z desfaz.")
         if escolha is not None:
             self.pagina.inserir_paginas(caminhos, escolha[1] + 1)
+
+    def _total(self) -> int:
+        return self.pagina.fonte.total if self.pagina.fonte else 0
+
+    def girar_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
+        sentido = dp.campo_do_sentido()
+        escolha = dp.perguntar_com(
+            self, "Girar páginas", self._total(), [("Girar", sentido)], sentido.currentData,
+            selecao=self._selecao_de_agora(selecionadas),
+            efeito="{N} página(s) giram: {PAGINAS}.",
+            explicacao="A imagem gira, e os glifos, as áreas e os diagramas lidos vão junto. "
+                       "Ctrl+Z desfaz.")
+        if escolha is not None:
+            self.pagina.girar_paginas(*escolha)
+
+    def cortar_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
+        margens = [dp.campo_de_porcentagem(0.0, 0.0, 95.0) for _ in range(4)]
+        escolha = dp.perguntar_com(
+            self, "Cortar páginas", self._total(),
+            list(zip(("Margem esquerda", "Margem de cima", "Margem direita", "Margem de baixo"),
+                     margens)),
+            lambda: tuple(m.value() / 100 for m in margens),
+            selecao=self._selecao_de_agora(selecionadas),
+            efeito="{N} página(s) são cortadas: {PAGINAS}.",
+            explicacao="Cada margem é a parte da imagem que se vê agora que sai, em "
+                       "porcentagem da largura ou da altura. Os glifos que ficam de fora "
+                       "são guardados: Ctrl+Z, ou Tirar o corte…, os devolvem.")
+        if escolha is not None:
+            self.pagina.cortar_paginas(*escolha)
+
+    def tirar_o_corte(self, selecionadas: Optional[Sequence[int]] = None) -> None:
+        escolha = dp.perguntar_paginas(
+            self, "Tirar o corte", self._total(), selecao=self._selecao_de_agora(selecionadas),
+            efeito="{N} página(s) voltam inteiras: {PAGINAS}.",
+            explicacao="A página volta inteira (o giro fica), com os glifos que o corte "
+                       "guardou. A metade de uma página dividida não: o Ctrl+Z da divisão "
+                       "junta as metades.")
+        if escolha is not None:
+            self.pagina.tirar_o_corte(escolha[0])
+
+    def dividir_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
+        onde = dp.campo_de_porcentagem(50.0, 5.0, 95.0, " % da largura")
+        escolha = dp.perguntar_com(
+            self, "Dividir páginas", self._total(), [("Dividir em", onde)],
+            lambda: onde.value() / 100, selecao=self._selecao_de_agora(selecionadas),
+            efeito="{N} página(s) espelhada(s) viram duas cada: {PAGINAS}.",
+            explicacao="A página de duas colunas de livro (a espelhada) vira duas: a metade "
+                       "esquerda fica no lugar e a direita entra logo depois, cada uma com "
+                       "os glifos dela. Ctrl+Z junta de novo.")
+        if escolha is not None:
+            self.pagina.dividir_paginas(*escolha)
 
     def paginas_apagadas(self) -> None:
         apagadas = self.projeto.sequencia.apagadas if self.projeto is not None else ()

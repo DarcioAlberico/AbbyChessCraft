@@ -1,5 +1,5 @@
-"""Os diálogos das operações de página (SPEC §12.4, passo L): mover, apagar e inserir páginas,
-e Páginas apagadas….
+"""Os diálogos das operações de página (SPEC §12.4, passo L): mover, apagar, inserir, girar,
+cortar e dividir páginas, e Páginas apagadas….
 
 As páginas se escolhem como texto, pela seleção do livro (`sequencia.selecao`: "3-7, 12",
 "ímpares", "pares", "todas"), com o número de agora; o diálogo mostra, enquanto se digita,
@@ -9,12 +9,12 @@ lugar ("depois da página N") é um número de 0 a N, em que 0 é o começo do l
 
 from __future__ import annotations
 
-from typing import List, Optional, Sequence, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QAbstractItemView, QDialog, QDialogButtonBox, QFormLayout,
-                               QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
-                               QSpinBox, QVBoxLayout)
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog, QDialogButtonBox,
+                               QDoubleSpinBox, QFormLayout, QLabel, QLineEdit, QListWidget,
+                               QListWidgetItem, QPushButton, QSpinBox, QVBoxLayout, QWidget)
 
 from abbychess import sequencia as sq
 from abbychess.app import estilo
@@ -33,11 +33,13 @@ def texto_da_selecao(posicoes: Sequence[int]) -> str:
 
 class DialogoDasPaginas(QDialog):
     """Escolhe as páginas e, para mover e inserir, o lugar. `com_selecao=False` (inserir) só
-    pergunta o lugar."""
+    pergunta o lugar; `linhas` (rótulo, widget) são as perguntas da operação (girar, cortar,
+    dividir), depois das páginas."""
 
     def __init__(self, parent, titulo: str, total: int, *, selecao: str = "",
                  com_selecao: bool = True, lugar: Optional[str] = None, lugar_padrao: int = 0,
-                 explicacao: str = "", efeito: str = "{N} página(s)"):
+                 explicacao: str = "", efeito: str = "{N} página(s)",
+                 linhas: Sequence[Tuple[str, QWidget]] = ()):
         super().__init__(parent)
         self.setWindowTitle(titulo)
         self.total = total
@@ -64,6 +66,9 @@ class DialogoDasPaginas(QDialog):
             self.lugar.setSpecialValueText("o começo do livro")
             self.lugar.setAccessibleName(lugar)
             formulario.addRow(lugar, self.lugar)
+        for rotulo, widget in linhas:
+            widget.setAccessibleName(rotulo)
+            formulario.addRow(rotulo, widget)
         self.botoes = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                        QDialogButtonBox.StandardButton.Cancel)
         self.botoes.accepted.connect(self.accept)
@@ -116,6 +121,41 @@ def perguntar_paginas(janela, titulo: str, total: int, **opcoes
         return dialogo.posicoes(), dialogo.depois_da()
     finally:
         dialogo.deleteLater()
+
+
+def perguntar_com(janela, titulo: str, total: int, linhas: Sequence[Tuple[str, QWidget]],
+                  ler: Callable[[], object], **opcoes) -> Optional[Tuple[List[int], object]]:
+    """(posições, o que `ler()` diz das `linhas`) do diálogo aceito, ou None. `ler` roda com
+    o diálogo ainda vivo."""
+    dialogo = DialogoDasPaginas(janela, titulo, total, linhas=linhas, **opcoes)
+    try:
+        if dialogo.exec() != QDialog.DialogCode.Accepted:
+            return None
+        return dialogo.posicoes(), ler()
+    finally:
+        dialogo.deleteLater()
+
+
+#: Os sentidos de girar, como o diálogo os oferece: (texto, graus no sentido horário).
+SENTIDOS = (("90° à direita", 90), ("90° à esquerda", 270), ("180°", 180))
+
+
+def campo_do_sentido() -> QComboBox:
+    campo = QComboBox()
+    for texto, graus in SENTIDOS:
+        campo.addItem(texto, graus)
+    return campo
+
+
+def campo_de_porcentagem(valor: float, minimo: float, maximo: float, sufixo: str = " %"
+                         ) -> QDoubleSpinBox:
+    campo = QDoubleSpinBox()
+    campo.setRange(minimo, maximo)
+    campo.setDecimals(1)
+    campo.setSingleStep(1.0)
+    campo.setSuffix(sufixo)
+    campo.setValue(valor)
+    return campo
 
 
 # ----------------------------------------------------------------------

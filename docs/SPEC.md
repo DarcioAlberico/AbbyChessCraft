@@ -818,7 +818,8 @@ migradas ficam com `pid` = índice, as outras ganham `pid` novos acima de todos;
 `inclinacoes.json`, `janela.json` e as listas passam a `pid`; todo `gid`, amostra, zona e
 diagrama fica igual; reabrir não migra de novo; copiar `backup-v2/` de volta reabre igual; um
 projeto v1 vai direto à v3 (CA-4.5 de novo). Só para leitura: a sequência é montada na
-memória e nada é gravado.
+memória e nada é gravado. Sem a fonte do livro (o número de páginas não se sabe), a v3
+espera: o projeto segue na v2 e migra na abertura em que o PDF estiver no lugar.
 **CA-12.8** (reordenar) Mover as posições 2–4 para depois da 10 só reescreve a sequência
 (nenhum JSON de página muda, pela data e pelo hash); o seletor, a gaveta de Páginas, a busca,
 a fila do livro e as exportações mostram a ordem nova; a página aberta e `janela.json` seguem

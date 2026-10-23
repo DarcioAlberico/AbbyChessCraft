@@ -839,6 +839,26 @@ As rodadas:
    entrada. O `janela.json` e as listas de páginas do `projeto.json` (o corpo, a amostra
    guiada, a camada nativa, o lote a retomar) **foram para a 1e**: chaveá-los por `pid`
    antes de todo `pid` ser gravado faria a página nunca editada abrir outra ao reabrir.
+   (1e) `VERSAO = 3`: a sequência vai para o `projeto.json` (o projeto novo já nasce com
+   ela); a cadeia v1 → v2 → v3, com `backup-v1/` e `backup-v2/` (o `projeto.json`, as
+   inclinações, `janela.json` e `lote.json` de antes); a sequência montada dos dados da v2 e
+   as listas de páginas passadas a `pid` vão juntas na gravação do `projeto.json`, antes de
+   qualquer outro arquivo; depois, `inclinacoes.json` (chave `p<pid>:<quadro>:<giro>`),
+   `janela.json` (o `pid` da página aberta) e `lote.json` (`pids`) passam a `pid`, e quem os
+   lê aceita a forma da v2 (uma queda no meio não faz medir de novo). Sem gravar na pasta, o
+   projeto da v2 abre só para leitura, com a sequência na memória. Na v3, o `p<pid>.json` que
+   não está na sequência vai às apagadas, e a página da sequência que o `livro.json` não
+   cita volta a ele. Da revisão: a fonte é procurada antes de migrar, e sem ela a v3 espera
+   (a sequência curta, de um PDF sumido, nunca é gravada; a gravada curta ganha no fim as
+   páginas do PDF que faltam); o que a migração passa a `pid` depois do `projeto.json` é
+   completado a cada abertura da v3 (`_completar_v3`), e uma falha ali só avisa; valor
+   estragado nas listas sai; o perdedor de dois arquivos da mesma página não vira apagada;
+   `salvar` toma a trava do livro; a sequência gravada sem `entradas` é recusada. O
+   `backup-v2/` é o da primeira migração: copiado de volta e migrado de novo, ele não é
+   regravado. **O JSON de página v3** (sem o índice, com a geometria dos boxes, §4.3)
+   **foi para a rodada 3**, com girar, cortar e dividir: é só lá que a geometria muda. O teste
+   por AST dos métodos públicos que tomam `indice` não entrou: eles tomam a posição do livro,
+   que segue sendo o que a interface usa.
 2. Reordenar, apagar e inserir, com a seleção (CA-12.8 a 12.10, 12.15).
 3. Girar, cortar e dividir, com a `geometria` preguiçosa (CA-12.11 a 12.13, CA-4.6).
 4. Endireitar à mão e as imagens transformadas nas exportações (CA-12.14, 12.16).

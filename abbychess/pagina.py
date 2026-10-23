@@ -30,7 +30,7 @@ from abbychess import sequencia as sq
 
 from abbychess.leitor import (FONTE_AGUARDANDO, FONTE_MANUAL, LeitorDoLivro, nome_de_origem,
                               precisa_revisao)
-from abbychess.projeto import EXTENSOES_DE_IMAGEM, ProjetoDeLivro
+from abbychess.projeto import ARQUIVO_DE_INCLINACOES, EXTENSOES_DE_IMAGEM, ProjetoDeLivro
 
 log = logging.getLogger(__name__)
 
@@ -45,8 +45,6 @@ PASSO_DA_INCLINACAO = 0.05
 #: Abaixo disto a página fica como está: girar custa uma interpolação.
 INCLINACAO_MINIMA = 0.1
 
-#: O arquivo, na pasta do projeto, com o ângulo medido de cada página.
-ARQUIVO_DE_INCLINACOES = "inclinacoes.json"
 
 
 def medir_inclinacao(cinza: np.ndarray, limite: float = INCLINACAO_MAXIMA,
@@ -121,7 +119,8 @@ class FonteDePaginas:
 
     def __init__(self, caminho: str | Path, *, endireitar: bool = False,
                  pasta: Optional[str | Path] = None, somente_leitura: bool = False,
-                 sequencia: Optional[Callable[[], "sq.Sequencia"]] = None):
+                 sequencia: Optional[Callable[[], "sq.Sequencia"]] = None,
+                 por_pid: bool = False):
         self.caminho = Path(caminho)
         self.endireitar = endireitar
         #: Projeto só para leitura: lê as inclinações gravadas, mas não grava as novas.
@@ -129,6 +128,9 @@ class FonteDePaginas:
         self.pasta = Path(pasta) if pasta else None
         #: A sequência do livro de agora (a do projeto, que as operações de página trocam).
         self._sequencia = sequencia
+        #: As medidas por `pid` (o projeto da v3, com todo `pid` gravado); senão, a página do
+        #: livro sem geometria segue pelo índice do PDF (`_chave_da_inclinacao`).
+        self.por_pid = por_pid
         self._arquivo_das_inclinacoes = (self.pasta / ARQUIVO_DE_INCLINACOES
                                          if self.pasta else None)
         self._inclinacoes: dict = {}
@@ -206,9 +208,13 @@ class FonteDePaginas:
             return entrada.angulo if abs(entrada.angulo) >= INCLINACAO_MINIMA else 0.0
         if not self.endireitar:
             return 0.0
-        chave = _chave_da_inclinacao(entrada)
+        chave = _chave_da_inclinacao(entrada, self.por_pid)
         with self._trava_das_inclinacoes:
             angulo = self._inclinacoes.get(chave)
+            if angulo is None and self.por_pid and _sem_geometria(entrada):
+                # A medida da v2, pelo índice do PDF: a migração a passa a `pid`, e uma queda
+                # no meio dela não faz medir de novo (os boxes estão no ângulo medido).
+                angulo = self._inclinacoes.get(entrada.pagina)
         if angulo is None:
             imagem = imagem if imagem is not None else self.original_da_entrada(entrada)
             medido = medir_inclinacao(np.asarray(imagem.convert("L")))     # fora das travas
@@ -229,13 +235,16 @@ def _ordem_da_chave(item) -> tuple:
     return (0, chave, "") if isinstance(chave, int) else (1, 0, chave)
 
 
-def _chave_da_inclinacao(entrada: "sq.Entrada"):
-    """A chave da medida em `inclinacoes.json`. A página do livro sem quadro nem giro usa o
-    índice dela no PDF, como até o passo K: o `pid` das páginas nunca editadas de um projeto
-    da v2 só existe na memória e muda de uma sessão para outra, e uma medida chaveada por ele
-    iria parar noutra página. As outras (inseridas, cortadas, giradas: só a partir da v3, com
-    todo `pid` gravado) usam `p<pid>` e a geometria em que foram medidas (§12.4)."""
-    if entrada.fonte == sq.FONTE_DO_LIVRO and entrada.quadro is None and not entrada.giro:
+def _sem_geometria(entrada: "sq.Entrada") -> bool:
+    return entrada.fonte == sq.FONTE_DO_LIVRO and entrada.quadro is None and not entrada.giro
+
+
+def _chave_da_inclinacao(entrada: "sq.Entrada", por_pid: bool = False):
+    """A chave da medida em `inclinacoes.json`: `p<pid>` e a geometria em que ela foi medida
+    (§12.4), no projeto da v3. Num da v2 (só para leitura, ou uma fonte sem projeto), a página
+    do livro sem quadro nem giro usa o índice dela no PDF, como até o passo K: lá o `pid` das
+    páginas nunca editadas só existe na memória e muda de uma sessão para outra."""
+    if not por_pid and _sem_geometria(entrada):
         return entrada.pagina
     quadro = "-".join(map(str, entrada.quadro)) if entrada.quadro else "inteira"
     return f"p{entrada.pid}:{quadro}:{entrada.giro}"
@@ -439,7 +448,8 @@ def fonte_do_projeto(projeto: ProjetoDeLivro) -> FonteDePaginas:
     projeto.sequencia
     return FonteDePaginas(projeto.fonte, endireitar=projeto.dados.endireitar,
                           pasta=projeto.pasta, somente_leitura=projeto.somente_leitura,
-                          sequencia=lambda: projeto.sequencia)
+                          sequencia=lambda: projeto.sequencia,
+                          por_pid=projeto.sequencia_gravada)
 
 
 @dataclass

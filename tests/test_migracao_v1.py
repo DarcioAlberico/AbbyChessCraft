@@ -69,7 +69,13 @@ def _conferir(projeto: ProjetoDeLivro, verdade: dict) -> None:
         assert projeto.pagina_reconhecida(indice) == (indice not in verdade["marcadas"])
         zonas = [(z.tipo, list(z.caixa)) for z in projeto.carregar_zonas(indice)]
         assert zonas == verdade["zonas"].get(indice, []), indice
-    assert (projeto.pasta / "inclinacoes.json").read_bytes() == verdade["inclinacoes"]
+    # Desde a v3 (§12.4) as medidas são por pid: os mesmos ângulos, um por página, e o arquivo
+    # de antes em `backup-v2/`.
+    antigos = json.loads(verdade["inclinacoes"])
+    novos = json.loads((projeto.pasta / "inclinacoes.json").read_text(encoding="utf-8"))
+    assert novos == {f"p{projeto.pid_da_pagina(int(k))}:inteira:0": v for k, v in antigos.items()}
+    assert (projeto.pasta / "backup-v2" / "inclinacoes.json").read_bytes() == \
+        verdade["inclinacoes"]
     padroes = {p.relative_to(projeto.pasta).as_posix(): p.read_bytes()
                for p in (projeto.pasta / "padroes").rglob("*") if p.is_file()}
     assert padroes == verdade["padroes"]

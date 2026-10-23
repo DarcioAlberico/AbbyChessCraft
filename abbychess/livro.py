@@ -64,10 +64,14 @@ class SaudeDoLivro:
 def saude(projeto: ProjetoDeLivro, padroes: int = 0) -> SaudeDoLivro:
     """O cartão Saúde derivado do projeto; não abre páginas, só lê ``livro.json``."""
     extras = projeto.dados.extras
-    paginas = tuple(int(i) for i in extras.get(CHAVE_DA_AMOSTRA, ()))
+    # Gravadas por `pid` (§12.4): `paginas` é a posição de agora de cada uma; os pendentes
+    # iniciais são chaveados pelo valor gravado.
+    gravadas = [g for g in extras.get(CHAVE_DA_AMOSTRA, ())
+                if projeto.posicoes_das_gravadas([g])]
+    paginas = tuple(projeto.posicoes_das_gravadas(gravadas))
     iniciais = extras.get(CHAVE_DOS_PENDENTES_INICIAIS, {}) or {}
     resumo = projeto.resumo_do_livro()
-    antes = sum(int(iniciais.get(str(i), iniciais.get(i, 0)) or 0) for i in paginas)
+    antes = sum(int(iniciais.get(str(g), iniciais.get(g, 0)) or 0) for g in gravadas)
     agora = sum(int(resumo.get(i, {}).get("pendentes", 0) or 0) for i in paginas)
     limiar = int(extras.get(CHAVE_DO_LIMIAR_DA_SAUDE, max(3, round(antes * 0.1))) or 0)
     return SaudeDoLivro(paginas, antes, agora, int(padroes), limiar)

@@ -193,8 +193,9 @@ def _cada_arquivo_do_projeto(projeto: ProjetoDeLivro, tmp_path: Path):
     def zonas():
         projeto.salvar_zonas(0, [Zona("texto", 0, 0, 10 + next(contador) % 50, 10)])
 
-    # No v2, a página, a marca dela (o estado) e as áreas ficam no arquivo da página.
-    arquivo_da_pagina = projeto.pasta / "paginas" / f"p{projeto.dados.proximo_pid}.json"
+    # No v2, a página, a marca dela (o estado) e as áreas ficam no arquivo da página; desde a
+    # v3 (§12.4), o pid dela é o da sequência.
+    arquivo_da_pagina = projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(0)}.json"
     return [("pagina", arquivo_da_pagina, pagina),
             ("marcadas", arquivo_da_pagina, marcadas),
             ("projeto.json", projeto.pasta / "projeto.json", projeto_json),

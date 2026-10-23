@@ -440,8 +440,10 @@ def test_o_que_falta_retomar_fica_no_projeto_e_volta_ao_reabrir(ctl, projeto):
     ctl.cancelar()
     ctl.executor.tudo()
     arquivo = projeto.pasta / ARQUIVO_DO_LOTE
+    # Por pid desde a v3 (§12.4): no projeto novo, o pid da página é a posição dela.
     assert json.loads(arquivo.read_text(encoding="utf-8")) == {
-        "paginas": [1, 2], "refazer": True, "reler_depois": []}
+        "paginas": [projeto.pid_da_pagina(1), projeto.pid_da_pagina(2)], "refazer": True,
+        "reler_depois": [], "pids": True}
     p = ctl.pagina                                        # reabre o projeto
     ctl.usar(projeto, p.fonte, p.leitor)
     assert ctl.restante == ([1, 2], True) and ctl.pode_retomar

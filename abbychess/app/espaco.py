@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QDockWidget, QLabel, QMess
 from abbychess import atalhos
 from abbychess import avisos as av
 from abbychess import gravacao as gv
+from abbychess.projeto import ARQUIVO_DA_JANELA
 from abbychess import livro as lv
 from abbychess import verificacao as vf
 from abbychess.modelo import LIDAS
@@ -45,7 +46,7 @@ from abbychess.controladores import ControladorDaFila
 
 log = logging.getLogger(__name__)
 
-ARQUIVO_DO_ESPACO = "janela.json"
+ARQUIVO_DO_ESPACO = ARQUIVO_DA_JANELA      # o nome mora no projeto (a migração o lê)
 VERSAO_DO_ESPACO = 1
 ARRANJOS = ("so_imagem", "lado_a_lado", "empilhado", "so_vista")
 #: Até esta largura o arranjo padrão é o empilhado (§3.1: abaixo de 1280, e em 1280×720).
@@ -78,6 +79,9 @@ def _validar_espaco(dados) -> dict:
                                                  ("largura", 0))}
     if not all(type(v) is int for v in inteiros.values()):
         raise TypeError("página, aba ou foco não é um número inteiro")
+    pid = dados.get("pid")                      # desde a v3 (§12.4); nulo: só a posição
+    if pid is not None and type(pid) is not int:
+        raise TypeError("o pid da página não é um número inteiro")
     escala = dados.get("escala")
     if escala is not None and not isinstance(escala, (int, float)):
         raise TypeError("escala não é um número")
@@ -85,7 +89,7 @@ def _validar_espaco(dados) -> dict:
             "divisor": QByteArray(base64.b64decode(dados["divisor"], validate=True)),
             "docas": {str(k): bool(v) for k, v in docas.items()}, "modo_zoom": modo_zoom,
             "escala": float(escala) if escala else None, "editor": editor, "fila": fila,
-            "arranjo": arranjo, **inteiros}
+            "arranjo": arranjo, "pid": pid, **inteiros}
 
 
 def _doca(janela, titulo: str, nome: str, widget, area) -> QDockWidget:
@@ -597,7 +601,15 @@ class EspacoDeTrabalho:
                 "escala": self.visor.escala(), "modo_zoom": self.visor.modo_zoom,
                 "aba": self.vista.currentIndex(), "editor": self.inspetor.atual(),
                 "fila": self.fila.modo, "foco": self.painel_com_o_foco(),
-                "pagina": self.pagina.indice, "largura": self.width()}
+                "pagina": self.pagina.indice, "pid": self._pid_aberto(),
+                "largura": self.width()}
+
+    def _pid_aberto(self) -> Optional[int]:
+        """O `pid` da página aberta (v3): reabrir volta a ela mesmo se ela mudou de lugar."""
+        projeto = self.projeto
+        if projeto is None or not projeto.sequencia_gravada or self.pagina.fonte is None:
+            return None
+        return projeto.pid_da_pagina(self.pagina.indice)
 
     def gravar_espaco(self) -> None:
         """Grava o espaço do projeto aberto (atômico, como as páginas)."""
@@ -637,8 +649,13 @@ class EspacoDeTrabalho:
             if doca is not None:
                 doca.setVisible(visivel)
         total = self.pagina.fonte.total if self.pagina.fonte else 0
-        if 0 <= dados["pagina"] < total and dados["pagina"] != self.pagina.indice:
-            self.pagina.ir_para(dados["pagina"])
+        pagina = dados["pagina"]
+        if dados["pid"] is not None and self.projeto.sequencia_gravada:
+            pela_sequencia = self.projeto.posicao_do_pid(dados["pid"])
+            if pela_sequencia is not None:      # a página aberta, onde ela estiver agora
+                pagina = pela_sequencia
+        if 0 <= pagina < total and pagina != self.pagina.indice:
+            self.pagina.ir_para(pagina)
         if dados["modo_zoom"] == "pagina":
             self.visor.zoom_pagina()
         elif dados["modo_zoom"] == "largura":

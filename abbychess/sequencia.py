@@ -181,8 +181,13 @@ class Sequencia:
 
     @classmethod
     def de_json(cls, bruto: Mapping) -> "Sequencia":
-        return cls(tuple(Entrada.de_json(e) for e in bruto.get("entradas", [])),
-                   tuple(Apagada.de_json(a) for a in bruto.get("apagadas", [])))
+        """A sequência gravada; sem a lista `entradas` (outro formato), KeyError: uma sequência
+        vazia por engano daria `pid` novos a todas as páginas."""
+        entradas, apagadas = bruto["entradas"], bruto.get("apagadas", [])
+        if not isinstance(entradas, list) or not isinstance(apagadas, list):
+            raise TypeError("as entradas e as apagadas são listas")
+        return cls(tuple(Entrada.de_json(e) for e in entradas),
+                   tuple(Apagada.de_json(a) for a in apagadas))
 
     @classmethod
     def do_livro(cls, pids: Iterable[int]) -> "Sequencia":

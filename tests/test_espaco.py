@@ -572,6 +572,31 @@ def test_reabrir_o_projeto_restaura_o_espaco(app, tmp_path, pdf_de_60_paginas, s
         k.close()
 
 
+def test_reabrir_volta_a_pagina_aberta_pelo_pid_mesmo_se_ela_mudou_de_lugar(
+        app, tmp_path, pdf_de_60_paginas, sim):  # noqa: F811
+    """`janela.json` guarda o pid da página aberta (§12.4, v3): reordenado o livro, reabrir
+    volta a ela, na posição nova."""
+    from abbychess.sequencia import Sequencia
+
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Pid", pdf_de_60_paginas)
+    j = _abrir(projeto)
+    j.ir_para_pagina(12)
+    pid = projeto.pid_da_pagina(12)
+    j.close()
+    outro = ProjetoDeLivro.abrir(projeto.pasta)
+    s = outro.sequencia                              # o que a reordenação (rodada 2) grava
+    nova = Sequencia((s.entradas[12], *s.entradas[:12], *s.entradas[13:]))
+    outro._trocar_sequencia(nova)
+    outro.dados.sequencia = nova.para_json()
+    outro.salvar()
+    k = _abrir(ProjetoDeLivro.abrir(projeto.pasta))
+    try:
+        app.processEvents()
+        assert k.pagina.indice == 0 and k.pagina.projeto.pid_da_pagina(0) == pid
+    finally:
+        k.close()
+
+
 @pytest.mark.parametrize("estrago", ['{"versao": 1, "pagina": "x"}', '[1, 2]', '{"versao": 1}',
                                      '{"versao": 1, "janela": "", "divisor": "", "docas": [1]}',
                                      'não é JSON'])

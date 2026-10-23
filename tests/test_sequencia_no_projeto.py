@@ -133,19 +133,33 @@ def test_perguntar_fora_do_livro_nao_cria_paginas(projeto):
     assert len(projeto.sequencia) == 60
 
 
-def test_arquivo_em_disco_fora_do_livro_reserva_o_pid(projeto):
-    """Um `p<pid>.json` que não entra na sequência (o perdedor de dois arquivos do mesmo
-    índice) não tem o pid dele dado a outra página."""
+def test_arquivo_em_disco_fora_da_sequencia_vai_as_apagadas_e_reserva_o_pid(projeto):
+    """Desde a v3 (§12.4): um `p<pid>.json` que não está na sequência nem nas apagadas (uma
+    queda entre gravações) entra nas apagadas, e o pid dele não é dado a outra página."""
+    projeto.salvar_pagina(0, [_box()])
+    bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(0)}.json")
+                       .read_text(encoding="utf-8"))
+    bruto.update(pid=500, indice=30)             # a página 31, que não tem arquivo dela
+    (projeto.pasta / "paginas" / "p500.json").write_text(json.dumps(bruto), encoding="utf-8")
+    (projeto.pasta / ARQUIVO_DO_LIVRO).unlink()
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert reaberto.pid_da_pagina(0) == projeto.pid_da_pagina(0)
+    assert 500 not in reaberto.sequencia.pids and reaberto.sequencia.apagada(500) is not None
+    assert reaberto._proximo_pid > 500
+    assert ProjetoDeLivro.abrir(projeto.pasta).sequencia.apagada(500) is not None   # gravada
+
+
+def test_o_perdedor_de_dois_arquivos_da_mesma_pagina_nao_vira_apagada(projeto):
+    """O duplicado (a página tem o arquivo dela) fica de fora, para não ser "restaurado"
+    depois; o pid dele continua reservado."""
     projeto.salvar_pagina(0, [_box()])
     bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(0)}.json")
                        .read_text(encoding="utf-8"))
     bruto.update(pid=500, gravado_em="2000-01-01T00:00:00+00:00")
     (projeto.pasta / "paginas" / "p500.json").write_text(json.dumps(bruto), encoding="utf-8")
-    (projeto.pasta / ARQUIVO_DO_LIVRO).unlink()
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.pid_da_pagina(0) == projeto.pid_da_pagina(0)
-    assert 500 not in reaberto.sequencia.pids
-    assert min(p for p in reaberto.sequencia.pids if p != reaberto.pid_da_pagina(0)) > 500
+    assert reaberto.sequencia.apagada(500) is None and 500 not in reaberto.sequencia.pids
+    assert reaberto._proximo_pid > 500
 
 
 def test_sem_a_fonte_a_pagina_gravada_continua_no_lugar(projeto):

@@ -82,8 +82,10 @@ def importar(projeto: ProjetoDeLivro, indices: Optional[Sequence[int]] = None, *
         recusadas += [do_pdf[v.numero] for v in extracao.recusadas if v.numero in do_pdf]
     importadas.sort()
     recusadas.sort()
+    # Por `pid` (§12.4), como as outras listas de páginas do projeto.
     projeto.dados.extras[CHAVE_DAS_PAGINAS] = sorted(set(
-        projeto.dados.extras.get(CHAVE_DAS_PAGINAS, ())) | set(importadas))
+        projeto.dados.extras.get(CHAVE_DAS_PAGINAS, ())) | set(
+        projeto.paginas_para_gravar(importadas)))
     projeto.salvar()
     return Resultado(tuple(importadas), tuple(recusadas))
 

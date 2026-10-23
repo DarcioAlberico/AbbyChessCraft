@@ -38,7 +38,7 @@ from abbychess.leitor import LeitorDoLivro, congelar_para_a_coleta_de_lixo
 log = logging.getLogger(__name__)
 
 #: O que o último lote deixou para retomar, na pasta do projeto.
-ARQUIVO_DO_LOTE = "lote.json"
+from abbychess.projeto import ARQUIVO_DO_LOTE  # noqa: E402  (o nome mora no projeto)
 
 
 # ----------------------------------------------------------------------
@@ -845,8 +845,11 @@ class ControladorDoLivro:
             return False
         extras = p.projeto.dados.extras
         candidatos = extras.get(lv.CHAVE_DOS_CANDIDATOS_DA_AMOSTRA)
-        if candidatos is None:                  # projeto criado antes desta chave
-            inicio, fim = extras.get("intervalo_do_corpo", (0, p.fonte.total - 1))
+        if candidatos is not None:               # gravados por pid (§12.4)
+            candidatos = p.projeto.posicoes_das_gravadas(candidatos)
+        else:                                    # projeto criado antes desta chave
+            ponta = p.projeto.posicoes_das_gravadas(extras.get("intervalo_do_corpo") or ())
+            inicio, fim = (ponta[0], ponta[-1]) if len(ponta) == 2 else (0, p.fonte.total - 1)
             candidatos = range(max(0, int(inicio)), min(p.fonte.total - 1, int(fim)) + 1)
         candidatos = [int(i) for i in candidatos if 0 <= int(i) < p.fonte.total]
         indices = tuple(lv.paginas_da_amostra(candidatos))
@@ -855,7 +858,7 @@ class ControladorDoLivro:
             p.projeto.salvar()
             return False
         p.projeto.dados.extras["amostra_guiada_pendente"] = False
-        p.projeto.dados.extras[lv.CHAVE_DA_AMOSTRA] = list(indices)
+        p.projeto.dados.extras[lv.CHAVE_DA_AMOSTRA] = p.projeto.paginas_para_gravar(indices)
         p.projeto.salvar()
         self._amostra_guiada = indices
         self.reconhecer(indices, refazer=False)
@@ -897,10 +900,13 @@ class ControladorDoLivro:
             extras = self.pagina.projeto.dados.extras
             extras["amostra_guiada_pendente"] = not completa
             if completa:
-                resumo = self.pagina.projeto.resumo_do_livro()
+                projeto = self.pagina.projeto
+                resumo = projeto.resumo_do_livro()
+                # Pelo valor gravado da página (o `pid`, §12.4), como a lista da amostra.
                 extras[lv.CHAVE_DOS_PENDENTES_INICIAIS] = {
-                    str(i): int(resumo.get(i, {}).get("pendentes", 0) or 0)
+                    str(g): int(resumo.get(i, {}).get("pendentes", 0) or 0)
                     for i in paginas_da_amostra
+                    for g in projeto.paginas_para_gravar([i])
                 }
             self.pagina.projeto.salvar()
             if completa:
@@ -928,9 +934,11 @@ class ControladorDoLivro:
         arquivo, projeto = self._arquivo_do_lote(), self.pagina.projeto
         if arquivo is None or projeto.somente_leitura:
             return
+        # Por `pid` (§12.4, `pids`): a página que mudar de lugar continua no lote a retomar.
         dados = None if not faltam and not reler_depois else {
-            "paginas": [int(i) for i in faltam], "refazer": bool(refazer),
-            "reler_depois": [int(i) for i in reler_depois]}
+            "paginas": projeto.paginas_para_gravar(faltam), "refazer": bool(refazer),
+            "reler_depois": projeto.paginas_para_gravar(reler_depois),
+            "pids": projeto.sequencia_gravada}
         self._gravador_do_lote.gravar(arquivo, dados)
         if agora:
             self._gravador_do_lote.esperar()
@@ -945,11 +953,15 @@ class ControladorDoLivro:
             return
         try:
             bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-            total = self.pagina.fonte.total
-            paginas = [int(i) for i in bruto["paginas"] if 0 <= int(i) < total]
+            projeto, total = self.pagina.projeto, self.pagina.fonte.total
+            if bruto.get("pids"):               # v3: por pid
+                paginas = projeto.posicoes_das_gravadas(bruto["paginas"])
+                reler = projeto.posicoes_das_gravadas(bruto.get("reler_depois", []))
+            else:                               # o da v2, por posição (a migração o passa)
+                paginas = [int(i) for i in bruto["paginas"] if 0 <= int(i) < total]
+                reler = [int(i) for i in bruto.get("reler_depois", []) if 0 <= int(i) < total]
             self.restante = (paginas, bool(bruto["refazer"])) if paginas else None
-            self.reler_depois = [int(i) for i in bruto.get("reler_depois", [])
-                                 if 0 <= int(i) < total]
+            self.reler_depois = reler
         except (OSError, ValueError, KeyError, TypeError) as erro:
             log.warning("o lote a retomar (%s) não abriu: %s", arquivo, erro)
 

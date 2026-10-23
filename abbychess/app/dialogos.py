@@ -111,7 +111,8 @@ def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
         QMessageBox.warning(janela, "Novo projeto", str(erro))
         return None
     projeto.dados.idioma = opcoes.idioma
-    projeto.dados.extras["intervalo_do_corpo"] = list(opcoes.intervalo)
+    # As listas de páginas vão por `pid` (§12.4): seguem a página que mudar de lugar.
+    projeto.dados.extras["intervalo_do_corpo"] = projeto.paginas_para_gravar(opcoes.intervalo)
     projeto.salvar()
     try:
         camada = nativo.oferta(fonte)
@@ -134,7 +135,8 @@ def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
     inicio, fim = opcoes.intervalo
     candidatos = [i for i in range(inicio, fim + 1) if i not in set(importadas)]
     projeto.dados.extras["amostra_guiada_pendente"] = bool(candidatos)
-    projeto.dados.extras[livro.CHAVE_DOS_CANDIDATOS_DA_AMOSTRA] = candidatos
+    projeto.dados.extras[livro.CHAVE_DOS_CANDIDATOS_DA_AMOSTRA] = \
+        projeto.paginas_para_gravar(candidatos)
     projeto.salvar()
     config.setValue("pasta_dos_projetos", pasta_mae)
     return projeto
@@ -212,8 +214,8 @@ def avisos_da_abertura(janela, projeto: ProjetoDeLivro) -> None:
         QMessageBox.information(
             janela, "Abrir projeto",
             "O projeto passou ao formato novo. Os programas de antes não o abrem mais "
-            "para trabalhar (só para ver). A cópia das páginas, das áreas e do "
-            f"projeto.json de antes está em\n{projeto.pasta / 'backup-v1'}")
+            "para trabalhar (só para ver). A cópia dos arquivos de antes está em\n"
+            + "\n".join(str(p) for p in projeto.backups_da_migracao))
     if projeto.fonte_relocalizada:
         QMessageBox.information(
             janela, "Abrir projeto", f"A fonte do livro não estava mais no lugar "

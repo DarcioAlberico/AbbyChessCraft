@@ -1,0 +1,57 @@
+== content.opf ==
+<ns0:package xmlns:ns0="http://www.idpf.org/2007/opf" prefix="schema: http://schema.org/" unique-identifier="pub-id" version="3.0" xml:lang="pt-BR">
+<ns0:metadata>
+
+<dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">Golden</dc:title>
+
+<dc:language xmlns:dc="http://purl.org/dc/elements/1.1/">pt-BR</dc:language>
+
+<dc:source xmlns:dc="http://purl.org/dc/elements/1.1/" id="pub-fonte">Golden</dc:source>
+<ns0:meta property="source-of" refines="#pub-fonte">pagination</ns0:meta>
+
+<dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/">A. Autor</dc:creator>
+
+<dc:date xmlns:dc="http://purl.org/dc/elements/1.1/">2026</dc:date>
+<ns0:meta property="schema:accessMode">textual</ns0:meta>
+<ns0:meta property="schema:accessMode">visual</ns0:meta>
+<ns0:meta property="schema:accessModeSufficient">textual</ns0:meta>
+<ns0:meta property="schema:accessibilityFeature">alternativeText</ns0:meta>
+<ns0:meta property="schema:accessibilityFeature">structuralNavigation</ns0:meta>
+<ns0:meta property="schema:accessibilityFeature">pageNavigation</ns0:meta>
+<ns0:meta property="schema:accessibilityFeature">readingOrder</ns0:meta>
+<ns0:meta property="schema:accessibilityHazard">unknown</ns0:meta>
+<ns0:meta property="schema:accessibilitySummary">Texto reconhecido de um livro de xadrez impresso. Os diagramas lidos trazem a posição em FEN como texto alternativo.</ns0:meta>
+</ns0:metadata>
+<ns0:manifest>
+<ns0:item href="imagens/IMG.png" id="i1" media-type="image/png"></ns0:item>
+<ns0:item href="estilo.css" id="css" media-type="text/css"></ns0:item>
+<ns0:item href="nav.xhtml" id="nav" media-type="application/xhtml+xml" properties="nav"></ns0:item>
+<ns0:item href="texto/capitulo-001.xhtml" id="c1" media-type="application/xhtml+xml"></ns0:item>
+<ns0:item href="texto/capitulo-002.xhtml" id="c2" media-type="application/xhtml+xml"></ns0:item>
+</ns0:manifest>
+<ns0:spine><ns0:itemref idref="c1"></ns0:itemref><ns0:itemref idref="c2"></ns0:itemref><ns0:itemref idref="nav" linear="no"></ns0:itemref></ns0:spine>
+</ns0:package>
+== texto/capitulo-001.xhtml ==
+<html xmlns="http://www.w3.org/1999/xhtml" lang="pt-BR" xml:lang="pt-BR"><head>
+<meta charset="UTF-8"></meta><title>Golden</title><link href="../estilo.css" rel="stylesheet" type="text/css"></link></head><body><span xmlns:epub="http://www.idpf.org/2007/ops" aria-label="1" id="pg1" role="doc-pagebreak" epub:type="pagebreak"></span>
+<p>XADREZ VITORIOSO 23</p></body></html>
+== texto/capitulo-002.xhtml ==
+<html xmlns="http://www.w3.org/1999/xhtml" lang="pt-BR" xml:lang="pt-BR"><head>
+<meta charset="UTF-8"></meta><title>Capitulo um</title><link href="../estilo.css" rel="stylesheet" type="text/css"></link></head><body>
+<h1 id="t1">Capitulo um</h1>
+<p>O texto vai em <strong>negrito</strong> e o hiFen termina aqui. Uma duvida</p>
+<figure class="diagrama"><img alt="Diagrama: FEN r3k2r/pp3ppp/2n5/3q4/3P4/2N2N2/PP3PPP/R3K2R w - - 0 1 — brancas a jogar (informado na revisão)" src="../imagens/IMG.png"></img></figure>
+<p>Depois do diagrama.</p></body></html>
+== nav.xhtml ==
+<html xmlns="http://www.w3.org/1999/xhtml" lang="pt-BR" xml:lang="pt-BR"><head>
+<meta charset="UTF-8"></meta><title>Sumário</title></head><body>
+<nav xmlns:epub="http://www.idpf.org/2007/ops" id="toc" role="doc-toc" epub:type="toc">
+<h1>Sumário</h1><ol>
+<li><a href="texto/capitulo-002.xhtml#t1">Capitulo um</a></li></ol></nav>
+<nav xmlns:epub="http://www.idpf.org/2007/ops" hidden="hidden" id="paginas" epub:type="page-list">
+<h1>Páginas</h1><ol>
+<li><a href="texto/capitulo-001.xhtml#pg1">1</a></li></ol></nav>
+<nav xmlns:epub="http://www.idpf.org/2007/ops" hidden="hidden" id="marcos" epub:type="landmarks">
+<h1>Marcos</h1><ol>
+<li><a href="nav.xhtml#toc" epub:type="toc">Sumário</a></li>
+<li><a href="texto/capitulo-001.xhtml" epub:type="bodymatter">Início do texto</a></li></ol></nav></body></html>

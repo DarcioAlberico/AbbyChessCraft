@@ -126,6 +126,13 @@ class Opcoes:
     desenhar_diagramas: bool = True
     #: No TXT, uma marca `[p. N]` no começo de cada página.
     marcas_de_pagina: bool = False
+    #: As quebras de linha e os hífens do impresso ficam: cada linha impressa acaba numa
+    #: quebra dentro do parágrafo (`\n` no texto; `<br/>` no EPUB, `w:br` no DOCX), e o
+    #: parágrafo que a página partiu não se junta com o da seguinte.
+    manter_quebras: bool = False
+    #: No DOCX, os glifos de baixa confiança (os que a fila de revisão pede, §8) com o
+    #: realce amarelo do Word, para quem revisa no editor de texto achar onde olhar.
+    realcar_duvidosos: bool = False
 
 
 @dataclass
@@ -246,6 +253,9 @@ class Estrutura:
     italico: set = field(default_factory=set)
     paragrafo_antes: set = field(default_factory=set)
     hifen_de_quebra: set = field(default_factory=set)
+    #: Os boxes que a fila de revisão pede (`leitor.precisa_revisao`), quando a página foi
+    #: lida com os limiares do livro: o realce do DOCX (`Opcoes.realcar_duvidosos`).
+    duvidosos: set = field(default_factory=set)
     #: Os boxes numa área desenhada pelo usuário com função de texto (não de margem): a
     #: regra das margens corridas (`margens_corridas`) não os tira.
     protegidos: set = field(default_factory=set)
@@ -256,10 +266,11 @@ class Estrutura:
         return self.funcoes.get(id(b), "texto")
 
     @classmethod
-    def da_pagina(cls, pagina) -> Tuple[List[BoxEntry], "Estrutura"]:
+    def da_pagina(cls, pagina, limiares=None) -> Tuple[List[BoxEntry], "Estrutura"]:
         """Os boxes lidos da página do modelo (`modelo.Pagina`) e a estrutura deles; sem
-        modelo, nada."""
+        modelo, nada. Com os `limiares` do livro, também os duvidosos."""
         from abbychess import zonas as zn
+        from abbychess.leitor import precisa_revisao
 
         if pagina is None:
             return [], cls()
@@ -284,6 +295,9 @@ class Estrutura:
                 estrutura.paragrafo_antes.add(id(e))
             if b.gid in decisoes.hifen_de_quebra:
                 estrutura.hifen_de_quebra.add(id(e))
+            if limiares is not None and precisa_revisao(e.char, e.source, e.confidence,
+                                                        limiares):
+                estrutura.duvidosos.add(id(e))
         return list(estrutura.vivos), estrutura
 
 
@@ -302,6 +316,8 @@ class _Linha:
     hifen: bool = False
     negrito: List[Tuple[int, int]] = field(default_factory=list)
     italico: List[Tuple[int, int]] = field(default_factory=list)
+    #: Os trechos dos glifos duvidosos (`Estrutura.duvidosos`).
+    duvidosos: List[Tuple[int, int]] = field(default_factory=list)
 
 
 def palavras(boxes: Sequence[BoxEntry]) -> List[List[Tuple[str, List[int]]]]:
@@ -499,7 +515,11 @@ def _com_a_estrutura(linha: _Linha, palavras_da_linha, boxes: Sequence[BoxEntry]
     linha.funcao = max(set(funcoes), key=funcoes.count)
     linha.paragrafo = id(entradas[0]) in estrutura.paragrafo_antes
     linha.hifen = id(entradas[-1]) in estrutura.hifen_de_quebra and linha.texto.endswith("-")
-    for nome, marcados in (("negrito", estrutura.negrito), ("italico", estrutura.italico)):
+    for nome, marcados in (("negrito", estrutura.negrito), ("italico", estrutura.italico),
+                           ("duvidosos", estrutura.duvidosos)):
+        # O estilo cobre o glifo de vários caracteres só se todos o têm; a dúvida, se um
+        # só a tem (a palavra inteira é onde olhar).
+        basta_um = nome == "duvidosos"
         trechos: List[Tuple[int, int]] = []
         posicao = 0
         for texto, grupo in palavras_da_linha:
@@ -509,7 +529,7 @@ def _com_a_estrutura(linha: _Linha, palavras_da_linha, boxes: Sequence[BoxEntry]
                 for k, i in enumerate(grupo):
                     if id(boxes[i]) in marcados:
                         trechos.append((posicao + k, posicao + k + 1))
-            elif all(id(boxes[i]) in marcados for i in grupo):
+            elif (any if basta_um else all)(id(boxes[i]) in marcados for i in grupo):
                 trechos.append((posicao, posicao + len(texto)))
             posicao += len(texto) + 1
         setattr(linha, nome, _unir_trechos(trechos, linha.texto))
@@ -637,16 +657,23 @@ def _juntar_linhas(textos: Sequence[str]) -> str:
     return saida
 
 
-def _juntar(linhas: Sequence[_Linha]) -> Tuple[str, List[Tuple[int, int]], List[Tuple[int, int]]]:
-    """O texto do parágrafo e os trechos em negrito e em itálico, já no texto juntado.
+def _juntar(linhas: Sequence[_Linha], manter_quebras: bool = False
+            ) -> Tuple[str, List[Tuple[int, int]], List[Tuple[int, int]],
+                       List[Tuple[int, int]]]:
+    """O texto do parágrafo e os trechos em negrito, em itálico e duvidosos, já no texto
+    juntado.
 
     O hífen de quebra decidido no Documento (§6.3) sai sempre; o não decidido sai pela
-    regra de `_juntar_linhas` (letra antes, minúscula depois)."""
-    texto, negrito, italico = "", [], []
+    regra de `_juntar_linhas` (letra antes, minúscula depois). Com `manter_quebras`, as
+    linhas se juntam por `\\n` e todo hífen fica, como impresso."""
+    texto, negrito, italico, duvidosos = "", [], [], []
     anterior: Optional[_Linha] = None
     for linha in linhas:
         if anterior is None:
             base = 0
+        elif manter_quebras:
+            texto += "\n"
+            base = len(texto)
         elif anterior.hifen or (texto.endswith("-") and len(texto) > 1 and texto[-2].isalpha()
                                 and linha.texto[:1].islower()):
             texto = texto[:-1]
@@ -654,18 +681,62 @@ def _juntar(linhas: Sequence[_Linha]) -> Tuple[str, List[Tuple[int, int]], List[
             # O trecho que acabava no hífen não pode cobrir a letra da linha seguinte.
             negrito = [(a, min(b, base)) for a, b in negrito if a < base]
             italico = [(a, min(b, base)) for a, b in italico if a < base]
+            duvidosos = [(a, min(b, base)) for a, b in duvidosos if a < base]
         else:
             texto += " "
             base = len(texto)
         texto += linha.texto
         negrito += [(base + a, base + b) for a, b in linha.negrito]
         italico += [(base + a, base + b) for a, b in linha.italico]
+        duvidosos += [(base + a, base + b) for a, b in linha.duvidosos]
         anterior = linha
 
     def cortados(trechos):
         return _unir_trechos([(a, min(b, len(texto))) for a, b in trechos if a < len(texto)],
                              texto)
-    return texto, cortados(negrito), cortados(italico)
+    return texto, cortados(negrito), cortados(italico), cortados(duvidosos)
+
+
+@dataclass
+class ParagrafoExportado(Paragrafo):
+    """O `Paragrafo` do core com o que só esta exportação sabe: os trechos `(início, fim)`
+    dos glifos duvidosos, para o realce do DOCX (`Opcoes.realcar_duvidosos`)."""
+
+    duvidosos: List[Tuple[int, int]] = field(default_factory=list)
+
+
+def _juntar_entre_paginas(paginas: Sequence[PaginaExtraida]) -> None:
+    """`core.pdf_nativo.juntar_entre_paginas`, levando os duvidosos do parágrafo que
+    volta para a página de antes (o core leva só o negrito e o itálico)."""
+    from core import pdf_nativo
+
+    primeiros = [p.blocos[0] if p.blocos else None for p in paginas]
+    pdf_nativo.juntar_entre_paginas(paginas)
+    for atual, seguinte, primeiro in zip(paginas, paginas[1:], primeiros[1:]):
+        if primeiro is None or (seguinte.blocos and seguinte.blocos[0] is primeiro):
+            continue
+        antes = atual.blocos[-1]
+        trechos = getattr(primeiro, "duvidosos", None)
+        if trechos and isinstance(antes, ParagrafoExportado):
+            # O core escreve `fim + " " + começo`: o texto de depois acaba no fim do novo.
+            deslocamento = len(antes.texto) - len(primeiro.texto)
+            antes.duvidosos = list(antes.duvidosos) + [
+                (a + deslocamento, z + deslocamento) for a, z in trechos
+                if a + deslocamento >= 0]
+
+
+def _quebras_da_camada(pagina: PaginaExtraida) -> None:
+    """`manter_quebras` na página da camada nativa: o espaço antes de cada linha impressa
+    (`Paragrafo.inicios`) vira `\\n`, sem mudar o comprimento (os trechos de estilo ficam).
+    Onde a camada já juntou uma palavra partida, não há espaço, e a quebra não volta."""
+    for bloco in pagina.blocos:
+        if not isinstance(bloco, Paragrafo) or bloco.titulo or not bloco.inicios:
+            continue
+        letras = list(bloco.texto)
+        for inicio in bloco.inicios:
+            if 0 < inicio <= len(letras) and letras[inicio - 1] == " ":
+                letras[inicio - 1] = "\n"
+        bloco.texto = "".join(letras)
 
 
 def paragrafos(boxes: Sequence[BoxEntry], cortes: Sequence[int] = ()) -> List[Paragrafo]:
@@ -680,7 +751,8 @@ def paragrafos(boxes: Sequence[BoxEntry], cortes: Sequence[int] = ()) -> List[Pa
 
 def _paragrafos_por_trecho(boxes: Sequence[BoxEntry], cortes: Sequence[int] = (),
                            leitura: Optional[_Leitura] = None,
-                           estrutura: Optional[Estrutura] = None
+                           estrutura: Optional[Estrutura] = None,
+                           manter_quebras: bool = False
                            ) -> List[Tuple[Tuple[int, int], Paragrafo]]:
     """Os parágrafos de `paragrafos`, cada um com o trecho de leitura em que começa.
 
@@ -707,11 +779,11 @@ def _paragrafos_por_trecho(boxes: Sequence[BoxEntry], cortes: Sequence[int] = ()
             grupos[-1].append(linha)
     saida = []
     for g in grupos:
-        texto, negrito, italico = _juntar(g)
+        texto, negrito, italico, duvidosos = _juntar(g, manter_quebras)
         titulo = g[0].funcao == "titulo"
-        saida.append((g[0].trecho, Paragrafo(texto, titulo=titulo, nivel=1 if titulo else 2,
-                                             negrito=negrito, italico=italico,
-                                             topo=g[0].topo, pe=g[-1].pe)))
+        saida.append((g[0].trecho, ParagrafoExportado(
+            texto, titulo=titulo, nivel=1 if titulo else 2, negrito=negrito, italico=italico,
+            topo=g[0].topo, pe=g[-1].pe, duvidosos=duvidosos)))
     return saida
 
 
@@ -825,7 +897,8 @@ def pagina_extraida(indice: int, boxes: Sequence[BoxEntry],
                     diagramas: Sequence[DiagramaLido] = (),
                     estrutura: Optional[Estrutura] = None,
                     manter_margens: bool = False,
-                    desenhar_diagramas: bool = True) -> PaginaExtraida:
+                    desenhar_diagramas: bool = True,
+                    manter_quebras: bool = False) -> PaginaExtraida:
     """A página gravada no formato que os escritores do PyBoxEditor pedem.
 
     Os diagramas entram na altura em que estão, quando há a imagem: os lidos
@@ -839,7 +912,7 @@ def pagina_extraida(indice: int, boxes: Sequence[BoxEntry],
         fora = ("ignorar",) if manter_margens else FORA_DA_EXPORTACAO
         texto = [b for b in texto if estrutura.funcao(b) not in fora]
     leitura = _Leitura.da_pagina(texto)
-    com_trecho = _paragrafos_por_trecho(texto, cortes, leitura, estrutura)
+    com_trecho = _paragrafos_por_trecho(texto, cortes, leitura, estrutura, manter_quebras)
     blocos: list = [p for _trecho, p in com_trecho]
     figuras = []
     if imagem is not None:
@@ -895,8 +968,9 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
     nativas = paginas_da_camada(projeto, alvo) if camada == "auto" else {}
     pelos_boxes = [i for i in alvo if i not in nativas]
     lidos, estruturas = {}, {}
+    limiares = projeto.dados.limiares if opcoes.realcar_duvidosos else None
     for i in pelos_boxes:
-        lidos[i], estruturas[i] = Estrutura.da_pagina(projeto.carregar_modelo(i))
+        lidos[i], estruturas[i] = Estrutura.da_pagina(projeto.carregar_modelo(i), limiares)
     # A regra das margens corridas olha o livro inteiro, como sempre (o título corrido das
     # pares casa com o das ímpares); só não tira o que o usuário marcou como texto. As
     # mesmas margens dão o número impresso de cada página (os rótulos e os links do EPUB).
@@ -922,10 +996,16 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
                                            projeto.carregar_diagramas(indice),
                                            estrutura=estruturas[indice],
                                            manter_margens=opcoes.manter_margens,
-                                           desenhar_diagramas=opcoes.desenhar_diagramas))
+                                           desenhar_diagramas=opcoes.desenhar_diagramas,
+                                           manter_quebras=opcoes.manter_quebras))
         if progresso:
             progresso(feitas, len(alvo))
-    pdf_nativo.juntar_entre_paginas(paginas)
+    if opcoes.manter_quebras:
+        # A camada nativa já vem refluída: a quebra volta onde cada linha impressa começa.
+        for indice in nativas:
+            _quebras_da_camada(nativas[indice])
+    else:
+        _juntar_entre_paginas(paginas)
     pdf_nativo.lados_pelos_lances(paginas)
     _paginas_no_relatorio(relatorio, projeto, paginas, estados, nativas)
     return paginas
@@ -1174,7 +1254,8 @@ def _altura_da_pagina(projeto: ProjetoDeLivro, indice: int) -> int:
 
 def exportar_docx(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
                   titulo: str, autor: str = "", idioma: str = "pt-BR",
-                  metadados=None, relatorio: Optional["Relatorio"] = None) -> Path:
+                  metadados=None, relatorio: Optional["Relatorio"] = None,
+                  quebras: bool = False, realce: bool = False) -> Path:
     """O DOCX pelo escritor próprio (`abbychess.escritor_docx`): títulos nos estilos de
     título, estilos, diagramas com o texto alternativo, marcadores de página e hiperlinks
     internos, metadados. Depois de gravar, `escritor_docx.conferir` lê o arquivo; o que
@@ -1185,7 +1266,8 @@ def exportar_docx(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
     metadados = metadados or epub.Metadados(titulo=titulo, idioma=idioma,
                                             autores=(autor,) if autor else ())
     numeros = relatorio.numeros_impressos if relatorio is not None else None
-    escrito = escritor_docx.escrever(paginas, caminho, metadados, numeros=numeros)
+    escrito = escritor_docx.escrever(paginas, caminho, metadados, numeros=numeros,
+                                     quebras=quebras, realce=realce)
     problemas = escritor_docx.conferir(caminho)
     for problema in problemas:
         log.warning("DOCX %s: %s", caminho, problema)
@@ -1197,7 +1279,8 @@ def exportar_docx(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
 
 def exportar_epub(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
                   titulo: str, autor: str = "", idioma: str = "pt-BR",
-                  metadados=None, relatorio: Optional["Relatorio"] = None) -> Path:
+                  metadados=None, relatorio: Optional["Relatorio"] = None,
+                  quebras: bool = False) -> Path:
     """O EPUB pelo escritor próprio (`abbychess.epub`): capítulos, sumário pelos títulos,
     lista de páginas, marcos, metadados e a acessibilidade do que foi escrito. Depois de
     gravar, `epub.conferir` lê o arquivo; o que ele acusar vai ao `relatorio`."""
@@ -1206,7 +1289,7 @@ def exportar_epub(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
     metadados = metadados or epub.Metadados(titulo=titulo, idioma=idioma,
                                             autores=(autor,) if autor else ())
     numeros = relatorio.numeros_impressos if relatorio is not None else None
-    escrito = epub.escrever(paginas, caminho, metadados, numeros=numeros)
+    escrito = epub.escrever(paginas, caminho, metadados, numeros=numeros, quebras=quebras)
     problemas = epub.conferir(caminho)
     for problema in problemas:
         log.warning("EPUB %s: %s", caminho, problema)
@@ -1881,7 +1964,9 @@ def previa(projeto: ProjetoDeLivro, formato: str, indices: Optional[Iterable[int
         if len(paginas) > pv.LIMITE:
             texto += f"\n… e mais {len(paginas) - pv.LIMITE} página(s), que a exportação inclui.\n"
         return pv.html_do_texto(texto, linhas, titulo, idioma), relatorio
-    return pv.html_do_livro(paginas, linhas, titulo, idioma), relatorio
+    return (pv.html_do_livro(paginas, linhas, titulo, idioma, quebras=opcoes.manter_quebras,
+                             realce=formato == "docx" and opcoes.realcar_duvidosos),
+            relatorio)
 
 
 def exportar(projeto: ProjetoDeLivro, caminho: str | Path,
@@ -1939,8 +2024,9 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
     meta = metadados_do_projeto(projeto, idioma, metadados)
     if formato == "docx":
         exportar_docx(paginas, caminho, titulo=meta.titulo, idioma=idioma, metadados=meta,
-                      relatorio=relatorio)
+                      relatorio=relatorio, quebras=opcoes.manter_quebras,
+                      realce=opcoes.realcar_duvidosos)
     else:
         exportar_epub(paginas, caminho, titulo=meta.titulo, idioma=idioma, metadados=meta,
-                      relatorio=relatorio)
+                      relatorio=relatorio, quebras=opcoes.manter_quebras)
     return relatorio.resumo(), relatorio

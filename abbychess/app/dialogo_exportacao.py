@@ -54,18 +54,29 @@ class DialogoDeExportacao(QDialog):
         self.so_verificadas = QCheckBox("Só as páginas verificadas")
         self.desenhar = QCheckBox("Diagramas confiáveis redesenhados do FEN (senão, o recorte)")
         self.marcas = QCheckBox("Marcar o começo de cada página ([p. N])")
+        self.manter_quebras = QCheckBox("Manter as quebras de linha e os hífens do impresso")
+        self.manter_quebras.setToolTip("Cada linha impressa termina numa quebra dentro do "
+                                       "parágrafo, e a palavra partida fica com o hífen")
+        self.manter_quebras.setChecked(opcoes.manter_quebras)
+        self.realcar = QCheckBox("Realçar os glifos de baixa confiança (DOCX)")
+        self.realcar.setToolTip("Os glifos que a fila de revisão ainda pede saem com o "
+                                "realce amarelo do Word")
+        self.realcar.setChecked(opcoes.realcar_duvidosos)
         self.manter_margens.setChecked(opcoes.manter_margens)
         self.so_verificadas.setChecked(opcoes.so_verificadas)
         self.desenhar.setChecked(opcoes.desenhar_diagramas)
         self.marcas.setChecked(opcoes.marcas_de_pagina)
         caixa_opcoes = QGroupBox("Opções")
         coluna = QVBoxLayout(caixa_opcoes)
-        for check in (self.manter_margens, self.so_verificadas, self.desenhar, self.marcas):
+        for check in (self.manter_margens, self.manter_quebras, self.so_verificadas,
+                      self.desenhar, self.marcas, self.realcar):
             coluna.addWidget(check)
         texto = formato in ("epub", "docx", "txt")
         self.manter_margens.setEnabled(texto)
+        self.manter_quebras.setEnabled(texto)
         self.desenhar.setEnabled(formato in ("epub", "docx"))
         self.marcas.setEnabled(formato == "txt")
+        self.realcar.setEnabled(formato == "docx")
         self.so_verificadas.setEnabled(formato != "pdf")
         if formato == "pdf":
             coluna.addWidget(QLabel("O PDF pesquisável guarda as páginas inteiras: as opções de "
@@ -148,7 +159,9 @@ class DialogoDeExportacao(QDialog):
         return ex.Opcoes(manter_margens=self.manter_margens.isChecked(),
                          so_verificadas=self.so_verificadas.isChecked(),
                          desenhar_diagramas=self.desenhar.isChecked(),
-                         marcas_de_pagina=self.marcas.isChecked())
+                         marcas_de_pagina=self.marcas.isChecked(),
+                         manter_quebras=self.manter_quebras.isChecked(),
+                         realcar_duvidosos=self.realcar.isChecked())
 
     def metadados(self) -> dict:
         """O formulário como `metadados.json`. A capa é a de antes (também quando outra foi

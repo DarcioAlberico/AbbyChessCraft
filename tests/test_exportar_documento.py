@@ -215,7 +215,7 @@ def test_ca_12_6_duas_exportacoes_iguais_byte_a_byte(tmp_path, monkeypatch):
 def test_o_negrito_que_acaba_no_hifen_nao_cobre_a_linha_seguinte():
     a = ex._Linha("inter-", 0, 10, hifen=True, negrito=[(0, 6)])
     b = ex._Linha("essante fim", 20, 30)
-    assert ex._juntar([a, b]) == ("interessante fim", [(0, 5)], [])
+    assert ex._juntar([a, b]) == ("interessante fim", [(0, 5)], [], [])
 
 
 def test_a_juncao_dos_trechos_so_atravessa_espaco():

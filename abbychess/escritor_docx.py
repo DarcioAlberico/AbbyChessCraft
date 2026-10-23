@@ -65,6 +65,8 @@ class EscritoDocx:
     titulos: int = 0
     figuras: int = 0
     links: int = 0
+    #: Os parágrafos com algum trecho realçado (`realce`).
+    realcados: int = 0
 
 
 # ----------------------------------------------------------------------
@@ -120,18 +122,23 @@ def _marcador(paragrafo, nome: str, ident: int) -> None:
 
 
 def _texto_com_estilo(paragrafo, bloco: Paragrafo, simbolos: str, familia: str,
-                      links: Sequence[Tuple[int, int, str]]) -> None:
+                      links: Sequence[Tuple[int, int, str]], quebras: bool = False,
+                      realce: bool = False) -> None:
     """Os trechos do parágrafo como runs: negrito, itálico, fonte dos símbolos e o
     hiperlink interno por fora (o mesmo corte de `epub.xhtml_do_texto`)."""
+    from docx.enum.text import WD_COLOR_INDEX
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
     from docx.shared import RGBColor
 
-    # Como no EPUB: o comprimento fica; a quebra de linha (o python-docx a faria `w:br`) é
-    # espaço, como no XHTML.
-    texto = epub.sem_proibidos(bloco.texto).replace("\n", " ").replace("\r", " ")
-    marcas = [[False, False, c in simbolos, -1] for c in texto]
-    for k, trechos in ((0, bloco.negrito), (1, bloco.italico)):
+    # Como no EPUB: o comprimento fica; a quebra de linha é espaço, como no XHTML, salvo com
+    # `quebras` (as linhas impressas mantidas): aí ela fica, e o python-docx a escreve `w:br`.
+    texto = epub.sem_proibidos(bloco.texto).replace("\r", " ")
+    if not quebras:
+        texto = texto.replace("\n", " ")
+    marcas = [[False, False, c in simbolos, -1, False] for c in texto]
+    duvidosos = getattr(bloco, "duvidosos", ()) if realce else ()
+    for k, trechos in ((0, bloco.negrito), (1, bloco.italico), (4, duvidosos)):
         for inicio, fim in trechos or ():
             for i in range(max(0, inicio), min(fim, len(texto))):
                 marcas[i][k] = True
@@ -144,10 +151,12 @@ def _texto_com_estilo(paragrafo, bloco: Paragrafo, simbolos: str, familia: str,
         j = i
         while j < len(texto) and marcas[j] == marcas[i]:
             j += 1
-        negrito, italico, simbolo, link = marcas[i]
+        negrito, italico, simbolo, link, duvidoso = marcas[i]
         run = paragrafo.add_run(texto[i:j])
         run.bold = negrito or None
         run.italic = italico or None
+        if duvidoso:
+            run.font.highlight_color = WD_COLOR_INDEX.YELLOW
         if simbolo and familia:
             run.font.name = familia
             fontes = run._r.get_or_add_rPr().get_or_add_rFonts()
@@ -212,7 +221,8 @@ def _ressalva(doc, figura: Figura, idioma: str) -> bool:
 # ----------------------------------------------------------------------
 
 def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: epub.Metadados,
-             *, numeros: Optional[Dict[int, int]] = None) -> EscritoDocx:
+             *, numeros: Optional[Dict[int, int]] = None, quebras: bool = False,
+             realce: bool = False) -> EscritoDocx:
     """Escreve o DOCX em `caminho` (ao lado e troca no fim: a falha não estraga o anterior).
 
     `numeros` é o número impresso de cada página (índice -> número): as referências do
@@ -281,7 +291,9 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
                         {} if id(bloco) in contados.legendas else por_diagrama, por_capitulo)
                     escrito.links += len(links)
                 paragrafo = doc.add_paragraph(style=estilo)
-                _texto_com_estilo(paragrafo, bloco, simbolos, familia, links)
+                _texto_com_estilo(paragrafo, bloco, simbolos, familia, links, quebras, realce)
+                if realce and getattr(bloco, "duvidosos", None):
+                    escrito.realcados += 1
                 escrito.paragrafos += 1
                 if id(bloco) in contados.capitulos:
                     ident += 1

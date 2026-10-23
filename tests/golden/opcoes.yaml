@@ -1,0 +1,75 @@
+# CA-12.3: para cada opção da exportação (`exportar.Opcoes`), a diferença esperada na forma
+# normalizada (tests/test_golden_exportacao.py) entre a exportação padrão e a com a opção
+# ligada, na página sintética de lá (cabeçalho, título, negrito, hífen de quebra, uma palavra
+# duvidosa, um diagrama conferido).
+#
+# Por formato (docx, epub, txt): `remove` e `acrescenta` são as regex das linhas que saem e
+# que entram. Cada linha da diferença casa com uma delas e cada uma casa com ao menos uma
+# linha; o formato que não aparece não muda nada. `valor` é o da opção ligada (o contrário do
+# padrão, quando falta). `escopo: livro` é a opção que escolhe páginas do projeto e não muda
+# a página: os `testes` dela, em tests/test_exportar_documento.py, a cobrem.
+#
+# Este arquivo é a declaração: não é regravado pelo --atualizar-golden.
+
+manter_margens:
+  docx:
+    acrescenta: ['^Normal: XADREZ VITORIOSO 23$']
+  epub:
+    # O cabeçalho vem antes do título: fica num capítulo antes do capítulo do título.
+    acrescenta:
+      - '<p>XADREZ VITORIOSO 23</p>'
+      - 'capitulo-002\.xhtml'
+      - 'idref="c1"></ns0:itemref><ns0:itemref idref="c2">'
+      - '<title>Golden</title>'
+      - '^<html '
+      - '<title>Capitulo um</title>'
+    remove:
+      - 'idref="c1"></ns0:itemref><ns0:itemref idref="nav"'
+      - '<title>Capitulo um</title>.*pagebreak'
+      - 'capitulo-001\.xhtml#t1'
+  txt:
+    acrescenta: ['^XADREZ VITORIOSO 23$']
+
+manter_quebras:
+  docx:
+    remove: ['hiFen termina aqui\. Uma duvida$']
+    acrescenta: ['o hi-⏎Fen termina aqui\.⏎Uma duvida$']
+  epub:
+    remove: ['hiFen termina aqui\. Uma duvida</p>']
+    acrescenta: ['o hi-<br></br>Fen termina aqui\.<br></br>Uma duvida</p>']
+  txt:
+    remove: ['hiFen termina aqui\. Uma duvida$']
+    acrescenta: ['o hi-$', '^Fen termina aqui\.$', '^Uma duvida$']
+
+desenhar_diagramas:
+  valor: false
+  docx:
+    remove: ['^Normal: \[figura: Diagrama: FEN ']
+    acrescenta: ['^Normal: \[figura: Diagrama não lido; .*recorte pedido nas opções']
+  epub:
+    # O recorte não traz o FEN: a acessibilidade calculada deixa de dizer texto alternativo.
+    remove:
+      - 'accessModeSufficient">textual<'
+      - 'accessibilityFeature">alternativeText<'
+      - '<figure class="diagrama"><img alt="Diagrama: FEN '
+    acrescenta:
+      - 'accessModeSufficient">textual,visual<'
+      - '<figure class="diagrama recorte"><img alt="Diagrama não lido; .*recorte pedido'
+  txt:
+    remove: ['^\[Diagrama: r3k2r/']
+    acrescenta: ['^\[Diagrama: recorte pedido nas opções da exportação\]$']
+
+marcas_de_pagina:
+  txt:
+    acrescenta: ['^\[p\. 1\]$']
+
+realcar_duvidosos:
+  docx:
+    remove: ['Uma duvida$']
+    acrescenta: ['Uma \[\[duvida\]\]$']
+
+so_verificadas:
+  escopo: livro
+  testes:
+    - test_so_verificadas_sem_nenhuma_nao_exporta
+    - test_txt_do_projeto_com_relatorio

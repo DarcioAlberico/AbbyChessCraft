@@ -185,7 +185,7 @@ class Relatorio:
         if self.capitulos:
             partes.append(f"{self.capitulos} capítulo(s)")
         if self.links:
-            partes.append(f"{self.links} referência(s) a página com link")
+            partes.append(f"{self.links} referência(s) a página, diagrama ou capítulo com link")
         if self.numeros_impressos and self.formato == "epub":
             primeira = min(self.numeros_impressos)
             partes.append(f"página impressa {self.numeros_impressos[primeira]} na posição "

@@ -178,3 +178,104 @@ def test_pagina_sem_numero_impresso_nao_colide_com_um_impresso(tmp_path):
         nav = z.read("OEBPS/nav.xhtml").decode("utf-8")
     assert ">[1]</a>" in nav and ">[2]</a>" in nav and ">1</a>" in nav and ">2</a>" in nav
     assert epub.conferir(destino) == []
+
+# ----------------------------------------------------------------------
+# Os links para "Diagrama N" e para os capítulos
+# ----------------------------------------------------------------------
+
+def _png() -> bytes:
+    import io
+
+    from PIL import Image
+
+    dados = io.BytesIO()
+    Image.new("L", (8, 8), 0).save(dados, format="PNG")
+    return dados.getvalue()
+
+
+def _figura():
+    from core.pagina import Figura
+
+    return Figura(_png(), 8, 8, fen="8/8/8/8/8/8/8/K6k w - - 0 1", origem="render")
+
+
+def _livro_numerado():
+    um, dois = _figura(), _figura()
+    return [
+        PaginaExtraida(numero=0, blocos=[
+            Paragrafo("Capítulo 1", titulo=True, nivel=1),
+            um, Paragrafo("Diagrama 1. Jogam as brancas"),
+            Paragrafo("Texto do primeiro capítulo.")]),
+        PaginaExtraida(numero=1, blocos=[
+            Paragrafo("Capítulo II", titulo=True, nivel=1),
+            dois, Paragrafo("Diagrama 2. Jogam as pretas"),
+            Paragrafo("Como no Diagrama 1, do capítulo 1; o diagrama 7 não existe e o "
+                      "Capítulo 2 é este.")]),
+    ], um, dois
+
+
+def test_as_legendas_numeram_os_diagramas_e_os_titulos_os_capitulos():
+    paginas, um, dois = _livro_numerado()
+    numeros = epub.numerados(paginas)
+    assert numeros.figuras == {id(um): 1, id(dois): 2}
+    assert numeros.capitulos == {id(paginas[0].blocos[0]): 1, id(paginas[1].blocos[0]): 2}
+    assert numeros.legendas == {id(paginas[0].blocos[2]), id(paginas[1].blocos[2])}
+
+
+def test_a_legenda_acima_vale_quando_o_livro_a_usa_e_o_numero_repetido_nao_e_alvo():
+    a, b, c = _figura(), _figura(), _figura()
+    # As legendas impressas acima: o parágrafo depois de `a` é a legenda de `b`.
+    paginas = [PaginaExtraida(numero=0, blocos=[
+        Paragrafo("Diagrama 1"), a, Paragrafo("Diagrama 2"), b,
+        Paragrafo("Diagrama 2"), c])]
+    assert epub.numerados(paginas).figuras == {id(a): 1}
+    # Romano malformado e título que não é de capítulo não numeram.
+    titulos = [PaginaExtraida(numero=0, blocos=[Paragrafo("Capítulo IIII", titulo=True, nivel=1),
+                                                Paragrafo("Capítulo 3", titulo=True, nivel=2)])]
+    assert epub.numerados(titulos).capitulos == {}
+
+
+def test_referencias_internas_nao_se_sobrepoem():
+    texto = "Ver o Diagrama 6, p. 23, e o Chapter IV."
+    assert epub.referencias_internas(texto, "pt", {23: "c#pg"}, {6: "c#dg6"}, {4: "c#t4"}) == [
+        (6, 16, "c#dg6"), (18, 23, "c#pg"), (29, 39, "c#t4")]
+
+
+def test_o_epub_liga_diagramas_e_capitulos_e_a_legenda_nao_se_cita(tmp_path):
+    paginas, _, _ = _livro_numerado()
+    destino = tmp_path / "a.epub"
+    escrito = epub.escrever(paginas, destino, epub.Metadados("L"), limite_do_capitulo=10)
+    assert epub.conferir(destino) == []
+    with zipfile.ZipFile(destino) as z:
+        primeiro = z.read("OEBPS/texto/capitulo-001.xhtml").decode("utf-8")
+        segundo = z.read("OEBPS/texto/capitulo-002.xhtml").decode("utf-8")
+    assert '<figure class="diagrama" id="dg1">' in primeiro
+    assert '<a href="capitulo-001.xhtml#dg1">Diagrama 1</a>' in segundo
+    assert '<a href="capitulo-001.xhtml#t1">capítulo 1</a>' in segundo
+    assert '<a href="capitulo-002.xhtml#t2">Capítulo 2</a>' in segundo
+    assert "o diagrama 7 não" in segundo                       # sem alvo, fica texto
+    assert "<p>Diagrama 2. Jogam as pretas</p>" in segundo     # a legenda não se cita
+    assert escrito.links == 3
+    import os
+
+    if os.environ.get("ABBY_EPUBCHECK"):
+        assert epub.epubcheck(destino) == []
+    if os.environ.get("ABBY_ACE"):
+        assert epub.ace(destino) == []
+
+
+def test_o_docx_liga_diagramas_e_capitulos(tmp_path):
+    from docx import Document
+
+    from abbychess import escritor_docx as ed
+
+    paginas, _, _ = _livro_numerado()
+    destino = tmp_path / "a.docx"
+    escrito = ed.escrever(paginas, destino, epub.Metadados("L"))
+    assert ed.conferir(destino) == []
+    assert escrito.links == 3
+    xml = Document(str(destino)).element.xml
+    for nome in ("dg1", "dg2", "cap1", "cap2"):
+        assert f'w:name="{nome}"' in xml
+    for ancora in ("dg1", "cap1", "cap2"):
+        assert f'w:anchor="{ancora}"' in xml

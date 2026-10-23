@@ -10,7 +10,9 @@ Lê as mesmas `core.pagina.PaginaExtraida` que o EPUB e escreve pelo python-docx
   parte só (o python-docx já guarda pela soma).
 - **Páginas impressas**: cada página começa com um marcador (`pg23`), e as referências do
   texto ("página 23", `epub.referencias`) viram hiperlink interno para ele, quando a página
-  está no arquivo.
+  está no arquivo. Os diagramas numerados pela legenda e os capítulos numerados pelo título
+  (`epub.numerados`) têm marcador (`dg6`, `cap3`), e "ver o Diagrama 6" e "no capítulo 3"
+  viram hiperlink para eles.
 - **Metadados** (`epub.Metadados`): título, autores, assuntos, idioma e identificador nas
   propriedades; o idioma também no estilo base (`w:lang`), senão o Word revisa um livro
   inglês em português.
@@ -242,6 +244,11 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
     for pagina in com_conteudo:
         if numeros and pagina.numero in numeros:
             alvos[numeros[pagina.numero]] = f"pg{pagina.numero + 1}"
+    # Os diagramas e os capítulos numerados ganham marcador (`dg6`, `cap3`) e são alvo de
+    # "ver o Diagrama 6" e "no capítulo 3", como no EPUB.
+    contados = epub.numerados(com_conteudo)
+    por_diagrama = {n: f"dg{n}" for n in contados.figuras.values()}
+    por_capitulo = {n: f"cap{n}" for n in contados.capitulos.values()}
 
     ident = 0
     for numero_da_pagina, pagina in enumerate(com_conteudo):
@@ -257,6 +264,9 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
                     ident += 1
                     _marcador(paragrafo, f"pg{pagina.numero + 1}", ident)
                     primeiro = False
+                if id(bloco) in contados.figuras:
+                    ident += 1
+                    _marcador(paragrafo, f"dg{contados.figuras[id(bloco)]}", ident)
                 _ressalva(doc, bloco, idioma)
                 continue
             elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
@@ -266,11 +276,16 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
                     links: list = []
                 else:
                     estilo = None
-                    links = epub.referencias(bloco.texto, idioma, alvos)
+                    links = epub.referencias_internas(
+                        bloco.texto, idioma, alvos,
+                        {} if id(bloco) in contados.legendas else por_diagrama, por_capitulo)
                     escrito.links += len(links)
                 paragrafo = doc.add_paragraph(style=estilo)
                 _texto_com_estilo(paragrafo, bloco, simbolos, familia, links)
                 escrito.paragrafos += 1
+                if id(bloco) in contados.capitulos:
+                    ident += 1
+                    _marcador(paragrafo, f"cap{contados.capitulos[id(bloco)]}", ident)
             else:
                 continue
             if primeiro:

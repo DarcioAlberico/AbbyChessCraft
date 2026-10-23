@@ -18,6 +18,8 @@ exportação) e escreve um EPUB 3 que a auditoria do EPUB do Aagaard pediu (road
   ninguém verificou.
 - **Diagramas**: o texto alternativo diz o FEN e o lado a jogar (e se foi assumido); o
   recorte diz que o diagrama não foi lido. Imagens iguais byte a byte são um recurso só.
+- **Links internos**: "página 23", "Diagrama 6" (pelo número da legenda) e "capítulo 3"
+  (pelo número do título) viram link quando o alvo está no livro (`referencias_internas`).
 - **Os mesmos bytes**: com o mesmo `SOURCE_DATE_EPOCH`, o mesmo arquivo (CA-12.6): a data
   do pacote e das entradas do zip vem de `core.exportar.instante`, e nada mais varia.
 
@@ -259,6 +261,105 @@ def _citacao(texto: str, inicio: int) -> bool:
     return antes.count("(") > antes.count(")") or bool(re.search(r"[A-ZÀ-Ý][\w.'-]*,$", antes))
 
 
+#: "Diagrama 6", "Diagram 6", "Diagramm 6", "diagramme 6", "diag. 6": a referência a um
+#: diagrama numerado, em qualquer idioma (grupo 1). No começo de um parágrafo vizinho do
+#: diagrama, é a legenda que o numera (`LEGENDA`).
+DIAGRAMA = re.compile(r"\b(?:diagram(?:a|me|m)?|diag\.)\s*(\d{1,4})\b", re.IGNORECASE)
+LEGENDA = re.compile(r"\s*(?:diagram(?:a|me|m)?|diag\.)\s*(\d{1,4})\b", re.IGNORECASE)
+#: "Capítulo 3", "Chapter III", "Kapitel 3", "chapitre 3": a referência a um capítulo
+#: (grupo 1, arábico ou romano). No começo de um título de capítulo, é o número dele.
+CAPITULO = re.compile(r"\b(?:cap[íi]tulo|chapter|kapitel|chapitre)\s+(\d{1,3}|[IVXLC]{1,7})\b",
+                      re.IGNORECASE)
+_ROMANOS = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100}
+
+
+def _numero_do_capitulo(texto: str) -> Optional[int]:
+    """`3`, `III` -> 3; `None` para o romano malformado ("IIII", "VX")."""
+    if texto.isdigit():
+        return int(texto)
+    letras = texto.upper()
+    total = 0
+    for i, letra in enumerate(letras):
+        valor = _ROMANOS[letra]
+        seguinte = _ROMANOS[letras[i + 1]] if i + 1 < len(letras) else 0
+        total += -valor if valor < seguinte else valor
+    canonico = ""
+    resto = total
+    for valor, simbolo in ((100, "C"), (90, "XC"), (50, "L"), (40, "XL"), (10, "X"), (9, "IX"),
+                           (5, "V"), (4, "IV"), (1, "I")):
+        while resto >= valor:
+            canonico, resto = canonico + simbolo, resto - valor
+    return total if total and canonico == letras else None
+
+
+@dataclass
+class Numerados:
+    """O que o livro numera e o texto pode citar: `figuras` (id da `Figura` -> o número que a
+    legenda dela imprime), `legendas` (id dos parágrafos que são essas legendas, onde a
+    referência não vira link para si mesma) e `capitulos` (id do título -> o número dele).
+
+    Número que se repete no livro (a numeração que recomeça a cada capítulo) não é alvo: o
+    link iria para o diagrama errado."""
+    figuras: Dict[int, int] = field(default_factory=dict)
+    legendas: set = field(default_factory=set)
+    capitulos: Dict[int, int] = field(default_factory=dict)
+
+
+def numerados(paginas: Sequence[PaginaExtraida]) -> Numerados:
+    """Os diagramas e os capítulos que o livro numera (`Numerados`).
+
+    A legenda do diagrama é o parágrafo logo depois dele, ou logo antes: vale o lado que o
+    livro mais usa, contado em todos os diagramas, porque o parágrafo de depois de um
+    diagrama pode ser a legenda impressa acima do seguinte."""
+    from collections import Counter
+
+    lados: Dict[str, Dict[int, Tuple[int, int]]] = {"depois": {}, "antes": {}}
+    titulos: Dict[int, int] = {}
+    for pagina in paginas:
+        blocos = pagina.blocos
+        for k, bloco in enumerate(blocos):
+            if isinstance(bloco, Paragrafo) and bloco.titulo and bloco.nivel == 1:
+                achado = CAPITULO.match(bloco.texto.strip())
+                numero = _numero_do_capitulo(achado.group(1)) if achado else None
+                if numero is not None:
+                    titulos[id(bloco)] = numero
+            if not isinstance(bloco, Figura):
+                continue
+            for lado, j in (("depois", k + 1), ("antes", k - 1)):
+                if 0 <= j < len(blocos) and isinstance(blocos[j], Paragrafo):
+                    achado = LEGENDA.match(blocos[j].texto)
+                    if achado:
+                        lados[lado][id(bloco)] = (int(achado.group(1)), id(blocos[j]))
+    escolhido = lados["depois"] if len(lados["depois"]) >= len(lados["antes"]) else lados["antes"]
+    vezes = Counter(n for n, _ in escolhido.values())
+    capitulos = Counter(titulos.values())
+    return Numerados(figuras={f: n for f, (n, _) in escolhido.items() if vezes[n] == 1},
+                     legendas={p for _, p in escolhido.values()},
+                     capitulos={t: n for t, n in titulos.items() if capitulos[n] == 1})
+
+
+def referencias_internas(texto: str, idioma: str, paginas: Dict[int, str],
+                         diagramas: Dict[int, str], capitulos: Dict[int, str]
+                         ) -> List[Tuple[int, int, str]]:
+    """As referências do texto que viram link: às páginas impressas (`referencias`), aos
+    diagramas ("ver o Diagrama 6") e aos capítulos ("no capítulo 3") que estão nos alvos
+    (número -> href). Sem sobrepor: "Diagrama 6, p. 23" são dois links."""
+    achados = list(referencias(texto, idioma, paginas))
+    for padrao, alvos, numero in ((DIAGRAMA, diagramas, int), (CAPITULO, capitulos,
+                                                               _numero_do_capitulo)):
+        if not alvos:
+            continue
+        for achado in padrao.finditer(texto):
+            href = alvos.get(numero(achado.group(1)))
+            if href:
+                achados.append((achado.start(), achado.end(), href))
+    saida: List[Tuple[int, int, str]] = []
+    for inicio, fim, href in sorted(achados):
+        if not saida or inicio >= saida[-1][1]:
+            saida.append((inicio, fim, href))
+    return saida
+
+
 #: A procedência do lado a jogar nos idiomas sem a frase do core (`lado_a_jogar.marca`, que
 #: é em português): legenda, conferência, número do lance; o resto é assumido.
 PROCEDENCIAS = {
@@ -319,19 +420,27 @@ class _Capitulo:
     titulos: List[Tuple[int, str, str]] = field(default_factory=list)
     #: (número impresso da página no arquivo, âncora) das páginas que começam aqui.
     paginas: List[Tuple[int, str]] = field(default_factory=list)
-    #: As referências a página que viraram link neste capítulo.
+    #: As referências (a página, diagrama ou capítulo) que viraram link neste capítulo.
     links: int = 0
+    #: (número impresso, âncora) dos diagramas e dos capítulos numerados que caem aqui.
+    diagramas: List[Tuple[int, str]] = field(default_factory=list)
+    numerados: List[Tuple[int, str]] = field(default_factory=list)
 
 
 def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbolos: str,
                msg: Dict[str, str], idioma: str, limite: int,
                rotulos: Optional[Dict[int, int]] = None,
-               alvos: Optional[Dict[int, str]] = None) -> List[_Capitulo]:
+               alvos: Optional[Dict[str, Dict[int, str]]] = None,
+               numeros: Optional[Numerados] = None) -> List[_Capitulo]:
     """Os capítulos. `rotulos` dá o número impresso de cada página (índice -> número; sem
-    ele, a posição no PDF), e `alvos` o href da âncora de cada número impresso, para as
-    referências do texto virarem link."""
+    ele, a posição no PDF); `alvos`, o href de cada página impressa, diagrama e capítulo
+    numerado (`"paginas"`, `"diagramas"`, `"capitulos"`: número -> href), para as
+    referências do texto virarem link; `numeros`, o que o livro numera (`numerados`)."""
     rotulos = rotulos or {}
     alvos = alvos or {}
+    numeros = numeros or Numerados()
+    por_pagina, por_diagrama, por_capitulo = (alvos.get(k, {}) for k in
+                                              ("paginas", "diagramas", "capitulos"))
     capitulos = [_Capitulo("capitulo-001.xhtml")]
     numero_do_titulo = 0
 
@@ -378,10 +487,17 @@ def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbo
                 if getattr(bloco, "revisao_pendente", False):
                     ressalva = ([marca_do_lado(bloco, idioma)] if bloco.fen else []) + [msg["nao_revisado"]]
                     legenda = f"<figcaption>{_e('; '.join(ressalva))}</figcaption>"
-                atual.partes.append(f'<figure class="{classe}"><img src="../{nome}" '
+                ident = ""
+                if id(bloco) in numeros.figuras:
+                    ancora_do_diagrama = f"dg{numeros.figuras[id(bloco)]}"
+                    atual.diagramas.append((numeros.figuras[id(bloco)], ancora_do_diagrama))
+                    ident = f' id="{ancora_do_diagrama}"'
+                atual.partes.append(f'<figure class="{classe}"{ident}><img src="../{nome}" '
                                     f'alt="{alt}"/>{legenda}</figure>')
             elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
-                links = [] if bloco.titulo else referencias(bloco.texto, idioma, alvos)
+                links = ([] if bloco.titulo else referencias_internas(
+                    bloco.texto, idioma, por_pagina,
+                    {} if id(bloco) in numeros.legendas else por_diagrama, por_capitulo))
                 atual.links += len(links)
                 corpo = xhtml_do_texto(bloco, simbolos, links)
                 if bloco.titulo:
@@ -390,6 +506,8 @@ def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbo
                     alvo = f"t{numero_do_titulo}"
                     atual.partes.append(f'<h{nivel} id="{alvo}">{corpo}</h{nivel}>')
                     atual.titulos.append((nivel, alvo, bloco.texto.strip()))
+                    if id(bloco) in numeros.capitulos:
+                        atual.numerados.append((numeros.capitulos[id(bloco)], alvo))
                 else:
                     atual.partes.append(f"<p>{corpo}</p>")
                 atual.tamanho += len(bloco.texto)
@@ -552,15 +670,21 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
                          'media-type="application/xhtml+xml"/>')
         espinha.append('<itemref idref="capa"/>')
 
-    # Duas passadas: a primeira diz em que capítulo cai cada página, e a segunda escreve as
-    # referências já com o arquivo certo.
+    # Duas passadas: a primeira diz em que capítulo cai cada página, diagrama e capítulo
+    # numerado, e a segunda escreve as referências já com o arquivo certo.
     numeros = numeros or {}
+    contados = numerados(paginas)
     capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
-                           numeros)
-    if numeros:
-        alvos = {rotulo: f"{c.nome}#{ancora}" for c in capitulos for rotulo, ancora in c.paginas}
+                           numeros, numeros=contados)
+    alvos = {
+        "paginas": ({rotulo: f"{c.nome}#{ancora}" for c in capitulos
+                     for rotulo, ancora in c.paginas} if numeros else {}),
+        "diagramas": {n: f"{c.nome}#{ancora}" for c in capitulos for n, ancora in c.diagramas},
+        "capitulos": {n: f"{c.nome}#{ancora}" for c in capitulos for n, ancora in c.numerados},
+    }
+    if any(alvos.values()):
         capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
-                               numeros, alvos)
+                               numeros, alvos, contados)
     escrito.links = sum(c.links for c in capitulos)
     if not capitulos:
         raise ValueError("Nada para escrever no EPUB: as páginas não têm texto nem diagrama.")

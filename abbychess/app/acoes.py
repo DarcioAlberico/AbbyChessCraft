@@ -84,10 +84,12 @@ def montar(janela) -> None:
     j.acao_apagar_paginas = teclado.sem_atalho(j, "Apagar páginas…", lambda: j.apagar_paginas())
     j.acao_inserir_paginas = teclado.sem_atalho(j, "Inserir páginas…", j.inserir_paginas)
     j.acao_paginas_apagadas = teclado.sem_atalho(j, "Páginas apagadas…", j.paginas_apagadas)
-    j.acao_girar_a_direita = teclado.sem_atalho(j, "Girar à direita",
-                                                lambda: j.girar_a_direita())
-    j.acao_girar_a_esquerda = teclado.sem_atalho(j, "Girar à esquerda",
-                                                 lambda: j.girar_a_esquerda())
+    # No perfil de teclado sem tecla padrão (Ctrl+Shift+< e > dependem do teclado, ABNT2):
+    # a tecla se atribui em Ferramentas › Teclado.
+    j.acao_girar_a_direita = acao(j, "girar_a_direita", lambda: j.girar_a_direita(),
+                                  texto="Girar à direita")
+    j.acao_girar_a_esquerda = acao(j, "girar_a_esquerda", lambda: j.girar_a_esquerda(),
+                                   texto="Girar à esquerda")
     j.acao_girar_paginas = teclado.sem_atalho(j, "Girar páginas…", lambda: j.girar_paginas())
     j.acao_cortar_paginas = teclado.sem_atalho(j, "Cortar páginas…", lambda: j.cortar_paginas())
     j.acao_tirar_o_corte = teclado.sem_atalho(j, "Tirar o corte…", lambda: j.tirar_o_corte())

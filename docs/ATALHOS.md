@@ -21,6 +21,8 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Foco na Linha | — | Alt+4 | global | K |
 | Foco na vista direita (repetido cicla as abas) | Alt+3 | Alt+3 | global | A2 |
 | Foco no Inspetor | Alt+4 | Alt+5 | global | A2 |
+| Girar à direita (a página aberta ou as escolhidas na gaveta) | — | — | global | L |
+| Girar à esquerda (a página aberta ou as escolhidas na gaveta) | — | — | global | L |
 | Imagem e vista direita empilhadas | Ctrl+Shift+F7 | Shift+F7 | global | A2 |
 | Imagem e vista direita lado a lado | Ctrl+F7 | F7 | global | A2 |
 | Ir para a página | Ctrl+G | Ctrl+G | global | A1 |

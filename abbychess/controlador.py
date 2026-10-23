@@ -699,7 +699,11 @@ class ControladorDePagina:
             troca.update(paginas=paginas, movidos=(dict(projeto.dados.gids_movidos), movidos))
             return nova
 
-        return self._mudar_sequencia(fazer, f"Dividir {sq.quantas_paginas(len(set(posicoes)))}",
+        sequencia = self.projeto.sequencia if self.projeto is not None else None
+        ja_metades = {p for p in set(posicoes) if sequencia is not None
+                      and 0 <= p < len(sequencia) and sequencia.entrada_em(p).metade}
+        return self._mudar_sequencia(fazer,
+                                     f"Dividir {sq.quantas_paginas(len(set(posicoes)) - len(ja_metades))}",
                                      troca=troca, nota=nota,
                                      depois_de_gravar=lambda: self._guardar_os_angulos(angulos))
 

@@ -48,8 +48,10 @@ class DialogoDasPaginas(QDialog):
     """Escolhe as páginas e, para mover e inserir, o lugar. `com_selecao=False` (inserir) só
     pergunta o lugar; `linhas` (rótulo, widget) são as perguntas da operação (girar, cortar,
     dividir), depois das páginas. `efeito` é a prévia: um modelo com `{N}` e `{PAGINAS}`, ou
-    uma função das posições; `validar(posições, depois_da)` diz por que a escolha não vale
-    (o OK fica desligado), ou None; `ok`, o texto do botão que confirma."""
+    uma função das posições (que pode devolver também o texto do OK: `(prévia, ok)`);
+    `validar(posições, depois_da)` diz por que a escolha não vale (o OK fica desligado), ou
+    None; `ok`, o texto do botão que confirma; `sinais`, os que refazem a prévia (uma caixa
+    que muda o que o OK faz)."""
 
     def __init__(self, parent, titulo: str, total: int, *, selecao: str = "",
                  com_selecao: bool = True, lugar: Optional[str] = None, lugar_padrao: int = 0,
@@ -57,7 +59,7 @@ class DialogoDasPaginas(QDialog):
                  efeito: Union[str, Callable[[List[int]], str]] = "{N} página(s)",
                  linhas: Sequence[Tuple[str, QWidget]] = (),
                  validar: Optional[Callable[[List[int], int], Optional[str]]] = None,
-                 ok: str = ""):
+                 ok: str = "", sinais: Sequence = ()):
         super().__init__(parent)
         self.setWindowTitle(titulo)
         self.setMinimumWidth(LARGURA_DOS_DIALOGOS)
@@ -106,6 +108,8 @@ class DialogoDasPaginas(QDialog):
         corpo.addWidget(self.botoes)
         self.com_selecao = com_selecao
         self.campo.textChanged.connect(self._conferir)
+        for sinal in sinais:
+            sinal.connect(self._conferir)
         self._conferir()
 
     def posicoes(self) -> List[int]:
@@ -128,15 +132,18 @@ class DialogoDasPaginas(QDialog):
             estilo.papel(self.previa, "erro")
             ok.setEnabled(False)
             return
+        previa = (self.efeito(posicoes) if callable(self.efeito) else
+                  self.efeito.format(N=len(posicoes), PAGINAS=texto_da_selecao(posicoes)))
+        if isinstance(previa, tuple):
+            previa, rotulo = previa
+            ok.setText(rotulo)
         erro = self.validar(posicoes, self.depois_da()) if self.validar else None
         if erro:
             self.previa.setText(erro)
             estilo.papel(self.previa, "erro")
             ok.setEnabled(False)
             return
-        self.previa.setText(self.efeito(posicoes) if callable(self.efeito) else
-                            self.efeito.format(N=len(posicoes),
-                                               PAGINAS=texto_da_selecao(posicoes)))
+        self.previa.setText(previa)
         estilo.papel(self.previa, "dica")
         ok.setEnabled(True)
 

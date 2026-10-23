@@ -396,16 +396,16 @@ def test_a_mesma_pagina_pedida_por_duas_threads_e_renderizada_uma_vez(pdf_de_60_
 
     fonte = pg.FonteDePaginas(pdf_de_60_paginas)
     chamadas = []
-    original = fonte._pagina
+    original = fonte.pagina_da_entrada
     dentro, solta = threading.Event(), threading.Event()
 
-    def _pagina(indice):
-        chamadas.append(indice)
+    def _pagina(entrada):
+        chamadas.append(entrada.pagina)
         dentro.set()
         solta.wait(5)
-        return original(indice)
+        return original(entrada)
 
-    fonte._pagina = _pagina
+    fonte.pagina_da_entrada = _pagina
     cache = pg.CacheDePaginas(fonte)
     cache.precarregar(5)                              # a pré-carga começa a renderizar
     assert dentro.wait(5)

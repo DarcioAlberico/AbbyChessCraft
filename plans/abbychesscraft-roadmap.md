@@ -823,6 +823,13 @@ As rodadas:
    livro não cria páginas; o desfazer e o lote acham a página pelo `pid`. O índice da busca
    fica por posição: ele vive só na memória e é refeito a cada sessão, e na rodada 2 é
    rechaveado pelo `pid` que cada página indexada já guarda quando a sequência mudar.
+   (1c) a `FonteDePaginas` renderiza pela entrada (a fonte, inclusive `inseridas/`, a página,
+   o `quadro`, o `giro` e o ângulo à mão, que vence o medido); o cache de páginas é chaveado
+   pela entrada (a página que muda de lugar fica nele; a que muda de geometria sai); o lote
+   resolve as páginas em `pid` ao começar, segue a posição de agora e pula a que saiu do
+   livro. A chave de `inclinacoes.json` continua o índice do PDF na página do livro sem
+   geometria: até a v3 o `pid` das páginas nunca editadas muda de uma sessão para outra, e a
+   medida iria parar noutra página; passa a `pid` na rodada 1e.
 2. Reordenar, apagar e inserir, com a seleção (CA-12.8 a 12.10, 12.15).
 3. Girar, cortar e dividir, com a `geometria` preguiçosa (CA-12.11 a 12.13, CA-4.6).
 4. Endireitar à mão e as imagens transformadas nas exportações (CA-12.14, 12.16).

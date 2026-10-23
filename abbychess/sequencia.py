@@ -26,6 +26,14 @@ METADES = ("esquerda", "direita")
 Quadro = Tuple[int, int, int, int]
 
 
+def _dentro_das_inseridas(fonte: str) -> bool:
+    """`inseridas/<arquivo>`, um nome só: sem `..`, sem barra invertida, sem caminho absoluto
+    (um `projeto.json` de fora não abre arquivo nenhum fora da pasta do projeto)."""
+    partes = fonte.split("/")
+    return (len(partes) == 2 and partes[0] == PASTA_DAS_INSERIDAS and partes[1] not in ("", ".", "..")
+            and "\\" not in fonte and ":" not in fonte)
+
+
 @dataclass(frozen=True)
 class Entrada:
     """Uma página do livro: o `pid` e a receita da imagem dela (§12.4). `quadro` é o
@@ -42,6 +50,8 @@ class Entrada:
     angulo: Optional[float] = None
 
     def __post_init__(self):
+        if self.quadro is not None and not isinstance(self.quadro, tuple):
+            object.__setattr__(self, "quadro", tuple(self.quadro))     # chave de cache: hashável
         if self.pid < 0 or self.pagina < 0:
             raise ValueError(f"pid e página não negativos: {self.pid}, {self.pagina}")
         if self.giro not in GIROS:
@@ -52,7 +62,7 @@ class Entrada:
             x0, y0, x1, y1 = self.quadro
             if not (0 <= x0 < x1 and 0 <= y0 < y1):
                 raise ValueError(f"quadro vazio ou invertido: {self.quadro}")
-        if self.fonte != FONTE_DO_LIVRO and not self.fonte.startswith(PASTA_DAS_INSERIDAS + "/"):
+        if self.fonte != FONTE_DO_LIVRO and not _dentro_das_inseridas(self.fonte):
             raise ValueError(f"fonte desconhecida: {self.fonte!r}")
 
     @property

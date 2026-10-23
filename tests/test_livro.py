@@ -157,14 +157,14 @@ def test_cancelar_no_meio_da_pagina_nao_grava_ela_pela_metade(projeto, fonte, le
 
 
 def test_pagina_que_falha_nao_derruba_o_lote(projeto, fonte, leitor, monkeypatch):
-    original = fonte.pagina
+    original = fonte.pagina_da_entrada            # o lote renderiza pela entrada (§12.4)
 
-    def pagina(indice):
-        if indice == 1:
+    def pagina(entrada):
+        if entrada.pagina == 1:
             raise OSError("A página 2 não renderizou.")
-        return original(indice)
+        return original(entrada)
 
-    monkeypatch.setattr(fonte, "pagina", pagina)
+    monkeypatch.setattr(fonte, "pagina_da_entrada", pagina)
     resultado = livro.reconhecer_paginas(projeto, fonte, leitor, range(3))
     assert resultado.lidas == [0, 2]
     assert "não renderizou" in resultado.falhas[1]

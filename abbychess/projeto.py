@@ -225,6 +225,8 @@ class ProjetoDeLivro:
         #: acima dela, para as páginas que ela ainda não tem.
         self._sequencia: Optional[sq.Sequencia] = None
         self._proximo_pid = 0
+        #: (sequência, página do PDF -> primeira posição dela): a origem das amostras antigas.
+        self._posicoes_do_pdf: Optional[tuple] = None
         #: A abertura achou a fonte noutro lugar, pelo SHA-256 (a janela avisa).
         self.fonte_relocalizada = False
         #: Esta abertura passou o projeto do formato 1 ao 2 (a janela avisa onde ficou a cópia).
@@ -1054,6 +1056,32 @@ class ProjetoDeLivro:
                     posicao = nova.posicao_de(pid)
                     if posicao is not None:
                         pagina.indice = posicao
+
+    def origem_da_amostra(self, origem: str) -> Optional[Tuple[Optional[int], Optional[int]]]:
+        """(posição de agora, gid) do glifo de onde a amostra veio, pelo nome de origem dela
+        (`leitor.nome_de_origem`); None se o nome não diz. A posição vem do `gid` (`pid =
+        gid >> 20`, §12.4), e não do número da página no nome, que é o de quando ela foi
+        ensinada; None na posição: a página saiu do livro. A amostra antiga, sem o `gid` no
+        nome, vai à primeira entrada da página do PDF do nome (a metade esquerda, se ela foi
+        dividida)."""
+        from abbychess.leitor import origem_de
+        from abbychess.modelo import pid_de
+
+        lido = origem_de(origem)
+        if lido is None:
+            return None
+        pagina_do_nome, gid = lido
+        sequencia = self.sequencia
+        if gid is not None:
+            return sequencia.posicao_de(pid_de(gid)), gid
+        guardado = self._posicoes_do_pdf
+        if guardado is None or guardado[0] is not sequencia:   # uma vez por sequência
+            posicoes: Dict[int, int] = {}
+            for posicao, entrada in enumerate(sequencia.entradas):
+                if entrada.fonte == sq.FONTE_DO_LIVRO:
+                    posicoes.setdefault(entrada.pagina, posicao)   # a primeira: a esquerda
+            guardado = self._posicoes_do_pdf = (sequencia, posicoes)
+        return guardado[1].get(pagina_do_nome), None
 
     def posicao_do_pid(self, pid: int) -> Optional[int]:
         """A posição no livro da página `pid`, ou None (fora da sequência)."""

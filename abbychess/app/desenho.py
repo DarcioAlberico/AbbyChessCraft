@@ -164,12 +164,10 @@ class DesenhoDaJanela:
     def _padroes_mudaram(self) -> None:
         """A aba Padrões: as amostras, com a origem, a altura, o efeito e quantos glifos do
         livro cada uma leu (pelo índice da busca, §8.3)."""
-        if self.leitor is None:
+        if self.leitor is None or self.projeto is None:
             return
-        from abbychess.leitor import origem_de
-
         padroes = self.leitor.padroes
-        pasta = Path(self.projeto.pasta_de_padroes).resolve() if self.projeto else None
+        pasta = Path(self.projeto.pasta_de_padroes).resolve()
         lidos = self.busca.lidos_por_amostra() if hasattr(self, "busca") else {}
         detalhes = {}
         for arquivos in self.leitor.padroes_por_caractere().values():
@@ -179,15 +177,21 @@ class DesenhoDaJanela:
                     nome = Path(arquivo).resolve().relative_to(pasta).as_posix() if pasta else ""
                 except ValueError:
                     nome = ""
-                detalhes[str(arquivo)] = {"origem": origem_de(meta.get("origem", "")),
+                # (posição de agora, gid): pelo gid da amostra, que segue a página (§12.4).
+                origem = self.projeto.origem_da_amostra(meta.get("origem", ""))
+                detalhes[str(arquivo)] = {"origem": origem,
                                           "altura": meta.get("altura"),
                                           "efeito": meta.get("efeito"),
                                           "lidos": lidos.get(nome, 0)}
         self.padroes.atualizar(self.leitor.padroes_por_caractere(), detalhes)
 
     def ir_a_origem(self, pagina: int, gid) -> None:
-        """A página e o glifo de onde a amostra veio (a aba Padrões, "ir para")."""
-        if self.fonte is None or not 0 <= pagina < self.fonte.total:
+        """A página e o glifo de onde a amostra veio (a aba Padrões, "ir para"); `pagina` é a
+        posição de agora (`projeto.origem_da_amostra`), ou None se ela saiu do livro."""
+        if self.fonte is None or pagina is None or not 0 <= pagina < self.fonte.total:
+            if pagina is None:
+                self.statusBar().showMessage("A página de origem desta amostra saiu do livro.",
+                                             6000)
             return
         if pagina != self.pagina.indice:
             self.ir_para_pagina(pagina)

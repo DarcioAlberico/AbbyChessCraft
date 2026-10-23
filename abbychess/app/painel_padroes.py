@@ -22,6 +22,13 @@ from abbychess.app.painel_treino import FONTE_DE_SIMBOLOS
 from abbychess.app import vazios
 
 
+def _pagina_da_origem(origem, com_pagina: str, fora: str, sem: str) -> str:
+    """O texto da origem `(posição, gid)`: a página de agora, a que saiu do livro, ou nada."""
+    if not origem:
+        return sem
+    return fora if origem[0] is None else com_pagina.format(origem[0] + 1)
+
+
 class _GradeDeAmostras(QListWidget):
     """A grade das amostras: Delete esquece as selecionadas."""
 
@@ -38,8 +45,9 @@ class _GradeDeAmostras(QListWidget):
 
 class PainelDePadroes(QWidget):
     esquecer = Signal(list)
-    #: A origem da amostra escolhida: (índice da página, gid ou None).
-    ir_para = Signal(int, object)
+    #: A origem da amostra escolhida: (posição de agora ou None, gid ou None). `object`, e
+    #: não `int`: o None da página que saiu do livro chegaria como 0 (a página 1).
+    ir_para = Signal(object, object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -139,7 +147,7 @@ class PainelDePadroes(QWidget):
     def _texto_da_amostra(self, arquivo) -> str:
         d = self._detalhes.get(str(arquivo), {})
         origem = d.get("origem")
-        partes = [f"p. {origem[0] + 1}" if origem else "origem ?"]
+        partes = [_pagina_da_origem(origem, "p. {}", "fora do livro", "origem ?")]
         if d.get("lidos"):
             partes.append(f"leu {d['lidos']}")
         return " · ".join(partes)
@@ -148,7 +156,8 @@ class PainelDePadroes(QWidget):
         d = self._detalhes.get(str(arquivo), {})
         origem = d.get("origem")
         linhas = [Path(arquivo).stem,
-                  f"Origem: página {origem[0] + 1}" if origem else "Origem: não diz",
+                  _pagina_da_origem(origem, "Origem: página {}", "Origem: a página saiu do livro",
+                                    "Origem: não diz"),
                   f"Altura relativa: {d['altura']:.2f}" if d.get("altura") is not None
                   else "Altura relativa: —",
                   f"Efeito: {d['efeito']}" if d.get("efeito") else "Efeito: — (passo I)",

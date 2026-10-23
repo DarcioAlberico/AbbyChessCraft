@@ -19,6 +19,7 @@ from typing import Iterable, Optional, Sequence
 
 from core.box_model import BoxEntry
 
+from abbychess import sequencia as sq
 from abbychess.leitor import FONTE_NATIVA
 from abbychess.modelo import Box, Estilo, Pagina, RECONHECIDA
 from abbychess.projeto import ProjetoDeLivro
@@ -55,19 +56,32 @@ def oferta(caminho: str | Path, *, paginas: int = 12) -> Oferta:
 
 def importar(projeto: ProjetoDeLivro, indices: Optional[Sequence[int]] = None, *,
              idioma: Optional[str] = None, progresso=None) -> Resultado:
-    """Cria no projeto as páginas cuja camada o core aceita, sem chamar leitor ou servidor."""
+    """Cria no projeto as páginas cuja camada o core aceita, sem chamar leitor ou servidor.
+    `indices` são posições do livro; a camada vale só na página do livro intacta (sem
+    quadro, giro nem ângulo à mão, §12.4), e é pedida pela página do PDF dela."""
     from core import pdf_nativo
 
-    extracao = pdf_nativo.extrair(str(projeto.fonte), indices, idioma=idioma,
-                                  progress_callback=progresso)
-    importadas = []
-    for extraida in extracao.paginas:
-        pagina = projeto.pagina_para_editar(extraida.numero)
-        pagina.boxes = _boxes(pagina, extraida)
-        pagina.estado = RECONHECIDA
-        projeto.salvar_modelo(pagina)
-        importadas.append(extraida.numero)
-    recusadas = [v.numero for v in extracao.recusadas]
+    sequencia = projeto.sequencia
+    posicoes = range(len(sequencia)) if indices is None else indices
+    importadas, recusadas = [], []
+    # Em trechos seguidos no livro e no PDF (`sequencia.trechos_do_pdf`): o core junta o
+    # parágrafo de uma página com o da seguinte do pedido.
+    for trecho in sq.trechos_do_pdf(sequencia, posicoes):
+        do_pdf = dict(trecho)                   # página do PDF -> posição no livro
+        extracao = pdf_nativo.extrair(str(projeto.fonte), sorted(do_pdf), idioma=idioma,
+                                      progress_callback=progresso)
+        for extraida in extracao.paginas:
+            posicao = do_pdf.get(extraida.numero)
+            if posicao is None:
+                continue
+            pagina = projeto.pagina_para_editar(posicao)
+            pagina.boxes = _boxes(pagina, extraida)
+            pagina.estado = RECONHECIDA
+            projeto.salvar_modelo(pagina)
+            importadas.append(posicao)
+        recusadas += [do_pdf[v.numero] for v in extracao.recusadas if v.numero in do_pdf]
+    importadas.sort()
+    recusadas.sort()
     projeto.dados.extras[CHAVE_DAS_PAGINAS] = sorted(set(
         projeto.dados.extras.get(CHAVE_DAS_PAGINAS, ())) | set(importadas))
     projeto.salvar()

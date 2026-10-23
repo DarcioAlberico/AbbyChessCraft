@@ -16,7 +16,7 @@ from PySide6.QtGui import QFont, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from abbychess.app.imagens import pixmap_de_cinza
-from abbychess.app import estilo
+from abbychess.app import estilo, teclado
 
 FONTE = "Segoe UI Symbol"
 #: A altura da parte do texto, embaixo da imagem.
@@ -77,7 +77,8 @@ class FaixaDaLinha(QWidget):
         if self._recorte is None or self._recorte.isNull():
             pintor.setPen(estilo.TINTA_SECUNDARIA)
             pintor.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
-                            "A linha do glifo atual aparece aqui (Ctrl+F5 esconde).")
+                            teclado.com_teclas("A linha do glifo atual aparece aqui "
+                                               "({mostrar_linha} esconde)."))
             pintor.end()
             return
         altura_util = self.height() - ALTURA_DO_TEXTO - 2 * MARGEM

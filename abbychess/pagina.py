@@ -125,11 +125,14 @@ class FonteDePaginas:
             bruto = json.loads(self._arquivo_das_inclinacoes.read_text(encoding="utf-8"))
             self._inclinacoes = {int(k): float(v) for k, v in bruto.items()}
         self._pdf = None
-        #: Uma página por vez: a janela, a pré-carga (`CacheDePaginas`) e o lote renderizam
-        #: da mesma fonte, de threads diferentes. Com o lote rodando, abrir uma página fora do
-        #: cache espera a página que o lote está renderizando (antes, os dois disputavam o
-        #: fitz sem trava, o que não é seguro).
+        #: Um render do fitz por vez: a janela, a pré-carga (`CacheDePaginas`) e o lote
+        #: renderizam da mesma fonte, de threads diferentes, e o fitz não é seguro entre
+        #: threads. Só o render fica na trava: medir a inclinação (~370 ms numa página nunca
+        #: vista) e girar são do OpenCV, que solta o GIL, e correm fora dela; antes, o clique
+        #: numa página esperava a medida inteira da página que a pré-carga estava fazendo.
         self._trava = threading.RLock()
+        #: O dicionário das inclinações e o `inclinacoes.json`.
+        self._trava_das_inclinacoes = threading.Lock()
         self.total = 1
         sufixo = self.caminho.suffix.lower()
         if sufixo == ".pdf":
@@ -145,8 +148,7 @@ class FonteDePaginas:
 
     def pagina(self, indice: int) -> Image.Image:
         """A página `indice`, endireitada quando a fonte foi aberta para isso."""
-        with self._trava:
-            return self._pagina(indice)
+        return self._pagina(indice)
 
     def _pagina(self, indice: int) -> Image.Image:
         imagem = self.original(indice)
@@ -162,7 +164,8 @@ class FonteDePaginas:
         if not 0 <= indice < self.total:
             raise IndexError(f"Página {indice + 1} fora de 1..{self.total}")
         if self._pdf is not None:
-            imagem = self._pdf.load_page(indice)
+            with self._trava:
+                imagem = self._pdf.load_page(indice)
             if imagem is None:
                 raise OSError(f"A página {indice + 1} não renderizou.")
             return imagem
@@ -170,20 +173,22 @@ class FonteDePaginas:
             return imagem.convert("L")
 
     def inclinacao(self, indice: int, imagem: Optional[Image.Image] = None) -> float:
-        """O ângulo aplicado à página: o gravado, ou medido agora e gravado."""
-        with self._trava:
-            return self._inclinacao(indice, imagem)
-
-    def _inclinacao(self, indice: int, imagem: Optional[Image.Image] = None) -> float:
+        """O ângulo aplicado à página: o gravado, ou medido agora e gravado. Duas threads que
+        medem a mesma página ao mesmo tempo dão o mesmo número; vale o da primeira."""
         if not self.endireitar:
             return 0.0
-        if indice not in self._inclinacoes:
+        with self._trava_das_inclinacoes:
+            angulo = self._inclinacoes.get(indice)
+        if angulo is None:
             imagem = imagem if imagem is not None else self.original(indice)
-            self._inclinacoes[indice] = medir_inclinacao(np.asarray(imagem.convert("L")))
-            if self._arquivo_das_inclinacoes is not None and not self.somente_leitura:
-                gv.gravar_json(self._arquivo_das_inclinacoes,
-                               {str(k): v for k, v in sorted(self._inclinacoes.items())})
-        angulo = self._inclinacoes[indice]
+            medido = medir_inclinacao(np.asarray(imagem.convert("L")))     # fora das travas
+            with self._trava_das_inclinacoes:
+                angulo = self._inclinacoes.get(indice)
+                if angulo is None:
+                    angulo = self._inclinacoes[indice] = medido
+                    if self._arquivo_das_inclinacoes is not None and not self.somente_leitura:
+                        gv.gravar_json(self._arquivo_das_inclinacoes,
+                                       {str(k): v for k, v in sorted(self._inclinacoes.items())})
         return angulo if abs(angulo) >= INCLINACAO_MINIMA else 0.0
 
 
@@ -191,15 +196,21 @@ class CacheDePaginas:
     """As últimas páginas renderizadas e endireitadas, com a pré-carga da seguinte (§14.1).
 
     `pagina(i)` devolve `(imagem, matriz em cinza)`, do cache se ela está lá; `precarregar(i)`
-    renderiza numa thread de fundo, uma por vez (o pedido mais novo vence). Sem Qt.
+    renderiza numa thread de fundo, uma por vez (o pedido mais novo vence). Sem Qt: o
+    `preparar` (a janela dá o da `QImage`) roda com a matriz na thread que renderiza, e
+    `preparada(i, imagem)` devolve o resultado.
     """
 
     TAMANHO = 5
 
-    def __init__(self, fonte: FonteDePaginas, tamanho: int = TAMANHO):
+    def __init__(self, fonte: FonteDePaginas, tamanho: int = TAMANHO,
+                 preparar: Optional[Callable[[np.ndarray], object]] = None):
         self.fonte = fonte
         self.tamanho = tamanho
+        self.preparar = preparar
         self._paginas: "OrderedDict[int, Tuple[Image.Image, np.ndarray]]" = OrderedDict()
+        #: índice -> o `preparar` da matriz dela (sai do cache junto com a página).
+        self._preparadas: Dict[int, object] = {}
         self._trava = threading.Lock()
         self._pedida: Optional[int] = None
         self._thread: Optional[threading.Thread] = None
@@ -229,16 +240,33 @@ class CacheDePaginas:
         try:
             imagem = self.fonte.pagina(indice)
             par = (imagem, np.asarray(imagem.convert("L")))
+            preparada = None
+            if self.preparar is not None:
+                try:
+                    preparada = self.preparar(par[1])
+                except Exception:               # sem a preparada, a janela converte sozinha
+                    log.warning("preparar a página %d falhou", indice + 1, exc_info=True)
             with self._trava:
                 self._paginas[indice] = par
                 self._paginas.move_to_end(indice)
+                if preparada is not None:
+                    self._preparadas[indice] = preparada
                 while len(self._paginas) > self.tamanho:
-                    self._paginas.popitem(last=False)
+                    velha, _ = self._paginas.popitem(last=False)
+                    self._preparadas.pop(velha, None)
             return par
         finally:
             with self._trava:
                 del self._em_curso[indice]
             aviso.set()
+
+    def preparada(self, indice: int, imagem: Image.Image) -> Optional[object]:
+        """O `preparar` da página `indice`, se ela está no cache e é esta `imagem`."""
+        with self._trava:
+            par = self._paginas.get(indice)
+            if par is None or par[0] is not imagem:
+                return None
+            return self._preparadas.get(indice)
 
     def precarregar(self, indice: int) -> None:
         """Renderiza a página `indice` em segundo plano, se ela ainda não está no cache."""

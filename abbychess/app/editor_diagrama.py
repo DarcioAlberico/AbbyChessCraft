@@ -35,7 +35,7 @@ from core.tabuleiro_edicao import SIMBOLOS, TabuleiroEdicao
 
 from abbychess import lances
 from abbychess.diagramas import LADO_DA_LEGENDA, DiagramaLido, afirmar_lado
-from abbychess.app import estilo
+from abbychess.app import estilo, teclado
 
 #: O lado de uma casa no Inspetor (o tabuleiro cabe nos 296 px de 1366, §3.1).
 LADO_CASA = 30
@@ -316,19 +316,24 @@ class EditorDeDiagrama(QWidget):
         self.avisos.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
 
         self.btn_anterior = QPushButton("◀")
-        self.btn_anterior.setToolTip("O diagrama anterior do livro (PgUp)")
+        teclado.texto_vivo(self.btn_anterior, "setToolTip",
+                           "O diagrama anterior do livro ({diagrama_anterior})")
+        self.btn_anterior.setAccessibleName("Diagrama anterior")
         self.btn_anterior.clicked.connect(lambda: self.ir(-1))
         self.btn_seguinte = QPushButton("▶")
-        self.btn_seguinte.setToolTip("O diagrama seguinte do livro (PgDn)")
+        teclado.texto_vivo(self.btn_seguinte, "setToolTip",
+                           "O diagrama seguinte do livro ({diagrama_seguinte})")
+        self.btn_seguinte.setAccessibleName("Diagrama seguinte")
         self.btn_seguinte.clicked.connect(lambda: self.ir(+1))
         self.btn_desfazer = QPushButton("Desfazer")
         self.btn_desfazer.clicked.connect(self.desfazer)
         self.btn_refazer = QPushButton("Refazer")
         self.btn_refazer.clicked.connect(self.refazer)
         self.btn_conferido = QPushButton("Conferido")
-        self.btn_conferido.setToolTip("Grava o diagrama e vai ao próximo por conferir "
-                                      "(Ctrl+Enter)")
+        teclado.texto_vivo(self.btn_conferido, "setToolTip",
+                           "Grava o diagrama e vai ao próximo por conferir ({conferir_diagrama})")
         self.btn_conferido.clicked.connect(self.confirmar)
+        teclado.quando_mudar(self._mostrar)     # o cabeçalho vazio cita o F8 do perfil
         navegar = QHBoxLayout()
         for botao in (self.btn_anterior, self.btn_seguinte, self.btn_desfazer, self.btn_refazer):
             navegar.addWidget(botao)
@@ -509,8 +514,9 @@ class EditorDeDiagrama(QWidget):
                   self.btn_vazia, *self.botoes_paleta.values()):
             w.setEnabled(aberto)
         if not aberto:
-            self.cabecalho.setText("Nenhum diagrama em conferência. Clique num diagrama da "
-                                   "Imagem ou use F8.")
+            self.cabecalho.setText(teclado.com_teclas(
+                "Nenhum diagrama em conferência. Clique num diagrama da Imagem ou use "
+                "{proximo_diagrama}."))
             self.fen.clear()
             self.avisos.clear()
             self.origem_do_lado.clear()

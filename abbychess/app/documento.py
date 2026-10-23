@@ -50,6 +50,7 @@ from abbychess import sessao as ss
 from abbychess import texto as tx
 from abbychess.app import estilo, teclado
 from abbychess.app.imagens import pixmap_de_cinza
+from abbychess.app import vazios
 
 FONTE = "Segoe UI Symbol"
 MONO = "Consolas"
@@ -219,11 +220,13 @@ class VistaDoDocumento(QTextEdit):
                estados: Optional[Dict[int, str]] = None, desconhecidos: Iterable[int] = (),
                virtuais: Iterable[int] = (), matriz: Optional[np.ndarray] = None,
                margens: Iterable[int] = (),
-               aviso: str = "Página não reconhecida: F5 reconhece.") -> None:
+               aviso: Optional[str] = None) -> None:
         """O documento da página; sem documento (a página não reconhecida), o aviso.
         `margens`: os glifos do cabeçalho e do rodapé corridos, em cinza pequeno (a linha
         toda de margem; Ctrl+Shift+H a oculta), até as áreas terem função (passo F). Com
-        uma sessão de edição aberta, a montagem espera o fim dela."""
+        uma sessão de edição aberta, a montagem espera o fim dela. Sem `aviso`, o da página
+        não reconhecida, com as teclas do perfil de agora."""
+        aviso = vazios.pagina_nao_reconhecida() if aviso is None else aviso
         entrada = (documento, list(diagramas), dict(estados or {}), set(desconhecidos),
                    set(virtuais), matriz, set(margens), aviso)
         if self._sessao is not None:

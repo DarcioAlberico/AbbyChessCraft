@@ -31,6 +31,29 @@ if os.name == "nt":
                                                          "Fonts"))
 
 
+def pytest_configure(config):
+    """O `QSettings` dos testes num INI temporário, e não no registro do usuário: um teste que
+    troca o perfil de teclado, a pasta de exportação ou as opções lembradas não deixa nada
+    no programa de quem roda a suíte (e não herda o que essa pessoa escolheu). Vale para o
+    `janela.configuracao()`, que segue o formato padrão."""
+    import tempfile
+
+    from PySide6.QtCore import QSettings
+
+    pasta = tempfile.mkdtemp(prefix="abby-qsettings-")
+    config._abby_qsettings = pasta
+    QSettings.setDefaultFormat(QSettings.Format.IniFormat)
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, pasta)
+
+
+def pytest_unconfigure(config):
+    import shutil
+
+    pasta = getattr(config, "_abby_qsettings", None)
+    if pasta:
+        shutil.rmtree(pasta, ignore_errors=True)
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     resultado = yield

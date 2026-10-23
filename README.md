@@ -590,6 +590,34 @@ Todas as cores estão em `abbychess/app/estilo.py`. As capturas de revisão saem
 .venv\Scripts\python.exe ferramentas\capturas.py --livro xv --indice 25 --tema escuro
 ```
 
+Os ícones da barra e dos menus são do [Lucide](https://lucide.dev) 0.460.0 (licença ISC, em
+`abbychess/app/icones/LICENSE`): só os usados moram no pacote, pintados com a cor do texto do
+tema e refeitos quando ele muda. Reconhecer e Reler mostram o nome ao lado do ícone; os
+outros, o nome e a tecla na dica.
+
+Painel vazio diz o que fazer, com a tecla do perfil em uso: sem livro, a Imagem e o Glifo
+dizem como criar ou abrir um projeto; a página não reconhecida diz como reconhecer e como
+marcar glifos à mão; os Padrões sem nenhum, como ensinar. Todo botão só com símbolo (◀, ▶,
+as peças da paleta, os botões internos das docas) tem nome para o leitor de tela e dica.
+
+### O teclado: perfil e trocas
+
+**Ferramentas › Teclado…** escolhe o perfil e troca as teclas, sem reiniciar:
+
+- **Padrão**, o do AbbyChessCraft (as teclas deste README);
+- **FineReader**, as teclas do ABBYY FineReader para quem vem dele: Ctrl+F9 reconhece a
+  página, F5 mostra Páginas, F6/F7/Shift+F7/F8 escolhem o arranjo, Alt+4 vai à Linha (e o
+  Inspetor e Resultados passam a Alt+5 e Alt+6), Ctrl+Tab e Ctrl+Shift+Tab andam pelos
+  painéis, Ctrl+F7 escolhe a fila de palavras, Ctrl+1 a Ctrl+5 dão o tipo da área
+  selecionada no editor de áreas (texto, diagrama, tabela, imagem, ignorar).
+
+Na tabela, as teclas de cada ação se editam como texto (`Ctrl+Y; Ctrl+Shift+Z`, separadas
+por ponto e vírgula; vazio tira a tecla). Ao aceitar, as trocas passam pelas mesmas regras de `docs/atalhos.yaml`: tecla
+repetida no mesmo contexto, letra sem modificador onde se digita, Ctrl+Alt (o AltGr dos
+teclados ABNT) e tecla que encobre uma ligação do campo são recusadas, com o motivo. O perfil
+e as trocas ficam lembrados; trocar de perfil desfaz as trocas. As dicas e os avisos que
+citam uma tecla citam a do perfil em uso.
+
 ### Exportar
 
 **Projeto › Exportar** (Ctrl+E) escreve as páginas já reconhecidas, com as correções, no

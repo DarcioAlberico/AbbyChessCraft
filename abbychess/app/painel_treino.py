@@ -161,7 +161,8 @@ class PainelDeTreino(QWidget):
         self.corte: Optional[int] = None
 
         self.glifo = _GlifoAmpliado()
-        self.glifo.setToolTip("Clique onde dividir o box e aperte Ctrl+D.")
+        teclado.texto_vivo(self.glifo, "setToolTip",
+                           "Clique onde dividir o box e aperte {dividir}.")
         self.glifo.clicado.connect(self._clicar_no_glifo)
         self.glifo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.glifo.setMinimumHeight(150)
@@ -181,30 +182,38 @@ class PainelDeTreino(QWidget):
         self.campo.setPlaceholderText("caractere")
         self.campo.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        botao_ensinar = QPushButton("Ensinar (Enter)")
+        # Os nomes e as dicas citam a tecla do perfil (`{id}`, `teclado.texto_vivo`).
+        botao_ensinar = QPushButton()
+        teclado.texto_vivo(botao_ensinar, "setText", "Ensinar ({ensinar})")
         botao_ensinar.setToolTip("Ensina o glifo como padrão deste livro e relê a página")
         botao_ensinar.setDefault(True)
         botao_ensinar.clicked.connect(self.pedir_ensinar)
-        botao_corrigir = QPushButton("Só esta (Shift+Enter)")
+        botao_corrigir = QPushButton()
+        teclado.texto_vivo(botao_corrigir, "setText", "Só esta ({so_corrigir})")
         botao_corrigir.setToolTip("Corrige só esta ocorrência, sem gravar padrão")
         botao_corrigir.clicked.connect(self.pedir_so_corrigir)
-        botao_descartar = QPushButton("Não é caractere (Del)")
+        botao_descartar = QPushButton()
+        teclado.texto_vivo(botao_descartar, "setText", "Não é caractere ({descartar_box})")
         botao_descartar.clicked.connect(self.pedir_descartar)
         botao_anterior = QPushButton("◀ Anterior")
-        botao_anterior.setToolTip("O anterior da fila (Alt+↑)")
+        teclado.texto_vivo(botao_anterior, "setToolTip", "O anterior da fila ({anterior_da_fila})")
         botao_anterior.clicked.connect(self.anterior.emit)
         botao_pular = QPushButton("Pular ▶")
-        botao_pular.setToolTip("Pula para o próximo da fila, sem decidir (Alt+↓)")
+        teclado.texto_vivo(botao_pular, "setToolTip",
+                           "Pula para o próximo da fila, sem decidir ({proximo_da_fila})")
         botao_pular.clicked.connect(self.pular.emit)
         botao_dividir = QPushButton("Dividir")
-        botao_dividir.setToolTip("Divide o box em dois glifos, na linha vermelha do recorte "
-                                 "ou, sem ela, no vão da tinta (Ctrl+D).")
+        teclado.texto_vivo(botao_dividir, "setToolTip",
+                           "Divide o box em dois glifos, na linha vermelha do recorte ou, sem "
+                           "ela, no vão da tinta ({dividir}).")
         botao_dividir.clicked.connect(self.pedir_dividir)
         botao_juntar_antes = QPushButton("◀ Juntar")
-        botao_juntar_antes.setToolTip("Junta com o box anterior da linha (Ctrl+Shift+J).")
+        teclado.texto_vivo(botao_juntar_antes, "setToolTip",
+                           "Junta com o box anterior da linha ({juntar_anterior}).")
         botao_juntar_antes.clicked.connect(lambda: self.pedir_juntar(-1))
         botao_juntar_depois = QPushButton("Juntar ▶")
-        botao_juntar_depois.setToolTip("Junta com o box seguinte da linha (Ctrl+J).")
+        teclado.texto_vivo(botao_juntar_depois, "setToolTip",
+                           "Junta com o box seguinte da linha ({juntar_seguinte}).")
         botao_juntar_depois.clicked.connect(lambda: self.pedir_juntar(+1))
         self._botoes = [botao_ensinar, botao_corrigir, botao_descartar, botao_anterior, botao_pular,
                         botao_dividir, botao_juntar_antes, botao_juntar_depois]
@@ -224,13 +233,15 @@ class PainelDeTreino(QWidget):
         navegar.addWidget(botao_anterior)
         navegar.addWidget(botao_pular)
 
-        paleta = QGroupBox("Símbolos  (F2)")
+        paleta = QGroupBox()
+        teclado.texto_vivo(paleta, "setTitle", "Símbolos  ({paleta})")
         grade = QGridLayout(paleta)
         grade.setSpacing(2)
         for i, simbolo in enumerate(PALETA):
             botao = QToolButton()
             botao.setText(simbolo)
             botao.setToolTip(f"{simbolo}  {NOMES_DOS_SIMBOLOS.get(simbolo, '')}")
+            botao.setAccessibleName(f"Inserir {NOMES_DOS_SIMBOLOS.get(simbolo, simbolo)}")
             botao.setFont(QFont(FONTE_DE_SIMBOLOS, 14))
             botao.setFixedSize(34, 34)
             botao.setFocusPolicy(Qt.FocusPolicy.NoFocus)

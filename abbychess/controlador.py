@@ -147,6 +147,11 @@ class ControladorDePagina:
         #: Chamado antes de sair da página aberta (outra página, o Ctrl+T): a janela confirma
         #: ali a sessão aberta do Documento (§6.3), que não pode ficar para depois.
         self.antes_de_sair_da_pagina: Optional[Callable[[], None]] = None
+        #: Feito com a matriz da página na thread que a renderiza (a da pré-carga, quase
+        #: sempre): a janela põe aqui a `QImage` dela, e a conversão sai da interface.
+        self.preparar_imagem: Optional[Callable[[np.ndarray], object]] = None
+        #: +1 ou -1: o sentido do último passo entre páginas, o da pré-carga.
+        self._sentido = 1
         #: O livro tem figurinas lidas (o modo "livro" das peças, §6.4): o "sim" fica guardado
         #: até outro projeto; sem ele (None), o resumo das páginas é consultado de novo.
         self._livro_tem_figurinas: Optional[bool] = None
@@ -370,7 +375,9 @@ class ControladorDePagina:
         self.lote_rodando = False               # o lote do projeto anterior não vale aqui
         self.projeto, self.fonte, self.leitor = projeto, fonte, leitor
         #: As páginas renderizadas mais recentes e a pré-carga da seguinte (§14.1).
-        self.cache = pg.CacheDePaginas(fonte) if fonte is not None else None
+        self.cache = (pg.CacheDePaginas(fonte, preparar=self.preparar_imagem)
+                      if fonte is not None else None)
+        self._sentido = 1
         #: As páginas visitadas, para Alt+← e Alt+→ (§3.3), e onde se está nelas.
         self.visitas: List[int] = []
         self._visita = -1
@@ -394,6 +401,8 @@ class ControladorDePagina:
         except OSError as erro:
             self.eventos.emitir("aviso", "Página", str(erro))
             return False
+        if indice != self.indice:
+            self._sentido = 1 if indice > self.indice else -1
         self.indice, self.imagem, self.matriz = indice, imagem, matriz
         self._letra_que_faltava = None
         if visita:
@@ -407,18 +416,28 @@ class ControladorDePagina:
             self._ler_os_aguardando(self.modelo, indice, None)
             if not self.reconhecida:
                 self._avisar(f"Página com {len(self.boxes)} glifo(s) marcados à mão e ainda não "
-                             "reconhecida. O F5 reconhece o resto e mantém os quadros.", 10000)
+                             "reconhecida. O {reconhecer_pagina} reconhece o resto e mantém "
+                             "os quadros.", 10000)
         else:
             self.eventos.emitir("atual_mudou")
         self.eventos.emitir("acoes_mudaram")
         return True
 
     def precarregar_seguinte(self) -> None:
-        """Renderiza a página seguinte, a mais provável, noutra thread. A janela chama depois
-        de pintar a atual: dentro do `ir_para`, a pré-carga disputava a CPU com a conversão e
-        a pintura da página pedida, e a troca fora do cache ficava ~60 ms mais lenta."""
+        """Renderiza a próxima página no sentido em que se anda (a seguinte, ou a anterior
+        depois de um PgUp), a mais provável, noutra thread. A janela chama depois de pintar a
+        atual: dentro do `ir_para`, a pré-carga disputava a CPU com a conversão e a pintura
+        da página pedida, e a troca fora do cache ficava ~60 ms mais lenta."""
         if self.cache is not None and self.fonte is not None:
-            self.cache.precarregar(self.indice + 1)
+            self.cache.precarregar(self.proxima_provavel)
+
+    @property
+    def proxima_provavel(self) -> int:
+        """A página que a pré-carga prepara: a vizinha no sentido do último passo; na ponta do
+        livro (o Home deixa o sentido para trás na primeira), a do outro lado."""
+        alvo = self.indice + self._sentido
+        total = self.fonte.total if self.fonte is not None else 0
+        return alvo if 0 <= alvo < total else self.indice - self._sentido
 
     # ------------------------------------------------------------------
     # Navegação (§3.3)
@@ -550,7 +569,8 @@ class ControladorDePagina:
                          "como verificada depois que ela entrar.", 8000)
             return
         if self.modelo is None or self.modelo.estado not in LIDAS:
-            self._avisar("Reconheça a página antes de marcá-la como verificada (F5).", 6000)
+            self._avisar("Reconheça a página antes de marcá-la como verificada "
+                         "({reconhecer_pagina}).", 6000)
             return
 
         def corpo():

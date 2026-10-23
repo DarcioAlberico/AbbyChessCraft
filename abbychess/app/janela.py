@@ -35,7 +35,8 @@ from PySide6.QtCore import QSettings, QTimer, Signal
 from PySide6.QtWidgets import QApplication, QInputDialog, QMainWindow
 
 from abbychess import avisos as av
-from abbychess.app import acoes, dialogo_exportacao, dialogos
+from abbychess.app import acessibilidade, acoes, dialogo_exportacao, dialogos, teclado
+from abbychess.app.imagens import qimage_da_pagina
 from abbychess.app.busca_na_janela import BuscaNaJanela
 from abbychess.app.galeria_na_janela import GaleriaNaJanela
 from abbychess.app.substituir_na_janela import SubstituirNaJanela
@@ -60,6 +61,13 @@ log = logging.getLogger(__name__)
 TITULO = "AbbyChessCraft"
 
 
+def configuracao() -> QSettings:
+    """As escolhas lembradas do programa, no formato padrão do `QSettings`: o registro no
+    programa, o INI temporário nos testes (`tests/conftest.py`). O construtor só com a
+    organização e o nome ignora o formato padrão e ia sempre ao registro."""
+    return QSettings(QSettings.defaultFormat(), QSettings.Scope.UserScope, TITULO, TITULO)
+
+
 class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, LoteNaJanela,
                       EdicaoNoDocumento, BuscaNaJanela, SubstituirNaJanela, GaleriaNaJanela, QMainWindow):
     #: Da thread do gravador: a página `indice` não gravou (o erro).
@@ -69,7 +77,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         super().__init__()
         self.setWindowTitle(TITULO)
         self.resize(1500, 950)
-        self.config = QSettings("AbbyChessCraft", "AbbyChessCraft")
+        self.config = configuracao()
+        descartadas = teclado.carregar(self.config)   # o perfil antes das dicas dos painéis
 
         self.executor = Executor(self)
         self.eventos = Eventos()
@@ -85,10 +94,15 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self._montar_galeria()
         acoes.montar(self)
         self._ligar_eventos()
-        self.treino.limpar("Crie um projeto (Ctrl+N) ou abra um existente (Ctrl+O).")
+        self.textos_do_teclado()                # §13: a Imagem e o Glifo sem livro
+        teclado.quando_mudar(self.textos_do_teclado)
         acoes.atualizar(self)
         self.arranjo_padrao()
         self.atualizar_fila()
+        acessibilidade.nomear_os_controles_do_qt(self)     # CA-13.1
+        if descartadas:
+            self.statusBar().showMessage("Teclado: trocas que não valem mais foram deixadas de "
+                                         f"lado ({', '.join(descartadas)}).", 15000)
 
     # O projeto aberto, para quem lê de fora (os testes, os diálogos).
     projeto = property(lambda self: self.pagina.projeto)
@@ -121,6 +135,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self._pre_carga.setSingleShot(True)
         self._pre_carga.setInterval(150)
         self._pre_carga.timeout.connect(self.pagina.precarregar_seguinte)
+        self._ultima_troca = 0.0                # folheando depressa, a pré-carga vem já
+        self.pagina.preparar_imagem = qimage_da_pagina      # a QImage na thread da pré-carga
         self._pre_pixmap = QTimer(self)
         self._pre_pixmap.setSingleShot(True)
         self._pre_pixmap.setInterval(400)
@@ -425,8 +441,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         elif sim:
             self.statusBar().showMessage(
                 "Editor de áreas: arraste para desenhar, dentro para mover, na borda para "
-                "esticar; 1 texto, 2 diagrama, 3 imagem, 4 ignorar; Del apaga. F5 reconhece "
-                "pelas áreas.", 10000)
+                "esticar; 1 texto, 2 diagrama, 3 imagem, 4 ignorar; Del apaga. "
+                + teclado.com_teclas("{reconhecer_pagina} reconhece pelas áreas."), 10000)
         else:
             self.statusBar().showMessage("Editor de áreas desligado.", 5000)
 

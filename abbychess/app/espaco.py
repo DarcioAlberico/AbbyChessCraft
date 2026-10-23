@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QDockWidget, QLabel, QMess
                                QProgressBar, QSpinBox, QSplitter, QTabWidget, QTextBrowser,
                                QToolBar, QToolButton, QVBoxLayout, QWidget)
 
+from abbychess import atalhos
 from abbychess import avisos as av
 from abbychess import gravacao as gv
 from abbychess import livro as lv
@@ -35,7 +36,7 @@ from abbychess import verificacao as vf
 from abbychess.modelo import LIDAS
 from abbychess.app import visor as vs
 from abbychess.app.confirmacao import BarraDeConfirmacao
-from abbychess.app import estilo
+from abbychess.app import acessibilidade, estilo, icones, teclado, vazios
 from abbychess.app.inspetor import PainelDoInspetor
 from abbychess.app.linha import FaixaDaLinha
 from abbychess.app.painel_paginas import NOMES_DOS_ESTADOS, PainelDePaginas
@@ -53,8 +54,6 @@ LARGURA_DO_EMPILHADO = 1280
 LARGURA_DA_GAVETA = 1600
 #: As larguras padrão (§3.1, com as alças): (Páginas, Imagem, vista direita, Inspetor).
 TAMANHOS = {1366: (0, 556, 500, 296), 1920: (150, 760, 680, 320)}
-ATALHOS_MD = Path(__file__).resolve().parents[2] / "docs" / "ATALHOS.md"
-
 
 def _b64(dados: QByteArray) -> str:
     return base64.b64encode(bytes(dados)).decode("ascii")
@@ -183,7 +182,8 @@ class EspacoDeTrabalho:
         self.caixa_de_zoom.setSuffix("%")
         self.caixa_de_zoom.setKeyboardTracking(False)
         self.caixa_de_zoom.setFocusPolicy(Qt.FocusPolicy.ClickFocus)   # o Tab não para nela
-        self.caixa_de_zoom.setToolTip("Zoom da página (Ctrl+roda, Ctrl++ e Ctrl+−)")
+        teclado.texto_vivo(self.caixa_de_zoom, "setToolTip",
+                           "Zoom da página (Ctrl+roda, {zoom_mais} e {zoom_menos})")
         self.caixa_de_zoom.setAccessibleName("Zoom da página")     # ligada em `acoes.montar`
         self.rotulo_do_lote = QLabel("")
         self.botao_cancelar = QToolButton()
@@ -231,6 +231,9 @@ class EspacoDeTrabalho:
         self.vista.setVisible(nome != "so_imagem")
         self.divisor.setOrientation(Qt.Orientation.Vertical if nome == "empilhado"
                                     else Qt.Orientation.Horizontal)
+        # As abas de docas agrupadas nascem com o arranjo e com o espaço restaurado: os
+        # botões internos delas também têm nome (CA-13.1).
+        acessibilidade.nomear_os_controles_do_qt(self)
 
     def arranjo_padrao(self) -> None:
         """O arranjo e os tamanhos padrão para a largura da janela (§3.1). Os tamanhos vão
@@ -464,11 +467,48 @@ class EspacoDeTrabalho:
     # ------------------------------------------------------------------
     # A fila, a gaveta, a barra e os avisos
     # ------------------------------------------------------------------
+    def focar_linha(self) -> None:
+        """Foco na faixa Linha (perfil FineReader, Alt+4), que aparece se estava escondida."""
+        self.alternar_linha(True)
+        self.linha.setFocus(Qt.FocusReason.ShortcutFocusReason)
+
+    def focar_vizinho(self, passo: int) -> None:
+        """Ctrl+Tab e Ctrl+Shift+Tab no perfil FineReader: o painel seguinte ou o anterior,
+        na ordem do Alt+1…5."""
+        atual = self.painel_com_o_foco() or 2
+        self.focar((atual - 1 + passo) % 5 + 1)
+
+    def configurar_teclado(self) -> None:
+        """Opções › Teclado: o perfil e as trocas valem na hora e ficam lembrados."""
+        from abbychess.app import dialogo_teclado, teclado
+
+        escolha = dialogo_teclado.perguntar(self)
+        if escolha is None:
+            return
+        perfil, trocas = escolha
+        teclado.definir(perfil, trocas)
+        teclado.gravar(self.config)
+        mudaram = teclado.reaplicar(self)
+        nome = dict(dialogo_teclado.PERFIS)[perfil]
+        self.statusBar().showMessage(f"Teclado: perfil {nome}, {len(trocas)} troca(s); "
+                                     f"{mudaram} atalho(s) mudaram.", 8000)
+
+    def textos_do_teclado(self) -> None:
+        """Os estados vazios citam a tecla do perfil (§13): ao abrir a janela e a cada troca
+        de perfil ou de tecla (`teclado.quando_mudar`)."""
+        if self.pagina.fonte is None:
+            self.treino.limpar(vazios.sem_projeto())
+            self.visor.definir_vazio(vazios.sem_projeto())
+        else:
+            self._atual_mudou()
+            self.pintar_texto()
+
     def _tema_mudou(self, _nome: str) -> None:
         """O tema do sistema mudou: o que guardou cor da interface é pintado de novo."""
         self.paginas.esquecer_as_cores()
         self.atualizar_paginas()
         self.resultados.repintar()
+        icones.aplicar(self)
 
     def _modo_da_fila_mudou(self, modo: str) -> None:
         """O modo da fila escolhe o editor do Inspetor: Palavra nas palavras, Diagrama nos
@@ -651,8 +691,14 @@ class EspacoDeTrabalho:
         dialogo.setWindowTitle("Atalhos do teclado")
         dialogo.resize(820, 640)
         texto = QTextBrowser()
-        texto.setMarkdown(ATALHOS_MD.read_text(encoding="utf-8") if ATALHOS_MD.exists()
-                          else "docs/ATALHOS.md não encontrado.")
+        # A tabela de `docs/ATALHOS.md`, feita na hora com as trocas do usuário no perfil em
+        # uso (Ferramentas › Teclado): o arquivo tem só as teclas do YAML.
+        nome = {"padrao": "Padrão", "finereader": "FineReader"}.get(teclado.PERFIL,
+                                                                     teclado.PERFIL)
+        trocadas = (f", com {len(teclado.trocas)} tecla(s) trocada(s)" if teclado.trocas
+                    else "")
+        texto.setMarkdown(f"**Perfil em uso: {nome}{trocadas}.**\n\n" + atalhos.markdown(
+            teclado.tabela_com_trocas(teclado.PERFIL, teclado.trocas)))
         QVBoxLayout(dialogo).addWidget(texto)
         self.dialogo_de_atalhos = dialogo
         dialogo.open()

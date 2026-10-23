@@ -99,7 +99,7 @@ def _esperado_do_yaml():
     esperado = {}
     for item in bruto["acoes"]:
         sem = item.get("sem_atalho") or []
-        sequencias = item.get(teclado.PERFIL)
+        sequencias = item.get(teclado.PERFIL) or item.get(bruto["perfis"][0])   # herda o padrão
         if (passos.index(str(item["desde_passo"])) <= limite and sequencias
                 and teclado.PERFIL not in sem):
             lista = sequencias if isinstance(sequencias, list) else [sequencias]
@@ -119,6 +119,12 @@ _SO_DEPOIS_DA_EDICAO: set = set()
 
 
 def test_os_atalhos_registrados_sao_exatamente_os_do_yaml_ate_o_passo(janela):
+    conferir_os_registrados(janela)
+
+
+def conferir_os_registrados(janela):
+    """As teclas da janela são as do YAML no perfil de agora (`teclado.PERFIL`); o perfil
+    FineReader usa o mesmo em `tests/test_teclado.py`."""
     esperado = _esperado_do_yaml()
     por_escopo = _widgets_do_escopo(janela)
     registrados = {}
@@ -165,7 +171,9 @@ def test_atalho_citado_no_readme_ou_na_spec_existe_no_yaml():
     tabela = teclado.tabela()
     nativos = {x for n in tabela.nativos.values() for lista in n.values() for x in lista}
     todos = {x for a in tabela.acoes for seqs in a.sequencias.values() for x in seqs}
-    ja_valem = {x for a, seqs in tabela.ativas(teclado.PERFIL, teclado.PASSO) for x in seqs}
+    # O README descreve os dois perfis (desde o passo K, o FineReader também vale).
+    ja_valem = {x for perfil in tabela.perfis
+                for a, seqs in tabela.ativas(perfil, teclado.PASSO) for x in seqs}
     # O README descreve o programa de agora; ele cita as teclas antigas só ao lado de "antes".
     readme = (RAIZ / "README.md").read_text(encoding="utf-8")
     antigas = {"Tab", "Shift+Tab", "Alt+Shift+Left", "Ctrl+I", "Ctrl+Shift+P", "Ctrl+T"}

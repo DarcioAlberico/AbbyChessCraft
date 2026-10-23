@@ -27,6 +27,10 @@ abbychess = "abbychess.app.principal:main"
 [tool.setuptools]
 packages = ["abbychess", "abbychess.app"]
 
+[tool.setuptools.package-data]
+# Os ícones do Lucide (ISC): só os usados, com a licença (abbychess/app/icones.py).
+"abbychess.app" = ["icones/*.svg", "icones/LICENSE"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 timeout = 60

@@ -43,9 +43,10 @@ _PDF_DO_FILHO = None
 _ARQUIVO_DO_FILHO = None
 
 
-def _vigiar_o_pai() -> None:
-    """No filho (o `initializer` do pool): sai quando o processo que o abriu morre, mesmo
-    morto à força (sem o `atexit` dele, o filho ficava órfão)."""
+def vigiar_o_pai() -> None:
+    """No filho (o `initializer` de um pool `spawn`): sai quando o processo que o abriu morre,
+    mesmo morto à força (sem o `atexit` dele, o filho ficava órfão). O pool do índice
+    (`busca.PoolDoIndice`) também o usa."""
     pai = mp.parent_process()
     if pai is None:
         return
@@ -126,7 +127,7 @@ class RenderEmProcesso:
                 self._relogio = None
             if self._pool is None:
                 self._pool = cf.ProcessPoolExecutor(1, mp_context=mp.get_context("spawn"),
-                                                    initializer=_vigiar_o_pai)
+                                                    initializer=vigiar_o_pai)
             pool = self._pool
         try:
             resultado = pool.submit(_renderizar_no_filho, str(caminho), arquivo,

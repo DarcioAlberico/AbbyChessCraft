@@ -324,7 +324,8 @@ def _palavras_por_trecho(boxes: Sequence[BoxEntry], leitura: Optional["_Leitura"
     saida = []
     for chave, trecho in leitura.trechos(boxes):
         parte = [boxes[i] for i in trecho]
-        for linha in palavras_da_pagina(parte):
+        for linha in palavras_da_pagina(
+                parte, leitura.deteccao if len(trecho) == len(boxes) else None):
             indices = [trecho[s.indice] for p in linha for s in p.simbolos]
             caixa = _caixa_pela_altura(boxes, indices)
             saida.append((chave, [(_captura_minuscula("".join(
@@ -372,6 +373,9 @@ class _Leitura:
     colunas: List[Tuple[int, int]] = field(default_factory=list)
     #: As faixas que atravessam, `[topo, pé]` em pixels, de cima para baixo.
     faixas: List[List[float]] = field(default_factory=list)
+    #: A detecção do core sobre a página inteira, que o core reaproveita quando a página é
+    #: um trecho só (como em `layout.OrdemDeLeitura`).
+    deteccao: object = field(default=None, compare=False, repr=False)
 
     @classmethod
     def da_pagina(cls, boxes: Sequence[BoxEntry]) -> "_Leitura":
@@ -379,16 +383,17 @@ class _Leitura:
 
         if len(boxes) < 2:
             return cls()
-        colunas = BoxService.detectar_colunas(list(boxes))
+        deteccao = BoxService.detectar_colunas_e_transversais(list(boxes))
+        colunas = deteccao[0]
         if len(colunas) < 2:
-            return cls()
+            return cls(deteccao=deteccao)
         altura = statistics.median(b.y2 - b.y1 for b in boxes)
         # Uma coluna tem filas de texto: com uma linha só, o vão entre duas palavras
         # passaria por calha e partiria a linha.
         filas = [{round(((b.y1 + b.y2) / 2) / max(1.0, altura)) for b in boxes
                   if a <= (b.x1 + b.x2) / 2 <= z} for a, z in colunas]
         if min(len(f) for f in filas) < FILAS_DE_COLUNA:
-            return cls()
+            return cls(deteccao=deteccao)
         calhas = []
         for a, b in zip(colunas, colunas[1:]):
             largura = b[0] - a[1]

@@ -111,7 +111,7 @@ def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
     ordem = OrdemDeLeitura.da_pagina(entries)
     for _chave, indices in ordem.trechos(entries):
         trecho = [entries[i] for i in indices]
-        for linha in palavras_da_pagina(trecho):
+        for linha in palavras_da_pagina(trecho, ordem.deteccao_do_trecho(indices, entries)):
             palavras = [[lidos[indices[s.indice]].gid for s in p.simbolos] for p in linha]
             palavras = [p for p in palavras if p]
             if palavras:

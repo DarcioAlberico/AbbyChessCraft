@@ -85,6 +85,9 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
+#: O `indice` gravado da página que não é uma do PDF do livro (`_pagina_da_fonte`).
+FORA_DO_PDF = -1
+
 ARQUIVO_DO_PROJETO = "projeto.json"
 PASTA_DE_PADROES = "padroes"
 PASTA_DE_PAGINAS = "paginas"
@@ -1580,7 +1583,10 @@ class ProjetoDeLivro:
                 continue
             dono = do_pdf.get(pagina.indice)
             if dono is not None and self._arquivo_v2(dono).is_file():
-                continue                        # o perdedor de dois arquivos da mesma página
+                # O perdedor de dois arquivos da mesma página (uma queda): o dono vale.
+                log.warning("p%d.json repete a página %d do PDF, que é da p%d: fica fora do "
+                            "livro", pid, pagina.indice + 1, dono)
+                continue
             orfaos.append(sq.Apagada(sq.Entrada(pid, sq.FONTE_DO_LIVRO, max(0, pagina.indice)),
                                      len(sequencia)))
         proximo = max([self.dados.proximo_pid, *(p + 1 for p in em_disco),
@@ -1615,8 +1621,9 @@ class ProjetoDeLivro:
         livro = self._carregar_livro()
         gravados: Dict[int, int] = {}
         for chave, resumo in livro["paginas"].items():
-            if isinstance(resumo.get("pagina_da_fonte"), int):
-                gravados[resumo["pagina_da_fonte"]] = int(chave)
+            indice = resumo.get("pagina_da_fonte")
+            if isinstance(indice, int) and indice >= 0:     # a inserida e a direita, não
+                gravados[indice] = int(chave)
         orfaos = self._orfaos(livro, gravados)
         for indice, (pid, pagina) in orfaos.items():
             gravados[indice] = pid
@@ -1652,6 +1659,8 @@ class ProjetoDeLivro:
             except (OSError, ValueError, TypeError, KeyError):
                 continue
             indice = pagina.indice
+            if indice < 0:
+                continue                    # não é uma página do PDF (a v2 não a conhece)
             if indice in gravados and self._arquivo_v2(gravados[indice]).is_file():
                 continue                    # o livro já tem esta página, e o arquivo dela
             achados.setdefault(indice, []).append(
@@ -1737,13 +1746,22 @@ class ProjetoDeLivro:
     def _pagina_da_fonte(self, pagina: Pagina) -> int:
         """O índice da página no PDF do livro (na v2, o que dá a ordem do livro, §12.4): o da
         entrada dela na sequência, e não a posição (`pagina.indice`), que muda ao reordenar.
-        Antes de a sequência existir (montando-a, ou refazendo o livro), a página veio do JSON,
-        e o `indice` dela é o gravado: o do PDF."""
+        A página que não é uma do PDF (a inserida) e a metade direita de uma divisão (a
+        esquerda fica com o índice) gravam `FORA_DO_PDF`: o `backup-v2/` copiado de volta não
+        as toma pela página do livro de mesmo número. Antes de a sequência existir (montando-a,
+        ou refazendo o livro), a página veio do JSON, e o `indice` dela é o gravado."""
         sequencia = self._sequencia         # sem montar: quem monta chama daqui
-        entrada = sequencia.entrada_de(pagina.pid) if sequencia is not None else None
-        if entrada is not None and entrada.fonte == sq.FONTE_DO_LIVRO:
+        if sequencia is None:
+            return pagina.indice
+        entrada = sequencia.entrada_de(pagina.pid)
+        if entrada is None:
+            apagada = sequencia.apagada(pagina.pid)
+            entrada = None if apagada is None else apagada.entrada
+        if entrada is None:
+            return pagina.indice
+        if entrada.fonte == sq.FONTE_DO_LIVRO and entrada.metade != "direita":
             return entrada.pagina
-        return pagina.indice
+        return FORA_DO_PDF
 
     def resumo_do_modelo(self, pagina: Pagina) -> dict:
         """O resumo da página no `livro.json` (sem mudar nada: vale numa thread)."""

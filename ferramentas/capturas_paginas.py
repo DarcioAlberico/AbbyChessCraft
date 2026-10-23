@@ -38,38 +38,54 @@ def main() -> int:
     analisador.add_argument("--tema", choices=("claro", "escuro"), default="claro")
     args = analisador.parse_args()
 
+    import time
+
     from PySide6.QtGui import QFont
-    from PySide6.QtWidgets import QApplication, QDialog, QMenu
+    from PySide6.QtWidgets import QApplication, QDialog, QFileDialog, QMenu
 
     from abbychess import pagina as pg
     from abbychess.app import dialogo_paginas as dp
     from abbychess.app import estilo
     from abbychess.app.janela import JanelaPrincipal
+    from abbychess.app.principal import traduzir_o_qt
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
 
     app = QApplication.instance() or QApplication([])
+    traduzir_o_qt(app)
     estilo.aplicar(app, args.tema)
     app.setFont(QFont("Segoe UI", 9))
     saida = Path(args.saida)
     saida.mkdir(parents=True, exist_ok=True)
 
     def gravar(widget, nome: str) -> None:
+        # O Documento e a Linha se redesenham por um relógio (150 ms): a captura espera por
+        # eles, ou mostra o estado de antes da operação.
+        fim = time.monotonic() + 5.0
+        while time.monotonic() < fim:
+            app.processEvents()
+            janela_viva = janelas[0] if janelas else None
+            if janela_viva is None or not janela_viva.relogio_do_texto.isActive():
+                break
+            time.sleep(0.02)
         app.processEvents()
         caminho = saida / f"{nome}-{args.tema}.png"
         widget.grab().save(str(caminho))
         print(caminho)
 
-    def capturar(dialogo: QDialog, nome: str) -> None:
+    def capturar(dialogo: QDialog, nome: str, ajustar: bool = True) -> None:
         dialogo.show()
-        dialogo.adjustSize()
+        if ajustar:
+            dialogo.adjustSize()
         gravar(dialogo, nome)
         dialogo.reject()
         dialogo.deleteLater()
 
     # Os diálogos são mostrados e capturados, e não executados (a resposta é "cancelar").
-    nomes = iter(["dialogo-mover", "dialogo-apagar", "dialogo-girar", "dialogo-cortar",
-                  "dialogo-tirar-o-corte", "dialogo-dividir", "dialogo-endireitar"])
+    nomes = iter(["dialogo-mover", "dialogo-apagar", "dialogo-inserir", "dialogo-girar",
+                  "dialogo-cortar", "dialogo-tirar-o-corte", "dialogo-dividir",
+                  "dialogo-endireitar"])
+    janelas: list = []
 
     def perguntar_paginas(janela, titulo, total, **opcoes):
         capturar(dp.DialogoDasPaginas(janela, titulo, total, **opcoes), next(nomes))
@@ -81,12 +97,14 @@ def main() -> int:
         return None
 
     dp.perguntar_paginas, dp.perguntar_com = perguntar_paginas, perguntar_com
+    QFileDialog.getOpenFileNames = staticmethod(lambda *_a, **_k: (["inserida.pdf"], ""))
     pdf = _pdf(args)
     with tempfile.TemporaryDirectory(prefix="abby-capturas-l-") as pasta:
         projeto = ProjetoDeLivro.criar(Path(pasta) / "livros", "Capturas", pdf)
         leitor = LeitorDoLivro.com_modelos_globais(projeto.pasta_de_padroes,
                                                    limiares=projeto.dados.limiares)
         janela = JanelaPrincipal()
+        janelas.append(janela)
         janela.resize(1366, 768)
         janela.show()
         janela.usar(projeto, pg.fonte_do_projeto(projeto), leitor)
@@ -102,12 +120,13 @@ def main() -> int:
         gravar(menu, "menu-pagina")
         menu.hide()
         for acao in (janela.acao_mover_paginas, janela.acao_apagar_paginas,
-                     janela.acao_girar_paginas, janela.acao_cortar_paginas,
+                     janela.acao_inserir_paginas, janela.acao_girar_paginas,
+                     janela.acao_cortar_paginas,
                      janela.acao_tirar_o_corte, janela.acao_dividir_paginas,
                      janela.acao_endireitar_paginas):
             acao.trigger()
         capturar(dp.DialogoDasApagadas(janela, projeto.sequencia.apagar(
-            [args.indice + 1]).apagadas), "dialogo-paginas-apagadas")
+            [args.indice + 1]).apagadas), "dialogo-paginas-apagadas", ajustar=False)
 
         p, i = janela.pagina, args.indice
         for nome, fazer in (("1-girada-90", lambda: p.girar_paginas([i], 90)),

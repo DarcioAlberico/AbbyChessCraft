@@ -84,6 +84,10 @@ def montar(janela) -> None:
     j.acao_apagar_paginas = teclado.sem_atalho(j, "Apagar páginas…", lambda: j.apagar_paginas())
     j.acao_inserir_paginas = teclado.sem_atalho(j, "Inserir páginas…", j.inserir_paginas)
     j.acao_paginas_apagadas = teclado.sem_atalho(j, "Páginas apagadas…", j.paginas_apagadas)
+    j.acao_girar_a_direita = teclado.sem_atalho(j, "Girar à direita",
+                                                lambda: j.girar_a_direita())
+    j.acao_girar_a_esquerda = teclado.sem_atalho(j, "Girar à esquerda",
+                                                 lambda: j.girar_a_esquerda())
     j.acao_girar_paginas = teclado.sem_atalho(j, "Girar páginas…", lambda: j.girar_paginas())
     j.acao_cortar_paginas = teclado.sem_atalho(j, "Cortar páginas…", lambda: j.cortar_paginas())
     j.acao_tirar_o_corte = teclado.sem_atalho(j, "Tirar o corte…", lambda: j.tirar_o_corte())
@@ -92,7 +96,8 @@ def montar(janela) -> None:
     j.acao_endireitar_paginas = teclado.sem_atalho(j, "Endireitar páginas…",
                                                    lambda: j.endireitar_paginas())
     j.acoes_de_paginas = (j.acao_mover_paginas, j.acao_apagar_paginas, j.acao_inserir_paginas,
-                          j.acao_paginas_apagadas, j.acao_girar_paginas, j.acao_cortar_paginas,
+                          j.acao_paginas_apagadas, j.acao_girar_a_direita,
+                          j.acao_girar_a_esquerda, j.acao_girar_paginas, j.acao_cortar_paginas,
                           j.acao_tirar_o_corte, j.acao_dividir_paginas,
                           j.acao_endireitar_paginas)
     barra.addSeparator()
@@ -355,12 +360,14 @@ def atualizar(janela) -> None:
              "Tira páginas do livro; elas ficam guardadas no projeto",
              "Põe páginas de um PDF ou de imagens no livro",
              "Devolve ao livro as páginas apagadas",
+             "Gira 90° no sentido horário a página aberta (ou as escolhidas na gaveta)",
+             "Gira 90° no sentido anti-horário a página aberta (ou as escolhidas na gaveta)",
              "Gira as páginas de 90 em 90 graus, com os glifos",
              "Corta as margens das páginas; os glifos de fora ficam guardados",
              "Devolve as páginas cortadas inteiras",
              "Divide a página espelhada em duas",
              "Endireita as páginas por um ângulo à mão; a leitura delas se desfaz")
-    valem = (True, True, True, apagadas, True, True, True, True, True)
+    valem = (True, True, True, apagadas, True, True, True, True, True, True, True)
     for q, dica, vale in zip(j.acoes_de_paginas, dicas, valem):
         q.setEnabled(motivo is None and vale)
         q.setToolTip(dica if motivo is None else f"{dica}. {motivo}")

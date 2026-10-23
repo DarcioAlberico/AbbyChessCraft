@@ -215,15 +215,33 @@ class FonteDePaginas:
     def fixar_inclinacao(self, entrada: "sq.Entrada", angulo: float) -> None:
         """O ângulo da entrada é este (a página com boxes que muda de giro guarda o ângulo
         em que foi lida, §12.4: medir de novo moveria os boxes)."""
-        if not self.endireitar or entrada.angulo is not None:
+        self.fixar_inclinacoes([(entrada, angulo)])
+
+    def fixar_inclinacoes(self, pares) -> None:
+        """`fixar_inclinacao` de várias entradas, com uma gravação só do `inclinacoes.json`
+        (dividir ou girar o livro inteiro)."""
+        if not self.endireitar:
             return
-        chave = _chave_da_inclinacao(entrada, self.por_pid)
+        novas = {_chave_da_inclinacao(e, self.por_pid): float(angulo)
+                 for e, angulo in pares if e.angulo is None}
+        if not novas:
+            return
         with self._trava_das_inclinacoes:
-            self._inclinacoes[chave] = float(angulo)
+            self._inclinacoes.update(novas)
             if self._arquivo_das_inclinacoes is not None and not self.somente_leitura:
                 gv.gravar_json(self._arquivo_das_inclinacoes, {
                     str(k): v for k, v in sorted(self._inclinacoes.items(),
                                                  key=_ordem_da_chave)})
+
+    def inclinacao_guardada(self, entrada: "sq.Entrada") -> Optional[float]:
+        """O ângulo medido e guardado da entrada, sem medir (None: ainda não foi medido)."""
+        if not self.endireitar or entrada.angulo is not None:
+            return None
+        with self._trava_das_inclinacoes:
+            angulo = self._inclinacoes.get(_chave_da_inclinacao(entrada, self.por_pid))
+            if angulo is None and self.por_pid and entrada.do_livro_sem_geometria:
+                angulo = self._inclinacoes.get(entrada.pagina)
+        return angulo
 
     def inclinacao_da_entrada(self, entrada: "sq.Entrada",
                               imagem: Optional[Image.Image] = None) -> float:
@@ -238,7 +256,7 @@ class FonteDePaginas:
         chave = _chave_da_inclinacao(entrada, self.por_pid)
         with self._trava_das_inclinacoes:
             angulo = self._inclinacoes.get(chave)
-            if angulo is None and self.por_pid and _sem_geometria(entrada):
+            if angulo is None and self.por_pid and entrada.do_livro_sem_geometria:
                 # A medida da v2, pelo índice do PDF: a migração a passa a `pid`, e uma queda
                 # no meio dela não faz medir de novo (os boxes estão no ângulo medido).
                 angulo = self._inclinacoes.get(entrada.pagina)
@@ -267,17 +285,13 @@ def _ordem_da_chave(item) -> tuple:
     return (0, chave, "") if isinstance(chave, int) else (1, 0, chave)
 
 
-def _sem_geometria(entrada: "sq.Entrada") -> bool:
-    return entrada.fonte == sq.FONTE_DO_LIVRO and entrada.quadro is None and not entrada.giro
-
-
 def _chave_da_inclinacao(entrada: "sq.Entrada", por_pid: bool = False):
     """A chave da medida em `inclinacoes.json`: `p<pid>:inteira:<giro>` (§12.4), no projeto
     da v3: a medida é da página inteira (o quadro vem depois de endireitar) já girada. Num da
     v2 (só para leitura, ou uma fonte sem projeto), a página do livro sem quadro nem giro usa
     o índice dela no PDF, como até o passo K: lá o `pid` das páginas nunca editadas só existe
     na memória e muda de uma sessão para outra."""
-    if not por_pid and _sem_geometria(entrada):
+    if not por_pid and entrada.do_livro_sem_geometria:
         return entrada.pagina
     return f"p{entrada.pid}:inteira:{entrada.giro}"
 

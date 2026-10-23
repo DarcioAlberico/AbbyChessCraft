@@ -81,7 +81,7 @@ def test_o_dialogo_das_apagadas_restaura_as_escolhidas_ou_todas(app):
 
     s = Sequencia.do_livro(range(10)).apagar([2, 6])
     d = dp.DialogoDasApagadas(None, s.apagadas)
-    assert d.lista.count() == 2 and "página 3 do PDF" in d.lista.item(0).text()
+    assert d.lista.count() == 2 and "p. 3 do PDF" in d.lista.item(0).text()
     assert not d.botao_escolhidas.isEnabled()
     d.lista.item(1).setSelected(True)
     d.botao_escolhidas.click()

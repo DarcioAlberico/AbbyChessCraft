@@ -749,11 +749,13 @@ os três arquivos saíram em 1,5 s (PDF), 0,8 s (DOCX) e 0,5 s (EPUB).
 ### As páginas do livro: mover, apagar, inserir, girar, cortar, dividir (passo L)
 
 O menu **Página** tem **Mover páginas…**, **Apagar páginas…**, **Inserir páginas…**,
-**Páginas apagadas…**, **Girar páginas…**, **Cortar páginas…**, **Tirar o corte…**,
-**Dividir páginas…** e **Endireitar páginas…**; a gaveta de Páginas move e apaga as linhas selecionadas (menu de
-contexto). As páginas se escolhem como texto, com o número de agora no livro: `3-7, 12`,
-`ímpares`, `pares` ou `todas`; o diálogo diz quantas o texto escolhe, ou o que está errado
-nele.
+**Páginas apagadas…**, **Girar à direita** e **Girar à esquerda** (um gesto, sem diálogo),
+**Girar páginas…**, **Cortar páginas…**, **Tirar o corte…**, **Dividir páginas…** e
+**Endireitar páginas…**. O menu de contexto da gaveta de Páginas faz o mesmo com as linhas
+selecionadas, e o menu Página vale para elas quando há mais de uma escolhida (senão, para a
+página aberta). Nos diálogos, as páginas se escolhem como texto, com o número de agora no
+livro: `3-7, 12`, `ímpares`, `pares`, `todas` ou uma paridade num intervalo (`ímpares
+15-200`, `pares de 3 a 9`); o diálogo diz quantas o texto escolhe, ou o que está errado nele.
 
 - **Mover** tira as páginas de onde estão e as põe, na mesma ordem, depois da página
   escolhida (0: o começo do livro).
@@ -765,20 +767,25 @@ nele.
   `inseridas/` do projeto (o arquivo de fora pode sumir depois). PDF com senha é recusado.
   As inseridas são lidas, ensinadas e exportadas como as outras; no PDF pesquisável, a
   página inserida, cortada ou girada sai com a imagem que se vê no programa.
-- **Girar** gira de 90 em 90 graus; **cortar** tira margens (em porcentagem do que se vê).
-  Os glifos, as áreas e os diagramas lidos vão junto, nos mesmos pixels; o que o corte deixa
-  de fora fica guardado e volta com o Ctrl+Z ou com **Tirar o corte…**.
+- **Girar** gira de 90 em 90 graus; **cortar** tira margens (em porcentagem do que se vê:
+  confira na página depois, o corte ainda é por números). Os glifos, as áreas e os diagramas
+  lidos vão junto, nos mesmos pixels; o que o corte deixa de fora fica guardado e volta com o
+  Ctrl+Z ou com **Tirar o corte…**. A página lida girada mantém a leitura da posição de antes
+  (a barra avisa): o F5 lê de novo.
 - **Endireitar** gira a página por um ângulo à mão (até 20°, positivo no sentido
-  anti-horário), no lugar do medido. A leitura dela se desfaz: ficam os glifos de leitura
-  digitada ou aceitos na revisão, girados com a página, e as áreas desenhadas; o F5 lê o
-  resto de novo.
+  anti-horário), no lugar do medido. O diálogo começa no ângulo medido de cada página (dar
+  OK sem mexer não muda nada) e diz quantas das escolhidas perdem a leitura: ficam os glifos
+  de leitura digitada ou aceitos na revisão, girados com a página, e as áreas desenhadas; o
+  F5 lê o resto de novo.
 - **Dividir** separa a página espelhada (duas páginas do livro numa imagem) em duas: a
   metade esquerda fica no lugar, a direita entra logo depois, cada uma com os glifos dela.
   As amostras ensinadas antes continuam achando o glifo de origem. Uma metade não se divide
-  de novo; o Ctrl+Z junta as duas.
+  de novo (na seleção, ela é pulada, e a barra avisa); o Ctrl+Z junta as duas. Dividir as
+  230 páginas lidas do Xadrez Vitorioso leva ~3 s.
 
 Cada operação é um passo do **Ctrl+Z**. Elas ficam desligadas, com o motivo na dica, no
-projeto só para leitura, com o lote rodando ou com uma tarefa em curso. A página de cada
+projeto só para leitura, com o lote rodando, com uma tarefa em curso ou com o servidor lendo
+glifos da página. A página de cada
 glifo tem um número que não muda (o `pid`): a página aberta, a busca, o lote a retomar e a
 origem das amostras seguem a página para onde ela for. O `projeto.json` guarda a ordem do
 livro desde o formato 3 (§12.4): o projeto antigo passa a ele na primeira abertura com o PDF

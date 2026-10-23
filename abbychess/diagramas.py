@@ -93,6 +93,9 @@ class DiagramaLido:
     #: O trecho da legenda que disse o lado, para quem confere poder julgar.
     lado_trecho: str = ""
     roque: str = ""
+    #: Quem conferiu disse o roque, inclusive nenhum: desmarcar todos não volta ao inferido
+    #: na validação pelos lances.
+    roque_informado: bool = False
     #: Como o diagrama está impresso; as casas já vêm giradas para a posição.
     orientacao: str = "branca"
     #: Os rótulos impressos decidiram a orientação. Sem eles, é suposição.
@@ -178,7 +181,7 @@ class DiagramaLido:
         if self.lado_origem == LADO_DO_USUARIO and self.lado in lado_a_jogar.LADOS:
             tabuleiro.lado, tabuleiro.lado_origem, tabuleiro.lado_informado = (
                 self.lado, LADO_DO_USUARIO, True)
-        if self.roque:
+        if self.roque or self.roque_informado:
             tabuleiro.roque, tabuleiro.roque_informado = self.roque, True
         # O que veio gravado é o ponto de partida: não há o que desfazer antes dele.
         tabuleiro._historico = [tabuleiro._estado()]
@@ -195,7 +198,9 @@ class DiagramaLido:
                        lado=tabuleiro.lado if dito else None,
                        lado_origem=tabuleiro.lado_origem if dito else "",
                        lado_trecho=self.lado_trecho if tabuleiro.lado_origem == LADO_DA_LEGENDA else "",
-                       roque=tabuleiro.roque, conferido=conferido)
+                       roque=tabuleiro.roque,
+                       roque_informado=bool(tabuleiro.roque_informado or tabuleiro.roque),
+                       conferido=conferido)
 
     # ------------------------------------------------------------------
     def para_json(self) -> dict:
@@ -210,6 +215,7 @@ class DiagramaLido:
             "lado_origem": self.lado_origem,
             "lado_trecho": self.lado_trecho,
             "roque": self.roque,
+            "roque_informado": self.roque_informado,
             "orientacao": self.orientacao,
             "orientacao_confirmada": self.orientacao_confirmada,
             "titulo": self.titulo,
@@ -233,6 +239,8 @@ class DiagramaLido:
                    lado_origem=bruto.get("lado_origem", "") if lado else "",
                    lado_trecho=bruto.get("lado_trecho", ""),
                    roque=bruto.get("roque", ""),
+                   # Gravado antes do campo, só o roque marcado sabe que foi dito.
+                   roque_informado=bool(bruto.get("roque_informado", bruto.get("roque"))),
                    orientacao=bruto.get("orientacao", "branca"),
                    orientacao_confirmada=bool(bruto.get("orientacao_confirmada", False)),
                    titulo=bruto.get("titulo", ""),

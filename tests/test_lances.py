@@ -115,6 +115,26 @@ def test_o_roque_do_texto_usa_o_inferido():
     assert v.confiavel and v.lances == ("O-O-O", "O-O")
 
 
+def test_desmarcar_todos_os_roques_nao_volta_ao_inferido(tmp_path):
+    pecas = "r3k2r/pppq1ppp/2n2n2/3pp3/3PP3/2N2N2/PPPQ1PPP/R3K2R"
+    linha = lc.primeira_linha("10.0-0-0 0-0", "pt")
+    assert not lc.validar(pecas, linha, roque="", roque_informado=True).confiavel
+
+    # No diagrama: conferir com os roques todos desmarcados é dizer "sem roque".
+    d = _lido(pecas + " w - - 0 1")
+    tabuleiro = d.edicao()
+    tabuleiro.definir_roque("KQkq")
+    tabuleiro.definir_roque("")
+    conferido = d.conferir(tabuleiro)
+    assert conferido.roque == "" and conferido.roque_informado
+    volta = dg.DiagramaLido.de_json(json.loads(json.dumps(conferido.para_json())))
+    assert volta.roque_informado and volta.edicao().roque_informado
+    # O gravado antes do campo, sem roque, ainda deixa o inferido valer.
+    bruto = conferido.para_json()
+    del bruto["roque_informado"]
+    assert not dg.DiagramaLido.de_json(bruto).roque_informado
+
+
 # ----------------------------------------------------------------------
 # O roque inferido nunca vai ao FEN sem conferência (CA-10.3)
 # ----------------------------------------------------------------------

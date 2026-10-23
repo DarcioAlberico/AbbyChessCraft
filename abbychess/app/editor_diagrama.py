@@ -498,7 +498,8 @@ class EditorDeDiagrama(QWidget):
         linha = self.linhas[self.atual] if self.atual < len(self.linhas) else []
         tabuleiro = self.tabuleiro()
         lado = tabuleiro.lado if tabuleiro.lado_origem != "convencao" else None
-        return lances.validar(tabuleiro.fen(), linha, lado=lado, roque=tabuleiro.roque)
+        return lances.validar(tabuleiro.fen(), linha, lado=lado, roque=tabuleiro.roque,
+                              roque_informado=tabuleiro.roque_informado)
 
     def pgn(self) -> str:
         """O PGN da posição do editor e dos lances validados (`lances.pgn_do_diagrama`)."""

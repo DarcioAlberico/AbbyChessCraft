@@ -265,6 +265,13 @@ def test_manter_quebras_na_camada_nativa_volta_pelos_inicios():
     pagina = ex.PaginaExtraida(numero=0, blocos=[paragrafo])
     ex._quebras_da_camada(pagina)
     assert paragrafo.texto == "uma linha\noutra linha"
+    # A camada guarda o hífen colado (`inter-essante`): o `\n` entra depois dele, e o
+    # negrito de "essante" e o da linha de antes seguem nas letras deles.
+    partida = ex.Paragrafo("o inter-essante fim", inicios=[0, 8], negrito=[(2, 8), (8, 15)])
+    ex._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[partida]))
+    assert partida.texto == "o inter-\nessante fim"
+    assert [partida.texto[a:z] for a, z in partida.negrito] == ["inter-", "essante"]
+    assert partida.inicios == [0, 9] and partida.pesos is None
 
 
 def test_o_realce_marca_so_a_palavra_duvidosa_e_atravessa_a_pagina():

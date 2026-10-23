@@ -329,6 +329,13 @@ def test_o_png_otimizado_nao_perde_pixel_e_so_fica_se_for_menor():
         assert volta.convert("RGB").tobytes() == imagem.tobytes()
     assert epub.png_otimizado(menor) == menor or len(epub.png_otimizado(menor)) < len(menor)
     assert epub.png_otimizado(b"GIF89a...") == b"GIF89a..."               # não é PNG
+    from PIL import PngImagePlugin
+
+    com_gama = io.BytesIO()
+    meta = PngImagePlugin.PngInfo()
+    meta.add(b"gAMA", (45455).to_bytes(4, "big"))
+    imagem.save(com_gama, format="PNG", compress_level=0, pnginfo=meta)
+    assert epub.png_otimizado(com_gama.getvalue()) == com_gama.getvalue()  # gestão de cor
     assert epub.png_otimizado(b"\x89PNG estragado") == b"\x89PNG estragado"
 
 

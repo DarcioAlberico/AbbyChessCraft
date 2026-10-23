@@ -235,6 +235,13 @@ def test_a_legenda_acima_vale_quando_o_livro_a_usa_e_o_numero_repetido_nao_e_alv
     assert epub.numerados(titulos).capitulos == {}
 
 
+def test_numeracao_por_capitulo_e_romano_minusculo_nao_viram_link():
+    alvos = {6: "c#dg6"}
+    assert epub.referencias_internas("o Diagrama 6.1 e o 6,2", "pt", {}, alvos, {}) == []
+    assert epub.referencias_internas("in chapter i", "en", {}, {}, {1: "c#t1"}) == []
+    assert epub.LEGENDA.match("Diagrama 6.1. Jogam as brancas") is None
+
+
 def test_referencias_internas_nao_se_sobrepoem():
     texto = "Ver o Diagrama 6, p. 23, e o Chapter IV."
     assert epub.referencias_internas(texto, "pt", {23: "c#pg"}, {6: "c#dg6"}, {4: "c#t4"}) == [

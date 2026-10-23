@@ -127,8 +127,9 @@ class Opcoes:
     #: No TXT, uma marca `[p. N]` no começo de cada página.
     marcas_de_pagina: bool = False
     #: As quebras de linha e os hífens do impresso ficam: cada linha impressa acaba numa
-    #: quebra dentro do parágrafo (`\n` no texto; `<br/>` no EPUB, `w:br` no DOCX), e o
-    #: parágrafo que a página partiu não se junta com o da seguinte.
+    #: quebra dentro do parágrafo (`\n` no texto; `<br/>` no EPUB, `w:br` no DOCX). Nas
+    #: páginas do OCR, o parágrafo que a página partiu não se junta com o da seguinte; na
+    #: camada nativa o core já o juntou ao ler, e ele fica junto, com a quebra no lugar.
     manter_quebras: bool = False
     #: No DOCX, os glifos de baixa confiança (os que a fila de revisão pede, §8) com o
     #: realce amarelo do Word, para quem revisa no editor de texto achar onde olhar.
@@ -730,16 +731,38 @@ def _juntar_entre_paginas(paginas: Sequence[PaginaExtraida]) -> None:
 
 
 def _quebras_da_camada(pagina: PaginaExtraida) -> None:
-    """`manter_quebras` na página da camada nativa: o espaço antes de cada linha impressa
-    (`Paragrafo.inicios`) vira `\\n`, sem mudar o comprimento (os trechos de estilo ficam).
-    Onde a camada já juntou uma palavra partida, não há espaço, e a quebra não volta."""
+    """`manter_quebras` na página da camada nativa: a quebra volta onde cada linha impressa
+    começa (`Paragrafo.inicios`). O espaço antes dela vira `\\n`, sem mudar o comprimento;
+    depois do hífen que a camada guardou colado (`inter-essante`), o `\\n` entra, e os trechos
+    de estilo e os inícios seguintes andam um. Sem espaço nem hífen (a camada tirou o hífen
+    da palavra partida), não há onde a quebra estava, e ela não volta."""
     for bloco in pagina.blocos:
         if not isinstance(bloco, Paragrafo) or bloco.titulo or not bloco.inicios:
             continue
         letras = list(bloco.texto)
+        inseridas: List[int] = []                # as posições, no texto de antes
         for inicio in bloco.inicios:
-            if 0 < inicio <= len(letras) and letras[inicio - 1] == " ":
+            if not 0 < inicio <= len(letras):
+                continue
+            if letras[inicio - 1] == " ":
                 letras[inicio - 1] = "\n"
+            elif letras[inicio - 1] == "-":
+                inseridas.append(inicio)
+        for inicio in sorted(inseridas, reverse=True):
+            letras.insert(inicio, "\n")
+        if inseridas:
+            def andar(p: int) -> int:
+                return p + sum(1 for i in inseridas if i <= p)
+
+            def andar_fim(p: int) -> int:           # o fim exclusivo não leva o `\n` dele
+                return p + sum(1 for i in inseridas if i < p)
+
+            for nome in ("negrito", "italico", "duvidosos"):
+                trechos = getattr(bloco, nome, None)
+                if trechos:
+                    setattr(bloco, nome, [(andar(a), andar_fim(z)) for a, z in trechos])
+            bloco.inicios = [andar(i) for i in bloco.inicios]
+            bloco.pesos = bloco.lacunas = None    # uma medida por caractere: não bate mais
         bloco.texto = "".join(letras)
 
 

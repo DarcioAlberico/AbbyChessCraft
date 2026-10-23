@@ -746,10 +746,11 @@ conferido o primeiro, ele saiu desenhado nos três formatos e o FEN dele foi ach
 Nas páginas 26 e 27 do Darcy Lima, o lote levou 24 s depois de 13 s carregando os modelos, e
 os três arquivos saíram em 1,5 s (PDF), 0,8 s (DOCX) e 0,5 s (EPUB).
 
-### As páginas do livro: mover, apagar, inserir (passo L)
+### As páginas do livro: mover, apagar, inserir, girar, cortar, dividir (passo L)
 
-O menu **Página** tem **Mover páginas…**, **Apagar páginas…**, **Inserir páginas…** e
-**Páginas apagadas…**; a gaveta de Páginas move e apaga as linhas selecionadas (menu de
+O menu **Página** tem **Mover páginas…**, **Apagar páginas…**, **Inserir páginas…**,
+**Páginas apagadas…**, **Girar páginas…**, **Cortar páginas…**, **Tirar o corte…** e
+**Dividir páginas…**; a gaveta de Páginas move e apaga as linhas selecionadas (menu de
 contexto). As páginas se escolhem como texto, com o número de agora no livro: `3-7, 12`,
 `ímpares`, `pares` ou `todas`; o diálogo diz quantas o texto escolhe, ou o que está errado
 nele.
@@ -764,6 +765,13 @@ nele.
   `inseridas/` do projeto (o arquivo de fora pode sumir depois). PDF com senha é recusado.
   As inseridas são lidas, ensinadas e exportadas como as outras (o PDF pesquisável com elas
   vem na rodada 4 do passo L).
+- **Girar** gira de 90 em 90 graus; **cortar** tira margens (em porcentagem do que se vê).
+  Os glifos, as áreas e os diagramas lidos vão junto, nos mesmos pixels; o que o corte deixa
+  de fora fica guardado e volta com o Ctrl+Z ou com **Tirar o corte…**.
+- **Dividir** separa a página espelhada (duas páginas do livro numa imagem) em duas: a
+  metade esquerda fica no lugar, a direita entra logo depois, cada uma com os glifos dela.
+  As amostras ensinadas antes continuam achando o glifo de origem. Uma metade não se divide
+  de novo; o Ctrl+Z junta as duas.
 
 Cada operação é um passo do **Ctrl+Z**. Elas ficam desligadas, com o motivo na dica, no
 projeto só para leitura, com o lote rodando ou com uma tarefa em curso. A página de cada

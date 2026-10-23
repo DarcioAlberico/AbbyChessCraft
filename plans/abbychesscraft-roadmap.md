@@ -888,8 +888,16 @@ As rodadas:
    endireitar à mão limpa os `fora` (eles estão na página endireitada pelo ângulo de antes);
    o resumo do livro e o índice da busca contam os glifos guardados até a página ser
    gravada; `tamanho_da_fonte` reabre o PDF a cada página (girar muitas de uma vez).
-   **(3b)**: dividir (a página nova, os
-   `gids_movidos`), o menu e os diálogos de girar, cortar e dividir.
+   **(3b) feito**: `modelo.dividir` (os glifos pelo centro, os da direita com gids do `pid`
+   novo; as áreas cortadas; as decisões e os virtuais com os glifos deles),
+   `ProjetoDeLivro.trocar_paginas` (as páginas inteiras com a sequência e os
+   `gids_movidos`, na ordem de gravação da SPEC) e `pagina_igual`; a `Transacao` ganha
+   `inteiras` e `movidos`, e o Ctrl+Z junta as metades e apaga o arquivo da direita;
+   `origem_da_amostra` segue os `gids_movidos`; no menu Página, **Girar páginas…**, **Cortar
+   páginas…**, **Tirar o corte…** e **Dividir páginas…**, com a seleção. As operações de
+   página esperam a leitura do servidor pendente chegar. Ficam como estão: as duas metades
+   herdam o estado da página (a verificada continua verificada), e o diagrama que passa da
+   divisão vai aparado com a leitura de antes.
 4. Endireitar à mão e as imagens transformadas nas exportações (CA-12.14, 12.16).
 
 **Tarefas.**

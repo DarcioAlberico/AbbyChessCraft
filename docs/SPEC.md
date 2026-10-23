@@ -792,7 +792,16 @@ A partir do L:
   a metade do centro dele; os que mudam de página ganham `gid` novo (do `pid` novo), e o
   projeto guarda `gids_movidos` (velho → novo). As junções e os virtuais que ligam glifos das
   duas metades se desfazem; as zonas são cortadas pela divisão. Uma metade não se divide de
-  novo.
+  novo. **Dividir grava as duas páginas inteiras** (rodada 3b, 2026-10-23: uma divisão
+  preguiçosa poria os glifos da direita no `fora` da esquerda): o arquivo da direita, depois
+  o `projeto.json` (a sequência, o contador de `pid` e os `gids_movidos`), depois o da
+  esquerda; a queda no meio deixa no máximo um arquivo a mais, que a abertura põe nas
+  apagadas. O glifo que passa da divisão vai para a metade do centro dele, aparado nela; o
+  tabuleiro e o diagrama também vão pelo centro; o que estava guardado fora do quadro
+  (`fora`, `areas_fora`) fica na esquerda. Tirar o corte de uma metade é recusado (o quadro
+  dela é a divisão); o Ctrl+Z da divisão junta as metades: a esquerda volta como era, o
+  arquivo da direita sai e o `pid` dela fica aposentado. O desfazer só aplica se as duas
+  páginas estão como a divisão as deixou.
 - **Inserir** copia o PDF ou a imagem para `inseridas/` (nome pelo SHA-256): o projeto não
   depende do arquivo de fora. Cada página dele vira uma entrada com `pid` novo; a imagem
   solta é lida no DPI dela (sem DPI, o do projeto); PDF cifrado é recusado com aviso.

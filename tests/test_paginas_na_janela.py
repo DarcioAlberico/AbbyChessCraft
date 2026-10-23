@@ -160,3 +160,38 @@ def test_com_o_lote_rodando_as_operacoes_ficam_desligadas_com_o_motivo(app, jane
     acoes.atualizar(janela)
     assert janela.acao_mover_paginas.isEnabled()
     assert not janela.acao_paginas_apagadas.isEnabled()   # nenhuma apagada ainda
+
+
+# ----------------------------------------------------------------------
+# Girar, cortar e dividir pelo menu (rodada 3b)
+# ----------------------------------------------------------------------
+
+def test_os_dialogos_de_girar_cortar_e_dividir_leem_os_campos(app):
+    sentido = dp.campo_do_sentido()
+    sentido.setCurrentIndex(1)
+    margens = [dp.campo_de_porcentagem(0.0, 0.0, 95.0) for _ in range(4)]
+    margens[2].setValue(12.5)
+    d = dp.DialogoDasPaginas(None, "Cortar", 20, selecao="2",
+                             linhas=[("Girar", sentido), ("Margem direita", margens[2])])
+    assert sentido.currentData() == 270 and margens[2].value() == 12.5
+    assert sentido.accessibleName() == "Girar"
+    d.deleteLater()
+
+
+def test_girar_cortar_e_dividir_pelo_menu(app, janela, monkeypatch):
+    projeto = janela.projeto
+    monkeypatch.setattr(dp, "perguntar_com", lambda *_a, **_k: ([0, 2], 90))
+    janela.acao_girar_paginas.trigger()
+    assert [projeto.sequencia.entrada_em(i).giro for i in range(3)] == [90, 0, 90]
+    monkeypatch.setattr(dp, "perguntar_com", lambda *_a, **_k: ([1], (0.1, 0, 0, 0)))
+    janela.acao_cortar_paginas.trigger()
+    assert projeto.sequencia.entrada_em(1).quadro is not None
+    monkeypatch.setattr(dp, "perguntar_paginas", lambda *_a, **_k: ([1], -1))
+    janela.acao_tirar_o_corte.trigger()
+    assert projeto.sequencia.entrada_em(1).quadro is None
+    monkeypatch.setattr(dp, "perguntar_com", lambda *_a, **_k: ([4], 0.5))
+    janela.acao_dividir_paginas.trigger()
+    assert janela.fonte.total == 61 and janela.seletor.maximum() == 61
+    assert projeto.sequencia.entrada_em(5).metade == "direita"
+    janela.pagina.desfazer()
+    assert janela.fonte.total == 60

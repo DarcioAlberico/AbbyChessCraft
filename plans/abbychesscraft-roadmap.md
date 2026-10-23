@@ -30,7 +30,7 @@ Paralelos, só com git e worktrees e com arquivos disjuntos:
   passo depois do 2a).
 - Atalho novo entra primeiro em `docs/atalhos.yaml` (CA-3.7).
 - Verificação, sempre:
-  - `.venv\Scripts\python.exe -m pytest -q` (< 60 s);
+  - `.venv\Scripts\python.exe -m pytest -q -n auto` (< 60 s; em paralelo desde 2026-10-23);
   - `-m processo` quando o passo toca processo ou gravação;
   - `ABBY_PORTAO=1 .venv\Scripts\python.exe -m pytest -q -m "livro_real or desempenho"` no
     fechamento;
@@ -956,8 +956,8 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
 
 Continuam: CA-10.1 (a redação, decisão do usuário); o itálico no OCR (régua do core); CA-9.1 e
 CA-F.1 (o texto verificado); os testes do EPUB em leitores; o render do fitz num processo (K);
-unificar as linhas da exportação com a `OrdemDeLeitura` (F, J); a suíte abaixo de 60 s (pede
-separar os testes de janela ou rodar em paralelo, decisão do usuário).
+unificar as linhas da exportação com a `OrdemDeLeitura` (F, J). A suíte rápida roda em
+paralelo (`-n auto`, pytest-xdist): ~32 s.
 
 ---
 

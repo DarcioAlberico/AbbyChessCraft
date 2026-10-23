@@ -237,6 +237,11 @@ def test_confirmar_uma_leitura_nao_monta_o_texto_de_novo(monkeypatch):
     lance = next(b for b in pagina.boxes if b.entry.y1 == 520 and b.entry.char == "C")
     lance.entry.confidence, lance.entry.source = 0.3, "rede"
     assert lc.validar_pagina(pagina, "pt") == primeira and len(montagens) == 1
+    # A moldura muda a ordem de leitura do core: entra na chave.
+    sem_moldura = lc._chave_do_texto(pagina)
+    lance.entry.moldura = True
+    assert lc._chave_do_texto(pagina) != sem_moldura
+    lance.entry.moldura = False
     lance.entry.char = "D"                                   # 3.Df3: outro lance, outro texto
     com_a_cache = lc.validar_pagina(pagina, "pt")
     assert len(montagens) == 2

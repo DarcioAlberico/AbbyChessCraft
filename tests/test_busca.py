@@ -438,9 +438,13 @@ def test_trocar_de_projeto_com_o_pool_nao_esvazia_o_indice_novo(tmp_path):
             p = _pagina(f"{nome} pagina {i} com Cf3 e casa")
             p.indice = i
             (pasta / f"p{i}.json").write_text(json.dumps(_pagina_para_json(p)), encoding="utf-8")
+        # A sequência, desde o passo L: o índice lê dela a geometria de cada página.
+        from abbychess.sequencia import Sequencia
+
         return SimpleNamespace(dados=SimpleNamespace(idioma="pt"), paginas_lidas=lambda: range(120),
                                pid_da_pagina=lambda i: i, modelo_em_memoria=lambda i: None,
-                               arquivo_da_pagina=lambda i: pasta / f"p{i}.json")
+                               arquivo_da_pagina=lambda i: pasta / f"p{i}.json",
+                               sequencia=Sequencia.do_livro(range(120)))
     ctl = SimpleNamespace(projeto=projeto("a"), eventos=Eventos(), executar=SimpleNamespace(),
                           historico=SimpleNamespace(versao=lambda pid: 0))
     busca = ControladorDaBusca(ctl, paralelo=True)

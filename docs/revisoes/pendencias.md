@@ -18,6 +18,7 @@ sem editar o core e sem gabarito novo. Ramo `pendencias`, a partir da tag `passo
 | O aviso de uma thread depois que a janela fechou | achado no portão | `a925137` |
 | A validação pelos lances guarda o texto depois dos diagramas (o Enter, 38,8 → ~25 ms) | custo do H, achado aqui | `9c98367` |
 | Os ícones rasterizados uma vez por tema (abrir a janela, 78 → 36 ms; a suíte, ~118 → ~102 s) | achado aqui | `e671d7c` |
+| A suíte rápida em paralelo (`-n auto`): ~32 s | §15.1 | este commit |
 
 ## A bissecção do lote
 
@@ -62,8 +63,12 @@ rasterizados uma vez por tema (`e671d7c`): ~102 s. Ainda passa do limite, e o qu
 espalhado por 1.555 testes (36 s de preparação, 50 de chamada, 10 de desmontagem; o mais lento,
 3 s; as esperas com `sleep`, as travas do gravador, os `fsync`). No D1 eram 56–60 s com bem
 menos testes. Baixar o passo da espera mais usada (`_esperar`, de 10 para 2 ms) ganhou 1,5 s e
-foi desfeito. Chegar aos 60 s pede uma decisão: separar os testes de janela num marcador
-próprio, ou rodar em paralelo (`pytest-xdist`, uma dependência nova). Apagar as janelas mostrou um bug do programa: a troca de perfil de teclado caía no
+foi desfeito. Para chegar aos 60 s, o usuário deixou a escolha comigo: a suíte rápida roda em
+paralelo, `pytest -q -n auto` (pytest-xdist 3.8.0, instalado no venv e declarado no
+`pyproject.toml`): 32,3, 31,8 e 32,0 s em três rodadas, 12 núcleos, sem teste instável. Separar
+os testes de janela tiraria da suíte rápida os que mais pegam regressão. As camadas de
+desempenho e o portão continuam em série, porque medem tempo; o `-n auto` não entrou no
+`addopts` por isso. Apagar as janelas mostrou um bug do programa: a troca de perfil de teclado caía no
 ouvinte de uma janela já apagada ("Signal source has been deleted", que `teclado._apagado` não
 reconhecia).
 
@@ -104,8 +109,8 @@ medida (509 → 440 s).
 
 ## Verificação
 
-- Suíte rápida: 1553 passed, 2 skipped, em ~2 min no `2cbbdf6`; 1555 passed no `e671d7c`, em
-  ~100 s.
+- Suíte rápida: 1553 passed, 2 skipped, em ~2 min no `2cbbdf6`; 1555 passed no `d29d399`, em
+  ~102 s em série e ~32 s com `-n auto`.
 - `ruff check --select E,F --line-length 110 abbychess tests`: limpo.
 - EPUBCheck 5.4.0 e Ace 1.4.6 (`ABBY_EPUBCHECK`, `ABBY_ACE`): aprovam o livro com os links novos
   e as quatro combinações do golden.
@@ -125,8 +130,6 @@ Trabalho grande, para um passo próprio:
   pede um processo, como o servidor de leitura.
 - **Unificar a montagem das linhas da exportação com a `OrdemDeLeitura`** do Documento (passos F
   e J), quando a caracterização mostrar a equivalência.
-- **A suíte rápida abaixo de 60 s**: ~102 s hoje, sem um culpado só; pede separar os testes de
-  janela ou rodar em paralelo.
 - **Corrigir um caractere ainda monta o texto da página** para a validação pelos lances
   (~25 ms); só confirmar a leitura deixou de montar.
 

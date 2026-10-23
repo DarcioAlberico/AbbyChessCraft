@@ -994,7 +994,7 @@ dentro da meta de §2.
 | Propriedade | — | máquinas de estado (gid, decisões, edição, desfazer), `derandomize` | ≤ 10 s |
 | Controlador | — | `tmp_path`, páginas sintéticas, falhas injetadas | ≤ 15 s |
 | Interface | — | pytest-qt offscreen, `waitUntil`, janela ativa | ≤ 15 s |
-| **Suíte rápida** | `pytest -q` | as quatro acima | **< 60 s** (falha se passar) |
+| **Suíte rápida** | `pytest -q -n auto` (em paralelo, pytest-xdist) | as quatro acima | **< 60 s** (falha se passar) |
 | Processo | `processo` | servidor com leitor falso, matança do gravador; só correção | ≤ 90 s |
 | Livro real | `livro_real` | gabaritos, modelos reais, replay da fatia | ≤ 5 min |
 | Desempenho | `desempenho` | §2 em p95, na máquina cadastrada | ≤ 10 min |

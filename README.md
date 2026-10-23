@@ -24,11 +24,12 @@ py -3.13 -m venv --system-site-packages .venv
 .venv\Scripts\python.exe -m pip install hypothesis regex psutil pytest-timeout pytest-qt PyYAML
 ```
 
-Os testes vêm em camadas (SPEC §15.1). A suíte rápida roda sempre e fica abaixo de 60 s; as
-outras rodam com `-m`:
+Os testes vêm em camadas (SPEC §15.1). A suíte rápida roda sempre e fica abaixo de 60 s em
+paralelo (`-n auto`, do pytest-xdist: ~32 s em 12 núcleos; em série, ~100 s); as outras rodam
+com `-m`, em série, porque as de desempenho medem tempo:
 
 ```text
-.venv\Scripts\python.exe -m pytest -q
+.venv\Scripts\python.exe -m pytest -q -n auto
 .venv\Scripts\python.exe -m pytest -q -m livro_real
 $env:ABBY_ROTULO_DA_MEDIDA = "linha-de-base"; .venv\Scripts\python.exe -m pytest -q -m desempenho tests\desempenho
 ```
@@ -1619,6 +1620,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   com o lote duas vezes mais rápido, ela disputa o servidor com mais páginas. **O Enter** que
   confirma a leitura ficou em ~25 ms na mediana (três rodadas do `9c98367`); o que corrige um
   caractere ainda paga ~25 ms a mais, da validação pelos lances, que monta o texto da página.
-  **A suíte rápida** leva ~100 s, acima dos 60 s da §15.1. Manter as quebras
+  **A suíte rápida** leva ~32 s em paralelo (`-n auto`), dentro dos 60 s da §15.1; em série,
+  ~100 s. Manter as quebras
   numa página da camada nativa não devolve a quebra onde a camada tirou o hífen da palavra
   partida.

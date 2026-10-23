@@ -133,7 +133,8 @@ def _texto_com_estilo(paragrafo, bloco: Paragrafo, simbolos: str, familia: str,
 
     # Como no EPUB: o comprimento fica; a quebra de linha é espaço, como no XHTML, salvo com
     # `quebras` (as linhas impressas mantidas): aí ela fica, e o python-docx a escreve `w:br`.
-    texto = epub.sem_proibidos(bloco.texto).replace("\r", " ")
+    # As aspas retas do OCR viram as curvas do impresso (PD-07), uma por uma.
+    texto = epub.aspas_curvas(epub.sem_proibidos(bloco.texto).replace("\r", " "))
     if not quebras:
         texto = texto.replace("\n", " ")
     marcas = [[False, False, c in simbolos, -1, False] for c in texto]
@@ -192,7 +193,7 @@ def _figura(doc, figura: Figura, alt: str, numero: int) -> None:
         proporcao = (figura.largura / figura.altura) if figura.altura else 1.0
         largura = Cm(min(LARGURA_MAXIMA_DO_RECORTE_CM,
                          LARGURA_DO_DIAGRAMA_CM * max(proporcao, 0.5)))
-    doc.add_picture(io.BytesIO(figura.png), width=largura)
+    doc.add_picture(io.BytesIO(epub.png_otimizado(figura.png)), width=largura)
     paragrafo = doc.paragraphs[-1]
     paragrafo.alignment = WD_ALIGN_PARAGRAPH.CENTER
     for propriedades in paragrafo._p.xpath(".//wp:docPr"):

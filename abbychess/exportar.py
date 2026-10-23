@@ -161,6 +161,8 @@ class Relatorio:
     #: conferência do arquivo escrito acusou (`epub.conferir`).
     capitulos: int = 0
     imagens_reutilizadas: int = 0
+    #: No EPUB: os bytes que o PNG otimizado sem perda tirou das imagens.
+    bytes_poupados: int = 0
     problemas_do_arquivo: List[str] = field(default_factory=list)
     #: Índice da página -> o número impresso nela (`numeros_impressos`), quando se sabe.
     numeros_impressos: Dict[int, int] = field(default_factory=dict)
@@ -199,6 +201,8 @@ class Relatorio:
                           f"{primeira + 1} do PDF")
         if self.imagens_reutilizadas:
             partes.append(f"{self.imagens_reutilizadas} imagem(ns) reaproveitada(s)")
+        if self.bytes_poupados >= 1024:
+            partes.append(f"imagens {self.bytes_poupados // 1024} KB menores, sem perda")
         if self.problemas_do_arquivo:
             partes.append(f"{len(self.problemas_do_arquivo)} problema(s) no arquivo "
                           "(ver Resultados)")
@@ -1296,6 +1300,7 @@ def exportar_epub(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
     if relatorio is not None:
         relatorio.capitulos = escrito.capitulos
         relatorio.imagens_reutilizadas = escrito.reutilizadas
+        relatorio.bytes_poupados = escrito.poupados
         relatorio.problemas_do_arquivo = problemas
         relatorio.links = escrito.links
     return Path(caminho)

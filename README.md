@@ -721,8 +721,9 @@ outras páginas saem dos boxes, como antes. Nas pp. 1 e 6–8 do *Odds & Ends* (
 
 **Pelos boxes**, a exportação também:
 
-- monta as linhas **coluna a coluna** (`exportar._Leitura`): o que atravessa a calha (o título
-  centrado) é uma faixa sozinha, e as figuras entram no trecho da coluna delas;
+- monta as linhas **coluna a coluna**, pela mesma ordem de leitura do Documento
+  (`layout.OrdemDeLeitura`, desde 2026-10-23): o que atravessa a calha (o título centrado) é
+  uma faixa sozinha, e as figuras entram no trecho da coluna delas;
 - acerta a **caixa** das letras que só mudam de tamanho (`o O`, `c C`, `s S`, `v V`, `w W`,
   `x X`, `z Z`) pela altura na linha, e o `X` de captura (`♖Xf2` → `♖xf2`);
 - tira do texto as **coordenadas** do tabuleiro (o número sozinho à esquerda, a letra sozinha

@@ -48,6 +48,32 @@ def test_sem_resposta_do_processo_a_pre_carga_renderiza_aqui(fonte):
     assert falso.pedidos == [2] and cache.tem(2)
 
 
+def test_a_pagina_pedida_nao_espera_a_pre_carga_travada_no_processo(fonte, monkeypatch):
+    """O processo de render que trava não prende a interface: quem pede a página que a
+    pré-carga renderiza lá espera `ESPERA_PELA_PRE_CARGA_S` e renderiza aqui."""
+    import threading
+    import time
+
+    monkeypatch.setattr(pg, "ESPERA_PELA_PRE_CARGA_S", 0.2)
+    solta = threading.Event()
+
+    class _Travado(_RenderFalso):
+        def renderizar(self, caminho, indice):
+            solta.wait(10)
+            return super().renderizar(caminho, indice)
+
+    cache = pg.CacheDePaginas(fonte, renderizador=_Travado(fonte))
+    cache.precarregar(1)
+    time.sleep(0.05)                                  # a pré-carga já está no processo
+    inicio = time.perf_counter()
+    imagem, _ = cache.pagina(1)
+    assert time.perf_counter() - inicio < 2.0
+    assert imagem.tobytes() == fonte.pagina(1).tobytes()
+    solta.set()
+    cache.esperar()
+    assert cache.tem(1)
+
+
 def test_desligado_pelo_ambiente(monkeypatch):
     monkeypatch.setenv("ABBY_RENDER_EM_PROCESSO", "0")
     assert render.do_programa() is None
@@ -68,3 +94,65 @@ def test_o_processo_da_os_mesmos_pixels_e_desiste_quando_fecha(tmp_path):
     finally:
         renderizador.fechar()
     assert renderizador.desistiu and renderizador.renderizar(caminho, 0) is None
+
+
+def _filhos_vivos(limite: float = 10.0) -> list:
+    import multiprocessing as mp
+    import time
+
+    fim = time.monotonic() + limite
+    while mp.active_children() and time.monotonic() < fim:
+        time.sleep(0.05)
+    return mp.active_children()
+
+
+@pytest.mark.processo
+def test_o_filho_que_nao_responde_no_prazo_e_morto(tmp_path):
+    """Sem o `kill`, o filho travado ficava vivo e o programa não fechava (o `atexit` do
+    `concurrent.futures` o esperava). Aqui o prazo é menor que abrir o processo."""
+    caminho = pdf_sintetico(tmp_path)
+    renderizador = render.RenderEmProcesso(limite_s=0.001)
+    assert renderizador.renderizar(caminho, 0) is None and not renderizador.aberto
+    assert _filhos_vivos() == []
+    renderizador.limite_s = render.LIMITE_S                  # de novo: abre outro e responde
+    try:
+        assert renderizador.renderizar(caminho, 0) is not None
+    finally:
+        renderizador.fechar()
+
+
+@pytest.mark.processo
+def test_matar_o_pool_mata_o_filho_travado():
+    import concurrent.futures as cf
+    import multiprocessing as mp
+    import time
+
+    pool = cf.ProcessPoolExecutor(1, mp_context=mp.get_context("spawn"))
+    trabalho = pool.submit(time.sleep, 30)
+    fim = time.monotonic() + 30
+    while not trabalho.running() and time.monotonic() < fim:
+        time.sleep(0.05)
+    assert trabalho.running()
+    render._matar(pool)
+    assert _filhos_vivos(limite=5) == []                    # sem o kill, 30 s dormindo
+
+
+@pytest.mark.processo
+def test_o_pdf_trocado_no_mesmo_lugar_e_lido_de_novo_e_o_ocioso_fecha(tmp_path):
+    import time
+
+    pasta = tmp_path / "a"
+    pasta.mkdir()
+    caminho = pdf_sintetico(pasta)
+    renderizador = render.RenderEmProcesso(ocioso_s=0.3)
+    try:
+        renderizador.renderizar(caminho, 0)
+        outro = pdf_sintetico(tmp_path, [("zzz zzz zzz",), ("yyy",), ("xxx",)])
+        caminho.write_bytes(outro.read_bytes())
+        de_la = renderizador.renderizar(caminho, 0)
+        assert de_la.tobytes() == pg.FonteDePaginas(caminho).pagina(0).tobytes()
+        time.sleep(1.0)
+        assert not renderizador.aberto and _filhos_vivos() == []
+        assert renderizador.renderizar(caminho, 1) is not None   # reabre no próximo pedido
+    finally:
+        renderizador.fechar()

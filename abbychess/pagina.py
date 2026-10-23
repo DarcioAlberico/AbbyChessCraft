@@ -395,6 +395,11 @@ class _ArquivoDePaginas:
             return imagem.convert("L")
 
 
+#: Quanto quem pede a página na hora espera a pré-carga dela no processo de render (uma página
+#: nunca vista leva ~0,5 s com a medida da inclinação); passou disso, renderiza aqui.
+ESPERA_PELA_PRE_CARGA_S = 1.0
+
+
 class CacheDePaginas:
     """As últimas páginas renderizadas e endireitadas, com a pré-carga da seguinte (§14.1).
 
@@ -424,9 +429,10 @@ class CacheDePaginas:
         self._trava = threading.Lock()
         self._pedida: Optional["sq.Entrada"] = None
         self._thread: Optional[threading.Thread] = None
-        #: entrada -> o aviso de que a renderização em curso dela acabou: quem pede a mesma
-        #: página espera, em vez de renderizá-la de novo (a pré-carga e o clique juntos).
-        self._em_curso: Dict["sq.Entrada", threading.Event] = {}
+        #: entrada -> (o aviso de que a renderização em curso dela acabou, e se ela é no
+        #: processo de render): quem pede a mesma página espera, em vez de renderizá-la de
+        #: novo (a pré-carga e o clique juntos); a do processo, só `ESPERA_PELA_PRE_CARGA_S`.
+        self._em_curso: Dict["sq.Entrada", Tuple[threading.Event, bool]] = {}
 
     @property
     def total(self) -> int:
@@ -450,35 +456,48 @@ class CacheDePaginas:
                 if entrada in self._paginas:
                     self._paginas.move_to_end(entrada)
                     return self._paginas[entrada]
-                aviso = self._em_curso.get(entrada)
-                if aviso is None:
-                    aviso = self._em_curso[entrada] = threading.Event()
+                em_curso = self._em_curso.get(entrada)
+                if em_curso is None:
+                    aviso = threading.Event()
+                    self._em_curso[entrada] = (aviso, renderizador is not None)
                     break                       # esta thread renderiza
+                aviso, de_fora = em_curso
+            if de_fora and renderizador is None:
+                # A pré-carga está no processo de render: quem pede na hora (a interface) espera
+                # o que um render daqui levaria, e não o limite do processo, se ele travou.
+                if not aviso.wait(ESPERA_PELA_PRE_CARGA_S):
+                    return self._renderizar(entrada, None)
+                continue
             aviso.wait()                        # outra renderiza: espera e olha de novo
         try:
-            imagem = (self.fonte.pagina_da_entrada(entrada) if renderizador is None
-                      else self.fonte.pagina_da_entrada(entrada, renderizador))
-            par = (imagem, np.asarray(imagem.convert("L")))
-            preparada = None
-            if self.preparar is not None:
-                try:
-                    preparada = self.preparar(par[1])
-                except Exception:               # sem a preparada, a janela converte sozinha
-                    log.warning("preparar a página do pid %d falhou", entrada.pid,
-                                exc_info=True)
-            with self._trava:
-                self._paginas[entrada] = par
-                self._paginas.move_to_end(entrada)
-                if preparada is not None:
-                    self._preparadas[entrada] = preparada
-                while len(self._paginas) > self.tamanho:
-                    velha, _ = self._paginas.popitem(last=False)
-                    self._preparadas.pop(velha, None)
-            return par
+            return self._renderizar(entrada, renderizador)
         finally:
             with self._trava:
                 del self._em_curso[entrada]
             aviso.set()
+
+    def _renderizar(self, entrada: "sq.Entrada", renderizador) -> Tuple[Image.Image, np.ndarray]:
+        """Renderiza a entrada (no processo do `renderizador`, se houver) e a guarda no cache."""
+        imagem = (self.fonte.pagina_da_entrada(entrada) if renderizador is None
+                  else self.fonte.pagina_da_entrada(entrada, renderizador))
+        par = (imagem, np.asarray(imagem.convert("L")))
+        preparada = None
+        if self.preparar is not None:
+            try:
+                preparada = self.preparar(par[1])
+            except Exception:                   # sem a preparada, a janela converte sozinha
+                log.warning("preparar a página do pid %d falhou", entrada.pid, exc_info=True)
+        with self._trava:
+            self._paginas[entrada] = par
+            self._paginas.move_to_end(entrada)
+            if preparada is not None:
+                self._preparadas[entrada] = preparada
+            else:
+                self._preparadas.pop(entrada, None)
+            while len(self._paginas) > self.tamanho:
+                velha, _ = self._paginas.popitem(last=False)
+                self._preparadas.pop(velha, None)
+        return par
 
     def esquecer(self, entrada: "sq.Entrada") -> None:
         """Tira a página do cache (o ângulo dela mudou, e a `Entrada` é a mesma)."""

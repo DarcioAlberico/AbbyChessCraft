@@ -169,6 +169,7 @@ def test_a_pagina_de_uma_coluna_detecta_as_colunas_uma_vez(monkeypatch, saida):
 
     def montar():
         if saida == "documento":
+            tx._LINHAS_VISTAS.clear()              # as linhas guardadas pulariam a detecção
             return tx.texto(tx.montar(tx.pagina_avulsa(entries)))
         return [p.texto for p in ex.paragrafos(entries)]
 

@@ -260,14 +260,17 @@ cima no `a6555df`.
 
 ## O que continua pendente
 
-Precisa do usuário:
+Resolvido com o usuário:
 - **CA-10.1** (passo H): a redação. "A precisão de 'confiável pelos lances' é 1,0 nos dois
   conjuntos" não passa nas perturbadas: a perturbação que nenhum lance do texto toca não muda
   nenhum lance, e nenhuma validação pelos lances a vê (no Xadrez Vitorioso, 73 de 100 saem
   confiáveis assim; das 23 afetadas, nenhuma). O `medir.py` já conta as duas: as confiáveis
-  afetadas (erro da validação) e as não afetadas (fora do alcance dela). Proposta: precisão 1,0
-  nos FEN do gabarito; nas perturbadas, a detecção ≥ 60% das afetadas, e as não afetadas fora da
-  conta.
+  afetadas (erro da validação) e as não afetadas (fora do alcance dela). Com o sim do usuário, o
+  SPEC passou a pedir a precisão 1,0 nos FEN do gabarito e, nas perturbadas, a detecção ≥ 60% das
+  afetadas, com as não afetadas fora da conta. Pela medida de hoje, passa no Xadrez Vitorioso
+  (23 de 23) e no Yusupov (16 de 17).
+
+Precisa do usuário:
 - **CA-9.1 e CA-F.1**: o texto e os FEN das p. 21–27 do Xadrez Vitorioso verificados.
 - **Os leitores que não estão na máquina** (Thorium, celular); o Calibre já confere.
 

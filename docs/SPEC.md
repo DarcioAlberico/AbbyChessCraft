@@ -667,9 +667,12 @@ OCR (o servidor não recebe pedido de leitura).
 
 **CA-10.1** [livro_real] Sobre os FEN do gabarito (p. 21–27) e sobre 100 versões perturbadas
 deles (uma peça trocada, tirada ou movida, semente 1234, só posições legais): a precisão de
-"confiável pelos lances" é 1,0 nos dois conjuntos; nas perturbadas, a validação detecta ≥ 60%
+"confiável pelos lances" é 1,0 nos FEN do gabarito; nas perturbadas, a validação detecta ≥ 60%
 das que têm um lance do texto afetado pela perturbação (denominador calculado por
-`ferramentas/medir.py`).
+`ferramentas/medir.py`), e as que nenhum lance do texto toca ficam fora da conta. (Até
+2026-10-23 pedia também a precisão 1,0 nas perturbadas; saiu, com o sim do usuário, porque a
+perturbação que nenhum lance toca não muda nenhum deles e nenhuma validação pelos lances a vê:
+no Xadrez Vitorioso, 73 de 100 saíam confiáveis assim.)
 **CA-10.2** Com a conferência aberta, a Imagem aceita zoom e rolagem.
 **CA-10.3** O roque inferido nunca sai afirmado no FEN exportado sem conferência.
 

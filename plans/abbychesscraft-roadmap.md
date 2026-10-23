@@ -969,8 +969,10 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
 - O EPUB conferido no Calibre (J, `epub.calibre`).
 - Os processos do índice da busca morrem com o programa morto à força.
 
-Continuam: CA-10.1 (a redação, decisão do usuário; a proposta está no registro); CA-9.1 e
-CA-F.1 (o texto verificado); o EPUB no Thorium e no celular. A página pedida na hora renderiza
+- CA-10.1 com a redação nova (com o sim do usuário): a precisão 1,0 nos FEN do gabarito e a
+  detecção ≥ 60% das perturbadas afetadas, as não afetadas fora da conta.
+
+Continuam: CA-9.1 e CA-F.1 (o texto verificado); o EPUB no Thorium e no celular. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).
 
 ---

@@ -288,3 +288,57 @@ def test_o_opf_declara_o_idioma_e_a_fonte_da_paginacao(tmp_path):
 def test_ace_sem_configuracao_e_none(tmp_path, monkeypatch):
     monkeypatch.delenv("ABBY_ACE", raising=False)
     assert epub.ace(tmp_path / "x.epub") is None
+
+
+# ----------------------------------------------------------------------
+# As pendências do passo J: as aspas curvas (PD-07) e o PNG sem perda
+# ----------------------------------------------------------------------
+
+def test_as_aspas_saem_curvas_no_epub_e_no_docx_e_o_estilo_fica(tmp_path):
+    from docx import Document
+
+    from abbychess import escritor_docx as ed
+
+    texto = 'Ele disse "joga" e d\'agua.'
+    paginas = [PaginaExtraida(numero=0, blocos=[
+        Paragrafo('O "Gambito"', titulo=True, nivel=1),
+        Paragrafo(texto, negrito=[(10, 16)])])]
+    destino = tmp_path / "a.epub"
+    epub.escrever(paginas, destino, epub.Metadados("L"))
+    partes, _ = _ler(destino)
+    capitulo = partes["OEBPS/texto/capitulo-001.xhtml"].decode("utf-8")
+    assert "Ele disse <strong>“joga”</strong> e d’agua." in capitulo
+    assert "O “Gambito”" in partes["OEBPS/nav.xhtml"].decode("utf-8")
+    docx = tmp_path / "a.docx"
+    ed.escrever(paginas, docx, epub.Metadados("L"))
+    assert [p.text for p in Document(str(docx)).paragraphs if p.text] == [
+        "O “Gambito”", "Ele disse “joga” e d’agua."]
+    assert ex.texto_do_livro(paginas).splitlines()[2] == texto     # o TXT como lido
+
+
+def test_o_png_otimizado_nao_perde_pixel_e_so_fica_se_for_menor():
+    # Um "colorido" sem cor nenhuma, de poucos tons: vira cinza ou paleta, menor.
+    imagem = Image.new("RGB", (64, 64), (255, 255, 255))
+    for x in range(0, 64, 8):
+        imagem.paste((90, 90, 90), (x, 0, x + 4, 64))
+    bruto = io.BytesIO()
+    imagem.save(bruto, format="PNG", compress_level=0)
+    menor = epub.png_otimizado(bruto.getvalue())
+    assert len(menor) < len(bruto.getvalue())
+    with Image.open(io.BytesIO(menor)) as volta:
+        assert volta.convert("RGB").tobytes() == imagem.tobytes()
+    assert epub.png_otimizado(menor) == menor or len(epub.png_otimizado(menor)) < len(menor)
+    assert epub.png_otimizado(b"GIF89a...") == b"GIF89a..."               # não é PNG
+    assert epub.png_otimizado(b"\x89PNG estragado") == b"\x89PNG estragado"
+
+
+def test_o_epub_guarda_o_png_otimizado_e_o_relatorio_conta(tmp_path):
+    bruto = io.BytesIO()
+    Image.new("RGB", (40, 40), (200, 200, 200)).save(bruto, format="PNG", compress_level=0)
+    figura = Figura(bruto.getvalue(), 40, 40, origem="recorte", aviso="x")
+    destino = tmp_path / "a.epub"
+    escrito = epub.escrever([PaginaExtraida(numero=0, blocos=[figura])], destino,
+                            epub.Metadados("L"))
+    assert escrito.poupados > 0 and epub.conferir(destino) == []
+    imagens = [v for n, v in _ler(destino)[0].items() if n.startswith("OEBPS/imagens/")]
+    assert len(imagens) == 1 and len(imagens[0]) == len(figura.png) - escrito.poupados

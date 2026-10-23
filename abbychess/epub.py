@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import hashlib
 import html
+import io
 import logging
 import os
 import posixpath
@@ -178,6 +179,8 @@ class Escrito:
     sem_fen: int = 0
     #: As referências a página impressa que viraram link.
     links: int = 0
+    #: Os bytes que o PNG otimizado sem perda tirou das imagens (`png_otimizado`).
+    poupados: int = 0
 
 
 def mensagens(idioma: str) -> Dict[str, str]:
@@ -200,8 +203,9 @@ def xhtml_do_texto(paragrafo: Paragrafo, simbolos: str,
     texto = paragrafo.texto
     if not texto:
         return ""
-    # Tirar caracteres mudaria os trechos de estilo: os proibidos viram espaço.
-    texto = sem_proibidos(texto)
+    # Tirar caracteres mudaria os trechos de estilo: os proibidos viram espaço. As aspas
+    # retas do OCR viram as curvas do impresso (PD-07), também uma por uma.
+    texto = aspas_curvas(sem_proibidos(texto))
     marcas = [[False, False, c in simbolos, -1, False] for c in texto]
     duvidosos = getattr(paragrafo, "duvidosos", ()) if realce else ()
     for k, trechos in ((0, paragrafo.negrito), (1, paragrafo.italico), (4, duvidosos)):
@@ -515,7 +519,7 @@ def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbo
                     nivel = 1 if bloco.nivel == 1 else 2
                     alvo = f"t{numero_do_titulo}"
                     atual.partes.append(f'<h{nivel} id="{alvo}">{corpo}</h{nivel}>')
-                    atual.titulos.append((nivel, alvo, bloco.texto.strip()))
+                    atual.titulos.append((nivel, alvo, aspas_curvas(bloco.texto.strip())))
                     if id(bloco) in numeros.capitulos:
                         atual.numerados.append((numeros.capitulos[id(bloco)], alvo))
                 else:
@@ -601,6 +605,52 @@ def lista_do_sumario(titulos: Sequence[Tuple[str, int, str, str]]) -> str:
 # Escrever
 # ----------------------------------------------------------------------
 
+def aspas_curvas(texto: str) -> str:
+    """As aspas retas trocadas pelas curvas, uma por uma (`core.exportar.aspas_curvas`,
+    PD-07): o impresso tem `“`, `”` e `’`, e o OCR devolve as do teclado. Só nos arquivos
+    formatados (EPUB, DOCX e a prévia); o TXT e o PGN saem como lidos."""
+    from core.exportar import aspas_curvas as do_core
+
+    return do_core(texto)
+
+
+def png_otimizado(dados: bytes) -> bytes:
+    """O mesmo PNG, menor quando dá, sem perder um pixel: em tons de cinza quando a imagem
+    colorida não tem cor, em paleta quando tem até 256 cores, e com a compressão máxima.
+    Cada candidato é conferido pixel a pixel contra o original, e só fica o menor; o que
+    não é PNG, ou não abre, volta como veio. Os mesmos bytes de entrada dão os mesmos
+    de saída (CA-12.6)."""
+    from PIL import Image
+
+    if not dados.startswith(b"\x89PNG"):
+        return dados
+    try:
+        with Image.open(io.BytesIO(dados)) as aberta:
+            aberta.load()
+            original = aberta.copy()
+            info = {k: v for k, v in aberta.info.items() if k == "dpi"}
+    except Exception:                          # PNG estragado: o escritor decide
+        return dados
+    if original.mode not in ("1", "L", "LA", "P", "RGB", "RGBA"):
+        return dados
+    referencia = original.convert("RGBA").tobytes()
+    candidatos = [original]
+    if original.mode in ("RGB", "RGBA"):
+        sem_alfa = original.mode == "RGB" or original.getextrema()[3] == (255, 255)
+        candidatos.append(original.convert("L" if sem_alfa else "LA"))
+        if original.getcolors(256) is not None:
+            candidatos.append(original.convert("RGBA").quantize(colors=256, method=Image.Quantize.FASTOCTREE))
+    melhor = dados
+    for candidato in candidatos:
+        if candidato.convert("RGBA").tobytes() != referencia:
+            continue                            # perderia algo: fica de fora
+        saida = io.BytesIO()
+        candidato.save(saida, format="PNG", optimize=True, **info)
+        if len(saida.getvalue()) < len(melhor):
+            melhor = saida.getvalue()
+    return melhor
+
+
 def tipo_da_imagem(dados: bytes) -> Tuple[str, str]:
     if dados[:3] == b"\xff\xd8\xff":
         return "image/jpeg", ".jpg"
@@ -635,14 +685,16 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
                 continue
             if not bloco.fen:
                 escrito.sem_fen += 1
-            soma = hashlib.sha256(bloco.png).hexdigest()
+            png = png_otimizado(bloco.png)
+            soma = hashlib.sha256(png).hexdigest()
             if soma in por_hash:
                 escrito.reutilizadas += 1
             else:
-                tipo, extensao = tipo_da_imagem(bloco.png)
+                tipo, extensao = tipo_da_imagem(png)
                 nome = f"imagens/{soma[:20]}{extensao}"
                 por_hash[soma] = nome
-                arquivos.append((f"OEBPS/{nome}", bloco.png))
+                arquivos.append((f"OEBPS/{nome}", png))
+                escrito.poupados += len(bloco.png) - len(png)
                 manifesto.append(f'<item id="i{len(por_hash)}" href="{nome}" '
                                  f'media-type="{tipo}"/>')
             imagens[id(bloco)] = por_hash[soma]

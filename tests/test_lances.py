@@ -222,6 +222,29 @@ def test_validar_pagina_usa_o_texto_depois_do_diagrama():
     assert diagramas[0].confiavel
 
 
+def test_confirmar_uma_leitura_nao_monta_o_texto_de_novo(monkeypatch):
+    """A validação é refeita em toda edição; o Enter que confirma a leitura muda só a fonte e
+    a confiança do glifo, e o texto depois do diagrama é o mesmo: não é montado de novo
+    (custava ~25 ms por Enter). Mudar um caractere monta, e o resultado é o de sem a cache."""
+    boxes = (_linha("Observe a posição seguinte:", 0) + _linha("1.e4 e5 2.f4 exf4 3.Cf3 f5", 520)
+             + _linha("Agora as brancas atacam.", 560))
+    pagina = tx.pagina_avulsa(boxes, [_lido(P23, caixa=(0, 60, 400, 460))])
+    montagens = []
+    original = tx.montar
+    monkeypatch.setattr(tx, "montar", lambda p, **k: montagens.append(1) or original(p, **k))
+    lc._TEXTOS_VISTOS.clear()
+    primeira = lc.validar_pagina(pagina, "pt")
+    lance = next(b for b in pagina.boxes if b.entry.y1 == 520 and b.entry.char == "C")
+    lance.entry.confidence, lance.entry.source = 0.3, "rede"
+    assert lc.validar_pagina(pagina, "pt") == primeira and len(montagens) == 1
+    lance.entry.char = "D"                                   # 3.Df3: outro lance, outro texto
+    com_a_cache = lc.validar_pagina(pagina, "pt")
+    assert len(montagens) == 2
+    lc._TEXTOS_VISTOS.clear()
+    assert lc.validar_pagina(pagina, "pt") == com_a_cache
+    assert lc.textos_depois(original(pagina))["d0"].startswith("1.e4 e5 2.f4 exf4 3.Df3")
+
+
 def test_o_texto_do_diagrama_vai_ate_o_proximo():
     boxes = (_linha("Primeiro:", 0) + _linha("1.e4 e5", 470) + _linha("Segundo:", 520)
              + _linha("1.d4 d5", 990))

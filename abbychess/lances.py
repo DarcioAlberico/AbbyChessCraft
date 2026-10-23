@@ -41,6 +41,8 @@ from __future__ import annotations
 
 import random
 import re
+import threading
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -348,6 +350,50 @@ def textos_depois(documento, modo: str = "impresso") -> Dict[str, str]:
     return saida
 
 
+#: O texto depois dos diagramas das últimas páginas validadas, pela chave do que ele usa
+#: (`_chave_do_texto`): `{chave: textos}`, do mais velho ao mais novo.
+_TEXTOS_VISTOS: "OrderedDict[tuple, Dict[str, str]]" = OrderedDict()
+_TRAVA_DOS_TEXTOS = threading.Lock()
+#: Quantas páginas a cache guarda (a aberta, a do lote e as vizinhas).
+TEXTOS_GUARDADOS = 8
+
+
+def _chave_do_texto(pagina) -> Optional[tuple]:
+    """O que o texto da página usa para ser montado (`texto.montar`): o caractere, a caixa e
+    o ângulo de cada glifo, as áreas, as decisões e os diagramas. A confiança e a fonte da
+    leitura não entram: confirmar uma leitura (o Enter mais comum) não muda o texto. `None`
+    se algo não for comparável (aí o texto é montado sempre)."""
+    try:
+        chave = (tuple((b.gid, b.entry.char, b.entry.x1, b.entry.y1, b.entry.x2, b.entry.y2,
+                        b.entry.angulo) for b in pagina.boxes),
+                 tuple(pagina.zonas), pagina.decisoes,
+                 tuple((tuple(d.caixa), d.id) for d in pagina.diagramas))
+        hash(chave)
+    except TypeError:
+        return None
+    return chave
+
+
+def _textos_da_pagina(pagina) -> Dict[str, str]:
+    """`textos_depois(texto.montar(pagina))`, guardado pela chave do que ele usa: montar o
+    texto da página custava ~25 ms em cada Enter (a validação é refeita em toda edição)."""
+    from abbychess import texto as tx
+
+    chave = _chave_do_texto(pagina)
+    if chave is not None:
+        with _TRAVA_DOS_TEXTOS:
+            if chave in _TEXTOS_VISTOS:
+                _TEXTOS_VISTOS.move_to_end(chave)
+                return _TEXTOS_VISTOS[chave]
+    textos = textos_depois(tx.montar(pagina))
+    if chave is not None:
+        with _TRAVA_DOS_TEXTOS:
+            _TEXTOS_VISTOS[chave] = textos
+            while len(_TEXTOS_VISTOS) > TEXTOS_GUARDADOS:
+                _TEXTOS_VISTOS.popitem(last=False)
+    return textos
+
+
 def validar_pagina(pagina, idioma: str = "pt") -> list:
     """Os diagramas da página com a validação pelos lances do texto que segue cada um.
 
@@ -357,7 +403,6 @@ def validar_pagina(pagina, idioma: str = "pt") -> list:
     from dataclasses import replace
 
     from abbychess import diagramas as dg
-    from abbychess import texto as tx
 
     if not any(d.lido and d.id for d in pagina.diagramas):
         return [d if d.validacao is None and d.lado_origem != LADO_DOS_LANCES
@@ -367,7 +412,7 @@ def validar_pagina(pagina, idioma: str = "pt") -> list:
     copia = copy.copy(pagina)
     if pagina.tabuleiros:
         copia.diagramas = dg.com_ids(dg.para_caixas(pagina.tabuleiros, pagina.diagramas))
-    textos = textos_depois(tx.montar(copia))
+    textos = _textos_da_pagina(copia)
     saida = []
     for d in pagina.diagramas:
         linha = primeira_linha(textos.get(d.id, ""), idioma) if d.lido and d.id else []

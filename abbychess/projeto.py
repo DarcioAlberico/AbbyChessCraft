@@ -72,6 +72,7 @@ from core.box_model import BoxEntry
 
 from abbychess import gravacao as gv
 from abbychess import procedencia
+from abbychess import sequencia as sq
 from abbychess.gravador import Gravador
 from abbychess import zonas as zn
 from abbychess.modelo import (FIGURINAS, GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
@@ -104,8 +105,9 @@ PASTA_DO_BACKUP_V1 = "backup-v1"
 PAGINAS_EM_MEMORIA = 16
 #: A versão do formato de `livro.json`; outra versão é refeita das páginas.
 #: 2: a confiança 1,0 ganhou a faixa 100 do histograma; 3: o `pid` de cada página e os
-#: estados de §4.4 (os caches anteriores são refeitos).
-VERSAO_DO_LIVRO = 3
+#: estados de §4.4; 4: chaveado por `pid` (passo L), com o índice da página no PDF em cada
+#: resumo (os caches anteriores são refeitos).
+VERSAO_DO_LIVRO = 4
 #: Quanto da fonte entra no SHA-256 que a reconhece depois de movida.
 BYTES_DO_SHA = 4 * 2**20
 #: Quantos arquivos do tamanho certo, no máximo, `abrir` lê ao procurar a fonte sumida
@@ -212,14 +214,17 @@ class ProjetoDeLivro:
         #: ordem é sempre a do livro e depois a do cache, nunca o contrário.
         self._trava_do_cache = threading.RLock()
         self._travado = somente_leitura         # este objeto segura uma trava de só leitura
-        #: As páginas lidas, no modelo (as mais recentes), e a foto (`modelo.foto`) de cada
-        #: glifo na última gravação síncrona: quem grava listas de `BoxEntry` (o lote, as
-        #: ferramentas) pode tê-los mudado no lugar, e só a foto diz o que mudou.
+        #: As páginas lidas, no modelo (as mais recentes), por `pid`, e a foto
+        #: (`modelo.foto`) de cada glifo na última gravação síncrona: quem grava listas de
+        #: `BoxEntry` (o lote, as ferramentas) pode tê-los mudado no lugar, e só a foto diz o
+        #: que mudou.
         self._modelos: "OrderedDict[int, Pagina]" = OrderedDict()
-        #: Os `p<pid>.json` que o `livro.json` não cita (uma queda entre a página e o livro),
-        #: varridos uma vez por sessão, na primeira página que o livro não acha.
-        self._sem_livro: Optional[set] = None
         self._estados: Dict[int, Dict[int, int]] = {}
+        #: A sequência do livro (§12.4): a posição de cada `pid`. Montada na primeira vez que
+        #: alguém pergunta (`sequencia`), dos dados da v2; `_proximo_pid` é o primeiro `pid`
+        #: acima dela, para as páginas que ela ainda não tem.
+        self._sequencia: Optional[sq.Sequencia] = None
+        self._proximo_pid = 0
         #: A abertura achou a fonte noutro lugar, pelo SHA-256 (a janela avisa).
         self.fonte_relocalizada = False
         #: Esta abertura passou o projeto do formato 1 ao 2 (a janela avisa onde ficou a cópia).
@@ -228,7 +233,7 @@ class ProjetoDeLivro:
         self.motivo_so_leitura = ""
         #: O gravador das páginas que a janela edita, criado na primeira entrega.
         self._gravador: Optional[Gravador] = None
-        #: índice -> (instantâneo, resumo) das páginas entregues e ainda não gravadas: o
+        #: pid -> (instantâneo, resumo) das páginas entregues e ainda não gravadas: o
         #: resumo do livro as mostra como estão, e não como o disco ainda está.
         self._a_gravar: Dict[int, tuple] = {}
         #: Avisado da thread do gravador quando uma página não grava: `(indice, erro)`.
@@ -258,6 +263,7 @@ class ProjetoDeLivro:
                         fonte_tamanho=fonte.stat().st_size)
         projeto = cls(pasta, dados)
         projeto.salvar()
+        projeto.sequencia               # agora, antes de qualquer render (o fitz e as threads)
         return projeto
 
     @classmethod
@@ -292,6 +298,7 @@ class ProjetoDeLivro:
             # A trava por último: uma falha antes dela não deixa a pasta travada sem dono.
             projeto.somente_leitura = projeto._travado = True
             gv.proteger(pasta)
+            projeto.sequencia           # só na memória: nada é gravado
             return projeto
         (pasta / PASTA_DE_PADROES).mkdir(exist_ok=True)
         (pasta / PASTA_DE_PAGINAS).mkdir(exist_ok=True)
@@ -310,6 +317,7 @@ class ProjetoDeLivro:
                     f"gravar na pasta dele ({erro}). Ele abre só para leitura.")
                 projeto.somente_leitura = projeto._travado = True
                 gv.proteger(pasta)
+                projeto.sequencia
                 return projeto
         mudou = bool(desconhecidos or outros_limiares)
         if projeto.fonte.is_file():
@@ -327,6 +335,7 @@ class ProjetoDeLivro:
                 projeto.salvar()
             except OSError as erro:     # mídia só de leitura: abre igual, sem gravar o ajuste
                 log.warning("não deu para gravar %s ao abrir: %s", ARQUIVO_DO_PROJETO, erro)
+        projeto.sequencia               # agora, antes de qualquer render (o fitz e as threads)
         return projeto
 
     def fechar(self, limite: Optional[float] = 30.0) -> bool:
@@ -365,8 +374,8 @@ class ProjetoDeLivro:
             self._guardar_no_cache(pagina, foto=False)
             instantaneo = pagina.instantaneo()
             # O resumo vale já para quem pergunta (F6, o lote, "lidas"), antes da gravação.
-            self._a_gravar[pagina.indice] = (instantaneo, resumo if resumo is not None
-                                             else self._resumo_do_modelo(instantaneo))
+            self._a_gravar[pagina.pid] = (instantaneo, resumo if resumo is not None
+                                          else self._resumo_do_modelo(instantaneo))
             self.gravador.agendar(pagina.pid, instantaneo)
         return True
 
@@ -381,32 +390,33 @@ class ProjetoDeLivro:
         return self._gravador.sujas if self._gravador is not None else set()
 
     def paginas_sujas(self) -> List[int]:
-        """Os índices das páginas entregues ao gravador e ainda não gravadas."""
+        """As posições das páginas entregues ao gravador e ainda não gravadas."""
+        sequencia = self.sequencia
         with self._trava_do_cache:
-            return sorted(self._a_gravar)
+            pids = list(self._a_gravar)
+        return sorted(p for p in map(sequencia.posicao_de, pids) if p is not None)
 
     def _gravar_instantaneo(self, pagina: Pagina) -> None:
         """A gravação do gravador. O arquivo da página é gravado sem a trava do livro: o
         instantâneo não muda, e só esta thread grava as páginas que a interface edita (o
         lote, que grava as dele, começa depois de `descarregar`). A trava vale só para o
         `livro.json`, que o lote também grava."""
-        gv.gravar_json(self._arquivo_v2(pagina.pid), _pagina_para_json(pagina))
+        gv.gravar_json(self._arquivo_v2(pagina.pid),
+                       _pagina_para_json(pagina, self._pagina_da_fonte(pagina)))
         with self._trava_do_livro:
             with self._trava_do_cache:
                 # A foto é das gravações síncronas; esta página veio da interface, que não
                 # muda nada no lugar, e a reconciliação a compara com o glifo mesmo.
                 self._estados.pop(pagina.pid, None)
-            self._atualizar_livro(pagina.indice, self._resumo_do_modelo(pagina))
+            self._atualizar_livro(pagina.pid, self._resumo_do_modelo(pagina))
         with self._trava_do_cache:
-            pendente = self._a_gravar.get(pagina.indice)
+            pendente = self._a_gravar.get(pagina.pid)
             if pendente is not None and pendente[0] is pagina:
-                del self._a_gravar[pagina.indice]
+                del self._a_gravar[pagina.pid]
 
     def _falhou(self, pid: int, erro: BaseException) -> None:
         if self.ao_falhar_gravacao is not None:
-            with self._trava_do_cache:
-                indice = next((i for i, p in self._modelos.items() if p.pid == pid), None)
-            self.ao_falhar_gravacao(indice, erro)
+            self.ao_falhar_gravacao(self.sequencia.posicao_de(pid), erro)
 
     def salvar(self) -> None:
         gv.gravar_json(self.pasta / ARQUIVO_DO_PROJETO, asdict(self.dados))
@@ -489,11 +499,10 @@ class ProjetoDeLivro:
     def _arquivo_da_pagina(self, indice: int) -> Path:
         """O arquivo da página: o v2 (`paginas/p<pid>.json`) se existe, senão o v1 se ela
         ainda não migrou, senão onde o v2 vai ficar."""
-        with self._trava_do_livro:
-            pid = self._pid_de(indice)
-        if pid is not None and self._arquivo_v2(pid).is_file():
+        pid = self._pid_em(indice, criar=True)
+        if self._arquivo_v2(pid).is_file():
             return self._arquivo_v2(pid)
-        if self._arquivo_v1(indice).is_file() or pid is None:
+        if self._arquivo_v1(indice).is_file():
             return self._arquivo_v1(indice)
         return self._arquivo_v2(pid)
 
@@ -530,7 +539,7 @@ class ProjetoDeLivro:
         if arquivo is None:
             return None
         try:
-            return _pagina_de_json(json.loads(arquivo.read_text(encoding="utf-8")))
+            return self._de_json(json.loads(arquivo.read_text(encoding="utf-8")))
         except (OSError, ValueError):
             return None
 
@@ -563,25 +572,31 @@ class ProjetoDeLivro:
 
     def modelo_em_memoria(self, indice: int) -> Optional[Pagina]:
         """A página do cache, sem ler o disco (None se ela não está na memória)."""
+        pid = self._pid_em(indice)
+        if pid is None:
+            return None
         with self._trava_do_cache:
-            return self._modelos.get(indice)
+            return self._modelos.get(pid)
 
     def carregar_modelo(self, indice: int) -> Optional[Pagina]:
         """A página no modelo v2, ou `None` se nada foi gravado dela. Uma página v1 é
         migrada e gravada aqui, na primeira leitura (§4.3)."""
+        pid = self._pid_em(indice)              # antes das travas (a do livro, se montar)
+        if pid is None:
+            return None                         # fora do livro: nada gravado
         v1 = not self.somente_leitura and self._tem_v1(indice)     # o stat, fora das travas
         with self._trava_do_cache:              # o caminho comum, sem esperar o disco
-            em_cache = self._modelos.get(indice)
+            em_cache = self._modelos.get(pid)
             if em_cache is not None and not v1:
-                self._modelos.move_to_end(indice)
+                self._modelos.move_to_end(pid)
                 return em_cache
         with self._trava_do_livro:
-            em_cache = self._modelos.get(indice)
+            em_cache = self._modelos.get(pid)
             # Um v1 que apareceu (o `backup-v1/` copiado de volta) vence a página em
             # memória; em só leitura nada migra, e a página em memória vale.
             v1 = (em_cache is None or not self.somente_leitura) and self._tem_v1(indice)
             if em_cache is not None and not v1:
-                self._modelos.move_to_end(indice)
+                self._modelos.move_to_end(pid)
                 return em_cache
             if v1:
                 pagina = self._migrar(indice)
@@ -589,45 +604,28 @@ class ProjetoDeLivro:
                 arquivo = self._arquivo_v2_de(indice)
                 if arquivo is None:
                     return None
-                pagina = _pagina_de_json(json.loads(arquivo.read_text(encoding="utf-8")))
+                pagina = self._de_json(json.loads(arquivo.read_text(encoding="utf-8")))
             self._guardar_no_cache(pagina, foto_nova=True)
             return pagina
 
+    def _de_json(self, bruto: dict) -> Pagina:
+        """A página do JSON, com a posição dela no livro (a da sequência, e não o `indice`
+        gravado no arquivo, que a sequência deixa de seguir no passo L)."""
+        pagina = _pagina_de_json(bruto)
+        posicao = self.sequencia.posicao_de(pagina.pid)
+        if posicao is not None:
+            pagina.indice = posicao
+        return pagina
+
     def _arquivo_v2_de(self, indice: int) -> Optional[Path]:
-        """O `p<pid>.json` da página: pelo `livro.json` e, se ele não a tiver (uma queda entre
-        gravar a página e gravar o livro), pelos arquivos que o livro não cita."""
-        pid = self._pid_de(indice)
-        if pid is not None and self._arquivo_v2(pid).is_file():
-            return self._arquivo_v2(pid)
-        if self._sem_livro is None:             # uma varredura por sessão, não por acesso
-            citados = {r.get("pid") for r in self._carregar_livro()["paginas"].values()}
-            self._sem_livro = {int(a.stem[1:]) for a in (self.pasta / PASTA_DE_PAGINAS).glob("p*.json")
-                               if a.stem[1:].isdigit() and int(a.stem[1:]) not in citados}
-        achados = []
-        for outro in sorted(self._sem_livro):
-            arquivo = self._arquivo_v2(outro)
-            try:
-                bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                continue
-            if bruto.get("indice") == indice:
-                achados.append((bruto.get("gravado_em", ""), int(arquivo.stem[1:]), arquivo))
-        if not achados:
+        """O `p<pid>.json` da página na posição `indice`, ou None se nada foi gravado dela.
+        Os arquivos que o `livro.json` não cita (uma queda entre a página e o livro) entram
+        na sequência quando ela é montada (`_montar_sequencia`)."""
+        pid = self._pid_em(indice)
+        if pid is None:
             return None
-        # O mais recente pelo `gravado_em` (de segundo em segundo); no empate, o pid maior.
-        _, pid, arquivo = max(achados)
-        self._sem_livro -= {p for _, p, _ in achados}
-        if len(achados) > 1:
-            log.warning("a página %d tem %d arquivos sem o livro; vale o mais recente, p%d",
-                        indice + 1, len(achados), pid)
-        pagina = _pagina_de_json(json.loads(arquivo.read_text(encoding="utf-8")))
-        resumo = self._resumo_do_modelo(pagina)
-        if self.somente_leitura:                # só na memória; troca, não muda no lugar
-            livro = self._carregar_livro()
-            self._livro = {**livro, "paginas": {**livro["paginas"], str(indice + 1): resumo}}
-        else:
-            self._atualizar_livro(indice, resumo)
-        return arquivo
+        arquivo = self._arquivo_v2(pid)
+        return arquivo if arquivo.is_file() else None
 
     def salvar_modelo(self, pagina: Pagina) -> None:
         """Grava a página v2 e o resumo dela em `livro.json`."""
@@ -639,12 +637,12 @@ class ProjetoDeLivro:
 
     def _gravar(self, pagina: Pagina) -> None:
         """A página e o resumo dela em `livro.json` (com a trava do livro)."""
-        dados = _pagina_para_json(pagina)
+        dados = _pagina_para_json(pagina, self._pagina_da_fonte(pagina))
         gv.gravar_json(self._arquivo_v2(pagina.pid), dados)
         with self._trava_do_cache:
             # A foto da gravação, do mesmo `as_state()` que foi para o JSON.
             self._estados[pagina.pid] = {b[0]: hash(tuple(b[1])) for b in dados["boxes"]}
-        self._atualizar_livro(pagina.indice, self._resumo_do_modelo(pagina))
+        self._atualizar_livro(pagina.pid, self._resumo_do_modelo(pagina))
 
     def _guardar_no_cache(self, pagina: Pagina, *, foto_nova: bool = False,
                           foto: bool = True) -> None:
@@ -656,21 +654,21 @@ class ProjetoDeLivro:
             self._no_cache(pagina, foto_nova, foto)
 
     def _no_cache(self, pagina: Pagina, foto_nova: bool, com_foto: bool) -> None:
-        self._modelos[pagina.indice] = pagina
-        self._modelos.move_to_end(pagina.indice)
+        self._modelos[pagina.pid] = pagina
+        self._modelos.move_to_end(pagina.pid)
         if not com_foto:
             self._estados.pop(pagina.pid, None)
         elif foto_nova or pagina.pid not in self._estados:
             self._estados[pagina.pid] = {b.gid: foto(b.entry) for b in pagina.boxes}
         sujas = self.sujas
-        for indice in list(self._modelos):
+        for pid in list(self._modelos):
             if len(self._modelos) <= PAGINAS_EM_MEMORIA:
                 break
-            saiu = self._modelos[indice]
-            if saiu.pid in sujas or saiu is pagina:
+            saiu = self._modelos[pid]
+            if pid in sujas or saiu is pagina:
                 continue                    # a página com gravação pendente fica
-            del self._modelos[indice]
-            self._estados.pop(saiu.pid, None)
+            del self._modelos[pid]
+            self._estados.pop(pid, None)
 
     def pagina_para_editar(self, indice: int) -> Pagina:
         """A página no modelo, criada (com pid novo) se nada foi gravado dela: é a que a
@@ -681,16 +679,17 @@ class ProjetoDeLivro:
     def _modelo_ou_novo(self, indice: int) -> Pagina:
         pagina = self.carregar_modelo(indice)
         if pagina is None:
-            pagina = Pagina(pid=self._alocar_pid(), indice=indice)
+            pid = self._pid_em(indice, criar=True)
+            if pid >= self.dados.proximo_pid:
+                # O contador gravado passa do pid da página que nasce, antes do arquivo dela.
+                # Ele não é o teto dos pids em disco (uma página de pid menor nasce sem
+                # gravá-lo): ao montar a sequência, os `p<pid>.json` em disco também contam.
+                self.dados.proximo_pid = pid + 1
+                if not self.somente_leitura:
+                    self.salvar()
+            pagina = Pagina(pid=pid, indice=indice)
             self._guardar_no_cache(pagina)
         return pagina
-
-    def _alocar_pid(self) -> int:
-        pid = self.dados.proximo_pid
-        self.dados.proximo_pid += 1
-        if not self.somente_leitura:
-            self.salvar()
-        return pid
 
     def _reconciliar(self, pagina: Pagina, boxes: Sequence[BoxEntry]):
         novos, dif = reconciliar(pagina.boxes, boxes, pagina.alocar, procedencia.amostra_de,
@@ -774,7 +773,8 @@ class ProjetoDeLivro:
         """A página como está agora, antes de o lote com "refazer" a reler: o lote não entra
         no desfazer, e "Voltar ao estado antes do lote" a restaura."""
         gv.gravar_json(self._arquivo_antes_do_lote(pagina.pid),
-                       _pagina_para_json(pagina.instantaneo()))
+                       _pagina_para_json(pagina.instantaneo(),
+                                         self._pagina_da_fonte(pagina)))
 
     def tem_antes_do_lote(self, indice: int) -> bool:
         # O pid do modelo (em memória), e não o do `livro.json`: logo depois do lote, a
@@ -783,13 +783,9 @@ class ProjetoDeLivro:
         return pagina is not None and self._arquivo_antes_do_lote(pagina.pid).is_file()
 
     def pid_da_pagina(self, indice: int) -> Optional[int]:
-        """O pid da página sem ler o JSON dela: o do modelo em memória, ou o do livro."""
-        with self._trava_do_cache:
-            em_cache = self._modelos.get(indice)
-        if em_cache is not None:
-            return em_cache.pid
-        with self._trava_do_livro:
-            return self._pid_de(indice)
+        """O pid da página na posição `indice`, sem ler o JSON dela (o da sequência), ou
+        None fora do livro."""
+        return self._pid_em(indice)
 
     def data_antes_do_lote(self, indice: int) -> Optional[datetime]:
         """Quando a cópia de antes do lote foi feita (a hora do arquivo), ou None."""
@@ -812,16 +808,16 @@ class ProjetoDeLivro:
         if not self.descarregar(10):
             raise OSError("há páginas que não puderam ser gravadas (veja a barra de status); "
                           "nada foi mudado")
+        pid = self._pid_em(indice)
         with self._trava_do_livro:
-            pid = self._pid_de(indice)
-            if pid is None:
+            copia = None if pid is None else self._arquivo_antes_do_lote(pid)
+            if copia is None or not copia.is_file():
                 raise OSError(f"a página {indice + 1} não tem cópia de antes do lote")
-            copia = self._arquivo_antes_do_lote(pid)
             dados = copia.read_bytes()
             gv.gravar_bytes(self._arquivo_v2(pid), dados)
-            pagina = _pagina_de_json(json.loads(dados.decode("utf-8")))
+            pagina = self._de_json(json.loads(dados.decode("utf-8")))
             self._guardar_no_cache(pagina, foto_nova=True)
-            self._atualizar_livro(indice, self._resumo_do_modelo(pagina))
+            self._atualizar_livro(pid, self._resumo_do_modelo(pagina))
             gv.apagar(copia)
             return pagina
 
@@ -843,8 +839,11 @@ class ProjetoDeLivro:
         lá (pode ter o que ainda não foi gravado), ou a do JSON, **sem entrar no cache** (a
         leitura do livro não despeja as páginas abertas). Uma página v1 não é migrada aqui:
         vai por `carregar_modelo`."""
+        pid = self._pid_em(indice)
+        if pid is None:
+            return None
         with self._trava_do_cache:
-            em_cache = self._modelos.get(indice)
+            em_cache = self._modelos.get(pid)
         if em_cache is not None:
             return em_cache
         if self._tem_v1(indice):
@@ -853,7 +852,7 @@ class ProjetoDeLivro:
         if arquivo is None:
             return None
         try:
-            return _pagina_de_json(json.loads(arquivo.read_text(encoding="utf-8")))
+            return self._de_json(json.loads(arquivo.read_text(encoding="utf-8")))
         except (OSError, ValueError):           # gravada agora mesmo pelo gravador: na próxima
             return None
 
@@ -986,23 +985,154 @@ class ProjetoDeLivro:
     # livro.json: o resumo de cada página, sem abrir as páginas
     # ------------------------------------------------------------------
     def resumo_do_livro(self) -> Dict[int, dict]:
-        """Índice da página -> o resumo dela (`_resumo_do_modelo`), de toda página gravada."""
+        """Posição da página no livro -> o resumo dela (`_resumo_do_modelo`), de toda página
+        gravada que está na sequência."""
+        sequencia = self.sequencia
         # Os pendentes antes do livro: uma página que o gravador termine entre as duas
         # leituras já está no livro lido, e não some por uma chamada.
         with self._trava_do_cache:
-            pendentes = {i: r for i, (_, r) in self._a_gravar.items()}
+            pendentes = {pid: r for pid, (_, r) in self._a_gravar.items()}
         livro = self._livro                     # trocado inteiro a cada gravação
         if livro is None:
             with self._trava_do_livro:
                 livro = self._carregar_livro()
-        resumo = {int(k) - 1: v for k, v in livro["paginas"].items()}
-        resumo.update(pendentes)
+        por_pid = {int(k): v for k, v in livro["paginas"].items()}
+        por_pid.update(pendentes)
+        resumo = {}
+        for pid, r in por_pid.items():
+            posicao = sequencia.posicao_de(pid)
+            if posicao is not None:
+                resumo[posicao] = r
         # Cópia funda: o cache não vaza.
         return {i: json.loads(json.dumps(resumo[i])) for i in sorted(resumo)}
 
-    def _pid_de(self, indice: int) -> Optional[int]:
-        resumo = self._carregar_livro()["paginas"].get(str(indice + 1))
-        return None if resumo is None else resumo.get("pid")
+    # ------------------------------------------------------------------
+    # A sequência do livro (§12.4)
+    # ------------------------------------------------------------------
+    @property
+    def sequencia(self) -> sq.Sequencia:
+        """A ordem das páginas e o `pid` de cada uma (montada na primeira pergunta)."""
+        sequencia = self._sequencia
+        if sequencia is None:
+            with self._trava_do_livro:
+                if self._sequencia is None:
+                    self._sequencia, self._proximo_pid = self._montar_sequencia()
+                sequencia = self._sequencia
+        return sequencia
+
+    def _pid_em(self, indice: int, criar: bool = False) -> Optional[int]:
+        """O `pid` da página na posição `indice`, ou None fora do livro. Só `criar` (a
+        página que nasce numa gravação: a fonte sumida não diz quantas páginas tem) estende a
+        sequência com `pid` novos; uma pergunta não deixa entradas fantasmas."""
+        sequencia = self.sequencia
+        if 0 <= indice < len(sequencia):
+            return sequencia.pid_em(indice)
+        if indice < 0:
+            raise IndexError(f"Página {indice + 1} fora do livro")
+        if not criar:
+            return None
+        with self._trava_do_livro:
+            sequencia = self._sequencia
+            if indice >= len(sequencia):
+                faltam = indice + 1 - len(sequencia)
+                pids = list(range(self._proximo_pid, self._proximo_pid + faltam))
+                self._proximo_pid += faltam
+                novas = tuple(sq.Entrada(p, sq.FONTE_DO_LIVRO, len(sequencia) + k)
+                              for k, p in enumerate(pids))
+                self._sequencia = sequencia = sq.Sequencia(sequencia.entradas + novas,
+                                                           sequencia.apagadas)
+            return sequencia.pid_em(indice)
+
+    def _trocar_sequencia(self, nova: sq.Sequencia) -> None:
+        """A sequência nova (as operações de página, rodada 2): as páginas da memória passam a
+        ter a posição dela no `indice`. Não grava nada."""
+        with self._trava_do_livro:
+            self._sequencia = nova
+            self._proximo_pid = max([self._proximo_pid, *(p + 1 for p in nova.todos_os_pids)])
+            with self._trava_do_cache:
+                for pid, pagina in self._modelos.items():
+                    posicao = nova.posicao_de(pid)
+                    if posicao is not None:
+                        pagina.indice = posicao
+
+    def posicao_do_pid(self, pid: int) -> Optional[int]:
+        """A posição no livro da página `pid`, ou None (fora da sequência)."""
+        return self.sequencia.posicao_de(pid)
+
+    def total_de_paginas(self) -> int:
+        """Quantas páginas a fonte do livro tem (sem a fonte: 0)."""
+        if not self.fonte.is_file():
+            return 0
+        if not self.fonte_e_pdf:
+            return 1
+        import fitz
+
+        try:
+            with fitz.open(str(self.fonte)) as documento:
+                return documento.page_count
+        except (RuntimeError, ValueError, OSError):
+            return 0
+
+    def _montar_sequencia(self) -> Tuple[sq.Sequencia, int]:
+        """A sequência de um projeto da v2 (`sequencia.da_v2`): a ordem do PDF, os `pid`
+        das páginas gravadas pelo `livro.json`, e os `p<pid>.json` que ele não cita (uma
+        queda entre a página e o livro: o mais recente de cada índice entra, e o livro é
+        atualizado), a v1 não migrada com `pid` = índice. Um arquivo v1 presente vence a
+        página v2 do mesmo índice (o `backup-v1/` copiado de volta, CA-4.5): os `gid` e as
+        amostras dele usam o `pid` = índice. Todo `p<pid>.json` em disco fica abaixo do
+        próximo `pid`, mesmo o que não entra na sequência."""
+        livro = self._carregar_livro()
+        gravados: Dict[int, int] = {}
+        for chave, resumo in livro["paginas"].items():
+            if isinstance(resumo.get("pagina_da_fonte"), int):
+                gravados[resumo["pagina_da_fonte"]] = int(chave)
+        orfaos = self._orfaos(livro, gravados)
+        for indice, (pid, pagina) in orfaos.items():
+            gravados[indice] = pid
+        v1 = self._indices_v1()
+        for indice in v1:
+            gravados[indice] = indice
+        em_disco = [int(a.stem[1:]) for a in (self.pasta / PASTA_DE_PAGINAS).glob("p*.json")
+                    if a.stem[1:].isdigit()]
+        piso = max([self.dados.proximo_pid, *(p + 1 for p in em_disco)])
+        total = max([self.total_de_paginas(), *(i + 1 for i in gravados)], default=0)
+        sequencia, proximo = sq.da_v2(total, gravados, (), piso)
+        for indice, (pid, pagina) in orfaos.items():
+            resumo = self._resumo_do_modelo(pagina)
+            if self.somente_leitura:            # só na memória; troca, não muda no lugar
+                livro = self._carregar_livro()
+                self._livro = {**livro, "paginas": {**livro["paginas"], str(pid): resumo}}
+            else:
+                self._atualizar_livro(pid, resumo)
+        return sequencia, proximo
+
+    def _orfaos(self, livro: dict, gravados: Dict[int, int]) -> Dict[int, Tuple[int, Pagina]]:
+        """índice -> (pid, página) dos `p<pid>.json` que o livro não cita, para os índices
+        que ele não tem (ou cujo arquivo sumiu): o mais recente pelo `gravado_em` e, no
+        empate, o `pid` maior."""
+        citados = {int(k) for k in livro["paginas"]}
+        achados: Dict[int, list] = {}
+        for arquivo in (self.pasta / PASTA_DE_PAGINAS).glob("p*.json"):
+            if not arquivo.stem[1:].isdigit() or int(arquivo.stem[1:]) in citados:
+                continue
+            try:
+                bruto = json.loads(arquivo.read_text(encoding="utf-8"))
+                pagina = _pagina_de_json(bruto)
+            except (OSError, ValueError, TypeError, KeyError):
+                continue
+            indice = pagina.indice
+            if indice in gravados and self._arquivo_v2(gravados[indice]).is_file():
+                continue                    # o livro já tem esta página, e o arquivo dela
+            achados.setdefault(indice, []).append(
+                (bruto.get("gravado_em", ""), pagina.pid, pagina))
+        orfaos = {}
+        for indice, lista in achados.items():
+            _, pid, pagina = max(lista, key=lambda t: (t[0], t[1]))
+            if len(lista) > 1:
+                log.warning("a página %d tem %d arquivos sem o livro; vale o mais recente, p%d",
+                            indice + 1, len(lista), pid)
+            orfaos[indice] = (pid, pagina)
+        return orfaos
 
     def reaplicar_limiar(self) -> None:
         """Os `pendentes` de `livro.json` com o limiar de revisão de agora, pelo histograma
@@ -1021,7 +1151,7 @@ class ProjetoDeLivro:
     def recalcular_livro(self) -> dict:
         """O `livro.json` como ele deve ser, lendo todas as páginas gravadas (v2 e as v1 que
         ainda não migraram, sem migrá-las)."""
-        paginas, quando = {}, {}
+        por_indice: Dict[int, Tuple[tuple, Pagina]] = {}
         for arquivo in sorted((self.pasta / PASTA_DE_PAGINAS).glob("p*.json")):
             if not arquivo.stem[1:].isdigit():
                 continue
@@ -1030,18 +1160,19 @@ class ProjetoDeLivro:
                 pagina = _pagina_de_json(bruto)
             except (OSError, ValueError, TypeError, KeyError):
                 continue                # página ilegível: fica fora do resumo
-            chave, ordem = str(pagina.indice + 1), (bruto.get("gravado_em", ""), pagina.pid)
-            if chave in quando:         # dois arquivos do mesmo índice: vale o mais recente
-                log.warning("a página %s tem mais de um arquivo; vale o gravado por último",
-                            chave)
-                if ordem < quando[chave]:
+            ordem = (bruto.get("gravado_em", ""), pagina.pid)
+            if pagina.indice in por_indice:     # dois arquivos do mesmo índice: o mais recente
+                log.warning("a página %d tem mais de um arquivo; vale o gravado por último",
+                            pagina.indice + 1)
+                if ordem < por_indice[pagina.indice][0]:
                     continue
-            paginas[chave], quando[chave] = self._resumo_do_modelo(pagina), ordem
+            por_indice[pagina.indice] = (ordem, pagina)
         for indice in self._indices_v1():
             try:
-                paginas[str(indice + 1)] = self._resumo_do_modelo(self._ler_v1(indice))
+                por_indice[indice] = ((), self._ler_v1(indice))
             except (OSError, ValueError, TypeError, KeyError):
                 continue
+        paginas = {str(p.pid): self._resumo_do_modelo(p) for _, p in por_indice.values()}
         return {"versao": VERSAO_DO_LIVRO,
                 "paginas": dict(sorted(paginas.items(), key=lambda kv: int(kv[0])))}
 
@@ -1060,14 +1191,25 @@ class ProjetoDeLivro:
             self._livro = bruto
         return self._livro
 
-    def _atualizar_livro(self, indice: int, resumo: dict) -> None:
+    def _atualizar_livro(self, pid: int, resumo: dict) -> None:
         with self._trava_do_livro:
             livro = self._carregar_livro()
-            paginas = {**livro["paginas"], str(indice + 1): resumo}
+            paginas = {**livro["paginas"], str(pid): resumo}
             novo = {"versao": livro["versao"],
                     "paginas": dict(sorted(paginas.items(), key=lambda kv: int(kv[0])))}
             gv.gravar_json(self.pasta / ARQUIVO_DO_LIVRO, novo)
             self._livro = novo                  # o cache só muda depois de gravado
+
+    def _pagina_da_fonte(self, pagina: Pagina) -> int:
+        """O índice da página no PDF do livro (na v2, o que dá a ordem do livro, §12.4): o da
+        entrada dela na sequência, e não a posição (`pagina.indice`), que muda ao reordenar.
+        Antes de a sequência existir (montando-a, ou refazendo o livro), a página veio do JSON,
+        e o `indice` dela é o gravado: o do PDF."""
+        sequencia = self._sequencia         # sem montar: quem monta chama daqui
+        entrada = sequencia.entrada_de(pagina.pid) if sequencia is not None else None
+        if entrada is not None and entrada.fonte == sq.FONTE_DO_LIVRO:
+            return entrada.pagina
+        return pagina.indice
 
     def resumo_do_modelo(self, pagina: Pagina) -> dict:
         """O resumo da página no `livro.json` (sem mudar nada: vale numa thread)."""
@@ -1076,7 +1218,8 @@ class ProjetoDeLivro:
     def _resumo_do_modelo(self, pagina: Pagina) -> dict:
         tabuleiros = len(pagina.tabuleiros)
         conferidos = sum(1 for d in pagina.diagramas if d.conferido)
-        return {"pid": pagina.pid, "estado": pagina.estado,
+        return {"pid": pagina.pid, "pagina_da_fonte": self._pagina_da_fonte(pagina),
+                "estado": pagina.estado,
                 **resumo_das_confiancas(pagina.entries(), self.dados.limiares,
                                         [b.revisado for b in pagina.boxes]),
                 "diagramas": tabuleiros,
@@ -1085,9 +1228,12 @@ class ProjetoDeLivro:
                 "figurinas": any(b.entry.char in FIGURINAS for b in pagina.boxes)}
 
 
-def _pagina_para_json(pagina: Pagina) -> dict:
+def _pagina_para_json(pagina: Pagina, pagina_da_fonte: Optional[int] = None) -> dict:
+    """O JSON da página. O `indice` gravado é o da página no PDF (`pagina_da_fonte`,
+    §12.4), e não a posição no livro, que muda ao reordenar; sem ele, o da página."""
     return {
-        "versao": VERSAO_DA_PAGINA, "pid": pagina.pid, "indice": pagina.indice,
+        "versao": VERSAO_DA_PAGINA, "pid": pagina.pid,
+        "indice": pagina.indice if pagina_da_fonte is None else pagina_da_fonte,
         "estado": pagina.estado, "proximo_n": pagina.proximo_n,
         "gravado_em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "boxes": [b.para_json() for b in pagina.boxes],

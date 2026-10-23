@@ -814,6 +814,15 @@ As rodadas:
    listas do `projeto.json`, a origem das amostras e as exportações pela sequência; (1e)
    `VERSAO = 3`, `backup-v2/`, a cadeia v1 → v3, CA-12.7 e de novo CA-4.1 e CA-4.5. Um teste
    por AST reprova método público do `ProjetoDeLivro` que ainda tome `indice`.
+   **Feito**: (1a) `abbychess/sequencia.py` (`d53ad1d`). (1b) o `ProjetoDeLivro` monta a
+   sequência ao abrir (o número de páginas do PDF, os `pid` do `livro.json`, os arquivos que
+   ele não cita, a v1 com `pid` = índice, e todo `p<pid>.json` em disco abaixo do próximo
+   `pid`); o cache, as gravações pendentes e o `livro.json` (versão 4) são por `pid`, com a
+   página do PDF (`pagina_da_fonte`) no resumo e no `indice` do JSON de página, e não a
+   posição; a página editada pela primeira vez usa o `pid` da sequência; perguntar fora do
+   livro não cria páginas; o desfazer e o lote acham a página pelo `pid`. O índice da busca
+   fica por posição: ele vive só na memória e é refeito a cada sessão, e na rodada 2 é
+   rechaveado pelo `pid` que cada página indexada já guarda quando a sequência mudar.
 2. Reordenar, apagar e inserir, com a seleção (CA-12.8 a 12.10, 12.15).
 3. Girar, cortar e dividir, com a `geometria` preguiçosa (CA-12.11 a 12.13, CA-4.6).
 4. Endireitar à mão e as imagens transformadas nas exportações (CA-12.14, 12.16).

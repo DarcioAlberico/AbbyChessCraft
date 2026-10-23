@@ -1510,10 +1510,14 @@ class ControladorDePagina:
         paginas = {}
         try:
             for pid, m in transacao.paginas.items():
+                # Pelo pid (§12.4): a página pode ter mudado de posição desde a transação.
+                posicao = self.projeto.posicao_do_pid(pid)
+                if posicao is None:
+                    raise hs.Recusa(f"a página {m.indice + 1} saiu do livro")
                 pagina = (self.modelo if self.modelo is not None and self.modelo.pid == pid
-                          else self.projeto.carregar_modelo(m.indice))
+                          else self.projeto.carregar_modelo(posicao))
                 if pagina is None or pagina.pid != pid:
-                    raise hs.Recusa(f"a página {m.indice + 1} não é mais a da transação")
+                    raise hs.Recusa(f"a página {posicao + 1} não é mais a da transação")
                 hs.conferir(m, pagina, para_tras=not refazer)
                 paginas[pid] = pagina
         except hs.Recusa as recusa:
@@ -1544,7 +1548,9 @@ class ControladorDePagina:
                 self.leitor.padroes.restaurar(amostra)
             h.desfeita()
         aberta = self.modelo is not None and self.modelo.pid in transacao.paginas
-        if aberta or not transacao.indices or not self.ir_para(transacao.indices[0]):
+        posicoes = sorted(p for p in map(self.projeto.posicao_do_pid, transacao.paginas)
+                          if p is not None)
+        if aberta or not posicoes or not self.ir_para(posicoes[0]):
             # A página aberta mudou (ou a da transação não abre): o glifo em revisão, os
             # pulados e a seleção podem citar glifos que saíram.
             self.atual, self.pulados, self.selecao = None, set(), set()

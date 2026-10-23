@@ -350,6 +350,9 @@ class _ProjetoNaMemoria:
     def pagina_para_editar(self, indice):
         return self.pagina
 
+    def posicao_do_pid(self, pid):                  # a página única, na posição 0
+        return 0 if pid == self.pagina.pid else None
+
     def agendar(self, pagina):
         self.agendadas += 1
         return True

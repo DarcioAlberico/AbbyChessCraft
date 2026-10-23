@@ -64,7 +64,7 @@ def _sem_hora(dados: bytes) -> dict:
 
 
 def _hash(projeto, indice) -> str:
-    pid = projeto._pid_de(indice)
+    pid = projeto.pid_da_pagina(indice)
     return hashlib.sha256(projeto._arquivo_v2(pid).read_bytes()).hexdigest()
 
 
@@ -218,13 +218,13 @@ def test_ca_4_8_voltar_ao_estado_antes_do_lote_devolve_o_json_copiado(ctl, proje
     p.ensinar("a")                                        # o lote lê os "a" da 1 pelo padrão
     ctl.executor.tudo()
     projeto.descarregar(10)
-    copia_esperada = (projeto.pasta / "paginas" / f"p{projeto._pid_de(1)}.json").read_bytes()
+    copia_esperada = (projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(1)}.json").read_bytes()
     assert not any(b.entry.source == "livro" for b in projeto.carregar_modelo(1).boxes)
     ctl.reconhecer([1], refazer=True)
     ctl.executor.tudo()
     assert ctl.fins[-1].lidas == [1]
     projeto.descarregar(10)
-    pid = projeto._pid_de(1)
+    pid = projeto.pid_da_pagina(1)
     copia = projeto.pasta / "paginas" / ".antes-do-lote" / f"p{pid}.json"
     relida = projeto.carregar_modelo(1)
     assert any(b.entry.char == "W" and b.entry.source == FONTE_MANUAL for b in relida.boxes)

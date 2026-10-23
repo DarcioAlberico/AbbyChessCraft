@@ -137,6 +137,8 @@ class ControladorDePagina:
         self.indice = 0
         self.imagem = None
         self.matriz: Optional[np.ndarray] = None
+        #: A imagem de que a `matriz` é o cinza (quem troca `imagem` à mão não a leva junto).
+        self._matriz_da_imagem = None
         #: A página no modelo; `None` enquanto nada dela foi gravado (nasce na 1ª mudança).
         self.modelo: Optional[Pagina] = None
         #: O glifo em revisão, os pulados e a seleção do modo de treino, por gid.
@@ -197,6 +199,13 @@ class ControladorDePagina:
     @property
     def gids(self) -> List[int]:
         return [b.gid for b in self.modelo.boxes] if self.modelo is not None else []
+
+    def _cinza(self):
+        """A página aberta para recortar glifos: a matriz do cache quando é a desta imagem
+        (converter de novo custava ~7 ms em cada clique e em cada Enter), senão a imagem."""
+        if self.matriz is not None and self._matriz_da_imagem is self.imagem:
+            return self.matriz
+        return self.imagem
 
     def indice_de(self, gid: Optional[int]) -> Optional[int]:
         if gid is None or self.modelo is None:
@@ -405,6 +414,7 @@ class ControladorDePagina:
         if indice != self.indice:
             self._sentido = 1 if indice > self.indice else -1
         self.indice, self.imagem, self.matriz = indice, imagem, matriz
+        self._matriz_da_imagem = imagem
         self._letra_que_faltava = None
         if visita:
             self._registrar_visita(indice)
@@ -1295,7 +1305,7 @@ class ControladorDePagina:
         if not por_char:
             self._avisar("O glifo a ensinar saiu da página antes da vez dele.", 6000)
             return
-        imagem, leitor, projeto = self.imagem, self.leitor, self.projeto
+        imagem, leitor, projeto = self._cinza(), self.leitor, self.projeto
         antes_inst = self._instantaneo()
         antes = tuple(pagina.boxes)
         onde = {b.gid: i for i, b in enumerate(antes)}
@@ -1332,7 +1342,7 @@ class ControladorDePagina:
         cópia, que já tem as amostras do Enter), fora da interface. O que ela resolve emenda
         a `transacao`; desfeita antes do fim, o resultado é descartado."""
         foto_do_leitor = self.leitor.para_propagar()
-        imagem = self.imagem
+        imagem = self._cinza()
 
         def preparar():
             if transacao.invalidada:
@@ -2085,7 +2095,7 @@ class ControladorDePagina:
             from core import proporcao
             from abbychess.leitor import altura_relativa
 
-            recorte = pg.recorte(self.imagem, entradas[i])
+            recorte = pg.recorte(self._cinza(), entradas[i])
             referencia = proporcao.altura_de_referencia(entradas)
             achado = self.leitor.padroes.conflito(recorte, char,
                                                   altura_relativa(recorte, referencia),

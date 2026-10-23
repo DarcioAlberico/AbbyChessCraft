@@ -224,6 +224,26 @@ def test_o_aviso_de_ensino_diz_o_efeito_e_o_conflito(livro):
     assert "amostra(s) de 'o'" in conflito
 
 
+def test_o_aviso_e_o_enter_recortam_da_matriz_do_cache(livro, monkeypatch):
+    """O clique no Documento e o Enter não convertem a página de novo a cada vez: o cache já
+    tem o cinza dela (eram ~7 ms em cada um, a piora desde o D2)."""
+    from PIL import Image
+
+    projeto, ctl, fila = livro
+    fila.definir("leitura")
+    ctl.escolher(ctl.modelo.boxes[0].gid)
+    assert ctl._cinza() is ctl.matriz
+    convertidas = []
+    original = Image.Image.convert
+    monkeypatch.setattr(Image.Image, "convert",
+                        lambda self, *a, **k: convertidas.append(1) or original(self, *a, **k))
+    ctl.aviso_de_ensino("e")
+    assert convertidas == []
+    # Quem troca a imagem à mão não leva a matriz da outra junto.
+    ctl.imagem = ctl.imagem.copy()
+    assert ctl._cinza() is ctl.imagem
+
+
 def test_ca_8_5_todas_as_transicoes_do_4_4():
     """Cada par (estado, evento) da tabela, e todo par fora dela deixa o estado como está."""
     from abbychess import modelo as md

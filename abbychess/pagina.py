@@ -622,10 +622,16 @@ def _contido(b: BoxEntry, caixa: Caixa) -> bool:
     return caixa[0] <= b.x1 and b.x2 <= caixa[2] and caixa[1] <= b.y1 and b.y2 <= caixa[3]
 
 
+def cinza(imagem) -> np.ndarray:
+    """A página em tons de cinza: a imagem PIL convertida, ou a matriz que já é (a do cache
+    de páginas, `CacheDePaginas`). Converter custa ~7 ms numa página do livro: quem recorta
+    muitos glifos converte uma vez, e a janela passa a matriz que já tem."""
+    return np.asarray(imagem.convert("L")) if isinstance(imagem, Image.Image) else imagem
+
+
 def recorte(imagem, box: BoxEntry) -> np.ndarray:
     """O recorte do box em pé e positivo, como o classificador o quer."""
-    return vertical.recorte_de_pe(np.asarray(imagem.convert("L")
-                                             if isinstance(imagem, Image.Image) else imagem), box)
+    return vertical.recorte_de_pe(cinza(imagem), box)
 
 
 def efeitos_de_impressao(imagem: Image.Image, boxes: Sequence[BoxEntry]) -> List[Optional[bool]]:
@@ -645,8 +651,8 @@ def efeitos_de_impressao(imagem: Image.Image, boxes: Sequence[BoxEntry]) -> List
     if not boxes:
         return []
     # A página em tons de cinza uma vez: convertê-la a cada glifo dobrava o tempo do lote.
-    pagina = np.asarray(imagem.convert("L")) if isinstance(imagem, Image.Image) else imagem
-    medidas = [negrito.espessura(recorte(pagina, box)) for box in boxes]
+    pagina = cinza(imagem)
+    medidas =[negrito.espessura(recorte(pagina, box)) for box in boxes]
     amostras = defaultdict(list)
     for box, medida in zip(boxes, medidas):
         if box.char and medida is not None and not isnan(medida):
@@ -680,7 +686,7 @@ def ler_boxes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorDoLivro,
     Box manual nunca é relido: a correção do usuário tem precedência até ele
     pedir outra coisa (invariante 2 do PyBoxEditor).
     """
-    pagina = np.asarray(imagem.convert("L"))
+    pagina = cinza(imagem)
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
     alvos = [b for b in boxes if b.source != FONTE_MANUAL and (
         not so_pendentes or precisa_revisao(b.char, b.source, b.confidence, leitor.limiares))]
@@ -714,7 +720,7 @@ def recortes_para_ler(imagem: Image.Image, boxes: List[BoxEntry], indices: Seque
                       ) -> List[Tuple[np.ndarray, Optional[float]]]:
     """Os recortes em pé dos boxes `indices`, com a altura de referência da página: o pedido
     de leitura de glifos ao servidor (§11), sem mandar a página inteira pela fila."""
-    pagina = np.asarray(imagem.convert("L"))
+    pagina = cinza(imagem)
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
     return [(vertical.recorte_de_pe(pagina, boxes[i]), referencia) for i in indices]
 
@@ -724,7 +730,7 @@ def _reler(imagem: Image.Image, boxes: List[BoxEntry], indices: List[int],
     """Lê de novo só os boxes que uma edição criou ou mudou."""
     if leitor is None:
         return
-    pagina = np.asarray(imagem.convert("L"))
+    pagina = cinza(imagem)
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
     for i in indices:
         _ler_um(pagina, boxes[i], leitor, referencia)
@@ -800,7 +806,7 @@ def propagar_padroes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorD
     o que custa milissegundos, em vez de reler a página inteira, que custava
     oito segundos no Darcy Lima. Devolve quantos pendentes foram resolvidos.
     """
-    pagina = np.asarray(imagem.convert("L"))
+    pagina = cinza(imagem)
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
     resolvidos = 0
     for i, box in enumerate(boxes):

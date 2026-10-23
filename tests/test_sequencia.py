@@ -118,6 +118,67 @@ def test_a_selecao_ruim_diz_o_motivo(texto, motivo):
         sq.selecao(texto, 7)
 
 
+def test_mover_para_o_comeco_e_para_o_fim():
+    s = Sequencia.do_livro(range(5))
+    assert s.mover([3], -1).pids == [3, 0, 1, 2, 4]
+    assert s.mover([0, 1], 4).pids == [2, 3, 4, 0, 1]
+    assert s.mover([0, 1, 2, 3], 4).pids == [4, 0, 1, 2, 3]   # todas menos uma
+    with pytest.raises(ValueError, match="referência"):
+        s.mover([1, 2], 2)
+    with pytest.raises(ValueError):
+        s.mover([1], 5)
+
+
+def test_restaurar_uma_das_apagadas_juntas_volta_ao_lugar_certo():
+    s = Sequencia.do_livro(range(10)).apagar([2, 6])
+    assert s.restaurar([6]).pids == [0, 1, 3, 4, 5, 6, 7, 8, 9]
+    assert s.restaurar([2]).pids == [0, 1, 2, 3, 4, 5, 7, 8, 9]
+    assert s.restaurar([2]).restaurar([6]).pids == list(range(10))
+
+
+@pytest.mark.parametrize("semente", range(5))
+def test_restaurar_tudo_ou_da_mais_nova_para_a_mais_velha_volta_a_ordem(semente):
+    """Apagadas em várias vezes: restaurar todas juntas, ou cada vez da mais nova para a mais
+    velha (como um desfazer), devolve a ordem exata."""
+    import random
+
+    sorteio = random.Random(semente)
+    for _ in range(200):
+        n = sorteio.randint(3, 12)
+        t, lotes = Sequencia.do_livro(range(n)), []
+        for _ in range(sorteio.randint(2, 4)):
+            if len(t) < 2:
+                break
+            parte = sorteio.sample(t.pids, sorteio.randint(1, len(t) - 1))
+            t, lotes = t.apagar(parte), lotes + [parte]
+        assert t.restaurar([p for lote in lotes for p in lote]).pids == list(range(n))
+        volta = t
+        for lote in reversed(lotes):
+            volta = volta.restaurar(lote)
+        assert volta.pids == list(range(n))
+
+
+def test_a_ancora_vai_e_volta_no_json():
+    s = Sequencia.do_livro(range(4)).apagar([2])
+    assert s.apagadas[0].depois_de == 1
+    assert Sequencia.de_json(s.para_json()) == s
+
+
+def test_restaurar_com_o_livro_mais_curto_vai_ao_fim():
+    s = Sequencia.do_livro(range(6)).apagar([5]).apagar([2, 3, 4])
+    assert s.restaurar([5]).pids == [0, 1, 5]
+    with pytest.raises(ValueError, match="apagadas"):
+        s.restaurar([0])
+
+
+def test_inserir_fora_do_livro_e_recusado():
+    s = Sequencia.do_livro(range(3))
+    nova = Entrada(9, "inseridas/a.png", 0)
+    assert s.inserir([nova], 3).pids == [0, 1, 2, 9] and s.inserir([nova], 0).pid_em(0) == 9
+    with pytest.raises(ValueError):
+        s.inserir([nova], 4)
+
+
 def test_a_selecao_segue_a_ordem_do_livro_depois_de_reordenar():
     reordenada = Sequencia.do_livro([10, 11, 12, 13])
     reordenada = Sequencia(tuple(reordenada.entradas[i] for i in (2, 0, 3, 1)))

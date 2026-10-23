@@ -860,6 +860,18 @@ As rodadas:
    por AST dos métodos públicos que tomam `indice` não entrou: eles tomam a posição do livro,
    que segue sendo o que a interface usa.
 2. Reordenar, apagar e inserir, com a seleção (CA-12.8 a 12.10, 12.15).
+   **(2a) feito**: as operações puras na `Sequencia` (mover, apagar, restaurar, inserir); o
+   `ProjetoDeLivro.gravar_sequencia` (o `projeto.json` antes da memória) e o
+   `inserir_arquivo` (a cópia em `inseridas/` pelo SHA-256, o PDF cifrado recusado); no
+   controlador, os comandos, uma transação do desfazer com a sequência antes e depois
+   (recusada se a ordem mudou por fora, com o lote ou com uma tarefa em curso), as visitas e
+   a página aberta seguindo o `pid`, e `sequencia_mudou`: a busca é montada de novo, o lote
+   a retomar volta do `lote.json`, e a janela limpa os pixmaps, a gaveta, a aba Diagramas,
+   o seletor e os resultados. A página apagada guarda a vizinha de antes (`depois_de`):
+   restaurar todas juntas, ou da apagada mais nova para a mais velha, devolve a ordem exata;
+   restaurar uma apagada mais velha antes de uma mais nova, que eram vizinhas, pode trocar as
+   duas de lugar. Desfazer um inserir põe as inseridas nas apagadas. **(2b)**: a interface
+   (o menu Página, os diálogos com a seleção, Páginas apagadas…) e o teste na janela.
 3. Girar, cortar e dividir, com a `geometria` preguiçosa (CA-12.11 a 12.13, CA-4.6).
 4. Endireitar à mão e as imagens transformadas nas exportações (CA-12.14, 12.16).
 

@@ -727,6 +727,8 @@ class ControladorDoLivro:
         self._gravador_do_lote = _GravadorDoLote()
         self.eventos.ligar("pagina_reconhecida", self._saiu_de_reler_depois)
         self.eventos.ligar("pagina_verificada", self._saiu_de_reler_depois)
+        # A ordem do livro mudou (§12.4): o lote a retomar volta do `lote.json`, que é por pid.
+        self.eventos.ligar("sequencia_mudou", self._ler_restante)
         #: O servidor cujo `modelos_prontos` já foi emitido (uma vez por servidor).
         self._modelos_avisados = None
         #: As três páginas do primeiro treino enquanto o lote delas está rodando.
@@ -1299,6 +1301,13 @@ class ControladorDaBusca:
         self.ultimo_resultado = None
         self.eventos.ligar("pagina_reconhecida", self.marcar_velha)
         self.eventos.ligar("pagina_do_lote", self.marcar_velha)
+        # A ordem do livro mudou (§12.4): o índice, chaveado pela posição e com threads em voo,
+        # é montado de novo (em segundo plano, como ao abrir o projeto).
+        self.eventos.ligar("sequencia_mudou", self._sequencia_mudou)
+
+    def _sequencia_mudou(self) -> None:
+        if self.pagina.projeto is not None:
+            self.abrir()
 
     @property
     def idioma(self) -> str:

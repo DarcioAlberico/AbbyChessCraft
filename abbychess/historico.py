@@ -88,9 +88,14 @@ class Transacao:
     juntar: Optional[tuple] = None
     #: Desfeita com a propagação dela ainda rodando: o resultado da propagação não entra.
     invalidada: bool = False
+    #: (antes, depois) da sequência do livro, nas operações de página (§12.4): desfazer só
+    #: aplica se a sequência de agora é a de depois.
+    sequencia: Optional[tuple] = None
 
     def bytes(self) -> int:
-        return (sum(m.bytes() for m in self.paginas.values())
+        ordem = 0 if self.sequencia is None else sum(
+            (len(s.entradas) + len(s.apagadas)) * 96 for s in self.sequencia)
+        return (sum(m.bytes() for m in self.paginas.values()) + ordem
                 + sum(len(a.png) for a in self.amostras_criadas + self.amostras_apagadas))
 
 

@@ -186,6 +186,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
     def _ligar_eventos(self) -> None:
         e = self.eventos
         for nome, funcao in (("pagina_trocou", self._pagina_trocou),
+                             ("sequencia_mudou", self._sequencia_mudou),
                              ("glifos_mudaram", self._glifos_mudaram),
                              ("glifos_mudaram", self._sincronizar_conferencia),
                              ("atual_mudou", self._atual_mudou),

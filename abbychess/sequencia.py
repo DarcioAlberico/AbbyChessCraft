@@ -100,13 +100,21 @@ class Apagada:
 
     entrada: Entrada
     posicao: int
+    #: O `pid` da página que vinha logo antes dela (apagada junto ou não; None: ela era a
+    #: primeira). Restaurar a põe depois dessa página; a posição vale se ela sumiu.
+    depois_de: Optional[int] = None
 
     def para_json(self) -> dict:
-        return {**self.entrada.para_json(), "posicao": self.posicao}
+        bruto = {**self.entrada.para_json(), "posicao": self.posicao}
+        if self.depois_de is not None:
+            bruto["depois_de"] = self.depois_de
+        return bruto
 
     @classmethod
     def de_json(cls, bruto: Mapping) -> "Apagada":
-        return cls(Entrada.de_json(bruto), int(bruto.get("posicao", 0)))
+        depois_de = bruto.get("depois_de")
+        return cls(Entrada.de_json(bruto), int(bruto.get("posicao", 0)),
+                   None if depois_de is None else int(depois_de))
 
 
 @dataclass(frozen=True)
@@ -175,6 +183,93 @@ class Sequencia:
         return replace(self, entradas=tuple(entradas))
 
     # ------------------------------------------------------------------
+    # As operações de página (§12.4, rodada 2): cada uma devolve a sequência nova
+    # ------------------------------------------------------------------
+    def mover(self, pids: Iterable[int], depois_da: int) -> "Sequencia":
+        """As páginas `pids` (na ordem do livro) vão para depois da posição `depois_da` (-1:
+        para o começo), contada na numeração de agora. A página de referência não pode ser
+        uma das movidas."""
+        movidas = self._do_livro(pids)
+        if not -1 <= depois_da < len(self.entradas):
+            raise ValueError(f"não há a página {depois_da + 1} para pôr as outras depois dela")
+        if depois_da >= 0 and self.entradas[depois_da].pid in movidas:
+            raise ValueError("a página de referência é uma das que se movem")
+        ficam = [e for e in self.entradas if e.pid not in movidas]
+        vao = [e for e in self.entradas if e.pid in movidas]
+        lugar = 0 if depois_da < 0 else ficam.index(self.entradas[depois_da]) + 1
+        return replace(self, entradas=tuple(ficam[:lugar] + vao + ficam[lugar:]))
+
+    def apagar(self, pids: Iterable[int]) -> "Sequencia":
+        """As páginas `pids` saem do livro para as apagadas, com a posição de onde saíram,
+        contada entre as que ficaram (quantas páginas do livro vinham antes dela): restaurar
+        só uma das apagadas juntas a põe no lugar certo. O livro não fica sem página nenhuma."""
+        saem = self._do_livro(pids)
+        if len(saem) >= len(self.entradas):
+            raise ValueError("o livro não pode ficar sem páginas")
+        apagadas, ficaram, anterior = [], 0, None
+        for entrada in self.entradas:
+            if entrada.pid in saem:
+                apagadas.append(Apagada(entrada, ficaram, anterior))
+            else:
+                ficaram += 1
+            anterior = entrada.pid
+        apagadas = tuple(apagadas)
+        return Sequencia(tuple(e for e in self.entradas if e.pid not in saem),
+                         self.apagadas + apagadas)
+
+    def restaurar(self, pids: Iterable[int]) -> "Sequencia":
+        """As páginas apagadas `pids` voltam com o mesmo `pid`, logo depois da página que
+        vinha antes delas (`Apagada.depois_de`; se ela também está apagada, a que vinha antes
+        dela, e assim por diante). Sem essa página no livro, vale a posição gravada (ou o
+        fim, se o livro ficou mais curto). Juntas ou uma de cada vez, voltam à mesma ordem."""
+        pids = set(pids)
+        voltam = sorted((a for a in self.apagadas if a.entrada.pid in pids),
+                        key=lambda a: a.posicao)
+        if len(voltam) != len(pids):
+            faltam = pids - {a.entrada.pid for a in voltam}
+            raise ValueError(f"página(s) que não estão entre as apagadas: {sorted(faltam)}")
+        por_pid = {a.entrada.pid: a for a in self.apagadas}
+        entradas = list(self.entradas)
+        # Da apagada mais nova para a mais velha (as apagadas estão na ordem em que saíram):
+        # cada uma volta ao livro como ele era quando ela saiu, como um desfazer em sequência.
+        voltando = [a for a in reversed(self.apagadas) if a.entrada.pid in pids]
+        while voltando:
+            # Primeiro a que tem a âncora já no livro (as apagadas juntas voltam em cadeia).
+            no_livro = {e.pid for e in entradas}
+            for k, apagada in enumerate(voltando):
+                ancora = _ancora(apagada, por_pid, no_livro, pids)
+                if ancora is not _ESPERA:
+                    break
+            else:
+                k, ancora = 0, None             # um ciclo (não acontece): a posição gravada
+            apagada = voltando.pop(k)
+            if ancora is _SEM_ANCORA or ancora is None:
+                lugar = 0 if ancora is _SEM_ANCORA else min(apagada.posicao, len(entradas))
+            else:
+                lugar = next(i for i, e in enumerate(entradas) if e.pid == ancora) + 1
+            entradas.insert(lugar, apagada.entrada)
+        return Sequencia(tuple(entradas),
+                         tuple(a for a in self.apagadas if a.entrada.pid not in pids))
+
+    def inserir(self, novas: Sequence[Entrada], na_posicao: int) -> "Sequencia":
+        """As entradas novas (com `pid` novos) entram a partir da posição `na_posicao` (0: antes
+        da primeira; o tamanho do livro: no fim)."""
+        if not 0 <= na_posicao <= len(self.entradas):
+            raise ValueError(f"posição {na_posicao + 1} fora do livro")
+        entradas = list(self.entradas)
+        entradas[na_posicao:na_posicao] = list(novas)
+        return replace(self, entradas=tuple(entradas))
+
+    def _do_livro(self, pids: Iterable[int]) -> set:
+        pids = set(pids)
+        if not pids:
+            raise ValueError("nenhuma página escolhida")
+        fora = pids - set(self._posicoes)
+        if fora:
+            raise ValueError(f"página(s) fora do livro: {sorted(fora)}")
+        return pids
+
+    # ------------------------------------------------------------------
     def para_json(self) -> dict:
         return {"entradas": [e.para_json() for e in self.entradas],
                 "apagadas": [a.para_json() for a in self.apagadas]}
@@ -193,6 +288,31 @@ class Sequencia:
     def do_livro(cls, pids: Iterable[int]) -> "Sequencia":
         """A página `i` do PDF do livro na posição `i`, com o `pid` dado."""
         return cls(tuple(Entrada(pid, FONTE_DO_LIVRO, i) for i, pid in enumerate(pids)))
+
+
+#: As respostas de `_ancora` que não são um pid: a página era a primeira do livro, ou a
+#: âncora dela volta junto e ainda não entrou.
+_SEM_ANCORA, _ESPERA = object(), object()
+
+
+def _ancora(apagada: Apagada, por_pid: Mapping[int, Apagada], no_livro: set, voltam: set):
+    """Depois de que página a apagada volta: o pid de uma página do livro, `_SEM_ANCORA` (a
+    primeira), `_ESPERA` (a âncora volta junto e ainda não entrou) ou None (a âncora sumiu:
+    vale a posição gravada)."""
+    vistos = set()
+    atual = apagada
+    while True:
+        alvo = atual.depois_de
+        if alvo is None:
+            return _SEM_ANCORA if atual.posicao == 0 else None
+        if alvo in no_livro:
+            return alvo
+        if alvo in voltam and alvo in por_pid:
+            return _ESPERA
+        if alvo in vistos or alvo not in por_pid:
+            return None
+        vistos.add(alvo)
+        atual = por_pid[alvo]                   # apagada antes e que fica: a âncora dela
 
 
 def da_v2(total: int, pids_gravados: Mapping[int, int], indices_v1: Iterable[int],

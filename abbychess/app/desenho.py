@@ -52,6 +52,24 @@ class DesenhoDaJanela:
         self.atualizar_barra()
         self.atualizar_paginas(seguir=True)
 
+    def _sequencia_mudou(self) -> None:
+        """A ordem do livro mudou (§12.4): o que a janela guarda por posição sai (os pixmaps
+        convertidos), e a gaveta e a aba Diagramas mostram a ordem nova."""
+        self._pixmaps.clear()
+        self.atualizar_paginas(seguir=True)
+        self._diagramas_mudaram()
+        total = self.pagina.fonte.total if self.pagina.fonte is not None else 0
+        self.seletor.blockSignals(True)
+        self.seletor.setMaximum(max(1, total))
+        self.seletor.setValue(self.pagina.indice + 1)
+        self.seletor.blockSignals(False)
+        self.total_de_paginas.setText(f" de {total} ")
+        # As ocorrências da busca e a prévia do substituir citam posições de antes.
+        if self.resultados.na_previa():
+            self.resultados.limpar_previa("A ordem do livro mudou: peça a prévia de novo.")
+        else:
+            self.resultados.mostrar_ocorrencias([], "A ordem do livro mudou: busque de novo.")
+
     def _pixmap(self, indice: int, imagem):
         """O QPixmap da página, das últimas 5 convertidas (a conversão leva dezenas de ms)."""
         guardado = self._pixmaps.get(indice)

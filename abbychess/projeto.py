@@ -1225,6 +1225,66 @@ class ProjetoDeLivro:
                     self.salvar()
             return sequencia.pid_em(indice)
 
+    def gravar_sequencia(self, nova: sq.Sequencia) -> None:
+        """A sequência nova (uma operação de página, §12.4): o `projeto.json` primeiro, e só
+        depois a memória; uma falha de gravação (`OSError`) não muda nada. Recusa o projeto
+        só para leitura e o da v2 (sem a sequência gravada: a fonte sumida)."""
+        if self.somente_leitura:
+            raise OSError("o projeto está aberto só para leitura")
+        if not self.sequencia_gravada:
+            raise OSError("o projeto ainda está no formato antigo: abra-o com a fonte do livro "
+                          "no lugar para passar ao novo")
+        with self._trava_do_livro:
+            antes = (self.dados.sequencia, self.dados.proximo_pid)
+            self.dados.sequencia = nova.para_json()
+            self.dados.proximo_pid = max([self.dados.proximo_pid, self._proximo_pid,
+                                          *(p + 1 for p in nova.todos_os_pids)])
+            try:
+                self.salvar()
+            except BaseException:
+                self.dados.sequencia, self.dados.proximo_pid = antes
+                raise
+            self._trocar_sequencia(nova)
+
+    def inserir_arquivo(self, caminho: str | Path) -> List[sq.Entrada]:
+        """Copia o PDF ou a imagem para `inseridas/` (o nome pelo SHA-256: o mesmo arquivo
+        inserido duas vezes é uma cópia só) e devolve uma entrada com `pid` novo para cada
+        página dele, para `Sequencia.inserir`. O PDF cifrado ou que não abre levanta
+        `ProjetoInvalido`, e nada é copiado. A imagem é uma página (de um TIFF de várias, a
+        primeira)."""
+        caminho = Path(caminho)
+        sufixo = caminho.suffix.lower()
+        if sufixo != ".pdf" and sufixo not in EXTENSOES_DE_IMAGEM:
+            raise ProjetoInvalido(f"Formato não suportado: {sufixo}. Use PDF ou imagem.")
+        try:
+            dados = caminho.read_bytes()
+        except OSError as erro:
+            raise ProjetoInvalido(f"{caminho.name} não abriu: {erro}") from erro
+        paginas = 1
+        if sufixo == ".pdf":
+            import fitz
+
+            try:
+                with fitz.open(stream=dados, filetype="pdf") as documento:
+                    cifrado = documento.needs_pass or documento.is_encrypted
+                    paginas = documento.page_count
+            except (RuntimeError, ValueError) as erro:
+                raise ProjetoInvalido(f"{caminho.name} não é um PDF legível: {erro}") from erro
+            if cifrado:
+                raise ProjetoInvalido(f"{caminho.name} é um PDF cifrado: tire a senha antes de "
+                                      "inserir.")
+            if paginas == 0:
+                raise ProjetoInvalido(f"{caminho.name} não tem páginas.")
+        nome = f"{sq.PASTA_DAS_INSERIDAS}/{hashlib.sha256(dados).hexdigest()}{sufixo}"
+        destino = self.pasta / nome
+        if not destino.is_file():
+            gv.gravar_bytes(destino, dados)
+        with self._trava_do_livro:
+            self.sequencia                      # o próximo pid vem dela
+            pids = list(range(self._proximo_pid, self._proximo_pid + paginas))
+            self._proximo_pid += paginas
+        return [sq.Entrada(pid, nome, k) for k, pid in enumerate(pids)]
+
     def _trocar_sequencia(self, nova: sq.Sequencia) -> None:
         """A sequência nova (as operações de página, rodada 2): as páginas da memória passam a
         ter a posição dela no `indice`. Não grava nada."""

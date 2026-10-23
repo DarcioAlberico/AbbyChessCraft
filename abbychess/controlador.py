@@ -54,6 +54,7 @@ from abbychess import modelo as md
 from abbychess import pagina as pg
 from abbychess import procedencia
 from abbychess import servidor_de_leitura as sl
+from abbychess import sequencia as sq
 from abbychess import sessao as ss
 from abbychess import texto as tx
 from abbychess import zonas as zn
@@ -486,6 +487,130 @@ class ControladorDePagina:
     def vizinha(self, passo: int) -> bool:
         """A página anterior (-1) ou a seguinte (+1), se houver."""
         return self.ir_para(self.indice + passo)
+
+    # ------------------------------------------------------------------
+    # As operações de página (§12.4, passo L): reordenar, apagar, restaurar, inserir
+    # ------------------------------------------------------------------
+    def motivo_para_nao_mudar_as_paginas(self) -> Optional[str]:
+        """Por que as operações de página estão desligadas agora, ou None (§12.4: só para
+        leitura, o lote rodando, o projeto ainda na v2)."""
+        if self.projeto is None or self.fonte is None:
+            return "Nenhum projeto aberto."
+        if self.projeto.somente_leitura:
+            return "O projeto está aberto só para leitura."
+        if not self.projeto.sequencia_gravada:
+            return ("O projeto ainda está no formato antigo: abra-o com a fonte do livro no "
+                    "lugar para passar ao novo.")
+        if self.lote_rodando:
+            return "O lote está lendo o livro: espere-o terminar, ou cancele-o."
+        if not self._agora():
+            # Uma tarefa (o F5, uma gravação da sessão) usa a posição de agora: mudar a
+            # ordem no meio dela a faria gravar noutra página.
+            return "Espere a tarefa em curso terminar."
+        return None
+
+    def mover_paginas(self, posicoes: Sequence[int], depois_da: int) -> bool:
+        """As páginas das `posicoes` vão para depois da posição `depois_da` (-1: o começo)."""
+        return self._mudar_sequencia(
+            lambda s: s.mover(sq.pids_da_selecao(s, posicoes), depois_da),
+            f"Mover {len(set(posicoes))} página(s)")
+
+    def apagar_paginas(self, posicoes: Sequence[int]) -> bool:
+        """As páginas saem do livro para as apagadas (os JSON e as amostras ficam)."""
+        return self._mudar_sequencia(lambda s: s.apagar(sq.pids_da_selecao(s, posicoes)),
+                                     f"Apagar {len(set(posicoes))} página(s)")
+
+    def restaurar_paginas(self, pids: Sequence[int]) -> bool:
+        """As páginas apagadas voltam ao lugar de onde saíram, com o mesmo `pid`."""
+        return self._mudar_sequencia(lambda s: s.restaurar(pids),
+                                     f"Restaurar {len(set(pids))} página(s)")
+
+    def inserir_paginas(self, caminhos: Sequence, na_posicao: int) -> bool:
+        """As páginas dos arquivos (PDF ou imagem, copiados para `inseridas/`) entram a partir
+        da posição `na_posicao` (0: antes da primeira)."""
+        from abbychess.projeto import ProjetoInvalido
+
+        motivo = self.motivo_para_nao_mudar_as_paginas()
+        if motivo is not None:
+            self._avisar(motivo, 8000)
+            return False
+        if not 0 <= na_posicao <= len(self.projeto.sequencia) or not caminhos:
+            self._avisar("Inserir páginas: diga os arquivos e onde inseri-los.", 8000)
+            return False
+        novas = []
+        try:
+            for caminho in caminhos:
+                novas += self.projeto.inserir_arquivo(caminho)
+        except (ProjetoInvalido, OSError) as erro:
+            self.eventos.emitir("aviso", "Inserir páginas", f"{erro} Nada foi inserido.")
+            return False
+
+        def desfeita(antes: "sq.Sequencia") -> "sq.Sequencia":
+            # Desfazer põe as inseridas nas apagadas (e não as esquece): lidas pelo F5 ou pelo
+            # lote, que não entram no desfazer, elas voltam por Páginas apagadas, com a fonte
+            # certa (um JSON de página órfão viraria página do livro).
+            return sq.Sequencia(antes.entradas, antes.apagadas + tuple(
+                sq.Apagada(e, na_posicao + k) for k, e in enumerate(novas)))
+
+        return self._mudar_sequencia(lambda s: s.inserir(novas, na_posicao),
+                                     f"Inserir {len(novas)} página(s)", desfeita=desfeita)
+
+    def _mudar_sequencia(self, fazer, descricao: str, *, desfeita=None) -> bool:
+        """Uma operação de página: a sequência nova gravada, uma transação do desfazer com a
+        de antes e a de depois (§14.2), e a janela seguindo a página aberta. `desfeita(antes)`
+        é a sequência que o desfazer põe, quando não é a de antes (a do inserir)."""
+        motivo = self.motivo_para_nao_mudar_as_paginas()
+        if motivo is not None:
+            self._avisar(motivo, 8000)
+            return False
+        antes = self.projeto.sequencia
+        try:
+            nova = fazer(antes)
+        except (ValueError, IndexError) as erro:
+            self._avisar(f"{descricao}: {erro}.", 8000)
+            return False
+        if nova == antes:
+            self._avisar(f"{descricao}: a ordem do livro já é essa.", 6000)
+            return False
+        if self.antes_de_sair_da_pagina is not None:
+            self.antes_de_sair_da_pagina()      # a sessão do Documento aberta entra antes
+        if desfeita is not None:
+            antes = desfeita(antes)
+        try:
+            self._aplicar_sequencia(nova)
+        except OSError as erro:
+            self.eventos.emitir("aviso", "Páginas", f"{descricao} não foi gravado ({erro}); "
+                                "nada mudou.")
+            return False
+        self.historico.registrar(hs.Transacao(descricao, sequencia=(antes, nova)))
+        self.eventos.emitir("acoes_mudaram")
+        self._avisar(f"{descricao}. Ctrl+Z desfaz.", 6000)
+        return True
+
+    def _aplicar_sequencia(self, nova: "sq.Sequencia") -> None:
+        """Grava a sequência e leva a janela junto: as visitas e a página aberta pelo `pid`
+        (a apagada dá lugar à vizinha), e `sequencia_mudou` para quem guarda posições."""
+        projeto = self.projeto
+        aberta = projeto.sequencia.entrada_em(self.indice) if self.imagem is not None else None
+        visitas = [projeto.pid_da_pagina(i) for i in self.visitas]
+        projeto.gravar_sequencia(nova)          # OSError: nada mudou
+        # As visitas pelo pid; a de agora é a que sobra até ela (a mesma página pode estar
+        # duas vezes), e as vizinhas iguais que a saída de uma deixou se juntam.
+        novas, lugar = [], -1
+        for k, pid in enumerate(visitas):
+            posicao = None if pid is None else nova.posicao_de(pid)
+            if posicao is not None and (not novas or novas[-1] != posicao):
+                novas.append(posicao)
+            if k == self._visita:
+                lugar = len(novas) - 1
+        self.visitas, self._visita = novas, lugar if novas else -1
+        if aberta is not None:
+            alvo = nova.posicao_de(aberta.pid)
+            if alvo is None:
+                alvo = min(self.indice, len(nova) - 1)
+            if alvo != self.indice or nova.entrada_em(alvo) != aberta:
+                self.ir_para(alvo, visita=False)    # a página aberta mudou de lugar ou saiu
+        self.eventos.emitir("sequencia_mudou")
 
     def recarregar(self) -> None:
         """Mostra de novo a página aberta (o lote acabou de gravá-la)."""
@@ -1495,6 +1620,14 @@ class ControladorDePagina:
         self._desfazer_ou_refazer(refazer=True)
 
     def _desfazer_ou_refazer(self, *, refazer: bool) -> None:
+        h = self.historico
+        transacao = h.proxima_a_refazer() if refazer else h.proxima_a_desfazer()
+        if transacao is not None and transacao.sequencia is not None:
+            motivo = self.motivo_para_nao_mudar_as_paginas()
+            if motivo is not None:              # a ordem não muda com o lote ou uma tarefa
+                self.eventos.emitir("recusa", refazer, f"\u201c{transacao.descricao}\u201d "
+                                    f"não pode voltar agora: {motivo}")
+                return
         if self._agora():
             self._voltar(refazer)
         else:
@@ -1509,6 +1642,12 @@ class ControladorDePagina:
             return
         paginas = {}
         try:
+            if transacao.sequencia is not None:
+                # A operação de página (§12.4): só se a ordem do livro é a que ela deixou.
+                antes, depois = transacao.sequencia
+                esperada = antes if refazer else depois
+                if self.projeto.sequencia != esperada:
+                    raise hs.Recusa("a ordem do livro mudou depois (por outra ação)")
             for pid, m in transacao.paginas.items():
                 # Pelo pid (§12.4): a página pode ter mudado de posição desde a transação.
                 posicao = self.projeto.posicao_do_pid(pid)
@@ -1525,6 +1664,14 @@ class ControladorDePagina:
             self.eventos.emitir("recusa", refazer, f"Não dá para {acao} "
                                 f"\u201c{transacao.descricao}\u201d: {recusa}. Nada foi mudado.")
             return
+        if transacao.sequencia is not None:
+            antes, depois = transacao.sequencia
+            try:
+                self._aplicar_sequencia(depois if refazer else antes)
+            except OSError as erro:
+                self.eventos.emitir("recusa", refazer, "A ordem do livro não foi gravada "
+                                    f"({erro}); nada foi mudado.")
+                return
         for pid, m in transacao.paginas.items():
             hs.aplicar(m, paginas[pid], para_tras=not refazer)
         if not refazer:

@@ -245,6 +245,25 @@ def test_trocar_o_perfil_reaplica_as_teclas_e_as_dicas(app, padrao):
     assert "Ctrl+Shift+F12 reconhece" in vazios.pagina_nao_reconhecida()
 
 
+def test_trocar_o_perfil_com_uma_janela_ja_apagada(app, tmp_path, sim):
+    """A janela fechada e apagada pelo Qt ainda está nos ouvintes da troca: o painel dela
+    emitiria um sinal de um objeto destruído ("Signal source has been deleted"), e a troca
+    de perfil caía na janela que continua aberta."""
+    from PySide6.QtCore import QCoreApplication, QEvent
+
+    for pasta in ("morta", "viva"):
+        (tmp_path / pasta).mkdir()
+    morta = _janela(app, tmp_path / "morta")
+    morta.close()
+    morta.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    viva = _janela(app, tmp_path / "viva")
+    teclado.definir("finereader")
+    teclado.reaplicar(viva)
+    assert "Ctrl+F9" in viva.acao_reconhecer.toolTip()
+    viva.close()
+
+
 def test_o_mapa_dos_widgets_de_ligacao_nativa_segue_a_troca(app):
     q = QAction("teste")
     q.setShortcut(QKeySequence("Return"))

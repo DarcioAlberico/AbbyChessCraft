@@ -166,8 +166,9 @@ def _refazer_os_textos() -> None:
 
 
 def _apagado(erro: RuntimeError) -> bool:
-    """O erro do PySide de um objeto cujo C++ já foi destruído (a janela fechada)."""
-    return "already deleted" in str(erro)
+    """O erro do PySide de um objeto cujo C++ já foi destruído (a janela fechada): o do
+    método chamado nele e o do sinal que ele emitiria."""
+    return "already deleted" in str(erro) or "Signal source has been deleted" in str(erro)
 
 
 def _dica(q: QAction) -> str:

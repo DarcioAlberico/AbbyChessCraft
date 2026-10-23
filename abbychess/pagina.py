@@ -170,21 +170,35 @@ class FonteDePaginas:
         return self.pagina_da_entrada(self.entrada(indice))
 
     def pagina_da_entrada(self, entrada: "sq.Entrada") -> Image.Image:
-        imagem = self.original_da_entrada(entrada)
+        """A imagem da entrada (§12.4): a página da fonte endireitada inteira, depois o quadro
+        e o giro (`abbychess.geometria`: assim cortar e girar são contas inteiras)."""
+        imagem = self._da_fonte(entrada)
         angulo = self.inclinacao_da_entrada(entrada, imagem)
-        if abs(angulo) < INCLINACAO_MINIMA:
-            return imagem
-        return Image.fromarray(girar(np.asarray(imagem.convert("L")), angulo))
+        if abs(angulo) >= INCLINACAO_MINIMA:
+            imagem = Image.fromarray(girar(np.asarray(imagem.convert("L")), angulo))
+        return com_geometria(imagem, entrada.quadro, entrada.giro)
 
     def original(self, indice: int) -> Image.Image:
-        """A página com o quadro e o giro da entrada, sem endireitar."""
+        """A página sem endireitar (a camada de texto do PDF e as ferramentas, só na página
+        sem quadro nem giro: com eles, a imagem da entrada, que já é endireitada)."""
         return self.original_da_entrada(self.entrada(indice))
 
     def original_da_entrada(self, entrada: "sq.Entrada") -> Image.Image:
+        if entrada.quadro is None and not entrada.giro:
+            return self._da_fonte(entrada)
+        return self.pagina_da_entrada(entrada)
+
+    def _da_fonte(self, entrada: "sq.Entrada") -> Image.Image:
+        """A página da fonte da entrada, como está no arquivo."""
         arquivo = self._arquivo(entrada.fonte)
         with self._trava:
-            imagem = arquivo.pagina(entrada.pagina)
-        return com_geometria(imagem, entrada.quadro, entrada.giro)
+            return arquivo.pagina(entrada.pagina)
+
+    def tamanho_da_fonte(self, entrada: "sq.Entrada") -> Tuple[int, int]:
+        """(largura, altura) da página da fonte renderizada, sem renderizá-la."""
+        arquivo = self._arquivo(entrada.fonte)
+        with self._trava:
+            return arquivo.tamanho(entrada.pagina)
 
     def _arquivo(self, fonte: str) -> "_ArquivoDePaginas":
         with self._trava:
@@ -197,6 +211,19 @@ class FonteDePaginas:
 
     def inclinacao(self, indice: int, imagem: Optional[Image.Image] = None) -> float:
         return self.inclinacao_da_entrada(self.entrada(indice), imagem)
+
+    def fixar_inclinacao(self, entrada: "sq.Entrada", angulo: float) -> None:
+        """O ângulo da entrada é este (a página com boxes que muda de giro guarda o ângulo
+        em que foi lida, §12.4: medir de novo moveria os boxes)."""
+        if not self.endireitar or entrada.angulo is not None:
+            return
+        chave = _chave_da_inclinacao(entrada, self.por_pid)
+        with self._trava_das_inclinacoes:
+            self._inclinacoes[chave] = float(angulo)
+            if self._arquivo_das_inclinacoes is not None and not self.somente_leitura:
+                gv.gravar_json(self._arquivo_das_inclinacoes, {
+                    str(k): v for k, v in sorted(self._inclinacoes.items(),
+                                                 key=_ordem_da_chave)})
 
     def inclinacao_da_entrada(self, entrada: "sq.Entrada",
                               imagem: Optional[Image.Image] = None) -> float:
@@ -216,8 +243,13 @@ class FonteDePaginas:
                 # no meio dela não faz medir de novo (os boxes estão no ângulo medido).
                 angulo = self._inclinacoes.get(entrada.pagina)
         if angulo is None:
-            imagem = imagem if imagem is not None else self.original_da_entrada(entrada)
-            medido = medir_inclinacao(np.asarray(imagem.convert("L")))     # fora das travas
+            # Medida na página inteira da fonte, já girada (o texto deitado de uma página
+            # escaneada de lado mede em pé); como girar de 90 e endireitar comutam em volta
+            # do centro (a menos de um pixel na página não quadrada), o ângulo vale aplicado
+            # à página da fonte.
+            imagem = imagem if imagem is not None else self._da_fonte(entrada)
+            medido = medir_inclinacao(np.asarray(
+                com_geometria(imagem, None, entrada.giro).convert("L")))   # fora das travas
             with self._trava_das_inclinacoes:
                 angulo = self._inclinacoes.get(chave)
                 if angulo is None:
@@ -240,14 +272,14 @@ def _sem_geometria(entrada: "sq.Entrada") -> bool:
 
 
 def _chave_da_inclinacao(entrada: "sq.Entrada", por_pid: bool = False):
-    """A chave da medida em `inclinacoes.json`: `p<pid>` e a geometria em que ela foi medida
-    (§12.4), no projeto da v3. Num da v2 (só para leitura, ou uma fonte sem projeto), a página
-    do livro sem quadro nem giro usa o índice dela no PDF, como até o passo K: lá o `pid` das
-    páginas nunca editadas só existe na memória e muda de uma sessão para outra."""
+    """A chave da medida em `inclinacoes.json`: `p<pid>:inteira:<giro>` (§12.4), no projeto
+    da v3: a medida é da página inteira (o quadro vem depois de endireitar) já girada. Num da
+    v2 (só para leitura, ou uma fonte sem projeto), a página do livro sem quadro nem giro usa
+    o índice dela no PDF, como até o passo K: lá o `pid` das páginas nunca editadas só existe
+    na memória e muda de uma sessão para outra."""
     if not por_pid and _sem_geometria(entrada):
         return entrada.pagina
-    quadro = "-".join(map(str, entrada.quadro)) if entrada.quadro else "inteira"
-    return f"p{entrada.pid}:{quadro}:{entrada.giro}"
+    return f"p{entrada.pid}:inteira:{entrada.giro}"
 
 
 #: Quantos pixels o quadro pode passar da página (o arredondamento de um render).
@@ -302,6 +334,22 @@ class _ArquivoDePaginas:
             self.total = total
         elif sufixo not in EXTENSOES_DE_IMAGEM:
             raise OSError(f"Formato não suportado: {sufixo}")
+
+    def tamanho(self, indice: int) -> Tuple[int, int]:
+        """(largura, altura) da página renderizada, sem renderizar (a do `get_pixmap` do
+        core: o retângulo da página na escala do DPI, arredondado como ele arredonda)."""
+        if not 0 <= indice < self.total:
+            raise IndexError(f"Página {indice + 1} fora de 1..{self.total}")
+        if self._pdf is None:
+            with Image.open(self.caminho) as imagem:
+                return imagem.size
+        import fitz
+        from core.services.pdf_service import DPI_PADRAO
+
+        with fitz.open(stream=self._pdf.pdf_bytes, filetype="pdf") as documento:
+            escala = DPI_PADRAO / 72
+            retangulo = (documento[indice].rect * fitz.Matrix(escala, escala)).irect
+            return retangulo.width, retangulo.height
 
     def pagina(self, indice: int) -> Image.Image:
         if not 0 <= indice < self.total:
@@ -392,6 +440,12 @@ class CacheDePaginas:
             with self._trava:
                 del self._em_curso[entrada]
             aviso.set()
+
+    def esquecer(self, entrada: "sq.Entrada") -> None:
+        """Tira a página do cache (o ângulo dela mudou, e a `Entrada` é a mesma)."""
+        with self._trava:
+            self._paginas.pop(entrada, None)
+            self._preparadas.pop(entrada, None)
 
     def preparada(self, indice: int, imagem: Image.Image) -> Optional[object]:
         """O `preparar` da página `indice`, se ela está no cache e é esta `imagem`."""

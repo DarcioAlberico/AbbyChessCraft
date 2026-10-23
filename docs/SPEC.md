@@ -761,20 +761,32 @@ A partir do L:
   deixa de valer.
 - **Todas as páginas têm `pid`** desde a migração (as não editadas também), e o `pid` nunca
   muda nem é reaproveitado: reordenar mexe só na sequência.
-- **A imagem da página** é: a página da fonte → `quadro` → `giro` → endireitar (o `angulo` à
-  mão, ou o medido). A inclinação medida é a da imagem já com quadro e giro, guardada em
-  `inclinacoes.json` por `pid` com a geometria em que foi medida; ela é medida de novo
-  quando a geometria muda **só em página sem boxes**: com boxes, o ângulo fica (girar boxes
-  por um ângulo medido de novo não seria conta exata).
+- **A imagem da página** é: a página da fonte → endireitar (o `angulo` à mão, ou o medido) →
+  `quadro` → `giro` (decidido na rodada 3, 2026-10-23, em lugar de quadro → giro →
+  endireitar: endireitar gira em volta do centro, e o centro muda com o quadro; endireitando
+  antes, cortar e girar de 90 em 90 graus são contas inteiras sobre a página endireitada, e
+  a caixa passa de uma geometria a outra sem arredondar). O `quadro` é em pixels da página
+  endireitada inteira, e a entrada com quadro ou giro grava o `tamanho` da página da fonte.
+  A inclinação é medida na página inteira já girada (o texto de uma página escaneada de lado
+  mede em pé; girar de 90 e endireitar comutam em volta do centro, a menos de um pixel na página que
+  não é quadrada; a conta das caixas não depende disso, porque a fonte é endireitada antes) e guardada em
+  `inclinacoes.json` como `p<pid>:inteira:<giro>`; ela é medida de novo quando o giro muda
+  **só em página sem boxes**: com boxes, o ângulo em que ela foi lida fica.
 - **Os glifos acompanham a imagem**: girar, cortar e dividir levam os boxes, as zonas, os
-  diagramas e os tabuleiros com conta exata (o `gid` fica; no corte, o box que sai da área
-  sai da página como uma `Diferenca`). **Cada JSON de página grava a `geometria` (quadro e
-  giro) em que os boxes estão**; ao carregar, se ela difere da entrada da sequência, os
-  boxes são transformados nessa hora (como a migração da v1). Assim uma operação num
-  intervalo grava só a sequência, e uma queda no meio não deixa boxes no quadro errado.
-  Endireitar à mão desfaz a leitura da página (com pergunta): os glifos marcados à mão ficam,
-  girados em volta do centro; os outros, as zonas automáticas e os diagramas saem; o estado
-  vai a `glifos_marcados` (§4.4).
+  diagramas e os tabuleiros com conta exata (`abbychess.geometria`; o `gid` fica). **Cada
+  JSON de página (versão 3) grava a `geometria` (quadro e giro) em que os boxes estão** e o
+  tamanho da fonte; ao carregar, se ela difere da entrada da sequência, os boxes são levados
+  nessa hora (`modelo.reenquadrar`). Assim girar e cortar gravam só a sequência, o Ctrl+Z é
+  a sequência de antes, e uma queda no meio não deixa boxes no quadro errado. **O glifo que
+  não cabe no quadro fica guardado na página** (`fora`: o box na página endireitada inteira e
+  o lugar dele na ordem de leitura): o Ctrl+Z, um quadro maior ou tirar o corte o devolvem,
+  com o mesmo `gid`, mesmo depois de gravar e reabrir. As áreas são aparadas no quadro; o
+  tabuleiro e o diagrama que não cabem saem; uns e outros ficam guardados na página
+  (`areas_fora`, inteiros) e voltam como os glifos (a área aparada volta inteira se
+  ninguém a mexeu; o diagrama que volta com o id tomado ganha outro). O `angulo` do glifo
+  (o do texto impresso) acompanha o giro. Endireitar à mão desfaz a leitura da página
+  (com pergunta): os glifos marcados à mão ficam, girados em volta do centro; os outros, as
+  zonas automáticas e os diagramas saem; o estado vai a `glifos_marcados` (§4.4).
 - **Dividir** uma página espelhada dá duas entradas, cada uma com metade do `quadro` (no `x`
   escolhido): a esquerda fica com o `pid`, a direita ganha um `pid` novo. Cada box vai para
   a metade do centro dele; os que mudam de página ganham `gid` novo (do `pid` novo), e o
@@ -840,9 +852,10 @@ imagem é `np.rot90(antes, k=-1)`; os boxes caem sobre os mesmos pixels (o recor
 volta tudo. Uma queda injetada depois de gravar a sequência e antes dos JSON de página
 (CA-4.2) reabre com os boxes no lugar certo.
 **CA-12.12** (cortar) Cortar um intervalo com um retângulo: a imagem é o recorte exato; os
-boxes de dentro são deslocados (mesmos pixels); os de fora saem como `removidos` da
-transação; o Ctrl+Z os devolve com os `gid` de antes. A amostra cuja origem foi cortada diz
-"o glifo de origem saiu da página".
+boxes de dentro são deslocados (mesmos pixels); os de fora ficam guardados na página
+(`fora`); o Ctrl+Z, e tirar o corte depois de gravar e reabrir, os devolvem com os `gid` de
+antes e no lugar da ordem de leitura. A amostra cuja origem foi cortada diz "o glifo de
+origem saiu da página".
 **CA-12.13** (dividir) Dividir uma página dupla (sintética, com texto nas duas metades): duas
 entradas no lugar dela, cada uma com a metade dos pixels; os boxes da direita têm `gid`
 novos e `gids_movidos`; a amostra ensinada antes, num glifo da direita, abre o glifo certo

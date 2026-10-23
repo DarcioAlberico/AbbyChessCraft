@@ -147,7 +147,8 @@ def test_o_pdf_pesquisavel_recusa_por_ora_a_pagina_girada(projeto, tmp_path):
     _ler(projeto, [(0, "a")])
     e = projeto.sequencia.entrada_em(0)
     projeto._trocar_sequencia(projeto.sequencia.com_entrada(
-        Entrada(e.pid, "livro", e.pagina, giro=90)))
+        Entrada(e.pid, "livro", e.pagina, giro=90,
+                tamanho=pg.fonte_do_projeto(projeto).tamanho_da_fonte(e))))
     with pytest.raises(ex.NadaParaExportar, match="giradas"):
         ex.exportar_pdf_pesquisavel(projeto, tmp_path / "x.pdf")
 
@@ -166,7 +167,8 @@ def test_a_altura_vem_da_pagina_do_pdf_da_entrada(tmp_path):
         round(a * ex.DPI_DA_LEITURA / 72) for a in (500, 300, 400)]
     e = projeto.sequencia.entrada_em(0)                          # girada: renderiza
     projeto._trocar_sequencia(projeto.sequencia.com_entrada(
-        Entrada(e.pid, "livro", e.pagina, giro=90)))
+        Entrada(e.pid, "livro", e.pagina, giro=90,
+                tamanho=pg.fonte_do_projeto(projeto).tamanho_da_fonte(e))))
     assert ex._altura_da_pagina(projeto, 0) == pg.fonte_do_projeto(projeto).original(0).height
 
 

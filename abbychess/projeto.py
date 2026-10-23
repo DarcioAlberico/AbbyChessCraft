@@ -77,7 +77,7 @@ from abbychess.gravador import Gravador
 from abbychess import zonas as zn
 from abbychess.modelo import (FIGURINAS, GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
                               Box, Decisoes,
-                              Pagina, foto, gid_de, proximo_estado, reconciliar)
+                              Pagina, foto, gid_de, proximo_estado, reconciliar, reenquadrar)
 from abbychess.zonas import Zona
 
 if TYPE_CHECKING:
@@ -99,8 +99,10 @@ ARQUIVO_DO_LIVRO = "livro.json"
 #: 3: a sequência do livro em `projeto.json` (passo L, §12.4): toda página tem `pid` gravado,
 #: e as listas de páginas, as inclinações, `janela.json` e `lote.json` são por `pid`.
 VERSAO = 3
-#: A versão do formato de cada `paginas/p<pid>.json`.
-VERSAO_DA_PAGINA = 2
+#: A versão do formato de cada `paginas/p<pid>.json`. 3 (passo L): a geometria dos boxes,
+#: o tamanho da fonte e os glifos fora do quadro; a 2 é lida como a geometria inteira.
+VERSAO_DA_PAGINA = 3
+VERSOES_DA_PAGINA = (2, 3)
 #: Onde a primeira abertura v2 guarda o projeto v1 de antes (§4.3).
 PASTA_DO_BACKUP_V1 = "backup-v1"
 #: Onde a primeira abertura v3 guarda os arquivos da v2 que ela muda (§12.4, CA-12.7).
@@ -609,9 +611,12 @@ class ProjetoDeLivro:
             em_cache = self.modelo_em_memoria(pagina.indice)
             if em_cache is not None:
                 return em_cache
-            if (carimbo is None or self._tem_v1(pagina.indice)
-                    or self.carimbo(pagina.indice) != carimbo):
+            if (carimbo is None or self._pid_em(pagina.indice) != pagina.pid
+                    or self._tem_v1(pagina.indice) or self.carimbo(pagina.indice) != carimbo):
                 return None
+            # Girar e cortar não gravam a página (o carimbo é o mesmo): a lida na geometria
+            # de antes é levada à de agora.
+            self._na_geometria_da_entrada(pagina)
             self._guardar_no_cache(pagina, foto_nova=True)
             return pagina
 
@@ -660,7 +665,26 @@ class ProjetoDeLivro:
         posicao = self.sequencia.posicao_de(pagina.pid)
         if posicao is not None:
             pagina.indice = posicao
+        self._na_geometria_da_entrada(pagina)
         return pagina
+
+    def _na_geometria_da_entrada(self, pagina: Pagina) -> None:
+        """Os boxes na geometria da entrada de agora (§12.4): a página gravada noutra (uma
+        operação de página que só gravou a sequência, ou uma queda antes do arquivo da
+        página) é levada na leitura."""
+        sequencia = self._sequencia
+        if sequencia is None:
+            return
+        entrada = sequencia.entrada_de(pagina.pid)
+        if entrada is None:
+            apagada = sequencia.apagada(pagina.pid)
+            entrada = None if apagada is None else apagada.entrada
+        if entrada is not None:
+            try:
+                reenquadrar(pagina, entrada.geometria, entrada.tamanho)
+            except ValueError as erro:          # um projeto.json sem o tamanho (estragado)
+                log.warning("a página p%d não foi levada à geometria da entrada: %s",
+                            pagina.pid, erro)
 
     def _arquivo_v2_de(self, indice: int) -> Optional[Path]:
         """O `p<pid>.json` da página na posição `indice`, ou None se nada foi gravado dela.
@@ -732,7 +756,10 @@ class ProjetoDeLivro:
                 self.dados.proximo_pid = pid + 1
                 if not self.somente_leitura:
                     self.salvar()
+            entrada = self.sequencia.entrada_de(pid)
             pagina = Pagina(pid=pid, indice=indice)
+            if entrada is not None:
+                pagina.geometria, pagina.tamanho = entrada.geometria, entrada.tamanho
             self._guardar_no_cache(pagina)
         return pagina
 
@@ -1296,6 +1323,7 @@ class ProjetoDeLivro:
                     posicao = nova.posicao_de(pid)
                     if posicao is not None:
                         pagina.indice = posicao
+                        self._na_geometria_da_entrada(pagina)
 
     def origem_da_amostra(self, origem: str) -> Optional[Tuple[Optional[int], Optional[int]]]:
         """(posição de agora, gid) do glifo de onde a amostra veio, pelo nome de origem dela
@@ -1591,9 +1619,15 @@ def _inteiro(valor) -> Optional[int]:
 def _pagina_para_json(pagina: Pagina, pagina_da_fonte: Optional[int] = None) -> dict:
     """O JSON da página. O `indice` gravado é o da página no PDF (`pagina_da_fonte`,
     §12.4), e não a posição no livro, que muda ao reordenar; sem ele, o da página."""
+    quadro, giro = pagina.geometria
     return {
         "versao": VERSAO_DA_PAGINA, "pid": pagina.pid,
         "indice": pagina.indice if pagina_da_fonte is None else pagina_da_fonte,
+        "geometria": [None if quadro is None else list(quadro), int(giro)],
+        "tamanho": None if pagina.tamanho is None else list(pagina.tamanho),
+        "fora": [[lugar, box.para_json()] for lugar, box in pagina.fora],
+        "areas_fora": [[tipo, lugar, _area_para_json(tipo, objeto), aparada]
+                       for tipo, lugar, objeto, aparada in pagina.areas_fora],
         "estado": pagina.estado, "proximo_n": pagina.proximo_n,
         "gravado_em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "boxes": [b.para_json() for b in pagina.boxes],
@@ -1607,7 +1641,7 @@ def _pagina_para_json(pagina: Pagina, pagina_da_fonte: Optional[int] = None) -> 
 def _pagina_de_json(bruto: dict) -> Pagina:
     from abbychess.diagramas import DiagramaLido
 
-    if bruto.get("versao") != VERSAO_DA_PAGINA:
+    if bruto.get("versao") not in VERSOES_DA_PAGINA:
         raise ValueError(f"página de versão {bruto.get('versao')!r}")
     return Pagina(pid=int(bruto["pid"]), indice=int(bruto["indice"]),
                   boxes=[Box.de_json(b) for b in bruto.get("boxes", [])],
@@ -1616,7 +1650,40 @@ def _pagina_de_json(bruto: dict) -> Pagina:
                   zonas=[Zona.de_dict(z) for z in bruto.get("zonas", [])],
                   decisoes=Decisoes.de_json(bruto.get("decisoes")),
                   estado=bruto.get("estado", RECONHECIDA),
-                  proximo_n=int(bruto.get("proximo_n", 0)))
+                  proximo_n=int(bruto.get("proximo_n", 0)),
+                  geometria=_geometria_de(bruto.get("geometria")),
+                  tamanho=None if bruto.get("tamanho") is None
+                  else tuple(int(v) for v in bruto["tamanho"]),
+                  fora=tuple((int(lugar), Box.de_json(b)) for lugar, b in bruto.get("fora", [])),
+                  areas_fora=tuple((tipo, int(lugar), _area_de_json(tipo, objeto), bool(aparada))
+                                   for tipo, lugar, objeto, aparada
+                                   in bruto.get("areas_fora", [])))
+
+
+def _area_para_json(tipo: str, objeto):
+    if tipo == "zona":
+        return objeto.como_dict()
+    if tipo == "diagrama":
+        return objeto.para_json()
+    return [int(v) for v in objeto]
+
+
+def _area_de_json(tipo: str, bruto):
+    from abbychess.diagramas import DiagramaLido
+
+    if tipo == "zona":
+        return Zona.de_dict(bruto)
+    if tipo == "diagrama":
+        return DiagramaLido.de_json(bruto)
+    if tipo == "tabuleiro":
+        return tuple(int(v) for v in bruto)
+    raise ValueError(f"área guardada de tipo {tipo!r}")
+
+
+def _geometria_de(bruto) -> tuple:
+    from abbychess import geometria as geo
+
+    return geo.normalizar(bruto)
 
 
 def com_ids_de_diagramas(diagramas):

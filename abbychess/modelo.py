@@ -320,6 +320,20 @@ class Pagina:
     decisoes: Decisoes = field(default_factory=Decisoes)
     estado: str = NAO_RECONHECIDA
     proximo_n: int = 0
+    #: (quadro, giro) da imagem em que os boxes estão (§12.4): a da entrada quando a página
+    #: foi lida ou gravada. Ao carregar, se a entrada tem outra, `reenquadrar` leva os boxes.
+    geometria: tuple = (None, 0)
+    #: (largura, altura) da página da fonte, para a conta (quando a geometria não é a inteira).
+    tamanho: Optional[Tuple[int, int]] = None
+    #: Os glifos que o quadro deixou de fora, guardados (o Ctrl+Z ou um quadro maior os
+    #: devolvem, com o mesmo gid): (lugar na ordem de leitura, Box na página endireitada
+    #: inteira).
+    fora: tuple = ()
+    #: As áreas, os tabuleiros e os diagramas que o quadro cortou ou deixou de fora:
+    #: (tipo, lugar na lista, o objeto na página endireitada inteira, aparada). `tipo` é
+    #: "zona", "tabuleiro" ou "diagrama"; `aparada` diz que a área está na página, cortada,
+    #: e o objeto guardado é ela inteira (ela volta inteira se ninguém a mexer).
+    areas_fora: tuple = ()
 
     def alocar(self) -> int:
         """Um gid novo desta página (nunca um já usado)."""
@@ -353,7 +367,9 @@ class Pagina:
         return Pagina(pid=self.pid, indice=self.indice, boxes=tuple(self.boxes),
                       tabuleiros=tuple(self.tabuleiros), diagramas=tuple(self.diagramas),
                       zonas=tuple(self.zonas), decisoes=self.decisoes, estado=self.estado,
-                      proximo_n=self.proximo_n)
+                      proximo_n=self.proximo_n, geometria=self.geometria,
+                      tamanho=self.tamanho, fora=tuple(self.fora),
+                      areas_fora=tuple(self.areas_fora))
 
     def aplicar(self, diferenca: Diferenca, nova_ordem: Sequence[Box]) -> Diferenca:
         """Põe na página a lista de boxes depois da edição e leva as decisões aos sucessores.
@@ -534,3 +550,125 @@ def _sobrepoe(a: BoxEntry, b: BoxEntry) -> bool:
     area_a = max((a.x2 - a.x1) * (a.y2 - a.y1), 1)
     area_b = max((b.x2 - b.x1) * (b.y2 - b.y1), 1)
     return inter > 0.5 * min(area_a, area_b)
+
+
+# ----------------------------------------------------------------------
+# A geometria da página (§12.4, passo L)
+# ----------------------------------------------------------------------
+
+def _caixa(entry: BoxEntry) -> Tuple[int, int, int, int]:
+    return (entry.x1, entry.y1, entry.x2, entry.y2)
+
+
+def _na_caixa(box: Box, caixa, angulo: int) -> Box:
+    x1, y1, x2, y2 = caixa
+    return replace(box, entry=replace(box.entry, x1=x1, y1=y1, x2=x2, y2=y2,
+                                      angulo=angulo % 360))
+
+
+def reenquadrar(pagina: Pagina, para, tamanho: Optional[Tuple[int, int]]) -> bool:
+    """Leva os boxes, as áreas, os tabuleiros e os diagramas da geometria da página à `para`
+    (`(quadro, giro)`), com conta exata (`abbychess.geometria`). O glifo que não cabe no
+    quadro novo vai para `pagina.fora`, com o gid e o lugar dele na ordem de leitura; o que
+    estava fora e cabe volta ao lugar. O `angulo` do glifo (o do texto impresso, anti-horário)
+    acompanha o giro. As áreas são aparadas no quadro; o tabuleiro e o diagrama que não cabem
+    saem; tudo isso fica em `pagina.areas_fora` e volta como os glifos. Devolve se algo
+    mudou. Sem `tamanho` (a página da fonte), levanta `ValueError`."""
+    from abbychess import geometria as geo
+
+    de, para = geo.normalizar(pagina.geometria), geo.normalizar(para)
+    tamanho = tamanho or pagina.tamanho
+    if de == para:
+        return False
+    if tamanho is None:
+        raise ValueError("sem o tamanho da página da fonte, a geometria não muda")
+    # Na página inteira, o glifo tem o ângulo da fonte: girar a página de g graus no sentido
+    # horário tira g do ângulo anti-horário do texto.
+    inteira = [(b, geo.para_a_fonte(_caixa(b.entry), de, tamanho), b.entry.angulo + de[1])
+               for b in pagina.boxes]
+    for lugar, box in sorted(pagina.fora, key=lambda t: t[0]):
+        inteira.insert(min(lugar, len(inteira)), (box, _caixa(box.entry), box.entry.angulo))
+    dentro, fora = [], []
+    for lugar, (box, caixa, angulo) in enumerate(inteira):
+        nova = geo.da_fonte(caixa, para, tamanho)
+        if nova is None:
+            fora.append((lugar, _na_caixa(box, caixa, angulo)))
+        else:
+            dentro.append(_na_caixa(box, nova, angulo - para[1]))
+    guardadas = {}
+    for tipo, lugar, objeto, aparada in pagina.areas_fora:
+        guardadas.setdefault(tipo, []).append((lugar, objeto, aparada))
+
+    def caixa_da_zona(z):
+        return z.caixa
+
+    def zona_com(z, c):
+        return replace(z, x1=c[0], y1=c[1], x2=c[2], y2=c[3])
+
+    zonas, fora_z = _levar(pagina.zonas, guardadas.get("zona", ()), de, para, tamanho,
+                           caixa_de=caixa_da_zona, com_caixa=zona_com,
+                           chave=lambda z: z.id, prefixo="z", aparar=True)
+    tabuleiros, fora_t = _levar(pagina.tabuleiros, guardadas.get("tabuleiro", ()), de, para,
+                                tamanho, caixa_de=tuple, com_caixa=lambda _t, c: tuple(c),
+                                chave=tuple, prefixo=None, aparar=False)
+    diagramas, fora_d = _levar(pagina.diagramas, guardadas.get("diagrama", ()), de, para,
+                               tamanho, caixa_de=lambda d: tuple(d.caixa),
+                               com_caixa=lambda d, c: replace(d, caixa=tuple(c)),
+                               chave=lambda d: d.id, prefixo="d", aparar=False)
+    areas_fora = tuple((tipo, lugar, objeto, aparada)
+                       for tipo, lista in (("zona", fora_z), ("tabuleiro", fora_t),
+                                           ("diagrama", fora_d))
+                       for lugar, objeto, aparada in lista)
+    pagina.boxes, pagina.fora = dentro, tuple(fora)
+    pagina.zonas, pagina.tabuleiros, pagina.diagramas = zonas, tabuleiros, diagramas
+    pagina.areas_fora = areas_fora
+    pagina.geometria, pagina.tamanho = para, tamanho
+    return True
+
+
+def _levar(itens, guardados, de, para, tamanho, *, caixa_de, com_caixa, chave, prefixo,
+           aparar):
+    """As áreas (ou tabuleiros, ou diagramas) `itens` da geometria `de` à `para`, com as
+    `guardados` (`(lugar, objeto inteiro, aparada)`) de volta onde couberem. Devolve os que
+    ficam na página e os que ficam guardados.
+
+    A área aparada volta inteira só se ainda está como o corte a deixou (quem a mexeu ou a
+    apagou decidiu por ela). A que tinha saído volta no lugar dela; se outra tomou o id dela
+    nesse meio-tempo, ganha um id livre (`prefixo`), e o tabuleiro repetido não volta."""
+    from abbychess import geometria as geo
+
+    aparadas = {chave(obj): obj for _lugar, obj, aparada in guardados if aparada}
+    inteira = []
+    for item in itens:
+        caixa = geo.para_a_fonte(caixa_de(item), de, tamanho)
+        original = aparadas.get(chave(item)) if chave(item) else None
+        if original is not None:
+            vista = geo.recortar(caixa_de(original), de, tamanho)
+            if vista is not None and geo.para_a_fonte(vista, de, tamanho) == caixa:
+                caixa = caixa_de(original)
+        inteira.append((item, caixa))
+    usadas = {chave(item) for item in itens}
+    usadas.update(chave(obj) for _lugar, obj, _aparada in guardados)
+    for lugar, obj, _aparada in sorted((g for g in guardados if not g[2]), key=lambda g: g[0]):
+        if chave(obj) in {chave(item) for item, _caixa in inteira}:
+            if prefixo is None:
+                continue
+            n = 0
+            while f"{prefixo}{n}" in usadas:
+                n += 1
+            obj = replace(obj, id=f"{prefixo}{n}")
+            usadas.add(obj.id)
+        inteira.insert(min(lugar, len(inteira)), (obj, caixa_de(obj)))
+    dentro, fora = [], []
+    for lugar, (item, caixa) in enumerate(inteira):
+        if aparar:
+            vista = geo.recortar(caixa, para, tamanho)
+        else:
+            vista = geo.da_fonte(caixa, para, tamanho)
+        if vista is None:
+            fora.append((lugar, com_caixa(item, caixa), False))
+            continue
+        dentro.append(com_caixa(item, vista))
+        if chave(item) and geo.para_a_fonte(vista, para, tamanho) != tuple(caixa):
+            fora.append((lugar, com_caixa(item, caixa), True))
+    return dentro, fora

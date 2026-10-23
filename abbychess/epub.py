@@ -189,17 +189,22 @@ def mensagens(idioma: str) -> Dict[str, str]:
 # ----------------------------------------------------------------------
 
 def xhtml_do_texto(paragrafo: Paragrafo, simbolos: str,
-                   links: Sequence[Tuple[int, int, str]] = ()) -> str:
+                   links: Sequence[Tuple[int, int, str]] = (), *,
+                   quebras: bool = False, realce: bool = False) -> str:
     """O texto com `<strong>`, `<em>`, o `<span class="s">` dos símbolos e os `<a>` de
     `links` (`(início, fim, href)`), sem aninhar errado: a marcação abre e fecha por trecho
-    de mesmo estilo, e o link fica por fora."""
+    de mesmo estilo, e o link fica por fora. Com `quebras`, a quebra de linha do texto (as
+    linhas impressas mantidas, `Opcoes.manter_quebras`) vira `<br/>`; sem, é espaço. `realce`
+    põe os trechos duvidosos do parágrafo (`exportar.ParagrafoExportado`) em `<mark>`: é a
+    prévia do realce do DOCX."""
     texto = paragrafo.texto
     if not texto:
         return ""
     # Tirar caracteres mudaria os trechos de estilo: os proibidos viram espaço.
     texto = sem_proibidos(texto)
-    marcas = [[False, False, c in simbolos, -1] for c in texto]
-    for k, trechos in ((0, paragrafo.negrito), (1, paragrafo.italico)):
+    marcas = [[False, False, c in simbolos, -1, False] for c in texto]
+    duvidosos = getattr(paragrafo, "duvidosos", ()) if realce else ()
+    for k, trechos in ((0, paragrafo.negrito), (1, paragrafo.italico), (4, duvidosos)):
         for inicio, fim in trechos or ():
             for i in range(max(0, inicio), min(fim, len(texto))):
                 marcas[i][k] = True
@@ -212,7 +217,11 @@ def xhtml_do_texto(paragrafo: Paragrafo, simbolos: str,
         while j < len(texto) and marcas[j] == marcas[i]:
             j += 1
         pedaco = html.escape(texto[i:j], quote=False)
-        negrito, italico, simbolo, link = marcas[i]
+        if quebras:
+            pedaco = pedaco.replace("\n", "<br/>")
+        negrito, italico, simbolo, link, duvidoso = marcas[i]
+        if duvidoso:
+            pedaco = f"<mark>{pedaco}</mark>"
         if simbolo:
             pedaco = f'<span class="s">{pedaco}</span>'
         if italico:
@@ -431,7 +440,8 @@ def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbo
                msg: Dict[str, str], idioma: str, limite: int,
                rotulos: Optional[Dict[int, int]] = None,
                alvos: Optional[Dict[str, Dict[int, str]]] = None,
-               numeros: Optional[Numerados] = None) -> List[_Capitulo]:
+               numeros: Optional[Numerados] = None,
+               quebras: bool = False) -> List[_Capitulo]:
     """Os capítulos. `rotulos` dá o número impresso de cada página (índice -> número; sem
     ele, a posição no PDF); `alvos`, o href de cada página impressa, diagrama e capítulo
     numerado (`"paginas"`, `"diagramas"`, `"capitulos"`: número -> href), para as
@@ -499,7 +509,7 @@ def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbo
                     bloco.texto, idioma, por_pagina,
                     {} if id(bloco) in numeros.legendas else por_diagrama, por_capitulo))
                 atual.links += len(links)
-                corpo = xhtml_do_texto(bloco, simbolos, links)
+                corpo = xhtml_do_texto(bloco, simbolos, links, quebras=quebras)
                 if bloco.titulo:
                     numero_do_titulo += 1
                     nivel = 1 if bloco.nivel == 1 else 2
@@ -603,11 +613,12 @@ def tipo_da_imagem(dados: bytes) -> Tuple[str, str]:
 
 def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: Metadados, *,
              limite_do_capitulo: int = LIMITE_DO_CAPITULO,
-             numeros: Optional[Dict[int, int]] = None) -> Escrito:
+             numeros: Optional[Dict[int, int]] = None, quebras: bool = False) -> Escrito:
     """Escreve o EPUB em `caminho` (ao lado e troca no fim: a falha não estraga o anterior).
 
     `numeros` é o número impresso de cada página (índice -> número): vira o rótulo da
-    página na `page-list` e o alvo das referências do texto ("ver a página 23")."""
+    página na `page-list` e o alvo das referências do texto ("ver a página 23"). `quebras`
+    escreve as quebras de linha dos parágrafos como `<br/>` (`Opcoes.manter_quebras`)."""
     from core.exportar import agora, data_no_zip, fonte_dos_simbolos, instante
 
     idioma = metadados.idioma or "pt-BR"
@@ -675,7 +686,7 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
     numeros = numeros or {}
     contados = numerados(paginas)
     capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
-                           numeros, numeros=contados)
+                           numeros, numeros=contados, quebras=quebras)
     alvos = {
         "paginas": ({rotulo: f"{c.nome}#{ancora}" for c in capitulos
                      for rotulo, ancora in c.paginas} if numeros else {}),
@@ -684,7 +695,7 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
     }
     if any(alvos.values()):
         capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
-                               numeros, alvos, contados)
+                               numeros, alvos, contados, quebras)
     escrito.links = sum(c.links for c in capitulos)
     if not capitulos:
         raise ValueError("Nada para escrever no EPUB: as páginas não têm texto nem diagrama.")

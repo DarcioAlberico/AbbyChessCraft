@@ -50,7 +50,8 @@ def _relatorio(linhas: Sequence[str]) -> str:
 
 
 def html_do_livro(paginas: Sequence[PaginaExtraida], linhas_do_relatorio: Sequence[str],
-                  titulo: str, idioma: str = "pt-BR", limite: int = LIMITE) -> str:
+                  titulo: str, idioma: str = "pt-BR", limite: int = LIMITE,
+                  quebras: bool = False, realce: bool = False) -> str:
     """O HTML da prévia: o relatório, e as páginas com os títulos, os parágrafos (negrito e
     itálico como no EPUB) e os diagramas com o texto alternativo do EPUB embaixo."""
     msg = epub.mensagens(idioma)
@@ -67,7 +68,7 @@ def html_do_livro(paginas: Sequence[PaginaExtraida], linhas_do_relatorio: Sequen
                               f'alt="{html.escape(alt, quote=True)}"></p>'
                               f'<p class="alt">{html.escape(alt)}</p>')
             elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
-                corpo = epub.xhtml_do_texto(bloco, "")
+                corpo = epub.xhtml_do_texto(bloco, "", quebras=quebras, realce=realce)
                 if bloco.titulo:
                     nivel = 1 if bloco.nivel == 1 else 2
                     partes.append(f"<h{nivel + 1}>{corpo}</h{nivel + 1}>")

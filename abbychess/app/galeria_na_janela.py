@@ -10,6 +10,8 @@ import logging
 import threading
 from collections import defaultdict
 
+import numpy as np
+
 from abbychess import pagina as pg
 from abbychess.app.galeria import Item, PainelDaGaleria
 
@@ -94,7 +96,8 @@ class GaleriaNaJanela:
                     if modelo is None or imagem is None:
                         continue
                     entradas = {b.gid: b.entry for b in modelo.boxes}
-                    recortes = [(indice, g, pg.recorte(imagem, entradas[g]))
+                    cinza = np.asarray(imagem.convert("L"))
+                    recortes = [(indice, g, pg.recorte(cinza, entradas[g]))
                                 for g in gids if g in entradas]
                 except Exception:
                     log.exception("os recortes da página %d para a Galeria falharam", indice + 1)

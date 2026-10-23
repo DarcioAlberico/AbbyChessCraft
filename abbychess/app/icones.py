@@ -54,11 +54,20 @@ def _pixmap(svg: bytes, lado: int) -> QPixmap:
 def icone(nome: str) -> QIcon:
     """O ícone `nome` do Lucide nas cores do tema de agora."""
     tema = estilo.tema()
+    return _icone(nome, tema.texto.name(), tema.texto_secundario.name(),
+                  tema.texto_do_destaque.name())
+
+
+@lru_cache(maxsize=256)
+def _icone(nome: str, texto: str, secundario: str, destaque: str) -> QIcon:
+    """O ícone rasterizado nestas cores: 15 pixmaps (3 modos × `LADOS`), ~2 ms. Guardado pelas
+    cores: a janela nova, e a que volta a um tema já visto, não rasterizam de novo (o `QIcon`
+    é compartilhado implicitamente pelo Qt, e ninguém o altera depois de pronto)."""
     resultado = QIcon()
     # O Active, sem pixmap próprio, usa o Normal.
-    for modo, cor in ((QIcon.Mode.Normal, tema.texto), (QIcon.Mode.Disabled, tema.texto_secundario),
-                      (QIcon.Mode.Selected, tema.texto_do_destaque)):
-        svg = _svg(nome).replace(b"currentColor", cor.name().encode("ascii"))
+    for modo, cor in ((QIcon.Mode.Normal, texto), (QIcon.Mode.Disabled, secundario),
+                      (QIcon.Mode.Selected, destaque)):
+        svg = _svg(nome).replace(b"currentColor", cor.encode("ascii"))
         for lado in LADOS:
             resultado.addPixmap(_pixmap(svg, lado), modo)
     return resultado

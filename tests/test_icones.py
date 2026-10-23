@@ -67,6 +67,20 @@ def test_o_icone_tem_a_cor_do_texto_do_tema(tema_claro):
     assert _cor_do_traco(icones.icone("scan-text")) == estilo.ESCURO.texto.name()
 
 
+def test_o_icone_e_rasterizado_uma_vez_por_tema(tema_claro, monkeypatch):
+    """Rasterizar os 25 ícones era metade do custo de abrir uma janela (~40 de 78 ms)."""
+    icones._icone.cache_clear()
+    feitos = []
+    original = icones._pixmap
+    monkeypatch.setattr(icones, "_pixmap", lambda svg, lado: feitos.append(lado) or original(svg, lado))
+    primeiro = icones.icone("scan-text")
+    assert len(feitos) == 3 * len(icones.LADOS)
+    assert icones.icone("scan-text").cacheKey() == primeiro.cacheKey() and len(feitos) == 15
+    estilo.aplicar(tema_claro, "escuro")                 # outro tema, outras cores: de novo
+    assert _cor_do_traco(icones.icone("scan-text")) == estilo.ESCURO.texto.name()
+    assert len(feitos) == 30
+
+
 def test_toda_acao_do_mapa_existe_e_tem_icone(janela):
     for atributo in icones.DA_JANELA:
         acao = getattr(janela, atributo)          # um nome errado no mapa reprova aqui

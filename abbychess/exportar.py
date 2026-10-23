@@ -638,29 +638,37 @@ def _juntar_entre_paginas(paginas: Sequence[PaginaExtraida]) -> None:
 def _quebras_da_camada(pagina: PaginaExtraida) -> None:
     """`manter_quebras` na página da camada nativa: a quebra volta onde cada linha impressa
     começa (`Paragrafo.inicios`). O espaço antes dela vira `\\n`, sem mudar o comprimento;
-    depois do hífen que a camada guardou colado (`inter-essante`), o `\\n` entra, e os trechos
-    de estilo e os inícios seguintes andam um. Sem espaço nem hífen (a camada tirou o hífen
-    da palavra partida), não há onde a quebra estava, e ela não volta."""
+    depois do hífen que a camada guardou colado (`inter-essante`), o `\\n` entra. Sem espaço
+    nem hífen, o core tirou o hífen da palavra partida (o dicionário disse que era quebra, ou
+    era o hífen brando: `core.pdf_nativo._juntar`): o hífen volta com a quebra (`intere-\\n
+    ssante`, como impresso). Os trechos de estilo e os inícios seguintes andam o que entrou; o
+    hífen que volta fica no trecho da letra antes dele."""
+    from core.lexico import HIFENS
+
     for bloco in pagina.blocos:
         if not isinstance(bloco, Paragrafo) or bloco.titulo or not bloco.inicios:
             continue
         letras = list(bloco.texto)
-        inseridas: List[int] = []                # as posições, no texto de antes
+        inseridas: List[Tuple[int, str]] = []    # (posição no texto de antes, o que entra)
         for inicio in bloco.inicios:
             if not 0 < inicio <= len(letras):
                 continue
             if letras[inicio - 1] == " ":
                 letras[inicio - 1] = "\n"
-            elif letras[inicio - 1] == "-":
-                inseridas.append(inicio)
-        for inicio in sorted(inseridas, reverse=True):
-            letras.insert(inicio, "\n")
+            elif letras[inicio - 1] in HIFENS:
+                inseridas.append((inicio, "\n"))
+            elif (inicio < len(letras) and letras[inicio - 1].isalnum()
+                  and letras[inicio].isalnum()):
+                inseridas.append((inicio, "-\n"))
+        for inicio, texto in sorted(inseridas, reverse=True):
+            letras[inicio:inicio] = list(texto)
         if inseridas:
             def andar(p: int) -> int:
-                return p + sum(1 for i in inseridas if i <= p)
+                return p + sum(len(t) for i, t in inseridas if i <= p)
 
-            def andar_fim(p: int) -> int:           # o fim exclusivo não leva o `\n` dele
-                return p + sum(1 for i in inseridas if i < p)
+            def andar_fim(p: int) -> int:           # o fim exclusivo não leva o `\n` dele,
+                return p + sum(len(t) if i < p else len(t) - 1     # mas leva o hífen que
+                               for i, t in inseridas if i <= p)    # volta
 
             for nome in ("negrito", "italico", "duvidosos"):
                 trechos = getattr(bloco, nome, None)

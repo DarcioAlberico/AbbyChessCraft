@@ -48,6 +48,8 @@ class MudancaDaPagina:
     """O que uma transação mudou numa página."""
 
     pid: int
+    #: A posição da página quando a transação foi feita: só para os avisos (o desfazer acha a
+    #: página pelo `pid`, que não muda quando ela troca de lugar, §12.4).
     indice: int
     #: gid -> o Box antes e depois (None: não existia).
     antes: Dict[int, Optional[Box]] = field(default_factory=dict)
@@ -90,10 +92,6 @@ class Transacao:
     def bytes(self) -> int:
         return (sum(m.bytes() for m in self.paginas.values())
                 + sum(len(a.png) for a in self.amostras_criadas + self.amostras_apagadas))
-
-    @property
-    def indices(self) -> List[int]:
-        return sorted(m.indice for m in self.paginas.values())
 
 
 # ----------------------------------------------------------------------

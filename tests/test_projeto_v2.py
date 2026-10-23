@@ -96,14 +96,17 @@ def test_livro_json_tem_o_pid_e_e_igual_ao_recalculado(lido):
     projeto.salvar_pagina(2, pg.segmentar(imagem)[:1], reconhecida=False)
     gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
     assert gravado == projeto.recalcular_livro()
-    assert {r["pid"] for r in projeto.resumo_do_livro().values()} == {0, 1}
+    # Desde o passo L, o livro é chaveado por pid e cada página tem o pid da sequência.
+    assert set(gravado["paginas"]) == {"0", str(projeto.pid_da_pagina(2))}
+    assert {i: r["pid"] for i, r in projeto.resumo_do_livro().items()} == {
+        0: 0, 2: projeto.pid_da_pagina(2)}
 
 
 def test_livro_sem_a_pagina_acha_o_arquivo_e_nao_duplica(lido):
     projeto, _, _ = lido
     arquivo = projeto.pasta / ARQUIVO_DO_LIVRO
     livro_json = json.loads(arquivo.read_text(encoding="utf-8"))
-    del livro_json["paginas"]["1"]                           # a queda entre página e livro
+    del livro_json["paginas"]["0"]                  # a queda entre página e livro (pid 0)
     arquivo.write_text(json.dumps(livro_json), encoding="utf-8")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     assert reaberto.carregar_pagina(0) is not None

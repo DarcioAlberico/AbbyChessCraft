@@ -305,8 +305,9 @@ class CondutorDoLote:
         p = self.p
         if p.projeto.estado_da_pagina(pedida.indice) == VERIFICADA:
             return VERIFICADA_PULADA
-        modelo = p.projeto.carregar_modelo(pedida.indice)
-        pid = modelo.pid if modelo is not None else None
+        # O pid da sequência (§12.4): a página ainda sem dados já tem o dela, e a mudança do
+        # usuário no meio da leitura (a primeira, que cria a página, também) sobe a versão.
+        pid = p.projeto.pid_da_pagina(pedida.indice)
         if pid != pedida.pid or p.historico.versao(pid) != pedida.versao:
             return RELER_DEPOIS
         return None

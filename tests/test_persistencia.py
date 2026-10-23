@@ -435,9 +435,11 @@ def test_livro_json_e_igual_ao_recalculado_depois_de_qualquer_sequencia(projeto,
 
 def test_livro_json_que_falta_e_refeito(projeto):
     projeto.salvar_pagina(2, [_box(), _box(source=FONTE_MANUAL)], reconhecida=False)
+    pid = projeto.pid_da_pagina(2)
     (projeto.pasta / ARQUIVO_DO_LIVRO).unlink()
     resumo = ProjetoDeLivro.abrir(projeto.pasta).resumo_do_livro()
-    assert resumo == {2: {"pid": 0, "estado": "glifos_marcados", "boxes": 2, "pendentes": 1,
+    assert resumo == {2: {"pid": pid, "pagina_da_fonte": 2, "estado": "glifos_marcados", "boxes": 2,
+                          "pendentes": 1,
                           "confirmados": 1, "sem_leitura": 0, "histograma": {"50": 1},
                           "diagramas": 0, "diagramas_por_conferir": 0, "figurinas": False}}
     assert (projeto.pasta / ARQUIVO_DO_LIVRO).is_file()
@@ -617,7 +619,7 @@ def test_livro_json_da_versao_1_e_refeito_com_a_faixa_100(projeto):
     arquivo = projeto.pasta / ARQUIVO_DO_LIVRO
     velho = json.loads(arquivo.read_text(encoding="utf-8"))
     velho["versao"] = 1
-    velho["paginas"]["1"]["histograma"] = {"99": 1}          # a faixa da versão 1
+    velho["paginas"][str(projeto.pid_da_pagina(0))]["histograma"] = {"99": 1}  # a da versão 1
     arquivo.write_text(json.dumps(velho), encoding="utf-8")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     assert reaberto.resumo_do_livro()[0]["histograma"] == {"100": 1}

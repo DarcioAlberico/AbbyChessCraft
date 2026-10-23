@@ -274,6 +274,49 @@ def test_manter_quebras_na_camada_nativa_volta_pelos_inicios():
     assert partida.inicios == [0, 9] and partida.pesos is None
 
 
+def test_manter_quebras_na_camada_nativa_devolve_o_hifen_que_o_core_tirou():
+    """O core tira o hífen da palavra partida quando o dicionário diz que era quebra, e o
+    hífen brando: sem espaço nem hífen no início da linha, a quebra volta com o hífen, como
+    impressa, e o hífen fica no negrito da sílaba de antes."""
+    partida = ex.Paragrafo("o interessante fim e mais", inicios=[0, 7, 19],
+                           negrito=[(2, 14)], italico=[(15, 18)])
+    ex._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[partida]))
+    assert partida.texto == "o inter-\nessante fim\ne mais"
+    assert [partida.texto[a:z] for a, z in partida.negrito] == ["inter-\nessante"]
+    assert [partida.texto[a:z] for a, z in partida.italico] == ["fim"]
+    assert partida.inicios == [0, 9, 21]
+    # Sem letra dos dois lados, não é palavra partida: nada entra.
+    numero = ex.Paragrafo("lance 12.e4", inicios=[0, 8])
+    ex._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[numero]))
+    assert numero.texto == "lance 12.e4"
+
+
+@pytest.mark.parametrize("com_dicionario", [False, True])
+def test_manter_quebras_com_a_camada_de_um_pdf_que_parte_palavras(tmp_path, com_dicionario):
+    """Pela camada de verdade (`core.pdf_nativo`): a palavra partida volta partida, com o
+    dicionário que tira o hífen ou sem ele (o hífen fica colado), e as outras quebras viram
+    `\\n`."""
+    import fitz
+
+    from core import lexico, pdf_nativo
+
+    caminho = tmp_path / "partido.pdf"
+    doc = fitz.open()
+    pagina = doc.new_page(width=300, height=200)
+    for k, linha in enumerate(["Then came a very beauti-", "ful combination in the game and",
+                               "it ends here."]):
+        pagina.insert_text((20, 40 + 14 * k), linha, fontsize=11)
+    doc.save(caminho)
+    doc.close()
+    lex = lexico.Lexico(palavras={"beautiful"}) if com_dicionario else None
+    extraida = pdf_nativo.extrair(str(caminho), [0], idioma="en", lex=lex).paginas[0]
+    textos = [b.texto for b in extraida.blocos if isinstance(b, ex.Paragrafo)]
+    assert any(("beautiful" if com_dicionario else "beauti-ful") in t for t in textos), textos
+    ex._quebras_da_camada(extraida)
+    textos = [b.texto for b in extraida.blocos if isinstance(b, ex.Paragrafo)]
+    assert "Then came a very beauti-\nful combination in the game and\nit ends here." in textos
+
+
 def test_o_realce_marca_so_a_palavra_duvidosa_e_atravessa_a_pagina():
     corpo = next(b for b in _extraida(ex.Opcoes(realcar_duvidosos=True))[0].blocos
                  if isinstance(b, ex.Paragrafo) and "duvida" in b.texto)

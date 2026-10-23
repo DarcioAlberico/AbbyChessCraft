@@ -26,6 +26,7 @@ from core.services.box_service import BoxService
 
 from abbychess import gravacao as gv
 from abbychess import procedencia
+from abbychess import sequencia as sq
 
 from abbychess.leitor import (FONTE_AGUARDANDO, FONTE_MANUAL, LeitorDoLivro, nome_de_origem,
                               precisa_revisao)
@@ -104,27 +105,37 @@ def ponto_original(x: float, y: float, angulo: float, largura: int, altura: int
 
 
 class FonteDePaginas:
-    """As páginas de um PDF ou de uma imagem solta, em tons de cinza.
+    """As páginas do livro em tons de cinza, pela sequência do livro (§12.4).
 
-    Com `endireitar`, cada página sai girada pela inclinação medida dela
-    (`medir_inclinacao`). Com `pasta`, a medida fica gravada lá
-    (`inclinacoes.json`) e vale das próximas vezes: os boxes gravados da página
-    estão nas coordenadas da página endireitada, e uma medida que mudasse
-    depois os deixaria fora do lugar.
+    Cada posição é uma `Entrada`: a página `pagina` da fonte dela (o PDF ou a imagem do
+    livro, ou um arquivo em `inseridas/`), cortada pelo `quadro` e girada pelo `giro`. Sem a
+    `sequencia` (as ferramentas e os testes que abrem um PDF solto), a posição `i` é a página
+    `i` do arquivo.
+
+    Com `endireitar`, cada página sai girada pela inclinação dela: o ângulo à mão da entrada,
+    ou o medido (`medir_inclinacao`). Com `pasta`, a medida fica gravada lá
+    (`inclinacoes.json`) e vale das próximas vezes: os boxes gravados da página estão nas
+    coordenadas da página endireitada, e uma medida que mudasse depois os deixaria fora do
+    lugar. A chave da medida é a da entrada (`_chave_da_inclinacao`).
     """
 
     def __init__(self, caminho: str | Path, *, endireitar: bool = False,
-                 pasta: Optional[str | Path] = None, somente_leitura: bool = False):
+                 pasta: Optional[str | Path] = None, somente_leitura: bool = False,
+                 sequencia: Optional[Callable[[], "sq.Sequencia"]] = None):
         self.caminho = Path(caminho)
         self.endireitar = endireitar
         #: Projeto só para leitura: lê as inclinações gravadas, mas não grava as novas.
         self.somente_leitura = somente_leitura
-        self._arquivo_das_inclinacoes = Path(pasta) / ARQUIVO_DE_INCLINACOES if pasta else None
+        self.pasta = Path(pasta) if pasta else None
+        #: A sequência do livro de agora (a do projeto, que as operações de página trocam).
+        self._sequencia = sequencia
+        self._arquivo_das_inclinacoes = (self.pasta / ARQUIVO_DE_INCLINACOES
+                                         if self.pasta else None)
         self._inclinacoes: dict = {}
         if self._arquivo_das_inclinacoes is not None and self._arquivo_das_inclinacoes.is_file():
             bruto = json.loads(self._arquivo_das_inclinacoes.read_text(encoding="utf-8"))
-            self._inclinacoes = {int(k): float(v) for k, v in bruto.items()}
-        self._pdf = None
+            self._inclinacoes = {(int(k) if k.isdigit() else k): float(v)
+                                 for k, v in bruto.items()}
         #: Um render do fitz por vez: a janela, a pré-carga (`CacheDePaginas`) e o lote
         #: renderizam da mesma fonte, de threads diferentes, e o fitz não é seguro entre
         #: threads. Só o render fica na trava: medir a inclinação (~370 ms numa página nunca
@@ -133,6 +144,143 @@ class FonteDePaginas:
         self._trava = threading.RLock()
         #: O dicionário das inclinações e o `inclinacoes.json`.
         self._trava_das_inclinacoes = threading.Lock()
+        #: fonte da entrada -> o arquivo aberto (o do livro e os inseridos, na primeira vez).
+        self._arquivos: Dict[str, "_ArquivoDePaginas"] = {
+            sq.FONTE_DO_LIVRO: _ArquivoDePaginas(self.caminho)}
+
+    @property
+    def total(self) -> int:
+        """Quantas páginas o livro tem (as da sequência; sem ela, as do arquivo)."""
+        if self._sequencia is not None:
+            return len(self._sequencia())
+        return self._arquivos[sq.FONTE_DO_LIVRO].total
+
+    def entrada(self, indice: int) -> "sq.Entrada":
+        """A entrada da posição `indice` (IndexError fora do livro)."""
+        if self._sequencia is not None:
+            return self._sequencia().entrada_em(indice)
+        if not 0 <= indice < self.total:
+            raise IndexError(f"Página {indice + 1} fora de 1..{self.total}")
+        return sq.Entrada(indice, sq.FONTE_DO_LIVRO, indice)
+
+    def pagina(self, indice: int) -> Image.Image:
+        """A página `indice`, endireitada quando a fonte foi aberta para isso."""
+        return self.pagina_da_entrada(self.entrada(indice))
+
+    def pagina_da_entrada(self, entrada: "sq.Entrada") -> Image.Image:
+        imagem = self.original_da_entrada(entrada)
+        angulo = self.inclinacao_da_entrada(entrada, imagem)
+        if abs(angulo) < INCLINACAO_MINIMA:
+            return imagem
+        return Image.fromarray(girar(np.asarray(imagem.convert("L")), angulo))
+
+    def original(self, indice: int) -> Image.Image:
+        """A página com o quadro e o giro da entrada, sem endireitar."""
+        return self.original_da_entrada(self.entrada(indice))
+
+    def original_da_entrada(self, entrada: "sq.Entrada") -> Image.Image:
+        arquivo = self._arquivo(entrada.fonte)
+        with self._trava:
+            imagem = arquivo.pagina(entrada.pagina)
+        return com_geometria(imagem, entrada.quadro, entrada.giro)
+
+    def _arquivo(self, fonte: str) -> "_ArquivoDePaginas":
+        with self._trava:
+            arquivo = self._arquivos.get(fonte)
+            if arquivo is None:
+                if self.pasta is None:
+                    raise OSError(f"A página inserida {fonte} precisa da pasta do projeto.")
+                arquivo = self._arquivos[fonte] = _ArquivoDePaginas(self.pasta / fonte)
+            return arquivo
+
+    def inclinacao(self, indice: int, imagem: Optional[Image.Image] = None) -> float:
+        return self.inclinacao_da_entrada(self.entrada(indice), imagem)
+
+    def inclinacao_da_entrada(self, entrada: "sq.Entrada",
+                              imagem: Optional[Image.Image] = None) -> float:
+        """O ângulo aplicado à página: o à mão da entrada, ou o gravado, ou medido agora e
+        gravado. Duas threads que medem a mesma página ao mesmo tempo dão o mesmo número;
+        vale o da primeira. O ângulo à mão vale mesmo na fonte que não endireita: é uma
+        escolha do usuário na página, e não a medida automática."""
+        if entrada.angulo is not None:
+            return entrada.angulo if abs(entrada.angulo) >= INCLINACAO_MINIMA else 0.0
+        if not self.endireitar:
+            return 0.0
+        chave = _chave_da_inclinacao(entrada)
+        with self._trava_das_inclinacoes:
+            angulo = self._inclinacoes.get(chave)
+        if angulo is None:
+            imagem = imagem if imagem is not None else self.original_da_entrada(entrada)
+            medido = medir_inclinacao(np.asarray(imagem.convert("L")))     # fora das travas
+            with self._trava_das_inclinacoes:
+                angulo = self._inclinacoes.get(chave)
+                if angulo is None:
+                    angulo = self._inclinacoes[chave] = medido
+                    if self._arquivo_das_inclinacoes is not None and not self.somente_leitura:
+                        gv.gravar_json(self._arquivo_das_inclinacoes, {
+                            str(k): v for k, v in sorted(self._inclinacoes.items(),
+                                                         key=_ordem_da_chave)})
+        return angulo if abs(angulo) >= INCLINACAO_MINIMA else 0.0
+
+
+def _ordem_da_chave(item) -> tuple:
+    """Os índices do PDF em ordem numérica, como até o passo K; as chaves `p<pid>` depois."""
+    chave = item[0]
+    return (0, chave, "") if isinstance(chave, int) else (1, 0, chave)
+
+
+def _chave_da_inclinacao(entrada: "sq.Entrada"):
+    """A chave da medida em `inclinacoes.json`. A página do livro sem quadro nem giro usa o
+    índice dela no PDF, como até o passo K: o `pid` das páginas nunca editadas de um projeto
+    da v2 só existe na memória e muda de uma sessão para outra, e uma medida chaveada por ele
+    iria parar noutra página. As outras (inseridas, cortadas, giradas: só a partir da v3, com
+    todo `pid` gravado) usam `p<pid>` e a geometria em que foram medidas (§12.4)."""
+    if entrada.fonte == sq.FONTE_DO_LIVRO and entrada.quadro is None and not entrada.giro:
+        return entrada.pagina
+    quadro = "-".join(map(str, entrada.quadro)) if entrada.quadro else "inteira"
+    return f"p{entrada.pid}:{quadro}:{entrada.giro}"
+
+
+#: Quantos pixels o quadro pode passar da página (o arredondamento de um render).
+FOLGA_DO_QUADRO = 2
+
+
+class QuadroForaDaPagina(OSError):
+    """O quadro da entrada não cabe na página da fonte (um `OSError`: abrir a página avisa,
+    como a página que não renderiza)."""
+
+
+#: O giro horário da entrada -> a transposição do PIL (que gira no sentido anti-horário).
+_TRANSPOSICOES = {90: Image.Transpose.ROTATE_270, 180: Image.Transpose.ROTATE_180,
+                  270: Image.Transpose.ROTATE_90}
+
+
+def com_geometria(imagem: Image.Image, quadro: Optional[Tuple[int, int, int, int]],
+                  giro: int) -> Image.Image:
+    """A imagem cortada pelo `quadro` (`[x0, y0, x1, y1)` em pixels dela) e girada `giro`
+    graus no sentido horário, sem interpolar (§12.4: conta exata). Um quadro que passa da
+    página mais que `FOLGA_DO_QUADRO` px (a página renderizada noutro tamanho, um
+    `projeto.json` estragado) levanta `QuadroForaDaPagina`: cortar menos que o pedido em
+    silêncio deixaria os boxes fora do lugar."""
+    if quadro is not None:
+        x0, y0, x1, y1 = quadro
+        largura, altura = imagem.size
+        if (x0 < -FOLGA_DO_QUADRO or y0 < -FOLGA_DO_QUADRO or x1 > largura + FOLGA_DO_QUADRO
+                or y1 > altura + FOLGA_DO_QUADRO or x1 <= x0 or y1 <= y0):
+            raise QuadroForaDaPagina(f"o quadro {list(quadro)} não cabe na página "
+                                     f"({largura}×{altura} px)")
+        imagem = imagem.crop((max(0, x0), max(0, y0), min(x1, largura), min(y1, altura)))
+    if giro:
+        imagem = imagem.transpose(_TRANSPOSICOES[giro])
+    return imagem
+
+
+class _ArquivoDePaginas:
+    """Um PDF ou uma imagem solta, página por página (a trava é de quem chama)."""
+
+    def __init__(self, caminho: Path):
+        self.caminho = Path(caminho)
+        self._pdf = None
         self.total = 1
         sufixo = self.caminho.suffix.lower()
         if sufixo == ".pdf":
@@ -147,58 +295,26 @@ class FonteDePaginas:
             raise OSError(f"Formato não suportado: {sufixo}")
 
     def pagina(self, indice: int) -> Image.Image:
-        """A página `indice`, endireitada quando a fonte foi aberta para isso."""
-        return self._pagina(indice)
-
-    def _pagina(self, indice: int) -> Image.Image:
-        imagem = self.original(indice)
-        if not self.endireitar:
-            return imagem
-        angulo = self.inclinacao(indice, imagem)
-        if abs(angulo) < INCLINACAO_MINIMA:
-            return imagem
-        return Image.fromarray(girar(np.asarray(imagem.convert("L")), angulo))
-
-    def original(self, indice: int) -> Image.Image:
-        """A página como está no arquivo, sem endireitar."""
         if not 0 <= indice < self.total:
             raise IndexError(f"Página {indice + 1} fora de 1..{self.total}")
         if self._pdf is not None:
-            with self._trava:
-                imagem = self._pdf.load_page(indice)
+            imagem = self._pdf.load_page(indice)
             if imagem is None:
                 raise OSError(f"A página {indice + 1} não renderizou.")
             return imagem
         with Image.open(self.caminho) as imagem:
             return imagem.convert("L")
 
-    def inclinacao(self, indice: int, imagem: Optional[Image.Image] = None) -> float:
-        """O ângulo aplicado à página: o gravado, ou medido agora e gravado. Duas threads que
-        medem a mesma página ao mesmo tempo dão o mesmo número; vale o da primeira."""
-        if not self.endireitar:
-            return 0.0
-        with self._trava_das_inclinacoes:
-            angulo = self._inclinacoes.get(indice)
-        if angulo is None:
-            imagem = imagem if imagem is not None else self.original(indice)
-            medido = medir_inclinacao(np.asarray(imagem.convert("L")))     # fora das travas
-            with self._trava_das_inclinacoes:
-                angulo = self._inclinacoes.get(indice)
-                if angulo is None:
-                    angulo = self._inclinacoes[indice] = medido
-                    if self._arquivo_das_inclinacoes is not None and not self.somente_leitura:
-                        gv.gravar_json(self._arquivo_das_inclinacoes,
-                                       {str(k): v for k, v in sorted(self._inclinacoes.items())})
-        return angulo if abs(angulo) >= INCLINACAO_MINIMA else 0.0
-
 
 class CacheDePaginas:
     """As últimas páginas renderizadas e endireitadas, com a pré-carga da seguinte (§14.1).
 
     `pagina(i)` devolve `(imagem, matriz em cinza)`, do cache se ela está lá; `precarregar(i)`
-    renderiza numa thread de fundo, uma por vez (o pedido mais novo vence). Sem Qt: o
-    `preparar` (a janela dá o da `QImage`) roda com a matriz na thread que renderiza, e
-    `preparada(i, imagem)` devolve o resultado.
+    renderiza numa thread de fundo, uma por vez (o pedido mais novo vence). A chave é a
+    `Entrada` da posição (o `pid` e a geometria): a página que muda de lugar continua no cache,
+    e a que muda de quadro, giro ou ângulo sai dele. Sem Qt: o `preparar` (a janela dá o da
+    `QImage`) roda com a matriz na thread que renderiza, e `preparada(i, imagem)` devolve o
+    resultado.
     """
 
     TAMANHO = 5
@@ -208,72 +324,88 @@ class CacheDePaginas:
         self.fonte = fonte
         self.tamanho = tamanho
         self.preparar = preparar
-        self._paginas: "OrderedDict[int, Tuple[Image.Image, np.ndarray]]" = OrderedDict()
-        #: índice -> o `preparar` da matriz dela (sai do cache junto com a página).
-        self._preparadas: Dict[int, object] = {}
+        self._paginas: "OrderedDict[sq.Entrada, Tuple[Image.Image, np.ndarray]]" = OrderedDict()
+        #: entrada -> o `preparar` da matriz dela (sai do cache junto com a página).
+        self._preparadas: Dict["sq.Entrada", object] = {}
         self._trava = threading.Lock()
-        self._pedida: Optional[int] = None
+        self._pedida: Optional["sq.Entrada"] = None
         self._thread: Optional[threading.Thread] = None
-        #: índice -> o aviso de que a renderização em curso dele acabou: quem pede a mesma
+        #: entrada -> o aviso de que a renderização em curso dela acabou: quem pede a mesma
         #: página espera, em vez de renderizá-la de novo (a pré-carga e o clique juntos).
-        self._em_curso: Dict[int, threading.Event] = {}
+        self._em_curso: Dict["sq.Entrada", threading.Event] = {}
 
     @property
     def total(self) -> int:
         return self.fonte.total
 
     def tem(self, indice: int) -> bool:
+        try:
+            entrada = self.fonte.entrada(indice)
+        except IndexError:
+            return False
         with self._trava:
-            return indice in self._paginas
+            return entrada in self._paginas
 
     def pagina(self, indice: int) -> Tuple[Image.Image, np.ndarray]:
+        return self._da_entrada(self.fonte.entrada(indice))
+
+    def _da_entrada(self, entrada: "sq.Entrada") -> Tuple[Image.Image, np.ndarray]:
         while True:
             with self._trava:
-                if indice in self._paginas:
-                    self._paginas.move_to_end(indice)
-                    return self._paginas[indice]
-                aviso = self._em_curso.get(indice)
+                if entrada in self._paginas:
+                    self._paginas.move_to_end(entrada)
+                    return self._paginas[entrada]
+                aviso = self._em_curso.get(entrada)
                 if aviso is None:
-                    aviso = self._em_curso[indice] = threading.Event()
+                    aviso = self._em_curso[entrada] = threading.Event()
                     break                       # esta thread renderiza
             aviso.wait()                        # outra renderiza: espera e olha de novo
         try:
-            imagem = self.fonte.pagina(indice)
+            imagem = self.fonte.pagina_da_entrada(entrada)
             par = (imagem, np.asarray(imagem.convert("L")))
             preparada = None
             if self.preparar is not None:
                 try:
                     preparada = self.preparar(par[1])
                 except Exception:               # sem a preparada, a janela converte sozinha
-                    log.warning("preparar a página %d falhou", indice + 1, exc_info=True)
+                    log.warning("preparar a página do pid %d falhou", entrada.pid,
+                                exc_info=True)
             with self._trava:
-                self._paginas[indice] = par
-                self._paginas.move_to_end(indice)
+                self._paginas[entrada] = par
+                self._paginas.move_to_end(entrada)
                 if preparada is not None:
-                    self._preparadas[indice] = preparada
+                    self._preparadas[entrada] = preparada
                 while len(self._paginas) > self.tamanho:
                     velha, _ = self._paginas.popitem(last=False)
                     self._preparadas.pop(velha, None)
             return par
         finally:
             with self._trava:
-                del self._em_curso[indice]
+                del self._em_curso[entrada]
             aviso.set()
 
     def preparada(self, indice: int, imagem: Image.Image) -> Optional[object]:
         """O `preparar` da página `indice`, se ela está no cache e é esta `imagem`."""
+        try:
+            entrada = self.fonte.entrada(indice)
+        except IndexError:
+            return None
         with self._trava:
-            par = self._paginas.get(indice)
+            par = self._paginas.get(entrada)
             if par is None or par[0] is not imagem:
                 return None
-            return self._preparadas.get(indice)
+            return self._preparadas.get(entrada)
 
     def precarregar(self, indice: int) -> None:
         """Renderiza a página `indice` em segundo plano, se ela ainda não está no cache."""
-        if not 0 <= indice < self.total or self.tem(indice):
+        try:
+            entrada = self.fonte.entrada(indice)    # uma vez: a sequência pode mudar no meio
+        except IndexError:
             return
         with self._trava:
-            self._pedida = indice
+            if entrada in self._paginas or entrada in self._em_curso:
+                return
+            self._pedida = entrada
             if self._thread is not None:
                 return                          # a thread que roda pega o pedido novo
             self._thread = threading.Thread(target=self._pre_carga, daemon=True,
@@ -283,14 +415,15 @@ class CacheDePaginas:
     def _pre_carga(self) -> None:
         while True:
             with self._trava:
-                indice, self._pedida = self._pedida, None
-                if indice is None:              # decidido na trava: nenhum pedido se perde
+                entrada, self._pedida = self._pedida, None
+                if entrada is None:             # decidido na trava: nenhum pedido se perde
                     self._thread = None
                     return
             try:
-                self.pagina(indice)
+                self._da_entrada(entrada)
             except Exception:                   # a página que não renderiza: avisa na vez dela
-                log.warning("a pré-carga da página %d falhou", indice + 1, exc_info=True)
+                log.warning("a pré-carga da página do pid %d falhou", entrada.pid,
+                            exc_info=True)
 
     def esperar(self, limite: float = 10.0) -> None:
         """Espera a pré-carga em curso (os testes; fechar o projeto não precisa)."""
@@ -300,9 +433,13 @@ class CacheDePaginas:
 
 
 def fonte_do_projeto(projeto: ProjetoDeLivro) -> FonteDePaginas:
-    """As páginas do livro como o projeto as lê: endireitadas, se ele nasceu assim."""
+    """As páginas do livro como o projeto as lê: pela sequência dele, endireitadas se ele
+    nasceu assim. A sequência é montada aqui, na thread de quem abre (o fitz que conta as
+    páginas não roda junto com um render da pré-carga)."""
+    projeto.sequencia
     return FonteDePaginas(projeto.fonte, endireitar=projeto.dados.endireitar,
-                          pasta=projeto.pasta, somente_leitura=projeto.somente_leitura)
+                          pasta=projeto.pasta, somente_leitura=projeto.somente_leitura,
+                          sequencia=lambda: projeto.sequencia)
 
 
 @dataclass

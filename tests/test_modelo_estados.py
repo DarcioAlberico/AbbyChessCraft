@@ -367,6 +367,14 @@ class _FonteNaMemoria:
     def pagina(self, indice):
         return self.imagem
 
+    def entrada(self, indice):                       # o cache chaveia pela entrada (§12.4)
+        from abbychess.sequencia import Entrada
+
+        return Entrada(0, "livro", indice)
+
+    def pagina_da_entrada(self, _entrada):
+        return self.imagem
+
 
 class _LeitorSemPadroes:
     """A fila sai das confianças; ler não acha nada (como um livro sem padrões)."""

@@ -864,7 +864,7 @@ class ControladorDoLivro:
     def _progrediu(self, feitas: int, total: int, estimativa: Optional[float]) -> None:
         condutor = self._condutor
         if condutor is not None and feitas:     # o ponto, a cada página (G1 da rodada 3)
-            self._guardar(list(condutor.restante), condutor.refazer,
+            self._guardar(condutor.posicoes_restantes(), condutor.refazer,
                           self._reler_depois_de(condutor), agora=False)
         self.eventos.emitir("lote_progresso", feitas, total, estimativa)
 
@@ -878,7 +878,7 @@ class ControladorDoLivro:
         self.pagina.lote_rodando = False
         # O que faltou (cancelado, ou o servidor parou) e as páginas para reler depois ficam
         # para "Retomar o lote", guardadas no projeto (`lote.json`).
-        faltam = list(condutor.restante) if resultado.cancelado else []
+        faltam = condutor.posicoes_restantes() if resultado.cancelado else []
         self._guardar(faltam, condutor.refazer, self._reler_depois_de(condutor))
         mensagem = lt.resumo_do_fim(resultado)
         if resultado.servidor_parou and faltam:

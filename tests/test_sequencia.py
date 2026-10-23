@@ -30,6 +30,9 @@ def test_pid_repetido_e_recusado():
     ({"metade": "meio"}, "metade"),
     ({"quadro": (10, 0, 10, 5)}, "quadro"),
     ({"fonte": "C:/outro.pdf"}, "fonte"),
+    ({"fonte": "inseridas/../../segredo.pdf"}, "fonte"),     # nada fora da pasta do projeto
+    ({"fonte": "inseridas/a/b.png"}, "fonte"),
+    ({"fonte": "inseridas\\..\\x.png"}, "fonte"),
     ({"pagina": -1}, "negativos"),
 ])
 def test_entrada_ruim_e_recusada(campos, motivo):

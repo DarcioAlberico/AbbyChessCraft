@@ -8,15 +8,15 @@ topo da seguinte. Faixas que atravessam a calha, como títulos, ficam entre os t
 from __future__ import annotations
 
 import statistics
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Sequence, Tuple
 
 from core.box_model import BoxEntry
 
 MARGEM_DA_CALHA = 0.25
-# O Documento Ã© refeito a cada ediÃ§Ã£o e recebe pÃ¡ginas ainda incompletas. Exigimos mais
-# evidÃªncia que a exportaÃ§Ã£o legada: trÃªs filas curtas aparecem por acaso depois de dividir
-# ou juntar boxes; seis mantÃªm esses rascunhos em uma coluna e ainda cobrem pÃ¡ginas reais.
+# O Documento é refeito a cada edição e recebe páginas ainda incompletas. Exigimos mais
+# evidência que a exportação legada: três filas curtas aparecem por acaso depois de dividir
+# ou juntar boxes; seis mantêm esses rascunhos em uma coluna e ainda cobrem páginas reais.
 FILAS_DE_COLUNA = 6
 ChaveDeLeitura = Tuple[int, int]
 
@@ -36,6 +36,10 @@ class OrdemDeLeitura:
 
     colunas: Tuple[Tuple[int, int], ...] = ()
     faixas: Tuple[Tuple[float, float], ...] = ()
+    #: A detecção do core sobre a página inteira; quando a página é um trecho só, o core a
+    #: reaproveita (`deteccao_do_trecho`) em vez de refazê-la: ela é a parte mais cara de
+    #: montar o texto, e o índice da busca monta o de todas as páginas.
+    deteccao: object = field(default=None, compare=False, repr=False)
 
     @classmethod
     def da_pagina(cls, boxes: Sequence[BoxEntry]) -> "OrdemDeLeitura":
@@ -43,14 +47,15 @@ class OrdemDeLeitura:
 
         if len(boxes) < 2:
             return cls()
-        colunas = BoxService.detectar_colunas(list(boxes))
+        deteccao = BoxService.detectar_colunas_e_transversais(list(boxes))
+        colunas = deteccao[0]
         if len(colunas) < 2:
-            return cls()
+            return cls(deteccao=deteccao)
         altura = statistics.median(b.y2 - b.y1 for b in boxes)
         filas = [{round(((b.y1 + b.y2) / 2) / max(1.0, altura)) for b in boxes
                   if inicio <= (b.x1 + b.x2) / 2 <= fim} for inicio, fim in colunas]
         if min(len(fila) for fila in filas) < FILAS_DE_COLUNA:
-            return cls()
+            return cls(deteccao=deteccao)
         calhas = []
         for esquerda, direita in zip(colunas, colunas[1:]):
             largura = direita[0] - esquerda[1]
@@ -92,3 +97,8 @@ class OrdemDeLeitura:
             chave = self.chave((box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2)
             por_trecho.setdefault(chave, []).append(i)
         return [(chave, por_trecho[chave]) for chave in sorted(por_trecho)]
+
+    def deteccao_do_trecho(self, indices: Sequence[int], boxes: Sequence[BoxEntry]):
+        """A detecção para `palavras_da_pagina` do trecho: a da página, quando o trecho é a
+        página inteira (os mesmos boxes, na mesma ordem); senão, None (o core a faz)."""
+        return self.deteccao if len(indices) == len(boxes) else None

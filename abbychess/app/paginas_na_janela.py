@@ -137,11 +137,23 @@ class PaginasNaJanela:
 
     def dividir_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         onde = dp.campo_de_porcentagem(50.0, 5.0, 95.0, " % da largura")
+        lidas = set(self.projeto.paginas_lidas()) if self.projeto is not None else set()
+        contagem = dp.efeito("1 página dupla vira duas: {PAGINAS}.",
+                             "{N} páginas duplas viram duas cada: {PAGINAS}.")
+
+        def efeito(posicoes):
+            texto = contagem(posicoes)
+            ja_lidas = len(lidas.intersection(posicoes))
+            if ja_lidas > 20:
+                # As duas metades de cada página lida são gravadas: uns segundos no livro.
+                texto += (f" {ja_lidas} já foram lidas: leva alguns segundos (dividir antes "
+                          "de ler é instantâneo).")
+            return texto
+
         escolha = dp.perguntar_com(
             self, "Dividir páginas", self._total(), [("Dividir em", onde)],
             lambda: onde.value() / 100, selecao=self._selecao_de_agora(selecionadas),
-            efeito=dp.efeito("1 página dupla vira duas: {PAGINAS}.",
-                             "{N} páginas duplas viram duas cada: {PAGINAS}."), ok="Dividir",
+            efeito=efeito, ok="Dividir",
             explicacao="A imagem com duas páginas do livro lado a lado (a página dupla) vira "
                        "duas: a metade esquerda fica no lugar e a direita entra logo depois, "
                        "cada uma com os glifos dela. A que já é metade de uma divisão fica "
@@ -177,10 +189,10 @@ class PaginasNaJanela:
                 perdem = len(lidas.intersection(voltam))
                 rotulo = "Voltar ao ângulo medido"
             else:
+                graus = f"{angulo.value():.2f}".replace(".", ",")
                 texto = (f"{sq.quantas_paginas(len(posicoes))} "
                          f"{'é endireitada' if len(posicoes) == 1 else 'são endireitadas'} "
-                         f"em {angulo.value():.2f}°: {dp.texto_da_selecao(posicoes)}."
-                         .replace(".", ",", 1))
+                         f"em {graus}°: {dp.texto_da_selecao(posicoes)}.")
                 perdem = len(lidas.intersection(posicoes))
                 rotulo = "Endireitar e desfazer a leitura" if perdem else "Endireitar"
             if perdem:
@@ -237,9 +249,12 @@ class _ocupado:
     def __enter__(self):
         self.janela.statusBar().showMessage(self.aviso)
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        # Desligada antes de pintar o aviso: um clique no meio não dispara outra operação.
+        self.janela.setEnabled(False)
         QApplication.processEvents()
         return self
 
     def __exit__(self, *_erro):
+        self.janela.setEnabled(True)
         QApplication.restoreOverrideCursor()
         return False

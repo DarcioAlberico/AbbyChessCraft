@@ -278,9 +278,10 @@ def _contradiz(board: chess.Board, movimento: chess.Move, lance: Lance) -> str:
 
 
 def validar(fen: str, linha: Sequence[Lance], *, lado: Optional[str] = None,
-            roque: str = "") -> Optional[Validacao]:
+            roque: str = "", roque_informado: bool = False) -> Optional[Validacao]:
     """A validação de `linha` a partir do FEN (só as peças contam). `lado` é o que o
-    diagrama diz ("w"/"b") ou `None`; `roque`, o conferido. Sem lances, `None`."""
+    diagrama diz ("w"/"b") ou `None`; `roque`, o conferido, e `roque_informado`, se quem
+    conferiu o disse (vazio dito é "sem roque", não "o inferido"). Sem lances, `None`."""
     pecas = (fen or "").split()[0] if (fen or "").strip() else ""
     if not linha or not pecas:
         return None
@@ -293,10 +294,11 @@ def validar(fen: str, linha: Sequence[Lance], *, lado: Optional[str] = None,
         return Validacao(ILEGAL, total, 0, f"{primeiro.rotulo()} do texto diz que jogam "
                          f"{quem[vez]}, mas o diagrama diz {quem[lado]}", vez, numero)
     # O roque marcado só vale onde rei e torre ainda estão (o editor pode guardar um que a
-    # correção de uma casa desfez); sem marcado, vale o inferido.
+    # correção de uma casa desfez); sem ninguém dizer, vale o inferido.
     try:
         possiveis = roque_inferido(pecas)
-        roque = "".join(letra for letra in (roque or possiveis) if letra in possiveis)
+        dito = roque if roque_informado or roque else possiveis
+        roque = "".join(letra for letra in dito if letra in possiveis)
         board = _tabuleiro(pecas, vez, roque, numero)
     except ValueError:                          # FEN malformado
         board = None
@@ -370,7 +372,8 @@ def validar_pagina(pagina, idioma: str = "pt") -> list:
     for d in pagina.diagramas:
         linha = primeira_linha(textos.get(d.id, ""), idioma) if d.lido and d.id else []
         dito = d.lado if d.lado_origem != LADO_DOS_LANCES else None
-        validacao = validar(d.fen, linha, lado=dito, roque=d.roque) if linha else None
+        validacao = (validar(d.fen, linha, lado=dito, roque=d.roque,
+                             roque_informado=d.roque_informado) if linha else None)
         novo = d if d.validacao == validacao else replace(d, validacao=validacao)
         if not novo.conferido and dito is None:
             # O número do primeiro lance (`1...`) diz de quem é a vez quando ninguém disse.

@@ -746,6 +746,32 @@ conferido o primeiro, ele saiu desenhado nos três formatos e o FEN dele foi ach
 Nas páginas 26 e 27 do Darcy Lima, o lote levou 24 s depois de 13 s carregando os modelos, e
 os três arquivos saíram em 1,5 s (PDF), 0,8 s (DOCX) e 0,5 s (EPUB).
 
+### As páginas do livro: mover, apagar, inserir (passo L)
+
+O menu **Página** tem **Mover páginas…**, **Apagar páginas…**, **Inserir páginas…** e
+**Páginas apagadas…**; a gaveta de Páginas move e apaga as linhas selecionadas (menu de
+contexto). As páginas se escolhem como texto, com o número de agora no livro: `3-7, 12`,
+`ímpares`, `pares` ou `todas`; o diálogo diz quantas o texto escolhe, ou o que está errado
+nele.
+
+- **Mover** tira as páginas de onde estão e as põe, na mesma ordem, depois da página
+  escolhida (0: o começo do livro).
+- **Apagar** tira as páginas do livro, da busca, da fila e das exportações, mas o projeto as
+  guarda com os glifos, as correções e os padrões ensinados nelas: **Páginas apagadas…** as
+  devolve ao lugar de onde saíram (todas juntas, ou da apagada mais recente para a mais
+  antiga, voltam à ordem exata).
+- **Inserir** põe no livro as páginas de um PDF ou de imagens, copiadas para a pasta
+  `inseridas/` do projeto (o arquivo de fora pode sumir depois). PDF com senha é recusado.
+  As inseridas são lidas, ensinadas e exportadas como as outras (o PDF pesquisável com elas
+  vem na rodada 4 do passo L).
+
+Cada operação é um passo do **Ctrl+Z**. Elas ficam desligadas, com o motivo na dica, no
+projeto só para leitura, com o lote rodando ou com uma tarefa em curso. A página de cada
+glifo tem um número que não muda (o `pid`): a página aberta, a busca, o lote a retomar e a
+origem das amostras seguem a página para onde ela for. O `projeto.json` guarda a ordem do
+livro desde o formato 3 (§12.4): o projeto antigo passa a ele na primeira abertura com o PDF
+no lugar, e os arquivos de antes ficam em `backup-v2/`.
+
 ### O projeto no disco
 
 Desde o passo 1a, todo arquivo do projeto (as páginas, que desde o 1b trazem as áreas e a

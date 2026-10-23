@@ -79,6 +79,13 @@ def montar(janela) -> None:
                              texto="Página verificada (abre a próxima)")
     j.acao_antes_do_lote = acao(j, "voltar_antes_do_lote", j.voltar_ao_antes_do_lote,
                                 texto="Voltar ao estado antes do lote…")
+    # As operações de página (§12.4, passo L): sem tecla, no menu Página e na gaveta.
+    j.acao_mover_paginas = teclado.sem_atalho(j, "Mover páginas…", lambda: j.mover_paginas())
+    j.acao_apagar_paginas = teclado.sem_atalho(j, "Apagar páginas…", lambda: j.apagar_paginas())
+    j.acao_inserir_paginas = teclado.sem_atalho(j, "Inserir páginas…", j.inserir_paginas)
+    j.acao_paginas_apagadas = teclado.sem_atalho(j, "Páginas apagadas…", j.paginas_apagadas)
+    j.acoes_de_paginas = (j.acao_mover_paginas, j.acao_apagar_paginas, j.acao_inserir_paginas,
+                          j.acao_paginas_apagadas)
     barra.addSeparator()
 
     # --- A fila ----------------------------------------------------------------
@@ -293,7 +300,7 @@ def _menus(j) -> None:
     for acao in (j.acao_anterior, j.acao_seguinte, j.acao_primeira, j.acao_ultima,
                  j.acao_ir_para, j.acao_voltar_visita, j.acao_avancar_visita, None,
                  j.acao_reconhecer, j.acao_reler, j.acao_verificada, j.acao_antes_do_lote,
-                 None,
+                 None, *j.acoes_de_paginas, None,
                  j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
                  j.acao_escopo_da_fila, j.acao_proximo_do_livro, j.acao_diagramas):
         menu.addSeparator() if acao is None else menu.addAction(acao)
@@ -331,6 +338,18 @@ def atualizar(janela) -> None:
     j, p = janela, janela.pagina
     tem = p.pronto
     sem_lote = not p.lote_rodando
+    # As operações de página: desligadas, com o motivo na dica (só para leitura, o lote, uma
+    # tarefa em curso, o projeto ainda na v2).
+    motivo = p.motivo_para_nao_mudar_as_paginas()
+    apagadas = bool(p.projeto.sequencia.apagadas) if p.projeto is not None else False
+    dicas = ("Muda páginas de lugar (as escolhidas, depois de outra)",
+             "Tira páginas do livro; elas ficam guardadas no projeto",
+             "Põe páginas de um PDF ou de imagens no livro",
+             "Devolve ao livro as páginas apagadas")
+    for q, dica, vale in zip(j.acoes_de_paginas, dicas, (True, True, True, apagadas)):
+        q.setEnabled(motivo is None and vale)
+        q.setToolTip(dica if motivo is None else f"{dica}. {motivo}")
+    j.paginas.paginas_mudam = motivo is None
     total = p.fonte.total if p.fonte else 0
     editar = tem
     j.acao_novo.setEnabled(sem_lote)

@@ -153,6 +153,8 @@ class EspacoDeTrabalho:
         self.paginas.abrir.connect(self.ir_para_pagina)
         self.paginas.reconhecer.connect(lambda indices: self.livro.reconhecer(indices, False))
         self.paginas.reconhecer_livro.connect(self.reconhecer_livro)
+        self.paginas.mover.connect(self.mover_paginas)
+        self.paginas.apagar.connect(self.apagar_paginas)
         self.doca_paginas = _doca(self, "Páginas", "doca_paginas", self.paginas,
                                   Qt.DockWidgetArea.LeftDockWidgetArea)
         self.doca_paginas.hide()

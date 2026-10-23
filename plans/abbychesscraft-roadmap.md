@@ -773,7 +773,8 @@ de 1 s), a tem já: parado 0,25 s em cada página nunca vista, ~390 → ~250 ms 
 
 **Pendente.** O render do fitz segura o GIL (~80 ms por página nunca vista, a interface
 para nesse tempo durante a pré-carga); tirá-lo da interface pede um processo, como o
-servidor de leitura. A medida da inclinação (~370 ms) poderia buscar do grosso ao fino, mas
+servidor de leitura. **Feito em 2026-10-23 para a pré-carga** (`abbychess/render.py`, ver
+"Pendências"); a página pedida na hora ainda renderiza aqui. A medida da inclinação (~370 ms) poderia buscar do grosso ao fino, mas
 mudaria os ângulos gravados dos projetos novos: fica para quando houver gabarito que a meça.
 
 **Tarefas.**
@@ -954,10 +955,15 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
 - O Enter que confirma a leitura não monta mais o texto da página para a validação pelos
   lances: ~25 ms na mediana (38,8 antes).
 
+- A exportação lê a página pela `OrdemDeLeitura` do Documento (F, J): as duas liam igual em
+  157 de 160 páginas de 8 livros, e nas 3 outras a da exportação inventava colunas.
+- A pré-carga renderiza o PDF num processo à parte (K): a interface não para mais ~85 ms a
+  cada página nunca vista (a maior parada, 13–14 ms).
+- A suíte rápida roda em paralelo (`-n auto`, pytest-xdist): ~32–39 s.
+
 Continuam: CA-10.1 (a redação, decisão do usuário); o itálico no OCR (régua do core); CA-9.1 e
-CA-F.1 (o texto verificado); os testes do EPUB em leitores; o render do fitz num processo (K);
-unificar as linhas da exportação com a `OrdemDeLeitura` (F, J). A suíte rápida roda em
-paralelo (`-n auto`, pytest-xdist): ~32 s.
+CA-F.1 (o texto verificado); os testes do EPUB em leitores; a página pedida na hora ainda
+renderiza na thread da interface.
 
 ---
 

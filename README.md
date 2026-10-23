@@ -1001,38 +1001,38 @@ Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (commit 76ba432; má
 
 Desempenho por passo, em ms ou MB (uma rodada cada, a do portão, que roda no mesmo processo depois dos testes `livro_real` e por isso não é a condição das rodadas repetidas; quanto o mesmo código varia, e o que se conclui, está nelas, abaixo):
 
-| Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) | 2a (`2026-10-16-passo-2a.json`) | 2b (`2026-10-16-passo-2b.json`) | a1 (`2026-10-16-passo-a1.json`) | a2 (`2026-10-16-passo-a2.json`) | a3 (`2026-10-17-passo-a3.json`) | e (`2026-10-17-passo-e.json`) | d1 (`2026-10-17-passo-d1-094555.json`) | b (`2026-10-17-passo-b.json`) | d2 (`2026-10-17-passo-d2.json`) | l (`2026-10-23-passo-l.json`) | pendencias (`2026-10-23-passo-pendencias.json`) |
+| Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) | 2a (`2026-10-16-passo-2a.json`) | 2b (`2026-10-16-passo-2b.json`) | a1 (`2026-10-16-passo-a1.json`) | a2 (`2026-10-16-passo-a2.json`) | a3 (`2026-10-17-passo-a3.json`) | e (`2026-10-17-passo-e.json`) | d1 (`2026-10-17-passo-d1-094555.json`) | b (`2026-10-17-passo-b.json`) | d2 (`2026-10-17-passo-d2.json`) | l (`2026-10-23-passo-l.json`) | pendencias (`2026-10-23-passo-pendencias-151932.json`) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,89 | 15,21 | 16,04 | 14,5 | 16,74 | 17,44 | 18,97 | 18,6 | 18,82 | 19,7 |
-| Troca fora do cache, p95 | — | — | — | — | — | 147,1 | 144,68 | 145,27 | 146,97 | 147,86 | 150,02 | 153,78 | 135,34 | 138,58 |
-| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 23,68 | 26,63 | 26,8 | 22,41 | 26,12 | 29,66 | 27,35 | 32,23 | 54,04 | 41,97 |
-| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 16,92 | 20,23 | 20,88 | 20,15 | 44,48 | 45,03 | 46,99 | 51,44 | 57,97 | 55,01 |
+| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,89 | 15,21 | 16,04 | 14,5 | 16,74 | 17,44 | 18,97 | 18,6 | 18,82 | 16,43 |
+| Troca fora do cache, p95 | — | — | — | — | — | 147,1 | 144,68 | 145,27 | 146,97 | 147,86 | 150,02 | 153,78 | 135,34 | 138,42 |
+| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 23,68 | 26,63 | 26,8 | 22,41 | 26,12 | 29,66 | 27,35 | 32,23 | 54,04 | 41,43 |
+| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 16,92 | 20,23 | 20,88 | 20,15 | 44,48 | 45,03 | 46,99 | 51,44 | 57,97 | 52,37 |
 | Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 | 164 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8,6 | 8,6 |
-| Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 12,9 | 22 | 12 | 9,5 | 2,2 | 2,3 | 2,4 | 2,5 | 2,2 | 2,2 |
-| Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1654 | 1793 | 1799 | 1823 | 2050 | 2053 | 2459 | 2468 | 2752 | 1994 |
-| Releitura com o lote, p95 | — | — | — | — | — | — | — | — | 124,11 | 113,34 | 92,99 | 111,17 | 169,14 | 206,09 |
-| Atraso no lote falso (51 p.), p99 | — | — | — | — | — | — | — | — | 14,1 | 2,8 | 4,1 | 4,6 | 2,1 | 2,5 |
-| Gravar uma página do lote, p95 | — | — | — | — | — | — | — | — | 17,6 | 19,2 | 19,7 | 22 | 32 | 36,7 |
-| Lote com servidor (s/p.) | — | — | — | — | — | — | — | — | 8,33 | 8,34 | 8,5 | 8,71 | 17,2 | 8,5 |
-| Lote sem servidor (s/p.) | — | — | — | — | — | — | — | — | 8,26 | 8,52 | 8,48 | 8,71 | 17,4 | 8,52 |
-| Pintura de 2.000 boxes, p95 | — | — | — | — | — | 11,5 | 13,14 | 13,2 | 13,12 | 13,27 | 13,2 | 13,46 | 12 | 10,03 |
-| Montar o Documento, p95 | — | — | — | — | 25,61 | 22,72 | 25,97 | 31,78 | 39,82 | 34,81 | 35,42 | 34,88 | 41,17 | 45,92 |
-| Clique no Documento, p95 | — | — | — | — | — | — | — | 2,84 | 3,25 | 3,46 | 3,26 | 3,43 | 11,33 | 4,4 |
-| Clique acha o box, p95 | — | — | — | — | — | 0,0016 | 0,0016 | 0,0016 | 0,0017 | 0,0017 | 0,0017 | 0,0017 | 0,0016 | 0,002 |
-| Montar o índice da busca (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | 1395,66 | 1430,76 | 1422,75 | 1502,46 |
-| Buscar regex no livro (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | 17,25 | 15,07 | 13,51 | 13,47 |
-| Atraso durante a busca, p99 | — | — | — | — | — | — | — | — | — | — | 2 | 1,8 | 1,6 | 2,3 |
+| Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 12,9 | 22 | 12 | 9,5 | 2,2 | 2,3 | 2,4 | 2,5 | 2,2 | 2,6 |
+| Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1654 | 1793 | 1799 | 1823 | 2050 | 2053 | 2459 | 2468 | 2752 | 1998 |
+| Releitura com o lote, p95 | — | — | — | — | — | — | — | — | 124,11 | 113,34 | 92,99 | 111,17 | 169,14 | 102,71 |
+| Atraso no lote falso (51 p.), p99 | — | — | — | — | — | — | — | — | 14,1 | 2,8 | 4,1 | 4,6 | 2,1 | 2,1 |
+| Gravar uma página do lote, p95 | — | — | — | — | — | — | — | — | 17,6 | 19,2 | 19,7 | 22 | 32 | 41,7 |
+| Lote com servidor (s/p.) | — | — | — | — | — | — | — | — | 8,33 | 8,34 | 8,5 | 8,71 | 17,2 | 8,6 |
+| Lote sem servidor (s/p.) | — | — | — | — | — | — | — | — | 8,26 | 8,52 | 8,48 | 8,71 | 17,4 | 8,75 |
+| Pintura de 2.000 boxes, p95 | — | — | — | — | — | 11,5 | 13,14 | 13,2 | 13,12 | 13,27 | 13,2 | 13,46 | 12 | 11,93 |
+| Montar o Documento, p95 | — | — | — | — | 25,61 | 22,72 | 25,97 | 31,78 | 39,82 | 34,81 | 35,42 | 34,88 | 41,17 | 42,14 |
+| Clique no Documento, p95 | — | — | — | — | — | — | — | 2,84 | 3,25 | 3,46 | 3,26 | 3,43 | 11,33 | 4,21 |
+| Clique acha o box, p95 | — | — | — | — | — | 0,0016 | 0,0016 | 0,0016 | 0,0017 | 0,0017 | 0,0017 | 0,0017 | 0,0016 | 0,0018 |
+| Montar o índice da busca (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | 1395,66 | 1430,76 | 1422,75 | 1454 |
+| Buscar regex no livro (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | 17,25 | 15,07 | 13,51 | 13,21 |
+| Atraso durante a busca, p99 | — | — | — | — | — | — | — | — | — | — | 2 | 1,8 | 1,6 | 2 |
 | Atraso durante o aborto, p99 | — | — | — | — | — | — | — | — | — | — | 2 | 1,2 | 1,5 | 1,5 |
-| Índice pela janela (230 p.), máx. | — | — | — | — | — | — | — | — | — | — | 2217 | 2257 | 2379 | 2504 |
-| Substituir no livro: a janela presa (230 p.) | — | — | — | — | — | — | — | — | — | — | — | 371 | 355 | 360 |
-| Substituir no livro: o Ctrl+Z (230 p.) | — | — | — | — | — | — | — | — | — | — | — | 563 | 527 | 526 |
+| Índice pela janela (230 p.), máx. | — | — | — | — | — | — | — | — | — | — | 2217 | 2257 | 2379 | 2506 |
+| Substituir no livro: a janela presa (230 p.) | — | — | — | — | — | — | — | — | — | — | — | 371 | 355 | 370 |
+| Substituir no livro: o Ctrl+Z (230 p.) | — | — | — | — | — | — | — | — | — | — | — | 563 | 527 | 537 |
 | Substituir no livro: o desfazer (MB) | — | — | — | — | — | — | — | — | — | — | — | 43,4 | 44 | 44 |
-| Abrir ao painel de Páginas (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | — | — | 54,8 | 56,1 |
-| Dividir o livro lido (230 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 7741 | 7840 |
-| Dividir o livro: o Ctrl+Z (230 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 2347 | 2615 |
-| Dividir o livro antes de ler (231 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 129 | 130 |
-| Girar o livro lido (230 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 342 | 662 |
-| Girar uma página, p95 | — | — | — | — | — | — | — | — | — | — | — | — | 16,43 | 15,26 |
+| Abrir ao painel de Páginas (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | — | — | 54,8 | 150,9 |
+| Dividir o livro lido (230 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 7741 | 8075 |
+| Dividir o livro: o Ctrl+Z (230 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 2347 | 2524 |
+| Dividir o livro antes de ler (231 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 129 | 134 |
+| Girar o livro lido (230 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 342 | 663 |
+| Girar uma página, p95 | — | — | — | — | — | — | — | — | — | — | — | — | 16,43 | 15,58 |
 
 Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter do passo 0 ao 1b tem duas faixas no mesmo código (perto de 110–130 e de 180–235; no 2a, uma só, perto de 90); o atraso no lote tem duas faixas sempre (perto de 8–10 e de 21). Desde o 2b o congelamento é desligado (`ABBY_CONGELAR=1` liga): as duas linhas do 2b rodam o mesmo programa (o rótulo `sem_congelar` é do roteiro de medida), e a coluna do Enter mede até a cor mudar (até o 2a, até o fim da propagação). Desde o A1 a troca é no cache de páginas (a vizinha já pré-carregada); a de fora do cache tem coluna própria. Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
 
@@ -1617,8 +1617,10 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 - **Depois das pendências de 2026-10-23** (portão do `0888053`, coluna "pendencias" das
   tabelas; o registro em `docs/revisoes/pendencias.md`). O lote voltou a 8,5 s por página e o
   clique no Documento a 3,7 ms. **A releitura de um glifo com o lote** passa do alvo de 150 ms
-  no p95 numa parte das rodadas (206 no portão, 101–153 em três repetições; no L, 106–169):
-  com o lote duas vezes mais rápido, ela disputa o servidor com mais páginas. **O Enter** que
+  no p95 numa parte das rodadas (206 no primeiro portão, 101–153 em três repetições, 103 no
+  segundo portão; no L, 106–169). **A pré-carga** renderiza o PDF num processo à parte
+  (`abbychess/render.py`): a interface não para mais ~85 ms a cada página nunca vista; a
+  página pedida na hora ainda renderiza na thread da interface. **O Enter** que
   confirma a leitura ficou em ~25 ms na mediana (três rodadas do `9c98367`); o que corrige um
   caractere ainda paga ~25 ms a mais, da validação pelos lances, que monta o texto da página.
   **A suíte rápida** leva ~32 s em paralelo (`-n auto`), dentro dos 60 s da §15.1; em série,

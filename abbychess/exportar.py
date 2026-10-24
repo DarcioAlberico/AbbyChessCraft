@@ -342,13 +342,12 @@ def palavras(boxes: Sequence[BoxEntry]) -> List[List[Tuple[str, List[int]]]]:
 def _palavras_por_trecho(boxes: Sequence[BoxEntry], leitura: Optional[OrdemDeLeitura] = None
                          ) -> List[Tuple[Tuple[int, int], List[Tuple[str, List[int]]]]]:
     """As linhas de `palavras`, cada uma com o trecho de leitura em que está."""
-    from core.notacao import normalizar_saida, palavras_da_pagina
+    from core.notacao import normalizar_saida
 
     leitura = leitura or OrdemDeLeitura.da_pagina(boxes)
     saida = []
     for chave, trecho in leitura.trechos(boxes):
-        parte = [boxes[i] for i in trecho]
-        for linha in palavras_da_pagina(parte, leitura.deteccao_do_trecho(trecho, boxes)):
+        for linha in leitura.linhas_do_trecho(trecho, boxes):
             indices = [trecho[s.indice] for p in linha for s in p.simbolos]
             caixa = _caixa_pela_altura(boxes, indices)
             saida.append((chave, [(_captura_minuscula("".join(

@@ -103,6 +103,48 @@ def test_dividir_fora_do_box_ou_no_branco_e_recusado(imagem, leitor):
     assert boxes == antes
 
 
+def _par_com_pingo(pingo_largo: bool = False):
+    """Um "vi" colado num box só: o "v" e a haste do "i" ligados por uma ponte fina, e o
+    pingo (ou, com `pingo_largo`, uma barra da largura do par) acima, com branco entre."""
+    from PIL import Image, ImageDraw
+
+    from core.box_model import BoxEntry
+
+    imagem = Image.new("L", (60, 60), 255)
+    d = ImageDraw.Draw(imagem)
+    d.rectangle((10, 22, 27, 49), fill=0)            # o "v"
+    d.rectangle((28, 47, 31, 48), fill=0)            # a ponte que os colou
+    d.rectangle((32, 22, 36, 49), fill=0)            # a haste do "i"
+    d.rectangle((10, 10, 36, 14) if pingo_largo else (32, 10, 36, 14), fill=0)
+    return imagem, [BoxEntry("", 10, 10, 37, 50)]
+
+
+def test_dividir_nao_separa_o_pingo_do_i():
+    """O core corta sob o pingo (o vão horizontal é o mais fundo); o pingo sozinho
+    partia a linha. O corte vai para a coluna, e o pingo fica com a haste."""
+    imagem, boxes = _par_com_pingo()
+    pg.dividir(imagem, boxes, 0)
+    # A ponte fica com o "i": o vale é a ponte inteira, e o empate vai ao mais central.
+    assert [_caixa(b) for b in boxes] == [(10, 22, 28, 50), (28, 10, 37, 50)]
+
+
+def test_dividir_empilhados_de_verdade_continua_no_eixo_do_core():
+    """A parte de cima larga não é pingo: o corte do core fica."""
+    imagem, boxes = _par_com_pingo(pingo_largo=True)
+    pg.dividir(imagem, boxes, 0)
+    assert [_caixa(b) for b in boxes] == [(10, 10, 37, 15), (10, 22, 37, 50)]
+
+
+def test_dividir_um_box_girado_continua_no_eixo_do_core():
+    """No rótulo girado as letras se empilham em y: o corte horizontal é o certo."""
+    from dataclasses import replace
+
+    imagem, boxes = _par_com_pingo()
+    boxes[0] = replace(boxes[0], angulo=90)
+    pg.dividir(imagem, boxes, 0)
+    assert [_caixa(b) for b in boxes] == [(32, 10, 37, 15), (10, 22, 37, 50)]
+
+
 def test_cada_parte_dividida_ensina_a_sua_letra(projeto, imagem, leitor):
     """O caso do "rp": dividido, cada letra vira um padrão, e não o par."""
     boxes, a, b = _colar_ab(imagem, leitor)

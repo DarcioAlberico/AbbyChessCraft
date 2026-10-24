@@ -118,3 +118,47 @@ class OrdemDeLeitura:
         """A detecção para `palavras_da_pagina` do trecho: a da página, quando o trecho é a
         página inteira (os mesmos boxes, na mesma ordem); senão, None (o core a faz)."""
         return self.deteccao if len(indices) == len(boxes) else None
+
+    def linhas_do_trecho(self, indices: Sequence[int], boxes: Sequence[BoxEntry]) -> list:
+        """As linhas de palavras do trecho (`palavras_da_pagina` do core, com os índices dos
+        símbolos relativos ao trecho), partidas nos vãos largos demais (`partir_nos_vaos`)."""
+        from core.notacao import palavras_da_pagina
+
+        trecho = [boxes[i] for i in indices]
+        return partir_nos_vaos(palavras_da_pagina(trecho, self.deteccao_do_trecho(indices, boxes)),
+                               trecho)
+
+
+#: O vão entre palavras que parte uma linha, em alturas de glifo (a mediana da linha), e as
+#: palavras que cada parte precisa ter. Nas p. 21–27 do Xadrez Vitorioso, as legendas de dois
+#: diagramas lado a lado saíam numa linha só, com 10,5 alturas entre elas (entre palavras, ~0,6).
+#: Em 135 páginas de 9 livros, só passam dos dois as legendas lado a lado, as colunas de um
+#: índice e títulos com ornamentos, que também são linhas à parte; a tabela de lances (o
+#: número de um lado, o lance do outro) fica em 6,3, e por isso o limiar é 8.
+VAO_QUE_PARTE, PALAVRAS_DE_CADA_LADO = 8.0, 3
+
+
+def partir_nos_vaos(linhas: list, trecho: Sequence[BoxEntry]) -> list:
+    """Cada linha do core partida onde o vão entre duas palavras passa de `VAO_QUE_PARTE`
+    alturas de glifo, com ao menos `PALAVRAS_DE_CADA_LADO` palavras em cada parte: o core
+    junta numa linha o que está na mesma altura, e as legendas lado a lado viravam uma frase."""
+    saida = []
+    for linha in linhas:
+        palavras = [p for p in linha if p.simbolos]
+        if len(palavras) < 2 * PALAVRAS_DE_CADA_LADO:
+            saida.append(linha)
+            continue
+        altura = statistics.median(trecho[s.indice].y2 - trecho[s.indice].y1
+                                   for p in palavras for s in p.simbolos)
+        partes, atual = [], [palavras[0]]
+        for k, (p, q) in enumerate(zip(palavras, palavras[1:]), start=1):
+            vao = (min(trecho[s.indice].x1 for s in q.simbolos)
+                   - max(trecho[s.indice].x2 for s in p.simbolos))
+            if (vao > VAO_QUE_PARTE * max(1, altura) and len(atual) >= PALAVRAS_DE_CADA_LADO
+                    and len(palavras) - k >= PALAVRAS_DE_CADA_LADO):
+                partes.append(atual)
+                atual = []
+            atual.append(q)
+        partes.append(atual)
+        saida.extend(partes if len(partes) > 1 else [linha])
+    return saida

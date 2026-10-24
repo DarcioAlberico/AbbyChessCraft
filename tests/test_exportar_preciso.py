@@ -115,6 +115,32 @@ def _duas_colunas(titulo=""):
     return boxes
 
 
+def _lado_a_lado(esquerda, direita, vao_em_alturas, y=3300):
+    """Duas frases na mesma altura, a da direita a `vao_em_alturas` alturas de letra (50)."""
+    boxes = _linha(esquerda, y, x=200)
+    fim = max(b.x2 for b in boxes)
+    return boxes + _linha(direita, y, x=fim + int(vao_em_alturas * 50))
+
+
+def test_as_legendas_lado_a_lado_sao_duas_linhas():
+    """Xadrez Vitorioso p. 25: as legendas dos dois diagramas saíam numa frase só."""
+    boxes = _lado_a_lado("Diagrama 6. Jogam as brancas.", "Diagrama 7. Jogam as brancas.", 10.5)
+    assert [" ".join(t for t, _ in linha) for linha in ex.palavras(boxes)] == [
+        "Diagrama 6. Jogam as brancas.", "Diagrama 7. Jogam as brancas."]
+
+    pagina = Pagina(1, 0, boxes=[Box(i, e) for i, e in enumerate(boxes)], proximo_n=len(boxes))
+    assert tx.texto(tx.montar(pagina)).splitlines() == [
+        "Diagrama 6. Jogam as brancas.", "Diagrama 7. Jogam as brancas."]
+
+
+@pytest.mark.parametrize("esquerda, direita, vao", [
+    ("32. ... b2xa2 c3 d4", "Tb2xa2 Rg8 Th8", 6.3),       # a tabela de lances: vão menor
+    ("Capitulo um", "Diagrama 7. Jogam as brancas.", 12),  # só duas palavras de um lado
+])
+def test_o_vao_que_nao_parte_a_linha(esquerda, direita, vao):
+    assert len(ex.palavras(_lado_a_lado(esquerda, direita, vao))) == 1
+
+
 def test_as_colunas_nao_se_misturam_na_linha():
     textos = [b.texto for b in ex.paragrafos(_duas_colunas())]
     juntos = " ".join(textos)

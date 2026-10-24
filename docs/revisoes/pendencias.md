@@ -315,9 +315,12 @@ Resolvido com o usuário:
 
 Medido com o texto verificado (seção acima):
 - **CA-9.1** aprova, provisório até a estrutura ser revisada.
-- **CA-F.1** reprova. Estava em 92,4% da linha de base; com a fila do contexto
-  (`abbychess/contexto.py`, `29572c1`) foi a 90,1% (1.066 gestos), e com o ensinar em lote
-  (Ctrl+Enter, `02fc26a`, catálogo 6) a 89,4% (1.057); o alvo é ≤ 70%. O descritor
+- **CA-F.1** aprova, com o alvo novo. Estava em 92,4% da linha de base; com a fila do
+  contexto (`abbychess/contexto.py`, `29572c1`) foi a 90,1% (1.066 gestos), com o ensinar em
+  lote (Ctrl+Enter, `02fc26a`, catálogo 6) a 89,4% (1.057), e com o palpite da rede no glifo
+  que ninguém leu (`92ce6b9`, catálogo 7) a 83,1% (983). O alvo era ≤ 70% depois do D1; com o
+  sim do usuário, passou a ≤ 85% no fim do roadmap (SPEC §15.4). Fica provisório até a
+  estrutura e os FEN serem revisados. O descritor
   `contraste_borrado` reprovou na validação no Darcy Lima e no Yusupov e não foi adotado. O
   detalhe e o que falta estão em `docs/revisoes/ca-f1-investigacao.md`.
 

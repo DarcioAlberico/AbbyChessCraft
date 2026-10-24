@@ -63,7 +63,7 @@ Toda meta de tempo é um **alvo**; o **corte** que reprova é alvo × 1,2 (§15.
 | Atraso de evento da interface durante o lote | p99 ≤ 50 ms, com as ações funcionando |
 | Memória do desfazer (300 páginas × 20 ações) | ≤ 50 MB |
 | Memória total com o lote rodando | ≤ 2,5 GB |
-| Gestos para levar as p. 21–27 ao gabarito (replay, CA-F.1) | ≤ 70% da linha de base depois do D1 |
+| Gestos para levar as p. 21–27 ao gabarito (replay, CA-F.1) | ≤ 85% da linha de base no fim do roadmap |
 
 O número de hoje de cada meta não fica aqui: ele está no JSON da medida
 (`docs/medidas/`) e na tabela que `ferramentas/resumo_medidas.py` gera no README
@@ -1087,9 +1087,14 @@ filtrado por `passo ≤ atual`, rodam na linha de base e depois; o que nenhum co
 corrige entra com o custo fixo de "impossível" declarado no catálogo. A linha de base é
 sempre medida com o código da tag `passo-0` (o replay chama o núcleo, que muda); duas
 medidas só se comparam com o mesmo snapshot, catálogo e versões dos gabaritos. O total
-`gestos` (com os impossíveis) é ≤ 70% da linha de base depois do passo D1. (Até a versão
-0.8 do roadmap havia também ≤ 85% depois do A3; saiu porque o A3 é só leitura e não muda o
-custo de nenhum comando.)
+`gestos` (com os impossíveis) é ≤ 85% da linha de base no fim do roadmap (o passo L, com as
+pendências). (Até a versão 0.8 do roadmap havia também ≤ 85% depois do A3; saiu porque o A3 é
+só leitura e não muda o custo de nenhum comando. Até 2026-10-24 o alvo era ≤ 70% depois do
+D1; mudou, com o sim do usuário, depois da investigação `docs/revisoes/ca-f1-investigacao.md`:
+dos 983 gestos que sobram, 190 são o custo fixo do que nenhum comando corrige (5 linhas que a
+leitura não acha e os 170 caracteres delas), e o resto é sobretudo ensinar o glifo que a rede
+erra e dividir os colados, um gesto por glifo. As alavancas que ainda restam, somadas, ficam
+perto de 0,80.)
 **CA-F.2** (informativo, não reprova) Tempo humano pelo protocolo
 `docs/medidas/protocolo-fatia.md`: o mesmo snapshot; o tempo vem do registro de gestos da
 aplicação (`ABBY_REGISTRO_DE_EVENTOS`, somado por `ferramentas/tempo_da_fatia.py`),

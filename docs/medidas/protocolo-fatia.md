@@ -37,7 +37,8 @@ do estado reconhecido ao gabarito. Ela tem duas partes.
    que recusa medidas de snapshots diferentes, de versões diferentes do catálogo, de
    gabaritos diferentes (versão ou conteúdo de algum) ou de conjuntos de linhas diferentes.
 7. **O critério** do roadmap vale sobre o total `gestos`, que inclui o custo fixo dos
-   impossíveis: ≤ 85% da linha de base depois do passo A3, e ≤ 70% depois do D1. Um passo
+   impossíveis: ≤ 85% da linha de base no fim do roadmap (até 2026-10-24, ≤ 70% depois do
+   D1; SPEC §15.4 diz por que mudou). Um passo
    que torna possível uma correção antes impossível tem de baixar esse total. A navegação
    entre as páginas (`gestos_navegacao`) entra no total e sai também à parte.
 

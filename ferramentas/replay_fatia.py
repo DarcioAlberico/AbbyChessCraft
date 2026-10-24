@@ -14,7 +14,7 @@ declarados no catálogo e conferidos com a interface real por `tests/test_custo_
 
 As diferenças que nenhum comando do passo corrige ficam contadas como **impossíveis**, cada
 uma com o custo fixo declarado no catálogo, e entram no total; o total sem elas também sai.
-O critério do roadmap (≤ 85% depois do A3, ≤ 70% depois do D1) vale sobre o total `gestos`,
+O critério do roadmap (≤ 85% da linha de base no fim dele, SPEC §15.4) vale sobre o total `gestos`,
 com os impossíveis: um passo que torna uma correção possível tem de baixar o total.
 
 Os padrões ensinados valem para o resto da fatia, como no programa: ao chegar a uma página

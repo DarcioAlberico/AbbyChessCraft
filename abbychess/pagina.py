@@ -1017,19 +1017,28 @@ def dividir(imagem: Image.Image, boxes: List[BoxEntry], indice: int,
     do par, e a altura relativa que o padrão do livro grava ensinaria um "r"
     do tamanho de um "p".
 
+    **O pingo do "i" não é um glifo.** Em "vi", "wi" e "xi" o vão horizontal sob o
+    pingo é mais fundo que o vertical entre as letras, e o core corta ali (ele diz
+    isso na própria `split_box`): saíam o pingo e o par sem pingo, um em cima do
+    outro, e o pingo solto partia a linha. Quando a parte de cima é só um pingo, o
+    corte vai para o vão vertical mais fundo do resto (`_corte_sob_o_pingo`).
+
     As partes entram no lugar do box, a da esquerda (ou de cima) primeiro, sem
     leitura e fora do manual. Com `leitor`, são relidas na hora. Devolve os
     índices das duas; os boxes depois de `indice` andam uma casa para a frente.
     """
     box = boxes[indice]
     matriz = np.asarray(imagem.convert("L"))
+    tinta = BoxService._tinta_do_box(box, matriz)
     if x is None:
         partes = BoxService.split_box(box, matriz)
+        coluna = _corte_sob_o_pingo(partes, box, tinta)
+        if coluna is not None:
+            partes = [replace(box, x2=coluna), replace(box, x1=coluna)]
     else:
         if not box.x1 < x < box.x2:
             raise ValueError(f"O corte em x={x} está fora do box ({box.x1}..{box.x2}).")
         partes = [replace(box, x2=x), replace(box, x1=x)]
-    tinta = BoxService._tinta_do_box(box, matriz)
     novas = []
     for parte in partes:
         parte = replace(parte, char="", source="", confidence=0.0,
@@ -1041,6 +1050,29 @@ def dividir(imagem: Image.Image, boxes: List[BoxEntry], indice: int,
     boxes[indice:indice + 1] = novas
     _reler(imagem, boxes, [indice, indice + 1], leitor)
     return [indice, indice + 1]
+
+
+#: O pingo: a parte de cima aparada com até esta fração da altura e da largura do box.
+PINGO_ALTURA, PINGO_LARGURA = 0.3, 0.5
+
+
+def _corte_sob_o_pingo(partes: List[BoxEntry], box: BoxEntry, tinta) -> Optional[int]:
+    """A coluna onde cortar quando o core cortou sob o pingo de um "i"; senão, `None`.
+
+    O vão vertical é medido só na tinta de baixo do corte do core, sem o pingo, pela
+    mesma régua do core (`_vale_mais_fundo`, com a margem dele)."""
+    if tinta is None or len(partes) != 2 or (box.angulo or 0) % 180:
+        return None                                  # girado, o corte em y é o certo
+    de_cima = partes[0]
+    if (de_cima.x1, de_cima.x2) != (box.x1, box.x2) or de_cima.y2 >= box.y2:
+        return None                                  # o core cortou na coluna
+    pingo = _aparar(de_cima, box, tinta)
+    if pingo is None or (pingo.y2 - pingo.y1 > PINGO_ALTURA * box.height
+                         or pingo.x2 - pingo.x1 > PINGO_LARGURA * box.width):
+        return None
+    vale = BoxService._vale_mais_fundo(tinta[de_cima.y2 - box.y1:].sum(axis=0),
+                                       BoxService.MARGEM_DO_CORTE)
+    return box.x1 + vale[0] if vale else None
 
 
 def _aparar(parte: BoxEntry, inteiro: BoxEntry, tinta) -> Optional[BoxEntry]:

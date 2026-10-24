@@ -109,10 +109,11 @@ def _lidos(pagina: Pagina, com_os_nao_lidos: bool):
 
 def palavras_dos_gids(pagina: Pagina) -> List[List[int]]:
     """As palavras (gids) de todas as linhas da página, em ordem de leitura, como a vista do
-    Documento as monta (com os não lidos): a mesma chave das linhas guardadas, então depois
-    do Documento elas não são refeitas."""
+    Documento as monta (com os não lidos e as decisões de palavra): a mesma chave das linhas
+    guardadas, então depois do Documento elas não são refeitas. Os virtuais entram pelos
+    gids deles (`pagina.decisoes.virtuais`)."""
     linhas, _ = _linhas_da_pagina(*_lidos(pagina, True))
-    return [p for ln in linhas for p in ln]
+    return [p for ln in _aplicar_decisoes(linhas, pagina.decisoes) for p in ln]
 
 
 def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:

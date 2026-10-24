@@ -34,6 +34,7 @@ def test_o_que_a_palavra_desmente(palavra, marcados):
 @pytest.mark.parametrize("palavra", [
     "Tae1+", "Cxh2", "12.h3+", "1.e4", "2...Cf6", "4.Bc4?", "0-0", "Bxd6++", "(1.Dc3",
     "e4-e5", "Bispo-c8)", "1º", "2ª", "1890", "Inicialmente", "Diagrama", "PEÇAS", "f7",
+    "NxN", "QxQ+", "DxD", "TxT", "♘gf3", "1.♘gf3", "♕xf7+", "exd6e.p.", "a8=D", "0-0-0",
 ])
 def test_lance_numero_e_palavra_comum_passam(palavra):
     assert _marcados(palavra) == "." * len(palavra)
@@ -67,22 +68,51 @@ def test_o_padrao_do_livro_volta_e_o_texto_nativo_nao():
     assert contexto.pendentes(boxes, Limiares()) == [False, True, False]
 
 
+class _Leitor:
+    """O k-NN do livro de mentira: lê todo glifo pendente como `char`."""
+
+    limiares = Limiares()
+
+    def __init__(self, char):
+        self.char, self.lidos = char, 0
+
+    def ler_pelo_livro(self, recorte, referencia, efeito):
+        self.lidos += 1
+        return SimpleNamespace(char=self.char, fonte=FONTE_LIVRO, confianca=0.5, amostra=None)
+
+
 def test_a_propagacao_rele_o_improvavel():
-    boxes = _linha("p0r")
-    lidos = []
-
-    class Leitor:
-        limiares = Limiares()
-
-        def ler_pelo_livro(self, recorte, referencia, efeito):
-            lidos.append(recorte.shape)
-            return SimpleNamespace(char="o", fonte=FONTE_LIVRO, confianca=0.5, amostra=None)
-
     from PIL import Image
 
-    resolvidos = pg.propagar_padroes(Image.new("L", (200, 200), 255), boxes, Leitor())
-    assert resolvidos == 1 and len(lidos) == 1
-    assert "".join(b.char for b in boxes) == "por"
+    boxes = _linha("p0r")
+    leitor = _Leitor("o")
+    assert pg.propagar_padroes(Image.new("L", (200, 200), 255), boxes, leitor) == 1
+    assert leitor.lidos == 1 and "".join(b.char for b in boxes) == "por"
+
+
+def test_o_improvavel_lido_igual_nao_conta_como_resolvido():
+    from PIL import Image
+
+    boxes = _linha("p0r")
+    leitor = _Leitor("0")                       # o padrão do livro também diz 0
+    assert pg.propagar_padroes(Image.new("L", (200, 200), 255), boxes, leitor) == 0
+    assert leitor.lidos == 1
+    assert contexto.pendentes(boxes, Limiares()) == [False, True, False]   # e segue na fila
+
+
+def test_a_quebra_de_palavra_do_usuario_vale_e_a_mudanca_renova_o_julgamento():
+    from abbychess import texto as tx
+
+    pagina = tx.pagina_avulsa(_linha("c0l0ca"))
+    zero = pagina.boxes[1].gid
+    assert zero in contexto.improvaveis(pagina)
+    pagina.boxes[1].entry.char = "o"                               # corrigido no lugar
+    assert zero not in contexto.improvaveis(pagina)
+    pagina.boxes[1].entry.char = "0"
+    l_ = pagina.boxes[2].gid
+    pagina.decisoes = type(pagina.decisoes)(quebras=frozenset({l_}))   # "c0" | "l0ca"
+    assert zero not in contexto.improvaveis(pagina)                 # "c0": 1 letra antes
+    assert pagina.boxes[3].gid in contexto.improvaveis(pagina)      # "l0ca" segue
 
 
 def test_o_resumo_conta_o_improvavel_com_qualquer_limiar():

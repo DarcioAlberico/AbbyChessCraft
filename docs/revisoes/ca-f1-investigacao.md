@@ -244,3 +244,47 @@ mais, que pede outra abordagem. Nenhuma combinação delas chega a 0,70.
 O alvo passou a ser **≤ 85% da linha de base no fim do roadmap** (SPEC §15.4), no lugar de
 ≤ 70% depois do D1. Com ele, o CA-F.1 aprova (0,831), provisório até a estrutura e os FEN das
 p. 21–27 serem revisados.
+
+## As linhas não lidas: o pingo do i e as legendas lado a lado (2026-10-24)
+
+Das 5 linhas sem par no fim do replay, só as duas legendas da p. 25 já estavam sem par no
+snapshot. Duas são a caixa do gabarito que engole o diagrama (i024 l03 e i026 l28); ficam
+para a revisão da estrutura. A quinta, a l06 da p. 26, casava no snapshot e se partia no meio
+do replay.
+
+**O pingo do i.** A divisão do "xi" de "existir", e depois a do "vi" de "vitória", saía com o
+pingo num box e o par sem pingo noutro, um em cima do outro. É o defeito que o próprio
+`split_box` do core descreve: em "vi" e "wi" o vão horizontal sob o pingo é mais fundo que o
+vertical entre as letras. O pingo solto, no alto da linha, a partia em duas, e a l06 deixava de
+casar. O `dividir` agora corta na coluna quando a parte de cima aparada é só um pingo, até 30%
+da altura e 50% da largura do box (`pagina._corte_sob_o_pingo`). O vão vertical é medido na
+tinta de baixo, pela régua do core. O box girado fica com o corte do core.
+
+**As legendas lado a lado.** O core junta numa linha o que está na mesma altura. As legendas
+dos Diagramas 6 e 7 saíam numa frase só, com 315 px entre elas: 10,5 alturas de letra, contra
+~0,6 entre palavras. `layout.partir_nos_vaos` parte a linha num vão de mais de 8 alturas, com
+3 palavras ou mais de cada lado. O Documento e a exportação montam as linhas por ela. Em 135
+páginas de 9 livros (15 por livro, só segmentadas), passaram do limiar:
+- as legendas lado a lado (as do Attacking Manual, com duas e com três);
+- as colunas de um índice onomástico;
+- títulos com ornamentos e a capa;
+- linhas de ruído do Yusupov.
+
+A tabela de lances do Rubinstein, o número de um lado e o lance do outro, fica em 6,3. Nas
+p. 21–27 só a linha das legendas se parte.
+
+**A medida** (`2026-10-24-fatia-xv-passo-L-143804.json`, no `7511f02`, árvore limpa, catálogo 7
+sem mudança) dá **880 gestos**, razão **0,744**. A linha de base continua em 1.183, porque é
+medida no código do passo 0. Os impossíveis caem de 190 para 56: sobram as 2 linhas do
+gabarito e os 48 caracteres delas. A estimativa da proposta 4 era de −60 a −70, contando só as
+legendas. A medida deu −103, porque a l06 da p. 26 também volta a casar, e com ela os
+caracteres certos que a leitura já tinha.
+
+A qualidade do Xadrez Vitorioso (`2026-10-24-qualidade-xv.json`, no `7511f02`) não se compara
+só com esta mudança, porque a anterior é de 2026-10-23, antes da fila do contexto. Nas páginas
+de corpo, só a p. 25 muda de linhas: 3 → 2 sem par e 2 → 0 perdidas. O CER do corpo vai de
+3,23% a 2,81%. Os pendentes sobem em todas as páginas de corpo, de 1 a 10 por página; é a fila
+do contexto, que manda à revisão a leitura confiante improvável. Na capa (i000, uma foto),
+as linhas de ruído partidas vão de 937 a 1.485 sem par.
+
+Com 0,744, o CA-F.1 passa do alvo novo com folga, mas ainda não chega aos 0,70 do alvo antigo.

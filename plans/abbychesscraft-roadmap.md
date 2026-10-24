@@ -996,6 +996,10 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   de ≤ 70% depois do D1. Com ele, o CA-F.1 **aprova** (83,1%), provisório até a estrutura e os
   FEN serem revisados.
 
+- O pingo do i no dividir e as legendas lado a lado em duas linhas (`7511f02`): o corte sob o
+  pingo de "vi"/"xi" vai para a coluna, e uma linha se parte num vão de mais de 8 alturas de
+  letra com 3 palavras de cada lado. A fatia cai para 880 gestos (74,4%).
+
 Continuam: os FEN e a estrutura das p. 21–27; o EPUB no
 Thorium e no celular. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).

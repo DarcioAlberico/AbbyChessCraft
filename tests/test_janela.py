@@ -640,3 +640,19 @@ def test_propagacao_nao_tira_o_glifo_escolhido_por_clique(app, janela, monkeypat
     _esperar(app, janela)
     assert janela.pagina.atual == escolhido
     assert janela.treino.campo.text() == "a"              # e com a leitura nova, não a velha
+
+
+def test_o_efeito_de_ensinar_sem_conflito_mostra_as_aspas(app):
+    """Sem o aviso de conflito, o rótulo não tinha marcação: o Qt o tomava por texto puro e
+    mostrava o escape do `html.escape` ("Enter ensina &#x27;1&#x27;")."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QTextDocument
+
+    from abbychess.app.painel_treino import PainelDeTreino
+
+    painel = PainelDeTreino()
+    painel.mostrar_aviso_de_ensino("Enter ensina '1' · 4 iguais nesta página", "")
+    assert painel.aviso_de_ensino.textFormat() == Qt.TextFormat.RichText
+    documento = QTextDocument()
+    documento.setHtml(painel.aviso_de_ensino.text())
+    assert documento.toPlainText() == "Enter ensina '1' · 4 iguais nesta página"

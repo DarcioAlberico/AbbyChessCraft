@@ -174,6 +174,9 @@ class PainelDeTreino(QWidget):
         self.leitura = QLabel("Abra um projeto e reconheça uma página.")
         #: O efeito e o conflito de ensinar o que está no campo (§8.3).
         self.aviso_de_ensino = QLabel("")
+        # Sempre HTML: só o efeito, sem o <span> do conflito, o Qt o adivinhava texto puro e
+        # mostrava o escape ("Enter ensina &#x27;1&#x27;").
+        self.aviso_de_ensino.setTextFormat(Qt.TextFormat.RichText)
         self.aviso_de_ensino.setWordWrap(True)
         self.aviso_de_ensino.setAccessibleName("O efeito de ensinar e o aviso de conflito")
         self.leitura.setWordWrap(True)

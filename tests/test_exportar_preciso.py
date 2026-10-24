@@ -282,3 +282,55 @@ def test_a_captura_sai_em_minuscula():
     assert ex._captura_minuscula("♖Xf2!") == "♖xf2!"
     assert ex._captura_minuscula("eXd5") == "exd5"
     assert ex._captura_minuscula("XIIIIIY") == "XIIIIIY"
+
+
+def _com_lacunas(*partes, y=3300):
+    """Uma linha de boxes de largura 16, como a p. 15 do Aagaard: cada parte é `(texto,
+    lacuna antes)`, e dentro da parte as letras ficam a 2 px umas das outras."""
+    boxes, x = [], 200
+    for texto, antes in partes:
+        x += antes
+        for c in texto:
+            boxes.append(BoxEntry(c, x, y, x + 16, y + 25, 1.0, FONTE_MANUAL))
+            x += 18
+        x -= 2
+    return boxes
+
+
+#: Três "f" dentro da palavra, com o gancho sobre a letra seguinte (-3): o mínimo para o
+#: gancho valer (`layout.AMOSTRAS_DO_GANCHO`).
+_COM_GANCHO = (("af", 20), ("ter", -3), ("f", 20), ("or", -3), ("f", 20), ("ar", -3))
+
+
+def test_o_espaco_depois_do_f_com_gancho():
+    """O gancho do "f" passa da haste, e a lacuna até a palavra seguinte cai a 5–8 px,
+    abaixo do limiar do core (8): "Depth ofthe analysis". Dentro da palavra, o gancho
+    cobre a letra seguinte ("after", -3)."""
+    boxes = _com_lacunas(("Depth", 0), ("of", 20), ("the", 6), *_COM_GANCHO,
+                         ("of", 20), ("exercises", 5))
+    assert _texto(boxes) == "Depth of the after for far of exercises"
+
+    pagina = Pagina(1, 0, boxes=[Box(i, e) for i, e in enumerate(boxes)], proximo_n=len(boxes))
+    assert tx.texto(tx.montar(pagina)) == "Depth of the after for far of exercises"
+
+
+def test_o_f_sem_gancho_continua_na_palavra():
+    """Numa fonte sem gancho, o "f" fica à lacuna comum da palavra (2 px)."""
+    assert _texto(_com_lacunas(("af", 0), ("ter", 2), ("of", 20), ("fer", 2))) == "after offer"
+
+
+def test_o_gancho_de_uma_amostra_so_nao_vale():
+    """Na p. 1045 do Yusupov uma amostra só (-4) dava um gancho de 7 px."""
+    boxes = _com_lacunas(("Depth", 0), ("of", 20), ("the", 6), ("af", 20), ("ter", -3))
+    assert _texto(boxes) == "Depth ofthe after"
+
+
+def test_o_box_sem_leitura_depois_do_f_nao_parte_a_palavra():
+    """"fo|llowed" com o "o" sem leitura: o core não o faz símbolo, mas mede a lacuna por
+    ele, e a palavra fica como ele a fez."""
+    from dataclasses import replace
+
+    boxes = _com_lacunas(*_COM_GANCHO, ("of", 20), ("the", 6), ("fo", 20), ("llowed", 2))
+    o = max(i for i, b in enumerate(boxes) if b.char == "o" and boxes[i - 1].char == "f")
+    boxes[o] = replace(boxes[o], char="")
+    assert _texto(boxes) == "after for far of the fllowed"

@@ -21,6 +21,8 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Foco na Linha | — | Alt+4 | global | K |
 | Foco na vista direita (repetido cicla as abas) | Alt+3 | Alt+3 | global | A2 |
 | Foco no Inspetor | Alt+4 | Alt+5 | global | A2 |
+| Girar à direita (a página aberta ou as escolhidas na gaveta) | — | — | global | L |
+| Girar à esquerda (a página aberta ou as escolhidas na gaveta) | — | — | global | L |
 | Imagem e vista direita empilhadas | Ctrl+Shift+F7 | Shift+F7 | global | A2 |
 | Imagem e vista direita lado a lado | Ctrl+F7 | F7 | global | A2 |
 | Ir para a página | Ctrl+G | Ctrl+G | global | A1 |
@@ -85,6 +87,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 
 | Ação | Padrão | FineReader | Escopo | Desde |
 |---|---|---|---|---|
+| Aplicar modelo de áreas nesta página | — | — | imagem_areas | F |
 | Função da zona: cabeçalho | C | C | imagem_areas | F |
 | Função da zona: diagrama | D | D | imagem_areas | F |
 | Função da zona: ignorar | X | X | imagem_areas | F |
@@ -94,7 +97,9 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Função da zona: rodapé | R | R | imagem_areas | F |
 | Função da zona: texto | T | T | imagem_areas | F |
 | Função da zona: título | H | H | imagem_areas | F |
+| Ordenar áreas | — | — | imagem_areas | F |
 | Reconhecer só a zona escolhida | Ctrl+Shift+R | Ctrl+Shift+B | imagem_areas | F |
+| Salvar modelo de áreas | — | — | imagem_areas | F |
 | Tipo da zona: diagrama | — | Ctrl+2 | imagem_areas | K |
 | Tipo da zona: ignorar | — | Ctrl+5 | imagem_areas | K |
 | Tipo da zona: imagem | — | Ctrl+4 | imagem_areas | K |
@@ -145,4 +150,12 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Corrigir a palavra | Enter | Enter | palavra | A2 |
 | Corrigir a palavra e ensinar os glifos dela | Ctrl+Enter | Ctrl+Enter | palavra | A2 |
 | Ignorar a palavra | Ctrl+Shift+I | Ctrl+Shift+I | palavra | A2 |
+
+## diagrama
+
+| Ação | Padrão | FineReader | Escopo | Desde |
+|---|---|---|---|---|
+| Diagrama conferido (grava e vai ao próximo por conferir) | Ctrl+Enter | Ctrl+Enter | diagrama | H |
+| O diagrama anterior do livro | PgUp | PgUp | diagrama | H |
+| O diagrama seguinte do livro | PgDn | PgDn | diagrama | H |
 

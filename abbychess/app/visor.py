@@ -34,7 +34,7 @@ from core.box_model import BoxEntry
 
 from abbychess import grade as gd
 from abbychess import zonas as zn
-from abbychess.app import cores, estilo
+from abbychess.app import estilo
 from abbychess.app.item_dos_boxes import ItemDosBoxes
 
 
@@ -62,6 +62,9 @@ class VisorDePagina(QGraphicsView):
     zona_apagada = Signal(int)
     #: Editor de áreas: a área e o tipo novo.
     zona_tipo = Signal(int, str)
+    #: Editor de áreas: a área e a função semântica nova.
+    zona_funcao = Signal(int, str)
+    ordenacao_cancelada = Signal()
     #: O zoom mudou: a escala (1 = 100%) e o limite alcançado ("máximo", "mínimo" ou "").
     zoom_mudou = Signal(float, str)
     #: PgDn no fim da página (+1) ou PgUp no topo (-1): a página vizinha.
@@ -85,7 +88,9 @@ class VisorDePagina(QGraphicsView):
         self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-        self.setBackgroundBrush(QBrush(QColor(90, 90, 90)))
+        self.setBackgroundBrush(QBrush(estilo.FUNDO_DA_IMAGEM))
+        #: O que a Imagem diz sem página (§13, estado vazio): sem livro aberto, a instrução.
+        self.mensagem_vazia = ""
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         #: Os itens que não são boxes e saem a cada `mostrar_boxes` (os tabuleiros).
@@ -118,7 +123,25 @@ class VisorDePagina(QGraphicsView):
         self._palavra_do_documento: Optional[QGraphicsRectItem] = None
 
     # ------------------------------------------------------------------
+    def definir_vazio(self, mensagem: str) -> None:
+        """Sem página na cena, a Imagem mostra `mensagem` (vazia: nada)."""
+        self.mensagem_vazia = mensagem
+        self.viewport().update()
+
+    def drawForeground(self, pintor: QPainter, retangulo: QRectF) -> None:
+        super().drawForeground(pintor, retangulo)
+        if not self.mensagem_vazia:             # com página, sai aqui: nada de varrer a cena
+            return
+        pintor.save()
+        pintor.resetTransform()                 # o texto na tela, não na página
+        pintor.setPen(estilo.PAPEL)
+        area = self.viewport().rect().adjusted(24, 24, -24, -24)
+        pintor.drawText(area, Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap,
+                        self.mensagem_vazia)
+        pintor.restore()
+
     def mostrar_pagina(self, pixmap: QPixmap) -> None:
+        self.mensagem_vazia = ""                # a página toma o lugar do estado vazio
         cena = self.scene()
         cena.clear()
         self._itens, self._boxes, self._selecionado, self._destaque = [], [], None, None
@@ -154,7 +177,7 @@ class VisorDePagina(QGraphicsView):
         self._itens, self._boxes = [], boxes
         self._tabuleiros = [tuple(t) for t in tabuleiros]
         for i, (x1, y1, x2, y2) in enumerate(self._tabuleiros):
-            caneta = QPen(cores_dos_tabuleiros[i] if cores_dos_tabuleiros else cores.DIAGRAMA)
+            caneta = QPen(cores_dos_tabuleiros[i] if cores_dos_tabuleiros else estilo.DIAGRAMA_POR_LER)
             caneta.setCosmetic(True)
             caneta.setWidthF(2.5)
             caneta.setStyle(Qt.PenStyle.DashLine)
@@ -237,6 +260,18 @@ class VisorDePagina(QGraphicsView):
         self._escalar(min(vista.width() / alvo.width(), vista.height() / alvo.height()))
         self.centerOn(alvo.center())
 
+    def enquadrar(self, caixa, folga: float = 0.12) -> None:
+        """A caixa (da página) ocupa a vista, com `folga` em volta (o diagrama em conferência,
+        §10). O zoom fica livre: Ctrl+roda, PgUp/PgDn e as barras continuam valendo."""
+        x1, y1, x2, y2 = caixa
+        largura, altura = max(x2 - x1, 8), max(y2 - y1, 8)
+        alvo = QRectF(x1 - folga * largura, y1 - folga * altura,
+                      largura * (1 + 2 * folga), altura * (1 + 2 * folga))
+        vista = self.viewport().rect()
+        if vista.width() >= 40 and vista.height() >= 40:
+            self._escalar(min(vista.width() / alvo.width(), vista.height() / alvo.height()))
+        self.centerOn(alvo.center())
+
     def _aplicar_modo(self) -> None:
         cena = self.scene().sceneRect()
         vista = self.viewport().rect()
@@ -290,11 +325,18 @@ class VisorDePagina(QGraphicsView):
             return
         b = self._boxes[indice]
         margem = 3
-        caneta = QPen(cores.SELECIONADO)
-        caneta.setCosmetic(True)
-        caneta.setWidthF(3)
-        self._destaque = cena.addRect(b.x1 - margem, b.y1 - margem,
-                                      b.x2 - b.x1 + 2 * margem, b.y2 - b.y1 + 2 * margem, caneta)
+        retangulo = QRectF(b.x1 - margem, b.y1 - margem,
+                           b.x2 - b.x1 + 2 * margem, b.y2 - b.y1 + 2 * margem)
+        # Contorno duplo (§3.3): o escuro por fora, que aparece no papel e na ilustração,
+        # e o amarelo por dentro; o de dentro é filho, e sai junto.
+        fora = QPen(estilo.CONTORNO_DA_SELECAO)
+        fora.setCosmetic(True)
+        fora.setWidthF(5)
+        self._destaque = cena.addRect(retangulo, fora)
+        dentro = QPen(estilo.SELECIONADO)
+        dentro.setCosmetic(True)
+        dentro.setWidthF(2.5)
+        QGraphicsRectItem(retangulo, self._destaque).setPen(dentro)
         self._destaque.setZValue(10)
         if centralizar:
             self.ensureVisible(self._destaque, 120, 120)
@@ -306,7 +348,7 @@ class VisorDePagina(QGraphicsView):
             cena.removeItem(item)
         self._marcados = []
         self._marcados_indices = {i for i in indices if 0 <= i < len(self._boxes)}
-        caneta = QPen(cores.MARCADO)
+        caneta = QPen(estilo.MARCADO)
         caneta.setCosmetic(True)
         caneta.setWidthF(2.5)
         for i in sorted(self._marcados_indices):
@@ -351,7 +393,7 @@ class VisorDePagina(QGraphicsView):
         if not self.modo_areas:
             return
         for i, z in enumerate(self._zonas):
-            cor = cores.COR_DA_ZONA[z.tipo]
+            cor = estilo.COR_DA_FUNCAO.get(z.funcao, estilo.COR_DA_ZONA[z.tipo])
             caneta = QPen(cor)
             caneta.setCosmetic(True)
             caneta.setWidthF(3.5 if i == self._zona_sel else 2)
@@ -361,7 +403,8 @@ class VisorDePagina(QGraphicsView):
             fundo.setAlpha(45 if i == self._zona_sel else 25)
             item = cena.addRect(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1, caneta, QBrush(fundo))
             item.setZValue(5)
-            rotulo = cena.addSimpleText(f"{i + 1} {zn.NOMES[z.tipo]}")
+            numero = z.ordem + 1 if z.ordem is not None else i + 1
+            rotulo = cena.addSimpleText(f"{numero} {zn.NOMES_DAS_FUNCOES[z.funcao]}")
             rotulo.setBrush(QBrush(cor))
             rotulo.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
             rotulo.setPos(z.x1 + 2, z.y1 + 2)
@@ -369,13 +412,16 @@ class VisorDePagina(QGraphicsView):
             self._zonas_itens += [item, rotulo]
 
     def menu_da_zona(self, indice: int) -> QMenu:
-        """O tipo da área e apagá-la, pelo botão direito."""
+        """A função da área e apagá-la, pelo botão direito."""
         menu = QMenu(self)
-        for numero, tipo in enumerate(zn.TIPOS, start=1):
-            acao = menu.addAction(f"{zn.NOMES[tipo]}\t{numero}")
+        teclas = {"texto": "T", "titulo": "H", "cabecalho": "C", "rodape": "R",
+                  "numero_de_pagina": "P", "nota": "N", "legenda": "L", "diagrama": "D",
+                  "ignorar": "X"}
+        for funcao in teclas:
+            acao = menu.addAction(f"{zn.NOMES_DAS_FUNCOES[funcao]}\t{teclas[funcao]}")
             acao.setCheckable(True)
-            acao.setChecked(self._zonas[indice].tipo == tipo)
-            acao.triggered.connect(lambda _=False, t=tipo: self.zona_tipo.emit(indice, t))
+            acao.setChecked(self._zonas[indice].funcao == funcao)
+            acao.triggered.connect(lambda _=False, f=funcao: self.zona_funcao.emit(indice, f))
         menu.addSeparator()
         menu.addAction("Apagar área\tDel").triggered.connect(
             lambda: self.zona_apagada.emit(indice))
@@ -390,7 +436,7 @@ class VisorDePagina(QGraphicsView):
         if coluna is None or indice is None or not 0 <= indice < len(self._boxes):
             return
         b = self._boxes[indice]
-        caneta = QPen(cores.SELECIONADO)
+        caneta = QPen(estilo.SELECIONADO)
         caneta.setCosmetic(True)
         caneta.setWidthF(2)
         self._corte = self.scene().addLine(coluna, b.y1 - 4, coluna, b.y2 + 4, caneta)
@@ -404,7 +450,7 @@ class VisorDePagina(QGraphicsView):
         if caixa is None:
             return
         x1, y1, x2, y2 = caixa
-        caneta = QPen(cores.PALAVRA)
+        caneta = QPen(estilo.PALAVRA)
         caneta.setCosmetic(True)
         caneta.setWidthF(3)
         self._palavra = self.scene().addRect(x1 - 6, y1 - 6, x2 - x1 + 12, y2 - y1 + 12, caneta)
@@ -541,7 +587,7 @@ class VisorDePagina(QGraphicsView):
             ponto = self.mapToScene(evento.position().toPoint())
             retangulo = QRectF(self._inicio, ponto).normalized()
             if self._quadro is None:
-                caneta = QPen(cores.COR_DA_ZONA[zn.TEXTO] if self.modo_areas else cores.MARCADO)
+                caneta = QPen(estilo.COR_DA_ZONA[zn.TEXTO] if self.modo_areas else estilo.MARCADO)
                 caneta.setCosmetic(True)
                 caneta.setWidthF(1.5)
                 caneta.setStyle(Qt.PenStyle.DashLine)
@@ -612,9 +658,18 @@ class VisorDePagina(QGraphicsView):
             if tecla in numeros:
                 self.zona_tipo.emit(self._zona_sel, zn.TIPOS[numeros.index(tecla)])
                 return
-            if tecla == Qt.Key.Key_Escape:
-                self.zona_escolhida.emit(-1)
+            funcoes = {Qt.Key.Key_T: "texto", Qt.Key.Key_H: "titulo",
+                       Qt.Key.Key_C: "cabecalho", Qt.Key.Key_R: "rodape",
+                       Qt.Key.Key_P: "numero_de_pagina", Qt.Key.Key_N: "nota",
+                       Qt.Key.Key_L: "legenda", Qt.Key.Key_D: "diagrama",
+                       Qt.Key.Key_X: "ignorar"}
+            if tecla in funcoes and evento.modifiers() == Qt.KeyboardModifier.NoModifier:
+                self.zona_funcao.emit(self._zona_sel, funcoes[tecla])
                 return
+        if self.modo_areas and tecla == Qt.Key.Key_Escape:
+            self.ordenacao_cancelada.emit()
+            self.zona_escolhida.emit(-1)
+            return
         super().keyPressEvent(evento)
 
     def focusOutEvent(self, evento):

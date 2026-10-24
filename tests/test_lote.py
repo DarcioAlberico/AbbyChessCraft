@@ -18,6 +18,7 @@ import json
 
 import pytest
 
+from abbychess import livro as lv
 from abbychess import pagina as pg
 from abbychess.controlador import ControladorDePagina, Eventos
 from abbychess.controladores import ControladorDoLivro
@@ -63,8 +64,56 @@ def _sem_hora(dados: bytes) -> dict:
 
 
 def _hash(projeto, indice) -> str:
-    pid = projeto._pid_de(indice)
+    pid = projeto.pid_da_pagina(indice)
     return hashlib.sha256(projeto._arquivo_v2(pid).read_bytes()).hexdigest()
+
+
+def test_ca_9_4_o_projeto_novo_le_a_amostra_e_guarda_a_saude(ctl, projeto):
+    projeto.dados.extras.update(amostra_guiada_pendente=True, intervalo_do_corpo=[0, 2])
+    projeto.salvar()
+    terminou = []
+    ctl.eventos.ligar("amostra_terminou", lambda paginas: terminou.append(tuple(paginas)))
+
+    assert ctl.iniciar_amostra_guiada()
+    assert not ctl.iniciar_amostra_guiada()       # uma abertura não agenda a amostra duas vezes
+    ctl.executor.tudo()
+
+    assert terminou == [(0, 1, 2)]
+    saude = lv.saude(projeto, padroes=4)
+    assert saude.paginas == (0, 1, 2)
+    assert saude.pendentes_antes == saude.pendentes_agora > 0
+    assert saude.padroes == 4 and not saude.pode_reconhecer_o_livro
+
+
+def test_amostra_cancelada_fica_pendente_para_a_proxima_abertura(ctl, projeto):
+    projeto.dados.extras.update(amostra_guiada_pendente=True, intervalo_do_corpo=[0, 2])
+    projeto.salvar()
+    terminou = []
+    ctl.eventos.ligar("amostra_terminou", lambda paginas: terminou.append(tuple(paginas)))
+
+    assert ctl.iniciar_amostra_guiada()
+    ctl.cancelar()
+    ctl.executor.tudo()
+
+    assert terminou == []
+    assert projeto.dados.extras["amostra_guiada_pendente"] is True
+
+
+def test_amostra_guiada_usa_apenas_as_paginas_que_ficaram_para_ocr(ctl, projeto):
+    projeto.dados.extras.update(
+        amostra_guiada_pendente=True,
+        candidatos_da_amostra_guiada=[1, 2],
+        intervalo_do_corpo=[0, 2],
+    )
+    projeto.salvar()
+    terminou = []
+    ctl.eventos.ligar("amostra_terminou", lambda paginas: terminou.append(tuple(paginas)))
+
+    assert ctl.iniciar_amostra_guiada()
+    ctl.executor.tudo()
+
+    assert terminou == [(1, 2)]
+    assert projeto.paginas_lidas() == [1, 2]
 
 
 def test_o_lote_le_e_grava_as_paginas_e_a_aberta_aparece(ctl, projeto):
@@ -169,13 +218,13 @@ def test_ca_4_8_voltar_ao_estado_antes_do_lote_devolve_o_json_copiado(ctl, proje
     p.ensinar("a")                                        # o lote lê os "a" da 1 pelo padrão
     ctl.executor.tudo()
     projeto.descarregar(10)
-    copia_esperada = (projeto.pasta / "paginas" / f"p{projeto._pid_de(1)}.json").read_bytes()
+    copia_esperada = (projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(1)}.json").read_bytes()
     assert not any(b.entry.source == "livro" for b in projeto.carregar_modelo(1).boxes)
     ctl.reconhecer([1], refazer=True)
     ctl.executor.tudo()
     assert ctl.fins[-1].lidas == [1]
     projeto.descarregar(10)
-    pid = projeto._pid_de(1)
+    pid = projeto.pid_da_pagina(1)
     copia = projeto.pasta / "paginas" / ".antes-do-lote" / f"p{pid}.json"
     relida = projeto.carregar_modelo(1)
     assert any(b.entry.char == "W" and b.entry.source == FONTE_MANUAL for b in relida.boxes)
@@ -391,8 +440,10 @@ def test_o_que_falta_retomar_fica_no_projeto_e_volta_ao_reabrir(ctl, projeto):
     ctl.cancelar()
     ctl.executor.tudo()
     arquivo = projeto.pasta / ARQUIVO_DO_LOTE
+    # Por pid desde a v3 (§12.4): no projeto novo, o pid da página é a posição dela.
     assert json.loads(arquivo.read_text(encoding="utf-8")) == {
-        "paginas": [1, 2], "refazer": True, "reler_depois": []}
+        "paginas": [projeto.pid_da_pagina(1), projeto.pid_da_pagina(2)], "refazer": True,
+        "reler_depois": [], "pids": True}
     p = ctl.pagina                                        # reabre o projeto
     ctl.usar(projeto, p.fonte, p.leitor)
     assert ctl.restante == ([1, 2], True) and ctl.pode_retomar

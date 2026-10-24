@@ -1,4 +1,4 @@
-"""O Inspetor (SPEC §3.1): um editor só, o do item atual.
+"""O Inspetor (SPEC §3.1): um editor só, o do item atual (Glifo, Palavra ou Diagrama).
 
 No cabeçalho, o seletor da fila (um `QToolButton` com menu, não um combo: o Alt+↓ é da
 fila) e o contador; no meio, o editor (Glifo, o treino; Palavra, a verificação); no rodapé,
@@ -15,10 +15,18 @@ from PySide6.QtGui import QAction, QActionGroup
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QMenu, QScrollArea, QStackedWidget,
                                QToolButton, QVBoxLayout, QWidget)
 
+from abbychess.app import estilo, teclado
+
+#: A dica de cada editor; `{id}` é a tecla da ação no perfil de agora (`teclado.com_teclas`).
 DICAS = {
-    "glifo": "Alt+↓ pula · Ctrl+D divide · Ctrl+J junta · Shift+seta bordas · F2 símbolos",
-    "palavra": "Enter corrige · Ctrl+Enter corrige e ensina · Alt+↓ pula · "
-               "Ctrl+Shift+I ignora a palavra · Ctrl+Shift+D dicionário",
+    "glifo": "{proximo_da_fila} pula · {dividir} divide · {juntar_seguinte} junta · "
+             "Shift+seta bordas · {paleta} símbolos",
+    "palavra": "{corrigir_palavra} corrige · {corrigir_e_ensinar_palavra} corrige e ensina · "
+               "{proximo_da_fila} pula · {ignorar_palavra} ignora a palavra · "
+               "{adicionar_ao_lexico} dicionário",
+    "diagrama": "letra da peça escreve · Delete esvazia · {conferir_diagrama} conferido · "
+                "{diagrama_anterior}/{diagrama_seguinte} diagrama anterior/seguinte do livro · "
+                "{proximo_diagrama} próximo por conferir",
 }
 
 
@@ -34,9 +42,13 @@ class PainelDoInspetor(QWidget):
         self.seletor = QToolButton()
         self.seletor.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.seletor.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
-        self.seletor.setAccessibleName("Modo da fila de revisão (F7 cicla; Shift+F7, o escopo)")
-        self.seletor.setToolTip("O que Alt+↓ e Alt+↑ percorrem (F7 cicla o modo; Shift+F7 "
-                                "alterna a página e o livro)")
+        teclado.texto_vivo(self.seletor, "setAccessibleName",
+                           "Modo da fila de revisão ({ciclar_modo_da_fila} cicla; "
+                           "{alternar_escopo_da_fila}, o escopo)")
+        teclado.texto_vivo(self.seletor, "setToolTip",
+                           "O que {proximo_da_fila} e {anterior_da_fila} percorrem "
+                           "({ciclar_modo_da_fila} cicla o modo; {alternar_escopo_da_fila} "
+                           "alterna a página e o livro)")
         menu = QMenu(self.seletor)
         grupo = QActionGroup(menu)
         self._modos: Dict[str, QAction] = {}
@@ -79,7 +91,7 @@ class PainelDoInspetor(QWidget):
             self._rolagens[nome] = rolagem
         self.dica = QLabel("")
         self.dica.setWordWrap(True)
-        self.dica.setStyleSheet("color: #555;")
+        estilo.papel(self.dica, "dica")
 
         caixa = QVBoxLayout(self)
         caixa.setContentsMargins(4, 4, 4, 4)
@@ -87,12 +99,16 @@ class PainelDoInspetor(QWidget):
         caixa.addWidget(self.pilha, 1)
         caixa.addWidget(self.dica)
         self.mostrar(next(iter(editores)))
+        teclado.quando_mudar(self._refazer_a_dica)
 
     # ------------------------------------------------------------------
     def mostrar(self, nome: str) -> None:
-        """Mostra o editor `nome` ("glifo", "palavra")."""
+        """Mostra o editor `nome` ("glifo", "palavra", "diagrama")."""
         self.pilha.setCurrentWidget(self._rolagens[nome])
-        self.dica.setText(DICAS.get(nome, ""))
+        self._refazer_a_dica()
+
+    def _refazer_a_dica(self) -> None:
+        self.dica.setText(teclado.com_teclas(DICAS.get(self.atual(), "")))
 
     def atual(self) -> str:
         rolagem = self.pilha.currentWidget()

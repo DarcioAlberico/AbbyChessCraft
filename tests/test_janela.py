@@ -247,7 +247,10 @@ def _no_visor(janela, x, y):
 
 def test_ferramentas_tem_o_modo_de_treino_e_as_opcoes(janela):
     textos = [a.text() for a in janela.menu_ferramentas.actions()]
-    assert "Marcar glifo à mão (Ctrl+M)" in textos and "Opções…" in textos
+    # A tecla não vai no nome: o menu a mostra ao lado, e a dica cita a do perfil (passo K).
+    assert "Marcar glifo à mão" in textos and "Opções…" in textos and "Teclado…" in textos
+    assert janela.acao_modo_treino.shortcut().toString() == "Ctrl+M"
+    assert "Ctrl+M" in janela.acao_modo_treino.toolTip()
     assert janela.acao_modo_treino.isCheckable()
 
 

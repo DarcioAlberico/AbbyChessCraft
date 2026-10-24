@@ -17,12 +17,15 @@ from __future__ import annotations
 import zipfile
 
 import fitz
+import pytest
 from PIL import Image
 
 from core.box_model import BoxEntry
 
 from abbychess import exportar as ex
+from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
+from abbychess.modelo import Box, Pagina
 from abbychess.projeto import ProjetoDeLivro
 
 
@@ -122,6 +125,60 @@ def test_as_colunas_nao_se_misturam_na_linha():
 def test_o_titulo_que_atravessa_a_calha_vem_primeiro():
     textos = [b.texto for b in ex.paragrafos(_duas_colunas(titulo="Games"))]
     assert textos[0] == "Games"
+
+
+def test_o_documento_tambem_le_uma_coluna_inteira_antes_da_seguinte():
+    entries = _duas_colunas(titulo="Games")
+    pagina = Pagina(1, 0, boxes=[Box(i, entry) for i, entry in enumerate(entries)],
+                    proximo_n=len(entries))
+
+    linhas = tx.texto(tx.montar(pagina)).splitlines()
+
+    assert linhas[0] == "Games"
+    assert not any(linha != linha.upper() and linha != linha.lower() for linha in linhas[1:])
+    assert "as brancas jogam e ganham 00" in linhas[1]
+    assert linhas.index(f"{FRASES[5]} 11") < linhas.index(f"{FRASES[3].upper()} 00")
+
+
+def _contar_deteccoes(monkeypatch, refazer=False):
+    """Conta as detecções de colunas do core; com `refazer`, a ordenação ignora a detecção
+    que recebe (como antes de ela ser reaproveitada)."""
+    from core.services.box_service import BoxService
+
+    chamadas = []
+    detectar = BoxService._colunas_e_transversais
+    ordenar = BoxService.sort_boxes_reading_order
+
+    def contando(*a, **k):
+        chamadas.append(1)
+        return detectar(*a, **k)
+
+    monkeypatch.setattr(BoxService, "_colunas_e_transversais", staticmethod(contando))
+    if refazer:
+        monkeypatch.setattr(BoxService, "sort_boxes_reading_order",
+                            staticmethod(lambda boxes, _deteccao=None: ordenar(boxes)))
+    return chamadas
+
+
+@pytest.mark.parametrize("saida", ["documento", "exportacao"])
+def test_a_pagina_de_uma_coluna_detecta_as_colunas_uma_vez(monkeypatch, saida):
+    """O índice da busca monta o texto de todas as páginas: a detecção das colunas é a parte
+    mais cara, e a página de um trecho só a fazia duas vezes (a ordem de leitura e o core),
+    o que pôs o índice pela janela em 2,4 s no portão do passo L."""
+    entries = [b for k in range(12) for b in _linha(f"{FRASES[k % 6]} {k:02d}", 300 + 60 * k)]
+
+    def montar():
+        if saida == "documento":
+            tx._LINHAS_VISTAS.clear()              # as linhas guardadas pulariam a detecção
+            return tx.texto(tx.montar(tx.pagina_avulsa(entries)))
+        return [p.texto for p in ex.paragrafos(entries)]
+
+    with monkeypatch.context() as m:
+        refeitas = _contar_deteccoes(m, refazer=True)
+        antes = montar()
+    chamadas = _contar_deteccoes(monkeypatch)
+    assert montar() == antes
+    assert (len(refeitas), len(chamadas)) == (2, 1)
 
 
 # ----------------------------------------------------------------------

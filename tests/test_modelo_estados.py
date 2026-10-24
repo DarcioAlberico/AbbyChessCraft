@@ -350,6 +350,9 @@ class _ProjetoNaMemoria:
     def pagina_para_editar(self, indice):
         return self.pagina
 
+    def posicao_do_pid(self, pid):                  # a página única, na posição 0
+        return 0 if pid == self.pagina.pid else None
+
     def agendar(self, pagina):
         self.agendadas += 1
         return True
@@ -362,6 +365,14 @@ class _FonteNaMemoria:
         self.imagem = imagem
 
     def pagina(self, indice):
+        return self.imagem
+
+    def entrada(self, indice):                       # o cache chaveia pela entrada (§12.4)
+        from abbychess.sequencia import Entrada
+
+        return Entrada(0, "livro", indice)
+
+    def pagina_da_entrada(self, _entrada):
         return self.imagem
 
 

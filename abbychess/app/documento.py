@@ -40,7 +40,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Set
 
 import numpy as np
 from PySide6.QtCore import QRectF, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import (QColor, QFont, QFontMetrics, QGuiApplication, QImage, QPainter, QPen,
+from PySide6.QtGui import (QFont, QFontMetrics, QGuiApplication, QImage, QPainter, QPen,
                            QTextBlockFormat, QTextBlockUserData, QTextCharFormat, QTextCursor,
                            QTextDocument, QTextImageFormat)
 from PySide6.QtWidgets import QMenu, QTextEdit
@@ -50,6 +50,7 @@ from abbychess import sessao as ss
 from abbychess import texto as tx
 from abbychess.app import estilo, teclado
 from abbychess.app.imagens import pixmap_de_cinza
+from abbychess.app import vazios
 
 FONTE = "Segoe UI Symbol"
 MONO = "Consolas"
@@ -57,13 +58,13 @@ CORPO_PADRAO = 11
 CORPO_MINIMO, CORPO_MAXIMO = 7, 28
 #: As funções em cinza pequeno, que Ctrl+Shift+H oculta.
 MARGENS = {"cabecalho", "rodape", "numero_de_pagina"}
-FUNDO_DE_BAIXA_CONFIANCA = QColor(255, 226, 184)
-FUNDO_DO_ATUAL = QColor(190, 220, 255)
+FUNDO_DE_BAIXA_CONFIANCA = estilo.FUNDO_DE_BAIXA_CONFIANCA
+FUNDO_DO_ATUAL = estilo.FUNDO_DO_ATUAL
 #: O fundo das palavras da sessão aberta: o texto ainda não confirmado (§6.3).
-FUNDO_DA_SESSAO = QColor(255, 246, 200)
+FUNDO_DA_SESSAO = estilo.FUNDO_DA_SESSAO
 #: As ocorrências da busca na página (§7.1), e a atual.
-FUNDO_DA_BUSCA = QColor(255, 232, 130)
-FUNDO_DA_OCORRENCIA = QColor(255, 170, 70)
+FUNDO_DA_BUSCA = estilo.FUNDO_DA_BUSCA
+FUNDO_DA_OCORRENCIA = estilo.FUNDO_DA_OCORRENCIA
 #: A figurina de cada peça no desenho do diagrama.
 FIGURINAS = {"K": "♔", "Q": "♕", "R": "♖", "B": "♗", "N": "♘", "P": "♙",
              "k": "♚", "q": "♛", "r": "♜", "b": "♝", "n": "♞", "p": "♟"}
@@ -106,14 +107,14 @@ def imagem_do_diagrama(diagrama, matriz: Optional[np.ndarray]) -> QImage:
     if not diagrama.lido:
         if matriz is None:
             imagem = QImage(8 * LADO_DA_CASA, 8 * LADO_DA_CASA, QImage.Format.Format_RGB32)
-            imagem.fill(QColor(240, 240, 240))
+            imagem.fill(estilo.FUNDO_SEM_IMAGEM)
             return imagem
         x1, y1, x2, y2 = (int(v) for v in diagrama.caixa)
         recorte = pixmap_de_cinza(matriz[max(0, y1):y2, max(0, x1):x2]).toImage()
         return recorte.scaledToHeight(8 * LADO_DA_CASA, Qt.TransformationMode.SmoothTransformation)
     lado = LADO_DA_CASA
     imagem = QImage(8 * lado + 2, 8 * lado + 2, QImage.Format.Format_RGB32)
-    imagem.fill(QColor(255, 255, 255))
+    imagem.fill(estilo.PAPEL)
     pintor = QPainter(imagem)
     pintor.setRenderHint(QPainter.RenderHint.Antialiasing)
     pintor.setFont(QFont(FONTE, int(lado * 0.62)))
@@ -121,19 +122,22 @@ def imagem_do_diagrama(diagrama, matriz: Optional[np.ndarray]) -> QImage:
         linha, coluna = divmod(n, 8)
         retangulo = QRectF(1 + coluna * lado, 1 + linha * lado, lado, lado)
         if (linha + coluna) % 2:
-            pintor.fillRect(retangulo, QColor(181, 196, 166))
+            pintor.fillRect(retangulo, estilo.CASA_ESCURA_DO_DOCUMENTO)
         if casa.simbolo:
-            pintor.setPen(QColor(0, 0, 0))
+            pintor.setPen(estilo.TINTA)
             pintor.drawText(retangulo, Qt.AlignmentFlag.AlignCenter, FIGURINAS.get(casa.simbolo, "?"))
-    pintor.setPen(QPen(QColor(90, 90, 90)))
+    pintor.setPen(QPen(estilo.MOLDURA_DO_TABULEIRO))
     pintor.drawRect(QRectF(0.5, 0.5, 8 * lado + 1, 8 * lado + 1))
     pintor.end()
     return imagem
 
 
 def estado_do_diagrama(diagrama) -> str:
+    validacao = getattr(diagrama, "validacao", None)
     if diagrama.conferido:
         return "conferido"
+    if diagrama.lido and validacao is not None:
+        return "confiável pelos lances" if validacao.confiavel else validacao.aviso
     if diagrama.lido:
         return "lido, não conferido"
     return "não lido"
@@ -157,6 +161,7 @@ class VistaDoDocumento(QTextEdit):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        estilo.papel_de_papel(self)             # o livro é papel nos dois temas (§13)
         self.setReadOnly(True)                  # editável quando há página (montar)
         self.setUndoRedoEnabled(False)          # o desfazer é do projeto (§6.3)
         self.setAcceptRichText(False)           # colar e arrastar trazem só o texto
@@ -215,11 +220,13 @@ class VistaDoDocumento(QTextEdit):
                estados: Optional[Dict[int, str]] = None, desconhecidos: Iterable[int] = (),
                virtuais: Iterable[int] = (), matriz: Optional[np.ndarray] = None,
                margens: Iterable[int] = (),
-               aviso: str = "Página não reconhecida: F5 reconhece.") -> None:
+               aviso: Optional[str] = None) -> None:
         """O documento da página; sem documento (a página não reconhecida), o aviso.
         `margens`: os glifos do cabeçalho e do rodapé corridos, em cinza pequeno (a linha
         toda de margem; Ctrl+Shift+H a oculta), até as áreas terem função (passo F). Com
-        uma sessão de edição aberta, a montagem espera o fim dela."""
+        uma sessão de edição aberta, a montagem espera o fim dela. Sem `aviso`, o da página
+        não reconhecida, com as teclas do perfil de agora."""
+        aviso = vazios.pagina_nao_reconhecida() if aviso is None else aviso
         entrada = (documento, list(diagramas), dict(estados or {}), set(desconhecidos),
                    set(virtuais), matriz, set(margens), aviso)
         if self._sessao is not None:
@@ -412,7 +419,7 @@ class VistaDoDocumento(QTextEdit):
                 char = documento.chars.get(g, "")
                 letras = tx.NAO_LIDO if char == tx.NAO_LIDO else (normal(char) or tx.NAO_LIDO)
                 formato = self._formato_do_glifo(base, estados.get(g), g in desconhecidos,
-                                                 g in virtuais)
+                                                 g in virtuais, documento.estilos.get(g))
                 if formato is not formato_da_corrida:
                     escrever()
                     formato_da_corrida = formato
@@ -471,16 +478,24 @@ class VistaDoDocumento(QTextEdit):
         return formato
 
     def _formato_do_glifo(self, base: QTextCharFormat, estado: Optional[str], desconhecido: bool,
-                          virtual: bool) -> QTextCharFormat:
+                          virtual: bool, estilo_do_glifo=None) -> QTextCharFormat:
         """O formato do glifo pelo realce; o `base` (o mesmo objeto) quando não há realce, para
         as corridas de texto seguido ficarem numa inserção só."""
-        if not self.realce or not (desconhecido or virtual
-                                   or estado in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO)):
+        tem_estilo = estilo_do_glifo is not None and any((estilo_do_glifo.negrito,
+                                                          estilo_do_glifo.italico,
+                                                          estilo_do_glifo.sublinhado))
+        if not tem_estilo and (not self.realce or not (desconhecido or virtual
+                or estado in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO))):
             return base
-        chave = (id(base), estado, desconhecido, virtual)   # o base é o do bloco, vivo até o fim
+        chave = (id(base), estado, desconhecido, virtual, estilo_do_glifo)
         if chave in self._formatos:
             return self._formatos[chave]
         formato = QTextCharFormat(base)
+        if tem_estilo:
+            formato.setFontWeight(QFont.Weight.Bold if estilo_do_glifo.negrito
+                                  else QFont.Weight.Normal)
+            formato.setFontItalic(estilo_do_glifo.italico)
+            formato.setFontUnderline(estilo_do_glifo.sublinhado)
         if estado in (gd.PENDENTE, gd.SEM_LEITURA):
             formato.setBackground(FUNDO_DE_BAIXA_CONFIANCA)
         elif estado == gd.AGUARDANDO:
@@ -507,6 +522,25 @@ class VistaDoDocumento(QTextEdit):
             if 0 <= k < len(mapa.gids) and mapa.gids[k] >= 0:
                 return mapa.gids[k]
         return None
+
+    def gids_selecionados(self) -> List[int]:
+        """Gids cobertos pela seleção; sem seleção, os da palavra sob o cursor."""
+        cursor = self.textCursor()
+        if not cursor.hasSelection():
+            gid = self.gid_na_posicao(cursor.position())
+            return list(self._palavra_do_gid.get(gid, [])) if gid is not None else []
+        inicio, fim = sorted((cursor.anchor(), cursor.position()))
+        gids = []
+        for posicao in range(inicio, fim):
+            gid = self.gid_na_posicao(posicao)
+            if gid is not None and gid not in gids:
+                gids.append(gid)
+        return gids
+
+    def primeiro_gid_da_palavra(self) -> Optional[int]:
+        gid = self.gid_na_posicao(self.textCursor().position())
+        palavra = self._palavra_do_gid.get(gid, []) if gid is not None else []
+        return palavra[0] if palavra else gid
 
     def gid_no_ponto(self, ponto) -> Optional[int]:
         """O glifo sob o ponto do clique: o cursor cai entre dois caracteres, e o lado do

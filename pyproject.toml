@@ -17,15 +17,20 @@ dependencies = ["PySide6>=6.6", "numpy", "opencv-python", "Pillow", "PyMuPDF", "
 
 [project.optional-dependencies]
 # pytest-timeout e psutil já são usados; hypothesis entra no passo 1b (CA-4.3),
-# pytest-qt no A2 e regex no B, pelo roadmap.
+# pytest-qt no A2 e regex no B, pelo roadmap. pytest-xdist (2026-10-23) roda a suíte rápida
+# em paralelo (`-n auto`); as medidas de desempenho e o portão continuam em série.
 dev = ["pytest>=8.0", "pytest-qt>=4.4", "pytest-timeout>=2.3", "hypothesis>=6.100",
-       "regex>=2024.0", "psutil>=5.9"]
+       "regex>=2024.0", "psutil>=5.9", "pytest-xdist>=3.6"]
 
 [project.scripts]
 abbychess = "abbychess.app.principal:main"
 
 [tool.setuptools]
 packages = ["abbychess", "abbychess.app"]
+
+[tool.setuptools.package-data]
+# Os ícones do Lucide (ISC): só os usados, com a licença (abbychess/app/icones.py).
+"abbychess.app" = ["icones/*.svg", "icones/LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

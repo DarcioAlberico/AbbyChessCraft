@@ -1,10 +1,11 @@
-"""A edição no Documento vista da janela (SPEC §6.3, §6.4, passo D1): a sessão confirmada,
+"""A edição no Documento vista da janela (SPEC §6.3 e §6.4): a sessão confirmada,
 a recusa, o desfazer e o refazer que olham a sessão aberta, a paleta e as figurinas. Um
 mixin da `JanelaPrincipal`, como `EspacoDeTrabalho`.
 """
 
 from __future__ import annotations
 
+from abbychess.app import teclado
 
 class EdicaoNoDocumento:
     def _sessao_do_documento(self, unidades, novo, avancar, ensinar_gid, ultimo, fixos,
@@ -44,25 +45,38 @@ class EdicaoNoDocumento:
         self.treino.campo.selectAll()
 
     def _sem_duvidosas(self) -> None:
-        self._aviso_estrutural("Nenhuma palavra duvidosa depois desta na página · F6 vai à "
-                               "próxima página com pendentes")
+        self._aviso_estrutural(teclado.com_teclas(
+            "Nenhuma palavra duvidosa depois desta na página · {proxima_pagina_pendente} vai à "
+            "próxima página com pendentes"))
 
     def _aviso_estrutural(self, texto: str) -> None:
         """Na Linha e também na barra de status (a Linha pode estar escondida, Ctrl+F5)."""
         self.linha.avisar(texto)
         self.statusBar().showMessage(texto, 8000)
 
+    def _no_editor_de_diagrama(self) -> bool:
+        """O foco está no editor Diagrama do Inspetor (o desfazer é o do tabuleiro, §10)."""
+        foco = self.focusWidget()
+        editor = self.editor_diagrama
+        return foco is not None and (foco is editor or editor.isAncestorOf(foco))
+
     def desfazer(self) -> None:
-        """Ctrl+Z: com uma sessão aberta no Documento, ela volta ao que era (Ctrl+Y a
-        reaplica); senão, o desfazer do projeto."""
-        if self.texto.tem_sessao:
+        """Ctrl+Z: com o foco no editor Diagrama, a última casa editada (sem casa a desfazer,
+        vale o da página, como desfazer a conferência); com uma sessão
+        aberta no Documento, ela volta ao que era (Ctrl+Y a reaplica); senão, o desfazer do
+        projeto."""
+        if self._no_editor_de_diagrama() and self.editor_diagrama.pode_desfazer:
+            self.editor_diagrama.desfazer()
+        elif self.texto.tem_sessao:
             self.texto.restaurar()
         else:
             self.texto.esquecer_a_restaurada()
             self.pagina.desfazer()
 
     def refazer(self) -> None:
-        if self.texto.pode_reaplicar:
+        if self._no_editor_de_diagrama() and self.editor_diagrama.pode_refazer:
+            self.editor_diagrama.refazer()
+        elif self.texto.pode_reaplicar:
             self.texto.reaplicar()
         else:
             self.pagina.refazer()
@@ -84,3 +98,13 @@ class EdicaoNoDocumento:
             self.treino.inserir_figurina(figurina)
         else:
             self.texto.inserir_figurina(figurina)
+
+    def novo_paragrafo(self) -> None:
+        gid = self.texto.primeiro_gid_da_palavra()
+        self.confirmar_a_sessao_aberta()
+        self.pagina.novo_paragrafo(gid)
+
+    def alternar_estilo(self, campo: str) -> None:
+        gids = self.texto.gids_selecionados()
+        self.confirmar_a_sessao_aberta()
+        self.pagina.alternar_estilo(gids, campo)

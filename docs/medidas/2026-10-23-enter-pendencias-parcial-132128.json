@@ -1,0 +1,51 @@
+{
+ "data": "2026-10-23",
+ "rotulo": "enter-pendencias-parcial",
+ "exitstatus": 0,
+ "metas_ausentes": [
+  "troca_de_pagina",
+  "releitura_de_um_glifo",
+  "memoria_do_desfazer",
+  "atraso_durante_o_lote",
+  "memoria_total_com_o_lote"
+ ],
+ "ordem": "cada módulo tem a janela e o projeto dele, em ordem fixa: na linha de base o Enter ensina antes da releitura; o lote (desde o E, em test_servidor.py) lê num projeto novo, sem padrões",
+ "configuracao": "desde o passo E, a janela com o servidor de leitura (o leitor real no filho), como o programa abre o projeto",
+ "ambiente": {
+  "objetos_congelados": 0,
+  "maquina": "DESKTOP-E025G20",
+  "maquina_cadastrada": true,
+  "cpu": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
+  "ram_gb": 15.9,
+  "python": "3.13.2",
+  "pyside6": "6.11.1",
+  "pymupdf": "1.26.6",
+  "torch": "2.14.0+cpu",
+  "threads_do_torch": 6,
+  "commit": "9c98367",
+  "arvore_suja": false,
+  "arquivos_sujos": []
+ },
+ "medidas": {
+  "enter_ensinar": {
+   "p50_ms": 24.21,
+   "p95_ms": 39.66,
+   "max_ms": 46.57,
+   "n": 30,
+   "alvo_ms": 100,
+   "padroes_no_livro": [
+    0,
+    35
+   ],
+   "caracteres_novos": 7,
+   "como": "desde o 2b: QTest.keyClick(Enter) no campo, com o caractere lido do primeiro pendente (conferir a leitura), até a cor mudar (a parte síncrona: o glifo manual, a amostra gravada); a propagação vai para a fila e não entra. Até o 2a, era até o fim da propagação (ver enter_ate_o_fim_da_propagacao)"
+  },
+  "enter_ate_o_fim_da_propagacao": {
+   "p50_ms": 90.13,
+   "p95_ms": 107.54,
+   "max_ms": 109.13,
+   "n": 30,
+   "como": "o mesmo Enter, até a propagação acabar (o que o 2a media como Enter)"
+  }
+ }
+}

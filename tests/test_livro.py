@@ -13,8 +13,10 @@ import zipfile
 from pathlib import Path
 
 import fitz
+import numpy as np
 import pytest
 from PIL import Image
+from core.box_model import BoxEntry
 
 from abbychess import exportar as ex
 from abbychess import livro
@@ -74,6 +76,27 @@ def test_amostra_escolhe_inicio_meio_e_fim_do_corpo():
     assert livro.paginas_da_amostra(range(20, 220)) == [40, 120, 199]
     assert livro.paginas_da_amostra([7, 5, 6]) == [5, 6, 7]
     assert livro.paginas_da_amostra([5, 5, 6]) == [5, 6]
+
+
+def test_negrito_e_medido_por_palavra_com_a_referencia_da_pagina(monkeypatch):
+    boxes = [BoxEntry("a", x, 0, x + 8, 20) for x in (0, 10, 40, 50)]
+    pesos = {0: 1.0, 10: 1.0, 40: 2.0, 50: 2.0}
+    monkeypatch.setattr(pg, "recorte", lambda _imagem, box: np.array([[box.x1]]))
+    monkeypatch.setattr("core.negrito.espessura", lambda imagem: pesos[int(imagem[0, 0])])
+
+    assert pg.efeitos_de_impressao(Image.new("L", (80, 30)), boxes) == [False, False, True, True]
+
+
+def test_negrito_converte_a_pagina_uma_vez(monkeypatch):
+    """Converter a página inteira a cada glifo dobrou o tempo do lote no passo I."""
+    convertidas = []
+    original = Image.Image.convert
+    monkeypatch.setattr(Image.Image, "convert",
+                        lambda self, *a, **k: convertidas.append(1) or original(self, *a, **k))
+    boxes = [BoxEntry("a", x, 0, x + 8, 20) for x in range(0, 200, 10)]
+
+    assert len(pg.efeitos_de_impressao(Image.new("RGB", (220, 30), "white"), boxes)) == 20
+    assert len(convertidas) == 1
 
 
 @pytest.mark.parametrize("texto", ["0-2", "4-9", "a-b", "1..2"])
@@ -146,14 +169,14 @@ def test_cancelar_no_meio_da_pagina_nao_grava_ela_pela_metade(projeto, fonte, le
 
 
 def test_pagina_que_falha_nao_derruba_o_lote(projeto, fonte, leitor, monkeypatch):
-    original = fonte.pagina
+    original = fonte.pagina_da_entrada            # o lote renderiza pela entrada (§12.4)
 
-    def pagina(indice):
-        if indice == 1:
+    def pagina(entrada):
+        if entrada.pagina == 1:
             raise OSError("A página 2 não renderizou.")
-        return original(indice)
+        return original(entrada)
 
-    monkeypatch.setattr(fonte, "pagina", pagina)
+    monkeypatch.setattr(fonte, "pagina_da_entrada", pagina)
     resultado = livro.reconhecer_paginas(projeto, fonte, leitor, range(3))
     assert resultado.lidas == [0, 2]
     assert "não renderizou" in resultado.falhas[1]
@@ -236,7 +259,8 @@ def test_diagrama_entra_como_recorte_na_altura_dele(projeto, fonte):
         b.char = "a"
     meio = (boxes[0].y2 + max(b.y1 for b in boxes)) // 2
     pagina = ex.pagina_extraida(0, boxes, [(10, meio, 60, meio + 5)], imagem)
-    tipos = [type(b).__name__ for b in pagina.blocos]
+    tipos = ["Figura" if isinstance(b, ex.Figura) else "Paragrafo" if isinstance(b, ex.Paragrafo)
+             else type(b).__name__ for b in pagina.blocos]
     assert tipos == ["Paragrafo", "Figura", "Paragrafo"]
     assert pagina.diagramas == 1
     figura = next(b for b in pagina.blocos if isinstance(b, ex.Figura))
@@ -280,4 +304,4 @@ def test_sem_paginas_lidas_nao_exporta(projeto, tmp_path):
     with pytest.raises(ex.NadaParaExportar):
         ex.exportar(projeto, tmp_path / "x.epub")
     with pytest.raises(ValueError, match="não suportado"):
-        ex.formato_do_caminho(tmp_path / "x.txt")
+        ex.formato_do_caminho(tmp_path / "x.rtf")

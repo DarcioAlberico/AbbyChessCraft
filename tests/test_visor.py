@@ -8,6 +8,7 @@ clique com 2.000 boxes) está em `tests/desempenho/test_visor.py`.
 
 from __future__ import annotations
 
+import json
 import os
 
 import pytest
@@ -395,16 +396,16 @@ def test_a_mesma_pagina_pedida_por_duas_threads_e_renderizada_uma_vez(pdf_de_60_
 
     fonte = pg.FonteDePaginas(pdf_de_60_paginas)
     chamadas = []
-    original = fonte._pagina
+    original = fonte.pagina_da_entrada
     dentro, solta = threading.Event(), threading.Event()
 
-    def _pagina(indice):
-        chamadas.append(indice)
+    def _pagina(entrada):
+        chamadas.append(entrada.pagina)
         dentro.set()
         solta.wait(5)
-        return original(indice)
+        return original(entrada)
 
-    fonte._pagina = _pagina
+    fonte.pagina_da_entrada = _pagina
     cache = pg.CacheDePaginas(fonte)
     cache.precarregar(5)                              # a pré-carga começa a renderizar
     assert dentro.wait(5)
@@ -512,3 +513,106 @@ def test_a_seguinte_e_pre_carregada_depois_da_pintura(app, janela_de_60, monkeyp
         app.processEvents()
         time.sleep(0.01)
     assert chamadas == [11]
+
+
+def _ate_a_pre_carga(app, chamadas):
+    import time
+
+    fim = time.monotonic() + 2
+    while not chamadas and time.monotonic() < fim:
+        app.processEvents()
+        time.sleep(0.005)
+
+
+def test_a_pre_carga_segue_o_sentido_e_vem_ja_quem_folheia(app, janela_de_60, monkeypatch):
+    """Depois de um PgUp, a anterior; trocas a menos de 1 s, a pré-carga sem esperar os
+    150 ms (a página nunca vista chegava tarde a quem folheia, revisão de produto do A1)."""
+    j = janela_de_60
+    chamadas = []
+    monkeypatch.setattr(j.pagina.cache, "precarregar", chamadas.append)
+    j._ultima_troca = 0.0
+    j.ir_para_pagina(20)
+    assert j._pre_carga.interval() == 150                      # parado: depois da pintura
+    _ate_a_pre_carga(app, chamadas)
+    chamadas.clear()
+    j.acao_anterior.trigger()                                  # PgUp logo depois
+    assert j._pre_carga.interval() == 20
+    _ate_a_pre_carga(app, chamadas)
+    assert chamadas == [18] and j.pagina.proxima_provavel == 18
+
+
+def test_a_qimage_da_pagina_nasce_na_thread_que_renderiza(pdf_de_60_paginas):
+    import threading
+
+    from abbychess.app.imagens import qimage_da_pagina
+
+    onde = []
+
+    def preparar(matriz):
+        onde.append(threading.current_thread().name)
+        return qimage_da_pagina(matriz)
+
+    cache = pg.CacheDePaginas(pg.FonteDePaginas(pdf_de_60_paginas), tamanho=2,
+                              preparar=preparar)
+    cache.precarregar(4)
+    cache.esperar()
+    imagem, matriz = cache.pagina(4)
+    qimage, dona = cache.preparada(4, imagem)
+    assert onde == ["pre-carga"] and dona is matriz
+    assert (qimage.width(), qimage.height()) == (matriz.shape[1], matriz.shape[0])
+    assert qimage.pixelColor(0, 0).red() == int(matriz[0, 0])
+    assert cache.preparada(4, imagem.copy()) is None           # outra imagem: não é dela
+    cache.pagina(5)
+    cache.pagina(6)                                            # a 4 sai, e a preparada junto
+    assert cache.preparada(4, imagem) is None and 4 not in cache._preparadas
+
+
+def test_preparar_que_falha_nao_impede_a_pagina(pdf_de_60_paginas):
+    def preparar(_matriz):
+        raise MemoryError("sem memória para a QImage")
+
+    cache = pg.CacheDePaginas(pg.FonteDePaginas(pdf_de_60_paginas), preparar=preparar)
+    imagem, _matriz = cache.pagina(3)                          # a página abre
+    assert cache.preparada(3, imagem) is None                  # e a janela converte sozinha
+
+
+def test_na_ponta_do_livro_a_pre_carga_vai_ao_outro_lado(app, janela_de_60):
+    p = janela_de_60.pagina
+    p.ir_para(5)
+    p.ir_para(0)                                               # o Home: sentido para trás
+    assert p.proxima_provavel == 1
+    p.ir_para(58)
+    p.ir_para(59)                                              # o End
+    assert p.proxima_provavel == 58
+
+
+def test_a_medida_da_inclinacao_nao_segura_o_render_de_outra_pagina(pdf_de_60_paginas,
+                                                                    monkeypatch, tmp_path):
+    """Só o render do fitz fica na trava da fonte: o clique numa página não espera a
+    pré-carga medir a inclinação de outra (~370 ms numa página de livro nunca vista)."""
+    import threading
+
+    medindo, solta = threading.Event(), threading.Event()
+    medir = pg.medir_inclinacao
+
+    def medir_devagar(cinza, *a, **k):
+        if threading.current_thread().name == "pre-carga":
+            medindo.set()
+            solta.wait(5)
+        return medir(cinza, *a, **k)
+
+    monkeypatch.setattr(pg, "medir_inclinacao", medir_devagar)
+    fonte = pg.FonteDePaginas(pdf_de_60_paginas, endireitar=True, pasta=tmp_path)
+    cache = pg.CacheDePaginas(fonte)
+    cache.precarregar(5)
+    assert medindo.wait(5)                                     # a pré-carga está medindo
+    resultado = []
+    clique = threading.Thread(target=lambda: resultado.append(cache.pagina(9)))
+    clique.start()
+    clique.join(5)
+    pronta_antes = bool(resultado)
+    solta.set()
+    cache.esperar()
+    assert pronta_antes                                        # não esperou a medida da 5
+    assert cache.tem(5) and cache.tem(9)
+    assert set(json.loads((tmp_path / pg.ARQUIVO_DE_INCLINACOES).read_text())) == {"5", "9"}

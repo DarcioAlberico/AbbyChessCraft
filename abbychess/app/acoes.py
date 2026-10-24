@@ -7,9 +7,10 @@ janela que abre um diálogo antes. Os atalhos vêm de `docs/atalhos.yaml`, pelo 
 
 from __future__ import annotations
 
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QLabel, QSpinBox, QToolBar
 
-from abbychess.app import teclado
+from abbychess.app import icones, teclado
 
 
 def montar(janela) -> None:
@@ -19,6 +20,7 @@ def montar(janela) -> None:
     barra = QToolBar("Principal")
     barra.setObjectName("barra_principal")
     barra.setMovable(False)
+    barra.setIconSize(QSize(20, 20))            # com a margem do botão, o alvo de 24 px
     j.addToolBar(barra)
 
     # --- Projeto e Editar ----------------------------------------------------------
@@ -41,7 +43,8 @@ def montar(janela) -> None:
     barra.addSeparator()
 
     # --- Página e livro ------------------------------------------------------------
-    j.acao_anterior = acao(j, "pagina_anterior", lambda: p.vizinha(-1), texto="◀", barra=barra)
+    j.acao_anterior = acao(j, "pagina_anterior", lambda: p.vizinha(-1),
+                           texto="Página anterior", barra=barra)
     j.seletor = QSpinBox()
     j.seletor.setMinimum(1)
     j.seletor.setKeyboardTracking(False)
@@ -50,7 +53,8 @@ def montar(janela) -> None:
     barra.addWidget(j.seletor)
     j.total_de_paginas = QLabel(" de 0 ")
     barra.addWidget(j.total_de_paginas)
-    j.acao_seguinte = acao(j, "pagina_seguinte", lambda: p.vizinha(+1), texto="▶", barra=barra)
+    j.acao_seguinte = acao(j, "pagina_seguinte", lambda: p.vizinha(+1),
+                           texto="Página seguinte", barra=barra)
     j.acao_primeira = acao(j, "primeira_pagina", p.primeira, texto="Primeira página")
     j.acao_ultima = acao(j, "ultima_pagina", p.ultima, texto="Última página")
     j.acao_ir_para = acao(j, "ir_para_pagina", j.ir_para_a_pagina_pedida,
@@ -65,7 +69,7 @@ def montar(janela) -> None:
                                widgets=[j.visor])
     barra.addSeparator()
     j.acao_reconhecer = acao(j, "reconhecer_pagina", j.reconhecer,
-                             texto="Reconhecer página (F5)", barra=barra)
+                             texto="Reconhecer página", barra=barra)
     j.acao_reler = acao(j, "reler_pendentes", lambda: p.reler_pendentes(),
                         texto="Reler pendentes", barra=barra)
     j.acao_lote = acao(j, "reconhecer_livro", j.reconhecer_livro, texto="Reconhecer o livro…")
@@ -75,6 +79,29 @@ def montar(janela) -> None:
                              texto="Página verificada (abre a próxima)")
     j.acao_antes_do_lote = acao(j, "voltar_antes_do_lote", j.voltar_ao_antes_do_lote,
                                 texto="Voltar ao estado antes do lote…")
+    # As operações de página (§12.4, passo L): sem tecla, no menu Página e na gaveta.
+    j.acao_mover_paginas = teclado.sem_atalho(j, "Mover páginas…", lambda: j.mover_paginas())
+    j.acao_apagar_paginas = teclado.sem_atalho(j, "Apagar páginas…", lambda: j.apagar_paginas())
+    j.acao_inserir_paginas = teclado.sem_atalho(j, "Inserir páginas…", j.inserir_paginas)
+    j.acao_paginas_apagadas = teclado.sem_atalho(j, "Páginas apagadas…", j.paginas_apagadas)
+    # No perfil de teclado sem tecla padrão (Ctrl+Shift+< e > dependem do teclado, ABNT2):
+    # a tecla se atribui em Ferramentas › Teclado.
+    j.acao_girar_a_direita = acao(j, "girar_a_direita", lambda: j.girar_a_direita(),
+                                  texto="Girar à direita")
+    j.acao_girar_a_esquerda = acao(j, "girar_a_esquerda", lambda: j.girar_a_esquerda(),
+                                   texto="Girar à esquerda")
+    j.acao_girar_paginas = teclado.sem_atalho(j, "Girar páginas…", lambda: j.girar_paginas())
+    j.acao_cortar_paginas = teclado.sem_atalho(j, "Cortar páginas…", lambda: j.cortar_paginas())
+    j.acao_tirar_o_corte = teclado.sem_atalho(j, "Tirar o corte…", lambda: j.tirar_o_corte())
+    j.acao_dividir_paginas = teclado.sem_atalho(j, "Dividir páginas…",
+                                                lambda: j.dividir_paginas())
+    j.acao_endireitar_paginas = teclado.sem_atalho(j, "Endireitar páginas…",
+                                                   lambda: j.endireitar_paginas())
+    j.acoes_de_paginas = (j.acao_mover_paginas, j.acao_apagar_paginas, j.acao_inserir_paginas,
+                          j.acao_paginas_apagadas, j.acao_girar_a_direita,
+                          j.acao_girar_a_esquerda, j.acao_girar_paginas, j.acao_cortar_paginas,
+                          j.acao_tirar_o_corte, j.acao_dividir_paginas,
+                          j.acao_endireitar_paginas)
     barra.addSeparator()
 
     # --- A fila ----------------------------------------------------------------
@@ -90,8 +117,16 @@ def montar(janela) -> None:
                             texto="Próximo diagrama por conferir")
     j.acao_diagramas.setToolTip("O próximo diagrama do livro ainda não conferido (o desta "
                                 "página primeiro); também abre com um clique no diagrama.")
-    j.acao_verificar = teclado.sem_atalho(j, "Verificação de texto (fila de palavras)",
-                                          lambda: j.fila.definir("palavras"))
+    # O editor Diagrama do Inspetor (§10): valem com o foco dentro dele.
+    editor = [j.editor_diagrama]
+    j.acao_conferir_diagrama = acao(j, "conferir_diagrama", j.editor_diagrama.confirmar,
+                                    widgets=editor)
+    j.acao_diagrama_anterior = acao(j, "diagrama_anterior", lambda: j.editor_diagrama.ir(-1),
+                                    widgets=editor)
+    j.acao_diagrama_seguinte = acao(j, "diagrama_seguinte", lambda: j.editor_diagrama.ir(+1),
+                                    widgets=editor)
+    j.acao_verificar = acao(j, "fila_em_palavras", lambda: j.fila.definir("palavras"),
+                            texto="Verificação de texto (fila de palavras)")
 
     # --- Exibir: arranjos, painéis, foco, zoom -------------------------------------------
     j.acao_so_imagem = acao(j, "arranjo_so_imagem", lambda: j.arranjar("so_imagem"),
@@ -109,6 +144,13 @@ def montar(janela) -> None:
                             ("vista", "Ir à vista direita (de novo: a aba seguinte)"),
                             ("inspetor", "Ir ao Inspetor"), ("resultados", "Ir a Resultados")),
                            start=1)]
+    j.acao_foco_linha = acao(j, "foco_linha", j.focar_linha, texto="Ir à Linha")
+    j.acao_painel_seguinte = acao(j, "painel_seguinte", lambda: j.focar_vizinho(+1),
+                                  texto="Painel seguinte")
+    j.acao_painel_anterior = acao(j, "painel_anterior", lambda: j.focar_vizinho(-1),
+                                  texto="Painel anterior")
+    j.acao_teclado = teclado.sem_atalho(j, "Teclado…", j.configurar_teclado)
+    j.acao_teclado.setToolTip("O perfil de teclado (padrão ou FineReader) e a troca de atalhos")
     j.caixa_de_zoom.valueChanged.connect(lambda valor: j.visor.definir_zoom(valor / 100))
     # O Enter na caixa devolve o foco ao visor (os atalhos voltam). Não pelo editingFinished,
     # que também vem quando a caixa perde o foco: roubaria o clique dado noutro campo.
@@ -119,7 +161,8 @@ def montar(janela) -> None:
     com_o_documento = [*imagem_e_glifo, j.texto]   # e, no Documento, muda o corpo
     j.acao_ajustar = acao(j, "zoom_pagina", j.zoom_padrao, texto="Página inteira",
                           widgets=com_o_documento, barra=barra)
-    j.acao_ajustar.setToolTip("Página inteira na Imagem; no Documento, o corpo padrão (Ctrl+0)")
+    teclado.dica(j.acao_ajustar, "Página inteira na Imagem; no Documento, o corpo padrão "
+                                 "({zoom_pagina})")
     j.acao_zoom_mais = acao(j, "zoom_mais", j.aproximar, texto="Aproximar",
                             widgets=com_o_documento)
     j.acao_zoom_menos = acao(j, "zoom_menos", j.afastar, texto="Afastar",
@@ -132,8 +175,9 @@ def montar(janela) -> None:
     j.acao_origem = acao(j, "mostrar_origem", j.visor.definir_origem,
                          texto="Mostrar a origem das leituras", widgets=[j.visor],
                          marcavel=True)
-    j.acao_padroes = teclado.sem_atalho(j, "Padrões do livro (Alt+3 cicla as abas)",
+    j.acao_padroes = teclado.sem_atalho(j, "Padrões do livro",
                                         lambda: j.vista.setCurrentWidget(j.padroes))
+    teclado.dica(j.acao_padroes, "Padrões do livro ({foco_vista} de novo cicla as abas)")
     j.acao_fechar = acao(j, "fechar_sobreposicao", j.fechar_sobreposicao,
                          texto="Fechar o que está por cima")
     j.acao_linha = acao(j, "mostrar_linha", j.alternar_linha, texto="Linha", marcavel=True)
@@ -150,15 +194,36 @@ def montar(janela) -> None:
 
     # --- Ferramentas -------------------------------------------------------------
     j.acao_modo_treino = acao(j, "marcar_glifo", j.modo_treino,
-                              texto="Marcar glifo à mão (Ctrl+M)", barra=barra, marcavel=True)
-    j.acao_modo_treino.setToolTip("Arraste na página para marcar um glifo; "
-                                  "Ctrl+clique junta boxes na seleção.")
-    j.acao_areas = acao(j, "modo_areas", j.modo_areas, texto="Editor de áreas (Ctrl+Shift+A)",
+                              texto="Marcar glifo à mão", barra=barra, marcavel=True)
+    teclado.dica(j.acao_modo_treino, "Marcar glifo à mão ({marcar_glifo}): arraste na página "
+                                     "para marcar um glifo; Ctrl+clique junta boxes na seleção.")
+    j.acao_areas = acao(j, "modo_areas", j.modo_areas, texto="Editor de áreas",
                         barra=barra, marcavel=True)
-    j.acao_areas.setToolTip("Arraste para desenhar uma área; arraste dentro dela para "
-                            "mover e na borda para esticar. 1-4 trocam o tipo, Del apaga.")
+    teclado.dica(j.acao_areas, "Editor de áreas ({modo_areas}): arraste para desenhar uma área; "
+                               "arraste dentro dela para mover e na borda para esticar. 1-4 "
+                               "trocam o tipo, Del apaga.")
     j.acao_areas_auto = acao(j, "areas_automaticas", j.areas.automaticas,
                              texto="Refazer as áreas automáticas")
+    j.acao_reconhecer_zona = acao(j, "reconhecer_zona", j.areas.reconhecer_atual,
+                                  widgets=[j.visor])
+    j.acao_ordenar_areas = acao(j, "ordenar_areas", j.areas.iniciar_ordenacao,
+                                widgets=[j.visor])
+    j.acao_salvar_modelo_areas = acao(j, "salvar_modelo_areas", j.areas.salvar_modelo,
+                                      widgets=[j.visor])
+    j.acao_aplicar_modelo_areas = acao(j, "aplicar_modelo_areas", j.aplicar_modelo_de_areas,
+                                       widgets=[j.visor])
+    funcoes = (("funcao_texto", "texto"), ("funcao_titulo", "titulo"),
+               ("funcao_cabecalho", "cabecalho"), ("funcao_rodape", "rodape"),
+               ("funcao_numero", "numero_de_pagina"), ("funcao_nota", "nota"),
+               ("funcao_legenda", "legenda"), ("funcao_diagrama", "diagrama"),
+               ("funcao_ignorar", "ignorar"))
+    j.acoes_das_funcoes = [acao(j, id_, lambda _=False, f=f: j.areas.trocar_funcao_atual(f),
+                                widgets=[j.visor]) for id_, f in funcoes]
+    # O tipo da zona por Ctrl+1…5, como no FineReader (só nesse perfil, passo K).
+    tipos = (("tipo_texto", "texto"), ("tipo_diagrama", "diagrama"), ("tipo_tabela", "tabela"),
+             ("tipo_imagem", "figura"), ("tipo_ignorar", "ignorar"))
+    j.acoes_dos_tipos = [acao(j, id_, lambda _=False, f=f: j.areas.trocar_funcao_atual(f),
+                              widgets=[j.visor]) for id_, f in tipos]
 
     # --- O Glifo e a Palavra (escopos de painel) -----------------------------------------
     t, campo = j.treino, j.treino.campo
@@ -208,12 +273,19 @@ def _documento(j) -> None:
     j.acao_ensinar_no_documento = acao(j, "ensinar_no_documento",
                                        lambda: j.confirmar_no_documento(ensinar=True),
                                        widgets=[d])
+    j.acao_novo_paragrafo = acao(j, "novo_paragrafo", j.novo_paragrafo, widgets=[d])
+    j.acao_negrito = acao(j, "negrito", lambda: j.alternar_estilo("negrito"), widgets=[d])
+    j.acao_italico = acao(j, "italico", lambda: j.alternar_estilo("italico"), widgets=[d])
+    j.acao_sublinhado = acao(j, "sublinhado", lambda: j.alternar_estilo("sublinhado"),
+                             widgets=[d])
     j.acoes_das_figurinas = [acao(j, id_, lambda _=False, f=f: j.inserir_figurina(f),
                                   widgets=[d, j.treino])
                              for id_, f in (("figurina_rei", "♔"), ("figurina_dama", "♕"),
                                             ("figurina_torre", "♖"), ("figurina_bispo", "♗"),
                                             ("figurina_cavalo", "♘"), ("figurina_peao", "♙"))]
-    for q in (j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_desfazer, j.acao_refazer):
+    for q in (j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_novo_paragrafo,
+              j.acao_negrito, j.acao_italico, j.acao_sublinhado,
+              j.acao_desfazer, j.acao_refazer):
         d.teclas.ligar(q)
 
 
@@ -231,7 +303,9 @@ def _menus(j) -> None:
                  j.acao_galeria):
         menu.addAction(acao)
     menu.addSeparator()                         # a sessão do Documento (§6.3)
-    for acao in (j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_ensinar_no_documento):
+    for acao in (j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_ensinar_no_documento,
+                 j.acao_novo_paragrafo, j.acao_negrito, j.acao_italico,
+                 j.acao_sublinhado):
         menu.addAction(acao)
     menu.addSeparator()
     menu.addAction(j.acao_paleta)
@@ -242,7 +316,7 @@ def _menus(j) -> None:
     for acao in (j.acao_anterior, j.acao_seguinte, j.acao_primeira, j.acao_ultima,
                  j.acao_ir_para, j.acao_voltar_visita, j.acao_avancar_visita, None,
                  j.acao_reconhecer, j.acao_reler, j.acao_verificada, j.acao_antes_do_lote,
-                 None,
+                 None, *j.acoes_de_paginas[:4], None, *j.acoes_de_paginas[4:], None,
                  j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
                  j.acao_escopo_da_fila, j.acao_proximo_do_livro, j.acao_diagramas):
         menu.addSeparator() if acao is None else menu.addAction(acao)
@@ -255,13 +329,20 @@ def _menus(j) -> None:
                  j.acao_zoom_mais, j.acao_zoom_menos, j.acao_origem, j.acao_seguir):
         menu.addSeparator() if acao is None else menu.addAction(acao)
     j.menu_ferramentas = j.menuBar().addMenu("&Ferramentas")
-    for acao in (j.acao_modo_treino, j.acao_areas, j.acao_areas_auto, j.acao_verificar, None,
+    for acao in (j.acao_modo_treino, j.acao_areas, j.acao_areas_auto,
+                 j.acao_reconhecer_zona, j.acao_ordenar_areas,
+                 j.acao_salvar_modelo_areas, j.acao_aplicar_modelo_areas,
+                 j.acao_verificar, None,
                  j.acao_lote, None,
-                 j.acao_opcoes):
+                 j.acao_opcoes, j.acao_teclado):
         j.menu_ferramentas.addSeparator() if acao is None else j.menu_ferramentas.addAction(acao)
     menu = j.menuBar().addMenu("Aj&uda")
     menu.addAction("Atalhos do teclado", j.mostrar_atalhos)
     menu.addAction("Sobre o AbbyChessCraft", j.sobre)
+    icones.aplicar(j)                            # Lucide, na cor do tema (§18.5)
+    barra = j.findChild(QToolBar, "barra_principal")
+    for q in (j.acao_reconhecer, j.acao_reler):  # os dois comandos principais, com o nome
+        barra.widgetForAction(q).setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
 
 
 def atualizar(janela) -> None:
@@ -273,6 +354,26 @@ def atualizar(janela) -> None:
     j, p = janela, janela.pagina
     tem = p.pronto
     sem_lote = not p.lote_rodando
+    # As operações de página: desligadas, com o motivo na dica (só para leitura, o lote, uma
+    # tarefa em curso, o projeto ainda na v2).
+    motivo = p.motivo_para_nao_mudar_as_paginas()
+    apagadas = bool(p.projeto.sequencia.apagadas) if p.projeto is not None else False
+    dicas = ("Muda páginas de lugar (as escolhidas, depois de outra)",
+             "Tira páginas do livro; elas ficam guardadas no projeto",
+             "Põe páginas de um PDF ou de imagens no livro",
+             "Devolve ao livro as páginas apagadas",
+             "Gira 90° no sentido horário a página aberta (ou as escolhidas na gaveta)",
+             "Gira 90° no sentido anti-horário a página aberta (ou as escolhidas na gaveta)",
+             "Gira as páginas de 90 em 90 graus, com os glifos",
+             "Corta as margens das páginas; os glifos de fora ficam guardados",
+             "Devolve as páginas cortadas inteiras",
+             "Divide a página espelhada em duas",
+             "Endireita as páginas por um ângulo à mão; a leitura delas se desfaz")
+    valem = (True, True, True, apagadas, True, True, True, True, True, True, True)
+    for q, dica, vale in zip(j.acoes_de_paginas, dicas, valem):
+        q.setEnabled(motivo is None and vale)
+        q.setToolTip(dica if motivo is None else f"{dica}. {motivo}")
+    j.paginas.paginas_mudam = motivo is None
     total = p.fonte.total if p.fonte else 0
     editar = tem
     j.acao_novo.setEnabled(sem_lote)
@@ -304,6 +405,15 @@ def atualizar(janela) -> None:
     j.acao_galeria.setEnabled(tem and bool(p.boxes))
     j.acao_areas.setEnabled(tem)
     j.acao_areas_auto.setEnabled(editar and j.acao_areas.isChecked())
+    area_atual = editar and j.acao_areas.isChecked() and j.areas.atual is not None
+    j.acao_reconhecer_zona.setEnabled(area_atual)
+    j.acao_ordenar_areas.setEnabled(editar and j.acao_areas.isChecked() and bool(j.areas.zonas))
+    j.acao_salvar_modelo_areas.setEnabled(editar and j.acao_areas.isChecked()
+                                          and bool(j.areas.zonas))
+    j.acao_aplicar_modelo_areas.setEnabled(editar and j.acao_areas.isChecked()
+                                           and j.areas.modelo is not None)
+    for q in (*j.acoes_das_funcoes, *j.acoes_dos_tipos):
+        q.setEnabled(area_atual)
     j.acao_verificar.setEnabled(tem and bool(p.boxes))
     j.acao_diagramas.setEnabled(tem)
     for q in (j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
@@ -317,7 +427,9 @@ def atualizar(janela) -> None:
         desfazer = "a palavra"
     if j.texto.pode_reaplicar:                  # depois do Esc, o Ctrl+Y a reaplica
         refazer = "a palavra"
-    j.acao_desfazer.setEnabled(editar and desfazer is not None)
-    j.acao_refazer.setEnabled(editar and refazer is not None)
+    # Com o editor Diagrama aberto, o Ctrl+Z dele (o do tabuleiro) vale sem histórico.
+    no_diagrama = j.editor_diagrama.aberto and j.editor_diagrama.isVisible()
+    j.acao_desfazer.setEnabled(editar and (desfazer is not None or no_diagrama))
+    j.acao_refazer.setEnabled(editar and (refazer is not None or no_diagrama))
     j.acao_desfazer.setText(f"Desfazer: {desfazer}" if desfazer else "Desfazer")
     j.acao_refazer.setText(f"Refazer: {refazer}" if refazer else "Refazer")

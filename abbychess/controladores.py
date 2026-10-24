@@ -25,6 +25,8 @@ from typing import List, Optional, Sequence
 from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import exportar as ex
+from abbychess import historico as hs
+from abbychess import lances as lc
 from abbychess import livro
 from abbychess import lote as lt
 from abbychess import servidor_de_leitura as sl
@@ -36,7 +38,7 @@ from abbychess.leitor import LeitorDoLivro, congelar_para_a_coleta_de_lixo
 log = logging.getLogger(__name__)
 
 #: O que o último lote deixou para retomar, na pasta do projeto.
-ARQUIVO_DO_LOTE = "lote.json"
+from abbychess.projeto import ARQUIVO_DO_LOTE  # noqa: E402  (o nome mora no projeto)
 
 
 # ----------------------------------------------------------------------
@@ -51,6 +53,8 @@ class ControladorDeLayout:
         self.eventos = pagina.eventos
         #: A área escolhida (posição na lista), ou None.
         self.atual: Optional[int] = None
+        self._ordenacao: Optional[List[int]] = None
+        self.modelo: Optional[zn.ModeloDeAreas] = None
         pagina.eventos.ligar("pagina_trocou", self._pagina_trocou)
 
     @property
@@ -59,6 +63,7 @@ class ControladorDeLayout:
 
     def _pagina_trocou(self) -> None:
         self.atual = None
+        self._ordenacao = None
         self.eventos.emitir("layout_mudou")
 
     def _trocar(self, zonas: Sequence[zn.Zona], atual: Optional[int], descricao: str,
@@ -111,13 +116,36 @@ class ControladorDeLayout:
         p.tarefa("Achando as áreas", preparar, falhou=p._falhou("Áreas"))
 
     def _automaticas_prontas(self, zonas) -> None:
+        zonas = self._aprender_margens(zonas)
         self._trocar(zonas, None, "Áreas automáticas")
         tipos: dict = {}
         for z in zonas:
             nome = zn.NOMES[z.tipo].lower()
             tipos[nome] = tipos.get(nome, 0) + 1
         resumo = ", ".join(f"{n} {t}" for t, n in tipos.items()) or "nenhuma"
-        self.pagina._avisar(f"Áreas automáticas: {resumo}. Corrija e aperte F5.", 10000)
+        self.pagina._avisar(f"Áreas automáticas: {resumo}. Corrija e aperte "
+                            "{reconhecer_pagina}.", 10000)
+
+    def _aprender_margens(self, zonas):
+        """Dá função às margens atuais pelas repetições das páginas reconhecidas."""
+        p = self.pagina
+        if p.projeto is None or p.imagem is None:
+            return zonas
+        paginas = {}
+        for indice in p.projeto.paginas_lidas():
+            modelo = p.modelo if indice == p.indice else p.projeto.carregar_modelo(indice)
+            if modelo is None:
+                continue
+            lidos = [b.entry for b in modelo.boxes if b.entry.char]
+            # Todas as páginas do livro são renderizadas no mesmo DPI. A altura aberta
+            # evita renderizar as demais só para aprender a margem; pequenas variações de
+            # mídia não atravessam as faixas conservadoras de 10% e 3%.
+            paginas[indice] = (lidos, p.imagem.height)
+        if p.indice not in paginas:
+            lidos = [b.entry for b in (p.modelo.boxes if p.modelo else []) if b.entry.char]
+            paginas[p.indice] = (lidos, p.imagem.height)
+        funcoes = ex.funcoes_das_margens(paginas).get(p.indice, {})
+        return zn.aplicar_funcoes_de_margem(zonas, paginas[p.indice][0], funcoes)
 
     def desenhar(self, x1: int, y1: int, x2: int, y2: int) -> None:
         p = self.pagina
@@ -134,8 +162,20 @@ class ControladorDeLayout:
         p._avisar(f"Área {len(zonas)} de texto criada. 2 diagrama, 3 imagem, 4 ignorar.", 6000)
 
     def escolher(self, indice: int) -> None:
+        if self._ordenacao is not None and 0 <= indice < len(self.zonas):
+            if indice not in self._ordenacao:
+                self._ordenacao.append(indice)
+            if len(self._ordenacao) == len(self.zonas):
+                self._trocar(zn.ordenar(self.zonas, self._ordenacao), indice, "Ordenar áreas")
+                self._ordenacao = None
+            else:
+                self.atual = indice
+                self.eventos.emitir("layout_mudou")
+                self.eventos.emitir("acoes_mudaram")
+            return
         self.atual = indice if 0 <= indice < len(self.zonas) else None
         self.eventos.emitir("layout_mudou")
+        self.eventos.emitir("acoes_mudaram")
 
     def arrastar(self, indice: int, bordas: str, dx: int, dy: int) -> None:
         p = self.pagina
@@ -163,6 +203,91 @@ class ControladorDeLayout:
         zn.trocar_tipo(zonas, indice, tipo)
         self._trocar(zonas, indice, "Trocar o tipo da área")
         self.pagina._avisar(f"Área {indice + 1}: {zn.NOMES[tipo].lower()}.", 5000)
+
+    def trocar_funcao(self, indice: int, funcao: str) -> None:
+        zonas = self.zonas
+        if not 0 <= indice < len(zonas):
+            return
+        zn.trocar_funcao(zonas, indice, funcao)
+        self._trocar(zonas, indice, "Trocar a função da área")
+        self.pagina._avisar(f"Área {indice + 1}: {funcao.replace('_', ' ')}.", 5000)
+
+    def trocar_funcao_atual(self, funcao: str) -> None:
+        if self.atual is not None:
+            self.trocar_funcao(self.atual, funcao)
+
+    def iniciar_ordenacao(self) -> None:
+        if not self.zonas:
+            return
+        self._ordenacao = []
+        self.atual = None
+        self.eventos.emitir("layout_mudou")
+        self.pagina._avisar("Ordenar áreas: clique em cada uma na ordem de leitura; Esc cancela.",
+                            8000)
+
+    def cancelar_ordenacao(self) -> None:
+        if self._ordenacao is not None:
+            self._ordenacao = None
+            self.atual = None
+            self.eventos.emitir("layout_mudou")
+            self.pagina._avisar("Ordenação cancelada.", 4000)
+
+    def salvar_modelo(self) -> None:
+        p = self.pagina
+        if p.imagem is None or not self.zonas:
+            return
+        largura, altura = p.imagem.size
+        self.modelo = zn.ModeloDeAreas(largura, altura, tuple(self.zonas))
+        p._avisar(f"Modelo salvo com {len(self.zonas)} área(s).", 5000)
+
+    def aplicar_modelo_aqui(self) -> None:
+        p = self.pagina
+        if self.modelo is None or p.imagem is None:
+            return
+        try:
+            zonas = self.modelo.aplicar(*p.imagem.size)
+        except ValueError as erro:
+            p._avisar(f"Modelo não aplicado: {erro}", 7000)
+            return
+        self._trocar(zonas, None, "Aplicar modelo de áreas")
+
+    def aplicar_modelo(self, indices: Sequence[int]) -> None:
+        """Aplica o modelo a um intervalo já filtrado (todos, pares ou ímpares).
+
+        Páginas de outra resolução são recusadas; todas as aceitas formam um único passo
+        do desfazer do projeto.
+        """
+        p, modelo = self.pagina, self.modelo
+        if modelo is None or p.projeto is None or p.fonte is None:
+            return
+        mudancas, recusadas = {}, []
+        for indice in sorted(set(indices)):
+            if not 0 <= indice < p.fonte.total:
+                continue
+            largura, altura = p.fonte.pagina(indice).size
+            try:
+                zonas = modelo.aplicar(largura, altura)
+            except ValueError:
+                recusadas.append(indice + 1)
+                continue
+            pagina = p.projeto.pagina_para_editar(indice)
+            antes = pagina.instantaneo()
+            pagina.zonas = zonas
+            pagina.zonas = zn.vincular_legendas(zn.com_ids(pagina.zonas), pagina.diagramas)
+            mudancas[pagina.pid] = hs.mudanca(antes, pagina.instantaneo())
+            p.projeto.agendar(pagina)
+        if mudancas:
+            p.historico.registrar(hs.Transacao("Aplicar modelo de áreas", mudancas))
+            p.eventos.emitir("acoes_mudaram")
+            if p.modelo is not None and p.modelo.pid in mudancas:
+                self.atual = None
+                p.eventos.emitir("layout_mudou")
+        complemento = f"; recusadas por resolução: {recusadas}" if recusadas else ""
+        p._avisar(f"Modelo aplicado a {len(mudancas)} página(s){complemento}.", 8000)
+
+    def reconhecer_atual(self) -> None:
+        if self.atual is not None and 0 <= self.atual < len(self.zonas):
+            self.pagina.reconhecer_zona(self.zonas[self.atual])
 
 
 # ----------------------------------------------------------------------
@@ -376,6 +501,57 @@ class ControladorDeDiagramas:
         if p.ir_para(proxima):
             self.conferir()
 
+    def vizinho_do_livro(self, passo: int) -> None:
+        """PgDn (+1) na ponta da página: o primeiro diagrama da próxima página que tem algum;
+        PgUp (−1): o último da anterior. Não dá a volta no livro."""
+        p = self.pagina
+        if not p.pronto:
+            return
+        resumo = p.projeto.resumo_do_livro()
+        com = sorted(i for i, r in resumo.items() if r.get("diagramas", 0) > 0)
+        if passo > 0:
+            alvo = next((i for i in com if i > p.indice), None)
+        else:
+            alvo = next((i for i in reversed(com) if i < p.indice), None)
+        if alvo is None:
+            p._avisar(f"Não há diagrama {'depois' if passo > 0 else 'antes'} deste no livro.",
+                      5000)
+            return
+        if not p.ir_para(alvo):
+            p._avisar(f"A página {alvo + 1} não abriu.", 5000)
+            return
+        self.conferir(0 if passo > 0 else max(0, len(p.diagramas) - 1))
+
+    def do_livro(self, pronto) -> None:
+        """Os diagramas de todas as páginas que têm algum, fora da interface: `pronto` recebe
+        [(índice da página, [DiagramaLido])] (a aba Diagramas), um por tabuleiro, os por ler
+        também (`para_caixas`, a mesma lista de `ControladorDePagina.diagramas`: o índice do
+        item é o da conferência). Lê sem passar pelo cache de páginas (`ler_sem_guardar`)."""
+        p = self.pagina
+        if p.projeto is None:
+            return
+        projeto = p.projeto
+
+        def preparar():
+            com = sorted(i for i, r in projeto.resumo_do_livro().items()
+                         if r.get("diagramas", 0) > 0)
+
+            def trabalho(_progresso):
+                saida = []
+                for i in com:
+                    pagina = projeto.ler_sem_guardar(i)
+                    if pagina is not None:
+                        saida.append((i, dg.para_caixas(pagina.tabuleiros, pagina.diagramas)))
+                return saida
+
+            def chegou(paginas):
+                if p.projeto is projeto:
+                    pronto(paginas)
+            return trabalho, chegou
+
+        p.tarefa("Lendo os diagramas do livro", preparar,
+                 falhou=p._falhou("Diagramas do livro"))
+
     def clicado(self, x: int, y: int) -> None:
         indice = dg.diagrama_em(self.pagina.diagramas, x, y)
         if indice is not None:
@@ -430,7 +606,8 @@ class ControladorDeDiagramas:
                     for i, d in enumerate(novos):
                         if d.caixa == lido.caixa and not d.lido:
                             novos[i] = lido
-                pagina.diagramas = novos
+                pagina.diagramas = dg.com_ids(novos)
+                pagina.diagramas = lc.validar_pagina(pagina, p.projeto.dados.idioma)
                 p._gravar(pagina)
                 if pagina is p.modelo:
                     self.eventos.emitir("glifos_mudaram", None)
@@ -440,19 +617,36 @@ class ControladorDeDiagramas:
         p.executar("Lendo os diagramas", preparar, falhou=p._falhou("Ler os diagramas"))
 
     def _abrir(self, indice: int) -> None:
-        d = self.pagina.diagramas[indice]
+        diagramas = self.pagina.diagramas
+        if not 0 <= indice < len(diagramas):
+            self.pagina._avisar("O diagrama pedido não está mais na página.", 6000)
+            return
+        d = diagramas[indice]
         if not d.lido:
             self.pagina._avisar(f"O diagrama não foi lido: {d.erro}", 8000)
             return
         self.eventos.emitir("conferir", indice)
 
-    def aplicar(self, indice: int, tabuleiro, tudo: bool) -> None:
-        """Grava o diagrama conferido, refaz o texto e guarda as amostras no projeto."""
+    def aplicar(self, caixa, tabuleiro, tudo: bool) -> bool:
+        """Grava o diagrama conferido, refaz o texto e guarda as amostras no projeto.
+
+        O diagrama é achado pela `caixa`, não pelo índice: entre abrir a conferência e
+        conferir, um F5, um desfazer ou a edição de áreas podem ter mudado a lista. Devolve
+        se gravou (falso: sem página, projeto só leitura, ou o diagrama sumiu)."""
         p = self.pagina
         if p.modelo is None:
-            return
-        antes = p._instantaneo()
+            return False
+        if p.projeto.somente_leitura:
+            p._avisar("Projeto aberto só para leitura: a conferência não é gravada.", 6000)
+            return False
         diagramas = p.diagramas
+        indice = next((i for i, d in enumerate(diagramas)
+                       if tuple(d.caixa) == tuple(caixa)), None)
+        if indice is None:
+            p._avisar("O diagrama mudou na página ({reconhecer_pagina}, desfazer ou áreas): reabra a "
+                      "conferência.", 8000)
+            return False
+        antes = p._instantaneo()
         diagramas[indice] = diagramas[indice].conferir(tabuleiro)
         p.modelo.diagramas = diagramas
         p._mudou(p.modelo, p.indice, f"Conferir o diagrama {indice + 1}", antes)
@@ -468,6 +662,7 @@ class ControladorDeDiagramas:
             else:
                 mensagem += f"; {len(caminhos)} amostra(s) guardadas no projeto"
         p._avisar(mensagem, 8000)
+        return True
 
 
 # ----------------------------------------------------------------------
@@ -532,8 +727,12 @@ class ControladorDoLivro:
         self._gravador_do_lote = _GravadorDoLote()
         self.eventos.ligar("pagina_reconhecida", self._saiu_de_reler_depois)
         self.eventos.ligar("pagina_verificada", self._saiu_de_reler_depois)
+        # A ordem do livro mudou (§12.4): o lote a retomar volta do `lote.json`, que é por pid.
+        self.eventos.ligar("sequencia_mudou", self._ler_restante)
         #: O servidor cujo `modelos_prontos` já foi emitido (uma vez por servidor).
         self._modelos_avisados = None
+        #: As três páginas do primeiro treino enquanto o lote delas está rodando.
+        self._amostra_guiada: Optional[tuple[int, ...]] = None
 
     @property
     def lote_rodando(self) -> bool:
@@ -639,21 +838,52 @@ class ControladorDoLivro:
         self.eventos.emitir("acoes_mudaram")
         condutor.comecar()
 
+    def iniciar_amostra_guiada(self) -> bool:
+        """Começa uma vez as páginas 10/50/90% do corpo de um projeto novo."""
+        from abbychess import livro as lv
+
+        p = self.pagina
+        if not p.pronto or not p.projeto.dados.extras.get("amostra_guiada_pendente"):
+            return False
+        extras = p.projeto.dados.extras
+        candidatos = extras.get(lv.CHAVE_DOS_CANDIDATOS_DA_AMOSTRA)
+        if candidatos is not None:               # gravados por pid (§12.4)
+            candidatos = p.projeto.posicoes_das_gravadas(candidatos)
+        else:                                    # projeto criado antes desta chave
+            ponta = p.projeto.posicoes_das_gravadas(extras.get("intervalo_do_corpo") or ())
+            inicio, fim = (ponta[0], ponta[-1]) if len(ponta) == 2 else (0, p.fonte.total - 1)
+            candidatos = range(max(0, int(inicio)), min(p.fonte.total - 1, int(fim)) + 1)
+        candidatos = [int(i) for i in candidatos if 0 <= int(i) < p.fonte.total]
+        indices = tuple(lv.paginas_da_amostra(candidatos))
+        if not indices:
+            extras["amostra_guiada_pendente"] = False
+            p.projeto.salvar()
+            return False
+        p.projeto.dados.extras["amostra_guiada_pendente"] = False
+        p.projeto.dados.extras[lv.CHAVE_DA_AMOSTRA] = p.projeto.paginas_para_gravar(indices)
+        p.projeto.salvar()
+        self._amostra_guiada = indices
+        self.reconhecer(indices, refazer=False)
+        return True
+
     def _progrediu(self, feitas: int, total: int, estimativa: Optional[float]) -> None:
         condutor = self._condutor
         if condutor is not None and feitas:     # o ponto, a cada página (G1 da rodada 3)
-            self._guardar(list(condutor.restante), condutor.refazer,
+            self._guardar(condutor.posicoes_restantes(), condutor.refazer,
                           self._reler_depois_de(condutor), agora=False)
         self.eventos.emitir("lote_progresso", feitas, total, estimativa)
 
     def _fim_do_lote(self, condutor, resultado) -> None:
         if self._condutor is not condutor:
             return                              # de um lote largado (outro projeto)
+        era_amostra = self._amostra_guiada is not None
+        paginas_da_amostra = self._amostra_guiada or ()
+        self._amostra_guiada = None
         self._condutor = None
         self.pagina.lote_rodando = False
         # O que faltou (cancelado, ou o servidor parou) e as páginas para reler depois ficam
         # para "Retomar o lote", guardadas no projeto (`lote.json`).
-        faltam = list(condutor.restante) if resultado.cancelado else []
+        faltam = condutor.posicoes_restantes() if resultado.cancelado else []
         self._guardar(faltam, condutor.refazer, self._reler_depois_de(condutor))
         mensagem = lt.resumo_do_fim(resultado)
         if resultado.servidor_parou and faltam:
@@ -663,6 +893,26 @@ class ControladorDoLivro:
         self.eventos.emitir("lote_mudou")
         self.eventos.emitir("acoes_mudaram")
         self.eventos.emitir("lote_terminou", mensagem, resultado)
+        if era_amostra:
+            from abbychess import livro as lv
+
+            completa = (not resultado.cancelado and not resultado.servidor_parou
+                        and not resultado.falhas
+                        and set(paginas_da_amostra) <= set(resultado.lidas + resultado.puladas))
+            extras = self.pagina.projeto.dados.extras
+            extras["amostra_guiada_pendente"] = not completa
+            if completa:
+                projeto = self.pagina.projeto
+                resumo = projeto.resumo_do_livro()
+                # Pelo valor gravado da página (o `pid`, §12.4), como a lista da amostra.
+                extras[lv.CHAVE_DOS_PENDENTES_INICIAIS] = {
+                    str(g): int(resumo.get(i, {}).get("pendentes", 0) or 0)
+                    for i in paginas_da_amostra
+                    for g in projeto.paginas_para_gravar([i])
+                }
+            self.pagina.projeto.salvar()
+            if completa:
+                self.eventos.emitir("amostra_terminou", paginas_da_amostra)
         detalhe = " Detalhes em Avisos (⚠)." if lt.tem_detalhe(resultado) else ""
         self.pagina._avisar(mensagem + detalhe, 15000)
 
@@ -686,9 +936,11 @@ class ControladorDoLivro:
         arquivo, projeto = self._arquivo_do_lote(), self.pagina.projeto
         if arquivo is None or projeto.somente_leitura:
             return
+        # Por `pid` (§12.4, `pids`): a página que mudar de lugar continua no lote a retomar.
         dados = None if not faltam and not reler_depois else {
-            "paginas": [int(i) for i in faltam], "refazer": bool(refazer),
-            "reler_depois": [int(i) for i in reler_depois]}
+            "paginas": projeto.paginas_para_gravar(faltam), "refazer": bool(refazer),
+            "reler_depois": projeto.paginas_para_gravar(reler_depois),
+            "pids": projeto.sequencia_gravada}
         self._gravador_do_lote.gravar(arquivo, dados)
         if agora:
             self._gravador_do_lote.esperar()
@@ -703,11 +955,15 @@ class ControladorDoLivro:
             return
         try:
             bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-            total = self.pagina.fonte.total
-            paginas = [int(i) for i in bruto["paginas"] if 0 <= int(i) < total]
+            projeto, total = self.pagina.projeto, self.pagina.fonte.total
+            if bruto.get("pids"):               # v3: por pid
+                paginas = projeto.posicoes_das_gravadas(bruto["paginas"])
+                reler = projeto.posicoes_das_gravadas(bruto.get("reler_depois", []))
+            else:                               # o da v2, por posição (a migração o passa)
+                paginas = [int(i) for i in bruto["paginas"] if 0 <= int(i) < total]
+                reler = [int(i) for i in bruto.get("reler_depois", []) if 0 <= int(i) < total]
             self.restante = (paginas, bool(bruto["refazer"])) if paginas else None
-            self.reler_depois = [int(i) for i in bruto.get("reler_depois", [])
-                                 if 0 <= int(i) < total]
+            self.reler_depois = reler
         except (OSError, ValueError, KeyError, TypeError) as erro:
             log.warning("o lote a retomar (%s) não abriu: %s", arquivo, erro)
 
@@ -795,17 +1051,65 @@ class ControladorDoLivro:
         p.ir_para(proxima)
         p._avisar(f"Página {proxima + 1}: {len(p.fila())} a revisar.", 6000)
 
-    def exportar(self, destino: Path) -> None:
-        """Escreve as páginas reconhecidas em PDF pesquisável, DOCX ou EPUB (pelo sufixo)."""
+    def previa(self, formato: str, opcoes: Optional["ex.Opcoes"], metadados: Optional[dict],
+               pronto, falhou=None) -> None:
+        """A pré-visualização da exportação (§12.2), fora da interface: `pronto` recebe o
+        HTML. Nada é gravado (nem os metadados do formulário)."""
         p = self.pagina
         projeto = p.projeto
 
         def preparar():
             def trabalho(progresso):
-                return ex.exportar(projeto, destino, progresso=progresso)
+                return ex.previa(projeto, formato, opcoes=opcoes, metadados=metadados,
+                                 progresso=progresso)[0]
 
-            def pronto(resumo: str):
+            def chegou(html: str):
+                if p.projeto is projeto:
+                    pronto(html)
+                elif falhou is not None:
+                    falhou("o projeto mudou")
+            return trabalho, chegou
+
+        aviso = p._falhou("Pré-visualizar")
+
+        def falha(mensagem: str) -> None:
+            aviso(mensagem)
+            if falhou is not None:
+                falhou(mensagem)
+
+        p.tarefa(f"Pré-visualizando {formato.upper()}", preparar, falhou=falha)
+
+    def exportar(self, destino: Path, opcoes: Optional["ex.Opcoes"] = None,
+                 metadados: Optional[dict] = None, capa: Optional[Path] = None) -> None:
+        """Escreve as páginas reconhecidas em PDF pesquisável, DOCX, EPUB, TXT ou PGN (pelo
+        sufixo), com as `opcoes` do diálogo. Os `metadados` do formulário vão antes para o
+        `metadados.json` do projeto (com a `capa` copiada para a pasta); num projeto só de
+        leitura, ou se a gravação falhar, valem só nesta exportação, sem a capa nova."""
+        p = self.pagina
+        projeto = p.projeto
+        if metadados is not None:
+            try:
+                metadados = ex.gravar_metadados(projeto, metadados, capa)
+            except (OSError, ValueError) as erro:   # SomenteLeitura é um OSError
+                nova = " A capa nova ficou de fora; vale a de antes." if capa is not None else ""
+                p._avisar(f"Os metadados não foram gravados no projeto ({erro}); valem só "
+                          f"nesta exportação.{nova}", 10000)
+                try:
+                    metadados = ex.normalizar_metadados(metadados)
+                except ValueError:
+                    metadados = None            # o arquivo, como estava
+
+        def preparar():
+            def trabalho(progresso):
+                return ex.exportar_com_relatorio(projeto, destino, progresso=progresso,
+                                                 opcoes=opcoes, metadados=metadados)
+
+            def pronto(resultado):
+                resumo, relatorio = resultado
                 p._avisar(f"Exportado em {destino.name}: {resumo}", 15000)
+                # O relatório inteiro vai a Resultados / Avisos (§12.2), sem diálogo.
+                self.eventos.emitir("relatorio", f"Exportação: {destino.name}",
+                                    relatorio.texto())
             return trabalho, pronto
 
         p.tarefa(f"Exportando {destino.suffix[1:].upper()}", preparar,
@@ -997,6 +1301,13 @@ class ControladorDaBusca:
         self.ultimo_resultado = None
         self.eventos.ligar("pagina_reconhecida", self.marcar_velha)
         self.eventos.ligar("pagina_do_lote", self.marcar_velha)
+        # A ordem do livro mudou (§12.4): o índice, chaveado pela posição e com threads em voo,
+        # é montado de novo (em segundo plano, como ao abrir o projeto).
+        self.eventos.ligar("sequencia_mudou", self._sequencia_mudou)
+
+    def _sequencia_mudou(self) -> None:
+        if self.pagina.projeto is not None:
+            self.abrir()
 
     @property
     def idioma(self) -> str:
@@ -1039,7 +1350,11 @@ class ControladorDaBusca:
             if modelo is not None:              # na memória (talvez sem gravar): o instantâneo
                 fontes[indice] = (modelo.instantaneo(), versao)
             elif caminho is not None:
-                fontes[indice] = (str(caminho), versao)
+                # A posição e a geometria da entrada: o arquivo pode estar na de antes de um
+                # giro (que não regrava a página, §12.4).
+                entrada = projeto.sequencia.entrada_em(indice)
+                fontes[indice] = ((str(caminho), indice, entrada.geometria, entrada.tamanho),
+                                  versao)
             else:                               # v1: lida na thread, sem migrar
                 a_ler[indice] = versao
         total = len(fontes) + len(a_ler)
@@ -1544,6 +1859,8 @@ class ControladorDaSubstituicao:
         fontes = {i: previas[i].lida for i in aceitos}
         carimbos = {i: previas[i].carimbo for i in aceitos}
 
+        idioma = pc.projeto.dados.idioma
+
         def preparar():
             projeto = pc.projeto
             for i in aceitos:
@@ -1559,7 +1876,7 @@ class ControladorDaSubstituicao:
                     copia = fontes[i].instantaneo()
                     try:
                         sb.aplicar_na_pagina(copia, casos)
-                        _depois_de_editar(copia, fontes[i])
+                        _depois_de_editar(copia, fontes[i], idioma)
                         feitas[i] = (copia, hs.mudanca(fontes[i], copia.instantaneo()),
                                      projeto.resumo_do_modelo(copia))
                     except ss.Recusa as recusa:
@@ -1608,7 +1925,7 @@ class ControladorDaSubstituicao:
                     falhas[i] = (str(erro) if isinstance(erro, ss.Recusa)
                                  else f"a substituição falhou: {erro}")
                     continue
-                _depois_de_editar(viva, antes)
+                _depois_de_editar(viva, antes, self.pagina.projeto.dados.idioma)
                 mudanca, resumo = hs.mudanca(antes, viva.instantaneo()), None
             transacao.paginas[viva.pid] = mudanca
             mudadas.append((viva, resumo))
@@ -1639,7 +1956,7 @@ def _outro_onde(alvo: str) -> str:
     return "notação" if alvo == sb.PROSA else "prosa"
 
 
-def _depois_de_editar(pagina, antes) -> None:
+def _depois_de_editar(pagina, antes, idioma: str = "pt") -> None:
     """O que toda edição faz depois (como `ControladorDePagina._mudou`): o estado (§4.4), o
     lado dos diagramas pela legenda, os ids das áreas e dos diagramas."""
     from abbychess.modelo import proximo_estado
@@ -1650,6 +1967,8 @@ def _depois_de_editar(pagina, antes) -> None:
                                               pagina.entries())
     pagina.zonas = zn.com_ids(list(pagina.zonas))
     pagina.diagramas = dg.com_ids(list(pagina.diagramas))
+    pagina.zonas = zn.vincular_legendas(pagina.zonas, pagina.diagramas)
+    pagina.diagramas = lc.validar_pagina(pagina, idioma)
 
 
 def _mesma_pagina(viva, lida) -> bool:

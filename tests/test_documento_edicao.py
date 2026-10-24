@@ -1,4 +1,4 @@
-"""A edição no Documento, na janela (SPEC §6.3, §6.4, passo D1).
+"""A edição no Documento, na janela (SPEC §6.3 e §6.4, passos D1 e G).
 
 A página é montada no modelo com o texto que cada teste pede (um box por letra, como em
 `tests/test_sessao.py`), e o teste edita pelo teclado do `VistaDoDocumento`: Backspace,
@@ -195,13 +195,16 @@ def test_ca_6_4_colar_varias_linhas(j):
     assert _texto(j) == "ganhar tempos" and pagina.decisoes.quebras
 
 
-def test_o_que_e_do_passo_g_recusa_e_restaura(j):
+def test_o_passo_g_junta_boxes_e_desfaz(j):
     pagina = _escrever(j, "rnar")
     _por_o_cursor(j, 0, 2)
     QTest.keyClicks(j.texto, "m")
     _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    assert _texto(j) == "mar" and len(pagina.boxes) == 3
+    assert "glifos juntados" in j.linha.aviso
+    j.desfazer()
+    j.pintar_texto()
     assert _texto(j) == "rnar" and [b.entry.char for b in pagina.boxes] == list("rnar")
-    assert "próxima versão" in j.linha.aviso
 
 
 def test_o_aviso_estrutural_vai_para_a_linha(j):
@@ -523,14 +526,30 @@ def test_ctrl_shift_n_no_campo_do_glifo(j):
     assert j.treino.campo.text() == "♞"
 
 
-def test_backspace_so_no_hifen_de_fim_de_linha_e_recusado(j):
+def test_backspace_no_hifen_de_fim_de_linha_remove_o_box(j):
     pagina = _escrever(j, "exem-", "plo bom")
-    antes = [b.gid for b in pagina.boxes]
+    hifen = pagina.boxes[4].gid
     _por_o_cursor(j, 5)                                   # logo depois do hífen
     _tecla(j, Qt.Key.Key_Backspace)
     _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
-    assert [b.gid for b in pagina.boxes] == antes and _texto(j).startswith("exem-")
-    assert "hífen" in j.linha.aviso
+    assert hifen not in pagina.vivos and _texto(j).startswith("exem\nplo")
+
+
+def test_ctrl_shift_enter_e_estilos_gravam_e_desfazem(j):
+    pagina = _escrever(j, "casa", "velha")
+    _por_o_cursor(j, 5)
+    _tecla(j, Qt.Key.Key_Return,
+           Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+    assert pagina.boxes[4].gid in pagina.decisoes.paragrafo_antes
+    j.desfazer()
+    assert not pagina.decisoes.paragrafo_antes
+
+    _por_o_cursor(j, 0, 4)
+    _tecla(j, Qt.Key.Key_B, Qt.KeyboardModifier.ControlModifier)
+    assert all(box.estilo.negrito for box in pagina.boxes[:4])
+    _tecla(j, Qt.Key.Key_I, Qt.KeyboardModifier.ControlModifier)
+    _tecla(j, Qt.Key.Key_U, Qt.KeyboardModifier.ControlModifier)
+    assert all(box.estilo.italico and box.estilo.sublinhado for box in pagina.boxes[:4])
 
 
 def test_o_cursor_volta_ao_lugar_quando_a_montagem_tira_o_espaco_a_mais(j):

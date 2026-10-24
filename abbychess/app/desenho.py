@@ -7,15 +7,20 @@ lê o estado dos controladores e desenha; nenhum decide nada.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from abbychess import avisos as av
 from abbychess import grade as gd
+from abbychess import livro as lv
 from abbychess import verificacao as vf
-from abbychess.app import acoes, cores
+from abbychess.app import acoes
 from abbychess.app.imagens import pixmap_da_pagina
+from abbychess.app import estilo
+from abbychess.app import teclado, vazios
 
 
 class DesenhoDaJanela:
@@ -29,10 +34,16 @@ class DesenhoDaJanela:
         self.seletor.blockSignals(False)
         self.total_de_paginas.setText(f" de {p.fonte.total} ")
         self.visor.mostrar_pagina(self._pixmap(p.indice, p.imagem))
-        self._pre_carga.start()                 # a seguinte, depois desta pintada
+        # A seguinte, depois desta pintada. Folheando (outra troca há menos de 1 s: ninguém
+        # lê uma página nesse tempo), já: a página nunca vista leva ~470 ms para renderizar e
+        # medir, e o pedido seguinte chegava antes de uma pré-carga adiada acabar.
+        agora = time.monotonic()
+        self._pre_carga.setInterval(20 if agora - self._ultima_troca < 1.0 else 150)
+        self._ultima_troca = agora
+        self._pre_carga.start()
         self._pre_pixmap.start()                # e o pixmap dela, quando a pré-carga a tiver
-        self.verificacao.limpar("Escolha a fila de palavras desconhecidas (F7) para verificar "
-                                "o texto.")
+        self._fechar_conferencia()              # os diagramas em edição eram da outra
+        self.verificacao.limpar(vazios.escolha_a_fila_de_palavras())
         self._layout_mudou()
         if self.visor.modo_areas and not p.zonas:
             self.areas.automaticas()
@@ -41,23 +52,45 @@ class DesenhoDaJanela:
         self.atualizar_barra()
         self.atualizar_paginas(seguir=True)
 
+    def _sequencia_mudou(self) -> None:
+        """A ordem do livro mudou (§12.4): o que a janela guarda por posição sai (os pixmaps
+        convertidos), e a gaveta e a aba Diagramas mostram a ordem nova."""
+        self._pixmaps.clear()
+        self.atualizar_paginas(seguir=True)
+        self._diagramas_mudaram()
+        total = self.pagina.fonte.total if self.pagina.fonte is not None else 0
+        self.seletor.blockSignals(True)
+        self.seletor.setMaximum(max(1, total))
+        self.seletor.setValue(self.pagina.indice + 1)
+        self.seletor.blockSignals(False)
+        self.total_de_paginas.setText(f" de {total} ")
+        # As ocorrências da busca e a prévia do substituir citam posições de antes.
+        if self.resultados.na_previa:
+            self.resultados.limpar_previa("A ordem do livro mudou: peça a prévia de novo.")
+        else:
+            self.resultados.mostrar_ocorrencias([], "A ordem do livro mudou: busque de novo.")
+
     def _pixmap(self, indice: int, imagem):
         """O QPixmap da página, das últimas 5 convertidas (a conversão leva dezenas de ms)."""
         guardado = self._pixmaps.get(indice)
         if guardado is not None and guardado[0] is imagem:
             self._pixmaps.move_to_end(indice)
             return guardado[1]
-        pixmap = pixmap_da_pagina(imagem)
+        cache = self.pagina.cache
+        preparada = cache.preparada(indice, imagem) if cache is not None else None
+        # A QImage feita na thread que renderizou: aqui só a cópia para o QPixmap.
+        pixmap = (QPixmap.fromImage(preparada.qimage) if preparada is not None
+                  else pixmap_da_pagina(imagem))
         self._pixmaps[indice] = (imagem, pixmap)
         while len(self._pixmaps) > 5:
             self._pixmaps.popitem(last=False)
         return pixmap
 
     def _pre_converter(self) -> None:
-        """Converte a página seguinte, se a pré-carga já a renderizou (fora do clique)."""
+        """Converte a próxima provável, se a pré-carga já a renderizou (fora do clique)."""
         p = self.pagina
-        if p.cache is not None and p.cache.tem(p.indice + 1):
-            self._pixmap(p.indice + 1, p.cache.pagina(p.indice + 1)[0])
+        if p.cache is not None and p.cache.tem(p.proxima_provavel):
+            self._pixmap(p.proxima_provavel, p.cache.pagina(p.proxima_provavel)[0])
 
     def _zoom_mudou(self, escala: float, limite: str) -> None:
         self.caixa_de_zoom.blockSignals(True)
@@ -76,7 +109,7 @@ class DesenhoDaJanela:
         if mudados is None or not self.visor.repintar_boxes(p.boxes, pendentes, mudados):
             diagramas = p.diagramas
             self.visor.mostrar_boxes(p.boxes, pendentes, [d.caixa for d in diagramas],
-                                     [cores.cor_do_diagrama(d) for d in diagramas])
+                                     [estilo.cor_do_diagrama(d) for d in diagramas])
         self._selecao_mudou()
         self.relogio_do_texto.start()
         self.relogio_das_paginas.start()        # o estado e os pendentes, na gaveta
@@ -91,10 +124,11 @@ class DesenhoDaJanela:
         self.atualizar_fila()
         if p.box_atual() is None:
             self.visor.selecionar(None)
-            self.treino.limpar("Esta página ainda não foi reconhecida. Aperte F5."
+            self.treino.limpar(vazios.pagina_nao_reconhecida()
                                if not p.boxes else
                                "Nada a revisar nesta página. Clique num box para corrigi-lo, "
-                               "ou vá para o próximo pendente do livro (F6).")
+                               + teclado.com_teclas("ou vá para o próximo pendente do livro "
+                                                    "({proxima_pagina_pendente})."))
             return
         self.treino.mostrar(p.matriz, p.box_atual(), p.posicao_do_atual())
         # A fila e a Imagem levam o Documento e a Linha ao glifo (§6.2).
@@ -114,8 +148,13 @@ class DesenhoDaJanela:
         na_fila = set(p.fila())
         estados = {b.gid: gd.estado(b.entry, b.gid in na_fila) for b in p.modelo.boxes} \
             if p.modelo is not None else {}
-        aviso = ("Nada reconhecido nesta página." if p.reconhecida
-                 else "Página não reconhecida: F5 reconhece.")
+        aviso = vazios.nada_reconhecido() if p.reconhecida else vazios.pagina_nao_reconhecida()
+        if not p.reconhecida and p.projeto is not None:
+            saude = lv.saude(p.projeto, p.leitor.arquivos_de_padrao() if p.leitor else 0)
+            if saude.paginas:
+                aviso = (f"Saúde do livro\n\nAmostra: {len(saude.paginas)} página(s)\n"
+                         f"Pendentes: {saude.pendentes_antes} → {saude.pendentes_agora}\n"
+                         f"Padrões ensinados: {saude.padroes}\n\n{aviso}")
         # A palavra fora do léxico que o usuário aceitou (Enter: revisada) não é mais duvidosa.
         revisados = {b.gid for b in p.modelo.boxes if b.revisado} if p.modelo is not None else set()
         self.texto.montar(p.documento(), p.diagramas, estados, v.gids_desconhecidos() - revisados,
@@ -143,12 +182,10 @@ class DesenhoDaJanela:
     def _padroes_mudaram(self) -> None:
         """A aba Padrões: as amostras, com a origem, a altura, o efeito e quantos glifos do
         livro cada uma leu (pelo índice da busca, §8.3)."""
-        if self.leitor is None:
+        if self.leitor is None or self.projeto is None:
             return
-        from abbychess.leitor import origem_de
-
         padroes = self.leitor.padroes
-        pasta = Path(self.projeto.pasta_de_padroes).resolve() if self.projeto else None
+        pasta = Path(self.projeto.pasta_de_padroes).resolve()
         lidos = self.busca.lidos_por_amostra() if hasattr(self, "busca") else {}
         detalhes = {}
         for arquivos in self.leitor.padroes_por_caractere().values():
@@ -158,21 +195,32 @@ class DesenhoDaJanela:
                     nome = Path(arquivo).resolve().relative_to(pasta).as_posix() if pasta else ""
                 except ValueError:
                     nome = ""
-                detalhes[str(arquivo)] = {"origem": origem_de(meta.get("origem", "")),
+                # (posição de agora, gid): pelo gid da amostra, que segue a página (§12.4).
+                origem = self.projeto.origem_da_amostra(meta.get("origem", ""))
+                detalhes[str(arquivo)] = {"origem": origem,
                                           "altura": meta.get("altura"),
                                           "efeito": meta.get("efeito"),
                                           "lidos": lidos.get(nome, 0)}
         self.padroes.atualizar(self.leitor.padroes_por_caractere(), detalhes)
 
     def ir_a_origem(self, pagina: int, gid) -> None:
-        """A página e o glifo de onde a amostra veio (a aba Padrões, "ir para")."""
-        if self.fonte is None or not 0 <= pagina < self.fonte.total:
+        """A página e o glifo de onde a amostra veio (a aba Padrões, "ir para"); `pagina` é a
+        posição de agora (`projeto.origem_da_amostra`), ou None se ela saiu do livro."""
+        if self.fonte is None or pagina is None or not 0 <= pagina < self.fonte.total:
+            if pagina is None:
+                self.statusBar().showMessage("A página de origem desta amostra saiu do livro.",
+                                             6000)
             return
         if pagina != self.pagina.indice:
             self.ir_para_pagina(pagina)
             self.pintar_texto()
         if gid is not None and gid in set(self.pagina.gids):
             self.pagina.escolher(gid)
+        elif gid is not None and self.pagina.modelo is not None and gid in {
+                b.gid for _lugar, b in self.pagina.modelo.fora}:
+            self.statusBar().showMessage("O glifo de origem desta amostra saiu da página (o "
+                                         "corte o deixou de fora; tirar o corte o devolve).",
+                                         8000)
 
     def _layout_mudou(self) -> None:
         self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual)
@@ -191,6 +239,8 @@ class DesenhoDaJanela:
         acoes.atualizar(self)
 
     def _mensagem(self, texto: str, ms: int) -> None:
+        # Os controladores não têm Qt nem perfil: citam a tecla por `{id}`, trocada aqui.
+        texto = teclado.com_teclas(texto, so_conhecidas=True)
         if ms == 0 and self.executor.na_fila:   # o progresso não apaga a fila da barra
             texto += f" Na fila: {', '.join(self.executor.na_fila)}."
         self.statusBar().showMessage(texto, ms)
@@ -203,6 +253,10 @@ class DesenhoDaJanela:
     def _aviso(self, titulo: str, texto: str) -> None:
         self.registrar_aviso(av.AVISO, titulo, texto)
         QMessageBox.warning(self, titulo, texto)
+
+    def _relatorio(self, titulo: str, texto: str) -> None:
+        """Um relatório (o da exportação, §12.2): vai a Resultados / Avisos, sem diálogo."""
+        self.registrar_aviso(av.AVISO, titulo, texto)
 
     def _gravacao_falhou(self, indice, erro) -> None:
         """CA-4.2 (A2): a falha de gravação vai para Avisos, além da barra."""

@@ -28,12 +28,16 @@ from PySide6.QtWidgets import (QApplication, QDialog, QDockWidget, QLabel, QMess
                                QProgressBar, QSpinBox, QSplitter, QTabWidget, QTextBrowser,
                                QToolBar, QToolButton, QVBoxLayout, QWidget)
 
+from abbychess import atalhos
 from abbychess import avisos as av
 from abbychess import gravacao as gv
+from abbychess.projeto import ARQUIVO_DA_JANELA
+from abbychess import livro as lv
 from abbychess import verificacao as vf
 from abbychess.modelo import LIDAS
 from abbychess.app import visor as vs
 from abbychess.app.confirmacao import BarraDeConfirmacao
+from abbychess.app import acessibilidade, estilo, icones, teclado, vazios
 from abbychess.app.inspetor import PainelDoInspetor
 from abbychess.app.linha import FaixaDaLinha
 from abbychess.app.painel_paginas import NOMES_DOS_ESTADOS, PainelDePaginas
@@ -42,7 +46,7 @@ from abbychess.controladores import ControladorDaFila
 
 log = logging.getLogger(__name__)
 
-ARQUIVO_DO_ESPACO = "janela.json"
+ARQUIVO_DO_ESPACO = ARQUIVO_DA_JANELA      # o nome mora no projeto (a migração o lê)
 VERSAO_DO_ESPACO = 1
 ARRANJOS = ("so_imagem", "lado_a_lado", "empilhado", "so_vista")
 #: Até esta largura o arranjo padrão é o empilhado (§3.1: abaixo de 1280, e em 1280×720).
@@ -51,8 +55,6 @@ LARGURA_DO_EMPILHADO = 1280
 LARGURA_DA_GAVETA = 1600
 #: As larguras padrão (§3.1, com as alças): (Páginas, Imagem, vista direita, Inspetor).
 TAMANHOS = {1366: (0, 556, 500, 296), 1920: (150, 760, 680, 320)}
-ATALHOS_MD = Path(__file__).resolve().parents[2] / "docs" / "ATALHOS.md"
-
 
 def _b64(dados: QByteArray) -> str:
     return base64.b64encode(bytes(dados)).decode("ascii")
@@ -77,6 +79,9 @@ def _validar_espaco(dados) -> dict:
                                                  ("largura", 0))}
     if not all(type(v) is int for v in inteiros.values()):
         raise TypeError("página, aba ou foco não é um número inteiro")
+    pid = dados.get("pid")                      # desde a v3 (§12.4); nulo: só a posição
+    if pid is not None and type(pid) is not int:
+        raise TypeError("o pid da página não é um número inteiro")
     escala = dados.get("escala")
     if escala is not None and not isinstance(escala, (int, float)):
         raise TypeError("escala não é um número")
@@ -84,7 +89,7 @@ def _validar_espaco(dados) -> dict:
             "divisor": QByteArray(base64.b64decode(dados["divisor"], validate=True)),
             "docas": {str(k): bool(v) for k, v in docas.items()}, "modo_zoom": modo_zoom,
             "escala": float(escala) if escala else None, "editor": editor, "fila": fila,
-            "arranjo": arranjo, **inteiros}
+            "arranjo": arranjo, "pid": pid, **inteiros}
 
 
 def _doca(janela, titulo: str, nome: str, widget, area) -> QDockWidget:
@@ -115,6 +120,8 @@ class EspacoDeTrabalho:
         self.vista.setDocumentMode(True)
         self.vista.addTab(self.painel_do_documento, "Documento")
         self.vista.addTab(self.padroes, "Padrões")
+        self.vista.addTab(self.painel_diagramas, "Diagramas")
+        self.vista.currentChanged.connect(self._aba_mudou)
         self.divisor = QSplitter(Qt.Orientation.Horizontal)
         self.divisor.setObjectName("divisor")
         self.divisor.setChildrenCollapsible(False)
@@ -134,7 +141,8 @@ class EspacoDeTrabalho:
         self.arranjo = "lado_a_lado"
 
         self.inspetor = PainelDoInspetor(ControladorDaFila.MODOS,
-                                         {"glifo": self.treino, "palavra": self.verificacao},
+                                         {"glifo": self.treino, "palavra": self.verificacao,
+                                          "diagrama": self.editor_diagrama},
                                          escopos=ControladorDaFila.ESCOPOS)
         self.inspetor.modo_escolhido.connect(self.fila.definir)
         self.inspetor.escopo_escolhido.connect(self.fila.definir_escopo)
@@ -144,6 +152,10 @@ class EspacoDeTrabalho:
         self.paginas = PainelDePaginas()
         self.paginas.abrir.connect(self.ir_para_pagina)
         self.paginas.reconhecer.connect(lambda indices: self.livro.reconhecer(indices, False))
+        self.paginas.reconhecer_livro.connect(self.reconhecer_livro)
+        self.paginas.mover.connect(self.mover_paginas)
+        self.paginas.apagar.connect(self.apagar_paginas)
+        self.paginas.operacao.connect(self.operacao_da_gaveta)
         self.doca_paginas = _doca(self, "Páginas", "doca_paginas", self.paginas,
                                   Qt.DockWidgetArea.LeftDockWidgetArea)
         self.doca_paginas.hide()
@@ -165,6 +177,7 @@ class EspacoDeTrabalho:
         self.relogio_das_paginas.setInterval(500)
         self.relogio_das_paginas.timeout.connect(self.atualizar_paginas)
         self._montar_barra_de_status()
+        estilo.avisos().tema_mudou.connect(self._tema_mudou)
 
     def _montar_barra_de_status(self) -> None:
         barra = self.statusBar()
@@ -176,7 +189,8 @@ class EspacoDeTrabalho:
         self.caixa_de_zoom.setSuffix("%")
         self.caixa_de_zoom.setKeyboardTracking(False)
         self.caixa_de_zoom.setFocusPolicy(Qt.FocusPolicy.ClickFocus)   # o Tab não para nela
-        self.caixa_de_zoom.setToolTip("Zoom da página (Ctrl+roda, Ctrl++ e Ctrl+−)")
+        teclado.texto_vivo(self.caixa_de_zoom, "setToolTip",
+                           "Zoom da página (Ctrl+roda, {zoom_mais} e {zoom_menos})")
         self.caixa_de_zoom.setAccessibleName("Zoom da página")     # ligada em `acoes.montar`
         self.rotulo_do_lote = QLabel("")
         self.botao_cancelar = QToolButton()
@@ -224,6 +238,9 @@ class EspacoDeTrabalho:
         self.vista.setVisible(nome != "so_imagem")
         self.divisor.setOrientation(Qt.Orientation.Vertical if nome == "empilhado"
                                     else Qt.Orientation.Horizontal)
+        # As abas de docas agrupadas nascem com o arranjo e com o espaço restaurado: os
+        # botões internos delas também têm nome (CA-13.1).
+        acessibilidade.nomear_os_controles_do_qt(self)
 
     def arranjo_padrao(self) -> None:
         """O arranjo e os tamanhos padrão para a largura da janela (§3.1). Os tamanhos vão
@@ -457,10 +474,56 @@ class EspacoDeTrabalho:
     # ------------------------------------------------------------------
     # A fila, a gaveta, a barra e os avisos
     # ------------------------------------------------------------------
+    def focar_linha(self) -> None:
+        """Foco na faixa Linha (perfil FineReader, Alt+4), que aparece se estava escondida."""
+        self.alternar_linha(True)
+        self.linha.setFocus(Qt.FocusReason.ShortcutFocusReason)
+
+    def focar_vizinho(self, passo: int) -> None:
+        """Ctrl+Tab e Ctrl+Shift+Tab no perfil FineReader: o painel seguinte ou o anterior,
+        na ordem do Alt+1…5."""
+        atual = self.painel_com_o_foco() or 2
+        self.focar((atual - 1 + passo) % 5 + 1)
+
+    def configurar_teclado(self) -> None:
+        """Opções › Teclado: o perfil e as trocas valem na hora e ficam lembrados."""
+        from abbychess.app import dialogo_teclado, teclado
+
+        escolha = dialogo_teclado.perguntar(self)
+        if escolha is None:
+            return
+        perfil, trocas = escolha
+        teclado.definir(perfil, trocas)
+        teclado.gravar(self.config)
+        mudaram = teclado.reaplicar(self)
+        nome = dict(dialogo_teclado.PERFIS)[perfil]
+        self.statusBar().showMessage(f"Teclado: perfil {nome}, {len(trocas)} troca(s); "
+                                     f"{mudaram} atalho(s) mudaram.", 8000)
+
+    def textos_do_teclado(self) -> None:
+        """Os estados vazios citam a tecla do perfil (§13): ao abrir a janela e a cada troca
+        de perfil ou de tecla (`teclado.quando_mudar`)."""
+        if self.pagina.fonte is None:
+            self.treino.limpar(vazios.sem_projeto())
+            self.visor.definir_vazio(vazios.sem_projeto())
+        else:
+            self._atual_mudou()
+            self.pintar_texto()
+
+    def _tema_mudou(self, _nome: str) -> None:
+        """O tema do sistema mudou: o que guardou cor da interface é pintado de novo."""
+        self.paginas.esquecer_as_cores()
+        self.atualizar_paginas()
+        self.resultados.repintar()
+        icones.aplicar(self)
+
     def _modo_da_fila_mudou(self, modo: str) -> None:
-        """O modo da fila escolhe o editor do Inspetor: Palavra nas palavras, Glifo no resto."""
+        """O modo da fila escolhe o editor do Inspetor: Palavra nas palavras, Diagrama nos
+        diagramas (aberto pelo F8 ou por um clique), Glifo no resto."""
         if modo == "palavras":
             self.verificar_texto()
+        elif modo == "diagramas" and self.editor_diagrama.aberto:
+            self.inspetor.mostrar("diagrama")
         else:
             self.inspetor.mostrar("glifo")
             self.visor.marcar_palavra(None)
@@ -483,6 +546,8 @@ class EspacoDeTrabalho:
             return
         self.paginas.mostrar(p.fonte.total, p.projeto.resumo_do_livro(),
                              p.indice if seguir else None)
+        self.paginas.mostrar_saude(
+            lv.saude(p.projeto, p.leitor.arquivos_de_padrao() if p.leitor else 0))
 
     def atualizar_barra(self) -> None:
         p = self.pagina
@@ -539,7 +604,15 @@ class EspacoDeTrabalho:
                 "escala": self.visor.escala(), "modo_zoom": self.visor.modo_zoom,
                 "aba": self.vista.currentIndex(), "editor": self.inspetor.atual(),
                 "fila": self.fila.modo, "foco": self.painel_com_o_foco(),
-                "pagina": self.pagina.indice, "largura": self.width()}
+                "pagina": self.pagina.indice, "pid": self._pid_aberto(),
+                "largura": self.width()}
+
+    def _pid_aberto(self) -> Optional[int]:
+        """O `pid` da página aberta (v3): reabrir volta a ela mesmo se ela mudou de lugar."""
+        projeto = self.projeto
+        if projeto is None or not projeto.sequencia_gravada or self.pagina.fonte is None:
+            return None
+        return projeto.pid_da_pagina(self.pagina.indice)
 
     def gravar_espaco(self) -> None:
         """Grava o espaço do projeto aberto (atômico, como as páginas)."""
@@ -579,8 +652,13 @@ class EspacoDeTrabalho:
             if doca is not None:
                 doca.setVisible(visivel)
         total = self.pagina.fonte.total if self.pagina.fonte else 0
-        if 0 <= dados["pagina"] < total and dados["pagina"] != self.pagina.indice:
-            self.pagina.ir_para(dados["pagina"])
+        pagina = dados["pagina"]
+        if dados["pid"] is not None and self.projeto.sequencia_gravada:
+            pela_sequencia = self.projeto.posicao_do_pid(dados["pid"])
+            if pela_sequencia is not None:      # a página aberta, onde ela estiver agora
+                pagina = pela_sequencia
+        if 0 <= pagina < total and pagina != self.pagina.indice:
+            self.pagina.ir_para(pagina)
         if dados["modo_zoom"] == "pagina":
             self.visor.zoom_pagina()
         elif dados["modo_zoom"] == "largura":
@@ -633,8 +711,14 @@ class EspacoDeTrabalho:
         dialogo.setWindowTitle("Atalhos do teclado")
         dialogo.resize(820, 640)
         texto = QTextBrowser()
-        texto.setMarkdown(ATALHOS_MD.read_text(encoding="utf-8") if ATALHOS_MD.exists()
-                          else "docs/ATALHOS.md não encontrado.")
+        # A tabela de `docs/ATALHOS.md`, feita na hora com as trocas do usuário no perfil em
+        # uso (Ferramentas › Teclado): o arquivo tem só as teclas do YAML.
+        nome = {"padrao": "Padrão", "finereader": "FineReader"}.get(teclado.PERFIL,
+                                                                     teclado.PERFIL)
+        trocadas = (f", com {len(teclado.trocas)} tecla(s) trocada(s)" if teclado.trocas
+                    else "")
+        texto.setMarkdown(f"**Perfil em uso: {nome}{trocadas}.**\n\n" + atalhos.markdown(
+            teclado.tabela_com_trocas(teclado.PERFIL, teclado.trocas)))
         QVBoxLayout(dialogo).addWidget(texto)
         self.dialogo_de_atalhos = dialogo
         dialogo.open()

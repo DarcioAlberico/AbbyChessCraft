@@ -99,7 +99,7 @@ def _esperado_do_yaml():
     esperado = {}
     for item in bruto["acoes"]:
         sem = item.get("sem_atalho") or []
-        sequencias = item.get(teclado.PERFIL)
+        sequencias = item.get(teclado.PERFIL) or item.get(bruto["perfis"][0])   # herda o padrão
         if (passos.index(str(item["desde_passo"])) <= limite and sequencias
                 and teclado.PERFIL not in sem):
             lista = sequencias if isinstance(sequencias, list) else [sequencias]
@@ -108,9 +108,9 @@ def _esperado_do_yaml():
 
 
 def _widgets_do_escopo(janela):
-    return {"imagem": {janela.visor}, "glifo": {janela.treino},
+    return {"imagem": {janela.visor}, "imagem_areas": {janela.visor}, "glifo": {janela.treino},
             "campo_glifo": {janela.treino.campo}, "palavra": {janela.verificacao},
-            "documento": {janela.texto}, "galeria": set()}
+            "documento": {janela.texto}, "galeria": set(), "diagrama": {janela.editor_diagrama}}
 
 
 #: (ação, escopo) que só passam a valer depois (nenhum, desde que o Documento ficou editável
@@ -119,6 +119,12 @@ _SO_DEPOIS_DA_EDICAO: set = set()
 
 
 def test_os_atalhos_registrados_sao_exatamente_os_do_yaml_ate_o_passo(janela):
+    conferir_os_registrados(janela)
+
+
+def conferir_os_registrados(janela):
+    """As teclas da janela são as do YAML no perfil de agora (`teclado.PERFIL`); o perfil
+    FineReader usa o mesmo em `tests/test_teclado.py`."""
     esperado = _esperado_do_yaml()
     por_escopo = _widgets_do_escopo(janela)
     registrados = {}
@@ -165,7 +171,9 @@ def test_atalho_citado_no_readme_ou_na_spec_existe_no_yaml():
     tabela = teclado.tabela()
     nativos = {x for n in tabela.nativos.values() for lista in n.values() for x in lista}
     todos = {x for a in tabela.acoes for seqs in a.sequencias.values() for x in seqs}
-    ja_valem = {x for a, seqs in tabela.ativas(teclado.PERFIL, teclado.PASSO) for x in seqs}
+    # O README descreve os dois perfis (desde o passo K, o FineReader também vale).
+    ja_valem = {x for perfil in tabela.perfis
+                for a, seqs in tabela.ativas(perfil, teclado.PASSO) for x in seqs}
     # O README descreve o programa de agora; ele cita as teclas antigas só ao lado de "antes".
     readme = (RAIZ / "README.md").read_text(encoding="utf-8")
     antigas = {"Tab", "Shift+Tab", "Alt+Shift+Left", "Ctrl+I", "Ctrl+Shift+P", "Ctrl+T"}
@@ -560,6 +568,31 @@ def test_reabrir_o_projeto_restaura_o_espaco(app, tmp_path, pdf_de_60_paginas, s
         assert k.vista.currentWidget() is k.padroes
         assert k.fila.modo == "diagramas" and k.inspetor.atual() == "glifo"
         assert _dentro(k.vista)
+    finally:
+        k.close()
+
+
+def test_reabrir_volta_a_pagina_aberta_pelo_pid_mesmo_se_ela_mudou_de_lugar(
+        app, tmp_path, pdf_de_60_paginas, sim):  # noqa: F811
+    """`janela.json` guarda o pid da página aberta (§12.4, v3): reordenado o livro, reabrir
+    volta a ela, na posição nova."""
+    from abbychess.sequencia import Sequencia
+
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Pid", pdf_de_60_paginas)
+    j = _abrir(projeto)
+    j.ir_para_pagina(12)
+    pid = projeto.pid_da_pagina(12)
+    j.close()
+    outro = ProjetoDeLivro.abrir(projeto.pasta)
+    s = outro.sequencia                              # o que a reordenação (rodada 2) grava
+    nova = Sequencia((s.entradas[12], *s.entradas[:12], *s.entradas[13:]))
+    outro._trocar_sequencia(nova)
+    outro.dados.sequencia = nova.para_json()
+    outro.salvar()
+    k = _abrir(ProjetoDeLivro.abrir(projeto.pasta))
+    try:
+        app.processEvents()
+        assert k.pagina.indice == 0 and k.pagina.projeto.pid_da_pagina(0) == pid
     finally:
         k.close()
 

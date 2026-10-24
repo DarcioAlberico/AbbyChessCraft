@@ -28,7 +28,6 @@ em `app/espaco.py`; os diálogos, em `app/dialogos.py`.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from collections import OrderedDict
 
@@ -36,15 +35,17 @@ from PySide6.QtCore import QSettings, QTimer, Signal
 from PySide6.QtWidgets import QApplication, QInputDialog, QMainWindow
 
 from abbychess import avisos as av
-from abbychess.app import acoes, dialogos
+from abbychess.app import acessibilidade, acoes, dialogo_exportacao, dialogos, teclado
+from abbychess.app.imagens import qimage_da_pagina
+from abbychess.app.paginas_na_janela import PaginasNaJanela
 from abbychess.app.busca_na_janela import BuscaNaJanela
 from abbychess.app.galeria_na_janela import GaleriaNaJanela
 from abbychess.app.substituir_na_janela import SubstituirNaJanela
 from abbychess.app.desenho import DesenhoDaJanela
+from abbychess.app.diagramas_na_janela import DiagramasNaJanela
 from abbychess.app.edicao_na_janela import EdicaoNoDocumento
 from abbychess.app.espaco import EspacoDeTrabalho
 from abbychess.app.lote_na_janela import LoteNaJanela
-from abbychess.app.dialogo_diagrama import DialogoDeDiagrama
 from abbychess.app.documento import VistaDoDocumento
 from abbychess.app.opcoes import DialogoDeOpcoes
 from abbychess.app.painel_padroes import PainelDePadroes
@@ -61,8 +62,16 @@ log = logging.getLogger(__name__)
 TITULO = "AbbyChessCraft"
 
 
-class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoDocumento,
-                      BuscaNaJanela, SubstituirNaJanela, GaleriaNaJanela, QMainWindow):
+def configuracao() -> QSettings:
+    """As escolhas lembradas do programa, no formato padrão do `QSettings`: o registro no
+    programa, o INI temporário nos testes (`tests/conftest.py`). O construtor só com a
+    organização e o nome ignora o formato padrão e ia sempre ao registro."""
+    return QSettings(QSettings.defaultFormat(), QSettings.Scope.UserScope, TITULO, TITULO)
+
+
+class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, LoteNaJanela,
+                      EdicaoNoDocumento, BuscaNaJanela, SubstituirNaJanela, GaleriaNaJanela,
+                      PaginasNaJanela, QMainWindow):
     #: Da thread do gravador: a página `indice` não gravou (o erro).
     falha_de_gravacao = Signal(object, object)
 
@@ -70,8 +79,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         super().__init__()
         self.setWindowTitle(TITULO)
         self.resize(1500, 950)
-        self.config = QSettings("AbbyChessCraft", "AbbyChessCraft")
-        self.dialogo_diagrama: Optional[DialogoDeDiagrama] = None
+        self.config = configuracao()
+        descartadas = teclado.carregar(self.config)   # o perfil antes das dicas dos painéis
 
         self.executor = Executor(self)
         self.eventos = Eventos()
@@ -87,10 +96,15 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         self._montar_galeria()
         acoes.montar(self)
         self._ligar_eventos()
-        self.treino.limpar("Crie um projeto (Ctrl+N) ou abra um existente (Ctrl+O).")
+        self.textos_do_teclado()                # §13: a Imagem e o Glifo sem livro
+        teclado.quando_mudar(self.textos_do_teclado)
         acoes.atualizar(self)
         self.arranjo_padrao()
         self.atualizar_fila()
+        acessibilidade.nomear_os_controles_do_qt(self)     # CA-13.1
+        if descartadas:
+            self.statusBar().showMessage("Teclado: trocas que não valem mais foram deixadas de "
+                                         f"lado ({', '.join(descartadas)}).", 15000)
 
     # O projeto aberto, para quem lê de fora (os testes, os diálogos).
     projeto = property(lambda self: self.pagina.projeto)
@@ -114,6 +128,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         self.visor.zona_arrastada.connect(self.areas.arrastar)
         self.visor.zona_apagada.connect(self.areas.apagar)
         self.visor.zona_tipo.connect(self.areas.trocar_tipo)
+        self.visor.zona_funcao.connect(self.areas.trocar_funcao)
+        self.visor.ordenacao_cancelada.connect(self.areas.cancelar_ordenacao)
         self.visor.zoom_mudou.connect(self._zoom_mudou)
         self.visor.pagina_vizinha.connect(self._pagina_vizinha)
         self._pixmaps = OrderedDict()
@@ -121,10 +137,13 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         self._pre_carga.setSingleShot(True)
         self._pre_carga.setInterval(150)
         self._pre_carga.timeout.connect(self.pagina.precarregar_seguinte)
+        self._ultima_troca = 0.0                # folheando depressa, a pré-carga vem já
+        self.pagina.preparar_imagem = qimage_da_pagina      # a QImage na thread da pré-carga
         self._pre_pixmap = QTimer(self)
         self._pre_pixmap.setSingleShot(True)
         self._pre_pixmap.setInterval(400)
         self._pre_pixmap.timeout.connect(self._pre_converter)
+        self._montar_diagramas()                # o editor Diagrama e a aba (§10)
 
         self.treino = PainelDeTreino()
         self.treino.ensinar.connect(p.ensinar)
@@ -169,7 +188,9 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
     def _ligar_eventos(self) -> None:
         e = self.eventos
         for nome, funcao in (("pagina_trocou", self._pagina_trocou),
+                             ("sequencia_mudou", self._sequencia_mudou),
                              ("glifos_mudaram", self._glifos_mudaram),
+                             ("glifos_mudaram", self._sincronizar_conferencia),
                              ("atual_mudou", self._atual_mudou),
                              ("selecao_mudou", self._selecao_mudou),
                              ("padroes_mudaram", self._padroes_mudaram),
@@ -181,6 +202,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
                              ("recusa", self._recusa),
                              ("projeto_aberto", self._projeto_aberto),
                              ("modelos_prontos", self._modelos_prontos),
+                             ("amostra_terminou", self._amostra_terminou),
                              ("servidor_caiu", self._servidor_caiu),
                              ("lote_progresso", self._lote_progrediu),
                              ("lote_terminou", self._lote_terminou),
@@ -196,7 +218,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
                              ("palavra_mudou", self.atualizar_fila),
                              ("mensagem", self._mensagem),
                              ("falha", self._falha),
-                             ("aviso", self._aviso)):
+                             ("aviso", self._aviso),
+                             ("relatorio", self._relatorio)):
             e.ligar(nome, funcao)
         self.executor.ocupado_mudou.connect(self._ocupado_mudou)
         self.executor.fila_mudou.connect(self._fila_mudou)
@@ -382,12 +405,22 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         if escolha is not None:
             self.livro.reconhecer(*escolha)
 
+    def aplicar_modelo_de_areas(self) -> None:
+        """Aplica o modelo salvo a um intervalo, opcionalmente só nas pares ou ímpares."""
+        if self.fonte is None or self.areas.modelo is None:
+            return
+        indices = dialogos.paginas_do_modelo_de_areas(self, self.fonte.total)
+        if indices is not None:
+            self.areas.aplicar_modelo(indices)
+
     def exportar(self) -> None:
-        """Escreve as páginas reconhecidas em PDF pesquisável, DOCX ou EPUB."""
+        """O arquivo, as opções e os metadados (§12.1), e a exportação em segundo plano."""
         if self.projeto is not None:
             destino = dialogos.destino_da_exportacao(self, self.projeto)
-            if destino is not None:
-                self.livro.exportar(destino)
+            escolha = dialogo_exportacao.perguntar(self, self.projeto, destino) if destino else None
+            if escolha is not None:
+                meta = escolha.metadados if destino.suffix.lower() in (".epub", ".docx") else None
+                self.livro.exportar(destino, escolha.opcoes, meta, escolha.capa)
 
     def modo_treino(self, sim: bool) -> None:
         if sim and self.acao_areas.isChecked():
@@ -411,8 +444,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         elif sim:
             self.statusBar().showMessage(
                 "Editor de áreas: arraste para desenhar, dentro para mover, na borda para "
-                "esticar; 1 texto, 2 diagrama, 3 imagem, 4 ignorar; Del apaga. F5 reconhece "
-                "pelas áreas.", 10000)
+                "esticar; 1 texto, 2 diagrama, 3 imagem, 4 ignorar; Del apaga. "
+                + teclado.com_teclas("{reconhecer_pagina} reconhece pelas áreas."), 10000)
         else:
             self.statusBar().showMessage("Editor de áreas desligado.", 5000)
 
@@ -455,13 +488,6 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, LoteNaJanela, EdicaoNoD
         if dialogos.confirmar(self, "Desfazer", texto + f"\n\nTirar esta ação do {pilha} e "
                               "continuar com as outras?"):
             self.pagina.tirar_do_desfazer(refazer)
-
-    def _abrir_conferencia(self, indice: int) -> DialogoDeDiagrama:
-        dialogo = DialogoDeDiagrama(self.pagina.matriz, self.pagina.diagramas, indice, self)
-        dialogo.conferido.connect(self.conferencia.aplicar)
-        self.dialogo_diagrama = dialogo
-        dialogo.open()
-        return dialogo
 
     def closeEvent(self, evento):
         self.config.setValue("geometria", self.saveGeometry())

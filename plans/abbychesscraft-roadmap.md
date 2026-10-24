@@ -333,7 +333,8 @@ aviso.
 - CA-6.2, CA-6.3, CA-6.7, CA-6.8 e CA-6.9.
 - CA-6.4 nas linhas D1.
 - CA-4.3 completo.
-- CA-F.1 com alvo de ≤ 70%; CA-F.2 (informativo).
+- CA-F.1 com alvo de ≤ 70% (até 2026-10-24; hoje ≤ 85% no fim do roadmap, SPEC §15.4); CA-F.2
+  (informativo).
 
 ## Passo B — Busca (§7.1, §7.3)
 
@@ -987,7 +988,15 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   1.057 gestos (89,4%). Rende pouco porque a propagação já resolve a maior parte dessas
   confusões desde a fila do contexto; o que sobra para ensinar é sobretudo glifo sem leitura.
 
-Continuam: o CA-F.1 (decisão do usuário); os FEN e a estrutura das p. 21–27; o EPUB no
+- O palpite da rede no glifo que ninguém leu (catálogo 7, `92ce6b9`): o campo do Glifo vem com
+  o primeiro da rede abaixo do limiar, selecionado, e o Enter o ensina. A fatia cai para 983
+  gestos (83,1%), e o palpite foi aceito 74 vezes.
+
+- O alvo do CA-F.1, com o sim do usuário: ≤ 85% da linha de base no fim do roadmap, no lugar
+  de ≤ 70% depois do D1. Com ele, o CA-F.1 **aprova** (83,1%), provisório até a estrutura e os
+  FEN serem revisados.
+
+Continuam: os FEN e a estrutura das p. 21–27; o EPUB no
 Thorium e no celular. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).
 

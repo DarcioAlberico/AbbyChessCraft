@@ -199,3 +199,48 @@ maior bloco que sobra (cerca de 366 gestos), seguido das linhas não lidas (190)
 (96). Para chegar a ≤ 0,70, o caminho passa por eles:
 - uma leitura melhor dos glifos que hoje saem vazios, que é o k-NN do livro de antes;
 - dividir as linhas das legendas lado a lado (proposta 4).
+
+## O palpite da rede no glifo sem leitura (2026-10-24, com o sim do usuário)
+
+**De onde veio.** Dos 61 glifos sem leitura do snapshot que pedem uma substituição, o primeiro
+da rede global, abaixo do limiar dela (0,80), é o certo em 36. Uma faixa de confiança mínima
+não ajudaria: os 36 certos têm todos confiança ≥ 0,4, e só 3 dos errados ficam abaixo disso.
+
+**O comando** (`92ce6b9`). O glifo que ninguém leu chega ao Glifo com esse palpite no campo,
+selecionado (SPEC §9.2). O Enter o ensina, e digitar o troca. A leitura diz que é palpite, e
+o glifo continua sem leitura na fila até alguém decidir. O palpite vem do servidor de leitura,
+num pedido com os glifos sem leitura da página toda.
+
+O risco é o Enter por reflexo num palpite errado, que grava um padrão errado. Ele é o mesmo
+de aceitar a leitura de um glifo lido com confiança baixa, que o Enter já ensina hoje.
+
+**No catálogo e no teste.** O catálogo vai à versão 7, e cada comando custa um gesto a menos
+que o ensinar que substitui:
+- `aceitar_palpite_da_fila`, 1 gesto: o Enter;
+- `aceitar_palpite`, 2 gestos: o clique e o Enter.
+
+`test_custo_dos_comandos.py` confere os dois na janela. A linha de base com o catálogo 7
+(`2026-10-24-fatia-xv-passo-0-082756.json`) continua em 1.183.
+
+**A medida** (`2026-10-24-fatia-xv-passo-L-082803.json`, no `92ce6b9`, árvore limpa) dá **983
+gestos**, razão **0,831** (era 0,894). O palpite foi aceito 74 vezes: 67 fora da vez da fila e
+7 na vez dela. A estimativa era de −40 a −60, e a medida deu −74. A estimativa contava só os
+61 glifos sem leitura do snapshot; o replay acha outros no caminho, como as partes de um box
+dividido que os padrões do livro não leem.
+
+## O alvo revisto (2026-10-24, com o sim do usuário)
+
+Com o palpite, o que sobra na fatia é:
+- 190 gestos de custo fixo do que nenhum comando corrige (5 linhas que a leitura não acha, a
+  4 gestos cada, e os 170 caracteres delas, a 1);
+- 118 `ensinar_glifo` e 5 `ensinar_da_fila`, sobretudo glifos que a rede erra;
+- 48 divisões, 15 descartes, 15 marcações e 11 junções.
+
+As alavancas que restam, somadas, ficam perto de 0,80: dividir as legendas lado a lado (cerca
+de −25), não cobrar a divisão de um box cujo texto já está certo (a razão vai de 0,83 a cerca
+de 0,82, porque o ajuste vale nos dois lados) e um k-NN do livro que propague mais sem errar
+mais, que pede outra abordagem. Nenhuma combinação delas chega a 0,70.
+
+O alvo passou a ser **≤ 85% da linha de base no fim do roadmap** (SPEC §15.4), no lugar de
+≤ 70% depois do D1. Com ele, o CA-F.1 aprova (0,831), provisório até a estrutura e os FEN das
+p. 21–27 serem revisados.

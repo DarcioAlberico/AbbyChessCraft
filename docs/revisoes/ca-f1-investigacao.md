@@ -154,3 +154,48 @@ Para chegar a ≤ 0,70, faltam 238 gestos. O que ainda pode dar isso:
 - dividir a linha das legendas lado a lado (proposta 4);
 - um k-NN que propague mais sem errar mais. Isso pede outra abordagem, que não seja só trocar o
   descritor: por exemplo, mais amostras por caractere ou uma métrica aprendida no próprio livro.
+
+## A proposta 3, o ensinar em lote (2026-10-24, com o sim do usuário)
+
+**O comando** (`02fc26a`). No campo do Glifo, o Ctrl+Enter ensina o glifo como o Enter. No
+mesmo passo do desfazer, ele também corrige, sem ensinar, os outros glifos da página que têm a
+mesma leitura e que a palavra desmente (`contexto.lote`). A troca só vale onde deixa a palavra
+provável: o "0" de "C0L0CA" não vira "o", e nada muda num lance como "ca6".
+
+Nenhum comando anterior fazia isso. A fila por caractere (o modo "Por caractere" do F7) só
+põe juntos os glifos da mesma leitura, e cada um continua custando o seu gesto. A Galeria do
+passo C corrige muitos
+glifos de uma vez, mas mostra todos os glifos lidos como o caractere, inclusive os "0" certos
+de "10" e de "1.e4". Escolher à mão os que estão dentro de palavras custa um gesto por glifo.
+
+**No catálogo e no teste.** O catálogo vai à versão 6. O custo de cada comando é o do ensinar
+que ele substitui:
+- `ensinar_em_lote_da_fila`, 2 gestos: digitar e Ctrl+Enter;
+- `ensinar_em_lote`, 3 gestos: clique, digitar e Ctrl+Enter.
+
+`test_custo_dos_comandos.py` confere os dois na janela, com QTest. A linha de base do passo 0
+medida de novo com o catálogo 6 (`2026-10-24-fatia-xv-passo-0.json`) continua em 1.183 gestos.
+
+**No replay.** O lote substitui o ensinar quando deixa certos mais glifos do que o Enter
+simples deixaria, contando a propagação que vem depois do Enter. A comparação roda numa cópia,
+porque a propagação também acerta parte desses glifos de graça.
+
+**A medida** (`2026-10-24-fatia-xv-passo-L.json`, no `02fc26a`, árvore limpa) dá **1.057
+gestos**, razão **0,894** (era 0,901). O CA-F.1 continua reprovado, e faltam 229 gestos.
+- **Os lotes.** Foram usados 8 vezes, sobre 23 glifos: `0→o` três vezes (7, 1 e 1 glifos),
+  `1→l` três vezes (4, 3 e 1), `S→s` uma (4) e `I→l` uma (2).
+- **O saldo.** O `ensinar_glifo` caiu de 196 para 185 (−33 gestos), e os 8 lotes custam 24.
+  Sobram −9 gestos.
+
+A estimativa da proposta era de −80 a −110 gestos e errou. Ela contava as confusões do
+snapshot, antes da fila do contexto. Desde a proposta 1, essas leituras já vão para a fila,
+e a propagação do padrão ensinado resolve a maior parte delas: dos 55 `1→l` improváveis do
+snapshot, só 7 ainda são ensinados à mão.
+
+**O que ainda se ensina à mão.** São 205 glifos, e 122 deles **não tinham leitura nenhuma**
+(`''→r` 15, `''→s` 11, `''→p` 8, `''→i` 7…). As confusões que sobram são poucas por página:
+`—→-` 8, `0→o` 7, `1→l` 7, `C→c` 6. Nenhum lote resolve os glifos sem leitura: eles são o
+maior bloco que sobra (cerca de 366 gestos), seguido das linhas não lidas (190) e das divisões
+(96). Para chegar a ≤ 0,70, o caminho passa por eles:
+- uma leitura melhor dos glifos que hoje saem vazios, que é o k-NN do livro de antes;
+- dividir as linhas das legendas lado a lado (proposta 4).

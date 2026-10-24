@@ -24,7 +24,7 @@ from PySide6.QtWidgets import QApplication, QPushButton
 from abbychess.app.registro_de_eventos import tipo_do_gesto
 from abbychess.leitor import FONTE_MANUAL
 
-from tests import test_janela, test_janela_diagramas
+from tests import leitor_falso, test_janela, test_janela_diagramas
 from tests.test_janela import _esperar
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ferramentas"))
@@ -350,9 +350,10 @@ def test_corrigir_no_documento(app, janela, contador):
 # O ensinar em lote (pendências do passo L)
 # ----------------------------------------------------------------------
 
-def test_os_comandos_do_lote_estao_no_catalogo_sem_estimativa():
+def test_os_comandos_do_passo_l_estao_no_catalogo_sem_estimativa():
     comandos = [c for c in rf.carregar_catalogo()["comandos"] if str(c["passo"]) == "L"]
-    assert {c["id"] for c in comandos} == {"ensinar_em_lote_da_fila", "ensinar_em_lote"}
+    assert {c["id"] for c in comandos} == {"ensinar_em_lote_da_fila", "ensinar_em_lote",
+                                           "aceitar_palpite_da_fila", "aceitar_palpite"}
     assert not any("conferir_no_passo" in c for c in comandos)
 
 
@@ -415,3 +416,50 @@ def test_ensinar_em_lote(app, janela, contador):
     assert contador.gestos == CUSTO_L["ensinar_em_lote"]
     _so_um_padrao_e_o_resto_corrigido(janela, lida, seis, lance)
 
+
+# ----------------------------------------------------------------------
+# O palpite da rede no glifo que ninguém leu (pendências do passo L, §9.2)
+# ----------------------------------------------------------------------
+
+def _com_palpite(app, janela) -> int:
+    """A página que ninguém leu (o leitor da janela não tem a cadeia global) e a rede falsa,
+    que dá o palpite "y" para todo glifo; o primeiro da fila mostrado de novo, agora com ele.
+    Devolve o índice desse glifo."""
+    _pronta(app, janela)
+    janela.leitor.rede = leitor_falso.RedeFalsa()
+    assert all((b.char, b.source) == ("", "none") for b in boxes(janela))
+    primeiro = fila(janela)[0]
+    mostrar(janela, primeiro)                       # o que a janela mostra (sem gesto)
+    app.processEvents()
+    return primeiro
+
+
+def test_aceitar_palpite_da_fila(app, janela, contador):
+    """O glifo já mostrado vem com o palpite no campo, selecionado: só o Enter."""
+    primeiro = _com_palpite(app, janela)
+    campo = janela.treino.campo
+    assert campo.text() == leitor_falso.PALPITE and campo.selectedText() == campo.text()
+    assert "Palpite da rede" in janela.treino.leitura.text()
+    contador.gestos = 0
+    QTest.keyClick(campo, Qt.Key.Key_Return)
+    _esperar(app, janela)
+    assert contador.gestos == CUSTO_L["aceitar_palpite_da_fila"]
+    assert (boxes(janela)[primeiro].char, boxes(janela)[primeiro].source) == (
+        leitor_falso.PALPITE, FONTE_MANUAL)
+    assert leitor_falso.PALPITE in janela.leitor.padroes_por_caractere()
+    assert atual(janela) != primeiro             # a janela foi sozinha ao próximo da fila
+
+
+def test_aceitar_palpite(app, janela, contador):
+    """Um glifo fora da vez: o clique nele, e o Enter aceita o palpite que o campo traz."""
+    primeiro = _com_palpite(app, janela)
+    outro = next(i for i in fila(janela) if i != primeiro)
+    contador.gestos = 0
+    QTest.mouseClick(janela.visor.viewport(), Qt.MouseButton.LeftButton,
+                     Qt.KeyboardModifier.NoModifier, _no_visor(janela, *_centro(boxes(janela)[outro])))
+    assert janela.treino.campo.text() == leitor_falso.PALPITE
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_Return)
+    _esperar(app, janela)
+    assert contador.gestos == CUSTO_L["aceitar_palpite"]
+    assert (boxes(janela)[outro].char, boxes(janela)[outro].source) == (
+        leitor_falso.PALPITE, FONTE_MANUAL)

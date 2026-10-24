@@ -60,7 +60,7 @@ from abbychess import texto as tx
 from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL, FONTE_NENHUMA, precisa_revisao
 from abbychess.modelo import (IOU_DA_RELEITURA, LIDAS, NAO_RECONHECIDA, VERIFICADA, Diferenca,
-                              Pagina, descrever_caidas, proximo_estado, reconciliar)
+                              Pagina, descrever_caidas, pid_de, proximo_estado, reconciliar)
 
 log = logging.getLogger(__name__)
 
@@ -134,6 +134,14 @@ class ControladorDePagina:
         self._enviados: frozenset = frozenset()
         #: Os gids aguardando cuja leitura já foi pedida ao servidor.
         self._em_leitura: set = set()
+        #: O palpite da rede para os glifos que ninguém leu (§9.2): gid -> (o `BoxEntry`
+        #: de quando foi pedido, `(char, confiança)` ou None). Vale enquanto o glifo é o mesmo
+        #: objeto; os pedidos em curso ficam em `_sugerindo`.
+        self._sugestoes: Dict[int, Tuple[BoxEntry, Optional[Tuple[str, float]]]] = {}
+        self._sugerindo: set = set()
+        self.eventos.ligar("atual_mudou", self._sugerir_ao_atual)
+        # O glifo mostrado aguardando o servidor só fica sem leitura quando a leitura chega.
+        self.eventos.ligar("glifos_mudaram", lambda *_: self._sugerir_ao_atual())
         self.indice = 0
         self.imagem = None
         self.matriz: Optional[np.ndarray] = None
@@ -383,6 +391,7 @@ class ControladorDePagina:
         self.servidor = servidor
         self._enviados = self.padroes_de(leitor) if servidor is not None else frozenset()
         self._em_leitura = set()
+        self._sugestoes, self._sugerindo = {}, set()
         self.geracao += 1
         self.lote_rodando = False               # o lote do projeto anterior não vale aqui
         self.projeto, self.fonte, self.leitor = projeto, fonte, leitor
@@ -1471,6 +1480,78 @@ class ControladorDePagina:
         servidor.pedir("ler_recortes", recortes,
                        ao_terminar=lambda pedido: self.executar.na_interface(
                            lambda: chegou(pedido)))
+
+    # ------------------------------------------------------------------
+    # O palpite da rede para o glifo que ninguém leu (§9.2)
+    # ------------------------------------------------------------------
+    def sugestao_do_atual(self) -> Optional[Tuple[str, float]]:
+        """O palpite da rede para o glifo em revisão, se ninguém o leu e o palpite já chegou."""
+        guardada = self._sugestao_guardada(self.indice_de(self.atual))
+        return guardada[1] if guardada is not None else None
+
+    def _sugestao_guardada(self, i: Optional[int]):
+        if i is None or self.modelo is None:
+            return None
+        box = self.modelo.boxes[i]
+        guardada = self._sugestoes.get(box.gid)
+        return guardada if guardada is not None and guardada[0] is box.entry else None
+
+    def _sugerir_ao_atual(self) -> None:
+        """O glifo mostrado não tem leitura: pede o palpite da rede, que vai ao painel
+        (`caractere_sugerido`, com a confiança) quando chega. Com o servidor, o pedido leva os
+        glifos sem leitura da página toda, e os seguintes da fila já o têm quando chegam; sem
+        ele, lê-se aqui só o atual, para não pesar na interface. Uma falha fica no log: o
+        palpite é ajuda, e o resto do `atual_mudou` (o painel, a seleção) tem de rodar."""
+        try:
+            self._pedir_palpite()
+        except Exception:                  # o palpite não pode prender a navegação
+            log.exception("o palpite da rede para o glifo sem leitura falhou")
+
+    def _pedir_palpite(self) -> None:
+        i = self.indice_de(self.atual)
+        if (i is None or self.imagem is None or not pg.sem_leitura(self.modelo.boxes[i].entry)
+                or self._sugestao_guardada(i) is not None or self.atual in self._sugerindo):
+            return
+        servidor, geracao = self.servidor, self.geracao
+        if servidor is None and getattr(self.leitor, "rede", None) is None:
+            return
+        if servidor is not None and servidor.parado:
+            return
+        antes = tuple(self.modelo.boxes)
+        # Guarda-se só o da página aberta (os gids levam a página, e os outros não voltam a
+        # valer sem um novo pedido).
+        pid = pid_de(antes[i].gid)
+        self._sugestoes = {g: v for g, v in self._sugestoes.items() if pid_de(g) == pid}
+        indices = [i] if servidor is None else [
+            k for k, b in enumerate(antes) if pg.sem_leitura(b.entry)
+            and b.gid not in self._sugerindo and self._sugestao_guardada(k) is None]
+        recortes = pg.recortes_para_ler(self._cinza(), [b.entry for b in antes], indices)
+        gids = {antes[k].gid for k in indices}
+
+        def chegou(sugestoes) -> None:
+            for k, sugestao in zip(indices, sugestoes):
+                self._sugestoes[antes[k].gid] = (antes[k].entry, sugestao)
+            if (sugestao := self.sugestao_do_atual()) is not None:
+                self.eventos.emitir("caractere_sugerido", *sugestao)
+
+        if servidor is None:
+            chegou([self.leitor.sugerir(recorte, altura) for recorte, altura in recortes])
+            return
+        self._sugerindo |= gids
+
+        def terminou(pedido: sl.Pedido) -> None:
+            if self.geracao != geracao:
+                return                          # outro projeto
+            self._sugerindo -= gids
+            if pedido.ok:
+                chegou(pedido.resultado)
+            elif not pedido.cancelado:
+                log.warning("o palpite da rede para os glifos sem leitura falhou: %s",
+                            pedido.resultado)
+
+        servidor.pedir("sugerir_recortes", recortes,
+                       ao_terminar=lambda pedido: self.executar.na_interface(
+                           lambda: terminou(pedido)))
 
     def servidor_parado(self) -> bool:
         """O servidor desistiu (caiu duas vezes): o comando que lê avisa e não roda."""

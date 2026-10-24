@@ -371,3 +371,44 @@ def test_o_lote_custa_o_mesmo_que_o_ensinar_que_ele_substitui():
     custo = {c["id"]: c["custo"] for c in CATALOGO["comandos"] if str(c["passo"]) in ("0", "L")}
     assert custo["ensinar_em_lote_da_fila"] == custo["ensinar_da_fila"]
     assert custo["ensinar_em_lote"] == custo["ensinar_glifo"]
+
+
+class _Sugeridor:
+    """A rede de mentira do palpite (§9.2): palpita `char` para todo glifo."""
+
+    def __init__(self, char):
+        self.char = char
+
+    def sugerir(self, recorte, altura):
+        return (self.char, 0.4) if self.char else None
+
+
+def _palpite(char, *, lido="", fonte="none", passo="L", da_fila=True, comando="ensinar_da_fila"):
+    """O `_palpite` de um glifo com a leitura `lido` (vazia: ninguém leu), cujo certo é "e"."""
+    from PIL import Image
+
+    from core.box_model import BoxEntry
+
+    boxes = [BoxEntry(lido, 40, 100, 50, 120, 0.0, fonte)]
+    comandos = {c["id"]: c for c in CATALOGO["comandos"]}
+    return rf._palpite(boxes, 0, "e", comandos[comando], rf.comandos_do_passo(CATALOGO, passo, PASSOS),
+                       da_fila, Image.new("L", (400, 200), 255), _Sugeridor(char))
+
+
+def test_o_palpite_certo_custa_so_o_enter():
+    assert _palpite("e")["id"] == "aceitar_palpite_da_fila"
+    assert _palpite("e", da_fila=False, comando="ensinar_glifo")["id"] == "aceitar_palpite"
+
+
+def test_o_palpite_so_vale_certo_no_glifo_que_ninguem_leu_e_no_passo_l():
+    assert _palpite("c") is None                         # errado: digitar o troca
+    assert _palpite(None) is None                        # a rede não palpitou
+    assert _palpite("e", lido="c", fonte="neural") is None    # lido: o campo traz a leitura
+    assert _palpite("e", fonte="") is None               # aguardando o servidor
+    assert _palpite("e", passo="K") is None
+
+
+def test_o_palpite_custa_um_gesto_a_menos_que_o_ensinar():
+    custo = {c["id"]: c["custo"] for c in CATALOGO["comandos"] if str(c["passo"]) in ("0", "L")}
+    assert custo["aceitar_palpite_da_fila"] == custo["ensinar_da_fila"] - 1
+    assert custo["aceitar_palpite"] == custo["ensinar_glifo"] - 1

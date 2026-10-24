@@ -17,9 +17,10 @@
 # conferidos (`espaco_no_documento`, `corrigir_no_documento`), com os custos de antes. Quando o passo os conferir, a versão do catálogo
 # sobe, e a linha de base é medida de novo no worktree da tag `passo-0` com o catálogo
 # novo (o `comparar` recusa catálogos diferentes). Versão 6 (pendências do L): o ensinar em
-# lote (`ensinar_em_lote_da_fila`, `ensinar_em_lote`), conferido pelo teste.
+# lote (`ensinar_em_lote_da_fila`, `ensinar_em_lote`), conferido pelo teste. Versão 7: o palpite
+# da rede no glifo que ninguém leu (`aceitar_palpite_da_fila`, `aceitar_palpite`), conferido.
 
-versao: 6
+versao: 7
 
 # O que conta como um gesto (a regra do filtro de eventos do teste).
 convencao_de_gestos: >-
@@ -140,4 +141,19 @@ comandos:
     corrige: confusao
     custo: 3
     gestos: [clique no box (Imagem), digitar o caractere (o campo vem selecionado), Ctrl+Enter]
+    efeito: o mesmo, para um glifo fora da vez da fila
+  # O palpite da rede no glifo que ninguém leu (§9.2): o campo vem com o primeiro da rede
+  # abaixo do limiar, selecionado, e o Enter o ensina. O replay o usa quando o palpite é o
+  # certo do gabarito; errado, digitar o troca e o ensinar custa o de sempre.
+  - id: aceitar_palpite_da_fila
+    passo: L
+    corrige: palpite_da_fila
+    custo: 1
+    gestos: [Enter (o glifo sem leitura é o primeiro da fila, já mostrado com o palpite no campo)]
+    efeito: ensina o palpite como padrão; depois do Enter a janela vai ao próximo da fila
+  - id: aceitar_palpite
+    passo: L
+    corrige: palpite
+    custo: 2
+    gestos: [clique no box (Imagem), Enter (o campo vem com o palpite)]
     efeito: o mesmo, para um glifo fora da vez da fila

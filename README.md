@@ -1061,7 +1061,7 @@ Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: ca
 
 | Livro | Commit | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por diagrama | Lado certo | Ordem | CER do corpo | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| xv | a6555df | 9 | 0,5 / 1 | 7/7 (1) | 6 | 938 (2 pág.) | 3 (+9 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 2/5) | 0 | pendente | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 0/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| xv | c9e5751 | 9 | 0,5 / 1 | 7/7 (1) | 6 | 938 (2 pág.) | 3 (+9 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 2/5) | 0 | 3,23% | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 213/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 | yusupov | 071b8e5 | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 5 | 3/3 | pendente (provisório: 0) | pendente (provisório: 1/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 | darcy | 071b8e5 | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 
@@ -1095,6 +1095,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | xv | 071b8e5 | 0,5 / 1 | 7/7 (1) | 6 | 3 | 0 | 2/5 | 508,9 s |
 | xv | 0888053 | 0,5 / 1 | 7/7 (1) | 6 | 3 | 0 | 2/5 | 440,5 s |
 | xv | a6555df | 0,5 / 1 | 7/7 (1) | 6 | 3 | 0 | 2/5 | 454,8 s |
+| xv | c9e5751 | 0,5 / 1 | 7/7 (1) | 6 | 3 | 0 | 2/5 | 469,9 s |
 | yusupov | bb0b7e5 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23 s |
 | yusupov | 0ebbf9c | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,1 s |
 | yusupov | 3bf1ad3 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,4 s |
@@ -1142,7 +1143,7 @@ Fatia (`ferramentas\replay_fatia.py`; **erros** são as diferenças do snapshot 
 
 | Livro | Passo | Páginas | Total | Gestos dos diagramas | Navegação | Erros | Estado | JSON |
 |---|---|---|---|---|---|---|---|---|
-| xv | 0 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-0.json` |
+| xv | 0 | i020, i021, i022, i023, i024, i025, i026 | 1183 gestos (873 sem os impossíveis) | 14 | 6 | 442 | provisório: estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-23-fatia-xv-passo-0.json` |
 | xv | 1a | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-16-fatia-xv-passo-1a.json` |
 | xv | 1b | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-16-fatia-xv-passo-1b.json` |
 | xv | 2a | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-16-fatia-xv-passo-2a.json` |
@@ -1154,7 +1155,7 @@ Fatia (`ferramentas\replay_fatia.py`; **erros** são as diferenças do snapshot 
 | xv | D1 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-D1-101106.json` |
 | xv | B | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-B.json` |
 | xv | D2 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-D2.json` |
-| xv | L | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-23-fatia-xv-passo-L.json` |
+| xv | L | i020, i021, i022, i023, i024, i025, i026 | 1093 gestos (903 sem os impossíveis) | 14 | 6 | 442 | provisório: estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-23-fatia-xv-passo-L-213554.json` |
 <!-- medidas:fim -->
 
 O replay da fatia (os gestos para levar as p. 21–27 ao gabarito) é

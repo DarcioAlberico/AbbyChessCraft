@@ -24,12 +24,12 @@ from core import proporcao, vertical
 from core.box_model import BoxEntry
 from core.services.box_service import BoxService
 
+from abbychess import contexto
 from abbychess import gravacao as gv
 from abbychess import procedencia
 from abbychess import sequencia as sq
 
-from abbychess.leitor import (FONTE_AGUARDANDO, FONTE_MANUAL, LeitorDoLivro, nome_de_origem,
-                              precisa_revisao)
+from abbychess.leitor import FONTE_AGUARDANDO, FONTE_MANUAL, LeitorDoLivro, nome_de_origem
 from abbychess.projeto import ARQUIVO_DE_INCLINACOES, EXTENSOES_DE_IMAGEM, ProjetoDeLivro
 
 log = logging.getLogger(__name__)
@@ -814,16 +814,20 @@ def _italicos(pagina: np.ndarray, boxes: Sequence[BoxEntry], palavras: Sequence[
 
 def ler_boxes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorDoLivro, *,
               so_pendentes: bool = False, progresso: Optional[Progresso] = None,
-              cancelado: Callable[[], bool] = lambda: False) -> ResumoDaLeitura:
+              cancelado: Callable[[], bool] = lambda: False,
+              pendentes: Optional[Sequence[bool]] = None) -> ResumoDaLeitura:
     """Lê os boxes no lugar. Com `so_pendentes`, não toca no que já foi confirmado.
 
     Box manual nunca é relido: a correção do usuário tem precedência até ele
-    pedir outra coisa (invariante 2 do PyBoxEditor).
+    pedir outra coisa (invariante 2 do PyBoxEditor). Os pendentes são os de
+    `contexto.pendentes`, ou os `pendentes` de quem lê cópias (`propagar_padroes`).
     """
     pagina = cinza(imagem)
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
-    alvos = [b for b in boxes if b.source != FONTE_MANUAL and (
-        not so_pendentes or precisa_revisao(b.char, b.source, b.confidence, leitor.limiares))]
+    if so_pendentes and pendentes is None:
+        pendentes = contexto.pendentes(boxes, leitor.limiares)
+    alvos = [b for i, b in enumerate(boxes) if b.source != FONTE_MANUAL and (
+        not so_pendentes or pendentes[i])]
     for i, box in enumerate(alvos):
         if cancelado():
             break
@@ -881,10 +885,10 @@ def fila_de_revisao(boxes: List[BoxEntry], leitor: LeitorDoLivro) -> List[int]:
     """Índices dos boxes a revisar, do menos confiável ao mais.
 
     Em empate de confiança fica a ordem de leitura, para o usuário andar pela
-    página e não pular de um canto para outro.
+    página e não pular de um canto para outro. O glifo que a palavra desmente
+    (`contexto`) entra mesmo com a confiança alta.
     """
-    pendentes = [i for i, b in enumerate(boxes)
-                 if precisa_revisao(b.char, b.source, b.confidence, leitor.limiares)]
+    pendentes = [i for i, p in enumerate(contexto.pendentes(boxes, leitor.limiares)) if p]
     return sorted(pendentes, key=lambda i: (round(boxes[i].confidence, 2), i))
 
 
@@ -932,19 +936,25 @@ def ensinar_varios(imagem: Image.Image, boxes: List[BoxEntry], indices: List[int
 
 
 def propagar_padroes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorDoLivro, *,
-                     efeitos: Optional[Sequence] = None) -> int:
+                     efeitos: Optional[Sequence] = None,
+                     pendentes: Optional[Sequence[bool]] = None) -> int:
     """Aplica os padrões do livro aos boxes pendentes, sem a cadeia global.
 
     Um padrão novo só muda o que o k-NN do livro responde; a rede e a base
     global dariam a mesma leitura de antes. Por isso basta consultar o livro,
     o que custa milissegundos, em vez de reler a página inteira, que custava
     oito segundos no Darcy Lima. Devolve quantos pendentes foram resolvidos.
+
+    Os pendentes são os de `contexto.pendentes`; quem lê cópias fora da interface passa
+    `pendentes`, os mesmos com que escolheu o que copiar.
     """
     pagina = cinza(imagem)
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
+    if pendentes is None:
+        pendentes = contexto.pendentes(boxes, leitor.limiares)
     resolvidos = 0
     for i, box in enumerate(boxes):
-        if not precisa_revisao(box.char, box.source, box.confidence, leitor.limiares):
+        if not pendentes[i]:
             continue
         efeito = None if efeitos is None else efeitos[i]
         leitura = leitor.ler_pelo_livro(vertical.recorte_de_pe(pagina, box), referencia, efeito)

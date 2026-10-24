@@ -46,6 +46,7 @@ import numpy as np
 from core.box_model import BoxEntry
 
 from abbychess import ancoragem as ag
+from abbychess import contexto
 from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import historico as hs
@@ -272,16 +273,18 @@ class ControladorDePagina:
         limiares = self.leitor.limiares
         chave = limiares.revisao                 # o único limiar que decide a fila
         anterior = self._pendencia if chave == self._limiar_da_pendencia else {}
+        contra = contexto.improvaveis(self.modelo)       # a palavra desmente a leitura
         nova, indices = {}, []
         for i, box in enumerate(self.modelo.boxes):
             e = box.entry
-            estado = (e.char, e.source, e.confidence, box.revisado)
+            estado = (e.char, e.source, e.confidence, box.revisado, box.gid in contra)
             visto = anterior.get(box.gid)
             if visto is not None and visto[0] == estado:
                 pendente = visto[1]
             else:
-                pendente = not box.revisado and precisa_revisao(e.char, e.source, e.confidence,
-                                                                limiares)
+                pendente = not box.revisado and (
+                    precisa_revisao(e.char, e.source, e.confidence, limiares)
+                    or (box.gid in contra and contexto.volta_pelo_contexto(e.source)))
             nova[box.gid] = (estado, pendente)
             if pendente:
                 indices.append(i)
@@ -1206,18 +1209,20 @@ class ControladorDePagina:
         imagem = self.imagem
         leitor, limiares = self.leitor, self.leitor.limiares
         antes = tuple(pagina.boxes)
+        pendentes = None
         if tudo:
             lidos = ed.copias_para_ler(antes, lambda e: e.source != FONTE_MANUAL)
         else:
-            lidos = ed.copias_para_ler(antes, lambda e: precisa_revisao(
-                e.char, e.source, e.confidence, limiares))
+            pendentes = contexto.pendentes_da_pagina(pagina, limiares, com_os_revisados=True)
+            copiar = {id(b.entry) for b, p in zip(antes, pendentes) if p}
+            lidos = ed.copias_para_ler(antes, lambda e: id(e) in copiar)
 
         servidor = self._servidor_para_pedir()
 
         def trabalho(progresso):
             if servidor is None:
                 resumo = pg.ler_boxes(imagem, lidos, leitor, so_pendentes=not tudo,
-                                      progresso=progresso)
+                                      progresso=progresso, pendentes=pendentes)
                 return lidos, resumo
             try:
                 relidos, amostras, resumo = servidor.chamar(
@@ -1349,13 +1354,15 @@ class ControladorDePagina:
             if transacao.invalidada:
                 return None
             antes = tuple(pagina.boxes)
-            limiares = foto_do_leitor.limiares
-            lidos = ed.copias_para_ler(antes, lambda e: precisa_revisao(
-                e.char, e.source, e.confidence, limiares))
+            pendentes = contexto.pendentes_da_pagina(pagina, foto_do_leitor.limiares,
+                                                     com_os_revisados=True)
+            copiar = {id(b.entry) for b, p in zip(antes, pendentes) if p}
+            lidos = ed.copias_para_ler(antes, lambda e: id(e) in copiar)
 
             def trabalho(_progresso):
                 return pg.propagar_padroes(imagem, lidos, foto_do_leitor,
-                                           efeitos=[b.estilo for b in antes])
+                                           efeitos=[b.estilo for b in antes],
+                                           pendentes=pendentes)
 
             def pronto(resolvidos: int):
                 if transacao.invalidada:

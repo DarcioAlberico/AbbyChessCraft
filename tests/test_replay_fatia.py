@@ -301,9 +301,11 @@ def test_glifo_fora_da_cabeca_da_fila_custa_o_clique():
     """Só o primeiro da fila sai mais barato: os outros pedem o clique no box."""
     from abbychess.projeto import Limiares
 
+    from core.box_model import BoxEntry
+
     leitor = SimpleNamespace(limiares=Limiares())
-    boxes = [SimpleNamespace(char="x", source="net", confidence=0.95),     # não está na fila
-             SimpleNamespace(char="", source="none", confidence=0.0)]       # o primeiro da fila
+    boxes = [BoxEntry("x", 10, 10, 20, 30, 0.95, "net"),         # não está na fila
+             BoxEntry("", 40, 10, 50, 30, 0.0, "none")]           # o primeiro da fila
     dif = rf.Diferencas(acoes=[("substituicao", 0, "a"), ("substituicao", 1, "b")])
     disponiveis = rf.comandos_do_passo(CATALOGO, "0", PASSOS)
     assert rf._proxima_acao(dif, boxes, leitor, disponiveis) == (("substituicao", 1, "b"), True)

@@ -245,6 +245,49 @@ Xadrez Vitorioso (`2026-10-23-qualidade-xv-180804.json`) é idêntica à de ante
 do lote da medida (440 → 455 s). O itálico, `2026-10-23-italico.json`, repete os números de
 cima no `a6555df`.
 
+## O texto verificado das p. 21–27
+
+O usuário corrigiu e conferiu as 213 linhas de corpo de i020–i026 contra as faixas
+(`7a824ec`, `rotulado_por: DarcioAlberico`; 149 diferiam da leitura). A estrutura (legenda,
+corpo, título) e os FEN continuam sem revisão, e por isso as três medidas abaixo são
+provisórias. Todas no `c9e5751`.
+
+**CA-9.1, aprovado** (`ferramentas/medir_legendas.py`, nova, e `2026-10-23-legendas-xv.json`).
+A ferramenta parte do snapshot da fatia e ensina os 17 glifos errados das legendas com o estilo
+medido na página, como o Enter faz. Depois propaga os padrões nas sete páginas, como o F5 faz.
+
+| | CER do corpo (9.870 glifos) | Glifos de corpo certos que erram | Errados que acertam | CER das legendas |
+|---|---|---|---|---|
+| Com o estilo (o critério) | 4,22% → 4,22% | 0 | 0 | 26,3% → 20,1% |
+| Sem o estilo (informativo) | 4,22% → 4,14% | 0 | 8 | 26,3% → 20,4% |
+
+Só 8 dos 17 glifos ensinados saíram medidos em negrito. Com o estilo, o padrão negrito não
+alcança o corpo, que é reto. Nesta fatia, então, o filtro do efeito não evitou estrago nenhum,
+porque sem ele também não houve estrago. Ele só barrou 8 acertos no corpo. O critério passa,
+mas a medida não mostra o benefício que o filtro promete.
+
+**CA-F.1, reprovado.** As duas medidas usam o mesmo snapshot, o catálogo versão 5 e os mesmos
+gabaritos:
+- a linha de base no código da tag `passo-0`, num worktree com os gabaritos e o catálogo
+  copiados, como manda o protocolo: `2026-10-23-fatia-xv-passo-0.json`, 1.183 gestos;
+- hoje, no `--passo L`: `2026-10-23-fatia-xv-passo-L-213554.json`, 1.093 gestos.
+
+`replay_fatia.py comparar` dá razão 0,924, e o alvo era ≤ 0,70 depois do D1. A diferença
+inteira são os 15 espaços: impossíveis no passo 0, hoje se corrigem no Documento
+(`espaco_no_documento`), e o custo dos impossíveis cai de 310 para 190. O resto é igual nos
+dois códigos:
+- 205 `ensinar_glifo` e 12 `ensinar_da_fila`;
+- 48 divisões, 11 junções, 15 descartes e 15 marcações;
+- 5 linhas que a leitura não acha, que custam 170 caracteres.
+
+Nenhum passo até o L barateou o comando de ensinar nem aumentou o que a propagação resolve
+na fatia. O replay ensina cada caractere só uma vez, e por isso uma propagação melhor
+apareceria no número de glifos ensinados.
+
+A qualidade do Xadrez Vitorioso com o texto verificado (`2026-10-23-qualidade-xv-214359.json`)
+dá CER do corpo de 3,23%, nas 213 linhas e com espaços (o `medir.py` conta por caractere). O
+resto é igual ao de antes.
+
 ## Verificação
 
 - Suíte rápida: 1553 passed, 2 skipped, em ~2 min no `2cbbdf6`; 1555 passed no `d29d399`, em
@@ -270,8 +313,15 @@ Resolvido com o usuário:
   afetadas, com as não afetadas fora da conta. Pela medida de hoje, passa no Xadrez Vitorioso
   (23 de 23) e no Yusupov (16 de 17).
 
+Medido com o texto verificado (seção acima):
+- **CA-9.1** aprova, provisório até a estrutura ser revisada.
+- **CA-F.1** reprova: 92,4% da linha de base, o alvo é ≤ 70%. Baixar o custo de ensinar e
+  divisões e linhas não lidas é trabalho de leitura e de propagação. O que fazer com o alvo,
+  ou com o passo que o fecharia, é do usuário.
+
 Precisa do usuário:
-- **CA-9.1 e CA-F.1**: o texto e os FEN das p. 21–27 do Xadrez Vitorioso verificados.
+- **Os FEN e a estrutura das p. 21–27** (os diagramas e as legendas revisados), para as
+  medidas deixarem de ser provisórias.
 - **Os leitores que não estão na máquina** (Thorium, celular); o Calibre já confere.
 
 Decididos como estão:

@@ -637,6 +637,13 @@ menor que a margem configurada (matriz montada à mão).
 - **Ligaduras**: padrão de vários caracteres (`ﬁ` como "fi"); no Documento, cada letra
   sincroniza com o mesmo gid.
 - A faixa Linha no lugar do rótulo "Na linha".
+- **O palpite da rede** (pendências do passo L): o glifo que ninguém leu chega ao Glifo com o
+  primeiro da rede abaixo do limiar no campo, selecionado, e a leitura diz que é palpite
+  ("Palpite da rede: r (abaixo do limiar, confiança 0,46): confira antes do Enter"). Enter o
+  ensina; digitar o troca. Sem palpite (sem rede, ou nenhum que passe no veto de proporção) o
+  campo fica vazio, como antes. O palpite não é leitura: o glifo continua "sem leitura" na
+  fila e na Imagem até alguém decidir. Ele vem do servidor (§11), num pedido com os glifos sem
+  leitura da página toda, e só entra no campo ainda vazio.
 
 **CA-9.1** [livro_real] Nas linhas de corpo do gabarito (p. 21–27), o CER depois de ensinar
 as legendas em negrito é ≤ o de antes, e nenhum glifo de corpo certo passa a errado.

@@ -324,6 +324,18 @@ class PainelDeTreino(QWidget):
         self.habilitar(True)                    # antes do foco: num campo desligado o Qt o
         self.campo.setFocus()                   # ignora, e a próxima tecla iria para outro lugar
 
+    def sugerir(self, char: str, confianca: float) -> None:
+        """O palpite da rede para o glifo que ninguém leu (§9.2), no campo ainda vazio e
+        selecionado: Enter o ensina, digitar o troca. A leitura diz que é palpite."""
+        if self._box is None or self._box.char or self.campo.text():
+            return
+        numero = f"{confianca:.2f}".replace(".", ",")
+        self.leitura.setText(self.leitura.text() + "<br>Palpite da rede: <b style='font-size:"
+                             f"16pt'>{html.escape(char)}</b> &nbsp;(abaixo do limiar, confiança "
+                             f"{numero}): confira antes do Enter")
+        self.campo.setText(char)
+        self.campo.selectAll()
+
     def limpar(self, mensagem: str) -> None:
         self._pagina, self._box = None, None
         self._definir_corte(None)

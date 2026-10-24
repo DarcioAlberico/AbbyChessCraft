@@ -24,7 +24,9 @@ navegação (`pagina_seguinte` entre cada par de páginas) sai em `gestos_navega
 
 Desde o catálogo 6, um passo com o ensinar em lote (Ctrl+Enter) o usa no lugar do ensinar
 quando o lote da página (`contexto.lote`) deixa certos mais glifos do que o Enter simples,
-com a propagação dele, deixaria (`_lote`).
+com a propagação dele, deixaria (`_lote`). Desde o 7, o glifo que ninguém leu e cujo palpite
+da rede (§9.2, só a rede global, num leitor à parte) é o certo custa só o Enter que o aceita
+(`_palpite`).
 
 Só entram as linhas de corpo com `texto_verificado: true` (o texto do gabarito é do
 usuário) e os diagramas do gabarito. Sem linha verificada, o texto fica **pendente** e o
@@ -222,7 +224,7 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
     from abbychess import exportar as ex
     from abbychess import pagina as pg
     from abbychess.atalhos import carregar as carregar_atalhos
-    from abbychess.leitor import LeitorDoLivro
+    from abbychess.leitor import LeitorDoLivro, rede_global
     from abbychess.projeto import ProjetoDeLivro
 
     passos = carregar_atalhos().passos
@@ -234,6 +236,9 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
         z.extractall(pasta)
     projeto = ProjetoDeLivro.abrir(next(p.parent for p in pasta.rglob("projeto.json")))
     leitor = LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
+    # O palpite da rede (§9.2) só com a rede: o leitor do replay continua só com os padrões.
+    sugeridor = (LeitorDoLivro(projeto.pasta_de_padroes, rede=rede_global())
+                 if {"palpite", "palpite_da_fila"} & set(disponiveis) else None)
     fonte = pg.fonte_do_projeto(projeto)
     indices = indices or projeto.paginas_lidas()
     gabaritos = {i: json.loads((verdade / livro / f"i{i:03d}.json").read_text(encoding="utf-8"))
@@ -286,6 +291,8 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
                     comando = ensinar
                 else:
                     comando = disponiveis["substituicao"]
+                comando = _palpite(boxes, i, certo, comando, disponiveis, da_fila, imagem,
+                                   sugeridor) or comando
                 if comando["id"] == "corrigir_no_documento":         # corrige sem ensinar
                     pg.confirmar(boxes, i, certo)
                     texto_conta.usar_comando(comando)
@@ -399,6 +406,23 @@ def _lote(dif: Diferencas, boxes, i: int, lida: str, certo: str, disponiveis: di
     sem_lote = sum(1 for j in outros if simples[j].char == verdade[j])
     com_lote = sum(1 for j in outros if verdade[j] == certo)
     return (disponiveis[tipo], outros) if com_lote > sem_lote else None
+
+
+def _palpite(boxes, i: int, certo: str, comando: dict, disponiveis: dict, da_fila: bool,
+             imagem, sugeridor):
+    """O Enter que aceita o palpite da rede (§9.2) no lugar do `comando` do glifo `i`, se o
+    passo o tem, ninguém leu o glifo, o palpite é o certo e o Enter sai mais barato. O
+    palpite errado não muda nada: digitar o troca, e o ensinar custa o mesmo. Devolve o
+    comando ou `None`."""
+    from abbychess import pagina as pg
+
+    tipo = "palpite_da_fila" if da_fila else "palpite"
+    if tipo not in disponiveis or sugeridor is None or not pg.sem_leitura(boxes[i]) \
+            or disponiveis[tipo]["custo"] >= comando["custo"]:
+        return None
+    recorte, altura = pg.recortes_para_ler(imagem, boxes, [i])[0]
+    sugestao = sugeridor.sugerir(recorte, altura)
+    return disponiveis[tipo] if sugestao is not None and sugestao[0] == certo else None
 
 
 def _estado(resultado: dict, gabaritos) -> str:

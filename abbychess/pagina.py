@@ -29,8 +29,8 @@ from abbychess import gravacao as gv
 from abbychess import procedencia
 from abbychess import sequencia as sq
 
-from abbychess.leitor import (FONTE_AGUARDANDO, FONTE_MANUAL, LeitorDoLivro, nome_de_origem,
-                              precisa_revisao)
+from abbychess.leitor import (FONTE_AGUARDANDO, FONTE_MANUAL, FONTE_NENHUMA, LeitorDoLivro,
+                              nome_de_origem, precisa_revisao)
 from abbychess.projeto import ARQUIVO_DE_INCLINACOES, EXTENSOES_DE_IMAGEM, ProjetoDeLivro
 
 log = logging.getLogger(__name__)
@@ -853,6 +853,12 @@ def por_leitura(box: BoxEntry, leitura) -> None:
 def aguardando(box: BoxEntry) -> bool:
     """O box ainda não lido (§11): a interface não o leu e espera o servidor."""
     return not box.char and box.source == FONTE_AGUARDANDO
+
+
+def sem_leitura(box: BoxEntry) -> bool:
+    """O box que a cadeia toda leu e ninguém reconheceu (o painel pode sugerir o palpite da
+    rede, §9.2)."""
+    return not box.char and box.source == FONTE_NENHUMA
 
 
 def recortes_para_ler(imagem: Image.Image, boxes: List[BoxEntry], indices: Sequence[int]

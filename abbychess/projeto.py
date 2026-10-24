@@ -1948,14 +1948,20 @@ def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares,
     O histograma tem faixas de 0,01 (a chave é o centésimo de baixo; 100 é a confiança
     1,0) e conta só os boxes lidos e não confirmados, os únicos que um limiar de revisão
     diferente mudaria de lado: com ele, `pendentes_pelo_histograma` dá os pendentes de
-    outro limiar (de duas casas) sem abrir a página.
+    outro limiar (de duas casas) sem abrir a página. O glifo que a palavra desmente
+    (`contexto`) é pendente com qualquer limiar: conta em `improvaveis`, fora do resto.
     """
+    from abbychess import contexto
     from abbychess.leitor import FONTE_NENHUMA, FONTES_CONFIRMADAS, precisa_revisao
 
-    confirmados = sem_leitura = pendentes = 0
+    confirmados = sem_leitura = pendentes = improvaveis = 0
     histograma: Dict[int, int] = {}
     revisados = revisados or [False] * len(boxes)
-    for b, revisado in zip(boxes, revisados):
+    for b, revisado, improvavel in zip(boxes, revisados, contexto.improvaveis_da_lista(boxes)):
+        if improvavel and not revisado:
+            improvaveis += 1
+            pendentes += 1
+            continue
         if not revisado and precisa_revisao(b.char, b.source, b.confidence, limiares):
             pendentes += 1
         if b.source in FONTES_CONFIRMADAS or revisado:      # o revisado é aceito (§6.3)
@@ -1966,7 +1972,7 @@ def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares,
             faixa = _faixa(b.confidence)
             histograma[faixa] = histograma.get(faixa, 0) + 1
     return {"boxes": len(boxes), "pendentes": pendentes, "confirmados": confirmados,
-            "sem_leitura": sem_leitura,
+            "sem_leitura": sem_leitura, "improvaveis": improvaveis,
             "histograma": {str(k): histograma[k] for k in sorted(histograma)}}
 
 
@@ -1974,8 +1980,8 @@ def pendentes_pelo_histograma(resumo: dict, revisao: float) -> int:
     """Os pendentes da página com o limiar `revisao` (de duas casas, de 0,00 a 1,00), pelo
     histograma."""
     corte = math.floor(round(float(revisao) * 100, 6))
-    return resumo["sem_leitura"] + sum(n for k, n in resumo["histograma"].items()
-                                       if int(k) < corte)
+    return (resumo["sem_leitura"] + int(resumo.get("improvaveis", 0) or 0)
+            + sum(n for k, n in resumo["histograma"].items() if int(k) < corte))
 
 
 def _faixa(confianca: float) -> int:

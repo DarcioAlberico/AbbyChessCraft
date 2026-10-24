@@ -92,11 +92,10 @@ class Documento:
 NAO_LIDO = "□"
 
 
-def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
-    """O documento da página (função pura do que está gravado nela). O texto e a exportação
-    só têm os glifos lidos; a vista do Documento (`com_os_nao_lidos`) mostra também os que
-    ninguém leu, como `NAO_LIDO`, para o realce deles (§6.1)."""
-    lidos =[b for b in pagina.boxes if b.entry.char or com_os_nao_lidos]
+def _lidos(pagina: Pagina, com_os_nao_lidos: bool):
+    """Os boxes que entram no documento e o `BoxEntry` de cada um (o não lido como
+    `NAO_LIDO`, numa cópia)."""
+    lidos = [b for b in pagina.boxes if b.entry.char or com_os_nao_lidos]
     entries = []
     for b in lidos:
         if b.entry.char:
@@ -105,6 +104,22 @@ def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
             vazio = copy.copy(b.entry)
             vazio.char = NAO_LIDO
             entries.append(vazio)
+    return lidos, entries
+
+
+def palavras_dos_gids(pagina: Pagina) -> List[List[int]]:
+    """As palavras (gids) de todas as linhas da página, em ordem de leitura, como a vista do
+    Documento as monta (com os não lidos): a mesma chave das linhas guardadas, então depois
+    do Documento elas não são refeitas."""
+    linhas, _ = _linhas_da_pagina(*_lidos(pagina, True))
+    return [p for ln in linhas for p in ln]
+
+
+def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
+    """O documento da página (função pura do que está gravado nela). O texto e a exportação
+    só têm os glifos lidos; a vista do Documento (`com_os_nao_lidos`) mostra também os que
+    ninguém leu, como `NAO_LIDO`, para o realce deles (§6.1)."""
+    lidos, entries = _lidos(pagina, com_os_nao_lidos)
     chars = {b.gid: e.char for b, e in zip(lidos, entries)}
     chars.update({v.gid: v.char for v in pagina.decisoes.virtuais})
     linhas, topos = _linhas_da_pagina(lidos, entries)

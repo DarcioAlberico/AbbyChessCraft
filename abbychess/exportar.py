@@ -258,7 +258,7 @@ class Estrutura:
     italico: set = field(default_factory=set)
     paragrafo_antes: set = field(default_factory=set)
     hifen_de_quebra: set = field(default_factory=set)
-    #: Os boxes que a fila de revisão pede (`leitor.precisa_revisao`), quando a página foi
+    #: Os boxes que a fila de revisão pede (`leitor.precisa_revisao` e `contexto`), quando a página foi
     #: lida com os limiares do livro: o realce do DOCX (`Opcoes.realcar_duvidosos`).
     duvidosos: set = field(default_factory=set)
     #: Os boxes numa área desenhada pelo usuário com função de texto (não de margem): a
@@ -274,12 +274,14 @@ class Estrutura:
     def da_pagina(cls, pagina, limiares=None) -> Tuple[List[BoxEntry], "Estrutura"]:
         """Os boxes lidos da página do modelo (`modelo.Pagina`) e a estrutura deles; sem
         modelo, nada. Com os `limiares` do livro, também os duvidosos."""
+        from abbychess import contexto
         from abbychess import zonas as zn
         from abbychess.leitor import precisa_revisao
 
         if pagina is None:
             return [], cls()
         lidos = [b for b in pagina.boxes if b.entry.char]
+        contra = contexto.improvaveis(pagina) if limiares is not None else set()
         areas = [z for z in pagina.zonas if z.tipo in (zn.TEXTO, zn.IGNORAR)]
         estrutura = cls(vivos=[b.entry for b in lidos])
         decisoes = pagina.decisoes
@@ -300,8 +302,9 @@ class Estrutura:
                 estrutura.paragrafo_antes.add(id(e))
             if b.gid in decisoes.hifen_de_quebra:
                 estrutura.hifen_de_quebra.add(id(e))
-            if limiares is not None and precisa_revisao(e.char, e.source, e.confidence,
-                                                        limiares):
+            if limiares is not None and (
+                    precisa_revisao(e.char, e.source, e.confidence, limiares)
+                    or (b.gid in contra and contexto.volta_pelo_contexto(e.source))):
                 estrutura.duvidosos.add(id(e))
         return list(estrutura.vivos), estrutura
 

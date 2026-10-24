@@ -27,7 +27,7 @@ from core.box_model import BoxEntry
 
 from abbychess import pagina as pg
 from abbychess import servidor_de_leitura as sl
-from abbychess.leitor import LeitorDoLivro, precisa_revisao
+from abbychess.leitor import LeitorDoLivro
 from abbychess.lote import ResultadoDoLote  # noqa: F401 (o resultado do lote mora lá)
 from abbychess.projeto import Limiares, ProjetoDeLivro
 
@@ -170,7 +170,9 @@ def reconhecer_paginas(projeto: ProjetoDeLivro, fonte: pg.FonteDePaginas,
 # ----------------------------------------------------------------------
 
 def pendentes_da_pagina(boxes: List[BoxEntry], limiares: Limiares) -> int:
-    return sum(1 for b in boxes if precisa_revisao(b.char, b.source, b.confidence, limiares))
+    from abbychess import contexto
+
+    return sum(contexto.pendentes(boxes, limiares))
 
 
 def pendentes_por_pagina(projeto: ProjetoDeLivro, limiares: Limiares) -> Dict[int, int]:

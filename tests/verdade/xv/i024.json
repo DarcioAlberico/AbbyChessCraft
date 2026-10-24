@@ -9,8 +9,8 @@
  "pymupdf": "1.26.6",
  "inclinacao": -0.6,
  "papel": 255,
- "verdade_versao": 1,
- "rotulado_por": "",
+ "verdade_versao": 2,
+ "rotulado_por": "DarcioAlberico",
  "revisado_por": "",
  "blocos": [
   {
@@ -37,7 +37,7 @@
    ],
    "ordem": 1,
    "coluna": 0,
-   "texto_impresso": "na batalha, acabarão ganhando. por isso, as brancas são forçadas a dar um g01pe"
+   "texto_impresso": "na batalha, acabarão ganhando. Por isso, as brancas são forçadas a dar um golpe"
   },
   {
    "id": "b02",
@@ -76,7 +76,7 @@
    ],
    "ordem": 4,
    "coluna": 0,
-   "texto_impresso": "Dia9rama 5. J09am as pretas. .",
+   "texto_impresso": "Diagrama 5. Jogam as pretas.",
    "diagrama": "d0"
   },
   {
@@ -90,7 +90,7 @@
    ],
    "ordem": 5,
    "coluna": 0,
-   "texto_impresso": "10...Rf8 11.Dd5??"
+   "texto_impresso": "10...Rf8 11.Dd5!"
   },
   {
    "id": "b05",
@@ -103,7 +103,7 @@
    ],
    "ordem": 6,
    "coluna": 0,
-   "texto_impresso": "As brancas ameaçam dar o xeque-mate em f7 e esperam que as preta? se"
+   "texto_impresso": "As brancas ameaçam dar o xeque-mate em f7 e esperam que as pretas se"
   },
   {
    "id": "b06",
@@ -116,7 +116,7 @@
    ],
    "ordem": 7,
    "coluna": 0,
-   "texto_impresso": "entusiasmem?or 11...Cxd5 12.Bxd6+ + Rg8 13.Bxd5+ Be6 14.Bxe6 xeque—mate."
+   "texto_impresso": "entusiasmem por 11...Cxd5 12.Bxd6++ Rg8 13.Bxd5+ Be6 14.Bxe6 xeque-mate."
   },
   {
    "id": "b07",
@@ -129,7 +129,7 @@
    ],
    "ordem": 8,
    "coluna": 0,
-   "texto_impresso": "Esse tipo de tática pode parecer chocante para um jogad0r amado? mas as bran-"
+   "texto_impresso": "Esse tipo de tática pode parecer chocante para um jogador amador mas as bran-"
   },
   {
    "id": "b08",
@@ -142,7 +142,7 @@
    ],
    "ordem": 9,
    "coluna": 0,
-   "texto_impresso": "cas precisam definir o jogo e sabem que m0vimentos como esse equiva1em a um"
+   "texto_impresso": "cas precisam definir o jogo e sabem que movimentos como esse equivalem a um"
   },
   {
    "id": "b09",
@@ -155,7 +155,7 @@
    ],
    "ordem": 10,
    "coluna": 0,
-   "texto_impresso": "go1pe arrasad0r."
+   "texto_impresso": "golpe arrasador."
   },
   {
    "id": "b10",
@@ -168,7 +168,7 @@
    ],
    "ordem": 11,
    "coluna": 0,
-   "texto_impresso": "11...Dd7 12.Dxd4 CC6"
+   "texto_impresso": "11...Dd7 12.Dxd4 Cc6"
   },
   {
    "id": "b11",
@@ -194,7 +194,7 @@
    ],
    "ordem": 13,
    "coluna": 0,
-   "texto_impresso": "volver uma peça. Se que o ataque das brancas fracassou?"
+   "texto_impresso": "volver uma peça. Será que o ataque das brancas fracassou?"
   },
   {
    "id": "b13",
@@ -207,7 +207,7 @@
    ],
    "ordem": 14,
    "coluna": 0,
-   "texto_impresso": "13.Dxf6+ ??"
+   "texto_impresso": "13.Dxf6+!!"
   },
   {
    "id": "b14",
@@ -233,7 +233,7 @@
    ],
    "ordem": 16,
    "coluna": 0,
-   "texto_impresso": "13...9xf6 14.Bh6+ D97 15.Txf6 xeque.mate"
+   "texto_impresso": "13...gxf6 14.Bh6+ Dg7 15.Txf6 xeque-mate"
   },
   {
    "id": "b16",
@@ -246,7 +246,7 @@
    ],
    "ordem": 17,
    "coluna": 0,
-   "texto_impresso": "Com exceçã0 do Rei, todas as peças brancaS participaram nesse xeque-mate."
+   "texto_impresso": "Com exceção do Rei, todas as peças brancas participaram nesse xeque-mate."
   },
   {
    "id": "b17",
@@ -259,7 +259,7 @@
    ],
    "ordem": 18,
    "coluna": 0,
-   "texto_impresso": "Se uma superioridade em desenvo1vimento pode compensar uII1 déficit ma-"
+   "texto_impresso": "Se uma superioridade em desenvolvimento pode compensar um déficit ma-"
   },
   {
    "id": "b18",
@@ -272,7 +272,7 @@
    ],
    "ordem": 19,
    "coluna": 0,
-   "texto_impresso": "terial, podemos conclui? então, que a vantagem material não é tão importante"
+   "texto_impresso": "terial, podemos concluir, então, que a vantagem material não é tão importante"
   },
   {
    "id": "b19",
@@ -324,7 +324,7 @@
    ],
    "ordem": 23,
    "coluna": 0,
-   "texto_impresso": "Quando tem uma grande desvantagem material o jogador p0de muito bem"
+   "texto_impresso": "Quando tem uma grande desvantagem material, o jogador pode muito bem"
   },
   {
    "id": "b23",
@@ -350,7 +350,7 @@
    ],
    "ordem": 25,
    "coluna": 0,
-   "texto_impresso": "sacrificar mais algumas peças. Quem está por ba1xo, nao Drecisa ter med0 de"
+   "texto_impresso": "sacrificar mais algumas peças. Quem está por baixo, não precisa ter medo de"
   },
   {
    "id": "b25",
@@ -363,7 +363,7 @@
    ],
    "ordem": 26,
    "coluna": 0,
-   "texto_impresso": "cair! No entanto? ?uem está por cima, deve recusar ?acr ícios adicionais de"
+   "texto_impresso": "cair! No entanto, quem está por cima, deve recusar sacrifícios adicionais de"
   },
   {
    "id": "b26",
@@ -376,7 +376,7 @@
    ],
    "ordem": 27,
    "coluna": 0,
-   "texto_impresso": "materia1 do advers rio e preoct1par-se mais com o desenvolvimento das peças e"
+   "texto_impresso": "material do adversário e preocupar-se mais com o desenvolvimento das peças e"
   },
   {
    "id": "b27",
@@ -389,7 +389,7 @@
    ],
    "ordem": 28,
    "coluna": 0,
-   "texto_impresso": "com a segurança do Rei. Depois de alcançar esses objetivos, ai sim, estará 1iVre"
+   "texto_impresso": "com a segurança do Rei. Depois de alcançar esses objetivos, ai sim, estará livre"
   },
   {
    "id": "b28",
@@ -448,9 +448,9 @@
     0.94129,
     0.10947
    ],
-   "texto": "na batalha, acabarão ganhando. por isso, as brancas são forçadas a dar um g01pe",
+   "texto": "na batalha, acabarão ganhando. Por isso, as brancas são forçadas a dar um golpe",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l02",
@@ -463,7 +463,7 @@
    ],
    "texto": "rápido, antes da chegada dos reforços.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l03",
@@ -474,9 +474,9 @@
     0.74268,
     0.41065
    ],
-   "texto": "Dia9rama 5. J09am as pretas. .",
+   "texto": "Diagrama 5. Jogam as pretas.",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l04",
@@ -487,9 +487,9 @@
     0.27584,
     0.45678
    ],
-   "texto": "10...Rf8 11.Dd5??",
+   "texto": "10...Rf8 11.Dd5!",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l05",
@@ -500,9 +500,9 @@
     0.94678,
     0.48033
    ],
-   "texto": "As brancas ameaçam dar o xeque-mate em f7 e esperam que as preta? se",
+   "texto": "As brancas ameaçam dar o xeque-mate em f7 e esperam que as pretas se",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l06",
@@ -513,9 +513,9 @@
     0.94624,
     0.49817
    ],
-   "texto": "entusiasmem?or 11...Cxd5 12.Bxd6+ + Rg8 13.Bxd5+ Be6 14.Bxe6 xeque—mate.",
+   "texto": "entusiasmem por 11...Cxd5 12.Bxd6++ Rg8 13.Bxd5+ Be6 14.Bxe6 xeque-mate.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l07",
@@ -526,9 +526,9 @@
     0.9473,
     0.51555
    ],
-   "texto": "Esse tipo de tática pode parecer chocante para um jogad0r amado? mas as bran-",
+   "texto": "Esse tipo de tática pode parecer chocante para um jogador amador mas as bran-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l08",
@@ -539,9 +539,9 @@
     0.94796,
     0.53236
    ],
-   "texto": "cas precisam definir o jogo e sabem que m0vimentos como esse equiva1em a um",
+   "texto": "cas precisam definir o jogo e sabem que movimentos como esse equivalem a um",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l09",
@@ -552,9 +552,9 @@
     0.35186,
     0.55167
    ],
-   "texto": "go1pe arrasad0r.",
+   "texto": "golpe arrasador.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l10",
@@ -565,9 +565,9 @@
     0.32656,
     0.58655
    ],
-   "texto": "11...Dd7 12.Dxd4 CC6",
+   "texto": "11...Dd7 12.Dxd4 Cc6",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l11",
@@ -580,7 +580,7 @@
    ],
    "texto": "As brancas recuperam uma de suas peças, mas as pretas conseguem desen-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l12",
@@ -591,9 +591,9 @@
     0.75784,
     0.62854
    ],
-   "texto": "volver uma peça. Se que o ataque das brancas fracassou?",
+   "texto": "volver uma peça. Será que o ataque das brancas fracassou?",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l13",
@@ -604,9 +604,9 @@
     0.22812,
     0.665
    ],
-   "texto": "13.Dxf6+ ??",
+   "texto": "13.Dxf6+!!",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l14",
@@ -619,7 +619,7 @@
    ],
    "texto": "O Rei das pretas perde sua proteção.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l15",
@@ -630,9 +630,9 @@
     0.54678,
     0.72851
    ],
-   "texto": "13...9xf6 14.Bh6+ D97 15.Txf6 xeque.mate",
+   "texto": "13...gxf6 14.Bh6+ Dg7 15.Txf6 xeque-mate",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l16",
@@ -643,9 +643,9 @@
     0.95036,
     0.74934
    ],
-   "texto": "Com exceçã0 do Rei, todas as peças brancaS participaram nesse xeque-mate.",
+   "texto": "Com exceção do Rei, todas as peças brancas participaram nesse xeque-mate.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l17",
@@ -656,9 +656,9 @@
     0.95102,
     0.76644
    ],
-   "texto": "Se uma superioridade em desenvo1vimento pode compensar uII1 déficit ma-",
+   "texto": "Se uma superioridade em desenvolvimento pode compensar um déficit ma-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l18",
@@ -669,9 +669,9 @@
     0.95169,
     0.78428
    ],
-   "texto": "terial, podemos conclui? então, que a vantagem material não é tão importante",
+   "texto": "terial, podemos concluir, então, que a vantagem material não é tão importante",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l19",
@@ -684,7 +684,7 @@
    ],
    "texto": "quanto se imaginava? Conclusão errada. As pretas teriam ganhado o jogo se",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l20",
@@ -697,7 +697,7 @@
    ],
    "texto": "tivessem sido menos ávidas e mais cuidadosas com o desenvolvimento. Mais uma",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l21",
@@ -710,7 +710,7 @@
    ],
    "texto": "vez surge a questão da estratégia:",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l22",
@@ -721,9 +721,9 @@
     0.95349,
     0.87999
    ],
-   "texto": "Quando tem uma grande desvantagem material o jogador p0de muito bem",
+   "texto": "Quando tem uma grande desvantagem material, o jogador pode muito bem",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l24",
@@ -734,9 +734,9 @@
     0.95328,
     0.8911
    ],
-   "texto": "sacrificar mais algumas peças. Quem está por ba1xo, nao Drecisa ter med0 de",
+   "texto": "sacrificar mais algumas peças. Quem está por baixo, não precisa ter medo de",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l25",
@@ -747,9 +747,9 @@
     0.95351,
     0.90649
    ],
-   "texto": "cair! No entanto? ?uem está por cima, deve recusar ?acr ícios adicionais de",
+   "texto": "cair! No entanto, quem está por cima, deve recusar sacrifícios adicionais de",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l26",
@@ -760,9 +760,9 @@
     0.95373,
     0.92159
    ],
-   "texto": "materia1 do advers rio e preoct1par-se mais com o desenvolvimento das peças e",
+   "texto": "material do adversário e preocupar-se mais com o desenvolvimento das peças e",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l27",
@@ -773,9 +773,9 @@
     0.95396,
     0.9367
    ],
-   "texto": "com a segurança do Rei. Depois de alcançar esses objetivos, ai sim, estará 1iVre",
+   "texto": "com a segurança do Rei. Depois de alcançar esses objetivos, ai sim, estará livre",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l28",
@@ -788,7 +788,7 @@
    ],
    "texto": "para devorar o que aparecer pela frente.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   }
  ],
  "estrutura_por": "Claude (estrutura pelas faixas)"

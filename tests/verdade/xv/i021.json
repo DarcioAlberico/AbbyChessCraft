@@ -9,8 +9,8 @@
  "pymupdf": "1.26.6",
  "inclinacao": -0.9,
  "papel": 255,
- "verdade_versao": 1,
- "rotulado_por": "",
+ "verdade_versao": 2,
+ "rotulado_por": "DarcioAlberico",
  "revisado_por": "",
  "blocos": [
   {
@@ -50,7 +50,7 @@
    ],
    "ordem": 2,
    "coluna": 0,
-   "texto_impresso": "AS brancas pretendem desenvolVer as peças o mais rapidamente poss?vel, de"
+   "texto_impresso": "As brancas pretendem desenvolver as peças o mais rapidamente possível, de"
   },
   {
    "id": "b03",
@@ -63,7 +63,7 @@
    ],
    "ordem": 3,
    "coluna": 0,
-   "texto_impresso": "modo a varrer as pretas do tabuleiro anteS que a fa1ta da Dama pese em suas"
+   "texto_impresso": "modo a varrer as pretas do tabuleiro antes que a falta da Dama pese em suas"
   },
   {
    "id": "b04",
@@ -76,7 +76,7 @@
    ],
    "ordem": 4,
    "coluna": 0,
-   "texto_impresso": "costas e reSulte em derrota."
+   "texto_impresso": "costas e resulte em derrota."
   },
   {
    "id": "b05",
@@ -89,7 +89,7 @@
    ],
    "ordem": 5,
    "coluna": 0,
-   "texto_impresso": "1...e5 2.Cf3 Cc6 3.Bc4 Cf6 4.C?3 Ca5?"
+   "texto_impresso": "1...e5 2.Cf3 Cc6 3.Bc4 Cf6 4.Cc3 Ca5?"
   },
   {
    "id": "b06",
@@ -102,7 +102,7 @@
    ],
    "ordem": 6,
    "coluna": 0,
-   "texto_impresso": "Até aqui, as pretas jogaram bem. Ganharam algum espaço centra1 (com"
+   "texto_impresso": "Até aqui, as pretas jogaram bem. Ganharam algum espaço central (com"
   },
   {
    "id": "b07",
@@ -115,7 +115,7 @@
    ],
    "ordem": 7,
    "coluna": 0,
-   "texto_impresso": "1...e5) e desenvolveram dois CaValos. Mas, de repente? pararam de mover ou,"
+   "texto_impresso": "1...e5) e desenvolveram dois Cavalos. Mas, de repente, pararam de mover ou-"
   },
   {
    "id": "b08",
@@ -128,7 +128,7 @@
    ],
    "ordem": 8,
    "coluna": 0,
-   "texto_impresso": "tras peças e c0meçaram a jogar apenas com e1es. Se as pretas tiVessem mobili-"
+   "texto_impresso": "tras peças e começaram a jogar apenas com eles. Se as pretas tivessem mobili-"
   },
   {
    "id": "b09",
@@ -141,7 +141,7 @@
    ],
    "ordem": 9,
    "coluna": 0,
-   "texto_impresso": "zado o exército inteiro, com 4...Bc5, seguido de 5...0-0 (que co1oca o Rei em"
+   "texto_impresso": "zado o exército inteiro, com 4...Bc5, seguido de 5...0-0 (que coloca o Rei em"
   },
   {
    "id": "b10",
@@ -206,7 +206,7 @@
    ],
    "ordem": 14,
    "coluna": 0,
-   "texto_impresso": "não significa praticamente nada. Se t1vessem revidado ao ataque das brancas"
+   "texto_impresso": "não significa praticamente nada. Se tivessem revidado ao ataque das brancas"
   },
   {
    "id": "b15",
@@ -219,7 +219,7 @@
    ],
    "ordem": 15,
    "coluna": 0,
-   "texto_impresso": "com 5...Cxc4, o jog0 ainda seria delas."
+   "texto_impresso": "com 5...Cxc4, o jogo ainda seria delas."
   },
   {
    "id": "b16",
@@ -284,7 +284,7 @@
    ],
    "ordem": 20,
    "coluna": 0,
-   "texto_impresso": "que, e1iminando as peças que poderiam fazer algum dano. Mas, em vez disSo, as"
+   "texto_impresso": "que, eliminando as peças que poderiam fazer algum dano. Mas, em vez disso, as"
   },
   {
    "id": "b21",
@@ -323,7 +323,7 @@
    ],
    "ordem": 23,
    "coluna": 0,
-   "texto_impresso": "As pretaS continuam movimentando os dois Cava1os indefinidamente, en-"
+   "texto_impresso": "As pretas continuam movimentando os dois Cavalos indefinidamente, en-"
   },
   {
    "id": "b24",
@@ -336,7 +336,7 @@
    ],
    "ordem": 24,
    "coluna": 0,
-   "texto_impresso": "quanto o resto do exército permanece tranqüi1o em casa. Ninguém pode ganhar"
+   "texto_impresso": "quanto o resto do exército permanece tranqüilo em casa. Ninguém pode ganhar"
   },
   {
    "id": "b25",
@@ -375,7 +375,7 @@
    ],
    "ordem": 27,
    "coluna": 0,
-   "texto_impresso": "7.Bxf1+"
+   "texto_impresso": "7.Bxf7+"
   },
   {
    "id": "b28",
@@ -401,7 +401,7 @@
    ],
    "ordem": 29,
    "coluna": 0,
-   "texto_impresso": "das pretas é forçado a ir para o centro, onde vai perecer sob um ataque bruta1."
+   "texto_impresso": "das pretas é forçado a ir para o centro, onde vai perecer sob um ataque brutal."
   },
   {
    "id": "b30",
@@ -427,7 +427,7 @@
    ],
    "ordem": 31,
    "coluna": 0,
-   "texto_impresso": "As brancas poderiam ter sucumbido à tentação de c0ntinuar o ataque com"
+   "texto_impresso": "As brancas poderiam ter sucumbido à tentação de continuar o ataque com"
   },
   {
    "id": "b32",
@@ -453,7 +453,7 @@
    ],
    "ordem": 33,
    "coluna": 0,
-   "texto_impresso": "biamente colocar uma nova peça na luta. potter sabe que seu adverSário errou ao"
+   "texto_impresso": "biamente colocar uma nova peça na luta. potter sabe que seu adversário errou ao"
   },
   {
    "id": "b34",
@@ -466,7 +466,7 @@
    ],
    "ordem": 34,
    "coluna": 0,
-   "texto_impresso": "não mobilizar outras peças e não tem a menor intenção de cometer o II1esmo"
+   "texto_impresso": "não mobilizar outras peças e não tem a menor intenção de cometer o mesmo"
   },
   {
    "id": "b35",
@@ -492,7 +492,7 @@
    ],
    "ordem": 36,
    "coluna": 0,
-   "texto_impresso": "8...?d6 9.Cb5+"
+   "texto_impresso": "8...Rd6 9.Cb5+"
   },
   {
    "id": "b37",
@@ -505,7 +505,7 @@
    ],
    "ordem": 37,
    "coluna": 0,
-   "texto_impresso": "O plano das brancas consiste em forçar as pretas a capturar o Cava1o-e5. O"
+   "texto_impresso": "O plano das brancas consiste em forçar as pretas a capturar o Cavalo-e5. O"
   },
   {
    "id": "b38",
@@ -518,7 +518,7 @@
    ],
    "ordem": 38,
    "coluna": 0,
-   "texto_impresso": "jogador parte do princ?pio de que, como não tem a Dama, a perda de mais uma"
+   "texto_impresso": "jogador parte do princípio de que, como não tem a Dama, a perda de mais uma"
   },
   {
    "id": "b39",
@@ -547,7 +547,7 @@
    ],
    "texto": "1.e4",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l02",
@@ -558,9 +558,9 @@
     0.94677,
     0.14395
    ],
-   "texto": "AS brancas pretendem desenvolVer as peças o mais rapidamente poss?vel, de",
+   "texto": "As brancas pretendem desenvolver as peças o mais rapidamente possível, de",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l03",
@@ -571,9 +571,9 @@
     0.94716,
     0.16159
    ],
-   "texto": "modo a varrer as pretas do tabuleiro anteS que a fa1ta da Dama pese em suas",
+   "texto": "modo a varrer as pretas do tabuleiro antes que a falta da Dama pese em suas",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l04",
@@ -584,9 +584,9 @@
     0.45722,
     0.17856
    ],
-   "texto": "costas e reSulte em derrota.",
+   "texto": "costas e resulte em derrota.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l05",
@@ -597,9 +597,9 @@
     0.48986,
     0.21618
    ],
-   "texto": "1...e5 2.Cf3 Cc6 3.Bc4 Cf6 4.C?3 Ca5?",
+   "texto": "1...e5 2.Cf3 Cc6 3.Bc4 Cf6 4.Cc3 Ca5?",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l06",
@@ -610,9 +610,9 @@
     0.94889,
     0.23913
    ],
-   "texto": "Até aqui, as pretas jogaram bem. Ganharam algum espaço centra1 (com",
+   "texto": "Até aqui, as pretas jogaram bem. Ganharam algum espaço central (com",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l07",
@@ -623,9 +623,9 @@
     0.94928,
     0.25704
    ],
-   "texto": "1...e5) e desenvolveram dois CaValos. Mas, de repente? pararam de mover ou,",
+   "texto": "1...e5) e desenvolveram dois Cavalos. Mas, de repente, pararam de mover ou-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l08",
@@ -636,9 +636,9 @@
     0.94926,
     0.27443
    ],
-   "texto": "tras peças e c0meçaram a jogar apenas com e1es. Se as pretas tiVessem mobili-",
+   "texto": "tras peças e começaram a jogar apenas com eles. Se as pretas tivessem mobili-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l09",
@@ -649,9 +649,9 @@
     0.95005,
     0.29124
    ],
-   "texto": "zado o exército inteiro, com 4...Bc5, seguido de 5...0-0 (que co1oca o Rei em",
+   "texto": "zado o exército inteiro, com 4...Bc5, seguido de 5...0-0 (que coloca o Rei em",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l10",
@@ -664,7 +664,7 @@
    ],
    "texto": "segurança) e 6...d6, as brancas não conseguiriam adiar a derrota e as pretas",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l11",
@@ -677,7 +677,7 @@
    ],
    "texto": "teriam ganhado.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l12",
@@ -690,7 +690,7 @@
    ],
    "texto": "5.Cxe5 Cxe4?",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l13",
@@ -703,7 +703,7 @@
    ],
    "texto": "As pretas perdem um peão, mas, por ter a vantagem da Dama, essa perda",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l14",
@@ -714,9 +714,9 @@
     0.95257,
     0.40493
    ],
-   "texto": "não significa praticamente nada. Se t1vessem revidado ao ataque das brancas",
+   "texto": "não significa praticamente nada. Se tivessem revidado ao ataque das brancas",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l15",
@@ -727,9 +727,9 @@
     0.56507,
     0.42419
    ],
-   "texto": "com 5...Cxc4, o jog0 ainda seria delas.",
+   "texto": "com 5...Cxc4, o jogo ainda seria delas.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l16",
@@ -742,7 +742,7 @@
    ],
    "texto": "6.d3 ?",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l17",
@@ -755,7 +755,7 @@
    ],
    "texto": "As brancas perderam todo o respeito pelo adversário e o desafiam a fazer",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l18",
@@ -768,7 +768,7 @@
    ],
    "texto": "um bom lance. Um imediato 6.Bxf7+ teria sido melhor pois agora as pretas",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l19",
@@ -781,7 +781,7 @@
    ],
    "texto": "ainda podem arrancar as garras das brancas com 6...Cxc4, que poria fim ao ata-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l20",
@@ -792,9 +792,9 @@
     0.95546,
     0.53487
    ],
-   "texto": "que, e1iminando as peças que poderiam fazer algum dano. Mas, em vez disSo, as",
+   "texto": "que, eliminando as peças que poderiam fazer algum dano. Mas, em vez disso, as",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l21",
@@ -807,7 +807,7 @@
    ],
    "texto": "pretas tropeçam.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l22",
@@ -820,7 +820,7 @@
    ],
    "texto": "6...Cc5??",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l23",
@@ -831,9 +831,9 @@
     0.95719,
     0.6127
    ],
-   "texto": "As pretaS continuam movimentando os dois Cava1os indefinidamente, en-",
+   "texto": "As pretas continuam movimentando os dois Cavalos indefinidamente, en-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l24",
@@ -844,9 +844,9 @@
     0.95798,
     0.63033
    ],
-   "texto": "quanto o resto do exército permanece tranqüi1o em casa. Ninguém pode ganhar",
+   "texto": "quanto o resto do exército permanece tranqüilo em casa. Ninguém pode ganhar",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l25",
@@ -859,7 +859,7 @@
    ],
    "texto": "uma partida jogando dessa maneira! Capturar o Bispo de c4 seria o lance corre-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l26",
@@ -872,7 +872,7 @@
    ],
    "texto": "to.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l27",
@@ -883,9 +883,9 @@
     0.20431,
     0.70339
    ],
-   "texto": "7.Bxf1+",
+   "texto": "7.Bxf7+",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l28",
@@ -898,7 +898,7 @@
    ],
    "texto": "As pretas não repararam que esse ponto foi atacado duas vezes. Agora, o Rei",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l29",
@@ -909,9 +909,9 @@
     0.95001,
     0.74323
    ],
-   "texto": "das pretas é forçado a ir para o centro, onde vai perecer sob um ataque bruta1.",
+   "texto": "das pretas é forçado a ir para o centro, onde vai perecer sob um ataque brutal.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l30",
@@ -924,7 +924,7 @@
    ],
    "texto": "7...Re7 8.Bg5+",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l31",
@@ -935,9 +935,9 @@
     0.96144,
     0.80389
    ],
-   "texto": "As brancas poderiam ter sucumbido à tentação de c0ntinuar o ataque com",
+   "texto": "As brancas poderiam ter sucumbido à tentação de continuar o ataque com",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l32",
@@ -950,7 +950,7 @@
    ],
    "texto": "8.Cd5+, usando apenas as três peças já desenvolvidas. No entanto, decidem sa-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l33",
@@ -961,9 +961,9 @@
     0.96181,
     0.83892
    ],
-   "texto": "biamente colocar uma nova peça na luta. potter sabe que seu adverSário errou ao",
+   "texto": "biamente colocar uma nova peça na luta. potter sabe que seu adversário errou ao",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l34",
@@ -974,9 +974,9 @@
     0.96219,
     0.85601
    ],
-   "texto": "não mobilizar outras peças e não tem a menor intenção de cometer o II1esmo",
+   "texto": "não mobilizar outras peças e não tem a menor intenção de cometer o mesmo",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l35",
@@ -989,7 +989,7 @@
    ],
    "texto": "erro.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l36",
@@ -1000,9 +1000,9 @@
     0.2791,
     0.91186
    ],
-   "texto": "8...?d6 9.Cb5+",
+   "texto": "8...Rd6 9.Cb5+",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l37",
@@ -1013,9 +1013,9 @@
     0.96312,
     0.93412
    ],
-   "texto": "O plano das brancas consiste em forçar as pretas a capturar o Cava1o-e5. O",
+   "texto": "O plano das brancas consiste em forçar as pretas a capturar o Cavalo-e5. O",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l38",
@@ -1026,9 +1026,9 @@
     0.96391,
     0.95177
    ],
-   "texto": "jogador parte do princ?pio de que, como não tem a Dama, a perda de mais uma",
+   "texto": "jogador parte do princípio de que, como não tem a Dama, a perda de mais uma",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   }
  ],
  "estrutura_por": "Claude (estrutura pelas faixas)"

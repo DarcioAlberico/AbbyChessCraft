@@ -1093,8 +1093,9 @@ só leitura e não muda o custo de nenhum comando. Até 2026-10-24 o alvo era �
 D1; mudou, com o sim do usuário, depois da investigação `docs/revisoes/ca-f1-investigacao.md`:
 dos 983 gestos que sobram, 190 são o custo fixo do que nenhum comando corrige (5 linhas que a
 leitura não acha e os 170 caracteres delas), e o resto é sobretudo ensinar o glifo que a rede
-erra e dividir os colados, um gesto por glifo. As alavancas que ainda restam, somadas, ficam
-perto de 0,80.)
+erra e dividir os colados, um gesto por glifo. As alavancas que ainda restavam, somadas,
+ficavam perto de 0,80. Depois, o pingo do i no dividir e as legendas lado a lado em duas
+linhas, `7511f02`, levaram a fatia a 880 gestos, 0,744.)
 **CA-F.2** (informativo, não reprova) Tempo humano pelo protocolo
 `docs/medidas/protocolo-fatia.md`: o mesmo snapshot; o tempo vem do registro de gestos da
 aplicação (`ABBY_REGISTRO_DE_EVENTOS`, somado por `ferramentas/tempo_da_fatia.py`),

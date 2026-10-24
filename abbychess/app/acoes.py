@@ -230,6 +230,9 @@ def montar(janela) -> None:
     j.acao_ensinar = acao(j, "ensinar", t.pedir_ensinar, texto="Ensinar padrão", widgets=[campo])
     j.acao_so_corrigir = acao(j, "so_corrigir", t.pedir_so_corrigir,
                               texto="Só esta ocorrência", widgets=[campo])
+    j.acao_ensinar_em_lote = acao(j, "ensinar_em_lote", t.pedir_ensinar_em_lote,
+                                  texto="Ensinar e corrigir em lote", widgets=[campo])
+    t.ensinar_em_lote.connect(p.ensinar_em_lote)
     j.acao_descartar = acao(j, "descartar_box", t.pedir_descartar, texto="Não é caractere",
                             widgets=[t])
     j.acao_dividir = acao(j, "dividir", t.pedir_dividir, texto="Dividir o box", widgets=[t])
@@ -243,7 +246,8 @@ def montar(janela) -> None:
               ("borda_topo_cima", (0, -1, 0, 0)), ("borda_topo_baixo", (0, 1, 0, 0)))
     j.acoes_das_bordas = [acao(j, id_, lambda _=False, d=d: j.treino.pedir_ajustar(*d),
                                widgets=[j.visor, campo]) for id_, d in bordas]
-    for q in (j.acao_ensinar, j.acao_so_corrigir, j.acao_descartar, *j.acoes_das_bordas):
+    for q in (j.acao_ensinar, j.acao_so_corrigir, j.acao_ensinar_em_lote, j.acao_descartar,
+              *j.acoes_das_bordas):
         campo.teclas.ligar(q)                   # no campo, a tecla é dele (exceção 6, §3.4)
     j.acao_paleta = acao(j, "paleta", j.abrir_paleta, texto="Símbolos…", widgets=[t, j.texto])
     _documento(j)

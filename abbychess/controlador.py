@@ -1253,13 +1253,23 @@ class ControladorDePagina:
 
         return trabalho, pronto
 
-    def ensinar(self, char: str) -> None:
+    def ensinar(self, char: str, em_lote: bool = False) -> None:
         """Enter: ensina o glifo em revisão (ou a seleção inteira) como `char` neste livro e
-        propaga o padrão pelos pendentes da página."""
+        propaga o padrão pelos pendentes da página. Ctrl+Enter (`em_lote`): no mesmo passo do
+        desfazer, corrige sem ensinar os outros glifos da página com a mesma leitura que a
+        palavra desmente (`contexto.lote`: o "0" de "c0l0ca" vira "o" em toda a página)."""
         if self.atual is None or not self._pode_ler():
             return
         alvos = self.alvos()
-        self.ensinar_gids({char: alvos}, f"Ensinar '{char}'", self._depois_de_ensinar(char, alvos))
+        lote = None
+        if em_lote:
+            lote = ({self.box(g).char for g in alvos} - {char}, char)
+        self.ensinar_gids({char: alvos}, f"Ensinar '{char}'" + (" em lote" if em_lote else ""),
+                          self._depois_de_ensinar(char, alvos), lote=lote)
+
+    def ensinar_em_lote(self, char: str) -> None:
+        """Ctrl+Enter no Glifo: `ensinar` com o lote."""
+        self.ensinar(char, em_lote=True)
 
     def _depois_de_ensinar(self, char: str, alvos: Sequence[int]):
         amostras = f" com {len(alvos)} amostras" if len(alvos) > 1 else ""
@@ -1283,25 +1293,27 @@ class ControladorDePagina:
         return ensinou, propagou
 
     def ensinar_gids(self, por_char: Dict[str, Sequence[int]], descricao: str,
-                     depois=None, *, juntar=None) -> None:
+                     depois=None, *, juntar=None, lote=None) -> None:
         """Ensina cada grupo de gids como o caractere dele (§14.2): a parte síncrona (o
         glifo vira manual, a amostra é gravada, a cor muda) roda na hora, se nada prende o
         leitor (`_agora`); a propagação pelos pendentes da página vai para a fila, com uma
         cópia dos padrões que já tem as amostras novas, e emenda a transação deste Enter.
         `depois` é `(ensinou, propagou(resolvidos))`, ou uma função só (chamada com o número
         de resolvidos no fim). `juntar` é a chave da transação que este emenda (a correção de
-        uma palavra que também ensina: um Ctrl+Z desfaz as duas)."""
+        uma palavra que também ensina: um Ctrl+Z desfaz as duas). `lote` é `(leituras,
+        caractere)`: os glifos de `contexto.lote` com essas leituras viram o caractere, sem
+        ensinar, na parte síncrona."""
         indice = self.indice
 
         def agora():
-            self._ensinar_agora(indice, por_char, descricao, depois, juntar)
+            self._ensinar_agora(indice, por_char, descricao, depois, juntar, lote)
 
         if self._agora():
             agora()
         else:
             self.tarefa("Ensinando", lambda: (agora(), None)[1], falhou=self._falhou("Ensinar"))
 
-    def _ensinar_agora(self, indice, por_char, descricao, depois, juntar) -> None:
+    def _ensinar_agora(self, indice, por_char, descricao, depois, juntar, lote=None) -> None:
         pagina = self.modelo
         if indice != self.indice or pagina is None or self.leitor is None:
             return
@@ -1332,6 +1344,15 @@ class ControladorDePagina:
             log.exception("o Enter falhou")
             self._falhou("Ensinar")(f"O padrão não foi ensinado: {erro}")
             return
+        corrigidos = []
+        if lote is not None:
+            lidas, novo = lote
+            ensinados = {g for gids in por_char.values() for g in gids}
+            for gid in contexto.lote(pagina, lidas, novo, ensinados):
+                i = onde[gid]
+                lidos[i] = ed.copia(antes[i].entry)
+                pg.confirmar(lidos, i, novo)
+                corrigidos.append(gid)
         ed.aplicar_leituras(pagina, antes, lidos)
         for char, gids in por_char.items():
             self._tirar_a_letra_que_faltava(pagina, gids, char)
@@ -1340,6 +1361,12 @@ class ControladorDePagina:
         ensinou, propagou = depois if isinstance(depois, tuple) else (None, depois)
         if ensinou is not None and pagina is self.modelo:
             ensinou()
+        if lote is not None and pagina is self.modelo:
+            self.pulados.difference_update(corrigidos)
+            self._avisar(f"Padrão '{lote[1]}' ensinado e {len(corrigidos)} glifo(s) corrigido(s) "
+                         "em lote na página; propagando…" if corrigidos else
+                         "Nenhum outro glifo da página tem essa leitura numa palavra que a "
+                         "desminta: só este foi ensinado.", 6000)
         self._propagar(pagina, indice, transacao, propagou)
 
     def _propagar(self, pagina: Pagina, indice: int, transacao: hs.Transacao,
@@ -2087,7 +2114,8 @@ class ControladorDePagina:
 
     def aviso_de_ensino(self, char: str) -> Tuple[str, str]:
         """§8.3, ao digitar o caractere do glifo atual: o efeito ("Enter ensina 'l' · 23
-        iguais nesta página": os glifos da página com a mesma leitura dele) e o conflito
+        iguais nesta página": os glifos da página com a mesma leitura dele; e, se alguns a
+        palavra desmente, quantos o Ctrl+Enter corrige em lote) e o conflito
         ("este glifo está a 0,08 de 14 amostras de '1'", ou "")."""
         if not char or self.modelo is None or self.atual is None or self.leitor is None:
             return "", ""
@@ -2098,6 +2126,12 @@ class ControladorDePagina:
         lida = entradas[i].char
         iguais = sum(1 for k, e in enumerate(entradas) if k != i and lida and e.char == lida)
         efeito = f"Enter ensina '{char}'" + (f" · {iguais} iguais nesta página" if iguais else "")
+        alvos = self.alvos()                     # o que o Ctrl+Enter usaria (`ensinar`)
+        lidas = {self.box(g).char for g in alvos} - {char, ""}
+        em_lote = len(contexto.lote(self.modelo, lidas, char, alvos)) if lidas else 0
+        if em_lote:
+            efeito += (f" · Ctrl+Enter corrige também {em_lote} "
+                       f"{'/'.join(repr(c) for c in sorted(lidas))} que a palavra desmente")
         conflito = ""
         if self.imagem is not None:
             from core import proporcao

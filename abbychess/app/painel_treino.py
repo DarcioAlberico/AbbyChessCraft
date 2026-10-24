@@ -141,6 +141,8 @@ ALTURA_DO_GLIFO = 140
 class PainelDeTreino(QWidget):
     ensinar = Signal(str)
     so_corrigir = Signal(str)
+    #: Ensinar e corrigir em lote os glifos da página com a mesma leitura que a palavra desmente.
+    ensinar_em_lote = Signal(str)
     descartar = Signal()
     pular = Signal()
     anterior = Signal()
@@ -401,6 +403,10 @@ class PainelDeTreino(QWidget):
     def pedir_so_corrigir(self) -> None:
         if self._ativo and (texto := self._texto()):
             self.so_corrigir.emit(texto)
+
+    def pedir_ensinar_em_lote(self) -> None:
+        if self._ativo and (texto := self._texto()):
+            self.ensinar_em_lote.emit(texto)
 
     def pedir_descartar(self) -> None:
         if self._ativo:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -125,3 +126,34 @@ def test_o_resumo_conta_o_improvavel_com_qualquer_limiar():
     assert pendentes_pelo_histograma(resumo, 0.90) == 3
     revisados = [b.char == "S" for b in boxes]
     assert resumo_das_confiancas(boxes, Limiares(), revisados)["improvaveis"] == 2
+
+
+# ----------------------------------------------------------------------
+# O lote (Ctrl+Enter no Glifo)
+# ----------------------------------------------------------------------
+
+def test_o_lote_e_a_mesma_leitura_que_a_palavra_desmente():
+    boxes = _linha("c0l0ca n0 10 1.e4 b0l0s", fontes={15: FONTE_MANUAL})
+    # O outro 0 de "c0l0ca" e o último de "b0l0s"; não o de "n0" (uma letra só), nem o de
+    # "10" e o de "1.e4" (número e lance), nem o 0 manual (o primeiro de "b0l0s").
+    assert contexto.lote_da_lista(boxes, {"0"}, "o", fora={1}) == [3, 17]
+    assert contexto.lote_da_lista(boxes, {"0", "1"}, "o", fora={1}) == [3, 17]
+
+
+def test_o_lote_so_troca_onde_a_troca_deixa_a_palavra_provavel():
+    boxes = _linha("c0l0ca C0L0CA")
+    assert contexto.lote_da_lista(boxes, {"0"}, "o") == [1, 3]          # não o de "CoLoCA"
+    assert contexto.lote_da_lista(boxes, {"0"}, "O") == [7, 9]          # não o de "cOlOca"
+
+
+def test_o_lote_deixa_de_fora_o_revisado_e_vale_pelos_gids():
+    from abbychess import texto as tx
+
+    pagina = tx.pagina_avulsa(_linha("c0l0ca b0l0s"))
+    gids = [b.gid for b in pagina.boxes]
+    assert contexto.lote(pagina, {"0"}, "o", {gids[1]}) == [gids[3], gids[7], gids[9]]
+    boxes = list(pagina.boxes)
+    boxes[7] = replace(boxes[7], revisado=True)
+    pagina.boxes = boxes
+    assert contexto.lote(pagina, {"0"}, "o", {gids[1]}) == [gids[3], gids[9]]
+    assert contexto.lote(pagina, {"1"}, "l") == []

@@ -22,6 +22,10 @@ depois de ter ensinado algo, o replay relê os pendentes (`reler_pendentes`, pel
 propagação dos padrões do livro, que é o que a releitura muda) e cobra o comando. A
 navegação (`pagina_seguinte` entre cada par de páginas) sai em `gestos_navegacao`.
 
+Desde o catálogo 6, um passo com o ensinar em lote (Ctrl+Enter) o usa no lugar do ensinar
+quando o lote da página (`contexto.lote`) deixa certos mais glifos do que o Enter simples,
+com a propagação dele, deixaria (`_lote`).
+
 Só entram as linhas de corpo com `texto_verificado: true` (o texto do gabarito é do
 usuário) e os diagramas do gabarito. Sem linha verificada, o texto fica **pendente** e o
 total não é número; os diagramas saem à parte (`gestos_diagramas`). O `estado` diz também
@@ -276,20 +280,28 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
                 break
             if acao[0] == "substituicao":
                 _, i, certo = acao
-                if ensinar is not None and certo not in ensinados:
-                    pg.ensinar(imagem, boxes, i, certo, leitor, projeto, indice)
-                    ensinados.add(certo)
-                    texto_conta.usar_comando(disponiveis["substituicao_da_fila"] if da_fila
-                                             else ensinar)
-                    continue
                 if da_fila:
-                    pg.ensinar(imagem, boxes, i, certo, leitor, projeto, indice)
-                    texto_conta.usar("substituicao_da_fila")
-                    continue
-                if disponiveis["substituicao"]["id"] == "ensinar_glifo":
-                    pg.ensinar(imagem, boxes, i, certo, leitor, projeto, indice)
+                    comando = disponiveis["substituicao_da_fila"]
+                elif ensinar is not None and certo not in ensinados:
+                    comando = ensinar
                 else:
+                    comando = disponiveis["substituicao"]
+                if comando["id"] == "corrigir_no_documento":         # corrige sem ensinar
                     pg.confirmar(boxes, i, certo)
+                    texto_conta.usar_comando(comando)
+                    continue
+                lida = boxes[i].char
+                # O ensinar propaga depois do Enter; o lote entra antes da propagação.
+                pg.ensinar(imagem, boxes, i, certo, leitor, projeto, indice, propagar=False)
+                ensinados.add(certo)
+                lote = _lote(dif, boxes, i, lida, certo, disponiveis, da_fila, imagem, leitor)
+                if lote is not None:
+                    comando, outros = lote
+                    for j in outros:
+                        pg.confirmar(boxes, j, certo)
+                pg.propagar_padroes(imagem, boxes, leitor)
+                texto_conta.usar_comando(comando)
+                continue
             elif acao[0] == "sobra":
                 pg.descartar(boxes, acao[1])
             elif acao[0] == "divisao":
@@ -359,6 +371,34 @@ def _proxima_acao(dif: Diferencas, boxes, leitor, disponiveis: dict):
             if da_fila is not None:
                 return da_fila, True
     return next((a for a in dif.acoes if a[0] in disponiveis), None), False
+
+
+def _lote(dif: Diferencas, boxes, i: int, lida: str, certo: str, disponiveis: dict,
+          da_fila: bool, imagem, leitor):
+    """O ensinar em lote no lugar do ensinar do glifo `i` (já ensinado, sem propagar; `lida`
+    é a leitura dele antes), se o passo o tem e o lote (`contexto.lote`) deixa certos mais
+    glifos do lote do que o Enter simples deixaria: a propagação pelos pendentes, numa cópia,
+    também pode acertá-los, de graça. Fora do lote, a propagação lê igual nos dois. O certo
+    de cada glifo é o do gabarito; sem substituição a fazer, a leitura dele já está certa.
+    Devolve (comando, os índices do lote) ou `None`."""
+    from dataclasses import replace
+
+    from abbychess import contexto
+    from abbychess import pagina as pg
+
+    tipo = "confusao_da_fila" if da_fila else "confusao"
+    if tipo not in disponiveis or not lida or lida == certo:
+        return None
+    outros = contexto.lote_da_lista(boxes, {lida}, certo, fora={i})
+    if not outros:
+        return None
+    certos = {a[1]: a[2] for a in dif.acoes if a[0] == "substituicao"}
+    verdade = {j: certos.get(j, boxes[j].char) for j in outros}
+    simples = [replace(b) for b in boxes]
+    pg.propagar_padroes(imagem, simples, leitor)
+    sem_lote = sum(1 for j in outros if simples[j].char == verdade[j])
+    com_lote = sum(1 for j in outros if verdade[j] == certo)
+    return (disponiveis[tipo], outros) if com_lote > sem_lote else None
 
 
 def _estado(resultado: dict, gabaritos) -> str:

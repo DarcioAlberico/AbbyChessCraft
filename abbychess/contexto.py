@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import re
 import threading
-from typing import FrozenSet, List, Optional, Sequence, Tuple
+from typing import Collection, FrozenSet, List, Optional, Sequence, Tuple
 
 #: Um lance em SAN, com as letras das peças em inglês e em português (a figurina vira a letra
 #: antes, `core.notacao.FIGURINAS`), o número do lance antes e a pontuação depois: a casa
@@ -167,3 +167,47 @@ def pendentes_da_pagina(pagina, limiares, *, com_os_revisados: bool = False) -> 
     dos pendentes, que relê pela confiança sem olhar a revisão; sem, ele sai, como na fila."""
     revisados = [False if com_os_revisados else b.revisado for b in pagina.boxes]
     return _pendentes(pagina, limiares, revisados)
+
+
+def _do_lote(pagina, lidas: Collection[str], novo: str, fora: Collection[int]) -> List[bool]:
+    from abbychess import texto as tx
+
+    contra = improvaveis(pagina)
+    candidatos = {b.gid for b in pagina.boxes
+                  if b.gid in contra and b.gid not in fora and b.entry.char
+                  and b.entry.char in lidas and not b.revisado
+                  and volta_pelo_contexto(b.entry.source)}
+    if not candidatos:
+        return [False] * len(pagina.boxes)
+    # A troca tem de deixar o glifo provável na palavra: o "0" de "C0L0CA" não vira "o".
+    char = {b.gid: b.entry.char for b in pagina.boxes}
+    char.update({v.gid: v.char for v in pagina.decisoes.virtuais})
+    provaveis = set()
+    for palavra in tx.palavras_dos_gids(pagina):
+        trocados = [g for g in palavra if g in candidatos]
+        if trocados:
+            julgados = improvaveis_na_palavra([novo if g in candidatos else char[g]
+                                               for g in palavra])
+            provaveis.update(g for g, improvavel in zip(palavra, julgados)
+                             if g in candidatos and not improvavel)
+    return [b.gid in provaveis for b in pagina.boxes]
+
+
+def lote(pagina, lidas: Collection[str], novo: str, fora: Collection[int] = ()) -> List[int]:
+    """A confusão do livro corrigida em lote (Ctrl+Enter no Glifo): os gids da página lidos
+    como um dos caracteres de `lidas` que a palavra desmente e que, trocados por `novo`,
+    deixam de ser improváveis; menos os de `fora` (os ensinados). Ficam de fora o que o
+    usuário confirmou (manual, revisado) e o nativo: o "0" de "c0l0ca" entra; o de "1.e4",
+    o de "10" e o de "C0L0CA" (com `novo` "o"), não."""
+    return [b.gid for b, sim in zip(pagina.boxes, _do_lote(pagina, lidas, novo, set(fora)))
+            if sim]
+
+
+def lote_da_lista(boxes, lidas: Collection[str], novo: str,
+                  fora: Collection[int] = ()) -> List[int]:
+    """`lote` para a lista de `BoxEntry` da página inteira: os índices, e `fora` também."""
+    from abbychess import texto as tx
+
+    pagina = tx.pagina_avulsa(list(boxes))
+    fora = {pagina.boxes[i].gid for i in fora}
+    return [i for i, sim in enumerate(_do_lote(pagina, lidas, novo, fora)) if sim]

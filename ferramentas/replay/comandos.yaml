@@ -16,9 +16,10 @@
 # só confere comandos que já existem. Versão 5 (passo D1): os dois comandos do Documento
 # conferidos (`espaco_no_documento`, `corrigir_no_documento`), com os custos de antes. Quando o passo os conferir, a versão do catálogo
 # sobe, e a linha de base é medida de novo no worktree da tag `passo-0` com o catálogo
-# novo (o `comparar` recusa catálogos diferentes).
+# novo (o `comparar` recusa catálogos diferentes). Versão 6 (pendências do L): o ensinar em
+# lote (`ensinar_em_lote_da_fila`, `ensinar_em_lote`), conferido pelo teste.
 
-versao: 5
+versao: 6
 
 # O que conta como um gesto (a regra do filtro de eventos do teste).
 convencao_de_gestos: >-
@@ -124,3 +125,19 @@ comandos:
     custo: 3
     gestos: [clique depois do caractere errado no Documento, Backspace, digitar o certo]
     efeito: corrige sem ensinar (o replay o usa depois que o caractere já foi ensinado)
+  # A confusão do livro corrigida em lote: o Ctrl+Enter no lugar do Enter ensina o glifo e
+  # corrige, sem ensinar, os outros da página com a mesma leitura que a palavra desmente
+  # (`contexto.lote`: o "0" de "c0l0ca", não o de "1.e4"). O replay o usa no lugar do ensinar
+  # quando o lote acerta mais glifos do que estraga, pelo gabarito.
+  - id: ensinar_em_lote_da_fila
+    passo: L
+    corrige: confusao_da_fila
+    custo: 2
+    gestos: [digitar o caractere (o glifo é o primeiro da fila, já mostrado), Ctrl+Enter]
+    efeito: ensina o padrão e corrige o lote da página num passo do desfazer; depois, a propagação
+  - id: ensinar_em_lote
+    passo: L
+    corrige: confusao
+    custo: 3
+    gestos: [clique no box (Imagem), digitar o caractere (o campo vem selecionado), Ctrl+Enter]
+    efeito: o mesmo, para um glifo fora da vez da fila

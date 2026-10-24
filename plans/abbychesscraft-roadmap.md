@@ -978,6 +978,10 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   1.183 da linha de base do passo 0 (92,4%; o alvo é ≤ 70%). Só os espaços ficaram mais
   baratos, e ensinar, dividir e as linhas não lidas custam igual.
 
+- A leitura confiante que a palavra desmente vai para a fila (`abbychess/contexto.py`): a fatia
+  cai para 1.066 gestos (90,1% da linha de base). O descritor `contraste_borrado` reprovou na
+  validação no Darcy Lima e no Yusupov (`docs/revisoes/ca-f1-investigacao.md`).
+
 Continuam: o CA-F.1 (decisão do usuário); os FEN e a estrutura das p. 21–27; o EPUB no
 Thorium e no celular. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).

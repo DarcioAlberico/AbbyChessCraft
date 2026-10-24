@@ -120,3 +120,37 @@ Duas correções do lado da medida mudam os números sem mudar a razão:
 - **A revisão da estrutura corrige as caixas das duas legendas.** Ela é do usuário.
 
 Nenhuma das propostas mexe no core do PyBoxEditor.
+
+## O que foi feito (2026-10-23, com o sim do usuário para a 1 e a validação da 2)
+
+**Proposta 1, implementada** (`abbychess/contexto.py`, `ca011ae` e revisão `29572c1`). A fatia
+no `29572c1` (`2026-10-23-fatia-xv-passo-L-223221.json`) dá **1.066 gestos**, razão **0,901**
+contra a linha de base de 1.183 (era 0,924). O CA-F.1 continua reprovado. A regra marca os
+glifos confiantes que a palavra desmente, mas só 9 deixam de ser ensinados à mão (205 → 196
+`ensinar_glifo`). Os outros entram na fila e na propagação, e lá o k-NN do livro esbarra na
+mesma trava de distância dos 122 pendentes. A estimativa era de −25 a −70 gestos, e o
+resultado foi −27.
+
+**Proposta 2, reprovada na validação** (`ferramentas/medir_descritor.py`,
+`2026-10-23-descritor.json`, no `ca011ae`). O limiar do `contraste_borrado` foi escolhido na
+fatia: 1.278, que com K = 3 dá os mesmos erros do descritor de hoje a 1.500. Depois foi aplicado
+sem mudança a 7 páginas do Darcy Lima e a 7 do Yusupov. Os rótulos são os glifos em que a
+leitura confiante do programa e a camada de OCR do PDF concordam.
+
+| Livro (glifos lidos) | K | Hoje: certos / errados | `contraste_borrado`: certos / errados |
+|---|---|---|---|
+| Xadrez Vitorioso (8.339), ajuste | 1 / 3 / 5 | 2.708 / 7, 4.711 / 4, 5.284 / 5 | 3.300 / 8, 5.221 / 4, 5.662 / 4 |
+| Darcy Lima (9.104) | 1 / 3 / 5 | 5.990 / 1, 7.192 / 0, 7.407 / 0 | 5.886 / 2, 6.843 / 0, 7.091 / 0 |
+| Yusupov (2.997) | 1 / 3 / 5 | 20 / 9, 223 / 11, 296 / 11 | 22 / 10, 220 / 11, 242 / 11 |
+
+No Darcy Lima, também escaneado e em português, ele lê de 1 a 4 pontos **menos**. No Yusupov,
+os dois empatam. O ganho da fatia era do Xadrez Vitorioso, não do descritor, e ele não foi
+adotado. No Yusupov, os dois descritores leem menos de 10% da página seguinte com o limiar de
+1.500. É um livro em que o k-NN do livro quase não propaga, e isso merece uma investigação
+própria.
+
+Para chegar a ≤ 0,70, faltam 238 gestos. O que ainda pode dar isso:
+- a correção em lote de uma confusão (proposta 3);
+- dividir a linha das legendas lado a lado (proposta 4);
+- um k-NN que propague mais sem errar mais. Isso pede outra abordagem, que não seja só trocar o
+  descritor: por exemplo, mais amostras por caractere ou uma métrica aprendida no próprio livro.

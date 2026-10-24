@@ -6,7 +6,7 @@ veio e a função dela, e linhas de palavras de gids. Nada do documento é grava
 precisa do texto monta de novo.
 
 - **Linhas e palavras** são as do core (`core.notacao.palavras_da_pagina`), que já são as do
-  texto de hoje.
+  texto de hoje, com os acertos de `layout` (o espaço depois do "f", os vãos largos).
 - **Decisões**: uma `quebra` parte a palavra antes do gid; uma `juncao` (a, b) junta a
   palavra que termina em `a` com a seguinte, que começa em `b`, na mesma linha; um glifo
   virtual entra depois de `depois_de` (na mesma palavra ou, com `palavra_nova`, numa nova),
@@ -189,14 +189,16 @@ LINHAS_GUARDADAS = 16
 def _o_que_as_palavras_leem(char: str) -> Optional[str]:
     """O caractere, se as palavras do core dependem dele; `None` se não. As linhas e as
     colunas são só da geometria; das palavras, o caractere só pesa quando some na
-    normalização (o box vazio ocupa espaço, mas não é símbolo) e nos números que o core
-    remonta (a palavra só de algarismos, a que começa por algarismo ou ponto)."""
+    normalização (o box vazio ocupa espaço, mas não é símbolo), nos números que o core
+    remonta (a palavra só de algarismos, a que começa por algarismo ou ponto) e no "f", que
+    tem limiar de espaço próprio (`layout.partir_depois_do_f`). Depois do "f", se a letra
+    seguinte é letra ou não, também decide; a chave a guarda como "letra"."""
     from core.notacao import FIGURINAS, normalizar_saida
 
     simbolo = FIGURINAS.get(char, normalizar_saida(char))
-    if not simbolo or any(c.isdigit() or c == "." for c in simbolo):
+    if not simbolo or simbolo == "f" or any(c.isdigit() or c == "." for c in simbolo):
         return simbolo
-    return None
+    return "letra" if simbolo[:1].isalpha() else None
 
 
 def _chave_das_linhas(lidos, entries) -> Optional[tuple]:

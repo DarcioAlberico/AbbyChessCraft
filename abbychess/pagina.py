@@ -641,7 +641,69 @@ def segmentar_tudo(imagem: Image.Image, leitor: Optional[LeitorDoLivro] = None
 
     arbitro = leitor.arbitro if leitor is not None else None
     todas = BoxService.generate_boxes_opencv(cinza, arbitro=arbitro, binaria=binaria)
+    todas = devolver_pingos(todas, binaria, escala)
     return SegmentacaoBruta(todas, tabuleiros, escala)
+
+
+#: O pingo perdido: até esta fração da escala de texto nos dois eixos, e com pelo menos
+#: esta outra de área (abaixo é poeira, não pingo).
+PINGO_PERDIDO_MAXIMO, PINGO_PERDIDO_AREA_MINIMA = 0.6, 0.02
+
+
+def devolver_pingos(boxes: List[BoxEntry], binaria: np.ndarray, escala: float
+                    ) -> List[BoxEntry]:
+    """Devolve ao glifo de baixo o pingo que a segmentação deixou sem box.
+
+    **O "i" em negrito perdia o pingo.** O merge do core cola o pingo na haste, mas o
+    par (pingo, vão de 1–2 px, haste) passa de 1,6 escalas de altura, e o
+    `dividir_linhas_coladas` o toma por duas linhas grudadas: corta no vão e joga fora
+    o pingo, mais curto que um caractere (`PECA_MINIMA_DE_LINHA`). A rede via só a
+    haste, que em negrito tem a serifa do "1", e lia "1" com 0,98 ("exerc1se",
+    "analys1s" na p. 15 do Aagaard, "A Matter of Endgame Technique").
+
+    O pingo devolvido é um componente de tinta **inteiro sem box** (a cauda de um "p"
+    cortada pelo mesmo passo é parte de um componente que tem box, e fica de fora),
+    pequeno nos dois eixos, com o centro sobre o box de baixo e a até
+    `FOLGA_DE_DIACRITICO` da altura dele: a régua com que o core cola o pingo.
+    """
+    if not boxes or binaria is None or escala <= 0:
+        return boxes
+    import cv2
+
+    # A tinta sem box (quase nada numa página): a binária com os boxes apagados. O componente
+    # dela que encosta em tinta coberta é pedaço de um glifo que tem box.
+    orfa = binaria.copy()
+    for b in boxes:
+        orfa[b.y1:b.y2, b.x1:b.x2] = 0
+    total, rotulos, medidas, _c = cv2.connectedComponentsWithStats(orfa, connectivity=8)
+    maximo, area_minima = PINGO_PERDIDO_MAXIMO * escala, PINGO_PERDIDO_AREA_MINIMA * escala ** 2
+    saida = list(boxes)
+    crescidos = set()
+    larguras, alturas, areas = (medidas[:, k] for k in (cv2.CC_STAT_WIDTH, cv2.CC_STAT_HEIGHT,
+                                                         cv2.CC_STAT_AREA))
+    pequenos = (larguras <= maximo) & (alturas <= maximo) & (areas >= area_minima)
+    for rotulo in np.nonzero(pequenos)[0]:
+        if rotulo == 0:                                  # o fundo
+            continue
+        x, y, w, h = (int(v) for v in medidas[rotulo][:4])
+        y0, x0 = max(0, y - 1), max(0, x - 1)
+        janela = np.s_[y0:y + h + 1, x0:x + w + 1]
+        vizinhanca = cv2.dilate((rotulos[janela] == rotulo).astype(np.uint8),
+                                np.ones((3, 3), np.uint8)) > 0
+        if (vizinhanca & (binaria[janela] > 0) & (orfa[janela] == 0)).any():
+            continue
+        centro = x + w / 2
+        candidatos = [k for k, b in enumerate(saida)
+                      if k not in crescidos and not (b.angulo or 0) % 180
+                      and b.x1 <= centro <= b.x2 and w <= b.width + 1
+                      and 0 <= b.y1 - (y + h) <= BoxService.FOLGA_DE_DIACRITICO * b.height]
+        if not candidatos:
+            continue
+        k = min(candidatos, key=lambda k: saida[k].y1 - (y + h))
+        b = saida[k]
+        saida[k] = replace(b, x1=min(b.x1, x), y1=y, x2=max(b.x2, x + w))
+        crescidos.add(k)
+    return saida
 
 
 def segmentar(imagem: Image.Image, leitor: Optional[LeitorDoLivro] = None) -> List[BoxEntry]:

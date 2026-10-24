@@ -36,6 +36,8 @@ janela = test_janela.janela
 CUSTO = {c["id"]: c["custo"] for c in rf.carregar_catalogo()["comandos"] if str(c["passo"]) == "0"}
 CUSTO_D1 = {c["id"]: c["custo"] for c in rf.carregar_catalogo()["comandos"]
             if str(c["passo"]) == "D1"}
+CUSTO_L = {c["id"]: c["custo"] for c in rf.carregar_catalogo()["comandos"]
+           if str(c["passo"]) == "L"}
 
 
 class _Contador(QObject):
@@ -342,4 +344,74 @@ def test_corrigir_no_documento(app, janela, contador):
     caixa = j.pagina.box(primeiro)
     assert (caixa.char, caixa.source) == ("z", FONTE_MANUAL)
     assert "z" not in j.leitor.padroes_por_caractere()    # corrigir não ensina
+
+
+# ----------------------------------------------------------------------
+# O ensinar em lote (pendências do passo L)
+# ----------------------------------------------------------------------
+
+def test_os_comandos_do_lote_estao_no_catalogo_sem_estimativa():
+    comandos = [c for c in rf.carregar_catalogo()["comandos"] if str(c["passo"]) == "L"]
+    assert {c["id"] for c in comandos} == {"ensinar_em_lote_da_fila", "ensinar_em_lote"}
+    assert not any("conferir_no_passo" in c for c in comandos)
+
+
+def _com_uma_confusao(app, janela):
+    """A página com o 'b' de toda palavra lido como '6' ("a6c"), o primeiro na janela.
+    Devolve o caractere, os índices dos '6' que a palavra desmente e o do "ca6", que é um
+    lance (o peão de c toma em a6) e fica fora do lote."""
+    from tests.janela_util import trocar_entries
+
+    _pronta(app, janela)
+    impresso = iter("abcabcabc" "cabbca")           # "abc abc abc" / "cab bca", lidos assim
+    assert len(boxes(janela)) == 15
+
+    def confundir(e):
+        e.char, e.source, e.confidence = next(impresso), "neural", 0.99
+        if e.char == "b":
+            e.char = "6"
+    trocar_entries(janela, janela.pagina.indice, confundir)
+    lida = "b"
+    _esperar(app, janela)
+    seis = [i for i, b in enumerate(boxes(janela)) if b.char == "6"]
+    assert seis == [1, 4, 7, 11, 12] and fila(janela) == [1, 4, 7, 12]
+    mostrar(janela, seis[0])                        # o que a janela mostra (sem gesto)
+    app.processEvents()
+    return lida, [1, 4, 7, 12], 11
+
+
+def _so_um_padrao_e_o_resto_corrigido(janela, lida, seis, lance):
+    assert all((boxes(janela)[i].char, boxes(janela)[i].source) == (lida, FONTE_MANUAL)
+               for i in seis)
+    assert boxes(janela)[lance].char == "6"
+    assert len(janela.leitor.padroes_por_caractere()[lida]) == 1    # o lote não ensina
+
+
+def test_ensinar_em_lote_da_fila(app, janela, contador):
+    """O glifo já mostrado: digitar e Ctrl+Enter; os outros '6' da página viram o certo."""
+    lida, seis, lance = _com_uma_confusao(app, janela)
+    assert atual(janela) == seis[0] and janela.treino.campo.text() == "6"
+    contador.gestos = 0
+    QTest.keyClicks(janela.treino.campo, lida)
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+    _esperar(app, janela)
+    assert contador.gestos == CUSTO_L["ensinar_em_lote_da_fila"]
+    _so_um_padrao_e_o_resto_corrigido(janela, lida, seis, lance)
+    janela.pagina.desfazer()                         # um Ctrl+Z desfaz o lote inteiro
+    _esperar(app, janela)
+    assert all(boxes(janela)[i].char == "6" for i in seis)
+
+
+def test_ensinar_em_lote(app, janela, contador):
+    """Um glifo fora da vez: o clique nele, digitar e Ctrl+Enter."""
+    lida, seis, lance = _com_uma_confusao(app, janela)
+    outro = seis[2]
+    contador.gestos = 0
+    QTest.mouseClick(janela.visor.viewport(), Qt.MouseButton.LeftButton,
+                     Qt.KeyboardModifier.NoModifier, _no_visor(janela, *_centro(boxes(janela)[outro])))
+    QTest.keyClicks(janela.treino.campo, lida)
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+    _esperar(app, janela)
+    assert contador.gestos == CUSTO_L["ensinar_em_lote"]
+    _so_um_padrao_e_o_resto_corrigido(janela, lida, seis, lance)
 

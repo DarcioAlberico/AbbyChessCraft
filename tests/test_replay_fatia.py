@@ -311,3 +311,63 @@ def test_glifo_fora_da_cabeca_da_fila_custa_o_clique():
     assert rf._proxima_acao(dif, boxes, leitor, disponiveis) == (("substituicao", 1, "b"), True)
     dif = rf.Diferencas(acoes=[("substituicao", 0, "a")])
     assert rf._proxima_acao(dif, boxes, leitor, disponiveis) == (("substituicao", 0, "a"), False)
+
+
+def _palavras(texto: str):
+    """Uma linha de boxes de 10×20 px, 1 px entre letras e 12 px entre palavras."""
+    from core.box_model import BoxEntry
+
+    boxes, x = [], 40
+    for c in texto:
+        if c == " ":
+            x += 12
+            continue
+        boxes.append(BoxEntry(c, x, 100, x + 10, 120, 0.99, "neural"))
+        x += 11
+    return boxes
+
+
+class _LeitorFixo:
+    """O k-NN do livro de mentira: lê todo pendente como `char` (ou não lê, com None)."""
+
+    def __init__(self, char):
+        from abbychess.projeto import Limiares
+
+        self.char, self.limiares = char, Limiares()
+
+    def ler_pelo_livro(self, recorte, referencia, efeito):
+        return SimpleNamespace(char=self.char or "", fonte="livro", confianca=0.5, amostra=None)
+
+
+def _lote(trocas, passo="L", da_fila=True, leitor=None):
+    """O `_lote` do primeiro 0 de "c0l0ca b0l0s 1.e4", já ensinado como "o"."""
+    from PIL import Image
+
+    boxes = _palavras("c0l0ca b0l0s 1.e4")          # o 0 é o "o" em toda palavra
+    boxes[1].char, boxes[1].source = "o", "manual"
+    return rf._lote(rf.Diferencas(acoes=trocas), boxes, 1, "0", "o",
+                    rf.comandos_do_passo(CATALOGO, passo, PASSOS), da_fila,
+                    Image.new("L", (400, 200), 255), leitor or _LeitorFixo(None))
+
+
+def test_o_lote_substitui_o_ensinar_quando_deixa_mais_glifos_certos():
+    trocas = [("substituicao", i, "o") for i in (1, 3, 7, 9)]
+    comando, outros = _lote(trocas)
+    assert comando["id"] == "ensinar_em_lote_da_fila" and outros == [3, 7, 9]
+    assert _lote(trocas, da_fila=False)[0]["id"] == "ensinar_em_lote"
+    # No passo 0 não há lote; e um lote que acerta 1 e estraga 2 não é usado.
+    assert _lote(trocas, passo="0") is None
+    assert _lote(trocas[:2]) is None
+
+
+def test_o_lote_nao_e_usado_se_a_propagacao_ja_acerta_o_mesmo():
+    """O Enter simples propaga: se o padrão ensinado lê os outros 0 como "o", o lote não
+    acerta nada a mais, e o replay não o cobra no lugar do ensinar."""
+    trocas = [("substituicao", i, "o") for i in (1, 3, 7, 9)]
+    assert _lote(trocas, leitor=_LeitorFixo("o")) is None
+
+
+def test_o_lote_custa_o_mesmo_que_o_ensinar_que_ele_substitui():
+    custo = {c["id"]: c["custo"] for c in CATALOGO["comandos"] if str(c["passo"]) in ("0", "L")}
+    assert custo["ensinar_em_lote_da_fila"] == custo["ensinar_da_fila"]
+    assert custo["ensinar_em_lote"] == custo["ensinar_glifo"]

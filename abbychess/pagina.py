@@ -29,7 +29,8 @@ from abbychess import gravacao as gv
 from abbychess import procedencia
 from abbychess import sequencia as sq
 
-from abbychess.leitor import FONTE_AGUARDANDO, FONTE_MANUAL, LeitorDoLivro, nome_de_origem
+from abbychess.leitor import (FONTE_AGUARDANDO, FONTE_MANUAL, LeitorDoLivro, nome_de_origem,
+                              precisa_revisao)
 from abbychess.projeto import ARQUIVO_DE_INCLINACOES, EXTENSOES_DE_IMAGEM, ProjetoDeLivro
 
 log = logging.getLogger(__name__)
@@ -959,9 +960,13 @@ def propagar_padroes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorD
         efeito = None if efeitos is None else efeitos[i]
         leitura = leitor.ler_pelo_livro(vertical.recorte_de_pe(pagina, box), referencia, efeito)
         if leitura.char:
+            # O improvável que o livro lê igual continua pendente (a palavra ainda o
+            # desmente): resolvido é o que muda de caractere ou saía pela confiança.
+            if leitura.char != box.char or precisa_revisao(box.char, box.source,
+                                                           box.confidence, leitor.limiares):
+                resolvidos += 1
             box.char, box.source, box.confidence = leitura.char, leitura.fonte, leitura.confianca
             procedencia.registrar(box, leitura.amostra)
-            resolvidos += 1
     return resolvidos
 
 

@@ -24,12 +24,22 @@ nativo do PDF não voltam.
 from __future__ import annotations
 
 import re
-from typing import List, Optional, Sequence, Set
+import threading
+from typing import FrozenSet, List, Optional, Sequence, Tuple
 
-#: Um lance em SAN, com as letras das peças em inglês e em português, o número do lance
-#: antes e a pontuação depois. Basta reconhecer a palavra, não validar o lance.
+#: Um lance em SAN, com as letras das peças em inglês e em português (a figurina vira a letra
+#: antes, `core.notacao.FIGURINAS`), o número do lance antes e a pontuação depois: a casa
+#: ("Cxh2", "a8=D", "exd6e.p."), a troca entre peças ("NxN", "DxD+") ou o roque. Basta
+#: reconhecer a palavra, não validar o lance.
 _LANCE = re.compile(r"^[(\[]?(\d+\.+)?([KQRBNDTCP]?[a-h]?[1-8]?[x:]?[a-h][1-8](=?[KQRBNDTC])?"
-                    r"|[O0]-[O0](-[O0])?)[+#‡†]*[!?]*[)\],.;:]*$")
+                    r"(e\.p\.)?|[KQRBNDTCP][x:][KQRBNDTCP]|[O0]-[O0](-[O0])?)"
+                    r"[+#‡†]*[!?]*[)\],.;:]*$")
+
+
+def _e_lance(chars: Sequence[str]) -> bool:
+    from core.notacao import FIGURINAS
+
+    return bool(_LANCE.match("".join(FIGURINAS.get(c, c) for c in chars)))
 
 
 def _tipo(c: str) -> str:
@@ -54,7 +64,7 @@ def _letras_seguidas(tipos: Sequence[str], inicio: int, passo: int) -> int:
 def improvaveis_na_palavra(chars: Sequence[str]) -> List[bool]:
     """Para cada glifo da palavra (o caractere de cada box, em ordem), se ele é improvável."""
     saida = [False] * len(chars)
-    if _LANCE.match("".join(chars)):
+    if _e_lance(chars):
         return saida
     tipos = [_tipo(c) for c in chars]
     k = 0
@@ -80,18 +90,38 @@ def improvaveis_na_palavra(chars: Sequence[str]) -> List[bool]:
     return saida
 
 
-def improvaveis(pagina) -> Set[int]:
+#: A última página julgada: (chave, gids improváveis). A fila da janela pergunta várias vezes
+#: por ação (~2–3 ms cada numa página do livro); a chave custa uma fração disso.
+_ULTIMA: Tuple[Optional[tuple], FrozenSet[int]] = (None, frozenset())
+_TRAVA = threading.Lock()
+
+
+def _chave(pagina) -> tuple:
+    """O que a regra lê: o caractere e a caixa de cada glifo, e as decisões de palavra."""
+    return (tuple((b.gid, b.entry.char, b.entry.x1, b.entry.y1, b.entry.x2, b.entry.y2,
+                   getattr(b.entry, "angulo", 0)) for b in pagina.boxes), pagina.decisoes)
+
+
+def improvaveis(pagina) -> FrozenSet[int]:
     """Os gids dos glifos improváveis da página (`modelo.Pagina`), pelas palavras do
     Documento (`texto.palavras_dos_gids`)."""
+    global _ULTIMA
     from abbychess import texto as tx
 
+    chave = _chave(pagina)
+    with _TRAVA:
+        if _ULTIMA[0] == chave:
+            return _ULTIMA[1]
     char = {b.gid: b.entry.char for b in pagina.boxes}
-    saida: Set[int] = set()
+    char.update({v.gid: v.char for v in pagina.decisoes.virtuais})
+    saida = set()
     for palavra in tx.palavras_dos_gids(pagina):
         for gid, improvavel in zip(palavra, improvaveis_na_palavra([char[g] for g in palavra])):
             if improvavel:
                 saida.add(gid)
-    return saida
+    with _TRAVA:
+        _ULTIMA = (chave, frozenset(saida))
+        return _ULTIMA[1]
 
 
 def volta_pelo_contexto(fonte: str) -> bool:

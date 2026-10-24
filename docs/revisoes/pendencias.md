@@ -316,9 +316,10 @@ Resolvido com o usuário:
 Medido com o texto verificado (seção acima):
 - **CA-9.1** aprova, provisório até a estrutura ser revisada.
 - **CA-F.1** reprova. Estava em 92,4% da linha de base; com a fila do contexto
-  (`abbychess/contexto.py`, `29572c1`) foi a 90,1% (1.066 gestos), e o alvo é ≤ 70%. O
-  descritor `contraste_borrado` reprovou na validação no Darcy Lima e no Yusupov e não foi
-  adotado. O detalhe e o que falta estão em `docs/revisoes/ca-f1-investigacao.md`.
+  (`abbychess/contexto.py`, `29572c1`) foi a 90,1% (1.066 gestos), e com o ensinar em lote
+  (Ctrl+Enter, `02fc26a`, catálogo 6) a 89,4% (1.057); o alvo é ≤ 70%. O descritor
+  `contraste_borrado` reprovou na validação no Darcy Lima e no Yusupov e não foi adotado. O
+  detalhe e o que falta estão em `docs/revisoes/ca-f1-investigacao.md`.
 
 Precisa do usuário:
 - **Os FEN e a estrutura das p. 21–27** (os diagramas e as legendas revisados), para as

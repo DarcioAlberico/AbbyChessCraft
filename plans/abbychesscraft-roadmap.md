@@ -982,6 +982,11 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   cai para 1.066 gestos (90,1% da linha de base). O descritor `contraste_borrado` reprovou na
   validação no Darcy Lima e no Yusupov (`docs/revisoes/ca-f1-investigacao.md`).
 
+- O ensinar em lote (Ctrl+Enter no Glifo, catálogo 6): ensina o glifo e corrige, no mesmo passo
+  do desfazer, os outros da página com a mesma leitura que a palavra desmente. A fatia cai para
+  1.057 gestos (89,4%). Rende pouco porque a propagação já resolve a maior parte dessas
+  confusões desde a fila do contexto; o que sobra para ensinar é sobretudo glifo sem leitura.
+
 Continuam: o CA-F.1 (decisão do usuário); os FEN e a estrutura das p. 21–27; o EPUB no
 Thorium e no celular. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).

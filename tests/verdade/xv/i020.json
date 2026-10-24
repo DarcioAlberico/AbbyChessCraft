@@ -9,8 +9,8 @@
  "pymupdf": "1.26.6",
  "inclinacao": 0.0,
  "papel": 255,
- "verdade_versao": 1,
- "rotulado_por": "",
+ "verdade_versao": 2,
+ "rotulado_por": "DarcioAlberico",
  "revisado_por": "",
  "blocos": [
   {
@@ -37,7 +37,7 @@
    ],
    "ordem": 1,
    "coluna": 0,
-   "texto_impresso": "Você reparou que a Dama branca não está no Diagrama 3? p0r quê? Porque"
+   "texto_impresso": "Você reparou que a Dama branca não está no Diagrama 3? por quê? Porque"
   },
   {
    "id": "b02",
@@ -76,7 +76,7 @@
    ],
    "ordem": 4,
    "coluna": 0,
-   "texto_impresso": "vencer umjogad0r muit0 mais f0rte. Com0 é feit0 eSse jog0? Depois de se c0l0ca-"
+   "texto_impresso": "vencer um jogador muito mais forte. Como é feito esse jogo? Depois de se coloca-"
   },
   {
    "id": "b05",
@@ -89,7 +89,7 @@
    ],
    "ordem": 5,
    "coluna": 0,
-   "texto_impresso": "rem todas as peças normalmente no tabuleiro, tira-se a peça ou peão que o joga—"
+   "texto_impresso": "rem todas as peças normalmente no tabuleiro, tira-se a peça ou peão que o joga-"
   },
   {
    "id": "b06",
@@ -115,7 +115,7 @@
    ],
    "ordem": 7,
    "coluna": 0,
-   "texto_impresso": "analisar agora, o jogador abriu mão da Dama, sendo a partida chamada de '?van-"
+   "texto_impresso": "analisar agora, o jogador abriu mão da Dama, sendo a partida chamada de \"van-"
   },
   {
    "id": "b08",
@@ -128,7 +128,7 @@
    ],
    "ordem": 8,
    "coluna": 0,
-   "texto_impresso": "tagem da Dama,,."
+   "texto_impresso": "tagem da Dama\"."
   },
   {
    "id": "b09",
@@ -141,7 +141,7 @@
    ],
    "ordem": 9,
    "coluna": 0,
-   "texto_impresso": "?odemos perguntar então: como as brancas esperam ganhar sem a Dama?"
+   "texto_impresso": "Podemos perguntar então: como as brancas esperam ganhar sem a Dama?"
   },
   {
    "id": "b10",
@@ -154,7 +154,7 @@
    ],
    "ordem": 10,
    "coluna": 0,
-   "texto_impresso": "Contra um adversário igualmente hábil, na verdade seria m- uito difícil. Mas nesse"
+   "texto_impresso": "Contra um adversário igualmente hábil, na verdade seria muito difícil. Mas nesse"
   },
   {
    "id": "b11",
@@ -167,7 +167,7 @@
    ],
    "ordem": 11,
    "coluna": 0,
-   "texto_impresso": "ca?o as brancas são de Wil1iam Norwood Potte? um enxadrista experiente, e ele"
+   "texto_impresso": "caso as brancas são de William Norwood Potter, um enxadrista experiente, e ele"
   },
   {
    "id": "b12",
@@ -180,7 +180,7 @@
    ],
    "ordem": 12,
    "coluna": 0,
-   "texto_impresso": "sabe que o adVersário, um iniciante, vai cometer erros. A que?tão é a seguinte.."
+   "texto_impresso": "sabe que o adversário, um iniciante, vai cometer erros. A questão é a seguinte:"
   },
   {
    "id": "b13",
@@ -193,7 +193,7 @@
    ],
    "ordem": 13,
    "coluna": 0,
-   "texto_impresso": "será que esses erroS vão ser tão sérioS a ponto de permitir que potte? sem a"
+   "texto_impresso": "será que esses erros vão ser tão sério a ponto de permitir que Potter, sem a"
   },
   {
    "id": "b14",
@@ -245,7 +245,7 @@
    ],
    "ordem": 17,
    "coluna": 0,
-   "texto_impresso": "1.e4 e5 2.Cf3 CC6 3.B?4 Cf6 4.CC3 Ca5 5.Cxe5 Cxe4 6.d3 CC5 7.Bx? + Re7"
+   "texto_impresso": "1.e4 e5 2.Cf3 Cc6 3.Bc4 Cf6 4.Cc3 Ca5 5.Cxe5 Cxe4 6.d3 Cc5 7.Bxf7+ Re7"
   },
   {
    "id": "b18",
@@ -258,7 +258,7 @@
    ],
    "ordem": 18,
    "coluna": 0,
-   "texto_impresso": "8.Bg5+ Rd6 9.?b5+ Rxe5 1 ?.f4+ Rf5 11.Cd4+ ?g4 12.h3+ R93"
+   "texto_impresso": "8.Bg5+ Rd6 9.Cb5+ Rxe5 10.f4+ Rf5 11.Cd4+ Rg4 12.h3+ Rg3"
   },
   {
    "id": "b19",
@@ -271,7 +271,7 @@
    ],
    "ordem": 19,
    "coluna": 0,
-   "texto_impresso": "13.Ce2+ Rxg2 ?4. Bd5+ Ce4 15. Bxe4 xeque-mate"
+   "texto_impresso": "13.Ce2+ Rxg2 14. Bd5+ Ce4 15. Bxe4 xeque-mate"
   },
   {
    "id": "d0",
@@ -297,7 +297,7 @@
    ],
    "ordem": 21,
    "coluna": 0,
-   "texto_impresso": "?iagrama 3.",
+   "texto_impresso": "Diagrama 3.",
    "diagrama": "d0"
   },
   {
@@ -311,7 +311,7 @@
    ],
    "ordem": 22,
    "coluna": 0,
-   "texto_impresso": "Potter-Amador .",
+   "texto_impresso": "Potter-Amador.",
    "diagrama": "d0"
   },
   {
@@ -325,7 +325,7 @@
    ],
    "ordem": 23,
    "coluna": 0,
-   "texto_impresso": "Londres/ 1870",
+   "texto_impresso": "Londres, 1870",
    "diagrama": "d0"
   },
   {
@@ -353,7 +353,7 @@
    ],
    "ordem": 25,
    "coluna": 0,
-   "texto_impresso": "Não se precisa ser um mestre para concluir ?ue as ?retas ?erderam de for—"
+   "texto_impresso": "Não se precisa ser um mestre para concluir que as pretas perderam de for-"
   },
   {
    "id": "b25",
@@ -366,7 +366,7 @@
    ],
    "ordem": 26,
    "coluna": 0,
-   "texto_impresso": "ma humilhante. Por quê? Você conseguiu descobr1r os pr1ncipa1S erro?? Aém de"
+   "texto_impresso": "ma humilhante. Por quê? Você conseguiu descobrir os principais erros? Além de"
   },
   {
    "id": "b26",
@@ -379,7 +379,7 @@
    ],
    "ordem": 27,
    "coluna": 0,
-   "texto_impresso": "não ?er capaz de reconhecer ameaças básicas, o iniciante não deSenvolveu as"
+   "texto_impresso": "não ser capaz de reconhecer ameaças básicas, o iniciante não desenvolveu as"
   },
   {
    "id": "b27",
@@ -392,7 +392,7 @@
    ],
    "ordem": 28,
    "coluna": 0,
-   "texto_impresso": "peças, sendo e??e o motivo báSico de seu fim. Voltemos ao jogo, desta vez, com"
+   "texto_impresso": "peças, sendo esse o motivo básico de seu fim. Voltemos ao jogo, desta vez, com"
   },
   {
    "id": "b28",
@@ -405,7 +405,7 @@
    ],
    "ordem": 29,
    "coluna": 0,
-   "texto_impresso": "comentários para exp1icar os erros."
+   "texto_impresso": "comentários para explicar os erros."
   },
   {
    "id": "b29",
@@ -444,9 +444,9 @@
     0.94435,
     0.11314
    ],
-   "texto": "Você reparou que a Dama branca não está no Diagrama 3? p0r quê? Porque",
+   "texto": "Você reparou que a Dama branca não está no Diagrama 3? por quê? Porque",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l02",
@@ -459,7 +459,7 @@
    ],
    "texto": "a partida que vamos analisar agora foi jogada com vantagem predeterminada.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l03",
@@ -472,7 +472,7 @@
    ],
    "texto": "Hoje, é raro esse tipo de jogo, destinado a dar a um jogador fraco a chance de",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l04",
@@ -483,9 +483,9 @@
     0.94395,
     0.16529
    ],
-   "texto": "vencer umjogad0r muit0 mais f0rte. Com0 é feit0 eSse jog0? Depois de se c0l0ca-",
+   "texto": "vencer um jogador muito mais forte. Como é feito esse jogo? Depois de se coloca-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l05",
@@ -496,9 +496,9 @@
     0.94435,
     0.18239
    ],
-   "texto": "rem todas as peças normalmente no tabuleiro, tira-se a peça ou peão que o joga—",
+   "texto": "rem todas as peças normalmente no tabuleiro, tira-se a peça ou peão que o joga-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l06",
@@ -511,7 +511,7 @@
    ],
    "texto": "dor mais forte (aquele que dá a vantagem ao outro) oferece. No caso que vamos",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l07",
@@ -522,9 +522,9 @@
     0.94395,
     0.21687
    ],
-   "texto": "analisar agora, o jogador abriu mão da Dama, sendo a partida chamada de '?van-",
+   "texto": "analisar agora, o jogador abriu mão da Dama, sendo a partida chamada de \"van-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l08",
@@ -535,9 +535,9 @@
     0.35968,
     0.23368
    ],
-   "texto": "tagem da Dama,,.",
+   "texto": "tagem da Dama\".",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l09",
@@ -548,9 +548,9 @@
     0.94315,
     0.25135
    ],
-   "texto": "?odemos perguntar então: como as brancas esperam ganhar sem a Dama?",
+   "texto": "Podemos perguntar então: como as brancas esperam ganhar sem a Dama?",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l10",
@@ -561,9 +561,9 @@
     0.94435,
     0.26874
    ],
-   "texto": "Contra um adversário igualmente hábil, na verdade seria m- uito difícil. Mas nesse",
+   "texto": "Contra um adversário igualmente hábil, na verdade seria muito difícil. Mas nesse",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l11",
@@ -574,9 +574,9 @@
     0.94395,
     0.28641
    ],
-   "texto": "ca?o as brancas são de Wil1iam Norwood Potte? um enxadrista experiente, e ele",
+   "texto": "caso as brancas são de William Norwood Potter, um enxadrista experiente, e ele",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l12",
@@ -587,9 +587,9 @@
     0.94274,
     0.30379
    ],
-   "texto": "sabe que o adVersário, um iniciante, vai cometer erros. A que?tão é a seguinte..",
+   "texto": "sabe que o adversário, um iniciante, vai cometer erros. A questão é a seguinte:",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l13",
@@ -600,9 +600,9 @@
     0.94435,
     0.32089
    ],
-   "texto": "será que esses erroS vão ser tão sérioS a ponto de permitir que potte? sem a",
+   "texto": "será que esses erros vão ser tão sério a ponto de permitir que Potter, sem a",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l14",
@@ -615,7 +615,7 @@
    ],
    "texto": "Dama, consiga a vitória? Inicialmente apresento os lances do jogo sem comentá-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l15",
@@ -628,7 +628,7 @@
    ],
    "texto": "rios. Monte a partida no seu próprio tabuleiro e veja se consegue descobrir quais",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l16",
@@ -641,7 +641,7 @@
    ],
    "texto": "foram os erros.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l17",
@@ -652,9 +652,9 @@
     0.8496,
     0.4155
    ],
-   "texto": "1.e4 e5 2.Cf3 CC6 3.B?4 Cf6 4.CC3 Ca5 5.Cxe5 Cxe4 6.d3 CC5 7.Bx? + Re7",
+   "texto": "1.e4 e5 2.Cf3 Cc6 3.Bc4 Cf6 4.Cc3 Ca5 5.Cxe5 Cxe4 6.d3 Cc5 7.Bxf7+ Re7",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l18",
@@ -665,9 +665,9 @@
     0.76331,
     0.44258
    ],
-   "texto": "8.Bg5+ Rd6 9.?b5+ Rxe5 1 ?.f4+ Rf5 11.Cd4+ ?g4 12.h3+ R93",
+   "texto": "8.Bg5+ Rd6 9.Cb5+ Rxe5 10.f4+ Rf5 11.Cd4+ Rg4 12.h3+ Rg3",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l19",
@@ -678,9 +678,9 @@
     0.62218,
     0.46537
    ],
-   "texto": "13.Ce2+ Rxg2 ?4. Bd5+ Ce4 15. Bxe4 xeque-mate",
+   "texto": "13.Ce2+ Rxg2 14. Bd5+ Ce4 15. Bxe4 xeque-mate",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l20",
@@ -691,9 +691,9 @@
     0.575,
     0.7629
    ],
-   "texto": "?iagrama 3.",
+   "texto": "Diagrama 3.",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l21",
@@ -704,9 +704,9 @@
     0.84839,
     0.77657
    ],
-   "texto": "Potter-Amador .",
+   "texto": "Potter-Amador.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l22",
@@ -717,9 +717,9 @@
     0.58427,
     0.79339
    ],
-   "texto": "Londres/ 1870",
+   "texto": "Londres, 1870",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l23",
@@ -732,7 +732,7 @@
    ],
    "texto": "Vantagem da Dama",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l24",
@@ -743,9 +743,9 @@
     0.94395,
     0.88287
    ],
-   "texto": "Não se precisa ser um mestre para concluir ?ue as ?retas ?erderam de for—",
+   "texto": "Não se precisa ser um mestre para concluir que as pretas perderam de for-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l25",
@@ -756,9 +756,9 @@
     0.94435,
     0.89541
    ],
-   "texto": "ma humilhante. Por quê? Você conseguiu descobr1r os pr1ncipa1S erro?? Aém de",
+   "texto": "ma humilhante. Por quê? Você conseguiu descobrir os principais erros? Além de",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l26",
@@ -769,9 +769,9 @@
     0.94395,
     0.91251
    ],
-   "texto": "não ?er capaz de reconhecer ameaças básicas, o iniciante não deSenvolveu as",
+   "texto": "não ser capaz de reconhecer ameaças básicas, o iniciante não desenvolveu as",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l27",
@@ -782,9 +782,9 @@
     0.94355,
     0.92989
    ],
-   "texto": "peças, sendo e??e o motivo báSico de seu fim. Voltemos ao jogo, desta vez, com",
+   "texto": "peças, sendo esse o motivo básico de seu fim. Voltemos ao jogo, desta vez, com",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l28",
@@ -795,9 +795,9 @@
     0.52581,
     0.94728
    ],
-   "texto": "comentários para exp1icar os erros.",
+   "texto": "comentários para explicar os erros.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   }
  ],
  "estrutura_por": "Claude (estrutura pelas faixas)"

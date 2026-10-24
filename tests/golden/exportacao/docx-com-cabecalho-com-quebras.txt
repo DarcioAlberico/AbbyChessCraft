@@ -1,0 +1,5 @@
+Normal: XADREZ VITORIOSO 23
+Heading1: Capitulo um
+Normal: O texto vai em **negrito** e o hi-⏎Fen termina aqui.⏎Uma duvida
+Normal: [figura: Diagrama: FEN r3k2r/pp3ppp/2n5/3q4/3P4/2N2N2/PP3PPP/R3K2R w - - 0 1 — brancas a jogar (informado na revisão)]
+Normal: Depois do diagrama.

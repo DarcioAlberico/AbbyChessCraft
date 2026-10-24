@@ -9,8 +9,8 @@
  "pymupdf": "1.26.6",
  "inclinacao": 0.55,
  "papel": 255,
- "verdade_versao": 1,
- "rotulado_por": "",
+ "verdade_versao": 2,
+ "rotulado_por": "DarcioAlberico",
  "revisado_por": "",
  "blocos": [
   {
@@ -117,7 +117,7 @@
    ],
    "ordem": 7,
    "coluna": 0,
-   "texto_impresso": "Nuremberg 189o",
+   "texto_impresso": "Nuremberg 1890",
    "diagrama": "d0"
   },
   {
@@ -131,7 +131,7 @@
    ],
    "ordem": 8,
    "coluna": 0,
-   "texto_impresso": "TROCAR PE?AS PARA TER ?M Fl?AL vIT?RlOSO"
+   "texto_impresso": "TROCAR PEÇAS PARA TER UM FINAL VITORIOSO"
   },
   {
    "id": "b08",
@@ -144,7 +144,7 @@
    ],
    "ordem": 9,
    "coluna": 0,
-   "texto_impresso": "A partir dos exemplos anteriores, podemos conc1uir que, quando temos menos"
+   "texto_impresso": "A partir dos exemplos anteriores, podemos concluir que, quando temos menos"
   },
   {
    "id": "b09",
@@ -170,7 +170,7 @@
    ],
    "ordem": 11,
    "coluna": 0,
-   "texto_impresso": "obrigados a tentar um golpe de s0rte — fazer um lance que dependa maiS do erro"
+   "texto_impresso": "obrigados a tentar um golpe de sorte — fazer um lance que dependa mais do erro"
   },
   {
    "id": "b11",
@@ -196,7 +196,7 @@
    ],
    "ordem": 13,
    "coluna": 0,
-   "texto_impresso": "ação é conhecida como tentar um g0zpe b?rat?. ?or outro 1ado, quando a Superi,"
+   "texto_impresso": "ação é conhecida como tentar um golpe barato. Por outro lado, quando a superi-"
   },
   {
    "id": "b13",
@@ -222,7 +222,7 @@
    ],
    "ordem": 15,
    "coluna": 0,
-   "texto_impresso": "posição. Trocar peças num momento de vantagem materia1 é um ótimo modo de"
+   "texto_impresso": "posição. Trocar peças num momento de vantagem material é um ótimo modo de"
   },
   {
    "id": "b15",
@@ -287,7 +287,7 @@
    ],
    "ordem": 20,
    "coluna": 0,
-   "texto_impresso": "ao fina1 com a vantagem de um peão ou mais. Nesse caso, o pobre adversário,"
+   "texto_impresso": "ao final com a vantagem de um peão ou mais. Nesse caso, o pobre adversário,"
   },
   {
    "id": "b20",
@@ -300,7 +300,7 @@
    ],
    "ordem": 21,
    "coluna": 0,
-   "texto_impresso": "reduzido a uma peça 0u duas, não terá c0ndições de se defender bem e muito"
+   "texto_impresso": "reduzido a uma peça ou duas, não terá condições de se defender bem e muito"
   },
   {
    "id": "b21",
@@ -339,7 +339,7 @@
    ],
    "ordem": 24,
    "coluna": 0,
-   "texto_impresso": "Dia?rama 6. Jo?am a? hran?as.",
+   "texto_impresso": "Diagrama 6. Jogam as brancas.",
    "diagrama": "d1",
    "caixa_estimada": true
   },
@@ -367,7 +367,7 @@
    ],
    "ordem": 26,
    "coluna": 0,
-   "texto_impresso": "Dia?rama 7. Jo9am as ?rancas.",
+   "texto_impresso": "Diagrama 7. Jogam as brancas.",
    "diagrama": "d2",
    "caixa_estimada": true
   },
@@ -432,7 +432,7 @@
    ],
    "texto": "TESTE 1. As pretas têm a vantagem de uma Dama, mas agora ela está sob ataque.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l03",
@@ -445,7 +445,7 @@
    ],
    "texto": "Jogam as pretas. O que fazer?",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l04",
@@ -458,7 +458,7 @@
    ],
    "texto": "Teste 1",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l05",
@@ -471,7 +471,7 @@
    ],
    "texto": "Tarrasch,Schroeder",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l06",
@@ -482,9 +482,9 @@
     0.55966,
     0.29974
    ],
-   "texto": "Nuremberg 189o",
+   "texto": "Nuremberg 1890",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l07",
@@ -495,9 +495,9 @@
     0.55512,
     0.36956
    ],
-   "texto": "TROCAR PE?AS PARA TER ?M Fl?AL vIT?RlOSO",
+   "texto": "TROCAR PEÇAS PARA TER UM FINAL VITORIOSO",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l08",
@@ -508,9 +508,9 @@
     0.92914,
     0.41045
    ],
-   "texto": "A partir dos exemplos anteriores, podemos conc1uir que, quando temos menos",
+   "texto": "A partir dos exemplos anteriores, podemos concluir que, quando temos menos",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l09",
@@ -523,7 +523,7 @@
    ],
    "texto": "material do que o adversário e nenhuma compensação por esse déficit, somos",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l10",
@@ -534,9 +534,9 @@
     0.92867,
     0.44494
    ],
-   "texto": "obrigados a tentar um golpe de s0rte — fazer um lance que dependa maiS do erro",
+   "texto": "obrigados a tentar um golpe de sorte — fazer um lance que dependa mais do erro",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l11",
@@ -549,7 +549,7 @@
    ],
    "texto": "do adversário do que de nosso brilhantismo. Na linguagem do xadrez, essa situ-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l12",
@@ -560,9 +560,9 @@
     0.92821,
     0.47942
    ],
-   "texto": "ação é conhecida como tentar um g0zpe b?rat?. ?or outro 1ado, quando a Superi,",
+   "texto": "ação é conhecida como tentar um golpe barato. Por outro lado, quando a superi-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l13",
@@ -575,7 +575,7 @@
    ],
    "texto": "oridade material é nossa, tentamos eliminar a possibilidade de truques numa",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l14",
@@ -586,9 +586,9 @@
     0.92773,
     0.51418
    ],
-   "texto": "posição. Trocar peças num momento de vantagem materia1 é um ótimo modo de",
+   "texto": "posição. Trocar peças num momento de vantagem material é um ótimo modo de",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l15",
@@ -601,7 +601,7 @@
    ],
    "texto": "evitar golpes baratos. A estratégia é a seguinte:",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l16",
@@ -614,7 +614,7 @@
    ],
    "texto": "Quando estiver numa posição de superioridade material, troque, troque,",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l17",
@@ -627,7 +627,7 @@
    ],
    "texto": "troque!",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l18",
@@ -640,7 +640,7 @@
    ],
    "texto": "O conceito de trocar peças é particularmente útil quando podemos chegar",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l19",
@@ -651,9 +651,9 @@
     0.92526,
     0.637
    ],
-   "texto": "ao fina1 com a vantagem de um peão ou mais. Nesse caso, o pobre adversário,",
+   "texto": "ao final com a vantagem de um peão ou mais. Nesse caso, o pobre adversário,",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l20",
@@ -664,9 +664,9 @@
     0.92583,
     0.6541
    ],
-   "texto": "reduzido a uma peça 0u duas, não terá c0ndições de se defender bem e muito",
+   "texto": "reduzido a uma peça ou duas, não terá condições de se defender bem e muito",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l21",
@@ -679,7 +679,7 @@
    ],
    "texto": "menos de atacar. Aguns exemplos poderão demonstrar a eficácia dessa estratégia.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l22",
@@ -690,8 +690,8 @@
     0.45,
     0.95359
    ],
-   "texto": "Dia?rama 6. Jo?am a? hran?as.",
-   "texto_verificado": false,
+   "texto": "Diagrama 6. Jogam as brancas.",
+   "texto_verificado": true,
    "caixa_estimada": true,
    "negrito": true
   },
@@ -704,8 +704,8 @@
     0.81652,
     0.95359
    ],
-   "texto": "Dia?rama 7. Jo9am as ?rancas.",
-   "texto_verificado": false,
+   "texto": "Diagrama 7. Jogam as brancas.",
+   "texto_verificado": true,
    "caixa_estimada": true,
    "negrito": true
   }

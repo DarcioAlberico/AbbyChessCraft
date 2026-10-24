@@ -28,9 +28,10 @@ from PySide6.QtWidgets import (QGridLayout, QLabel, QLineEdit, QPushButton, QSiz
 from core.box_model import BoxEntry
 
 from abbychess import verificacao as vf
-from abbychess.app import cores, teclado
+from abbychess.app import teclado, vazios
 from abbychess.app.imagens import pixmap_de_cinza
 from abbychess.app.painel_treino import FONTE_DE_SIMBOLOS
+from abbychess.app import estilo
 
 #: Altura do recorte da palavra no painel, em pixels de tela.
 ALTURA_DO_RECORTE = 110
@@ -91,7 +92,8 @@ class PainelDeVerificacao(QWidget):
         self.recorte.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.recorte.setMinimumSize(1, ALTURA_DO_RECORTE + 20)   # o pixmap não alarga o painel
         self.recorte.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.recorte.setStyleSheet("background: white; border: 1px solid #999;")
+        self.recorte.setStyleSheet(f"background: {estilo.PAPEL.name()}; "    # papel
+                                   f"border: 1px solid {estilo.BORDA_DO_PAPEL.name()};")
         self.recorte.setToolTip("Clique num glifo para abri-lo no Glifo.")
         self.recorte.clicado.connect(self._clicar)
 
@@ -102,21 +104,22 @@ class PainelDeVerificacao(QWidget):
 
         # Em grade de duas colunas, com o rótulo curto e a tecla na dica: cabe no Inspetor de
         # 296 px (§3.1). Os botões não pegam o foco pelo Tab: o teclado é o do campo.
-        self.botao_corrigir = self._botao("Corrigir", "Grava o texto nos glifos (Enter)",
+        self.botao_corrigir = self._botao("Corrigir",
+                                          "Grava o texto nos glifos ({corrigir_palavra})",
                                           self.pedir_corrigir)
         self.botao_ensinar = self._botao("Corrigir e ensinar",
-                                         "Grava e ensina os glifos mudados (Ctrl+Enter)",
-                                         self.pedir_ensinar)
-        self.botao_anterior = self._botao("◀ Anterior", "A palavra anterior (Alt+↑)",
+                                         "Grava e ensina os glifos mudados "
+                                         "({corrigir_e_ensinar_palavra})", self.pedir_ensinar)
+        self.botao_anterior = self._botao("◀ Anterior", "A palavra anterior ({anterior_da_fila})",
                                           self.anterior.emit)
-        self.botao_pular = self._botao("Pular ▶", "A próxima palavra, sem mudar esta (Alt+↓)",
-                                       self.pular.emit)
+        self.botao_pular = self._botao("Pular ▶", "A próxima palavra, sem mudar esta "
+                                       "({proximo_da_fila})", self.pular.emit)
         self.botao_todas = self._botao("Ignorar a palavra",
                                        "Ignora a palavra em toda a página, nesta sessão "
-                                       "(Ctrl+Shift+I)", self.ignorar_todas.emit)
+                                       "({ignorar_palavra})", self.ignorar_todas.emit)
         self.botao_adicionar = self._botao("Ao dicionário",
                                            "Põe a palavra no dicionário do livro, lexico.txt "
-                                           "(Ctrl+Shift+D)", self.adicionar.emit)
+                                           "({adicionar_ao_lexico})", self.adicionar.emit)
         grade = QGridLayout()
         grade.setSpacing(4)
         for n, botao in enumerate((self.botao_corrigir, self.botao_ensinar, self.botao_anterior,
@@ -127,7 +130,7 @@ class PainelDeVerificacao(QWidget):
                       "nunca aparece aqui. Um espaço separa a palavra em duas; com letras de "
                       "mais ou de menos, clique no glifo e divida ou junte no Glifo.")
         dica.setWordWrap(True)
-        dica.setStyleSheet("color: #666;")
+        estilo.papel(dica, "dica")
 
         caixa = QVBoxLayout(self)
         caixa.setContentsMargins(4, 4, 4, 4)
@@ -139,12 +142,13 @@ class PainelDeVerificacao(QWidget):
         caixa.addWidget(dica)
         caixa.addStretch(1)
 
-        self.limpar("Escolha a fila de palavras desconhecidas (F7) para verificar o texto.")
+        self.limpar(vazios.escolha_a_fila_de_palavras())
 
     @staticmethod
     def _botao(texto: str, dica: str, funcao) -> QPushButton:
+        """`dica` cita teclas por `{id}`: segue o perfil e as trocas (`teclado.texto_vivo`)."""
         botao = QPushButton(texto)
-        botao.setToolTip(dica)
+        teclado.texto_vivo(botao, "setToolTip", dica)
         botao.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         botao.clicked.connect(funcao)
         return botao
@@ -177,7 +181,7 @@ class PainelDeVerificacao(QWidget):
         self._glifos = []
         for i in palavra.indices:
             b = boxes[i]
-            cor = cores.SEM_LEITURA if not b.char else cores.PALAVRA
+            cor = estilo.VERMELHAO if not b.char else estilo.PALAVRA
             caneta = QPen(cor)
             caneta.setWidthF(1.5)
             pintor.setPen(caneta)

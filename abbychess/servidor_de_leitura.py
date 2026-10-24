@@ -76,6 +76,21 @@ class PaginaLida:
     tabuleiros: list
     escala: Optional[float]
     diagramas: list = field(default_factory=list)
+    #: ``True``/``False`` quando o negrito foi medido; ``None`` quando faltou medida.
+    negritos: list = field(default_factory=list)
+    #: O mesmo para o itálico (vazio: não medido, como no servidor falso dos testes).
+    italicos: list = field(default_factory=list)
+
+    def estilos(self) -> dict:
+        """`{id(entry): Estilo}` dos boxes com o negrito medido, ou em itálico: o box sem
+        estilo tem o efeito desconhecido, e o k-NN o compara com todas as amostras."""
+        from abbychess.modelo import Estilo
+
+        vazio = [None] * len(self.boxes)
+        return {id(entry): Estilo(negrito=bool(negrito), italico=bool(italico))
+                for entry, negrito, italico in zip(self.boxes, self.negritos or vazio,
+                                                   self.italicos or vazio)
+                if negrito is not None or italico}
 
 
 def ler_pagina(imagem, zonas, marcados, leitor, *, progresso=None,
@@ -94,8 +109,9 @@ def ler_pagina(imagem, zonas, marcados, leitor, *, progresso=None,
         raise Cancelado
     lidos = dg.ler_diagramas(imagem, segmentada.tabuleiros, escala=segmentada.escala,
                              classificar=leitor.arbitro, boxes=segmentada.boxes)
+    negritos, italicos = pg.efeitos_da_pagina(imagem, segmentada.boxes)
     return PaginaLida(segmentada.boxes, [procedencia.amostra_de(b) for b in segmentada.boxes],
-                      list(segmentada.tabuleiros), segmentada.escala, lidos)
+                      list(segmentada.tabuleiros), segmentada.escala, lidos, negritos, italicos)
 
 
 def reler_boxes(imagem, boxes, leitor, *, so_pendentes: bool, progresso=None):

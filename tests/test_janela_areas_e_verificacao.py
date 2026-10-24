@@ -104,6 +104,53 @@ def test_arrastar_a_area_move_e_grava(app, janela):  # noqa: F811
     assert (depois.x1, depois.y1) == (antes.x1 + 10, antes.y1 + 5)
 
 
+def test_funcao_e_ordem_das_areas_atualizam_o_documento_e_desfazem(app, janela):  # noqa: F811
+    _ler_a_mao(app, janela)
+    largura, altura = janela.pagina.imagem.size
+    janela.pagina.modelo.zonas = [
+        zn.Zona(zn.TEXTO, 0, 0, largura, altura // 2, id="z0"),
+        zn.Zona(zn.TEXTO, 0, altura // 2, largura, altura, id="z1"),
+    ]
+    janela.areas.escolher(0)
+    janela.areas.trocar_funcao_atual("titulo")
+    assert janela.pagina.documento().blocos[0].funcao == "titulo"
+    janela.pagina.desfazer()
+    assert janela.areas.zonas[0].funcao == "texto"
+
+    janela.areas.iniciar_ordenacao()
+    janela.areas.escolher(1)
+    janela.areas.escolher(0)
+    assert [z.ordem for z in janela.areas.zonas] == [1, 0]
+    assert [b.zona_id for b in janela.pagina.documento().blocos] == ["z1", "z0"]
+
+
+def test_esc_cancela_a_ordenacao_sem_mudar_as_areas(app, janela):  # noqa: F811
+    janela.acao_areas.setChecked(True)
+    janela.modo_areas(True)
+    _esperar(app, janela)
+    antes = list(janela.areas.zonas)
+    janela.areas.iniciar_ordenacao()
+    janela.areas.escolher(0)
+    janela.areas.cancelar_ordenacao()
+    assert janela.areas.zonas == antes
+
+
+def test_reconhecer_so_a_zona_preserva_boxes_de_fora(app, janela):  # noqa: F811
+    _ler_a_mao(app, janela)
+    pagina = janela.pagina
+    primeira = min(b.y1 for b in pagina.boxes)
+    alvo = zn.Zona(zn.TEXTO, 0, primeira - 5, pagina.imagem.width, primeira + 40, id="z0")
+    fora = next(b for b in pagina.modelo.boxes if b.entry.y1 > alvo.y2)
+    pagina.escolher(fora.gid)
+    pagina.corrigir("Z")
+
+    pagina.reconhecer_zona(alvo)
+    _esperar(app, janela)
+
+    assert pagina.modelo.box(fora.gid).entry.char == "Z"
+    assert pagina.modelo.box(fora.gid).entry.source == FONTE_MANUAL
+
+
 # ----------------------------------------------------------------------
 # Verificação de texto
 # ----------------------------------------------------------------------

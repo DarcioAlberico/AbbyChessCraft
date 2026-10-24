@@ -10,8 +10,11 @@ import json
 
 import pytest
 
+from core.box_model import BoxEntry
+
 from abbychess import pagina as pg
 from abbychess import zonas as zn
+from abbychess.diagramas import DiagramaLido
 from abbychess.projeto import ProjetoDeLivro
 
 from tests.test_treino_por_livro import _pagina_sintetica
@@ -100,6 +103,105 @@ def test_areas_automaticas_reconhecem_a_mesma_coisa(imagem):
     zonas = zn.automaticas(segmentada.boxes, segmentada.tabuleiros, largura, altura)
     pelas_areas = zn.segmentar_com_zonas(imagem, zonas)
     assert pelas_areas.boxes == segmentada.boxes
+
+
+def _boxes_de(texto, x, y, altura=10, passo=8):
+    return [BoxEntry(c, x + i * passo, y, x + i * passo + 6, y + altura)
+            for i, c in enumerate(texto) if c != " "]
+
+
+def test_areas_automaticas_dividem_as_funcoes_de_legenda_numero_e_titulo():
+    boxes = (_boxes_de("CAPITULO", 320, 100, altura=20, passo=12)
+             + _boxes_de("texto normal bastante longo", 100, 250)
+             + _boxes_de("Diagrama 7 jogam pretas", 220, 630)
+             + _boxes_de("42", 390, 960))
+    zonas = zn.automaticas(boxes, [(200, 400, 600, 600)], 800, 1000, escala=10)
+
+    funcoes = {z.funcao for z in zonas}
+    assert {"titulo", "texto", "legenda", "numero_de_pagina", "diagrama"} <= funcoes
+
+
+def test_classificacao_nao_altera_area_desenhada_pelo_usuario():
+    boxes = _boxes_de("Diagrama 7", 100, 120)
+    manual = zn.Zona(zn.TEXTO, 90, 110, 220, 140, funcao="texto", automatica=False)
+    diagrama = zn.Zona(zn.DIAGRAMA, 90, 150, 250, 350, automatica=True)
+
+    classificadas = zn.classificar_funcoes([manual, diagrama], boxes, 500, 500, 10)
+
+    assert classificadas[0].funcao == "texto"
+
+
+def test_legenda_automatica_fica_ligada_ao_diagrama_mais_proximo_e_persiste():
+    zonas = [
+        zn.Zona(zn.TEXTO, 100, 420, 300, 450, id="z0", funcao="legenda", automatica=True),
+        zn.Zona(zn.TEXTO, 500, 420, 700, 450, id="z1", funcao="legenda", automatica=True),
+    ]
+    diagramas = [DiagramaLido((100, 100, 300, 400), id="d0"),
+                 DiagramaLido((500, 100, 700, 400), id="d1")]
+
+    ligadas = zn.vincular_legendas(zonas, diagramas)
+    restauradas = [zn.Zona.de_dict(z.como_dict()) for z in ligadas]
+
+    assert [z.diagrama_id for z in restauradas] == ["d0", "d1"]
+
+
+def test_vinculo_manual_de_legenda_nao_e_recalculado():
+    manual = zn.Zona(zn.TEXTO, 100, 420, 300, 450, funcao="legenda",
+                     automatica=False, diagrama_id="d1")
+    diagramas = [DiagramaLido((100, 100, 300, 400), id="d0"),
+                 DiagramaLido((500, 100, 700, 400), id="d1")]
+
+    assert zn.vincular_legendas([manual], diagramas)[0].diagrama_id == "d1"
+
+
+def test_funcao_de_margem_so_muda_zona_automatica_inteiramente_classificada():
+    boxes = _boxes_de("CABECALHO", 100, 20) + _boxes_de("corpo", 100, 100)
+    cabecalho = zn.Zona(zn.TEXTO, 90, 10, 190, 45, automatica=True)
+    corpo = zn.Zona(zn.TEXTO, 90, 90, 190, 125, automatica=True)
+    manual = zn.Zona(zn.TEXTO, 90, 10, 190, 45, automatica=False)
+    funcoes = {i: "cabecalho" for i in range(len("CABECALHO"))}
+
+    classificadas = zn.aplicar_funcoes_de_margem([cabecalho, corpo, manual], boxes, funcoes)
+
+    assert [z.funcao for z in classificadas] == ["cabecalho", "texto", "texto"]
+
+
+def test_titulo_centralizado_e_nota_menor_no_pe_sao_classificados():
+    boxes = (_boxes_de("Um titulo", 360, 100)
+             + _boxes_de("corpo normal bastante longo", 100, 300, altura=12)
+             + _boxes_de("nota curta", 100, 850, altura=7))
+    zonas = zn.automaticas(boxes, [], 800, 1000, escala=10)
+
+    assert [z.funcao for z in zonas] == ["titulo", "texto", "nota"]
+
+
+def test_recuo_da_primeira_linha_abre_outro_bloco():
+    boxes = (_boxes_de("primeiro paragrafo", 100, 100)
+             + _boxes_de("continua aqui", 100, 120)
+             + _boxes_de("novo paragrafo", 120, 140))
+
+    zonas = zn.automaticas(boxes, [], 800, 1000, escala=10)
+
+    assert len(zonas) == 2
+
+
+def test_modelo_de_areas_conserva_funcoes_e_recusa_outra_resolucao():
+    original = zn.Zona(zn.TEXTO, 10, 20, 100, 80, id="z9", funcao="titulo", ordem=2)
+    modelo = zn.ModeloDeAreas(800, 1000, (original,))
+
+    [aplicada] = modelo.aplicar(800, 1000)
+
+    assert aplicada.funcao == "titulo" and aplicada.ordem == 2 and aplicada.id == "z0"
+    with pytest.raises(ValueError, match="resolução"):
+        modelo.aplicar(801, 1000)
+
+
+def test_ordenar_exige_todas_as_areas_uma_vez():
+    zonas = [zn.Zona(zn.TEXTO, i * 20, 0, i * 20 + 10, 10) for i in range(4)]
+    ordenadas = zn.ordenar(zonas, [3, 2, 1, 0])
+    assert [z.ordem for z in ordenadas] == [3, 2, 1, 0]
+    with pytest.raises(ValueError):
+        zn.ordenar(zonas, [0, 1, 1, 3])
 
 
 def test_ignorar_e_imagem_nao_geram_boxes(imagem):

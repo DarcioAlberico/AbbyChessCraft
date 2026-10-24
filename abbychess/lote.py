@@ -31,9 +31,10 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, Deque, Dict, List, Optional, Sequence
 
 from abbychess import diagramas as dg
+from abbychess import lances as lc
 from abbychess import pagina as pg
 from abbychess import procedencia
 from abbychess import servidor_de_leitura as sl
@@ -68,6 +69,9 @@ class ResultadoDoLote:
     diagramas: Dict[int, int] = field(default_factory=dict)
     #: Página -> as decisões que não puderam seguir os glifos relidos (§4.6).
     caidas: Dict[int, List[str]] = field(default_factory=dict)
+    #: Os `pid` das páginas que saíram do livro (apagadas, §12.4) antes de a vez delas chegar
+    #: ou enquanto eram lidas: sem posição, e nada gravado nelas.
+    fora_do_livro: List[int] = field(default_factory=list)
     cancelado: bool = False
     #: O lote parou porque o servidor de leitura desistiu (a página em curso fica para
     #: retomar, e não conta como falha).
@@ -104,7 +108,17 @@ class CondutorDoLote:
                  forcar: Sequence[int] = ()):
         self.p = pagina
         self.indices = list(indices)
-        self.restante = deque(self.indices)
+        #: Os `pid` que faltam ler (§12.4): o intervalo é resolvido em `pid` ao começar, e a
+        #: posição de cada um é a de agora, na vez dele (a página pode mudar de lugar, ou sair
+        #: do livro, no meio do lote). A posição fora do livro já entra como falha.
+        self.restante: Deque[int] = deque()
+        self.resultado = ResultadoDoLote()
+        for indice in self.indices:
+            pid = pagina.projeto.pid_da_pagina(indice)
+            if pid is None:
+                self.resultado.falhas[indice] = "a página não está no livro"
+            else:
+                self.restante.append(pid)
         self.refazer = refazer
         #: As páginas que o usuário mandou ler de novo de qualquer jeito (as que ficaram para
         #: reler depois, confirmadas no Retomar): lidas mesmo já lidas, e mesmo abertas com
@@ -114,11 +128,11 @@ class CondutorDoLote:
         self.ao_gravar = ao_gravar or (lambda _indice: None)
         self.ao_fim = ao_fim or (lambda _resultado: None)
         self._de_fora = cancelado
-        self.resultado = ResultadoDoLote()
         self._cancelar = threading.Event()
         self._pedido: Optional[sl.Pedido] = None
         self._geracao = pagina.geracao
-        self._feitas = 0
+        #: As posições fora do livro já contam como feitas (falharam ao começar).
+        self._feitas = len(self.resultado.falhas)
         #: Segundos de leitura das páginas lidas (o tempo estimado vem da média).
         self._tempos: List[float] = []
         self.terminou = False
@@ -129,6 +143,11 @@ class CondutorDoLote:
     @property
     def total(self) -> int:
         return len(self.indices)
+
+    def posicoes_restantes(self) -> List[int]:
+        """As posições de agora das páginas que faltam (as que saíram do livro, não)."""
+        projeto = self.p.projeto
+        return [p for p in map(projeto.posicao_do_pid, self.restante) if p is not None]
 
     def comecar(self) -> None:
         self.ao_progresso(0, self.total, None)
@@ -174,7 +193,11 @@ class CondutorDoLote:
             if not self.restante:
                 self._terminar()
                 return
-            indice = self.restante[0]
+            indice = self.p.projeto.posicao_do_pid(self.restante[0])
+            if indice is None:                  # apagada antes da vez dela
+                self.resultado.fora_do_livro.append(self.restante.popleft())
+                self._avancar()
+                continue
             motivo = self._fica_de_fora(indice)
             if motivo is None:
                 self._ler(indice)
@@ -215,15 +238,21 @@ class CondutorDoLote:
         # mantém, vão para a thread da leitura). Uma mudança do usuário depois daqui sobe a
         # versão, e `_mudou_durante` a pega.
         pid = projeto.pid_da_pagina(indice)
+        # A entrada e o pid são tomados aqui, na interface: a thread da leitura não resolve a
+        # posição de novo (uma reordenação no meio daria a imagem de outra página).
+        entrada = fonte.entrada(indice)
         pedida = _Pedida(indice, pid, p.historico.versao(pid), time.perf_counter())
         self.em_leitura = indice
 
         def ler(cancelado) -> sl.PaginaLida:
-            modelo = projeto.carregar_modelo(indice)
-            zonas = list(modelo.zonas) if modelo is not None else projeto.carregar_zonas(indice)
+            agora = projeto.posicao_do_pid(pid)
+            if agora is None:
+                raise OSError("a página saiu do livro")    # `_voltou` a conta como fora
+            modelo = projeto.carregar_modelo(agora)
+            zonas = list(modelo.zonas) if modelo is not None else projeto.carregar_zonas(agora)
             marcados = (pg.a_manter_na_releitura(modelo.boxes, modelo.estado in LIDAS)
                         if modelo is not None else [])                     # §4.6
-            imagem = fonte.pagina(indice)
+            imagem = fonte.pagina_da_entrada(entrada)
             if servidor is None:
                 return sl.ler_pagina(imagem, zonas, marcados, leitor, cancelado=cancelado)
             return self._ler_no_servidor(servidor, (imagem, zonas, marcados), cancelado)
@@ -269,7 +298,8 @@ class CondutorDoLote:
         return lida
 
     def _voltou(self, pedida: _Pedida, resultado) -> None:
-        indice = pedida.indice
+        # A posição de agora: a página pode ter mudado de lugar enquanto era lida.
+        indice = self.p.projeto.posicao_do_pid(pedida.pid)
         self._tempos.append(time.perf_counter() - pedida.inicio)
         self.em_leitura = None
         p = self.p
@@ -285,13 +315,17 @@ class CondutorDoLote:
             self.resultado.cancelado = True
             self._terminar()
             return
+        if indice is None:                      # apagada enquanto era lida: nada a gravar
+            self.resultado.fora_do_livro.append(self.restante.popleft())
+            self._avancar()
+            return
         if isinstance(resultado, Exception):
             log.warning("a página %d não foi reconhecida: %s", indice + 1, resultado)
             self.restante.popleft()
             self.resultado.falhas[indice] = str(resultado)
             self._avancar()
             return
-        motivo = self._mudou_durante(pedida)
+        motivo = self._mudou_durante(pedida, indice)
         if motivo is not None:
             self._pular(indice, motivo)
             return
@@ -299,13 +333,15 @@ class CondutorDoLote:
         self._gravar(indice, resultado)
         self._avancar()
 
-    def _mudou_durante(self, pedida: _Pedida) -> Optional[str]:
-        """A página verificada, ou mudada pelo usuário, enquanto era lida (aberta ou não)."""
+    def _mudou_durante(self, pedida: _Pedida, indice: int) -> Optional[str]:
+        """A página verificada, ou mudada pelo usuário, enquanto era lida (aberta ou não).
+        `indice` é a posição de agora da página pedida (ela pode ter mudado de lugar)."""
         p = self.p
-        if p.projeto.estado_da_pagina(pedida.indice) == VERIFICADA:
+        if p.projeto.estado_da_pagina(indice) == VERIFICADA:
             return VERIFICADA_PULADA
-        modelo = p.projeto.carregar_modelo(pedida.indice)
-        pid = modelo.pid if modelo is not None else None
+        # O pid da sequência (§12.4): a página ainda sem dados já tem o dela, e a mudança do
+        # usuário no meio da leitura (a primeira, que cria a página, também) sobe a versão.
+        pid = p.projeto.pid_da_pagina(indice)
         if pid != pedida.pid or p.historico.versao(pid) != pedida.versao:
             return RELER_DEPOIS
         return None
@@ -346,14 +382,17 @@ class CondutorDoLote:
                 and not projeto.somente_leitura:
             projeto.guardar_antes_do_lote(pagina)                         # §4.6
         de_antes = list(pagina.boxes)
+        estilos = lida.estilos()
         novos, dif = reconciliar(pagina.boxes, lida.boxes, pagina.alocar, procedencia.amostra_de,
+                                 estilo_de=lambda entry: estilos.get(id(entry)),
                                  iou_minimo=IOU_DA_RELEITURA)
         pagina.aplicar(dif, novos)
         if dif.caidas:
             self.resultado.caidas[indice] = descrever_caidas(dif.caidas, de_antes)
         pagina.tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
-        pagina.diagramas = dg.mesclar(lida.diagramas, dg.para_caixas(pagina.tabuleiros,
-                                                                     pagina.diagramas))
+        pagina.diagramas = dg.com_ids(dg.mesclar(lida.diagramas, dg.para_caixas(pagina.tabuleiros,
+                                                                     pagina.diagramas)))
+        pagina.diagramas = lc.validar_pagina(pagina, projeto.dados.idioma)
         pagina.estado = proximo_estado(pagina.estado, "reconhecer")
         p._gravar(pagina)
         self.resultado.lidas.append(indice)
@@ -398,7 +437,7 @@ def _paginas(indices) -> str:
 def tem_detalhe(resultado: ResultadoDoLote) -> bool:
     """O fim do lote tem algo a conferir (vai aos Avisos); o lote limpo não."""
     return bool(resultado.cancelado or resultado.reler_depois or resultado.falhas
-                or resultado.caidas)
+                or resultado.caidas or resultado.fora_do_livro)
 
 
 def resumo_do_fim(resultado: ResultadoDoLote) -> str:
@@ -414,6 +453,8 @@ def resumo_do_fim(resultado: ResultadoDoLote) -> str:
         partes.append(f"{len(resultado.reler_depois)} para reler depois")
     if resultado.falhas:
         partes.append(f"{len(resultado.falhas)} falharam")
+    if resultado.fora_do_livro:
+        partes.append(f"{len(resultado.fora_do_livro)} saíram do livro antes de lidas")
     return f"{inicio}: " + ", ".join(partes) + "."
 
 
@@ -433,6 +474,9 @@ def detalhe_do_fim(resultado: ResultadoDoLote) -> str:
         linhas.append("Falharam: " + "; ".join(
             f"{i + 1} ({(motivo.splitlines() or ['sem motivo'])[0]})"
             for i, motivo in resultado.falhas.items()) + ".")
+    if resultado.fora_do_livro:
+        linhas.append(f"{len(resultado.fora_do_livro)} página(s) saíram do livro (apagadas) "
+                      "antes de o lote lê-las: nada foi gravado nelas.")
     for indice, caidas in resultado.caidas.items():
         linhas.append(f"Página {indice + 1}, decisões que não seguiram os glifos relidos: "
                       + "; ".join(caidas) + ".")

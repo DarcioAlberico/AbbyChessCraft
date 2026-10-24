@@ -77,7 +77,7 @@ def test_todas_na_pagina_aplica_direto(jb):  # noqa: F811
     assert not jb.resultados.na_previa
 
 
-def test_o_caso_sem_traducao_vem_desabilitado_na_previa(jb):  # noqa: F811
+def test_o_caso_estrutural_vem_habilitado_na_previa(jb):  # noqa: F811
     _pagina_lida(jb, "uma casa")
     _buscar(jb, "m")
     _substituir_por(jb, "rn")
@@ -85,9 +85,9 @@ def test_o_caso_sem_traducao_vem_desabilitado_na_previa(jb):  # noqa: F811
     _ate(lambda: jb.resultados.na_previa)
     modelo = jb.resultados.modelo_da_previa
     indice = modelo.index(0)
-    assert not modelo.flags(indice) & Qt.ItemFlag.ItemIsEnabled
-    assert "dividir" in modelo.data(indice, Qt.ItemDataRole.ToolTipRole)
-    assert not jb.resultados.botao_aplicar.isEnabled()
+    assert modelo.flags(indice) & Qt.ItemFlag.ItemIsEnabled
+    assert not modelo.data(indice, Qt.ItemDataRole.ToolTipRole)
+    assert jb.resultados.botao_aplicar.isEnabled()
 
 
 # ----------------------------------------------------------------------

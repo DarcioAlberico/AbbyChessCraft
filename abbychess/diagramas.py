@@ -48,6 +48,9 @@ from core import lado_a_jogar
 from core.box_model import BoxEntry
 from core.tabuleiro_edicao import TabuleiroEdicao
 
+from abbychess import lances
+from abbychess.lances import Validacao
+
 Caixa = Tuple[int, int, int, int]
 
 #: Procedências do lado a jogar. Vazio quer dizer que ninguém disse.
@@ -90,6 +93,9 @@ class DiagramaLido:
     #: O trecho da legenda que disse o lado, para quem confere poder julgar.
     lado_trecho: str = ""
     roque: str = ""
+    #: Quem conferiu disse o roque, inclusive nenhum: desmarcar todos não volta ao inferido
+    #: na validação pelos lances.
+    roque_informado: bool = False
     #: Como o diagrama está impresso; as casas já vêm giradas para a posição.
     orientacao: str = "branca"
     #: Os rótulos impressos decidiram a orientação. Sem eles, é suposição.
@@ -107,6 +113,9 @@ class DiagramaLido:
     erro: str = ""
     #: Estável na página (`d0`, `d1`…): é o que o documento cita (§4.2). Vazio até gravar.
     id: str = ""
+    #: O que os lances do texto depois dele disseram (`lances.validar_pagina`); `None` sem
+    #: lances. Derivada do texto, refeita a cada edição.
+    validacao: Optional[Validacao] = None
 
     # ------------------------------------------------------------------
     @property
@@ -115,7 +124,22 @@ class DiagramaLido:
 
     @property
     def confiavel(self) -> bool:
-        return self.lido and (self.conferido or not self.motivo)
+        """Conferido; ou com a confiança do porteiro e sem lance ilegal no texto.
+
+        A linha legal não anula a dúvida do porteiro: um lance só ("veja 3.e4") passa
+        em muitas posições erradas, e o diagrama duvidoso sairia redesenhado do FEN."""
+        if not self.lido:
+            return False
+        if self.conferido:
+            return True
+        if self.validacao is not None and not self.validacao.confiavel:
+            return False
+        return not self.motivo
+
+    @property
+    def roque_inferido(self) -> str:
+        """O roque que rei e torre nas casas iniciais sugerem; nunca vai ao FEN (CA-10.3)."""
+        return lances.roque_inferido(self.fen) if self.lido else ""
 
     @property
     def fen(self) -> str:
@@ -126,6 +150,9 @@ class DiagramaLido:
 
     def marca_do_lado(self) -> str:
         """`brancas a jogar (assumido: a página não diz)` e as outras procedências."""
+        if self.lado in lado_a_jogar.LADOS and self.lado_origem == lances.LADO_DOS_LANCES:
+            cor = "brancas" if self.lado == "w" else "pretas"
+            return f"{cor} a jogar (pelo número do lance do texto, {self.lado_trecho})"
         return lado_a_jogar.marca(self.lado, self.lado_origem if self.lado else "")
 
     def linha_de_texto(self, numero: int, *, com_ressalva: bool = True) -> str:
@@ -154,7 +181,7 @@ class DiagramaLido:
         if self.lado_origem == LADO_DO_USUARIO and self.lado in lado_a_jogar.LADOS:
             tabuleiro.lado, tabuleiro.lado_origem, tabuleiro.lado_informado = (
                 self.lado, LADO_DO_USUARIO, True)
-        if self.roque:
+        if self.roque or self.roque_informado:
             tabuleiro.roque, tabuleiro.roque_informado = self.roque, True
         # O que veio gravado é o ponto de partida: não há o que desfazer antes dele.
         tabuleiro._historico = [tabuleiro._estado()]
@@ -171,7 +198,9 @@ class DiagramaLido:
                        lado=tabuleiro.lado if dito else None,
                        lado_origem=tabuleiro.lado_origem if dito else "",
                        lado_trecho=self.lado_trecho if tabuleiro.lado_origem == LADO_DA_LEGENDA else "",
-                       roque=tabuleiro.roque, conferido=conferido)
+                       roque=tabuleiro.roque,
+                       roque_informado=bool(tabuleiro.roque_informado or tabuleiro.roque),
+                       conferido=conferido)
 
     # ------------------------------------------------------------------
     def para_json(self) -> dict:
@@ -186,6 +215,7 @@ class DiagramaLido:
             "lado_origem": self.lado_origem,
             "lado_trecho": self.lado_trecho,
             "roque": self.roque,
+            "roque_informado": self.roque_informado,
             "orientacao": self.orientacao,
             "orientacao_confirmada": self.orientacao_confirmada,
             "titulo": self.titulo,
@@ -194,6 +224,7 @@ class DiagramaLido:
             "conferido": self.conferido,
             "motivo": self.motivo,
             "erro": self.erro,
+            **({"validacao": self.validacao.para_json()} if self.validacao else {}),
         }
 
     @classmethod
@@ -208,6 +239,8 @@ class DiagramaLido:
                    lado_origem=bruto.get("lado_origem", "") if lado else "",
                    lado_trecho=bruto.get("lado_trecho", ""),
                    roque=bruto.get("roque", ""),
+                   # Gravado antes do campo, só o roque marcado sabe que foi dito.
+                   roque_informado=bool(bruto.get("roque_informado", bruto.get("roque"))),
                    orientacao=bruto.get("orientacao", "branca"),
                    orientacao_confirmada=bool(bruto.get("orientacao_confirmada", False)),
                    titulo=bruto.get("titulo", ""),
@@ -216,7 +249,8 @@ class DiagramaLido:
                    lados_de_rotulo=tuple(bruto.get("lados_de_rotulo", ())),
                    conferido=bool(bruto.get("conferido", False)),
                    motivo=bruto.get("motivo", ""), erro=bruto.get("erro", ""),
-                   id=str(bruto.get("id") or ""))
+                   id=str(bruto.get("id") or ""),
+                   validacao=Validacao.de_json(bruto.get("validacao")))
 
 
 def com_ids(diagramas: Sequence[DiagramaLido]) -> List[DiagramaLido]:

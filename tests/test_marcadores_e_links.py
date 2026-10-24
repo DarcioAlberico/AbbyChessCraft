@@ -1,0 +1,315 @@
+"""Os marcadores do PDF, o número impresso das páginas e os links internos do EPUB (passo J)."""
+
+from __future__ import annotations
+
+import os
+import zipfile
+
+import fitz
+import pytest
+
+from core.box_model import BoxEntry
+from core.pagina import PaginaExtraida, Paragrafo
+
+from abbychess import epub
+from abbychess import exportar as ex
+from abbychess import texto as tx
+from abbychess.leitor import FONTE_MANUAL
+from abbychess.zonas import Zona
+
+from tests.test_livro import _ensinar_e_ler, fonte, leitor, projeto  # noqa: F401 (fixtures)
+
+
+def _linha(texto: str, y: int, x: int = 40):
+    boxes, cursor = [], x
+    for char in texto:
+        if char != " ":
+            boxes.append(BoxEntry(char, cursor, y, cursor + 10, y + 20, 1.0, FONTE_MANUAL))
+        cursor += 14
+    return boxes
+
+
+def _pagina_com_rodape(numero_impresso: str):
+    entries = _linha("Texto da pagina corrida.", 100) + _linha(numero_impresso, 3000)
+    pagina = tx.pagina_avulsa(entries, zonas=[Zona("texto", 0, 2990, 2000, 3040,
+                                                   funcao="numero_de_pagina")])
+    return ex.Estrutura.da_pagina(pagina)
+
+
+# ----------------------------------------------------------------------
+# O número impresso
+# ----------------------------------------------------------------------
+
+def test_o_deslocamento_mais_votado_vale_para_o_livro_todo():
+    paginas = {20: _pagina_com_rodape("21"), 21: _pagina_com_rodape("22"),
+               22: _pagina_com_rodape("2l"),                  # o OCR errou: não vota
+               23: _pagina_com_rodape("99")}                  # um número qualquer: perde
+    numeros = ex.numeros_impressos(paginas, {}, todas=range(20, 26))
+    assert numeros == {i: i + 1 for i in range(20, 26)}
+
+
+def test_sem_acordo_nao_ha_numero():
+    paginas = {0: _pagina_com_rodape("7"), 1: _pagina_com_rodape("40")}
+    assert ex.numeros_impressos(paginas, {}) == {}
+
+
+# ----------------------------------------------------------------------
+# Os marcadores e os rótulos do PDF
+# ----------------------------------------------------------------------
+
+def test_o_pdf_ganha_os_marcadores_pelos_titulos(projeto, fonte, leitor, tmp_path):  # noqa: F811
+    _ensinar_e_ler(projeto, fonte, leitor)
+    boxes = projeto.carregar_pagina(1)
+    topo = min(b.y1 for b in boxes)
+    primeira = [b for b in boxes if b.y1 < topo + 20]
+    zona = Zona("texto", 0, topo - 5, 5000, max(b.y2 for b in primeira) + 5, funcao="titulo")
+    projeto.salvar_zonas(1, [zona])
+    titulos = ex.titulos_das_paginas(projeto, projeto.paginas_lidas())
+    assert [i for i, _t in titulos] == [1]
+    destino = tmp_path / "saida.pdf"                  # o livro.pdf é a fonte da fixture
+    resumo = ex.exportar_pdf_pesquisavel(projeto, destino)
+    assert resumo.marcadores == 1
+    with fitz.open(destino) as doc:
+        assert doc.get_toc() == [[1, titulos[0][1], 2]]
+
+
+def test_o_sumario_do_pdf_original_fica(tmp_path):
+    doc = fitz.open()
+    for _ in range(2):
+        doc.new_page()
+    doc.set_toc([[1, "Do editor", 2]])
+    resumo = ex.ResumoDoPdf()
+
+    class _Projeto:
+        def carregar_modelo(self, _i):
+            return None
+
+    ex._marcar_o_pdf(doc, _Projeto(), [0, 1], resumo)
+    assert doc.get_toc() == [[1, "Do editor", 2]]
+    assert resumo.marcadores_do_original == 1 and resumo.marcadores == 0
+
+
+# ----------------------------------------------------------------------
+# Os links internos do EPUB
+# ----------------------------------------------------------------------
+
+def test_referencia_a_pagina_impressa_vira_link_e_o_rotulo_e_o_impresso(tmp_path):
+    paginas = [PaginaExtraida(numero=0, blocos=[Paragrafo("Capítulo", titulo=True, nivel=1),
+                                                Paragrafo("A solução está na página 12; "
+                                                          "a página 99 não existe.",
+                                                          negrito=[(20, 30)])]),
+               PaginaExtraida(numero=1, blocos=[Paragrafo("Outro", titulo=True, nivel=1),
+                                                Paragrafo("Meio.")]),
+               PaginaExtraida(numero=2, blocos=[Paragrafo("Solução.")])]
+    destino = tmp_path / "a.epub"
+    escrito = epub.escrever(paginas, destino, epub.Metadados("L"),
+                            numeros={0: 10, 1: 11, 2: 12})
+    assert escrito.links == 1
+    assert epub.conferir(destino) == []
+    with zipfile.ZipFile(destino) as z:
+        primeiro = z.read("OEBPS/texto/capitulo-001.xhtml").decode("utf-8")
+        nav = z.read("OEBPS/nav.xhtml").decode("utf-8")
+    # O link atravessa o negrito sem quebrar a marcação, e aponta outro capítulo.
+    assert 'href="capitulo-002.xhtml#pg3"' in primeiro
+    assert "página 99 não existe" in primeiro and "#pg99" not in primeiro
+    assert 'aria-label="10"' in primeiro
+    assert '<a href="texto/capitulo-002.xhtml#pg3">12</a>' in nav
+
+
+def test_sem_numero_impresso_nao_ha_link():
+    alvos = {}
+    assert epub.referencias("ver a página 12", "pt", alvos) == []
+    assert epub.referencias("see page 12 and p. 13", "en", {12: "x#a", 13: "x#b"}) == [
+        (4, 11, "x#a"), (16, 21, "x#b")]
+    assert epub.referencias("siehe Seite 5", "de", {5: "y#c"}) == [(6, 13, "y#c")]
+
+
+def test_exportar_sobre_a_propria_fonte_e_recusado(projeto, fonte, leitor):  # noqa: F811
+    import pytest
+
+    _ensinar_e_ler(projeto, fonte, leitor)
+    antes = projeto.fonte.read_bytes()
+    with pytest.raises(ValueError, match="próprio arquivo de origem"):
+        ex.exportar(projeto, projeto.fonte)
+    assert projeto.fonte.read_bytes() == antes
+
+# ----------------------------------------------------------------------
+# A revisão de código (rodada 1)
+# ----------------------------------------------------------------------
+
+def test_o_encarte_sem_numero_muda_o_deslocamento_dali_em_diante():
+    # 10 e 11 são as páginas 11 e 12; depois de um encarte de 4 páginas, 16 e 17 são 13 e 14.
+    paginas = {10: _pagina_com_rodape("11"), 11: _pagina_com_rodape("12"),
+               16: _pagina_com_rodape("13"), 17: _pagina_com_rodape("14")}
+    numeros = ex.numeros_impressos(paginas, {}, todas=[10, 11, 16, 17, 18])
+    assert numeros == {10: 11, 11: 12, 16: 13, 17: 14, 18: 15}
+
+
+def test_paginas_de_rosto_ganham_romanos_e_o_rotulo_do_pdf_fica_valido(tmp_path, monkeypatch):
+    doc = fitz.open()
+    for _ in range(4):
+        doc.new_page()
+    estruturas = {i: _pagina_com_rodape(str(i - 1)) if i >= 2 else ex.Estrutura.da_pagina(None)
+                  for i in range(4)}
+
+    class _Projeto:
+        def carregar_modelo(self, _i):
+            return None
+
+    # As estruturas entram pelo `Estrutura.da_pagina` do projeto falso.
+    fila = iter(estruturas[i] for i in range(4))
+    monkeypatch.setattr(ex.Estrutura, "da_pagina", classmethod(lambda cls, _p: next(fila)))
+    resumo = ex.ResumoDoPdf()
+    ex._marcar_o_pdf(doc, _Projeto(), [0, 1, 2, 3], resumo)
+    assert resumo.rotulos
+    assert [p.get_label() for p in doc] == ["i", "ii", "1", "2"]
+
+
+def test_citacao_de_outra_obra_nao_vira_link():
+    alvos = {3: "c#a", 12: "c#b"}
+    assert epub.referencias("(Informator 45, p. 12)", "en", alvos) == []
+    assert epub.referencias("Fine, p. 3", "en", alvos) == []
+    assert epub.referencias("Ver a solução, p. 12", "pt", alvos) == [(15, 20, "c#b")]
+
+
+def test_pagina_sem_numero_impresso_nao_colide_com_um_impresso(tmp_path):
+    paginas = [PaginaExtraida(numero=i, blocos=[Paragrafo(f"Texto {i}.")]) for i in range(4)]
+    destino = tmp_path / "a.epub"
+    epub.escrever(paginas, destino, epub.Metadados("L"), numeros={2: 1, 3: 2})
+    with zipfile.ZipFile(destino) as z:
+        nav = z.read("OEBPS/nav.xhtml").decode("utf-8")
+    assert ">[1]</a>" in nav and ">[2]</a>" in nav and ">1</a>" in nav and ">2</a>" in nav
+    assert epub.conferir(destino) == []
+
+# ----------------------------------------------------------------------
+# Os links para "Diagrama N" e para os capítulos
+# ----------------------------------------------------------------------
+
+def _png() -> bytes:
+    import io
+
+    from PIL import Image
+
+    dados = io.BytesIO()
+    Image.new("L", (8, 8), 0).save(dados, format="PNG")
+    return dados.getvalue()
+
+
+def _figura():
+    from core.pagina import Figura
+
+    return Figura(_png(), 8, 8, fen="8/8/8/8/8/8/8/K6k w - - 0 1", origem="render")
+
+
+def _livro_numerado():
+    um, dois = _figura(), _figura()
+    return [
+        PaginaExtraida(numero=0, blocos=[
+            Paragrafo("Capítulo 1", titulo=True, nivel=1),
+            um, Paragrafo("Diagrama 1. Jogam as brancas"),
+            Paragrafo("Texto do primeiro capítulo.")]),
+        PaginaExtraida(numero=1, blocos=[
+            Paragrafo("Capítulo II", titulo=True, nivel=1),
+            dois, Paragrafo("Diagrama 2. Jogam as pretas"),
+            Paragrafo("Como no Diagrama 1, do capítulo 1; o diagrama 7 não existe e o "
+                      "Capítulo 2 é este.")]),
+    ], um, dois
+
+
+def test_as_legendas_numeram_os_diagramas_e_os_titulos_os_capitulos():
+    paginas, um, dois = _livro_numerado()
+    numeros = epub.numerados(paginas)
+    assert numeros.figuras == {id(um): 1, id(dois): 2}
+    assert numeros.capitulos == {id(paginas[0].blocos[0]): 1, id(paginas[1].blocos[0]): 2}
+    assert numeros.legendas == {id(paginas[0].blocos[2]), id(paginas[1].blocos[2])}
+
+
+def test_a_legenda_acima_vale_quando_o_livro_a_usa_e_o_numero_repetido_nao_e_alvo():
+    a, b, c = _figura(), _figura(), _figura()
+    # As legendas impressas acima: o parágrafo depois de `a` é a legenda de `b`.
+    paginas = [PaginaExtraida(numero=0, blocos=[
+        Paragrafo("Diagrama 1"), a, Paragrafo("Diagrama 2"), b,
+        Paragrafo("Diagrama 2"), c])]
+    assert epub.numerados(paginas).figuras == {id(a): 1}
+    # Romano malformado e título que não é de capítulo não numeram.
+    titulos = [PaginaExtraida(numero=0, blocos=[Paragrafo("Capítulo IIII", titulo=True, nivel=1),
+                                                Paragrafo("Capítulo 3", titulo=True, nivel=2)])]
+    assert epub.numerados(titulos).capitulos == {}
+
+
+def test_numeracao_por_capitulo_e_romano_minusculo_nao_viram_link():
+    alvos = {6: "c#dg6"}
+    assert epub.referencias_internas("o Diagrama 6.1 e o 6,2", "pt", {}, alvos, {}) == []
+    assert epub.referencias_internas("in chapter i", "en", {}, {}, {1: "c#t1"}) == []
+    assert epub.LEGENDA.match("Diagrama 6.1. Jogam as brancas") is None
+
+
+def test_referencias_internas_nao_se_sobrepoem():
+    texto = "Ver o Diagrama 6, p. 23, e o Chapter IV."
+    assert epub.referencias_internas(texto, "pt", {23: "c#pg"}, {6: "c#dg6"}, {4: "c#t4"}) == [
+        (6, 16, "c#dg6"), (18, 23, "c#pg"), (29, 39, "c#t4")]
+
+
+def test_o_epub_liga_diagramas_e_capitulos_e_a_legenda_nao_se_cita(tmp_path):
+    paginas, _, _ = _livro_numerado()
+    destino = tmp_path / "a.epub"
+    escrito = epub.escrever(paginas, destino, epub.Metadados("L"), limite_do_capitulo=10)
+    assert epub.conferir(destino) == []
+    with zipfile.ZipFile(destino) as z:
+        primeiro = z.read("OEBPS/texto/capitulo-001.xhtml").decode("utf-8")
+        segundo = z.read("OEBPS/texto/capitulo-002.xhtml").decode("utf-8")
+    assert '<figure class="diagrama" id="dg1">' in primeiro
+    assert '<a href="capitulo-001.xhtml#dg1">Diagrama 1</a>' in segundo
+    assert '<a href="capitulo-001.xhtml#t1">capítulo 1</a>' in segundo
+    assert '<a href="capitulo-002.xhtml#t2">Capítulo 2</a>' in segundo
+    assert "o diagrama 7 não" in segundo                       # sem alvo, fica texto
+    assert "<p>Diagrama 2. Jogam as pretas</p>" in segundo     # a legenda não se cita
+    assert escrito.links == 3
+    if os.environ.get("ABBY_EPUBCHECK"):
+        assert epub.epubcheck(destino) == []
+    if os.environ.get("ABBY_ACE"):
+        assert epub.ace(destino) == []
+
+
+@pytest.mark.skipif(not os.environ.get("ABBY_CALIBRE"),
+                    reason="o Calibre não está configurado (ABBY_CALIBRE)")
+def test_no_calibre_os_links_do_texto_levam_ao_diagrama_e_ao_capitulo(tmp_path):
+    """Num leitor de verdade (o Calibre, pelo PDF que ele renderiza do EPUB)."""
+    paginas, _, _ = _livro_numerado()
+    destino = tmp_path / "a.epub"
+    epub.escrever(paginas, destino, epub.Metadados("L"), limite_do_capitulo=10)
+    assert epub.calibre(destino) == []
+    # O link que some do texto é acusado.
+    with zipfile.ZipFile(destino) as z:
+        partes = {n: z.read(n) for n in z.namelist()}
+    partes["OEBPS/texto/capitulo-002.xhtml"] = partes["OEBPS/texto/capitulo-002.xhtml"].replace(
+        b'href="capitulo-001.xhtml#dg1"', b'href="capitulo-009.xhtml#dg1"')
+    quebrado = tmp_path / "quebrado.epub"
+    with zipfile.ZipFile(quebrado, "w") as z:
+        for nome, dados in partes.items():
+            z.writestr(nome, dados, zipfile.ZIP_STORED if nome == "mimetype" else zipfile.ZIP_DEFLATED)
+    assert epub.calibre(quebrado) == [
+        "o Calibre avisou: Referenced file 'OEBPS/texto/capitulo-009.xhtml' not found",
+        'o link "Diagrama 1" não saiu como link no PDF do Calibre']
+
+
+def test_calibre_sem_configuracao_e_none(tmp_path, monkeypatch):
+    monkeypatch.delenv("ABBY_CALIBRE", raising=False)
+    assert epub.calibre(tmp_path / "x.epub") is None
+
+
+def test_o_docx_liga_diagramas_e_capitulos(tmp_path):
+    from docx import Document
+
+    from abbychess import escritor_docx as ed
+
+    paginas, _, _ = _livro_numerado()
+    destino = tmp_path / "a.docx"
+    escrito = ed.escrever(paginas, destino, epub.Metadados("L"))
+    assert ed.conferir(destino) == []
+    assert escrito.links == 3
+    xml = Document(str(destino)).element.xml
+    for nome in ("dg1", "dg2", "cap1", "cap2"):
+        assert f'w:name="{nome}"' in xml
+    for ancora in ("dg1", "cap1", "cap2"):
+        assert f'w:anchor="{ancora}"' in xml

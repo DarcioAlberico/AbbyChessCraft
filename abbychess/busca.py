@@ -155,17 +155,27 @@ def _margens_pelas_linhas(pagina: Pagina, texto: str, gids: Sequence[Optional[in
 
 def _indexar_tarefa(tarefa) -> Optional[PaginaIndexada]:
     """No processo do pool (ou na thread, sem pool): a página indexada. `tarefa` é (fonte,
-    idioma, versão), a fonte o caminho do JSON v2 ou a própria `Pagina` (a que está na
-    memória, como instantâneo, e a v1, lida sem migrar)."""
+    idioma, versão), a fonte a própria `Pagina` (a que está na memória, como instantâneo, e a
+    v1, lida sem migrar), o caminho do JSON v2, ou (caminho, posição no livro, geometria e
+    tamanho da entrada): o arquivo de uma página girada ou cortada pode estar na geometria de
+    antes (§12.4, ela é levada à da entrada na leitura), e o `indice` gravado é o do PDF, e
+    não a posição."""
     fonte, idioma, versao = tarefa
     if isinstance(fonte, Pagina):
         return indexar_pagina(fonte, idioma, versao=versao)
+    from abbychess.modelo import reenquadrar
     from abbychess.projeto import _pagina_de_json
 
+    caminho, posicao, geometria, tamanho = (fonte if isinstance(fonte, tuple)
+                                            else (fonte, None, None, None))
     try:
-        pagina = _pagina_de_json(json.loads(Path(fonte).read_text(encoding="utf-8")))
+        pagina = _pagina_de_json(json.loads(Path(caminho).read_text(encoding="utf-8")))
+        if geometria is not None:
+            reenquadrar(pagina, geometria, tamanho)
     except (OSError, ValueError, KeyError, TypeError):
         return None
+    if posicao is not None:
+        pagina.indice = posicao
     return indexar_pagina(pagina, idioma, versao=versao)
 
 
@@ -216,10 +226,15 @@ class PoolDoIndice:
     def _abrir(self) -> Optional[ProcessPoolExecutor]:
         import multiprocessing
 
+        from abbychess.render import vigiar_o_pai
+
         with self._trava:
             if self._pool is None:
                 n = processos_para_indexar()
-                self._pool = ProcessPoolExecutor(n, mp_context=multiprocessing.get_context("spawn"))
+                # Sem o vigia, os filhos de um programa morto à força ficavam vivos (12 órfãos
+                # parados desde a manhã, achados em 2026-10-23).
+                self._pool = ProcessPoolExecutor(n, mp_context=multiprocessing.get_context("spawn"),
+                                                 initializer=vigiar_o_pai)
                 try:
                     list(self._pool.map(_aquecer, range(n)))
                 except Exception:               # o pool quebrado: o índice monta sem ele

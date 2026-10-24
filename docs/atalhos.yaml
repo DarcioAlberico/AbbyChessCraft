@@ -52,7 +52,7 @@ nativos:
             Shift+Up, Shift+Down, Shift+Home, Shift+End, Shift+PgUp, Shift+PgDn, Ctrl+Left,
             Ctrl+Right, Ctrl+Up, Ctrl+Down, Ctrl+Home, Ctrl+End, Ctrl+Shift+Left,
             Ctrl+Shift+Right, Ctrl+Shift+Up, Ctrl+Shift+Down, Ctrl+Shift+Home, Ctrl+Shift+End,
-            Backspace, Delete, Enter, Shift+Enter]
+            Backspace, Delete, Enter, Shift+Enter, Ctrl+Shift+Enter]
   graphicsview:
     perde: [Left, Right, Up, Down, PgUp, PgDn, Home, End]
   listview:
@@ -138,6 +138,10 @@ acoes:
       - {tecla: PgDn, widget: graphicsview, tipo: substitui, motivo: "rola uma tela e vira a página no fim (§3.3)"}
   - {id: reconhecer_pagina, descricao: Reconhecer a página, escopo: [global], padrao: F5, finereader: Ctrl+F9, desde_passo: A2}
   - {id: reconhecer_livro, descricao: Reconhecer o livro (lote), escopo: [global], padrao: Ctrl+Shift+F5, desde_passo: A2}
+  - {id: girar_a_direita, descricao: Girar à direita (a página aberta ou as escolhidas na gaveta),
+     escopo: [global], sem_atalho: [padrao, finereader], desde_passo: L}
+  - {id: girar_a_esquerda, descricao: Girar à esquerda (a página aberta ou as escolhidas na gaveta),
+     escopo: [global], sem_atalho: [padrao, finereader], desde_passo: L}
   - {id: reler_pendentes, descricao: Reler os pendentes, escopo: [global], padrao: Ctrl+R, desde_passo: A2}
   - {id: reconhecer_zona, descricao: Reconhecer só a zona escolhida, escopo: [imagem_areas], padrao: Ctrl+Shift+R,
      finereader: Ctrl+Shift+B, desde_passo: F}
@@ -170,6 +174,10 @@ acoes:
      sem_atalho: [padrao], finereader: Ctrl+F7, desde_passo: K}
   - {id: proximo_diagrama, descricao: Próximo diagrama por conferir do livro, escopo: [global], padrao: F8,
      finereader: Ctrl+F8, desde_passo: A1}
+  - {id: conferir_diagrama, descricao: Diagrama conferido (grava e vai ao próximo por conferir),
+     escopo: [diagrama], padrao: Ctrl+Enter, desde_passo: H}
+  - {id: diagrama_anterior, descricao: O diagrama anterior do livro, escopo: [diagrama], padrao: PgUp, desde_passo: H}
+  - {id: diagrama_seguinte, descricao: O diagrama seguinte do livro, escopo: [diagrama], padrao: PgDn, desde_passo: H}
 
   # --- Exibir: arranjos, painéis, zoom -------------------------------------------
   - {id: arranjo_so_imagem, descricao: Só a Imagem, escopo: [global], padrao: Ctrl+F6, finereader: F6, desde_passo: A2}
@@ -219,6 +227,12 @@ acoes:
   - {id: modo_areas, descricao: Editor de áreas, escopo: [global], padrao: Ctrl+Shift+A, desde_passo: A2}
   - {id: areas_automaticas, descricao: Refazer as áreas automáticas, escopo: [global],
      sem_atalho: [padrao, finereader], desde_passo: A2}
+  - {id: ordenar_areas, descricao: Ordenar áreas, escopo: [imagem_areas],
+     sem_atalho: [padrao, finereader], desde_passo: F}
+  - {id: salvar_modelo_areas, descricao: Salvar modelo de áreas, escopo: [imagem_areas],
+     sem_atalho: [padrao, finereader], desde_passo: F}
+  - {id: aplicar_modelo_areas, descricao: Aplicar modelo de áreas nesta página, escopo: [imagem_areas],
+     sem_atalho: [padrao, finereader], desde_passo: F}
 
   # --- Inspetor: Glifo (o treino) --------------------------------------------------
   - id: ensinar
@@ -308,7 +322,13 @@ acoes:
     excecoes:
       - {tecla: Shift+Enter, widget: textedit, tipo: redireciona, motivo: "a sessão de edição trata o Shift+Enter (§6.3)"}
   - {id: ensinar_no_documento, descricao: Confirmar e ensinar o glifo sob o cursor, escopo: [documento], padrao: Ctrl+Enter, desde_passo: D1}
-  - {id: novo_paragrafo, descricao: Novo parágrafo antes da palavra, escopo: [documento], padrao: Ctrl+Shift+Enter, desde_passo: G}
+  - id: novo_paragrafo
+    descricao: Novo parágrafo antes da palavra
+    escopo: [documento]
+    padrao: Ctrl+Shift+Enter
+    desde_passo: G
+    excecoes:
+      - {tecla: Ctrl+Shift+Enter, widget: textedit, tipo: redireciona, motivo: "o Documento grava a decisão de parágrafo em vez de inserir uma quebra livre"}
   - {id: ocultar_cabecalhos, descricao: Mostrar ou ocultar cabeçalhos e rodapés, escopo: [documento], padrao: Ctrl+Shift+H, desde_passo: A3}
   - {id: negrito, descricao: Negrito, escopo: [documento], padrao: Ctrl+B, desde_passo: G}
   - {id: italico, descricao: Itálico, escopo: [documento], padrao: Ctrl+I, desde_passo: G}

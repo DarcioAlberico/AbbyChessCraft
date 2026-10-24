@@ -3,18 +3,83 @@ exportação. Cada função pergunta o que precisa e chama os controladores com 
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from PySide6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
+from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
+                               QInputDialog, QLineEdit, QMessageBox)
 
 from abbychess import livro
+from abbychess import nativo
 from abbychess import pagina as pg
 from abbychess.projeto import ProjetoDeLivro, ProjetoInvalido
 
 FILTRO_DE_LIVROS = "Livros (*.pdf *.png *.jpg *.jpeg *.tif *.tiff *.bmp)"
 FILTROS_DE_EXPORTACAO = {"PDF pesquisável (*.pdf)": ".pdf", "Word (*.docx)": ".docx",
-                         "EPUB (*.epub)": ".epub"}
+                         "EPUB (*.epub)": ".epub", "Texto (*.txt)": ".txt",
+                         "PGN dos diagramas (*.pgn)": ".pgn"}
+
+IDIOMAS = (("Português", "pt"), ("English", "en"), ("Español", "es"),
+           ("Deutsch", "de"), ("Français", "fr"))
+
+
+@dataclass(frozen=True)
+class OpcoesDoNovoProjeto:
+    nome: str
+    idioma: str
+    intervalo: tuple[int, int]
+
+
+def intervalo_do_corpo(texto: str, total: int) -> tuple[int, int]:
+    """Um intervalo contínuo visível ao usuário, convertido para índices de zero."""
+    indices = livro.interpretar_intervalo(texto, total)
+    if not indices:
+        raise ValueError("Informe ao menos uma página do corpo do livro.")
+    if indices != list(range(indices[0], indices[-1] + 1)):
+        raise ValueError("O corpo do livro deve ser um intervalo contínuo, como 5-230.")
+    return indices[0], indices[-1]
+
+
+class DialogoDeNovoProjeto(QDialog):
+    """Nome, idioma e corpo num formulário só, depois da escolha do arquivo (§9.1)."""
+
+    def __init__(self, parent, nome: str, total: int):
+        super().__init__(parent)
+        self.setWindowTitle("Novo projeto")
+        self.total = total
+        self.nome = QLineEdit(nome)
+        self.idioma = QComboBox()
+        for rotulo, codigo in IDIOMAS:
+            self.idioma.addItem(rotulo, codigo)
+        self.intervalo = QLineEdit(f"1-{total}")
+        self.intervalo.setToolTip("Páginas do conteúdo, sem capa e sumário; por exemplo, 5-230")
+        botoes = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                                  QDialogButtonBox.StandardButton.Cancel)
+        botoes.accepted.connect(self._aceitar)
+        botoes.rejected.connect(self.reject)
+        formulario = QFormLayout(self)
+        formulario.addRow("Nome do livro:", self.nome)
+        formulario.addRow("Idioma:", self.idioma)
+        formulario.addRow(f"Corpo (páginas 1-{total}):", self.intervalo)
+        formulario.addRow(botoes)
+        self.opcoes: Optional[OpcoesDoNovoProjeto] = None
+
+    def _aceitar(self) -> None:
+        try:
+            intervalo = intervalo_do_corpo(self.intervalo.text(), self.total)
+        except ValueError as erro:
+            QMessageBox.warning(self, "Intervalo do corpo", str(erro))
+            self.intervalo.setFocus()
+            return
+        self.opcoes = OpcoesDoNovoProjeto(
+            self.nome.text().strip(), str(self.idioma.currentData()), intervalo)
+        self.accept()
+
+    @classmethod
+    def obter(cls, parent, nome: str, total: int) -> Optional[OpcoesDoNovoProjeto]:
+        dialogo = cls(parent, nome, total)
+        return dialogo.opcoes if dialogo.exec() == QDialog.DialogCode.Accepted else None
 
 
 def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
@@ -25,9 +90,13 @@ def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
     if not fonte:
         return None
     config.setValue("ultima_fonte", str(Path(fonte).parent))
-    nome, ok = QInputDialog.getText(janela, "Novo projeto", "Nome do livro:",
-                                    text=Path(fonte).stem)
-    if not ok:
+    try:
+        total = pg.FonteDePaginas(fonte).total
+    except OSError as erro:
+        QMessageBox.warning(janela, "Novo projeto", f"A fonte do livro não abriu:\n{erro}")
+        return None
+    opcoes = DialogoDeNovoProjeto.obter(janela, Path(fonte).stem, total)
+    if opcoes is None:
         return None
     padrao = config.value("pasta_dos_projetos", str(Path.home() / "AbbyChessCraft"))
     Path(padrao).mkdir(parents=True, exist_ok=True)
@@ -35,11 +104,40 @@ def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
         janela, "Pasta onde guardar o projeto (sem acentos no caminho)", padrao)
     if not pasta_mae:
         return None
+    importadas = ()
     try:
-        projeto = ProjetoDeLivro.criar(pasta_mae, nome, fonte)
+        projeto = ProjetoDeLivro.criar(pasta_mae, opcoes.nome, fonte)
     except ProjetoInvalido as erro:
         QMessageBox.warning(janela, "Novo projeto", str(erro))
         return None
+    projeto.dados.idioma = opcoes.idioma
+    # As listas de páginas vão por `pid` (§12.4): seguem a página que mudar de lugar.
+    projeto.dados.extras["intervalo_do_corpo"] = projeto.paginas_para_gravar(opcoes.intervalo)
+    projeto.salvar()
+    try:
+        camada = nativo.oferta(fonte)
+        if camada.disponivel and QMessageBox.question(
+                janela, "Texto nativo encontrado",
+                (f"O PDF tem texto tipográfico confiável em {camada.aceitas} de "
+                 f"{camada.amostradas} página(s) examinada(s). Usar esse texto sem OCR?"),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes) == QMessageBox.StandardButton.Yes:
+            resultado = nativo.importar(projeto, idioma=opcoes.idioma)
+            importadas = resultado.importadas
+            janela.statusBar().showMessage(
+                f"Texto nativo usado em {len(resultado.importadas)} página(s); "
+                f"{len(resultado.recusadas)} ficaram para OCR.", 12000)
+    except (OSError, ValueError) as erro:
+        # A oferta é uma otimização segura: se a camada não abre ou não monta, o projeto
+        # continua novo e o caminho de OCR de sempre permanece disponível.
+        QMessageBox.warning(janela, "Texto nativo",
+                            f"A camada de texto não pôde ser usada ({erro}). O OCR continua disponível.")
+    inicio, fim = opcoes.intervalo
+    candidatos = [i for i in range(inicio, fim + 1) if i not in set(importadas)]
+    projeto.dados.extras["amostra_guiada_pendente"] = bool(candidatos)
+    projeto.dados.extras[livro.CHAVE_DOS_CANDIDATOS_DA_AMOSTRA] = \
+        projeto.paginas_para_gravar(candidatos)
+    projeto.salvar()
     config.setValue("pasta_dos_projetos", pasta_mae)
     return projeto
 
@@ -116,8 +214,8 @@ def avisos_da_abertura(janela, projeto: ProjetoDeLivro) -> None:
         QMessageBox.information(
             janela, "Abrir projeto",
             "O projeto passou ao formato novo. Os programas de antes não o abrem mais "
-            "para trabalhar (só para ver). A cópia das páginas, das áreas e do "
-            f"projeto.json de antes está em\n{projeto.pasta / 'backup-v1'}")
+            "para trabalhar (só para ver). A cópia dos arquivos de antes está em\n"
+            + "\n".join(str(p) for p in projeto.backups_da_migracao))
     if projeto.fonte_relocalizada:
         QMessageBox.information(
             janela, "Abrir projeto", f"A fonte do livro não estava mais no lugar "
@@ -170,6 +268,30 @@ def intervalo_do_lote(janela, projeto, total: int) -> Optional[Tuple[List[int], 
             return None
         refazer = resposta == botoes.Yes
     return indices, refazer
+
+
+def paginas_do_modelo_de_areas(janela, total: int) -> Optional[List[int]]:
+    """Intervalo e paridade em que aplicar um modelo de áreas."""
+    texto, ok = QInputDialog.getText(
+        janela, "Aplicar modelo de áreas",
+        f"Páginas (de 1 a {total}; por exemplo 5-20):", text=f"1-{total}")
+    if not ok:
+        return None
+    try:
+        indices = livro.interpretar_intervalo(texto, total)
+    except ValueError as erro:
+        QMessageBox.warning(janela, "Aplicar modelo de áreas", str(erro))
+        return None
+    escolha, ok = QInputDialog.getItem(
+        janela, "Aplicar modelo de áreas", "Aplicar a:",
+        ["Todas", "Páginas ímpares", "Páginas pares"], 0, False)
+    if not ok:
+        return None
+    if escolha == "Páginas ímpares":
+        indices = [i for i in indices if (i + 1) % 2 == 1]
+    elif escolha == "Páginas pares":
+        indices = [i for i in indices if (i + 1) % 2 == 0]
+    return indices
 
 
 def reler_depois(janela, paginas, *, faltou: bool) -> Optional[bool]:

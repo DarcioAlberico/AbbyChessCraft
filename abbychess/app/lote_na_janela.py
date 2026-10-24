@@ -15,6 +15,17 @@ class LoteNaJanela:
         self.carregando.hide()
         leitor = self.leitor
         dialogos.avisos_dos_modelos(self, estado, leitor.arquivos_de_padrao() if leitor else 0)
+        self.livro.iniciar_amostra_guiada()
+
+    def _amostra_terminou(self, paginas) -> None:
+        """A primeira fila já abre por caractere, pronta para o primeiro Enter."""
+        self.fila.definir("caractere")
+        self.fila.definir_escopo("pagina")
+        self.atualizar_fila()
+        self.relogio_das_paginas.start()
+        self.statusBar().showMessage(
+            f"Amostra pronta nas páginas {', '.join(str(i + 1) for i in paginas)}. "
+            "Revise por caractere e ensine com Enter.", 15000)
 
     def _servidor_caiu(self, texto: str, desistiu: bool) -> None:
         """§11: a primeira queda do servidor de leitura (reaberto sozinho) vai para os Avisos;

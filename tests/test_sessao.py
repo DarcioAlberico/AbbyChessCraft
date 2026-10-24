@@ -1,9 +1,9 @@
-"""A sessão de edição do Documento, sem Qt (SPEC §6.3, as linhas do passo D1; §6.4).
+"""A sessão de edição do Documento, sem Qt (SPEC §6.3 e §6.4).
 
 Cada linha D1 da tabela de §6.3 numa página sintética (as palavras montadas pelo core, como
 na janela): o 1 → 1 (CA-6.2), o glifo que sai, a letra que faltou (no meio, no começo e a
 palavra nova), o espaço inserido (CA-6.3) e o apagado, o colar de várias linhas; o que é do
-passo G recusa sem mudar nada; e as figurinas (CA-6.7).
+as operações estruturais do passo G; e as figurinhas (CA-6.7).
 """
 
 from __future__ import annotations
@@ -117,14 +117,14 @@ def test_colar_varias_linhas_vira_espacos():
     assert _texto(p) == "ganhar tempos"
 
 
-@pytest.mark.parametrize("de, para", [("rnar", "mar"), ("mar", "rnar")])
-def test_o_que_e_do_passo_g_recusa_sem_mudar_nada(de, para):
+@pytest.mark.parametrize(("de", "para", "boxes"), [("rnar", "mar", 3), ("mar", "rnar", 3)])
+def test_ca_6_4_junta_ou_divide_os_boxes(de, para, boxes):
     p = _pagina(de)
-    antes = p.instantaneo()
-    with pytest.raises(ss.Recusa, match="próxima versão"):
-        _editar(p, de, para)
-    assert [b.entry.as_state() for b in p.boxes] == [b.entry.as_state() for b in antes.boxes]
-    assert p.decisoes == antes.decisoes
+    plano = _editar(p, de, para)
+    assert _texto(p) == para and len(p.boxes) == boxes
+    assert plano.juntar_boxes if len(de) > len(para) else plano.dividir_boxes
+    estrutural = plano.estrutural()
+    assert "glifos juntados" in estrutural if len(de) > len(para) else "dividido" in estrutural
 
 
 def test_sem_mudanca_so_revisa():
@@ -217,11 +217,11 @@ def test_o_espaco_junto_de_um_virtual(pagina, com_virtual, para):
     assert _texto(p) == para
 
 
-def test_uma_letra_no_meio_da_ligadura_e_do_passo_g():
+def test_uma_letra_no_meio_da_ligadura_divide_ou_cria_caixa_multicaractere():
     p = _pagina("afb")
     p.boxes[1] = Box(p.boxes[1].gid, BoxEntry("fi", 42, 20, 60, 50, 0.9, "net"))
-    with pytest.raises(ss.Recusa, match="dividir um glifo"):
-        _editar(p, "afib", "afxib")
+    plano = _editar(p, "afib", "afxib")
+    assert _texto(p) == "afxib" and plano.dividir_boxes
 
 
 def test_o_que_ninguem_tocou_fica_com_o_glifo_dele():
@@ -262,12 +262,12 @@ def test_trocar_a_letra_e_partir_corrige_o_glifo_sem_tirar_o_box(de, para, onde,
     assert _texto(p) == para.strip()
 
 
-def test_apagar_o_hifen_de_fim_de_linha_e_do_passo_g():
+def test_apagar_o_hifen_de_fim_de_linha_remove_o_box_e_mantem_a_linha_fisica():
     p = _pagina("exem-", "plo")
-    antes = p.instantaneo()
-    with pytest.raises(ss.Recusa, match="hífen"):
-        _editar(p, "exem-\nplo", "exemplo")
-    assert [b.gid for b in p.boxes] == [b.gid for b in antes.boxes]
+    hifen = p.boxes[4].gid
+    plano = _editar(p, "exem-\nplo", "exemplo")
+    assert hifen in plano.sair and hifen not in p.vivos
+    assert _texto(p) == "exem\nplo"
 
 
 def test_apagar_a_quebra_de_linha_avisa_que_ela_fica():

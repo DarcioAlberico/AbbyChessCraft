@@ -49,9 +49,11 @@ from abbychess import ancoragem as ag
 from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import historico as hs
+from abbychess import lances as lc
 from abbychess import pagina as pg
 from abbychess import procedencia
 from abbychess import servidor_de_leitura as sl
+from abbychess import sequencia as sq
 from abbychess import sessao as ss
 from abbychess import texto as tx
 from abbychess import zonas as zn
@@ -134,6 +136,8 @@ class ControladorDePagina:
         self.indice = 0
         self.imagem = None
         self.matriz: Optional[np.ndarray] = None
+        #: A imagem de que a `matriz` é o cinza (quem troca `imagem` à mão não a leva junto).
+        self._matriz_da_imagem = None
         #: A página no modelo; `None` enquanto nada dela foi gravado (nasce na 1ª mudança).
         self.modelo: Optional[Pagina] = None
         #: O glifo em revisão, os pulados e a seleção do modo de treino, por gid.
@@ -145,6 +149,11 @@ class ControladorDePagina:
         #: Chamado antes de sair da página aberta (outra página, o Ctrl+T): a janela confirma
         #: ali a sessão aberta do Documento (§6.3), que não pode ficar para depois.
         self.antes_de_sair_da_pagina: Optional[Callable[[], None]] = None
+        #: Feito com a matriz da página na thread que a renderiza (a da pré-carga, quase
+        #: sempre): a janela põe aqui a `QImage` dela, e a conversão sai da interface.
+        self.preparar_imagem: Optional[Callable[[np.ndarray], object]] = None
+        #: +1 ou -1: o sentido do último passo entre páginas, o da pré-carga.
+        self._sentido = 1
         #: O livro tem figurinas lidas (o modo "livro" das peças, §6.4): o "sim" fica guardado
         #: até outro projeto; sem ele (None), o resumo das páginas é consultado de novo.
         self._livro_tem_figurinas: Optional[bool] = None
@@ -189,6 +198,13 @@ class ControladorDePagina:
     @property
     def gids(self) -> List[int]:
         return [b.gid for b in self.modelo.boxes] if self.modelo is not None else []
+
+    def _cinza(self):
+        """A página aberta para recortar glifos: a matriz do cache quando é a desta imagem
+        (converter de novo custava ~7 ms em cada clique e em cada Enter), senão a imagem."""
+        if self.matriz is not None and self._matriz_da_imagem is self.imagem:
+            return self.matriz
+        return self.imagem
 
     def indice_de(self, gid: Optional[int]) -> Optional[int]:
         if gid is None or self.modelo is None:
@@ -304,6 +320,17 @@ class ControladorDePagina:
         pagina.diagramas = self.diagramas
         return tx.montar(pagina, com_os_nao_lidos=True)
 
+    def linhas_dos_diagramas(self) -> List[List[lc.Lance]]:
+        """A primeira linha de lances do texto que segue cada diagrama (§10), na ordem de
+        `diagramas`, para a conferência validar a posição enquanto ela é corrigida."""
+        if self.modelo is None or not self.modelo.tabuleiros:
+            return []
+        pagina = self.modelo.instantaneo()
+        pagina.diagramas = dg.com_ids(self.diagramas)
+        idioma = self.projeto.dados.idioma if self.projeto is not None else "pt"
+        textos = lc.textos_depois(tx.montar(pagina))
+        return [lc.primeira_linha(textos.get(d.id, ""), idioma) for d in pagina.diagramas]
+
     def gids_de_margem(self) -> frozenset:
         """Os glifos do cabeçalho e do rodapé corridos da página, pela regra da exportação
         (`exportar.margens_corridas`: a faixa, o vão e o número da página), até o layout do
@@ -356,8 +383,14 @@ class ControladorDePagina:
         self.geracao += 1
         self.lote_rodando = False               # o lote do projeto anterior não vale aqui
         self.projeto, self.fonte, self.leitor = projeto, fonte, leitor
-        #: As páginas renderizadas mais recentes e a pré-carga da seguinte (§14.1).
-        self.cache = pg.CacheDePaginas(fonte) if fonte is not None else None
+        #: As páginas renderizadas mais recentes e a pré-carga da seguinte (§14.1), que
+        #: renderiza o PDF num processo à parte (`render.do_programa`).
+        from abbychess import render
+
+        self.cache = (pg.CacheDePaginas(fonte, preparar=self.preparar_imagem,
+                                        renderizador=render.do_programa())
+                      if fonte is not None else None)
+        self._sentido = 1
         #: As páginas visitadas, para Alt+← e Alt+→ (§3.3), e onde se está nelas.
         self.visitas: List[int] = []
         self._visita = -1
@@ -381,7 +414,10 @@ class ControladorDePagina:
         except OSError as erro:
             self.eventos.emitir("aviso", "Página", str(erro))
             return False
+        if indice != self.indice:
+            self._sentido = 1 if indice > self.indice else -1
         self.indice, self.imagem, self.matriz = indice, imagem, matriz
+        self._matriz_da_imagem = imagem
         self._letra_que_faltava = None
         if visita:
             self._registrar_visita(indice)
@@ -394,18 +430,28 @@ class ControladorDePagina:
             self._ler_os_aguardando(self.modelo, indice, None)
             if not self.reconhecida:
                 self._avisar(f"Página com {len(self.boxes)} glifo(s) marcados à mão e ainda não "
-                             "reconhecida. O F5 reconhece o resto e mantém os quadros.", 10000)
+                             "reconhecida. O {reconhecer_pagina} reconhece o resto e mantém "
+                             "os quadros.", 10000)
         else:
             self.eventos.emitir("atual_mudou")
         self.eventos.emitir("acoes_mudaram")
         return True
 
     def precarregar_seguinte(self) -> None:
-        """Renderiza a página seguinte, a mais provável, noutra thread. A janela chama depois
-        de pintar a atual: dentro do `ir_para`, a pré-carga disputava a CPU com a conversão e
-        a pintura da página pedida, e a troca fora do cache ficava ~60 ms mais lenta."""
+        """Renderiza a próxima página no sentido em que se anda (a seguinte, ou a anterior
+        depois de um PgUp), a mais provável, noutra thread. A janela chama depois de pintar a
+        atual: dentro do `ir_para`, a pré-carga disputava a CPU com a conversão e a pintura
+        da página pedida, e a troca fora do cache ficava ~60 ms mais lenta."""
         if self.cache is not None and self.fonte is not None:
-            self.cache.precarregar(self.indice + 1)
+            self.cache.precarregar(self.proxima_provavel)
+
+    @property
+    def proxima_provavel(self) -> int:
+        """A página que a pré-carga prepara: a vizinha no sentido do último passo; na ponta do
+        livro (o Home deixa o sentido para trás na primeira), a do outro lado."""
+        alvo = self.indice + self._sentido
+        total = self.fonte.total if self.fonte is not None else 0
+        return alvo if 0 <= alvo < total else self.indice - self._sentido
 
     # ------------------------------------------------------------------
     # Navegação (§3.3)
@@ -454,6 +500,404 @@ class ControladorDePagina:
     def vizinha(self, passo: int) -> bool:
         """A página anterior (-1) ou a seguinte (+1), se houver."""
         return self.ir_para(self.indice + passo)
+
+    # ------------------------------------------------------------------
+    # As operações de página (§12.4, passo L): reordenar, apagar, restaurar, inserir
+    # ------------------------------------------------------------------
+    def motivo_para_nao_mudar_as_paginas(self) -> Optional[str]:
+        """Por que as operações de página estão desligadas agora, ou None (§12.4: só para
+        leitura, o lote rodando, o projeto ainda na v2)."""
+        if self.projeto is None or self.fonte is None:
+            return "Nenhum projeto aberto."
+        if self.projeto.somente_leitura:
+            return "O projeto está aberto só para leitura."
+        if not self.projeto.sequencia_gravada:
+            return ("O projeto ainda está no formato antigo: abra-o com a fonte do livro no "
+                    "lugar para passar ao novo.")
+        if self.lote_rodando:
+            return "O lote está lendo o livro: espere-o terminar, ou cancele-o."
+        if self._em_leitura:
+            # A leitura que chega grava a página de quando foi pedida.
+            return "O servidor está lendo glifos da página: espere a leitura chegar."
+        if not self._agora():
+            # Uma tarefa (o F5, uma gravação da sessão) usa a posição de agora: mudar a
+            # ordem no meio dela a faria gravar noutra página.
+            return "Espere a tarefa em curso terminar."
+        return None
+
+    def mover_paginas(self, posicoes: Sequence[int], depois_da: int) -> bool:
+        """As páginas das `posicoes` vão para depois da posição `depois_da` (-1: o começo)."""
+        return self._mudar_sequencia(
+            lambda s: s.mover(sq.pids_da_selecao(s, posicoes), depois_da),
+            f"Mover {sq.quantas_paginas(len(set(posicoes)))}")
+
+    def apagar_paginas(self, posicoes: Sequence[int]) -> bool:
+        """As páginas saem do livro para as apagadas (os JSON e as amostras ficam)."""
+        return self._mudar_sequencia(lambda s: s.apagar(sq.pids_da_selecao(s, posicoes)),
+                                     f"Apagar {sq.quantas_paginas(len(set(posicoes)))}")
+
+    def restaurar_paginas(self, pids: Sequence[int]) -> bool:
+        """As páginas apagadas voltam ao lugar de onde saíram, com o mesmo `pid`."""
+        return self._mudar_sequencia(lambda s: s.restaurar(pids),
+                                     f"Restaurar {sq.quantas_paginas(len(set(pids)))}")
+
+    def inserir_paginas(self, caminhos: Sequence, na_posicao: int) -> bool:
+        """As páginas dos arquivos (PDF ou imagem, copiados para `inseridas/`) entram a partir
+        da posição `na_posicao` (0: antes da primeira)."""
+        from abbychess.projeto import ProjetoInvalido
+
+        motivo = self.motivo_para_nao_mudar_as_paginas()
+        if motivo is not None:
+            self._avisar(motivo, 8000)
+            return False
+        if not 0 <= na_posicao <= len(self.projeto.sequencia) or not caminhos:
+            self._avisar("Inserir páginas: diga os arquivos e onde inseri-los.", 8000)
+            return False
+        novas = []
+        try:
+            for caminho in caminhos:
+                novas += self.projeto.inserir_arquivo(caminho)
+        except (ProjetoInvalido, OSError) as erro:
+            self.eventos.emitir("aviso", "Inserir páginas", f"{erro} Nada foi inserido.")
+            return False
+
+        def desfeita(antes: "sq.Sequencia") -> "sq.Sequencia":
+            # Desfazer põe as inseridas nas apagadas (e não as esquece): lidas pelo F5 ou pelo
+            # lote, que não entram no desfazer, elas voltam por Páginas apagadas, com a fonte
+            # certa (um JSON de página órfão viraria página do livro).
+            return sq.Sequencia(antes.entradas, antes.apagadas + tuple(
+                sq.Apagada(e, na_posicao + k) for k, e in enumerate(novas)))
+
+        return self._mudar_sequencia(lambda s: s.inserir(novas, na_posicao),
+                                     f"Inserir {sq.quantas_paginas(len(novas))}",
+                                     desfeita=desfeita)
+
+    def girar_paginas(self, posicoes: Sequence[int], graus: int) -> bool:
+        """Gira as páginas `graus` (90, 180 ou 270) no sentido horário (§12.4). Os boxes vão
+        juntos, com conta exata (`modelo.reenquadrar`); a página com boxes guarda o ângulo de
+        endireitar em que foi lida (`_aplicar_sequencia`, também no Ctrl+Z)."""
+        graus %= 360
+        if graus not in (90, 180, 270):
+            self._avisar("Girar páginas: só 90°, 180° ou 270°.", 6000)
+            return False
+
+        nota = []
+
+        def fazer(s):
+            nova = s
+            pids = sq.pids_da_selecao(s, posicoes)
+            for pid in pids:
+                e = nova.entrada_de(pid)
+                nova = nova.com_entrada(replace(e, giro=(e.giro + graus) % 360,
+                                                tamanho=e.tamanho or self._tamanho(e)))
+            lidas = {self.projeto.pid_da_pagina(i) for i in self.projeto.paginas_lidas()}
+            if lidas.intersection(pids):
+                # Os glifos vão junto, mas a leitura (a ordem das linhas, o texto deitado) é a
+                # da posição de antes.
+                nota.append("a leitura é da posição de antes; F5 lê de novo")
+            return nova
+
+        sentido = {90: "à direita", 180: "de cabeça para baixo", 270: "à esquerda"}[graus]
+        return self._mudar_sequencia(
+            fazer, f"Girar {sq.quantas_paginas(len(set(posicoes)))} {sentido}", nota=nota)
+
+    def cortar_paginas(self, posicoes: Sequence[int], margens: Sequence[float]) -> bool:
+        """Corta as páginas pelas margens `(esquerda, cima, direita, baixo)`, frações da imagem
+        que se vê (uma página já cortada é cortada dentro do que se vê). O glifo que sai do
+        quadro fica guardado na página (`Pagina.fora`): o Ctrl+Z, ou tirar o corte, o
+        devolvem com o mesmo gid."""
+        from abbychess import geometria as geo
+
+        esquerda, cima, direita, baixo = (float(m) for m in margens)
+        if min(esquerda, cima, direita, baixo) < 0 or esquerda + direita >= 1 \
+                or cima + baixo >= 1:
+            self._avisar("Cortar páginas: as margens somadas deixam a página vazia.", 6000)
+            return False
+
+        def fazer(s):
+            nova = s
+            for pid in sq.pids_da_selecao(s, posicoes):
+                e = nova.entrada_de(pid)
+                tamanho = e.tamanho or self._tamanho(e)
+                largura, altura = geo.tamanho_da_imagem(e.geometria, tamanho)
+                vista = (round(esquerda * largura), round(cima * altura),
+                         largura - round(direita * largura), altura - round(baixo * altura))
+                if vista[2] <= vista[0] or vista[3] <= vista[1]:
+                    raise ValueError(f"a página {s.posicao_de(pid) + 1} ficaria vazia")
+                nova = nova.com_entrada(replace(
+                    e, quadro=geo.quadro_da_vista(vista, e.geometria, tamanho), tamanho=tamanho))
+            return nova
+
+        return self._mudar_sequencia(fazer, f"Cortar {sq.quantas_paginas(len(set(posicoes)))}")
+
+    def tirar_o_corte(self, posicoes: Sequence[int]) -> bool:
+        """A página inteira de volta (o giro fica); os glifos guardados voltam. A metade de
+        uma divisão não: o quadro dela é a divisão (o Ctrl+Z junta as metades)."""
+        def fazer(s):
+            nova = s
+            for pid in sq.pids_da_selecao(s, posicoes):
+                e = nova.entrada_de(pid)
+                if e.metade is not None:
+                    raise ValueError(f"a página {s.posicao_de(pid) + 1} é a metade de uma "
+                                     "divisão; o Ctrl+Z da divisão junta as metades")
+                nova = nova.com_entrada(replace(e, quadro=None))
+            return nova
+
+        return self._mudar_sequencia(
+            fazer, f"Tirar o corte de {sq.quantas_paginas(len(set(posicoes)))}")
+
+    def dividir_paginas(self, posicoes: Sequence[int], fracao: float = 0.5) -> bool:
+        """Divide as páginas espelhadas (§12.4) na `fracao` da largura do que se vê: a metade
+        esquerda fica com o `pid`, a direita entra logo depois com um `pid` novo, e os glifos
+        dela ganham gids novos (`gids_movidos`, para as amostras acharem a origem). As páginas
+        são gravadas inteiras com a sequência; o Ctrl+Z as junta de novo e aposenta o `pid`
+        novo. A metade de uma divisão não se divide de novo: na seleção, ela é pulada (com
+        aviso). Nada é medido aqui (seria um render por página, na thread da interface): a
+        direita recebe o ângulo guardado da página, e sem ele mede o mesmo, da mesma página
+        inteira, quando abrir."""
+        from abbychess import geometria as geo
+        from abbychess import modelo as md
+
+        fracao = float(fracao)
+        if not 0 < fracao < 1:
+            self._avisar("Dividir páginas: a divisão fica dentro da página.", 6000)
+            return False
+        angulos, troca, nota = [], {}, []
+
+        def fazer(s):
+            projeto = self.projeto
+            projeto.descarregar()               # nada do gravador chega depois da divisão
+            movidos = dict(projeto.dados.gids_movidos)
+            nova, paginas, metades = s, {}, 0
+            for pid in sq.pids_da_selecao(s, posicoes):
+                e = nova.entrada_de(pid)
+                if e.metade is not None:
+                    metades += 1
+                    continue
+                tamanho = e.tamanho or self._tamanho(e)
+                largura, altura = geo.tamanho_da_imagem(e.geometria, tamanho)
+                corte = round(fracao * largura)
+                if not 0 < corte < largura:
+                    raise ValueError(f"a página {s.posicao_de(pid) + 1} é estreita demais")
+                pid_novo = projeto.novo_pid()
+                esquerda = replace(e, metade="esquerda", tamanho=tamanho,
+                                   quadro=geo.quadro_da_vista((0, 0, corte, altura),
+                                                              e.geometria, tamanho))
+                direita = replace(e, pid=pid_novo, metade="direita", tamanho=tamanho,
+                                  quadro=geo.quadro_da_vista((corte, 0, largura, altura),
+                                                             e.geometria, tamanho))
+                nova = nova.com_entrada(esquerda)
+                nova = nova.inserir([direita], nova.posicao_de(pid) + 1)
+                pagina = projeto.carregar_modelo(s.posicao_de(pid))
+                if pagina is None:
+                    paginas[pid] = paginas[pid_novo] = (None, None)
+                else:
+                    pagina_e, pagina_d, m = md.dividir(pagina, corte, esquerda.geometria,
+                                                       direita.geometria, tamanho, pid_novo)
+                    paginas[pid] = (pagina.instantaneo(), pagina_e)
+                    paginas[pid_novo] = (None, pagina_d)
+                    movidos.update({str(velho): novo for velho, novo in m.items()})
+                    # Os boxes da direita estão no ângulo em que a página foi lida (o
+                    # guardado; sem ele, a direita mede o mesmo, da mesma página inteira).
+                    guardado = self.fonte.inclinacao_guardada(e)
+                    if guardado is not None:
+                        angulos.append((direita, guardado))
+            if metades and nova == s:
+                raise ValueError("as páginas escolhidas já são metades de uma divisão")
+            if metades:
+                nota.append(f"{sq.quantas_paginas(metades)} já "
+                            f"{'era metade' if metades == 1 else 'eram metades'}, e "
+                            f"{'ficou' if metades == 1 else 'ficaram'} como "
+                            f"{'estava' if metades == 1 else 'estavam'}")
+            troca.update(paginas=paginas, movidos=(dict(projeto.dados.gids_movidos), movidos))
+            return nova
+
+        sequencia = self.projeto.sequencia if self.projeto is not None else None
+        ja_metades = {p for p in set(posicoes) if sequencia is not None
+                      and 0 <= p < len(sequencia) and sequencia.entrada_em(p).metade}
+        a_dividir = len(set(posicoes)) - len(ja_metades) or len(set(posicoes))
+        return self._mudar_sequencia(fazer, f"Dividir {sq.quantas_paginas(a_dividir)}",
+                                     troca=troca, nota=nota,
+                                     depois_de_gravar=lambda: self._guardar_os_angulos(angulos))
+
+    #: O maior ângulo de endireitar à mão, em graus (para mais, girar de 90 em 90).
+    ENDIREITAR_NO_MAXIMO = 20.0
+
+    def endireitar_paginas(self, posicoes: Sequence[int], angulo: Optional[float]) -> bool:
+        """Endireita as páginas à mão (§12.4, CA-12.14): o `angulo` (graus, anti-horário, como
+        `pagina.girar`) vence o medido; None volta ao medido. A leitura da página com glifos
+        se desfaz: ficam os marcados à mão (a leitura digitada, ou o glifo aceito na revisão),
+        girados em volta do centro, e as áreas do usuário; o resto sai, e a página vai a
+        `glifos_marcados` (`modelo.endireitar`). O Ctrl+Z devolve o ângulo e a página."""
+        from abbychess import modelo as md
+        from abbychess.leitor import FONTE_MANUAL
+
+        if angulo is not None:
+            angulo = round(float(angulo), 2)
+            if abs(angulo) > self.ENDIREITAR_NO_MAXIMO:
+                self._avisar(f"Endireitar páginas: no máximo {self.ENDIREITAR_NO_MAXIMO:g}° "
+                             "(para mais, gire a página).", 6000)
+                return False
+
+        def manter(box) -> bool:
+            return box.entry.source == FONTE_MANUAL or box.revisado
+
+        troca = {}
+
+        def fazer(s):
+            projeto = self.projeto
+            projeto.descarregar()
+            nova, paginas = s, {}
+            for pid in sq.pids_da_selecao(s, posicoes):
+                e = nova.entrada_de(pid)
+                if e.angulo == angulo:
+                    continue
+                tamanho = e.tamanho or self._tamanho(e)
+                outra = replace(e, angulo=angulo, tamanho=tamanho)
+                nova = nova.com_entrada(outra)
+                pagina = projeto.carregar_modelo(s.posicao_de(pid))
+                if pagina is None:
+                    continue                    # sem leitura: nada a medir nem a girar
+                delta = self.fonte.inclinacao_da_entrada(outra) - \
+                    self.fonte.inclinacao_da_entrada(e)
+                if delta:
+                    paginas[pid] = (pagina.instantaneo(),
+                                    md.endireitar(pagina, delta, tamanho, manter))
+            if paginas:
+                movidos = dict(projeto.dados.gids_movidos)
+                troca.update(paginas=paginas, movidos=(movidos, movidos))
+            return nova
+
+        como = "pelo ângulo medido" if angulo is None else f"em {angulo:g}°"
+        return self._mudar_sequencia(
+            fazer, f"Endireitar {sq.quantas_paginas(len(set(posicoes)))} {como}", troca=troca)
+
+    def _tamanho(self, entrada) -> tuple:
+        return tuple(self.fonte.tamanho_da_fonte(entrada))
+
+    def _angulos_a_guardar(self, antes, nova) -> list:
+        """(entrada nova, ângulo) de cada página com boxes que muda de giro: ela fica no
+        ângulo de endireitar em que foi lida (§12.4: um ângulo medido de novo, na página
+        girada, os tiraria do lugar). Vale na operação e no Ctrl+Z e Ctrl+Y dela: a página
+        lida depois do giro desfeito guarda o ângulo do giro. Só lê; `_guardar_os_angulos`
+        grava."""
+        mudam = [e for e in nova.entradas
+                 if antes.entrada_de(e.pid) is not None
+                 and antes.entrada_de(e.pid).giro != e.giro]
+        if not mudam:
+            return []
+        # O guardado, sem medir (um render por página, na thread da interface): a página lida
+        # foi aberta e medida; a que ganhou boxes sem abrir não tem ângulo a guardar.
+        com_dados = {self.projeto.pid_da_pagina(i) for i in self.projeto.resumo_do_livro()}
+        angulos = []
+        for e in mudam:
+            if e.pid in com_dados:
+                guardado = self.fonte.inclinacao_guardada(antes.entrada_de(e.pid))
+                if guardado is not None:
+                    angulos.append((e, guardado))
+        return angulos
+
+    def _guardar_os_angulos(self, angulos) -> None:
+        """Grava os ângulos (a sequência nova já está gravada, e a página girada ainda não foi
+        mostrada) e tira do cache a imagem endireitada por outro ângulo."""
+        if not angulos:
+            return
+        try:
+            self.fonte.fixar_inclinacoes(angulos)
+        except OSError:
+            # O ângulo vale na memória; numa outra sessão a página é medida de novo, e os
+            # boxes podem andar uns pixels.
+            log.warning("os ângulos de %d página(s) não foram gravados", len(angulos),
+                        exc_info=True)
+        if self.cache is not None:
+            for entrada, _angulo in angulos:
+                self.cache.esquecer(entrada)
+
+    def _mudar_sequencia(self, fazer, descricao: str, *, desfeita=None,
+                         depois_de_gravar=None, troca: Optional[dict] = None,
+                         nota: Sequence[str] = ()) -> bool:
+        """Uma operação de página: a sequência nova gravada, uma transação do desfazer com a
+        de antes e a de depois (§14.2), e a janela seguindo a página aberta. `desfeita(antes)`
+        é a sequência que o desfazer põe, quando não é a de antes (a do inserir);
+        `depois_de_gravar()` roda com a sequência nova gravada, antes de mostrar a página.
+        `troca`, que `fazer` preenche, traz as páginas trocadas inteiras (dividir):
+        `paginas` (pid -> (instantâneo antes, a página nova)) e `movidos` (os `gids_movidos`
+        antes e depois). `nota`, que `fazer` também preenche, vai no aviso de feito."""
+        motivo = self.motivo_para_nao_mudar_as_paginas()
+        if motivo is not None:
+            self._avisar(motivo, 8000)
+            return False
+        if self.antes_de_sair_da_pagina is not None:
+            # A sessão do Documento aberta entra antes: `fazer` olha quais páginas têm boxes.
+            self.antes_de_sair_da_pagina()
+        antes = self.projeto.sequencia
+        try:
+            nova = fazer(antes)
+        except (ValueError, IndexError) as erro:
+            self._avisar(f"{descricao}: {erro}.", 8000)
+            return False
+        except (OSError, RuntimeError) as erro:   # a fonte ilegível (o tamanho, o ângulo)
+            self.eventos.emitir("aviso", "Páginas", f"{descricao}: a fonte não foi lida "
+                                f"({erro}); nada mudou.")
+            return False
+        if nova == antes:
+            self._avisar(f"{descricao}: nada muda.", 6000)
+            return False
+        if desfeita is not None:
+            antes = desfeita(antes)
+        transacao = hs.Transacao(descricao, sequencia=(antes, nova))
+        gravar = None
+        if troca:
+            novas = {pid: depois for pid, (_antes, depois) in troca["paginas"].items()}
+            transacao.inteiras = {
+                pid: (velha, None if depois is None else depois.instantaneo())
+                for pid, (velha, depois) in troca["paginas"].items()}
+            transacao.movidos = troca["movidos"]
+
+            def gravar(s):
+                self.projeto.trocar_paginas(s, novas, troca["movidos"][1])
+        try:
+            self._aplicar_sequencia(nova, depois_de_gravar, gravar)
+        except OSError as erro:
+            self.eventos.emitir("aviso", "Páginas", f"{descricao} não foi gravado ({erro}); "
+                                "nada mudou.")
+            return False
+        self.historico.registrar(transacao)
+        self.eventos.emitir("acoes_mudaram")
+        extra = "".join(f" ({n})" for n in nota)
+        self._avisar(f"Feito: {descricao}{extra}. Ctrl+Z desfaz.", 6000)
+        return True
+
+    def _aplicar_sequencia(self, nova: "sq.Sequencia", depois_de_gravar=None,
+                           gravar=None) -> None:
+        """Grava a sequência (com `gravar(nova)`, se dado: a das páginas trocadas inteiras) e
+        leva a janela junto: as visitas e a página aberta pelo `pid` (a apagada dá lugar à
+        vizinha), e `sequencia_mudou` para quem guarda posições."""
+        projeto = self.projeto
+        aberta = projeto.sequencia.entrada_em(self.indice) if self.imagem is not None else None
+        visitas = [projeto.pid_da_pagina(i) for i in self.visitas]
+        angulos = self._angulos_a_guardar(projeto.sequencia, nova)
+        (gravar or projeto.gravar_sequencia)(nova)      # OSError: nada mudou
+        self._guardar_os_angulos(angulos)
+        if depois_de_gravar is not None:
+            depois_de_gravar()
+        # As visitas pelo pid; a de agora é a que sobra até ela (a mesma página pode estar
+        # duas vezes), e as vizinhas iguais que a saída de uma deixou se juntam.
+        novas, lugar = [], -1
+        for k, pid in enumerate(visitas):
+            posicao = None if pid is None else nova.posicao_de(pid)
+            if posicao is not None and (not novas or novas[-1] != posicao):
+                novas.append(posicao)
+            if k == self._visita:
+                lugar = len(novas) - 1
+        self.visitas, self._visita = novas, lugar if novas else -1
+        if aberta is not None:
+            alvo = nova.posicao_de(aberta.pid)
+            if alvo is None:
+                alvo = min(self.indice, len(nova) - 1)
+            if alvo != self.indice or nova.entrada_em(alvo) != aberta:
+                self.ir_para(alvo, visita=False)    # a página aberta mudou de lugar ou saiu
+        self.eventos.emitir("sequencia_mudou")
 
     def recarregar(self) -> None:
         """Mostra de novo a página aberta (o lote acabou de gravá-la)."""
@@ -537,7 +981,8 @@ class ControladorDePagina:
                          "como verificada depois que ela entrar.", 8000)
             return
         if self.modelo is None or self.modelo.estado not in LIDAS:
-            self._avisar("Reconheça a página antes de marcá-la como verificada (F5).", 6000)
+            self._avisar("Reconheça a página antes de marcá-la como verificada "
+                         "({reconhecer_pagina}).", 6000)
             return
 
         def corpo():
@@ -665,13 +1110,26 @@ class ControladorDePagina:
         self.tarefa("Reconhecendo a página", lambda: self._preparar_reconhecer(indice),
                     falhou=self._falhou("Reconhecer página"))
 
-    def _preparar_reconhecer(self, indice: int):
+    def reconhecer_zona(self, zona) -> None:
+        """Ctrl+Shift+R: reconhece somente uma zona e conserva o restante da página."""
+        if not self._pode_ler() or self.servidor_parado():
+            return
+        indice = self.indice
+        self.tarefa("Reconhecendo a área",
+                    lambda: self._preparar_reconhecer(indice, zona),
+                    falhou=self._falhou("Reconhecer área"))
+
+    def _preparar_reconhecer(self, indice: int, zona=None):
         if indice != self.indice or not self._pode_ler(avisar=False):
             return None
         pagina = self._pagina_para_editar()
-        imagem, leitor, zonas = self.imagem, self.leitor, list(pagina.zonas)
+        imagem, leitor = self.imagem, self.leitor
+        zonas = [zona] if zona is not None else list(pagina.zonas)
         antes = self._instantaneo()
         marcados = pg.a_manter_na_releitura(pagina.boxes, pagina.estado in LIDAS)   # §4.6
+        if zona is not None:
+            marcados = [b for b in marcados
+                        if zona.contem((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)]
         servidor = self._servidor_para_pedir()
 
         def trabalho(progresso):
@@ -690,20 +1148,36 @@ class ControladorDePagina:
                 return
             lidos = lida.diagramas
             de_antes = list(pagina.boxes)
-            novos, dif = reconciliar(pagina.boxes, lida.boxes, pagina.alocar,
-                                     procedencia.amostra_de, iou_minimo=IOU_DA_RELEITURA)
+            estilos = lida.estilos()
+            depois = list(lida.boxes)
+            if zona is not None:
+                from core.services.box_service import BoxService
+
+                fora = [b.entry for b in pagina.boxes
+                        if not zona.contem((b.entry.x1 + b.entry.x2) / 2,
+                                          (b.entry.y1 + b.entry.y2) / 2)]
+                depois = BoxService.sort_boxes_reading_order(fora + depois)
+            novos, dif = reconciliar(pagina.boxes, depois, pagina.alocar,
+                                     procedencia.amostra_de,
+                                     estilo_de=lambda entry: estilos.get(id(entry)),
+                                     iou_minimo=IOU_DA_RELEITURA)
             pagina.aplicar(dif, novos)
             if dif.caidas:                      # §4.6: o que não pôde seguir os glifos novos
                 self.eventos.emitir("resultado", "Reconhecer a página", (
                     f"Página {indice + 1}: decisões que não puderam seguir os glifos relidos: "
                     + "; ".join(descrever_caidas(dif.caidas, de_antes))))
-            pagina.tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
+            tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
+            if zona is not None:
+                tabuleiros = [t for t in pagina.tabuleiros
+                              if not zona.contem((t[0] + t[2]) / 2, (t[1] + t[3]) / 2)] + tabuleiros
+            pagina.tabuleiros = tabuleiros
             # A conferência de antes vale mais que a releitura do mesmo tabuleiro.
             pagina.diagramas = dg.mesclar(lidos, dg.para_caixas(pagina.tabuleiros,
                                                                 pagina.diagramas))
             if pagina is self.modelo:
                 self.atual, self.pulados, self.selecao = None, set(), set()
-            self._mudou(pagina, indice, "Reconhecer a página", antes, evento="reconhecer")
+            descricao = "Reconhecer a área" if zona is not None else "Reconhecer a página"
+            self._mudou(pagina, indice, descricao, antes, evento="reconhecer")
             self.eventos.emitir("pagina_reconhecida", indice)
             if pagina is self.modelo:
                 self.ir_ao_primeiro_pendente()
@@ -832,7 +1306,7 @@ class ControladorDePagina:
         if not por_char:
             self._avisar("O glifo a ensinar saiu da página antes da vez dele.", 6000)
             return
-        imagem, leitor, projeto = self.imagem, self.leitor, self.projeto
+        imagem, leitor, projeto = self._cinza(), self.leitor, self.projeto
         antes_inst = self._instantaneo()
         antes = tuple(pagina.boxes)
         onde = {b.gid: i for i, b in enumerate(antes)}
@@ -843,7 +1317,7 @@ class ControladorDePagina:
                     i = onde[gid]
                     lidos[i] = ed.copia(antes[i].entry)
                     pg.ensinar(imagem, lidos, i, char, leitor, projeto, indice,
-                               propagar=False, gid=gid)
+                               propagar=False, gid=gid, efeito=antes[i].estilo)
         except Exception as erro:        # disco cheio, antivírus: nada do Enter fica
             for caminho in self.padroes() - antes_inst.padroes:
                 try:
@@ -869,7 +1343,7 @@ class ControladorDePagina:
         cópia, que já tem as amostras do Enter), fora da interface. O que ela resolve emenda
         a `transacao`; desfeita antes do fim, o resultado é descartado."""
         foto_do_leitor = self.leitor.para_propagar()
-        imagem = self.imagem
+        imagem = self._cinza()
 
         def preparar():
             if transacao.invalidada:
@@ -880,7 +1354,8 @@ class ControladorDePagina:
                 e.char, e.source, e.confidence, limiares))
 
             def trabalho(_progresso):
-                return pg.propagar_padroes(imagem, lidos, foto_do_leitor)
+                return pg.propagar_padroes(imagem, lidos, foto_do_leitor,
+                                           efeitos=[b.estilo for b in antes])
 
             def pronto(resolvidos: int):
                 if transacao.invalidada:
@@ -1249,7 +1724,7 @@ class ControladorDePagina:
             antes = Antes(pagina.instantaneo(), self.padroes())
             vivos_antes = set(pagina.vivos)
             try:
-                ss.aplicar(pagina, plano)
+                ss.aplicar(pagina, plano, self.imagem if aberta else None, self.leitor)
             except Exception:
                 # Nada da sessão fica pela metade: a página volta ao instantâneo (os gids já
                 # alocados não voltam: um gid nunca se repete).
@@ -1305,6 +1780,30 @@ class ControladorDePagina:
         self._editar("Editando o texto", rodar(corpo), so_nesta_pagina=False,
                      nao_rodou=rodar(lambda: self.eventos.emitir(
                          "sessao_recusada", "a página não pode ser editada agora")))
+
+    def novo_paragrafo(self, gid: Optional[int]) -> None:
+        """Começa um parágrafo antes do glifo indicado, num passo do desfazer."""
+        if gid is None or self.modelo is None:
+            return
+
+        def corpo():
+            antes = Antes(self.modelo.instantaneo(), self.padroes())
+            ed.paragrafo(self.modelo, gid)
+            self._mudou(self.modelo, self.indice, "Novo parágrafo", antes)
+        self._editar("Criando parágrafo", corpo)
+
+    def alternar_estilo(self, gids: Sequence[int], campo: str) -> None:
+        """Alterna negrito, itálico ou sublinhado na seleção do Documento."""
+        gids = [g for g in dict.fromkeys(gids)
+                if self.modelo is not None and g in self.modelo.vivos]
+        if not gids or self.modelo is None:
+            return
+
+        def corpo():
+            antes = Antes(self.modelo.instantaneo(), self.padroes())
+            ed.estilizar(self.modelo, gids, campo)
+            self._mudou(self.modelo, self.indice, f"Alternar {campo}", antes)
+        self._editar(f"Aplicando {campo}", corpo)
 
     def aplicar_as_sessoes_na_fila(self) -> None:
         """Fechar o projeto (a fila vai ser esvaziada): as sessões do Documento que esperavam
@@ -1406,6 +1905,14 @@ class ControladorDePagina:
         self._desfazer_ou_refazer(refazer=True)
 
     def _desfazer_ou_refazer(self, *, refazer: bool) -> None:
+        h = self.historico
+        transacao = h.proxima_a_refazer() if refazer else h.proxima_a_desfazer()
+        if transacao is not None and transacao.sequencia is not None:
+            motivo = self.motivo_para_nao_mudar_as_paginas()
+            if motivo is not None:              # a ordem não muda com o lote ou uma tarefa
+                self.eventos.emitir("recusa", refazer, f"\u201c{transacao.descricao}\u201d "
+                                    f"não pode voltar agora: {motivo}")
+                return
         if self._agora():
             self._voltar(refazer)
         else:
@@ -1420,11 +1927,34 @@ class ControladorDePagina:
             return
         paginas = {}
         try:
+            if transacao.sequencia is not None:
+                # A operação de página (§12.4): só se a ordem do livro é a que ela deixou.
+                antes, depois = transacao.sequencia
+                esperada = antes if refazer else depois
+                if self.projeto.sequencia != esperada:
+                    raise hs.Recusa("a ordem do livro mudou depois (por outra ação)")
+                if transacao.inteiras:
+                    self.projeto.descarregar()
+                for pid, (velha, nova) in transacao.inteiras.items():
+                    contador = self.projeto.proximo_n_de(pid)
+                    for guardada in (velha, nova):
+                        if contador is not None and guardada is not None:
+                            # Um gid nunca volta: a página que sai (a direita, no desfazer)
+                            # leva o contador dela para quando voltar.
+                            guardada.proximo_n = max(guardada.proximo_n, contador)
+                    if not self.projeto.pagina_igual(pid, velha if refazer else nova):
+                        posicao = self.projeto.posicao_do_pid(pid)
+                        onde = "" if posicao is None else f" {posicao + 1}"
+                        raise hs.Recusa(f"a página{onde} mudou depois (por outra ação)")
             for pid, m in transacao.paginas.items():
+                # Pelo pid (§12.4): a página pode ter mudado de posição desde a transação.
+                posicao = self.projeto.posicao_do_pid(pid)
+                if posicao is None:
+                    raise hs.Recusa(f"a página {m.indice + 1} saiu do livro")
                 pagina = (self.modelo if self.modelo is not None and self.modelo.pid == pid
-                          else self.projeto.carregar_modelo(m.indice))
+                          else self.projeto.carregar_modelo(posicao))
                 if pagina is None or pagina.pid != pid:
-                    raise hs.Recusa(f"a página {m.indice + 1} não é mais a da transação")
+                    raise hs.Recusa(f"a página {posicao + 1} não é mais a da transação")
                 hs.conferir(m, pagina, para_tras=not refazer)
                 paginas[pid] = pagina
         except hs.Recusa as recusa:
@@ -1432,6 +1962,24 @@ class ControladorDePagina:
             self.eventos.emitir("recusa", refazer, f"Não dá para {acao} "
                                 f"\u201c{transacao.descricao}\u201d: {recusa}. Nada foi mudado.")
             return
+        if transacao.sequencia is not None:
+            antes, depois = transacao.sequencia
+            gravar = None
+            if transacao.inteiras:
+                from abbychess.modelo import viva
+
+                lado = 1 if refazer else 0
+                alvo = {pid: None if par[lado] is None else viva(par[lado])
+                        for pid, par in transacao.inteiras.items()}
+
+                def gravar(s):
+                    self.projeto.trocar_paginas(s, alvo, transacao.movidos[lado])
+            try:
+                self._aplicar_sequencia(depois if refazer else antes, gravar=gravar)
+            except OSError as erro:
+                self.eventos.emitir("recusa", refazer, "A ordem do livro não foi gravada "
+                                    f"({erro}); nada foi mudado.")
+                return
         for pid, m in transacao.paginas.items():
             hs.aplicar(m, paginas[pid], para_tras=not refazer)
         if not refazer:
@@ -1455,7 +2003,9 @@ class ControladorDePagina:
                 self.leitor.padroes.restaurar(amostra)
             h.desfeita()
         aberta = self.modelo is not None and self.modelo.pid in transacao.paginas
-        if aberta or not transacao.indices or not self.ir_para(transacao.indices[0]):
+        posicoes = sorted(p for p in map(self.projeto.posicao_do_pid, transacao.paginas)
+                          if p is not None)
+        if aberta or not posicoes or not self.ir_para(posicoes[0]):
             # A página aberta mudou (ou a da transação não abre): o glifo em revisão, os
             # pulados e a seleção podem citar glifos que saíram.
             self.atual, self.pulados, self.selecao = None, set(), set()
@@ -1546,7 +2096,7 @@ class ControladorDePagina:
             from core import proporcao
             from abbychess.leitor import altura_relativa
 
-            recorte = pg.recorte(self.imagem, entradas[i])
+            recorte = pg.recorte(self._cinza(), entradas[i])
             referencia = proporcao.altura_de_referencia(entradas)
             achado = self.leitor.padroes.conflito(recorte, char,
                                                   altura_relativa(recorte, referencia),
@@ -1737,6 +2287,8 @@ class ControladorDePagina:
         # o que vai para o disco (e o desfazer compara com o que a página tem).
         pagina.zonas = zn.com_ids(pagina.zonas)
         pagina.diagramas = dg.com_ids(pagina.diagramas)
+        pagina.zonas = zn.vincular_legendas(pagina.zonas, pagina.diagramas)
+        pagina.diagramas = lc.validar_pagina(pagina, self.projeto.dados.idioma)
         transacao = self.historico.registrar(hs.Transacao(
             descricao, {pagina.pid: hs.mudanca(antes.pagina, pagina.instantaneo())},
             amostras_criadas=criados, juntar=juntar))

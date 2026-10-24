@@ -67,10 +67,10 @@ def test_o_substituto_com_grupo_que_nao_existe_e_invalido():
     sb.validar(r"\3", expressao, False)                  # sem a regex, nada a validar
 
 
-def test_o_que_e_do_passo_g_vem_desabilitado_com_o_motivo():
+def test_o_que_e_do_passo_g_agora_e_aplicavel():
     p = _pagina("uma casa")
     [caso] = _casos(p, "m", "rn")                         # 1 glifo -> 2 letras: dividir
-    assert not caso.aplicavel and "dividir" in caso.motivo
+    assert caso.aplicavel and not caso.motivo
     [caso] = _casos(p, "as", "a")                         # tirar um glifo: tem tradução
     assert caso.aplicavel
 
@@ -284,10 +284,10 @@ def test_a_previa_so_le_as_paginas_que_o_indice_diz(sub, monkeypatch):
     assert lidas == [1]
 
 
-def test_o_motivo_sem_traducao_nomeia_o_trecho():
+def test_a_juncao_estrutural_tambem_entra_na_previa():
     p = _pagina("uma casa")
     [caso] = _casos(p, "casa", "lar")
-    assert caso.motivo.startswith("'sa' → 'r'") or caso.motivo.startswith("'as' → 'r'")
+    assert caso.aplicavel and not caso.motivo
 
 
 def test_a_troca_que_nao_cabe_avisa_os_passos_do_desfazer_que_sairam(sub):

@@ -1,0 +1,88 @@
+{
+ "livro": "xv",
+ "snapshot": "xv-i020-026-inicial.zip",
+ "snapshot_sha256": "0cf949dff64e9609389eef1bdc6ef935459fb6fd1e6933c3baaf66bc8fcf2431",
+ "gabaritos": {
+  "i020": {
+   "verdade_versao": 2,
+   "revisada": false
+  },
+  "i021": {
+   "verdade_versao": 2,
+   "revisada": false
+  },
+  "i022": {
+   "verdade_versao": 2,
+   "revisada": false
+  },
+  "i023": {
+   "verdade_versao": 2,
+   "revisada": false
+  },
+  "i024": {
+   "verdade_versao": 2,
+   "revisada": false
+  },
+  "i025": {
+   "verdade_versao": 2,
+   "revisada": false
+  },
+  "i026": {
+   "verdade_versao": 2,
+   "revisada": false
+  }
+ },
+ "criterio": "CER do corpo depois ≤ antes e nenhum glifo de corpo certo passa a errado (rodada com o estilo)",
+ "aprovado": true,
+ "estado": "provisório: a divisão entre legenda e corpo vem da estrutura do gabarito, revisada em 0/7 páginas",
+ "com_estilo": {
+  "com_estilo": true,
+  "glifos_de_legenda_ensinados": 17,
+  "ensinados_medidos_em_negrito": 8,
+  "corpo": {
+   "linhas": 196,
+   "glifos": 9870,
+   "erros_antes": 417,
+   "erros_depois": 417,
+   "cer_antes": 0.0422,
+   "cer_depois": 0.0422,
+   "corrigidos": 0,
+   "estragados": 0
+  },
+  "legendas": {
+   "linhas": 17,
+   "glifos": 274,
+   "cer_antes": 0.2628,
+   "cer_depois": 0.2007
+  },
+  "estragados": [],
+  "aprovado": true
+ },
+ "sem_estilo_informativo": {
+  "com_estilo": false,
+  "glifos_de_legenda_ensinados": 17,
+  "ensinados_medidos_em_negrito": null,
+  "corpo": {
+   "linhas": 196,
+   "glifos": 9870,
+   "erros_antes": 417,
+   "erros_depois": 409,
+   "cer_antes": 0.0422,
+   "cer_depois": 0.0414,
+   "corrigidos": 8,
+   "estragados": 0
+  },
+  "legendas": {
+   "linhas": 17,
+   "glifos": 274,
+   "cer_antes": 0.2628,
+   "cer_depois": 0.2044
+  },
+  "estragados": [],
+  "aprovado": true
+ },
+ "data": "2026-10-23",
+ "commit": "c9e5751",
+ "arvore_suja": false,
+ "arquivos_sujos": []
+}

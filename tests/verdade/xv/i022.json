@@ -9,8 +9,8 @@
  "pymupdf": "1.26.6",
  "inclinacao": 0.0,
  "papel": 255,
- "verdade_versao": 1,
- "rotulado_por": "",
+ "verdade_versao": 2,
+ "rotulado_por": "DarcioAlberico",
  "revisado_por": "",
  "blocos": [
   {
@@ -50,7 +50,7 @@
    ],
    "ordem": 2,
    "coluna": 0,
-   "texto_impresso": "go para a frente, deixando-o em mauS IençóiS."
+   "texto_impresso": "go para a frente, deixando-o em maus lençóis."
   },
   {
    "id": "b03",
@@ -76,7 +76,7 @@
    ],
    "ordem": 4,
    "coluna": 0,
-   "texto_impresso": "É claro que, para compenSar a desvantagem da Dama? as brancasT)oderiam"
+   "texto_impresso": "É claro que, para compensar a desvantagem da Dama as brancas poderiam"
   },
   {
    "id": "b05",
@@ -89,7 +89,7 @@
    ],
    "ordem": 5,
    "coluna": 0,
-   "texto_impresso": "capturar a Dama das pretas, mas nesse momento ojogador busca um tro?u maio?"
+   "texto_impresso": "capturar a Dama das pretas, mas nesse momento o jogador busca um troféu maior"
   },
   {
    "id": "b06",
@@ -102,7 +102,7 @@
    ],
    "ordem": 6,
    "coluna": 0,
-   "texto_impresso": "11...Rg4 12.h3+ R93 13.Ce2+ Rx92 14.Bd5+ Ce4 15.Bxe4 xeque.mate"
+   "texto_impresso": "11...Rg4 12.h3+ Rg3 13.Ce2+ Rxg2 14.Bd5+ Ce4 15.Bxe4 xeque-mate"
   },
   {
    "id": "b07",
@@ -115,7 +115,7 @@
    ],
    "ordem": 7,
    "coluna": 0,
-   "texto_impresso": "As pretas tiveram o que mereciam. Quando o jogado. r não desenvo1ve as"
+   "texto_impresso": "As pretas tiveram o que mereciam. Quando o jogador não desenvolve as"
   },
   {
    "id": "b08",
@@ -128,7 +128,7 @@
    ],
    "ordem": 8,
    "coluna": 0,
-   "texto_impresso": "peça?? acaba caindo em dificu1dade?."
+   "texto_impresso": "peças acaba caindo em dificuldades."
   },
   {
    "id": "b09",
@@ -141,7 +141,7 @@
    ],
    "ordem": 9,
    "coluna": 0,
-   "texto_impresso": "Como vimos? a superioridade no de?envo1Vimento pode compensar a des—"
+   "texto_impresso": "Como vimos, a superioridade no desenvolvimento pode compensar a des-"
   },
   {
    "id": "b10",
@@ -154,7 +154,7 @@
    ],
    "ordem": 10,
    "coluna": 0,
-   "texto_impresso": "vantagem materia1. No entanto, se o exército adversário for capaz de reduzir a"
+   "texto_impresso": "vantagem material. No entanto, se o exército adversário for capaz de reduzir a"
   },
   {
    "id": "b11",
@@ -167,7 +167,7 @@
    ],
    "ordem": 11,
    "coluna": 0,
-   "texto_impresso": "diferença de desenvolVimento, a vantagem material se reafirma. Quando tiver"
+   "texto_impresso": "diferença de desenvolvimento, a vantagem material se reafirma. Quando tiver"
   },
   {
    "id": "b12",
@@ -180,7 +180,7 @@
    ],
    "ordem": 12,
    "coluna": 0,
-   "texto_impresso": "uma vantagem materia1, não a1imente as tropas inimigas deixando de lado a"
+   "texto_impresso": "uma vantagem material, não alimente as tropas inimigas deixando de lado a"
   },
   {
    "id": "b13",
@@ -193,7 +193,7 @@
    ],
    "ordem": 13,
    "coluna": 0,
-   "texto_impresso": "própria mobi1ização."
+   "texto_impresso": "própria mobilização."
   },
   {
    "id": "b14",
@@ -206,7 +206,7 @@
    ],
    "ordem": 14,
    "coluna": 0,
-   "texto_impresso": "Demonstrarei me1hor eSse conceito em outro j0go com vantagem predeter-"
+   "texto_impresso": "Demonstrarei melhor esse conceito em outro jogo com vantagem predeter-"
   },
   {
    "id": "b15",
@@ -245,7 +245,7 @@
    ],
    "ordem": 17,
    "coluna": 0,
-   "texto_impresso": "portanto, o jogo começa sem o CaValo—b1."
+   "texto_impresso": "portanto, o jogo começa sem o Cavalo-b1."
   },
   {
    "id": "b18",
@@ -284,7 +284,7 @@
    ],
    "ordem": 20,
    "coluna": 0,
-   "texto_impresso": "Dia?rama 4.",
+   "texto_impresso": "Diagrama 4.",
    "diagrama": "d0"
   },
   {
@@ -298,7 +298,7 @@
    ],
    "ordem": 21,
    "coluna": 0,
-   "texto_impresso": "Ward—BroWne",
+   "texto_impresso": "Ward-Browne",
    "diagrama": "d0"
   },
   {
@@ -312,7 +312,7 @@
    ],
    "ordem": 22,
    "coluna": 0,
-   "texto_impresso": "No?ingham/ 1874",
+   "texto_impresso": "Nottingham, 1874",
    "diagrama": "d0"
   },
   {
@@ -326,7 +326,7 @@
    ],
    "ordem": 23,
    "coluna": 0,
-   "texto_impresso": "Vantagem do CavaIo da Dama .",
+   "texto_impresso": "Vantagem do Cavalo da Dama",
    "diagrama": "d0"
   },
   {
@@ -366,7 +366,7 @@
    ],
    "ordem": 26,
    "coluna": 0,
-   "texto_impresso": "materia1 para abrir linhas para suas peças."
+   "texto_impresso": "material para abrir linhas para suas peças."
   },
   {
    "id": "b26",
@@ -379,7 +379,7 @@
    ],
    "ordem": 27,
    "coluna": 0,
-   "texto_impresso": "2lI.exf4 3.Cf3 f5?"
+   "texto_impresso": "2...exf4 3.Cf3 f5?"
   },
   {
    "id": "b27",
@@ -392,7 +392,7 @@
    ],
    "ordem": 28,
    "coluna": 0,
-   "texto_impresso": "Um 1ance muito ruim. A? pretas enfraquecem a proteção de peões em torno"
+   "texto_impresso": "Um lance muito ruim. As pretas enfraquecem a proteção de peões em torno"
   },
   {
    "id": "b28",
@@ -405,7 +405,7 @@
    ],
    "ordem": 29,
    "coluna": 0,
-   "texto_impresso": "do Rei e deixam de desenvolver uma peça. Seria melhor a1go como 2...d5 (que"
+   "texto_impresso": "do Rei e deixam de desenvolver uma peça. Seria melhor algo como 2...d5 (que"
   },
   {
    "id": "b29",
@@ -453,7 +453,7 @@
    ],
    "texto": "peça não vai fazer muita diferença no final. O importante é empurrar o Rei inimi-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l02",
@@ -464,9 +464,9 @@
     0.62419,
     0.12967
    ],
-   "texto": "go para a frente, deixando-o em mauS IençóiS.",
+   "texto": "go para a frente, deixando-o em maus lençóis.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l03",
@@ -479,7 +479,7 @@
    ],
    "texto": "9...Rxe5 10.f4+ Rf5 11.Cd4+",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l04",
@@ -490,9 +490,9 @@
     0.9379,
     0.19008
    ],
-   "texto": "É claro que, para compenSar a desvantagem da Dama? as brancasT)oderiam",
+   "texto": "É claro que, para compensar a desvantagem da Dama as brancas poderiam",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l05",
@@ -503,9 +503,9 @@
     0.9371,
     0.20747
    ],
-   "texto": "capturar a Dama das pretas, mas nesse momento ojogador busca um tro?u maio?",
+   "texto": "capturar a Dama das pretas, mas nesse momento o jogador busca um troféu maior",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l06",
@@ -516,9 +516,9 @@
     0.81935,
     0.24537
    ],
-   "texto": "11...Rg4 12.h3+ R93 13.Ce2+ Rx92 14.Bd5+ Ce4 15.Bxe4 xeque.mate",
+   "texto": "11...Rg4 12.h3+ Rg3 13.Ce2+ Rxg2 14.Bd5+ Ce4 15.Bxe4 xeque-mate",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l07",
@@ -529,9 +529,9 @@
     0.9375,
     0.26845
    ],
-   "texto": "As pretas tiveram o que mereciam. Quando o jogado. r não desenvo1ve as",
+   "texto": "As pretas tiveram o que mereciam. Quando o jogador não desenvolve as",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l08",
@@ -542,9 +542,9 @@
     0.5371,
     0.28555
    ],
-   "texto": "peça?? acaba caindo em dificu1dade?.",
+   "texto": "peças acaba caindo em dificuldades.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l09",
@@ -555,9 +555,9 @@
     0.9375,
     0.30294
    ],
-   "texto": "Como vimos? a superioridade no de?envo1Vimento pode compensar a des—",
+   "texto": "Como vimos, a superioridade no desenvolvimento pode compensar a des-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l10",
@@ -568,9 +568,9 @@
     0.9375,
     0.3206
    ],
-   "texto": "vantagem materia1. No entanto, se o exército adversário for capaz de reduzir a",
+   "texto": "vantagem material. No entanto, se o exército adversário for capaz de reduzir a",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l11",
@@ -581,9 +581,9 @@
     0.9379,
     0.33799
    ],
-   "texto": "diferença de desenvolVimento, a vantagem material se reafirma. Quando tiver",
+   "texto": "diferença de desenvolvimento, a vantagem material se reafirma. Quando tiver",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l12",
@@ -594,9 +594,9 @@
     0.9379,
     0.35537
    ],
-   "texto": "uma vantagem materia1, não a1imente as tropas inimigas deixando de lado a",
+   "texto": "uma vantagem material, não alimente as tropas inimigas deixando de lado a",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l13",
@@ -607,9 +607,9 @@
     0.38387,
     0.37247
    ],
-   "texto": "própria mobi1ização.",
+   "texto": "própria mobilização.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l14",
@@ -620,9 +620,9 @@
     0.9371,
     0.39014
    ],
-   "texto": "Demonstrarei me1hor eSse conceito em outro j0go com vantagem predeter-",
+   "texto": "Demonstrarei melhor esse conceito em outro jogo com vantagem predeter-",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l15",
@@ -635,7 +635,7 @@
    ],
    "texto": "minada. Como mostra o Diagrama 4, desta vez as brancas não estão tão seguras",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l16",
@@ -648,7 +648,7 @@
    ],
    "texto": "de si (ou são mais realistas) e oferecem o Cavalo da Dama como vantagem.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l17",
@@ -659,9 +659,9 @@
     0.58226,
     0.44201
    ],
-   "texto": "portanto, o jogo começa sem o CaValo—b1.",
+   "texto": "portanto, o jogo começa sem o Cavalo-b1.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l19",
@@ -672,9 +672,9 @@
     0.56694,
     0.723
    ],
-   "texto": "Dia?rama 4.",
+   "texto": "Diagrama 4.",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l20",
@@ -685,9 +685,9 @@
     0.575,
     0.73668
    ],
-   "texto": "Ward—BroWne",
+   "texto": "Ward-Browne",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l21",
@@ -698,9 +698,9 @@
     0.59153,
     0.75435
    ],
-   "texto": "No?ingham/ 1874",
+   "texto": "Nottingham, 1874",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l22",
@@ -711,9 +711,9 @@
     0.84839,
     0.76917
    ],
-   "texto": "Vantagem do CavaIo da Dama .",
+   "texto": "Vantagem do Cavalo da Dama",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l23",
@@ -726,7 +726,7 @@
    ],
    "texto": "1.e4 e5 2.f4",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l24",
@@ -739,7 +739,7 @@
    ],
    "texto": "As brancas mostram imediatamente que estão dispostas a entregar mais",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l25",
@@ -750,9 +750,9 @@
     0.5871,
     0.86834
    ],
-   "texto": "materia1 para abrir linhas para suas peças.",
+   "texto": "material para abrir linhas para suas peças.",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l26",
@@ -763,9 +763,9 @@
     0.26815,
     0.90225
    ],
-   "texto": "2lI.exf4 3.Cf3 f5?",
+   "texto": "2...exf4 3.Cf3 f5?",
    "negrito": true,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l27",
@@ -776,9 +776,9 @@
     0.93629,
     0.92932
    ],
-   "texto": "Um 1ance muito ruim. A? pretas enfraquecem a proteção de peões em torno",
+   "texto": "Um lance muito ruim. As pretas enfraquecem a proteção de peões em torno",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   },
   {
    "id": "l28",
@@ -789,9 +789,9 @@
     0.93629,
     0.94642
    ],
-   "texto": "do Rei e deixam de desenvolver uma peça. Seria melhor a1go como 2...d5 (que",
+   "texto": "do Rei e deixam de desenvolver uma peça. Seria melhor algo como 2...d5 (que",
    "negrito": false,
-   "texto_verificado": false
+   "texto_verificado": true
   }
  ],
  "estrutura_por": "Claude (estrutura pelas faixas)"

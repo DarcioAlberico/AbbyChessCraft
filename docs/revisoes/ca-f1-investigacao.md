@@ -288,3 +288,42 @@ do contexto, que manda à revisão a leitura confiante improvável. Na capa (i00
 as linhas de ruído partidas vão de 937 a 1.485 sem par.
 
 Com 0,744, o CA-F.1 passa do alvo novo com folga, mas ainda não chega aos 0,70 do alvo antigo.
+
+## O título corrido na frente da fila (2026-10-24)
+
+Dos 880 gestos, 85 eram palpites aceitos fora da fila, a 2 gestos, e 111 ensinos fora dela,
+a 3; na fila, cada um custa 1 a menos. O glifo sem leitura tem confiança 0 e devia abrir a
+fila, mas em toda página a cabeça dela era um □ do título corrido ("XADREZ VITORIOSO:
+ESTRATÉGIA 21", "YASSER SEIRAWAN JEREMY SILMAN"). Nenhuma linha verificada o cobre, e por
+isso o replay nunca o resolvia: ele travava a cabeça, e toda correção saía fora da fila. Na
+janela era igual: o usuário tinha de pular o □ antes de chegar ao texto, e a exportação o
+tira de qualquer jeito.
+
+**A mudança** (`da2d530`, SPEC §8.1). Por confiança e por caractere, a fila põe o que a
+exportação tira depois do resto e antes dos pulados:
+- o cabeçalho e o rodapé corridos, pela regra da exportação;
+- o □ que cai na altura e na faixa deles;
+- as áreas de cabeçalho, rodapé, número de página e ignorar.
+
+Nada sai da fila, e quem exporta com as margens ainda as revisa, no fim. Na ordem de leitura
+a fila fica na ordem da página. O replay anda pela mesma fila que a janela.
+
+A revisão de código pegou duas coisas na primeira versão:
+- ela mexia também na ordem de leitura: o Alt+↑ ia ao □ do título, e o fim da página não
+  chegava;
+- ela contava o □ como glifo na regra: um cisco sem leitura logo abaixo do título fechava o
+  vão que a regra pede, e o título deixava de ser margem.
+
+**O custo na janela.** O Enter (`test_enter_ensinar`), duas rodadas de cada, com a primeira
+versão: 37,8/54,3 e 36,8/59,6 ms (p50/p95) sem a mudança, 39,4/70,0 e 37,9/54,7 com ela. O
+alvo é 100 ms. A máquina estava mais lenta que no último portão nas duas.
+
+**A medida** (`2026-10-24-fatia-xv-passo-L-220141.json`, no `da2d530`, árvore limpa, catálogo
+7 sem mudança) dá **772 gestos**, razão **0,653**. A linha de base continua em 1.183. Agora
+85 palpites e 36 ensinos saem da fila (eram 7 e 5). O que sobra:
+- 81 `ensinar_glifo`, o glifo que a rede erra e que a fila não alcança na vez dele;
+- 51 divisões, 15 descartes, 20 marcações e 11 junções;
+- 56 gestos de impossíveis, as 2 linhas do gabarito.
+
+Com 0,653, o CA-F.1 passa também dos 0,70 do alvo antigo. Continua provisório até a estrutura
+e os FEN das p. 21–27 serem revisados.

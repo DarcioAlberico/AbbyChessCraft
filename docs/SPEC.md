@@ -576,6 +576,10 @@ de notação e Notação nunca toca prosa; FEN nunca é substituído; nada é en
 - **Alt+↓ / Alt+↑**: próximo / anterior item no modo e escopo atuais, em qualquer painel.
   **F6**: próxima *página* com pendentes.
 - Recalculada incrementalmente, só para os gids tocados.
+- Por confiança e por caractere, o que a exportação tira (o cabeçalho e o rodapé corridos,
+  com o □ que cai na linha deles, e as áreas de cabeçalho, rodapé, número de página e
+  ignorar) vem depois do resto da fila e antes dos pulados. Nada sai da fila. Na ordem de
+  leitura, a fila fica na ordem da página.
 
 ### 8.2 A Galeria por caractere
 
@@ -1095,7 +1099,8 @@ dos 983 gestos que sobram, 190 são o custo fixo do que nenhum comando corrige (
 leitura não acha e os 170 caracteres delas), e o resto é sobretudo ensinar o glifo que a rede
 erra e dividir os colados, um gesto por glifo. As alavancas que ainda restavam, somadas,
 ficavam perto de 0,80. Depois, o pingo do i no dividir e as legendas lado a lado em duas
-linhas, `7511f02`, levaram a fatia a 880 gestos, 0,744.)
+linhas, `7511f02`, levaram a fatia a 880 gestos, 0,744, e as margens no fim da fila de
+revisão, `da2d530`, a 772, 0,653.)
 **CA-F.2** (informativo, não reprova) Tempo humano pelo protocolo
 `docs/medidas/protocolo-fatia.md`: o mesmo snapshot; o tempo vem do registro de gestos da
 aplicação (`ABBY_REGISTRO_DE_EVENTOS`, somado por `ferramentas/tempo_da_fatia.py`),

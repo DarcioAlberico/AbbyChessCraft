@@ -15,7 +15,7 @@ import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Collection, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 from PIL import Image
@@ -950,15 +950,18 @@ def resumir(boxes: List[BoxEntry], leitor: LeitorDoLivro) -> ResumoDaLeitura:
     return ResumoDaLeitura(len(boxes), len(fila_de_revisao(boxes, leitor)), por_fonte)
 
 
-def fila_de_revisao(boxes: List[BoxEntry], leitor: LeitorDoLivro) -> List[int]:
+def fila_de_revisao(boxes: List[BoxEntry], leitor: LeitorDoLivro,
+                    no_fim: Collection[int] = ()) -> List[int]:
     """Índices dos boxes a revisar, do menos confiável ao mais.
 
     Em empate de confiança fica a ordem de leitura, para o usuário andar pela
     página e não pular de um canto para outro. O glifo que a palavra desmente
-    (`contexto`) entra mesmo com a confiança alta.
+    (`contexto`) entra mesmo com a confiança alta. Os de `no_fim` (as margens que a
+    exportação tira, `exportar.margens_da_pagina`) vêm depois de todos os outros.
     """
     pendentes = [i for i, p in enumerate(contexto.pendentes(boxes, leitor.limiares)) if p]
-    return sorted(pendentes, key=lambda i: (round(boxes[i].confidence, 2), i))
+    no_fim = set(no_fim)
+    return sorted(pendentes, key=lambda i: (i in no_fim, round(boxes[i].confidence, 2), i))
 
 
 def ensinar(imagem: Image.Image, boxes: List[BoxEntry], indice: int, char: str,

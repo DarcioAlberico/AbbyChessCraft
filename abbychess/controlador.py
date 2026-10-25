@@ -260,20 +260,28 @@ class ControladorDePagina:
         """Os gids a revisar (§8.1): do menos confiável ao mais, com os pulados no fim; na
         ordem de leitura (`ordem_da_fila`), na ordem da página; por caractere, agrupados pela
         leitura (os sem leitura no fim) e, em cada grupo, do menos confiável ao mais. O glifo
-        `revisado` (visto e aceito no Documento, §6.3) não volta."""
+        `revisado` (visto e aceito no Documento, §6.3) não volta.
+
+        Por confiança e por caractere, o que a exportação tira (`gids_fora_do_texto`: o
+        cabeçalho e o rodapé corridos, as áreas de margem) vem depois do resto e antes dos
+        pulados: no Xadrez Vitorioso o □ do título corrido abria a fila de toda página. Na
+        ordem de leitura, não: `andar` e o fim da página contam com a fila na ordem dela."""
         if self.leitor is None or self.modelo is None:
             return []
         boxes = self.modelo.boxes
         indices = self._pendentes()
-        if self.ordem_da_fila == "leitura":
-            return [boxes[i].gid for i in indices]
         if self.ordem_da_fila == "caractere":
             indices = sorted(indices, key=lambda i: (boxes[i].entry.char or "\uffff",
                                                      round(boxes[i].entry.confidence, 2), i))
-        else:
+        elif self.ordem_da_fila != "leitura":
             indices = sorted(indices, key=lambda i: (round(boxes[i].entry.confidence, 2), i))
         fila = [boxes[i].gid for i in indices]
-        return [g for g in fila if g not in self.pulados] + [g for g in fila if g in self.pulados]
+        if self.ordem_da_fila == "leitura":
+            return fila
+        fora = self.gids_fora_do_texto() if fila else frozenset()
+        return ([g for g in fila if g not in self.pulados and g not in fora]
+                + [g for g in fila if g not in self.pulados and g in fora]
+                + [g for g in fila if g in self.pulados])
 
     def _pendentes(self) -> List[int]:
         """Os índices dos glifos que vão para a fila, na ordem da página. Só os glifos que
@@ -345,21 +353,36 @@ class ControladorDePagina:
     def gids_de_margem(self) -> frozenset:
         """Os glifos do cabeçalho e do rodapé corridos da página, pela regra da exportação
         (`exportar.margens_corridas`: a faixa, o vão e o número da página), até o layout do
-        passo F dar a função às áreas."""
+        passo F dar a função às áreas. O glifo sem leitura conta (`exportar.margens_da_pagina`):
+        o □ do título corrido é título corrido."""
         if self.modelo is None or self.imagem is None:
             return frozenset()
         from abbychess import exportar as ex
 
-        lidos = [b for b in self.modelo.boxes if b.entry.char]
+        boxes = self.modelo.boxes
         # A regra olha as linhas inteiras da página (~20 ms numa página cheia): o resultado
-        # fica enquanto o que ela lê não muda (o texto, a posição de cada glifo lido e a
-        # altura da página); montar a chave custa uma fração de milissegundo.
+        # fica enquanto o que ela lê não muda (o texto, a posição de cada glifo e a altura da
+        # página); montar a chave custa uma fração de milissegundo.
         chave = (self.indice, self.imagem.height,
-                 tuple((b.gid, b.entry.char, b.entry.x1, b.entry.y1, b.entry.y2) for b in lidos))
+                 tuple((b.gid, b.entry.char, b.entry.x1, b.entry.y1, b.entry.x2, b.entry.y2)
+                       for b in boxes))
         if self._margens[0] != chave:
-            indices = ex.margens_corridas({0: ([b.entry for b in lidos], self.imagem.height)})[0]
-            self._margens = (chave, frozenset(lidos[i].gid for i in indices if i < len(lidos)))
+            indices = ex.margens_da_pagina([b.entry for b in boxes], self.imagem.height)
+            self._margens = (chave, frozenset(boxes[i].gid for i in indices if i < len(boxes)))
         return self._margens[1]
+
+    def gids_fora_do_texto(self) -> frozenset:
+        """Os glifos que a exportação tira: os de `gids_de_margem` e os das áreas de
+        cabeçalho, rodapé, número de página e ignorar (`exportar.FORA_DA_EXPORTACAO`)."""
+        if self.modelo is None:
+            return frozenset()
+        from abbychess import exportar as ex
+
+        areas = [z for z in self.modelo.zonas if z.funcao in ex.FORA_DA_EXPORTACAO]
+        nas_areas = {b.gid for b in self.modelo.boxes
+                     if any(z.contem((b.entry.x1 + b.entry.x2) / 2, (b.entry.y1 + b.entry.y2) / 2)
+                            for z in areas)} if areas else set()
+        return self.gids_de_margem() | nas_areas
 
     def gids_virtuais(self) -> frozenset:
         """Os gids dos glifos virtuais (sem caixa) da página."""

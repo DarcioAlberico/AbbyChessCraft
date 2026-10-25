@@ -280,7 +280,7 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
         for _ in range(LIMITE_DE_PASSOS):
             linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
             dif = diferencas(boxes, linhas, caixas, palavra, gabarito)
-            acao, da_fila = _proxima_acao(dif, boxes, leitor, disponiveis)
+            acao, da_fila = _proxima_acao(dif, boxes, leitor, disponiveis, imagem.height)
             if acao is None:
                 break
             if acao[0] == "substituicao":
@@ -364,14 +364,17 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
     return resultado
 
 
-def _proxima_acao(dif: Diferencas, boxes, leitor, disponiveis: dict):
+def _proxima_acao(dif: Diferencas, boxes, leitor, disponiveis: dict, altura=None):
     """A próxima correção: a do glifo que a janela mostra (o primeiro da fila de revisão),
     se ele tem uma substituição e o passo tem o comando da fila; senão, a primeira na ordem
-    de leitura. Devolve (ação, se é a da fila)."""
+    de leitura. Devolve (ação, se é a da fila). Com `altura` (a da página), a fila manda o
+    cabeçalho e o rodapé corridos para o fim, como a janela (`exportar.margens_da_pagina`)."""
+    from abbychess import exportar as ex
     from abbychess import pagina as pg
 
     if "substituicao_da_fila" in disponiveis:
-        fila = pg.fila_de_revisao(boxes, leitor)
+        fila = pg.fila_de_revisao(boxes, leitor, ex.margens_da_pagina(boxes, altura)
+                                  if altura is not None else ())
         if fila:
             da_fila = next((a for a in dif.acoes if a[0] == "substituicao" and a[1] == fila[0]),
                            None)

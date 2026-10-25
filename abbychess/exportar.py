@@ -521,6 +521,28 @@ def margens_corridas(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]) -> Dict
     return {i: set(margens[i].poeira) | set(funcoes[i]) for i in paginas}
 
 
+def margens_da_pagina(boxes: Sequence[BoxEntry], altura: int) -> set:
+    """Os índices de `margens_corridas` de uma página só, com os glifos sem leitura: o □ do
+    cabeçalho corrido também é cabeçalho. A fila de revisão os manda para o fim (§8.1).
+
+    A regra roda só nos lidos, como na exportação; contar o □ como glifo mudaria as linhas
+    dela (um cisco sem leitura logo abaixo do título fecharia o vão que a regra pede). Depois,
+    o sem leitura entra quando o centro dele cai na altura de um glifo de margem e na faixa
+    dos glifos de margem dessa altura, com a folga de uma altura de cada lado."""
+    lidos = [k for k, b in enumerate(boxes) if b.char]
+    margem = {lidos[i] for i in margens_corridas({0: ([boxes[k] for k in lidos], altura)})[0]}
+    for k, b in enumerate(boxes):
+        if b.char or not margem:
+            continue
+        x, y = (b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2
+        na_altura = [boxes[m] for m in margem if boxes[m].y1 <= y <= boxes[m].y2]
+        if na_altura:
+            folga = max(m.y2 - m.y1 for m in na_altura)
+            if min(m.x1 for m in na_altura) - folga <= x <= max(m.x2 for m in na_altura) + folga:
+                margem.add(k)
+    return margem
+
+
 def funcoes_das_margens(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]) -> Dict[int, dict]:
     """`{página: {indice_do_box: função}}` aprendido no conjunto do livro.
 

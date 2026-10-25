@@ -330,3 +330,47 @@ comando. A linha de base continua em 1.183. Agora
 
 Com 0,653, o CA-F.1 passa também dos 0,70 do alvo antigo. Continua provisório até a estrutura
 e os FEN das p. 21–27 serem revisados.
+
+## O replay refinado: o catálogo 8 (2026-10-24, com o pedido do usuário)
+
+Com o título corrido no fim da fila, o que ainda a travava era do replay, não do programa:
+- **o Enter que confirma a leitura certa pendente** não era cobrado, nem na linha de base nem
+  depois, e a cabeça certa da fila não andava: toda correção seguinte saía fora da fila, com
+  o clique;
+- **dividir, juntar e descartar** o glifo que a janela já mostra pediam o clique nele.
+
+**O que mudou** (`3841795`). O replay anda pela fila da janela:
+- o glifo que a janela mostra sai sem o clique, também com o Ctrl+D, o Ctrl+J (com o
+  seguinte da linha) e o Del;
+- o certo e pendente numa linha medida custa o Enter, que ensina o padrão, como na janela;
+- a janela mostra o primeiro da fila ao abrir a página e depois do Enter e do Del; depois do
+  Ctrl+D e do Ctrl+J, o box novo (`_depois_de_editar`), e o replay segue o mesmo;
+- o glifo da fila fora das linhas medidas e sem diferença é transparente.
+
+Os quatro comandos novos (`confirmar_da_fila`, `dividir_da_fila`, `juntar_da_fila`,
+`descartar_da_fila`) são do passo 0, a 1 gesto, conferidos na janela com o efeito e o glifo
+mostrado depois. A revisão de código pegou que a primeira versão supunha a volta ao primeiro
+da fila depois do Ctrl+D e do Ctrl+J, e o teste passava só porque as confianças empatavam.
+
+**O mesmo algoritmo dos dois lados.** Até aqui a linha de base rodava o `replay_fatia.py` da
+tag `passo-0`. Agora ela roda o do checkout, copiado com o catálogo (protocolo, item 5). O
+replay só importa o que o passo tem. Na fatia, com o catálogo 7, ele deu no código do passo
+0 a mesma linha de base de antes, 1.183, página por página.
+
+**As medidas**, com o catálogo 8:
+
+| | Linha de base (passo 0) | Passo L |
+|---|---|---|
+| Arquivo | `2026-10-24-fatia-xv-passo-0-230353.json` | `2026-10-24-fatia-xv-passo-L-230526.json` |
+| Gestos | 1.076 | 773 |
+| Sem os impossíveis | 782 | 717 |
+| Impossíveis | 294 | 56 |
+| Enter que confirma | 136 | 146 |
+| Ensinar, da fila / fora dela | 132 / 60 | 56 / 44 |
+| Palpite, da fila / fora dela | n/a | 79 / 3 |
+| Dividir, da fila / fora dela | 22 / 27 | 22 / 31 |
+
+A razão vai a **0,718** (era 0,653 com o catálogo 7). A linha de base cai mais que o passo L
+(−107 contra +1), porque no passo 0 a cabeça certa travava mais a fila. E os ~140 Enter
+cobrados dos dois lados puxam a razão para 1. O CA-F.1 passa do alvo de ≤ 85%, provisório
+até a estrutura e os FEN das p. 21–27 serem revisados, e fica acima dos 0,70 do alvo antigo.

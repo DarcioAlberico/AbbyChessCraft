@@ -528,14 +528,20 @@ def margens_da_pagina(boxes: Sequence[BoxEntry], altura: int) -> set:
     A regra roda só nos lidos, como na exportação; contar o □ como glifo mudaria as linhas
     dela (um cisco sem leitura logo abaixo do título fecharia o vão que a regra pede). Depois,
     o sem leitura entra quando o centro dele cai na altura de um glifo de margem e na faixa
-    dos glifos de margem dessa altura, com a folga de uma altura de cada lado."""
+    dos glifos de margem dessa altura, com a folga de uma altura de cada lado. O sem leitura
+    todo dentro da faixa da poeira (`FAIXA_DA_POEIRA`, em cima ou embaixo) também entra: é o
+    cisco da borda da digitalização, que nenhuma linha do texto alcança."""
     lidos = [k for k, b in enumerate(boxes) if b.char]
     margem = {lidos[i] for i in margens_corridas({0: ([boxes[k] for k in lidos], altura)})[0]}
+    de_margem = list(margem)
     for k, b in enumerate(boxes):
-        if b.char or not margem:
+        if b.char:
+            continue
+        if b.y2 < FAIXA_DA_POEIRA * altura or b.y1 > (1 - FAIXA_DA_POEIRA) * altura:
+            margem.add(k)
             continue
         x, y = (b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2
-        na_altura = [boxes[m] for m in margem if boxes[m].y1 <= y <= boxes[m].y2]
+        na_altura = [boxes[m] for m in de_margem if boxes[m].y1 <= y <= boxes[m].y2]
         if na_altura:
             folga = max(m.y2 - m.y1 for m in na_altura)
             if min(m.x1 for m in na_altura) - folga <= x <= max(m.x2 for m in na_altura) + folga:

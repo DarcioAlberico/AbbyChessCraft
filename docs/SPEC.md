@@ -737,7 +737,8 @@ registrada pelo servidor falso).
   notas, estilos, diagramas desenhados ou recortados), TXT e **PGN**.
 - Opções: manter cabeçalhos e rodapés; manter quebras de linha e hífens; números de página;
   só páginas verificadas; intervalo; diagramas desenhados × recortados; realçar baixa
-  confiança no DOCX.
+  confiança no DOCX; link de análise dos diagramas (nenhum, Lichess ou Chess.com: no EPUB,
+  no DOCX e na prévia, embaixo de cada diagrama com FEN, abrindo do lado impresso).
 - Lê o Documento (§4.2), não os boxes.
 
 ### 12.2 Pré-visualização e relatório

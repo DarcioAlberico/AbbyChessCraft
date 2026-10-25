@@ -30,7 +30,10 @@ da rede (§9.2, só a rede global, num leitor à parte) é o certo custa só o E
 (`_palpite`). Desde o 8, o replay anda pela fila da janela (`_proxima_acao`): o primeiro
 dela sai sem o clique, também para dividir, juntar com o seguinte e descartar, e o certo e
 pendente numa linha medida custa o Enter que o confirma. A linha de base roda este mesmo
-arquivo no código do passo 0, e por isso ele só importa o que o passo tem.
+arquivo no código do passo 0, e por isso ele só importa o que o passo tem. Desde o 9, o que
+falta vai pelo mais barato: o box colado dividido pelo Ctrl+D, quando a divisão dá um box
+para o que falta (`_colado`), ou cada trecho marcado à mão ou, desde o D1, inserido no
+Documento (`_faltas_pelo_mais_barato`).
 
 Só entram as linhas de corpo com `texto_verificado: true` (o texto do gabarito é do
 usuário) e os diagramas do gabarito. Sem linha verificada, o texto fica **pendente** e o
@@ -112,6 +115,9 @@ class Diferencas:
     caracteres_sem_par: int = 0
     #: Os boxes das linhas lidas casadas com uma linha verificada: o que a medida cobre.
     medidos: set = field(default_factory=set)
+    #: Cada trecho de caracteres que falta: (o box antes, o box depois, quantos), com `None`
+    #: na ponta da linha. A soma dos "quantos" é `faltas`.
+    lugares_das_faltas: list = field(default_factory=list)
 
 
 def diferencas(boxes, linhas_lidas, caixas_lidas, palavra_do_box, gabarito) -> Diferencas:
@@ -147,6 +153,10 @@ def diferencas(boxes, linhas_lidas, caixas_lidas, palavra_do_box, gabarito) -> D
                     dif.acoes.append(("substituicao", indices[a1 + t], certos[b1 + t]))
                     mapa[b1 + t] = a1 + t
                 dif.acoes.extend(("sobra", i) for i in indices[a1 + comum:a2])
+                if (b2 - b1) > comum:
+                    antes = indices[a1 + comum - 1] if a1 + comum > 0 else None
+                    depois = indices[a2] if a2 < len(indices) else None
+                    dif.lugares_das_faltas.append((antes, depois, (b2 - b1) - comum))
                 dif.faltas += (b2 - b1) - comum
         palavra_certa = _palavras_por_glifo(linha["texto"])
         for b in range(1, len(certos)):
@@ -197,6 +207,25 @@ def _linhas_da_pagina(boxes, fonte, indice, ex):
 # O replay
 # ----------------------------------------------------------------------
 
+def custo_do_comando(comando: dict, caracteres: int = 0) -> int:
+    """O custo de uma vez do comando: o fixo, mais `por_caractere` vezes os caracteres que ele
+    digita (a inserção no Documento, desde o catálogo 9)."""
+    return comando["custo"] + comando.get("por_caractere", 0) * caracteres
+
+
+def _faltas_pelo_mais_barato(contas, dif, disponiveis) -> None:
+    """Cada trecho que falta, pelo comando mais barato do passo: marcar cada glifo à mão
+    (`falta`, por glifo) ou, desde o D1, inserir as letras no Documento (`falta_no_documento`,
+    o clique e cada letra; elas entram virtuais, sem box)."""
+    marcar, inserir = disponiveis.get("falta"), disponiveis.get("falta_no_documento")
+    for _antes, _depois, n in dif.lugares_das_faltas:
+        if inserir is not None and (marcar is None
+                                    or custo_do_comando(inserir, n) < marcar["custo"] * n):
+            contas.usar_comando(inserir, caracteres=n)
+        else:
+            contas.usar("falta", n)
+
+
 class _Contas:
     def __init__(self, disponiveis: dict, impossiveis: dict):
         self.disponiveis, self.custos_impossiveis = disponiveis, impossiveis
@@ -212,8 +241,8 @@ class _Contas:
         self.usar_comando(comando, vezes)
         return True
 
-    def usar_comando(self, comando: dict, vezes: int = 1) -> None:
-        self.gestos += comando["custo"] * vezes
+    def usar_comando(self, comando: dict, vezes: int = 1, caracteres: int = 0) -> None:
+        self.gestos += custo_do_comando(comando, caracteres) * vezes
         self.comandos[comando["id"]] = self.comandos.get(comando["id"], 0) + vezes
 
     @property
@@ -292,13 +321,23 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
         # página e depois do Enter e do Del; depois do Ctrl+D e do Ctrl+J, o box novo
         # (`ControladorDePagina._depois_de_editar`).
         mostrado = None
+        sem_colado: set = set()          # as caixas já vistas que dividir não ajuda
+        padroes_vistos = len(ensinados)
         for _ in range(LIMITE_DE_PASSOS):
+            if len(ensinados) != padroes_vistos:
+                # Com um padrão novo, a parte de um box colado pode sair certa ao dividir.
+                sem_colado.clear()
+                padroes_vistos = len(ensinados)
             linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
             dif = diferencas(boxes, linhas, caixas, palavra, gabarito)
             acao, da_fila = _proxima_acao(dif, boxes, leitor, disponiveis, imagem.height,
                                           mostrado)
             if acao is None:
-                break
+                colado = _colado(dif, boxes, sem_colado, disponiveis, imagem, leitor,
+                                 fonte, indice, ex, gabarito, mostrado)
+                if colado is None:
+                    break
+                acao, da_fila = ("divisao", colado), colado == mostrado
             mostrado = None
             if acao[0] == "confirmacao":                   # o Enter na leitura certa
                 i = acao[1]
@@ -350,7 +389,7 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
         linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
         dif = diferencas(boxes, linhas, caixas, palavra, gabarito)
         if dif.faltas:
-            texto_conta.usar("falta", dif.faltas)
+            _faltas_pelo_mais_barato(texto_conta, dif, disponiveis)
         if dif.espacos:
             texto_conta.usar("espaco", dif.espacos)
         if dif.linhas_sem_par:
@@ -420,6 +459,60 @@ def _proxima_acao(dif: Diferencas, boxes, leitor, disponiveis: dict, altura=None
             if alvo in fila and alvo not in envolvidos and "confirmacao_da_fila" in disponiveis:
                 return ("confirmacao", alvo), True
     return next((a for a in dif.acoes if a[0] in disponiveis), None), False
+
+
+def _colado(dif: Diferencas, boxes, sem_colado: set, disponiveis: dict, imagem, leitor,
+            fonte, indice, ex, gabarito, mostrado=None):
+    """O box colado a dividir com o Ctrl+D, ou `None` (desde o catálogo 9).
+
+    Um trecho que falta ao lado de um box pode ser o box que juntou dois glifos e foi lido
+    como o primeiro ("r," lido "r"). O replay divide o box vizinho numa cópia, como o Ctrl+D
+    (`pagina.dividir`): se a divisão dá um box para o que falta (as faltas diminuem), o
+    custo dela é o do dividir mais o de ensinar cada parte que sai errada. Ele fica com o
+    Ctrl+D se esse custo é menor que o de marcar ou inserir o que deixa de faltar
+    (`_faltas_pelo_mais_barato`); senão, a caixa vai para `sem_colado`, que o replay esvazia
+    quando um padrão novo entra (com ele, a parte pode sair certa ao dividir, e o Ctrl+D fica
+    mais barato). O Ctrl+D do box que a janela mostra (`mostrado`) não pede o clique. As
+    estimativas são do lado conservador: a parte errada custa o ensinar fora da fila."""
+    from dataclasses import replace
+
+    from abbychess import pagina as pg
+
+    dividir, ensinar = disponiveis.get("divisao"), disponiveis.get("substituicao")
+    if dividir is None or ensinar is None:
+        return None
+    substituicoes = sum(1 for a in dif.acoes if a[0] == "substituicao")
+    for antes, depois, _n in dif.lugares_das_faltas:
+        for candidato in (antes, depois):
+            if candidato is None:
+                continue
+            b = boxes[candidato]
+            caixa = (b.x1, b.y1, b.x2, b.y2)
+            if caixa in sem_colado:
+                continue
+            sem_colado.add(caixa)
+            copia = [replace(x) for x in boxes]
+            try:
+                pg.dividir(imagem, copia, candidato, leitor)
+            except ValueError:
+                continue
+            linhas, caixas, palavra = _linhas_da_pagina(copia, fonte, indice, ex)
+            depois_de_dividir = diferencas(copia, linhas, caixas, palavra, gabarito)
+            deixam = dif.faltas - depois_de_dividir.faltas
+            if deixam <= 0:
+                continue
+            novas = max(0, sum(1 for a in depois_de_dividir.acoes if a[0] == "substituicao")
+                        - substituicoes)
+            ctrl_d = (disponiveis.get("divisao_da_fila", dividir) if candidato == mostrado
+                      else dividir)
+            pelo_ctrl_d = custo_do_comando(ctrl_d) + novas * custo_do_comando(ensinar)
+            sem = _Contas(disponiveis, {})
+            _faltas_pelo_mais_barato(
+                sem, Diferencas(lugares_das_faltas=[(None, None, deixam)]), disponiveis)
+            if pelo_ctrl_d < sem.gestos:
+                sem_colado.discard(caixa)
+                return candidato
+    return None
 
 
 def _fila(boxes, leitor, altura=None) -> list:

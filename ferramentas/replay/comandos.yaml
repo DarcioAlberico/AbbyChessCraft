@@ -23,8 +23,12 @@
 # descartar, sem o clique) e o Enter que confirma a leitura certa pendente, que o replay não
 # cobrava; todos do passo 0, conferidos pelo teste. Desde ela, a linha de base roda o
 # `replay_fatia.py` do checkout no código do passo 0 (o mesmo algoritmo dos dois lados).
+# Versão 9: o que falta tem dois caminhos, e o replay fica com o mais barato: o box colado
+# ("r," lido "r") dividido pelo Ctrl+D, quando a divisão dá um box para o que falta, mais o
+# ensinar da parte; e, desde o D1, as letras inseridas no Documento (`inserir_no_documento`,
+# conferido pelo teste), que custam o clique e uma tecla por letra (`por_caractere`).
 
-versao: 8
+versao: 9
 
 # O que conta como um gesto (a regra do filtro de eventos do teste).
 convencao_de_gestos: >-
@@ -148,6 +152,13 @@ comandos:
     corrige: espaco
     custo: 2
     gestos: [clique no ponto do Documento, espaço ou Backspace (confirma ao sair da palavra)]
+  - id: inserir_no_documento
+    passo: D1
+    corrige: falta_no_documento
+    custo: 1
+    por_caractere: 1
+    gestos: [clique no ponto do Documento, cada letra que falta (entra virtual, sem box; confirma ao sair da palavra)]
+    efeito: o texto sai certo, mas a letra não tem box nem ensina padrão
   - id: corrigir_no_documento
     passo: D1
     corrige: substituicao

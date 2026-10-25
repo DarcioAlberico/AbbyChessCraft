@@ -7,9 +7,10 @@ r"""O replay da fatia (SPEC §15.4, CA-F.1): quantos gestos levam as páginas ao
 O **snapshot** é o projeto reconhecido (modelos globais, padrões vazios), guardado em
 `tests/dados/fatia/<livro>-iAAA-BBB-inicial.zip` com o SHA-256 ao lado; toda medida parte
 dele. O **replay** é uma simulação: percorre as diferenças entre a leitura e o gabarito,
-na ordem de leitura, e aplica no núcleo do programa a correção de cada uma com o comando
-de menor custo de `ferramentas/replay/comandos.yaml` disponível no passo (o ensinar
-propaga, e a propagação pode corrigir ou estragar outras ocorrências). Os custos são
+pela fila da janela e, fora dela, na ordem de leitura, e aplica no núcleo do programa a
+correção de cada uma com o comando de menor custo de `ferramentas/replay/comandos.yaml`
+disponível no passo (o ensinar propaga, e a propagação pode corrigir ou estragar outras
+ocorrências). Os custos são
 declarados no catálogo e conferidos com a interface real por `tests/test_custo_dos_comandos.py`.
 
 As diferenças que nenhum comando do passo corrige ficam contadas como **impossíveis**, cada
@@ -26,7 +27,10 @@ Desde o catálogo 6, um passo com o ensinar em lote (Ctrl+Enter) o usa no lugar 
 quando o lote da página (`contexto.lote`) deixa certos mais glifos do que o Enter simples,
 com a propagação dele, deixaria (`_lote`). Desde o 7, o glifo que ninguém leu e cujo palpite
 da rede (§9.2, só a rede global, num leitor à parte) é o certo custa só o Enter que o aceita
-(`_palpite`).
+(`_palpite`). Desde o 8, o replay anda pela fila da janela (`_proxima_acao`): o primeiro
+dela sai sem o clique, também para dividir, juntar com o seguinte e descartar, e o certo e
+pendente numa linha medida custa o Enter que o confirma. A linha de base roda este mesmo
+arquivo no código do passo 0, e por isso ele só importa o que o passo tem.
 
 Só entram as linhas de corpo com `texto_verificado: true` (o texto do gabarito é do
 usuário) e os diagramas do gabarito. Sem linha verificada, o texto fica **pendente** e o
@@ -106,6 +110,8 @@ class Diferencas:
     linhas_sem_par: int = 0
     #: Os caracteres (sem espaço) das linhas sem par, que custam por caractere.
     caracteres_sem_par: int = 0
+    #: Os boxes das linhas lidas casadas com uma linha verificada: o que a medida cobre.
+    medidos: set = field(default_factory=set)
 
 
 def diferencas(boxes, linhas_lidas, caixas_lidas, palavra_do_box, gabarito) -> Diferencas:
@@ -123,6 +129,7 @@ def diferencas(boxes, linhas_lidas, caixas_lidas, palavra_do_box, gabarito) -> D
             dif.caracteres_sem_par += sum(1 for c in linha["texto"] if not c.isspace())
             continue
         indices = list(linhas_lidas[casados[k]].indices)
+        dif.medidos.update(indices)
         lidos = [normalizar_saida(boxes[i].char) or SEM_LEITURA for i in indices]
         certos = [c for c in linha["texto"] if not c.isspace()]
         mapa = {}                                      # posição no certo -> posição no lido
@@ -224,7 +231,7 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
     from abbychess import exportar as ex
     from abbychess import pagina as pg
     from abbychess.atalhos import carregar as carregar_atalhos
-    from abbychess.leitor import LeitorDoLivro, rede_global
+    from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
 
     passos = carregar_atalhos().passos
@@ -237,8 +244,12 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
     projeto = ProjetoDeLivro.abrir(next(p.parent for p in pasta.rglob("projeto.json")))
     leitor = LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
     # O palpite da rede (§9.2) só com a rede: o leitor do replay continua só com os padrões.
-    sugeridor = (LeitorDoLivro(projeto.pasta_de_padroes, rede=rede_global())
-                 if {"palpite", "palpite_da_fila"} & set(disponiveis) else None)
+    # A importação fica aqui porque a linha de base roda este mesmo arquivo no código do
+    # passo 0, que não tem a `rede_global`.
+    sugeridor = None
+    if {"palpite", "palpite_da_fila"} & set(disponiveis):
+        from abbychess.leitor import rede_global
+        sugeridor = LeitorDoLivro(projeto.pasta_de_padroes, rede=rede_global())
     fonte = pg.fonte_do_projeto(projeto)
     indices = indices or projeto.paginas_lidas()
     gabaritos = {i: json.loads((verdade / livro / f"i{i:03d}.json").read_text(encoding="utf-8"))
@@ -277,12 +288,26 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
         erros_diagramas = _replay_dos_diagramas(projeto, fonte, indice, imagem, gabarito,
                                                 diagramas_conta)
 
+        # O glifo que a janela mostra: `None` é o primeiro da fila, aonde ela vai ao abrir a
+        # página e depois do Enter e do Del; depois do Ctrl+D e do Ctrl+J, o box novo
+        # (`ControladorDePagina._depois_de_editar`).
+        mostrado = None
         for _ in range(LIMITE_DE_PASSOS):
             linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
             dif = diferencas(boxes, linhas, caixas, palavra, gabarito)
-            acao, da_fila = _proxima_acao(dif, boxes, leitor, disponiveis, imagem.height)
+            acao, da_fila = _proxima_acao(dif, boxes, leitor, disponiveis, imagem.height,
+                                          mostrado)
             if acao is None:
                 break
+            mostrado = None
+            if acao[0] == "confirmacao":                   # o Enter na leitura certa
+                i = acao[1]
+                certo = boxes[i].char
+                pg.ensinar(imagem, boxes, i, certo, leitor, projeto, indice, propagar=False)
+                ensinados.add(certo)
+                pg.propagar_padroes(imagem, boxes, leitor)
+                texto_conta.usar("confirmacao_da_fila")
+                continue
             if acao[0] == "substituicao":
                 _, i, certo = acao
                 if da_fila:
@@ -296,6 +321,7 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
                 if comando["id"] == "corrigir_no_documento":         # corrige sem ensinar
                     pg.confirmar(boxes, i, certo)
                     texto_conta.usar_comando(comando)
+                    mostrado = i                 # o clique no Documento escolhe o glifo
                     continue
                 lida = boxes[i].char
                 # O ensinar propaga depois do Enter; o lote entra antes da propagação.
@@ -313,9 +339,11 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
                 pg.descartar(boxes, acao[1])
             elif acao[0] == "divisao":
                 pg.dividir(imagem, boxes, acao[1], leitor)
+                mostrado = acao[1]                          # a primeira parte
             elif acao[0] == "juncao":
                 pg.juntar(imagem, boxes, acao[1], acao[2], leitor)
-            texto_conta.usar(acao[0])
+                mostrado = min(acao[1], acao[2])            # o box junto
+            texto_conta.usar(f"{acao[0]}_da_fila" if da_fila else acao[0])
         else:
             raise RuntimeError(f"i{indice:03d}: o replay não convergiu")
 
@@ -364,23 +392,47 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
     return resultado
 
 
-def _proxima_acao(dif: Diferencas, boxes, leitor, disponiveis: dict, altura=None):
-    """A próxima correção: a do glifo que a janela mostra (o primeiro da fila de revisão),
-    se ele tem uma substituição e o passo tem o comando da fila; senão, a primeira na ordem
-    de leitura. Devolve (ação, se é a da fila). Com `altura` (a da página), a fila manda o
-    cabeçalho e o rodapé corridos para o fim, como a janela (`exportar.margens_da_pagina`)."""
+def _proxima_acao(dif: Diferencas, boxes, leitor, disponiveis: dict, altura=None,
+                  mostrado=None):
+    """A próxima correção e se ela vem do glifo que a janela mostra: (ação, da_fila).
+
+    A janela mostra `mostrado` ou, com `None`, o primeiro da fila de revisão (`_fila`, com
+    `altura`, a da página, para as margens irem ao fim). O glifo da fila que a medida não
+    cobre (fora das linhas verificadas e sem diferença) é transparente: o replay não sabe o
+    que o usuário faria com ele. Se o mostrado tem uma diferença cujo comando "da fila" o
+    passo tem (substituição, divisão, sobra, ou a junção em que ele é o primeiro dos dois),
+    ela vem dele, sem o clique. Se ele está na fila e certo numa linha medida, é o Enter que
+    confirma a leitura (`("confirmacao", box)`, desde o catálogo 8): o usuário passa por ele
+    para chegar ao seguinte. Senão, a primeira diferença na ordem de leitura, com o clique."""
+    if any(tipo.endswith("_da_fila") for tipo in disponiveis):
+        principal = {}
+        envolvidos = set()
+        for a in dif.acoes:
+            principal.setdefault(a[1], a)
+            envolvidos.update(a[1:3] if a[0] == "juncao" else a[1:2])
+        fila = [i for i in _fila(boxes, leitor, altura) if i in dif.medidos or i in envolvidos]
+        alvo = mostrado if mostrado is not None and mostrado < len(boxes) else (
+            fila[0] if fila else None)
+        if alvo is not None:
+            acao = principal.get(alvo)
+            if acao is not None and f"{acao[0]}_da_fila" in disponiveis:
+                return acao, True
+            if alvo in fila and alvo not in envolvidos and "confirmacao_da_fila" in disponiveis:
+                return ("confirmacao", alvo), True
+    return next((a for a in dif.acoes if a[0] in disponiveis), None), False
+
+
+def _fila(boxes, leitor, altura=None) -> list:
+    """A fila de revisão da janela, com as margens no fim quando o código as tem
+    (`exportar.margens_da_pagina`, desde o `2e3d9a1`; a linha de base roda este arquivo no
+    código do passo 0, que não as tem)."""
     from abbychess import exportar as ex
     from abbychess import pagina as pg
 
-    if "substituicao_da_fila" in disponiveis:
-        fila = pg.fila_de_revisao(boxes, leitor, ex.margens_da_pagina(boxes, altura)
-                                  if altura is not None else ())
-        if fila:
-            da_fila = next((a for a in dif.acoes if a[0] == "substituicao" and a[1] == fila[0]),
-                           None)
-            if da_fila is not None:
-                return da_fila, True
-    return next((a for a in dif.acoes if a[0] in disponiveis), None), False
+    margens = getattr(ex, "margens_da_pagina", None)
+    if margens is None or altura is None:
+        return pg.fila_de_revisao(boxes, leitor)
+    return pg.fila_de_revisao(boxes, leitor, margens(boxes, altura))
 
 
 def _lote(dif: Diferencas, boxes, i: int, lida: str, certo: str, disponiveis: dict,

@@ -19,8 +19,12 @@
 # novo (o `comparar` recusa catálogos diferentes). Versão 6 (pendências do L): o ensinar em
 # lote (`ensinar_em_lote_da_fila`, `ensinar_em_lote`), conferido pelo teste. Versão 7: o palpite
 # da rede no glifo que ninguém leu (`aceitar_palpite_da_fila`, `aceitar_palpite`), conferido.
+# Versão 8: os comandos da fila para o glifo que a janela já mostra (dividir, juntar,
+# descartar, sem o clique) e o Enter que confirma a leitura certa pendente, que o replay não
+# cobrava; todos do passo 0, conferidos pelo teste. Desde ela, a linha de base roda o
+# `replay_fatia.py` do checkout no código do passo 0 (o mesmo algoritmo dos dois lados).
 
-versao: 7
+versao: 8
 
 # O que conta como um gesto (a regra do filtro de eventos do teste).
 convencao_de_gestos: >-
@@ -90,6 +94,30 @@ comandos:
     corrige: divisao
     custo: 2
     gestos: [clique no box, Ctrl+D (corta no vão da tinta)]
+  # Versão 8: o glifo que a janela já mostra (o primeiro da fila) não pede o clique. O replay
+  # anda pela fila: o que ela mostra e a medida não cobre (fora das linhas verificadas) é
+  # transparente; o certo e pendente numa linha medida custa o Enter que o confirma.
+  - id: confirmar_da_fila
+    passo: "0"
+    corrige: confirmacao_da_fila
+    custo: 1
+    gestos: [Enter (o campo vem com a leitura certa, selecionada)]
+    efeito: ensina o padrão da leitura; depois do Enter a janela vai ao próximo da fila
+  - id: dividir_da_fila
+    passo: "0"
+    corrige: divisao_da_fila
+    custo: 1
+    gestos: [Ctrl+D (o glifo já mostrado)]
+  - id: juntar_da_fila
+    passo: "0"
+    corrige: juncao_da_fila
+    custo: 1
+    gestos: [Ctrl+J (o glifo já mostrado com o seguinte da linha)]
+  - id: descartar_da_fila
+    passo: "0"
+    corrige: sobra_da_fila
+    custo: 1
+    gestos: [clique em "Não é caractere" (o glifo já mostrado; desde o A2, o Del também)]
   - id: juntar_glifos
     passo: "0"
     corrige: juncao

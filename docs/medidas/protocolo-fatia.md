@@ -21,13 +21,17 @@ do estado reconhecido ao gabarito. Ela tem duas partes.
    o `estado` diz **provisório** e o que falta.
 5. **A linha de base é medida com o código do passo 0**, sempre: o replay chama o núcleo do
    programa (ensinar, propagar, dividir), e os passos 1b, 2b e outros mudam esse núcleo.
-   Ela roda num worktree da tag `passo-0`, com os gabaritos e o catálogo copiados do checkout
-   principal (os da medida nova):
+   Ela roda num worktree da tag `passo-0`, com os gabaritos, o catálogo e, desde o catálogo
+   8, o próprio `replay_fatia.py` copiados do checkout principal (os da medida nova): o mesmo
+   algoritmo dos dois lados. O replay de hoje roda no código do passo 0 (o que o passo 0 não
+   tem, ele não usa); na fatia xv, com o catálogo 7, ele deu a mesma linha de base de antes,
+   página por página (2026-10-24).
 
    ```text
    git worktree add ..\AbbyChessCraft_passo0 passo-0
    robocopy tests\verdade ..\AbbyChessCraft_passo0\tests\verdade /E
    copy ferramentas\replay\comandos.yaml ..\AbbyChessCraft_passo0\ferramentas\replay\
+   copy ferramentas\replay_fatia.py ..\AbbyChessCraft_passo0\ferramentas\
    cd ..\AbbyChessCraft_passo0
    ..\AbbyChessCraft\.venv\Scripts\python.exe ferramentas\replay_fatia.py rodar --livro xv --passo 0
    ```
@@ -42,9 +46,14 @@ do estado reconhecido ao gabarito. Ela tem duas partes.
    que torna possível uma correção antes impossível tem de baixar esse total. A navegação
    entre as páginas (`gestos_navegacao`) entra no total e sai também à parte.
 
-Limite conhecido: o replay só usa o atalho da fila (`ensinar_da_fila`) quando o glifo da
-cabeça da fila tem erro; uma cabeça de fila pendente mas certa não custa nada (a pessoa a
-confirmaria com um Enter). Isso não subestima o custo dos glifos errados.
+O replay anda pela fila da janela (desde o catálogo 8): o glifo que a janela mostra sai sem
+o clique, seja a correção dele um ensinar, uma divisão, uma junção com o seguinte ou um
+descarte; se ele está na fila e certo numa linha medida, custa o Enter que confirma a
+leitura. A janela mostra o primeiro da fila ao abrir a página e depois do Enter e do Del;
+depois do Ctrl+D e do Ctrl+J, o box novo, como na janela. O que a fila mostra
+e a medida não cobre (fora das linhas verificadas e sem diferença) é transparente. Até o
+catálogo 7, só o ensinar saía da fila, e a cabeça certa não custava nada nem andava: ela
+travava a fila.
 
 ## CA-F.2: o tempo de uma pessoa (informativo, não reprova)
 

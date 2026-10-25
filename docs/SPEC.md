@@ -1086,7 +1086,8 @@ núcleo do programa o comando de menor custo de `ferramentas/replay/comandos.yam
 (catálogo versionado: comando, passo em que existe, custo em gestos) e soma o custo
 declarado. O custo de cada comando é conferido contra a interface real por
 `tests/test_custo_dos_comandos.py`: QTest e um filtro de eventos que conta cliques, teclas
-que não são modificador e atalhos disparados. O mesmo algoritmo e o mesmo catálogo,
+que não são modificador e atalhos disparados. O mesmo algoritmo (desde o catálogo 8, o
+mesmo `replay_fatia.py`) e o mesmo catálogo,
 filtrado por `passo ≤ atual`, rodam na linha de base e depois; o que nenhum comando do passo
 corrige entra com o custo fixo de "impossível" declarado no catálogo. A linha de base é
 sempre medida com o código da tag `passo-0` (o replay chama o núcleo, que muda); duas

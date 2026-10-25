@@ -84,7 +84,9 @@ def test_o_catalogo_do_passo_0_e_o_que_este_teste_cobre():
                           "descartar_box",
                           "marcar_glifo",
                           "dividir_glifo", "juntar_glifos", "abrir_diagrama", "corrigir_casa",
-                          "corrigir_lado", "fechar_diagrama"}
+                          "corrigir_lado", "fechar_diagrama",
+                          "confirmar_da_fila", "dividir_da_fila", "juntar_da_fila",
+                          "descartar_da_fila"}
 
 
 def test_premissa_evento_que_sobe_para_o_pai_nao_e_espontaneo(app, contador):
@@ -463,3 +465,95 @@ def test_aceitar_palpite(app, janela, contador):
     assert contador.gestos == CUSTO_L["aceitar_palpite"]
     assert (boxes(janela)[outro].char, boxes(janela)[outro].source) == (
         leitor_falso.PALPITE, FONTE_MANUAL)
+
+
+# ----------------------------------------------------------------------
+# Catálogo 8: os comandos da fila para o glifo que a janela já mostra
+# ----------------------------------------------------------------------
+
+def _na_cabeca_da_fila(janela) -> int:
+    """O primeiro da fila, que a janela mostra sem gesto; devolve o índice dele."""
+    primeiro = fila(janela)[0]
+    assert atual(janela) == primeiro
+    return primeiro
+
+
+def _segue_a_fila(janela) -> None:
+    """Depois do comando, a janela mostra o primeiro da fila: o seguinte "da fila" também
+    não pede o clique."""
+    assert fila(janela) and atual(janela) == fila(janela)[0]
+
+
+def test_confirmar_da_fila(app, janela, contador):
+    """A leitura certa e pendente vem no campo, selecionada: o Enter a confirma e ensina."""
+    from tests.janela_util import trocar_entries
+
+    _pronta(app, janela)
+    impresso = iter("abcabcabc" "cabbca")
+
+    def ler_certo(e):
+        e.char, e.source, e.confidence = next(impresso), "neural", 0.5     # abaixo do limiar
+    trocar_entries(janela, janela.pagina.indice, ler_certo)
+    _esperar(app, janela)
+    mostrar(janela, fila(janela)[0])
+    app.processEvents()
+    primeiro = _na_cabeca_da_fila(janela)
+    lida = boxes(janela)[primeiro].char
+    campo = janela.treino.campo
+    assert campo.text() == lida and campo.selectedText() == lida
+    contador.gestos = 0
+    QTest.keyClick(campo, Qt.Key.Key_Return)
+    _esperar(app, janela)
+    assert contador.gestos == CUSTO["confirmar_da_fila"]
+    assert (boxes(janela)[primeiro].char, boxes(janela)[primeiro].source) == (lida, FONTE_MANUAL)
+    assert lida in janela.leitor.padroes_por_caractere()     # o Enter ensinou o padrão
+    _segue_a_fila(janela)
+
+
+def test_juntar_e_dividir_da_fila(app, janela, contador):
+    """O Ctrl+J e o Ctrl+D no glifo mostrado; depois deles a janela mostra o box novo, não o
+    primeiro da fila (`_depois_de_editar`), e é isso que o replay segue (`mostrado`)."""
+    from tests.janela_util import trocar_entries
+
+    _pronta(app, janela)
+    total = len(boxes(janela))
+    na_frente = (boxes(janela)[2].x1, boxes(janela)[2].y1)
+
+    def confiancas(e):            # o terceiro sem leitura, na frente da fila; o resto lido
+        if (e.x1, e.y1) == na_frente:
+            e.char, e.source, e.confidence = "", "none", 0.0
+        else:
+            e.char, e.source, e.confidence = "x", "neural", 0.5
+    trocar_entries(janela, janela.pagina.indice, confiancas)
+    _esperar(app, janela)
+    mostrar(janela, 6)                                 # o glifo mostrado, sem gesto
+    app.processEvents()
+    assert fila(janela)[0] == 2 and atual(janela) == 6
+    contador.gestos = 0
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_J, Qt.KeyboardModifier.ControlModifier)
+    assert contador.gestos == CUSTO["juntar_da_fila"]
+    assert len(boxes(janela)) == total - 1
+    assert atual(janela) == 6 and fila(janela)[0] == 2     # o box junto, não a fila
+
+    contador.gestos = 0
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_D, Qt.KeyboardModifier.ControlModifier)
+    assert contador.gestos == CUSTO["dividir_da_fila"]
+    assert len(boxes(janela)) == total
+    assert atual(janela) == 6 and fila(janela)[0] == 2     # a primeira parte, não a fila
+
+
+@pytest.mark.parametrize("como", ["Del", "botão"])
+def test_descartar_da_fila(app, janela, contador, como):
+    _pronta(app, janela)
+    total = len(boxes(janela))
+    _na_cabeca_da_fila(janela)
+    contador.gestos = 0
+    if como == "Del":
+        QTest.keyClick(janela.treino.campo, Qt.Key.Key_Delete)
+    else:
+        botao = next(w for w in janela.treino.findChildren(QPushButton)
+                     if w.text().startswith("Não é caractere"))
+        QTest.mouseClick(botao, Qt.MouseButton.LeftButton)
+    assert contador.gestos == CUSTO["descartar_da_fila"]
+    assert len(boxes(janela)) == total - 1
+    _segue_a_fila(janela)

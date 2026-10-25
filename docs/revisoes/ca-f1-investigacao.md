@@ -374,3 +374,43 @@ A razão vai a **0,718** (era 0,653 com o catálogo 7). A linha de base cai mais
 (−107 contra +1), porque no passo 0 a cabeça certa travava mais a fila. E os ~140 Enter
 cobrados dos dois lados puxam a razão para 1. O CA-F.1 passa do alvo de ≤ 85%, provisório
 até a estrutura e os FEN das p. 21–27 serem revisados, e fica acima dos 0,70 do alvo antigo.
+
+## O que falta: o box colado e a inserção no Documento (2026-10-25, com o pedido do usuário)
+
+Dos 16 glifos que o passo L cobrava como faltando (4 gestos cada, marcados à mão), a maioria
+era um box colado lido como a primeira letra:
+- "r," de "concluir," lido "r" (a altura do box pega a perna da vírgula);
+- "tir," de "existir," lido "t" (52 px de largura);
+- "ran" de "tranqüila" lido "r".
+
+O replay casava a primeira letra e contava o resto como faltando.
+
+**O Documento não divide esse box.** O 1 → k dele só vale quando a leitura do box está errada
+("x" por "tir,"). Lido como a primeira letra, o box fica, e as letras que faltam entram
+virtuais, sem box (conferido em `sessao.planejar`).
+
+**O que mudou** (`f38e5d7`, catálogo 9). O que falta vai pelo mais barato:
+- **o Ctrl+D no box colado.** O replay divide numa cópia o box vizinho do trecho que falta
+  (`_colado`). Ele fica com o Ctrl+D se a divisão dá um box para o que falta e se dividir,
+  mais ensinar as partes que saem erradas, custa menos que o outro caminho;
+- **marcar cada glifo à mão** (4 gestos por glifo);
+- **ou, desde o D1, inserir as letras no Documento** (`inserir_no_documento`: o clique e uma
+  tecla por letra, conferido na janela).
+
+A revisão de código pediu que o box rejeitado volte a ser avaliado quando um padrão novo
+entra. Com o padrão, a parte sai certa ao dividir, e o Ctrl+D custa só ele. As estimativas
+do Ctrl+D continuam do lado conservador: a parte errada custa o ensinar fora da fila.
+
+**As medidas** (`2026-10-25-fatia-xv-passo-0.json` e `2026-10-25-fatia-xv-passo-L.json`, no
+`f38e5d7`):
+
+| | Linha de base | Passo L |
+|---|---|---|
+| Gestos | 1.076 | 739 (era 773) |
+| Marcar à mão | 14 | 0 (eram 16) |
+| Inserir no Documento | n/a | 9 trechos |
+| Dividir, fora da fila / da fila | 27 / 22 | 32 / 23 (eram 31 / 22) |
+
+Na linha de base o Ctrl+D não sai mais barato em nenhum box: dividir (2) e ensinar a parte
+(3) passam de marcar a vírgula (4). A razão vai a **0,687**, abaixo também dos 0,70 do alvo
+antigo. O CA-F.1 passa, provisório até a estrutura e os FEN das p. 21–27 serem revisados.

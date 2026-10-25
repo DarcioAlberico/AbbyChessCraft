@@ -1009,6 +1009,11 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   confirma a leitura certa pendente; a linha de base roda o mesmo `replay_fatia.py` no código
   do passo 0. Linha de base 1.076, passo L 773: 71,8%.
 
+- O que falta pelo mais barato, catálogo 9 (`f38e5d7`, com o pedido do usuário): o box
+  colado ("r," lido "r") dividido pelo Ctrl+D quando a divisão dá um box para o que falta, ou
+  as letras inseridas no Documento desde o D1 (o clique e uma tecla por letra). Linha de base
+  1.076, passo L 739: 68,7%.
+
 Continuam: os FEN e a estrutura das p. 21–27; o EPUB no
 Thorium e no celular. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).

@@ -313,6 +313,67 @@ def test_glifo_fora_da_cabeca_da_fila_custa_o_clique():
     assert rf._proxima_acao(dif, boxes, leitor, disponiveis) == (("substituicao", 0, "a"), False)
 
 
+def _fila_de_tres(acoes, medidos=(0, 1, 2), mostrado=None):
+    """Três boxes na fila, nessa ordem (as confianças), e as diferenças dadas."""
+    from abbychess.projeto import Limiares
+
+    from core.box_model import BoxEntry
+
+    leitor = SimpleNamespace(limiares=Limiares())
+    boxes = [BoxEntry("a", 10, 10, 20, 30, 0.1, "net"), BoxEntry("b", 30, 10, 40, 30, 0.2, "net"),
+             BoxEntry("c", 50, 10, 60, 30, 0.3, "net")]
+    dif = rf.Diferencas(acoes=list(acoes), medidos=set(medidos))
+    return rf._proxima_acao(dif, boxes, leitor, rf.comandos_do_passo(CATALOGO, "0", PASSOS),
+                            mostrado=mostrado)
+
+
+@pytest.mark.parametrize("acao", [("divisao", 0), ("sobra", 0), ("juncao", 0, 1),
+                                  ("substituicao", 0, "x")])
+def test_a_diferenca_do_primeiro_da_fila_vem_dela(acao):
+    """Catálogo 8: dividir, juntar e descartar o glifo já mostrado também dispensam o clique."""
+    assert _fila_de_tres([("substituicao", 2, "z"), acao]) == (acao, True)
+
+
+def test_a_juncao_em_que_o_primeiro_da_fila_e_o_segundo_box_pede_o_clique():
+    """O Ctrl+J junta o glifo mostrado com o seguinte: o anterior pede o clique nele."""
+    assert _fila_de_tres([("juncao", 2, 0)]) == (("juncao", 2, 0), False)
+
+
+def test_o_primeiro_da_fila_certo_custa_o_enter_que_o_confirma():
+    assert _fila_de_tres([("substituicao", 2, "z")]) == (("confirmacao", 0), True)
+
+
+def test_o_que_a_medida_nao_cobre_e_transparente_na_fila():
+    """Fora das linhas verificadas e sem diferença, o glifo não custa nem trava a fila."""
+    assert _fila_de_tres([("divisao", 1)], medidos=(1, 2)) == (("divisao", 1), True)
+    assert _fila_de_tres([], medidos=()) == (None, False)
+
+
+def test_depois_do_ctrl_d_e_do_ctrl_j_vale_o_box_mostrado_e_nao_a_fila():
+    """A janela mostra o box novo: a diferença dele sai sem o clique; certo e na fila, ele
+    custa o Enter que o confirma, antes do primeiro da fila."""
+    assert _fila_de_tres([("divisao", 0), ("divisao", 2)], mostrado=2) == (("divisao", 2), True)
+    assert _fila_de_tres([("divisao", 0)], mostrado=2) == (("confirmacao", 2), True)
+
+
+def test_o_glifo_mostrado_fora_da_fila_nao_e_confirmado():
+    """Certo e já confiante (fora da fila), ele não custa o Enter: o seguinte pede o clique."""
+    from abbychess.projeto import Limiares
+
+    from core.box_model import BoxEntry
+
+    leitor = SimpleNamespace(limiares=Limiares())
+    boxes = [BoxEntry("a", 10, 10, 20, 30, 0.99, "net"), BoxEntry("b", 30, 10, 40, 30, 0.2, "net")]
+    dif = rf.Diferencas(acoes=[("substituicao", 1, "z")], medidos={0, 1})
+    disponiveis = rf.comandos_do_passo(CATALOGO, "0", PASSOS)
+    assert rf._proxima_acao(dif, boxes, leitor, disponiveis, mostrado=0) == (
+        ("substituicao", 1, "z"), False)
+
+
+def test_as_diferencas_guardam_os_boxes_medidos():
+    assert _diferencas("abc", "abc").medidos == {0, 1, 2}
+
+
 def _palavras(texto: str):
     """Uma linha de boxes de 10×20 px, 1 px entre letras e 12 px entre palavras."""
     from core.box_model import BoxEntry

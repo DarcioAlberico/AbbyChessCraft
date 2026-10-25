@@ -299,7 +299,7 @@ isso o replay nunca o resolvia: ele travava a cabeça, e toda correção saía f
 janela era igual: o usuário tinha de pular o □ antes de chegar ao texto, e a exportação o
 tira de qualquer jeito.
 
-**A mudança** (`da2d530`, SPEC §8.1). Por confiança e por caractere, a fila põe o que a
+**A mudança** (`2e3d9a1`, SPEC §8.1). Por confiança e por caractere, a fila põe o que a
 exportação tira depois do resto e antes dos pulados:
 - o cabeçalho e o rodapé corridos, pela regra da exportação;
 - o □ que cai na altura e na faixa deles;
@@ -318,8 +318,11 @@ A revisão de código pegou duas coisas na primeira versão:
 versão: 37,8/54,3 e 36,8/59,6 ms (p50/p95) sem a mudança, 39,4/70,0 e 37,9/54,7 com ela. O
 alvo é 100 ms. A máquina estava mais lenta que no último portão nas duas.
 
-**A medida** (`2026-10-24-fatia-xv-passo-L-220141.json`, no `da2d530`, árvore limpa, catálogo
-7 sem mudança) dá **772 gestos**, razão **0,653**. A linha de base continua em 1.183. Agora
+**A medida** (`2026-10-24-fatia-xv-passo-L-220446.json`, no `84f2956`, que soma só os
+documentos ao `2e3d9a1`, árvore limpa, catálogo 7 sem mudança) dá **772 gestos**, razão
+**0,653**. A primeira rodada, no mesmo código antes de ele ir para cima do `985bd37` (o negrito
+do pingo do i e o espaço depois do "f", de outra sessão), deu os mesmos 772, comando por
+comando. A linha de base continua em 1.183. Agora
 85 palpites e 36 ensinos saem da fila (eram 7 e 5). O que sobra:
 - 81 `ensinar_glifo`, o glifo que a rede erra e que a fila não alcança na vez dele;
 - 51 divisões, 15 descartes, 20 marcações e 11 junções;

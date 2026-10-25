@@ -1004,6 +1004,11 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   título corrido abria a fila de toda página. A fatia cai para 772 gestos (65,3%), abaixo
   também dos 70% do alvo antigo.
 
+- O replay refinado, catálogo 8 (`3841795`, com o pedido do usuário): ele anda pela fila da
+  janela (dividir, juntar e descartar o glifo mostrado sem o clique) e cobra o Enter que
+  confirma a leitura certa pendente; a linha de base roda o mesmo `replay_fatia.py` no código
+  do passo 0. Linha de base 1.076, passo L 773: 71,8%.
+
 Continuam: os FEN e a estrutura das p. 21–27; o EPUB no
 Thorium e no celular. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).

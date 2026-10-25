@@ -20,6 +20,8 @@ exportação) e escreve um EPUB 3 que a auditoria do EPUB do Aagaard pediu (road
   recorte diz que o diagrama não foi lido. Imagens iguais byte a byte são um recurso só.
 - **Links internos**: "página 23", "Diagrama 6" (pelo número da legenda) e "capítulo 3"
   (pelo número do título) viram link quando o alvo está no livro (`referencias_internas`).
+- **Links de análise**, se pedidos: na legenda de cada diagrama lido, o link que abre a
+  posição no Lichess ou no Chess.com (`links_de_analise`).
 - **Os mesmos bytes**: com o mesmo `SOURCE_DATE_EPOCH`, o mesmo arquivo (CA-12.6): a data
   do pacote e das entradas do zip vem de `core.exportar.instante`, e nada mais varia.
 
@@ -47,6 +49,8 @@ from typing import Dict, List, Optional, Sequence, Tuple
 from xml.etree import ElementTree
 
 from core.pagina import Figura, PaginaExtraida, Paragrafo
+
+from abbychess import links_de_analise
 
 log = logging.getLogger(__name__)
 
@@ -179,6 +183,8 @@ class Escrito:
     sem_fen: int = 0
     #: As referências a página impressa que viraram link.
     links: int = 0
+    #: Os diagramas com link de análise (`links_de_analise`).
+    analises: int = 0
     #: Os bytes que o PNG otimizado sem perda tirou das imagens (`png_otimizado`).
     poupados: int = 0
 
@@ -437,6 +443,8 @@ class _Capitulo:
     paginas: List[Tuple[int, str]] = field(default_factory=list)
     #: As referências (a página, diagrama ou capítulo) que viraram link neste capítulo.
     links: int = 0
+    #: Os diagramas com link de análise neste capítulo.
+    analises: int = 0
     #: (número impresso, âncora) dos diagramas e dos capítulos numerados que caem aqui.
     diagramas: List[Tuple[int, str]] = field(default_factory=list)
     numerados: List[Tuple[int, str]] = field(default_factory=list)
@@ -447,11 +455,12 @@ def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbo
                rotulos: Optional[Dict[int, int]] = None,
                alvos: Optional[Dict[str, Dict[int, str]]] = None,
                numeros: Optional[Numerados] = None,
-               quebras: bool = False) -> List[_Capitulo]:
+               quebras: bool = False, analise: str = "nenhum") -> List[_Capitulo]:
     """Os capítulos. `rotulos` dá o número impresso de cada página (índice -> número; sem
     ele, a posição no PDF); `alvos`, o href de cada página impressa, diagrama e capítulo
     numerado (`"paginas"`, `"diagramas"`, `"capitulos"`: número -> href), para as
-    referências do texto virarem link; `numeros`, o que o livro numera (`numerados`)."""
+    referências do texto virarem link; `numeros`, o que o livro numera (`numerados`);
+    `analise`, o site do link de análise de cada diagrama lido (`links_de_analise`)."""
     rotulos = rotulos or {}
     alvos = alvos or {}
     numeros = numeros or Numerados()
@@ -499,10 +508,18 @@ def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbo
                 classe = "diagrama" if bloco.fen else "diagrama recorte"
                 alt = _e(alternativo(bloco, msg, idioma), aspas=True)
                 # A ressalva do diagrama que ninguém conferiu fica à vista (PD-21), além do alt.
-                legenda = ''
+                # E o link de análise, quando pedido, embaixo da ressalva.
+                na_legenda = []
                 if getattr(bloco, "revisao_pendente", False):
                     ressalva = ([marca_do_lado(bloco, idioma)] if bloco.fen else []) + [msg["nao_revisado"]]
-                    legenda = f"<figcaption>{_e('; '.join(ressalva))}</figcaption>"
+                    na_legenda.append(_e('; '.join(ressalva)))
+                endereco = links_de_analise.link_da_figura(bloco, analise)
+                if endereco:
+                    na_legenda.append(f'<a class="analise" href="{_e(endereco, aspas=True)}">'
+                                      f'{_e(links_de_analise.rotulo(analise, idioma))}</a>')
+                    atual.analises += 1
+                legenda = (f"<figcaption>{'<br/>'.join(na_legenda)}</figcaption>"
+                           if na_legenda else "")
                 ident = ""
                 if id(bloco) in numeros.figuras:
                     ancora_do_diagrama = f"dg{numeros.figuras[id(bloco)]}"
@@ -669,12 +686,16 @@ def tipo_da_imagem(dados: bytes) -> Tuple[str, str]:
 
 def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: Metadados, *,
              limite_do_capitulo: int = LIMITE_DO_CAPITULO,
-             numeros: Optional[Dict[int, int]] = None, quebras: bool = False) -> Escrito:
+             numeros: Optional[Dict[int, int]] = None, quebras: bool = False,
+             analise: str = "nenhum") -> Escrito:
     """Escreve o EPUB em `caminho` (ao lado e troca no fim: a falha não estraga o anterior).
 
     `numeros` é o número impresso de cada página (índice -> número): vira o rótulo da
     página na `page-list` e o alvo das referências do texto ("ver a página 23"). `quebras`
-    escreve as quebras de linha dos parágrafos como `<br/>` (`Opcoes.manter_quebras`)."""
+    escreve as quebras de linha dos parágrafos como `<br/>` (`Opcoes.manter_quebras`).
+    `analise` põe na legenda de cada diagrama lido o link que abre a posição no Lichess ou
+    no Chess.com (`Opcoes.links_de_analise`); `nenhum`, nenhum link."""
+    links_de_analise.validar(analise)
     from core.exportar import agora, data_no_zip, fonte_dos_simbolos, instante
 
     idioma = metadados.idioma or "pt-BR"
@@ -744,7 +765,7 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
     numeros = numeros or {}
     contados = numerados(paginas)
     capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
-                           numeros, numeros=contados, quebras=quebras)
+                           numeros, numeros=contados, quebras=quebras, analise=analise)
     alvos = {
         "paginas": ({rotulo: f"{c.nome}#{ancora}" for c in capitulos
                      for rotulo, ancora in c.paginas} if numeros else {}),
@@ -753,8 +774,9 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
     }
     if any(alvos.values()):
         capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
-                               numeros, alvos, contados, quebras)
+                               numeros, alvos, contados, quebras, analise)
     escrito.links = sum(c.links for c in capitulos)
+    escrito.analises = sum(c.analises for c in capitulos)
     if not capitulos:
         raise ValueError("Nada para escrever no EPUB: as páginas não têm texto nem diagrama.")
     escrito.capitulos = len(capitulos)

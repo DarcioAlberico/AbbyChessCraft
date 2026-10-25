@@ -370,6 +370,64 @@ def test_o_glifo_mostrado_fora_da_fila_nao_e_confirmado():
         ("substituicao", 1, "z"), False)
 
 
+def test_as_diferencas_guardam_o_lugar_de_cada_falta():
+    dif = _diferencas("rab", "r,a;;b")
+    assert dif.faltas == 3 and dif.lugares_das_faltas == [(0, 1, 1), (1, 2, 2)]
+    assert _diferencas("ab", "xab").lugares_das_faltas == [(None, 0, 1)]
+
+
+@pytest.mark.parametrize(("passo", "n", "comandos"), [
+    ("0", 1, {"marcar_glifo": 1}),                        # 4 gestos
+    ("D1", 1, {"inserir_no_documento": 1}),               # o clique e a letra: 2
+    ("D1", 3, {"inserir_no_documento": 1}),               # 4 contra 12
+])
+def test_a_falta_vai_pelo_comando_mais_barato(passo, n, comandos):
+    contas = rf._Contas(rf.comandos_do_passo(CATALOGO, passo, PASSOS), CATALOGO["impossiveis"])
+    rf._faltas_pelo_mais_barato(contas, rf.Diferencas(lugares_das_faltas=[(0, 1, n)]),
+                                contas.disponiveis)
+    assert contas.comandos == comandos
+    assert contas.gestos == (4 * n if passo == "0" else 1 + n)
+
+
+def _colado(monkeypatch, passo, parte_lida):
+    """O "r," num box só, lido "r", na linha "r,a"; o Ctrl+D (falso) dá o "r" e a parte
+    `parte_lida`."""
+    from core.box_model import BoxEntry
+
+    from abbychess import pagina as pg
+
+    def linhas(boxes, _fonte, _indice, _ex):
+        return ([SimpleNamespace(indices=list(range(len(boxes))))], [[0.1, 0.1, 0.9, 0.2]],
+                {i: 0 for i in range(len(boxes))})
+
+    def dividir(_imagem, boxes, i, _leitor):
+        b = boxes[i]
+        boxes[i:i + 1] = [BoxEntry("r", b.x1, b.y1, b.x1 + 10, b.y2),
+                          BoxEntry(parte_lida, b.x1 + 10, b.y1, b.x2, b.y2)]
+
+    monkeypatch.setattr(rf, "_linhas_da_pagina", linhas)
+    monkeypatch.setattr(pg, "dividir", dividir)
+    boxes = [BoxEntry("r", 10, 10, 30, 40), BoxEntry("a", 40, 10, 55, 40)]
+    gabarito = {"linhas_corpo": [{"caixa_rel": [0.1, 0.1, 0.9, 0.2], "texto": "r,a",
+                                  "texto_verificado": True}]}
+    dif = rf.diferencas(boxes, *linhas(boxes, None, None, None), gabarito)
+    assert dif.lugares_das_faltas == [(0, 1, 1)]
+    return rf._colado(dif, boxes, set(), rf.comandos_do_passo(CATALOGO, passo, PASSOS), None,
+                      None, None, None, None, gabarito)
+
+
+def test_o_box_colado_vai_pelo_ctrl_d_quando_e_mais_barato(monkeypatch):
+    """No passo 0, dividir (2) e a parte já lida certa contra marcar a vírgula (4)."""
+    assert _colado(monkeypatch, "0", ",") == 0
+
+
+def test_o_box_colado_fica_para_o_mais_barato(monkeypatch):
+    """A parte sai sem leitura: dividir (2) e ensiná-la (3) contra marcar (4); e, no D1,
+    dividir (2) contra inserir a vírgula no Documento (2): fica a falta."""
+    assert _colado(monkeypatch, "0", "") is None
+    assert _colado(monkeypatch, "D1", ",") is None
+
+
 def test_as_diferencas_guardam_os_boxes_medidos():
     assert _diferencas("abc", "abc").medidos == {0, 1, 2}
 

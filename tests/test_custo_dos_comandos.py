@@ -313,7 +313,8 @@ def _clicar_no_documento(janela, posicao: int) -> None:
 
 def test_os_comandos_do_documento_estao_no_catalogo_sem_estimativa():
     comandos = [c for c in rf.carregar_catalogo()["comandos"] if str(c["passo"]) == "D1"]
-    assert {c["id"] for c in comandos} == {"espaco_no_documento", "corrigir_no_documento"}
+    assert {c["id"] for c in comandos} == {"espaco_no_documento", "corrigir_no_documento",
+                                           "inserir_no_documento"}
     assert not any("conferir_no_passo" in c for c in comandos)       # conferidos aqui
 
 
@@ -346,6 +347,23 @@ def test_corrigir_no_documento(app, janela, contador):
     caixa = j.pagina.box(primeiro)
     assert (caixa.char, caixa.source) == ("z", FONTE_MANUAL)
     assert "z" not in j.leitor.padroes_por_caractere()    # corrigir não ensina
+
+
+def test_inserir_no_documento(app, janela, contador):
+    """Catálogo 9: o clique no ponto e cada letra que falta; elas entram virtuais."""
+    comando = next(c for c in rf.carregar_catalogo()["comandos"] if c["id"] == "inserir_no_documento")
+    j = _pronta(app, janela)
+    j.vista.setCurrentWidget(j.painel_do_documento)
+    app.processEvents()
+    primeiro = j.pagina.gids[0]
+    antes = j.pagina.box(primeiro).char
+    contador.gestos = 0
+    _clicar_no_documento(j, j.texto.posicao_do_gid(primeiro) + 1)
+    QTest.keyClicks(j.texto, ",;")
+    assert contador.gestos == rf.custo_do_comando(comando, 2) == 3
+    j.texto.confirmar()
+    assert [v.char for v in j.pagina.modelo.decisoes.virtuais] == [",", ";"]
+    assert j.pagina.box(primeiro).char == antes           # o glifo do lado não muda
 
 
 # ----------------------------------------------------------------------

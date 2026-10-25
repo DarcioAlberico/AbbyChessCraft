@@ -55,6 +55,13 @@ e a medida não cobre (fora das linhas verificadas e sem diferença) é transpar
 catálogo 7, só o ensinar saía da fila, e a cabeça certa não custava nada nem andava: ela
 travava a fila.
 
+O que falta vai pelo mais barato (desde o catálogo 9). Um box colado lido como a primeira
+letra ("r," lido "r") pode ser dividido pelo Ctrl+D, e a parte nova ensinada; o replay o
+divide numa cópia e fica com o Ctrl+D se ele dá um box para o que falta e sai mais barato.
+Senão, cada trecho que falta é marcado à mão (4 gestos por glifo) ou, desde o D1, inserido
+no Documento: o clique e uma tecla por letra, e as letras entram sem box. As estimativas do
+Ctrl+D são do lado conservador (a parte errada custa o ensinar fora da fila).
+
 ## CA-F.2: o tempo de uma pessoa (informativo, não reprova)
 
 1. O mesmo snapshot, aberto numa cópia, no programa do passo medido; a linha de base, no

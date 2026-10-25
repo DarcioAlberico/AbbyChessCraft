@@ -1103,7 +1103,9 @@ ficavam perto de 0,80. Depois, o pingo do i no dividir e as legendas lado a lado
 linhas, `7511f02`, levaram a fatia a 880 gestos, 0,744, e as margens no fim da fila de
 revisão, `2e3d9a1`, a 772, 0,653. Com o catálogo 8, `3841795`, o replay anda pela fila da
 janela e cobra o Enter que confirma a leitura certa pendente, dos dois lados: a linha de base
-vai a 1.076, o passo L a 773, e a razão a 0,718.)
+vai a 1.076, o passo L a 773, e a razão a 0,718. Com o catálogo 9, `f38e5d7`, o que falta
+vai pelo mais barato, o box colado pelo Ctrl+D ou, desde o D1, as letras inseridas no
+Documento: o passo L vai a 739, e a razão a 0,687.)
 **CA-F.2** (informativo, não reprova) Tempo humano pelo protocolo
 `docs/medidas/protocolo-fatia.md`: o mesmo snapshot; o tempo vem do registro de gestos da
 aplicação (`ABBY_REGISTRO_DE_EVENTOS`, somado por `ferramentas/tempo_da_fatia.py`),

@@ -46,6 +46,17 @@ def test_as_margens_da_pagina_contam_o_glifo_sem_leitura():
     assert ex.margens_da_pagina(cabecalho + [cisco] + corpo, ALTURA) == set(range(len(cabecalho)))
 
 
+def test_o_cisco_sem_leitura_na_borda_da_pagina_e_margem():
+    """O cisco da borda da digitalização (no Xadrez Vitorioso, 3×20 px a 34 px do pé da
+    página) travava a cabeça da fila; o do meio da página continua na vez dele."""
+    cabecalho, corpo = _entries()
+    no_pe = BoxEntry("", 168, ALTURA - 34, 171, ALTURA - 14, 0.0, FONTE_NENHUMA)
+    no_meio = BoxEntry("", 1500, 1400, 1508, 1406, 0.0, FONTE_NENHUMA)
+    boxes = cabecalho + corpo + [no_pe, no_meio]
+    margens = ex.margens_da_pagina(boxes, ALTURA)
+    assert len(boxes) - 2 in margens and len(boxes) - 1 not in margens
+
+
 def test_a_fila_da_lista_manda_as_margens_para_o_fim():
     cabecalho, corpo = _entries()
     boxes = cabecalho + corpo

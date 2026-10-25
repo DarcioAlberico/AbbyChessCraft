@@ -1000,7 +1000,7 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   pingo de "vi"/"xi" vai para a coluna, e uma linha se parte num vão de mais de 8 alturas de
   letra com 3 palavras de cada lado. A fatia cai para 880 gestos (74,4%).
 
-- O cabeçalho e o rodapé corridos no fim da fila de revisão (`da2d530`, SPEC §8.1): o □ do
+- O cabeçalho e o rodapé corridos no fim da fila de revisão (`2e3d9a1`, SPEC §8.1): o □ do
   título corrido abria a fila de toda página. A fatia cai para 772 gestos (65,3%), abaixo
   também dos 70% do alvo antigo.
 

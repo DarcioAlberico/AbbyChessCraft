@@ -416,7 +416,7 @@ class VisorDePagina(QGraphicsView):
         menu = QMenu(self)
         teclas = {"texto": "T", "titulo": "H", "cabecalho": "C", "rodape": "R",
                   "numero_de_pagina": "P", "nota": "N", "legenda": "L", "diagrama": "D",
-                  "ignorar": "X"}
+                  "figura": "I", "ignorar": "X"}
         for funcao in teclas:
             acao = menu.addAction(f"{zn.NOMES_DAS_FUNCOES[funcao]}\t{teclas[funcao]}")
             acao.setCheckable(True)
@@ -662,7 +662,7 @@ class VisorDePagina(QGraphicsView):
                        Qt.Key.Key_C: "cabecalho", Qt.Key.Key_R: "rodape",
                        Qt.Key.Key_P: "numero_de_pagina", Qt.Key.Key_N: "nota",
                        Qt.Key.Key_L: "legenda", Qt.Key.Key_D: "diagrama",
-                       Qt.Key.Key_X: "ignorar"}
+                       Qt.Key.Key_I: "figura", Qt.Key.Key_X: "ignorar"}
             if tecla in funcoes and evento.modifiers() == Qt.KeyboardModifier.NoModifier:
                 self.zona_funcao.emit(self._zona_sel, funcoes[tecla])
                 return

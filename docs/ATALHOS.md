@@ -91,6 +91,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Função da zona: cabeçalho | C | C | imagem_areas | F |
 | Função da zona: diagrama | D | D | imagem_areas | F |
 | Função da zona: ignorar | X | X | imagem_areas | F |
+| Função da zona: imagem | I | I | imagem_areas | F |
 | Função da zona: legenda | L | L | imagem_areas | F |
 | Função da zona: nota | N | N | imagem_areas | F |
 | Função da zona: número de página | P | P | imagem_areas | F |

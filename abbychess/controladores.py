@@ -210,7 +210,7 @@ class ControladorDeLayout:
             return
         zn.trocar_funcao(zonas, indice, funcao)
         self._trocar(zonas, indice, "Trocar a função da área")
-        self.pagina._avisar(f"Área {indice + 1}: {funcao.replace('_', ' ')}.", 5000)
+        self.pagina._avisar(f"Área {indice + 1}: {zn.NOMES_DAS_FUNCOES[funcao].lower()}.", 5000)
 
     def trocar_funcao_atual(self, funcao: str) -> None:
         if self.atual is not None:

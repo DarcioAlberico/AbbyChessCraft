@@ -250,10 +250,13 @@ O Documento se edita como um editor de texto, e cada edição vira o que ela é 
   Backspace no segundo "s" tira o segundo). As edições que mudam a estrutura (glifo tirado,
   glifo virtual) avisam na Linha e na barra de status ("casxa → casa: 1 glifo tirado · Ctrl+Z
   desfaz").
-- **Ainda não** (passo G): trocar duas letras por uma ("rn" → "m", que é juntar os glifos) ou
-  uma por duas ("m" → "rn", dividir, e também uma letra no meio de uma ligadura como "fi").
-  A sessão é recusada, a palavra volta ao que era, e a Linha diz "este tipo de edição chega
-  numa próxima versão". Negrito, itálico e sublinhado e o parágrafo novo também são do G.
+- **Desde o passo G**: duas letras viram uma ("rn" → "m" junta os glifos num box) e uma vira
+  duas ("m" → "rn" divide o box pela tinta, ou faz uma caixa de duas letras quando a tinta
+  não tem vão); a mesma edição pode mexer nas palavras ao mesmo tempo ("rn b" → "mb").
+  Apagar o hífen de fim de linha junta a palavra: o Documento continua mostrando as linhas
+  como impressas, e a exportação sai "exemplo". **Ctrl+Shift+Enter** começa um parágrafo no
+  começo da linha do cursor (de novo, tira), e **Ctrl+B/I/U** alternam negrito, itálico e
+  sublinhado na seleção; tudo entra no Ctrl+Z.
 - **As figurinas** (§6.4): num lance que você digitou, a letra da peça vira figurina ao
   confirmar, quando o livro é de figurinas ("Cf3" → "♘f3" em português; "Nf3" → "♘f3" em
   inglês; "(Cf3)," → "(♘f3),"). O lance que ficou igual e no mesmo lugar não muda. **Opções ›
@@ -336,10 +339,11 @@ você digita:
   tabela da edição no Documento (§6.3): uma letra trocada fica `manual`, uma letra que sobra
   tira o glifo dela, uma que falta vira glifo virtual; as correções de leitura comuns têm
   tradução ("cassa" → "casa", "ivro" → "livro", "conc1uir" → "concluir", "casas" → "casa").
-  Só o que é do passo G fica de fora: duas letras virando uma, ou uma virando duas, no mesmo
-  trecho ("rn" → "m", "m" → "rn", e também "casa" → "lar", onde "sa" vira "r"). Esse caso
-  aparece na prévia desmarcado e desabilitado, com o trecho e o motivo na dica, e na página
-  aberta fica de fora, com o aviso. Substituir não ensina nem marca nada como revisado.
+  Desde o passo G, duas letras virando uma ou uma virando duas também se aplicam ("rn" →
+  "m", "m" → "rn", "casa" → "lar"); na substituição, o "m" → "rn" faz uma caixa de duas
+  letras (sem a imagem, ele não divide pela tinta: isso é da edição no Documento).
+  Substituir não ensina nem marca nada como revisado, nem os boxes que nascem de juntar ou
+  dividir.
 - Tudo o que uma vez Substituir ou Todas trocou, mesmo no livro inteiro, é **um passo** do
   desfazer: um Ctrl+Z volta todas as páginas. Uma página editada entre a prévia e o Aplicar
   recebe a troca na versão de agora, se as palavras de cada caso ainda são as mesmas; senão
@@ -857,7 +861,7 @@ programa sabe quem veio de quem. O que muda para você:
 - **O texto da página** (o Documento, a busca e as exportações de hoje) sai de um
   documento montado das páginas (`abbychess.texto.montar`), com as decisões que você toma
   editando no Documento desde o passo D1 (espaço a mais ou a menos, o caractere que falta;
-  o parágrafo é do passo G). Sem edições, ele sai igual ao de antes, conferido pelos testes
+  desde o G, o parágrafo, os estilos e o hífen apagado). Sem edições, ele sai igual ao de antes, conferido pelos testes
   de caracterização.
 
 ### A página torta
@@ -1326,7 +1330,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | `abbychess/diagramas.py` | Ler cada tabuleiro em FEN, o lado a jogar (pela legenda nos boxes), a conferência, as amostras no projeto e o FEN no texto |
 | `abbychess/livro.py` | O lote síncrono das ferramentas e dos testes, e a fila de revisão do livro todo |
 | `abbychess/servidor_de_leitura.py` | O servidor de leitura (§11): o processo filho com os modelos globais, a vez entre glifos, os deltas dos padrões, a queda e o fechamento |
-| `abbychess/sessao.py` | A sessão de edição do Documento sem Qt (§6.3): alinhar, planejar (ou recusar o que é do passo G), aplicar; as figurinas (§6.4) |
+| `abbychess/sessao.py` | A sessão de edição do Documento sem Qt (§6.3): alinhar, planejar, aplicar (juntar e dividir boxes desde o G); as figurinas (§6.4) |
 | `abbychess/busca.py` | Localizar sem Qt (§7.1, §7.3): o índice das páginas (montado em processos), a busca com o `regex` e o tempo-limite, as classes `\L` `\P` `\C` `\V`, figurina = letra, a busca por glifo |
 | `abbychess/substituir.py` | Substituir sem Qt (§7.2): os casos (Prosa, Notação, Ambos; o FEN nunca), `\1` e `\g<nome>`, o que ainda não tem tradução, e aplicar numa página como uma sessão de edição |
 | `abbychess/ancoragem.py` | Onde os glifos virtuais da sessão ficam (a âncora de cada um, como o usuário os digitou) e as palavras que a montagem do core parte ou junta quando um box sai |
@@ -1566,15 +1570,15 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   com os processos já abertos (o primeiro projeto, aberto um pouco depois do programa); o
   projeto aberto junto com o programa, e o segundo da sessão, levam 2,0–2,9 s, e pela janela
   o índice chega a 2,4 s (CA-7.1, uma limitação conhecida).
-- **Substituir, desde o passo D2**: o que é do passo G fica de fora (desabilitado na
-  prévia): o caso comum é "rn" → "m" (e "m" → "rn"), que espera o juntar e o dividir glifos;
-  uma troca editorial em que duas letras viram uma ("casa" → "lar") também. As figurinas não
+- **Substituir, desde o passo D2**: o "m" → "rn" faz uma caixa de duas letras, e não divide
+  pela tinta (a substituição não tem a imagem da página). As figurinas não
   entram sozinhas no texto substituído (o §6.4 é da digitação). Uma troca no livro inteiro
   pode ocupar quase todo o desfazer (~43 MB em 230 páginas e 28 mil casos; a partir de ~270
   páginas com uma troca tão comum, passa dos 50 MB e fica sozinha no desfazer: os passos de
   antes saem, e a barra de status diz quantos).
-- **A edição no Documento, desde o D1**: o que é do passo G (k letras por 1, 1 por k, o
-  parágrafo, os estilos) é recusado com aviso; o Ctrl+T com uma edição do texto ainda na fila
+- **A edição no Documento, desde o D1**: uma linha não se divide em dois parágrafos (o
+  Ctrl+Shift+Enter no meio dela começa o parágrafo no começo da linha, com aviso); o
+  sublinhado fica só no Documento (a exportação leva negrito e itálico); o Ctrl+T com uma edição do texto ainda na fila
   pede para tentar de novo depois que ela entrar; num projeto com páginas lidas antes do D1,
   o modo das peças "como o livro" só vê as figurinas delas quando forem gravadas de novo
   (escolha "Figurinas" nas Opções); apagar a quebra de linha impressa entre duas

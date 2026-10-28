@@ -1955,14 +1955,39 @@ class ControladorDePagina:
                          "sessao_recusada", "a página não pode ser editada agora")))
 
     def novo_paragrafo(self, gid: Optional[int]) -> None:
-        """Começa um parágrafo antes do glifo indicado, num passo do desfazer."""
-        if gid is None or self.modelo is None:
+        """Ctrl+Shift+Enter: começa um parágrafo na linha do glifo indicado, num passo do
+        desfazer; de novo na mesma linha, tira o parágrafo. O parágrafo começa sempre no
+        começo da linha: o Documento e a exportação partem por linha, e uma linha não se
+        divide em dois parágrafos (antes, a palavra do meio da linha abria o bloco num e não
+        no outro)."""
+        if self.modelo is None:
             return
+        if gid is None:
+            self._avisar("Ponha o cursor numa palavra para começar o parágrafo nela.", 5000)
+            return
+        linha = next((ln for b in self.documento().blocos for ln in b.linhas
+                      if any(gid in p.gids for p in ln.palavras)), None)
+        inicio = next((g for p in linha.palavras for g in p.gids), gid) if linha else gid
+        tirar = inicio in self.modelo.decisoes.paragrafo_antes
 
         def corpo():
             antes = Antes(self.modelo.instantaneo(), self.padroes())
-            ed.paragrafo(self.modelo, gid)
-            self._mudou(self.modelo, self.indice, "Novo parágrafo", antes)
+            if tirar:
+                d = self.modelo.decisoes
+                self.modelo.decisoes = replace(d, paragrafo_antes=d.paragrafo_antes - {inicio})
+            else:
+                ed.paragrafo(self.modelo, inicio)
+            self._mudou(self.modelo, self.indice,
+                        "Tirar o parágrafo" if tirar else "Novo parágrafo", antes)
+            if tirar:
+                self._avisar("Parágrafo tirado: a linha volta ao parágrafo de antes · Ctrl+Z "
+                             "desfaz.", 6000)
+            elif inicio != gid:
+                self._avisar("Parágrafo novo no começo da linha (uma linha não se divide em "
+                             "dois parágrafos) · Ctrl+Z desfaz.", 7000)
+            else:
+                self._avisar("Parágrafo novo · de novo na mesma linha, tira · Ctrl+Z desfaz.",
+                             6000)
         self._editar("Criando parágrafo", corpo)
 
     def alternar_estilo(self, gids: Sequence[int], campo: str) -> None:
@@ -1975,8 +2000,9 @@ class ControladorDePagina:
         def corpo():
             antes = Antes(self.modelo.instantaneo(), self.padroes())
             ed.estilizar(self.modelo, gids, campo)
-            self._mudou(self.modelo, self.indice, f"Alternar {campo}", antes)
-        self._editar(f"Aplicando {campo}", corpo)
+            nome = {"negrito": "negrito", "italico": "itálico", "sublinhado": "sublinhado"}[campo]
+            self._mudou(self.modelo, self.indice, f"Alternar {nome}", antes)
+        self._editar("Aplicando o estilo", corpo)
 
     def aplicar_as_sessoes_na_fila(self) -> None:
         """Fechar o projeto (a fila vai ser esvaziada): as sessões do Documento que esperavam

@@ -552,6 +552,21 @@ def test_ctrl_shift_enter_e_estilos_gravam_e_desfazem(j):
     assert all(box.estilo.italico and box.estilo.sublinhado for box in pagina.boxes[:4])
 
 
+def test_ctrl_shift_enter_no_meio_da_linha_abre_a_linha_e_de_novo_tira(j):
+    """Numa palavra do meio da linha, o parágrafo começa no começo dela: o Documento e a
+    exportação concordam (antes, o Documento abria um bloco e a exportação não); de novo
+    na mesma linha, o parágrafo sai."""
+    pagina = _escrever(j, "casa", "velha longe")
+    _por_o_cursor(j, 13)                                  # dentro de "longe"
+    chord = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier
+    _tecla(j, Qt.Key.Key_Return, chord)
+    inicio_da_linha = pagina.boxes[4].gid                 # o "v" de "velha"
+    # A exportação abre o parágrafo pelo primeiro glifo da linha (`linha.paragrafo`).
+    assert pagina.decisoes.paragrafo_antes == {inicio_da_linha}
+    _tecla(j, Qt.Key.Key_Return, chord)
+    assert not pagina.decisoes.paragrafo_antes
+
+
 def test_o_cursor_volta_ao_lugar_quando_a_montagem_tira_o_espaco_a_mais(j):
     _escrever(j, "ganhar tempos fim")
     _por_o_cursor(j, 6)

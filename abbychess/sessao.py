@@ -216,7 +216,8 @@ class Plano:
         if self.linha_sem_boxes:
             partes.append("a linha ficou sem glifos: o resto dela foi para a vizinha")
         if self.linha_mantida:
-            partes.append("a quebra de linha fica (juntar linhas chega numa próxima versão)")
+            partes.append("a quebra de linha fica como impressa (o Documento mostra as "
+                          "linhas do livro; a exportação junta o parágrafo)")
         if not partes:
             return ""
         de, para = _curto(self.de), _curto(self.para)
@@ -509,6 +510,30 @@ def editar(pagina: Pagina, unidades: Sequence[Unidade], novo: str,
 # Aplicar
 # ----------------------------------------------------------------------
 
+def _hifens_de_fim_de_linha(pagina: Pagina, saem, onde) -> List[Tuple[int, int]]:
+    """(a letra antes do hífen, a primeira da linha seguinte) de cada hífen que sai e era o
+    último glifo da linha dele: a palavra partida pela quebra se junta (§6.3, "junta a
+    palavra e remove `hifen_de_quebra`"; antes, a exportação saía "exem plo")."""
+    if not saem or not onde:
+        return []
+    por_linha: Dict[Tuple[int, int], List[int]] = {}
+    for gid, (b, n, k) in onde.items():
+        por_linha.setdefault((b, n), []).append(gid)
+    ordem = {gid: i for i, gid in enumerate(onde)}
+    saida = []
+    for gid in saem:
+        box = pagina.box(gid) if gid in pagina.vivos else None
+        if box is None or box.entry.char not in ("-", "\u00ad") or gid not in onde:
+            continue
+        b, n, _k = onde[gid]
+        linha = sorted(por_linha[(b, n)], key=ordem.__getitem__)
+        seguinte = sorted(por_linha.get((b, n + 1), []), key=ordem.__getitem__)
+        if linha[-1] != gid or len(linha) < 2 or not seguinte:
+            continue
+        saida.append((linha[-2], seguinte[0]))
+    return saida
+
+
 def aplicar(pagina: Pagina, plano: Plano, imagem=None, leitor=None) -> None:
     """O plano na página: as letras, as fronteiras, as letras novas (virtuais), os virtuais
     que saem, as âncoras de todos como ficaram no texto, e só então os boxes que saem (já
@@ -519,12 +544,24 @@ def aplicar(pagina: Pagina, plano: Plano, imagem=None, leitor=None) -> None:
     from abbychess import edicao as ed
 
     sucessores_estruturais = {}
+    # gid aposentado -> (o primeiro sucessor, o último): a quebra e a junção de palavras do
+    # mesmo plano citam os gids de antes ("rn b" -> "mb" junta os boxes e a palavra).
+    sucessor: Dict[int, Tuple[int, int]] = {}
     for indice, (gids, char) in enumerate(plano.juntar_boxes):
         dif = ed.juntar_varios(pagina, gids, char)
         sucessores_estruturais[("juntar", indice)] = [dif.novos[0].gid]
+        for gid in gids:
+            sucessor[gid] = (dif.novos[0].gid, dif.novos[0].gid)
     for indice, (gid, chars) in enumerate(plano.dividir_boxes):
         dif = ed.dividir_em(pagina, imagem, gid, chars, leitor)
         sucessores_estruturais[("dividir", indice)] = [b.gid for b in dif.novos]
+        sucessor[gid] = (dif.novos[0].gid, dif.novos[-1].gid)
+
+    def primeiro(gid: int) -> int:
+        return sucessor.get(gid, (gid, gid))[0]
+
+    def ultimo_de(gid: int) -> int:
+        return sucessor.get(gid, (gid, gid))[1]
 
     virtuais = {v.gid for v in pagina.decisoes.virtuais}
     for gid, char in plano.corrigir.items():
@@ -533,14 +570,15 @@ def aplicar(pagina: Pagina, plano: Plano, imagem=None, leitor=None) -> None:
         else:
             ed.corrigir(pagina, gid, char)
     for gid in sorted(plano.quebrar):
-        ed.quebrar(pagina, gid)
+        ed.quebrar(pagina, primeiro(gid))
     sem_quebra = []
-    for ultimo, primeiro in sorted(plano.juntar):
-        if primeiro in pagina.decisoes.quebras:     # o espaço era uma quebra: ela sai
-            pagina.decisoes = replace(pagina.decisoes, quebras=pagina.decisoes.quebras - {primeiro})
-            sem_quebra.append((ultimo, primeiro))
+    for ultimo_velho, primeiro_velho in sorted(plano.juntar):
+        ultimo, comeco = ultimo_de(ultimo_velho), primeiro(primeiro_velho)
+        if comeco in pagina.decisoes.quebras:       # o espaço era uma quebra: ela sai
+            pagina.decisoes = replace(pagina.decisoes, quebras=pagina.decisoes.quebras - {comeco})
+            sem_quebra.append((ultimo, comeco))
         else:
-            ed.juntar_palavras(pagina, ultimo, primeiro)
+            ed.juntar_palavras(pagina, ultimo, comeco)
     if sem_quebra:                              # o core também separava ali: junção
         onde, _palavras = ag.pagina_montada(pagina)
         for ultimo, primeiro in sem_quebra:
@@ -566,8 +604,12 @@ def aplicar(pagina: Pagina, plano: Plano, imagem=None, leitor=None) -> None:
                                 for lp, _p in ag.palavras_da_sequencia(sequencia, plano.linha))
     ag.ancorar(pagina, sequencia, boxes_que_saem, plano.linha)
     antes = ag.pagina_montada(pagina)[0] if boxes_que_saem else {}
+    juntar_a_palavra = _hifens_de_fim_de_linha(pagina, boxes_que_saem, antes)
     for gid in boxes_que_saem:
         ed.descartar(pagina, gid)
+    for ultimo, primeiro in juntar_a_palavra:     # §6.3: apagar o hífen junta a palavra
+        if ultimo in pagina.vivos and primeiro in pagina.vivos:
+            ed.juntar_palavras(pagina, ultimo, primeiro)
     if boxes_que_saem:                          # só o box tirado deixa um vão na página
         ag.como_digitado(pagina, sequencia, {g for _i, g in sequencia} | set(plano.linha), antes)
     lidos = {b.gid for b in pagina.boxes if b.entry.char}

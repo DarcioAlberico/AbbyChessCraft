@@ -270,6 +270,9 @@ class Estrutura:
     italico: set = field(default_factory=set)
     paragrafo_antes: set = field(default_factory=set)
     hifen_de_quebra: set = field(default_factory=set)
+    #: (id do último glifo de uma linha, id do primeiro da seguinte) que o Documento juntou
+    #: numa palavra (o hífen de quebra apagado, §6.3): a linha seguinte entra sem espaço.
+    juncoes: set = field(default_factory=set)
     #: Os boxes que a fila de revisão pede (`leitor.precisa_revisao` e `contexto`), quando a página foi
     #: lida com os limiares do livro: o realce do DOCX (`Opcoes.realcar_duvidosos`).
     duvidosos: set = field(default_factory=set)
@@ -318,6 +321,10 @@ class Estrutura:
                     precisa_revisao(e.char, e.source, e.confidence, limiares)
                     or (b.gid in contra and contexto.volta_pelo_contexto(e.source))):
                 estrutura.duvidosos.add(id(e))
+        entrada_do = {b.gid: b.entry for b in lidos}
+        for ultimo, primeiro in decisoes.juncoes:
+            if ultimo in entrada_do and primeiro in entrada_do:
+                estrutura.juncoes.add((id(entrada_do[ultimo]), id(entrada_do[primeiro])))
         return list(estrutura.vivos), estrutura
 
 
@@ -334,6 +341,11 @@ class _Linha:
     funcao: str = "texto"
     paragrafo: bool = False
     hifen: bool = False
+    #: Os ids do primeiro e do último glifo da linha (as junções entre linhas, §6.3).
+    primeiro: int = 0
+    ultimo: int = 0
+    #: A junção da `Estrutura` com a linha anterior: entra sem espaço.
+    juncoes: frozenset = frozenset()
     negrito: List[Tuple[int, int]] = field(default_factory=list)
     italico: List[Tuple[int, int]] = field(default_factory=list)
     #: Os trechos dos glifos duvidosos (`Estrutura.duvidosos`).
@@ -441,6 +453,8 @@ def _com_a_estrutura(linha: _Linha, palavras_da_linha, boxes: Sequence[BoxEntry]
     linha.funcao = max(set(funcoes), key=funcoes.count)
     linha.paragrafo = id(entradas[0]) in estrutura.paragrafo_antes
     linha.hifen = id(entradas[-1]) in estrutura.hifen_de_quebra and linha.texto.endswith("-")
+    linha.primeiro, linha.ultimo = id(entradas[0]), id(entradas[-1])
+    linha.juncoes = frozenset(estrutura.juncoes)
     for nome, marcados in (("negrito", estrutura.negrito), ("italico", estrutura.italico),
                            ("duvidosos", estrutura.duvidosos)):
         # O estilo cobre o glifo de vários caracteres só se todos o têm; a dúvida, se um
@@ -628,6 +642,8 @@ def _juntar(linhas: Sequence[_Linha], manter_quebras: bool = False
         elif manter_quebras:
             texto += "\n"
             base = len(texto)
+        elif (anterior.ultimo, linha.primeiro) in linha.juncoes:
+            base = len(texto)                   # a palavra que o hífen apagado partia
         elif anterior.hifen or (texto.endswith("-") and len(texto) > 1 and texto[-2].isalpha()
                                 and linha.texto[:1].islower()):
             texto = texto[:-1]

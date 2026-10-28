@@ -297,3 +297,69 @@ def test_colar_a_pagina_inteira_alinha_pelos_trechos_iguais():
     pares = ss.alinhar(original, novo)
     trocas = [(i, j) for i, j in pares if i is not None and j is not None and original[i] != novo[j]]
     assert len(trocas) == 10 and all(i == j for i, j in pares)
+
+
+# ----------------------------------------------------------------------
+# Fechamento do passo G: juntar ou dividir boxes e mexer nas palavras numa edição só
+# ----------------------------------------------------------------------
+
+def _pagina_impressa(texto):
+    """Uma página com o texto impresso em Times (tinta de verdade), um box por letra."""
+    import numpy as np
+    from PIL import Image, ImageDraw, ImageFont
+
+    imagem = Image.new("L", (600, 120), 255)
+    desenho = ImageDraw.Draw(imagem)
+    fonte = ImageFont.truetype("times.ttf", 50)
+    x, boxes = 20, []
+    for c in texto:
+        if c == " ":
+            x += 30
+            continue
+        solta = Image.new("L", (200, 120), 255)
+        ImageDraw.Draw(solta).text((10, 10), c, font=fonte, fill=0)
+        ys, xs = np.nonzero(np.asarray(solta) < 128)
+        largura = int(xs.max() - xs.min() + 1)
+        desenho.text((x - (int(xs.min()) - 10), 10), c, font=fonte, fill=0)
+        boxes.append(Box(gid_de(1, len(boxes)),
+                         BoxEntry(c, x, int(ys.min()), x + largura, int(ys.max()) + 1, 0.9, "net")))
+        x += largura + 6
+    return imagem.convert("RGB"), Pagina(1, 0, boxes, estado="reconhecida",
+                                         proximo_n=len(boxes))
+
+
+@pytest.mark.parametrize("antes, depois", [
+    ("rn b", "mb"), ("b rn", "bm"), ("b m b", "brn b"), ("b m b", "b rnb"), ("bm b", "brnb")])
+def test_juntar_ou_dividir_e_mexer_na_palavra_numa_edicao_so(antes, depois):
+    """Consertar o "rn" lido e o espaço sobrando de uma vez ("rn b" -> "mb"): a quebra e a
+    junção de palavras citam os gids de antes, que juntar ou dividir aposentou (antes,
+    ValueError e a edição inteira desfeita)."""
+    imagem, pagina = _pagina_impressa(antes)
+    _texto, unidades = ss.texto_e_unidades(pagina)
+    ss.aplicar(pagina, ss.planejar(unidades, depois), imagem, None)
+    assert ss.texto_e_unidades(pagina)[0] == depois
+
+
+def test_m_impresso_vira_rn_com_tinta_pela_sessao():
+    """CA-6.6 pela sessão: "m" -> "rn" num "m" impresso dá dois boxes com tinta e nenhum
+    virtual."""
+    imagem, pagina = _pagina_impressa("cama")
+    _texto, unidades = ss.texto_e_unidades(pagina)
+    ss.aplicar(pagina, ss.planejar(unidades, "carna"), imagem, None)
+    assert ss.texto_e_unidades(pagina)[0] == "carna"
+    assert [b.entry.char for b in pagina.boxes] == list("carna")
+    assert not pagina.decisoes.virtuais
+
+
+def test_apagar_o_hifen_de_fim_de_linha_junta_a_palavra_na_exportacao():
+    """§6.3: apagar o hífen de quebra junta a palavra. O Documento mostra as linhas como
+    impressas, e a exportação sai "exemplo" (antes, "exem plo": pior que sem tocar)."""
+    from abbychess import exportar as ex
+    from abbychess.modelo import Decisoes
+
+    p = _pagina("exem-", "plo")
+    p.decisoes = Decisoes(hifen_de_quebra=frozenset({p.boxes[4].gid}))
+    _editar(p, "exem-\nplo", "exemplo")
+    entries, estrutura = ex.Estrutura.da_pagina(p)
+    blocos = ex.pagina_extraida(0, entries, estrutura=estrutura).blocos
+    assert [b.texto for b in blocos if hasattr(b, "texto")] == ["exemplo"]

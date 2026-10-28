@@ -19,7 +19,7 @@ ensinado nem marcado como revisado.
 from __future__ import annotations
 
 import difflib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 import regex
@@ -185,7 +185,8 @@ def _juntar_em_casos(indexada, unidades, texto: str, trocas) -> List[Caso]:
 
 def _motivo(antes: str, depois: str, recusa: str) -> str:
     """O motivo da recusa com o trecho que a causou ("'sa' → 'r': este tipo de edição chega
-    numa próxima versão (juntar glifos); corrija no Documento")."""
+    numa próxima versão (juntar glifos); corrija no Documento"). Desde o passo G a sessão
+    traduz todos os casos, e o `motivo` só aparece se ela voltar a recusar algum."""
     trechos = [(antes[i1:i2], depois[j1:j2]) for op, i1, i2, j1, j2
                in difflib.SequenceMatcher(None, antes, depois, autojunk=False).get_opcodes()
                if op != "equal"]
@@ -226,5 +227,13 @@ def aplicar_na_pagina(pagina: Pagina, casos: Sequence[Caso]) -> ss.Plano:
     partes.append(texto[posicao:])
     plano = ss.planejar(unidades, "".join(partes), fixos)
     plano.revisar = set()                       # substituir não revisa nem ensina (§7.2)
+    # A cópia da página (`instantaneo`) guarda os boxes numa tupla, e juntar ou dividir
+    # monta a lista nova somando pedaços dela (antes, TypeError em todo caso estrutural).
+    pagina.boxes = list(pagina.boxes)
+    antes = {b.gid for b in pagina.boxes}
     ss.aplicar(pagina, plano)
+    # Os boxes que nascem de juntar ou dividir também ficam por revisar (o substituir não
+    # revisa nada; a edição pelo Documento é que os marca revisados).
+    pagina.boxes = [replace(b, revisado=False) if b.gid not in antes and b.revisado else b
+                    for b in pagina.boxes]
     return plano

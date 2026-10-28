@@ -320,3 +320,16 @@ def test_substituir_avisa_a_ocorrencia_fora_do_onde(sub):
     assert feito is None and "em notação ficaram fora" in eventos["erros"][-1]
     feito = s.na_pagina(bs.Opcoes("Cf3", escopo=bs.PAGINA), "Cf3", sb.NOTACAO, posicao=5)
     assert feito == []                                   # já está como o substituto
+
+
+@pytest.mark.parametrize("padrao, modelo, depois", [
+    ("as", "o", "uma coa velha"), ("e", "rn", "uma casa vrnlha")])
+def test_o_caso_estrutural_se_aplica_na_copia_da_pagina(padrao, modelo, depois):
+    """A substituição edita a cópia da página (`instantaneo`, com os boxes numa tupla):
+    juntar ("as" -> "o") e dividir ("e" -> "rn") se aplicam, e os boxes que nascem ficam
+    por revisar (antes, TypeError em todo caso estrutural, e a página ficava de fora)."""
+    pagina = _pagina("uma casa velha")
+    copia = pagina.instantaneo()
+    sb.aplicar_na_pagina(copia, _casos(pagina, padrao, modelo))
+    assert ss.texto_e_unidades(copia)[0] == depois
+    assert not any(b.revisado for b in copia.boxes)

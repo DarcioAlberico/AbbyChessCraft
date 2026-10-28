@@ -13,6 +13,8 @@ Lê as mesmas `core.pagina.PaginaExtraida` que o EPUB e escreve pelo python-docx
   está no arquivo. Os diagramas numerados pela legenda e os capítulos numerados pelo título
   (`epub.numerados`) têm marcador (`dg6`, `cap3`), e "ver o Diagrama 6" e "no capítulo 3"
   viram hiperlink para eles.
+- **Links de análise**, se pedidos: embaixo de cada diagrama lido, o hiperlink externo que
+  abre a posição no Lichess ou no Chess.com (`links_de_analise`).
 - **Metadados** (`epub.Metadados`): título, autores, assuntos, idioma e identificador nas
   propriedades; o idioma também no estilo base (`w:lang`), senão o Word revisa um livro
   inglês em português.
@@ -39,6 +41,7 @@ from xml.etree import ElementTree
 from core.pagina import Figura, PaginaExtraida, Paragrafo
 
 from abbychess import epub
+from abbychess import links_de_analise
 
 #: A largura do diagrama sem medida de casa e a máxima de qualquer figura, em centímetros.
 LARGURA_DO_DIAGRAMA_CM = 6.5
@@ -67,6 +70,8 @@ class EscritoDocx:
     links: int = 0
     #: Os parágrafos com algum trecho realçado (`realce`).
     realcados: int = 0
+    #: Os diagramas com link de análise (`analise`).
+    analises: int = 0
 
 
 # ----------------------------------------------------------------------
@@ -210,10 +215,41 @@ def _ressalva(doc, figura: Figura, idioma: str) -> bool:
     partes = [epub.marca_do_lado(figura, idioma)] if figura.fen else []
     partes.append(msg["nao_revisado"])
     paragrafo = doc.add_paragraph(epub.limpo("; ".join(partes)))
+    _como_legenda(doc, paragrafo)
+    return True
+
+
+def _como_legenda(doc, paragrafo) -> None:
     try:
         paragrafo.style = doc.styles["Caption"]
     except KeyError:                            # o modelo sem o estilo: fica no Normal
         pass
+
+
+def _link_de_analise(doc, figura: Figura, site: str, idioma: str) -> bool:
+    """O hiperlink externo, embaixo do diagrama lido, que abre a posição no tabuleiro de
+    análise do `site` (`links_de_analise`); nada sem FEN ou com o site `nenhum`."""
+    endereco = links_de_analise.link_da_figura(figura, site)
+    if not endereco:
+        return False
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.opc.constants import RELATIONSHIP_TYPE
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import RGBColor
+
+    paragrafo = doc.add_paragraph()
+    _como_legenda(doc, paragrafo)
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    hiperlink = OxmlElement("w:hyperlink")
+    hiperlink.set(qn("r:id"), doc.part.relate_to(endereco, RELATIONSHIP_TYPE.HYPERLINK,
+                                                 is_external=True))
+    hiperlink.set(qn("w:history"), "1")
+    run = paragrafo.add_run(epub.limpo(links_de_analise.rotulo(site, idioma)))
+    run.font.underline = True
+    run.font.color.rgb = RGBColor.from_string(COR_DO_LINK)
+    hiperlink.append(run._r)
+    paragrafo._p.append(hiperlink)
     return True
 
 
@@ -223,11 +259,14 @@ def _ressalva(doc, figura: Figura, idioma: str) -> bool:
 
 def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: epub.Metadados,
              *, numeros: Optional[Dict[int, int]] = None, quebras: bool = False,
-             realce: bool = False) -> EscritoDocx:
+             realce: bool = False, analise: str = "nenhum") -> EscritoDocx:
     """Escreve o DOCX em `caminho` (ao lado e troca no fim: a falha não estraga o anterior).
 
     `numeros` é o número impresso de cada página (índice -> número): as referências do
-    texto a ele viram hiperlink para o marcador da página."""
+    texto a ele viram hiperlink para o marcador da página. `analise` põe embaixo de cada
+    diagrama lido o link que abre a posição no Lichess ou no Chess.com
+    (`Opcoes.links_de_analise`); `nenhum`, nenhum link."""
+    links_de_analise.validar(analise)
     from docx import Document
 
     from core.exportar import data_no_zip, fonte_dos_simbolos, instante
@@ -279,6 +318,8 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
                     ident += 1
                     _marcador(paragrafo, f"dg{contados.figuras[id(bloco)]}", ident)
                 _ressalva(doc, bloco, idioma)
+                if _link_de_analise(doc, bloco, analise, idioma):
+                    escrito.analises += 1
                 continue
             elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
                 if bloco.titulo:
@@ -441,6 +482,8 @@ def conferir(caminho: str | Path) -> List[str]:
         except ElementTree.ParseError as erro:
             return [f"XML ilegível ({erro})"]
         alvos = {r.get("Id"): r.get("Target") for r in relacoes}
+        externos = {r.get("Id"): r.get("Target") for r in relacoes
+                    if r.get("TargetMode") == "External"}
         for blip in documento.iter(f"{{{_A}}}blip"):
             ident = blip.get(f"{{{_R}}}embed")
             alvo = alvos.get(ident)
@@ -464,6 +507,8 @@ def conferir(caminho: str | Path) -> List[str]:
                 problemas.append("hiperlink sem destino")
             elif ancora is not None and ancora not in marcadores:
                 problemas.append(f"o hiperlink para {ancora} não tem marcador")
+            elif ancora is None and not externos.get(link.get(f"{{{_R}}}id")):
+                problemas.append(f"o hiperlink {link.get(f'{{{_R}}}id')} não tem endereço externo")
         figuras = [d.get("id") for d in documento.iter(
             "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr")]
         if len(figuras) != len(set(figuras)):

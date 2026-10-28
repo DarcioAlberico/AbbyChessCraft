@@ -104,6 +104,18 @@ def test_arrastar_a_area_move_e_grava(app, janela):  # noqa: F811
     assert (depois.x1, depois.y1) == (antes.x1 + 10, antes.y1 + 5)
 
 
+def test_o_menu_da_area_tem_imagem_e_ela_vira_imagem(app, janela):  # noqa: F811
+    janela.acao_areas.setChecked(True)
+    janela.modo_areas(True)
+    _esperar(app, janela)
+    acoes = {a.text().split("\t")[0]: a for a in janela.visor.menu_da_zona(0).actions()}
+    assert acoes["Imagem"].text() == "Imagem\tI"
+    acoes["Imagem"].trigger()
+    z = janela.projeto.carregar_zonas(0)[0]
+    assert (z.tipo, z.funcao) == (zn.IMAGEM, "figura")
+    assert janela.acoes_das_funcoes[-2].shortcut().toString() == "I"
+
+
 def test_funcao_e_ordem_das_areas_atualizam_o_documento_e_desfazem(app, janela):  # noqa: F811
     _ler_a_mao(app, janela)
     largura, altura = janela.pagina.imagem.size

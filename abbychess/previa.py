@@ -19,6 +19,7 @@ from typing import Sequence
 from core.pagina import Figura, PaginaExtraida, Paragrafo
 
 from abbychess import epub
+from abbychess import links_de_analise
 
 #: Quantas páginas a prévia mostra (o relatório cobre todas).
 LIMITE = 30
@@ -51,9 +52,11 @@ def _relatorio(linhas: Sequence[str]) -> str:
 
 def html_do_livro(paginas: Sequence[PaginaExtraida], linhas_do_relatorio: Sequence[str],
                   titulo: str, idioma: str = "pt-BR", limite: int = LIMITE,
-                  quebras: bool = False, realce: bool = False) -> str:
+                  quebras: bool = False, realce: bool = False,
+                  analise: str = "nenhum") -> str:
     """O HTML da prévia: o relatório, e as páginas com os títulos, os parágrafos (negrito e
-    itálico como no EPUB) e os diagramas com o texto alternativo do EPUB embaixo."""
+    itálico como no EPUB) e os diagramas com o texto alternativo do EPUB embaixo, e o link
+    de análise do `analise` (`links_de_analise`), como o EPUB e o DOCX o escrevem."""
     msg = epub.mensagens(idioma)
     partes = [_cabeca(titulo, idioma), _relatorio(linhas_do_relatorio)]
     for pagina in paginas[:limite]:
@@ -67,6 +70,10 @@ def html_do_livro(paginas: Sequence[PaginaExtraida], linhas_do_relatorio: Sequen
                 partes.append(f'<p><img src="data:{tipo};base64,{dados}" width="220" '
                               f'alt="{html.escape(alt, quote=True)}"></p>'
                               f'<p class="alt">{html.escape(alt)}</p>')
+                endereco = links_de_analise.link_da_figura(bloco, analise)
+                if endereco:
+                    partes.append(f'<p class="alt"><a href="{html.escape(endereco, quote=True)}">'
+                                  f"{html.escape(links_de_analise.rotulo(analise, idioma))}</a></p>")
             elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
                 corpo = epub.xhtml_do_texto(bloco, "", quebras=quebras, realce=realce)
                 if bloco.titulo:

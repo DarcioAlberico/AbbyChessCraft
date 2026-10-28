@@ -15,11 +15,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtWidgets import (QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
-                               QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
-                               QPushButton, QTextBrowser, QVBoxLayout, QWidget)
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
+                               QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+                               QMessageBox, QPushButton, QTextBrowser, QVBoxLayout, QWidget)
 
 from abbychess import exportar as ex
+from abbychess import links_de_analise as la
 
 #: Os formatos com metadados (o PDF guarda o do arquivo original; TXT e PGN não têm).
 COM_METADADOS = ("epub", "docx")
@@ -66,10 +69,25 @@ class DialogoDeExportacao(QDialog):
         self.so_verificadas.setChecked(opcoes.so_verificadas)
         self.desenhar.setChecked(opcoes.desenhar_diagramas)
         self.marcas.setChecked(opcoes.marcas_de_pagina)
+        self.analise = QComboBox()
+        for site in la.SITES:
+            self.analise.addItem(la.NOMES[site], site)
+        self.analise.setCurrentIndex(la.SITES.index(opcoes.links_de_analise))
+        self.analise.setAccessibleName("Link de análise dos diagramas")
+        self.analise.setToolTip("Embaixo de cada diagrama lido (com FEN), o link que abre a "
+                                "posição no tabuleiro de análise do site escolhido")
+        rotulo_da_analise = QLabel("Link de análise dos diagramas:")
+        rotulo_da_analise.setBuddy(self.analise)
+        linha_da_analise = QWidget()
+        analise_layout = QHBoxLayout(linha_da_analise)
+        analise_layout.setContentsMargins(0, 0, 0, 0)
+        analise_layout.addWidget(rotulo_da_analise)
+        analise_layout.addWidget(self.analise)
+        analise_layout.addStretch(1)
         caixa_opcoes = QGroupBox("Opções")
         coluna = QVBoxLayout(caixa_opcoes)
         for check in (self.manter_margens, self.manter_quebras, self.so_verificadas,
-                      self.desenhar, self.marcas, self.realcar):
+                      self.desenhar, self.marcas, self.realcar, linha_da_analise):
             coluna.addWidget(check)
         texto = formato in ("epub", "docx", "txt")
         self.manter_margens.setEnabled(texto)
@@ -77,6 +95,7 @@ class DialogoDeExportacao(QDialog):
         self.desenhar.setEnabled(formato in ("epub", "docx"))
         self.marcas.setEnabled(formato == "txt")
         self.realcar.setEnabled(formato == "docx")
+        linha_da_analise.setEnabled(formato in ("epub", "docx"))
         self.so_verificadas.setEnabled(formato != "pdf")
         if formato == "pdf":
             coluna.addWidget(QLabel("O PDF pesquisável guarda as páginas inteiras: as opções de "
@@ -161,7 +180,8 @@ class DialogoDeExportacao(QDialog):
                          desenhar_diagramas=self.desenhar.isChecked(),
                          marcas_de_pagina=self.marcas.isChecked(),
                          manter_quebras=self.manter_quebras.isChecked(),
-                         realcar_duvidosos=self.realcar.isChecked())
+                         realcar_duvidosos=self.realcar.isChecked(),
+                         links_de_analise=self.analise.currentData())
 
     def metadados(self) -> dict:
         """O formulário como `metadados.json`. A capa é a de antes (também quando outra foi
@@ -239,6 +259,7 @@ class JanelaDaPrevia(QDialog):
         self.resize(760, 820)
         self.navegador = QTextBrowser()
         self.navegador.setOpenLinks(False)
+        self.navegador.anchorClicked.connect(_abrir_fora)
         self.navegador.setAccessibleName("Pré-visualização da exportação")
         fechar = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         fechar.rejected.connect(self.close)
@@ -250,6 +271,12 @@ class JanelaDaPrevia(QDialog):
         self.navegador.setHtml(html)
         self.show()
         self.raise_()
+
+
+def _abrir_fora(url: QUrl) -> None:
+    """O link de análise da prévia abre no navegador; o resto da prévia não navega."""
+    if url.scheme() == "https":
+        QDesktopServices.openUrl(url)
 
 
 def _lista(valor) -> list:
@@ -271,7 +298,9 @@ CHAVE = "exportacao/opcoes"
 
 
 def opcoes_lembradas(config) -> ex.Opcoes:
-    """As opções da última exportação (`QSettings`), ou as padrão."""
+    """As opções da última exportação (`QSettings`), ou as padrão. As de ligar e desligar
+    vão pelo nome; as de escolher, como `campo=valor` (o valor que não vale mais fica no
+    padrão)."""
     bruto = config.value(CHAVE, "")
     padrao = ex.Opcoes()
     if isinstance(bruto, (list, tuple)):        # o INI devolve a lista que as vírgulas fazem
@@ -279,11 +308,20 @@ def opcoes_lembradas(config) -> ex.Opcoes:
     if not isinstance(bruto, str) or not bruto:
         return padrao
     marcadas = set(bruto.split(","))
-    return ex.Opcoes(**{campo: campo in marcadas for campo in vars(padrao)})
+    escolhas = dict(m.split("=", 1) for m in marcadas if "=" in m)
+    campos = {}
+    for campo, valor in vars(padrao).items():
+        if isinstance(valor, bool):
+            campos[campo] = campo in marcadas
+        elif campo == "links_de_analise" and escolhas.get(campo) in la.SITES:
+            campos[campo] = escolhas[campo]
+    return ex.Opcoes(**campos)
 
 
 def lembrar_opcoes(config, opcoes: ex.Opcoes) -> None:
-    config.setValue(CHAVE, ",".join(c for c, v in vars(opcoes).items() if v) or "nenhuma")
+    config.setValue(CHAVE, ",".join(c if v is True else f"{c}={v}"
+                                    for c, v in vars(opcoes).items()
+                                    if v is True or not isinstance(v, bool)) or "nenhuma")
 
 
 def perguntar(janela, projeto, destino: Path) -> Optional[Escolha]:

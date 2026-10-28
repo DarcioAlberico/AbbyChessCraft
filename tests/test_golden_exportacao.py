@@ -161,8 +161,9 @@ def _formas(tmp_path: Path, opcoes: ex.Opcoes) -> dict:
     docx, livro, txt = tmp_path / "a.docx", tmp_path / "a.epub", tmp_path / "a.txt"
     metadados = epub.Metadados("Golden", autores=("A. Autor",), data="2026")
     ed.escrever(paginas, docx, metadados, quebras=opcoes.manter_quebras,
-                realce=opcoes.realcar_duvidosos)
-    epub.escrever(paginas, livro, metadados, quebras=opcoes.manter_quebras)
+                realce=opcoes.realcar_duvidosos, analise=opcoes.links_de_analise)
+    epub.escrever(paginas, livro, metadados, quebras=opcoes.manter_quebras,
+                  analise=opcoes.links_de_analise)
     txt.write_text(ex.texto_do_livro(paginas, marcas_de_pagina=opcoes.marcas_de_pagina),
                    encoding="utf-8")
     assert ed.conferir(docx) == [] and epub.conferir(livro) == []

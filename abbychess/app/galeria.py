@@ -29,6 +29,9 @@ from abbychess.app import estilo
 LADO = 56
 ESCOPOS = (("pagina", "Página"), ("livro", "Livro"))
 _QUADRO_VAZIO: List[QPixmap] = []
+#: As teclas da grade, embaixo dela.
+DICA = ("Digite um caractere: aplica à seleção · Enter ensina · Shift+Enter só corrige · "
+        "Ctrl+A seleciona tudo · duplo clique vai ao glifo")
 #: O estado vazio (§13): o que fazer para a Galeria mostrar algo.
 VAZIA = ("Galeria vazia: escolha um glifo na Imagem ou no Documento e abra esta aba (ou "
          "Editar › Galeria do caractere) para ver todos os glifos lidos como ele.")
@@ -188,10 +191,12 @@ class PainelDaGaleria(QWidget):
         self.vista = VistaDaGaleria()
         self.vista.setModel(self.modelo)
         self.vista.doubleClicked.connect(self._escolhido)
-        self.dica = QLabel("Digite um caractere: aplica à seleção · Enter ensina · Shift+Enter "
-                           "só corrige · Ctrl+A seleciona tudo · duplo clique vai ao glifo")
+        self.dica = QLabel(DICA)
         self.dica.setWordWrap(True)
         estilo.papel(self.dica, "dica")
+        # Quantos a próxima tecla vai mudar: o número da seleção, à frente da dica.
+        self.vista.selectionModel().selectionChanged.connect(self._contar_selecao)
+        self.modelo.modelReset.connect(self._contar_selecao)
         cima = QHBoxLayout()
         cima.addWidget(self.titulo, 1)
         cima.addWidget(self.escopo)
@@ -212,6 +217,10 @@ class PainelDaGaleria(QWidget):
 
     def selecionados(self) -> List[Item]:
         return [self.modelo.itens[i.row()] for i in self.vista.selectionModel().selectedIndexes()]
+
+    def _contar_selecao(self, *_args) -> None:
+        n = len(self.vista.selectionModel().selectedIndexes())
+        self.dica.setText(f"{n} selecionado(s) · {DICA}" if n else DICA)
 
     def _escolhido(self, indice) -> None:
         if indice.isValid():

@@ -21,6 +21,9 @@ from tests.desempenho.test_substituir import _livro_de_230
 
 pytestmark = [pytest.mark.desempenho, pytest.mark.timeout(900)]
 
+#: As rodadas descartadas antes das 30 medidas (§15.3).
+AQUECIMENTOS = 5
+
 
 def _portao(valor: float, alvo: float) -> None:
     if na_maquina_cadastrada():
@@ -43,7 +46,7 @@ def test_ca_8_3_do_abrir_ao_painel_de_paginas(tmp_path, medidas, monkeypatch):
     try:
         janela.show()
         lista = janela.paginas.lista
-        for rodada in range(31):
+        for rodada in range(AQUECIMENTOS + 30):        # §15.3: 5 aquecem, 30 medem
             if janela.projeto is not None:
                 janela._fechar_projeto()
                 lista.clear()
@@ -61,7 +64,7 @@ def test_ca_8_3_do_abrir_ao_painel_de_paginas(tmp_path, medidas, monkeypatch):
                 app.processEvents()
                 time.sleep(0.001)
             assert lista.topLevelItemCount() >= PAGINAS
-            if rodada:                                   # a primeira aquece
+            if rodada >= AQUECIMENTOS:
                 tempos.append((time.perf_counter() - inicio) * 1000)
             # O fundo desta abertura (o leitor, o índice da busca) assenta antes da próxima:
             # a medida é a de abrir um projeto com o programa parado.
@@ -100,7 +103,7 @@ def test_ca_8_3_do_abrir_ao_painel_de_paginas(tmp_path, medidas, monkeypatch):
         "limiares_ms": round(t_limiares, 1),
         "como": "JanelaPrincipal com a gaveta aberta; do ProjetoDeLivro.abrir (o livro.json) às 230 "
                 "linhas no painel de Páginas (o leitor da interface carregando), 30 vezes depois "
-                "de uma que aquece, cada uma com o fundo da anterior já assentado; e mudar o "
+                f"de {AQUECIMENTOS} que aquecem, cada uma com o fundo da anterior já assentado; e mudar o "
                 "limiar de revisão (sem abrir as páginas)"}
     _portao(p95, 300)
 

@@ -118,13 +118,14 @@ class GaleriaNaJanela:
         escopo = escopo or self.galeria.escopo.currentData()
         self._char_da_galeria = char
         self._ir_a_galeria()
-        nome = f"'{char}'" if char else "os glifos sem leitura"
+        nome = f"de '{char}'" if char else "dos glifos sem leitura"
         if escopo == "pagina":
             itens = [Item(p.indice, b.gid, b.entry.char, float(b.entry.confidence),
                           str(b.entry.source)) for b in p.modelo.boxes if b.entry.char == char]
-            self._mostrar_na_galeria(f"Galeria de {nome} na página {p.indice + 1}", itens, escopo)
+            self._mostrar_na_galeria(f"Galeria {nome} na página {p.indice + 1}", itens, escopo)
             return
-        self.statusBar().showMessage(f"Juntando os glifos de {nome} do livro…", 0)
+        quais = f"lidos como '{char}'" if char else "sem leitura"
+        self.statusBar().showMessage(f"Juntando do livro os glifos {quais}…", 0)
         self._pedido_da_galeria += 1
         pedido, versao = self._pedido_da_galeria, p.mudancas_da_sequencia
         # Com o índice ainda montando, a Galeria do livro vê só as páginas já indexadas.
@@ -137,7 +138,7 @@ class GaleriaNaJanela:
             self.statusBar().clearMessage()
             itens = [Item(a.pagina, a.gid, a.char, a.confianca, a.fonte) for a in achados
                      if a.char == char]
-            self._mostrar_na_galeria(f"Galeria de {nome} no livro{montando}", itens, escopo)
+            self._mostrar_na_galeria(f"Galeria {nome} no livro{montando}", itens, escopo)
         self.busca.glifos(char, ao_terminar=chegou)
 
     def mostrar_glifos_na_galeria(self, achados, titulo: str) -> None:

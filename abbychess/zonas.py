@@ -50,7 +50,7 @@ FUNCOES = ("texto", "titulo", "cabecalho", "rodape", "numero_de_pagina", "nota",
 NOMES_DAS_FUNCOES = {
     "texto": "Texto", "titulo": "Título", "cabecalho": "Cabeçalho", "rodape": "Rodapé",
     "numero_de_pagina": "Nº de página", "nota": "Nota", "legenda": "Legenda",
-    "diagrama": "Diagrama", "figura": "Figura", "tabela": "Tabela", "ignorar": "Ignorar",
+    "diagrama": "Diagrama", "figura": "Imagem", "tabela": "Tabela", "ignorar": "Ignorar",
 }
 #: O tipo que cada função dá à área.
 TIPO_DA_FUNCAO = {"texto": TEXTO, "titulo": TEXTO, "cabecalho": TEXTO, "rodape": TEXTO,

@@ -216,7 +216,7 @@ def montar(janela) -> None:
                ("funcao_cabecalho", "cabecalho"), ("funcao_rodape", "rodape"),
                ("funcao_numero", "numero_de_pagina"), ("funcao_nota", "nota"),
                ("funcao_legenda", "legenda"), ("funcao_diagrama", "diagrama"),
-               ("funcao_ignorar", "ignorar"))
+               ("funcao_imagem", "figura"), ("funcao_ignorar", "ignorar"))
     j.acoes_das_funcoes = [acao(j, id_, lambda _=False, f=f: j.areas.trocar_funcao_atual(f),
                                 widgets=[j.visor]) for id_, f in funcoes]
     # O tipo da zona por Ctrl+1…5, como no FineReader (só nesse perfil, passo K).

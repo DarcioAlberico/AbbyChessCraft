@@ -354,6 +354,7 @@ acoes:
   - {id: funcao_nota, descricao: "Função da zona: nota", escopo: [imagem_areas], padrao: N, desde_passo: F}
   - {id: funcao_legenda, descricao: "Função da zona: legenda", escopo: [imagem_areas], padrao: L, desde_passo: F}
   - {id: funcao_diagrama, descricao: "Função da zona: diagrama", escopo: [imagem_areas], padrao: D, desde_passo: F}
+  - {id: funcao_imagem, descricao: "Função da zona: imagem", escopo: [imagem_areas], padrao: I, desde_passo: F}
   - {id: funcao_ignorar, descricao: "Função da zona: ignorar", escopo: [imagem_areas], padrao: X, desde_passo: F}
   - {id: tipo_texto, descricao: "Tipo da zona: texto", escopo: [imagem_areas], sem_atalho: [padrao], finereader: Ctrl+1, desde_passo: K}
   - {id: tipo_diagrama, descricao: "Tipo da zona: diagrama", escopo: [imagem_areas], sem_atalho: [padrao], finereader: Ctrl+2, desde_passo: K}

@@ -726,6 +726,21 @@ def test_ctrl_t_com_pendentes_pergunta_e_o_nao_deixa_a_pagina(app, lida, monkeyp
     j.fechar_busca()
 
 
+def test_o_cartao_saude_cabe_na_gaveta_de_150(app, janela):
+    """O cartão Saúde aparece na primeira sessão de um livro novo: com ele visível (o limiar,
+    as páginas da amostra e o total), a gaveta continua com 150 px e a Imagem não estreita."""
+    from abbychess import livro as lv
+
+    j = janela
+    imagem = _larguras(app, j)[1]
+    QTest.keyClick(j.visor, Qt.Key.Key_F9)
+    j.paginas.mostrar_saude(lv.SaudeDoLivro((1, 6, 10), 333, 270, 12, 3,
+                                            ((1, 109, 93), (6, 115, 115), (10, 109, 62))))
+    paginas, depois, _, _ = _larguras(app, j)
+    assert j.paginas.saude.isVisible()
+    assert abs(paginas - 150) <= 4 and abs(depois - imagem) <= 6
+
+
 def test_f9_em_1366_abre_a_gaveta_de_150_sem_estreitar_a_imagem(app, janela):
     j = janela
     imagem = _larguras(app, j)[1]

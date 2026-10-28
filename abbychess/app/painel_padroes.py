@@ -139,7 +139,8 @@ class PainelDePadroes(QWidget):
                 self.caracteres.setCurrentItem(item)
         self.caracteres.blockSignals(False)
         total = sum(len(v) for v in padroes.values())
-        self.resumo.setText(f"{total} amostra(s) em {len(padroes)} caractere(s)" if total
+        self.resumo.setText(f"{total} {'amostra' if total == 1 else 'amostras'} em {len(padroes)} "
+                            f"{'caractere' if len(padroes) == 1 else 'caracteres'}" if total
                             else vazios.SEM_PADROES)
         self.resumo.setWordWrap(True)
         self._filtrar(self.busca.text())

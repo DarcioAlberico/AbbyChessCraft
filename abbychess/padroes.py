@@ -206,7 +206,15 @@ class PadroesDoLivro:
         self._efeitos = efeitos
 
     def _chave(self, caminho: Path) -> str:
-        return caminho.relative_to(self.pasta).as_posix()
+        """A chave do `metadados.json`: o caminho relativo à pasta dos padrões. Aceita também
+        o caminho já relativo, que é a procedência gravada no `Box` (`relativo`)."""
+        caminho = Path(caminho)
+        if not caminho.is_absolute():
+            return caminho.as_posix()
+        try:
+            return caminho.relative_to(self.pasta).as_posix()
+        except ValueError:                       # o mesmo arquivo por outro nome (8.3, link)
+            return caminho.resolve().relative_to(self.pasta.resolve()).as_posix()
 
     def relativo(self, caminho) -> Optional[str]:
         """O caminho da amostra relativo à pasta dos padrões (a procedência gravada no `Box`)."""

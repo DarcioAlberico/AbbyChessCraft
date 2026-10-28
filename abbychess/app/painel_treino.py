@@ -361,8 +361,9 @@ class PainelDeTreino(QWidget):
 
     def mostrar_contagens(self, pendentes: int, total: int, padroes: int, caracteres: int) -> None:
         self.fila.setText(f"<b>A revisar nesta página:</b> {pendentes} de {total} boxes")
-        self.padroes.setText(f"<b>Padrões deste livro:</b> {padroes} amostra(s) em "
-                             f"{caracteres} caractere(s)")
+        self.padroes.setText(f"<b>Padrões deste livro:</b> {padroes} "
+                             f"{'amostra' if padroes == 1 else 'amostras'} em {caracteres} "
+                             f"{'caractere' if caracteres == 1 else 'caracteres'}")
 
     # ------------------------------------------------------------------
     def _desenhar_glifo(self) -> None:

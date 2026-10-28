@@ -3,6 +3,8 @@ palavra contra a das palavras retas da página (`pagina._italicos`)."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import fitz
 import numpy as np
 import pytest
@@ -146,18 +148,26 @@ def test_o_lote_rele_o_glifo_lido_por_amostra_de_outro_efeito(tmp_path):
     box = BoxEntry("", 35, 5, 55, 45)
     recorte = vertical.recorte_de_pe(np.asarray(imagem), box)
     leitor = LeitorDoLivro(tmp_path / "padroes")
-    negrito = leitor.ensinar(recorte, "n", altura_de_referencia=40, efeito=Estilo(True, False))
-    leitor.ensinar(recorte, "r", altura_de_referencia=40, efeito=Estilo(False, False))
-    box.char, box.source, box.confidence = "n", "livro", 1.0
-    procedencia.registrar(box, str(negrito))
+    leitor.ensinar(recorte, "n", altura_de_referencia=40, efeito=Estilo(True, False))
+    parecido = recorte.copy()
+    parecido[0, 0] = 255 - int(parecido[0, 0])          # um pixel: o "n" fica mais perto
+    leitor.ensinar(parecido, "r", altura_de_referencia=40, efeito=Estilo(False, False))
+    referencia = 40
+
+    def ler_como_o_lote():
+        # A leitura e a procedência como o lote e o F5 as fazem (`ler_boxes`): a amostra
+        # registrada é o caminho relativo à pasta dos padrões, não o absoluto.
+        pg.por_leitura(box, leitor.ler(recorte, altura_de_referencia=referencia))
+        assert box.char == "n" and not Path(procedencia.amostra_de(box)).is_absolute()
+
+    ler_como_o_lote()
     assert pg.reler_pelo_efeito(imagem, [box], leitor, [False], [None]) == 1
     assert box.char == "r"
     # Medido em negrito (ou sem medida), a leitura fica.
-    box.char = "n"
-    procedencia.registrar(box, str(negrito))
-    assert pg.reler_pelo_efeito(imagem, [box], leitor, [True], [None]) == 0
-    assert pg.reler_pelo_efeito(imagem, [box], leitor, [None], [None]) == 0
-    assert box.char == "n"
+    for negrito in (True, None):
+        ler_como_o_lote()
+        assert pg.reler_pelo_efeito(imagem, [box], leitor, [negrito], [None]) == 0
+        assert box.char == "n"
 
 
 def test_reler_mantem_o_sublinhado_do_usuario():

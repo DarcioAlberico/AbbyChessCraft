@@ -27,8 +27,9 @@ def saude_do_livro(saude) -> str:
     antes e agora, as amostras ensinadas, e o que fazer quando ela já basta."""
     linhas = ["Saúde do livro: a amostra, pendentes antes → agora"]
     linhas += [f"  p. {posicao + 1}: {antes} → {agora}" for posicao, antes, agora in saude.por_pagina]
+    n = saude.padroes
     linhas.append(f"  total: {saude.pendentes_antes} → {saude.pendentes_agora} · "
-                  f"{saude.padroes} amostra(s) ensinada(s)")
+                  f"{n} {'amostra ensinada' if n == 1 else 'amostras ensinadas'}")
     acao = _tecla("reconhecer_livro", "Projeto › Reconhecer o livro")
     if saude.pode_reconhecer_o_livro:
         linhas.append(f"A amostra está pronta: {acao} reconhece o livro inteiro.")

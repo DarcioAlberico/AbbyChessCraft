@@ -13,8 +13,8 @@ from typing import Dict, List, Optional
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QGroupBox, QHeaderView, QLabel,
-                               QMenu, QProgressBar, QPushButton, QSpinBox, QTreeWidget,
-                               QTreeWidgetItem, QVBoxLayout, QWidget)
+                               QMenu, QProgressBar, QPushButton, QSizePolicy, QSpinBox,
+                               QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from abbychess import modelo as md
 from abbychess.livro import SaudeDoLivro
@@ -105,17 +105,22 @@ class PainelDePaginas(QWidget):
         self.saude = QGroupBox("Saúde do livro")
         caixa_da_saude = QVBoxLayout(self.saude)
         caixa_da_saude.setContentsMargins(6, 6, 6, 6)
+        # A gaveta tem 150 px (§3.1): todo texto do cartão quebra a linha, e nada nele pede
+        # largura (o cartão aparece justo na primeira sessão de um livro novo).
         self.amostra_da_saude = QLabel()
+        self.amostra_da_saude.setWordWrap(True)
         # As páginas da amostra, cada uma um link para ela, com os pendentes antes → agora.
         self.pendentes_da_saude = QLabel()
         self.pendentes_da_saude.setWordWrap(True)
         self.pendentes_da_saude.setTextFormat(Qt.TextFormat.RichText)
         self.pendentes_da_saude.linkActivated.connect(lambda alvo: self.abrir.emit(int(alvo)))
         self.padroes_da_saude = QLabel()
+        self.padroes_da_saude.setWordWrap(True)
+        self.rotulo_do_limiar = QLabel("Destacar o lote com até estes pendentes:")
+        self.rotulo_do_limiar.setWordWrap(True)
         self.limiar_da_saude = QSpinBox()
         self.limiar_da_saude.setRange(0, 9999)
-        self.limiar_da_saude.setPrefix("Destacar com até ")
-        self.limiar_da_saude.setSuffix(" pend.")
+        self.rotulo_do_limiar.setBuddy(self.limiar_da_saude)
         self.limiar_da_saude.setAccessibleName("Limiar do cartão Saúde: pendentes na amostra")
         self.limiar_da_saude.setToolTip("Com até este número de pendentes na amostra, "
                                         "\"Reconhecer o livro\" fica em destaque.")
@@ -123,8 +128,9 @@ class PainelDePaginas(QWidget):
         self.botao_reconhecer_livro = QPushButton("Reconhecer o livro")
         self.botao_reconhecer_livro.clicked.connect(self.reconhecer_livro)
         for widget in (self.amostra_da_saude, self.pendentes_da_saude, self.padroes_da_saude,
-                       self.limiar_da_saude, self.botao_reconhecer_livro):
+                       self.rotulo_do_limiar, self.limiar_da_saude, self.botao_reconhecer_livro):
             caixa_da_saude.addWidget(widget)
+        self.saude.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.saude.hide()
 
         #: O progresso do lote (passo E): as páginas feitas, e o tempo estimado na dica.

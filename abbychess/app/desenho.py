@@ -131,6 +131,8 @@ class DesenhoDaJanela:
                                                     "({proxima_pagina_pendente})."))
             return
         self.treino.mostrar(p.matriz, p.box_atual(), p.posicao_do_atual())
+        if (sugestao := p.sugestao_do_atual()) is not None:    # §9.2: o palpite da rede
+            self.treino.sugerir(*sugestao)
         # A fila e a Imagem levam o Documento e a Linha ao glifo (§6.2).
         self.texto.ir_ao_gid(p.atual, rolar=True)   # §6.2: o Documento rola até o glifo
         self.texto.marcar_atual(p.atual)            # e o marca, também sem o foco nele

@@ -7,20 +7,33 @@ r"""O replay da fatia (SPEC §15.4, CA-F.1): quantos gestos levam as páginas ao
 O **snapshot** é o projeto reconhecido (modelos globais, padrões vazios), guardado em
 `tests/dados/fatia/<livro>-iAAA-BBB-inicial.zip` com o SHA-256 ao lado; toda medida parte
 dele. O **replay** é uma simulação: percorre as diferenças entre a leitura e o gabarito,
-na ordem de leitura, e aplica no núcleo do programa a correção de cada uma com o comando
-de menor custo de `ferramentas/replay/comandos.yaml` disponível no passo (o ensinar
-propaga, e a propagação pode corrigir ou estragar outras ocorrências). Os custos são
+pela fila da janela e, fora dela, na ordem de leitura, e aplica no núcleo do programa a
+correção de cada uma com o comando de menor custo de `ferramentas/replay/comandos.yaml`
+disponível no passo (o ensinar propaga, e a propagação pode corrigir ou estragar outras
+ocorrências). Os custos são
 declarados no catálogo e conferidos com a interface real por `tests/test_custo_dos_comandos.py`.
 
 As diferenças que nenhum comando do passo corrige ficam contadas como **impossíveis**, cada
 uma com o custo fixo declarado no catálogo, e entram no total; o total sem elas também sai.
-O critério do roadmap (≤ 85% depois do A3, ≤ 70% depois do D1) vale sobre o total `gestos`,
+O critério do roadmap (≤ 85% da linha de base no fim dele, SPEC §15.4) vale sobre o total `gestos`,
 com os impossíveis: um passo que torna uma correção possível tem de baixar o total.
 
 Os padrões ensinados valem para o resto da fatia, como no programa: ao chegar a uma página
 depois de ter ensinado algo, o replay relê os pendentes (`reler_pendentes`, pela
 propagação dos padrões do livro, que é o que a releitura muda) e cobra o comando. A
 navegação (`pagina_seguinte` entre cada par de páginas) sai em `gestos_navegacao`.
+
+Desde o catálogo 6, um passo com o ensinar em lote (Ctrl+Enter) o usa no lugar do ensinar
+quando o lote da página (`contexto.lote`) deixa certos mais glifos do que o Enter simples,
+com a propagação dele, deixaria (`_lote`). Desde o 7, o glifo que ninguém leu e cujo palpite
+da rede (§9.2, só a rede global, num leitor à parte) é o certo custa só o Enter que o aceita
+(`_palpite`). Desde o 8, o replay anda pela fila da janela (`_proxima_acao`): o primeiro
+dela sai sem o clique, também para dividir, juntar com o seguinte e descartar, e o certo e
+pendente numa linha medida custa o Enter que o confirma. A linha de base roda este mesmo
+arquivo no código do passo 0, e por isso ele só importa o que o passo tem. Desde o 9, o que
+falta vai pelo mais barato: o box colado dividido pelo Ctrl+D, quando a divisão dá um box
+para o que falta (`_colado`), ou cada trecho marcado à mão ou, desde o D1, inserido no
+Documento (`_faltas_pelo_mais_barato`).
 
 Só entram as linhas de corpo com `texto_verificado: true` (o texto do gabarito é do
 usuário) e os diagramas do gabarito. Sem linha verificada, o texto fica **pendente** e o
@@ -100,6 +113,11 @@ class Diferencas:
     linhas_sem_par: int = 0
     #: Os caracteres (sem espaço) das linhas sem par, que custam por caractere.
     caracteres_sem_par: int = 0
+    #: Os boxes das linhas lidas casadas com uma linha verificada: o que a medida cobre.
+    medidos: set = field(default_factory=set)
+    #: Cada trecho de caracteres que falta: (o box antes, o box depois, quantos), com `None`
+    #: na ponta da linha. A soma dos "quantos" é `faltas`.
+    lugares_das_faltas: list = field(default_factory=list)
 
 
 def diferencas(boxes, linhas_lidas, caixas_lidas, palavra_do_box, gabarito) -> Diferencas:
@@ -117,6 +135,7 @@ def diferencas(boxes, linhas_lidas, caixas_lidas, palavra_do_box, gabarito) -> D
             dif.caracteres_sem_par += sum(1 for c in linha["texto"] if not c.isspace())
             continue
         indices = list(linhas_lidas[casados[k]].indices)
+        dif.medidos.update(indices)
         lidos = [normalizar_saida(boxes[i].char) or SEM_LEITURA for i in indices]
         certos = [c for c in linha["texto"] if not c.isspace()]
         mapa = {}                                      # posição no certo -> posição no lido
@@ -134,6 +153,10 @@ def diferencas(boxes, linhas_lidas, caixas_lidas, palavra_do_box, gabarito) -> D
                     dif.acoes.append(("substituicao", indices[a1 + t], certos[b1 + t]))
                     mapa[b1 + t] = a1 + t
                 dif.acoes.extend(("sobra", i) for i in indices[a1 + comum:a2])
+                if (b2 - b1) > comum:
+                    antes = indices[a1 + comum - 1] if a1 + comum > 0 else None
+                    depois = indices[a2] if a2 < len(indices) else None
+                    dif.lugares_das_faltas.append((antes, depois, (b2 - b1) - comum))
                 dif.faltas += (b2 - b1) - comum
         palavra_certa = _palavras_por_glifo(linha["texto"])
         for b in range(1, len(certos)):
@@ -184,6 +207,25 @@ def _linhas_da_pagina(boxes, fonte, indice, ex):
 # O replay
 # ----------------------------------------------------------------------
 
+def custo_do_comando(comando: dict, caracteres: int = 0) -> int:
+    """O custo de uma vez do comando: o fixo, mais `por_caractere` vezes os caracteres que ele
+    digita (a inserção no Documento, desde o catálogo 9)."""
+    return comando["custo"] + comando.get("por_caractere", 0) * caracteres
+
+
+def _faltas_pelo_mais_barato(contas, dif, disponiveis) -> None:
+    """Cada trecho que falta, pelo comando mais barato do passo: marcar cada glifo à mão
+    (`falta`, por glifo) ou, desde o D1, inserir as letras no Documento (`falta_no_documento`,
+    o clique e cada letra; elas entram virtuais, sem box)."""
+    marcar, inserir = disponiveis.get("falta"), disponiveis.get("falta_no_documento")
+    for _antes, _depois, n in dif.lugares_das_faltas:
+        if inserir is not None and (marcar is None
+                                    or custo_do_comando(inserir, n) < marcar["custo"] * n):
+            contas.usar_comando(inserir, caracteres=n)
+        else:
+            contas.usar("falta", n)
+
+
 class _Contas:
     def __init__(self, disponiveis: dict, impossiveis: dict):
         self.disponiveis, self.custos_impossiveis = disponiveis, impossiveis
@@ -199,8 +241,8 @@ class _Contas:
         self.usar_comando(comando, vezes)
         return True
 
-    def usar_comando(self, comando: dict, vezes: int = 1) -> None:
-        self.gestos += comando["custo"] * vezes
+    def usar_comando(self, comando: dict, vezes: int = 1, caracteres: int = 0) -> None:
+        self.gestos += custo_do_comando(comando, caracteres) * vezes
         self.comandos[comando["id"]] = self.comandos.get(comando["id"], 0) + vezes
 
     @property
@@ -230,6 +272,13 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
         z.extractall(pasta)
     projeto = ProjetoDeLivro.abrir(next(p.parent for p in pasta.rglob("projeto.json")))
     leitor = LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
+    # O palpite da rede (§9.2) só com a rede: o leitor do replay continua só com os padrões.
+    # A importação fica aqui porque a linha de base roda este mesmo arquivo no código do
+    # passo 0, que não tem a `rede_global`.
+    sugeridor = None
+    if {"palpite", "palpite_da_fila"} & set(disponiveis):
+        from abbychess.leitor import rede_global
+        sugeridor = LeitorDoLivro(projeto.pasta_de_padroes, rede=rede_global())
     fonte = pg.fonte_do_projeto(projeto)
     indices = indices or projeto.paginas_lidas()
     gabaritos = {i: json.loads((verdade / livro / f"i{i:03d}.json").read_text(encoding="utf-8"))
@@ -268,42 +317,79 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
         erros_diagramas = _replay_dos_diagramas(projeto, fonte, indice, imagem, gabarito,
                                                 diagramas_conta)
 
+        # O glifo que a janela mostra: `None` é o primeiro da fila, aonde ela vai ao abrir a
+        # página e depois do Enter e do Del; depois do Ctrl+D e do Ctrl+J, o box novo
+        # (`ControladorDePagina._depois_de_editar`).
+        mostrado = None
+        sem_colado: set = set()          # as caixas já vistas que dividir não ajuda
+        padroes_vistos = len(ensinados)
         for _ in range(LIMITE_DE_PASSOS):
+            if len(ensinados) != padroes_vistos:
+                # Com um padrão novo, a parte de um box colado pode sair certa ao dividir.
+                sem_colado.clear()
+                padroes_vistos = len(ensinados)
             linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
             dif = diferencas(boxes, linhas, caixas, palavra, gabarito)
-            acao, da_fila = _proxima_acao(dif, boxes, leitor, disponiveis)
+            acao, da_fila = _proxima_acao(dif, boxes, leitor, disponiveis, imagem.height,
+                                          mostrado)
             if acao is None:
-                break
+                colado = _colado(dif, boxes, sem_colado, disponiveis, imagem, leitor,
+                                 fonte, indice, ex, gabarito, mostrado)
+                if colado is None:
+                    break
+                acao, da_fila = ("divisao", colado), colado == mostrado
+            mostrado = None
+            if acao[0] == "confirmacao":                   # o Enter na leitura certa
+                i = acao[1]
+                certo = boxes[i].char
+                pg.ensinar(imagem, boxes, i, certo, leitor, projeto, indice, propagar=False)
+                ensinados.add(certo)
+                pg.propagar_padroes(imagem, boxes, leitor)
+                texto_conta.usar("confirmacao_da_fila")
+                continue
             if acao[0] == "substituicao":
                 _, i, certo = acao
-                if ensinar is not None and certo not in ensinados:
-                    pg.ensinar(imagem, boxes, i, certo, leitor, projeto, indice)
-                    ensinados.add(certo)
-                    texto_conta.usar_comando(disponiveis["substituicao_da_fila"] if da_fila
-                                             else ensinar)
-                    continue
                 if da_fila:
-                    pg.ensinar(imagem, boxes, i, certo, leitor, projeto, indice)
-                    texto_conta.usar("substituicao_da_fila")
-                    continue
-                if disponiveis["substituicao"]["id"] == "ensinar_glifo":
-                    pg.ensinar(imagem, boxes, i, certo, leitor, projeto, indice)
+                    comando = disponiveis["substituicao_da_fila"]
+                elif ensinar is not None and certo not in ensinados:
+                    comando = ensinar
                 else:
+                    comando = disponiveis["substituicao"]
+                comando = _palpite(boxes, i, certo, comando, disponiveis, da_fila, imagem,
+                                   sugeridor) or comando
+                if comando["id"] == "corrigir_no_documento":         # corrige sem ensinar
                     pg.confirmar(boxes, i, certo)
+                    texto_conta.usar_comando(comando)
+                    mostrado = i                 # o clique no Documento escolhe o glifo
+                    continue
+                lida = boxes[i].char
+                # O ensinar propaga depois do Enter; o lote entra antes da propagação.
+                pg.ensinar(imagem, boxes, i, certo, leitor, projeto, indice, propagar=False)
+                ensinados.add(certo)
+                lote = _lote(dif, boxes, i, lida, certo, disponiveis, da_fila, imagem, leitor)
+                if lote is not None:
+                    comando, outros = lote
+                    for j in outros:
+                        pg.confirmar(boxes, j, certo)
+                pg.propagar_padroes(imagem, boxes, leitor)
+                texto_conta.usar_comando(comando)
+                continue
             elif acao[0] == "sobra":
                 pg.descartar(boxes, acao[1])
             elif acao[0] == "divisao":
                 pg.dividir(imagem, boxes, acao[1], leitor)
+                mostrado = acao[1]                          # a primeira parte
             elif acao[0] == "juncao":
                 pg.juntar(imagem, boxes, acao[1], acao[2], leitor)
-            texto_conta.usar(acao[0])
+                mostrado = min(acao[1], acao[2])            # o box junto
+            texto_conta.usar(f"{acao[0]}_da_fila" if da_fila else acao[0])
         else:
             raise RuntimeError(f"i{indice:03d}: o replay não convergiu")
 
         linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
         dif = diferencas(boxes, linhas, caixas, palavra, gabarito)
         if dif.faltas:
-            texto_conta.usar("falta", dif.faltas)
+            _faltas_pelo_mais_barato(texto_conta, dif, disponiveis)
         if dif.espacos:
             texto_conta.usar("espaco", dif.espacos)
         if dif.linhas_sem_par:
@@ -345,20 +431,146 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
     return resultado
 
 
-def _proxima_acao(dif: Diferencas, boxes, leitor, disponiveis: dict):
-    """A próxima correção: a do glifo que a janela mostra (o primeiro da fila de revisão),
-    se ele tem uma substituição e o passo tem o comando da fila; senão, a primeira na ordem
-    de leitura. Devolve (ação, se é a da fila)."""
+def _proxima_acao(dif: Diferencas, boxes, leitor, disponiveis: dict, altura=None,
+                  mostrado=None):
+    """A próxima correção e se ela vem do glifo que a janela mostra: (ação, da_fila).
+
+    A janela mostra `mostrado` ou, com `None`, o primeiro da fila de revisão (`_fila`, com
+    `altura`, a da página, para as margens irem ao fim). O glifo da fila que a medida não
+    cobre (fora das linhas verificadas e sem diferença) é transparente: o replay não sabe o
+    que o usuário faria com ele. Se o mostrado tem uma diferença cujo comando "da fila" o
+    passo tem (substituição, divisão, sobra, ou a junção em que ele é o primeiro dos dois),
+    ela vem dele, sem o clique. Se ele está na fila e certo numa linha medida, é o Enter que
+    confirma a leitura (`("confirmacao", box)`, desde o catálogo 8): o usuário passa por ele
+    para chegar ao seguinte. Senão, a primeira diferença na ordem de leitura, com o clique."""
+    if any(tipo.endswith("_da_fila") for tipo in disponiveis):
+        principal = {}
+        envolvidos = set()
+        for a in dif.acoes:
+            principal.setdefault(a[1], a)
+            envolvidos.update(a[1:3] if a[0] == "juncao" else a[1:2])
+        fila = [i for i in _fila(boxes, leitor, altura) if i in dif.medidos or i in envolvidos]
+        alvo = mostrado if mostrado is not None and mostrado < len(boxes) else (
+            fila[0] if fila else None)
+        if alvo is not None:
+            acao = principal.get(alvo)
+            if acao is not None and f"{acao[0]}_da_fila" in disponiveis:
+                return acao, True
+            if alvo in fila and alvo not in envolvidos and "confirmacao_da_fila" in disponiveis:
+                return ("confirmacao", alvo), True
+    return next((a for a in dif.acoes if a[0] in disponiveis), None), False
+
+
+def _colado(dif: Diferencas, boxes, sem_colado: set, disponiveis: dict, imagem, leitor,
+            fonte, indice, ex, gabarito, mostrado=None):
+    """O box colado a dividir com o Ctrl+D, ou `None` (desde o catálogo 9).
+
+    Um trecho que falta ao lado de um box pode ser o box que juntou dois glifos e foi lido
+    como o primeiro ("r," lido "r"). O replay divide o box vizinho numa cópia, como o Ctrl+D
+    (`pagina.dividir`): se a divisão dá um box para o que falta (as faltas diminuem), o
+    custo dela é o do dividir mais o de ensinar cada parte que sai errada. Ele fica com o
+    Ctrl+D se esse custo é menor que o de marcar ou inserir o que deixa de faltar
+    (`_faltas_pelo_mais_barato`); senão, a caixa vai para `sem_colado`, que o replay esvazia
+    quando um padrão novo entra (com ele, a parte pode sair certa ao dividir, e o Ctrl+D fica
+    mais barato). O Ctrl+D do box que a janela mostra (`mostrado`) não pede o clique. As
+    estimativas são do lado conservador: a parte errada custa o ensinar fora da fila."""
+    from dataclasses import replace
+
     from abbychess import pagina as pg
 
-    if "substituicao_da_fila" in disponiveis:
-        fila = pg.fila_de_revisao(boxes, leitor)
-        if fila:
-            da_fila = next((a for a in dif.acoes if a[0] == "substituicao" and a[1] == fila[0]),
-                           None)
-            if da_fila is not None:
-                return da_fila, True
-    return next((a for a in dif.acoes if a[0] in disponiveis), None), False
+    dividir, ensinar = disponiveis.get("divisao"), disponiveis.get("substituicao")
+    if dividir is None or ensinar is None:
+        return None
+    substituicoes = sum(1 for a in dif.acoes if a[0] == "substituicao")
+    for antes, depois, _n in dif.lugares_das_faltas:
+        for candidato in (antes, depois):
+            if candidato is None:
+                continue
+            b = boxes[candidato]
+            caixa = (b.x1, b.y1, b.x2, b.y2)
+            if caixa in sem_colado:
+                continue
+            sem_colado.add(caixa)
+            copia = [replace(x) for x in boxes]
+            try:
+                pg.dividir(imagem, copia, candidato, leitor)
+            except ValueError:
+                continue
+            linhas, caixas, palavra = _linhas_da_pagina(copia, fonte, indice, ex)
+            depois_de_dividir = diferencas(copia, linhas, caixas, palavra, gabarito)
+            deixam = dif.faltas - depois_de_dividir.faltas
+            if deixam <= 0:
+                continue
+            novas = max(0, sum(1 for a in depois_de_dividir.acoes if a[0] == "substituicao")
+                        - substituicoes)
+            ctrl_d = (disponiveis.get("divisao_da_fila", dividir) if candidato == mostrado
+                      else dividir)
+            pelo_ctrl_d = custo_do_comando(ctrl_d) + novas * custo_do_comando(ensinar)
+            sem = _Contas(disponiveis, {})
+            _faltas_pelo_mais_barato(
+                sem, Diferencas(lugares_das_faltas=[(None, None, deixam)]), disponiveis)
+            if pelo_ctrl_d < sem.gestos:
+                sem_colado.discard(caixa)
+                return candidato
+    return None
+
+
+def _fila(boxes, leitor, altura=None) -> list:
+    """A fila de revisão da janela, com as margens no fim quando o código as tem
+    (`exportar.margens_da_pagina`, desde o `2e3d9a1`; a linha de base roda este arquivo no
+    código do passo 0, que não as tem)."""
+    from abbychess import exportar as ex
+    from abbychess import pagina as pg
+
+    margens = getattr(ex, "margens_da_pagina", None)
+    if margens is None or altura is None:
+        return pg.fila_de_revisao(boxes, leitor)
+    return pg.fila_de_revisao(boxes, leitor, margens(boxes, altura))
+
+
+def _lote(dif: Diferencas, boxes, i: int, lida: str, certo: str, disponiveis: dict,
+          da_fila: bool, imagem, leitor):
+    """O ensinar em lote no lugar do ensinar do glifo `i` (já ensinado, sem propagar; `lida`
+    é a leitura dele antes), se o passo o tem e o lote (`contexto.lote`) deixa certos mais
+    glifos do lote do que o Enter simples deixaria: a propagação pelos pendentes, numa cópia,
+    também pode acertá-los, de graça. Fora do lote, a propagação lê igual nos dois. O certo
+    de cada glifo é o do gabarito; sem substituição a fazer, a leitura dele já está certa.
+    Devolve (comando, os índices do lote) ou `None`."""
+    from dataclasses import replace
+
+    from abbychess import contexto
+    from abbychess import pagina as pg
+
+    tipo = "confusao_da_fila" if da_fila else "confusao"
+    if tipo not in disponiveis or not lida or lida == certo:
+        return None
+    outros = contexto.lote_da_lista(boxes, {lida}, certo, fora={i})
+    if not outros:
+        return None
+    certos = {a[1]: a[2] for a in dif.acoes if a[0] == "substituicao"}
+    verdade = {j: certos.get(j, boxes[j].char) for j in outros}
+    simples = [replace(b) for b in boxes]
+    pg.propagar_padroes(imagem, simples, leitor)
+    sem_lote = sum(1 for j in outros if simples[j].char == verdade[j])
+    com_lote = sum(1 for j in outros if verdade[j] == certo)
+    return (disponiveis[tipo], outros) if com_lote > sem_lote else None
+
+
+def _palpite(boxes, i: int, certo: str, comando: dict, disponiveis: dict, da_fila: bool,
+             imagem, sugeridor):
+    """O Enter que aceita o palpite da rede (§9.2) no lugar do `comando` do glifo `i`, se o
+    passo o tem, ninguém leu o glifo, o palpite é o certo e o Enter sai mais barato. O
+    palpite errado não muda nada: digitar o troca, e o ensinar custa o mesmo. Devolve o
+    comando ou `None`."""
+    from abbychess import pagina as pg
+
+    tipo = "palpite_da_fila" if da_fila else "palpite"
+    if tipo not in disponiveis or sugeridor is None or not pg.sem_leitura(boxes[i]) \
+            or disponiveis[tipo]["custo"] >= comando["custo"]:
+        return None
+    recorte, altura = pg.recortes_para_ler(imagem, boxes, [i])[0]
+    sugestao = sugeridor.sugerir(recorte, altura)
+    return disponiveis[tipo] if sugestao is not None and sugestao[0] == certo else None
 
 
 def _estado(resultado: dict, gabaritos) -> str:

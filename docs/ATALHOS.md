@@ -140,6 +140,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Ação | Padrão | FineReader | Escopo | Desde |
 |---|---|---|---|---|
 | Corrigir só esta ocorrência | Shift+Enter | Shift+Enter | campo_glifo | A2 |
+| Ensinar e corrigir em lote os glifos da página com a mesma leitura que a palavra desmente | Ctrl+Enter | Ctrl+Enter | campo_glifo | L |
 | Ensinar o padrão | Enter | Enter | campo_glifo | A2 |
 
 ## palavra

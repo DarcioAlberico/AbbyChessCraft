@@ -65,6 +65,8 @@ class ServidorFalso:
                 resultado = sl.reler_boxes(imagem, boxes, self.leitor, so_pendentes=so_pendentes)
             elif pedido.operacao == "ler_recortes":
                 resultado = sl.ler_recortes(argumentos, self.leitor)
+            elif pedido.operacao == "sugerir_recortes":
+                resultado = sl.sugerir_recortes(argumentos, self.leitor)
             else:
                 raise ValueError(f"operação desconhecida {pedido.operacao!r}")
         except sl.Cancelado:

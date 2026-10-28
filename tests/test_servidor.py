@@ -67,6 +67,13 @@ def test_os_deltas_dos_padroes_valem_no_pedido_seguinte(servidor, pasta, imagem)
     assert servidor.chamar("padroes", timeout=10) == 0
 
 
+def test_o_palpite_da_rede_vem_do_filho(servidor):
+    """§9.2: o glifo que ninguém leu recebe o palpite da rede, que só o servidor tem."""
+    recorte = np.full((30, 20), 0, np.uint8)
+    palpites = servidor.chamar("sugerir_recortes", [(recorte, 30.0)], timeout=10)
+    assert palpites == [(leitor_falso.PALPITE, leitor_falso.CONFIANCA_DO_PALPITE)]
+
+
 def test_ca_11_8_o_pedido_interativo_passa_na_frente_da_pagina_seguinte_do_lote(servidor, imagem,
                                                                                 monkeypatch):
     lote = [servidor.pedir("ler_pagina", (imagem, [], []), prioridade=sl.LOTE) for _ in range(3)]

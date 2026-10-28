@@ -63,7 +63,7 @@ Toda meta de tempo é um **alvo**; o **corte** que reprova é alvo × 1,2 (§15.
 | Atraso de evento da interface durante o lote | p99 ≤ 50 ms, com as ações funcionando |
 | Memória do desfazer (300 páginas × 20 ações) | ≤ 50 MB |
 | Memória total com o lote rodando | ≤ 2,5 GB |
-| Gestos para levar as p. 21–27 ao gabarito (replay, CA-F.1) | ≤ 70% da linha de base depois do D1 |
+| Gestos para levar as p. 21–27 ao gabarito (replay, CA-F.1) | ≤ 85% da linha de base no fim do roadmap |
 
 O número de hoje de cada meta não fica aqui: ele está no JSON da medida
 (`docs/medidas/`) e na tabela que `ferramentas/resumo_medidas.py` gera no README
@@ -576,6 +576,10 @@ de notação e Notação nunca toca prosa; FEN nunca é substituído; nada é en
 - **Alt+↓ / Alt+↑**: próximo / anterior item no modo e escopo atuais, em qualquer painel.
   **F6**: próxima *página* com pendentes.
 - Recalculada incrementalmente, só para os gids tocados.
+- Por confiança e por caractere, o que a exportação tira (o cabeçalho e o rodapé corridos,
+  com o □ que cai na linha deles, e as áreas de cabeçalho, rodapé, número de página e
+  ignorar) vem depois do resto da fila e antes dos pulados. Nada sai da fila. Na ordem de
+  leitura, a fila fica na ordem da página.
 
 ### 8.2 A Galeria por caractere
 
@@ -637,6 +641,13 @@ menor que a margem configurada (matriz montada à mão).
 - **Ligaduras**: padrão de vários caracteres (`ﬁ` como "fi"); no Documento, cada letra
   sincroniza com o mesmo gid.
 - A faixa Linha no lugar do rótulo "Na linha".
+- **O palpite da rede** (pendências do passo L): o glifo que ninguém leu chega ao Glifo com o
+  primeiro da rede abaixo do limiar no campo, selecionado, e a leitura diz que é palpite
+  ("Palpite da rede: r (abaixo do limiar, confiança 0,46): confira antes do Enter"). Enter o
+  ensina; digitar o troca. Sem palpite (sem rede, ou nenhum que passe no veto de proporção) o
+  campo fica vazio, como antes. O palpite não é leitura: o glifo continua "sem leitura" na
+  fila e na Imagem até alguém decidir. Ele vem do servidor (§11), num pedido com os glifos sem
+  leitura da página toda, e só entra no campo ainda vazio.
 
 **CA-9.1** [livro_real] Nas linhas de corpo do gabarito (p. 21–27), o CER depois de ensinar
 as legendas em negrito é ≤ o de antes, e nenhum glifo de corpo certo passa a errado.
@@ -1075,14 +1086,26 @@ núcleo do programa o comando de menor custo de `ferramentas/replay/comandos.yam
 (catálogo versionado: comando, passo em que existe, custo em gestos) e soma o custo
 declarado. O custo de cada comando é conferido contra a interface real por
 `tests/test_custo_dos_comandos.py`: QTest e um filtro de eventos que conta cliques, teclas
-que não são modificador e atalhos disparados. O mesmo algoritmo e o mesmo catálogo,
+que não são modificador e atalhos disparados. O mesmo algoritmo (desde o catálogo 8, o
+mesmo `replay_fatia.py`) e o mesmo catálogo,
 filtrado por `passo ≤ atual`, rodam na linha de base e depois; o que nenhum comando do passo
 corrige entra com o custo fixo de "impossível" declarado no catálogo. A linha de base é
 sempre medida com o código da tag `passo-0` (o replay chama o núcleo, que muda); duas
 medidas só se comparam com o mesmo snapshot, catálogo e versões dos gabaritos. O total
-`gestos` (com os impossíveis) é ≤ 70% da linha de base depois do passo D1. (Até a versão
-0.8 do roadmap havia também ≤ 85% depois do A3; saiu porque o A3 é só leitura e não muda o
-custo de nenhum comando.)
+`gestos` (com os impossíveis) é ≤ 85% da linha de base no fim do roadmap (o passo L, com as
+pendências). (Até a versão 0.8 do roadmap havia também ≤ 85% depois do A3; saiu porque o A3 é
+só leitura e não muda o custo de nenhum comando. Até 2026-10-24 o alvo era ≤ 70% depois do
+D1; mudou, com o sim do usuário, depois da investigação `docs/revisoes/ca-f1-investigacao.md`:
+dos 983 gestos que sobram, 190 são o custo fixo do que nenhum comando corrige (5 linhas que a
+leitura não acha e os 170 caracteres delas), e o resto é sobretudo ensinar o glifo que a rede
+erra e dividir os colados, um gesto por glifo. As alavancas que ainda restavam, somadas,
+ficavam perto de 0,80. Depois, o pingo do i no dividir e as legendas lado a lado em duas
+linhas, `7511f02`, levaram a fatia a 880 gestos, 0,744, e as margens no fim da fila de
+revisão, `2e3d9a1`, a 772, 0,653. Com o catálogo 8, `3841795`, o replay anda pela fila da
+janela e cobra o Enter que confirma a leitura certa pendente, dos dois lados: a linha de base
+vai a 1.076, o passo L a 773, e a razão a 0,718. Com o catálogo 9, `f38e5d7`, o que falta
+vai pelo mais barato, o box colado pelo Ctrl+D ou, desde o D1, as letras inseridas no
+Documento: o passo L vai a 739, e a razão a 0,687.)
 **CA-F.2** (informativo, não reprova) Tempo humano pelo protocolo
 `docs/medidas/protocolo-fatia.md`: o mesmo snapshot; o tempo vem do registro de gestos da
 aplicação (`ABBY_REGISTRO_DE_EVENTOS`, somado por `ferramentas/tempo_da_fatia.py`),

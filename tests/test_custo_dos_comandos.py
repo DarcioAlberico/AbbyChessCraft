@@ -24,7 +24,7 @@ from PySide6.QtWidgets import QApplication, QPushButton
 from abbychess.app.registro_de_eventos import tipo_do_gesto
 from abbychess.leitor import FONTE_MANUAL
 
-from tests import test_janela, test_janela_diagramas
+from tests import leitor_falso, test_janela, test_janela_diagramas
 from tests.test_janela import _esperar
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ferramentas"))
@@ -36,6 +36,8 @@ janela = test_janela.janela
 CUSTO = {c["id"]: c["custo"] for c in rf.carregar_catalogo()["comandos"] if str(c["passo"]) == "0"}
 CUSTO_D1 = {c["id"]: c["custo"] for c in rf.carregar_catalogo()["comandos"]
             if str(c["passo"]) == "D1"}
+CUSTO_L = {c["id"]: c["custo"] for c in rf.carregar_catalogo()["comandos"]
+           if str(c["passo"]) == "L"}
 
 
 class _Contador(QObject):
@@ -82,7 +84,9 @@ def test_o_catalogo_do_passo_0_e_o_que_este_teste_cobre():
                           "descartar_box",
                           "marcar_glifo",
                           "dividir_glifo", "juntar_glifos", "abrir_diagrama", "corrigir_casa",
-                          "corrigir_lado", "fechar_diagrama"}
+                          "corrigir_lado", "fechar_diagrama",
+                          "confirmar_da_fila", "dividir_da_fila", "juntar_da_fila",
+                          "descartar_da_fila"}
 
 
 def test_premissa_evento_que_sobe_para_o_pai_nao_e_espontaneo(app, contador):
@@ -309,7 +313,8 @@ def _clicar_no_documento(janela, posicao: int) -> None:
 
 def test_os_comandos_do_documento_estao_no_catalogo_sem_estimativa():
     comandos = [c for c in rf.carregar_catalogo()["comandos"] if str(c["passo"]) == "D1"]
-    assert {c["id"] for c in comandos} == {"espaco_no_documento", "corrigir_no_documento"}
+    assert {c["id"] for c in comandos} == {"espaco_no_documento", "corrigir_no_documento",
+                                           "inserir_no_documento"}
     assert not any("conferir_no_passo" in c for c in comandos)       # conferidos aqui
 
 
@@ -343,3 +348,230 @@ def test_corrigir_no_documento(app, janela, contador):
     assert (caixa.char, caixa.source) == ("z", FONTE_MANUAL)
     assert "z" not in j.leitor.padroes_por_caractere()    # corrigir não ensina
 
+
+def test_inserir_no_documento(app, janela, contador):
+    """Catálogo 9: o clique no ponto e cada letra que falta; elas entram virtuais."""
+    comando = next(c for c in rf.carregar_catalogo()["comandos"] if c["id"] == "inserir_no_documento")
+    j = _pronta(app, janela)
+    j.vista.setCurrentWidget(j.painel_do_documento)
+    app.processEvents()
+    primeiro = j.pagina.gids[0]
+    antes = j.pagina.box(primeiro).char
+    contador.gestos = 0
+    _clicar_no_documento(j, j.texto.posicao_do_gid(primeiro) + 1)
+    QTest.keyClicks(j.texto, ",;")
+    assert contador.gestos == rf.custo_do_comando(comando, 2) == 3
+    j.texto.confirmar()
+    assert [v.char for v in j.pagina.modelo.decisoes.virtuais] == [",", ";"]
+    assert j.pagina.box(primeiro).char == antes           # o glifo do lado não muda
+
+
+# ----------------------------------------------------------------------
+# O ensinar em lote (pendências do passo L)
+# ----------------------------------------------------------------------
+
+def test_os_comandos_do_passo_l_estao_no_catalogo_sem_estimativa():
+    comandos = [c for c in rf.carregar_catalogo()["comandos"] if str(c["passo"]) == "L"]
+    assert {c["id"] for c in comandos} == {"ensinar_em_lote_da_fila", "ensinar_em_lote",
+                                           "aceitar_palpite_da_fila", "aceitar_palpite"}
+    assert not any("conferir_no_passo" in c for c in comandos)
+
+
+def _com_uma_confusao(app, janela):
+    """A página com o 'b' de toda palavra lido como '6' ("a6c"), o primeiro na janela.
+    Devolve o caractere, os índices dos '6' que a palavra desmente e o do "ca6", que é um
+    lance (o peão de c toma em a6) e fica fora do lote."""
+    from tests.janela_util import trocar_entries
+
+    _pronta(app, janela)
+    impresso = iter("abcabcabc" "cabbca")           # "abc abc abc" / "cab bca", lidos assim
+    assert len(boxes(janela)) == 15
+
+    def confundir(e):
+        e.char, e.source, e.confidence = next(impresso), "neural", 0.99
+        if e.char == "b":
+            e.char = "6"
+    trocar_entries(janela, janela.pagina.indice, confundir)
+    lida = "b"
+    _esperar(app, janela)
+    seis = [i for i, b in enumerate(boxes(janela)) if b.char == "6"]
+    assert seis == [1, 4, 7, 11, 12] and fila(janela) == [1, 4, 7, 12]
+    mostrar(janela, seis[0])                        # o que a janela mostra (sem gesto)
+    app.processEvents()
+    return lida, [1, 4, 7, 12], 11
+
+
+def _so_um_padrao_e_o_resto_corrigido(janela, lida, seis, lance):
+    assert all((boxes(janela)[i].char, boxes(janela)[i].source) == (lida, FONTE_MANUAL)
+               for i in seis)
+    assert boxes(janela)[lance].char == "6"
+    assert len(janela.leitor.padroes_por_caractere()[lida]) == 1    # o lote não ensina
+
+
+def test_ensinar_em_lote_da_fila(app, janela, contador):
+    """O glifo já mostrado: digitar e Ctrl+Enter; os outros '6' da página viram o certo."""
+    lida, seis, lance = _com_uma_confusao(app, janela)
+    assert atual(janela) == seis[0] and janela.treino.campo.text() == "6"
+    contador.gestos = 0
+    QTest.keyClicks(janela.treino.campo, lida)
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+    _esperar(app, janela)
+    assert contador.gestos == CUSTO_L["ensinar_em_lote_da_fila"]
+    _so_um_padrao_e_o_resto_corrigido(janela, lida, seis, lance)
+    janela.pagina.desfazer()                         # um Ctrl+Z desfaz o lote inteiro
+    _esperar(app, janela)
+    assert all(boxes(janela)[i].char == "6" for i in seis)
+
+
+def test_ensinar_em_lote(app, janela, contador):
+    """Um glifo fora da vez: o clique nele, digitar e Ctrl+Enter."""
+    lida, seis, lance = _com_uma_confusao(app, janela)
+    outro = seis[2]
+    contador.gestos = 0
+    QTest.mouseClick(janela.visor.viewport(), Qt.MouseButton.LeftButton,
+                     Qt.KeyboardModifier.NoModifier, _no_visor(janela, *_centro(boxes(janela)[outro])))
+    QTest.keyClicks(janela.treino.campo, lida)
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+    _esperar(app, janela)
+    assert contador.gestos == CUSTO_L["ensinar_em_lote"]
+    _so_um_padrao_e_o_resto_corrigido(janela, lida, seis, lance)
+
+
+# ----------------------------------------------------------------------
+# O palpite da rede no glifo que ninguém leu (pendências do passo L, §9.2)
+# ----------------------------------------------------------------------
+
+def _com_palpite(app, janela) -> int:
+    """A página que ninguém leu (o leitor da janela não tem a cadeia global) e a rede falsa,
+    que dá o palpite "y" para todo glifo; o primeiro da fila mostrado de novo, agora com ele.
+    Devolve o índice desse glifo."""
+    _pronta(app, janela)
+    janela.leitor.rede = leitor_falso.RedeFalsa()
+    assert all((b.char, b.source) == ("", "none") for b in boxes(janela))
+    primeiro = fila(janela)[0]
+    mostrar(janela, primeiro)                       # o que a janela mostra (sem gesto)
+    app.processEvents()
+    return primeiro
+
+
+def test_aceitar_palpite_da_fila(app, janela, contador):
+    """O glifo já mostrado vem com o palpite no campo, selecionado: só o Enter."""
+    primeiro = _com_palpite(app, janela)
+    campo = janela.treino.campo
+    assert campo.text() == leitor_falso.PALPITE and campo.selectedText() == campo.text()
+    assert "Palpite da rede" in janela.treino.leitura.text()
+    contador.gestos = 0
+    QTest.keyClick(campo, Qt.Key.Key_Return)
+    _esperar(app, janela)
+    assert contador.gestos == CUSTO_L["aceitar_palpite_da_fila"]
+    assert (boxes(janela)[primeiro].char, boxes(janela)[primeiro].source) == (
+        leitor_falso.PALPITE, FONTE_MANUAL)
+    assert leitor_falso.PALPITE in janela.leitor.padroes_por_caractere()
+    assert atual(janela) != primeiro             # a janela foi sozinha ao próximo da fila
+
+
+def test_aceitar_palpite(app, janela, contador):
+    """Um glifo fora da vez: o clique nele, e o Enter aceita o palpite que o campo traz."""
+    primeiro = _com_palpite(app, janela)
+    outro = next(i for i in fila(janela) if i != primeiro)
+    contador.gestos = 0
+    QTest.mouseClick(janela.visor.viewport(), Qt.MouseButton.LeftButton,
+                     Qt.KeyboardModifier.NoModifier, _no_visor(janela, *_centro(boxes(janela)[outro])))
+    assert janela.treino.campo.text() == leitor_falso.PALPITE
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_Return)
+    _esperar(app, janela)
+    assert contador.gestos == CUSTO_L["aceitar_palpite"]
+    assert (boxes(janela)[outro].char, boxes(janela)[outro].source) == (
+        leitor_falso.PALPITE, FONTE_MANUAL)
+
+
+# ----------------------------------------------------------------------
+# Catálogo 8: os comandos da fila para o glifo que a janela já mostra
+# ----------------------------------------------------------------------
+
+def _na_cabeca_da_fila(janela) -> int:
+    """O primeiro da fila, que a janela mostra sem gesto; devolve o índice dele."""
+    primeiro = fila(janela)[0]
+    assert atual(janela) == primeiro
+    return primeiro
+
+
+def _segue_a_fila(janela) -> None:
+    """Depois do comando, a janela mostra o primeiro da fila: o seguinte "da fila" também
+    não pede o clique."""
+    assert fila(janela) and atual(janela) == fila(janela)[0]
+
+
+def test_confirmar_da_fila(app, janela, contador):
+    """A leitura certa e pendente vem no campo, selecionada: o Enter a confirma e ensina."""
+    from tests.janela_util import trocar_entries
+
+    _pronta(app, janela)
+    impresso = iter("abcabcabc" "cabbca")
+
+    def ler_certo(e):
+        e.char, e.source, e.confidence = next(impresso), "neural", 0.5     # abaixo do limiar
+    trocar_entries(janela, janela.pagina.indice, ler_certo)
+    _esperar(app, janela)
+    mostrar(janela, fila(janela)[0])
+    app.processEvents()
+    primeiro = _na_cabeca_da_fila(janela)
+    lida = boxes(janela)[primeiro].char
+    campo = janela.treino.campo
+    assert campo.text() == lida and campo.selectedText() == lida
+    contador.gestos = 0
+    QTest.keyClick(campo, Qt.Key.Key_Return)
+    _esperar(app, janela)
+    assert contador.gestos == CUSTO["confirmar_da_fila"]
+    assert (boxes(janela)[primeiro].char, boxes(janela)[primeiro].source) == (lida, FONTE_MANUAL)
+    assert lida in janela.leitor.padroes_por_caractere()     # o Enter ensinou o padrão
+    _segue_a_fila(janela)
+
+
+def test_juntar_e_dividir_da_fila(app, janela, contador):
+    """O Ctrl+J e o Ctrl+D no glifo mostrado; depois deles a janela mostra o box novo, não o
+    primeiro da fila (`_depois_de_editar`), e é isso que o replay segue (`mostrado`)."""
+    from tests.janela_util import trocar_entries
+
+    _pronta(app, janela)
+    total = len(boxes(janela))
+    na_frente = (boxes(janela)[2].x1, boxes(janela)[2].y1)
+
+    def confiancas(e):            # o terceiro sem leitura, na frente da fila; o resto lido
+        if (e.x1, e.y1) == na_frente:
+            e.char, e.source, e.confidence = "", "none", 0.0
+        else:
+            e.char, e.source, e.confidence = "x", "neural", 0.5
+    trocar_entries(janela, janela.pagina.indice, confiancas)
+    _esperar(app, janela)
+    mostrar(janela, 6)                                 # o glifo mostrado, sem gesto
+    app.processEvents()
+    assert fila(janela)[0] == 2 and atual(janela) == 6
+    contador.gestos = 0
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_J, Qt.KeyboardModifier.ControlModifier)
+    assert contador.gestos == CUSTO["juntar_da_fila"]
+    assert len(boxes(janela)) == total - 1
+    assert atual(janela) == 6 and fila(janela)[0] == 2     # o box junto, não a fila
+
+    contador.gestos = 0
+    QTest.keyClick(janela.treino.campo, Qt.Key.Key_D, Qt.KeyboardModifier.ControlModifier)
+    assert contador.gestos == CUSTO["dividir_da_fila"]
+    assert len(boxes(janela)) == total
+    assert atual(janela) == 6 and fila(janela)[0] == 2     # a primeira parte, não a fila
+
+
+@pytest.mark.parametrize("como", ["Del", "botão"])
+def test_descartar_da_fila(app, janela, contador, como):
+    _pronta(app, janela)
+    total = len(boxes(janela))
+    _na_cabeca_da_fila(janela)
+    contador.gestos = 0
+    if como == "Del":
+        QTest.keyClick(janela.treino.campo, Qt.Key.Key_Delete)
+    else:
+        botao = next(w for w in janela.treino.findChildren(QPushButton)
+                     if w.text().startswith("Não é caractere"))
+        QTest.mouseClick(botao, Qt.MouseButton.LeftButton)
+    assert contador.gestos == CUSTO["descartar_da_fila"]
+    assert len(boxes(janela)) == total - 1
+    _segue_a_fila(janela)

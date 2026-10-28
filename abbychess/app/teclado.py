@@ -36,7 +36,7 @@ from abbychess import atalhos
 log = logging.getLogger(__name__)
 
 #: O passo do roadmap do programa: as ações do YAML até ele têm atalho.
-PASSO = "K"
+PASSO = "L"
 #: O perfil de teclado escolhido ("padrao" ou "finereader"); `definir` o troca.
 PERFIL = "padrao"
 #: As teclas que o usuário trocou no perfil (id -> sequências normalizadas; lista vazia tira).

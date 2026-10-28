@@ -66,6 +66,15 @@ def base_global() -> Path:
     return projeto_dir() / "training_data"
 
 
+def rede_global():
+    """Só a rede de glifos global do PyBoxEditor (`NeuralPredictor`), sem a base; None se
+    ela não carrega. Para quem quer o palpite (`LeitorDoLivro.sugerir`) e não a cadeia."""
+    from core.services.learning_service import LearningService
+
+    servico = LearningService(data_dir=str(base_global()))
+    return servico._predictor if servico.load_predictor() else None
+
+
 def altura_relativa(recorte: np.ndarray, altura_de_referencia: Optional[float]) -> Optional[float]:
     """A altura do glifo em pé dividida pela altura de referência da página."""
     if not altura_de_referencia or recorte is None or recorte.size == 0:
@@ -168,6 +177,27 @@ class LeitorDoLivro:
             neural_threshold=self.limiares.rede, learner_threshold=self.limiares.base,
             altura_de_referencia=altura_de_referencia)
         return Leitura(leitura.char, leitura.fonte, float(leitura.confianca))
+
+    def sugerir(self, recorte: np.ndarray, altura_de_referencia: Optional[float] = None
+                ) -> Optional[Tuple[str, float]]:
+        """O palpite da rede para o glifo que ninguém leu, abaixo do limiar dela (§9.2): o
+        primeiro dela que passe no veto de proporção, como na cadeia global, e com a confiança
+        dela. Não é leitura: o painel o põe no campo para o Enter ensinar, se ele estiver
+        certo. `None` sem rede ou sem palpite."""
+        rede = self.rede
+        if rede is None or not getattr(rede, "loaded", True) or recorte is None or recorte.size == 0:
+            return None
+        from core import proporcao
+
+        char, confianca = rede.predict(recorte)
+        largura, altura = proporcao.lados(recorte)
+        if char and not proporcao.cabe(char, largura, altura, altura_de_referencia):
+            escolhida = proporcao.escolher(rede.predict_topk(recorte, k=proporcao.CANDIDATAS),
+                                           largura, altura, altura_de_referencia)
+            if escolhida is None:
+                return None
+            char, confianca = escolhida
+        return (char, float(confianca)) if char else None
 
     def arbitro(self, recorte: np.ndarray):
         """`(char, confiança)` no formato que o separador de glifos colados pede."""

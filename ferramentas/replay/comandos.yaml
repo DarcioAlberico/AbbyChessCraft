@@ -16,9 +16,19 @@
 # só confere comandos que já existem. Versão 5 (passo D1): os dois comandos do Documento
 # conferidos (`espaco_no_documento`, `corrigir_no_documento`), com os custos de antes. Quando o passo os conferir, a versão do catálogo
 # sobe, e a linha de base é medida de novo no worktree da tag `passo-0` com o catálogo
-# novo (o `comparar` recusa catálogos diferentes).
+# novo (o `comparar` recusa catálogos diferentes). Versão 6 (pendências do L): o ensinar em
+# lote (`ensinar_em_lote_da_fila`, `ensinar_em_lote`), conferido pelo teste. Versão 7: o palpite
+# da rede no glifo que ninguém leu (`aceitar_palpite_da_fila`, `aceitar_palpite`), conferido.
+# Versão 8: os comandos da fila para o glifo que a janela já mostra (dividir, juntar,
+# descartar, sem o clique) e o Enter que confirma a leitura certa pendente, que o replay não
+# cobrava; todos do passo 0, conferidos pelo teste. Desde ela, a linha de base roda o
+# `replay_fatia.py` do checkout no código do passo 0 (o mesmo algoritmo dos dois lados).
+# Versão 9: o que falta tem dois caminhos, e o replay fica com o mais barato: o box colado
+# ("r," lido "r") dividido pelo Ctrl+D, quando a divisão dá um box para o que falta, mais o
+# ensinar da parte; e, desde o D1, as letras inseridas no Documento (`inserir_no_documento`,
+# conferido pelo teste), que custam o clique e uma tecla por letra (`por_caractere`).
 
-versao: 5
+versao: 9
 
 # O que conta como um gesto (a regra do filtro de eventos do teste).
 convencao_de_gestos: >-
@@ -88,6 +98,30 @@ comandos:
     corrige: divisao
     custo: 2
     gestos: [clique no box, Ctrl+D (corta no vão da tinta)]
+  # Versão 8: o glifo que a janela já mostra (o primeiro da fila) não pede o clique. O replay
+  # anda pela fila: o que ela mostra e a medida não cobre (fora das linhas verificadas) é
+  # transparente; o certo e pendente numa linha medida custa o Enter que o confirma.
+  - id: confirmar_da_fila
+    passo: "0"
+    corrige: confirmacao_da_fila
+    custo: 1
+    gestos: [Enter (o campo vem com a leitura certa, selecionada)]
+    efeito: ensina o padrão da leitura; depois do Enter a janela vai ao próximo da fila
+  - id: dividir_da_fila
+    passo: "0"
+    corrige: divisao_da_fila
+    custo: 1
+    gestos: [Ctrl+D (o glifo já mostrado)]
+  - id: juntar_da_fila
+    passo: "0"
+    corrige: juncao_da_fila
+    custo: 1
+    gestos: [Ctrl+J (o glifo já mostrado com o seguinte da linha)]
+  - id: descartar_da_fila
+    passo: "0"
+    corrige: sobra_da_fila
+    custo: 1
+    gestos: [clique em "Não é caractere" (o glifo já mostrado; desde o A2, o Del também)]
   - id: juntar_glifos
     passo: "0"
     corrige: juncao
@@ -118,9 +152,47 @@ comandos:
     corrige: espaco
     custo: 2
     gestos: [clique no ponto do Documento, espaço ou Backspace (confirma ao sair da palavra)]
+  - id: inserir_no_documento
+    passo: D1
+    corrige: falta_no_documento
+    custo: 1
+    por_caractere: 1
+    gestos: [clique no ponto do Documento, cada letra que falta (entra virtual, sem box; confirma ao sair da palavra)]
+    efeito: o texto sai certo, mas a letra não tem box nem ensina padrão
   - id: corrigir_no_documento
     passo: D1
     corrige: substituicao
     custo: 3
     gestos: [clique depois do caractere errado no Documento, Backspace, digitar o certo]
     efeito: corrige sem ensinar (o replay o usa depois que o caractere já foi ensinado)
+  # A confusão do livro corrigida em lote: o Ctrl+Enter no lugar do Enter ensina o glifo e
+  # corrige, sem ensinar, os outros da página com a mesma leitura que a palavra desmente
+  # (`contexto.lote`: o "0" de "c0l0ca", não o de "1.e4"). O replay o usa no lugar do ensinar
+  # quando o lote acerta mais glifos do que estraga, pelo gabarito.
+  - id: ensinar_em_lote_da_fila
+    passo: L
+    corrige: confusao_da_fila
+    custo: 2
+    gestos: [digitar o caractere (o glifo é o primeiro da fila, já mostrado), Ctrl+Enter]
+    efeito: ensina o padrão e corrige o lote da página num passo do desfazer; depois, a propagação
+  - id: ensinar_em_lote
+    passo: L
+    corrige: confusao
+    custo: 3
+    gestos: [clique no box (Imagem), digitar o caractere (o campo vem selecionado), Ctrl+Enter]
+    efeito: o mesmo, para um glifo fora da vez da fila
+  # O palpite da rede no glifo que ninguém leu (§9.2): o campo vem com o primeiro da rede
+  # abaixo do limiar, selecionado, e o Enter o ensina. O replay o usa quando o palpite é o
+  # certo do gabarito; errado, digitar o troca e o ensinar custa o de sempre.
+  - id: aceitar_palpite_da_fila
+    passo: L
+    corrige: palpite_da_fila
+    custo: 1
+    gestos: [Enter (o glifo sem leitura é o primeiro da fila, já mostrado com o palpite no campo)]
+    efeito: ensina o palpite como padrão; depois do Enter a janela vai ao próximo da fila
+  - id: aceitar_palpite
+    passo: L
+    corrige: palpite
+    custo: 2
+    gestos: [clique no box (Imagem), Enter (o campo vem com o palpite)]
+    efeito: o mesmo, para um glifo fora da vez da fila

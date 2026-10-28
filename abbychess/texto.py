@@ -6,7 +6,7 @@ veio e a função dela, e linhas de palavras de gids. Nada do documento é grava
 precisa do texto monta de novo.
 
 - **Linhas e palavras** são as do core (`core.notacao.palavras_da_pagina`), que já são as do
-  texto de hoje.
+  texto de hoje, com os acertos de `layout` (o espaço depois do "f", os vãos largos).
 - **Decisões**: uma `quebra` parte a palavra antes do gid; uma `juncao` (a, b) junta a
   palavra que termina em `a` com a seguinte, que começa em `b`, na mesma linha; um glifo
   virtual entra depois de `depois_de` (na mesma palavra ou, com `palavra_nova`, numa nova),
@@ -16,9 +16,9 @@ precisa do texto monta de novo.
 - **Blocos**: linhas seguidas na mesma área de texto formam um bloco com a função da área;
   sem área, a função é `texto`. A ordem é a de leitura das linhas, salvo quando as áreas
   têm `ordem`: aí os blocos seguem a ordem delas.
-- **Diagramas** entram como bloco próprio, no lugar de hoje
-  (`diagramas.texto_da_pagina`): antes da primeira linha na altura deles ou abaixo, mas só
-  num fim de frase; sem fim de frase, no fim.
+- **Diagramas** entram como bloco próprio (`_lugar_do_diagrama`): no trecho (a coluna)
+  deles, antes da primeira linha na altura deles ou abaixo. Quando essa linha fica ao lado
+  do tabuleiro (o parágrafo que o contorna), só num fim de frase; sem fim de frase, no fim.
 
 **O texto** (`texto`) tem dois modos: `impresso` (♘ como impresso; a vista, a busca, o DOCX
 e o EPUB) e `san` (as figurinhas como letras, ♘ → N; o PGN, a validação e o texto de hoje,
@@ -92,11 +92,10 @@ class Documento:
 NAO_LIDO = "□"
 
 
-def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
-    """O documento da página (função pura do que está gravado nela). O texto e a exportação
-    só têm os glifos lidos; a vista do Documento (`com_os_nao_lidos`) mostra também os que
-    ninguém leu, como `NAO_LIDO`, para o realce deles (§6.1)."""
-    lidos =[b for b in pagina.boxes if b.entry.char or com_os_nao_lidos]
+def _lidos(pagina: Pagina, com_os_nao_lidos: bool):
+    """Os boxes que entram no documento e o `BoxEntry` de cada um (o não lido como
+    `NAO_LIDO`, numa cópia)."""
+    lidos = [b for b in pagina.boxes if b.entry.char or com_os_nao_lidos]
     entries = []
     for b in lidos:
         if b.entry.char:
@@ -105,9 +104,26 @@ def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
             vazio = copy.copy(b.entry)
             vazio.char = NAO_LIDO
             entries.append(vazio)
+    return lidos, entries
+
+
+def palavras_dos_gids(pagina: Pagina) -> List[List[int]]:
+    """As palavras (gids) de todas as linhas da página, em ordem de leitura, como a vista do
+    Documento as monta (com os não lidos e as decisões de palavra): a mesma chave das linhas
+    guardadas, então depois do Documento elas não são refeitas. Os virtuais entram pelos
+    gids deles (`pagina.decisoes.virtuais`)."""
+    linhas = _linhas_da_pagina(*_lidos(pagina, True))[0]
+    return [p for ln in _aplicar_decisoes(linhas, pagina.decisoes) for p in ln]
+
+
+def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
+    """O documento da página (função pura do que está gravado nela). O texto e a exportação
+    só têm os glifos lidos; a vista do Documento (`com_os_nao_lidos`) mostra também os que
+    ninguém leu, como `NAO_LIDO`, para o realce deles (§6.1)."""
+    lidos, entries = _lidos(pagina, com_os_nao_lidos)
     chars = {b.gid: e.char for b, e in zip(lidos, entries)}
     chars.update({v.gid: v.char for v in pagina.decisoes.virtuais})
-    linhas, topos = _linhas_da_pagina(lidos, entries)
+    linhas, topos, trechos, ordem = _linhas_da_pagina(lidos, entries)
     linhas = _aplicar_decisoes(linhas, pagina.decisoes)
     texto_das_linhas = [" ".join("".join(chars[g] for g in p) for p in ln) for ln in linhas]
 
@@ -124,11 +140,8 @@ def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
     antes_da_linha: Dict[int, List[str]] = {}
     diagramas = sorted(pagina.diagramas, key=lambda d: (d.caixa[1], d.caixa[0]))
     for d in diagramas:
-        lugar = len(linhas)
-        for j in range(1, len(linhas)):
-            if topos[j] >= d.caixa[1] - altura and _FIM_DE_FRASE.search(texto_das_linhas[j - 1]):
-                lugar = j
-                break
+        lugar = _lugar_do_diagrama(d.caixa, ordem, linhas, topos, trechos, texto_das_linhas,
+                                   por_gid, altura)
         antes_da_linha.setdefault(lugar, []).append(d.id)
 
     blocos: List[Bloco] = []
@@ -160,6 +173,31 @@ def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
                      {b.gid: b.estilo for b in lidos})
 
 
+def _lugar_do_diagrama(caixa, ordem: OrdemDeLeitura, linhas, topos, trechos,
+                       texto_das_linhas, por_gid, altura: float) -> int:
+    """Antes de qual linha o diagrama entra (len(linhas) = no fim).
+
+    No trecho (a coluna) dele, antes da primeira linha na altura dele ou abaixo; sem linha
+    assim no trecho, antes da primeira do trecho seguinte. Só a linha ao lado do tabuleiro,
+    a do parágrafo que o contorna, pede um fim de frase antes: o parágrafo não é partido no
+    meio. A linha de lances logo acima ("52.bxc7 ♔d7 … 54.♔xa5", sem ponto) não segura
+    mais o diagrama, que caía depois do parágrafo de baixo (p. 54 do Aagaard).
+    """
+    x1, y1, x2, y2 = caixa
+    chave = ordem.chave((x1 + x2) / 2, y1)
+    j = next((j for j in range(len(linhas)) if (trechos[j], topos[j]) >= (chave, y1 - altura)),
+             len(linhas))
+    if j == len(linhas) or trechos[j] != chave:
+        return j
+    caixas = [por_gid[g] for p in linhas[j] for g in p if g in por_gid]
+    ao_lado = bool(caixas) and (min(e.y1 for e in caixas) < y2
+                                and (max(e.x2 for e in caixas) <= x1 or min(e.x1 for e in caixas) >= x2))
+    if not ao_lado:
+        return j
+    return next((k for k in range(max(j, 1), len(linhas))
+                 if _FIM_DE_FRASE.search(texto_das_linhas[k - 1])), len(linhas))
+
+
 #: As linhas de palavras das últimas páginas montadas, pela chave do que elas usam
 #: (`_chave_das_linhas`): `{chave: (linhas, topos)}`, do mais velho ao mais novo.
 _LINHAS_VISTAS: "OrderedDict[tuple, tuple]" = OrderedDict()
@@ -173,14 +211,16 @@ LINHAS_GUARDADAS = 16
 def _o_que_as_palavras_leem(char: str) -> Optional[str]:
     """O caractere, se as palavras do core dependem dele; `None` se não. As linhas e as
     colunas são só da geometria; das palavras, o caractere só pesa quando some na
-    normalização (o box vazio ocupa espaço, mas não é símbolo) e nos números que o core
-    remonta (a palavra só de algarismos, a que começa por algarismo ou ponto)."""
+    normalização (o box vazio ocupa espaço, mas não é símbolo), nos números que o core
+    remonta (a palavra só de algarismos, a que começa por algarismo ou ponto) e no "f", que
+    tem limiar de espaço próprio (`layout.partir_depois_do_f`). Depois do "f", se a letra
+    seguinte é letra ou não, também decide; a chave a guarda como "letra"."""
     from core.notacao import FIGURINAS, normalizar_saida
 
     simbolo = FIGURINAS.get(char, normalizar_saida(char))
-    if not simbolo or any(c.isdigit() or c == "." for c in simbolo):
+    if not simbolo or simbolo == "f" or any(c.isdigit() or c == "." for c in simbolo):
         return simbolo
-    return None
+    return "letra" if simbolo[:1].isalpha() else None
 
 
 def _chave_das_linhas(lidos, entries) -> Optional[tuple]:
@@ -198,12 +238,12 @@ def _chave_das_linhas(lidos, entries) -> Optional[tuple]:
     return chave
 
 
-def _linhas_da_pagina(lidos, entries) -> Tuple[List[List[List[int]]], List[int]]:
-    """As palavras (gids) de cada linha na ordem de leitura, e o topo de cada linha. A ordem
-    de leitura e as linhas são ~85% do `montar` (~15–20 ms numa página do livro): guardadas
-    pela chave, corrigir um caractere não as refaz."""
-    from core.notacao import palavras_da_pagina
-
+def _linhas_da_pagina(lidos, entries) -> Tuple[List[List[List[int]]], List[int],
+                                               List[tuple], OrdemDeLeitura]:
+    """As palavras (gids) de cada linha na ordem de leitura, o topo e o trecho de cada linha,
+    e a ordem de leitura (os diagramas entram no trecho deles). A ordem de leitura e as
+    linhas são ~85% do `montar` (~15–20 ms numa página do livro): guardadas pela chave,
+    corrigir um caractere não as refaz."""
     chave = _chave_das_linhas(lidos, entries)
     if chave is not None:
         with _TRAVA_DAS_LINHAS:
@@ -211,26 +251,28 @@ def _linhas_da_pagina(lidos, entries) -> Tuple[List[List[List[int]]], List[int]]
             if vistas is not None:
                 _LINHAS_VISTAS.move_to_end(chave)
         if vistas is not None:
-            linhas, topos = vistas
-            return [[list(p) for p in ln] for ln in linhas], list(topos)
+            linhas, topos, trechos, ordem = vistas
+            return [[list(p) for p in ln] for ln in linhas], list(topos), list(trechos), ordem
     linhas: List[List[List[int]]] = []
     topos: List[int] = []
+    trechos: List[tuple] = []
     ordem = OrdemDeLeitura.da_pagina(entries)
-    for _chave, indices in ordem.trechos(entries):
+    for chave_do_trecho, indices in ordem.trechos(entries):
         trecho = [entries[i] for i in indices]
-        for linha in palavras_da_pagina(trecho, ordem.deteccao_do_trecho(indices, entries)):
+        for linha in ordem.linhas_do_trecho(indices, entries):
             palavras = [[lidos[indices[s.indice]].gid for s in p.simbolos] for p in linha]
             palavras = [p for p in palavras if p]
             if palavras:
                 linhas.append(palavras)
                 topos.append(min(trecho[s.indice].y1 for p in linha for s in p.simbolos))
+                trechos.append(chave_do_trecho)
     if chave is not None:
         with _TRAVA_DAS_LINHAS:
             _LINHAS_VISTAS[chave] = (tuple(tuple(tuple(p) for p in ln) for ln in linhas),
-                                     tuple(topos))
+                                     tuple(topos), tuple(trechos), ordem)
             while len(_LINHAS_VISTAS) > LINHAS_GUARDADAS:
                 _LINHAS_VISTAS.popitem(last=False)
-    return linhas, topos
+    return linhas, topos, trechos, ordem
 
 
 def _aplicar_decisoes(linhas: List[List[List[int]]], decisoes: Decisoes) -> List[List[List[int]]]:

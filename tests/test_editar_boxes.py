@@ -103,6 +103,48 @@ def test_dividir_fora_do_box_ou_no_branco_e_recusado(imagem, leitor):
     assert boxes == antes
 
 
+def _par_com_pingo(pingo_largo: bool = False):
+    """Um "vi" colado num box só: o "v" e a haste do "i" ligados por uma ponte fina, e o
+    pingo (ou, com `pingo_largo`, uma barra da largura do par) acima, com branco entre."""
+    from PIL import Image, ImageDraw
+
+    from core.box_model import BoxEntry
+
+    imagem = Image.new("L", (60, 60), 255)
+    d = ImageDraw.Draw(imagem)
+    d.rectangle((10, 22, 27, 49), fill=0)            # o "v"
+    d.rectangle((28, 47, 31, 48), fill=0)            # a ponte que os colou
+    d.rectangle((32, 22, 36, 49), fill=0)            # a haste do "i"
+    d.rectangle((10, 10, 36, 14) if pingo_largo else (32, 10, 36, 14), fill=0)
+    return imagem, [BoxEntry("", 10, 10, 37, 50)]
+
+
+def test_dividir_nao_separa_o_pingo_do_i():
+    """O core corta sob o pingo (o vão horizontal é o mais fundo); o pingo sozinho
+    partia a linha. O corte vai para a coluna, e o pingo fica com a haste."""
+    imagem, boxes = _par_com_pingo()
+    pg.dividir(imagem, boxes, 0)
+    # A ponte fica com o "i": o vale é a ponte inteira, e o empate vai ao mais central.
+    assert [_caixa(b) for b in boxes] == [(10, 22, 28, 50), (28, 10, 37, 50)]
+
+
+def test_dividir_empilhados_de_verdade_continua_no_eixo_do_core():
+    """A parte de cima larga não é pingo: o corte do core fica."""
+    imagem, boxes = _par_com_pingo(pingo_largo=True)
+    pg.dividir(imagem, boxes, 0)
+    assert [_caixa(b) for b in boxes] == [(10, 10, 37, 15), (10, 22, 37, 50)]
+
+
+def test_dividir_um_box_girado_continua_no_eixo_do_core():
+    """No rótulo girado as letras se empilham em y: o corte horizontal é o certo."""
+    from dataclasses import replace
+
+    imagem, boxes = _par_com_pingo()
+    boxes[0] = replace(boxes[0], angulo=90)
+    pg.dividir(imagem, boxes, 0)
+    assert [_caixa(b) for b in boxes] == [(32, 10, 37, 15), (10, 22, 37, 50)]
+
+
 def test_cada_parte_dividida_ensina_a_sua_letra(projeto, imagem, leitor):
     """O caso do "rp": dividido, cada letra vira um padrão, e não o par."""
     boxes, a, b = _colar_ab(imagem, leitor)
@@ -189,3 +231,55 @@ def test_ensinar_varios_grava_uma_amostra_por_box(projeto, imagem, leitor):
     assert len(leitor.padroes_por_caractere()["a"]) == 2
     assert boxes[0].source == boxes[3].source == FONTE_MANUAL
     assert resolvidos == 3  # os outros três "a"
+
+
+def _haste_e_pingo(pingo=(12, 12, 19, 20)):
+    """A binária de um "i" em negrito como o da p. 15 do Aagaard (escala 19): a haste de
+    11×25 com o box dela, e o pingo (x1, y1, x2, y2) sem box, a 2 px acima."""
+    import numpy as np
+
+    from core.box_model import BoxEntry
+
+    binaria = np.zeros((60, 40), dtype=np.uint8)
+    binaria[22:47, 10:21] = 255                       # a haste
+    if pingo:
+        x1, y1, x2, y2 = pingo
+        binaria[y1:y2, x1:x2] = 255
+    return binaria, [BoxEntry("", 10, 22, 21, 47)]
+
+
+def test_o_pingo_sem_box_volta_para_a_haste():
+    """O `dividir_linhas_coladas` do core toma o "i" em negrito por duas linhas e joga o
+    pingo fora; sem ele a rede lê a haste como "1" ("exerc1se")."""
+    binaria, boxes = _haste_e_pingo()
+    assert [_caixa(b) for b in pg.devolver_pingos(boxes, binaria, 19)] == [(10, 12, 21, 47)]
+
+
+def test_o_pingo_que_tem_box_fica_como_esta():
+    from core.box_model import BoxEntry
+
+    binaria, boxes = _haste_e_pingo()
+    boxes.append(BoxEntry("", 12, 12, 19, 20))
+    assert pg.devolver_pingos(boxes, binaria, 19) == boxes
+
+
+@pytest.mark.parametrize("pingo", [
+    (8, 12, 23, 20),          # largo demais para pingo (15 px numa escala de 19)
+    (12, 2, 19, 10),          # longe demais: 12 px acima, a folga é 0,40 da haste (10 px)
+    (25, 12, 32, 20),         # ao lado, não em cima
+    (14, 19, 16, 20),         # poeira: 2 px
+])
+def test_o_que_nao_e_pingo_nao_cola(pingo):
+    binaria, boxes = _haste_e_pingo(pingo)
+    assert pg.devolver_pingos(boxes, binaria, 19) == boxes
+
+
+def test_a_cauda_cortada_de_outro_glifo_nao_cola():
+    """A cauda de um "p" da linha de cima que o mesmo corte deixou sem box é parte de um
+    componente que tem box: não é pingo."""
+    from core.box_model import BoxEntry
+
+    binaria, boxes = _haste_e_pingo()
+    binaria[0:20, 14:18] = 255                        # a perna do "p", do box dele à haste
+    boxes.append(BoxEntry("", 14, 0, 18, 9))          # o "p", sem a cauda
+    assert pg.devolver_pingos(boxes, binaria, 19) == boxes

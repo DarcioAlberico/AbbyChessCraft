@@ -5,6 +5,8 @@ mixin da `JanelaPrincipal`, como `EspacoDeTrabalho`.
 
 from __future__ import annotations
 
+from typing import Optional
+
 from abbychess.app import teclado
 
 class EdicaoNoDocumento:
@@ -38,9 +40,13 @@ class EdicaoNoDocumento:
         self._aviso_estrutural(f"Edição recusada: {motivo}")
         self.pintar_texto()                     # a palavra volta ao que era
 
-    def _caractere_sugerido(self, letra: str) -> None:
+    def _caractere_sugerido(self, letra: str, confianca: Optional[float] = None) -> None:
         """O box marcado ao lado de uma letra virtual: a letra dela no campo do Glifo,
-        selecionada (Enter a confirma; digitar troca)."""
+        selecionada (Enter a confirma; digitar troca). Com a `confianca`, é o palpite da rede
+        para o glifo que ninguém leu (§9.2), que só entra no campo ainda vazio."""
+        if confianca is not None:
+            self.treino.sugerir(letra, confianca)
+            return
         self.treino.campo.setText(letra)
         self.treino.campo.selectAll()
 

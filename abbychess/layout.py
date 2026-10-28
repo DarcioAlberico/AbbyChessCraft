@@ -118,3 +118,112 @@ class OrdemDeLeitura:
         """A detecção para `palavras_da_pagina` do trecho: a da página, quando o trecho é a
         página inteira (os mesmos boxes, na mesma ordem); senão, None (o core a faz)."""
         return self.deteccao if len(indices) == len(boxes) else None
+
+    def linhas_do_trecho(self, indices: Sequence[int], boxes: Sequence[BoxEntry]) -> list:
+        """As linhas de palavras do trecho (`palavras_da_pagina` do core, com os índices dos
+        símbolos relativos ao trecho), partidas depois do gancho do "f" (`partir_depois_do_f`)
+        e nos vãos largos demais (`partir_nos_vaos`)."""
+        from core.notacao import palavras_da_pagina
+
+        trecho = [boxes[i] for i in indices]
+        linhas = palavras_da_pagina(trecho, self.deteccao_do_trecho(indices, boxes))
+        return partir_nos_vaos(partir_depois_do_f(linhas, trecho), trecho)
+
+
+#: Quantas lacunas depois do "f", dentro da palavra, o trecho precisa ter para o gancho valer.
+AMOSTRAS_DO_GANCHO = 3
+
+
+def partir_depois_do_f(linhas: list, trecho: Sequence[BoxEntry]) -> list:
+    """Cada palavra do core partida entre um "f" e a letra seguinte quando a lacuna, somada ao
+    gancho do "f", passa do limiar de espaço do core (`notacao.LIMIAR_ESPACO`).
+
+    **O gancho do "f" passa da haste para a direita**, e o box acaba alguns pixels depois da
+    tinta do corpo: a lacuna até a palavra seguinte sai menor, e o espaço depois de "of"
+    sumia. Na p. 15 do Aagaard ("A Matter of Endgame Technique", largura 16, limiar 8), a
+    lacuna depois do "f" é de -4 a -3 dentro da palavra ("after", "for") e de 5 a 8 entre
+    palavras: "ofthe", "ofexercises", "yourselfa".
+
+    O gancho é medido no trecho: a lacuna comum dentro da palavra menos a mediana das lacunas
+    depois do "f" que não passam dela, com ao menos `AMOSTRAS_DO_GANCHO` delas. Sem gancho (a
+    fonte sem ele, o texto espaçado) ou sem amostras, o limiar é o do core e nada muda: na p.
+    1045 do Yusupov uma amostra só (-4) dava um gancho de 7 px, e "fr" ("for" com o "o"
+    perdido) saía partido.
+
+    **Com um box sem leitura entre o "f" e a letra** ("fo|llowed" sem o "o"), a palavra fica
+    como o core a fez: ele não faz símbolo do box, mas mede a lacuna por ele."""
+    from core.notacao import LIMIAR_ESPACO, Palavra, _largura_mediana
+
+    def depois_do_f(a, b) -> bool:
+        return a.char == "f" and b.char[:1].isalpha()
+
+    def lacuna(a, b) -> int:
+        return trecho[b.indice].x1 - trecho[a.indice].x2
+
+    def nada_no_meio(a, b) -> bool:
+        """Nenhum box entre os dois (só para quem vai ser partido)."""
+        esquerdo, direito = trecho[a.indice], trecho[b.indice]
+        return not any(c.x1 < direito.x1 and c.x2 > esquerdo.x2
+                       and c.y1 < esquerdo.y2 and c.y2 > esquerdo.y1
+                       and c is not esquerdo and c is not direito for c in trecho)
+
+    pares = [(a, b) for linha in linhas for p in linha for a, b in zip(p.simbolos, p.simbolos[1:])]
+    comuns = [lacuna(a, b) for a, b in pares if not depois_do_f(a, b)]
+    if not comuns:
+        return linhas
+    comum = statistics.median(comuns)
+    dentro = [lacuna(a, b) for a, b in pares if depois_do_f(a, b) and lacuna(a, b) <= comum]
+    gancho = comum - statistics.median(dentro) if len(dentro) >= AMOSTRAS_DO_GANCHO else 0
+    if gancho <= 0:
+        return linhas
+    limiar = LIMIAR_ESPACO * _largura_mediana(trecho) - gancho
+
+    saida = []
+    for linha in linhas:
+        palavras = []
+        for palavra in linha:
+            atual = []
+            for s in palavra.simbolos:
+                if (atual and depois_do_f(atual[-1], s) and lacuna(atual[-1], s) > limiar
+                        and nada_no_meio(atual[-1], s)):
+                    palavras.append(Palavra(atual))
+                    atual = []
+                atual.append(s)
+            palavras.append(Palavra(atual))
+        saida.append(palavras)
+    return saida
+
+
+#: O vão entre palavras que parte uma linha, em alturas de glifo (a mediana da linha), e as
+#: palavras que cada parte precisa ter. Nas p. 21–27 do Xadrez Vitorioso, as legendas de dois
+#: diagramas lado a lado saíam numa linha só, com 10,5 alturas entre elas (entre palavras, ~0,6).
+#: Em 135 páginas de 9 livros, só passam dos dois as legendas lado a lado, as colunas de um
+#: índice e títulos com ornamentos, que também são linhas à parte; a tabela de lances (o
+#: número de um lado, o lance do outro) fica em 6,3, e por isso o limiar é 8.
+VAO_QUE_PARTE, PALAVRAS_DE_CADA_LADO = 8.0, 3
+
+
+def partir_nos_vaos(linhas: list, trecho: Sequence[BoxEntry]) -> list:
+    """Cada linha do core partida onde o vão entre duas palavras passa de `VAO_QUE_PARTE`
+    alturas de glifo, com ao menos `PALAVRAS_DE_CADA_LADO` palavras em cada parte: o core
+    junta numa linha o que está na mesma altura, e as legendas lado a lado viravam uma frase."""
+    saida = []
+    for linha in linhas:
+        palavras = [p for p in linha if p.simbolos]
+        if len(palavras) < 2 * PALAVRAS_DE_CADA_LADO:
+            saida.append(linha)
+            continue
+        altura = statistics.median(trecho[s.indice].y2 - trecho[s.indice].y1
+                                   for p in palavras for s in p.simbolos)
+        partes, atual = [], [palavras[0]]
+        for k, (p, q) in enumerate(zip(palavras, palavras[1:]), start=1):
+            vao = (min(trecho[s.indice].x1 for s in q.simbolos)
+                   - max(trecho[s.indice].x2 for s in p.simbolos))
+            if (vao > VAO_QUE_PARTE * max(1, altura) and len(atual) >= PALAVRAS_DE_CADA_LADO
+                    and len(palavras) - k >= PALAVRAS_DE_CADA_LADO):
+                partes.append(atual)
+                atual = []
+            atual.append(q)
+        partes.append(atual)
+        saida.extend(partes if len(partes) > 1 else [linha])
+    return saida

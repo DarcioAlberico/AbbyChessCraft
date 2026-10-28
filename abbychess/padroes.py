@@ -80,19 +80,39 @@ TOLERANCIA_DE_ALTURA = 0.20
 PROPORCAO_MAXIMA = 1.6
 
 
-def _efeito(valor) -> Optional[Tuple[bool, bool]]:
-    """Normaliza o efeito conhecido para ``(negrito, italico)``.
+def _eixo(valor) -> Optional[bool]:
+    return None if valor is None else bool(valor)
 
-    ``None`` significa que o efeito ainda não foi medido. Aceitar tanto o ``Estilo`` do
-    modelo quanto uma sequência curta mantém este módulo independente do modelo da página.
-    Sublinhado é uma decisão editorial, não um efeito de impressão reconhecido.
+
+def _efeito(valor) -> Optional[Tuple[Optional[bool], Optional[bool]]]:
+    """Normaliza o efeito para ``(negrito, italico)``, cada eixo ``None`` quando não foi
+    medido; ``None`` inteiro quando nenhum dos dois foi.
+
+    Aceitar tanto o ``Estilo`` do modelo quanto uma sequência curta mantém este módulo
+    independente do modelo da página. Sublinhado é uma decisão editorial, não um efeito de
+    impressão reconhecido.
     """
     if valor is None:
         return None
     if hasattr(valor, "negrito"):
-        return bool(valor.negrito), bool(valor.italico)
-    itens = list(valor)
-    return bool(itens[0]) if itens else False, bool(itens[1]) if len(itens) > 1 else False
+        par = _eixo(valor.negrito), _eixo(valor.italico)
+    else:
+        itens = list(valor) + [None, None]
+        par = _eixo(itens[0]), _eixo(itens[1])
+    return None if par == (None, None) else par
+
+
+def _efeito_json(efeito) -> list:
+    """O efeito no `metadados.json`: [negrito, itálico], com `null` no eixo não medido."""
+    return [None if v is None else int(v) for v in efeito]
+
+
+def efeitos_compativeis(a, b) -> bool:
+    """Se uma amostra de efeito `a` pode ser vizinha de um glifo de efeito `b`: em cada eixo
+    que os dois conhecem, o mesmo valor (o eixo não medido vale para os dois lados)."""
+    if a is None or b is None:
+        return True
+    return all(x is None or y is None or x == y for x, y in zip(a, b))
 
 
 @dataclass(frozen=True)
@@ -231,9 +251,10 @@ class PadroesDoLivro:
         efeito = _efeito(efeito)
         if efeito is not None and candidatos.size:
             # Padrões antigos, sem efeito, continuam utilizáveis. Quando ambos os lados
-            # são conhecidos, porém, pesos diferentes nunca chegam a ser vizinhos.
+            # conhecem um eixo, porém, pesos diferentes nunca chegam a ser vizinhos.
             candidatos = np.array([i for i in candidatos
-                                   if self._efeitos[int(i)] in (None, efeito)], dtype=int)
+                                   if efeitos_compativeis(self._efeitos[int(i)], efeito)],
+                                  dtype=int)
         if not candidatos.size:
             return Resposta("", 0.0, float(distancias.min()), None)
         i = int(candidatos[np.argmin(distancias[candidatos])])
@@ -290,7 +311,7 @@ class PadroesDoLivro:
         self._meta[self._chave(caminho)] = {
             "altura": None if altura_relativa is None else round(float(altura_relativa), 4),
             "origem": origem,
-            **({"efeito": [int(v) for v in efeito]} if efeito is not None else {}),
+            **({"efeito": _efeito_json(efeito)} if efeito is not None else {}),
         }
         self._gravar_meta()
         v = _vetor(cinza)
@@ -325,7 +346,7 @@ class PadroesDoLivro:
             self._meta[self._chave(caminho)] = {
                 "altura": None if altura_relativa is None else round(float(altura_relativa), 4),
                 "origem": origem,
-                **({"efeito": [int(v) for v in efeito]} if efeito is not None else {}),
+                **({"efeito": _efeito_json(efeito)} if efeito is not None else {}),
             }
             caminhos.append(caminho)
             vetores.append((_vetor(cinza), char, _proporcao(cinza), altura_relativa))

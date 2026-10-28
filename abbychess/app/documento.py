@@ -494,7 +494,7 @@ class VistaDoDocumento(QTextEdit):
         if tem_estilo:
             formato.setFontWeight(QFont.Weight.Bold if estilo_do_glifo.negrito
                                   else QFont.Weight.Normal)
-            formato.setFontItalic(estilo_do_glifo.italico)
+            formato.setFontItalic(bool(estilo_do_glifo.italico))   # None: não medido
             formato.setFontUnderline(estilo_do_glifo.sublinhado)
         if estado in (gd.PENDENTE, gd.SEM_LEITURA):
             formato.setBackground(FUNDO_DE_BAIXA_CONFIANCA)

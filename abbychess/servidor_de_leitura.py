@@ -82,15 +82,16 @@ class PaginaLida:
     italicos: list = field(default_factory=list)
 
     def estilos(self) -> dict:
-        """`{id(entry): Estilo}` dos boxes com o negrito medido, ou em itálico: o box sem
-        estilo tem o efeito desconhecido, e o k-NN o compara com todas as amostras."""
+        """`{id(entry): Estilo}` dos boxes com o negrito ou o itálico medido; o eixo sem
+        medida fica `None` (o efeito desconhecido, que o k-NN compara com todas as
+        amostras), e o box sem medida nenhuma fica de fora."""
         from abbychess.modelo import Estilo
 
         vazio = [None] * len(self.boxes)
-        return {id(entry): Estilo(negrito=bool(negrito), italico=bool(italico))
+        return {id(entry): Estilo(negrito=negrito, italico=italico)
                 for entry, negrito, italico in zip(self.boxes, self.negritos or vazio,
                                                    self.italicos or vazio)
-                if negrito is not None or italico}
+                if negrito is not None or italico is not None}
 
 
 def ler_pagina(imagem, zonas, marcados, leitor, *, progresso=None,

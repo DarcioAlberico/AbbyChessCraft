@@ -53,19 +53,34 @@ def n_de(gid: int) -> int:
 
 @dataclass(frozen=True, slots=True)
 class Estilo:
-    negrito: bool = False
-    italico: bool = False
+    """O negrito e o itálico (`None`: não medido, o efeito desconhecido que o k-NN compara com
+    todas as amostras; `False`: medido e reto) e o sublinhado, que é só do usuário (§9.3)."""
+
+    negrito: Optional[bool] = None
+    italico: Optional[bool] = None
     sublinhado: bool = False
 
+    @property
+    def conhecido(self) -> bool:
+        """Se o negrito ou o itálico foi medido (ou decidido pelo usuário)."""
+        return self.negrito is not None or self.italico is not None
+
     def para_json(self) -> list:
-        return [int(self.negrito), int(self.italico), int(self.sublinhado)]
+        """[negrito, itálico, sublinhado], e um quarto item com o que foi medido como reto
+        (1: o negrito, 2: o itálico) quando há: o JSON de antes do fechamento do passo I não
+        o tem, e lá o 0 é "não medido"."""
+        retos = (self.negrito is False) | (self.italico is False) << 1
+        base = [int(bool(self.negrito)), int(bool(self.italico)), int(self.sublinhado)]
+        return base + [retos] if retos else base
 
     @classmethod
     def de_json(cls, bruto) -> "Estilo":
-        negrito, italico, sublinhado = (list(bruto or []) + [0, 0, 0])[:3]
-        if not (negrito or italico or sublinhado):
+        negrito, italico, sublinhado, retos = (list(bruto or []) + [0, 0, 0, 0])[:4]
+        negrito = True if negrito else (False if retos & 1 else None)
+        italico = True if italico else (False if retos & 2 else None)
+        if negrito is None and italico is None and not sublinhado:
             return SEM_ESTILO
-        return cls(bool(negrito), bool(italico), bool(sublinhado))
+        return cls(negrito, italico, bool(sublinhado))
 
 
 #: O estilo de quase todo glifo, um objeto só: uma página tem milhares de glifos, e cada
@@ -434,7 +449,11 @@ def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
         else:
             amostra = registrada or None    # "" = lido, mas não por um padrão do livro
         estilo = estilo_de(entry)
-        estilo = velho.estilo if estilo is None else estilo
+        if estilo is None:
+            estilo = velho.estilo
+        elif velho.estilo.sublinhado != estilo.sublinhado:
+            # A medida diz o negrito e o itálico; o sublinhado é do usuário (Ctrl+U) e fica.
+            estilo = replace(estilo, sublinhado=velho.estilo.sublinhado)
         if entry is velho.entry and amostra == velho.amostra and estilo == velho.estilo:
             saida[i] = velho                # o caso comum: nada a copiar
         else:

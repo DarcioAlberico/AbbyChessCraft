@@ -96,11 +96,52 @@ def test_o_estilo_da_pagina_lida_leva_o_italico():
                          italicos=[False, True, True, None])
     estilos = lida.estilos()
     assert [estilos.get(id(e)) for e in entradas] == [
-        Estilo(negrito=True), Estilo(italico=True), Estilo(italico=True), None]
-    # O servidor que não mede o itálico (o falso dos testes) dá o estilo de antes.
+        Estilo(True, False), Estilo(False, True), Estilo(None, True), None]
+    # O servidor que não mede o itálico (o falso dos testes): o itálico fica não medido, e
+    # o reto medido no negrito é reto (False), não desconhecido.
     so_negrito = sl.PaginaLida(entradas, [None] * 4, [], None, [], negritos=[True, None, False, None])
     assert [so_negrito.estilos().get(id(e)) for e in entradas] == [
-        Estilo(negrito=True), None, Estilo(), None]
+        Estilo(negrito=True), None, Estilo(negrito=False), None]
+
+
+def test_o_estilo_nao_medido_nao_vira_reto():
+    """O box sem medida tem o efeito desconhecido (None), que o JSON guarda e devolve; o reto
+    medido (False) também volta como reto, e o JSON de antes ([0, 0, 0]) é "não medido"."""
+    from abbychess.modelo import SEM_ESTILO
+
+    assert SEM_ESTILO.negrito is None and SEM_ESTILO.italico is None
+    for estilo in (Estilo(), Estilo(False, None), Estilo(None, False), Estilo(False, False),
+                   Estilo(True, None), Estilo(True, False, True), Estilo(sublinhado=True)):
+        assert Estilo.de_json(estilo.para_json()) == estilo, estilo
+    assert Estilo.de_json([0, 0, 0]) is SEM_ESTILO
+
+
+def test_o_glifo_sem_medida_acha_a_amostra_em_negrito(tmp_path):
+    """O box sem medida (SEM_ESTILO, o padrão) compara com todas as amostras: a amostra em
+    negrito continua vizinha dele; o reto medido, não."""
+    import numpy as np
+
+    from abbychess.leitor import LeitorDoLivro
+    from abbychess.modelo import SEM_ESTILO
+
+    recorte = np.full((40, 30), 255, dtype=np.uint8)
+    recorte[5:35, 10:20] = 0
+    leitor = LeitorDoLivro(tmp_path / "padroes")
+    leitor.ensinar(recorte, "l", altura_de_referencia=40, efeito=Estilo(True, False))
+    assert leitor.ler(recorte, altura_de_referencia=40, efeito=SEM_ESTILO).char == "l"
+    assert leitor.ler(recorte, altura_de_referencia=40, efeito=Estilo(None, False)).char == "l"
+    assert leitor.ler(recorte, altura_de_referencia=40, efeito=Estilo(False, False)).char == ""
+
+
+def test_reler_mantem_o_sublinhado_do_usuario():
+    """A medida nova diz o negrito e o itálico; o sublinhado (Ctrl+U) é do usuário e fica."""
+    from abbychess.modelo import Box, reconciliar
+
+    antes = [Box(0, BoxEntry("a", 0, 0, 5, 5), estilo=Estilo(False, False, True))]
+    nova = BoxEntry("a", 0, 0, 5, 5)
+    boxes, _dif = reconciliar(antes, [nova], alocar=lambda: 1,
+                              estilo_de=lambda e: Estilo(True, False))
+    assert boxes[0].estilo == Estilo(True, False, True)
 
 
 def test_efeitos_de_impressao_continua_so_o_negrito():

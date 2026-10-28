@@ -1,0 +1,6 @@
+Correção: o commit do código é o 2e3d9a1, não o da2d530.
+
+O da2d530 era o mesmo código antes de ir para cima do 985bd37 (rebase em 2026-10-24), e saiu
+do histórico. A medida citada (2026-10-24-fatia-xv-passo-L-220141.json) saiu junto; a que
+vale é a 2026-10-24-fatia-xv-passo-L-220446.json, no 84f2956, com os mesmos 772 gestos
+(ver o d76d793).

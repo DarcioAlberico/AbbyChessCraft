@@ -61,6 +61,17 @@ class ControladorDeLayout:
     def zonas(self) -> list:
         return self.pagina.zonas
 
+    @property
+    def ordenando(self) -> bool:
+        """Se o Ordenar está em curso (o Esc o cancela antes de qualquer outra coisa)."""
+        return self._ordenacao is not None
+
+    def _parar_a_ordenacao(self) -> None:
+        """Uma área que nasce, sai ou muda no meio do Ordenar invalida os cliques dados."""
+        if self._ordenacao is not None:
+            self._ordenacao = None
+            self.pagina._avisar("Ordenação cancelada: as áreas mudaram.", 4000)
+
     def _pagina_trocou(self) -> None:
         self.atual = None
         self._ordenacao = None
@@ -149,6 +160,7 @@ class ControladorDeLayout:
 
     def desenhar(self, x1: int, y1: int, x2: int, y2: int) -> None:
         p = self.pagina
+        self._parar_a_ordenacao()
         if p.imagem is None:
             return
         largura, altura = p.imagem.size
@@ -188,6 +200,7 @@ class ControladorDeLayout:
         self._trocar(zonas, indice, "Mover área", juntar=("area", p.indice, indice))
 
     def apagar(self, indice: int) -> None:
+        self._parar_a_ordenacao()
         zonas = self.zonas
         if not 0 <= indice < len(zonas):
             return
@@ -197,6 +210,7 @@ class ControladorDeLayout:
         self.pagina._avisar(f"Área apagada.{aviso}", 6000)
 
     def trocar_tipo(self, indice: int, tipo: str) -> None:
+        self._parar_a_ordenacao()
         zonas = self.zonas
         if not 0 <= indice < len(zonas):
             return
@@ -205,6 +219,7 @@ class ControladorDeLayout:
         self.pagina._avisar(f"Área {indice + 1}: {zn.NOMES[tipo].lower()}.", 5000)
 
     def trocar_funcao(self, indice: int, funcao: str) -> None:
+        self._parar_a_ordenacao()
         zonas = self.zonas
         if not 0 <= indice < len(zonas):
             return
@@ -240,17 +255,6 @@ class ControladorDeLayout:
         self.modelo = zn.ModeloDeAreas(largura, altura, tuple(self.zonas))
         p._avisar(f"Modelo salvo com {len(self.zonas)} área(s).", 5000)
 
-    def aplicar_modelo_aqui(self) -> None:
-        p = self.pagina
-        if self.modelo is None or p.imagem is None:
-            return
-        try:
-            zonas = self.modelo.aplicar(*p.imagem.size)
-        except ValueError as erro:
-            p._avisar(f"Modelo não aplicado: {erro}", 7000)
-            return
-        self._trocar(zonas, None, "Aplicar modelo de áreas")
-
     def aplicar_modelo(self, indices: Sequence[int]) -> None:
         """Aplica o modelo a um intervalo já filtrado (todos, pares ou ímpares).
 
@@ -260,11 +264,17 @@ class ControladorDeLayout:
         p, modelo = self.pagina, self.modelo
         if modelo is None or p.projeto is None or p.fonte is None:
             return
+        from abbychess import geometria as geo
+
         mudancas, recusadas = {}, []
         for indice in sorted(set(indices)):
             if not 0 <= indice < p.fonte.total:
                 continue
-            largura, altura = p.fonte.pagina(indice).size
+            # O tamanho da imagem da entrada sem renderizar (renderizar cada página, com a
+            # medida da inclinação, prendia a janela ~0,4 s por página nunca vista).
+            entrada = p.fonte.entrada(indice)
+            largura, altura = geo.tamanho_da_imagem((entrada.quadro, entrada.giro),
+                                                    p.fonte.tamanho_da_fonte(entrada))
             try:
                 zonas = modelo.aplicar(largura, altura)
             except ValueError:
@@ -279,8 +289,11 @@ class ControladorDeLayout:
         if mudancas:
             p.historico.registrar(hs.Transacao("Aplicar modelo de áreas", mudancas))
             p.eventos.emitir("acoes_mudaram")
-            if p.modelo is not None and p.modelo.pid in mudancas:
+            aberta = p.projeto.pid_da_pagina(p.indice) if p.indice is not None else None
+            if aberta in mudancas:
+                # A página aberta (lida ou não) mostra as zonas novas já.
                 self.atual = None
+                p.recarregar()
                 p.eventos.emitir("layout_mudou")
         complemento = f"; recusadas por resolução: {recusadas}" if recusadas else ""
         p._avisar(f"Modelo aplicado a {len(mudancas)} página(s){complemento}.", 8000)

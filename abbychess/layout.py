@@ -152,7 +152,7 @@ def partir_depois_do_f(linhas: list, trecho: Sequence[BoxEntry]) -> list:
 
     **Com um box sem leitura entre o "f" e a letra** ("fo|llowed" sem o "o"), a palavra fica
     como o core a fez: ele não faz símbolo do box, mas mede a lacuna por ele."""
-    from core.notacao import LIMIAR_ESPACO, Palavra, _largura_mediana
+    from core.notacao import LIMIAR_ESPACO, Palavra
 
     def depois_do_f(a, b) -> bool:
         return a.char == "f" and b.char[:1].isalpha()
@@ -176,7 +176,7 @@ def partir_depois_do_f(linhas: list, trecho: Sequence[BoxEntry]) -> list:
     gancho = comum - statistics.median(dentro) if len(dentro) >= AMOSTRAS_DO_GANCHO else 0
     if gancho <= 0:
         return linhas
-    limiar = LIMIAR_ESPACO * _largura_mediana(trecho) - gancho
+    limiar = LIMIAR_ESPACO * largura_mediana(trecho) - gancho
 
     saida = []
     for linha in linhas:
@@ -201,6 +201,13 @@ def partir_depois_do_f(linhas: list, trecho: Sequence[BoxEntry]) -> list:
 #: índice e títulos com ornamentos, que também são linhas à parte; a tabela de lances (o
 #: número de um lado, o lance do outro) fica em 6,3, e por isso o limiar é 8.
 VAO_QUE_PARTE, PALAVRAS_DE_CADA_LADO = 8.0, 3
+
+
+def largura_mediana(boxes: Sequence[BoxEntry]) -> float:
+    """A largura mediana dos glifos lidos (a régua de espaço do core, que a deixa privada:
+    `core.notacao._largura_mediana`, refeita aqui pelo contrato)."""
+    larguras = sorted(b.x2 - b.x1 for b in boxes if b.char)
+    return float(larguras[len(larguras) // 2]) or 1.0 if larguras else 1.0
 
 
 def partir_nos_vaos(linhas: list, trecho: Sequence[BoxEntry]) -> list:

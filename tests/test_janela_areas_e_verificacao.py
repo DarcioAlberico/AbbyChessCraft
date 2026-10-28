@@ -137,14 +137,73 @@ def test_funcao_e_ordem_das_areas_atualizam_o_documento_e_desfazem(app, janela):
 
 
 def test_esc_cancela_a_ordenacao_sem_mudar_as_areas(app, janela):  # noqa: F811
+    """O Esc de verdade, com o foco no visor: a ação global do Esc o leva antes do visor, e
+    cancelava outra coisa (CA-5.5)."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+
     janela.acao_areas.setChecked(True)
     janela.modo_areas(True)
     _esperar(app, janela)
     antes = list(janela.areas.zonas)
     janela.areas.iniciar_ordenacao()
     janela.areas.escolher(0)
-    janela.areas.cancelar_ordenacao()
+    janela.visor.setFocus()
+    QTest.keyClick(janela.visor, Qt.Key.Key_Escape)
+    assert not janela.areas.ordenando
     assert janela.areas.zonas == antes
+
+
+def test_ca_5_5_ordenar_quatro_areas_na_ordem_inversa(app, janela):  # noqa: F811
+    """Quatro zonas clicadas da última à primeira: o Documento sai nessa ordem, e o Ctrl+Z
+    a desfaz num passo."""
+    _ler_a_mao(app, janela)
+    largura, altura = janela.pagina.imagem.size
+    quarto = altura // 4
+    janela.pagina.modelo.zonas = [zn.Zona(zn.TEXTO, 0, k * quarto, largura, (k + 1) * quarto,
+                                          id=f"z{k}") for k in range(4)]
+    janela.areas.iniciar_ordenacao()
+    for k in (3, 2, 1, 0):
+        janela.areas.escolher(k)
+    assert not janela.areas.ordenando
+    assert [z.ordem for z in janela.areas.zonas] == [3, 2, 1, 0]
+    ids = [b.zona_id for b in janela.pagina.documento().blocos if b.zona_id]
+    assert ids == sorted(ids, reverse=True)
+    janela.pagina.desfazer()
+    assert all(z.ordem is None for z in janela.areas.zonas)
+
+
+def test_apagar_no_meio_do_ordenar_cancela_a_ordenacao(app, janela):  # noqa: F811
+    _ler_a_mao(app, janela)
+    largura, altura = janela.pagina.imagem.size
+    quarto = altura // 4
+    janela.pagina.modelo.zonas = [zn.Zona(zn.TEXTO, 0, k * quarto, largura, (k + 1) * quarto,
+                                          id=f"z{k}") for k in range(4)]
+    janela.areas.iniciar_ordenacao()
+    janela.areas.escolher(3)
+    janela.areas.escolher(1)
+    janela.areas.apagar(0)
+    assert not janela.areas.ordenando
+    janela.areas.escolher(0)                    # um clique comum, sem ValueError
+    assert janela.areas.atual == 0
+
+
+def test_ca_5_4_o_modelo_vai_so_as_impares_e_aparece_na_pagina_aberta(app, janela):  # noqa: F811
+    """O modelo de áreas aplicado às ímpares de um intervalo: as zonas só nelas, num passo
+    do desfazer; a página aberta, ainda não lida, já mostra as zonas."""
+    largura, altura = janela.pagina.imagem.size
+    janela.pagina.modelo = None
+    janela.areas.modelo = zn.ModeloDeAreas(
+        largura, altura, (zn.Zona(zn.TEXTO, 10, 10, largura - 10, altura - 10, id="z0"),))
+    total = janela.fonte.total
+    impares = [i for i in range(total) if (i + 1) % 2 == 1]
+    janela.areas.aplicar_modelo(impares)
+    for i in range(total):
+        tem = bool(janela.projeto.carregar_zonas(i))
+        assert tem == (i in impares), i
+    assert janela.pagina.indice in impares and janela.areas.zonas
+    janela.pagina.desfazer()
+    assert not any(janela.projeto.carregar_zonas(i) for i in range(total))
 
 
 def test_reconhecer_so_a_zona_preserva_boxes_de_fora(app, janela):  # noqa: F811

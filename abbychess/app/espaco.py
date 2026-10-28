@@ -320,7 +320,11 @@ class EspacoDeTrabalho:
         """A gaveta fechou: o divisor volta aos tamanhos de antes de ela abrir (sem isto, cada
         abrir e fechar deixaria a Imagem maior e a vista direita menor)."""
         antes, self._divisor_antes_da_gaveta = self._divisor_antes_da_gaveta, []
-        if antes and len(antes) == len(self.divisor.sizes()):
+        try:
+            tamanhos = self.divisor.sizes()
+        except RuntimeError:                    # a janela já foi apagada (o fim dos testes)
+            return
+        if antes and len(antes) == len(tamanhos):
             self.divisor.setSizes(antes)
 
     def focar(self, painel: int) -> None:
@@ -450,6 +454,8 @@ class EspacoDeTrabalho:
         restaura (§6.3). A pergunta do Ctrl+T, se aberta, fecha antes de tudo (só ela)."""
         if self.confirmacao.aberta:
             self.confirmacao.recusar()
+        elif self.areas.ordenando:              # "Esc cancela" o Ordenar das áreas (§5)
+            self.areas.cancelar_ordenacao()
         elif self._barra_de_busca_com_o_foco():
             self.fechar_busca()
         elif self.texto.tem_sessao:

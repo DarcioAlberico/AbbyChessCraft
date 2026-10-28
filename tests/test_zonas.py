@@ -271,3 +271,59 @@ def test_projeto_antigo_abre_sem_areas_e_em_portugues(projeto):
     assert reaberto.dados.idioma == "pt"
     assert reaberto.carregar_zonas(0) == []
     assert not (reaberto.pasta / "zonas").exists()
+
+
+# ----------------------------------------------------------------------
+# Fechamento do passo F: legendas lado a lado, a regra da legenda e a zona do usuário
+# ----------------------------------------------------------------------
+
+def _linha_de_boxes(texto, x, y, passo=12, altura=16):
+    """Uma linha de boxes, um por letra, a partir de (x, y); o espaço é um vão de um passo."""
+    from core.box_model import BoxEntry
+
+    saida = []
+    for c in texto:
+        if c != " ":
+            saida.append(BoxEntry(c, x, y, x + passo - 2, y + altura, 0.99, "neural"))
+        x += passo
+    return saida
+
+
+def test_legendas_lado_a_lado_viram_duas_zonas_ligadas_a_cada_diagrama():
+    """Dois tabuleiros lado a lado, com "Diagrama 6…" e "Diagrama 7…" na mesma linha: duas
+    legendas, uma para cada diagrama (CA-5.1, a ligação da legenda)."""
+    from types import SimpleNamespace
+
+    tabuleiros = [(50, 50, 330, 330), (420, 50, 700, 330)]
+    # Como na p. 25 do Xadrez Vitorioso: cada legenda sob o seu tabuleiro, com um vão de
+    # mais de 8 alturas de letra entre elas.
+    boxes = (_linha_de_boxes("Diagrama 6. Jogam as brancas.", 60, 345, passo=8)
+             + _linha_de_boxes("Diagrama 7. Jogam as brancas.", 430, 345, passo=8))
+    zonas = zn.automaticas(boxes, tabuleiros, 760, 1000, escala=16)
+    legendas = [z for z in zonas if z.funcao == "legenda"]
+    assert len(legendas) == 2
+    diagramas = [SimpleNamespace(id=f"d{k}", caixa=c) for k, c in enumerate(tabuleiros)]
+    ligadas = zn.vincular_legendas(legendas, diagramas)
+    assert sorted(z.diagrama_id for z in ligadas) == ["d0", "d1"]
+
+
+def test_prosa_e_lances_abaixo_do_diagrama_nao_sao_legenda():
+    tabuleiro = [(50, 50, 330, 330)]
+    for texto in ("Black moves the knight to f6 and the game is equal again after all",
+                  "1.e4 e5 2.Nf3 Nc6 3.Bb5 a6"):
+        zonas = zn.automaticas(_linha_de_boxes(texto, 55, 345, passo=5), tabuleiro, 760, 1000,
+                               escala=16)
+        assert not any(z.funcao == "legenda" for z in zonas), texto
+    for texto in ("Diagrama 5. Jogam as pretas.", "White to play", "12"):
+        zonas = zn.automaticas(_linha_de_boxes(texto, 60, 345), tabuleiro, 760, 1000, escala=16)
+        assert any(z.funcao == "legenda" for z in zonas), texto
+
+
+def test_a_zona_mexida_pelo_usuario_deixa_de_ser_automatica():
+    zona = zn.Zona(zn.TEXTO, 0, 0, 100, 100, funcao="cabecalho", automatica=True, id="z0")
+    for mexer in (lambda zs: zn.trocar_funcao(zs, 0, "texto"),
+                  lambda zs: zn.trocar_tipo(zs, 0, zn.IGNORAR)):
+        zonas = [zona]
+        mexer(zonas)
+        assert zonas[0].automatica is False
+    assert zn.arrastar(zona, "d", 10, 0, 500, 500).automatica is False

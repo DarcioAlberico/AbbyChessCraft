@@ -78,8 +78,15 @@ RAZAO_DO_TITULO = 1.3
 RAZAO_DA_NOTA = 0.82
 RECUO_DE_PARAGRAFO = 1.2
 
-_INICIO_DA_LEGENDA = re.compile(r"^\s*(?:diagrama|diagram|teste|test|\d+)\b", re.IGNORECASE)
-_TEXTO_DA_LEGENDA = re.compile(r"\b(?:jogam?|joga|to\s+play|moves?)\b", re.IGNORECASE)
+_INICIO_DA_LEGENDA = re.compile(r"^\s*(?:diagrama|diagram|teste|test|exerc[ií]cio|exercise)\b",
+                                re.IGNORECASE)
+_SO_O_NUMERO = re.compile(r"^\s*\d+\.?\s*$")
+_TEXTO_DA_LEGENDA = re.compile(r"\b(?:jogam?|joga|to\s+play|white\s+to|black\s+to)\b",
+                               re.IGNORECASE)
+#: A legenda é curta (§5.1): um parágrafo de prosa abaixo do diagrama não é legenda.
+TAMANHO_DA_LEGENDA = 80
+#: O vão que parte uma linha em duas zonas (em alturas de glifo) e os glifos de cada lado.
+VAO_QUE_PARTE, GLIFOS_DE_CADA_LADO = 8.0, 3
 _NUMERO_DE_PAGINA = re.compile(r"^\s*(?:p(?:ág(?:ina)?|age)?\.?\s*)?\d+\s*$", re.IGNORECASE)
 
 Caixa = Tuple[int, int, int, int]
@@ -222,7 +229,7 @@ def arrastar(zona: Zona, bordas: str, dx: float, dy: float, largura: int, altura
     if not bordas:
         dx = min(max(dx, -x1), largura - x2)
         dy = min(max(dy, -y1), altura - y2)
-        return replace(zona, x1=x1 + dx, y1=y1 + dy, x2=x2 + dx, y2=y2 + dy)
+        return replace(zona, x1=x1 + dx, y1=y1 + dy, x2=x2 + dx, y2=y2 + dy, automatica=False)
     if "e" in bordas:
         x1 = min(max(0, x1 + dx), x2 - MENOR_LADO)
     if "d" in bordas:
@@ -231,14 +238,16 @@ def arrastar(zona: Zona, bordas: str, dx: float, dy: float, largura: int, altura
         y1 = min(max(0, y1 + dy), y2 - MENOR_LADO)
     if "b" in bordas:
         y2 = max(min(altura, y2 + dy), y1 + MENOR_LADO)
-    return replace(zona, x1=x1, y1=y1, x2=x2, y2=y2)
+    return replace(zona, x1=x1, y1=y1, x2=x2, y2=y2, automatica=False)
 
 
 def trocar_tipo(zonas: List[Zona], indice: int, tipo: str) -> None:
     if tipo not in TIPOS:
         raise ValueError(f"Tipo de área desconhecido: {tipo!r}")
+    # Mexida pelo usuário, a zona deixa de ser automática: a aprendizagem das margens e a
+    # exportação não a reclassificam, e o endireitar a mantém (§5.1).
     zonas[indice] = replace(zonas[indice], tipo=tipo, funcao=FUNCAO_DO_TIPO[tipo],
-                            diagrama_id=None)
+                            diagrama_id=None, automatica=False)
 
 
 def trocar_funcao(zonas: List[Zona], indice: int, funcao: str) -> None:
@@ -247,7 +256,8 @@ def trocar_funcao(zonas: List[Zona], indice: int, funcao: str) -> None:
         raise ValueError(f"Função de área desconhecida: {funcao!r}")
     zonas[indice] = replace(zonas[indice], tipo=TIPO_DA_FUNCAO[funcao], funcao=funcao,
                             diagrama_id=(zonas[indice].diagrama_id
-                                         if funcao == "legenda" else None))
+                                         if funcao == "legenda" else None),
+                            automatica=False)
 
 
 def ordenar(zonas: Sequence[Zona], indices: Sequence[int]) -> List[Zona]:
@@ -360,7 +370,13 @@ def _texto_dos_boxes(boxes: Sequence[BoxEntry]) -> str:
 
 
 def _parece_legenda(texto: str) -> bool:
-    return bool(_INICIO_DA_LEGENDA.search(texto) or _TEXTO_DA_LEGENDA.search(texto))
+    """§5.1: linha curta perto do diagrama que diz "Diagrama N", "Teste N" ou só o número,
+    ou de quem é a vez ("jogam as brancas", "White to play"). A prosa ("Black moves the
+    knight…") e os lances ("1.e4 e5 2.Nf3") ficam no texto, que valida os lances."""
+    if len(texto) > TAMANHO_DA_LEGENDA:
+        return False
+    return bool(_INICIO_DA_LEGENDA.search(texto) or _SO_O_NUMERO.fullmatch(texto)
+                or _TEXTO_DA_LEGENDA.search(texto))
 
 
 def _vizinha_do_diagrama(zona: Zona, diagrama: Zona, escala: float) -> bool:
@@ -378,10 +394,11 @@ def _isolada(zona: Zona, zonas: Sequence[Zona], escala: float) -> bool:
 
 
 def vincular_legendas(zonas: Sequence[Zona], diagramas: Sequence) -> List[Zona]:
-    """Liga cada legenda automática ao diagrama `dN` geometricamente mais próximo.
+    """Liga cada legenda ao diagrama `dN` geometricamente mais próximo.
 
     O vínculo usa os diagramas lidos, cuja caixa é a do tabuleiro, e por isso sobrevive
-    à reordenação das listas. Uma ligação manual existente é autoridade e é preservada.
+    à reordenação das listas. Uma ligação existente a um diagrama da página é autoridade e
+    fica; a legenda marcada à mão (L) sem ligação também ganha a do vizinho.
     """
     ids = {d.id for d in diagramas if getattr(d, "id", "")}
     saida = []
@@ -389,7 +406,7 @@ def vincular_legendas(zonas: Sequence[Zona], diagramas: Sequence) -> List[Zona]:
         if zona.funcao != "legenda":
             saida.append(replace(zona, diagrama_id=None) if zona.diagrama_id else zona)
             continue
-        if zona.diagrama_id in ids or not zona.automatica:
+        if zona.diagrama_id in ids:
             saida.append(zona)
             continue
         candidatos = []
@@ -431,16 +448,41 @@ def _linhas(boxes: Sequence[BoxEntry]) -> List[List[int]]:
     blocos; a ordem de leitura de verdade é a do `BoxService`.
     """
     linhas: List[List[int]] = []
+    membros: List[List[BoxEntry]] = []
     for b in sorted(boxes, key=lambda b: (b.y1 + b.y2) / 2):
         meio = (b.y1 + b.y2) / 2
-        for linha in reversed(linhas[-3:]):
+        for linha, dela in zip(reversed(linhas[-3:]), reversed(membros[-3:])):
             if linha[1] <= meio <= linha[3] or b.y1 <= (linha[1] + linha[3]) / 2 <= b.y2:
                 linha[0], linha[1] = min(linha[0], b.x1), min(linha[1], b.y1)
                 linha[2], linha[3] = max(linha[2], b.x2), max(linha[3], b.y2)
+                dela.append(b)
                 break
         else:
             linhas.append([b.x1, b.y1, b.x2, b.y2])
-    return linhas
+            membros.append([b])
+    saida: List[List[int]] = []
+    for dela in membros:
+        saida.extend(_partir_no_vao(dela))
+    return saida
+
+
+def _partir_no_vao(boxes: Sequence[BoxEntry]) -> List[List[int]]:
+    """A linha partida onde o vão entre dois glifos passa de `VAO_QUE_PARTE` alturas, com
+    ao menos `GLIFOS_DE_CADA_LADO` glifos de cada lado: as legendas de dois diagramas lado a
+    lado ("Diagrama 6…   Diagrama 7…") ficam numa linha só da mesma altura, e viravam uma
+    zona só ligada a um diagrama só (a mesma regra da `layout.partir_nos_vaos`)."""
+    ordem = sorted(boxes, key=lambda b: b.x1)
+    altura = max(1, median(b.y2 - b.y1 for b in ordem))
+    partes, atual = [], [ordem[0]]
+    for k, (a, b) in enumerate(zip(ordem, ordem[1:]), start=1):
+        if (b.x1 - max(x.x2 for x in atual) > VAO_QUE_PARTE * altura
+                and len(atual) >= GLIFOS_DE_CADA_LADO and len(ordem) - k >= GLIFOS_DE_CADA_LADO):
+            partes.append(atual)
+            atual = []
+        atual.append(b)
+    partes.append(atual)
+    return [[min(x.x1 for x in p), min(x.y1 for x in p), max(x.x2 for x in p), max(x.y2 for x in p)]
+            for p in partes]
 
 
 def _blocos(linhas: List[List[int]], escala: float) -> List[Caixa]:

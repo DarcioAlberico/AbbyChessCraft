@@ -153,6 +153,7 @@ class EspacoDeTrabalho:
         self.paginas.abrir.connect(self.ir_para_pagina)
         self.paginas.reconhecer.connect(lambda indices: self.livro.reconhecer(indices, False))
         self.paginas.reconhecer_livro.connect(self.reconhecer_livro)
+        self.paginas.limiar_mudou.connect(self._limiar_da_saude)
         self.paginas.mover.connect(self.mover_paginas)
         self.paginas.apagar.connect(self.apagar_paginas)
         self.paginas.operacao.connect(self.operacao_da_gaveta)
@@ -537,6 +538,15 @@ class EspacoDeTrabalho:
         self.inspetor.mostrar_contador(contador)
         escopo = " (livro)" if f.escopo == "livro" else ""
         self.rotulo_da_fila.setText(f"fila: {f.nome().lower()}{escopo} {contador}".rstrip())
+
+    def _limiar_da_saude(self, limiar: int) -> None:
+        """O limiar do cartão Saúde, escolhido na gaveta (§9.1), vale para o projeto."""
+        p = self.pagina
+        if p.projeto is None or p.projeto.somente_leitura:
+            return
+        lv.escolher_limiar_da_saude(p.projeto, limiar)
+        self.paginas.mostrar_saude(
+            lv.saude(p.projeto, p.leitor.arquivos_de_padrao() if p.leitor else 0))
 
     def atualizar_paginas(self, seguir: bool = False) -> None:
         """A gaveta com o `livro.json` de agora; `seguir`: a página aberta mudou, e a gaveta

@@ -22,6 +22,24 @@ def pagina_nao_reconhecida() -> str:
             f"reconhece; {_tecla('marcar_glifo', 'o menu da Imagem')} marca glifos à mão.")
 
 
+def saude_do_livro(saude) -> str:
+    """O cartão Saúde no estado vazio do Documento (§9.1): os pendentes por página da amostra,
+    antes e agora, as amostras ensinadas, e o que fazer quando ela já basta."""
+    linhas = ["Saúde do livro: a amostra, pendentes antes → agora"]
+    linhas += [f"  p. {posicao + 1}: {antes} → {agora}" for posicao, antes, agora in saude.por_pagina]
+    linhas.append(f"  total: {saude.pendentes_antes} → {saude.pendentes_agora} · "
+                  f"{saude.padroes} amostra(s) ensinada(s)")
+    acao = _tecla("reconhecer_livro", "Projeto › Reconhecer o livro")
+    if saude.pode_reconhecer_o_livro:
+        linhas.append(f"A amostra está pronta: {acao} reconhece o livro inteiro.")
+    else:
+        linhas.append(f"Revise a amostra até restarem {saude.limiar} pendentes ou menos; depois "
+                      f"{acao} reconhece o livro inteiro "
+                      f"({_tecla('proxima_pagina_pendente', 'Editar › Próxima página com pendentes')}"
+                      " vai à página com pendentes).")
+    return "\n".join(linhas)
+
+
 def nada_reconhecido() -> str:
     return (f"Nada reconhecido nesta página. {_tecla('marcar_glifo', 'O menu da Imagem')} marca "
             f"glifos à mão; {_tecla('reconhecer_pagina', 'Página › Reconhecer')} lê de novo.")

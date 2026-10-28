@@ -174,9 +174,11 @@ def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
                                                   progresso=progresso))
             importadas = resultado.importadas
             do_corpo = sum(1 for i in resultado.recusadas if inicio <= i <= fim)
-            janela.statusBar().showMessage(
-                f"Texto nativo usado em {len(resultado.importadas)} página(s); "
-                f"{do_corpo} do corpo ficaram para OCR.", 12000)
+            texto = (f"Texto nativo usado em {len(resultado.importadas)} página(s); "
+                     f"{do_corpo} do corpo ficaram para OCR.")
+            janela.statusBar().showMessage(texto, 12000)
+            # A janela a mostra de novo quando os modelos ficam prontos (o aviso deles a apagaria).
+            janela.mensagem_depois_dos_modelos = texto
     except (OSError, ValueError, RuntimeError) as erro:
         # A oferta é uma otimização segura: se a camada não abre ou não monta, o projeto
         # continua novo e o caminho de OCR de sempre permanece disponível.

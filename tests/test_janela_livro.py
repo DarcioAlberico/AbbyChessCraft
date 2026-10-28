@@ -96,15 +96,30 @@ def test_cartao_de_saude_mostra_a_evolucao_e_oferece_o_lote(janela):
     janela.paginas.reconhecer_livro.disconnect()
     janela.paginas.reconhecer_livro.connect(lambda: chamadas.append(True))
 
-    janela.paginas.mostrar_saude(lv.SaudeDoLivro((0, 1, 2), 40, 3, 12, 4))
+    abertas = []
+    janela.paginas.abrir.disconnect()
+    janela.paginas.abrir.connect(abertas.append)
+    janela.paginas.mostrar_saude(lv.SaudeDoLivro((0, 1, 2), 40, 3, 12, 4,
+                                                 ((0, 10, 1), (1, 20, 2), (2, 10, 0))))
 
     assert janela.paginas.saude.isHidden() is False
-    assert janela.paginas.amostra_da_saude.text() == "Amostra: 3 páginas"
-    assert janela.paginas.pendentes_da_saude.text() == "Pendentes: 40 → 3"
-    assert janela.paginas.padroes_da_saude.text() == "Padrões ensinados: 12"
+    assert janela.paginas.amostra_da_saude.text() == "Amostra (3 páginas), pendentes antes → agora:"
+    texto = janela.paginas.pendentes_da_saude.text()
+    assert ">p. 2</a>: 20 → 2" in texto and "Total: 40 → 3" in texto   # por página (§9.1)
+    janela.paginas.pendentes_da_saude.linkActivated.emit("1")          # o link abre a página
+    assert abertas == [1]
+    assert janela.paginas.padroes_da_saude.text() == "12 amostras ensinadas"
+    assert janela.paginas.limiar_da_saude.value() == 4
     assert janela.paginas.botao_reconhecer_livro.isDefault()
+    assert janela.paginas.botao_reconhecer_livro.property("pronto") is True
     janela.paginas.botao_reconhecer_livro.click()
     assert chamadas == [True]
+
+
+def test_o_limiar_da_saude_e_escolhido_na_gaveta(janela):
+    """O limiar do cartão vem do usuário (§9.1) e fica no projeto."""
+    janela.paginas.limiar_da_saude.setValue(7)
+    assert janela.projeto.dados.extras[lv.CHAVE_DO_LIMIAR_DA_SAUDE] == 7
 
 
 def test_lote_reconhece_o_intervalo_e_mostra_a_pagina_atual(app, janela, respostas):

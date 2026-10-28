@@ -55,6 +55,8 @@ class SaudeDoLivro:
     pendentes_agora: int
     padroes: int
     limiar: int
+    #: Por página da amostra (§9.1): (posição, pendentes antes, pendentes agora).
+    por_pagina: tuple = ()
 
     @property
     def pode_reconhecer_o_livro(self) -> bool:
@@ -71,10 +73,21 @@ def saude(projeto: ProjetoDeLivro, padroes: int = 0) -> SaudeDoLivro:
     paginas = tuple(projeto.posicoes_das_gravadas(gravadas))
     iniciais = extras.get(CHAVE_DOS_PENDENTES_INICIAIS, {}) or {}
     resumo = projeto.resumo_do_livro()
-    antes = sum(int(iniciais.get(str(g), iniciais.get(g, 0)) or 0) for g in gravadas)
-    agora = sum(int(resumo.get(i, {}).get("pendentes", 0) or 0) for i in paginas)
+    por_pagina = tuple(
+        (posicao, int(iniciais.get(str(g), iniciais.get(g, 0)) or 0),
+         int(resumo.get(posicao, {}).get("pendentes", 0) or 0))
+        for g, posicao in zip(gravadas, paginas))
+    antes = sum(a for _p, a, _g in por_pagina)
+    agora = sum(g for _p, _a, g in por_pagina)
     limiar = int(extras.get(CHAVE_DO_LIMIAR_DA_SAUDE, max(3, round(antes * 0.1))) or 0)
-    return SaudeDoLivro(paginas, antes, agora, int(padroes), limiar)
+    return SaudeDoLivro(paginas, antes, agora, int(padroes), limiar, por_pagina)
+
+
+def escolher_limiar_da_saude(projeto: ProjetoDeLivro, limiar: int) -> None:
+    """O limiar do cartão Saúde, escolhido pelo usuário (§9.1): com até `limiar` pendentes
+    na amostra, "Reconhecer o livro" fica em destaque."""
+    projeto.dados.extras[CHAVE_DO_LIMIAR_DA_SAUDE] = max(0, int(limiar))
+    projeto.salvar()
 
 
 def interpretar_intervalo(texto: str, total: int) -> List[int]:

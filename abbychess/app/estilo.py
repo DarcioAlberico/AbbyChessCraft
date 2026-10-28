@@ -278,6 +278,10 @@ def folha_de_estilo(t: Tema) -> str:
               for nome, campo in PAPEIS.items()]
     linhas.append(f"QToolTip {{ color: {t.texto.name()}; background: {t.dica_fundo.name()}; "
                   f"border: 1px solid {t.borda.name()}; padding: {ESPACOS[0]}px; }}")
+    # O botão que já vale apertar (o "Reconhecer o livro" do cartão Saúde, §9.1).
+    linhas.append(f'QPushButton[pronto="true"] {{ color: {t.texto_do_destaque.name()}; '
+                  f"background: {t.destaque.name()}; font-weight: bold; "
+                  f"border: 1px solid {t.destaque.name()}; padding: {ESPACOS[0]}px; }}")
     return "\n".join(linhas) + "\n"
 
 

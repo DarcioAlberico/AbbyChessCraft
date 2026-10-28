@@ -13,8 +13,8 @@ from typing import Dict, List, Optional
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QGroupBox, QHeaderView, QLabel,
-                               QMenu, QProgressBar, QPushButton, QTreeWidget, QTreeWidgetItem,
-                               QVBoxLayout, QWidget)
+                               QMenu, QProgressBar, QPushButton, QSpinBox, QTreeWidget,
+                               QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from abbychess import modelo as md
 from abbychess.livro import SaudeDoLivro
@@ -53,6 +53,8 @@ class PainelDePaginas(QWidget):
     reconhecer = Signal(list)
     #: O livro inteiro, a partir do cartão Saúde do livro.
     reconhecer_livro = Signal()
+    #: O limiar do cartão Saúde escolhido (pendentes na amostra).
+    limiar_mudou = Signal(int)
     #: As operações de página nas selecionadas (§12.4): mover (pergunta o lugar) e apagar.
     mover = Signal(list)
     apagar = Signal(list)
@@ -104,12 +106,24 @@ class PainelDePaginas(QWidget):
         caixa_da_saude = QVBoxLayout(self.saude)
         caixa_da_saude.setContentsMargins(6, 6, 6, 6)
         self.amostra_da_saude = QLabel()
+        # As páginas da amostra, cada uma um link para ela, com os pendentes antes → agora.
         self.pendentes_da_saude = QLabel()
+        self.pendentes_da_saude.setWordWrap(True)
+        self.pendentes_da_saude.setTextFormat(Qt.TextFormat.RichText)
+        self.pendentes_da_saude.linkActivated.connect(lambda alvo: self.abrir.emit(int(alvo)))
         self.padroes_da_saude = QLabel()
+        self.limiar_da_saude = QSpinBox()
+        self.limiar_da_saude.setRange(0, 9999)
+        self.limiar_da_saude.setPrefix("Destacar com até ")
+        self.limiar_da_saude.setSuffix(" pend.")
+        self.limiar_da_saude.setAccessibleName("Limiar do cartão Saúde: pendentes na amostra")
+        self.limiar_da_saude.setToolTip("Com até este número de pendentes na amostra, "
+                                        "\"Reconhecer o livro\" fica em destaque.")
+        self.limiar_da_saude.valueChanged.connect(self._limiar_escolhido)
         self.botao_reconhecer_livro = QPushButton("Reconhecer o livro")
         self.botao_reconhecer_livro.clicked.connect(self.reconhecer_livro)
-        for widget in (self.amostra_da_saude, self.pendentes_da_saude,
-                       self.padroes_da_saude, self.botao_reconhecer_livro):
+        for widget in (self.amostra_da_saude, self.pendentes_da_saude, self.padroes_da_saude,
+                       self.limiar_da_saude, self.botao_reconhecer_livro):
             caixa_da_saude.addWidget(widget)
         self.saude.hide()
 
@@ -142,10 +156,20 @@ class PainelDePaginas(QWidget):
             self.saude.hide()
             return
         n = len(saude.paginas)
-        self.amostra_da_saude.setText(f"Amostra: {n} página{'s' if n != 1 else ''}")
-        self.pendentes_da_saude.setText(
-            f"Pendentes: {saude.pendentes_antes} → {saude.pendentes_agora}")
-        self.padroes_da_saude.setText(f"Padrões ensinados: {saude.padroes}")
+        self.amostra_da_saude.setText(f"Amostra ({n} página{'s' if n != 1 else ''}), "
+                                      "pendentes antes → agora:")
+        link = estilo.hex_de("link")
+        linhas = [f'<a href="{posicao}" style="color:{link}">p. {posicao + 1}</a>: '
+                  f"{antes} → {agora}" for posicao, antes, agora in saude.por_pagina]
+        linhas.append(f"<b>Total: {saude.pendentes_antes} → {saude.pendentes_agora}</b>")
+        self.pendentes_da_saude.setText("<br>".join(linhas))
+        n_padroes = saude.padroes
+        self.padroes_da_saude.setText(
+            f"{n_padroes} amostra{'s' if n_padroes != 1 else ''} ensinada"
+            f"{'s' if n_padroes != 1 else ''}")
+        self.limiar_da_saude.blockSignals(True)
+        self.limiar_da_saude.setValue(saude.limiar)
+        self.limiar_da_saude.blockSignals(False)
         pronto = saude.pode_reconhecer_o_livro
         self.botao_reconhecer_livro.setDefault(pronto)
         self.botao_reconhecer_livro.setProperty("pronto", pronto)
@@ -156,6 +180,9 @@ class PainelDePaginas(QWidget):
         self.botao_reconhecer_livro.style().unpolish(self.botao_reconhecer_livro)
         self.botao_reconhecer_livro.style().polish(self.botao_reconhecer_livro)
         self.saude.show()
+
+    def _limiar_escolhido(self, valor: int) -> None:
+        self.limiar_mudou.emit(int(valor))
 
     # ------------------------------------------------------------------
     def mostrar(self, total: int, resumo: Dict[int, dict], atual: Optional[int]) -> None:

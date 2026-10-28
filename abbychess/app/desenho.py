@@ -156,9 +156,7 @@ class DesenhoDaJanela:
         if not p.reconhecida and p.projeto is not None:
             saude = lv.saude(p.projeto, p.leitor.arquivos_de_padrao() if p.leitor else 0)
             if saude.paginas:
-                aviso = (f"Saúde do livro\n\nAmostra: {len(saude.paginas)} página(s)\n"
-                         f"Pendentes: {saude.pendentes_antes} → {saude.pendentes_agora}\n"
-                         f"Padrões ensinados: {saude.padroes}\n\n{aviso}")
+                aviso = f"{vazios.saude_do_livro(saude)}\n\n{aviso}"
         # A palavra fora do léxico que o usuário aceitou (Enter: revisada) não é mais duvidosa.
         revisados = {b.gid for b in p.modelo.boxes if b.revisado} if p.modelo is not None else set()
         self.texto.montar(p.documento(), p.diagramas, estados, v.gids_desconhecidos() - revisados,

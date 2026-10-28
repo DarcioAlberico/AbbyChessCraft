@@ -251,10 +251,10 @@ def gid_no_cursor(unidades: Sequence[Unidade], novo: str, onde: int,
 
 
 def planejar(unidades: Sequence[Unidade], novo: str,
-             fixos: Sequence[Tuple[int, int]] = (), fim_de_linha: bool = False) -> Plano:
+             fixos: Sequence[Tuple[int, int]] = ()) -> Plano:
     """O plano da sessão: o que fica, o que sai, o que entra, e as fronteiras. `fixos`, os
-    pares (no original, no novo) que nenhuma edição tocou (ver `alinhar`); `fim_de_linha`,
-    a sessão termina numa quebra de linha impressa (o hífen dela parte uma palavra)."""
+    pares (no original, no novo) que nenhuma edição tocou (ver `alinhar`). O hífen de fim de
+    linha que sai junta a palavra na aplicação (`_hifens_de_fim_de_linha`)."""
     novo = _normalizar(novo)
     original = "".join(u.texto if u.tipo != LINHA else " " for u in unidades)
     pares = alinhar(original, novo, fixos)
@@ -499,9 +499,9 @@ def palavras_em(unidades: Sequence[Unidade], inicio: int, fim: int) -> Tuple[int
 
 
 def editar(pagina: Pagina, unidades: Sequence[Unidade], novo: str,
-           fixos: Sequence[Tuple[int, int]] = (), fim_de_linha: bool = False) -> Plano:
-    """Planeja e aplica (levanta `Recusa` sem mudar nada)."""
-    plano = planejar(unidades, novo, fixos, fim_de_linha)
+           fixos: Sequence[Tuple[int, int]] = ()) -> Plano:
+    """Planeja e aplica."""
+    plano = planejar(unidades, novo, fixos)
     aplicar(pagina, plano)
     return plano
 
@@ -525,11 +525,13 @@ def _hifens_de_fim_de_linha(pagina: Pagina, saem, onde) -> List[Tuple[int, int]]
         box = pagina.box(gid) if gid in pagina.vivos else None
         if box is None or box.entry.char not in ("-", "\u00ad") or gid not in onde:
             continue
-        b, n, _k = onde[gid]
+        b, n, k = onde[gid]
         linha = sorted(por_linha[(b, n)], key=ordem.__getitem__)
         seguinte = sorted(por_linha.get((b, n + 1), []), key=ordem.__getitem__)
         if linha[-1] != gid or len(linha) < 2 or not seguinte:
             continue
+        if onde.get(linha[-2], (None, None, None))[2] != k:
+            continue                            # um travessão solto ("velha -") não parte palavra
         saida.append((linha[-2], seguinte[0]))
     return saida
 

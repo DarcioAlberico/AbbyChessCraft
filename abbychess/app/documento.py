@@ -152,7 +152,7 @@ class VistaDoDocumento(QTextEdit):
     #: duvidosa, o gid a ensinar (Ctrl+Enter, ou None), o último glifo da sessão e os pares
     #: (no original, no novo) que nenhuma edição tocou, se ela termina no fim de uma linha e
     #: se aplica sem a fila (`agora`: fechar o projeto).
-    sessao_confirmada = Signal(list, str, bool, object, object, list, bool, bool)
+    sessao_confirmada = Signal(list, str, bool, object, object, list, bool)
     #: A sessão abriu ou fechou, ou o Ctrl+Y (a palavra do Esc) passou a valer ou deixou de
     #: valer: as ações Desfazer e Refazer mudam (§6.3: elas valem na sessão).
     sessao_mudou = Signal()
@@ -830,10 +830,6 @@ class VistaDoDocumento(QTextEdit):
                 self.confirmar(avancar=False)
         QTimer.singleShot(0, confirmar)
 
-    def _no_fim_da_linha(self, b: int) -> bool:
-        """O trecho [a, b) do texto da montagem acaba numa quebra de linha impressa."""
-        return b < len(self._unidades) and self._unidades[b].tipo == ss.LINHA
-
     def _fixos(self, a: int, b: int) -> List[tuple]:
         """Os pares (no original, no novo) da sessão [a, b) que nenhuma edição tocou."""
         if self._origem is None:
@@ -876,8 +872,7 @@ class VistaDoDocumento(QTextEdit):
         self._sessao, self._restaurada = None, None
         self.marca_ao_confirmar = _marca(self.toPlainText(), posicao)
         self._avisar_da_sessao()
-        self.sessao_confirmada.emit(list(unidades), novo, avancar, alvo, ultimo, fixos,
-                                    self._no_fim_da_linha(b), agora)
+        self.sessao_confirmada.emit(list(unidades), novo, avancar, alvo, ultimo, fixos, agora)
 
     def restaurar(self) -> None:
         """Esc (ou Ctrl+Z na sessão): a palavra volta ao que era; Ctrl+Y a reaplica."""
@@ -907,8 +902,7 @@ class VistaDoDocumento(QTextEdit):
         self.marca_ao_confirmar = _marca(texto[:a] + novo, a + len(novo))
         self._avisar_da_sessao()
         ultimo = next((u.gid for u in reversed(unidades) if u.glifo), None)
-        self.sessao_confirmada.emit(unidades, novo, False, None, ultimo, fixos,
-                                    self._no_fim_da_linha(b), False)
+        self.sessao_confirmada.emit(unidades, novo, False, None, ultimo, fixos, False)
 
     def ir_a_proxima_duvidosa(self, depois_de: int) -> bool:
         """O cursor no começo da próxima palavra com um glifo duvidoso (pendente, sem

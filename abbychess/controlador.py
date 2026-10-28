@@ -1857,7 +1857,7 @@ class ControladorDePagina:
 
     def confirmar_sessao(self, unidades, novo: str, *, ensinar_gid: Optional[int] = None,
                          original: Optional[str] = None, fixos=(), depois=None,
-                         fim_de_linha: bool = False, agora: bool = False) -> None:
+                         agora: bool = False) -> None:
         """§6.3: a sessão do Documento confirmada (Enter, Shift+Enter, Ctrl+Enter, sair dela):
         as unidades originais dela e o texto de agora viram as operações da tabela, num passo
         do desfazer, e os glifos dela com leitura ficam `revisado`. Sem mudança, é aceitar a
@@ -1866,7 +1866,7 @@ class ControladorDePagina:
         cursor no mesmo passo do desfazer (`ss.LETRA_NOVA`: uma letra digitada agora, que não
         ensina). `fixos`: os pares que nenhuma edição tocou (`sessao.alinhar`). `depois()`
         roda quando a edição entrou na página (na hora, ou na vez dela na fila).
-        `fim_de_linha`: a sessão termina numa quebra de linha impressa. `agora`: aplica já,
+        `agora`: aplica já,
         sem a fila (fechar o projeto, que esvazia a fila)."""
         unidades = list(unidades)
         original = original if original is not None else "".join(u.texto for u in unidades)
@@ -1890,7 +1890,7 @@ class ControladorDePagina:
                 self.eventos.emitir("sessao_recusada", "a página mudou antes da confirmação")
                 return
             try:
-                plano = ss.planejar(unidades, novo, fixos, fim_de_linha)
+                plano = ss.planejar(unidades, novo, fixos)
             except ss.Recusa as recusa:
                 self.eventos.emitir("sessao_recusada", str(recusa))
                 return
@@ -1967,7 +1967,14 @@ class ControladorDePagina:
             return
         linha = next((ln for b in self.documento().blocos for ln in b.linhas
                       if any(gid in p.gids for p in ln.palavras)), None)
-        inicio = next((g for p in linha.palavras for g in p.gids), gid) if linha else gid
+        # O primeiro glifo da linha com leitura (não um virtual, nem um box ainda não lido:
+        # a exportação lê o parágrafo pelo primeiro glifo lido da linha).
+        lidos = {b.gid for b in self.modelo.boxes if b.entry.char}
+        inicio = next((g for p in linha.palavras for g in p.gids if g in lidos),
+                      gid if gid in lidos else None) if linha else (gid if gid in lidos else None)
+        if inicio is None:
+            self._avisar("A linha não tem glifo lido onde começar o parágrafo.", 6000)
+            return
         tirar = inicio in self.modelo.decisoes.paragrafo_antes
 
         def corpo():

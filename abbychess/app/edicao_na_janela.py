@@ -11,7 +11,7 @@ from abbychess.app import teclado
 
 class EdicaoNoDocumento:
     def _sessao_do_documento(self, unidades, novo, avancar, ensinar_gid, ultimo, fixos,
-                             fim_de_linha=False, agora=False) -> None:
+                             agora=False) -> None:
         """A sessão confirmada: o controlador aplica; quando a edição entra na página (na
         hora, ou na vez dela na fila), o Documento é montado de novo do modelo e o cursor fica
         onde estava ao confirmar (o texto montado é o digitado: sair da sessão para outra
@@ -26,8 +26,7 @@ class EdicaoNoDocumento:
             else:
                 self.texto.ir_a_marca(marca)
         self.pagina.confirmar_sessao(unidades, novo, ensinar_gid=ensinar_gid, fixos=fixos,
-                                     depois=entrou, fim_de_linha=fim_de_linha,
-                                     agora=agora)
+                                     depois=entrou, agora=agora)
 
     def confirmar_a_sessao_aberta(self, agora: bool = False) -> None:
         """Antes de sair da página (outra página, o Ctrl+T, fechar o projeto): a sessão aberta

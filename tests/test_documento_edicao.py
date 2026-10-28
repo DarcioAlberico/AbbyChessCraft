@@ -567,6 +567,21 @@ def test_ctrl_shift_enter_no_meio_da_linha_abre_a_linha_e_de_novo_tira(j):
     assert not pagina.decisoes.paragrafo_antes
 
 
+def test_ctrl_shift_enter_com_um_virtual_no_comeco_da_linha(j):
+    """A linha que começa por uma letra digitada (um virtual, sem box): o parágrafo vai ao
+    primeiro glifo lido dela (antes, ValueError dentro da edição)."""
+    pagina = _escrever(j, "casa", "longe")
+    _por_o_cursor(j, 5)                                   # o começo de "longe"
+    QTest.keyClicks(j.texto, "y")
+    _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    assert pagina.decisoes.virtuais
+    _por_o_cursor(j, 8)
+    _tecla(j, Qt.Key.Key_Return,
+           Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+    l_de_longe = next(b.gid for b in pagina.boxes if b.entry.char == "l")
+    assert pagina.decisoes.paragrafo_antes == {l_de_longe}
+
+
 def test_o_cursor_volta_ao_lugar_quando_a_montagem_tira_o_espaco_a_mais(j):
     _escrever(j, "ganhar tempos fim")
     _por_o_cursor(j, 6)

@@ -363,3 +363,11 @@ def test_apagar_o_hifen_de_fim_de_linha_junta_a_palavra_na_exportacao():
     entries, estrutura = ex.Estrutura.da_pagina(p)
     blocos = ex.pagina_extraida(0, entries, estrutura=estrutura).blocos
     assert [b.texto for b in blocos if hasattr(b, "texto")] == ["exemplo"]
+
+
+def test_apagar_um_travessao_solto_no_fim_da_linha_nao_junta_palavras():
+    """Só o hífen colado à palavra a parte: o travessão solto ("velha -") que sai não junta
+    "velha" com a palavra da linha seguinte."""
+    p = _pagina("casa velha -", "plo longe")
+    _editar(p, "casa velha -\nplo", "casa velha \nplo")
+    assert not p.decisoes.juncoes

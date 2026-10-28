@@ -116,7 +116,7 @@ class PainelDePaginas(QWidget):
         self.pendentes_da_saude.linkActivated.connect(lambda alvo: self.abrir.emit(int(alvo)))
         self.padroes_da_saude = QLabel()
         self.padroes_da_saude.setWordWrap(True)
-        self.rotulo_do_limiar = QLabel("Destacar o lote com até estes pendentes:")
+        self.rotulo_do_limiar = QLabel("Destacar \"Reconhecer o livro\" com até estes pendentes:")
         self.rotulo_do_limiar.setWordWrap(True)
         self.limiar_da_saude = QSpinBox()
         self.limiar_da_saude.setRange(0, 9999)

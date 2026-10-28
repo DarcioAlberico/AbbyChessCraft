@@ -183,6 +183,9 @@ class ControladorDePagina:
         #: Na ordem de leitura: (página, posição na ordem da página) do último glifo mostrado,
         #: para a decisão seguir em frente mesmo quando o glifo sai (descartar, juntar).
         self._lugar_de_leitura = (-1, 0)
+        #: Quantas vezes a ordem do livro mudou (§12.4): quem guarda posições de páginas
+        #: numa espera (a Galeria do livro) confere por ele.
+        self.mudancas_da_sequencia = 0
         #: (chave, gids) da última conta das margens corridas (`gids_de_margem`).
         self._margens: tuple = (None, frozenset())
         self.selecao: set = set()
@@ -932,6 +935,7 @@ class ControladorDePagina:
                 alvo = min(self.indice, len(nova) - 1)
             if alvo != self.indice or nova.entrada_em(alvo) != aberta:
                 self.ir_para(alvo, visita=False)    # a página aberta mudou de lugar ou saiu
+        self.mudancas_da_sequencia += 1
         self.eventos.emitir("sequencia_mudou")
 
     def recarregar(self) -> None:
@@ -1003,8 +1007,10 @@ class ControladorDePagina:
             self.pulados.add(self.atual)
             self.escolher(self.fila()[0])
             return
-        posicao = fila.index(self.atual) if self.atual in fila else 0
-        self.escolher(fila[(posicao + passo) % len(fila)])
+        if self.atual not in fila:               # fora da fila: o primeiro (ou o último) dela
+            self.escolher(fila[0] if passo > 0 else fila[-1])
+            return
+        self.escolher(fila[(fila.index(self.atual) + passo) % len(fila)])
 
     def verificar(self, indice: Optional[int] = None) -> None:
         """Ctrl+T: a página está verificada (§4.4), e a próxima página não verificada abre.
@@ -2229,6 +2235,7 @@ class ControladorDePagina:
             return
         self._avisar(f"Esquecida(s) {quantas} amostra(s); procurando no livro os glifos que "
                      "ela(s) leram…", 0)
+        # (Se a ordem do livro muda no meio, a busca procura de novo pela ordem nova.)
         procurar(nomes, lambda achados: self._devolver_no_livro(
             nomes, achados, transacao, devolvidos, quantas))
 
@@ -2316,6 +2323,8 @@ class ControladorDePagina:
         """O resultado da procura no livro: as outras páginas, na mesma transação (se ela
         não foi desfeita no meio)."""
         if transacao.invalidada or self.projeto is None:
+            if transacao.invalidada:             # a mensagem "procurando…" não fica na barra
+                self._avisar("Esquecer desfeito antes de a procura no livro voltar.", 6000)
             return
         for indice, gids in sorted(achados.items()):
             if self.modelo is not None and indice == self.indice:

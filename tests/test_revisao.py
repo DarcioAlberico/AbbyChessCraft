@@ -187,6 +187,36 @@ def test_refazer_o_esquecer_desfeito_antes_da_procura_devolve_os_30(livro):
     assert c.da_amostra() == 0 and not Path(c.caminho).exists()
 
 
+def test_a_ordem_que_muda_durante_a_procura_do_esquecer_procura_de_novo(livro):
+    """Mover páginas enquanto a procura do esquecer roda: as posições achadas são as de antes;
+    a procura roda de novo pela ordem nova, e os 30 glifos voltam à fila nas páginas certas."""
+    c = _amostra_em_tres_paginas(livro)
+    c.ctl.esquecer([c.caminho])
+    c.ctl.executar.tudo()
+    assert c.na_fila() == 10                            # só a página aberta, por enquanto
+    assert c.ctl.mover_paginas([2], -1)                 # a 3ª vai para o começo
+    c.ctl.executar.tudo()
+    c.esperar(lambda: c.na_fila() == 30)
+    assert c.da_amostra() == 0
+
+
+def test_a_galeria_em_duas_paginas_com_leituras_diferentes_e_um_passo(livro):
+    """`corrigir_no_livro` com uma leitura por glifo, em duas páginas: um passo do desfazer, e
+    o Ctrl+Z devolve as duas páginas."""
+    projeto, ctl, fila = livro
+    g0 = [b.gid for b in projeto.carregar_modelo(0).boxes][:2]
+    g2 = [b.gid for b in projeto.carregar_modelo(2).boxes][:1]
+    ctl.corrigir_no_livro({0: g0, 2: g2}, {(0, g0[0]): "x", (0, g0[1]): "y", (2, g2[0]): "z"})
+    ctl.executar.tudo()
+    leituras = lambda i, gids: [projeto.carregar_modelo(i).box(g).entry.char for g in gids]  # noqa: E731
+    assert leituras(0, g0) == ["x", "y"] and leituras(2, g2) == ["z"]
+    transacao = ctl.historico.proxima_a_desfazer()
+    assert len(transacao.paginas) == 2                  # as duas páginas, num passo só
+    ctl.desfazer()
+    ctl.executar.tudo()
+    assert leituras(0, g0) == ["c", "a"] and leituras(2, g2) == ["b"]
+
+
 def test_ensinar_e_esquecer_varios_de_uma_vez(tmp_path):
     import numpy as np
 
@@ -277,14 +307,57 @@ def test_o_aviso_e_o_enter_recortam_da_matriz_do_cache(livro, monkeypatch):
     assert ctl._cinza() is ctl.imagem
 
 
+#: A tabela do §4.4 escrita aqui, à mão (e não lida do `modelo`): cada (estado, evento) que
+#: muda o estado. Marcar um glifo também é edição; reconhecer de novo deixa `em_revisao`.
+_SAIDAS_DO_4_4 = {
+    ("nao_reconhecida", "marcar"): "glifos_marcados",
+    ("nao_reconhecida", "reconhecer"): "reconhecida",
+    ("glifos_marcados", "reconhecer"): "reconhecida",
+    ("reconhecida", "editar"): "em_revisao",
+    ("reconhecida", "marcar"): "em_revisao",
+    ("reconhecida", "verificar"): "verificada",
+    ("em_revisao", "verificar"): "verificada",
+    ("verificada", "editar"): "em_revisao",
+    ("verificada", "marcar"): "em_revisao",
+    ("verificada", "reconhecer"): "em_revisao",
+    ("verificada", "esquecer_padrao"): "em_revisao",
+}
+
+
 def test_ca_8_5_todas_as_transicoes_do_4_4():
-    """Cada par (estado, evento) da tabela, e todo par fora dela deixa o estado como está."""
+    """Cada par (estado, evento) do §4.4 vai aonde a tabela diz; todo par fora dela deixa o
+    estado como está (o evento que não se aplica não estraga a página)."""
     from abbychess import modelo as md
 
-    eventos = {e for _s, e in md._TRANSICOES}
+    eventos = {"marcar", "reconhecer", "editar", "verificar", "esquecer_padrao"}
+    assert set(md.ESTADOS) == {"nao_reconhecida", "glifos_marcados", "reconhecida",
+                               "em_revisao", "verificada"}
     for estado in md.ESTADOS:
         for evento in eventos:
-            esperado = md._TRANSICOES.get((estado, evento), estado)
+            esperado = _SAIDAS_DO_4_4.get((estado, evento), estado)
             assert md.proximo_estado(estado, evento) == esperado, (estado, evento)
-    assert md.proximo_estado(md.VERIFICADA, "esquecer_padrao") == md.EM_REVISAO
-    assert md.proximo_estado(md.RECONHECIDA, "verificar") == md.VERIFICADA
+
+
+def test_alt_baixo_fora_da_fila_vai_ao_primeiro_dela(livro):
+    """O glifo atual fora da fila (um confiável escolhido com o mouse): Alt+↓ vai ao primeiro
+    da fila e Alt+↑ ao último, sem pular nenhum."""
+    projeto, ctl, fila = livro
+    fila.definir("confianca")
+    confiavel = next(b.gid for b in ctl.modelo.boxes if b.entry.confidence >= 0.9)
+    ctl.escolher(confiavel)
+    ctl.andar(+1)
+    assert ctl.atual == ctl.fila()[0]
+    ctl.escolher(confiavel)
+    ctl.andar(-1)
+    assert ctl.atual == ctl.fila()[-1]
+
+
+def test_o_ctrl_t_da_pergunta_nao_marca_outra_pagina(livro):
+    """A pergunta do Ctrl+T leva a página dela: aceita depois de abrir outra, não marca nada."""
+    from abbychess.modelo import VERIFICADA
+
+    projeto, ctl, fila = livro
+    ctl.verificar(2)                                    # a pergunta era da página 3
+    ctl.executar.tudo()
+    assert ctl.indice == 0 and ctl.modelo.estado != VERIFICADA
+    assert projeto.carregar_modelo(2).estado != VERIFICADA

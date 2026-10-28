@@ -136,3 +136,14 @@ def test_trocar_de_pagina_fecha_a_pergunta_do_ctrl_t(jb, monkeypatch):  # noqa: 
     jb.pagina.indice -= 1
     assert jb.pagina.modelo.estado != "verificada"       # a outra página não é marcada
     assert marcadas == []
+
+
+def test_a_ordem_do_livro_que_muda_esvazia_a_galeria(jb):  # noqa: F811
+    """Os glifos da Galeria citam posições de páginas: com a ordem do livro mudada, corrigi-los
+    editaria outra página. A Galeria se esvazia e pede para abrir de novo."""
+    _uns(jb, 3)
+    jb.abrir_galeria("1", "pagina")
+    assert jb.galeria.modelo.rowCount() == 3
+    jb.pagina.eventos.emitir("sequencia_mudou")
+    assert jb.galeria.modelo.rowCount() == 0
+    assert "ordem do livro mudou" in jb.galeria.titulo.text()

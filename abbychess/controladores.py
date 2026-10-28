@@ -1590,6 +1590,11 @@ class ControladorDaBusca:
             def fim():
                 self._em_refazer.pop(leitura, None)
                 if geracao != self._geracao:
+                    # O índice foi montado de novo no meio. Pela ordem nova do mesmo projeto
+                    # (§12.4), as posições achadas são as de antes: procura de novo. Outro
+                    # projeto aberto: a procura se perde.
+                    if self.pagina.projeto is projeto:
+                        self.lidos_por(amostras, ao_terminar)
                     return
                 if leitura:
                     self._guardar(leitura, refeitas)

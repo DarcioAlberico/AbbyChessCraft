@@ -33,8 +33,19 @@ class GaleriaNaJanela:
         g.escolhido.connect(self._galeria_escolhido)
         self._char_da_galeria = ""
         self._carga_da_galeria = 0
+        self._pedido_da_galeria = 0
         self._galeria_pendente = None
         self.eventos.ligar("galeria_aplicada", self._galeria_aplicada)
+        self.eventos.ligar("sequencia_mudou", self._galeria_sem_ordem)
+
+    def _galeria_sem_ordem(self) -> None:
+        """A ordem do livro mudou (§12.4): os glifos da Galeria citam posições de antes, e
+        corrigi-los editaria a página que agora está ali. A Galeria se esvazia."""
+        self._carga_da_galeria += 1              # os recortes em curso não entram
+        self._pedido_da_galeria += 1             # nem a Galeria do livro que ainda junta
+        self._galeria_pendente = None
+        if self.galeria.modelo.itens:
+            self.galeria.mostrar("A ordem do livro mudou: abra a Galeria de novo", [], None)
 
     # ------------------------------------------------------------------
     def verificar_pagina(self) -> None:
@@ -73,8 +84,13 @@ class GaleriaNaJanela:
             self._mostrar_na_galeria(f"Galeria de {nome} na página {p.indice + 1}", itens, escopo)
             return
         self.statusBar().showMessage(f"Juntando os glifos de {nome} do livro…", 0)
+        self._pedido_da_galeria += 1
+        pedido, versao = self._pedido_da_galeria, p.mudancas_da_sequencia
 
         def chegou(achados):
+            # Uma resposta velha (outro pedido depois, ou a ordem do livro mudou) não entra.
+            if pedido != self._pedido_da_galeria or versao != p.mudancas_da_sequencia:
+                return
             self.statusBar().clearMessage()
             itens = [Item(a.pagina, a.gid, a.char, a.confianca, a.fonte) for a in achados
                      if a.char == char]

@@ -200,8 +200,9 @@ def montar(janela) -> None:
     j.acao_areas = acao(j, "modo_areas", j.modo_areas, texto="Editor de áreas",
                         barra=barra, marcavel=True)
     teclado.dica(j.acao_areas, "Editor de áreas ({modo_areas}): arraste para desenhar uma área; "
-                               "arraste dentro dela para mover e na borda para esticar. 1-4 "
-                               "trocam o tipo, Del apaga.")
+                               "arraste dentro dela para mover e na borda para esticar. A "
+                               "letra da função a troca (T, H, C, R, P, N, L, D, I, X; o botão "
+                               "direito mostra a lista), Del apaga.")
     j.acao_areas_auto = acao(j, "areas_automaticas", j.areas.automaticas,
                              texto="Refazer as áreas automáticas")
     j.acao_reconhecer_zona = acao(j, "reconhecer_zona", j.areas.reconhecer_atual,

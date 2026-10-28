@@ -435,7 +435,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         elif sim:
             self.statusBar().showMessage(
                 "Editor de áreas: arraste para desenhar, dentro para mover, na borda para "
-                "esticar; 1 texto, 2 diagrama, 3 imagem, 4 ignorar; Del apaga. "
+                "esticar; a letra troca a função (T texto, H título, C cabeçalho, R rodapé, "
+                "L legenda, X ignorar… ou o botão direito); Del apaga. "
                 + teclado.com_teclas("{reconhecer_pagina} reconhece pelas áreas."), 10000)
         else:
             self.statusBar().showMessage("Editor de áreas desligado.", 5000)

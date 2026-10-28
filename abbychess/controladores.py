@@ -62,6 +62,11 @@ class ControladorDeLayout:
         return self.pagina.zonas
 
     @property
+    def ordem_clicada(self) -> Optional[List[int]]:
+        """As áreas já clicadas no Ordenar, na ordem (None fora dele)."""
+        return None if self._ordenacao is None else list(self._ordenacao)
+
+    @property
     def ordenando(self) -> bool:
         """Se o Ordenar está em curso (o Esc o cancela antes de qualquer outra coisa)."""
         return self._ordenacao is not None
@@ -130,8 +135,8 @@ class ControladorDeLayout:
         zonas = self._aprender_margens(zonas)
         self._trocar(zonas, None, "Áreas automáticas")
         tipos: dict = {}
-        for z in zonas:
-            nome = zn.NOMES[z.tipo].lower()
+        for z in zonas:                          # pela função, que é o que se corrige
+            nome = zn.NOMES_DAS_FUNCOES[z.funcao].lower()
             tipos[nome] = tipos.get(nome, 0) + 1
         resumo = ", ".join(f"{n} {t}" for t, n in tipos.items()) or "nenhuma"
         self.pagina._avisar(f"Áreas automáticas: {resumo}. Corrija e aperte "
@@ -171,19 +176,24 @@ class ControladorDeLayout:
             return
         zonas = self.zonas + [zona]
         self._trocar(zonas, len(zonas) - 1, "Desenhar área")
-        p._avisar(f"Área {len(zonas)} de texto criada. 2 diagrama, 3 imagem, 4 ignorar.", 6000)
+        p._avisar(f"Área {len(zonas)} de texto criada: a letra da função a troca (T texto, "
+                  "H título, C cabeçalho, R rodapé, P nº de página, N nota, L legenda, "
+                  "D diagrama, I imagem, X ignorar).", 8000)
 
     def escolher(self, indice: int) -> None:
         if self._ordenacao is not None and 0 <= indice < len(self.zonas):
             if indice not in self._ordenacao:
                 self._ordenacao.append(indice)
             if len(self._ordenacao) == len(self.zonas):
-                self._trocar(zn.ordenar(self.zonas, self._ordenacao), indice, "Ordenar áreas")
-                self._ordenacao = None
+                self._ordenacao, ordem = None, self._ordenacao
+                self._trocar(zn.ordenar(self.zonas, ordem), indice, "Ordenar áreas")
+                self.pagina._avisar(f"Áreas ordenadas ({len(ordem)}) · Ctrl+Z desfaz.", 6000)
             else:
                 self.atual = indice
                 self.eventos.emitir("layout_mudou")
                 self.eventos.emitir("acoes_mudaram")
+                self.pagina._avisar(f"Ordenar: {len(self._ordenacao)} de {len(self.zonas)} · "
+                                    "clique na próxima · Esc cancela.", 0)
             return
         self.atual = indice if 0 <= indice < len(self.zonas) else None
         self.eventos.emitir("layout_mudou")
@@ -253,7 +263,9 @@ class ControladorDeLayout:
             return
         largura, altura = p.imagem.size
         self.modelo = zn.ModeloDeAreas(largura, altura, tuple(self.zonas))
-        p._avisar(f"Modelo salvo com {len(self.zonas)} área(s).", 5000)
+        p.eventos.emitir("acoes_mudaram")        # "Aplicar o modelo" liga já
+        p._avisar(f"Modelo salvo com {len(self.zonas)} área(s): Aplicar o modelo de áreas o "
+                  "leva a um intervalo de páginas.", 6000)
 
     def aplicar_modelo(self, indices: Sequence[int]) -> None:
         """Aplica o modelo a um intervalo já filtrado (todos, pares ou ímpares).

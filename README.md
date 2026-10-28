@@ -192,9 +192,8 @@ mais como texto puro:
   o rodapé corridos** (a linha curta na faixa de cima ou de baixo, separada do texto, com o
   número da página: a mesma regra que os tira da exportação) saem em cinza pequeno, e
   **Ctrl+Shift+H** (ou "Cabeçalhos e rodapés", na barra do Documento) os oculta. Os títulos
-  em negrito e as notas em corpo menor dependem da função das áreas, que só o layout do
-  passo F dá: até lá, o título sai como o corpo. Refluir as linhas em parágrafos também fica
-  para o F: sem os parágrafos, o título e o corpo da mesma área se juntariam.
+  em negrito e as notas em corpo menor vêm da função das áreas (desde o passo F: o título, a
+  legenda, a nota, o cabeçalho e o rodapé aprendidos pelo livro; ver "Editor de áreas").
 - **Os diagramas no lugar deles**, inteiros: o desenho da posição lida (o recorte da página,
   se ainda não lida), a linha do diagrama em monoespaçado, o estado (conferido, lido e não
   conferido, não lido; o "confiável pelos lances" de §6.1 vem com a validação pelos lances,
@@ -528,8 +527,19 @@ sempre com as pastas do projeto.
   a página ganha as áreas automáticas que a segmentação sugere: um bloco de texto por grupo de
   linhas sem vão grande e um diagrama por tabuleiro, com a margem das coordenadas. O arraste
   fora das áreas desenha uma área de texto; dentro de uma área, a escolhe e move; na borda da
-  escolhida, a estica. As teclas **1** a **4** trocam o tipo (texto, diagrama, imagem,
-  ignorar), **Del** apaga, e o botão direito faz as duas coisas. O F5 e o lote passam a
+  escolhida, a estica. Desde o passo F, cada área tem uma **função**, com a cor e o nome no
+  canto: a letra a troca (**T** texto, **H** título, **C** cabeçalho, **R** rodapé, **P** nº
+  de página, **N** nota, **L** legenda, **D** diagrama, **I** imagem, **X** ignorar; também
+  pelo botão direito), e as teclas **1** a **4** trocam o tipo (texto, diagrama, imagem,
+  ignorar). As automáticas já vêm com função: o título pelo tamanho das maiúsculas, a legenda
+  ("Diagrama N", "Teste N", de quem é a vez, ao lado ou embaixo do diagrama) ligada a ele, a
+  poeira como ignorar, e o cabeçalho, o rodapé e o número de página aprendidos pelas páginas
+  lidas do livro. Uma área que você mexe deixa de ser automática: nada a reclassifica.
+  **Ordenar áreas** pede um clique em cada área na ordem de leitura (a barra conta "2 de 13",
+  e cada área mostra a ordem nova; **Esc** cancela), e o Documento segue essa ordem.
+  **Salvar o modelo de áreas** guarda as áreas da página, e **Aplicar o modelo** as leva a um
+  intervalo, a todas, às pares ou às ímpares (num passo do Ctrl+Z; página de outra resolução
+  é recusada). **Ctrl+Shift+R** relê só a área escolhida. **Del** apaga. O F5 e o lote passam a
   reconhecer pelas áreas: só o que está numa área de texto vira box, cada diagrama vira
   tabuleiro (o achado dentro dele, ou a própria área) e imagem e ignorar não geram nada. Onde
   áreas se sobrepõem vence a mais restritiva: ignorar e imagem, depois diagrama, depois texto.
@@ -1602,9 +1612,10 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 - **A camada do PDF pesquisável supõe página sem rotação.** Página com `/Rotate` no PDF
   recebe o texto nas coordenadas da página renderizada, que não batem com as da página
   girada.
-- **O cabeçalho corrido é achado por regra, não por layout.** A linha de cabeçalho colada no
-  texto (sem o vão), ou o cabeçalho que não tem número e aparece numa página só da
-  exportação, entra no texto como parágrafo.
+- **O cabeçalho corrido é aprendido pelas páginas lidas.** O cabeçalho que não tem número e
+  aparece numa página só entra no texto como parágrafo; o Documento não mostra o editor
+  "Área" no Inspetor (a função se troca pela letra ou pelo botão direito), e o vínculo da
+  legenda ao diagrama não se edita à mão (ele vem do vizinho mais perto).
 - **As áreas valem no próximo reconhecimento.** Mudar uma área não tira nem acrescenta boxes
   na hora: é preciso o F5, que troca os boxes da página pelos das áreas.
 - **A verificação de texto não junta nem separa palavras.** "ganhartempos" aparece como uma

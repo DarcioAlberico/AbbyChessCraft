@@ -330,6 +330,7 @@ def paginas_do_modelo_de_areas(janela, total: int) -> Optional[List[int]]:
     """Intervalo e paridade em que aplicar um modelo de áreas."""
     texto, ok = QInputDialog.getText(
         janela, "Aplicar modelo de áreas",
+        f"As áreas destas páginas são trocadas pelas do modelo.\n"
         f"Páginas (de 1 a {total}; por exemplo 5-20):", text=f"1-{total}")
     if not ok:
         return None

@@ -381,8 +381,12 @@ class VisorDePagina(QGraphicsView):
         self.viewport().setCursor(Qt.CursorShape.OpenHandCursor if livre
                                   else Qt.CursorShape.CrossCursor)
 
-    def mostrar_zonas(self, zonas, selecionada: Optional[int] = None) -> None:
-        """Desenha as áreas, com o número e o tipo no canto. Só no editor de áreas."""
+    def mostrar_zonas(self, zonas, selecionada: Optional[int] = None,
+                      ordem_clicada: Optional[list] = None) -> None:
+        """Desenha as áreas, com o número da ordem e a função no canto, sobre um fundo de
+        papel (o texto colorido solto sumia sobre o impresso). Só no editor de áreas. No
+        Ordenar (`ordem_clicada`), as clicadas mostram a ordem nova e as outras um "?"."""
+        self.ordenando = ordem_clicada is not None
         cena = self.scene()
         for item in self._zonas_itens:
             cena.removeItem(item)
@@ -403,13 +407,21 @@ class VisorDePagina(QGraphicsView):
             fundo.setAlpha(45 if i == self._zona_sel else 25)
             item = cena.addRect(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1, caneta, QBrush(fundo))
             item.setZValue(5)
-            numero = z.ordem + 1 if z.ordem is not None else i + 1
+            if ordem_clicada is not None:
+                numero = ordem_clicada.index(i) + 1 if i in ordem_clicada else "?"
+            else:
+                numero = z.ordem + 1 if z.ordem is not None else i + 1
             rotulo = cena.addSimpleText(f"{numero} {zn.NOMES_DAS_FUNCOES[z.funcao]}")
             rotulo.setBrush(QBrush(cor))
             rotulo.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
             rotulo.setPos(z.x1 + 2, z.y1 + 2)
             rotulo.setZValue(6)
-            self._zonas_itens += [item, rotulo]
+            caixa = rotulo.boundingRect().adjusted(-2, -1, 2, 1)
+            fundo_do_rotulo = cena.addRect(caixa, QPen(cor), QBrush(estilo.PAPEL))
+            fundo_do_rotulo.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
+            fundo_do_rotulo.setPos(z.x1 + 2, z.y1 + 2)
+            fundo_do_rotulo.setZValue(5.5)
+            self._zonas_itens += [item, fundo_do_rotulo, rotulo]
 
     def menu_da_zona(self, indice: int) -> QMenu:
         """A função da área e apagá-la, pelo botão direito."""
@@ -506,6 +518,11 @@ class VisorDePagina(QGraphicsView):
         fora de todas, começa uma área nova."""
         x, y = ponto.x(), ponto.y()
         sel = self._zona_sel
+        if getattr(self, "ordenando", False):
+            indice = zn.zona_em(self._zonas, x, y)
+            if indice is not None:
+                self.zona_escolhida.emit(indice)
+            return
         if sel is not None:
             bordas = zn.bordas_em(self._zonas[sel], x, y, self._pega())
             if bordas:

@@ -225,7 +225,7 @@ class DesenhoDaJanela:
                                          8000)
 
     def _layout_mudou(self) -> None:
-        self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual)
+        self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual, self.areas.ordem_clicada)
 
     def _palavra_mudou(self) -> None:
         v, p = self.verificador, self.pagina

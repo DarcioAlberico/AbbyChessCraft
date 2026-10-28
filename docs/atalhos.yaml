@@ -231,7 +231,7 @@ acoes:
      sem_atalho: [padrao, finereader], desde_passo: F}
   - {id: salvar_modelo_areas, descricao: Salvar modelo de áreas, escopo: [imagem_areas],
      sem_atalho: [padrao, finereader], desde_passo: F}
-  - {id: aplicar_modelo_areas, descricao: Aplicar modelo de áreas nesta página, escopo: [imagem_areas],
+  - {id: aplicar_modelo_areas, descricao: Aplicar o modelo de áreas a páginas…, escopo: [imagem_areas],
      sem_atalho: [padrao, finereader], desde_passo: F}
 
   # --- Inspetor: Glifo (o treino) --------------------------------------------------

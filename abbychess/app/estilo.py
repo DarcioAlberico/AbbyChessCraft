@@ -134,12 +134,12 @@ COR_DA_ZONA = {
     "ignorar": QColor(127, 140, 141),
 }
 COR_DA_FUNCAO = {
-    "texto": QColor(46, 134, 222), "titulo": QColor(52, 73, 94),
-    "cabecalho": QColor(142, 68, 173), "rodape": QColor(125, 60, 152),
-    "numero_de_pagina": QColor(91, 44, 111), "nota": QColor(22, 160, 133),
-    "legenda": QColor(243, 156, 18), "diagrama": QColor(39, 174, 96),
-    "figura": QColor(211, 84, 0), "tabela": QColor(192, 57, 43),
-    "ignorar": QColor(127, 140, 141),
+    "texto": QColor(0, 95, 170), "titulo": QColor(120, 40, 150),
+    "cabecalho": QColor(170, 70, 0), "rodape": QColor(110, 100, 0),
+    "numero_de_pagina": QColor(160, 0, 90), "nota": QColor(0, 115, 105),
+    "legenda": QColor(0, 125, 45), "diagrama": QColor(40, 40, 40),
+    "figura": QColor(190, 30, 30), "tabela": QColor(90, 60, 30),
+    "ignorar": QColor(105, 105, 105),
 }
 
 #: O Documento é papel nos dois temas: os fundos dos destaques são deste papel.

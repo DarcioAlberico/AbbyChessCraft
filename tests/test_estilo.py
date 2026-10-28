@@ -218,3 +218,13 @@ def test_o_tema_novo_e_avisado(app, tema_claro_no_fim):
         estilo.avisos().tema_mudou.disconnect(recebidos.append)
     assert recebidos == ["escuro", "claro"]
 
+
+
+def test_as_cores_das_funcoes_das_areas_tem_contraste_no_papel():
+    """CA-13.2 também no modo Áreas: a cor de cada função (o contorno e o rótulo) passa de
+    3:1 contra o papel e contra o cinza 230 (a legenda e o diagrama ficavam em 2,2 e 2,9)."""
+    from abbychess.app import estilo
+
+    for funcao, cor in estilo.COR_DA_FUNCAO.items():
+        assert estilo.contraste(cor, estilo.PAPEL) >= 3, funcao
+        assert estilo.contraste(cor, estilo.PAPEL_ESCURO) >= 3, funcao

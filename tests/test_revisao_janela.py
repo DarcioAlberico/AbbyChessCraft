@@ -34,6 +34,23 @@ def test_ca_8_1_digitar_na_galeria_corrige_40_num_passo(jb):  # noqa: F811
     assert all(i.char == "l" for i in g.modelo.itens)    # a grade mostra a leitura nova
     jb.desfazer()                                         # um passo do desfazer
     _ate(lambda: sum(b.entry.char == "1" for b in jb.pagina.modelo.boxes) == 40)
+    assert all(i.char == "1" for i in g.modelo.itens)    # e a grade volta com ele
+    jb.refazer()
+    _ate(lambda: all(i.char == "l" for i in g.modelo.itens))
+
+
+def test_a_celula_da_galeria_tem_o_tamanho_do_recorte_antes_de_ele_chegar(jb):  # noqa: F811
+    """A grade mede a célula pelo primeiro item: sem o quadro do tamanho do recorte, as
+    células saíam cortadas (uma tira de ~11×14 px) até um reset."""
+    from abbychess.app.galeria import LADO
+
+    _uns(jb, 3)
+    jb.abrir_galeria("1", "pagina")
+    g = jb.galeria
+    g.vista.resize(400, 300)
+    g.vista.doItemsLayout()
+    retangulo = g.vista.visualRect(g.modelo.index(0))
+    assert retangulo.width() >= LADO and retangulo.height() >= LADO
 
 
 def test_shift_enter_so_corrige_e_enter_ensina_uma_amostra_por_glifo(jb):  # noqa: F811
@@ -83,7 +100,7 @@ def test_a_aba_padroes_filtra_vai_a_origem_e_esquece_com_delete(app, tmp_path): 
     assert painel.caracteres.currentItem().data(Qt.ItemDataRole.UserRole) == "1"
     item = painel.amostras.item(0)
     assert "p. 21" in item.text() and "leu 14" in item.text()
-    assert "Altura relativa: 1.02" in item.toolTip()
+    assert "Altura relativa: 1,02" in item.toolTip() and "Efeito: não medido" in item.toolTip()
     idas, esquecidas = [], []
     painel.ir_para.connect(lambda pagina, gid: idas.append((pagina, gid)))
     painel.esquecer.connect(esquecidas.append)

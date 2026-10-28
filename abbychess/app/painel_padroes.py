@@ -29,6 +29,20 @@ def _pagina_da_origem(origem, com_pagina: str, fora: str, sem: str) -> str:
     return fora if origem[0] is None else com_pagina.format(origem[0] + 1)
 
 
+def _efeito_por_extenso(efeito) -> str:
+    """O efeito gravado na amostra ([negrito, itálico], `null` no eixo não medido) em
+    palavras: "negrito", "itálico", "reto"; "não medido" sem nada."""
+    if not efeito:
+        return "não medido"
+    negrito, italico = (list(efeito) + [None, None])[:2]
+    if negrito is None and italico is None:
+        return "não medido"
+    partes = [nome for nome, valor in (("negrito", negrito), ("itálico", italico)) if valor]
+    if not partes:
+        return "reto"
+    return " e ".join(partes)
+
+
 class _GradeDeAmostras(QListWidget):
     """A grade das amostras: Delete esquece as selecionadas."""
 
@@ -155,13 +169,14 @@ class PainelDePadroes(QWidget):
     def _dica_da_amostra(self, arquivo) -> str:
         d = self._detalhes.get(str(arquivo), {})
         origem = d.get("origem")
-        linhas = [Path(arquivo).stem,
-                  _pagina_da_origem(origem, "Origem: página {}", "Origem: a página saiu do livro",
+        altura = d.get("altura")
+        linhas = [_pagina_da_origem(origem, "Origem: página {}", "Origem: a página saiu do livro",
                                     "Origem: não diz"),
-                  f"Altura relativa: {d['altura']:.2f}" if d.get("altura") is not None
+                  f"Altura relativa: {altura:.2f}".replace(".", ",") if altura is not None
                   else "Altura relativa: —",
-                  f"Efeito: {d['efeito']}" if d.get("efeito") else "Efeito: — (passo I)",
-                  f"Glifos do livro lidos por ela: {d.get('lidos', 0)}"]
+                  f"Efeito: {_efeito_por_extenso(d.get('efeito'))}",
+                  f"Glifos do livro lidos por ela: {d.get('lidos', 0)}",
+                  f"Arquivo: {Path(arquivo).name}"]
         return "\n".join(linhas)
 
     def _mostrar_amostras(self, *_args) -> None:
@@ -188,6 +203,7 @@ class PainelDePadroes(QWidget):
         tem_origem = len(itens) == 1 and bool(
             self._detalhes.get(itens[0].data(Qt.ItemDataRole.UserRole), {}).get("origem"))
         self.botao_ir.setEnabled(tem_origem)
+        self.botao_esquecer.setEnabled(bool(itens))
 
     def _ir_a_origem(self, item) -> None:
         if item is None:

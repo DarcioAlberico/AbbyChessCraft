@@ -352,8 +352,8 @@ você digita:
   página com pendentes (e o Alt+↑ no primeiro, a anterior), pelo resumo do `livro.json`, sem
   abrir as páginas; nas palavras, a página seguinte; o contador diz "3/12 · livro 410". A
   fila julga de novo só os glifos que mudaram. O **F6** também conta pelo resumo.
-- **A Galeria** (a terceira aba da vista direita; Editar › Galeria do caractere, ou a busca
-  por glifo): a grade dos recortes dos glifos lidos como o caractere do glifo atual, da
+- **A Galeria** (a aba Galeria da vista direita, que se preenche pelo glifo atual ao ser
+  aberta vazia; Editar › Galeria do caractere, ou a busca por glifo): a grade dos recortes dos glifos lidos como o caractere do glifo atual, da
   página ou do livro, do menos confiável ao mais, com a página e a confiança na dica. As
   setas, Shift e Ctrl+A selecionam; **digitar um caractere** o aplica à seleção, em quantas
   páginas forem, num passo do desfazer (sem ensinar); **Enter** ensina a seleção, uma amostra
@@ -1478,7 +1478,8 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   vêm do Windows como pedido de menu de contexto; o teste confere que cada painel abre o
   menu nesse pedido, não a tecla em si. A gaveta de Páginas é refeita do `livro.json` a cada
   troca de página e meio segundo depois de uma rajada de edições; com 230 páginas, ela fica
-  pronta ~0,1 s depois de abrir o projeto (CA-8.3, desde o passo C). Com ela aberta (o padrão de um projeto novo numa janela de
+  pronta logo depois de abrir o projeto (CA-8.3, desde o passo C: "Abrir ao painel de
+  Páginas" na tabela de desempenho, do `abrir()` do projeto, 5 aquecimentos e 30 rodadas). Com ela aberta (o padrão de um projeto novo numa janela de
   1600 px ou mais), a troca no cache passa de ~11 para ~16 ms na mediana (medida da revisão
   de produto, fora do protocolo); as medidas oficiais rodam com ela fechada.
 - **A memória do desfazer está no alvo** para correções de um glifo (é o que a medida faz:
@@ -1543,7 +1544,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   à página seguinte, uma a uma (o léxico não tem resumo no `livro.json`); o "iguais nesta
   página" do aviso de ensino conta os glifos com a mesma leitura, e não os de forma
   parecida; a Galeria do livro tira os recortes de cada página da fonte (a primeira vez,
-  ~0,15 s por página, em segundo plano); desde o passo I, o negrito medido por palavra fica
+  em segundo plano, sem medida no protocolo); desde o passo I, o negrito medido por palavra fica
   no glifo, é guardado na amostra ensinada e separa os vizinhos do k-NN, e o itálico também
   (pela inclinação das letras: palavra com 3 letras ou mais; no Odds & Ends, 0 falsos e ~96%
   das itálicas; no escaneado, a revocação não foi medida); o glifo devolvido à fila por um esquecer fica com a leitura e sem a fonte (a

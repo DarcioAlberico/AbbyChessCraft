@@ -28,6 +28,19 @@ from abbychess.app import estilo
 #: O lado do recorte na grade, em pixels.
 LADO = 56
 ESCOPOS = (("pagina", "Página"), ("livro", "Livro"))
+_QUADRO_VAZIO: List[QPixmap] = []
+#: O estado vazio (§13): o que fazer para a Galeria mostrar algo.
+VAZIA = ("Galeria vazia: escolha um glifo na Imagem ou no Documento e abra esta aba (ou "
+         "Editar › Galeria do caractere) para ver todos os glifos lidos como ele.")
+
+
+def _vazio() -> QPixmap:
+    """O quadro transparente do tamanho do recorte (um só, criado depois da QApplication)."""
+    if not _QUADRO_VAZIO:
+        quadro = QPixmap(LADO, LADO)
+        quadro.fill(estilo.TRANSPARENTE)
+        _QUADRO_VAZIO.append(quadro)
+    return _QUADRO_VAZIO[0]
 
 
 @dataclass
@@ -66,6 +79,26 @@ class ModeloDaGaleria(QAbstractListModel):
                 self.dataChanged.emit(indice, indice, [Qt.ItemDataRole.DecorationRole])
                 break
 
+    def atualizar_leituras(self, leituras) -> None:
+        """As leituras de agora ((página, gid) -> (char, confiança, fonte)), depois de um
+        desfazer ou de um refazer; os glifos que sumiram da página saem da grade."""
+        mudou = False
+        for item in list(self.itens):
+            chave = (item.pagina, item.gid)
+            if chave not in leituras:
+                continue
+            leitura = leituras[chave]
+            if leitura is None:
+                mudou = True
+                continue
+            if (item.char, item.confianca, item.fonte) != leitura:
+                item.char, item.confianca, item.fonte = leitura
+                mudou = True
+        if mudou:
+            self.beginResetModel()
+            self.itens = [i for i in self.itens if leituras.get((i.pagina, i.gid), ()) is not None]
+            self.endResetModel()
+
     def trocar_leitura(self, chaves, char: str) -> None:
         """A leitura nova dos glifos corrigidos (eles ficam na grade, com ela)."""
         chaves = set(chaves)
@@ -85,7 +118,11 @@ class ModeloDaGaleria(QAbstractListModel):
         if papel == Qt.ItemDataRole.DisplayRole:
             return item.char or "□"
         if papel == Qt.ItemDataRole.DecorationRole:
-            return self._figuras.get((item.pagina, item.gid))
+            # Até o recorte chegar (numa thread), um quadro vazio do mesmo tamanho: a grade
+            # mede a célula pelo primeiro item, e sem ele as células saíam cortadas.
+            return self._figuras.get((item.pagina, item.gid), _vazio())
+        if papel == Qt.ItemDataRole.SizeHintRole:
+            return QSize(LADO + 12, LADO + 22)
         if papel == Qt.ItemDataRole.ToolTipRole:
             fonte = f", {item.fonte}" if item.fonte else ""
             return (f"Página {item.pagina + 1} · '{item.char or '□'}' · "
@@ -139,7 +176,7 @@ class PainelDaGaleria(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.titulo = QLabel("Galeria: escolha um glifo e abra a Galeria do caractere dele.")
+        self.titulo = QLabel(VAZIA)
         self.titulo.setWordWrap(True)
         self.escopo = QComboBox()
         self.escopo.setAccessibleName("Galeria: a página ou o livro")

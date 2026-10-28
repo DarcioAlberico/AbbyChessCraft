@@ -34,9 +34,52 @@ class GaleriaNaJanela:
         self._char_da_galeria = ""
         self._carga_da_galeria = 0
         self._pedido_da_galeria = 0
+        self._mostrando_na_galeria = False
         self._galeria_pendente = None
         self.eventos.ligar("galeria_aplicada", self._galeria_aplicada)
         self.eventos.ligar("sequencia_mudou", self._galeria_sem_ordem)
+        self.eventos.ligar("historico_aplicado", self._galeria_depois_do_historico)
+        self.vista.currentChanged.connect(self._aba_da_galeria)
+
+    def _aba_da_galeria(self, _indice) -> None:
+        """Abrir a aba vazia (Alt+3, o clique) mostra a Galeria do caractere do glifo atual."""
+        p = self.pagina
+        if (self.vista.currentWidget() is self.galeria and not self._mostrando_na_galeria
+                and not self.galeria.modelo.itens and p.modelo is not None
+                and p.atual is not None):
+            self.abrir_galeria()
+
+    def _ir_a_galeria(self) -> None:
+        """A aba da Galeria à frente, sem o preenchimento pelo glifo atual (quem chama já vai
+        mostrar outra coisa nela)."""
+        self._mostrando_na_galeria = True
+        try:
+            self.vista.setCurrentWidget(self.galeria)
+        finally:
+            self._mostrando_na_galeria = False
+
+    def _galeria_depois_do_historico(self, pids) -> None:
+        """O Ctrl+Z ou o Ctrl+Y mudou páginas da Galeria: as leituras dos glifos dela voltam
+        a ser as das páginas (antes, a grade ficava com a correção desfeita)."""
+        p = self.pagina
+        if not self.galeria.modelo.itens or p.projeto is None:
+            return
+        posicoes = {p.projeto.posicao_do_pid(pid) for pid in pids} - {None}
+        afetadas = {i.pagina for i in self.galeria.modelo.itens} & posicoes
+        leituras = {}
+        for posicao in afetadas:
+            pagina = p.modelo if posicao == p.indice and p.modelo is not None \
+                else p.projeto.carregar_modelo(posicao)
+            vivos = set(pagina.vivos)
+            for item in self.galeria.modelo.itens:
+                if item.pagina == posicao:
+                    if item.gid not in vivos:
+                        leituras[(posicao, item.gid)] = None
+                        continue
+                    e = pagina.box(item.gid).entry
+                    leituras[(posicao, item.gid)] = (e.char, float(e.confidence), str(e.source))
+        if leituras:
+            self.galeria.modelo.atualizar_leituras(leituras)
 
     def _galeria_sem_ordem(self) -> None:
         """A ordem do livro mudou (§12.4): os glifos da Galeria citam posições de antes, e
@@ -76,7 +119,7 @@ class GaleriaNaJanela:
             char = p.modelo.boxes[i].entry.char if i is not None else ""
         escopo = escopo or self.galeria.escopo.currentData()
         self._char_da_galeria = char
-        self.vista.setCurrentWidget(self.galeria)
+        self._ir_a_galeria()
         nome = f"'{char}'" if char else "os glifos sem leitura"
         if escopo == "pagina":
             itens = [Item(p.indice, b.gid, b.entry.char, float(b.entry.confidence),
@@ -86,6 +129,8 @@ class GaleriaNaJanela:
         self.statusBar().showMessage(f"Juntando os glifos de {nome} do livro…", 0)
         self._pedido_da_galeria += 1
         pedido, versao = self._pedido_da_galeria, p.mudancas_da_sequencia
+        # Com o índice ainda montando, a Galeria do livro vê só as páginas já indexadas.
+        montando = "" if self.busca.pronto.is_set() else " (o índice ainda está sendo montado)"
 
         def chegou(achados):
             # Uma resposta velha (outro pedido depois, ou a ordem do livro mudou) não entra.
@@ -94,14 +139,14 @@ class GaleriaNaJanela:
             self.statusBar().clearMessage()
             itens = [Item(a.pagina, a.gid, a.char, a.confianca, a.fonte) for a in achados
                      if a.char == char]
-            self._mostrar_na_galeria(f"Galeria de {nome} no livro", itens, escopo)
+            self._mostrar_na_galeria(f"Galeria de {nome} no livro{montando}", itens, escopo)
         self.busca.glifos(char, ao_terminar=chegou)
 
     def mostrar_glifos_na_galeria(self, achados, titulo: str) -> None:
         """A busca por glifo (§7.1) abre na Galeria."""
         itens = [Item(a.pagina, a.gid, a.char, a.confianca, a.fonte) for a in achados]
         self._char_da_galeria = ""
-        self.vista.setCurrentWidget(self.galeria)
+        self._ir_a_galeria()
         self._mostrar_na_galeria(titulo, itens, None)
 
     def _mostrar_na_galeria(self, titulo: str, itens, escopo) -> None:

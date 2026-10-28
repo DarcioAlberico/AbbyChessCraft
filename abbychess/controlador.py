@@ -2178,6 +2178,8 @@ class ControladorDePagina:
             self._propagar(self.modelo, self.indice, transacao, None)
         self.eventos.emitir("padroes_mudaram")
         self.eventos.emitir("acoes_mudaram")
+        # Quem mostra leituras de outras páginas (a Galeria) as relê das páginas tocadas.
+        self.eventos.emitir("historico_aplicado", set(transacao.paginas))
         self.ler_os_aguardando()                # o que voltou ainda sem leitura
         acao = "Refeito" if refazer else "Desfeito"
         self._avisar(f"{acao}: {transacao.descricao}.", 6000)

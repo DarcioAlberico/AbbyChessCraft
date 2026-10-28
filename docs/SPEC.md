@@ -228,7 +228,7 @@ Extrato do perfil padrão, com o que muda em relação a hoje:
 | Mostrar/ocultar cabeçalhos e rodapés | — | Ctrl+Shift+H | Documento |
 | Paleta de símbolos no cursor | — | F2 | Documento, Glifo, Galeria |
 | Figurina ♔♕♖♗♘♙ (repetir alterna branca/preta) | — | Ctrl+Shift+K/Q/R/B/N/P | Documento, Galeria |
-| Função da zona | — | T texto, H título, C cabeçalho, R rodapé, P nº de página, N nota, L legenda, D diagrama, X ignorar | Imagem, modo Áreas (não editável) |
+| Função da zona | — | T texto, H título, C cabeçalho, R rodapé, P nº de página, N nota, L legenda, D diagrama, I imagem, X ignorar | Imagem, modo Áreas (não editável) |
 | Mostrar origem dos boxes | — | V | Imagem |
 | Padrões do livro | Ctrl+Shift+P | Alt+3 (ciclando as abas) | global |
 | Sair | Ctrl+Q | Ctrl+Q | global |

@@ -32,7 +32,7 @@ from abbychess import lote as lt
 from abbychess import servidor_de_leitura as sl
 from abbychess import verificacao as vf
 from abbychess import zonas as zn
-from abbychess.controlador import TEMPO_DO_PEDIDO, ControladorDePagina
+from abbychess.controlador import TEMPO_DO_PEDIDO, ControladorDePagina, depois_de_editar
 from abbychess.leitor import LeitorDoLivro, congelar_para_a_coleta_de_lixo
 
 log = logging.getLogger(__name__)
@@ -912,9 +912,14 @@ class ControladorDoLivro:
                 }
             self.pagina.projeto.salvar()
             if completa:
+                # A mensagem da amostra é a que fica (antes, o resumo do lote a apagava).
+                mensagem = (f"Amostra pronta nas páginas "
+                            f"{', '.join(str(i + 1) for i in paginas_da_amostra)}: revise por "
+                            "caractere e ensine com Enter. O cartão Saúde, na gaveta, mostra o "
+                            "que falta para o livro inteiro.")
                 self.eventos.emitir("amostra_terminou", paginas_da_amostra)
         detalhe = " Detalhes em Avisos (⚠)." if lt.tem_detalhe(resultado) else ""
-        self.pagina._avisar(mensagem + detalhe, 15000)
+        self.pagina._avisar(mensagem + detalhe, 20000)
 
     def _reler_depois_de(self, condutor) -> List[int]:
         """As páginas para reler depois: as de antes deste lote que ele não leu, e as dele."""
@@ -1881,7 +1886,7 @@ class ControladorDaSubstituicao:
                     copia = fontes[i].instantaneo()
                     try:
                         sb.aplicar_na_pagina(copia, casos)
-                        _depois_de_editar(copia, fontes[i], idioma)
+                        depois_de_editar(copia, fontes[i], idioma)
                         feitas[i] = (copia, hs.mudanca(fontes[i], copia.instantaneo()),
                                      projeto.resumo_do_modelo(copia))
                     except ss.Recusa as recusa:
@@ -1930,7 +1935,7 @@ class ControladorDaSubstituicao:
                     falhas[i] = (str(erro) if isinstance(erro, ss.Recusa)
                                  else f"a substituição falhou: {erro}")
                     continue
-                _depois_de_editar(viva, antes, self.pagina.projeto.dados.idioma)
+                depois_de_editar(viva, antes, self.pagina.projeto.dados.idioma)
                 mudanca, resumo = hs.mudanca(antes, viva.instantaneo()), None
             transacao.paginas[viva.pid] = mudanca
             mudadas.append((viva, resumo))
@@ -1959,21 +1964,6 @@ def _outro_onde(alvo: str) -> str:
     from abbychess import substituir as sb
 
     return "notação" if alvo == sb.PROSA else "prosa"
-
-
-def _depois_de_editar(pagina, antes, idioma: str = "pt") -> None:
-    """O que toda edição faz depois (como `ControladorDePagina._mudou`): o estado (§4.4), o
-    lado dos diagramas pela legenda, os ids das áreas e dos diagramas."""
-    from abbychess.modelo import proximo_estado
-
-    pagina.estado = proximo_estado(pagina.estado, "editar")
-    if pagina.diagramas:
-        pagina.diagramas = dg.rederivar_lados(list(pagina.diagramas), antes.entries(),
-                                              pagina.entries())
-    pagina.zonas = zn.com_ids(list(pagina.zonas))
-    pagina.diagramas = dg.com_ids(list(pagina.diagramas))
-    pagina.zonas = zn.vincular_legendas(pagina.zonas, pagina.diagramas)
-    pagina.diagramas = lc.validar_pagina(pagina, idioma)
 
 
 def _mesma_pagina(viva, lida) -> bool:

@@ -35,7 +35,6 @@ class GaleriaNaJanela:
         self._carga_da_galeria = 0
         self._pedido_da_galeria = 0
         self._mostrando_na_galeria = False
-        self._galeria_pendente = None
         self.eventos.ligar("galeria_aplicada", self._galeria_aplicada)
         self.eventos.ligar("sequencia_mudou", self._galeria_sem_ordem)
         self.eventos.ligar("historico_aplicado", self._galeria_depois_do_historico)
@@ -86,7 +85,6 @@ class GaleriaNaJanela:
         corrigi-los editaria a página que agora está ali. A Galeria se esvazia."""
         self._carga_da_galeria += 1              # os recortes em curso não entram
         self._pedido_da_galeria += 1             # nem a Galeria do livro que ainda junta
-        self._galeria_pendente = None
         if self.galeria.modelo.itens:
             self.galeria.mostrar("A ordem do livro mudou: abra a Galeria de novo", [], None)
 
@@ -200,7 +198,6 @@ class GaleriaNaJanela:
         itens = self.galeria.selecionados()
         if not itens:
             return
-        self._galeria_pendente = {(i.pagina, i.gid): char for i in itens}
         self.pagina.corrigir_no_livro(_por_pagina(itens), char)
 
     def _galeria_confirmar(self, ensinar: bool) -> None:
@@ -215,17 +212,15 @@ class GaleriaNaJanela:
                                          "de novo em um instante.", 6000)
             return
         leituras = {(i.pagina, i.gid): i.char for i in itens}   # cada um com a dele
-        self._galeria_pendente = leituras
         self.pagina.corrigir_no_livro(
             _por_pagina(itens), leituras,
             recortes={chave: recortes[chave] for chave in leituras} if ensinar else None)
 
-    def _galeria_aplicada(self, feitos: int, paginas: int, ensinou: bool) -> None:
-        pendente, self._galeria_pendente = self._galeria_pendente, None
-        if pendente:
-            for char in set(pendente.values()):
-                self.galeria.modelo.trocar_leitura(
-                    [chave for chave, c in pendente.items() if c == char], char)
+    def _galeria_aplicada(self, feitos: int, paginas: int, ensinou: bool,
+                          aplicadas: dict) -> None:
+        for char in set(aplicadas.values()):
+            self.galeria.modelo.trocar_leitura(
+                [chave for chave, c in aplicadas.items() if c == char], char)
         acao = "ensinado(s)" if ensinou else "corrigido(s)"
         self.statusBar().showMessage(f"Galeria: {feitos} glifo(s) {acao} em {paginas} "
                                      "página(s) · Ctrl+Z desfaz.", 8000)

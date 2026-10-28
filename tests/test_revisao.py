@@ -217,6 +217,52 @@ def test_a_galeria_em_duas_paginas_com_leituras_diferentes_e_um_passo(livro):
     assert leituras(0, g0) == ["c", "a"] and leituras(2, g2) == ["b"]
 
 
+def test_a_galeria_que_corrige_a_legenda_refaz_o_lado_do_diagrama(livro):
+    """Corrigir pela Galeria um glifo da legenda numa página fechada faz o que toda edição
+    faz: o lado do diagrama sai de novo da legenda, sem esperar o F5."""
+    from tests.test_diagramas import _CAIXA, _legenda, _lido
+
+    projeto, ctl, fila = livro
+    pagina = projeto.pagina_para_editar(2)
+    entradas = _legenda("Diagrama 5. Jo9am as pretas.", 110, 530)
+    pagina.boxes = [Box(gid_de(pagina.pid, n), e) for n, e in enumerate(entradas)]
+    pagina.proximo_n = len(entradas)
+    pagina.diagramas = [_lido(caixa=_CAIXA, titulo="Di5", titulo_do_core="Di5")]
+    projeto.salvar_modelo(pagina)
+    nove = next(b.gid for b in pagina.boxes if b.entry.char == "9")
+    ctl.corrigir_no_livro({2: [nove]}, "g")
+    ctl.executar.tudo()
+    assert projeto.carregar_modelo(2).diagramas[0].lado == "b"
+
+
+def test_restaurar_varios_devolve_as_linhas_sem_reler_a_base(tmp_path, monkeypatch):
+    """O Ctrl+Z de um esquecer devolve as amostras à matriz sem `_carregar` (que decodifica
+    cada PNG do livro): o mesmo estado que reabrir os padrões daria."""
+    import numpy as np
+
+    from abbychess.leitor import LeitorDoLivro
+    from abbychess.modelo import Estilo
+    from abbychess.padroes import PadroesDoLivro
+
+    leitor = LeitorDoLivro(tmp_path / "padroes")
+    recortes = [np.full((30, 18), 40 * k, np.uint8) for k in range(1, 6)]
+    caminhos = [leitor.ensinar(r, "abcde"[k], altura_de_referencia=30, origem=f"o{k}",
+                               efeito=Estilo(k % 2 == 0, None))
+                for k, r in enumerate(recortes)]
+    padroes = leitor.padroes
+    guardadas = [padroes.guardar(c) for c in caminhos[:3]]
+    padroes.esquecer_varios(caminhos[:3])
+    monkeypatch.setattr(PadroesDoLivro, "_carregar",
+                        lambda self: pytest.fail("restaurar_varios releu a base inteira"))
+    padroes.restaurar_varios(guardadas)
+    monkeypatch.undo()
+    reaberto = PadroesDoLivro(tmp_path / "padroes")
+    por_caminho = lambda p: {Path(c).name: (ch, ef) for c, ch, ef in  # noqa: E731
+                             zip(p._caminhos, p._chars, p._efeitos)}
+    assert por_caminho(padroes) == por_caminho(reaberto)
+    assert padroes._X.shape == reaberto._X.shape
+
+
 def test_ensinar_e_esquecer_varios_de_uma_vez(tmp_path):
     import numpy as np
 

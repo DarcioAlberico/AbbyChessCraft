@@ -475,12 +475,34 @@ class PadroesDoLivro:
         for caminho, _amostra in resolvidos:
             if raiz not in caminho.parents:
                 raise ValueError(f"{caminho} não é um padrão deste livro.")
+        novos = []
         for caminho, amostra in resolvidos:
             gv.gravar_bytes(caminho, amostra.png)
             self._meta[caminho.relative_to(raiz).as_posix()] = dict(amostra.meta)
-        if resolvidos:
-            self._gravar_meta()
-            self._carregar()
+            # O caminho como o `_carregar` o monta (a pasta do livro sem resolver).
+            local = self.pasta / caminho.relative_to(raiz)
+            if local not in self._caminhos:
+                cinza = cv2.imdecode(np.frombuffer(amostra.png, np.uint8), cv2.IMREAD_GRAYSCALE)
+                if cinza is not None:
+                    novos.append((local, cinza, amostra.meta))
+        if not resolvidos:
+            return
+        self._gravar_meta()
+        if not novos:
+            return
+        # As linhas entram na matriz como no `ensinar_varios` (sem reler os outros padrões:
+        # o Ctrl+Z de um esquecer de 40 numa base de 2.000 levava segundos).
+        matriz = np.vstack([_vetor(cinza) for _c, cinza, _m in novos])
+        alturas = [m.get("altura") for _c, _cinza, m in novos]
+        self._X = np.vstack([self._X, matriz])
+        self._normas = np.append(self._normas, np.einsum("ij,ij->i", matriz, matriz))
+        self._chars = self._chars + [folder_to_char(c.parent.name) for c, _x, _m in novos]
+        self._caminhos = self._caminhos + [c for c, _x, _m in novos]
+        self._proporcoes = np.append(self._proporcoes, np.array(
+            [_proporcao(cinza) for _c, cinza, _m in novos], np.float32))
+        self._alturas = np.append(self._alturas, np.array(
+            [np.nan if a is None else float(a) for a in alturas], np.float32))
+        self._efeitos = self._efeitos + [_efeito(m.get("efeito")) for _c, _x, m in novos]
 
     def meta_de(self, caminho: str | Path) -> dict:
         """Os metadados gravados da amostra (a altura relativa, a origem; o efeito, desde o

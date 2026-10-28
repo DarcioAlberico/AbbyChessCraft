@@ -119,6 +119,19 @@ class ExecutorSincrono:
         pronto(resultado)
 
 
+def depois_de_editar(pagina, antes, idioma: str = "pt") -> None:
+    """O que toda edição faz depois (como `ControladorDePagina._mudou`): o estado (§4.4), o
+    lado dos diagramas pela legenda, os ids das áreas e dos diagramas."""
+    pagina.estado = proximo_estado(pagina.estado, "editar")
+    if pagina.diagramas:
+        pagina.diagramas = dg.rederivar_lados(list(pagina.diagramas), antes.entries(),
+                                              pagina.entries())
+    pagina.zonas = zn.com_ids(list(pagina.zonas))
+    pagina.diagramas = dg.com_ids(list(pagina.diagramas))
+    pagina.zonas = zn.vincular_legendas(pagina.zonas, pagina.diagramas)
+    pagina.diagramas = lc.validar_pagina(pagina, idioma)
+
+
 class ControladorDePagina:
     """A página aberta: o modelo dela, a fila, a seleção, o desfazer e os comandos."""
 
@@ -1692,7 +1705,9 @@ class ControladorDePagina:
                             self.projeto.dados.nome, indice, pagina.indice_de(gid), gid)))
                     ed.corrigir(pagina, gid, letra)
                     feitos += 1
-                pagina.estado = proximo_estado(pagina.estado, "editar")
+                # Como toda edição: o estado, o lado dos diagramas pela legenda corrigida e a
+                # validação pelos lances (um lance do texto pode ter mudado).
+                depois_de_editar(pagina, antes, self.projeto.dados.idioma)
                 mudadas.append((pagina, antes))
             if not mudadas:
                 self._avisar("Os glifos escolhidos na Galeria saíram das páginas.", 6000)
@@ -1710,8 +1725,12 @@ class ControladorDePagina:
                 self.eventos.emitir("glifos_mudaram", None)
                 self.eventos.emitir("selecao_mudou")
             self.eventos.emitir("acoes_mudaram")
+            # As leituras aplicadas vão no evento: a Galeria troca a grade por elas (uma ação
+            # ainda na fila não confunde a grade da anterior).
+            aplicadas = {(i, g): char_de((i, g)) for i, gids in alvos.items() for g in gids
+                         if char_de((i, g))}
             self.eventos.emitir("galeria_aplicada", feitos, len(transacao.paginas),
-                                bool(transacao.amostras_criadas))
+                                bool(transacao.amostras_criadas), aplicadas)
         self._editar("Galeria", corpo, so_nesta_pagina=False, precisa_de_glifos=False)
 
     def descartar(self) -> None:

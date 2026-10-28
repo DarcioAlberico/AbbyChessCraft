@@ -422,8 +422,9 @@ def validar_pagina(pagina, idioma: str = "pt") -> list:
         validacao = (validar(d.fen, linha, lado=dito, roque=d.roque,
                              roque_informado=d.roque_informado) if linha else None)
         novo = d if d.validacao == validacao else replace(d, validacao=validacao)
-        if not novo.conferido and dito is None:
-            # O número do primeiro lance (`1...`) diz de quem é a vez quando ninguém disse.
+        if dito is None:
+            # O número do primeiro lance (`1...`) diz de quem é a vez quando ninguém disse:
+            # nem a legenda nem quem conferiu (conferir sem tocar no lado não o apaga).
             if validacao is not None and validacao.vez:
                 novo = replace(novo, lado=validacao.vez, lado_origem=LADO_DOS_LANCES,
                                lado_trecho=linha[0].rotulo())

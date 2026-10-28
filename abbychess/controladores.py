@@ -582,7 +582,8 @@ class ControladorDeDiagramas:
             p._avisar("Não há diagrama nesta página.", 5000)
             return
         if indice is None:
-            indice = next((i for i, d in enumerate(diagramas) if not d.conferido), 0)
+            indice = next((i for i, d in enumerate(diagramas) if d.lido and not d.conferido),
+                          0)
         if not any(not d.lido and not d.erro for d in diagramas):
             self._abrir(indice)
             return
@@ -658,6 +659,9 @@ class ControladorDeDiagramas:
         if indice is None:
             p._avisar("O diagrama mudou na página ({reconhecer_pagina}, desfazer ou áreas): reabra a "
                       "conferência.", 8000)
+            return False
+        if not diagramas[indice].lido:
+            p._avisar(f"O diagrama {indice + 1} não foi lido: não há posição a conferir.", 6000)
             return False
         antes = p._instantaneo()
         diagramas[indice] = diagramas[indice].conferir(tabuleiro)

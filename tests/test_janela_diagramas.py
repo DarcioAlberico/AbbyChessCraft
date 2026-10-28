@@ -384,3 +384,16 @@ def test_ctrl_z_sem_casa_editada_desfaz_a_conferencia_e_o_editor_acompanha(app, 
     _esperar(app, janela)
     assert not janela.pagina.diagramas[0].conferido
     assert editor.aberto and not editor.diagrama.conferido     # sincronizado, não fechado
+
+def test_o_editor_cabe_no_inspetor_de_1366_com_a_casa_de_32(app):
+    """CA-3.2 (a cláusula do tabuleiro, verificada no passo H): a casa do tabuleiro do
+    Inspetor tem ≥ 32 px, e o editor inteiro cabe nos 296 px do Inspetor em 1366 (nada
+    cortado: a coluna h, os botões, a paleta). O lado a jogar vem antes do FEN e da paleta,
+    à vista sem rolar."""
+    editor = dd.EditorDeDiagrama()
+    assert dd.LADO_CASA >= 32 and editor.posicao.width() == 8 * dd.LADO_CASA
+    assert editor.minimumSizeHint().width() <= 296, editor.minimumSizeHint().width()
+    corpo = editor.layout()
+    posicoes = {corpo.itemAt(k).widget(): k for k in range(corpo.count())
+                if corpo.itemAt(k).widget() is not None}
+    assert posicoes[editor.grupo_do_lado] < posicoes[editor.avisos]

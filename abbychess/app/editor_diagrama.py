@@ -38,7 +38,7 @@ from abbychess.diagramas import LADO_DA_LEGENDA, DiagramaLido, afirmar_lado
 from abbychess.app import estilo, teclado
 
 #: O lado de uma casa no Inspetor (o tabuleiro cabe nos 296 px de 1366, §3.1).
-LADO_CASA = 30
+LADO_CASA = 32                  # §3.2: a casa do tabuleiro do Inspetor, ≥ 32 px
 
 #: Abaixo disto a peça lida é pintada de laranja (o `CONFIANCA_BAIXA` do PyBoxEditor).
 CONFIANCA_BAIXA = 0.55
@@ -298,10 +298,13 @@ class EditorDeDiagrama(QWidget):
         self.fen.setReadOnly(True)
         self.fen.setFont(QFont("Consolas", 9))
         self.fen.setAccessibleName("FEN do diagrama")
-        copiar = QPushButton("FEN")
+        self.fen.setMinimumWidth(80)
+        copiar = QToolButton()
+        copiar.setText("FEN")
         copiar.setToolTip("Copiar o FEN")
         copiar.clicked.connect(lambda: QApplication.clipboard().setText(self.fen.text()))
-        copiar_pgn = QPushButton("PGN")
+        copiar_pgn = QToolButton()
+        copiar_pgn.setText("PGN")
         copiar_pgn.setToolTip("Copiar o PGN: a posição e os lances do texto que passaram na "
                               "validação")
         copiar_pgn.clicked.connect(lambda: QApplication.clipboard().setText(self.pgn()))
@@ -315,19 +318,23 @@ class EditorDeDiagrama(QWidget):
         self.avisos.setTextFormat(Qt.TextFormat.PlainText)
         self.avisos.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
 
-        self.btn_anterior = QPushButton("◀")
+        self.btn_anterior = QToolButton()
+        self.btn_anterior.setText("◀")
         teclado.texto_vivo(self.btn_anterior, "setToolTip",
                            "O diagrama anterior do livro ({diagrama_anterior})")
         self.btn_anterior.setAccessibleName("Diagrama anterior")
         self.btn_anterior.clicked.connect(lambda: self.ir(-1))
-        self.btn_seguinte = QPushButton("▶")
+        self.btn_seguinte = QToolButton()
+        self.btn_seguinte.setText("▶")
         teclado.texto_vivo(self.btn_seguinte, "setToolTip",
                            "O diagrama seguinte do livro ({diagrama_seguinte})")
         self.btn_seguinte.setAccessibleName("Diagrama seguinte")
         self.btn_seguinte.clicked.connect(lambda: self.ir(+1))
-        self.btn_desfazer = QPushButton("Desfazer")
+        self.btn_desfazer = QToolButton()
+        self.btn_desfazer.setText("Desfazer")
         self.btn_desfazer.clicked.connect(self.desfazer)
-        self.btn_refazer = QPushButton("Refazer")
+        self.btn_refazer = QToolButton()
+        self.btn_refazer.setText("Refazer")
         self.btn_refazer.clicked.connect(self.refazer)
         self.btn_conferido = QPushButton("Conferido")
         teclado.texto_vivo(self.btn_conferido, "setToolTip",
@@ -337,16 +344,20 @@ class EditorDeDiagrama(QWidget):
         navegar = QHBoxLayout()
         for botao in (self.btn_anterior, self.btn_seguinte, self.btn_desfazer, self.btn_refazer):
             navegar.addWidget(botao)
+        navegar.addWidget(self.btn_conferido, 1)
 
         corpo = QVBoxLayout(self)
         corpo.setContentsMargins(0, 0, 0, 0)
         corpo.addWidget(self.cabecalho)
         corpo.addWidget(self.posicao, 0, Qt.AlignmentFlag.AlignHCenter)
         corpo.addLayout(navegar)
-        corpo.addWidget(self.btn_conferido)
+        controles = self._montar_controles()
+        # O lado logo depois de conferir: em 1366 ele ficava abaixo da dobra, e quem conferia
+        # depressa gravava "assumido" sem vê-lo.
+        corpo.addWidget(self.grupo_do_lado)
         corpo.addLayout(linha_fen)
         corpo.addWidget(self.avisos)
-        corpo.addWidget(self._montar_controles())
+        corpo.addWidget(controles)
         corpo.addStretch(1)
 
     def _montar_controles(self) -> QWidget:
@@ -380,17 +391,21 @@ class EditorDeDiagrama(QWidget):
 
         lado = QGroupBox("Lado a jogar")
         coluna_lado = QVBoxLayout(lado)
+        linha_lado = QHBoxLayout()
         self.grupo_lado = QButtonGroup(self)
-        self.radio_brancas = QRadioButton("Brancas jogam")
-        self.radio_pretas = QRadioButton("Pretas jogam")
+        self.radio_brancas = QRadioButton("Brancas")
+        self.radio_pretas = QRadioButton("Pretas")
         for valor, radio in (("w", self.radio_brancas), ("b", self.radio_pretas)):
             self.grupo_lado.addButton(radio)
+            radio.setAccessibleName(f"{radio.text()} jogam")
             radio.clicked.connect(lambda _=False, v=valor: self._mudar_lado(v))
-            coluna_lado.addWidget(radio)
+            linha_lado.addWidget(radio)
+        linha_lado.addStretch(1)
+        coluna_lado.addLayout(linha_lado)
         self.origem_do_lado = QLabel()
         self.origem_do_lado.setWordWrap(True)
         coluna_lado.addWidget(self.origem_do_lado)
-        caixa.addWidget(lado)
+        self.grupo_do_lado = lado
 
         roque = QGroupBox("Roque")
         grade_roque = QGridLayout(roque)
@@ -483,7 +498,9 @@ class EditorDeDiagrama(QWidget):
         self.conferido.emit(self.diagrama.caixa, tabuleiro, tudo)
         self.diagramas[self.atual] = self.diagrama.conferir(tabuleiro)
         self.tabuleiros[self.atual] = self.diagramas[self.atual].edicao()
-        faltam = [i for i in range(len(self.diagramas)) if not self.diagramas[i].conferido]
+        # Os por conferir que foram lidos: o não lido não tem posição a conferir.
+        faltam = [i for i in range(len(self.diagramas))
+                  if self.diagramas[i].lido and not self.diagramas[i].conferido]
         if not faltam:
             self._mostrar()
             self.terminou.emit()
@@ -551,6 +568,10 @@ class EditorDeDiagrama(QWidget):
         elif tabuleiro.lado_origem == LADO_DA_LEGENDA:
             trecho = f": “{d.lado_trecho}”" if d.lado_trecho else ""
             self.origem_do_lado.setText(f"Da legenda da página{trecho}. Confira.")
+            estilo.papel(self.origem_do_lado, "aviso")
+        elif tabuleiro.lado_origem == lances.LADO_DOS_LANCES:
+            trecho = f" ({d.lado_trecho})" if d.lado_trecho else ""
+            self.origem_do_lado.setText(f"Pelo número do lance do texto{trecho}. Confira.")
             estilo.papel(self.origem_do_lado, "aviso")
         else:
             self.origem_do_lado.setText("Informado por você.")

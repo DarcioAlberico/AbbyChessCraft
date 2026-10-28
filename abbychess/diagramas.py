@@ -80,6 +80,14 @@ PASTA_DE_DIAGRAMAS = "diagramas"
 _FIM_DE_FRASE = re.compile(r"[.:!?…»”\"]\s*$")
 
 
+def roque_possivel(pecas: str, roque: str) -> str:
+    """Os direitos de `roque` que rei e torre ainda permitem nas casas iniciais de `pecas`."""
+    if not roque:
+        return ""
+    possiveis = lances.roque_inferido(pecas)
+    return "".join(c for c in roque if c in possiveis)
+
+
 @dataclass
 class DiagramaLido:
     """Um diagrama da página: onde está, o que se leu e o que se conferiu."""
@@ -146,7 +154,8 @@ class DiagramaLido:
         """O FEN da posição. Sem lado dito, o campo é `w` por exigência do formato."""
         if not self.lido:
             return ""
-        return f"{self.leitura().tabuleiro().board_fen()} {self.lado or 'w'} {self.roque or '-'} - 0 1"
+        pecas = self.leitura().tabuleiro().board_fen()
+        return f"{pecas} {self.lado or 'w'} {roque_possivel(pecas, self.roque) or '-'} - 0 1"
 
     def marca_do_lado(self) -> str:
         """`brancas a jogar (assumido: a página não diz)` e as outras procedências."""
@@ -181,6 +190,10 @@ class DiagramaLido:
         if self.lado_origem == LADO_DO_USUARIO and self.lado in lado_a_jogar.LADOS:
             tabuleiro.lado, tabuleiro.lado_origem, tabuleiro.lado_informado = (
                 self.lado, LADO_DO_USUARIO, True)
+        elif self.lado_origem == lances.LADO_DOS_LANCES and self.lado in lado_a_jogar.LADOS:
+            # O lado que o número do lance diz: o editor mostra e copia o mesmo FEN que a
+            # página (não é "informado": conferir sem tocar nele o deixa vir dos lances).
+            tabuleiro.lado, tabuleiro.lado_origem = self.lado, lances.LADO_DOS_LANCES
         if self.roque or self.roque_informado:
             tabuleiro.roque, tabuleiro.roque_informado = self.roque, True
         # O que veio gravado é o ponto de partida: não há o que desfazer antes dele.
@@ -198,7 +211,9 @@ class DiagramaLido:
                        lado=tabuleiro.lado if dito else None,
                        lado_origem=tabuleiro.lado_origem if dito else "",
                        lado_trecho=self.lado_trecho if tabuleiro.lado_origem == LADO_DA_LEGENDA else "",
-                       roque=tabuleiro.roque,
+                       # O roque marcado que uma casa corrigida tornou impossível não vai
+                       # ao FEN (ele sairia inválido e cairia do PGN).
+                       roque=roque_possivel(tabuleiro.tabuleiro().board_fen(), tabuleiro.roque),
                        roque_informado=bool(tabuleiro.roque_informado or tabuleiro.roque),
                        conferido=conferido)
 

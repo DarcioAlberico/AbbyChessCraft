@@ -354,3 +354,30 @@ def test_entradas_estranhas_nao_derrubam():
     assert lc.validar("isto não é FEN", lc.primeira_linha("1.e4", "pt")).estado == lc.ILEGAL
     assert lc.pgn_do_diagrama(dg.DiagramaLido((0, 0, 10, 10))) == ""
     assert lc.Validacao.de_json({"estado": lc.CONFIAVEL, "total": "x"}) is None
+
+def test_conferir_sem_tocar_no_lado_mantem_o_que_os_lances_dizem():
+    """O lado que só o número do lance dizia (10...): o editor abre com ele, e conferir sem
+    tocar no lado não o troca por "brancas, assumido" (o FEN, o texto e o PGN concordam)."""
+    boxes = (_linha("Observe a posição seguinte:", 0) + _linha("10...Rf8 11.Dd5 Dd7 12.Dxd4", 520)
+             + _linha("Agora as brancas atacam.", 560))
+    pagina = tx.pagina_avulsa(boxes, [_lido(P25, caixa=(0, 60, 400, 460))])
+    d = lc.validar_pagina(pagina, "pt")[0]
+    tabuleiro = d.edicao()
+    assert tabuleiro.lado == "b" and tabuleiro.fen().split()[1] == "b"
+    pagina.diagramas = [d.conferir(tabuleiro)]
+    conferido = lc.validar_pagina(pagina, "pt")[0]
+    assert conferido.conferido and conferido.lado == "b"
+    assert conferido.lado_origem == lc.LADO_DOS_LANCES and conferido.fen.split()[1] == "b"
+    assert lc.pgn_do_diagrama(conferido).count(" b - - 0 10") == 1
+
+
+def test_o_roque_que_uma_casa_corrigida_impede_nao_vai_ao_fen():
+    """Marcar o roque e depois tirar a torre: o FEN conferido sai sem o direito impossível
+    (antes, um FEN inválido que caía do PGN)."""
+    d = _lido("4k2r/8/8/8/8/8/8/4K2R")
+    tabuleiro = d.edicao()
+    tabuleiro.definir_roque("Kk")
+    tabuleiro.limpar(7, 7)                              # a torre de h1
+    conferido = d.conferir(tabuleiro)
+    assert conferido.fen.split()[2] == "k"
+    assert chess.Board(conferido.fen).is_valid()

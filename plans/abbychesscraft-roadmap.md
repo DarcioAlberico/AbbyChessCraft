@@ -391,8 +391,17 @@ automaticamente as três páginas da amostra dentro desse intervalo, abre a fila
 mostra a evolução dos pendentes e dos padrões no cartão Saúde, na gaveta e no estado vazio
 do Documento; o cartão também oferece o lote completo e o destaca ao atingir o limiar
 (CA-9.4). A faixa Linha única substituiu o antigo recorte “Na linha” do Inspetor Glifo e
-continua sincronizada com a fila e o Documento. A medição do itálico em imagens OCR aguarda
-uma régua pública do core; CA-9.1 também continua pendente.
+continua sincronizada com a fila e o Documento. O itálico no OCR e o CA-9.1 saíram nas
+pendências (a régua do itálico é do AbbyChessCraft; o CA-9.1, definitivo em 2026-10-28).
+
+**Fechamento (2026-10-28, `docs/revisoes/passo-i.md`).** As revisões de código e de produto
+do fechamento pegaram, entre outras coisas: o estilo não medido valia como reto no k-NN (o
+`Estilo` passou a ter três estados por eixo); o filtro do efeito não chegava ao lote nem ao
+F5 (`pagina.reler_pelo_efeito`); a camada nativa rodava na thread da interface; a ligadura
+saía `ﬁ` na exportação; o fim da amostra deixava a janela fora dela e o primeiro Enter sem
+efeito; o cartão Saúde não tinha os pendentes por página nem o limiar escolhível; o CA-9.4
+não era medido por gestos (agora `tests/test_ca_9_4.py`, e a cláusula de desempenho em
+`tests/desempenho/test_carregar_modelos.py`).
 
 **Tarefas.**
 1. O livro novo guiado:

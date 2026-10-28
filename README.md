@@ -51,10 +51,18 @@ letra solta em campo de texto, Ctrl+Alt e ligação nativa encoberta sem exceç�
 
 ## O fluxo de treino
 
-1. **Novo projeto** (Ctrl+N) liga um PDF ou uma imagem a uma pasta de projeto do livro. Se a
-   régua conservadora do `core.pdf_nativo` encontra texto tipográfico confiável no PDF, o
-   programa oferece importá-lo: aceitando, cria essas páginas diretamente e não pede OCR ao
-   servidor; as páginas recusadas pela régua continuam disponíveis para o F5 ou o lote.
+1. **Novo projeto** (Ctrl+N) liga um PDF ou uma imagem a uma pasta de projeto do livro. Um
+   formulário só pede o nome, o idioma e o intervalo do corpo (sem capa e sumário); Enter o
+   aceita. Se a régua conservadora do `core.pdf_nativo` encontra texto tipográfico confiável
+   no PDF, o programa oferece importá-lo (numa thread, com progresso): aceitando, cria essas
+   páginas diretamente e não pede OCR ao servidor; as recusadas continuam para o F5 ou o lote.
+   Com os modelos prontos, três páginas do corpo (a 10%, 50% e 90% dele) são reconhecidas
+   como **amostra**; a janela abre a primeira delas com a fila por caractere, o primeiro
+   glifo no Glifo e o foco no campo, e o Enter seguinte já ensina (CA-9.4: do Ctrl+N ao
+   primeiro Enter, 3 gestos além dos diálogos de arquivo, em `tests/test_ca_9_4.py`). O
+   cartão **Saúde do livro**, na gaveta e no estado vazio do Documento, mostra os pendentes
+   de cada página da amostra, antes e agora (cada página é um link para ela), e destaca
+   "Reconhecer o livro" quando eles caem até o limiar escolhido no próprio cartão.
 2. **Reconhecer página** (F5) segmenta a página, separa os diagramas do texto, lê cada glifo
    e lê cada diagrama em FEN, que entra no texto reconhecido da página.
 3. O **Inspetor**, à direita, mostra o glifo menos confiável, ampliado e na linha em que

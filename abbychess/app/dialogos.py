@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple
 
 from PySide6.QtCore import QEventLoop, Qt, QTimer
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
-                               QInputDialog, QLineEdit, QMessageBox, QProgressDialog, QWidget)
+                               QInputDialog, QLabel, QLineEdit, QMessageBox, QProgressDialog, QWidget)
 
 from abbychess import livro
 from abbychess import nativo
@@ -64,6 +64,11 @@ class DialogoDeNovoProjeto(QDialog):
         formulario.addRow("Nome do livro:", self.nome)
         formulario.addRow("Idioma:", self.idioma)
         formulario.addRow(f"Corpo (páginas 1-{total}):", self.intervalo)
+        aviso = QLabel("Páginas do conteúdo, sem capa e sumário. Ao criar, três páginas do "
+                       "corpo (a 10%, 50% e 90% dele) são reconhecidas como amostra, para "
+                       "você ensinar o livro por elas.")
+        aviso.setWordWrap(True)
+        formulario.addRow(aviso)
         formulario.addRow(botoes)
         self.opcoes: Optional[OpcoesDoNovoProjeto] = None
 

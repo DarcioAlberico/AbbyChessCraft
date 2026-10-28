@@ -22,6 +22,8 @@ FONTE = "Segoe UI Symbol"
 #: A altura da parte do texto, embaixo da imagem.
 ALTURA_DO_TEXTO = 24
 MARGEM = 4
+#: A faixa do aviso, em cima da imagem, quando há aviso.
+ALTURA_DO_AVISO = 20
 
 
 class FaixaDaLinha(QWidget):
@@ -81,13 +83,15 @@ class FaixaDaLinha(QWidget):
                                                "({mostrar_linha} esconde)."))
             pintor.end()
             return
-        altura_util = self.height() - ALTURA_DO_TEXTO - 2 * MARGEM
+        # O aviso tem uma faixa própria em cima: por cima da imagem, ele cobria as letras.
+        topo = MARGEM + (ALTURA_DO_AVISO if self.aviso else 0)
+        altura_util = self.height() - ALTURA_DO_TEXTO - MARGEM - topo
         largura_util = self.width() - 2 * MARGEM
         self.escala = min(altura_util / max(self._recorte.height(), 1),
                           largura_util / max(self._recorte.width(), 1))
         largura = self._recorte.width() * self.escala
         esquerda = MARGEM + (largura_util - largura) / 2
-        alvo = QRectF(esquerda, MARGEM, largura, self._recorte.height() * self.escala)
+        alvo = QRectF(esquerda, topo, largura, self._recorte.height() * self.escala)
         pintor.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         pintor.drawPixmap(alvo, self._recorte, QRectF(self._recorte.rect()))
         ox, oy = self._origem
@@ -100,7 +104,7 @@ class FaixaDaLinha(QWidget):
                 caneta = QPen(estilo.SELECIONADO)
                 caneta.setWidthF(2)
                 pintor.setPen(caneta)
-                pintor.drawRect(QRectF(gx1 - 1, MARGEM + (b.y1 - oy) * self.escala - 1,
+                pintor.drawRect(QRectF(gx1 - 1, topo + (b.y1 - oy) * self.escala - 1,
                                        gx2 - gx1 + 2, (b.y2 - b.y1) * self.escala + 2))
             pintor.setPen(estilo.TINTA if b.char else estilo.VERMELHAO)
             pintor.drawText(QRectF(gx1 - 8, base, gx2 - gx1 + 16, ALTURA_DO_TEXTO),
@@ -113,8 +117,11 @@ class FaixaDaLinha(QWidget):
         if not self.aviso:
             return
         pintor.setFont(QFont(FONTE, 9))
-        largura = pintor.fontMetrics().horizontalAdvance(self.aviso) + 12
-        caixa = QRectF(self.width() - largura - MARGEM, MARGEM, largura, 18)
+        metricas = pintor.fontMetrics()
+        texto = metricas.elidedText(self.aviso, Qt.TextElideMode.ElideRight,
+                                    self.width() - 2 * MARGEM - 12)
+        largura = metricas.horizontalAdvance(texto) + 12
+        caixa = QRectF(self.width() - largura - MARGEM, MARGEM / 2, largura, ALTURA_DO_AVISO - 2)
         pintor.fillRect(caixa, estilo.FUNDO_DO_GLIFO_DA_LINHA)
         pintor.setPen(estilo.TINTA_DO_GLIFO_DA_LINHA)
-        pintor.drawText(caixa, Qt.AlignmentFlag.AlignCenter, self.aviso)
+        pintor.drawText(caixa, Qt.AlignmentFlag.AlignCenter, texto)

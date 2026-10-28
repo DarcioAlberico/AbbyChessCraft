@@ -68,6 +68,16 @@ realcar_duvidosos:
     remove: ['Uma duvida$']
     acrescenta: ['Uma \[\[duvida\]\]$']
 
+links_de_analise:
+  valor: lichess
+  # O diagrama conferido ganha, embaixo, o link que abre a posição no Lichess; o TXT não muda.
+  docx:
+    acrescenta: ['^Caption: Analisar no Lichess$']
+  epub:
+    remove: ['<figure class="diagrama"><img alt="Diagrama: FEN .*</img></figure>$']
+    acrescenta:
+      - '<figure class="diagrama"><img alt="Diagrama: FEN .*</img><figcaption><a class="analise" href="https://lichess\.org/analysis/standard/r3k2r/pp3ppp/2n5/3q4/3P4/2N2N2/PP3PPP/R3K2R_w_-_-_0_1">Analisar no Lichess</a></figcaption></figure>$'
+
 so_verificadas:
   escopo: livro
   testes:

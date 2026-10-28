@@ -47,6 +47,7 @@ from PIL import Image
 from core.box_model import BoxEntry
 from core.pagina import Figura, PaginaExtraida, Paragrafo
 
+from abbychess import links_de_analise
 from abbychess import pagina as pg
 from abbychess import sequencia as sq
 from abbychess.diagramas import DiagramaLido, para_caixas
@@ -134,6 +135,12 @@ class Opcoes:
     #: No DOCX, os glifos de baixa confiança (os que a fila de revisão pede, §8) com o
     #: realce amarelo do Word, para quem revisa no editor de texto achar onde olhar.
     realcar_duvidosos: bool = False
+    #: No EPUB, no DOCX e na prévia, o link que abre cada diagrama lido no tabuleiro de
+    #: análise: `nenhum`, `lichess` ou `chesscom` (`links_de_analise.SITES`).
+    links_de_analise: str = "nenhum"
+
+    def __post_init__(self) -> None:
+        links_de_analise.validar(self.links_de_analise)
 
 
 @dataclass
@@ -170,6 +177,9 @@ class Relatorio:
     #: No EPUB, as referências a página que viraram link; no PDF, os marcadores.
     links: int = 0
     marcadores: int = 0
+    #: No EPUB e no DOCX, os diagramas com link de análise e o site dele (`Opcoes`).
+    analises: int = 0
+    site_de_analise: str = ""
 
     def resumo(self) -> str:
         """Uma linha, para a barra de status."""
@@ -196,6 +206,8 @@ class Relatorio:
             partes.append(f"{self.capitulos} capítulo(s)")
         if self.links:
             partes.append(f"{self.links} referência(s) a página, diagrama ou capítulo com link")
+        if self.analises:
+            partes.append(f"{self.analises} diagrama(s) com link para o {self.site_de_analise}")
         if self.numeros_impressos and self.formato == "epub":
             primeira = min(self.numeros_impressos)
             partes.append(f"página impressa {self.numeros_impressos[primeira]} na posição "
@@ -1225,11 +1237,13 @@ def _altura_da_pagina(projeto: ProjetoDeLivro, indice: int) -> int:
 def exportar_docx(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
                   titulo: str, autor: str = "", idioma: str = "pt-BR",
                   metadados=None, relatorio: Optional["Relatorio"] = None,
-                  quebras: bool = False, realce: bool = False) -> Path:
+                  quebras: bool = False, realce: bool = False,
+                  analise: str = "nenhum") -> Path:
     """O DOCX pelo escritor próprio (`abbychess.escritor_docx`): títulos nos estilos de
     título, estilos, diagramas com o texto alternativo, marcadores de página e hiperlinks
-    internos, metadados. Depois de gravar, `escritor_docx.conferir` lê o arquivo; o que
-    ele acusar vai ao `relatorio`."""
+    internos, metadados; com `analise`, o link de análise de cada diagrama lido
+    (`Opcoes.links_de_analise`). Depois de gravar, `escritor_docx.conferir` lê o arquivo;
+    o que ele acusar vai ao `relatorio`."""
     from abbychess import epub
     from abbychess import escritor_docx
 
@@ -1237,29 +1251,37 @@ def exportar_docx(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
                                             autores=(autor,) if autor else ())
     numeros = relatorio.numeros_impressos if relatorio is not None else None
     escrito = escritor_docx.escrever(paginas, caminho, metadados, numeros=numeros,
-                                     quebras=quebras, realce=realce)
+                                     quebras=quebras, realce=realce, analise=analise)
     problemas = escritor_docx.conferir(caminho)
     for problema in problemas:
         log.warning("DOCX %s: %s", caminho, problema)
     if relatorio is not None:
         relatorio.links = escrito.links
         relatorio.problemas_do_arquivo = problemas
+        _analises_no_relatorio(relatorio, escrito.analises, analise)
     return Path(caminho)
+
+
+def _analises_no_relatorio(relatorio: "Relatorio", analises: int, site: str) -> None:
+    relatorio.analises = analises
+    relatorio.site_de_analise = links_de_analise.NOMES[site] if analises else ""
 
 
 def exportar_epub(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
                   titulo: str, autor: str = "", idioma: str = "pt-BR",
                   metadados=None, relatorio: Optional["Relatorio"] = None,
-                  quebras: bool = False) -> Path:
+                  quebras: bool = False, analise: str = "nenhum") -> Path:
     """O EPUB pelo escritor próprio (`abbychess.epub`): capítulos, sumário pelos títulos,
-    lista de páginas, marcos, metadados e a acessibilidade do que foi escrito. Depois de
-    gravar, `epub.conferir` lê o arquivo; o que ele acusar vai ao `relatorio`."""
+    lista de páginas, marcos, metadados e a acessibilidade do que foi escrito; com
+    `analise`, o link de análise de cada diagrama lido (`Opcoes.links_de_analise`). Depois
+    de gravar, `epub.conferir` lê o arquivo; o que ele acusar vai ao `relatorio`."""
     from abbychess import epub
 
     metadados = metadados or epub.Metadados(titulo=titulo, idioma=idioma,
                                             autores=(autor,) if autor else ())
     numeros = relatorio.numeros_impressos if relatorio is not None else None
-    escrito = epub.escrever(paginas, caminho, metadados, numeros=numeros, quebras=quebras)
+    escrito = epub.escrever(paginas, caminho, metadados, numeros=numeros, quebras=quebras,
+                            analise=analise)
     problemas = epub.conferir(caminho)
     for problema in problemas:
         log.warning("EPUB %s: %s", caminho, problema)
@@ -1269,6 +1291,7 @@ def exportar_epub(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
         relatorio.bytes_poupados = escrito.poupados
         relatorio.problemas_do_arquivo = problemas
         relatorio.links = escrito.links
+        _analises_no_relatorio(relatorio, escrito.analises, analise)
     return Path(caminho)
 
 
@@ -1936,7 +1959,8 @@ def previa(projeto: ProjetoDeLivro, formato: str, indices: Optional[Iterable[int
             texto += f"\n… e mais {len(paginas) - pv.LIMITE} página(s), que a exportação inclui.\n"
         return pv.html_do_texto(texto, linhas, titulo, idioma), relatorio
     return (pv.html_do_livro(paginas, linhas, titulo, idioma, quebras=opcoes.manter_quebras,
-                             realce=formato == "docx" and opcoes.realcar_duvidosos),
+                             realce=formato == "docx" and opcoes.realcar_duvidosos,
+                             analise=opcoes.links_de_analise),
             relatorio)
 
 
@@ -1996,8 +2020,9 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
     if formato == "docx":
         exportar_docx(paginas, caminho, titulo=meta.titulo, idioma=idioma, metadados=meta,
                       relatorio=relatorio, quebras=opcoes.manter_quebras,
-                      realce=opcoes.realcar_duvidosos)
+                      realce=opcoes.realcar_duvidosos, analise=opcoes.links_de_analise)
     else:
         exportar_epub(paginas, caminho, titulo=meta.titulo, idioma=idioma, metadados=meta,
-                      relatorio=relatorio, quebras=opcoes.manter_quebras)
+                      relatorio=relatorio, quebras=opcoes.manter_quebras,
+                      analise=opcoes.links_de_analise)
     return relatorio.resumo(), relatorio

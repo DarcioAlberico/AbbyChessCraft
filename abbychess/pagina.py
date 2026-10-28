@@ -900,6 +900,38 @@ def ler_boxes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorDoLivro,
     return resumir(boxes, leitor)
 
 
+def reler_pelo_efeito(imagem: Image.Image, boxes: Sequence[BoxEntry], leitor: LeitorDoLivro,
+                      negritos: Sequence[Optional[bool]], italicos: Sequence[Optional[bool]]
+                      ) -> int:
+    """O filtro do efeito (§9.3, CA-9.3) na leitura do lote e do F5: a página é lida antes de
+    o efeito ser medido (a medida precisa das palavras lidas), e um glifo lido por uma
+    amostra de efeito incompatível com o medido (uma legenda em negrito vizinha do corpo
+    reto) é lido de novo com o efeito. Devolve quantos foram relidos."""
+    from abbychess.padroes import efeitos_compativeis
+
+    padroes = leitor.padroes
+    alvos = []
+    for i, box in enumerate(boxes):
+        negrito = negritos[i] if i < len(negritos) else None
+        italico = italicos[i] if i < len(italicos) else None
+        if negrito is None and italico is None:
+            continue
+        amostra = procedencia.amostra_de(box)
+        if not amostra or amostra == procedencia.NENHUMA:
+            continue
+        if not efeitos_compativeis(padroes.efeito_de(amostra), (negrito, italico)):
+            alvos.append((i, (negrito, italico)))
+    if not alvos:
+        return 0
+    pagina = np.asarray(imagem.convert("L"))
+    referencia = proporcao.altura_de_referencia(list(boxes))
+    for i, efeito in alvos:
+        box = boxes[i]
+        por_leitura(box, leitor.ler(vertical.recorte_de_pe(pagina, box),
+                                    altura_de_referencia=referencia, efeito=efeito))
+    return len(alvos)
+
+
 def _ler_um(pagina: np.ndarray, box: BoxEntry, leitor: LeitorDoLivro,
             referencia: Optional[float]) -> None:
     por_leitura(box, leitor.ler(vertical.recorte_de_pe(pagina, box),

@@ -399,10 +399,12 @@ def _na_ordem_das_zonas(blocos: List[Bloco], zonas: Sequence) -> List[Bloco]:
 
 def normalizar(char: str, modo: str) -> str:
     """O caractere como sai do programa no modo (§4.2)."""
-    return _normalizador(modo)(char)
+    return normalizador(modo)(char)
 
 
-def _normalizador(modo: str):
+def normalizador(modo: str):
+    """A função que leva o caractere lido ao que sai no modo (§4.2), sem as ligaduras: o
+    mesmo caminho no Documento, na edição e na exportação."""
     from core.notacao import FIGURINAS, normalizar_saida
 
     def sem_ligadura(char: str) -> str:
@@ -417,7 +419,7 @@ def _normalizador(modo: str):
 
 def texto(documento: Documento, diagramas: Sequence = (), modo: str = IMPRESSO) -> str:
     """O texto do documento: uma linha impressa por linha, e uma linha por diagrama."""
-    normal = _normalizador(modo)
+    normal = normalizador(modo)
     por_id = {d.id: d for d in diagramas}
     numero = {d.id: k for k, d in enumerate(sorted(diagramas, key=lambda d: (d.caixa[1], d.caixa[0])),
                                             start=1)}
@@ -436,7 +438,7 @@ def texto(documento: Documento, diagramas: Sequence = (), modo: str = IMPRESSO) 
 
 def texto_do_bloco(documento: Documento, bloco: Bloco, modo: str = IMPRESSO) -> str:
     """O texto de um bloco de texto: uma linha impressa por linha."""
-    normal = _normalizador(modo)
+    normal = normalizador(modo)
     return "\n".join(" ".join("".join(normal(documento.chars[g]) for g in p.gids)
                               for p in linha.palavras) for linha in bloco.linhas)
 

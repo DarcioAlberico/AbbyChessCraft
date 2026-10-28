@@ -133,6 +133,33 @@ def test_o_glifo_sem_medida_acha_a_amostra_em_negrito(tmp_path):
     assert leitor.ler(recorte, altura_de_referencia=40, efeito=Estilo(False, False)).char == ""
 
 
+def test_o_lote_rele_o_glifo_lido_por_amostra_de_outro_efeito(tmp_path):
+    """CA-9.3 no caminho do lote e do F5: lido antes de o efeito ser medido, o glifo que uma
+    amostra em negrito leu é lido de novo quando a página o mede reto."""
+    from core import vertical
+
+    from abbychess import procedencia
+    from abbychess.leitor import LeitorDoLivro
+
+    imagem = Image.new("L", (100, 60), 255)
+    imagem.paste(0, (40, 10, 50, 40))
+    box = BoxEntry("", 35, 5, 55, 45)
+    recorte = vertical.recorte_de_pe(np.asarray(imagem), box)
+    leitor = LeitorDoLivro(tmp_path / "padroes")
+    negrito = leitor.ensinar(recorte, "n", altura_de_referencia=40, efeito=Estilo(True, False))
+    leitor.ensinar(recorte, "r", altura_de_referencia=40, efeito=Estilo(False, False))
+    box.char, box.source, box.confidence = "n", "livro", 1.0
+    procedencia.registrar(box, str(negrito))
+    assert pg.reler_pelo_efeito(imagem, [box], leitor, [False], [None]) == 1
+    assert box.char == "r"
+    # Medido em negrito (ou sem medida), a leitura fica.
+    box.char = "n"
+    procedencia.registrar(box, str(negrito))
+    assert pg.reler_pelo_efeito(imagem, [box], leitor, [True], [None]) == 0
+    assert pg.reler_pelo_efeito(imagem, [box], leitor, [None], [None]) == 0
+    assert box.char == "n"
+
+
 def test_reler_mantem_o_sublinhado_do_usuario():
     """A medida nova diz o negrito e o itálico; o sublinhado (Ctrl+U) é do usuário e fica."""
     from abbychess.modelo import Box, reconciliar

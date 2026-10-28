@@ -111,6 +111,7 @@ def ler_pagina(imagem, zonas, marcados, leitor, *, progresso=None,
     lidos = dg.ler_diagramas(imagem, segmentada.tabuleiros, escala=segmentada.escala,
                              classificar=leitor.arbitro, boxes=segmentada.boxes)
     negritos, italicos = pg.efeitos_da_pagina(imagem, segmentada.boxes)
+    pg.reler_pelo_efeito(imagem, segmentada.boxes, leitor, negritos, italicos)
     return PaginaLida(segmentada.boxes, [procedencia.amostra_de(b) for b in segmentada.boxes],
                       list(segmentada.tabuleiros), segmentada.escala, lidos, negritos, italicos)
 

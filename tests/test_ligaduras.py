@@ -43,3 +43,13 @@ def test_efeitos_diferentes_nunca_sao_vizinhos_quando_conhecidos(tmp_path):
     reaberto = LeitorDoLivro(tmp_path / "padroes")
     assert reaberto.ler(recorte, altura_de_referencia=40,
                         efeito=Estilo(negrito=True)).char == "n"
+
+
+def test_a_ligadura_sai_como_as_letras_dela_na_exportacao():
+    """O mesmo texto do Documento: a ligadura de um box sai "fi" no TXT, no DOCX e no EPUB
+    (que leem `exportar.palavras`), e a busca por "fim" acha."""
+    from abbychess import exportar
+
+    boxes = [BoxEntry("ﬁ", 0, 0, 20, 30), BoxEntry("m", 22, 0, 40, 30)]
+    linhas = exportar.palavras(boxes)
+    assert [texto for linha in linhas for texto, _indices in linha] == ["fim"]

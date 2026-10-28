@@ -3,12 +3,14 @@ exportação. Cada função pergunta o que precisa e chama os controladores com 
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from PySide6.QtCore import QEventLoop, Qt, QTimer
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
-                               QInputDialog, QLineEdit, QMessageBox)
+                               QInputDialog, QLineEdit, QMessageBox, QProgressDialog, QWidget)
 
 from abbychess import livro
 from abbychess import nativo
@@ -82,6 +84,48 @@ class DialogoDeNovoProjeto(QDialog):
         return dialogo.opcoes if dialogo.exec() == QDialog.DialogCode.Accepted else None
 
 
+def em_segundo_plano(janela, titulo: str, rotulo: str, funcao):
+    """`funcao(progresso)` numa thread, com um diálogo de progresso modal: a janela continua
+    pintando enquanto o PDF é lido (o livro inteiro a 300 dpi leva tempo). `progresso(feito,
+    total)` pode ser chamado de lá. Devolve o resultado, ou levanta o erro dela aqui."""
+    dialogo = QProgressDialog(janela if isinstance(janela, QWidget) else None)
+    dialogo.setLabelText(rotulo)
+    dialogo.setCancelButton(None)                # o core não para no meio de uma página
+    dialogo.setRange(0, 0)
+    dialogo.setWindowTitle(titulo)
+    dialogo.setWindowModality(Qt.WindowModality.WindowModal)
+    dialogo.setMinimumDuration(400)
+    andamento, saida = [0, 0], {}
+
+    def progresso(feito, total) -> None:
+        andamento[:] = [feito, total]
+
+    def rodar() -> None:
+        try:
+            saida["valor"] = funcao(progresso)
+        except BaseException as erro:            # levantado de novo na thread da interface
+            saida["erro"] = erro
+
+    thread = threading.Thread(target=rodar, name="dialogo-em-segundo-plano", daemon=True)
+    thread.start()
+    laco, relogio = QEventLoop(), QTimer()
+
+    def conferir() -> None:
+        if andamento[1]:
+            dialogo.setMaximum(andamento[1])
+            dialogo.setValue(andamento[0])
+        if not thread.is_alive():
+            laco.quit()
+    relogio.timeout.connect(conferir)
+    relogio.start(50)
+    laco.exec()
+    relogio.stop()
+    dialogo.close()
+    if "erro" in saida:
+        raise saida["erro"]
+    return saida.get("valor")
+
+
 def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
     config = janela.config
     ultima = config.value("ultima_fonte", str(Path.home()))
@@ -114,25 +158,30 @@ def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
     # As listas de páginas vão por `pid` (§12.4): seguem a página que mudar de lugar.
     projeto.dados.extras["intervalo_do_corpo"] = projeto.paginas_para_gravar(opcoes.intervalo)
     projeto.salvar()
+    inicio, fim = opcoes.intervalo
     try:
-        camada = nativo.oferta(fonte)
+        camada = em_segundo_plano(janela, "Novo projeto", "Procurando texto nativo no PDF…",
+                                  lambda _progresso: nativo.oferta(fonte))
         if camada.disponivel and QMessageBox.question(
                 janela, "Texto nativo encontrado",
                 (f"O PDF tem texto tipográfico confiável em {camada.aceitas} de "
                  f"{camada.amostradas} página(s) examinada(s). Usar esse texto sem OCR?"),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes) == QMessageBox.StandardButton.Yes:
-            resultado = nativo.importar(projeto, idioma=opcoes.idioma)
+            resultado = em_segundo_plano(
+                janela, "Texto nativo", "Criando as páginas pelo texto do PDF…",
+                lambda progresso: nativo.importar(projeto, idioma=opcoes.idioma,
+                                                  progresso=progresso))
             importadas = resultado.importadas
+            do_corpo = sum(1 for i in resultado.recusadas if inicio <= i <= fim)
             janela.statusBar().showMessage(
                 f"Texto nativo usado em {len(resultado.importadas)} página(s); "
-                f"{len(resultado.recusadas)} ficaram para OCR.", 12000)
-    except (OSError, ValueError) as erro:
+                f"{do_corpo} do corpo ficaram para OCR.", 12000)
+    except (OSError, ValueError, RuntimeError) as erro:
         # A oferta é uma otimização segura: se a camada não abre ou não monta, o projeto
         # continua novo e o caminho de OCR de sempre permanece disponível.
         QMessageBox.warning(janela, "Texto nativo",
                             f"A camada de texto não pôde ser usada ({erro}). O OCR continua disponível.")
-    inicio, fim = opcoes.intervalo
     candidatos = [i for i in range(inicio, fim + 1) if i not in set(importadas)]
     projeto.dados.extras["amostra_guiada_pendente"] = bool(candidatos)
     projeto.dados.extras[livro.CHAVE_DOS_CANDIDATOS_DA_AMOSTRA] = \

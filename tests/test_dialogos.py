@@ -6,6 +6,7 @@ import pytest
 
 from abbychess.app import dialogos
 from abbychess.projeto import ProjetoDeLivro
+from tests.test_documento import app  # noqa: F401 (fixture: o diálogo de progresso)
 from tests.test_livro import pdf_sintetico
 
 
@@ -37,7 +38,7 @@ def test_modelo_de_areas_filtra_intervalo_por_numero_visivel(monkeypatch, parida
     assert dialogos.paginas_do_modelo_de_areas(None, 10) == esperado
 
 
-def test_novo_projeto_guarda_idioma_e_intervalo_no_mesmo_fluxo(tmp_path, monkeypatch):
+def test_novo_projeto_guarda_idioma_e_intervalo_no_mesmo_fluxo(app, tmp_path, monkeypatch):  # noqa: F811
     fonte = pdf_sintetico(tmp_path)
     destino = tmp_path / "projetos"
     valores = {}
@@ -75,7 +76,7 @@ def test_novo_projeto_guarda_idioma_e_intervalo_no_mesmo_fluxo(tmp_path, monkeyp
     assert valores["ultima_fonte"] == str(fonte.parent)
 
 
-def test_texto_nativo_parcial_deixa_so_as_recusadas_para_a_amostra(tmp_path, monkeypatch):
+def test_texto_nativo_parcial_deixa_so_as_recusadas_para_a_amostra(app, tmp_path, monkeypatch):  # noqa: F811
     fonte = pdf_sintetico(tmp_path)
     janela = SimpleNamespace(
         config=SimpleNamespace(value=lambda _chave, padrao: padrao, setValue=lambda *_: None),

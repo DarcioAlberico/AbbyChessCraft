@@ -347,7 +347,7 @@ class VistaDoDocumento(QTextEdit):
 
     def _preencher(self, doc, documento, diagramas, estados, desconhecidos, virtuais, matriz,
                    margens=frozenset()):
-        normal = tx._normalizador(tx.IMPRESSO)
+        normal = tx.normalizador(tx.IMPRESSO)
         self._diagramas = {d.id: d for d in diagramas}
         numero = {d.id: k for k, d in enumerate(sorted(diagramas, key=lambda d: (d.caixa[1], d.caixa[0])),
                                                 start=1)}

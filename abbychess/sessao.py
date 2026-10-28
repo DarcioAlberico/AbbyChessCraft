@@ -468,7 +468,7 @@ def texto_e_unidades(pagina: Pagina) -> Tuple[str, List[Unidade]]:
     from abbychess import texto as tx
 
     documento = tx.montar(pagina, com_os_nao_lidos=True)
-    normal = tx._normalizador(tx.IMPRESSO)
+    normal = tx.normalizador(tx.IMPRESSO)
     virtuais = {v.gid for v in pagina.decisoes.virtuais}
     unidades: List[Unidade] = []
     for bloco in documento.blocos:

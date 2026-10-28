@@ -346,7 +346,8 @@ def palavras(boxes: Sequence[BoxEntry]) -> List[List[Tuple[str, List[int]]]]:
     O corte em linhas e palavras é o de `core.notacao.palavras_da_pagina`, mas
     o texto sai do próprio box: lá a figurina vira a letra do SAN (♘ -> N), e o
     livro exportado tem de mostrar o que estava impresso. Só o `✝` do xeque vira
-    `+`, como em toda saída do PyBoxEditor (`notacao.normalizar_saida`).
+    `+`, como em toda saída do PyBoxEditor (`notacao.normalizar_saida`), e a ligadura
+    tipográfica (`ﬁ`) sai como as letras dela, como no Documento (`texto.normalizador`).
     """
     return [linha for _trecho, linha in _palavras_por_trecho(boxes)]
 
@@ -354,8 +355,9 @@ def palavras(boxes: Sequence[BoxEntry]) -> List[List[Tuple[str, List[int]]]]:
 def _palavras_por_trecho(boxes: Sequence[BoxEntry], leitura: Optional[OrdemDeLeitura] = None
                          ) -> List[Tuple[Tuple[int, int], List[Tuple[str, List[int]]]]]:
     """As linhas de `palavras`, cada uma com o trecho de leitura em que está."""
-    from core.notacao import normalizar_saida
+    from abbychess import texto as tx
 
+    normalizar_saida = tx.normalizador(tx.IMPRESSO)   # sem as ligaduras, como o Documento
     leitura = leitura or OrdemDeLeitura.da_pagina(boxes)
     saida = []
     for chave, trecho in leitura.trechos(boxes):
@@ -1549,11 +1551,12 @@ def _escrever_fens(page, diagramas: Sequence[DiagramaLido], escala: float, fonte
 
 
 def _escrever_box(page, b: BoxEntry, escala: float, fontes, resumo) -> None:
-    from core import notacao
     from core.searchable_pdf import FONTE_OCR, FONTE_SIMBOLOS
 
+    from abbychess import texto as tx
+
     fonte, _, fonte_sym, _ = fontes
-    char = notacao.normalizar_saida(b.char)
+    char = tx.normalizar(b.char, tx.IMPRESSO)          # a ligadura sai "fi": a busca acha
     if not char:
         return
     if all(fonte.has_glyph(ord(c)) for c in char):

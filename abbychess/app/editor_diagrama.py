@@ -331,10 +331,14 @@ class EditorDeDiagrama(QWidget):
         self.btn_seguinte.setAccessibleName("Diagrama seguinte")
         self.btn_seguinte.clicked.connect(lambda: self.ir(+1))
         self.btn_desfazer = QToolButton()
-        self.btn_desfazer.setText("Desfazer")
+        self.btn_desfazer.setText("↶")              # curtos: o Inspetor de 1366 tem 296 px
+        self.btn_desfazer.setToolTip("Desfazer a última casa (Ctrl+Z com o foco no editor)")
+        self.btn_desfazer.setAccessibleName("Desfazer")
         self.btn_desfazer.clicked.connect(self.desfazer)
         self.btn_refazer = QToolButton()
-        self.btn_refazer.setText("Refazer")
+        self.btn_refazer.setText("↷")
+        self.btn_refazer.setToolTip("Refazer a casa desfeita")
+        self.btn_refazer.setAccessibleName("Refazer")
         self.btn_refazer.clicked.connect(self.refazer)
         self.btn_conferido = QPushButton("Conferido")
         teclado.texto_vivo(self.btn_conferido, "setToolTip",

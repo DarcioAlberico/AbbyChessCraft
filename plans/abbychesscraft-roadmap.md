@@ -509,8 +509,11 @@ sobre os gabaritos do Xadrez Vitorioso: os 2 diagramas com lances saem confiáve
 perturbações (semente 1234), 23 tocam uma casa usada pela linha e as 23 são detectadas
 (1,0 ≥ 0,6), nenhuma afetada sai confiável. As 73 não afetadas que saem confiáveis estão
 fora do alcance de qualquer validação pelos lances; a precisão 1,0 "nas perturbadas" do
-CA-10.1 só é atingível lida sobre as afetadas — **decisão pendente do usuário** sobre a
-redação do critério.
+CA-10.1 só é atingível lida sobre as afetadas. **Resolvido com o sim do usuário** (ver
+"Pendências"): a precisão 1,0 nos FEN do gabarito e a detecção ≥ 60% das perturbadas afetadas,
+as não afetadas fora da conta. A medida joga os lances rotulados no gabarito
+(`lances_seguintes`), não a linha que o programa extrai do OCR: ela mede a validação, não o
+extrator (na p. 25 o extrator pega a linha hipotética da prosa, "11...Cxd5").
 
 A conferência deixou de ser um diálogo modal: é o editor Diagrama do Inspetor
 (`app/editor_diagrama.py`). A Imagem enquadra o diagrama impresso (`VisorDePagina.enquadrar`)
@@ -528,7 +531,8 @@ diagrama (nunca no diagrama errado depois de um F5, desfazer ou edição de áre
 página mantém as casas em edição; sem casa a desfazer, o Ctrl+Z no editor desfaz a página
 (a conferência); a aba lê o livro sem passar pelo cache de páginas.
 
-**Concluído em 2026-10-22**, salvo a decisão pendente sobre a redação do CA-10.1.
+**Concluído em 2026-10-22**; o CA-10.1 com a redação nova em 2026-10-23; o fechamento formal
+em 2026-10-28 (`docs/revisoes/passo-h.md`).
 
 **Tarefas.**
 1. ~~O editor Diagrama no Inspetor, com a Imagem dando zoom no diagrama, PgUp e PgDn pelo

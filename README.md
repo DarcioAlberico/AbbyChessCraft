@@ -460,9 +460,16 @@ o número do primeiro lance (`10...`) o diz. O PGN por diagrama parte do FEN (`S
 os lances que passaram.
 
 **A aba Diagramas** (vista direita) mostra os diagramas do livro numa grade: o recorte (das
-páginas já abertas), a posição desenhada e o estado, com os filtros por conferir, lidos sem
-confiança, confiáveis pelos lances e conferidos. Enter ou duplo clique abre o diagrama no
-editor.
+páginas já abertas), a posição desenhada e o estado, com os filtros por conferir, **lado não
+dito** (ninguém disse de quem é a vez: nem a legenda, nem quem conferiu, nem o número do
+lance; o FEN sai com "w" assumido, também no conferido assim), lidos sem confiança,
+confiáveis pelos lances e conferidos. Enter ou duplo clique abre o diagrama no editor.
+
+O **lado certo** das medidas (2/5 no Xadrez Vitorioso) conta só os diagramas cujo lado a página
+diz; os 3 errados são lado **não dito** pelo programa (assumido "w", que o filtro acima mostra),
+não lado afirmado errado. O **CA-10.1** (`validacao_pelos_lances` no JSON) joga os lances
+rotulados no gabarito: mede a validação, não o extrator da linha do OCR, que ainda pode pegar
+uma linha hipotética da prosa como a principal.
 
 O diagrama conferido não é relido: reconhecer a página de novo, pelo F5 ou pelo lote, mantém
 a conferência do tabuleiro que está no mesmo lugar. Uma página gravada antes desta leitura
@@ -1079,7 +1086,7 @@ Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem 
 | passo 2a sem congelar | d19c858 | completa | 174,66; 175,73; 178,05 | 188,01; 188,63; 188,4 | — | 82,23; 82,43; 82,52 | 91,7; 89,92; 92,03 | 73,15; 70,64; 75,29 | 88,33; 91,91; 92,78 | 11,7; 20,8; 21,5 | — |
 | passo 2b sem congelar | 6f863c3 | completa | 153,56; 153,19; 157,37 | 173,65; 165,46; 168,14 | — | 20,55; 20,57; 21,47 | 24,01; 27,01; 27,08 | 14,4; 13,82; 14,5 | 16,9; 16,99; 18,83 | 22,3; 9,1; 9,8 | — |
 
-Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
+Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. O **lado certo** conta os diagramas cujo lado a página diz; o errado pode ser o lado não dito pelo programa (assumido 'w'), e não o afirmado errado. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
 
 | Livro | Commit | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por diagrama | Lado certo | Ordem | CER do corpo | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|

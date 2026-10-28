@@ -119,7 +119,9 @@ _LEGENDA = (
     "parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só "
     "contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN "
     "rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e "
-    "a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. **Ordem**: "
+    "a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. O **lado "
+    "certo** conta os diagramas cujo lado a página diz; o errado pode ser o lado não dito pelo "
+    "programa (assumido 'w'), e não o afirmado errado. **Ordem**: "
     "pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai "
     "no texto). \"—\" é nada a medir.")
 

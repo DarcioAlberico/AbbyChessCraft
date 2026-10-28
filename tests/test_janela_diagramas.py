@@ -392,7 +392,9 @@ def test_o_editor_cabe_no_inspetor_de_1366_com_a_casa_de_32(app):
     à vista sem rolar."""
     editor = dd.EditorDeDiagrama()
     assert dd.LADO_CASA >= 32 and editor.posicao.width() == 8 * dd.LADO_CASA
-    assert editor.minimumSizeHint().width() <= 296, editor.minimumSizeHint().width()
+    # 296 px menos as margens do Inspetor e a barra de rolagem (a revisão de produto viu
+    # ~8 px cortados quando o editor pedia os 296 inteiros).
+    assert editor.minimumSizeHint().width() <= 270, editor.minimumSizeHint().width()
     corpo = editor.layout()
     posicoes = {corpo.itemAt(k).widget(): k for k in range(corpo.count())
                 if corpo.itemAt(k).widget() is not None}

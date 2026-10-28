@@ -37,6 +37,7 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
 
+from abbychess import zonas as zn
 from abbychess.layout import OrdemDeLeitura
 from abbychess.modelo import Decisoes, Pagina
 
@@ -371,13 +372,11 @@ def _inserir_virtual(linhas: List[List[List[int]]], v, depois: Optional[int]) ->
 
 
 def _zona_da_linha(linha, por_gid, zonas):
-    """A área de texto que contém o meio da linha (a primeira, se mais de uma)."""
+    """A área de texto que contém o meio da linha (a que vale, se mais de uma)."""
     entries = [por_gid[g] for p in linha for g in p if g in por_gid]
     if not entries or not zonas:
         return None
-    cx = (min(e.x1 for e in entries) + max(e.x2 for e in entries)) / 2
-    cy = (min(e.y1 for e in entries) + max(e.y2 for e in entries)) / 2
-    return next((z for z in zonas if z.contem(cx, cy)), None)
+    return zn.zona_da_maioria(zonas, entries)
 
 
 def _na_ordem_das_zonas(blocos: List[Bloco], zonas: Sequence) -> List[Bloco]:

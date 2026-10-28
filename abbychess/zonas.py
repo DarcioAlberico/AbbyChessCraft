@@ -85,8 +85,12 @@ _TEXTO_DA_LEGENDA = re.compile(r"\b(?:jogam?|joga|to\s+play|white\s+to|black\s+t
                                re.IGNORECASE)
 #: A legenda é curta (§5.1): um parágrafo de prosa abaixo do diagrama não é legenda.
 TAMANHO_DA_LEGENDA = 80
+#: A linha que continua a legenda (os jogadores, o lugar e o ano) é mais curta ainda.
+TAMANHO_DA_CONTINUACAO = 50
 #: O vão que parte uma linha em duas zonas (em alturas de glifo) e os glifos de cada lado.
 VAO_QUE_PARTE, GLIFOS_DE_CADA_LADO = 8.0, 3
+#: Um lance numerado ("1.e4", "10...Rf8"): a linha de lances não é título.
+_LANCE = re.compile(r"\b\d{1,3}\s*\.{1,3}\s*\S")
 _NUMERO_DE_PAGINA = re.compile(r"^\s*(?:p(?:ág(?:ina)?|age)?\.?\s*)?\d+\s*$", re.IGNORECASE)
 
 Caixa = Tuple[int, int, int, int]
@@ -198,6 +202,28 @@ def zona_em(zonas: Sequence[Zona], x: float, y: float) -> Optional[int]:
     """A área sob o ponto; com várias, a menor, que é a que o usuário mira."""
     achadas = [((z.x2 - z.x1) * (z.y2 - z.y1), i) for i, z in enumerate(zonas) if z.contem(x, y)]
     return min(achadas)[1] if achadas else None
+
+
+def zona_que_vale(zonas: Sequence[Zona], x: float, y: float) -> Optional[Zona]:
+    """A área que vale no ponto quando mais de uma o cobre (§5): a desenhada ou mexida pelo
+    usuário antes da automática, e entre elas a menor. A mesma regra no Documento, na
+    exportação e na medida (antes, cada um ficava com uma: a primeira, a menor…)."""
+    achadas = [z for z in zonas if z.contem(x, y)]
+    if not achadas:
+        return None
+    return min(achadas, key=lambda z: (z.automatica, (z.x2 - z.x1) * (z.y2 - z.y1)))
+
+
+def zona_da_maioria(zonas: Sequence[Zona], boxes: Sequence[BoxEntry]) -> Optional[Zona]:
+    """A área que vale para a maioria dos glifos de uma linha (pelo centro de cada um). O
+    centro da linha inteira engana: uma linha que pega as coordenadas do tabuleiro (a-h)
+    junto da legenda tem o centro dentro do diagrama."""
+    votos: dict = {}
+    for b in boxes:
+        zona = zona_que_vale(zonas, (b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)
+        if zona is not None:
+            votos[id(zona)] = (votos.get(id(zona), (0, zona))[0] + 1, zona)
+    return max(votos.values(), key=lambda v: v[0])[1] if votos else None
 
 
 def bordas_em(zona: Zona, x: float, y: float, tolerancia: float) -> str:
@@ -313,6 +339,9 @@ def classificar_funcoes(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
     diagramas = [z for z in zonas if z.funcao == "diagrama"]
     alturas = [b.y2 - b.y1 for b in boxes if b.char]
     corpo = median(alturas) if alturas else float(escala)
+    # O corpo das maiúsculas e dos algarismos (o percentil 90): uma linha de lances, cheia
+    # deles, tem a mediana alta sem ser de letra maior; o título tem as maiúsculas maiores.
+    maiusculas = _percentil(alturas, 0.9) if alturas else float(escala)
     saida: List[Zona] = []
     for zona in zonas:
         if not zona.automatica or zona.tipo != TEXTO:
@@ -321,22 +350,54 @@ def classificar_funcoes(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
         dentro = [b for b in boxes if zona.contem((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)]
         texto = _texto_dos_boxes(dentro)
         funcao = "texto"
+        if texto and len(texto) <= 2 and not any(c.isalnum() for c in texto):
+            # Poeira da digitalização (um ponto, um traço soltos): fica fora do texto.
+            saida.append(replace(zona, tipo=IGNORAR, funcao="ignorar"))
+            continue
         if texto and _NUMERO_DE_PAGINA.fullmatch(texto) and (
                 zona.y1 < 0.15 * altura or zona.y2 > 0.85 * altura):
             funcao = "numero_de_pagina"
         elif texto and _parece_legenda(texto) and any(
                 _vizinha_do_diagrama(zona, diagrama, escala) for diagrama in diagramas):
             funcao = "legenda"
-        elif dentro and median(b.y2 - b.y1 for b in dentro) >= RAZAO_DO_TITULO * corpo:
+        elif (dentro and not _LANCE.search(texto)
+              and _percentil([b.y2 - b.y1 for b in dentro], 0.9) >= RAZAO_DO_TITULO * maiusculas):
             funcao = "titulo"
-        elif texto and len(texto) <= 80 and abs((zona.x1 + zona.x2) / 2 - largura / 2) <= 0.1 * largura \
-                and _isolada(zona, zonas, escala):
+        elif (texto and len(texto) <= 80 and not _LANCE.search(texto)
+              and abs((zona.x1 + zona.x2) / 2 - largura / 2) <= 0.1 * largura
+              and zona.y2 - zona.y1 <= 2.2 * maiusculas       # uma linha só
+              and _isolada(zona, zonas, escala)):
             funcao = "titulo"
         elif (dentro and zona.y1 >= 0.7 * altura
               and median(b.y2 - b.y1 for b in dentro) <= RAZAO_DA_NOTA * corpo
               and _isolada(zona, zonas, escala)):
             funcao = "nota"
         saida.append(replace(zona, funcao=funcao))
+    return _continuacoes_da_legenda(saida, boxes, escala)
+
+
+def _continuacoes_da_legenda(zonas: List[Zona], boxes: Sequence[BoxEntry],
+                             escala: float) -> List[Zona]:
+    """A zona de texto curta logo embaixo de uma legenda, sobrepondo-a na horizontal, é a
+    continuação dela (os jogadores, o lugar e o ano: "Gormon-Silman / Memorial Ervin,
+    1987"), que a regra da primeira linha não reconhece sozinha."""
+    saida = list(zonas)
+    mudou = True
+    while mudou:
+        mudou = False
+        for k, zona in enumerate(saida):
+            if not zona.automatica or zona.tipo != TEXTO or zona.funcao != "texto":
+                continue
+            dentro = [b for b in boxes if zona.contem((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)]
+            if len(_texto_dos_boxes(dentro)) > TAMANHO_DA_CONTINUACAO:
+                continue
+            for legenda in saida:
+                if (legenda.funcao == "legenda"
+                        and min(zona.x2, legenda.x2) - max(zona.x1, legenda.x1) > 0
+                        and -escala <= zona.y1 - legenda.y2 <= 1.5 * escala):
+                    saida[k] = replace(zona, funcao="legenda")
+                    mudou = True
+                    break
     return saida
 
 
@@ -369,6 +430,33 @@ def _texto_dos_boxes(boxes: Sequence[BoxEntry]) -> str:
     return " ".join(textos).strip()
 
 
+def _percentil(valores, q: float) -> float:
+    ordenados = sorted(valores)
+    return ordenados[min(len(ordenados) - 1, int(round(q * (len(ordenados) - 1))))]
+
+
+def _comeca_como(texto: str, palavras: Sequence[str], erros: int = 2) -> bool:
+    """Se o começo do texto (sem espaços) é uma das `palavras` com até `erros` letras
+    trocadas, faltando ou sobrando: o OCR lê "Dia9rama", "Dia rama", "iagrama"."""
+    junto = re.sub(r"\s+", "", texto.lower())
+    for palavra in palavras:
+        n = len(palavra)
+        for tamanho in range(max(1, n - erros), n + erros + 1):
+            if _distancia(junto[:tamanho], palavra) <= erros:
+                return True
+    return False
+
+
+def _distancia(a: str, b: str) -> int:
+    anterior = list(range(len(b) + 1))
+    for i, ca in enumerate(a, start=1):
+        atual = [i]
+        for j, cb in enumerate(b, start=1):
+            atual.append(min(anterior[j] + 1, atual[j - 1] + 1, anterior[j - 1] + (ca != cb)))
+        anterior = atual
+    return anterior[-1]
+
+
 def _parece_legenda(texto: str) -> bool:
     """§5.1: linha curta perto do diagrama que diz "Diagrama N", "Teste N" ou só o número,
     ou de quem é a vez ("jogam as brancas", "White to play"). A prosa ("Black moves the
@@ -376,15 +464,29 @@ def _parece_legenda(texto: str) -> bool:
     if len(texto) > TAMANHO_DA_LEGENDA:
         return False
     return bool(_INICIO_DA_LEGENDA.search(texto) or _SO_O_NUMERO.fullmatch(texto)
-                or _TEXTO_DA_LEGENDA.search(texto))
+                or _TEXTO_DA_LEGENDA.search(texto)
+                or _comeca_como(texto, ("diagrama", "diagram", "teste")))
 
 
-def _vizinha_do_diagrama(zona: Zona, diagrama: Zona, escala: float) -> bool:
-    sobreposicao = min(zona.x2, diagrama.x2) - max(zona.x1, diagrama.x1)
-    if sobreposicao <= 0:
-        return False
-    distancia = max(diagrama.y1 - zona.y2, zona.y1 - diagrama.y2, 0)
-    return distancia <= DISTANCIA_DA_LEGENDA * escala
+def _vizinha_do_diagrama(zona: Zona, diagrama, escala: float) -> bool:
+    """Embaixo ou em cima do diagrama (sobrepondo na horizontal), ou ao lado dele
+    (sobrepondo na vertical), a até `DISTANCIA_DA_LEGENDA` alturas de letra."""
+    return _distancia_ao_diagrama(zona, _caixa(diagrama)) <= DISTANCIA_DA_LEGENDA * escala
+
+
+def _caixa(coisa) -> Caixa:
+    return tuple(coisa.caixa) if hasattr(coisa, "caixa") else (coisa.x1, coisa.y1, coisa.x2, coisa.y2)
+
+
+def _distancia_ao_diagrama(zona: Zona, caixa: Caixa) -> float:
+    """A distância da zona ao diagrama pelo lado em que eles se encaram; infinita se não se
+    encaram (nem na horizontal nem na vertical)."""
+    x1, y1, x2, y2 = caixa
+    if min(zona.x2, x2) - max(zona.x1, x1) > 0:
+        return max(y1 - zona.y2, zona.y1 - y2, 0)
+    if min(zona.y2, y2) - max(zona.y1, y1) > 0:
+        return max(x1 - zona.x2, zona.x1 - x2, 0)
+    return float("inf")
 
 
 def _isolada(zona: Zona, zonas: Sequence[Zona], escala: float) -> bool:
@@ -413,12 +515,12 @@ def vincular_legendas(zonas: Sequence[Zona], diagramas: Sequence) -> List[Zona]:
         for diagrama in diagramas:
             if not getattr(diagrama, "id", ""):
                 continue
-            x1, y1, x2, y2 = diagrama.caixa
-            sobreposicao = min(zona.x2, x2) - max(zona.x1, x1)
-            if sobreposicao <= 0:
+            distancia = _distancia_ao_diagrama(zona, tuple(diagrama.caixa))
+            if distancia == float("inf"):
                 continue
-            distancia = max(y1 - zona.y2, zona.y1 - y2, 0)
-            candidatos.append((distancia, -sobreposicao, diagrama.id))
+            x1, y1, x2, y2 = diagrama.caixa
+            embaixo = min(zona.x2, x2) - max(zona.x1, x1) > 0   # a de baixo vence a do lado
+            candidatos.append((distancia, not embaixo, diagrama.id))
         diagrama_id = min(candidatos)[2] if candidatos else None
         saida.append(replace(zona, diagrama_id=diagrama_id))
     return saida

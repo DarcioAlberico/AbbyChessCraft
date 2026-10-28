@@ -477,11 +477,12 @@ def _funcoes_das_linhas(boxes, linhas, diagramas, largura, altura, funcoes_das_m
     zonas = zn.vincular_legendas(zonas, lidos)
     caixa = {d.id: d.caixa for d in lidos if getattr(d, "id", "")}
     funcoes, ligacoes = [], []
+    de_texto = [z for z in zonas if z.tipo == zn.TEXTO]
     for ln in linhas:
-        x = (min(boxes[k].x1 for k in ln.indices) + max(boxes[k].x2 for k in ln.indices)) / 2
-        y = (ln.topo + ln.pe) / 2
-        dentro = [z for z in zonas if z.contem(x, y)]
-        zona = min(dentro, key=lambda z: (z.x2 - z.x1) * (z.y2 - z.y1)) if dentro else None
+        # A área de texto da maioria dos glifos da linha, como o Documento (a margem da área
+        # do diagrama cobre a legenda logo embaixo dele, e a legenda não é diagrama).
+        dela = [boxes[k] for k in ln.indices]
+        zona = zn.zona_da_maioria(de_texto, dela) or zn.zona_da_maioria(zonas, dela)
         funcoes.append(zona.funcao if zona is not None else "texto")
         ligada = caixa.get(zona.diagrama_id) if zona is not None and zona.diagrama_id else None
         ligacoes.append(rel(ligada) if ligada is not None else None)

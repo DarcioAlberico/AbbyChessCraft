@@ -300,7 +300,7 @@ class Estrutura:
         for b in lidos:
             e = b.entry
             cx, cy = (e.x1 + e.x2) / 2, (e.y1 + e.y2) / 2
-            area = next((z for z in areas if z.contem(cx, cy)), None)
+            area = zn.zona_que_vale(areas, cx, cy)
             if area is not None:
                 funcao = "ignorar" if area.tipo == zn.IGNORAR else area.funcao or "texto"
                 estrutura.funcoes[id(e)] = funcao

@@ -1240,6 +1240,8 @@ class ControladorDePagina:
             descricao = "Reconhecer a área" if zona is not None else "Reconhecer a página"
             self._mudou(pagina, indice, descricao, antes, evento="reconhecer")
             self.eventos.emitir("pagina_reconhecida", indice)
+            if pagina is self.modelo and pagina.zonas:
+                self.eventos.emitir("layout_mudou")   # os rótulos das áreas reclassificadas
             if pagina is self.modelo:
                 self.ir_ao_primeiro_pendente()
                 resumo = pg.resumir(pagina.entries(), leitor)

@@ -543,7 +543,9 @@ sempre com as pastas do projeto.
   poeira como ignorar, e o cabeçalho, o rodapé e o número de página aprendidos pelas páginas
   lidas do livro. Uma área que você mexe deixa de ser automática: nada a reclassifica.
   **Ordenar áreas** pede um clique em cada área na ordem de leitura (a barra conta "2 de 13",
-  e cada área mostra a ordem nova; **Esc** cancela), e o Documento segue essa ordem.
+  e cada área mostra a ordem nova; **Esc** cancela), e o texto do Documento segue essa ordem
+  (os diagramas ficam onde a leitura os pôs). As áreas feitas antes de reconhecer saem como
+  texto, e o F5 dá a função das que continuam automáticas pelo texto lido.
   **Salvar o modelo de áreas** guarda as áreas da página, e **Aplicar o modelo** as leva a um
   intervalo, a todas, às pares ou às ímpares (num passo do Ctrl+Z; página de outra resolução
   é recusada). **Ctrl+Shift+R** relê só a área escolhida. **Del** apaga. O F5 e o lote passam a
@@ -1088,11 +1090,11 @@ Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem 
 
 Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. O **lado certo** conta os diagramas cujo lado a página diz; o errado pode ser o lado não dito pelo programa (assumido 'w'), e não o afirmado errado. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
 
-| Livro | Commit | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por diagrama | Lado certo | Ordem | CER do corpo | Estado |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| xv | 8194283 | 9 | 0,5385 / 1 | 7/7 (1) | 5 | 1497 (2 pág.) | 1 (+9 nas negativas) | 7/7 | 0 | 2/5 | 0 | 2,80% | provisória: texto verificado em 213/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-| yusupov | 071b8e5 | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 5 | 3/3 | pendente (provisório: 0) | pendente (provisório: 1/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-| darcy | 071b8e5 | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| Livro | Commit | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por diagrama | Lado certo | Ordem | Funções P / R (CA-5.1) | Legendas ligadas | CER do corpo | Estado |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| xv | 8194283 | 9 | 0,5385 / 1 | 7/7 (1) | 5 | 1497 (2 pág.) | 1 (+9 nas negativas) | 7/7 | 0 | 2/5 | 0 | não medido | não medido | 2,80% | provisória: texto verificado em 213/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| yusupov | 071b8e5 | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 5 | 3/3 | pendente (provisório: 0) | pendente (provisório: 1/3) | 0 | não medido | não medido | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| darcy | 071b8e5 | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | não medido | não medido | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 
 Ainda não medido: a ligação da legenda ao diagrama, no passo H (a leitura de hoje não liga legenda a diagrama); precisão e revocação por função de bloco, no passo F (a leitura de hoje não classifica blocos).
 

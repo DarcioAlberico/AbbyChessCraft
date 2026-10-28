@@ -1231,6 +1231,10 @@ class ControladorDePagina:
             # A conferência de antes vale mais que a releitura do mesmo tabuleiro.
             pagina.diagramas = dg.mesclar(lidos, dg.para_caixas(pagina.tabuleiros,
                                                                 pagina.diagramas))
+            if pagina.zonas and imagem is not None:
+                # As áreas automáticas feitas antes de ler ganham a função pelo texto lido.
+                pagina.zonas = zn.reclassificar_automaticas(pagina.zonas, pagina.entries(),
+                                                            *imagem.size)
             if pagina is self.modelo:
                 self.atual, self.pulados, self.selecao = None, set(), set()
             descricao = "Reconhecer a área" if zona is not None else "Reconhecer a página"

@@ -360,7 +360,7 @@ def classificar_funcoes(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
         elif texto and _parece_legenda(texto) and any(
                 _vizinha_do_diagrama(zona, diagrama, escala) for diagrama in diagramas):
             funcao = "legenda"
-        elif (dentro and not _LANCE.search(texto)
+        elif (texto and not _LANCE.search(texto)
               and _percentil([b.y2 - b.y1 for b in dentro], 0.9) >= RAZAO_DO_TITULO * maiusculas):
             funcao = "titulo"
         elif (texto and len(texto) <= 80 and not _LANCE.search(texto)
@@ -368,12 +368,34 @@ def classificar_funcoes(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
               and zona.y2 - zona.y1 <= 2.2 * maiusculas       # uma linha só
               and _isolada(zona, zonas, escala)):
             funcao = "titulo"
-        elif (dentro and zona.y1 >= 0.7 * altura
+        elif (texto and zona.y1 >= 0.7 * altura
               and median(b.y2 - b.y1 for b in dentro) <= RAZAO_DA_NOTA * corpo
               and _isolada(zona, zonas, escala)):
             funcao = "nota"
         saida.append(replace(zona, funcao=funcao))
     return _continuacoes_da_legenda(saida, boxes, escala)
+
+
+#: As funções que a classificação local dá (as da margem vêm das páginas lidas do livro).
+FUNCOES_LOCAIS = frozenset({"texto", "titulo", "nota", "legenda", "ignorar"})
+
+
+def reclassificar_automaticas(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
+                              largura: int, altura: int) -> List[Zona]:
+    """Depois do F5: as áreas que continuam automáticas (ninguém as mexeu) ganham a função
+    pelo texto lido agora. As áreas feitas antes de reconhecer (o fluxo do FineReader) não
+    tinham texto, e sem ele a função era só um palpite; a do usuário e a da margem
+    aprendida pelo livro ficam como estão."""
+    lidos = [b for b in boxes if b.char]
+    if not lidos or not any(z.automatica and z.funcao in FUNCOES_LOCAIS for z in zonas):
+        return list(zonas)
+    escala = median(b.y2 - b.y1 for b in lidos)
+    candidatas = [replace(z, tipo=TEXTO, funcao="texto")
+                  if z.automatica and z.funcao in FUNCOES_LOCAIS else z for z in zonas]
+    marcadas = [z.automatica and z.funcao in FUNCOES_LOCAIS for z in zonas]
+    classificadas = classificar_funcoes(candidatas, lidos, largura, altura, escala)
+    return [nova if marcada else velha
+            for velha, nova, marcada in zip(zonas, classificadas, marcadas)]
 
 
 def _continuacoes_da_legenda(zonas: List[Zona], boxes: Sequence[BoxEntry],

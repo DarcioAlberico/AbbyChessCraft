@@ -332,11 +332,13 @@ class EditorDeDiagrama(QWidget):
         self.btn_seguinte.clicked.connect(lambda: self.ir(+1))
         self.btn_desfazer = QToolButton()
         self.btn_desfazer.setText("↶")              # curtos: o Inspetor de 1366 tem 296 px
+        self.btn_desfazer.setFont(QFont("Segoe UI Symbol", 13))   # legíveis (eram ~6 px)
         self.btn_desfazer.setToolTip("Desfazer a última casa (Ctrl+Z com o foco no editor)")
         self.btn_desfazer.setAccessibleName("Desfazer")
         self.btn_desfazer.clicked.connect(self.desfazer)
         self.btn_refazer = QToolButton()
         self.btn_refazer.setText("↷")
+        self.btn_refazer.setFont(QFont("Segoe UI Symbol", 13))
         self.btn_refazer.setToolTip("Refazer a casa desfeita")
         self.btn_refazer.setAccessibleName("Refazer")
         self.btn_refazer.clicked.connect(self.refazer)
@@ -430,7 +432,8 @@ class EditorDeDiagrama(QWidget):
         grade_roque.addWidget(self.btn_roque_inferido, 3, 0, 1, 2)
         caixa.addWidget(roque)
 
-        self.check_inteiro = QCheckBox("Conferi as 64 casas: guardar todas como amostras")
+        # Curto: no Inspetor de 1366 (296 px) o texto longo de antes cortava o editor.
+        self.check_inteiro = QCheckBox("Conferi as 64: todas viram amostra")
         self.check_inteiro.setToolTip(
             "Sem isto, só as casas corrigidas viram amostra. As amostras ficam na pasta "
             "do projeto (diagramas/), nunca na base global do PyBoxEditor.")

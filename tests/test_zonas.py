@@ -336,3 +336,22 @@ def test_a_legenda_tolera_o_ocr_so_no_diagrama():
         assert zn._parece_legenda(texto), texto
     for texto in ("These squares", "Tea time", "Testing the plan", "Tesla moves", "Teen"):
         assert not zn._parece_legenda(texto), texto
+
+
+def test_areas_antes_de_ler_saem_texto_e_o_f5_as_classifica():
+    """O fluxo do FineReader: as áreas feitas antes de reconhecer (boxes sem leitura) não
+    viram título pelo tamanho; depois de ler, as que continuam automáticas ganham a função
+    pelo texto (a legenda, ligada ao diagrama), e a do usuário fica."""
+    from core.box_model import BoxEntry
+
+    tabuleiro = [(50, 50, 330, 330)]
+    lidos = (_linha_de_boxes("Diagrama 5. Jogam as pretas.", 60, 345)
+             + _linha_de_boxes("O corpo do texto segue aqui, com as letras de sempre.", 60, 500,
+                               passo=10))
+    sem_leitura = [BoxEntry("", b.x1, b.y1, b.x2, b.y2, 0.0, "aguardando") for b in lidos]
+    antes = zn.automaticas(sem_leitura, tabuleiro, 760, 1000)
+    assert all(z.funcao in ("texto", "diagrama") for z in antes)
+    desenhada = zn.Zona(zn.TEXTO, 600, 900, 700, 960, funcao="nota", id="zu")
+    depois = zn.reclassificar_automaticas(antes + [desenhada], lidos, 760, 1000)
+    assert any(z.funcao == "legenda" for z in depois)
+    assert depois[-1] == desenhada

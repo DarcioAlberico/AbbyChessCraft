@@ -131,12 +131,28 @@ def _nas_negativas(r: dict) -> str:
     return f" (+{n} nas negativas)" if n else ""
 
 
+def _funcoes(r: dict) -> str:
+    """A precisão e a revocação de cada função medida (CA-5.1), "legenda 1 / 1; título…"."""
+    funcoes = r.get("funcoes")
+    if funcoes is None:
+        return "não medido"
+    partes = [f"{_NOMES_DAS_FUNCOES.get(f, f)} {_num(c.get('precisao'))} / {_num(c.get('revocacao'))}"
+              for f, c in funcoes.items() if f != "texto"]
+    return "; ".join(partes) or "—"
+
+
+#: Os nomes das funções na tabela.
+_NOMES_DAS_FUNCOES = {"titulo": "título", "cabecalho": "cabeçalho", "rodape": "rodapé",
+                      "numero_de_pagina": "nº de página", "nota": "nota", "legenda": "legenda"}
+
+
 def _qualidade() -> list:
     cabeca = ["", _LEGENDA, "",
               "| Livro | Commit | Páginas | Margens corridas P / R | Diagramas achados (falsos) | "
               "Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por "
-              "diagrama | Lado certo | Ordem | CER do corpo | Estado |",
-              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+              "diagrama | Lado certo | Ordem | Funções P / R (CA-5.1) | Legendas ligadas | "
+              "CER do corpo | Estado |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     linhas, fora = [], {}
     for livro in LIVROS:
         _, dados = _ultimo(f"qualidade-{livro}")
@@ -156,7 +172,8 @@ def _qualidade() -> list:
             f"{r.get('linhas_perdidas')}{_nas_negativas(r)} | {r.get('fen_igual_a_leitura')} | "
             f"{_provisorio(r.get('casas_erradas_por_diagrama'), r.get('casas_erradas_provisorio'))} | "
             f"{_provisorio(r.get('lado_certo'), r.get('lado_certo_provisorio'))} | "
-            f"{_num(r.get('ordem_discordancia_media'))} | {cer} | {r.get('estado')} |")
+            f"{_num(r.get('ordem_discordancia_media'))} | {_funcoes(r)} | "
+            f"{r.get('ligacao_da_legenda', 'não medido')} | {cer} | {r.get('estado')} |")
     if not linhas:
         return []
     saida = cabeca + linhas

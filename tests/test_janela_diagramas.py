@@ -390,11 +390,19 @@ def test_o_editor_cabe_no_inspetor_de_1366_com_a_casa_de_32(app):
     Inspetor tem ≥ 32 px, e o editor inteiro cabe nos 296 px do Inspetor em 1366 (nada
     cortado: a coluna h, os botões, a paleta). O lado a jogar vem antes do FEN e da paleta,
     à vista sem rolar."""
-    editor = dd.EditorDeDiagrama()
+    from PySide6.QtGui import QFont
+
+    fonte = app.font()
+    app.setFont(QFont("Segoe UI", 9))                     # a fonte que o Windows dá ao programa
+    try:
+        editor = dd.EditorDeDiagrama()
+        largura = editor.minimumSizeHint().width()
+    finally:
+        app.setFont(fonte)
     assert dd.LADO_CASA >= 32 and editor.posicao.width() == 8 * dd.LADO_CASA
     # 296 px menos as margens do Inspetor e a barra de rolagem (a revisão de produto viu
     # ~8 px cortados quando o editor pedia os 296 inteiros).
-    assert editor.minimumSizeHint().width() <= 270, editor.minimumSizeHint().width()
+    assert largura <= 270, largura
     corpo = editor.layout()
     posicoes = {corpo.itemAt(k).widget(): k for k in range(corpo.count())
                 if corpo.itemAt(k).widget() is not None}

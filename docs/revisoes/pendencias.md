@@ -288,6 +288,30 @@ A qualidade do Xadrez Vitorioso com o texto verificado (`2026-10-23-qualidade-xv
 dá CER do corpo de 3,23%, nas 213 linhas e com espaços (o `medir.py` conta por caractere). O
 resto é igual ao de antes.
 
+## A estrutura e os FEN das p. 21–27 (2026-10-28)
+
+O usuário revisou as 9 páginas do Xadrez Vitorioso (i000, i007, i020–i026) pela folha de
+conferência (`ferramentas/folha_de_conferencia.py`, `d47eb41`) e conferiu os 7 diagramas casa a
+casa e o lado de cada um (`8194283`). A estrutura que o assistente rotulou ficou como estava:
+o commit só traz `revisado_por` e as marcas `fen_verificado` / `lado_verificado`. O
+`rotular.py validar --livro xv` não acusa nada.
+
+Medido de novo no `8194283`, num worktree limpo; a linha de base no worktree da tag
+`passo-0`, com os gabaritos copiados:
+- **CA-9.1**, `2026-10-28-legendas-xv.json`: aprovado e **definitivo**. O CER do corpo fica
+  em 4,22% → 4,22% (9.870 glifos), sem glifo estragado. O das legendas, 10,95% → 1,82% (o
+  código mudou desde o `c9e5751`; a medida anterior dava 26,3% → 20,1%).
+- **CA-F.1**, `2026-10-28-fatia-xv-passo-0.json` e `2026-10-28-fatia-xv-passo-L.json`: 1.076
+  → 739 gestos, razão 0,687, como no `f38e5d7`.
+- **Qualidade**, `2026-10-28-qualidade-xv.json`: os 7 FEN do gabarito são os lidos (0 casa
+  errada por diagrama), e o lado sai certo em 2 dos 5 diagramas que o dizem, agora contra o
+  lado conferido. CER do corpo de 2,80%.
+
+O estado das três já não cita a estrutura nem os FEN. O CA-F.1 e a qualidade continuam
+provisórios só pela conferência cega da §15.2 (uma página transcrita do zero e um FEN montado
+sem ver o gabarito); a qualidade, também pelas 28 linhas do sumário (i007) sem texto
+verificado.
+
 ## Verificação
 
 - Suíte rápida: 1553 passed, 2 skipped, em ~2 min no `2cbbdf6`; 1555 passed no `d29d399`, em
@@ -331,8 +355,10 @@ Medido com o texto verificado (seção acima):
   detalhe e o que falta estão em `docs/revisoes/ca-f1-investigacao.md`.
 
 Precisa do usuário:
-- **Os FEN e a estrutura das p. 21–27** (os diagramas e as legendas revisados), para as
-  medidas deixarem de ser provisórias.
+- ~~**Os FEN e a estrutura das p. 21–27** (os diagramas e as legendas revisados), para as
+  medidas deixarem de ser provisórias.~~ Feito em 2026-10-28 (`8194283`, seção abaixo).
+- **A conferência cega da fatia** (§15.2: uma página transcrita e um FEN montado sem ver o
+  gabarito): é o que falta para o CA-F.1 e a qualidade deixarem de ser provisórios.
 - **Os leitores que não estão na máquina** (Thorium, celular); o Calibre já confere.
 
 Decididos como estão:

@@ -1018,8 +1018,15 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   as letras inseridas no Documento desde o D1 (o clique e uma tecla por letra). Linha de base
   1.076, passo L 739: 68,7%.
 
-Continuam: os FEN e a estrutura das p. 21–27; o EPUB no
-Thorium e no celular. A página pedida na hora renderiza
+- A estrutura, os FEN e os lados das p. 21–27 revisados pelo usuário (`8194283`, pela folha de
+  `ferramentas/folha_de_conferencia.py`, `d47eb41`): a estrutura ficou como estava. Medido de
+  novo no `8194283`: o CA-9.1 aprova como **definitivo** (o CER do corpo 4,22% → 4,22%, nenhum
+  glifo estragado); o CA-F.1 segue em 1.076 → 739 (68,7%); os 7 FEN do gabarito são iguais aos
+  lidos (0 casa errada), e o lado sai certo em 2 dos 5 diagramas que o dizem. Os três estados
+  agora só esperam a conferência cega (§15.2: uma página transcrita e um FEN montado às cegas);
+  a qualidade, também as 28 linhas do sumário (i007) sem texto verificado.
+
+Continuam: a conferência cega da fatia; o EPUB no Thorium e no celular. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).
 
 ---

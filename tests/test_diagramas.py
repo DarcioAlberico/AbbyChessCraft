@@ -295,6 +295,31 @@ def test_fen_entra_no_texto_num_fim_de_frase():
     assert texto[2:] == ["o texto segue", "e acaba aqui.", "Depois vem isto"]
 
 
+def test_o_diagrama_embaixo_dos_lances_entra_logo_depois_deles():
+    """P. 54 do Aagaard: os lances que levam à posição não terminam em ponto, e o diagrama
+    caía depois do parágrafo de baixo. Sem texto ao lado dele, não espera fim de frase."""
+    boxes = (_linha("52.bxc7 Kd7 54.Kxa5", 0) + _linha("a b c d e f g h", 460)
+             + _linha("The pawn ending is the", 500) + _linha("ultimate realisation.", 540))
+    texto = dg.texto_da_pagina(boxes, [_lido(caixa=(0, 40, 400, 440))]).split("\n")
+    assert texto[0] == "52.bxc7 Kd7 54.Kxa5"
+    assert texto[1].startswith("[Diagrama 1:")
+    assert texto[2:] == ["a b c d e f g h", "The pawn ending is the", "ultimate realisation."]
+
+
+def test_o_diagrama_fica_na_coluna_dele():
+    # Duas colunas (cada uma com as filas que a ordem de leitura pede; uma palavra por linha,
+    # ou os espaços alinhados viram calhas); sem a coluna, o diagrama da direita caía entre
+    # as linhas da esquerda.
+    esquerda = [b for k in range(10) for b in _linha(f"esquerda{k}", 40 * k)]
+    direita = [b for k in range(10) if k not in (2, 3, 4)
+               for b in _linha(f"direita{k}", 40 * k, x=600)]
+    # O tabuleiro na coluna da direita, entre a linha 1 e a 5 dela.
+    texto = dg.texto_da_pagina(esquerda + direita, [_lido(caixa=(600, 80, 900, 190))]).split("\n")
+    k = next(i for i, ln in enumerate(texto) if ln.startswith("[Diagrama 1:"))
+    assert texto[k - 1] == "direita1" and texto[k + 1] == "direita5"
+    assert texto[:10] == [f"esquerda{k}" for k in range(10)]
+
+
 def test_sem_fim_de_frase_o_diagrama_vai_para_o_fim():
     boxes = _linha("sem ponto", 0) + _linha("nenhum", 40)
     texto = dg.texto_da_pagina(boxes, [_lido(caixa=(500, 30, 900, 430))]).split("\n")

@@ -333,7 +333,8 @@ aviso.
 - CA-6.2, CA-6.3, CA-6.7, CA-6.8 e CA-6.9.
 - CA-6.4 nas linhas D1.
 - CA-4.3 completo.
-- CA-F.1 com alvo de ≤ 70%; CA-F.2 (informativo).
+- CA-F.1 com alvo de ≤ 70% (até 2026-10-24; hoje ≤ 85% no fim do roadmap, SPEC §15.4); CA-F.2
+  (informativo).
 
 ## Passo B — Busca (§7.1, §7.3)
 
@@ -628,10 +629,11 @@ DOCX iguais byte a byte com o mesmo `SOURCE_DATE_EPOCH`).
 
 **Tarefas.**
 1. ~~A exportação passa a ler o Documento estruturado e faz a junção entre páginas.~~
-   (Falta "manter quebras de linha e hífens", que depende de os escritores do core
-   aceitarem a quebra dentro do parágrafo.)
-2. Metadados, capa, idioma das mensagens e opções por formato (o diálogo das `Opcoes`).
-3. TOC semântico, `page-list`, landmarks, bookmarks e links internos.
+   ("Manter quebras de linha e hífens" saiu nas pendências, `7e97083` e `12dd644`.)
+2. ~~Metadados, capa, idioma das mensagens e opções por formato (o diálogo das `Opcoes`).~~
+   (Rodada 3.)
+3. ~~TOC semântico, `page-list`, landmarks, bookmarks e links internos.~~ (Rodada 5; os
+   links para "Diagrama N" e para capítulos, nas pendências, `150d5de`.)
 4. ~~TXT e PGN, com validação e relatório do que ficou de fora.~~
 5. ~~Pré-visualização em HTML do conteúdo e do relatório antes de gravar.~~ (Rodada 4: o
    botão Pré-visualizar do diálogo da exportação; `exportar.previa` pelo mesmo caminho e
@@ -639,10 +641,13 @@ DOCX iguais byte a byte com o mesmo `SOURCE_DATE_EPOCH`).
    primeiras páginas e o relatório inteiro; CA-12.4 e CA-12.5 testados. Da revisão de código: a
    prévia que chega depois de fechar o diálogo é ignorada, fechar o diálogo fecha a prévia e
    libera a memória, Exportar espera a prévia em curso, e a prévia do TXT é o próprio TXT.)
-6. Validação automática (EPUBCheck, Ace, referências internas e smoke tests de leitores).
-7. Deduplicação/otimização de recursos e divisão dos XHTML por capítulo e tamanho.
+6. ~~Validação automática (EPUBCheck, Ace, referências internas e smoke tests de leitores).~~
+   (EPUBCheck e Ace na rodada 2; o Calibre nas pendências, `18af9f0`. Thorium e o leitor do
+   celular pedem quem os abra.)
+7. ~~Deduplicação/otimização de recursos e divisão dos XHTML por capítulo e tamanho.~~
+   (A otimização sem perda das imagens, nas pendências, `3d7d66c`.)
 8. ~~`SOURCE_DATE_EPOCH` e pacote byte a byte reprodutível.~~
-9. Sair dos privados do core.
+9. ~~Sair dos privados do core.~~ (Rodada 6.)
 
 **Rodada 2 (2026-10-22): o escritor de EPUB próprio** (`abbychess/epub.py`, decisão do
 usuário: sem mexer no core). Lê as mesmas `PaginaExtraida` e escreve um XHTML por capítulo
@@ -978,7 +983,42 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   1.183 da linha de base do passo 0 (92,4%; o alvo é ≤ 70%). Só os espaços ficaram mais
   baratos, e ensinar, dividir e as linhas não lidas custam igual.
 
-Continuam: o CA-F.1 (decisão do usuário); os FEN e a estrutura das p. 21–27; o EPUB no
+- A leitura confiante que a palavra desmente vai para a fila (`abbychess/contexto.py`): a fatia
+  cai para 1.066 gestos (90,1% da linha de base). O descritor `contraste_borrado` reprovou na
+  validação no Darcy Lima e no Yusupov (`docs/revisoes/ca-f1-investigacao.md`).
+
+- O ensinar em lote (Ctrl+Enter no Glifo, catálogo 6): ensina o glifo e corrige, no mesmo passo
+  do desfazer, os outros da página com a mesma leitura que a palavra desmente. A fatia cai para
+  1.057 gestos (89,4%). Rende pouco porque a propagação já resolve a maior parte dessas
+  confusões desde a fila do contexto; o que sobra para ensinar é sobretudo glifo sem leitura.
+
+- O palpite da rede no glifo que ninguém leu (catálogo 7, `92ce6b9`): o campo do Glifo vem com
+  o primeiro da rede abaixo do limiar, selecionado, e o Enter o ensina. A fatia cai para 983
+  gestos (83,1%), e o palpite foi aceito 74 vezes.
+
+- O alvo do CA-F.1, com o sim do usuário: ≤ 85% da linha de base no fim do roadmap, no lugar
+  de ≤ 70% depois do D1. Com ele, o CA-F.1 **aprova** (83,1%), provisório até a estrutura e os
+  FEN serem revisados.
+
+- O pingo do i no dividir e as legendas lado a lado em duas linhas (`7511f02`): o corte sob o
+  pingo de "vi"/"xi" vai para a coluna, e uma linha se parte num vão de mais de 8 alturas de
+  letra com 3 palavras de cada lado. A fatia cai para 880 gestos (74,4%).
+
+- O cabeçalho e o rodapé corridos no fim da fila de revisão (`2e3d9a1`, SPEC §8.1): o □ do
+  título corrido abria a fila de toda página. A fatia cai para 772 gestos (65,3%), abaixo
+  também dos 70% do alvo antigo.
+
+- O replay refinado, catálogo 8 (`3841795`, com o pedido do usuário): ele anda pela fila da
+  janela (dividir, juntar e descartar o glifo mostrado sem o clique) e cobra o Enter que
+  confirma a leitura certa pendente; a linha de base roda o mesmo `replay_fatia.py` no código
+  do passo 0. Linha de base 1.076, passo L 773: 71,8%.
+
+- O que falta pelo mais barato, catálogo 9 (`f38e5d7`, com o pedido do usuário): o box
+  colado ("r," lido "r") dividido pelo Ctrl+D quando a divisão dá um box para o que falta, ou
+  as letras inseridas no Documento desde o D1 (o clique e uma tecla por letra). Linha de base
+  1.076, passo L 739: 68,7%.
+
+Continuam: os FEN e a estrutura das p. 21–27; o EPUB no
 Thorium e no celular. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).
 

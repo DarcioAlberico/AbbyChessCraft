@@ -301,11 +301,233 @@ def test_glifo_fora_da_cabeca_da_fila_custa_o_clique():
     """Só o primeiro da fila sai mais barato: os outros pedem o clique no box."""
     from abbychess.projeto import Limiares
 
+    from core.box_model import BoxEntry
+
     leitor = SimpleNamespace(limiares=Limiares())
-    boxes = [SimpleNamespace(char="x", source="net", confidence=0.95),     # não está na fila
-             SimpleNamespace(char="", source="none", confidence=0.0)]       # o primeiro da fila
+    boxes = [BoxEntry("x", 10, 10, 20, 30, 0.95, "net"),         # não está na fila
+             BoxEntry("", 40, 10, 50, 30, 0.0, "none")]           # o primeiro da fila
     dif = rf.Diferencas(acoes=[("substituicao", 0, "a"), ("substituicao", 1, "b")])
     disponiveis = rf.comandos_do_passo(CATALOGO, "0", PASSOS)
     assert rf._proxima_acao(dif, boxes, leitor, disponiveis) == (("substituicao", 1, "b"), True)
     dif = rf.Diferencas(acoes=[("substituicao", 0, "a")])
     assert rf._proxima_acao(dif, boxes, leitor, disponiveis) == (("substituicao", 0, "a"), False)
+
+
+def _fila_de_tres(acoes, medidos=(0, 1, 2), mostrado=None):
+    """Três boxes na fila, nessa ordem (as confianças), e as diferenças dadas."""
+    from abbychess.projeto import Limiares
+
+    from core.box_model import BoxEntry
+
+    leitor = SimpleNamespace(limiares=Limiares())
+    boxes = [BoxEntry("a", 10, 10, 20, 30, 0.1, "net"), BoxEntry("b", 30, 10, 40, 30, 0.2, "net"),
+             BoxEntry("c", 50, 10, 60, 30, 0.3, "net")]
+    dif = rf.Diferencas(acoes=list(acoes), medidos=set(medidos))
+    return rf._proxima_acao(dif, boxes, leitor, rf.comandos_do_passo(CATALOGO, "0", PASSOS),
+                            mostrado=mostrado)
+
+
+@pytest.mark.parametrize("acao", [("divisao", 0), ("sobra", 0), ("juncao", 0, 1),
+                                  ("substituicao", 0, "x")])
+def test_a_diferenca_do_primeiro_da_fila_vem_dela(acao):
+    """Catálogo 8: dividir, juntar e descartar o glifo já mostrado também dispensam o clique."""
+    assert _fila_de_tres([("substituicao", 2, "z"), acao]) == (acao, True)
+
+
+def test_a_juncao_em_que_o_primeiro_da_fila_e_o_segundo_box_pede_o_clique():
+    """O Ctrl+J junta o glifo mostrado com o seguinte: o anterior pede o clique nele."""
+    assert _fila_de_tres([("juncao", 2, 0)]) == (("juncao", 2, 0), False)
+
+
+def test_o_primeiro_da_fila_certo_custa_o_enter_que_o_confirma():
+    assert _fila_de_tres([("substituicao", 2, "z")]) == (("confirmacao", 0), True)
+
+
+def test_o_que_a_medida_nao_cobre_e_transparente_na_fila():
+    """Fora das linhas verificadas e sem diferença, o glifo não custa nem trava a fila."""
+    assert _fila_de_tres([("divisao", 1)], medidos=(1, 2)) == (("divisao", 1), True)
+    assert _fila_de_tres([], medidos=()) == (None, False)
+
+
+def test_depois_do_ctrl_d_e_do_ctrl_j_vale_o_box_mostrado_e_nao_a_fila():
+    """A janela mostra o box novo: a diferença dele sai sem o clique; certo e na fila, ele
+    custa o Enter que o confirma, antes do primeiro da fila."""
+    assert _fila_de_tres([("divisao", 0), ("divisao", 2)], mostrado=2) == (("divisao", 2), True)
+    assert _fila_de_tres([("divisao", 0)], mostrado=2) == (("confirmacao", 2), True)
+
+
+def test_o_glifo_mostrado_fora_da_fila_nao_e_confirmado():
+    """Certo e já confiante (fora da fila), ele não custa o Enter: o seguinte pede o clique."""
+    from abbychess.projeto import Limiares
+
+    from core.box_model import BoxEntry
+
+    leitor = SimpleNamespace(limiares=Limiares())
+    boxes = [BoxEntry("a", 10, 10, 20, 30, 0.99, "net"), BoxEntry("b", 30, 10, 40, 30, 0.2, "net")]
+    dif = rf.Diferencas(acoes=[("substituicao", 1, "z")], medidos={0, 1})
+    disponiveis = rf.comandos_do_passo(CATALOGO, "0", PASSOS)
+    assert rf._proxima_acao(dif, boxes, leitor, disponiveis, mostrado=0) == (
+        ("substituicao", 1, "z"), False)
+
+
+def test_as_diferencas_guardam_o_lugar_de_cada_falta():
+    dif = _diferencas("rab", "r,a;;b")
+    assert dif.faltas == 3 and dif.lugares_das_faltas == [(0, 1, 1), (1, 2, 2)]
+    assert _diferencas("ab", "xab").lugares_das_faltas == [(None, 0, 1)]
+
+
+@pytest.mark.parametrize(("passo", "n", "comandos"), [
+    ("0", 1, {"marcar_glifo": 1}),                        # 4 gestos
+    ("D1", 1, {"inserir_no_documento": 1}),               # o clique e a letra: 2
+    ("D1", 3, {"inserir_no_documento": 1}),               # 4 contra 12
+])
+def test_a_falta_vai_pelo_comando_mais_barato(passo, n, comandos):
+    contas = rf._Contas(rf.comandos_do_passo(CATALOGO, passo, PASSOS), CATALOGO["impossiveis"])
+    rf._faltas_pelo_mais_barato(contas, rf.Diferencas(lugares_das_faltas=[(0, 1, n)]),
+                                contas.disponiveis)
+    assert contas.comandos == comandos
+    assert contas.gestos == (4 * n if passo == "0" else 1 + n)
+
+
+def _colado(monkeypatch, passo, parte_lida):
+    """O "r," num box só, lido "r", na linha "r,a"; o Ctrl+D (falso) dá o "r" e a parte
+    `parte_lida`."""
+    from core.box_model import BoxEntry
+
+    from abbychess import pagina as pg
+
+    def linhas(boxes, _fonte, _indice, _ex):
+        return ([SimpleNamespace(indices=list(range(len(boxes))))], [[0.1, 0.1, 0.9, 0.2]],
+                {i: 0 for i in range(len(boxes))})
+
+    def dividir(_imagem, boxes, i, _leitor):
+        b = boxes[i]
+        boxes[i:i + 1] = [BoxEntry("r", b.x1, b.y1, b.x1 + 10, b.y2),
+                          BoxEntry(parte_lida, b.x1 + 10, b.y1, b.x2, b.y2)]
+
+    monkeypatch.setattr(rf, "_linhas_da_pagina", linhas)
+    monkeypatch.setattr(pg, "dividir", dividir)
+    boxes = [BoxEntry("r", 10, 10, 30, 40), BoxEntry("a", 40, 10, 55, 40)]
+    gabarito = {"linhas_corpo": [{"caixa_rel": [0.1, 0.1, 0.9, 0.2], "texto": "r,a",
+                                  "texto_verificado": True}]}
+    dif = rf.diferencas(boxes, *linhas(boxes, None, None, None), gabarito)
+    assert dif.lugares_das_faltas == [(0, 1, 1)]
+    return rf._colado(dif, boxes, set(), rf.comandos_do_passo(CATALOGO, passo, PASSOS), None,
+                      None, None, None, None, gabarito)
+
+
+def test_o_box_colado_vai_pelo_ctrl_d_quando_e_mais_barato(monkeypatch):
+    """No passo 0, dividir (2) e a parte já lida certa contra marcar a vírgula (4)."""
+    assert _colado(monkeypatch, "0", ",") == 0
+
+
+def test_o_box_colado_fica_para_o_mais_barato(monkeypatch):
+    """A parte sai sem leitura: dividir (2) e ensiná-la (3) contra marcar (4); e, no D1,
+    dividir (2) contra inserir a vírgula no Documento (2): fica a falta."""
+    assert _colado(monkeypatch, "0", "") is None
+    assert _colado(monkeypatch, "D1", ",") is None
+
+
+def test_as_diferencas_guardam_os_boxes_medidos():
+    assert _diferencas("abc", "abc").medidos == {0, 1, 2}
+
+
+def _palavras(texto: str):
+    """Uma linha de boxes de 10×20 px, 1 px entre letras e 12 px entre palavras."""
+    from core.box_model import BoxEntry
+
+    boxes, x = [], 40
+    for c in texto:
+        if c == " ":
+            x += 12
+            continue
+        boxes.append(BoxEntry(c, x, 100, x + 10, 120, 0.99, "neural"))
+        x += 11
+    return boxes
+
+
+class _LeitorFixo:
+    """O k-NN do livro de mentira: lê todo pendente como `char` (ou não lê, com None)."""
+
+    def __init__(self, char):
+        from abbychess.projeto import Limiares
+
+        self.char, self.limiares = char, Limiares()
+
+    def ler_pelo_livro(self, recorte, referencia, efeito):
+        return SimpleNamespace(char=self.char or "", fonte="livro", confianca=0.5, amostra=None)
+
+
+def _lote(trocas, passo="L", da_fila=True, leitor=None):
+    """O `_lote` do primeiro 0 de "c0l0ca b0l0s 1.e4", já ensinado como "o"."""
+    from PIL import Image
+
+    boxes = _palavras("c0l0ca b0l0s 1.e4")          # o 0 é o "o" em toda palavra
+    boxes[1].char, boxes[1].source = "o", "manual"
+    return rf._lote(rf.Diferencas(acoes=trocas), boxes, 1, "0", "o",
+                    rf.comandos_do_passo(CATALOGO, passo, PASSOS), da_fila,
+                    Image.new("L", (400, 200), 255), leitor or _LeitorFixo(None))
+
+
+def test_o_lote_substitui_o_ensinar_quando_deixa_mais_glifos_certos():
+    trocas = [("substituicao", i, "o") for i in (1, 3, 7, 9)]
+    comando, outros = _lote(trocas)
+    assert comando["id"] == "ensinar_em_lote_da_fila" and outros == [3, 7, 9]
+    assert _lote(trocas, da_fila=False)[0]["id"] == "ensinar_em_lote"
+    # No passo 0 não há lote; e um lote que acerta 1 e estraga 2 não é usado.
+    assert _lote(trocas, passo="0") is None
+    assert _lote(trocas[:2]) is None
+
+
+def test_o_lote_nao_e_usado_se_a_propagacao_ja_acerta_o_mesmo():
+    """O Enter simples propaga: se o padrão ensinado lê os outros 0 como "o", o lote não
+    acerta nada a mais, e o replay não o cobra no lugar do ensinar."""
+    trocas = [("substituicao", i, "o") for i in (1, 3, 7, 9)]
+    assert _lote(trocas, leitor=_LeitorFixo("o")) is None
+
+
+def test_o_lote_custa_o_mesmo_que_o_ensinar_que_ele_substitui():
+    custo = {c["id"]: c["custo"] for c in CATALOGO["comandos"] if str(c["passo"]) in ("0", "L")}
+    assert custo["ensinar_em_lote_da_fila"] == custo["ensinar_da_fila"]
+    assert custo["ensinar_em_lote"] == custo["ensinar_glifo"]
+
+
+class _Sugeridor:
+    """A rede de mentira do palpite (§9.2): palpita `char` para todo glifo."""
+
+    def __init__(self, char):
+        self.char = char
+
+    def sugerir(self, recorte, altura):
+        return (self.char, 0.4) if self.char else None
+
+
+def _palpite(char, *, lido="", fonte="none", passo="L", da_fila=True, comando="ensinar_da_fila"):
+    """O `_palpite` de um glifo com a leitura `lido` (vazia: ninguém leu), cujo certo é "e"."""
+    from PIL import Image
+
+    from core.box_model import BoxEntry
+
+    boxes = [BoxEntry(lido, 40, 100, 50, 120, 0.0, fonte)]
+    comandos = {c["id"]: c for c in CATALOGO["comandos"]}
+    return rf._palpite(boxes, 0, "e", comandos[comando], rf.comandos_do_passo(CATALOGO, passo, PASSOS),
+                       da_fila, Image.new("L", (400, 200), 255), _Sugeridor(char))
+
+
+def test_o_palpite_certo_custa_so_o_enter():
+    assert _palpite("e")["id"] == "aceitar_palpite_da_fila"
+    assert _palpite("e", da_fila=False, comando="ensinar_glifo")["id"] == "aceitar_palpite"
+
+
+def test_o_palpite_so_vale_certo_no_glifo_que_ninguem_leu_e_no_passo_l():
+    assert _palpite("c") is None                         # errado: digitar o troca
+    assert _palpite(None) is None                        # a rede não palpitou
+    assert _palpite("e", lido="c", fonte="neural") is None    # lido: o campo traz a leitura
+    assert _palpite("e", fonte="") is None               # aguardando o servidor
+    assert _palpite("e", passo="K") is None
+
+
+def test_o_palpite_custa_um_gesto_a_menos_que_o_ensinar():
+    custo = {c["id"]: c["custo"] for c in CATALOGO["comandos"] if str(c["passo"]) in ("0", "L")}
+    assert custo["aceitar_palpite_da_fila"] == custo["ensinar_da_fila"] - 1
+    assert custo["aceitar_palpite"] == custo["ensinar_glifo"] - 1

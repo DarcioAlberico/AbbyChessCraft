@@ -21,13 +21,17 @@ do estado reconhecido ao gabarito. Ela tem duas partes.
    o `estado` diz **provisório** e o que falta.
 5. **A linha de base é medida com o código do passo 0**, sempre: o replay chama o núcleo do
    programa (ensinar, propagar, dividir), e os passos 1b, 2b e outros mudam esse núcleo.
-   Ela roda num worktree da tag `passo-0`, com os gabaritos e o catálogo copiados do checkout
-   principal (os da medida nova):
+   Ela roda num worktree da tag `passo-0`, com os gabaritos, o catálogo e, desde o catálogo
+   8, o próprio `replay_fatia.py` copiados do checkout principal (os da medida nova): o mesmo
+   algoritmo dos dois lados. O replay de hoje roda no código do passo 0 (o que o passo 0 não
+   tem, ele não usa); na fatia xv, com o catálogo 7, ele deu a mesma linha de base de antes,
+   página por página (2026-10-24).
 
    ```text
    git worktree add ..\AbbyChessCraft_passo0 passo-0
    robocopy tests\verdade ..\AbbyChessCraft_passo0\tests\verdade /E
    copy ferramentas\replay\comandos.yaml ..\AbbyChessCraft_passo0\ferramentas\replay\
+   copy ferramentas\replay_fatia.py ..\AbbyChessCraft_passo0\ferramentas\
    cd ..\AbbyChessCraft_passo0
    ..\AbbyChessCraft\.venv\Scripts\python.exe ferramentas\replay_fatia.py rodar --livro xv --passo 0
    ```
@@ -37,13 +41,26 @@ do estado reconhecido ao gabarito. Ela tem duas partes.
    que recusa medidas de snapshots diferentes, de versões diferentes do catálogo, de
    gabaritos diferentes (versão ou conteúdo de algum) ou de conjuntos de linhas diferentes.
 7. **O critério** do roadmap vale sobre o total `gestos`, que inclui o custo fixo dos
-   impossíveis: ≤ 85% da linha de base depois do passo A3, e ≤ 70% depois do D1. Um passo
+   impossíveis: ≤ 85% da linha de base no fim do roadmap (até 2026-10-24, ≤ 70% depois do
+   D1; SPEC §15.4 diz por que mudou). Um passo
    que torna possível uma correção antes impossível tem de baixar esse total. A navegação
    entre as páginas (`gestos_navegacao`) entra no total e sai também à parte.
 
-Limite conhecido: o replay só usa o atalho da fila (`ensinar_da_fila`) quando o glifo da
-cabeça da fila tem erro; uma cabeça de fila pendente mas certa não custa nada (a pessoa a
-confirmaria com um Enter). Isso não subestima o custo dos glifos errados.
+O replay anda pela fila da janela (desde o catálogo 8): o glifo que a janela mostra sai sem
+o clique, seja a correção dele um ensinar, uma divisão, uma junção com o seguinte ou um
+descarte; se ele está na fila e certo numa linha medida, custa o Enter que confirma a
+leitura. A janela mostra o primeiro da fila ao abrir a página e depois do Enter e do Del;
+depois do Ctrl+D e do Ctrl+J, o box novo, como na janela. O que a fila mostra
+e a medida não cobre (fora das linhas verificadas e sem diferença) é transparente. Até o
+catálogo 7, só o ensinar saía da fila, e a cabeça certa não custava nada nem andava: ela
+travava a fila.
+
+O que falta vai pelo mais barato (desde o catálogo 9). Um box colado lido como a primeira
+letra ("r," lido "r") pode ser dividido pelo Ctrl+D, e a parte nova ensinada; o replay o
+divide numa cópia e fica com o Ctrl+D se ele dá um box para o que falta e sai mais barato.
+Senão, cada trecho que falta é marcado à mão (4 gestos por glifo) ou, desde o D1, inserido
+no Documento: o clique e uma tecla por letra, e as letras entram sem box. As estimativas do
+Ctrl+D são do lado conservador (a parte errada custa o ensinar fora da fila).
 
 ## CA-F.2: o tempo de uma pessoa (informativo, não reprova)
 

@@ -498,11 +498,12 @@ def amostras_guardadas(pasta_do_projeto: str | Path) -> int:
 def texto_da_pagina(boxes: Sequence[BoxEntry], diagramas: Sequence[DiagramaLido]) -> str:
     """O texto da página com uma linha por diagrama, no lugar em que ele está.
 
-    O diagrama entra antes da primeira linha que começa na altura dele ou
-    abaixo, mas só num fim de frase: a linha anterior termina em ponto, dois
-    pontos, exclamação ou interrogação. Assim o parágrafo que contorna o
-    tabuleiro não é partido no meio, e "Veja a posição ao lado:" fica antes
-    da posição. Sem fim de frase depois dele, o diagrama vai para o fim.
+    O diagrama entra na coluna dele, antes da primeira linha que começa na
+    altura dele ou abaixo. Se essa linha fica ao lado do tabuleiro (o parágrafo
+    que o contorna), só num fim de frase: a linha anterior termina em ponto,
+    dois pontos, exclamação ou interrogação. Assim o parágrafo não é partido no
+    meio, e "Veja a posição ao lado:" fica antes da posição. Sem fim de frase
+    depois dele, o diagrama vai para o fim.
 
     A regra mora em `abbychess.texto.montar`; aqui é o modo `san`, como sempre foi.
     """

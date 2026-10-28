@@ -1,0 +1,416 @@
+# Por que a fatia custa quase o mesmo no passo 0 e no L (CA-F.1, 2026-10-23)
+
+A medida do `c9e5751` deu 1.093 gestos no L contra 1.183 da linha de base do passo 0 (0,924; o
+alvo é ≤ 0,70, ou seja, ≤ 828). Esta é a investigação de onde vão os gestos e do que os
+baixaria. Os números vêm do replay instrumentado. Ele roda o mesmo `replay_fatia.replay`, num
+projeto temporário, com `pagina.ensinar`, `dividir`, `juntar` e `descartar` embrulhados para
+anotar cada correção. Não é uma medida do portão, e os scripts não estão no repositório.
+
+## Onde vão os 1.093 gestos
+
+| Comando | Vezes | Gestos | Igual no passo 0? |
+|---|---|---|---|
+| `ensinar_glifo` (3) | 205 | 615 | sim |
+| `ensinar_da_fila` (2) | 12 | 24 | sim |
+| `dividir_glifo` (2) | 48 | 96 | sim |
+| `marcar_glifo` (4) | 15 | 60 | sim |
+| `descartar_box` (2) | 15 | 30 | sim |
+| `juntar_glifos` (2) | 11 | 22 | sim |
+| `reler_pendentes` (1) | 6 | 6 | sim |
+| Espaços | 15 | 30 | não: 120 no passo 0, impossíveis a 8 |
+| Linhas não lidas (5 linhas, 170 caracteres) | | 190 | sim |
+| Diagramas e navegação | | 20 | sim |
+
+Duas razões fazem o L custar quase o mesmo que o passo 0:
+- **O catálogo não tem comando mais barato.** Depois do passo 0, o único comando de texto novo é
+  `corrigir_no_documento`, que custa 3, o mesmo que `ensinar_glifo`. A fila por caractere do
+  passo I não está no catálogo.
+- **A leitura e a propagação resolvem o mesmo número de glifos.** As 205 + 12 correções são
+  iguais nos dois códigos.
+
+## Os 217 glifos ensinados
+
+- **47** são a primeira vez de cada caractere, e esses são inevitáveis.
+- **122** são caracteres já ensinados, em boxes **pendentes**: a propagação passou por eles e o
+  k-NN do livro não leu. 88 deles não tinham leitura nenhuma (`''→'r'` 14 vezes, `''→'s'` 11).
+  Em 120 dos 122, a trava que barra é a **distância**: a amostra mais perto do mesmo caractere
+  fica acima de 1.500. Em 36 também falha a altura ou a proporção. Nenhum dos 122 tinha uma
+  amostra do caractere que passasse nas três travas. A menor distância fica entre 1.386 e
+  5.501, com mediana ~2.080 e um quarto entre 1.500 e 1.700. Quando a propagação falhou, o
+  caractere tinha de 1 a 8 amostras.
+- **48** são caracteres já ensinados que **não estavam pendentes**: lidos com confiança ≥ 0,90
+  pela rede ou pela base, ou lidos por um padrão do livro, que nunca volta à fila. Os pares mais
+  comuns são `1→l` (7), `C→c` (5), `S→s` (3), `-→.` (3), `0→o` (2) e `1→i` (2).
+  `precisa_revisao` não os manda à fila, e a propagação nunca olha para eles. Uns 23 são dígito no meio de palavra ou
+  maiúscula no meio de minúsculas.
+
+O recorte gravado ao ensinar e o que a propagação compara são o mesmo
+(`vertical.recorte_de_pe`), então a distância é real. O descritor é o recorte em cinza
+esticado para 32×32 e comparado pelo L2, e uma distância de 1.500 já é uma diferença média de
+~47 níveis de cinza por pixel.
+
+### Um descritor melhor
+
+O teste usa os 9.959 glifos do corpo que estão certos no fim do replay (rotulados pelo
+gabarito), pelo método da tabela de `abbychess/padroes.py`. As amostras são as K primeiras de
+cada caractere nas páginas anteriores. Cada página de 21 a 26 é lida com as travas de proporção
+e altura de hoje. O descritor de hoje usa o limiar de 1.500; os outros usam o limiar que dá o
+mesmo número de erros.
+
+| K | Hoje (cinza, 32×32) | `contraste_borrado` | `binario` (Otsu) |
+|---|---|---|---|
+| 1 | 39,9% (19 erros) | 47,0% | 51,0% |
+| 3 | 66,7% (12 erros) | **79,0%** | 71,3% |
+| 5 | 75,3% (13 erros) | **82,4%** | 71,3% |
+
+`contraste_borrado` estica o contraste entre os percentis 2 e 98, reduz por área para 32×32 e
+borra com σ 0,8. Com o mesmo número de erros, ele lê de 7 a 12 pontos a mais da página
+seguinte. Os limiares foram escolhidos nesta mesma fatia, então o ganho é otimista. Antes de
+adotar, ele tem de ser validado no Darcy Lima e no Yusupov, com a tabela do `padroes.py` medida
+de novo. Pôr o glifo num quadrado mantendo a proporção piora muito, porque a trava da proporção
+já faz esse papel.
+
+## As 48 divisões
+
+No snapshot há 53 divisões de 1 box para 2 caracteres, e **29 já têm o texto certo** num box só
+(`ri`, `an`, `tr`, `rt`…). A exportação já sai certa nesses casos, mas `replay_fatia.diferencas`
+compara o box com os caracteres um a um e cobra a divisão. São cerca de 58 gestos que não
+correspondem a nenhum erro do texto. Eles pesam igual na linha de base e no L, então não mudam
+a razão, mas inflam os dois números. As outras divisões são boxes sem leitura (15) ou com
+leitura errada.
+
+## As 5 linhas não lidas (190 gestos)
+
+- **Duas linhas são erro do gabarito, não da leitura:** "Diagrama 5. Jogam as pretas." (i024 l03)
+  e "Diagrama 8. Jogam as pretas." (i026 l28). A leitura as acha inteiras. Quem não casa é a
+  caixa da linha no gabarito, que vai de 25% a 41% da altura da página e engole o diagrama. A
+  revisão da estrutura (`revisado_por`) as corrige.
+- **"Diagrama 6…" e "Diagrama 7…" (i025 l22 e l24):** as legendas de dois diagramas lado a lado
+  saem como uma linha só.
+- **i026 l06:** a linha sai partida, e só a metade da direita casa.
+
+## O que baixaria o custo
+
+O alvo pede ≤ 828 gestos, 265 a menos que hoje. Os efeitos abaixo são estimativas, cada uma
+pelo número de casos acima vezes o custo do comando. Nenhuma foi medida no replay.
+
+1. **Mandar à fila a leitura confiante improvável.** Um dígito no meio de uma palavra de
+   letras, ou uma maiúscula no meio de minúsculas, vai para a revisão mesmo com confiança alta.
+   Assim ele entra na propagação e na fila, a 2 gestos em vez de 3. São ~23 dos 48 confiantes,
+   ou −25 a −70 gestos. A mudança é pequena e local (`precisa_revisao` com o contexto da
+   palavra) e serve a qualquer livro escaneado.
+2. **O descritor `contraste_borrado` no k-NN do livro**, depois de validado nos outros dois
+   livros. Se ele recuperar de 30% a 40% dos 122 pendentes que hoje não casam, são −110 a −150
+   gestos. Os padrões já gravados continuam valendo, porque o descritor é calculado na leitura
+   a partir do PNG.
+3. **Corrigir em lote uma confusão do livro.** Seria um comando novo, conferido pelo
+   `test_custo_dos_comandos.py`: todas as leituras `0` dentro de palavras viram `o` com um
+   Enter. Os pares que se repetem (`0→o` 11, `1→l` 12, `S→s` 6, `C→c` 6, `—→-` 8, `1→i` 5,
+   `9→g` 4, `D→p` 4) somam ~56 correções, ou −80 a −110 gestos. Vale conferir antes se a fila
+   por caractere do passo I já oferece esse caminho; se oferecer, falta só pô-la no catálogo.
+4. **Dividir a linha** que junta duas legendas lado a lado (o que é do passo G) e a linha
+   partida da i026: ~2 linhas, −60 a −70 gestos.
+
+Somadas, as propostas 1 a 4 dão de −275 a −400 gestos, ou de 0,61 a 0,69 da linha de base. A
+faixa passa do alvo, mas só se as estimativas se confirmarem.
+
+Duas correções do lado da medida mudam os números sem mudar a razão:
+- **O replay não cobra a divisão de um box cujo texto já está certo.** A linha de base é medida
+  de novo com a mesma regra.
+- **A revisão da estrutura corrige as caixas das duas legendas.** Ela é do usuário.
+
+Nenhuma das propostas mexe no core do PyBoxEditor.
+
+## O que foi feito (2026-10-23, com o sim do usuário para a 1 e a validação da 2)
+
+**Proposta 1, implementada** (`abbychess/contexto.py`, `ca011ae` e revisão `29572c1`). A fatia
+no `29572c1` (`2026-10-23-fatia-xv-passo-L-223221.json`) dá **1.066 gestos**, razão **0,901**
+contra a linha de base de 1.183 (era 0,924). O CA-F.1 continua reprovado. A regra marca os
+glifos confiantes que a palavra desmente, mas só 9 deixam de ser ensinados à mão (205 → 196
+`ensinar_glifo`). Os outros entram na fila e na propagação, e lá o k-NN do livro esbarra na
+mesma trava de distância dos 122 pendentes. A estimativa era de −25 a −70 gestos, e o
+resultado foi −27.
+
+**Proposta 2, reprovada na validação** (`ferramentas/medir_descritor.py`,
+`2026-10-23-descritor.json`, no `ca011ae`). O limiar do `contraste_borrado` foi escolhido na
+fatia: 1.278, que com K = 3 dá os mesmos erros do descritor de hoje a 1.500. Depois foi aplicado
+sem mudança a 7 páginas do Darcy Lima e a 7 do Yusupov. Os rótulos são os glifos em que a
+leitura confiante do programa e a camada de OCR do PDF concordam.
+
+| Livro (glifos lidos) | K | Hoje: certos / errados | `contraste_borrado`: certos / errados |
+|---|---|---|---|
+| Xadrez Vitorioso (8.339), ajuste | 1 / 3 / 5 | 2.708 / 7, 4.711 / 4, 5.284 / 5 | 3.300 / 8, 5.221 / 4, 5.662 / 4 |
+| Darcy Lima (9.104) | 1 / 3 / 5 | 5.990 / 1, 7.192 / 0, 7.407 / 0 | 5.886 / 2, 6.843 / 0, 7.091 / 0 |
+| Yusupov (2.997) | 1 / 3 / 5 | 20 / 9, 223 / 11, 296 / 11 | 22 / 10, 220 / 11, 242 / 11 |
+
+No Darcy Lima, também escaneado e em português, ele lê de 1 a 4 pontos **menos**. No Yusupov,
+os dois empatam. O ganho da fatia era do Xadrez Vitorioso, não do descritor, e ele não foi
+adotado. No Yusupov, os dois descritores leem menos de 10% da página seguinte com o limiar de
+1.500. É um livro em que o k-NN do livro quase não propaga, e isso merece uma investigação
+própria.
+
+Para chegar a ≤ 0,70, faltam 238 gestos. O que ainda pode dar isso:
+- a correção em lote de uma confusão (proposta 3);
+- dividir a linha das legendas lado a lado (proposta 4);
+- um k-NN que propague mais sem errar mais. Isso pede outra abordagem, que não seja só trocar o
+  descritor: por exemplo, mais amostras por caractere ou uma métrica aprendida no próprio livro.
+
+## A proposta 3, o ensinar em lote (2026-10-24, com o sim do usuário)
+
+**O comando** (`02fc26a`). No campo do Glifo, o Ctrl+Enter ensina o glifo como o Enter. No
+mesmo passo do desfazer, ele também corrige, sem ensinar, os outros glifos da página que têm a
+mesma leitura e que a palavra desmente (`contexto.lote`). A troca só vale onde deixa a palavra
+provável: o "0" de "C0L0CA" não vira "o", e nada muda num lance como "ca6".
+
+Nenhum comando anterior fazia isso. A fila por caractere (o modo "Por caractere" do F7) só
+põe juntos os glifos da mesma leitura, e cada um continua custando o seu gesto. A Galeria do
+passo C corrige muitos
+glifos de uma vez, mas mostra todos os glifos lidos como o caractere, inclusive os "0" certos
+de "10" e de "1.e4". Escolher à mão os que estão dentro de palavras custa um gesto por glifo.
+
+**No catálogo e no teste.** O catálogo vai à versão 6. O custo de cada comando é o do ensinar
+que ele substitui:
+- `ensinar_em_lote_da_fila`, 2 gestos: digitar e Ctrl+Enter;
+- `ensinar_em_lote`, 3 gestos: clique, digitar e Ctrl+Enter.
+
+`test_custo_dos_comandos.py` confere os dois na janela, com QTest. A linha de base do passo 0
+medida de novo com o catálogo 6 (`2026-10-24-fatia-xv-passo-0.json`) continua em 1.183 gestos.
+
+**No replay.** O lote substitui o ensinar quando deixa certos mais glifos do que o Enter
+simples deixaria, contando a propagação que vem depois do Enter. A comparação roda numa cópia,
+porque a propagação também acerta parte desses glifos de graça.
+
+**A medida** (`2026-10-24-fatia-xv-passo-L.json`, no `02fc26a`, árvore limpa) dá **1.057
+gestos**, razão **0,894** (era 0,901). O CA-F.1 continua reprovado, e faltam 229 gestos.
+- **Os lotes.** Foram usados 8 vezes, sobre 23 glifos: `0→o` três vezes (7, 1 e 1 glifos),
+  `1→l` três vezes (4, 3 e 1), `S→s` uma (4) e `I→l` uma (2).
+- **O saldo.** O `ensinar_glifo` caiu de 196 para 185 (−33 gestos), e os 8 lotes custam 24.
+  Sobram −9 gestos.
+
+A estimativa da proposta era de −80 a −110 gestos e errou. Ela contava as confusões do
+snapshot, antes da fila do contexto. Desde a proposta 1, essas leituras já vão para a fila,
+e a propagação do padrão ensinado resolve a maior parte delas: dos 55 `1→l` improváveis do
+snapshot, só 7 ainda são ensinados à mão.
+
+**O que ainda se ensina à mão.** São 205 glifos, e 122 deles **não tinham leitura nenhuma**
+(`''→r` 15, `''→s` 11, `''→p` 8, `''→i` 7…). As confusões que sobram são poucas por página:
+`—→-` 8, `0→o` 7, `1→l` 7, `C→c` 6. Nenhum lote resolve os glifos sem leitura: eles são o
+maior bloco que sobra (cerca de 366 gestos), seguido das linhas não lidas (190) e das divisões
+(96). Para chegar a ≤ 0,70, o caminho passa por eles:
+- uma leitura melhor dos glifos que hoje saem vazios, que é o k-NN do livro de antes;
+- dividir as linhas das legendas lado a lado (proposta 4).
+
+## O palpite da rede no glifo sem leitura (2026-10-24, com o sim do usuário)
+
+**De onde veio.** Dos 61 glifos sem leitura do snapshot que pedem uma substituição, o primeiro
+da rede global, abaixo do limiar dela (0,80), é o certo em 36. Uma faixa de confiança mínima
+não ajudaria: os 36 certos têm todos confiança ≥ 0,4, e só 3 dos errados ficam abaixo disso.
+
+**O comando** (`92ce6b9`). O glifo que ninguém leu chega ao Glifo com esse palpite no campo,
+selecionado (SPEC §9.2). O Enter o ensina, e digitar o troca. A leitura diz que é palpite, e
+o glifo continua sem leitura na fila até alguém decidir. O palpite vem do servidor de leitura,
+num pedido com os glifos sem leitura da página toda.
+
+O risco é o Enter por reflexo num palpite errado, que grava um padrão errado. Ele é o mesmo
+de aceitar a leitura de um glifo lido com confiança baixa, que o Enter já ensina hoje.
+
+**No catálogo e no teste.** O catálogo vai à versão 7, e cada comando custa um gesto a menos
+que o ensinar que substitui:
+- `aceitar_palpite_da_fila`, 1 gesto: o Enter;
+- `aceitar_palpite`, 2 gestos: o clique e o Enter.
+
+`test_custo_dos_comandos.py` confere os dois na janela. A linha de base com o catálogo 7
+(`2026-10-24-fatia-xv-passo-0-082756.json`) continua em 1.183.
+
+**A medida** (`2026-10-24-fatia-xv-passo-L-082803.json`, no `92ce6b9`, árvore limpa) dá **983
+gestos**, razão **0,831** (era 0,894). O palpite foi aceito 74 vezes: 67 fora da vez da fila e
+7 na vez dela. A estimativa era de −40 a −60, e a medida deu −74. A estimativa contava só os
+61 glifos sem leitura do snapshot; o replay acha outros no caminho, como as partes de um box
+dividido que os padrões do livro não leem.
+
+## O alvo revisto (2026-10-24, com o sim do usuário)
+
+Com o palpite, o que sobra na fatia é:
+- 190 gestos de custo fixo do que nenhum comando corrige (5 linhas que a leitura não acha, a
+  4 gestos cada, e os 170 caracteres delas, a 1);
+- 118 `ensinar_glifo` e 5 `ensinar_da_fila`, sobretudo glifos que a rede erra;
+- 48 divisões, 15 descartes, 15 marcações e 11 junções.
+
+As alavancas que restam, somadas, ficam perto de 0,80: dividir as legendas lado a lado (cerca
+de −25), não cobrar a divisão de um box cujo texto já está certo (a razão vai de 0,83 a cerca
+de 0,82, porque o ajuste vale nos dois lados) e um k-NN do livro que propague mais sem errar
+mais, que pede outra abordagem. Nenhuma combinação delas chega a 0,70.
+
+O alvo passou a ser **≤ 85% da linha de base no fim do roadmap** (SPEC §15.4), no lugar de
+≤ 70% depois do D1. Com ele, o CA-F.1 aprova (0,831), provisório até a estrutura e os FEN das
+p. 21–27 serem revisados.
+
+## As linhas não lidas: o pingo do i e as legendas lado a lado (2026-10-24)
+
+Das 5 linhas sem par no fim do replay, só as duas legendas da p. 25 já estavam sem par no
+snapshot. Duas são a caixa do gabarito que engole o diagrama (i024 l03 e i026 l28); ficam
+para a revisão da estrutura. A quinta, a l06 da p. 26, casava no snapshot e se partia no meio
+do replay.
+
+**O pingo do i.** A divisão do "xi" de "existir", e depois a do "vi" de "vitória", saía com o
+pingo num box e o par sem pingo noutro, um em cima do outro. É o defeito que o próprio
+`split_box` do core descreve: em "vi" e "wi" o vão horizontal sob o pingo é mais fundo que o
+vertical entre as letras. O pingo solto, no alto da linha, a partia em duas, e a l06 deixava de
+casar. O `dividir` agora corta na coluna quando a parte de cima aparada é só um pingo, até 30%
+da altura e 50% da largura do box (`pagina._corte_sob_o_pingo`). O vão vertical é medido na
+tinta de baixo, pela régua do core. O box girado fica com o corte do core.
+
+**As legendas lado a lado.** O core junta numa linha o que está na mesma altura. As legendas
+dos Diagramas 6 e 7 saíam numa frase só, com 315 px entre elas: 10,5 alturas de letra, contra
+~0,6 entre palavras. `layout.partir_nos_vaos` parte a linha num vão de mais de 8 alturas, com
+3 palavras ou mais de cada lado. O Documento e a exportação montam as linhas por ela. Em 135
+páginas de 9 livros (15 por livro, só segmentadas), passaram do limiar:
+- as legendas lado a lado (as do Attacking Manual, com duas e com três);
+- as colunas de um índice onomástico;
+- títulos com ornamentos e a capa;
+- linhas de ruído do Yusupov.
+
+A tabela de lances do Rubinstein, o número de um lado e o lance do outro, fica em 6,3. Nas
+p. 21–27 só a linha das legendas se parte.
+
+**A medida** (`2026-10-24-fatia-xv-passo-L-143804.json`, no `7511f02`, árvore limpa, catálogo 7
+sem mudança) dá **880 gestos**, razão **0,744**. A linha de base continua em 1.183, porque é
+medida no código do passo 0. Os impossíveis caem de 190 para 56: sobram as 2 linhas do
+gabarito e os 48 caracteres delas. A estimativa da proposta 4 era de −60 a −70, contando só as
+legendas. A medida deu −103, porque a l06 da p. 26 também volta a casar, e com ela os
+caracteres certos que a leitura já tinha.
+
+A qualidade do Xadrez Vitorioso (`2026-10-24-qualidade-xv.json`, no `7511f02`) não se compara
+só com esta mudança, porque a anterior é de 2026-10-23, antes da fila do contexto. Nas páginas
+de corpo, só a p. 25 muda de linhas: 3 → 2 sem par e 2 → 0 perdidas. O CER do corpo vai de
+3,23% a 2,81%. Os pendentes sobem em todas as páginas de corpo, de 1 a 10 por página; é a fila
+do contexto, que manda à revisão a leitura confiante improvável. Na capa (i000, uma foto),
+as linhas de ruído partidas vão de 937 a 1.485 sem par.
+
+Com 0,744, o CA-F.1 passa do alvo novo com folga, mas ainda não chega aos 0,70 do alvo antigo.
+
+## O título corrido na frente da fila (2026-10-24)
+
+Dos 880 gestos, 85 eram palpites aceitos fora da fila, a 2 gestos, e 111 ensinos fora dela,
+a 3; na fila, cada um custa 1 a menos. O glifo sem leitura tem confiança 0 e devia abrir a
+fila, mas em toda página a cabeça dela era um □ do título corrido ("XADREZ VITORIOSO:
+ESTRATÉGIA 21", "YASSER SEIRAWAN JEREMY SILMAN"). Nenhuma linha verificada o cobre, e por
+isso o replay nunca o resolvia: ele travava a cabeça, e toda correção saía fora da fila. Na
+janela era igual: o usuário tinha de pular o □ antes de chegar ao texto, e a exportação o
+tira de qualquer jeito.
+
+**A mudança** (`2e3d9a1`, SPEC §8.1). Por confiança e por caractere, a fila põe o que a
+exportação tira depois do resto e antes dos pulados:
+- o cabeçalho e o rodapé corridos, pela regra da exportação;
+- o □ que cai na altura e na faixa deles;
+- as áreas de cabeçalho, rodapé, número de página e ignorar.
+
+Nada sai da fila, e quem exporta com as margens ainda as revisa, no fim. Na ordem de leitura
+a fila fica na ordem da página. O replay anda pela mesma fila que a janela.
+
+A revisão de código pegou duas coisas na primeira versão:
+- ela mexia também na ordem de leitura: o Alt+↑ ia ao □ do título, e o fim da página não
+  chegava;
+- ela contava o □ como glifo na regra: um cisco sem leitura logo abaixo do título fechava o
+  vão que a regra pede, e o título deixava de ser margem.
+
+**O custo na janela.** O Enter (`test_enter_ensinar`), duas rodadas de cada, com a primeira
+versão: 37,8/54,3 e 36,8/59,6 ms (p50/p95) sem a mudança, 39,4/70,0 e 37,9/54,7 com ela. O
+alvo é 100 ms. A máquina estava mais lenta que no último portão nas duas.
+
+**A medida** (`2026-10-24-fatia-xv-passo-L-220446.json`, no `84f2956`, que soma só os
+documentos ao `2e3d9a1`, árvore limpa, catálogo 7 sem mudança) dá **772 gestos**, razão
+**0,653**. A primeira rodada, no mesmo código antes de ele ir para cima do `985bd37` (o negrito
+do pingo do i e o espaço depois do "f", de outra sessão), deu os mesmos 772, comando por
+comando. A linha de base continua em 1.183. Agora
+85 palpites e 36 ensinos saem da fila (eram 7 e 5). O que sobra:
+- 81 `ensinar_glifo`, o glifo que a rede erra e que a fila não alcança na vez dele;
+- 51 divisões, 15 descartes, 20 marcações e 11 junções;
+- 56 gestos de impossíveis, as 2 linhas do gabarito.
+
+Com 0,653, o CA-F.1 passa também dos 0,70 do alvo antigo. Continua provisório até a estrutura
+e os FEN das p. 21–27 serem revisados.
+
+## O replay refinado: o catálogo 8 (2026-10-24, com o pedido do usuário)
+
+Com o título corrido no fim da fila, o que ainda a travava era do replay, não do programa:
+- **o Enter que confirma a leitura certa pendente** não era cobrado, nem na linha de base nem
+  depois, e a cabeça certa da fila não andava: toda correção seguinte saía fora da fila, com
+  o clique;
+- **dividir, juntar e descartar** o glifo que a janela já mostra pediam o clique nele.
+
+**O que mudou** (`3841795`). O replay anda pela fila da janela:
+- o glifo que a janela mostra sai sem o clique, também com o Ctrl+D, o Ctrl+J (com o
+  seguinte da linha) e o Del;
+- o certo e pendente numa linha medida custa o Enter, que ensina o padrão, como na janela;
+- a janela mostra o primeiro da fila ao abrir a página e depois do Enter e do Del; depois do
+  Ctrl+D e do Ctrl+J, o box novo (`_depois_de_editar`), e o replay segue o mesmo;
+- o glifo da fila fora das linhas medidas e sem diferença é transparente.
+
+Os quatro comandos novos (`confirmar_da_fila`, `dividir_da_fila`, `juntar_da_fila`,
+`descartar_da_fila`) são do passo 0, a 1 gesto, conferidos na janela com o efeito e o glifo
+mostrado depois. A revisão de código pegou que a primeira versão supunha a volta ao primeiro
+da fila depois do Ctrl+D e do Ctrl+J, e o teste passava só porque as confianças empatavam.
+
+**O mesmo algoritmo dos dois lados.** Até aqui a linha de base rodava o `replay_fatia.py` da
+tag `passo-0`. Agora ela roda o do checkout, copiado com o catálogo (protocolo, item 5). O
+replay só importa o que o passo tem. Na fatia, com o catálogo 7, ele deu no código do passo
+0 a mesma linha de base de antes, 1.183, página por página.
+
+**As medidas**, com o catálogo 8:
+
+| | Linha de base (passo 0) | Passo L |
+|---|---|---|
+| Arquivo | `2026-10-24-fatia-xv-passo-0-230353.json` | `2026-10-24-fatia-xv-passo-L-230526.json` |
+| Gestos | 1.076 | 773 |
+| Sem os impossíveis | 782 | 717 |
+| Impossíveis | 294 | 56 |
+| Enter que confirma | 136 | 146 |
+| Ensinar, da fila / fora dela | 132 / 60 | 56 / 44 |
+| Palpite, da fila / fora dela | n/a | 79 / 3 |
+| Dividir, da fila / fora dela | 22 / 27 | 22 / 31 |
+
+A razão vai a **0,718** (era 0,653 com o catálogo 7). A linha de base cai mais que o passo L
+(−107 contra +1), porque no passo 0 a cabeça certa travava mais a fila. E os ~140 Enter
+cobrados dos dois lados puxam a razão para 1. O CA-F.1 passa do alvo de ≤ 85%, provisório
+até a estrutura e os FEN das p. 21–27 serem revisados, e fica acima dos 0,70 do alvo antigo.
+
+## O que falta: o box colado e a inserção no Documento (2026-10-25, com o pedido do usuário)
+
+Dos 16 glifos que o passo L cobrava como faltando (4 gestos cada, marcados à mão), a maioria
+era um box colado lido como a primeira letra:
+- "r," de "concluir," lido "r" (a altura do box pega a perna da vírgula);
+- "tir," de "existir," lido "t" (52 px de largura);
+- "ran" de "tranqüila" lido "r".
+
+O replay casava a primeira letra e contava o resto como faltando.
+
+**O Documento não divide esse box.** O 1 → k dele só vale quando a leitura do box está errada
+("x" por "tir,"). Lido como a primeira letra, o box fica, e as letras que faltam entram
+virtuais, sem box (conferido em `sessao.planejar`).
+
+**O que mudou** (`f38e5d7`, catálogo 9). O que falta vai pelo mais barato:
+- **o Ctrl+D no box colado.** O replay divide numa cópia o box vizinho do trecho que falta
+  (`_colado`). Ele fica com o Ctrl+D se a divisão dá um box para o que falta e se dividir,
+  mais ensinar as partes que saem erradas, custa menos que o outro caminho;
+- **marcar cada glifo à mão** (4 gestos por glifo);
+- **ou, desde o D1, inserir as letras no Documento** (`inserir_no_documento`: o clique e uma
+  tecla por letra, conferido na janela).
+
+A revisão de código pediu que o box rejeitado volte a ser avaliado quando um padrão novo
+entra. Com o padrão, a parte sai certa ao dividir, e o Ctrl+D custa só ele. As estimativas
+do Ctrl+D continuam do lado conservador: a parte errada custa o ensinar fora da fila.
+
+**As medidas** (`2026-10-25-fatia-xv-passo-0.json` e `2026-10-25-fatia-xv-passo-L.json`, no
+`f38e5d7`):
+
+| | Linha de base | Passo L |
+|---|---|---|
+| Gestos | 1.076 | 739 (era 773) |
+| Marcar à mão | 14 | 0 (eram 16) |
+| Inserir no Documento | n/a | 9 trechos |
+| Dividir, fora da fila / da fila | 27 / 22 | 32 / 23 (eram 31 / 22) |
+
+Na linha de base o Ctrl+D não sai mais barato em nenhum box: dividir (2) e ensinar a parte
+(3) passam de marcar a vírgula (4). A razão vai a **0,687**, abaixo também dos 0,70 do alvo
+antigo. O CA-F.1 passa, provisório até a estrutura e os FEN das p. 21–27 serem revisados.

@@ -258,7 +258,7 @@ class Estrutura:
     italico: set = field(default_factory=set)
     paragrafo_antes: set = field(default_factory=set)
     hifen_de_quebra: set = field(default_factory=set)
-    #: Os boxes que a fila de revisão pede (`leitor.precisa_revisao`), quando a página foi
+    #: Os boxes que a fila de revisão pede (`leitor.precisa_revisao` e `contexto`), quando a página foi
     #: lida com os limiares do livro: o realce do DOCX (`Opcoes.realcar_duvidosos`).
     duvidosos: set = field(default_factory=set)
     #: Os boxes numa área desenhada pelo usuário com função de texto (não de margem): a
@@ -274,12 +274,14 @@ class Estrutura:
     def da_pagina(cls, pagina, limiares=None) -> Tuple[List[BoxEntry], "Estrutura"]:
         """Os boxes lidos da página do modelo (`modelo.Pagina`) e a estrutura deles; sem
         modelo, nada. Com os `limiares` do livro, também os duvidosos."""
+        from abbychess import contexto
         from abbychess import zonas as zn
         from abbychess.leitor import precisa_revisao
 
         if pagina is None:
             return [], cls()
         lidos = [b for b in pagina.boxes if b.entry.char]
+        contra = contexto.improvaveis(pagina) if limiares is not None else set()
         areas = [z for z in pagina.zonas if z.tipo in (zn.TEXTO, zn.IGNORAR)]
         estrutura = cls(vivos=[b.entry for b in lidos])
         decisoes = pagina.decisoes
@@ -300,8 +302,9 @@ class Estrutura:
                 estrutura.paragrafo_antes.add(id(e))
             if b.gid in decisoes.hifen_de_quebra:
                 estrutura.hifen_de_quebra.add(id(e))
-            if limiares is not None and precisa_revisao(e.char, e.source, e.confidence,
-                                                        limiares):
+            if limiares is not None and (
+                    precisa_revisao(e.char, e.source, e.confidence, limiares)
+                    or (b.gid in contra and contexto.volta_pelo_contexto(e.source))):
                 estrutura.duvidosos.add(id(e))
         return list(estrutura.vivos), estrutura
 
@@ -339,13 +342,12 @@ def palavras(boxes: Sequence[BoxEntry]) -> List[List[Tuple[str, List[int]]]]:
 def _palavras_por_trecho(boxes: Sequence[BoxEntry], leitura: Optional[OrdemDeLeitura] = None
                          ) -> List[Tuple[Tuple[int, int], List[Tuple[str, List[int]]]]]:
     """As linhas de `palavras`, cada uma com o trecho de leitura em que está."""
-    from core.notacao import normalizar_saida, palavras_da_pagina
+    from core.notacao import normalizar_saida
 
     leitura = leitura or OrdemDeLeitura.da_pagina(boxes)
     saida = []
     for chave, trecho in leitura.trechos(boxes):
-        parte = [boxes[i] for i in trecho]
-        for linha in palavras_da_pagina(parte, leitura.deteccao_do_trecho(trecho, boxes)):
+        for linha in leitura.linhas_do_trecho(trecho, boxes):
             indices = [trecho[s.indice] for p in linha for s in p.simbolos]
             caixa = _caixa_pela_altura(boxes, indices)
             saida.append((chave, [(_captura_minuscula("".join(
@@ -517,6 +519,34 @@ def margens_corridas(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]) -> Dict
     """
     funcoes, margens = _funcoes_das_margens(paginas)
     return {i: set(margens[i].poeira) | set(funcoes[i]) for i in paginas}
+
+
+def margens_da_pagina(boxes: Sequence[BoxEntry], altura: int) -> set:
+    """Os índices de `margens_corridas` de uma página só, com os glifos sem leitura: o □ do
+    cabeçalho corrido também é cabeçalho. A fila de revisão os manda para o fim (§8.1).
+
+    A regra roda só nos lidos, como na exportação; contar o □ como glifo mudaria as linhas
+    dela (um cisco sem leitura logo abaixo do título fecharia o vão que a regra pede). Depois,
+    o sem leitura entra quando o centro dele cai na altura de um glifo de margem e na faixa
+    dos glifos de margem dessa altura, com a folga de uma altura de cada lado. O sem leitura
+    todo dentro da faixa da poeira (`FAIXA_DA_POEIRA`, em cima ou embaixo) também entra: é o
+    cisco da borda da digitalização, que nenhuma linha do texto alcança."""
+    lidos = [k for k, b in enumerate(boxes) if b.char]
+    margem = {lidos[i] for i in margens_corridas({0: ([boxes[k] for k in lidos], altura)})[0]}
+    de_margem = list(margem)
+    for k, b in enumerate(boxes):
+        if b.char:
+            continue
+        if b.y2 < FAIXA_DA_POEIRA * altura or b.y1 > (1 - FAIXA_DA_POEIRA) * altura:
+            margem.add(k)
+            continue
+        x, y = (b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2
+        na_altura = [boxes[m] for m in de_margem if boxes[m].y1 <= y <= boxes[m].y2]
+        if na_altura:
+            folga = max(m.y2 - m.y1 for m in na_altura)
+            if min(m.x1 for m in na_altura) - folga <= x <= max(m.x2 for m in na_altura) + folga:
+                margem.add(k)
+    return margem
 
 
 def funcoes_das_margens(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]) -> Dict[int, dict]:

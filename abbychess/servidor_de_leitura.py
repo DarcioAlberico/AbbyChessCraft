@@ -138,6 +138,12 @@ def ler_recortes(itens, leitor) -> list:
     return [leitor.ler(recorte, altura_de_referencia=altura) for recorte, altura in itens]
 
 
+def sugerir_recortes(itens, leitor) -> list:
+    """Os palpites da rede para glifos que ninguém leu: `[(recorte, altura_de_referencia)]` →
+    `[(char, confiança) ou None]` (`LeitorDoLivro.sugerir`)."""
+    return [leitor.sugerir(recorte, altura) for recorte, altura in itens]
+
+
 def ler_diagramas(imagem, caixas, boxes, leitor) -> list:
     from abbychess import diagramas as dg
 
@@ -345,6 +351,8 @@ class _Laco:
             return reler_boxes(imagem, boxes, leitor, so_pendentes=so_pendentes)
         if operacao == "ler_recortes":
             return ler_recortes(argumentos, leitor)
+        if operacao == "sugerir_recortes":
+            return sugerir_recortes(argumentos, leitor)
         if operacao == "ler_diagramas":
             imagem, caixas, boxes = argumentos
             return ler_diagramas(imagem, caixas, boxes, leitor)

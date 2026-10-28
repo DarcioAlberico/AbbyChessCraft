@@ -90,6 +90,20 @@ def test_trocar_uma_letra_por_outra_nao_refaz_a_ordem_de_leitura(paginas, monkey
     assert chamadas == [1]
 
 
+def test_a_letra_que_vira_f_refaz_as_palavras(paginas, monkeypatch):
+    """Depois do "f" o limiar de espaço é outro (`layout.partir_depois_do_f`)."""
+    pagina = paginas[1]
+    tx.montar(pagina)
+    chamadas = []
+    original = OrdemDeLeitura.da_pagina
+    monkeypatch.setattr(OrdemDeLeitura, "da_pagina",
+                        classmethod(lambda cls, e: chamadas.append(1) or original(e)))
+    letra = next(k for k, b in enumerate(pagina.boxes)
+                 if b.entry.char.isalpha() and b.entry.char != "f")
+    tx.montar(_corrigida(pagina, letra, "f"))
+    assert chamadas == [1]
+
+
 def test_o_box_movido_refaz_as_linhas(paginas):
     pagina = copy.deepcopy(paginas[0])
     tx.montar(pagina)

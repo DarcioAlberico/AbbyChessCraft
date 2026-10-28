@@ -15,7 +15,7 @@ import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Collection, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 from PIL import Image
@@ -24,12 +24,13 @@ from core import proporcao, vertical
 from core.box_model import BoxEntry
 from core.services.box_service import BoxService
 
+from abbychess import contexto
 from abbychess import gravacao as gv
 from abbychess import procedencia
 from abbychess import sequencia as sq
 
-from abbychess.leitor import (FONTE_AGUARDANDO, FONTE_MANUAL, LeitorDoLivro, nome_de_origem,
-                              precisa_revisao)
+from abbychess.leitor import (FONTE_AGUARDANDO, FONTE_MANUAL, FONTE_NENHUMA, LeitorDoLivro,
+                              nome_de_origem, precisa_revisao)
 from abbychess.projeto import ARQUIVO_DE_INCLINACOES, EXTENSOES_DE_IMAGEM, ProjetoDeLivro
 
 log = logging.getLogger(__name__)
@@ -640,7 +641,69 @@ def segmentar_tudo(imagem: Image.Image, leitor: Optional[LeitorDoLivro] = None
 
     arbitro = leitor.arbitro if leitor is not None else None
     todas = BoxService.generate_boxes_opencv(cinza, arbitro=arbitro, binaria=binaria)
+    todas = devolver_pingos(todas, binaria, escala)
     return SegmentacaoBruta(todas, tabuleiros, escala)
+
+
+#: O pingo perdido: até esta fração da escala de texto nos dois eixos, e com pelo menos
+#: esta outra de área (abaixo é poeira, não pingo).
+PINGO_PERDIDO_MAXIMO, PINGO_PERDIDO_AREA_MINIMA = 0.6, 0.02
+
+
+def devolver_pingos(boxes: List[BoxEntry], binaria: np.ndarray, escala: float
+                    ) -> List[BoxEntry]:
+    """Devolve ao glifo de baixo o pingo que a segmentação deixou sem box.
+
+    **O "i" em negrito perdia o pingo.** O merge do core cola o pingo na haste, mas o
+    par (pingo, vão de 1–2 px, haste) passa de 1,6 escalas de altura, e o
+    `dividir_linhas_coladas` o toma por duas linhas grudadas: corta no vão e joga fora
+    o pingo, mais curto que um caractere (`PECA_MINIMA_DE_LINHA`). A rede via só a
+    haste, que em negrito tem a serifa do "1", e lia "1" com 0,98 ("exerc1se",
+    "analys1s" na p. 15 do Aagaard, "A Matter of Endgame Technique").
+
+    O pingo devolvido é um componente de tinta **inteiro sem box** (a cauda de um "p"
+    cortada pelo mesmo passo é parte de um componente que tem box, e fica de fora),
+    pequeno nos dois eixos, com o centro sobre o box de baixo e a até
+    `FOLGA_DE_DIACRITICO` da altura dele: a régua com que o core cola o pingo.
+    """
+    if not boxes or binaria is None or escala <= 0:
+        return boxes
+    import cv2
+
+    # A tinta sem box (quase nada numa página): a binária com os boxes apagados. O componente
+    # dela que encosta em tinta coberta é pedaço de um glifo que tem box.
+    orfa = binaria.copy()
+    for b in boxes:
+        orfa[b.y1:b.y2, b.x1:b.x2] = 0
+    total, rotulos, medidas, _c = cv2.connectedComponentsWithStats(orfa, connectivity=8)
+    maximo, area_minima = PINGO_PERDIDO_MAXIMO * escala, PINGO_PERDIDO_AREA_MINIMA * escala ** 2
+    saida = list(boxes)
+    crescidos = set()
+    larguras, alturas, areas = (medidas[:, k] for k in (cv2.CC_STAT_WIDTH, cv2.CC_STAT_HEIGHT,
+                                                         cv2.CC_STAT_AREA))
+    pequenos = (larguras <= maximo) & (alturas <= maximo) & (areas >= area_minima)
+    for rotulo in np.nonzero(pequenos)[0]:
+        if rotulo == 0:                                  # o fundo
+            continue
+        x, y, w, h = (int(v) for v in medidas[rotulo][:4])
+        y0, x0 = max(0, y - 1), max(0, x - 1)
+        janela = np.s_[y0:y + h + 1, x0:x + w + 1]
+        vizinhanca = cv2.dilate((rotulos[janela] == rotulo).astype(np.uint8),
+                                np.ones((3, 3), np.uint8)) > 0
+        if (vizinhanca & (binaria[janela] > 0) & (orfa[janela] == 0)).any():
+            continue
+        centro = x + w / 2
+        candidatos = [k for k, b in enumerate(saida)
+                      if k not in crescidos and not (b.angulo or 0) % 180
+                      and b.x1 <= centro <= b.x2 and w <= b.width + 1
+                      and 0 <= b.y1 - (y + h) <= BoxService.FOLGA_DE_DIACRITICO * b.height]
+        if not candidatos:
+            continue
+        k = min(candidatos, key=lambda k: saida[k].y1 - (y + h))
+        b = saida[k]
+        saida[k] = replace(b, x1=min(b.x1, x), y1=y, x2=max(b.x2, x + w))
+        crescidos.add(k)
+    return saida
 
 
 def segmentar(imagem: Image.Image, leitor: Optional[LeitorDoLivro] = None) -> List[BoxEntry]:
@@ -814,16 +877,20 @@ def _italicos(pagina: np.ndarray, boxes: Sequence[BoxEntry], palavras: Sequence[
 
 def ler_boxes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorDoLivro, *,
               so_pendentes: bool = False, progresso: Optional[Progresso] = None,
-              cancelado: Callable[[], bool] = lambda: False) -> ResumoDaLeitura:
+              cancelado: Callable[[], bool] = lambda: False,
+              pendentes: Optional[Sequence[bool]] = None) -> ResumoDaLeitura:
     """Lê os boxes no lugar. Com `so_pendentes`, não toca no que já foi confirmado.
 
     Box manual nunca é relido: a correção do usuário tem precedência até ele
-    pedir outra coisa (invariante 2 do PyBoxEditor).
+    pedir outra coisa (invariante 2 do PyBoxEditor). Os pendentes são os de
+    `contexto.pendentes`, ou os `pendentes` de quem lê cópias (`propagar_padroes`).
     """
     pagina = cinza(imagem)
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
-    alvos = [b for b in boxes if b.source != FONTE_MANUAL and (
-        not so_pendentes or precisa_revisao(b.char, b.source, b.confidence, leitor.limiares))]
+    if so_pendentes and pendentes is None:
+        pendentes = contexto.pendentes(boxes, leitor.limiares)
+    alvos = [b for i, b in enumerate(boxes) if b.source != FONTE_MANUAL and (
+        not so_pendentes or pendentes[i])]
     for i, box in enumerate(alvos):
         if cancelado():
             break
@@ -848,6 +915,12 @@ def por_leitura(box: BoxEntry, leitura) -> None:
 def aguardando(box: BoxEntry) -> bool:
     """O box ainda não lido (§11): a interface não o leu e espera o servidor."""
     return not box.char and box.source == FONTE_AGUARDANDO
+
+
+def sem_leitura(box: BoxEntry) -> bool:
+    """O box que a cadeia toda leu e ninguém reconheceu (o painel pode sugerir o palpite da
+    rede, §9.2)."""
+    return not box.char and box.source == FONTE_NENHUMA
 
 
 def recortes_para_ler(imagem: Image.Image, boxes: List[BoxEntry], indices: Sequence[int]
@@ -877,15 +950,18 @@ def resumir(boxes: List[BoxEntry], leitor: LeitorDoLivro) -> ResumoDaLeitura:
     return ResumoDaLeitura(len(boxes), len(fila_de_revisao(boxes, leitor)), por_fonte)
 
 
-def fila_de_revisao(boxes: List[BoxEntry], leitor: LeitorDoLivro) -> List[int]:
+def fila_de_revisao(boxes: List[BoxEntry], leitor: LeitorDoLivro,
+                    no_fim: Collection[int] = ()) -> List[int]:
     """Índices dos boxes a revisar, do menos confiável ao mais.
 
     Em empate de confiança fica a ordem de leitura, para o usuário andar pela
-    página e não pular de um canto para outro.
+    página e não pular de um canto para outro. O glifo que a palavra desmente
+    (`contexto`) entra mesmo com a confiança alta. Os de `no_fim` (as margens que a
+    exportação tira, `exportar.margens_da_pagina`) vêm depois de todos os outros.
     """
-    pendentes = [i for i, b in enumerate(boxes)
-                 if precisa_revisao(b.char, b.source, b.confidence, leitor.limiares)]
-    return sorted(pendentes, key=lambda i: (round(boxes[i].confidence, 2), i))
+    pendentes = [i for i, p in enumerate(contexto.pendentes(boxes, leitor.limiares)) if p]
+    no_fim = set(no_fim)
+    return sorted(pendentes, key=lambda i: (i in no_fim, round(boxes[i].confidence, 2), i))
 
 
 def ensinar(imagem: Image.Image, boxes: List[BoxEntry], indice: int, char: str,
@@ -932,26 +1008,36 @@ def ensinar_varios(imagem: Image.Image, boxes: List[BoxEntry], indices: List[int
 
 
 def propagar_padroes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorDoLivro, *,
-                     efeitos: Optional[Sequence] = None) -> int:
+                     efeitos: Optional[Sequence] = None,
+                     pendentes: Optional[Sequence[bool]] = None) -> int:
     """Aplica os padrões do livro aos boxes pendentes, sem a cadeia global.
 
     Um padrão novo só muda o que o k-NN do livro responde; a rede e a base
     global dariam a mesma leitura de antes. Por isso basta consultar o livro,
     o que custa milissegundos, em vez de reler a página inteira, que custava
     oito segundos no Darcy Lima. Devolve quantos pendentes foram resolvidos.
+
+    Os pendentes são os de `contexto.pendentes`; quem lê cópias fora da interface passa
+    `pendentes`, os mesmos com que escolheu o que copiar.
     """
     pagina = cinza(imagem)
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
+    if pendentes is None:
+        pendentes = contexto.pendentes(boxes, leitor.limiares)
     resolvidos = 0
     for i, box in enumerate(boxes):
-        if not precisa_revisao(box.char, box.source, box.confidence, leitor.limiares):
+        if not pendentes[i]:
             continue
         efeito = None if efeitos is None else efeitos[i]
         leitura = leitor.ler_pelo_livro(vertical.recorte_de_pe(pagina, box), referencia, efeito)
         if leitura.char:
+            # O improvável que o livro lê igual continua pendente (a palavra ainda o
+            # desmente): resolvido é o que muda de caractere ou saía pela confiança.
+            if leitura.char != box.char or precisa_revisao(box.char, box.source,
+                                                           box.confidence, leitor.limiares):
+                resolvidos += 1
             box.char, box.source, box.confidence = leitura.char, leitura.fonte, leitura.confianca
             procedencia.registrar(box, leitura.amostra)
-            resolvidos += 1
     return resolvidos
 
 
@@ -996,19 +1082,28 @@ def dividir(imagem: Image.Image, boxes: List[BoxEntry], indice: int,
     do par, e a altura relativa que o padrão do livro grava ensinaria um "r"
     do tamanho de um "p".
 
+    **O pingo do "i" não é um glifo.** Em "vi", "wi" e "xi" o vão horizontal sob o
+    pingo é mais fundo que o vertical entre as letras, e o core corta ali (ele diz
+    isso na própria `split_box`): saíam o pingo e o par sem pingo, um em cima do
+    outro, e o pingo solto partia a linha. Quando a parte de cima é só um pingo, o
+    corte vai para o vão vertical mais fundo do resto (`_corte_sob_o_pingo`).
+
     As partes entram no lugar do box, a da esquerda (ou de cima) primeiro, sem
     leitura e fora do manual. Com `leitor`, são relidas na hora. Devolve os
     índices das duas; os boxes depois de `indice` andam uma casa para a frente.
     """
     box = boxes[indice]
     matriz = np.asarray(imagem.convert("L"))
+    tinta = BoxService._tinta_do_box(box, matriz)
     if x is None:
         partes = BoxService.split_box(box, matriz)
+        coluna = _corte_sob_o_pingo(partes, box, tinta)
+        if coluna is not None:
+            partes = [replace(box, x2=coluna), replace(box, x1=coluna)]
     else:
         if not box.x1 < x < box.x2:
             raise ValueError(f"O corte em x={x} está fora do box ({box.x1}..{box.x2}).")
         partes = [replace(box, x2=x), replace(box, x1=x)]
-    tinta = BoxService._tinta_do_box(box, matriz)
     novas = []
     for parte in partes:
         parte = replace(parte, char="", source="", confidence=0.0,
@@ -1020,6 +1115,29 @@ def dividir(imagem: Image.Image, boxes: List[BoxEntry], indice: int,
     boxes[indice:indice + 1] = novas
     _reler(imagem, boxes, [indice, indice + 1], leitor)
     return [indice, indice + 1]
+
+
+#: O pingo: a parte de cima aparada com até esta fração da altura e da largura do box.
+PINGO_ALTURA, PINGO_LARGURA = 0.3, 0.5
+
+
+def _corte_sob_o_pingo(partes: List[BoxEntry], box: BoxEntry, tinta) -> Optional[int]:
+    """A coluna onde cortar quando o core cortou sob o pingo de um "i"; senão, `None`.
+
+    O vão vertical é medido só na tinta de baixo do corte do core, sem o pingo, pela
+    mesma régua do core (`_vale_mais_fundo`, com a margem dele)."""
+    if tinta is None or len(partes) != 2 or (box.angulo or 0) % 180:
+        return None                                  # girado, o corte em y é o certo
+    de_cima = partes[0]
+    if (de_cima.x1, de_cima.x2) != (box.x1, box.x2) or de_cima.y2 >= box.y2:
+        return None                                  # o core cortou na coluna
+    pingo = _aparar(de_cima, box, tinta)
+    if pingo is None or (pingo.y2 - pingo.y1 > PINGO_ALTURA * box.height
+                         or pingo.x2 - pingo.x1 > PINGO_LARGURA * box.width):
+        return None
+    vale = BoxService._vale_mais_fundo(tinta[de_cima.y2 - box.y1:].sum(axis=0),
+                                       BoxService.MARGEM_DO_CORTE)
+    return box.x1 + vale[0] if vale else None
 
 
 def _aparar(parte: BoxEntry, inteiro: BoxEntry, tinta) -> Optional[BoxEntry]:

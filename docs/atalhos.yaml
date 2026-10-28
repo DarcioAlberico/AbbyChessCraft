@@ -249,6 +249,11 @@ acoes:
     desde_passo: A2
     excecoes:
       - {tecla: Shift+Enter, widget: lineedit, tipo: redireciona, motivo: "o campo do caractere fica com o Shift+Enter e dispara a ação (exceção 6 de §3.4)"}
+  - id: ensinar_em_lote
+    descricao: Ensinar e corrigir em lote os glifos da página com a mesma leitura que a palavra desmente
+    escopo: [campo_glifo]
+    padrao: Ctrl+Enter
+    desde_passo: L
   - id: descartar_box
     descricao: Não é caractere (descartar o box)
     escopo: [glifo]

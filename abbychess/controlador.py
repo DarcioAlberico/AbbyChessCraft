@@ -46,6 +46,7 @@ import numpy as np
 from core.box_model import BoxEntry
 
 from abbychess import ancoragem as ag
+from abbychess import contexto
 from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import historico as hs
@@ -59,7 +60,7 @@ from abbychess import texto as tx
 from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL, FONTE_NENHUMA, precisa_revisao
 from abbychess.modelo import (IOU_DA_RELEITURA, LIDAS, NAO_RECONHECIDA, VERIFICADA, Diferenca,
-                              Pagina, descrever_caidas, proximo_estado, reconciliar)
+                              Pagina, descrever_caidas, pid_de, proximo_estado, reconciliar)
 
 log = logging.getLogger(__name__)
 
@@ -133,6 +134,14 @@ class ControladorDePagina:
         self._enviados: frozenset = frozenset()
         #: Os gids aguardando cuja leitura já foi pedida ao servidor.
         self._em_leitura: set = set()
+        #: O palpite da rede para os glifos que ninguém leu (§9.2): gid -> (o `BoxEntry`
+        #: de quando foi pedido, `(char, confiança)` ou None). Vale enquanto o glifo é o mesmo
+        #: objeto; os pedidos em curso ficam em `_sugerindo`.
+        self._sugestoes: Dict[int, Tuple[BoxEntry, Optional[Tuple[str, float]]]] = {}
+        self._sugerindo: set = set()
+        self.eventos.ligar("atual_mudou", self._sugerir_ao_atual)
+        # O glifo mostrado aguardando o servidor só fica sem leitura quando a leitura chega.
+        self.eventos.ligar("glifos_mudaram", lambda *_: self._sugerir_ao_atual())
         self.indice = 0
         self.imagem = None
         self.matriz: Optional[np.ndarray] = None
@@ -251,20 +260,28 @@ class ControladorDePagina:
         """Os gids a revisar (§8.1): do menos confiável ao mais, com os pulados no fim; na
         ordem de leitura (`ordem_da_fila`), na ordem da página; por caractere, agrupados pela
         leitura (os sem leitura no fim) e, em cada grupo, do menos confiável ao mais. O glifo
-        `revisado` (visto e aceito no Documento, §6.3) não volta."""
+        `revisado` (visto e aceito no Documento, §6.3) não volta.
+
+        Por confiança e por caractere, o que a exportação tira (`gids_fora_do_texto`: o
+        cabeçalho e o rodapé corridos, as áreas de margem) vem depois do resto e antes dos
+        pulados: no Xadrez Vitorioso o □ do título corrido abria a fila de toda página. Na
+        ordem de leitura, não: `andar` e o fim da página contam com a fila na ordem dela."""
         if self.leitor is None or self.modelo is None:
             return []
         boxes = self.modelo.boxes
         indices = self._pendentes()
-        if self.ordem_da_fila == "leitura":
-            return [boxes[i].gid for i in indices]
         if self.ordem_da_fila == "caractere":
             indices = sorted(indices, key=lambda i: (boxes[i].entry.char or "\uffff",
                                                      round(boxes[i].entry.confidence, 2), i))
-        else:
+        elif self.ordem_da_fila != "leitura":
             indices = sorted(indices, key=lambda i: (round(boxes[i].entry.confidence, 2), i))
         fila = [boxes[i].gid for i in indices]
-        return [g for g in fila if g not in self.pulados] + [g for g in fila if g in self.pulados]
+        if self.ordem_da_fila == "leitura":
+            return fila
+        fora = self.gids_fora_do_texto() if fila else frozenset()
+        return ([g for g in fila if g not in self.pulados and g not in fora]
+                + [g for g in fila if g not in self.pulados and g in fora]
+                + [g for g in fila if g in self.pulados])
 
     def _pendentes(self) -> List[int]:
         """Os índices dos glifos que vão para a fila, na ordem da página. Só os glifos que
@@ -272,16 +289,18 @@ class ControladorDePagina:
         limiares = self.leitor.limiares
         chave = limiares.revisao                 # o único limiar que decide a fila
         anterior = self._pendencia if chave == self._limiar_da_pendencia else {}
+        contra = contexto.improvaveis(self.modelo)       # a palavra desmente a leitura
         nova, indices = {}, []
         for i, box in enumerate(self.modelo.boxes):
             e = box.entry
-            estado = (e.char, e.source, e.confidence, box.revisado)
+            estado = (e.char, e.source, e.confidence, box.revisado, box.gid in contra)
             visto = anterior.get(box.gid)
             if visto is not None and visto[0] == estado:
                 pendente = visto[1]
             else:
-                pendente = not box.revisado and precisa_revisao(e.char, e.source, e.confidence,
-                                                                limiares)
+                pendente = not box.revisado and (
+                    precisa_revisao(e.char, e.source, e.confidence, limiares)
+                    or (box.gid in contra and contexto.volta_pelo_contexto(e.source)))
             nova[box.gid] = (estado, pendente)
             if pendente:
                 indices.append(i)
@@ -334,21 +353,36 @@ class ControladorDePagina:
     def gids_de_margem(self) -> frozenset:
         """Os glifos do cabeçalho e do rodapé corridos da página, pela regra da exportação
         (`exportar.margens_corridas`: a faixa, o vão e o número da página), até o layout do
-        passo F dar a função às áreas."""
+        passo F dar a função às áreas. O glifo sem leitura conta (`exportar.margens_da_pagina`):
+        o □ do título corrido é título corrido."""
         if self.modelo is None or self.imagem is None:
             return frozenset()
         from abbychess import exportar as ex
 
-        lidos = [b for b in self.modelo.boxes if b.entry.char]
+        boxes = self.modelo.boxes
         # A regra olha as linhas inteiras da página (~20 ms numa página cheia): o resultado
-        # fica enquanto o que ela lê não muda (o texto, a posição de cada glifo lido e a
-        # altura da página); montar a chave custa uma fração de milissegundo.
+        # fica enquanto o que ela lê não muda (o texto, a posição de cada glifo e a altura da
+        # página); montar a chave custa uma fração de milissegundo.
         chave = (self.indice, self.imagem.height,
-                 tuple((b.gid, b.entry.char, b.entry.x1, b.entry.y1, b.entry.y2) for b in lidos))
+                 tuple((b.gid, b.entry.char, b.entry.x1, b.entry.y1, b.entry.x2, b.entry.y2)
+                       for b in boxes))
         if self._margens[0] != chave:
-            indices = ex.margens_corridas({0: ([b.entry for b in lidos], self.imagem.height)})[0]
-            self._margens = (chave, frozenset(lidos[i].gid for i in indices if i < len(lidos)))
+            indices = ex.margens_da_pagina([b.entry for b in boxes], self.imagem.height)
+            self._margens = (chave, frozenset(boxes[i].gid for i in indices if i < len(boxes)))
         return self._margens[1]
+
+    def gids_fora_do_texto(self) -> frozenset:
+        """Os glifos que a exportação tira: os de `gids_de_margem` e os das áreas de
+        cabeçalho, rodapé, número de página e ignorar (`exportar.FORA_DA_EXPORTACAO`)."""
+        if self.modelo is None:
+            return frozenset()
+        from abbychess import exportar as ex
+
+        areas = [z for z in self.modelo.zonas if z.funcao in ex.FORA_DA_EXPORTACAO]
+        nas_areas = {b.gid for b in self.modelo.boxes
+                     if any(z.contem((b.entry.x1 + b.entry.x2) / 2, (b.entry.y1 + b.entry.y2) / 2)
+                            for z in areas)} if areas else set()
+        return self.gids_de_margem() | nas_areas
 
     def gids_virtuais(self) -> frozenset:
         """Os gids dos glifos virtuais (sem caixa) da página."""
@@ -380,6 +414,7 @@ class ControladorDePagina:
         self.servidor = servidor
         self._enviados = self.padroes_de(leitor) if servidor is not None else frozenset()
         self._em_leitura = set()
+        self._sugestoes, self._sugerindo = {}, set()
         self.geracao += 1
         self.lote_rodando = False               # o lote do projeto anterior não vale aqui
         self.projeto, self.fonte, self.leitor = projeto, fonte, leitor
@@ -1206,18 +1241,20 @@ class ControladorDePagina:
         imagem = self.imagem
         leitor, limiares = self.leitor, self.leitor.limiares
         antes = tuple(pagina.boxes)
+        pendentes = None
         if tudo:
             lidos = ed.copias_para_ler(antes, lambda e: e.source != FONTE_MANUAL)
         else:
-            lidos = ed.copias_para_ler(antes, lambda e: precisa_revisao(
-                e.char, e.source, e.confidence, limiares))
+            pendentes = contexto.pendentes_da_pagina(pagina, limiares, com_os_revisados=True)
+            copiar = {id(b.entry) for b, p in zip(antes, pendentes) if p}
+            lidos = ed.copias_para_ler(antes, lambda e: id(e) in copiar)
 
         servidor = self._servidor_para_pedir()
 
         def trabalho(progresso):
             if servidor is None:
                 resumo = pg.ler_boxes(imagem, lidos, leitor, so_pendentes=not tudo,
-                                      progresso=progresso)
+                                      progresso=progresso, pendentes=pendentes)
                 return lidos, resumo
             try:
                 relidos, amostras, resumo = servidor.chamar(
@@ -1248,13 +1285,23 @@ class ControladorDePagina:
 
         return trabalho, pronto
 
-    def ensinar(self, char: str) -> None:
+    def ensinar(self, char: str, em_lote: bool = False) -> None:
         """Enter: ensina o glifo em revisão (ou a seleção inteira) como `char` neste livro e
-        propaga o padrão pelos pendentes da página."""
+        propaga o padrão pelos pendentes da página. Ctrl+Enter (`em_lote`): no mesmo passo do
+        desfazer, corrige sem ensinar os outros glifos da página com a mesma leitura que a
+        palavra desmente (`contexto.lote`: o "0" de "c0l0ca" vira "o" em toda a página)."""
         if self.atual is None or not self._pode_ler():
             return
         alvos = self.alvos()
-        self.ensinar_gids({char: alvos}, f"Ensinar '{char}'", self._depois_de_ensinar(char, alvos))
+        lote = None
+        if em_lote:
+            lote = ({self.box(g).char for g in alvos} - {char}, char)
+        self.ensinar_gids({char: alvos}, f"Ensinar '{char}'" + (" em lote" if em_lote else ""),
+                          self._depois_de_ensinar(char, alvos), lote=lote)
+
+    def ensinar_em_lote(self, char: str) -> None:
+        """Ctrl+Enter no Glifo: `ensinar` com o lote."""
+        self.ensinar(char, em_lote=True)
 
     def _depois_de_ensinar(self, char: str, alvos: Sequence[int]):
         amostras = f" com {len(alvos)} amostras" if len(alvos) > 1 else ""
@@ -1278,25 +1325,27 @@ class ControladorDePagina:
         return ensinou, propagou
 
     def ensinar_gids(self, por_char: Dict[str, Sequence[int]], descricao: str,
-                     depois=None, *, juntar=None) -> None:
+                     depois=None, *, juntar=None, lote=None) -> None:
         """Ensina cada grupo de gids como o caractere dele (§14.2): a parte síncrona (o
         glifo vira manual, a amostra é gravada, a cor muda) roda na hora, se nada prende o
         leitor (`_agora`); a propagação pelos pendentes da página vai para a fila, com uma
         cópia dos padrões que já tem as amostras novas, e emenda a transação deste Enter.
         `depois` é `(ensinou, propagou(resolvidos))`, ou uma função só (chamada com o número
         de resolvidos no fim). `juntar` é a chave da transação que este emenda (a correção de
-        uma palavra que também ensina: um Ctrl+Z desfaz as duas)."""
+        uma palavra que também ensina: um Ctrl+Z desfaz as duas). `lote` é `(leituras,
+        caractere)`: os glifos de `contexto.lote` com essas leituras viram o caractere, sem
+        ensinar, na parte síncrona."""
         indice = self.indice
 
         def agora():
-            self._ensinar_agora(indice, por_char, descricao, depois, juntar)
+            self._ensinar_agora(indice, por_char, descricao, depois, juntar, lote)
 
         if self._agora():
             agora()
         else:
             self.tarefa("Ensinando", lambda: (agora(), None)[1], falhou=self._falhou("Ensinar"))
 
-    def _ensinar_agora(self, indice, por_char, descricao, depois, juntar) -> None:
+    def _ensinar_agora(self, indice, por_char, descricao, depois, juntar, lote=None) -> None:
         pagina = self.modelo
         if indice != self.indice or pagina is None or self.leitor is None:
             return
@@ -1327,6 +1376,15 @@ class ControladorDePagina:
             log.exception("o Enter falhou")
             self._falhou("Ensinar")(f"O padrão não foi ensinado: {erro}")
             return
+        corrigidos = []
+        if lote is not None:
+            lidas, novo = lote
+            ensinados = {g for gids in por_char.values() for g in gids}
+            for gid in contexto.lote(pagina, lidas, novo, ensinados):
+                i = onde[gid]
+                lidos[i] = ed.copia(antes[i].entry)
+                pg.confirmar(lidos, i, novo)
+                corrigidos.append(gid)
         ed.aplicar_leituras(pagina, antes, lidos)
         for char, gids in por_char.items():
             self._tirar_a_letra_que_faltava(pagina, gids, char)
@@ -1335,6 +1393,12 @@ class ControladorDePagina:
         ensinou, propagou = depois if isinstance(depois, tuple) else (None, depois)
         if ensinou is not None and pagina is self.modelo:
             ensinou()
+        if lote is not None and pagina is self.modelo:
+            self.pulados.difference_update(corrigidos)
+            self._avisar(f"Padrão '{lote[1]}' ensinado e {len(corrigidos)} glifo(s) corrigido(s) "
+                         "em lote na página; propagando…" if corrigidos else
+                         "Nenhum outro glifo da página tem essa leitura numa palavra que a "
+                         "desminta: só este foi ensinado.", 6000)
         self._propagar(pagina, indice, transacao, propagou)
 
     def _propagar(self, pagina: Pagina, indice: int, transacao: hs.Transacao,
@@ -1349,13 +1413,15 @@ class ControladorDePagina:
             if transacao.invalidada:
                 return None
             antes = tuple(pagina.boxes)
-            limiares = foto_do_leitor.limiares
-            lidos = ed.copias_para_ler(antes, lambda e: precisa_revisao(
-                e.char, e.source, e.confidence, limiares))
+            pendentes = contexto.pendentes_da_pagina(pagina, foto_do_leitor.limiares,
+                                                     com_os_revisados=True)
+            copiar = {id(b.entry) for b, p in zip(antes, pendentes) if p}
+            lidos = ed.copias_para_ler(antes, lambda e: id(e) in copiar)
 
             def trabalho(_progresso):
                 return pg.propagar_padroes(imagem, lidos, foto_do_leitor,
-                                           efeitos=[b.estilo for b in antes])
+                                           efeitos=[b.estilo for b in antes],
+                                           pendentes=pendentes)
 
             def pronto(resolvidos: int):
                 if transacao.invalidada:
@@ -1437,6 +1503,78 @@ class ControladorDePagina:
         servidor.pedir("ler_recortes", recortes,
                        ao_terminar=lambda pedido: self.executar.na_interface(
                            lambda: chegou(pedido)))
+
+    # ------------------------------------------------------------------
+    # O palpite da rede para o glifo que ninguém leu (§9.2)
+    # ------------------------------------------------------------------
+    def sugestao_do_atual(self) -> Optional[Tuple[str, float]]:
+        """O palpite da rede para o glifo em revisão, se ninguém o leu e o palpite já chegou."""
+        guardada = self._sugestao_guardada(self.indice_de(self.atual))
+        return guardada[1] if guardada is not None else None
+
+    def _sugestao_guardada(self, i: Optional[int]):
+        if i is None or self.modelo is None:
+            return None
+        box = self.modelo.boxes[i]
+        guardada = self._sugestoes.get(box.gid)
+        return guardada if guardada is not None and guardada[0] is box.entry else None
+
+    def _sugerir_ao_atual(self) -> None:
+        """O glifo mostrado não tem leitura: pede o palpite da rede, que vai ao painel
+        (`caractere_sugerido`, com a confiança) quando chega. Com o servidor, o pedido leva os
+        glifos sem leitura da página toda, e os seguintes da fila já o têm quando chegam; sem
+        ele, lê-se aqui só o atual, para não pesar na interface. Uma falha fica no log: o
+        palpite é ajuda, e o resto do `atual_mudou` (o painel, a seleção) tem de rodar."""
+        try:
+            self._pedir_palpite()
+        except Exception:                  # o palpite não pode prender a navegação
+            log.exception("o palpite da rede para o glifo sem leitura falhou")
+
+    def _pedir_palpite(self) -> None:
+        i = self.indice_de(self.atual)
+        if (i is None or self.imagem is None or not pg.sem_leitura(self.modelo.boxes[i].entry)
+                or self._sugestao_guardada(i) is not None or self.atual in self._sugerindo):
+            return
+        servidor, geracao = self.servidor, self.geracao
+        if servidor is None and getattr(self.leitor, "rede", None) is None:
+            return
+        if servidor is not None and servidor.parado:
+            return
+        antes = tuple(self.modelo.boxes)
+        # Guarda-se só o da página aberta (os gids levam a página, e os outros não voltam a
+        # valer sem um novo pedido).
+        pid = pid_de(antes[i].gid)
+        self._sugestoes = {g: v for g, v in self._sugestoes.items() if pid_de(g) == pid}
+        indices = [i] if servidor is None else [
+            k for k, b in enumerate(antes) if pg.sem_leitura(b.entry)
+            and b.gid not in self._sugerindo and self._sugestao_guardada(k) is None]
+        recortes = pg.recortes_para_ler(self._cinza(), [b.entry for b in antes], indices)
+        gids = {antes[k].gid for k in indices}
+
+        def chegou(sugestoes) -> None:
+            for k, sugestao in zip(indices, sugestoes):
+                self._sugestoes[antes[k].gid] = (antes[k].entry, sugestao)
+            if (sugestao := self.sugestao_do_atual()) is not None:
+                self.eventos.emitir("caractere_sugerido", *sugestao)
+
+        if servidor is None:
+            chegou([self.leitor.sugerir(recorte, altura) for recorte, altura in recortes])
+            return
+        self._sugerindo |= gids
+
+        def terminou(pedido: sl.Pedido) -> None:
+            if self.geracao != geracao:
+                return                          # outro projeto
+            self._sugerindo -= gids
+            if pedido.ok:
+                chegou(pedido.resultado)
+            elif not pedido.cancelado:
+                log.warning("o palpite da rede para os glifos sem leitura falhou: %s",
+                            pedido.resultado)
+
+        servidor.pedir("sugerir_recortes", recortes,
+                       ao_terminar=lambda pedido: self.executar.na_interface(
+                           lambda: terminou(pedido)))
 
     def servidor_parado(self) -> bool:
         """O servidor desistiu (caiu duas vezes): o comando que lê avisa e não roda."""
@@ -2080,7 +2218,8 @@ class ControladorDePagina:
 
     def aviso_de_ensino(self, char: str) -> Tuple[str, str]:
         """§8.3, ao digitar o caractere do glifo atual: o efeito ("Enter ensina 'l' · 23
-        iguais nesta página": os glifos da página com a mesma leitura dele) e o conflito
+        iguais nesta página": os glifos da página com a mesma leitura dele; e, se alguns a
+        palavra desmente, quantos o Ctrl+Enter corrige em lote) e o conflito
         ("este glifo está a 0,08 de 14 amostras de '1'", ou "")."""
         if not char or self.modelo is None or self.atual is None or self.leitor is None:
             return "", ""
@@ -2091,6 +2230,12 @@ class ControladorDePagina:
         lida = entradas[i].char
         iguais = sum(1 for k, e in enumerate(entradas) if k != i and lida and e.char == lida)
         efeito = f"Enter ensina '{char}'" + (f" · {iguais} iguais nesta página" if iguais else "")
+        alvos = self.alvos()                     # o que o Ctrl+Enter usaria (`ensinar`)
+        lidas = {self.box(g).char for g in alvos} - {char, ""}
+        em_lote = len(contexto.lote(self.modelo, lidas, char, alvos)) if lidas else 0
+        if em_lote:
+            efeito += (f" · Ctrl+Enter corrige também {em_lote} "
+                       f"{'/'.join(repr(c) for c in sorted(lidas))} que a palavra desmente")
         conflito = ""
         if self.imagem is not None:
             from core import proporcao

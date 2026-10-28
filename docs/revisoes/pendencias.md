@@ -315,9 +315,20 @@ Resolvido com o usuário:
 
 Medido com o texto verificado (seção acima):
 - **CA-9.1** aprova, provisório até a estrutura ser revisada.
-- **CA-F.1** reprova: 92,4% da linha de base, o alvo é ≤ 70%. Baixar o custo de ensinar e
-  divisões e linhas não lidas é trabalho de leitura e de propagação. O que fazer com o alvo,
-  ou com o passo que o fecharia, é do usuário.
+- **CA-F.1** aprova, com o alvo novo. Estava em 92,4% da linha de base; com a fila do
+  contexto (`abbychess/contexto.py`, `29572c1`) foi a 90,1% (1.066 gestos), com o ensinar em
+  lote (Ctrl+Enter, `02fc26a`, catálogo 6) a 89,4% (1.057), e com o palpite da rede no glifo
+  que ninguém leu (`92ce6b9`, catálogo 7) a 83,1% (983), e com o pingo do i no dividir e as
+  legendas lado a lado em duas linhas (`7511f02`) a 74,4% (880), e com as margens no fim da
+  fila de revisão (`2e3d9a1`) a 65,3% (772). Com o replay refinado (catálogo 8, `3841795`),
+  que anda pela fila da janela e cobra o Enter que confirma a leitura certa pendente dos dois
+  lados, a linha de base vai a 1.076 e o passo L a 773: 71,8%. Com o que falta pelo mais
+  barato (catálogo 9, `f38e5d7`: o box colado pelo Ctrl+D ou a inserção no Documento), o passo
+  L vai a 739: 68,7%. O alvo era ≤ 70% depois do D1; com o
+  sim do usuário, passou a ≤ 85% no fim do roadmap (SPEC §15.4). Fica provisório até a
+  estrutura e os FEN serem revisados. O descritor
+  `contraste_borrado` reprovou na validação no Darcy Lima e no Yusupov e não foi adotado. O
+  detalhe e o que falta estão em `docs/revisoes/ca-f1-investigacao.md`.
 
 Precisa do usuário:
 - **Os FEN e a estrutura das p. 21–27** (os diagramas e as legendas revisados), para as

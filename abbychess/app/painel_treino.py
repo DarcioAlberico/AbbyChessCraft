@@ -141,6 +141,8 @@ ALTURA_DO_GLIFO = 140
 class PainelDeTreino(QWidget):
     ensinar = Signal(str)
     so_corrigir = Signal(str)
+    #: Ensinar e corrigir em lote os glifos da página com a mesma leitura que a palavra desmente.
+    ensinar_em_lote = Signal(str)
     descartar = Signal()
     pular = Signal()
     anterior = Signal()
@@ -172,6 +174,9 @@ class PainelDeTreino(QWidget):
         self.leitura = QLabel("Abra um projeto e reconheça uma página.")
         #: O efeito e o conflito de ensinar o que está no campo (§8.3).
         self.aviso_de_ensino = QLabel("")
+        # Sempre HTML: só o efeito, sem o <span> do conflito, o Qt o adivinhava texto puro e
+        # mostrava o escape ("Enter ensina &#x27;1&#x27;").
+        self.aviso_de_ensino.setTextFormat(Qt.TextFormat.RichText)
         self.aviso_de_ensino.setWordWrap(True)
         self.aviso_de_ensino.setAccessibleName("O efeito de ensinar e o aviso de conflito")
         self.leitura.setWordWrap(True)
@@ -322,6 +327,18 @@ class PainelDeTreino(QWidget):
         self.habilitar(True)                    # antes do foco: num campo desligado o Qt o
         self.campo.setFocus()                   # ignora, e a próxima tecla iria para outro lugar
 
+    def sugerir(self, char: str, confianca: float) -> None:
+        """O palpite da rede para o glifo que ninguém leu (§9.2), no campo ainda vazio e
+        selecionado: Enter o ensina, digitar o troca. A leitura diz que é palpite."""
+        if self._box is None or self._box.char or self.campo.text():
+            return
+        numero = f"{confianca:.2f}".replace(".", ",")
+        self.leitura.setText(self.leitura.text() + "<br>Palpite da rede: <b style='font-size:"
+                             f"16pt'>{html.escape(char)}</b> &nbsp;(abaixo do limiar, confiança "
+                             f"{numero}): confira antes do Enter")
+        self.campo.setText(char)
+        self.campo.selectAll()
+
     def limpar(self, mensagem: str) -> None:
         self._pagina, self._box = None, None
         self._definir_corte(None)
@@ -401,6 +418,10 @@ class PainelDeTreino(QWidget):
     def pedir_so_corrigir(self) -> None:
         if self._ativo and (texto := self._texto()):
             self.so_corrigir.emit(texto)
+
+    def pedir_ensinar_em_lote(self) -> None:
+        if self._ativo and (texto := self._texto()):
+            self.ensinar_em_lote.emit(texto)
 
     def pedir_descartar(self) -> None:
         if self._ativo:

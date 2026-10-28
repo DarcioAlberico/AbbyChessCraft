@@ -52,10 +52,10 @@ from rotular import (PASTA_DOS_PDFS, VERDADE, _caixa_relativa, _indices,  # noqa
 MEDIDAS = RAIZ / "docs" / "medidas"
 IOU_MINIMO = 0.5
 FUNCOES_DE_MARGEM = ("cabecalho", "numero_de_pagina", "rodape")
-NAO_MEDIDO = {
-    "ligacao_da_legenda": "passo H (a leitura de hoje não liga legenda a diagrama)",
-    "precisao_e_revocacao_por_funcao": "passo F (a leitura de hoje não classifica blocos)",
-}
+NAO_MEDIDO: dict = {}
+#: As funções de bloco que o CA-5.1 mede (o diagrama e o ignorar ficam de fora).
+FUNCOES_MEDIDAS = ("texto", "titulo", "cabecalho", "rodape", "numero_de_pagina", "nota",
+                   "legenda")
 
 #: As perturbações do CA-10.1: quantas e a semente.
 PERTURBACOES, SEMENTE = 100, 1234
@@ -202,6 +202,11 @@ class Leitura:
     #: As caixas das linhas tiradas como margem corrida (sem a poeira da borda).
     margens: List[list] = field(default_factory=list)
     diagramas: List[DiagramaDaLeitura] = field(default_factory=list)
+    #: A função de cada linha lida (a das zonas automáticas com as margens aprendidas pelo
+    #: livro), na ordem de `linhas`; vazia: não medida.
+    funcoes: List[str] = field(default_factory=list)
+    #: A caixa relativa do diagrama a que a zona de cada linha liga a legenda, ou None.
+    ligacoes: List[Optional[list]] = field(default_factory=list)
 
 
 def comparar_pagina(gabarito: dict, leitura: Leitura) -> dict:
@@ -233,6 +238,8 @@ def comparar_pagina(gabarito: dict, leitura: Leitura) -> dict:
             "lado_verificado": bool(verdade.get("lado_verificado")) and lado_dito,
             "confiavel": lido.confiavel})
 
+    funcoes = _funcoes_e_ligacoes(gabarito, leitura, caixas_linhas)
+
     corpo = gabarito["linhas_corpo"]
     casados_c = casar(caixas_linhas, [ln["caixa_rel"] for ln in corpo])
     com_par = ({ip for ip, _ in casados_c}
@@ -257,6 +264,7 @@ def comparar_pagina(gabarito: dict, leitura: Leitura) -> dict:
         "estrutura": bool(gabarito.get("estrutura_por")),
         "estrutura_revisada": bool(gabarito.get("revisado_por")),
         "margens": margens,
+        "funcoes": funcoes,
         "diagramas": {"verdade": len(blocos_d), "achados": len(leitura.diagramas),
                       "casados": len(casados_d), "detalhes": detalhes},
         "negativa": bool(gabarito.get("negativa")),
@@ -269,6 +277,37 @@ def comparar_pagina(gabarito: dict, leitura: Leitura) -> dict:
                   "linhas_verificadas": verificadas, "cer_erros": erros,
                   "cer_caracteres": caracteres,
                   "cer": round(erros / caracteres, 4) if caracteres else None}}
+
+
+def _funcoes_e_ligacoes(gabarito: dict, leitura: Leitura, caixas_linhas) -> dict:
+    """CA-5.1: a função de cada bloco do gabarito contra a da linha lida que casa com ele
+    (vp/fp/fn por função), e a ligação de cada legenda do gabarito ao diagrama dela."""
+    if not leitura.funcoes:
+        return {}
+    blocos = [b for b in gabarito["blocos"] if b["funcao"] in FUNCOES_MEDIDAS]
+    contagem = {f: {"vp": 0, "fp": 0, "fn": 0} for f in FUNCOES_MEDIDAS}
+    casados = casar(caixas_linhas, [b["caixa_rel"] for b in blocos])
+    for ip, jv in casados:
+        certa, lida = blocos[jv]["funcao"], leitura.funcoes[ip]
+        if lida == certa:
+            contagem[certa]["vp"] += 1
+        else:
+            contagem[certa]["fn"] += 1
+            if lida in contagem:
+                contagem[lida]["fp"] += 1
+    for jv in set(range(len(blocos))) - {jv for _, jv in casados}:
+        contagem[blocos[jv]["funcao"]]["fn"] += 1
+    caixa_do_diagrama = {b["id"]: b["caixa_rel"] for b in gabarito["blocos"]
+                         if b["funcao"] == "diagrama"}
+    legendas = ligadas = 0
+    for ip, jv in casados:
+        alvo = blocos[jv].get("diagrama")
+        if blocos[jv]["funcao"] != "legenda" or alvo not in caixa_do_diagrama:
+            continue
+        legendas += 1
+        ligacao = leitura.ligacoes[ip] if ip < len(leitura.ligacoes) else None
+        ligadas += bool(ligacao) and iou(ligacao, caixa_do_diagrama[alvo]) >= IOU_MINIMO
+    return {"por_funcao": contagem, "legendas": legendas, "legendas_ligadas": ligadas}
 
 
 def fen_conferido_as_cegas(diagrama: dict) -> bool:
@@ -292,6 +331,15 @@ def resumir(paginas: dict) -> dict:
     """A soma das páginas de `comparar_pagina`, com o estado da medida."""
     soma = lambda f: sum(f(p) for p in paginas.values())  # noqa: E731
     vp, fp, fn = (soma(lambda p, k=k: p["margens"][k]) for k in ("vp", "fp", "fn"))
+    por_funcao = {}
+    for f in FUNCOES_MEDIDAS:
+        c = {k: sum(p.get("funcoes", {}).get("por_funcao", {}).get(f, {}).get(k, 0)
+                    for p in paginas.values()) for k in ("vp", "fp", "fn")}
+        if any(c.values()):
+            por_funcao[f] = {"precisao": _razao(c["vp"], c["vp"] + c["fp"]),
+                             "revocacao": _razao(c["vp"], c["vp"] + c["fn"]), **c}
+    legendas = soma(lambda p: p.get("funcoes", {}).get("legendas", 0))
+    ligadas = soma(lambda p: p.get("funcoes", {}).get("legendas_ligadas", 0))
     detalhes = [d for p in paginas.values() for d in p["diagramas"]["detalhes"]]
     fen_ok = [d for d in detalhes if d["fen_verificado"] and d["casas_erradas"] is not None]
     fen_todos = [d for d in detalhes if d["casas_erradas"] is not None]
@@ -316,6 +364,8 @@ def resumir(paginas: dict) -> dict:
     if fen_todos and not any(p["conferencia_cega_fen"] for p in paginas.values()):
         pendencias.append("sem conferência cega de FEN igual")
     return {
+        "funcoes": por_funcao,
+        "ligacao_da_legenda": f"{ligadas}/{legendas}" if legendas else "—",
         "margens_precisao": _razao(vp, vp + fp),
         "margens_revocacao": _razao(vp, vp + fn),
         "diagramas_achados": f"{casados_d}/{verdade_d}",
@@ -375,6 +425,9 @@ def _medir(livro: str, pdf: Path, indices, pasta: Path) -> dict:
     alturas = {i: fonte.pagina(i).height for i in indices}
     larguras = {i: fonte.pagina(i).width for i in indices}
     tirados = ex.margens_corridas({i: (boxes[i], alturas[i]) for i in indices})
+    # As funções das zonas (CA-5.1): as automáticas de cada página, com as margens aprendidas
+    # pelas páginas lidas juntas, como o modo Áreas faz.
+    funcoes_das_margens = ex.funcoes_das_margens({i: (boxes[i], alturas[i]) for i in indices})
 
     paginas = {}
     for i in indices:
@@ -388,9 +441,13 @@ def _medir(livro: str, pdf: Path, indices, pasta: Path) -> dict:
         poeira = set(ex._margem_da_pagina(boxes[i], alturas[i]).poeira)
         margens = [c for c, ln in zip(caixas, linhas)
                    if set(ln.indices) & tirados[i] and not set(ln.indices) <= poeira]
+        lidos = projeto.carregar_diagramas(i)
         diagramas = [DiagramaDaLeitura(rel(d.caixa), d.fen or "", d.lado, d.confiavel)
-                     for d in projeto.carregar_diagramas(i)]
-        leitura = Leitura([(c, ln.texto) for c, ln in zip(caixas, linhas)], margens, diagramas)
+                     for d in lidos]
+        funcoes, ligacoes = _funcoes_das_linhas(boxes[i], linhas, lidos, larguras[i],
+                                                alturas[i], funcoes_das_margens.get(i, {}), rel)
+        leitura = Leitura([(c, ln.texto) for c, ln in zip(caixas, linhas)], margens, diagramas,
+                          funcoes, ligacoes)
         paginas[f"i{i:03d}"] = {**comparar_pagina(gabaritos[i], leitura),
                                 "pendentes": lote.pendentes.get(i)}
 
@@ -405,6 +462,30 @@ def _medir(livro: str, pdf: Path, indices, pasta: Path) -> dict:
             "nao_medido": NAO_MEDIDO, "resumo": resumo, "paginas": paginas,
             "validacao_pelos_lances": validacao_pelos_lances(
                 {f"i{i:03d}": g for i, g in gabaritos.items()})}
+
+
+def _funcoes_das_linhas(boxes, linhas, diagramas, largura, altura, funcoes_das_margens, rel):
+    """A função e a ligação da legenda de cada linha: a zona automática que contém o meio
+    dela (a menor, se mais de uma), depois das margens aprendidas e do vínculo legenda →
+    diagrama, como o modo Áreas as monta."""
+    from abbychess import diagramas as dg
+    from abbychess import zonas as zn
+
+    lidos = dg.com_ids(list(diagramas))
+    zonas = zn.automaticas(boxes, [d.caixa for d in lidos], largura, altura)
+    zonas = zn.aplicar_funcoes_de_margem(zonas, boxes, funcoes_das_margens)
+    zonas = zn.vincular_legendas(zonas, lidos)
+    caixa = {d.id: d.caixa for d in lidos if getattr(d, "id", "")}
+    funcoes, ligacoes = [], []
+    for ln in linhas:
+        x = (min(boxes[k].x1 for k in ln.indices) + max(boxes[k].x2 for k in ln.indices)) / 2
+        y = (ln.topo + ln.pe) / 2
+        dentro = [z for z in zonas if z.contem(x, y)]
+        zona = min(dentro, key=lambda z: (z.x2 - z.x1) * (z.y2 - z.y1)) if dentro else None
+        funcoes.append(zona.funcao if zona is not None else "texto")
+        ligada = caixa.get(zona.diagrama_id) if zona is not None and zona.diagrama_id else None
+        ligacoes.append(rel(ligada) if ligada is not None else None)
+    return funcoes, ligacoes
 
 
 def _sha_do_gabarito(livro: str, indice: int) -> str:

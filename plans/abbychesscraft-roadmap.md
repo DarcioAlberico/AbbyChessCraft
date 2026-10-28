@@ -629,10 +629,11 @@ DOCX iguais byte a byte com o mesmo `SOURCE_DATE_EPOCH`).
 
 **Tarefas.**
 1. ~~A exportação passa a ler o Documento estruturado e faz a junção entre páginas.~~
-   (Falta "manter quebras de linha e hífens", que depende de os escritores do core
-   aceitarem a quebra dentro do parágrafo.)
-2. Metadados, capa, idioma das mensagens e opções por formato (o diálogo das `Opcoes`).
-3. TOC semântico, `page-list`, landmarks, bookmarks e links internos.
+   ("Manter quebras de linha e hífens" saiu nas pendências, `7e97083` e `12dd644`.)
+2. ~~Metadados, capa, idioma das mensagens e opções por formato (o diálogo das `Opcoes`).~~
+   (Rodada 3.)
+3. ~~TOC semântico, `page-list`, landmarks, bookmarks e links internos.~~ (Rodada 5; os
+   links para "Diagrama N" e para capítulos, nas pendências, `150d5de`.)
 4. ~~TXT e PGN, com validação e relatório do que ficou de fora.~~
 5. ~~Pré-visualização em HTML do conteúdo e do relatório antes de gravar.~~ (Rodada 4: o
    botão Pré-visualizar do diálogo da exportação; `exportar.previa` pelo mesmo caminho e
@@ -640,10 +641,13 @@ DOCX iguais byte a byte com o mesmo `SOURCE_DATE_EPOCH`).
    primeiras páginas e o relatório inteiro; CA-12.4 e CA-12.5 testados. Da revisão de código: a
    prévia que chega depois de fechar o diálogo é ignorada, fechar o diálogo fecha a prévia e
    libera a memória, Exportar espera a prévia em curso, e a prévia do TXT é o próprio TXT.)
-6. Validação automática (EPUBCheck, Ace, referências internas e smoke tests de leitores).
-7. Deduplicação/otimização de recursos e divisão dos XHTML por capítulo e tamanho.
+6. ~~Validação automática (EPUBCheck, Ace, referências internas e smoke tests de leitores).~~
+   (EPUBCheck e Ace na rodada 2; o Calibre nas pendências, `18af9f0`. Thorium e o leitor do
+   celular pedem quem os abra.)
+7. ~~Deduplicação/otimização de recursos e divisão dos XHTML por capítulo e tamanho.~~
+   (A otimização sem perda das imagens, nas pendências, `3d7d66c`.)
 8. ~~`SOURCE_DATE_EPOCH` e pacote byte a byte reprodutível.~~
-9. Sair dos privados do core.
+9. ~~Sair dos privados do core.~~ (Rodada 6.)
 
 **Rodada 2 (2026-10-22): o escritor de EPUB próprio** (`abbychess/epub.py`, decisão do
 usuário: sem mexer no core). Lê as mesmas `PaginaExtraida` e escreve um XHTML por capítulo

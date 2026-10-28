@@ -465,7 +465,9 @@ def _parece_legenda(texto: str) -> bool:
         return False
     return bool(_INICIO_DA_LEGENDA.search(texto) or _SO_O_NUMERO.fullmatch(texto)
                 or _TEXTO_DA_LEGENDA.search(texto)
-                or _comeca_como(texto, ("diagrama", "diagram", "teste")))
+                # A tolerância do OCR só na palavra longa: "teste" com 2 erros casava
+                # "These squares" e "Tea time" (o "Teste N" impresso já casa acima).
+                or _comeca_como(texto, ("diagrama", "diagram")))
 
 
 def _vizinha_do_diagrama(zona: Zona, diagrama, escala: float) -> bool:

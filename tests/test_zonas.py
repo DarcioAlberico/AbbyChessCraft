@@ -327,3 +327,12 @@ def test_a_zona_mexida_pelo_usuario_deixa_de_ser_automatica():
         mexer(zonas)
         assert zonas[0].automatica is False
     assert zn.arrastar(zona, "d", 10, 0, 500, 500).automatica is False
+
+
+def test_a_legenda_tolera_o_ocr_so_no_diagrama():
+    """"Dia9rama", "iagrama" (o OCR) são legenda; a prosa curta que lembra "teste" ("These
+    squares", "Tea time") não é: a tolerância vale só para a palavra longa."""
+    for texto in ("Dia9rama 5. J09am as pretas.", "iagrama 3.", "Teste 1", "Diag ama 8."):
+        assert zn._parece_legenda(texto), texto
+    for texto in ("These squares", "Tea time", "Testing the plan", "Tesla moves", "Teen"):
+        assert not zn._parece_legenda(texto), texto

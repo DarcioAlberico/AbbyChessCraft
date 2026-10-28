@@ -397,3 +397,18 @@ def test_o_editor_cabe_no_inspetor_de_1366_com_a_casa_de_32(app):
     posicoes = {corpo.itemAt(k).widget(): k for k in range(corpo.count())
                 if corpo.itemAt(k).widget() is not None}
     assert posicoes[editor.grupo_do_lado] < posicoes[editor.avisos]
+
+
+def test_o_lado_dos_lances_nao_ganha_o_aviso_de_brancas_assumidas(app):
+    """Com o lado do número do lance, o editor não repete o "o FEN assume brancas" do core:
+    o FEN está com o lado dos lances, e o grupo do lado o diz."""
+    from core.tabuleiro_edicao import AVISO_CONVENCAO
+
+    from abbychess import lances as lc
+    from tests.test_diagramas import _lido
+
+    d = replace(_lido(), lado="b", lado_origem=lc.LADO_DOS_LANCES, lado_trecho="10...Rf8")
+    editor = dd.EditorDeDiagrama()
+    editor.abrir([d], 0)
+    assert editor.tabuleiro().lado == "b"
+    assert AVISO_CONVENCAO not in editor.avisos_do_diagrama()

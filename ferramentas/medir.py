@@ -66,7 +66,7 @@ def validacao_pelos_lances(gabaritos: dict, n: int = PERTURBACOES, semente: int 
 
     Os verdadeiros são os diagramas com lances; as perturbadas, `n` versões deles (uma peça
     trocada, tirada ou movida, só posições legais, `semente`). **Afetada** é a perturbada
-    que toca uma casa usada por um lance da linha (`lances.casas_dos_lances`): de onde sai,
+    que toca uma casa usada por um lance da linha (`perturbacoes.casas_dos_lances`): de onde sai,
     aonde chega, o caminho e a torre do roque. A detecção é a fração das afetadas que a
     validação não dá como confiável.
 
@@ -75,6 +75,7 @@ def validacao_pelos_lances(gabaritos: dict, n: int = PERTURBACOES, semente: int 
     nenhuma validação pelos lances a vê. Por isso as confiáveis vão em duas contas, as
     afetadas (um erro da validação) e as não afetadas (fora do alcance dela)."""
     from abbychess import lances as lc
+    from abbychess import perturbacoes as pt
 
     verdadeiros = []
     for nome, g in sorted(gabaritos.items()):
@@ -90,12 +91,12 @@ def validacao_pelos_lances(gabaritos: dict, n: int = PERTURBACOES, semente: int 
         return lc.validar(pecas, linha)
 
     certos = [valida(p, v, s) for _, p, v, s in verdadeiros]
-    perturbadas = lc.perturbacoes([(p, v) for _, p, v, _ in verdadeiros], n, semente)
+    perturbadas = pt.perturbacoes([(p, v) for _, p, v, _ in verdadeiros], n, semente)
     afetadas = detectadas = confiaveis_afetadas = confiaveis_nao_afetadas = 0
     for p in perturbadas:
         _, pecas, vez, sans = verdadeiros[p.origem]
         confiavel = valida(p.pecas, vez, sans).confiavel
-        if lc.afetada(p, lc.casas_dos_lances(pecas, vez, sans)):
+        if pt.afetada(p, pt.casas_dos_lances(pecas, vez, sans)):
             afetadas += 1
             detectadas += not confiavel
             confiaveis_afetadas += confiavel

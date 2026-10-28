@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QGridLayou
                                QHBoxLayout, QLabel, QLineEdit, QPushButton, QRadioButton,
                                QSizePolicy, QToolButton, QVBoxLayout, QWidget)
 
-from core.tabuleiro_edicao import SIMBOLOS, TabuleiroEdicao
+from core.tabuleiro_edicao import AVISO_CONVENCAO, SIMBOLOS, TabuleiroEdicao
 
 from abbychess import lances
 from abbychess.diagramas import LADO_DA_LEGENDA, DiagramaLido, afirmar_lado
@@ -476,6 +476,8 @@ class EditorDeDiagrama(QWidget):
         if not self.aberto:
             return
         alvo = self.atual + passo
+        while 0 <= alvo < len(self.diagramas) and not self.diagramas[alvo].lido:
+            alvo += passo                       # o não lido não tem posição a conferir
         if not 0 <= alvo < len(self.diagramas):
             self.fora_da_pagina.emit(passo)
             return
@@ -613,7 +615,12 @@ class EditorDeDiagrama(QWidget):
         elif validacao is not None:
             avisos.append(f"{validacao.aviso[:1].upper()}{validacao.aviso[1:]} "
                           f"({validacao.legais} de {validacao.total} lances passaram).")
-        avisos.extend(tabuleiro.avisos())
+        do_core = tabuleiro.avisos()
+        if tabuleiro.lado_origem == lances.LADO_DOS_LANCES:
+            # O core não conhece o lado dos lances e diz que o FEN "assume brancas": o FEN
+            # está com o lado do número do lance, que o grupo do lado já mostra.
+            do_core = [a for a in do_core if a != AVISO_CONVENCAO]
+        avisos.extend(do_core)
         legenda = []
         if any(c.corrigida for c in tabuleiro.casas):
             legenda.append("verde: corrigida por você")

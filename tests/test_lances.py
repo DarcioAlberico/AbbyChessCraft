@@ -15,6 +15,7 @@ from core.box_model import BoxEntry
 
 from abbychess import diagramas as dg
 from abbychess import lances as lc
+from abbychess import perturbacoes as pt
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
 
@@ -282,7 +283,7 @@ def test_validacao_vai_e_volta_no_json():
 
 def test_perturbacoes_sao_legais_reprodutiveis_e_diferentes():
     posicoes = [(P23, "w"), (P25, "b")]
-    a, b = lc.perturbacoes(posicoes, 30), lc.perturbacoes(posicoes, 30)
+    a, b = pt.perturbacoes(posicoes, 30), pt.perturbacoes(posicoes, 30)
     assert a == b and len(a) == 30
     assert {p.tipo for p in a} == {"trocada", "tirada", "movida"}
     for p in a:

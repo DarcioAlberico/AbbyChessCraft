@@ -61,7 +61,7 @@ def passa(d, filtro: str) -> bool:
     if filtro == "lado_assumido":
         # Nem a legenda, nem quem conferiu, nem o número do lance disse de quem é a vez: o
         # FEN sai com "w" assumido (o erro mais comum do lado a jogar, §10).
-        return d.lido and not d.conferido and not d.lado
+        return d.lido and not d.lado            # também o conferido que ficou sem lado
     if filtro == "sem_confianca":
         return e in (SEM_CONFIANCA, LANCE_ILEGAL)
     if filtro == "pelos_lances":

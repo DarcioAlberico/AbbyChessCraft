@@ -184,6 +184,9 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.relogio_do_texto.setSingleShot(True)
         self.relogio_do_texto.setInterval(150)
         self.relogio_do_texto.timeout.connect(self.pintar_texto)
+        # E com ele a conta das margens corridas da fila (~25 ms), que o Enter e a releitura
+        # não esperam: `pintar_texto` a refaz e mostra a fila de novo se ela mudou.
+        self.pagina.margens_com_o_texto = True
 
     def _ligar_eventos(self) -> None:
         e = self.eventos

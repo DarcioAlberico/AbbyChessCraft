@@ -150,6 +150,7 @@ class DesenhoDaJanela:
         self.relogio_do_texto.stop()
         p, v = self.pagina, self.verificador
         na_fila = set(p.fila())
+        da_fila = p.margens_da_fila()           # a conta que a fila usou, talvez de antes
         estados = {b.gid: gd.estado(b.entry, b.gid in na_fila) for b in p.modelo.boxes} \
             if p.modelo is not None else {}
         aviso = vazios.nada_reconhecido() if p.reconhecida else vazios.pagina_nao_reconhecida()
@@ -159,9 +160,12 @@ class DesenhoDaJanela:
                 aviso = f"{vazios.saude_do_livro(saude)}\n\n{aviso}"
         # A palavra fora do léxico que o usuário aceitou (Enter: revisada) não é mais duvidosa.
         revisados = {b.gid for b in p.modelo.boxes if b.revisado} if p.modelo is not None else set()
+        margens = p.gids_de_margem()
         self.texto.montar(p.documento(), p.diagramas, estados, v.gids_desconhecidos() - revisados,
-                          p.gids_virtuais(), p.matriz, p.gids_de_margem(), aviso)
+                          p.gids_virtuais(), p.matriz, margens, aviso)
         self._mostrar_a_linha()
+        if margens != da_fila:                  # a ordem da fila mudou com a conta nova
+            self.atualizar_fila()
 
     def _selecao_mudou(self) -> None:
         p = self.pagina

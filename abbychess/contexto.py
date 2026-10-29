@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import re
 import threading
-from typing import Collection, FrozenSet, List, Optional, Sequence, Tuple
+from typing import Collection, FrozenSet, List, Optional, Sequence
 
 #: Um lance em SAN, com as letras das peças em inglês e em português (a figurina vira a letra
 #: antes, `core.notacao.FIGURINAS`), o número do lance antes e a pontuação depois: a casa
@@ -90,9 +90,12 @@ def improvaveis_na_palavra(chars: Sequence[str]) -> List[bool]:
     return saida
 
 
-#: A última página julgada: (chave, gids improváveis). A fila da janela pergunta várias vezes
-#: por ação (~2–3 ms cada numa página do livro); a chave custa uma fração disso.
-_ULTIMA: Tuple[Optional[tuple], FrozenSet[int]] = (None, frozenset())
+#: As últimas páginas julgadas: chave -> gids improváveis, a mais recente no fim. A fila da
+#: janela pergunta várias vezes por ação (~2–3 ms cada numa página do livro); a chave custa
+#: uma fração disso. Mais de uma: o resumo da página gravada (`improvaveis_da_lista`, com os
+#: gids provisórios) julgava no meio, e a fila seguinte refazia a conta.
+_JULGADAS: dict = {}
+_GUARDADAS = 4
 _TRAVA = threading.Lock()
 
 
@@ -105,13 +108,13 @@ def _chave(pagina) -> tuple:
 def improvaveis(pagina) -> FrozenSet[int]:
     """Os gids dos glifos improváveis da página (`modelo.Pagina`), pelas palavras do
     Documento (`texto.palavras_dos_gids`)."""
-    global _ULTIMA
     from abbychess import texto as tx
 
     chave = _chave(pagina)
     with _TRAVA:
-        if _ULTIMA[0] == chave:
-            return _ULTIMA[1]
+        if (julgada := _JULGADAS.pop(chave, None)) is not None:
+            _JULGADAS[chave] = julgada
+            return julgada
     char = {b.gid: b.entry.char for b in pagina.boxes}
     char.update({v.gid: v.char for v in pagina.decisoes.virtuais})
     saida = set()
@@ -119,9 +122,12 @@ def improvaveis(pagina) -> FrozenSet[int]:
         for gid, improvavel in zip(palavra, improvaveis_na_palavra([char[g] for g in palavra])):
             if improvavel:
                 saida.add(gid)
+    julgada = frozenset(saida)
     with _TRAVA:
-        _ULTIMA = (chave, frozenset(saida))
-        return _ULTIMA[1]
+        _JULGADAS[chave] = julgada
+        while len(_JULGADAS) > _GUARDADAS:
+            del _JULGADAS[next(iter(_JULGADAS))]
+    return julgada
 
 
 def volta_pelo_contexto(fonte: str) -> bool:

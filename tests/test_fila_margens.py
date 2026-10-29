@@ -8,6 +8,7 @@ dos pulados, em todas as ordens.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 from PIL import Image
@@ -107,3 +108,48 @@ def test_o_glifo_numa_area_de_margem_tambem_vai_para_o_fim():
     primeira_linha = set(gids[n:n + 5])
     assert primeira_linha <= p.gids_fora_do_texto()
     assert set(p.fila()[-6:]) == {gids[5]} | primeira_linha
+
+
+def _sem_o_numero(p):
+    """O "12" do título vira "AB": sem o número, a linha deixa de ser título corrido."""
+    boxes = list(p.modelo.boxes)
+    for k, c in ((0, "A"), (1, "B")):
+        e = boxes[k].entry
+        boxes[k] = replace(boxes[k], entry=BoxEntry(c, e.x1, e.y1, e.x2, e.y2, 0.95, "neural"))
+    p.modelo.boxes = boxes
+
+
+def test_a_conta_das_margens_fica_por_pagina(monkeypatch):
+    """Ir e voltar entre duas páginas não refaz a regra (~25 ms numa página cheia): guardar só
+    a última página a refazia em toda troca."""
+    p, _n = _controlador()
+    a = p.modelo
+    b = Pagina(pid=1, indice=1, boxes=[Box(2000 + k, bx.entry) for k, bx in enumerate(a.boxes)])
+    contas = []
+    regra = ex.margens_da_pagina
+    monkeypatch.setattr(ex, "margens_da_pagina", lambda *x: contas.append(1) or regra(*x))
+    for modelo in (a, b, a, b, a):
+        p.modelo = modelo
+        p.gids_de_margem()
+    assert len(contas) == 2
+    _sem_o_numero(p)                    # mudou o que a regra lê: a conta é refeita
+    assert p.gids_de_margem() == frozenset() and len(contas) == 3
+
+
+def test_na_janela_a_fila_usa_a_ultima_conta_das_margens():
+    """Com `margens_com_o_texto` (a janela), a fila não refaz a regra a cada mudança: usa a
+    última conta da página até quem a liga refazê-la (`gids_de_margem`, com o texto). Sem
+    ele, a fila segue a página na hora."""
+    p, n = _controlador()
+    gids = [b.gid for b in p.modelo.boxes]
+    assert p.fila()[-1] == gids[5]
+    _sem_o_numero(p)
+    assert p.fila()[0] == gids[5]       # o "U" sem leitura, confiança 0, abre a fila
+
+    p, n = _controlador()
+    p.margens_com_o_texto = True
+    assert p.fila()[-1] == gids[5]      # sem conta guardada, a fila a faz
+    _sem_o_numero(p)
+    assert p.fila()[-1] == gids[5] and gids[5] in p.margens_da_fila()
+    assert p.gids_de_margem() == frozenset()            # o texto refaz a conta
+    assert p.fila()[0] == gids[5] and p.margens_da_fila() == frozenset()

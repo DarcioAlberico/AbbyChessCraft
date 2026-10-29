@@ -67,6 +67,9 @@ log = logging.getLogger(__name__)
 #: O máximo que um pedido da janela espera o servidor (o F5 com os modelos ainda carregando
 #: cabe com folga): um servidor travado sem morrer não prende a fila de tarefas para sempre.
 TEMPO_DO_PEDIDO = 600.0
+#: Quantas páginas guardam a conta das margens corridas (`gids_de_margem`): as do cache de
+#: páginas (§14.1) e folga.
+MARGENS_GUARDADAS = 8
 
 
 @dataclass(frozen=True)
@@ -199,8 +202,14 @@ class ControladorDePagina:
         #: Quantas vezes a ordem do livro mudou (§12.4): quem guarda posições de páginas
         #: numa espera (a Galeria do livro) confere por ele.
         self.mudancas_da_sequencia = 0
-        #: (chave, gids) da última conta das margens corridas (`gids_de_margem`).
-        self._margens: tuple = (None, frozenset())
+        #: pid -> (chave, gids) da última conta das margens corridas de cada página
+        #: (`gids_de_margem`), das `MARGENS_GUARDADAS` páginas vistas por último.
+        self._margens: dict = {}
+        #: A fila usa a última conta das margens da página (`margens_da_fila`), mesmo de antes
+        #: da última mudança, e quem liga isto a refaz (`gids_de_margem`) depois: a janela,
+        #: com o texto da página, 150 ms depois da última mudança. Desligado, a fila refaz a
+        #: conta a cada mudança (~25 ms numa página cheia; uma releitura muda a página 2 vezes).
+        self.margens_com_o_texto = False
         self.selecao: set = set()
         #: O desfazer do projeto (§14.2), da sessão.
         self.historico = hs.HistoricoDoProjeto()
@@ -281,7 +290,8 @@ class ControladorDePagina:
         Por confiança e por caractere, o que a exportação tira (`gids_fora_do_texto`: o
         cabeçalho e o rodapé corridos, as áreas de margem) vem depois do resto e antes dos
         pulados: no Xadrez Vitorioso o □ do título corrido abria a fila de toda página. Na
-        ordem de leitura, não: `andar` e o fim da página contam com a fila na ordem dela."""
+        ordem de leitura, não: `andar` e o fim da página contam com a fila na ordem dela. As
+        margens corridas são as de `margens_da_fila` (na janela, a última conta da página)."""
         if self.leitor is None or self.modelo is None:
             return []
         boxes = self.modelo.boxes
@@ -294,7 +304,7 @@ class ControladorDePagina:
         fila = [boxes[i].gid for i in indices]
         if self.ordem_da_fila == "leitura":
             return fila
-        fora = self.gids_fora_do_texto() if fila else frozenset()
+        fora = self.gids_fora_do_texto(self.margens_da_fila()) if fila else frozenset()
         return ([g for g in fila if g not in self.pulados and g not in fora]
                 + [g for g in fila if g not in self.pulados and g in fora]
                 + [g for g in fila if g in self.pulados])
@@ -376,20 +386,34 @@ class ControladorDePagina:
         from abbychess import exportar as ex
 
         boxes = self.modelo.boxes
-        # A regra olha as linhas inteiras da página (~20 ms numa página cheia): o resultado
-        # fica enquanto o que ela lê não muda (o texto, a posição de cada glifo e a altura da
-        # página); montar a chave custa uma fração de milissegundo.
-        chave = (self.indice, self.imagem.height,
+        # A regra olha as linhas inteiras da página (~25 ms numa página cheia): o resultado
+        # fica, por página, enquanto o que ela lê não muda (o texto, a posição de cada glifo e
+        # a altura da página); montar a chave custa uma fração de milissegundo. Guardar só a
+        # última página refazia a conta em toda troca entre duas páginas.
+        chave = (self.imagem.height,
                  tuple((b.gid, b.entry.char, b.entry.x1, b.entry.y1, b.entry.x2, b.entry.y2)
                        for b in boxes))
-        if self._margens[0] != chave:
+        guardada = self._margens.pop(self.modelo.pid, None)
+        if guardada is None or guardada[0] != chave:
             indices = ex.margens_da_pagina([b.entry for b in boxes], self.imagem.height)
-            self._margens = (chave, frozenset(boxes[i].gid for i in indices if i < len(boxes)))
-        return self._margens[1]
+            guardada = (chave, frozenset(boxes[i].gid for i in indices if i < len(boxes)))
+        self._margens[self.modelo.pid] = guardada          # a vista por último, no fim
+        while len(self._margens) > MARGENS_GUARDADAS:
+            del self._margens[next(iter(self._margens))]
+        return guardada[1]
 
-    def gids_fora_do_texto(self) -> frozenset:
-        """Os glifos que a exportação tira: os de `gids_de_margem` e os das áreas de
-        cabeçalho, rodapé, número de página e ignorar (`exportar.FORA_DA_EXPORTACAO`)."""
+    def margens_da_fila(self) -> frozenset:
+        """As margens corridas que a fila usa: as de `gids_de_margem` ou, com
+        `margens_com_o_texto`, a última conta desta página, se há uma."""
+        if self.margens_com_o_texto and self.modelo is not None:
+            guardada = self._margens.get(self.modelo.pid)
+            if guardada is not None:
+                return guardada[1]
+        return self.gids_de_margem()
+
+    def gids_fora_do_texto(self, margens: Optional[frozenset] = None) -> frozenset:
+        """Os glifos que a exportação tira: os de `gids_de_margem` (ou `margens`) e os das
+        áreas de cabeçalho, rodapé, número de página e ignorar (`exportar.FORA_DA_EXPORTACAO`)."""
         if self.modelo is None:
             return frozenset()
         from abbychess import exportar as ex
@@ -398,7 +422,7 @@ class ControladorDePagina:
         nas_areas = {b.gid for b in self.modelo.boxes
                      if any(z.contem((b.entry.x1 + b.entry.x2) / 2, (b.entry.y1 + b.entry.y2) / 2)
                             for z in areas)} if areas else set()
-        return self.gids_de_margem() | nas_areas
+        return (self.gids_de_margem() if margens is None else margens) | nas_areas
 
     def gids_virtuais(self) -> frozenset:
         """Os gids dos glifos virtuais (sem caixa) da página."""
@@ -431,6 +455,7 @@ class ControladorDePagina:
         self._enviados = self.padroes_de(leitor) if servidor is not None else frozenset()
         self._em_leitura = set()
         self._sugestoes, self._sugerindo = {}, set()
+        self._margens = {}                      # os pid se repetem de um projeto a outro
         self.geracao += 1
         self.lote_rodando = False               # o lote do projeto anterior não vale aqui
         self.projeto, self.fonte, self.leitor = projeto, fonte, leitor

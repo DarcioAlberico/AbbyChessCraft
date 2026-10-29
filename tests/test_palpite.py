@@ -142,3 +142,26 @@ def test_a_rede_que_falha_nao_prende_o_painel(app, janela, caplog):
     assert janela.treino.campo.isEnabled() and campo.text() == ""
     assert janela.pagina.atual == janela.pagina.gid_em(fila(janela)[1])
     assert "rede quebrada" in caplog.text
+
+
+def test_a_troca_pelo_contexto_vai_ao_campo(app, janela, monkeypatch):
+    """O glifo que a palavra ou a linha desmente (`contexto.sugestoes`) chega com a troca no
+    campo; vírgula e apóstrofo têm o mesmo desenho, e a leitura pede "só esta"."""
+    from abbychess import contexto
+
+    _pronta(app, janela)
+    caixa = (boxes(janela)[0].x1, boxes(janela)[0].y1)
+
+    def virgula(e):
+        if (e.x1, e.y1) == caixa:
+            e.char, e.source, e.confidence = ",", "neural", 0.99
+    trocar_entries(janela, janela.pagina.indice, virgula)
+    _esperar(app, janela)
+    gid = janela.pagina.modelo.boxes[0].gid
+    monkeypatch.setattr(contexto, "sugestoes", lambda pagina: {gid: "'"})
+    mostrar(janela, 0)
+    app.processEvents()
+    assert janela.pagina.sugestao_do_contexto() == ("'", True)
+    assert janela.treino.campo.text() == "'"
+    assert "Pelo contexto" in janela.treino.leitura.text()
+    assert "corrija só esta" in janela.treino.leitura.text()

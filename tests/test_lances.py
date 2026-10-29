@@ -319,6 +319,23 @@ def test_numero_separado_do_lance_e_reticencias_curtas():
     assert linha[0].pretas and _sans(linha) == ["e5", "Nf3"]
 
 
+def test_numero_e_fileira_lidos_com_letras_pelo_ocr():
+    """Mirkovic, *Chess School 1*: o `1` lido como `l` no número ("l.d6", "l9...") e na casa
+    ("♔fl"), e o `0` como `o` ("l0.f3"). Sem isso a linha começava num lance de variante."""
+    linha = lc.primeira_linha("l9...♘f2! 20.♔f2 ♕h4 2l.♔fl ♕h2", "en")
+    assert [(lance.numero, lance.pretas) for lance in linha][:2] == [(19, True), (20, False)]
+    assert _sans(linha) == ["Nf2", "Kf2", "Qh4", "Kf1", "Qh2"]
+    assert _sans(lc.primeira_linha("l.d6! defeat would be l.♔b3?", "en")) == ["d6"]
+    assert lc.primeira_linha("l0.f3 c5", "en")[0].numero == 10
+    assert lc.primeira_linha("l...♔d7 2.♔e3", "en")[0].pretas
+
+
+def test_letras_soltas_nao_viram_numero_nem_casa():
+    """"lo." é palavra, "I." é inicial, e o "el" do espanhol não é e1 (só no lance de peça)."""
+    assert _sans(lc.primeira_linha("eso lo. I. Ivanov jugó 1.e4", "es")) == ["e4"]
+    assert lc.primeira_linha("el peón", "es") == []
+
+
 def test_linha_legal_nao_anula_a_duvida_do_porteiro():
     boxes = (_linha("Observe a posição seguinte:", 0) + _linha("1.e4 e5 2.f4 exf4 3.Cf3 f5", 520)
              + _linha("Agora as brancas atacam.", 560))

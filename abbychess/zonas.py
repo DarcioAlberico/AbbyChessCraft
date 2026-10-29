@@ -511,10 +511,12 @@ def _parece_legenda(texto: str) -> bool:
     """§5.1: linha curta perto do diagrama que diz "Diagrama N", "Teste N" ou só o número,
     ou de quem é a vez ("jogam as brancas", "White to play"). A prosa ("Black moves the
     knight…") e os lances ("1.e4 e5 2.Nf3") ficam no texto, que valida os lances."""
+    from abbychess.diagramas import _VEZ_PELO_VERBO
+
     if len(texto) > TAMANHO_DA_LEGENDA:
         return False
     return bool(_INICIO_DA_LEGENDA.search(texto) or _SO_O_NUMERO.fullmatch(texto)
-                or _TEXTO_DA_LEGENDA.search(texto)
+                or _TEXTO_DA_LEGENDA.search(texto) or _VEZ_PELO_VERBO.match(texto)
                 # A tolerância do OCR só na palavra longa: "teste" com 2 erros casava
                 # "These squares" e "Tea time" (o "Teste N" impresso já casa acima).
                 or _comeca_como(texto, ("diagrama", "diagram")))

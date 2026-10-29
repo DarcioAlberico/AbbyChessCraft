@@ -69,6 +69,14 @@ _PEOES = "♙♟"
 _BORDA = ",:.\"'“”‘’"
 #: `1.`, `1...`, `1…` e `1..` (as reticências que o OCR leu com um ponto a menos).
 _NUMERO = re.compile(r"^(\d{1,3})(\.{2,}|…|\.)(.*)$")
+#: O número como o OCR o lê num livro escaneado: o `1` como `l`, `I` ou `|` e o `0` como `O`
+#: ou `o` ("l.d6", "l9...♘f2", "l0.f3", "2l.♔f1"; Mirkovic, *Chess School 1*, pp. 10–160).
+#: Sem algarismo de verdade, só vale colado a um lance: "lo." no fim de uma frase é palavra.
+_NUMERO_DO_OCR = re.compile(r"^([0-9lI|Oo]{1,3})(\.{2,}|…|\.)(.*)$")
+_ALGARISMOS_DO_OCR = str.maketrans("lI|Oo", "11100")
+#: O `1` da casa lido como `l` ("♕el", "♖adl", "♔hl"): só no lance de peça ou de captura,
+#: senão o "el" de um livro em espanhol viraria e1.
+_FILEIRA_1_DO_OCR = re.compile(r"(?<=[a-h])[lI|](?=[+#!?‼⁇⁈⁉]*$)")
 _LANCE = re.compile(r"^(?P<lance>O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?[x:×]?[a-h][1-8](?:=?[QRBN])?)"
                     r"(?P<marca>[+#]*)(?P<juizo>[!?‼⁇⁈⁉]*)(?:e\.?p\.?)?$")
 _SINAL = re.compile(r"^[+#!?‼⁇⁈⁉±∓⩱⩲=∞□■△▼→↑⇆–—-]+$")
@@ -164,7 +172,25 @@ def _em_san(nucleo: str, tabela: Dict[str, str]) -> Optional[re.Match]:
     """O lance do token em SAN inglês, ou `None` se o token não for lance."""
     convertido = "".join(tabela.get(c, c) for c in nucleo if c not in _PEOES)
     convertido = convertido.replace("0-0-0", "O-O-O").replace("0-0", "O-O")
-    return _LANCE.match(convertido)
+    achado = _LANCE.match(convertido)
+    if achado is None and (convertido[:1] in _INGLES or "x" in convertido):
+        achado = _LANCE.match(_FILEIRA_1_DO_OCR.sub("1", convertido))
+    return achado
+
+
+def _numero(nucleo: str) -> Optional[re.Match]:
+    """O número do lance no começo do token (`_NUMERO`), ou o lido pelo OCR com letras no
+    lugar dos algarismos (`_NUMERO_DO_OCR`); o grupo 1 sai sempre em algarismos."""
+    casado = _NUMERO.match(nucleo)
+    if casado is not None:
+        return casado
+    casado = _NUMERO_DO_OCR.match(nucleo)
+    if casado is None:
+        return None
+    cru, resto = casado.group(1), casado.group(3)
+    if not resto and (not any(c.isdigit() for c in cru) or "I" in cru):
+        return None                             # "lo." é palavra; "I." a inicial de um nome
+    return _NUMERO.match(cru.translate(_ALGARISMOS_DO_OCR) + casado.group(2) + resto)
 
 
 def _tokens(texto: str, idioma: str):
@@ -180,7 +206,7 @@ def _tokens(texto: str, idioma: str):
         nucleo = nucleo.replace(";", "").lstrip(_BORDA).rstrip(",:\"'“”‘’)]}")
         if abre:
             yield "variante", None
-        numero = _NUMERO.match(nucleo)
+        numero = _numero(nucleo)
         if numero:
             yield "numero", (int(numero.group(1)), numero.group(2) != ".")
             nucleo = numero.group(3)

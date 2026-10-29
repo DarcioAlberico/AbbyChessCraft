@@ -113,8 +113,13 @@ def palavras_dos_gids(pagina: Pagina) -> List[List[int]]:
     Documento as monta (com os não lidos e as decisões de palavra): a mesma chave das linhas
     guardadas, então depois do Documento elas não são refeitas. Os virtuais entram pelos
     gids deles (`pagina.decisoes.virtuais`)."""
+    return [p for ln in linhas_dos_gids(pagina) for p in ln]
+
+
+def linhas_dos_gids(pagina: Pagina) -> List[List[List[int]]]:
+    """As linhas de `palavras_dos_gids`, cada uma com as palavras dela (gids)."""
     linhas = _linhas_da_pagina(*_lidos(pagina, True))[0]
-    return [p for ln in _aplicar_decisoes(linhas, pagina.decisoes) for p in ln]
+    return _aplicar_decisoes(linhas, pagina.decisoes)
 
 
 def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:

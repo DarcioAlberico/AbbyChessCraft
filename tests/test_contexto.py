@@ -157,3 +157,97 @@ def test_o_lote_deixa_de_fora_o_revisado_e_vale_pelos_gids():
     pagina.boxes = boxes
     assert contexto.lote(pagina, {"0"}, "o", {gids[1]}) == [gids[3], gids[9]]
     assert contexto.lote(pagina, {"1"}, "l") == []
+
+
+# ----------------------------------------------------------------------
+# A letra onde o lance pede algarismo, e a linha (Mirkovic, Chess School 1)
+# ----------------------------------------------------------------------
+
+def _sugeridos(palavra: str) -> list:
+    return [s for s in contexto.julgar_palavra(list(palavra))]
+
+
+@pytest.mark.parametrize("palavra, sugestao", [
+    ("l.♗h7!", ["1", None, None, None, None, None]),
+    ("♕el", [None, None, "1"]),
+    ("l0.f3", ["1", None, None, None, None]),
+    ("l6l9", ["1", None, "1", None]),
+    ("8.o—o", [None, None, "0", None, "0"]),
+    ("c0l0ca", [None, "o", None, "o", None, None]),
+    ("anteS", [None, None, None, None, "s"]),
+])
+def test_a_palavra_sugere_a_troca(palavra, sugestao):
+    assert _sugeridos(palavra) == sugestao
+
+
+@pytest.mark.parametrize("palavra", ["el", "lo.", "Ol", "Il", "Oslo", "lol"])
+def test_letra_que_nao_vira_lance_nem_numero_fica(palavra):
+    assert _marcados(palavra) == "." * len(palavra)
+
+
+def _linha_medida(texto: str, x0: int = 40, altos=(), baixos=()):
+    """Uma linha com as alturas da fonte: maiúscula e haste de 30 px, o x de 20, a cauda
+    descendo 10, a vírgula na base e o apóstrofo no alto. `altos` e `baixos`: as posições
+    (no texto sem espaços) desenhadas como a outra caixa ou a outra altura de pontuação."""
+    boxes, x = [], x0
+    for c in texto:
+        if c == " ":
+            x += 12
+            continue
+        k = len(boxes)
+        if c in ",":
+            y1, y2 = (90, 98) if k in altos else (115, 126)
+        elif c in "'":
+            y1, y2 = (115, 126) if k in baixos else (90, 98)
+        elif c.isupper() or c in "bdfhklt" or k in altos:
+            y1, y2 = 90, 120
+        elif c in "gjpqy":
+            y1, y2 = 100, 130
+        else:
+            y1, y2 = 100, 120
+        if k in baixos and c.isalpha():
+            y1, y2 = 100, 120
+        boxes.append(BoxEntry(c, x, y1, x + 10, y2, 0.99, "neural"))
+        x += 11
+    return boxes
+
+
+def _sugestoes_da_linha(boxes):
+    from abbychess import texto as tx
+
+    pagina = tx.pagina_avulsa(boxes)
+    sugestoes = contexto.sugestoes(pagina)
+    return {k: sugestoes[b.gid] for k, b in enumerate(pagina.boxes) if b.gid in sugestoes}
+
+
+def test_virgula_no_alto_e_apostrofo_e_o_contrario():
+    # "pawn,s endings" com a vírgula desenhada no alto; "Linares' 2005" com o apóstrofo na base.
+    assert _sugestoes_da_linha(_linha_medida("the pawn,s endings", altos={7})) == {7: "'"}
+    assert _sugestoes_da_linha(_linha_medida("Linares' 2005 and the", baixos={7})) == {7: ","}
+    # Os de verdade passam.
+    assert _sugestoes_da_linha(_linha_medida("the pawn's endings, here")) == {}
+
+
+def test_a_caixa_pelo_tamanho_da_letra():
+    # "white moves": o w do tamanho das maiúsculas; "oPPOSITIoN": o o também.
+    assert _sugestoes_da_linha(_linha_medida("white moves - a draw", altos={0})) == {0: "W"}
+    assert _sugestoes_da_linha(_linha_medida("oPPOSITIoN and more", altos={0, 8})) == {0: "O", 8: "O"}
+    # O O baixo é o.
+    assert _sugestoes_da_linha(_linha_medida("the Opposition and more", baixos={3})) == {3: "o"}
+    # "whereWhite": o W é maiúsculo pela altura; o que falta é o espaço, e não há sugestão.
+    from abbychess import texto as tx
+
+    pagina = tx.pagina_avulsa(_linha_medida("whereWhite wins"))
+    assert pagina.boxes[5].gid in contexto.improvaveis(pagina)
+    assert pagina.boxes[5].gid not in contexto.sugestoes(pagina)
+
+
+def test_linha_de_um_tamanho_so_nao_decide_a_caixa():
+    # Sem diferença de altura entre as caixas (os boxes do OCR de mentira), nada muda.
+    assert _sugestoes_da_linha(_linha("white moves Opposition")) == {}
+
+
+def test_o_lote_troca_pela_sugestao_da_linha_e_so_por_ela():
+    boxes = _linha_medida("the pawn,s and dog,s", altos={7, 15})
+    assert contexto.lote_da_lista(boxes, {","}, "'") == [7, 15]
+    assert contexto.lote_da_lista(boxes, {","}, ".") == []

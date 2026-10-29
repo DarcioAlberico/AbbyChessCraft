@@ -1567,6 +1567,20 @@ class ControladorDePagina:
         guardada = self._sugestao_guardada(self.indice_de(self.atual))
         return guardada[1] if guardada is not None else None
 
+    def sugestao_do_contexto(self) -> Optional[Tuple[str, bool]]:
+        """(a troca que a palavra ou a linha pede, se os dois têm o mesmo desenho) para o glifo
+        em revisão (`contexto.sugestoes`); None sem troca, ou se ele já foi revisado."""
+        i = self.indice_de(self.atual)
+        if i is None or self.modelo is None:
+            return None
+        box = self.modelo.boxes[i]
+        if box.revisado or not box.entry.char or not contexto.volta_pelo_contexto(box.entry.source):
+            return None
+        sugestao = contexto.sugestoes(self.modelo).get(box.gid)
+        if not sugestao:
+            return None
+        return sugestao, contexto.mesmo_desenho(box.entry.char, sugestao)
+
     def _sugestao_guardada(self, i: Optional[int]):
         if i is None or self.modelo is None:
             return None

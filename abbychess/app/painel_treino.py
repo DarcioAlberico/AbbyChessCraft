@@ -347,6 +347,21 @@ class PainelDeTreino(QWidget):
         self.campo.setText(char)
         self.campo.selectAll()
 
+    def sugerir_pelo_contexto(self, char: str, mesmo_desenho: bool) -> None:
+        """A troca que a palavra ou a linha pede (`contexto.sugestoes`), no campo e selecionada.
+        Quando os dois caracteres têm o mesmo desenho (a vírgula e o apóstrofo, o w e o W, o l
+        e o 1 de algumas fontes), ensinar faria o livro ler assim todos os outros: a leitura
+        pede a tecla de "só esta"."""
+        if self._box is None or not char or self.campo.text() != self._box.char:
+            return
+        tecla = teclado.com_teclas("{so_corrigir}" if mesmo_desenho else "{ensinar}")
+        porque = (" — o desenho é o mesmo: corrija só esta" if mesmo_desenho else "")
+        self.leitura.setText(self.leitura.text() + "<br>Pelo contexto: <b style='font-size:"
+                             f"16pt'>{html.escape(char)}</b> &nbsp;({html.escape(tecla)}"
+                             f"{porque})")
+        self.campo.setText(char)
+        self.campo.selectAll()
+
     def limpar(self, mensagem: str) -> None:
         self._pagina, self._box = None, None
         self._definir_corte(None)

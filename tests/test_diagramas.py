@@ -20,6 +20,7 @@ from core.box_model import BoxEntry
 
 from abbychess import diagramas as dg
 from abbychess import pagina as pg
+from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.projeto import ProjetoDeLivro
 
@@ -466,3 +467,18 @@ def test_conferido_informado_e_legenda_que_nao_mudou_ficam_como_estao():
     # A mesma legenda antes e depois: nada é relido, mesmo o que diria outro lado.
     assumido = _lido(caixa=_CAIXA)
     assert dg.rederivar_lados([assumido], depois, list(depois))[0] is assumido
+
+
+def test_legenda_pelo_verbo_diz_o_lado():
+    """Mirkovic, *Chess School 1*: "White moves - a draw", "Black moves – a draw", com o
+    espaço perdido e o `o` lido como `0`; a prosa "Black moves the knight" não diz nada."""
+    assert (dg.ler_legenda("White moves - a draw").lado, dg.ler_legenda("whitemoves - a draw").lado,
+            dg.ler_legenda("Black m0ves – a □aw").lado) == ("w", "w", "b")
+    assert dg.ler_legenda("White moves - winning").origem == dg.LADO_DA_LEGENDA
+    assert dg.ler_legenda("Black moves the knight to f6").lado is None
+    assert dg.ler_legendas("White moves - a draw", "Black moves - White winning").origem == "ambigua"
+    # A linha da legenda nos boxes diz o lado, e a área dela é legenda.
+    d = _lido(caixa=_CAIXA)
+    [novo] = dg.rederivar_lados([d], [], _legenda("Black moves - a draw", 110, 530))
+    assert (novo.lado, novo.lado_origem) == ("b", dg.LADO_DA_LEGENDA)
+    assert zn._parece_legenda("White moves - a draw")

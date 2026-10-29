@@ -79,6 +79,37 @@ PASTA_DE_DIAGRAMAS = "diagramas"
 
 _FIM_DE_FRASE = re.compile(r"[.:!?…»”\"]\s*$")
 
+#: "White moves - a draw", "Black moves – winning": a legenda do Mirkovic (*Chess School 1*),
+#: que o core não lê (ele conhece "to move" e "to play"). Só no começo da legenda e com
+#: travessão, dois-pontos ou o fim logo depois: "Black moves the knight" é prosa. O OCR
+#: perde o espaço ("whitemoves") e lê o `o` como `0` ("Black m0ves").
+_VEZ_PELO_VERBO = re.compile(r"^\W*(white|black)\s*m[o0]ves?\s*(?:[-–—:,.]|$)", re.IGNORECASE)
+
+
+def ler_legenda(texto: Optional[str]) -> "lado_a_jogar.LadoLido":
+    """O lado dito por uma legenda (`core.lado_a_jogar.ler`), e também pelo verbo
+    (`_VEZ_PELO_VERBO`) quando o core não achou nada."""
+    lido = lado_a_jogar.ler(texto)
+    if lido or lido.origem != "ausente":
+        return lido
+    casado = _VEZ_PELO_VERBO.match(str(texto or "").strip())
+    if casado is None:
+        return lido
+    return lado_a_jogar.LadoLido("w" if casado.group(1).lower() == "white" else "b",
+                                 "legenda", casado.group(0).strip(" -–—:,."))
+
+
+def ler_legendas(*textos: Optional[str]) -> "lado_a_jogar.LadoLido":
+    """`core.lado_a_jogar.ler_varios` com `ler_legenda`: cada texto em separado, e dois que
+    discordam são `ambigua`."""
+    lidos = [item for item in (ler_legenda(lado_a_jogar.normalizar_legenda(t))
+                               for t in textos if t) if item]
+    if not lidos:
+        return lado_a_jogar.LadoLido()
+    if len({item.lado for item in lidos}) > 1:
+        return lado_a_jogar.LadoLido(None, "ambigua", "; ".join(item.trecho for item in lidos))
+    return lidos[0]
+
 
 def roque_possivel(pecas: str, roque: str) -> str:
     """Os direitos de `roque` que rei e torre ainda permitem nas casas iniciais de `pecas`."""
@@ -341,8 +372,8 @@ def _com_lado(d: DiagramaLido, legendas: Sequence[str]) -> DiagramaLido:
     livro e as correções do usuário (ver `legendas_dos_boxes`). Sem lado nelas,
     vale o título do core.
     """
-    dito, titulo = lado_a_jogar.ler(d.titulo_do_core), d.titulo_do_core
-    da_pagina = lado_a_jogar.ler_varios(*legendas) if legendas else None
+    dito, titulo = ler_legenda(d.titulo_do_core), d.titulo_do_core
+    da_pagina = ler_legendas(*legendas) if legendas else None
     if da_pagina and da_pagina.lado:
         dito, titulo = da_pagina, " / ".join(legendas)
     dito = dito if dito and dito.lado else None

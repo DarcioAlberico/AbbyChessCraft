@@ -286,3 +286,22 @@ def test_clique_no_glifo_abre_o_treino(app, janela):  # noqa: F811
     janela.verificacao._clicar((x1 + x2) / 2, 0)
     assert janela.inspetor.atual() == "glifo"
     assert atual(janela) == palavra.indices[1]
+
+
+def test_o_texto_noutro_idioma_avisa_uma_vez(app, janela, monkeypatch):  # noqa: F811
+    """Mirkovic, em inglês num projeto em português: a verificação diz que o dicionário é o
+    errado, e onde trocar; só uma vez por página."""
+    from abbychess import idioma
+
+    _ler_a_mao(app, janela)
+    janela.projeto.dados.idioma = "pt"
+    monkeypatch.setattr(idioma, "provavel", lambda texto: "en")
+    janela.verificador.lexico = lexico.Lexico(palavras={"abc", "cab"})
+    janela.verificar_texto()
+    mensagem = janela.statusBar().currentMessage()
+    assert "parece em inglês" in mensagem and "português" in mensagem and "Opções" in mensagem
+    janela.statusBar().clearMessage()
+    janela.verificador.recontar(0)
+    assert "parece em" not in janela.statusBar().currentMessage()
+    # Trocar o idioma nas opções esquece o léxico (o do idioma novo vem no próximo F7).
+    assert janela.pagina.definir_idioma("en") and not janela.pagina.definir_idioma("en")

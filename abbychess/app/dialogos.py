@@ -12,6 +12,7 @@ from PySide6.QtCore import QEventLoop, Qt, QTimer
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
                                QInputDialog, QLabel, QLineEdit, QMessageBox, QProgressDialog, QWidget)
 
+from abbychess import idioma as idm
 from abbychess import livro
 from abbychess import nativo
 from abbychess import pagina as pg
@@ -22,8 +23,7 @@ FILTROS_DE_EXPORTACAO = {"PDF pesquisável (*.pdf)": ".pdf", "Word (*.docx)": ".
                          "EPUB (*.epub)": ".epub", "Texto (*.txt)": ".txt",
                          "PGN dos diagramas (*.pgn)": ".pgn"}
 
-IDIOMAS = (("Português", "pt"), ("English", "en"), ("Español", "es"),
-           ("Deutsch", "de"), ("Français", "fr"))
+IDIOMAS = idm.IDIOMAS
 
 
 @dataclass(frozen=True)
@@ -46,7 +46,7 @@ def intervalo_do_corpo(texto: str, total: int) -> tuple[int, int]:
 class DialogoDeNovoProjeto(QDialog):
     """Nome, idioma e corpo num formulário só, depois da escolha do arquivo (§9.1)."""
 
-    def __init__(self, parent, nome: str, total: int):
+    def __init__(self, parent, nome: str, total: int, idioma: Optional[str] = None):
         super().__init__(parent)
         self.setWindowTitle("Novo projeto")
         self.total = total
@@ -54,6 +54,11 @@ class DialogoDeNovoProjeto(QDialog):
         self.idioma = QComboBox()
         for rotulo, codigo in IDIOMAS:
             self.idioma.addItem(rotulo, codigo)
+        if idioma is not None and self.idioma.findData(idioma) >= 0:
+            # O idioma que a camada de texto do PDF diz (`idioma.da_camada_do_pdf`).
+            self.idioma.setCurrentIndex(self.idioma.findData(idioma))
+            self.idioma.setToolTip("Escolhido pelo texto do PDF. Ele decide o dicionário da "
+                                   "verificação de texto e as letras das peças nos lances.")
         self.intervalo = QLineEdit(f"1-{total}")
         self.intervalo.setToolTip("Páginas do conteúdo, sem capa e sumário; por exemplo, 5-230")
         botoes = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
@@ -84,8 +89,9 @@ class DialogoDeNovoProjeto(QDialog):
         self.accept()
 
     @classmethod
-    def obter(cls, parent, nome: str, total: int) -> Optional[OpcoesDoNovoProjeto]:
-        dialogo = cls(parent, nome, total)
+    def obter(cls, parent, nome: str, total: int,
+              idioma: Optional[str] = None) -> Optional[OpcoesDoNovoProjeto]:
+        dialogo = cls(parent, nome, total, idioma)
         return dialogo.opcoes if dialogo.exec() == QDialog.DialogCode.Accepted else None
 
 
@@ -144,7 +150,11 @@ def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
     except OSError as erro:
         QMessageBox.warning(janela, "Novo projeto", f"A fonte do livro não abriu:\n{erro}")
         return None
-    opcoes = DialogoDeNovoProjeto.obter(janela, Path(fonte).stem, total)
+    sugerido = None
+    if Path(fonte).suffix.lower() == ".pdf":
+        sugerido = em_segundo_plano(janela, "Novo projeto", "Lendo o idioma do livro…",
+                                    lambda _progresso: idm.da_camada_do_pdf(fonte))
+    opcoes = DialogoDeNovoProjeto.obter(janela, Path(fonte).stem, total, sugerido)
     if opcoes is None:
         return None
     padrao = config.value("pasta_dos_projetos", str(Path.home() / "AbbyChessCraft"))

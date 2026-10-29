@@ -2464,6 +2464,14 @@ class ControladorDePagina:
         if self.projeto is not None:
             self.projeto.dados.notacao = notacao
 
+    def definir_idioma(self, idioma: str) -> bool:
+        """O idioma da prosa do livro (o léxico da verificação, as letras das peças), no
+        projeto, gravado junto com os limiares; devolve se mudou."""
+        if self.projeto is None or self.projeto.dados.idioma == idioma:
+            return False
+        self.projeto.dados.idioma = idioma
+        return True
+
     def _aplicar_limiares(self, limiares) -> None:
         projeto = self.projeto
         projeto.dados.limiares = limiares

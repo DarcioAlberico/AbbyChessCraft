@@ -386,9 +386,12 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         if not self.pagina.pronto:
             return
         dialogo = DialogoDeOpcoes(self.projeto.dados.limiares, self,
-                                  notacao=self.projeto.dados.notacao)
+                                  notacao=self.projeto.dados.notacao,
+                                  idioma=self.projeto.dados.idioma)
         if dialogo.exec() == DialogoDeOpcoes.DialogCode.Accepted:
             self.pagina.definir_notacao(dialogo.notacao())
+            if self.pagina.definir_idioma(dialogo.idioma()):
+                self.verificador.esquecer_projeto()     # o léxico do idioma novo, no próximo F7
             self.pagina.aplicar_limiares(dialogo.limiares())
 
     def reconhecer_livro(self) -> None:

@@ -104,3 +104,26 @@ def test_o_cabecalho_isolado_mede_o_espaco_pela_pagina():
     linhas = partir_pela_pagina(palavras_da_pagina(cabecalho), cabecalho, pagina)
     assert ["".join(cabecalho[s.indice].char for s in p.simbolos) for p in linhas[0]] == [
         "GM", "NIKOLA", "SEDLAK"]
+
+
+def test_o_idioma_pelas_palavras_comuns():
+    from abbychess import idioma
+
+    ingles = ("Opposition is when distance between the kings is odd number of squares. "
+              "Opposition has big practical importance in pawn's endings, and basically "
+              "represent maneuver fight, with cause of gaining the material advantage or "
+              "engaging the better position for king. The side which steps in the opposition "
+              "has the advantage in most of the cases, and we say that side is in opposition.")
+    portugues = ("As brancas jogam e ganham. O rei das pretas não pode voltar, e o peão "
+                 "passa. Com o lance do texto, a posição é de vitória, mas só se o rei for "
+                 "pelo caminho mais curto; senão as pretas empatam. É uma regra que vale "
+                 "também nos finais com mais peões, e o livro a mostra nos diagramas seguintes "
+                 "com o rei na frente do peão, pela casa da coroação, e com a oposição.")
+    espanhol = ("Las blancas juegan y ganan. El rey de las negras no puede volver, y el peón "
+                "pasa. Con la jugada del texto la posición es ganadora, pero solo si el rey va "
+                "por el camino más corto; si no, las negras hacen tablas. Es una regla que "
+                "vale también en los finales con más peones, y el libro lo muestra en los "
+                "diagramas siguientes con el rey delante del peón.")
+    assert (idioma.provavel(ingles), idioma.provavel(portugues),
+            idioma.provavel(espanhol)) == ("en", "pt", "es")
+    assert idioma.provavel("1.e4 e5 2.♘f3 ♘c6 3.♗b5 a6") is None       # só lances

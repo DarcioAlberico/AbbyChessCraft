@@ -100,3 +100,29 @@ def test_texto_nativo_parcial_deixa_so_as_recusadas_para_a_amostra(app, tmp_path
     finally:
         projeto.fechar()
 
+
+
+def test_o_idioma_sugerido_pela_camada_do_pdf_vem_escolhido(app, tmp_path, monkeypatch):  # noqa: F811
+    """O novo projeto pergunta o idioma já com o que a camada de texto do PDF diz (Mirkovic:
+    o projeto em inglês nasceu em português, o primeiro da lista)."""
+    from abbychess.app.opcoes import DialogoDeOpcoes
+    from abbychess.projeto import Limiares
+
+    fonte = pdf_sintetico(tmp_path)
+    vistos = {}
+
+    def obter(_parent, nome, total, idioma=None):
+        vistos["idioma"] = idioma
+        return None
+    monkeypatch.setattr(dialogos.idm, "da_camada_do_pdf", lambda caminho: "en")
+    monkeypatch.setattr(dialogos.DialogoDeNovoProjeto, "obter", obter)
+    monkeypatch.setattr(dialogos.QFileDialog, "getOpenFileName",
+                        lambda *_a, **_k: (str(fonte), ""))
+    janela = SimpleNamespace(config=SimpleNamespace(value=lambda _c, p: p, setValue=lambda *_: None))
+    assert dialogos.novo_projeto(janela) is None and vistos["idioma"] == "en"
+
+    dialogo = dialogos.DialogoDeNovoProjeto(None, "Livro", 10, "en")
+    assert dialogo.idioma.currentData() == "en"
+    assert dialogos.DialogoDeNovoProjeto(None, "Livro", 10).idioma.currentData() == "pt"
+    opcoes = DialogoDeOpcoes(Limiares(), None, idioma="en")
+    assert opcoes.idioma() == "en"

@@ -327,6 +327,8 @@ class ControladorDeVerificacao:
         self.eventos = pagina.eventos
         self.lexico = None
         self.ignoradas: set = set()
+        #: As páginas em que o aviso do idioma já saiu nesta sessão (`_conferir_o_idioma`).
+        self._idioma_avisado: set = set()
         self.desconhecidas: List[vf.Desconhecida] = []
         self.posicao = 0
         #: Os gids da página quando as palavras foram contadas (os índices delas são desta
@@ -335,7 +337,7 @@ class ControladorDeVerificacao:
         pagina.eventos.ligar("pagina_trocou", self._pagina_trocou)
 
     def esquecer_projeto(self) -> None:
-        self.lexico, self.ignoradas = None, set()
+        self.lexico, self.ignoradas, self._idioma_avisado = None, set(), set()
 
     def _pagina_trocou(self) -> None:
         self.desconhecidas, self.posicao, self._gids = [], 0, []
@@ -375,7 +377,27 @@ class ControladorDeVerificacao:
         decididas = p.modelo.decisoes.quebras if p.modelo is not None else frozenset()
         quebras = [i for i, g in enumerate(self._gids) if g in decididas]
         self.desconhecidas = vf.desconhecidas(p.boxes, self.lexico, self.ignoradas, quebras)
+        self._conferir_o_idioma()
         self.mostrar(self.posicao if posicao is None else posicao)
+
+    def _conferir_o_idioma(self) -> None:
+        """O texto da página noutro idioma que o do projeto: as palavras que o léxico marca
+        são quase todas certas, e as erradas se perdem entre elas (Mirkovic, p. 19: 178 com o
+        português, 32 com o inglês). Avisa uma vez por página aberta."""
+        from abbychess import idioma as idm
+        from abbychess import texto as tx
+
+        p = self.pagina
+        if p.modelo is None or p.projeto is None or p.indice in self._idioma_avisado:
+            return
+        self._idioma_avisado.add(p.indice)
+        dito = idm.provavel(tx.texto(tx.montar(p.modelo)))
+        do_projeto = p.projeto.dados.idioma
+        if dito is None or dito == (do_projeto or "").split("-")[0]:
+            return
+        p._avisar(f"O texto desta página parece em {idm.NOMES.get(dito, dito)}, e o idioma do "
+                  f"livro é {idm.NOMES.get(do_projeto, do_projeto)}: a verificação usa o "
+                  "dicionário errado. Troque em Projeto › Opções ({opcoes}).", 15000)
 
     def mostrar(self, posicao: int) -> None:
         if not self.desconhecidas:

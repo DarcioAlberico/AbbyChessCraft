@@ -174,6 +174,8 @@ class PainelDeTreino(QWidget):
         self.leitura = QLabel("Abra um projeto e reconheça uma página.")
         #: O efeito e o conflito de ensinar o que está no campo (§8.3).
         self.aviso_de_ensino = QLabel("")
+        self._aviso = ("", "", "")
+        estilo.avisos().tema_mudou.connect(self._tema_mudou)
         # Sempre HTML: só o efeito, sem o <span> do conflito, o Qt o adivinhava texto puro e
         # mostrava o escape ("Enter ensina &#x27;1&#x27;").
         self.aviso_de_ensino.setTextFormat(Qt.TextFormat.RichText)
@@ -305,12 +307,18 @@ class PainelDeTreino(QWidget):
     def mostrar_aviso_de_ensino(self, efeito: str, conflito: str, livro: str = "") -> None:
         """O efeito ("Enter ensina 'l' · 23 iguais nesta página · 410 no livro") e, em
         laranja, o conflito ("⚠ este glifo está a 0,08 de 14 amostras de '1'")."""
+        self._aviso = (efeito, conflito, livro)          # para repintar no tema novo
         partes = [html.escape(efeito + livro)] if efeito else []
         if conflito:
             # A cor de aviso do tema de agora (legível no claro e no escuro).
             partes.append(f"<span style='color:{estilo.hex_de('aviso')}'>⚠ "
                           f"{html.escape(conflito)}</span>")
         self.aviso_de_ensino.setText("<br>".join(partes))
+
+    def _tema_mudou(self, _nome: str) -> None:
+        """O conflito guardou a cor do tema de antes no HTML: refeito no de agora."""
+        if any(self._aviso):
+            self.mostrar_aviso_de_ensino(*self._aviso)
 
     def mostrar(self, pagina: np.ndarray, box: BoxEntry, posicao: str) -> None:
         """Mostra o box em revisão e põe a leitura atual no campo, selecionada."""

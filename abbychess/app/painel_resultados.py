@@ -50,6 +50,8 @@ class _DelegadoHtml(QStyledItemDelegate):
     def _documento(self, option, index) -> QTextDocument:
         documento = QTextDocument()
         documento.setDefaultFont(option.font)
+        # A cor pela classe, lida do tema na hora de pintar: o HTML guardado não a fixa.
+        documento.setDefaultStyleSheet(f".local {{ color: {estilo.hex_de('texto_secundario')} }}")
         documento.setHtml(index.data(PAPEL_DO_HTML) or html.escape(index.data() or ""))
         return documento
 
@@ -230,8 +232,7 @@ class PainelDeResultados(QTabWidget):
             depois = o.trecho[o.coluna + tamanho:o.coluna + tamanho + 60]
             local = f"p. {o.pagina + 1}, l. {o.linha}"
             item = QListWidgetItem(f"{local}: {antes}{casado}{depois}")
-            secundario = estilo.hex_de("texto_secundario")
-            item.setData(PAPEL_DO_HTML, f"<span style='color:{secundario}'>{local}:</span> "
+            item.setData(PAPEL_DO_HTML, f"<span class='local'>{local}:</span> "
                                         f"{html.escape(antes)}<b>{html.escape(casado)}</b>"
                                         f"{html.escape(depois)}")
             item.setData(PAPEL_DO_ALVO, o)

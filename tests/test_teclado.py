@@ -126,6 +126,13 @@ def test_tirar_a_tecla_e_uma_troca_valida():
     assert teclado.sequencias("proximo_diagrama") == []
 
 
+def test_a_acao_com_excecao_so_num_perfil_se_reatribui():
+    """O Ctrl+Tab do FineReader tem a exceção do QTabWidget; trocá-lo ou tirá-lo leva a
+    exceção junto, em vez de recusar a troca por "exceção sem uso"."""
+    assert teclado.problemas("finereader", {"painel_seguinte": ["Ctrl+F11"]}) == []
+    assert teclado.problemas("finereader", {"painel_seguinte": []}) == []
+
+
 # ----------------------------------------------------------------------
 # O perfil lembrado
 # ----------------------------------------------------------------------

@@ -228,3 +228,54 @@ def test_as_cores_das_funcoes_das_areas_tem_contraste_no_papel():
     for funcao, cor in estilo.COR_DA_FUNCAO.items():
         assert estilo.contraste(cor, estilo.PAPEL) >= 3, funcao
         assert estilo.contraste(cor, estilo.PAPEL_ESCURO) >= 3, funcao
+
+
+# ----------------------------------------------------------------------
+# A revisão de código do fechamento (rodada 1)
+# ----------------------------------------------------------------------
+
+def _luminancia(cor: QColor) -> float:
+    def canal(c):
+        c /= 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    return 0.2126 * canal(cor.red()) + 0.7152 * canal(cor.green()) + 0.0722 * canal(cor.blue())
+
+
+def test_o_tema_escuro_pinta_os_controles_pelo_fusion(app, tema_claro_no_fim):
+    """O estilo nativo do Windows pinta o botão claro sob a paleta escura: o tema troca o
+    estilo pelo Fusion, e o texto do botão fica legível sobre o fundo dele."""
+    from PySide6.QtWidgets import QPushButton
+
+    app.setStyle("Windows")
+    estilo.aplicar(app, "escuro")
+    folha = app.styleSheet()
+    app.setStyleSheet("")                       # com a folha, o estilo não diz o nome
+    assert app.style().name().lower() == "fusion"
+    app.setStyleSheet(folha)
+    botao = QPushButton("MMMM")
+    botao.resize(120, 32)
+    imagem = botao.grab().toImage()
+    fundo = imagem.pixelColor(6, imagem.height() // 2)
+    cores = [imagem.pixelColor(x, y) for x in range(20, 100) for y in range(8, 24)]
+    texto = max(cores, key=lambda c: abs(_luminancia(c) - _luminancia(fundo)))
+    claro, escuro = sorted((_luminancia(fundo), _luminancia(texto)), reverse=True)
+    assert _luminancia(fundo) < 0.2                     # o fundo do botão é escuro
+    assert (claro + 0.05) / (escuro + 0.05) >= 4.5
+
+
+def test_o_html_guardado_segue_o_tema(app, tema_claro_no_fim):
+    """O aviso de conflito e as linhas da busca não guardam a cor do tema de antes."""
+    from abbychess.app.painel_resultados import PAPEL_DO_HTML, PainelDeResultados
+    from abbychess.app.painel_treino import PainelDeTreino
+    from abbychess.busca import Ocorrencia
+
+    estilo.aplicar(app, "claro")
+    treino = PainelDeTreino()
+    treino.mostrar_aviso_de_ensino("Enter ensina", "perto de '1'")
+    assert estilo.CLARO.aviso.name() in treino.aviso_de_ensino.text()
+    estilo.aplicar(app, "escuro")
+    assert estilo.ESCURO.aviso.name() in treino.aviso_de_ensino.text()
+    resultados = PainelDeResultados()
+    resultados.mostrar_ocorrencias([Ocorrencia(0, 0, 3, 1, "abc def", 0, ())], "1 ocorrência")
+    guardado = resultados.resultados.item(1).data(PAPEL_DO_HTML)
+    assert "class='local'" in guardado and "color" not in guardado

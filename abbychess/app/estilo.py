@@ -340,8 +340,13 @@ def papel(widget, nome: str) -> None:
 
 def aplicar(app, nome: str = "") -> Tema:
     """Aplica o tema `nome` ("claro", "escuro"; vazio: o do sistema): paleta e folha de
-    estilo. Devolve o tema aplicado."""
+    estilo. Devolve o tema aplicado.
+
+    O estilo do Qt passa a ser o Fusion, que pinta tudo pela paleta: o nativo do Windows
+    (`windowsvista`) desenha botão, combo e spinbox pelo tema do sistema, claros sob a
+    paleta escura, com o texto claro ilegível em cima."""
     global _atual
+    app.setStyle("Fusion")                      # (com a folha, o estilo não diz o nome)
     _atual = TEMAS.get(nome or tema_do_sistema(), CLARO)
     app.setPalette(paleta(_atual))
     app.setStyleSheet(folha_de_estilo(_atual))

@@ -196,7 +196,11 @@ def tabela_com_trocas(perfil: str, trocas_: Mapping[str, List[str]]) -> atalhos.
                    else sorted(set(a.sem_atalho) | {perfil}))      # tirar a tecla é declarar
             declarados = (sorted(set(a.declarados) | {perfil}) if sequencias_[perfil]
                           else [p for p in a.declarados if p != perfil])
-            a = replace(a, sequencias=sequencias_, sem_atalho=sem, declarados=declarados)
+            # A exceção da tecla que saiu da ação (o Ctrl+Tab trocado no FineReader) não vale
+            # mais: ficando, viraria "exceção sem uso" e recusaria a troca.
+            todas = {s for seqs in sequencias_.values() for s in seqs}
+            a = replace(a, sequencias=sequencias_, sem_atalho=sem, declarados=declarados,
+                        excecoes=[e for e in a.excecoes if e.tecla in todas])
         acoes.append(a)
     return replace(base, acoes=acoes)
 

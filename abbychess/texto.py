@@ -7,6 +7,10 @@ precisa do texto monta de novo.
 
 - **Linhas e palavras** são as do core (`core.notacao.palavras_da_pagina`), que já são as do
   texto de hoje, com os acertos de `layout` (o espaço depois do "f", os vãos largos).
+- **Lances colados** (`partir_lances_colados`): o negrito apertado do Mirkovic junta o lance
+  ao número do seguinte ("♘f62.c4", "♗b44.e3", "e30—0", "♔c5♔a4"); a palavra parte depois da
+  casa quando o que vem é um número de lance, um roque ou outra figurina. As decisões vêm
+  depois: uma `juncao` do usuário junta de novo.
 - **Decisões**: uma `quebra` parte a palavra antes do gid; uma `juncao` (a, b) junta a
   palavra que termina em `a` com a seguinte, que começa em `b`, na mesma linha; um glifo
   virtual entra depois de `depois_de` (na mesma palavra ou, com `palavra_nova`, numa nova),
@@ -118,8 +122,48 @@ def palavras_dos_gids(pagina: Pagina) -> List[List[int]]:
 
 def linhas_dos_gids(pagina: Pagina) -> List[List[List[int]]]:
     """As linhas de `palavras_dos_gids`, cada uma com as palavras dela (gids)."""
-    linhas = _linhas_da_pagina(*_lidos(pagina, True))[0]
-    return _aplicar_decisoes(linhas, pagina.decisoes)
+    lidos, entries = _lidos(pagina, True)
+    linhas = _linhas_da_pagina(lidos, entries)[0]
+    return _aplicar_decisoes(partir_lances_colados(linhas, _chars(pagina, lidos, entries)),
+                             pagina.decisoes)
+
+
+def _chars(pagina: Pagina, lidos, entries) -> Dict[int, str]:
+    """O caractere de cada gid do documento, os virtuais também."""
+    chars = {b.gid: e.char for b, e in zip(lidos, entries)}
+    chars.update({v.gid: v.char for v in pagina.decisoes.virtuais})
+    return chars
+
+
+#: O fim de um lance: a casa, a promoção e os sinais ("f6", "f1♕", "c8=Q+", "b4!?").
+_FIM_DE_LANCE = re.compile(r"[a-h][1-8](?:=?[♔♕♖♗♘♚♛♜♝♞QRBN])?[+#‡†]*[!?]*$")
+#: O que começa o lance seguinte colado: o número dele, o roque ou uma figurina com a casa.
+_COMECO_DE_LANCE = re.compile(r"^(?:\d{1,3}\.|[0O][-–—][0O]|[♔♕♖♗♘♚♛♜♝♞][a-h]?[1-8]?[x:]?[a-h][1-8])")
+
+
+def partir_lances_colados(linhas: List[List[List[int]]], chars: Dict[int, str]
+                          ) -> List[List[List[int]]]:
+    """Cada palavra partida entre um lance e o seguinte que o OCR colou nela (sem espaço
+    entre eles): depois da casa (`_FIM_DE_LANCE`), quando o resto começa um lance
+    (`_COMECO_DE_LANCE`). "♘f62.c4" vira "♘f6" e "2.c4"; "1.e4e5" e "a1-h8" ficam."""
+    saida = []
+    for linha in linhas:
+        palavras = []
+        for p in linha:
+            texto = [chars.get(g) or "" for g in p]
+            if len(p) < 4 or not any(c[:1].isdigit() for c in texto):
+                palavras.append(p)
+                continue
+            atual = [p[0]]
+            for k in range(1, len(p)):
+                if (_FIM_DE_LANCE.search("".join(texto[k - len(atual):k]))
+                        and _COMECO_DE_LANCE.match("".join(texto[k:]))):
+                    palavras.append(atual)
+                    atual = []
+                atual.append(p[k])
+            palavras.append(atual)
+        saida.append(palavras)
+    return saida
 
 
 def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
@@ -127,10 +171,9 @@ def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
     só têm os glifos lidos; a vista do Documento (`com_os_nao_lidos`) mostra também os que
     ninguém leu, como `NAO_LIDO`, para o realce deles (§6.1)."""
     lidos, entries = _lidos(pagina, com_os_nao_lidos)
-    chars = {b.gid: e.char for b, e in zip(lidos, entries)}
-    chars.update({v.gid: v.char for v in pagina.decisoes.virtuais})
+    chars = _chars(pagina, lidos, entries)
     linhas, topos, trechos, ordem = _linhas_da_pagina(lidos, entries)
-    linhas = _aplicar_decisoes(linhas, pagina.decisoes)
+    linhas = _aplicar_decisoes(partir_lances_colados(linhas, chars), pagina.decisoes)
     texto_das_linhas = [" ".join("".join(chars[g] for g in p) for p in ln) for ln in linhas]
 
     por_gid = {b.gid: e for b, e in zip(lidos, entries)}
@@ -425,8 +468,7 @@ def texto(documento: Documento, diagramas: Sequence = (), modo: str = IMPRESSO) 
     """O texto do documento: uma linha impressa por linha, e uma linha por diagrama."""
     normal = normalizador(modo)
     por_id = {d.id: d for d in diagramas}
-    numero = {d.id: k for k, d in enumerate(sorted(diagramas, key=lambda d: (d.caixa[1], d.caixa[0])),
-                                            start=1)}
+    numero = numeros_dos_diagramas(documento, diagramas)
     saida = []
     for bloco in documento.blocos:
         if bloco.diagrama_id is not None:
@@ -438,6 +480,17 @@ def texto(documento: Documento, diagramas: Sequence = (), modo: str = IMPRESSO) 
             saida.append(" ".join("".join(normal(documento.chars[g]) for g in p.gids)
                                   for p in linha.palavras))
     return "\n".join(saida)
+
+
+def numeros_dos_diagramas(documento: Documento, diagramas: Sequence) -> Dict[str, int]:
+    """O número de cada diagrama ("Diagrama 1"): a ordem em que o documento os lê (a coluna da
+    esquerda antes da da direita; no Mirkovic, p. 18, a altura dava 2, 3, 1, 4), e os que o
+    documento não tem depois, de cima para baixo."""
+    ordem = [b.diagrama_id for b in documento.blocos if b.diagrama_id is not None]
+    vistos = set(ordem)
+    ordem += [d.id for d in sorted(diagramas, key=lambda d: (d.caixa[1], d.caixa[0]))
+              if d.id not in vistos]
+    return {did: k for k, did in enumerate(dict.fromkeys(ordem), start=1)}
 
 
 def texto_do_bloco(documento: Documento, bloco: Bloco, modo: str = IMPRESSO) -> str:

@@ -22,6 +22,10 @@ MARGEM_DA_CALHA = 0.25
 #: páginas de 8 livros, `docs/revisoes/pendencias.md`); com seis, nenhuma página real perde
 #: as colunas que tem. O Documento e a exportação usam a mesma, e leem a página igual.
 FILAS_DE_COLUNA = 6
+#: A linha que atravessa a calha (`_linhas_que_atravessam`): o vão dela na calha, em larguras
+#: da calha. No Mirkovic (calha de 48 px), as linhas de largura total têm de -10 a 21 px ali
+#: e o título centrado 13; entre as duas colunas o vão é a calha inteira ou mais.
+VAO_DA_LINHA_NA_CALHA = 0.6
 ChaveDeLeitura = Tuple[int, int]
 
 
@@ -91,7 +95,8 @@ class OrdemDeLeitura:
                 grupos.append([box])
         faixas = [(min(b.y1 for b in grupo), max(b.y2 for b in grupo)) for grupo in grupos
                   if len(grupo) >= 2 or max(b.height for b in grupo) >= 1.5 * altura]
-        return cls(tuple(tuple(c) for c in colunas), tuple(faixas))
+        faixas += _linhas_que_atravessam(boxes, colunas, altura)
+        return cls(tuple(tuple(c) for c in colunas), _unidas(faixas))
 
     def chave(self, x: float, y: float) -> ChaveDeLeitura:
         if not self.colunas:
@@ -127,7 +132,92 @@ class OrdemDeLeitura:
 
         trecho = [boxes[i] for i in indices]
         linhas = palavras_da_pagina(trecho, self.deteccao_do_trecho(indices, boxes))
+        if len(indices) < len(boxes):
+            linhas = partir_pela_pagina(linhas, trecho, boxes)
         return partir_nos_vaos(partir_depois_do_f(linhas, trecho), trecho)
+
+
+def _linhas_que_atravessam(boxes: Sequence[BoxEntry], colunas, altura: float
+                           ) -> List[Tuple[float, float]]:
+    """As faixas das linhas que passam de uma coluna à outra sem o vão da calha.
+
+    O parágrafo de largura total no alto de uma página de duas colunas (Mirkovic, p. 160:
+    "…where bish|op is sacrificed…") tem um box só, ou nenhum, no meio da calha; como faixa
+    pelos boxes da calha ele não entrava, e cada linha virava metade de uma coluna e metade
+    da outra. Aqui vale a linha: perto da calha, com texto dos dois lados, e o vão nela menor
+    que `VAO_DA_LINHA_NA_CALHA` da largura da calha. O título centrado com o espaço bem na
+    calha ("NO PAIN | NO GAIN", p. 10) também."""
+    faixas = []
+    for esquerda, direita in zip(colunas, colunas[1:]):
+        largura = direita[0] - esquerda[1]
+        if largura <= 0:
+            continue
+        meio = (esquerda[1] + direita[0]) / 2
+        perto = sorted((b for b in boxes if b.x2 >= esquerda[1] - 3 * altura
+                        and b.x1 <= direita[0] + 3 * altura and b.height > 0),
+                       key=lambda b: (b.y1 + b.y2) / 2)
+        filas: List[List[BoxEntry]] = []
+        for box in perto:
+            centro = (box.y1 + box.y2) / 2
+            if filas and min(b.y1 for b in filas[-1]) <= centro <= max(b.y2 for b in filas[-1]):
+                filas[-1].append(box)
+            else:
+                filas.append([box])
+        for fila in filas:
+            antes = [b for b in fila if (b.x1 + b.x2) / 2 < meio]
+            depois = [b for b in fila if (b.x1 + b.x2) / 2 >= meio]
+            if not antes or not depois:
+                continue
+            vao = min(b.x1 for b in depois) - max(b.x2 for b in antes)
+            if vao < VAO_DA_LINHA_NA_CALHA * largura:
+                linha = [b for b in boxes
+                         if min(f.y1 for f in fila) <= (b.y1 + b.y2) / 2 <= max(f.y2 for f in fila)]
+                faixas.append((min(b.y1 for b in linha), max(b.y2 for b in linha)))
+    return faixas
+
+
+def _unidas(faixas: Sequence[Tuple[float, float]]) -> Tuple[Tuple[float, float], ...]:
+    """As faixas em ordem, as que se sobrepõem juntas numa só."""
+    saida: List[Tuple[float, float]] = []
+    for topo, pe in sorted(faixas):
+        if saida and topo <= saida[-1][1]:
+            saida[-1] = (saida[-1][0], max(saida[-1][1], pe))
+        else:
+            saida.append((topo, pe))
+    return tuple(saida)
+
+
+#: O trecho cujos glifos são, na mediana, mais largos que isto vezes os da página mede o espaço
+#: pela página (`partir_pela_pagina`).
+LARGURA_DO_TRECHO_ISOLADO = 1.25
+
+
+def partir_pela_pagina(linhas: list, trecho: Sequence[BoxEntry], pagina: Sequence[BoxEntry]
+                       ) -> list:
+    """As palavras do trecho partidas pelo limiar de espaço da página quando o trecho só tem
+    glifos largos: o core mede o espaço pela largura mediana do trecho, e o cabeçalho ou o
+    título que viram um trecho sozinho (a faixa que atravessa a calha) perdiam os espaços
+    ("GMNIK0LAsEDLAK", Mirkovic p. 10: letras a 1–3 px, palavras a 11–13, o limiar do trecho
+    15 e o da página 9)."""
+    from core.notacao import LIMIAR_ESPACO, Palavra
+
+    da_pagina = largura_mediana(pagina)
+    if largura_mediana(trecho) <= LARGURA_DO_TRECHO_ISOLADO * da_pagina:
+        return linhas
+    limiar = LIMIAR_ESPACO * da_pagina
+    saida = []
+    for linha in linhas:
+        palavras = []
+        for palavra in linha:
+            atual = []
+            for s in palavra.simbolos:
+                if atual and trecho[s.indice].x1 - trecho[atual[-1].indice].x2 > limiar:
+                    palavras.append(Palavra(atual))
+                    atual = []
+                atual.append(s)
+            palavras.append(Palavra(atual))
+        saida.append(palavras)
+    return saida
 
 
 #: Quantas lacunas depois do "f", dentro da palavra, o trecho precisa ter para o gancho valer.

@@ -349,8 +349,7 @@ class VistaDoDocumento(QTextEdit):
                    margens=frozenset()):
         normal = tx.normalizador(tx.IMPRESSO)
         self._diagramas = {d.id: d for d in diagramas}
-        numero = {d.id: k for k, d in enumerate(sorted(diagramas, key=lambda d: (d.caixa[1], d.caixa[0])),
-                                                start=1)}
+        numero = tx.numeros_dos_diagramas(documento, diagramas)
         cursor = QTextCursor(doc)
         primeiro = True
         for bloco in documento.blocos:

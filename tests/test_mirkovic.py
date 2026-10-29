@@ -127,3 +127,25 @@ def test_o_idioma_pelas_palavras_comuns():
     assert (idioma.provavel(ingles), idioma.provavel(portugues),
             idioma.provavel(espanhol)) == ("en", "pt", "es")
     assert idioma.provavel("1.e4 e5 2.♘f3 ♘c6 3.♗b5 a6") is None       # só lances
+
+
+def test_o_fio_do_cabecalho_sai_e_a_moldura_do_tabuleiro_fica():
+    """pp. 18 e 89: o fio embaixo do cabeçalho corrido levava as letras dele na segmentação."""
+    import numpy as np
+    from PIL import Image
+
+    from abbychess.pagina import apagar_fios
+
+    matriz = np.full((2666, 1820), 255, np.uint8)
+    matriz[170:179, 130:1690] = 0                      # o fio, 9 px
+    matriz[130:162, 140:160] = 0                       # uma letra do cabeçalho
+    matriz[400:406, 200:720] = 0                       # a moldura de um tabuleiro
+    matriz[914:920, 200:720] = 0
+    matriz[400:920, 200:206] = 0
+    matriz[400:920, 714:720] = 0
+    matriz[1200:1230, 200:1600:40] = 0                 # um sublinhado de traços não é fio
+    limpa = np.asarray(apagar_fios(Image.fromarray(matriz)))
+    assert (limpa[170:179, 130:1690] == 255).all()
+    assert (limpa[130:162, 140:160] == 0).all()
+    assert (limpa[400:406, 200:720] == 0).all() and (limpa[914:920, 200:720] == 0).all()
+    assert (limpa[1200:1230, 200:1600:40] == 0).all()

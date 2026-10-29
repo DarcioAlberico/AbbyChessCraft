@@ -629,7 +629,7 @@ def segmentar_tudo(imagem: Image.Image, leitor: Optional[LeitorDoLivro] = None
     """
     from core import diagrama
 
-    cinza = imagem.convert("L")
+    cinza = apagar_fios(imagem.convert("L"))
     matriz = np.asarray(cinza)
     binaria = BoxService.binaria_para_segmentacao(
         matriz, max_contornos=BoxService.MAX_CONTORNOS_DE_TEXTO)
@@ -643,6 +643,41 @@ def segmentar_tudo(imagem: Image.Image, leitor: Optional[LeitorDoLivro] = None
     todas = BoxService.generate_boxes_opencv(cinza, arbitro=arbitro, binaria=binaria)
     todas = devolver_pingos(todas, binaria, escala)
     return SegmentacaoBruta(todas, tabuleiros, escala)
+
+
+#: O fio horizontal (`apagar_fios`): ao menos esta fração da largura da página, no máximo esta
+#: da altura, e com a tinta enchendo ao menos esta fração da caixa dele.
+FIO_LARGURA, FIO_ALTURA, FIO_CHEIO = 0.25, 0.012, 0.6
+
+
+def apagar_fios(cinza: Image.Image) -> Image.Image:
+    """A página em tons de cinza sem os fios horizontais soltos: o traço embaixo do cabeçalho
+    corrido, o de cima do rodapé.
+
+    **O fio levava o cabeçalho junto.** No *Chess School 1* do Mirkovic o cabeçalho corrido
+    fica de 4 a 11 px acima de um fio da largura do texto: "CHESS SCHOOL" (p. 18) saía sem
+    box nenhum, e o da p. 89 em dez pedaços lidos como "bi i i h i h ifi ♘", no meio do texto.
+    Sem o fio, saem os 11 e os 36 glifos, e os tabuleiros são os mesmos.
+
+    O fio é um componente de tinta sozinho, longo (`FIO_LARGURA`), fino (`FIO_ALTURA`) e
+    cheio (`FIO_CHEIO`). A moldura do tabuleiro tem os lados no mesmo componente e não é
+    fio; o sublinhado encostado nas letras também não (as letras esvaziam a caixa)."""
+    import cv2
+
+    matriz = np.asarray(cinza)
+    altura, largura = matriz.shape[:2]
+    tinta = (matriz < 128).astype(np.uint8)
+    total, rotulos, medidas, _c = cv2.connectedComponentsWithStats(tinta, connectivity=8)
+    larguras, alturas, areas = (medidas[:, k] for k in (cv2.CC_STAT_WIDTH, cv2.CC_STAT_HEIGHT,
+                                                         cv2.CC_STAT_AREA))
+    fios = np.nonzero((larguras >= FIO_LARGURA * largura) & (alturas <= FIO_ALTURA * altura)
+                      & (areas >= FIO_CHEIO * larguras * alturas))[0]
+    fios = fios[fios != 0]                               # o fundo
+    if not len(fios):
+        return cinza
+    limpa = matriz.copy()
+    limpa[np.isin(rotulos, fios)] = 255
+    return Image.fromarray(limpa)
 
 
 #: O pingo perdido: até esta fração da escala de texto nos dois eixos, e com pelo menos

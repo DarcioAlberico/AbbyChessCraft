@@ -91,6 +91,19 @@ TAMANHO_DA_CONTINUACAO = 50
 VAO_QUE_PARTE, GLIFOS_DE_CADA_LADO = 8.0, 3
 #: Um lance numerado ("1.e4", "10...Rf8"): a linha de lances não é título.
 _LANCE = re.compile(r"\b\d{1,3}\s*\.{1,3}\s*\S")
+#: Um lance pela casa de chegada ("exf4", "Cf3", "f5", "O-O"), também no texto da área,
+#: que vem sem espaços: a linha de lances com o número mal lido ("2lI.exf4") ainda tem as
+#: casas. E o que só lance tem: a peça, a captura ou o sinal colado na casa.
+_CASA_DO_LANCE = re.compile(r"[KQRBNCDTF]?x?[a-h][1-8]|[O0]-[O0]")
+_SO_DE_LANCE = re.compile(r"[KQRBNCDTF][a-h]?[1-8]?x?[a-h][1-8]|[a-h]x[a-h][1-8]"
+                          r"|[a-h][1-8][+#?!]|[O0]-[O0]")
+
+
+def _parece_lances(texto: str) -> bool:
+    """A linha de lances: o número do lance, ou duas casas de chegada com uma peça, uma
+    captura ou um sinal ("de 1972 e 1980" tem as casas e não é lance)."""
+    return bool(_LANCE.search(texto)) or (len(_CASA_DO_LANCE.findall(texto)) >= 2
+                                          and bool(_SO_DE_LANCE.search(texto)))
 _NUMERO_DE_PAGINA = re.compile(r"^\s*(?:p(?:ág(?:ina)?|age)?\.?\s*)?\d+\s*$", re.IGNORECASE)
 
 Caixa = Tuple[int, int, int, int]
@@ -360,10 +373,10 @@ def classificar_funcoes(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
         elif texto and _parece_legenda(texto) and any(
                 _vizinha_do_diagrama(zona, diagrama, escala) for diagrama in diagramas):
             funcao = "legenda"
-        elif (texto and not _LANCE.search(texto)
+        elif (texto and not _parece_lances(texto)
               and _percentil([b.y2 - b.y1 for b in dentro], 0.9) >= RAZAO_DO_TITULO * maiusculas):
             funcao = "titulo"
-        elif (texto and len(texto) <= 80 and not _LANCE.search(texto)
+        elif (texto and len(texto) <= 80 and not _parece_lances(texto)
               and abs((zona.x1 + zona.x2) / 2 - largura / 2) <= 0.1 * largura
               and zona.y2 - zona.y1 <= 2.2 * maiusculas       # uma linha só
               and _isolada(zona, zonas, escala)):
@@ -396,6 +409,21 @@ def reclassificar_automaticas(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
     classificadas = classificar_funcoes(candidatas, lidos, largura, altura, escala)
     return [nova if marcada else velha
             for velha, nova, marcada in zip(zonas, classificadas, marcadas)]
+
+
+def depois_de_ler(zonas: Sequence[Zona], boxes: Sequence[BoxEntry], tabuleiros: Iterable[Caixa],
+                  diagramas: Sequence, largura: int, altura: int) -> List[Zona]:
+    """As áreas da página depois de lê-la (o lote e o F5). Sem área nenhuma, as automáticas
+    pela leitura, como o FineReader cria as dele ao reconhecer: o título, a legenda ligada
+    ao diagrama e a nota chegam ao Documento e à exportação (o sumário) sem o usuário abrir
+    o modo Áreas. Com áreas, as automáticas reclassificadas pelo texto lido; a do usuário
+    fica como está."""
+    if zonas:
+        return reclassificar_automaticas(zonas, boxes, largura, altura)
+    lidos = [b for b in boxes if b.char]
+    if not lidos:
+        return []
+    return vincular_legendas(automaticas(lidos, tabuleiros, largura, altura), diagramas)
 
 
 def _continuacoes_da_legenda(zonas: List[Zona], boxes: Sequence[BoxEntry],

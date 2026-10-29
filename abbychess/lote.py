@@ -392,9 +392,9 @@ class CondutorDoLote:
         pagina.tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
         pagina.diagramas = dg.com_ids(dg.mesclar(lida.diagramas, dg.para_caixas(pagina.tabuleiros,
                                                                      pagina.diagramas)))
-        if pagina.zonas and p.fonte is not None:
-            # Como no F5: as áreas automáticas feitas antes de ler (o modelo aplicado ao
-            # livro antes do lote) ganham a função pelo texto lido.
+        if p.fonte is not None:
+            # Como no F5: a página sem áreas ganha as automáticas; as automáticas feitas
+            # antes de ler (o modelo aplicado ao livro antes do lote), a função pelo texto.
             from abbychess import geometria as geo
             from abbychess import zonas as zn
 
@@ -402,7 +402,8 @@ class CondutorDoLote:
             tamanho = geo.tamanho_da_imagem((entrada.quadro, entrada.giro),
                                             p.fonte.tamanho_da_fonte(entrada))
             pagina.zonas = zn.vincular_legendas(
-                zn.reclassificar_automaticas(pagina.zonas, pagina.entries(), *tamanho),
+                zn.depois_de_ler(pagina.zonas, pagina.entries(), pagina.tabuleiros,
+                                 pagina.diagramas, *tamanho),
                 pagina.diagramas)
         pagina.diagramas = lc.validar_pagina(pagina, projeto.dados.idioma)
         pagina.estado = proximo_estado(pagina.estado, "reconhecer")

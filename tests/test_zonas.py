@@ -355,3 +355,28 @@ def test_areas_antes_de_ler_saem_texto_e_o_f5_as_classifica():
     depois = zn.reclassificar_automaticas(antes + [desenhada], lidos, 760, 1000)
     assert any(z.funcao == "legenda" for z in depois)
     assert depois[-1] == desenhada
+
+
+def test_a_linha_de_lances_com_o_numero_mal_lido_nao_e_titulo():
+    """No Xadrez Vitorioso o OCR leu "21.exf4" como "2lI.exf4": as casas ainda dizem lance."""
+    assert zn._parece_lances("2lI.exf4 3.Cf3 f5?")
+    assert zn._parece_lances("2lI.exf43.Cf3f5?")              # o texto da área, sem espaços
+    assert not zn._parece_lances("Partidasde1972e1980")
+    assert zn._parece_lances("exf4 Cf3 f5")
+    assert zn._parece_lances("O-O e Txe8")
+    assert not zn._parece_lances("TROCAR PEÇAS PARA TER UM FINAL VITORIOSO")
+    assert not zn._parece_lances("Capítulo 1: a abertura")
+
+
+def test_a_pagina_lida_sem_areas_ganha_as_automaticas():
+    """O lote e o F5: sem área nenhuma, as automáticas pela leitura (o título chega ao
+    Documento e ao sumário); sem leitura, nada; com áreas, as do usuário ficam."""
+    titulo = _linha_de_boxes("CAPITULO", 300, 100, passo=24, altura=32)
+    corpo = [b for y in range(300, 700, 30) for b in _linha_de_boxes("texto corrido aqui", 100, y)]
+    zonas = zn.depois_de_ler([], titulo + corpo, [], [], 1000, 1400)
+    assert zonas and all(z.automatica for z in zonas)
+    assert "titulo" in {z.funcao for z in zonas}
+    sem_leitura = [BoxEntry("", b.x1, b.y1, b.x2, b.y2) for b in corpo]
+    assert zn.depois_de_ler([], sem_leitura, [], [], 1000, 1400) == []
+    do_usuario = [zn.Zona("texto", 0, 0, 1000, 1400)]
+    assert zn.depois_de_ler(do_usuario, titulo + corpo, [], [], 1000, 1400) == do_usuario

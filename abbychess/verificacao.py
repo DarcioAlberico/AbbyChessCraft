@@ -44,6 +44,7 @@ Caixa = Tuple[int, int, int, int]
 MOTIVOS = {
     "fora-do-dicionario": "fora do dicionário",
     "caixa-estranha": "maiúsculas no meio da palavra",
+    "camada": "a camada de texto do PDF lê outra palavra",
 }
 
 
@@ -103,6 +104,8 @@ class Desconhecida:
     palavra: str
     indices: List[int]
     motivo: str = "fora-do-dicionario"
+    #: O que a camada de texto do PDF lê no lugar (`camada.opinioes`), vazio sem opinião.
+    sugestao: str = ""
 
     @property
     def explicacao(self) -> str:
@@ -134,8 +137,25 @@ def desconhecidas(boxes: Sequence[BoxEntry], lex, ignoradas: Iterable[str] = (),
     for s in _partidas(lexico.suspeitas_da_pagina(list(boxes), lex), boxes, lex, quebras):
         if s.palavra.lower() in fora or not s.indices:
             continue
+        if s.motivo == "fora-do-dicionario" and conhecida_pelas_partes(lex, s.palavra):
+            continue
         saida.append(Desconhecida(s.palavra, _com_os_vazios(boxes, s.indices), s.motivo))
     return saida
+
+
+#: A palavra de prosa: letras, com apóstrofo ou hífen no meio.
+_PROSA = re.compile(r"^[^\W\d_]+(?:['’-][^\W\d_]+)*$")
+
+
+def conhecida_pelas_partes(lex, palavra: str) -> bool:
+    """Se o léxico conhece a palavra pelas partes: sem o possessivo ("pawn's", "Greco's") e
+    cada lado do hífen ("h-pawn", "a-file"; a letra solta é a da coluna). O léxico do core
+    as marcava: 4 das 32 palavras da p. 19 do Mirkovic."""
+    limpa = palavra.replace("’", "'")
+    if not lex.sinaliza or not _PROSA.match(limpa):
+        return False
+    raiz = re.sub(r"'s?$", "", limpa)
+    return all(parte and (len(parte) == 1 or lex.conhece(parte)) for parte in raiz.split("-"))
 
 
 def _partidas(suspeitas, boxes: Sequence[BoxEntry], lex, quebras: set) -> list:

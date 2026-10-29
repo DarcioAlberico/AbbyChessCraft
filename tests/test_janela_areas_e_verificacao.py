@@ -305,3 +305,20 @@ def test_o_texto_noutro_idioma_avisa_uma_vez(app, janela, monkeypatch):  # noqa:
     assert "parece em" not in janela.statusBar().currentMessage()
     # Trocar o idioma nas opções esquece o léxico (o do idioma novo vem no próximo F7).
     assert janela.pagina.definir_idioma("en") and not janela.pagina.definir_idioma("en")
+
+
+def test_a_camada_do_pdf_sugere_no_campo(app, janela, monkeypatch):  # noqa: F811
+    """A palavra marcada chega com a leitura da camada de texto do PDF no campo, quando o
+    léxico a conhece (`camada.opinioes`)."""
+    from abbychess import camada
+
+    _ler_a_mao(app, janela)
+    ultimos = boxes(janela)[-3:]
+    caixa = (min(b.x1 for b in ultimos), min(b.y1 for b in ultimos),
+             max(b.x2 for b in ultimos), max(b.y2 for b in ultimos))
+    monkeypatch.setattr(camada, "da_pagina", lambda *_a: [camada.PalavraDaCamada(caixa, "cab")])
+    janela.verificador.lexico = lexico.Lexico(palavras={"abc", "cab"})
+    janela.verificar_texto()
+    assert [(d.palavra, d.sugestao) for d in janela.verificador.desconhecidas] == [("bca", "cab")]
+    assert janela.verificacao.campo.text() == "cab"
+    assert "camada do PDF" in janela.verificacao.lido.text()

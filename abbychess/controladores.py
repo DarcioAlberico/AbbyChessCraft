@@ -377,8 +377,25 @@ class ControladorDeVerificacao:
         decididas = p.modelo.decisoes.quebras if p.modelo is not None else frozenset()
         quebras = [i for i, g in enumerate(self._gids) if g in decididas]
         self.desconhecidas = vf.desconhecidas(p.boxes, self.lexico, self.ignoradas, quebras)
+        self._com_a_camada()
         self._conferir_o_idioma()
         self.mostrar(self.posicao if posicao is None else posicao)
+
+    def _com_a_camada(self) -> None:
+        """A segunda opinião da camada de texto do PDF (`camada.opinioes`): a sugestão nas
+        palavras marcadas e as que só ela desmente. Uma falha dela não para a verificação."""
+        from abbychess import camada
+
+        p = self.pagina
+        try:
+            palavras = camada.da_pagina(p.projeto, getattr(p, "fonte", None), p.indice)
+            if palavras:
+                fora = {d.lower() for d in self.ignoradas}
+                self.desconhecidas = [d for d in camada.opinioes(self.desconhecidas, p.boxes,
+                                                                 palavras, self.lexico)
+                                      if d.palavra.lower() not in fora]
+        except Exception:
+            log.exception("a camada de texto do PDF não opinou")
 
     def _conferir_o_idioma(self) -> None:
         """O texto da página noutro idioma que o do projeto: as palavras que o léxico marca

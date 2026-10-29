@@ -149,3 +149,53 @@ def test_o_fio_do_cabecalho_sai_e_a_moldura_do_tabuleiro_fica():
     assert (limpa[130:162, 140:160] == 0).all()
     assert (limpa[400:406, 200:720] == 0).all() and (limpa[914:920, 200:720] == 0).all()
     assert (limpa[1200:1230, 200:1600:40] == 0).all()
+
+
+def _lex(*palavras):
+    from core import lexico
+
+    return lexico.Lexico(palavras=set(palavras))
+
+
+def test_a_camada_sugere_e_desmente_com_o_lexico_de_juiz():
+    """p. 19: a camada ClearScan lê "distance between" e "and" onde o OCR leu
+    "distancebetween" e "am"; e erra "Oposition", que o léxico não conhece."""
+    from abbychess import camada, verificacao as vf
+
+    lex = _lex("distance", "between", "the", "kings", "and", "am", "vertical", "opposition")
+    boxes = _boxes_da_linha("distancebetween the kings am vertical Opposition", 40, 100)
+    palavras = [camada.PalavraDaCamada((40, 100, 128, 120), "distance"),
+                camada.PalavraDaCamada((128, 100, 205, 120), "between"),
+                camada.PalavraDaCamada((216, 100, 249, 120), "the"),
+                camada.PalavraDaCamada((260, 100, 315, 120), "kings"),
+                camada.PalavraDaCamada((326, 100, 348, 120), "and"),
+                camada.PalavraDaCamada((359, 100, 425, 120), "vertical"),
+                camada.PalavraDaCamada((436, 100, 535, 120), "Oposition")]
+    marcadas = vf.desconhecidas(boxes, lex)
+    assert [d.palavra for d in marcadas] == ["distancebetween"]
+    opinioes = camada.opinioes(marcadas, boxes, palavras, lex)
+    assert [(d.palavra, d.motivo, d.sugestao) for d in opinioes] == [
+        ("distancebetween", "fora-do-dicionario", "distance between"),
+        ("am", camada.MOTIVO, "and")]
+
+
+def test_a_camada_nao_opina_em_lance_nem_sem_conhecer_a_palavra():
+    from abbychess import camada
+
+    lex = _lex("draw", "a")
+    boxes = _boxes_da_linha("1.♔c5 a draw", 40, 100)
+    palavras = [camada.PalavraDaCamada((40, 100, 90, 120), "1.'it'c5"),
+                camada.PalavraDaCamada((101, 100, 112, 120), "a"),
+                camada.PalavraDaCamada((123, 100, 167, 120), "dmw")]
+    assert camada.opinioes([], boxes, palavras, lex) == []
+
+
+def test_possessivo_e_hifen_pelas_partes():
+    from abbychess import verificacao as vf
+
+    lex = _lex("pawn", "file", "bishop")
+    assert vf.conhecida_pelas_partes(lex, "pawn's") and vf.conhecida_pelas_partes(lex, "h-pawn")
+    assert vf.conhecida_pelas_partes(lex, "a-file") and vf.conhecida_pelas_partes(lex, "Bishop’s")
+    assert not vf.conhecida_pelas_partes(lex, "pawn,s") and not vf.conhecida_pelas_partes(lex, "knight's")
+    boxes = _boxes_da_linha("the pawn's h-pawn knight's", 40, 100)
+    assert [d.palavra for d in vf.desconhecidas(boxes, _lex("the", "pawn"))] == ["knight's"]

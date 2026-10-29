@@ -372,7 +372,7 @@ def perguntar(janela, projeto, destino: Path) -> Optional[Escolha]:
     formato = ex.formato_do_caminho(destino)
     dialogo = DialogoDeExportacao(janela, formato, opcoes_lembradas(janela.config),
                                   ex.ler_metadados(projeto), projeto.pasta, projeto.dados.nome,
-                                  projeto.total_de_paginas())
+                                  len(projeto.sequencia))     # as páginas do livro, não do PDF
 
     def previsualizar(formato_, opcoes, metadados):
         janela.livro.previa(formato_, opcoes, metadados, dialogo.mostrar_previa,

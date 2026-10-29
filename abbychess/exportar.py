@@ -249,23 +249,26 @@ class Relatorio:
         return f"página {indice + 1}"
 
     def linhas(self) -> List[str]:
-        """O resumo e um item por linha, cada um com a página dele: em Avisos, cada linha é
-        um aviso, e o duplo clique abre a página do item."""
-        linhas = [self.resumo()]
+        """O resumo e uma linha por página com o que houve nela (os itens separados por
+        ";"): em Avisos, cada linha é um aviso, e o duplo clique abre a página. Uma por
+        página, e não por item, para o livro inteiro não lotar os Avisos."""
+        itens: Dict[int, List[str]] = {}
         for pagina, titulo in self.titulos:
-            linhas.append(f"{self.pagina(pagina)}: título “{titulo}”")
+            itens.setdefault(pagina, []).append(f"título “{titulo}”")
         for pagina, textos in sorted(self.margens.items()):
             for t in textos:
-                linhas.append(f"{self.pagina(pagina)}: margem tirada “{t}”")
+                itens.setdefault(pagina, []).append(f"margem tirada “{t}”")
         for pagina, motivo in self.recortados:
-            linhas.append(f"{self.pagina(pagina)}: diagrama como recorte ({motivo})")
+            itens.setdefault(pagina, []).append(f"diagrama como recorte ({motivo})")
         for pagina, numero, motivo in self.fora_do_pgn:
-            linhas.append(f"{self.pagina(pagina)}: diagrama {numero} fora do PGN ({motivo})")
+            itens.setdefault(pagina, []).append(f"diagrama {numero} fora do PGN ({motivo})")
         for pagina, n in sorted(self.sinalizadas.items()):
-            linhas.append(f"{self.pagina(pagina)}: {n} palavra(s) sinalizada(s)")
+            itens.setdefault(pagina, []).append(f"{n} palavra(s) sinalizada(s)")
         for pagina, n in sorted(self.pendentes.items()):
             if n:
-                linhas.append(f"{self.pagina(pagina)}: {n} glifo(s) pendente(s)")
+                itens.setdefault(pagina, []).append(f"{n} glifo(s) pendente(s)")
+        linhas = [self.resumo()]
+        linhas += [f"{self.pagina(p)}: " + "; ".join(itens[p]) for p in sorted(itens)]
         if self.nao_verificadas:
             linhas.append("Páginas não verificadas: "
                           + ", ".join(str(i + 1) for i in self.nao_verificadas))
@@ -1150,7 +1153,9 @@ def _paginas_no_relatorio(relatorio: Relatorio, projeto: ProjetoDeLivro,
         pendentes = resumo.get(i, {}).get("pendentes")
         if pendentes:
             relatorio.pendentes[i] = int(pendentes)
-        sinalizadas = sum(len(getattr(b, "duvidosos", ())) for b in pagina.blocos)
+        # As palavras, não os trechos (`_unir_trechos` junta as vizinhas num trecho só).
+        sinalizadas = sum(len(b.texto[a:z].split()) for b in pagina.blocos
+                          for a, z in getattr(b, "duvidosos", ()))
         if sinalizadas:
             relatorio.sinalizadas[i] = sinalizadas
         for bloco in pagina.blocos:

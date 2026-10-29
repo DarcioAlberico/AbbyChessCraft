@@ -372,19 +372,18 @@ def test_o_dialogo_devolve_o_intervalo():
 
 
 def test_cada_item_do_relatorio_leva_a_pagina_dele():
-    """Critério 7: cada item tem a página dele (o número impresso quando difere), e o duplo
-    clique em Avisos acha a página pelo texto do item."""
+    """Critério 7: cada página com o que houve nela (o número impresso quando difere), uma
+    linha por página, e o duplo clique em Avisos acha a página pelo texto da linha."""
     from abbychess.app.busca_na_janela import lugar_do_aviso
 
     r = ex.Relatorio(formato="epub", recortados=[(24, "não lido"), (30, "não lido")],
                      sinalizadas={24: 3}, pendentes={30: 2}, numeros_impressos={24: 23})
     linhas = r.linhas()
-    assert "p. 23, página 25: diagrama como recorte (não lido)" in linhas
-    assert "página 31: diagrama como recorte (não lido)" in linhas
-    assert "p. 23, página 25: 3 palavra(s) sinalizada(s)" in linhas
-    assert "página 31: 2 glifo(s) pendente(s)" in linhas
+    assert linhas[1:] == [
+        "p. 23, página 25: diagrama como recorte (não lido); 3 palavra(s) sinalizada(s)",
+        "página 31: diagrama como recorte (não lido); 2 glifo(s) pendente(s)"]
     assert "3 palavra(s) sinalizada(s)" in r.resumo()
-    assert [lugar_do_aviso(linha)[0] for linha in linhas[1:]] == [24, 30, 24, 30]
+    assert [lugar_do_aviso(linha)[0] for linha in linhas[1:]] == [24, 30]
 
 
 def test_as_palavras_sinalizadas_contam_sem_o_realce(projeto, fonte, leitor, tmp_path):  # noqa: F811
@@ -403,3 +402,33 @@ def test_ca_12_6_o_pdf_pesquisavel_sai_igual(projeto, fonte, leitor, tmp_path,  
     ex.exportar_com_relatorio(projeto, a)
     ex.exportar_com_relatorio(projeto, b)
     assert a.read_bytes() == b.read_bytes()
+
+
+def test_o_intervalo_do_dialogo_vai_ate_a_ultima_pagina_do_livro(tmp_path, monkeypatch):
+    """O livro com páginas inseridas é maior que o PDF: o intervalo vai até a última da
+    sequência (as posições que `Opcoes.intervalo` usa), não até a última do PDF."""
+    import os
+    from types import SimpleNamespace
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+
+    from abbychess.app import dialogo_exportacao as de
+
+    QApplication.instance() or QApplication([])
+    maximos = []
+    monkeypatch.setattr(de.DialogoDeExportacao, "exec",
+                        lambda d: maximos.append(d.ultima.maximum()) or 0)
+
+    class _Config(dict):
+        def value(self, chave, padrao=None):
+            return self.get(chave, padrao)
+    falso = SimpleNamespace(sequencia=list(range(61)), pasta=tmp_path,
+                            dados=SimpleNamespace(nome="Livro"),
+                            total_de_paginas=lambda: 60)
+    from PySide6.QtWidgets import QWidget
+
+    janela = QWidget()                                  # o pai do diálogo
+    janela.config, janela.livro = _Config(), None
+    assert de.perguntar(janela, falso, tmp_path / "livro.epub") is None
+    assert maximos == [61]

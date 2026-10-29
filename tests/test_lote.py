@@ -639,3 +639,15 @@ def test_o_gravador_do_lote_fica_com_o_mais_novo_e_apaga(tmp_path, monkeypatch):
     gravador.gravar(arquivo, None)                        # o lote acabou: o arquivo sai
     gravador.esperar()
     assert not arquivo.exists()
+
+
+def test_a_pagina_lida_pelo_lote_ganha_as_areas_automaticas(projeto):
+    """A página sem área nenhuma sai do lote com as automáticas (o título chega ao
+    Documento e ao sumário sem abrir o modo Áreas)."""
+    from tests.test_livro import _ensinar_e_ler
+
+    leitor = LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
+    _ensinar_e_ler(projeto, pg.FonteDePaginas(projeto.fonte), leitor)   # o lote, sem janela
+    pagina = projeto.carregar_modelo(0)
+    assert any(b.entry.char for b in pagina.boxes)
+    assert pagina.zonas and all(z.automatica for z in pagina.zonas)

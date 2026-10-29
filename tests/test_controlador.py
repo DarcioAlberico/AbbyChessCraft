@@ -470,3 +470,33 @@ def test_fechar_aplica_as_sessoes_que_esperavam_na_fila(dois_projetos):
     executor.tudo()                                    # a tarefa da fila não aplica de novo
     assert ss.texto_e_unidades(ctl.modelo)[0].startswith("x" + texto[inicio:fim])
     assert not ss.texto_e_unidades(ctl.modelo)[0].startswith("xx")
+
+
+def test_a_pagina_lida_antes_do_treino_avisa_o_reler(dois_projetos):
+    """Mirkovic: as pp. 10 e 89, lidas na criação do projeto, ficaram com o O lido como 0
+    depois do treino nas outras; abri-las avisa quantos padrões vieram depois e o Ctrl+R."""
+    import os
+
+    import numpy as np
+
+    from abbychess.modelo import RECONHECIDA
+
+    a, _b = dois_projetos
+    executor = ExecutorManual()
+    ctl = _controlador(a, executor)
+    ctl.reconhecer()
+    executor.tudo()
+    ctl.modelo.estado = RECONHECIDA
+    a.salvar_modelo(ctl.modelo)
+    arquivo = a.arquivo_da_pagina(0)
+    assert arquivo is not None and arquivo.is_file()
+    os.utime(arquivo, (1_000_000_000, 1_000_000_000))       # lida há muito tempo
+    avisos = []
+    ctl.eventos.ligar("mensagem", lambda texto, *_: avisos.append(texto))
+    ctl.ir_para(0)
+    assert ctl.padroes_novos_da_pagina(0) == 0 and not any("antes de" in t for t in avisos)
+
+    ctl.leitor.ensinar(np.full((20, 10), 0, np.uint8), "x")
+    ctl.ir_para(0)
+    assert ctl.padroes_novos_da_pagina(0) == 1
+    assert any("lida antes de 1 padrão" in t and "{reler_pendentes}" in t for t in avisos)

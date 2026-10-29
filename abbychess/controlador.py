@@ -59,8 +59,8 @@ from abbychess import sessao as ss
 from abbychess import texto as tx
 from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL, FONTE_NENHUMA, precisa_revisao
-from abbychess.modelo import (IOU_DA_RELEITURA, LIDAS, NAO_RECONHECIDA, VERIFICADA, Diferenca,
-                              Pagina, descrever_caidas, pid_de, proximo_estado, reconciliar)
+from abbychess.modelo import (IOU_DA_RELEITURA, LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
+                              Diferenca, Pagina, descrever_caidas, pid_de, proximo_estado, reconciliar)
 
 log = logging.getLogger(__name__)
 
@@ -508,10 +508,33 @@ class ControladorDePagina:
                 self._avisar(f"Página com {len(self.boxes)} glifo(s) marcados à mão e ainda não "
                              "reconhecida. O {reconhecer_pagina} reconhece o resto e mantém "
                              "os quadros.", 10000)
+            else:
+                self._avisar_os_padroes_novos(indice)
         else:
             self.eventos.emitir("atual_mudou")
         self.eventos.emitir("acoes_mudaram")
         return True
+
+    def padroes_novos_da_pagina(self, indice: int) -> int:
+        """Quantos padrões do livro foram ensinados depois da última gravação da página lida e
+        ainda não revisada (`RECONHECIDA`); 0 nas outras, ou sem leitor."""
+        modelo = self.modelo if indice == self.indice else None
+        padroes = getattr(self.leitor, "padroes", None)
+        if modelo is None or modelo.estado != RECONHECIDA or padroes is None:
+            return 0
+        arquivo = self.projeto.arquivo_da_pagina(indice)
+        try:
+            instante = arquivo.stat().st_mtime if arquivo is not None else None
+        except OSError:
+            instante = None
+        return padroes.ensinados_depois(instante) if instante is not None else 0
+
+    def _avisar_os_padroes_novos(self, indice: int) -> None:
+        """A página lida antes do treino: o aviso do Reler (Ctrl+R), que a lê com os padrões."""
+        novos = self.padroes_novos_da_pagina(indice)
+        if novos:
+            self._avisar(f"Esta página foi lida antes de {novos} padrão(ões) do livro ensinado(s) "
+                         "depois. O {reler_pendentes} relê os pendentes com eles.", 12000)
 
     def precarregar_seguinte(self) -> None:
         """Renderiza a próxima página no sentido em que se anda (a seguinte, ou a anterior

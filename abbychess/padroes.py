@@ -520,6 +520,18 @@ class PadroesDoLivro:
         except ValueError:
             return {}
 
+    def ensinados_depois(self, instante: float) -> int:
+        """Quantos padrões foram gravados depois de `instante` (o `st_mtime` de um arquivo): a
+        página lida antes deles não os usou (Mirkovic: as pp. 10 e 89, lidas na criação do
+        projeto, ficaram com o O lido como 0 depois do treino nas pp. 18, 19 e 160)."""
+        novos = 0
+        for caminho in self._caminhos:
+            try:
+                novos += Path(caminho).stat().st_mtime > instante
+            except OSError:
+                continue
+        return novos
+
     def por_caractere(self) -> Dict[str, List[Path]]:
         resultado: Dict[str, List[Path]] = {}
         for char, caminho in zip(self._chars, self._caminhos):

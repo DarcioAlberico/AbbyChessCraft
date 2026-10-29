@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog, QDialogBut
                                QListWidgetItem, QPushButton, QSpinBox, QVBoxLayout, QWidget)
 
 from abbychess import sequencia as sq
-from abbychess.app import estilo
+from abbychess.app import estilo, teclado
 
 
 def texto_da_selecao(posicoes: Sequence[int]) -> str:
@@ -100,7 +100,7 @@ class DialogoDasPaginas(QDialog):
         self.botoes.rejected.connect(self.reject)
         corpo = QVBoxLayout(self)
         if explicacao:
-            nota = QLabel(explicacao)
+            nota = QLabel(teclado.com_teclas(explicacao, so_conhecidas=True))
             nota.setWordWrap(True)
             estilo.papel(nota, "dica")
             corpo.addWidget(nota)

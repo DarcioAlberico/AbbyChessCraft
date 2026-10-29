@@ -59,12 +59,13 @@ class DialogoDoTeclado(QDialog):
         self.perfil.setAccessibleName("Perfil de teclado")
         self.perfil.setToolTip("Padrão: as teclas do AbbyChessCraft. FineReader: as do "
                                "ABBYY FineReader, para quem vem dele.")
-        self.perfil.currentIndexChanged.connect(lambda _i: self._preencher({}))
+        self.perfil.currentIndexChanged.connect(self._perfil_mudou)
         restaurar = QPushButton("Restaurar o perfil")
         restaurar.setToolTip("Desfaz as trocas: volta às teclas do perfil")
-        restaurar.clicked.connect(lambda: self._preencher({}))
+        restaurar.clicked.connect(self._restaurar)
         nota = QLabel("Edite as teclas como texto (\"Ctrl+Shift+F; F3\"); vazio tira a tecla. "
-                      "As trocas valem para o perfil escolhido; trocar de perfil as desfaz.")
+                      "As trocas valem para o perfil escolhido; trocar de perfil as desfaz "
+                      "(com troca feita, o programa pergunta antes).")
         nota.setWordWrap(True)
         estilo.papel(nota, "dica")
 
@@ -94,8 +95,35 @@ class DialogoDoTeclado(QDialog):
     def perfil_escolhido(self) -> str:
         return self.perfil.currentData()
 
+    def _perfil_mudou(self, _indice: int) -> None:
+        """Trocar de perfil desfaz as trocas: com alguma editada, pergunta antes."""
+        if self._descartar_as_trocas(self._perfil_mostrado, "Trocar de perfil"):
+            self._preencher({})
+        else:
+            self.perfil.blockSignals(True)
+            self.perfil.setCurrentIndex(self.perfil.findData(self._perfil_mostrado))
+            self.perfil.blockSignals(False)
+
+    def _restaurar(self) -> None:
+        if self._descartar_as_trocas(self._perfil_mostrado, "Restaurar o perfil"):
+            self._preencher({})
+
+    def _descartar_as_trocas(self, perfil: str, acao: str) -> bool:
+        """Sim se não há troca editada na tabela, ou se o usuário aceita perdê-las."""
+        try:
+            n = len(self.trocas(perfil))
+        except ValueError:
+            n = 1                                   # uma tecla mal escrita também é edição
+        if not n:
+            return True
+        resposta = QMessageBox.question(
+            self, acao, f"{acao} desfaz {n} troca(s) de tecla que você fez nesta tabela. "
+                        "Continuar?")
+        return resposta == QMessageBox.StandardButton.Yes
+
     def _preencher(self, trocas: Dict[str, List[str]]) -> None:
         perfil = self.perfil_escolhido()
+        self._perfil_mostrado = perfil
         acoes = [a for a in teclado.tabela().acoes if teclado.ativa(a.id)]
         self._ids = [a.id for a in acoes]
         self.tabela.setRowCount(len(acoes))
@@ -110,9 +138,10 @@ class DialogoDoTeclado(QDialog):
             self.tabela.setItem(linha, ESCOPO, escopo)
             self.tabela.setItem(linha, TECLAS, teclas)
 
-    def trocas(self) -> Dict[str, List[str]]:
-        """As teclas que diferem das do perfil (levanta `ValueError` com a tecla ruim)."""
-        perfil = self.perfil_escolhido()
+    def trocas(self, perfil: Optional[str] = None) -> Dict[str, List[str]]:
+        """As teclas que diferem das do perfil (o escolhido, se `perfil` falta; levanta
+        `ValueError` com a tecla ruim)."""
+        perfil = perfil or self.perfil_escolhido()
         saida = {}
         for linha, id_ in enumerate(self._ids):
             texto = self.tabela.item(linha, TECLAS).text()

@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QListWidget, QLis
                                QPushButton, QSplitter, QVBoxLayout, QWidget)
 
 from abbychess.app.painel_treino import FONTE_DE_SIMBOLOS
-from abbychess.app import vazios
+from abbychess.app import teclado, vazios
 
 
 def _pagina_da_origem(origem, com_pagina: str, fora: str, sem: str) -> str:
@@ -93,7 +93,8 @@ class PainelDePadroes(QWidget):
         self.botao_ir.clicked.connect(lambda: self._ir_a_origem(self.amostras.currentItem()))
         self.botao_esquecer = QPushButton("Esquecer (Delete)")
         self.botao_esquecer.setToolTip("Apaga as amostras selecionadas; os glifos que elas "
-                                       "leram voltam à fila. Ctrl+Z desfaz.")
+                                       "leram voltam à fila. "
+                                       + teclado.com_teclas("{desfazer} desfaz."))
         self.botao_esquecer.clicked.connect(self._esquecer)
         self.resumo = QLabel("")
 
@@ -141,7 +142,7 @@ class PainelDePadroes(QWidget):
         total = sum(len(v) for v in padroes.values())
         self.resumo.setText(f"{total} {'amostra' if total == 1 else 'amostras'} em {len(padroes)} "
                             f"{'caractere' if len(padroes) == 1 else 'caracteres'}" if total
-                            else vazios.SEM_PADROES)
+                            else vazios.sem_padroes())
         self.resumo.setWordWrap(True)
         self._filtrar(self.busca.text())
         self._mostrar_amostras()

@@ -394,7 +394,7 @@ def _linha_de(dialogo, id_):
     return dialogo._ids.index(id_)
 
 
-def test_o_dialogo_devolve_so_o_que_difere_do_perfil(app):
+def test_o_dialogo_devolve_so_o_que_difere_do_perfil(app, monkeypatch):
     from abbychess.app.dialogo_teclado import ACAO, TECLAS, DialogoDoTeclado
 
     d = DialogoDoTeclado(None, "finereader")
@@ -404,8 +404,18 @@ def test_o_dialogo_devolve_so_o_que_difere_do_perfil(app):
     assert d.tabela.item(linha, ACAO).flags() & Qt.ItemFlag.ItemIsEditable == Qt.ItemFlag(0)
     d.tabela.item(linha, TECLAS).setText("ctrl+shift+f12 ; ")
     assert d.escolha() == ("finereader", {"proximo_diagrama": ["Ctrl+Shift+F12"]})
-    d.perfil.setCurrentIndex(d.perfil.findData("padrao"))           # trocar de perfil desfaz
-    assert d.trocas() == {}
+    # Trocar de perfil desfaz as trocas: com uma feita, pergunta; o Não fica onde estava.
+    perguntas = []
+    respostas = iter([QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes])
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda _p, _t, texto: perguntas.append(texto) or next(respostas))
+    d.perfil.setCurrentIndex(d.perfil.findData("padrao"))
+    assert d.escolha() == ("finereader", {"proximo_diagrama": ["Ctrl+Shift+F12"]})
+    d.perfil.setCurrentIndex(d.perfil.findData("padrao"))
+    assert d.escolha() == ("padrao", {})
+    assert len(perguntas) == 2 and "1 troca" in perguntas[0]
+    d.perfil.setCurrentIndex(d.perfil.findData("finereader"))      # sem troca, sem pergunta
+    assert len(perguntas) == 2
     d.deleteLater()
 
 

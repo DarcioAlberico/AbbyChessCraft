@@ -2403,7 +2403,7 @@ class ControladorDePagina:
         total = sum(devolvidos.values())
         if total:
             self._avisar(f"Esquecida(s) {quantas} amostra(s): {total} glifo(s) voltaram à fila "
-                         f"em {len(devolvidos)} página(s) · Ctrl+Z desfaz.", 10000)
+                         f"em {len(devolvidos)} página(s) · {{desfazer}} desfaz.", 10000)
         else:
             self._avisar(f"Esquecida(s) {quantas} amostra(s); nenhum glifo lido por ela(s) · "
                          "Ctrl+Z desfaz.", 8000)

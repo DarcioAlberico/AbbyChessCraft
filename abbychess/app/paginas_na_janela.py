@@ -55,7 +55,7 @@ class PaginasNaJanela:
                              "{N} páginas mudam de lugar: {PAGINAS}."),
             validar=_mover_vale, ok="Mover",
             explicacao="As páginas saem de onde estão e entram, na mesma ordem, depois da "
-                       "página escolhida (contada como está agora). Ctrl+Z desfaz.")
+                       "página escolhida (contada como está agora). {desfazer} desfaz.")
         if escolha is not None:
             posicoes, depois_da = escolha
             self.pagina.mover_paginas(posicoes, depois_da)
@@ -67,7 +67,7 @@ class PaginasNaJanela:
             efeito=dp.efeito("1 página sai do livro: {PAGINAS}.",
                              "{N} páginas saem do livro: {PAGINAS}."), ok="Apagar",
             explicacao="As páginas saem do livro, da busca e das exportações, mas ficam "
-                       "guardadas no projeto, com os glifos e as correções: Ctrl+Z, ou "
+                       "guardadas no projeto, com os glifos e as correções: {desfazer}, ou "
                        "Página › Páginas apagadas…, as devolvem.")
         if escolha is not None:
             self.pagina.apagar_paginas(escolha[0])
@@ -84,11 +84,11 @@ class PaginasNaJanela:
             lugar="Depois da página", lugar_padrao=self.pagina.indice + 1,
             ok="Inserir",
             explicacao=("1 arquivo. Cada página dele vira uma página do livro; ele é copiado "
-                        "para o projeto (o original pode sair do lugar). Ctrl+Z desfaz."
+                        "para o projeto (o original pode sair do lugar). {desfazer} desfaz."
                         if len(caminhos) == 1 else
                         f"{len(caminhos)} arquivos. Cada página deles vira uma página do livro; "
                         "eles são copiados para o projeto (os originais podem sair do lugar). "
-                        "Ctrl+Z desfaz."))
+                        "{desfazer} desfaz."))
         if escolha is not None:
             self.pagina.inserir_paginas(caminhos, escolha[1] + 1)
 
@@ -103,7 +103,7 @@ class PaginasNaJanela:
             efeito=dp.efeito("1 página gira: {PAGINAS}.", "{N} páginas giram: {PAGINAS}."),
             ok="Girar",
             explicacao="A imagem gira, e os glifos, as áreas e os diagramas lidos vão junto. "
-                       "Ctrl+Z desfaz.")
+                       "{desfazer} desfaz.")
         if escolha is not None:
             self.pagina.girar_paginas(*escolha)
 
@@ -120,7 +120,7 @@ class PaginasNaJanela:
             explicacao="Cada margem é a parte da imagem que se vê agora que sai, em "
                        "porcentagem da largura ou da altura (confira na página depois: o "
                        "corte é por números). Os glifos que ficam de fora são guardados: "
-                       "Ctrl+Z, ou Tirar o corte…, os devolvem.")
+                       "{desfazer}, ou Tirar o corte…, os devolvem.")
         if escolha is not None:
             self.pagina.cortar_paginas(*escolha)
 
@@ -130,7 +130,7 @@ class PaginasNaJanela:
             efeito=dp.efeito("1 página volta inteira: {PAGINAS}.",
                              "{N} páginas voltam inteiras: {PAGINAS}."), ok="Tirar o corte",
             explicacao="A página volta inteira (o giro fica), com os glifos que o corte "
-                       "guardou. A metade de uma página dividida não: o Ctrl+Z da divisão "
+                       "guardou. A metade de uma página dividida não: o {desfazer} da divisão "
                        "junta as metades.")
         if escolha is not None:
             self.pagina.tirar_o_corte(escolha[0])
@@ -157,7 +157,7 @@ class PaginasNaJanela:
             explicacao="A imagem com duas páginas do livro lado a lado (a página dupla) vira "
                        "duas: a metade esquerda fica no lugar e a direita entra logo depois, "
                        "cada uma com os glifos dela. A que já é metade de uma divisão fica "
-                       "como está. Ctrl+Z junta de novo.")
+                       "como está. {desfazer} junta de novo.")
         if escolha is not None:
             with _ocupado(self, "Dividindo as páginas…"):
                 self.pagina.dividir_paginas(*escolha)
@@ -215,7 +215,7 @@ class PaginasNaJanela:
             explicacao="O ângulo positivo gira a página no sentido anti-horário. Na página "
                        "lida, a leitura se desfaz: ficam só os glifos marcados à mão (a "
                        "leitura digitada ou aceita na revisão), girados com a página, e as "
-                       "áreas que você desenhou; o F5 lê de novo. Ctrl+Z desfaz.")
+                       "áreas que você desenhou; o F5 lê de novo. {desfazer} desfaz.")
         if escolha is not None:
             with _ocupado(self, "Endireitando as páginas…"):
                 self.pagina.endireitar_paginas(*escolha)

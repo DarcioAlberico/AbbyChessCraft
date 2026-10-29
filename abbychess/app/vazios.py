@@ -55,5 +55,7 @@ def escolha_a_fila_de_palavras() -> str:
     return f"Escolha a fila de palavras desconhecidas ({como}) para verificar o texto."
 
 
-SEM_PADROES = ("Nenhum padrão ensinado ainda. No Glifo, digite o caractere do box e aperte "
-               "Enter: ele vira padrão deste livro.")
+def sem_padroes() -> str:
+    """O painel Padrões sem amostra: a tecla de ensinar do perfil de agora."""
+    return teclado.com_teclas("Nenhum padrão ensinado ainda. No Glifo, digite o caractere do "
+                              "box e aperte {ensinar}: ele vira padrão deste livro.")

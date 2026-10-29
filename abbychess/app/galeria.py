@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QHBoxLayout, QLabel
                                QVBoxLayout, QWidget)
 
 from abbychess.app.imagens import pixmap_de_cinza
-from abbychess.app import estilo
+from abbychess.app import estilo, teclado
 
 #: O lado do recorte na grade, em pixels.
 LADO = 56
@@ -32,9 +32,11 @@ _QUADRO_VAZIO: List[QPixmap] = []
 #: As teclas da grade, embaixo dela.
 DICA = ("Digite um caractere: aplica à seleção · Enter ensina · Shift+Enter só corrige · "
         "Ctrl+A seleciona tudo · duplo clique vai ao glifo")
-#: O estado vazio (§13): o que fazer para a Galeria mostrar algo.
-VAZIA = ("Galeria vazia: escolha um glifo na Imagem ou no Documento e abra esta aba (ou "
-         "Editar › Galeria do caractere) para ver todos os glifos lidos como ele.")
+#: O estado vazio (§13): o que fazer para a Galeria mostrar algo; `{foco_vista}` é a tecla
+#: do perfil que chega às abas da vista direita.
+VAZIA = ("Galeria vazia: escolha um glifo na Imagem ou no Documento e abra esta aba "
+         "({foco_vista} chega às abas; ou Editar › Galeria do caractere) para ver todos os "
+         "glifos lidos como ele.")
 
 
 def _vazio() -> QPixmap:
@@ -179,7 +181,7 @@ class PainelDaGaleria(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.titulo = QLabel(VAZIA)
+        self.titulo = QLabel(teclado.com_teclas(VAZIA))
         self.titulo.setWordWrap(True)
         self.escopo = QComboBox()
         self.escopo.setAccessibleName("Galeria: a página ou o livro")

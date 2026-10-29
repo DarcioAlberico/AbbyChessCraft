@@ -19,9 +19,10 @@ from typing import Optional
 
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
+from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QPushButton, QTextBrowser, QVBoxLayout, QWidget)
+                               QMessageBox, QPushButton, QRadioButton, QSpinBox, QTextBrowser,
+                               QVBoxLayout, QWidget)
 
 from abbychess import exportar as ex
 from abbychess import links_de_analise as la
@@ -42,7 +43,7 @@ class Escolha:
 
 class DialogoDeExportacao(QDialog):
     def __init__(self, parent, formato: str, opcoes: ex.Opcoes, metadados: dict,
-                 pasta_do_projeto: Path, titulo_padrao: str):
+                 pasta_do_projeto: Path, titulo_padrao: str, total_de_paginas: int = 0):
         super().__init__(parent)
         self.setWindowTitle(f"Exportar {formato.upper()}")
         self.formato = formato
@@ -86,6 +87,28 @@ class DialogoDeExportacao(QDialog):
         analise_layout.addWidget(rotulo_da_analise)
         analise_layout.addWidget(self.analise)
         analise_layout.addStretch(1)
+        # O intervalo (§12.1): todas as páginas lidas, ou de uma a outra (nunca lembrado).
+        self.todas = QRadioButton("Todas as páginas lidas")
+        self.de_ate = QRadioButton("Da página")
+        escolha_das_paginas = QButtonGroup(self)      # exclusivos já antes de ter o pai
+        escolha_das_paginas.addButton(self.todas)
+        escolha_das_paginas.addButton(self.de_ate)
+        self.primeira, self.ultima = QSpinBox(), QSpinBox()
+        for spin, nome in ((self.primeira, "Primeira página"), (self.ultima, "Última página")):
+            spin.setRange(1, max(1, total_de_paginas))
+            spin.setAccessibleName(nome)
+            spin.valueChanged.connect(lambda _v: self.de_ate.setChecked(True))
+        self.ultima.setValue(max(1, total_de_paginas))
+        self.todas.setChecked(True)
+        caixa_paginas = QGroupBox("Páginas")
+        linha_das_paginas = QHBoxLayout(caixa_paginas)
+        ate = QLabel("à")
+        ate.setBuddy(self.ultima)
+        for w in (self.todas, self.de_ate, self.primeira, ate, self.ultima):
+            linha_das_paginas.addWidget(w)
+        linha_das_paginas.addStretch(1)
+        self.caixa_paginas = caixa_paginas
+
         caixa_opcoes = QGroupBox("Opções")
         coluna = QVBoxLayout(caixa_opcoes)
         for check in (self.manter_margens, self.manter_quebras, self.so_verificadas,
@@ -159,6 +182,8 @@ class DialogoDeExportacao(QDialog):
         botoes.accepted.connect(self._aceitar)
         botoes.rejected.connect(self.reject)
         corpo = QVBoxLayout(self)
+        corpo.addWidget(caixa_paginas)
+        caixa_paginas.setHidden(total_de_paginas <= 0)    # depois de pôr no layout
         corpo.addWidget(caixa_opcoes)
         corpo.addWidget(self.caixa_metadados)
         corpo.addWidget(botoes)
@@ -190,7 +215,15 @@ class DialogoDeExportacao(QDialog):
                          manter_quebras=marcada("manter_quebras", self.manter_quebras),
                          realcar_duvidosos=marcada("realcar_duvidosos", self.realcar),
                          links_de_analise=(self.analise.currentData() if self.analise.isEnabled()
-                                           else padrao.links_de_analise))
+                                           else padrao.links_de_analise),
+                         intervalo=self._intervalo())
+
+    def _intervalo(self):
+        """`(primeira, última)` em índices, ou `None` para todas; a ordem trocada se acerta."""
+        if self.caixa_paginas.isHidden() or self.todas.isChecked():
+            return None
+        a, b = sorted((self.primeira.value(), self.ultima.value()))
+        return (a - 1, b - 1)
 
     def metadados(self) -> dict:
         """O formulário como `metadados.json`. A capa é a de antes (também quando outra foi
@@ -330,14 +363,16 @@ def opcoes_lembradas(config) -> ex.Opcoes:
 def lembrar_opcoes(config, opcoes: ex.Opcoes) -> None:
     config.setValue(CHAVE, ",".join(c if v is True else f"{c}={v}"
                                     for c, v in vars(opcoes).items()
-                                    if v is True or not isinstance(v, bool)) or "nenhuma")
+                                    if c != "intervalo"           # o intervalo não se lembra
+                                    and (v is True or not isinstance(v, bool))) or "nenhuma")
 
 
 def perguntar(janela, projeto, destino: Path) -> Optional[Escolha]:
     """O diálogo para o `destino`; `None` se o usuário cancelar."""
     formato = ex.formato_do_caminho(destino)
     dialogo = DialogoDeExportacao(janela, formato, opcoes_lembradas(janela.config),
-                                  ex.ler_metadados(projeto), projeto.pasta, projeto.dados.nome)
+                                  ex.ler_metadados(projeto), projeto.pasta, projeto.dados.nome,
+                                  projeto.total_de_paginas())
 
     def previsualizar(formato_, opcoes, metadados):
         janela.livro.previa(formato_, opcoes, metadados, dialogo.mostrar_previa,

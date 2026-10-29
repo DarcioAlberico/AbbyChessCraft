@@ -1141,9 +1141,10 @@ class ControladorDoLivro:
             def pronto(resultado):
                 resumo, relatorio = resultado
                 p._avisar(f"Exportado em {destino.name}: {resumo}", 15000)
-                # O relatório inteiro vai a Resultados / Avisos (§12.2), sem diálogo.
+                # O relatório vai a Resultados / Avisos (§12.2), sem diálogo: um aviso por
+                # item, que o duplo clique leva à página dele.
                 self.eventos.emitir("relatorio", f"Exportação: {destino.name}",
-                                    relatorio.texto())
+                                    relatorio.linhas())
             return trabalho, pronto
 
         p.tarefa(f"Exportando {destino.suffix[1:].upper()}", preparar,

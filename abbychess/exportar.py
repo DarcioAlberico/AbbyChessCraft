@@ -39,6 +39,7 @@ import re
 import statistics
 import unicodedata
 from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import AbstractSet, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -138,9 +139,23 @@ class Opcoes:
     #: No EPUB, no DOCX e na prévia, o link que abre cada diagrama lido no tabuleiro de
     #: análise: `nenhum`, `lichess` ou `chesscom` (`links_de_analise.SITES`).
     links_de_analise: str = "nenhum"
+    #: As páginas `(primeira, última)`, índices a partir de 0, as duas incluídas; `None`, o
+    #: livro todo. Não é lembrada entre exportações.
+    intervalo: Optional[Tuple[int, int]] = None
 
     def __post_init__(self) -> None:
         links_de_analise.validar(self.links_de_analise)
+        if self.intervalo is not None:
+            primeira, ultima = self.intervalo
+            if not 0 <= primeira <= ultima:
+                raise ValueError(f"intervalo inválido: {self.intervalo!r}")
+
+    def indices(self, indices: Optional[Iterable[int]]) -> Optional[Iterable[int]]:
+        """Os `indices` pedidos, cortados pelo `intervalo`."""
+        if self.intervalo is None:
+            return indices
+        dentro = range(self.intervalo[0], self.intervalo[1] + 1)
+        return dentro if indices is None else [i for i in indices if i in dentro]
 
 
 @dataclass
@@ -160,6 +175,8 @@ class Relatorio:
     nao_verificadas: List[int] = field(default_factory=list)
     #: Página -> glifos pendentes de revisão.
     pendentes: Dict[int, int] = field(default_factory=dict)
+    #: Página -> as palavras sinalizadas (com glifo de baixa confiança, §8).
+    sinalizadas: Dict[int, int] = field(default_factory=dict)
     #: No PGN: (página, número do diagrama, motivo) dos que ficaram de fora, e quantos entraram.
     fora_do_pgn: List[Tuple[int, int, str]] = field(default_factory=list)
     no_pgn: int = 0
@@ -202,6 +219,8 @@ class Relatorio:
             partes.append(f"{tiradas} linha(s) de cabeçalho/rodapé tirada(s)")
         if self.nao_verificadas:
             partes.append(f"{len(self.nao_verificadas)} página(s) não verificada(s)")
+        if self.sinalizadas:
+            partes.append(f"{sum(self.sinalizadas.values())} palavra(s) sinalizada(s)")
         if self.capitulos:
             partes.append(f"{self.capitulos} capítulo(s)")
         if self.links:
@@ -221,28 +240,42 @@ class Relatorio:
                           "(ver Resultados)")
         return "; ".join(partes) + "."
 
-    def texto(self) -> str:
-        """O relatório inteiro, uma linha por item, com a página (para Resultados)."""
+    def pagina(self, indice: int) -> str:
+        """A página do item: "página 25" (a posição no PDF, que o duplo clique em Avisos
+        abre), com o número impresso na frente quando difere ("p. 23, página 25")."""
+        impresso = self.numeros_impressos.get(indice)
+        if impresso is not None and impresso != indice + 1:
+            return f"p. {impresso}, página {indice + 1}"
+        return f"página {indice + 1}"
+
+    def linhas(self) -> List[str]:
+        """O resumo e um item por linha, cada um com a página dele: em Avisos, cada linha é
+        um aviso, e o duplo clique abre a página do item."""
         linhas = [self.resumo()]
         for pagina, titulo in self.titulos:
-            linhas.append(f"p. {pagina + 1}: título “{titulo}”")
+            linhas.append(f"{self.pagina(pagina)}: título “{titulo}”")
         for pagina, textos in sorted(self.margens.items()):
             for t in textos:
-                linhas.append(f"p. {pagina + 1}: margem tirada “{t}”")
+                linhas.append(f"{self.pagina(pagina)}: margem tirada “{t}”")
         for pagina, motivo in self.recortados:
-            linhas.append(f"p. {pagina + 1}: diagrama como recorte ({motivo})")
+            linhas.append(f"{self.pagina(pagina)}: diagrama como recorte ({motivo})")
         for pagina, numero, motivo in self.fora_do_pgn:
-            linhas.append(f"p. {pagina + 1}: diagrama {numero} fora do PGN ({motivo})")
+            linhas.append(f"{self.pagina(pagina)}: diagrama {numero} fora do PGN ({motivo})")
+        for pagina, n in sorted(self.sinalizadas.items()):
+            linhas.append(f"{self.pagina(pagina)}: {n} palavra(s) sinalizada(s)")
+        for pagina, n in sorted(self.pendentes.items()):
+            if n:
+                linhas.append(f"{self.pagina(pagina)}: {n} glifo(s) pendente(s)")
         if self.nao_verificadas:
             linhas.append("Páginas não verificadas: "
                           + ", ".join(str(i + 1) for i in self.nao_verificadas))
         for problema in self.problemas_do_arquivo:
             linhas.append(f"arquivo: {problema}")
-        com_pendentes = {i: n for i, n in sorted(self.pendentes.items()) if n}
-        if com_pendentes:
-            linhas.append("Glifos pendentes: " + ", ".join(
-                f"p. {i + 1} ({n})" for i, n in com_pendentes.items()))
-        return "\n".join(linhas)
+        return linhas
+
+    def texto(self) -> str:
+        """O relatório inteiro, uma linha por item, com a página (para Resultados)."""
+        return "\n".join(self.linhas())
 
 
 # ----------------------------------------------------------------------
@@ -957,7 +990,7 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
     nativas = paginas_da_camada(projeto, alvo) if camada == "auto" else {}
     pelos_boxes = [i for i in alvo if i not in nativas]
     lidos, estruturas = {}, {}
-    limiares = projeto.dados.limiares if opcoes.realcar_duvidosos else None
+    limiares = projeto.dados.limiares         # os duvidosos: o realce e o relatório
     for i in pelos_boxes:
         lidos[i], estruturas[i] = Estrutura.da_pagina(projeto.carregar_modelo(i), limiares)
     # A regra das margens corridas olha o livro inteiro, como sempre (o título corrido das
@@ -1117,6 +1150,9 @@ def _paginas_no_relatorio(relatorio: Relatorio, projeto: ProjetoDeLivro,
         pendentes = resumo.get(i, {}).get("pendentes")
         if pendentes:
             relatorio.pendentes[i] = int(pendentes)
+        sinalizadas = sum(len(getattr(b, "duvidosos", ())) for b in pagina.blocos)
+        if sinalizadas:
+            relatorio.sinalizadas[i] = sinalizadas
         for bloco in pagina.blocos:
             if isinstance(bloco, Paragrafo) and bloco.titulo and bloco.nivel == 1:
                 relatorio.titulos.append((i, bloco.texto))
@@ -1796,8 +1832,17 @@ def _marcar_o_pdf(doc, projeto: ProjetoDeLivro, alvo: Sequence[int], resumo: Res
 
 
 def _gravar_pdf(doc, caminho: Path) -> None:
+    """Grava ao lado e troca no fim. Com `SOURCE_DATE_EPOCH`, os mesmos bytes (CA-12.6): as
+    datas do arquivo são a dela, e o identificador do original fica (o PyMuPDF sorteia a
+    segunda metade do `/ID` a cada gravação)."""
     temporario = caminho.with_name(caminho.name + ".tmp")
-    doc.save(str(temporario), garbage=3, deflate=True)
+    epoca = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
+    if epoca.isdigit():
+        quando = datetime.fromtimestamp(int(epoca), timezone.utc).strftime("D:%Y%m%d%H%M%S+00'00'")
+        doc.set_metadata({**(doc.metadata or {}), "creationDate": quando, "modDate": quando})
+        doc.save(str(temporario), garbage=3, deflate=True, no_new_id=True)
+    else:
+        doc.save(str(temporario), garbage=3, deflate=True)
     temporario.replace(caminho)
 
 
@@ -1950,6 +1995,7 @@ def previa(projeto: ProjetoDeLivro, formato: str, indices: Optional[Iterable[int
     if formato not in FORMATOS or formato == "pdf":
         raise ValueError(f"Sem pré-visualização para {formato.upper()}.")
     opcoes = opcoes or Opcoes()
+    indices = opcoes.indices(indices)
     relatorio = Relatorio(formato=formato)
     idioma = idioma_do_arquivo(idioma_do_livro(projeto))
     titulo = metadados_do_projeto(projeto, idioma, metadados).titulo
@@ -1991,6 +2037,7 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
     if _mesmo_arquivo(caminho, Path(projeto.fonte)):
         raise ValueError("O destino é o próprio arquivo de origem do livro: escolha outro nome.")
     opcoes = opcoes or Opcoes()
+    indices = opcoes.indices(indices)
     relatorio = Relatorio(formato=formato)
     if formato == "pdf":
         resumo = exportar_pdf_pesquisavel(projeto, caminho, indices, progresso=progresso)

@@ -229,7 +229,7 @@ def test_ca_12_2_o_pgn_do_diagrama_conferido_com_lances():
     assert chess.pgn.NAG_BLUNDER in jogo.next().next().nags        # 11.Dd5??
     assert relatorio.no_pgn == 1
     assert relatorio.fora_do_pgn == [(24, 2, "nem conferido nem confiável pelos lances")]
-    assert "p. 25: diagrama 2 fora do PGN" in relatorio.texto()
+    assert "página 25: diagrama 2 fora do PGN" in relatorio.texto()
 
 
 class _ProjetoComEstados(_ProjetoFalso):
@@ -326,3 +326,80 @@ def test_pgn_recusa_posicao_ilegal_mesmo_conferida():
     relatorio = ex.Relatorio(formato="pgn")
     assert ex.pgn_do_livro(_ProjetoFalso({0: pagina}), relatorio=relatorio) == ""
     assert relatorio.fora_do_pgn == [(0, 1, "a posição não é legal")]
+
+# ----------------------------------------------------------------------
+# A revisão de produto do fechamento (rodada 1)
+# ----------------------------------------------------------------------
+
+def test_o_intervalo_leva_so_as_paginas_dele(projeto, fonte, leitor, tmp_path):  # noqa: F811
+    _ensinar_e_ler(projeto, fonte, leitor)
+    _, relatorio = ex.exportar_com_relatorio(projeto, tmp_path / "meio.txt",
+                                             opcoes=ex.Opcoes(intervalo=(1, 2)))
+    assert relatorio.paginas == [1, 2]
+    _, previa = ex.previa(projeto, "epub", opcoes=ex.Opcoes(intervalo=(2, 2)))
+    assert previa.paginas == [2]
+    with pytest.raises(ValueError):
+        ex.Opcoes(intervalo=(3, 1))
+
+
+def test_o_dialogo_devolve_o_intervalo():
+    import os
+    from pathlib import Path
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+
+    from abbychess.app.dialogo_exportacao import DialogoDeExportacao, lembrar_opcoes
+
+    QApplication.instance() or QApplication([])
+    dialogo = DialogoDeExportacao(None, "epub", ex.Opcoes(), {}, Path("."), "T", 300)
+    assert dialogo.opcoes().intervalo is None               # todas, de saída
+    dialogo.primeira.setValue(30)                           # mexer no número escolhe "Da página"
+    dialogo.ultima.setValue(12)
+    assert dialogo.de_ate.isChecked()
+    assert dialogo.opcoes().intervalo == (11, 29)           # a ordem trocada se acerta
+
+    class _Config(dict):
+        def setValue(self, chave, valor):
+            self[chave] = valor
+    config = _Config()
+    lembrar_opcoes(config, dialogo.opcoes())
+    assert "intervalo" not in next(iter(config.values()))   # não se lembra
+    sem_total = DialogoDeExportacao(None, "epub", ex.Opcoes(), {}, Path("."), "T")
+    assert sem_total.caixa_paginas.isHidden() and sem_total.opcoes().intervalo is None
+    dialogo.deleteLater()
+    sem_total.deleteLater()
+
+
+def test_cada_item_do_relatorio_leva_a_pagina_dele():
+    """Critério 7: cada item tem a página dele (o número impresso quando difere), e o duplo
+    clique em Avisos acha a página pelo texto do item."""
+    from abbychess.app.busca_na_janela import lugar_do_aviso
+
+    r = ex.Relatorio(formato="epub", recortados=[(24, "não lido"), (30, "não lido")],
+                     sinalizadas={24: 3}, pendentes={30: 2}, numeros_impressos={24: 23})
+    linhas = r.linhas()
+    assert "p. 23, página 25: diagrama como recorte (não lido)" in linhas
+    assert "página 31: diagrama como recorte (não lido)" in linhas
+    assert "p. 23, página 25: 3 palavra(s) sinalizada(s)" in linhas
+    assert "página 31: 2 glifo(s) pendente(s)" in linhas
+    assert "3 palavra(s) sinalizada(s)" in r.resumo()
+    assert [lugar_do_aviso(linha)[0] for linha in linhas[1:]] == [24, 30, 24, 30]
+
+
+def test_as_palavras_sinalizadas_contam_sem_o_realce(projeto, fonte, leitor, tmp_path):  # noqa: F811
+    _ensinar_e_ler(projeto, fonte, leitor)
+    _, relatorio = ex.exportar_com_relatorio(projeto, tmp_path / "livro.txt")
+    _, com_realce = ex.exportar_com_relatorio(projeto, tmp_path / "livro.docx",
+                                              opcoes=ex.Opcoes(realcar_duvidosos=True))
+    assert relatorio.sinalizadas == com_realce.sinalizadas
+
+
+def test_ca_12_6_o_pdf_pesquisavel_sai_igual(projeto, fonte, leitor, tmp_path,  # noqa: F811
+                                            monkeypatch):
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "1700000000")
+    _ensinar_e_ler(projeto, fonte, leitor)
+    a, b = tmp_path / "a.pdf", tmp_path / "b.pdf"
+    ex.exportar_com_relatorio(projeto, a)
+    ex.exportar_com_relatorio(projeto, b)
+    assert a.read_bytes() == b.read_bytes()

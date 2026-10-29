@@ -256,9 +256,11 @@ class DesenhoDaJanela:
         self.registrar_aviso(av.AVISO, titulo, texto)
         QMessageBox.warning(self, titulo, texto)
 
-    def _relatorio(self, titulo: str, texto: str) -> None:
-        """Um relatório (o da exportação, §12.2): vai a Resultados / Avisos, sem diálogo."""
-        self.registrar_aviso(av.AVISO, titulo, texto)
+    def _relatorio(self, titulo: str, linhas) -> None:
+        """Um relatório (o da exportação, §12.2): vai a Resultados / Avisos, sem diálogo, um
+        aviso por linha (o duplo clique no item abre a página que ele cita)."""
+        for linha in linhas:
+            self.registrar_aviso(av.AVISO, titulo, linha)
 
     def _gravacao_falhou(self, indice, erro) -> None:
         """CA-4.2 (A2): a falha de gravação vai para Avisos, além da barra."""

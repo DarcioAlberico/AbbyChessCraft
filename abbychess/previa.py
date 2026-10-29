@@ -24,15 +24,18 @@ from abbychess import links_de_analise
 #: Quantas páginas a prévia mostra (o relatório cobre todas).
 LIMITE = 30
 
+#: A prévia é o livro: papel e tinta nos dois temas, como o Documento (§13: o livro não
+#: inverte). Os cinzas têm 4,5:1 ou mais sobre o branco e sobre o fundo do relatório.
 CSS = """
-body { font-family: Georgia, serif; margin: 12px 16px; }
-h1.previa { font-family: 'Segoe UI', sans-serif; font-size: 13pt; color: #555; }
-div.relatorio { font-family: 'Segoe UI', sans-serif; font-size: 9pt; color: #333;
-                background: #f4f4f4; padding: 6px 10px; }
-div.pagina { font-family: 'Segoe UI', sans-serif; font-size: 8pt; color: #888;
-             border-top: 1px solid #ccc; margin-top: 14px; padding-top: 2px; }
-p.alt { font-family: 'Segoe UI', sans-serif; font-size: 8pt; color: #666; }
-p.resto { font-style: italic; color: #888; }
+body { font-family: Georgia, serif; margin: 12px 16px; background: #ffffff; color: #111111; }
+h1.previa { font-family: 'Segoe UI', sans-serif; font-size: 13pt; color: #444444; }
+div.relatorio { font-family: 'Segoe UI', sans-serif; font-size: 9pt; color: #222222;
+                background: #f2f2f2; padding: 6px 10px; }
+div.pagina { font-family: 'Segoe UI', sans-serif; font-size: 8pt; color: #595959;
+             border-top: 1px solid #bbbbbb; margin-top: 14px; padding-top: 2px; }
+p.alt { font-family: 'Segoe UI', sans-serif; font-size: 8pt; color: #595959; }
+p.resto { font-style: italic; color: #595959; }
+a { color: #0b57a4; }
 """
 
 

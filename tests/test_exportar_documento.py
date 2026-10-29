@@ -16,7 +16,7 @@ from abbychess import exportar as ex
 from abbychess import lances as lc
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
-from abbychess.modelo import Decisoes, Estilo
+from abbychess.modelo import VERIFICADA, Decisoes, Estilo
 from abbychess.zonas import Zona
 
 from tests.test_diagramas import _lido
@@ -134,6 +134,53 @@ def test_so_verificadas_sem_nenhuma_nao_exporta(projeto, fonte, leitor, tmp_path
         ex.exportar(projeto, tmp_path / "x.txt", opcoes=ex.Opcoes(so_verificadas=True))
 
 
+def test_so_verificadas_leva_so_a_verificada(projeto, fonte, leitor, tmp_path):  # noqa: F811
+    _ensinar_e_ler(projeto, fonte, leitor)
+    pagina = projeto.carregar_modelo(1)
+    pagina.estado = VERIFICADA
+    projeto.salvar_modelo(pagina)
+    _, todas = ex.exportar_com_relatorio(projeto, tmp_path / "todas.txt")
+    _, so = ex.exportar_com_relatorio(projeto, tmp_path / "so.txt",
+                                      opcoes=ex.Opcoes(so_verificadas=True))
+    assert todas.paginas == [0, 1, 2]
+    assert so.paginas == [1] and so.nao_verificadas == []
+    assert "Páginas não verificadas" not in so.texto()
+
+
+def test_o_pgn_sem_diagrama_nao_troca_o_anterior(projeto, fonte, leitor, tmp_path):  # noqa: F811
+    _ensinar_e_ler(projeto, fonte, leitor)
+    destino = tmp_path / "livro.pgn"
+    destino.write_text("o PGN bom de antes\n", encoding="utf-8")
+    with pytest.raises(ex.NadaParaExportar, match="Nenhum diagrama"):
+        ex.exportar_com_relatorio(projeto, destino)
+    assert destino.read_text(encoding="utf-8") == "o PGN bom de antes\n"
+
+
+def test_a_funcao_da_linha_empatada_nao_depende_do_processo():
+    """O empate entre duas funções sai pela primeira, igual em todo processo (CA-12.6)."""
+    import os
+    import subprocess
+    import sys
+    codigo = ("from tests.test_exportar_documento import _funcao_empatada; "
+              "print(_funcao_empatada())")
+    saidas = set()
+    for semente in ("1", "2", "3", "4", "5", "6"):
+        ambiente = dict(os.environ, PYTHONHASHSEED=semente)
+        saidas.add(subprocess.run([sys.executable, "-c", codigo], env=ambiente, check=True,
+                                  capture_output=True, text=True).stdout.strip())
+    assert saidas == {"titulo"}
+
+
+def _funcao_empatada() -> str:
+    """Uma linha com metade das letras numa área de título e metade numa de texto."""
+    entries = _linha("abcd efgh", 100)
+    zonas = [Zona("texto", 0, 90, 90, 130, funcao="titulo"),
+             Zona("texto", 90, 90, 1000, 130)]
+    pagina = tx.pagina_avulsa(entries, zonas=zonas)
+    lidos, estrutura = ex.Estrutura.da_pagina(pagina)
+    return ex._linhas(lidos, ex.OrdemDeLeitura(), estrutura)[0].funcao
+
+
 # ----------------------------------------------------------------------
 # PGN (CA-12.2)
 # ----------------------------------------------------------------------
@@ -183,6 +230,34 @@ def test_ca_12_2_o_pgn_do_diagrama_conferido_com_lances():
     assert relatorio.no_pgn == 1
     assert relatorio.fora_do_pgn == [(24, 2, "nem conferido nem confiável pelos lances")]
     assert "p. 25: diagrama 2 fora do PGN" in relatorio.texto()
+
+
+class _ProjetoComEstados(_ProjetoFalso):
+    def __init__(self, modelos, verificadas):
+        super().__init__(modelos)
+        self.verificadas = verificadas
+
+    def resumo_do_livro(self):
+        return {i: {"estado": VERIFICADA if i in self.verificadas else "reconhecida"}
+                for i in self.modelos}
+
+
+def test_so_verificadas_no_pgn_leva_so_o_diagrama_da_verificada():
+    def pagina():
+        conferido = replace(_lido(P25, caixa=(0, 0, 400, 400)), conferido=True, lado="b",
+                            lado_origem="usuario")
+        p = tx.pagina_avulsa([], [conferido])
+        p.tabuleiros = [(0, 0, 400, 400)]
+        return p
+    projeto_falso = _ProjetoComEstados({24: pagina(), 30: pagina()}, verificadas={24})
+    relatorio = ex.Relatorio(formato="pgn")
+    texto = ex.pgn_do_livro(projeto_falso, relatorio=relatorio,
+                            opcoes=ex.Opcoes(so_verificadas=True))
+    assert texto.count("[Page ") == 1 and '[Page "25"]' in texto
+    assert relatorio.no_pgn == 1
+    assert ex.pgn_do_livro(projeto_falso, relatorio=ex.Relatorio(formato="pgn")).count(
+        "[Page ") == 2
+
 
 
 # ----------------------------------------------------------------------

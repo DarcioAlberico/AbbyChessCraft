@@ -2,7 +2,9 @@
 o arquivo e antes de escrever, com a pré-visualização (§12.2) do que sairia.
 
 As opções valem conforme o formato: o PDF pesquisável guarda a página inteira (nenhuma opção
-de texto vale); o PGN só olha as páginas verificadas; as marcas de página são do TXT. Os
+de texto vale); o PGN leva os diagramas conferidos ou confiáveis pelos lances, e só escolhe
+páginas pelo "Só as páginas verificadas"; as marcas de página são do TXT. A opção que o
+formato não oferece fica cinza e vale o padrão. Os
 metadados (título, autores, editora, data, assuntos, direitos, identificador, edição
 impressa e capa) são do EPUB e do DOCX e vão para `<projeto>/metadados.json`: o que se
 preenche uma vez vale nas exportações seguintes. A capa escolhida fora do projeto é copiada
@@ -92,7 +94,7 @@ class DialogoDeExportacao(QDialog):
         texto = formato in ("epub", "docx", "txt")
         self.manter_margens.setEnabled(texto)
         self.manter_quebras.setEnabled(texto)
-        self.desenhar.setEnabled(formato in ("epub", "docx"))
+        self.desenhar.setEnabled(texto)
         self.marcas.setEnabled(formato == "txt")
         self.realcar.setEnabled(formato == "docx")
         linha_da_analise.setEnabled(formato in ("epub", "docx"))
@@ -175,13 +177,20 @@ class DialogoDeExportacao(QDialog):
         self.capa.clear()
 
     def opcoes(self) -> ex.Opcoes:
-        return ex.Opcoes(manter_margens=self.manter_margens.isChecked(),
-                         so_verificadas=self.so_verificadas.isChecked(),
-                         desenhar_diagramas=self.desenhar.isChecked(),
-                         marcas_de_pagina=self.marcas.isChecked(),
-                         manter_quebras=self.manter_quebras.isChecked(),
-                         realcar_duvidosos=self.realcar.isChecked(),
-                         links_de_analise=self.analise.currentData())
+        """As opções marcadas; a que o formato não oferece (o controle cinza) fica no padrão,
+        para a lembrada de outro formato não mudar este sem o usuário ver."""
+        padrao = ex.Opcoes()
+
+        def marcada(campo: str, check) -> bool:
+            return check.isChecked() if check.isEnabled() else getattr(padrao, campo)
+        return ex.Opcoes(manter_margens=marcada("manter_margens", self.manter_margens),
+                         so_verificadas=marcada("so_verificadas", self.so_verificadas),
+                         desenhar_diagramas=marcada("desenhar_diagramas", self.desenhar),
+                         marcas_de_pagina=marcada("marcas_de_pagina", self.marcas),
+                         manter_quebras=marcada("manter_quebras", self.manter_quebras),
+                         realcar_duvidosos=marcada("realcar_duvidosos", self.realcar),
+                         links_de_analise=(self.analise.currentData() if self.analise.isEnabled()
+                                           else padrao.links_de_analise))
 
     def metadados(self) -> dict:
         """O formulário como `metadados.json`. A capa é a de antes (também quando outra foi

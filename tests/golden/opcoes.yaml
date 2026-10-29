@@ -82,4 +82,5 @@ so_verificadas:
   escopo: livro
   testes:
     - test_so_verificadas_sem_nenhuma_nao_exporta
-    - test_txt_do_projeto_com_relatorio
+    - test_so_verificadas_leva_so_a_verificada
+    - test_so_verificadas_no_pgn_leva_so_o_diagrama_da_verificada

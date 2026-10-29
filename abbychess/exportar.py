@@ -40,7 +40,7 @@ import statistics
 import unicodedata
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import AbstractSet, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from PIL import Image
 
@@ -345,7 +345,7 @@ class _Linha:
     primeiro: int = 0
     ultimo: int = 0
     #: A junção da `Estrutura` com a linha anterior: entra sem espaço.
-    juncoes: frozenset = frozenset()
+    juncoes: AbstractSet[Tuple[int, int]] = frozenset()
     negrito: List[Tuple[int, int]] = field(default_factory=list)
     italico: List[Tuple[int, int]] = field(default_factory=list)
     #: Os trechos dos glifos duvidosos (`Estrutura.duvidosos`).
@@ -450,11 +450,11 @@ def _com_a_estrutura(linha: _Linha, palavras_da_linha, boxes: Sequence[BoxEntry]
     """A função, o parágrafo, o hífen e os estilos da linha, pela `Estrutura`."""
     entradas = [boxes[i] for i in linha.indices]
     funcoes = [estrutura.funcao(b) for b in entradas]
-    linha.funcao = max(set(funcoes), key=funcoes.count)
+    linha.funcao = max(dict.fromkeys(funcoes), key=funcoes.count)   # o empate: a primeira
     linha.paragrafo = id(entradas[0]) in estrutura.paragrafo_antes
     linha.hifen = id(entradas[-1]) in estrutura.hifen_de_quebra and linha.texto.endswith("-")
     linha.primeiro, linha.ultimo = id(entradas[0]), id(entradas[-1])
-    linha.juncoes = frozenset(estrutura.juncoes)
+    linha.juncoes = estrutura.juncoes
     for nome, marcados in (("negrito", estrutura.negrito), ("italico", estrutura.italico),
                            ("duvidosos", estrutura.duvidosos)):
         # O estilo cobre o glifo de vários caracteres só se todos o têm; a dúvida, se um
@@ -614,17 +614,6 @@ def _funcoes_das_margens(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]
     return saida, margens
 
 
-def _juntar_linhas(textos: Sequence[str]) -> str:
-    """As linhas de um parágrafo num texto só, desfazendo a hifenização."""
-    saida = ""
-    for texto in textos:
-        if saida.endswith("-") and len(saida) > 1 and saida[-2].isalpha() and texto[:1].islower():
-            saida = saida[:-1] + texto
-        else:
-            saida = f"{saida} {texto}" if saida else texto
-    return saida
-
-
 def _juntar(linhas: Sequence[_Linha], manter_quebras: bool = False
             ) -> Tuple[str, List[Tuple[int, int]], List[Tuple[int, int]],
                        List[Tuple[int, int]]]:
@@ -632,7 +621,7 @@ def _juntar(linhas: Sequence[_Linha], manter_quebras: bool = False
     juntado.
 
     O hífen de quebra decidido no Documento (§6.3) sai sempre; o não decidido sai pela
-    regra de `_juntar_linhas` (letra antes, minúscula depois). Com `manter_quebras`, as
+    regra da letra antes e da minúscula depois. Com `manter_quebras`, as
     linhas se juntam por `\\n` e todo hífen fica, como impresso."""
     texto, negrito, italico, duvidosos = "", [], [], []
     anterior: Optional[_Linha] = None
@@ -1260,8 +1249,8 @@ def exportar_docx(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
     """O DOCX pelo escritor próprio (`abbychess.escritor_docx`): títulos nos estilos de
     título, estilos, diagramas com o texto alternativo, marcadores de página e hiperlinks
     internos, metadados; com `analise`, o link de análise de cada diagrama lido
-    (`Opcoes.links_de_analise`). Depois de gravar, `escritor_docx.conferir` lê o arquivo;
-    o que ele acusar vai ao `relatorio`."""
+    (`Opcoes.links_de_analise`). O escritor confere o arquivo (`escritor_docx.conferir`)
+    antes de trocar o anterior, e recusa o que não passa."""
     from abbychess import epub
     from abbychess import escritor_docx
 
@@ -1270,12 +1259,8 @@ def exportar_docx(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
     numeros = relatorio.numeros_impressos if relatorio is not None else None
     escrito = escritor_docx.escrever(paginas, caminho, metadados, numeros=numeros,
                                      quebras=quebras, realce=realce, analise=analise)
-    problemas = escritor_docx.conferir(caminho)
-    for problema in problemas:
-        log.warning("DOCX %s: %s", caminho, problema)
-    if relatorio is not None:
+    if relatorio is not None:                   # o escritor recusa o que não passa em `conferir`
         relatorio.links = escrito.links
-        relatorio.problemas_do_arquivo = problemas
         _analises_no_relatorio(relatorio, escrito.analises, analise)
     return Path(caminho)
 
@@ -1393,11 +1378,14 @@ def gravar_metadados(projeto: ProjetoDeLivro, dados: dict,
         destino = pasta / nome
         if not destino.exists() or destino.resolve() != capa.resolve():
             gv.gravar_bytes(destino, conteudo)
-        for velha in EXTENSOES_DA_CAPA:          # a capa de outra extensão não fica órfã
-            if velha != extensao and (pasta / f"{NOME_DA_CAPA}{velha}").is_file():
-                gv.apagar(pasta / f"{NOME_DA_CAPA}{velha}")
         gravado["capa"] = nome
     gv.gravar_json(pasta / ARQUIVO_DE_METADADOS, gravado)
+    if capa is not None:
+        # A capa de outra extensão não fica órfã; sai só depois do JSON, que se falhar
+        # deixa valendo a de antes.
+        for velha in EXTENSOES_DA_CAPA:
+            if velha != extensao and (pasta / f"{NOME_DA_CAPA}{velha}").is_file():
+                gv.apagar(pasta / f"{NOME_DA_CAPA}{velha}")
     return gravado
 
 
@@ -2026,7 +2014,10 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
         relatorio.resumo_do_pdf = "; ".join(partes) + "."
         return relatorio.resumo_do_pdf, relatorio
     if formato == "pgn":
-        _gravar_texto(caminho, pgn_do_livro(projeto, indices, relatorio, opcoes))
+        texto = pgn_do_livro(projeto, indices, relatorio, opcoes)
+        if not texto:
+            raise NadaParaExportar("Nenhum diagrama entrou no PGN.\n\n" + relatorio.texto())
+        _gravar_texto(caminho, texto)
         return relatorio.resumo(), relatorio
     fonte = pg.fonte_do_projeto(projeto)
     paginas = paginas_do_projeto(projeto, fonte, indices, progresso=progresso,

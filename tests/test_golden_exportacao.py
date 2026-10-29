@@ -346,5 +346,15 @@ def test_o_dialogo_oferece_as_opcoes_novas_so_onde_valem():
         dialogo.manter_quebras.setChecked(True)
         dialogo.realcar.setChecked(True)
         opcoes = dialogo.opcoes()
-        assert opcoes.manter_quebras and opcoes.realcar_duvidosos
+        # A marcada vale só onde o formato a oferece; no controle cinza, o padrão.
+        assert opcoes.manter_quebras is quebras and opcoes.realcar_duvidosos is realce
         dialogo.deleteLater()
+    # A lembrada de outro formato não muda, escondida, este: o desenho desligado no EPUB
+    # vale no TXT (o controle fica ativo), e o PGN fica no padrão.
+    lembradas = ex.Opcoes(desenhar_diagramas=False, manter_quebras=True)
+    txt = DialogoDeExportacao(None, "txt", lembradas, {}, Path("."), "T")
+    assert txt.desenhar.isEnabled() and txt.opcoes().desenhar_diagramas is False
+    pgn = DialogoDeExportacao(None, "pgn", lembradas, {}, Path("."), "T")
+    assert pgn.opcoes() == ex.Opcoes()
+    txt.deleteLater()
+    pgn.deleteLater()

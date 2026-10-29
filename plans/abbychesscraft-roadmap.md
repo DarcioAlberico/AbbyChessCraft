@@ -30,7 +30,9 @@ Paralelos, só com git e worktrees e com arquivos disjuntos:
   passo depois do 2a).
 - Atalho novo entra primeiro em `docs/atalhos.yaml` (CA-3.7).
 - Verificação, sempre:
-  - `.venv\Scripts\python.exe -m pytest -q -n auto` (< 60 s; em paralelo desde 2026-10-23);
+  - `.venv\Scripts\python.exe -m pytest -q -n auto` (< 60 s; em paralelo desde 2026-10-23,
+    no máximo 4 workers desde 2026-10-28); uma carga pesada por vez: nunca duas suítes, ou uma
+    suíte e uma medida, ao mesmo tempo em sessões ou subagentes;
   - `-m processo` quando o passo toca processo ou gravação;
   - `ABBY_PORTAO=1 .venv\Scripts\python.exe -m pytest -q -m "livro_real or desempenho"` no
     fechamento;
@@ -977,7 +979,8 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   157 de 160 páginas de 8 livros, e nas 3 outras a da exportação inventava colunas.
 - A pré-carga renderiza o PDF num processo à parte (K): a interface não para mais ~85 ms a
   cada página nunca vista (a maior parada, 13–14 ms).
-- A suíte rápida roda em paralelo (`-n auto`, pytest-xdist): ~32–39 s.
+- A suíte rápida roda em paralelo (`-n auto`, pytest-xdist): ~32–39 s sem teto; com o teto de 4
+  workers (2026-10-28, contra os travamentos por falta de memória), ~57 s com 3.
 
 - O itálico no OCR (I), com uma régua do AbbyChessCraft (o core não tem): no Odds & Ends, 0
   falsos em 17.941 palavras retas e ~96% das itálicas (`ferramentas/medir_italico.py`).

@@ -126,6 +126,29 @@ def pytest_runtest_makereport(item, call):
                               f"obrigatório: {relatorio.longrepr}")
 
 
+#: O teto de workers do `-n auto`. Cada worker sobe o Qt, o PyMuPDF e o OpenCV: com `-n 4` a
+#: suíte soma ~3,4 GB no pico, e um worker chega a 1,8 GB. Sem teto o `-n auto` abria um por
+#: núcleo físico (6), e duas ou três suítes ao mesmo tempo (sessões e subagentes), mais as
+#: medidas, esgotavam os 16 GB: o Windows paginava num HDD e a máquina travava até o reset
+#: (cinco vezes em 2026-10-28).
+MAX_WORKERS = 4
+#: A memória livre que cada worker reserva ao decidir quantos abrir.
+GB_POR_WORKER = 1.5
+
+
+def pytest_xdist_auto_num_workers(config):
+    """O `-n auto` abre no máximo `MAX_WORKERS`, e menos se a memória livre não couber
+    `GB_POR_WORKER` para cada um (outra suíte ou uma medida já rodando). O
+    `PYTEST_XDIST_AUTO_NUM_WORKERS` do pytest-xdist continua valendo por cima."""
+    if os.environ.get("PYTEST_XDIST_AUTO_NUM_WORKERS"):
+        return None
+    import psutil
+
+    livre_gb = psutil.virtual_memory().available / 2**30
+    nucleos = psutil.cpu_count(logical=False) or psutil.cpu_count() or 1
+    return max(1, min(MAX_WORKERS, nucleos, int(livre_gb / GB_POR_WORKER)))
+
+
 def pytest_addoption(parser):
     parser.addoption("--atualizar-golden", action="store_true", default=False,
                      help="regrava os arquivos de referência (golden) em vez de comparar")

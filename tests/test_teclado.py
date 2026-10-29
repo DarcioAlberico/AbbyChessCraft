@@ -297,7 +297,8 @@ def test_o_menu_teclado_grava_e_reaplica(app, padrao, perfil_limpo, monkeypatch)
 #: Teclas novas para ações que os painéis citam (nenhuma é usada no perfil padrão).
 TROCAS_VISIVEIS = {"reconhecer_pagina": ["Ctrl+Shift+F12"], "paleta": ["Ctrl+Shift+F11"],
                    "proxima_ocorrencia": ["Ctrl+Shift+F9"], "dividir": ["Ctrl+Shift+F6"],
-                   "proximo_da_fila": ["Ctrl+Shift+F4"]}
+                   "proximo_da_fila": ["Ctrl+Shift+F4"], "desfazer": ["Ctrl+Shift+F3"],
+                   "foco_vista": ["Ctrl+Shift+F2"]}
 
 
 def _textos_da_janela(j):

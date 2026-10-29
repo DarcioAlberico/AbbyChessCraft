@@ -182,6 +182,7 @@ class PainelDaGaleria(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.titulo = QLabel(teclado.com_teclas(VAZIA))
+        teclado.quando_mudar(self._refazer_o_vazio)     # o estado vazio cita a tecla do perfil
         self.titulo.setWordWrap(True)
         self.escopo = QComboBox()
         self.escopo.setAccessibleName("Galeria: a página ou o livro")
@@ -216,6 +217,10 @@ class PainelDaGaleria(QWidget):
         self.modelo.mostrar(itens)
         self.titulo.setText(f"{titulo}: {len(self.modelo.itens)} glifo(s), do menos confiável "
                             "ao mais")
+
+    def _refazer_o_vazio(self) -> None:
+        if not self.modelo.itens:
+            self.titulo.setText(teclado.com_teclas(VAZIA))
 
     def selecionados(self) -> List[Item]:
         return [self.modelo.itens[i.row()] for i in self.vista.selectionModel().selectedIndexes()]

@@ -92,9 +92,9 @@ class PainelDePadroes(QWidget):
         self.botao_ir = QPushButton("Ir à origem")
         self.botao_ir.clicked.connect(lambda: self._ir_a_origem(self.amostras.currentItem()))
         self.botao_esquecer = QPushButton("Esquecer (Delete)")
-        self.botao_esquecer.setToolTip("Apaga as amostras selecionadas; os glifos que elas "
-                                       "leram voltam à fila. "
-                                       + teclado.com_teclas("{desfazer} desfaz."))
+        teclado.texto_vivo(self.botao_esquecer, "setToolTip",
+                           "Apaga as amostras selecionadas; os glifos que elas leram voltam à "
+                           "fila. {desfazer} desfaz.")
         self.botao_esquecer.clicked.connect(self._esquecer)
         self.resumo = QLabel("")
 

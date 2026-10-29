@@ -119,7 +119,9 @@ def test_troca_de_pagina_fora_do_cache(ambiente, medidas):
     medidas["troca_fora_do_cache"] = {
         **resultado, "alvo_ms": 600,
         "como": "mesmo processo, o cache de páginas e o de pixmaps esvaziados antes de cada "
-                "troca (o processo novo, com a primeira carga do PDF, não está nesta medida)"}
+                "troca (o processo novo, com a primeira carga do PDF, não está nesta medida); "
+                "2 aquecimentos e 12 repetições, não os 5 e 30 da §15.3: cada troca renderiza "
+                "e endireita a página de novo, e a medida inteira segue em poucos segundos"}
 
 
 #: A primeira das páginas nunca vistas que quem folheia atravessa (longe das lidas).

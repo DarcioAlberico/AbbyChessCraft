@@ -1677,12 +1677,10 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   segundo portão; no L, 106–169). **A pré-carga** renderiza o PDF num processo à parte
   (`abbychess/render.py`): quem folheia páginas nunca vistas vê a interface parar no
   máximo ~6 ms (p95; `docs/medidas/2026-10-28-passo-fechamento.json`); a página pedida na hora ainda renderiza na thread da interface.
-  **A troca no cache** subiu de 19,7 para 52 ms no p95 (alvo 150), e **a releitura de um
-  glifo**, sem o lote, de 58 para 166 ms (alvo 150; o portão corta em 180): a fila de revisão
-  calcula, a cada vez, o que a exportação tira (`2e3d9a1`: +18 ms na troca e +64 ms na
-  releitura, medidos antes e depois dele); o resto da releitura subiu aos poucos antes dele, e
-  as áreas automáticas na página lida (`976cafa`) somam ~6 ms. A bisseção está em
-  `docs/revisoes/passo-k.md`. **Gravar uma página do lote** na thread da interface foi de 36 a
+  **A troca no cache** chegou a 52 ms no p95 e **a releitura de um glifo**, sem o lote, a
+  166 ms (alvo 150) no portão: a fila de revisão calculava, a cada vez, o que a exportação
+  tira (`2e3d9a1`; a bisseção em `docs/revisoes/passo-k.md`). Corrigido em `223ea36`: a troca
+  no cache p95 25,3 ms e a releitura 85,3 ms (`docs/medidas/2026-10-29-fila-rapida-parcial.json`). **Gravar uma página do lote** na thread da interface foi de 36 a
   120 ms no p95 (as áreas automáticas e a fila), sem pesar no atraso durante o lote (p99
   2,6 ms). **O Enter** que
   confirma a leitura ficou em ~25 ms na mediana (três rodadas do `9c98367`); o que corrige um

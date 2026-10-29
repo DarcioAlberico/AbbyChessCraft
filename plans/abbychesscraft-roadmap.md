@@ -798,7 +798,7 @@ fitz, e a medida da inclinação (~370 ms) não segura mais o clique noutra pág
 segue o sentido do passo e, quem folheia (trocas a menos de 1 s), a tem já. No portão do
 fechamento (`docs/medidas/2026-10-28-passo-fechamento.json`, §15.3): a troca no cache p95 52 ms (alvo 150; era 19,7 ms em 23/10, e a
 bisseção pôs a alta em `2e3d9a1`, a fila que calcula o que a exportação tira; ver
-`docs/revisoes/passo-k.md`), fora do cache p95 175 ms (alvo 600), e quem folheia páginas
+`docs/revisoes/passo-k.md`; de volta a 25,3 ms em `223ea36`), fora do cache p95 175 ms (alvo 600), e quem folheia páginas
 nunca vistas, parado 0,25 s em cada, p50 283 / p95 335 ms por troca, com a maior parada da
 interface p95 6,4 ms.
 
@@ -837,9 +837,9 @@ código aceito na rodada 2 e produto na 2, com o portão
 (`docs/medidas/2026-10-28-passo-fechamento.json`). O tema põe o estilo Fusion (o nativo do
 Windows deixava os controles ilegíveis no escuro); o HTML guardado segue o tema; o Ctrl+Tab do
 FineReader se reatribui; os textos citam a tecla do perfil; o banco mede quem folheia. A
-troca no cache (52 ms) e a releitura de um glifo (166 ms, acima do alvo de 150) ficaram mais
-lentas desde `2e3d9a1`: está no registro, como pendência. A nota humana da CA-13.2 é do
-usuário.
+troca no cache (52 ms) e a releitura de um glifo (166 ms, acima do alvo de 150), mais lentas
+desde `2e3d9a1`, voltaram em `223ea36` a 25,3 e 85,3 ms no p95 (`docs/medidas/2026-10-29-fila-rapida-parcial.json`). A nota humana da
+CA-13.2 é do usuário.
 
 ## Passo L — Editor de imagem e páginas (§12.4)
 

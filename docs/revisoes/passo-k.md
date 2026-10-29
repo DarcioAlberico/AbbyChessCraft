@@ -69,16 +69,15 @@ Os commits: `8680ed7`, `5ed6d2d`, `b7f9096`, `534147b`, `872df37` e o deste regi
 
 ## Limitações conhecidas
 
-- **A releitura de um glifo passou do alvo**: p95 de 58 ms (23/10) para 166 ms (alvo 150; o
-  portão corta em 180). A mesma medida em cada ponta: 87 ms antes de `2e3d9a1` e 151 ms nele
-  (a fila que calcula `gids_fora_do_texto`), 155 ms antes de `976cafa` e 161 ms nele (as áreas
-  automáticas na página lida). Fica para uma pendência, junto com a troca no cache.
-- **A troca de página no cache ficou mais lenta**: p95 de 18,7 ms em `0888053` (23/10) para
-  ~49 ms, dentro da meta de 150 ms. A bisseção (a mesma medida, nesta máquina, em cada
-  commit) achou o salto em `2e3d9a1` (o cabeçalho e o rodapé corridos no fim da fila de
-  revisão): a fila calcula `gids_fora_do_texto` a cada troca, e a chave do cache das margens
-  percorre todos os glifos da página (~30 → ~48 ms); antes dele, a subida foi aos poucos
-  (~20 → ~30 ms). Fica para uma pendência: guardar o que a fila tira pela geração da página.
+- **A releitura de um glifo e a troca no cache, mais lentas no portão e corrigidas depois.**
+  No portão, a releitura estava em p95 166 ms (alvo 150; era 58 em 23/10) e a troca no cache
+  em 52 ms (era 18,7). A bisseção (a mesma medida, nesta máquina, em cada commit) pôs a maior
+  parte em `2e3d9a1` (o cabeçalho e o rodapé corridos no fim da fila de revisão): 87 → 151 ms
+  na releitura e ~30 → ~48 ms na troca, porque a fila calculava `gids_fora_do_texto` a cada
+  vez e a chave do cache das margens percorria todos os glifos da página; `976cafa` (as áreas
+  automáticas na página lida) somava ~6 ms. **Corrigido em `223ea36`** (2026-10-29, numa
+  sessão à parte, mesclado em `passo-i-treino`): a troca no cache p95 25,3 ms e a releitura
+  85,3 ms (`docs/medidas/2026-10-29-fila-rapida-parcial.json`, só essas medidas; a árvore só tinha arquivos do usuário fora do git).
 
 - A tecla se digita como texto no diálogo Teclado, e o conflito só aparece no OK.
 - O papel de referência (255) vem do gabarito, não medido da imagem.

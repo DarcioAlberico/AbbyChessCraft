@@ -758,6 +758,14 @@ testadas uma a uma, não pela diferença declarada); as aspas curvas do core (PD
 escritores próprios não aplicam. Os gabaritos do EPUB (EPUBCheck 5.4.0 e Ace 1.4.6) passam
 sem violação, erro ou advertência.
 
+**O fechamento formal pela §16** foi feito em 2026-10-28 (`docs/revisoes/passo-j.md`):
+código aceito na rodada 3 e produto na 2, com o portão. A opção cinza do diálogo vale o
+padrão; o relatório tem uma linha por página, que o duplo clique abre; o intervalo de
+páginas; o PDF reproduzível; a página lida ganha as áreas automáticas (o sumário com
+capítulos no livro de referência); a exportação medida em
+`docs/medidas/2026-10-29-exportacao-xv.json` (o EPUBCheck, o Ace e o Calibre sem problema, os
+cinco formatos com os mesmos bytes). Pendente: o Thorium e o leitor do celular.
+
 ## Passo K — Aparência e teclado (§13, §3.4)
 
 **Execução iniciada em 2026-10-22, ramo `passo-i-treino`.** Rodada 1: `app/estilo.py` tem
@@ -785,11 +793,14 @@ cobre a janela e os diálogos, com os botões internos do Qt nomeados. O perfil 
 entrou com as ações que só ele tem (Ctrl+F7, Alt+4, Ctrl+Tab, Ctrl+1…5), e
 **Ferramentas › Teclado…** escolhe o perfil e troca as teclas pelas regras do YAML, sem
 reiniciar, lembrado no `QSettings` (os testes usam um INI temporário). Desempenho: a
-`QImage` da página nasce na thread que a renderiza (a troca no cache, 23 → 13 ms); a trava
-da fonte cobre só o render do fitz, e a medida da inclinação (~370 ms) não segura mais o
-clique noutra página; a pré-carga segue o sentido do passo e, quem folheia (trocas a menos
-de 1 s), a tem já: parado 0,25 s em cada página nunca vista, ~390 → ~250 ms por troca
-(medido no Xadrez Vitorioso, offscreen).
+`QImage` da página nasce na thread que a renderiza; a trava da fonte cobre só o render do
+fitz, e a medida da inclinação (~370 ms) não segura mais o clique noutra página; a pré-carga
+segue o sentido do passo e, quem folheia (trocas a menos de 1 s), a tem já. No portão do
+fechamento (`docs/medidas/2026-10-28-passo-fechamento.json`, §15.3): a troca no cache p95 52 ms (alvo 150; era 19,7 ms em 23/10, e a
+bisseção pôs a alta em `2e3d9a1`, a fila que calcula o que a exportação tira; ver
+`docs/revisoes/passo-k.md`), fora do cache p95 175 ms (alvo 600), e quem folheia páginas
+nunca vistas, parado 0,25 s em cada, p50 283 / p95 335 ms por troca, com a maior parada da
+interface p95 6,4 ms.
 
 **Pendente.** O render do fitz segura o GIL (~80 ms por página nunca vista, a interface
 para nesse tempo durante a pré-carga); tirá-lo da interface pede um processo, como o
@@ -820,6 +831,15 @@ mudaria os ângulos gravados dos projetos novos: fica para quando houver gabarit
      pedida.
 
 **Verificação.** CA-13.1, CA-13.2 e CA-13.3; CA-3.3 e CA-3.7 nos dois perfis.
+
+**O fechamento formal pela §16** foi feito em 2026-10-28 (`docs/revisoes/passo-k.md`):
+código aceito na rodada 2 e produto na 2, com o portão
+(`docs/medidas/2026-10-28-passo-fechamento.json`). O tema põe o estilo Fusion (o nativo do
+Windows deixava os controles ilegíveis no escuro); o HTML guardado segue o tema; o Ctrl+Tab do
+FineReader se reatribui; os textos citam a tecla do perfil; o banco mede quem folheia. A
+troca no cache (52 ms) e a releitura de um glifo (166 ms, acima do alvo de 150) ficaram mais
+lentas desde `2e3d9a1`: está no registro, como pendência. A nota humana da CA-13.2 é do
+usuário.
 
 ## Passo L — Editor de imagem e páginas (§12.4)
 
@@ -977,8 +997,8 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
 
 - A exportação lê a página pela `OrdemDeLeitura` do Documento (F, J): as duas liam igual em
   157 de 160 páginas de 8 livros, e nas 3 outras a da exportação inventava colunas.
-- A pré-carga renderiza o PDF num processo à parte (K): a interface não para mais ~85 ms a
-  cada página nunca vista (a maior parada, 13–14 ms).
+- A pré-carga renderiza o PDF num processo à parte (K): a interface não para mais a cada
+  página nunca vista (a maior parada, p95 6,4 ms, folheando; `docs/medidas/2026-10-28-passo-fechamento.json`).
 - A suíte rápida roda em paralelo (`-n auto`, pytest-xdist): ~32–39 s sem teto; com o teto de 4
   workers (2026-10-28, contra os travamentos por falta de memória), ~57 s com 3.
 

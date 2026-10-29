@@ -1,0 +1,364 @@
+{
+ "livro": "yusupov",
+ "indices": [
+  6,
+  12,
+  33
+ ],
+ "pdf_sha256": "91f85227cdb43980b49e80f2e6f29d9ab92aabfac5652942a383df5695921427",
+ "gabaritos": {
+  "i006": {
+   "verdade_versao": 1,
+   "sha256": "9ae1bf54f35700bbbbcc290d91f410ea8cfbb321166d674e4dd209b359025da1"
+  },
+  "i012": {
+   "verdade_versao": 1,
+   "sha256": "342d33e96967609f03cb38ced42469103b1cd46e48ad283b4c35348680e8bb5c"
+  },
+  "i033": {
+   "verdade_versao": 1,
+   "sha256": "807485e3957535025d41067ecd62c49fc0b22584526ce31d81dafc6ee3ce56f9"
+  }
+ },
+ "gabaritos_revisados": "0/3",
+ "nao_medido": {},
+ "resumo": {
+  "funcoes": {
+   "texto": {
+    "precisao": 0.8146,
+    "revocacao": 0.9919,
+    "vp": 123,
+    "fp": 28,
+    "fn": 1
+   },
+   "titulo": {
+    "precisao": 1.0,
+    "revocacao": 0.0333,
+    "vp": 1,
+    "fp": 0,
+    "fn": 29
+   },
+   "cabecalho": {
+    "precisao": null,
+    "revocacao": 0.0,
+    "vp": 0,
+    "fp": 0,
+    "fn": 2
+   },
+   "numero_de_pagina": {
+    "precisao": 1.0,
+    "revocacao": 1.0,
+    "vp": 3,
+    "fp": 0,
+    "fn": 0
+   },
+   "legenda": {
+    "precisao": null,
+    "revocacao": 0.0,
+    "vp": 0,
+    "fp": 0,
+    "fn": 3
+   }
+  },
+  "ligacao_da_legenda": "—",
+  "margens_precisao": 1.0,
+  "margens_revocacao": 0.75,
+  "diagramas_achados": "3/3",
+  "diagramas_falsos": 0,
+  "linhas_sem_par": 10,
+  "linhas_sem_par_negativas": 0,
+  "paginas_negativas": 0,
+  "linhas_perdidas": 5,
+  "linhas_perdidas_negativas": 0,
+  "fen_igual_a_leitura": "3/3",
+  "fen_verificados": "0/3",
+  "casas_erradas_por_diagrama": null,
+  "casas_erradas_provisorio": 0.0,
+  "lado_certo": "0/0",
+  "lado_certo_provisorio": "1/3",
+  "ordem_discordancia_media": 0.0,
+  "cer_corpo": null,
+  "linhas_com_texto_verificado": "0/157",
+  "estado": "provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual",
+  "lote_s": 25.0,
+  "pendentes": 506
+ },
+ "paginas": {
+  "i006": {
+   "pagina_impressa": 6,
+   "estrutura": true,
+   "estrutura_revisada": false,
+   "margens": {
+    "vp": 1,
+    "fp": 0,
+    "fn": 0
+   },
+   "funcoes": {
+    "por_funcao": {
+     "texto": {
+      "vp": 44,
+      "fp": 0,
+      "fn": 0
+     },
+     "titulo": {
+      "vp": 0,
+      "fp": 0,
+      "fn": 1
+     },
+     "cabecalho": {
+      "vp": 0,
+      "fp": 0,
+      "fn": 0
+     },
+     "rodape": {
+      "vp": 0,
+      "fp": 0,
+      "fn": 0
+     },
+     "numero_de_pagina": {
+      "vp": 1,
+      "fp": 0,
+      "fn": 0
+     },
+     "nota": {
+      "vp": 0,
+      "fp": 0,
+      "fn": 0
+     },
+     "legenda": {
+      "vp": 0,
+      "fp": 0,
+      "fn": 0
+     }
+    },
+    "legendas": 0,
+    "legendas_ligadas": 0
+   },
+   "diagramas": {
+    "verdade": 0,
+    "achados": 0,
+    "casados": 0,
+    "detalhes": []
+   },
+   "negativa": false,
+   "linhas_sem_par": 1,
+   "linhas_perdidas": 1,
+   "conferencia_cega_texto": false,
+   "conferencia_cega_fen": false,
+   "corpo": {
+    "linhas": 45,
+    "casadas": 44,
+    "ordem_discordancia": 0.0,
+    "linhas_verificadas": 0,
+    "cer_erros": 0,
+    "cer_caracteres": 0,
+    "cer": null
+   },
+   "pendentes": 238
+  },
+  "i012": {
+   "pagina_impressa": 12,
+   "estrutura": true,
+   "estrutura_revisada": false,
+   "margens": {
+    "vp": 1,
+    "fp": 0,
+    "fn": 1
+   },
+   "funcoes": {
+    "por_funcao": {
+     "texto": {
+      "vp": 25,
+      "fp": 9,
+      "fn": 0
+     },
+     "titulo": {
+      "vp": 0,
+      "fp": 0,
+      "fn": 9
+     },
+     "cabecalho": {
+      "vp": 0,
+      "fp": 0,
+      "fn": 2
+     },
+     "rodape": {
+      "vp": 0,
+      "fp": 0,
+      "fn": 0
+     },
+     "numero_de_pagina": {
+      "vp": 1,
+      "fp": 0,
+      "fn": 0
+     },
+     "nota": {
+      "vp": 0,
+      "fp": 0,
+      "fn": 0
+     },
+     "legenda": {
+      "vp": 0,
+      "fp": 0,
+      "fn": 3
+     }
+    },
+    "legendas": 0,
+    "legendas_ligadas": 0
+   },
+   "diagramas": {
+    "verdade": 3,
+    "achados": 3,
+    "casados": 3,
+    "detalhes": [
+     {
+      "id": "d0",
+      "casas_erradas": 0,
+      "fen_verificado": false,
+      "fen_igual_a_leitura": true,
+      "lado_certo": false,
+      "lado_verificado": false,
+      "confiavel": false
+     },
+     {
+      "id": "d1",
+      "casas_erradas": 0,
+      "fen_verificado": false,
+      "fen_igual_a_leitura": true,
+      "lado_certo": false,
+      "lado_verificado": false,
+      "confiavel": true
+     },
+     {
+      "id": "d2",
+      "casas_erradas": 0,
+      "fen_verificado": false,
+      "fen_igual_a_leitura": true,
+      "lado_certo": true,
+      "lado_verificado": false,
+      "confiavel": true
+     }
+    ]
+   },
+   "negativa": false,
+   "linhas_sem_par": 8,
+   "linhas_perdidas": 3,
+   "conferencia_cega_texto": false,
+   "conferencia_cega_fen": false,
+   "corpo": {
+    "linhas": 37,
+    "casadas": 34,
+    "ordem_discordancia": 0.0,
+    "linhas_verificadas": 0,
+    "cer_erros": 0,
+    "cer_caracteres": 0,
+    "cer": null
+   },
+   "pendentes": 196
+  },
+  "i033": {
+   "pagina_impressa": 33,
+   "estrutura": true,
+   "estrutura_revisada": false,
+   "margens": {
+    "vp": 1,
+    "fp": 0,
+    "fn": 0
+   },
+   "funcoes": {
+    "por_funcao": {
+     "texto": {
+      "vp": 54,
+      "fp": 19,
+      "fn": 1
+     },
+     "titulo": {
+      "vp": 1,
+      "fp": 0,
+      "fn": 19
+     },
+     "cabecalho": {
+      "vp": 0,
+      "fp": 0,
+      "fn": 0
+     },
+     "rodape": {
+      "vp": 0,
+      "fp": 0,
+      "fn": 0
+     },
+     "numero_de_pagina": {
+      "vp": 1,
+      "fp": 0,
+      "fn": 0
+     },
+     "nota": {
+      "vp": 0,
+      "fp": 0,
+      "fn": 0
+     },
+     "legenda": {
+      "vp": 0,
+      "fp": 0,
+      "fn": 0
+     }
+    },
+    "legendas": 0,
+    "legendas_ligadas": 0
+   },
+   "diagramas": {
+    "verdade": 0,
+    "achados": 0,
+    "casados": 0,
+    "detalhes": []
+   },
+   "negativa": false,
+   "linhas_sem_par": 1,
+   "linhas_perdidas": 1,
+   "conferencia_cega_texto": false,
+   "conferencia_cega_fen": false,
+   "corpo": {
+    "linhas": 75,
+    "casadas": 74,
+    "ordem_discordancia": 0.0,
+    "linhas_verificadas": 0,
+    "cer_erros": 0,
+    "cer_caracteres": 0,
+    "cer": null
+   },
+   "pendentes": 72
+  }
+ },
+ "validacao_pelos_lances": {
+  "verdadeiros": 3,
+  "verdadeiros_confiaveis": 3,
+  "perturbadas": 100,
+  "semente": 1234,
+  "afetadas": 17,
+  "detectadas": 16,
+  "deteccao": 0.9412,
+  "confiaveis_afetadas": 1,
+  "confiaveis_nao_afetadas": 76,
+  "diagramas": [
+   {
+    "id": "i012/d0",
+    "estado": "confiavel_pelos_lances",
+    "aviso": ""
+   },
+   {
+    "id": "i012/d1",
+    "estado": "confiavel_pelos_lances",
+    "aviso": ""
+   },
+   {
+    "id": "i012/d2",
+    "estado": "confiavel_pelos_lances",
+    "aviso": ""
+   }
+  ]
+ },
+ "data": "2026-10-28",
+ "commit": "cd6681a",
+ "arvore_suja": false,
+ "arquivos_sujos": []
+}

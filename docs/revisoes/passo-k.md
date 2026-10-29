@@ -37,7 +37,8 @@ Galeria vazia não citava tecla; o diálogo Teclado descartava as trocas ao muda
 **Código 2** (aceita): a Galeria vazia e a dica de Esquecer não seguiam a troca de tecla com a
 janela aberta; corrigido.
 **Produto 2**: só a fidelidade: os números antigos no README, no roadmap e nas pendências
-trocados pelos do JSON do portão, e a alta da troca no cache registrada.
+trocados pelos do JSON do portão, e a alta da troca no cache registrada. A rodada disse que o
+passo fecha, sem nova revisão de produto, com isso: feito neste registro.
 
 Os commits: `8680ed7`, `5ed6d2d`, `b7f9096`, `534147b`, `872df37` e o deste registro.
 
@@ -53,15 +54,25 @@ Os commits: `8680ed7`, `5ed6d2d`, `b7f9096`, `534147b`, `872df37` e o deste regi
 
 ## Verificação
 
-- Suíte rápida no commit deste registro: ver o portão; ruff limpo.
+- Suíte rápida no commit deste registro: 1769 aprovados e 3 pulados; ruff limpo. O portão
+  do fechamento no `cd6681a`, com a árvore limpa: os 30 testes `livro_real` e `desempenho`
+  aprovados (`ABBY_PORTAO=1`), a fatia em 0,687 da linha de base (739 de 1076 gestos) e as
+  legendas aprovadas.
 - CA-13.2 e CA-13.3 em `tests/test_estilo.py` (com o contraste do botão no tema escuro);
   CA-13.1 em `tests/test_acessibilidade.py`; o teclado em `tests/test_teclado.py`.
-- As medidas oficiais: o JSON do banco de desempenho do portão.
+- As medidas oficiais: `docs/medidas/2026-10-28-passo-fechamento.json` (§15.3): a troca no
+  cache p95 52 ms (alvo 150), fora do cache 175 ms (alvo 600), quem folheia páginas nunca
+  vistas p50 283 / p95 335 ms, com a maior parada da interface p95 6,4 ms; o README, o
+  roadmap e as pendências citam este JSON no lugar dos números antigos.
 - As capturas da CA-13.2 (claro e escuro × 1366 e 1920 × com e sem leitura, a janela
   visível) pelo `ferramentas/capturas.py --visivel`; a nota humana da CA-13.2 é do usuário.
 
 ## Limitações conhecidas
 
+- **A releitura de um glifo passou do alvo**: p95 de 58 ms (23/10) para 166 ms (alvo 150; o
+  portão corta em 180). A mesma medida em cada ponta: 87 ms antes de `2e3d9a1` e 151 ms nele
+  (a fila que calcula `gids_fora_do_texto`), 155 ms antes de `976cafa` e 161 ms nele (as áreas
+  automáticas na página lida). Fica para uma pendência, junto com a troca no cache.
 - **A troca de página no cache ficou mais lenta**: p95 de 18,7 ms em `0888053` (23/10) para
   ~49 ms, dentro da meta de 150 ms. A bisseção (a mesma medida, nesta máquina, em cada
   commit) achou o salto em `2e3d9a1` (o cabeçalho e o rodapé corridos no fim da fila de

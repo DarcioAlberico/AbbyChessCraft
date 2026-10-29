@@ -39,7 +39,9 @@ cores fixas.
 **Código 2**: o intervalo ia até a última página do PDF, não do livro (com as inseridas).
 **Produto 2**: só o JSON das medidas (`ferramentas/medir_exportacao.py`), que sai no portão
 do fechamento, e o README passando a citá-lo; e o relatório lotaria os Avisos num livro
-inteiro (uma linha por item), agora uma linha por página.
+inteiro (uma linha por item), agora uma linha por página. A rodada disse que o passo fecha,
+sem nova revisão de produto, quando o portão gravar o JSON e o README o citar: feito neste
+registro (`docs/medidas/2026-10-29-exportacao-xv.json`).
 
 Os commits: `46ef90d`, `a823ae5`, `976cafa`, `acd4de9`, `4558a53` e o deste registro.
 
@@ -56,11 +58,17 @@ Os commits: `46ef90d`, `a823ae5`, `976cafa`, `acd4de9`, `4558a53` e o deste regi
 
 ## Verificação
 
-- Suíte rápida no commit deste registro: ver o portão; ruff limpo.
+- Suíte rápida no commit deste registro: 1769 aprovados e 3 pulados; ruff limpo. O portão
+  do fechamento no `cd6681a`, com a árvore limpa: os 30 testes `livro_real` e `desempenho`
+  aprovados (`ABBY_PORTAO=1`), a fatia em 0,687 da linha de base (739 de 1076 gestos) e as
+  legendas aprovadas.
 - CA-12.3 (`tests/golden/opcoes.yaml`, com o `intervalo` e o `so_verificadas` cobertos),
   CA-12.6 (EPUB, DOCX e PDF) em `tests/test_exportar_documento.py` e
   `tests/test_golden_exportacao.py`; o lote com as áreas automáticas em `tests/test_lote.py`.
-- As medidas oficiais: `docs/medidas/2026-10-28-exportacao-xv.json`, do portão.
+- As medidas oficiais: `docs/medidas/2026-10-29-exportacao-xv.json`, do portão (o commit `cd6681a`, a árvore limpa): o
+  EPUBCheck, o Ace e o Calibre sem problema; os cinco formatos com os mesmos bytes; o p95 de
+  30 repetições, 3,2 s o PDF, 1,6 s o DOCX, 1,5 s o EPUB, 1,1 s o TXT e 9 ms o PGN; o EPUB com
+  2 capítulos, 3 diagramas desenhados do FEN e 4 como recorte.
 
 ## Limitações conhecidas
 

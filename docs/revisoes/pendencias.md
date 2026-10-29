@@ -21,7 +21,7 @@ sem editar o core e sem gabarito novo. Ramo `pendencias`, a partir da tag `passo
 | A suíte rápida em paralelo (`-n auto`): ~32 s | §15.1 | `5612211` |
 | A exportação lê a página pela `OrdemDeLeitura` do Documento | F, J | `8a991b2` |
 | O teste do pool do índice (camada `processo`), quebrado desde o L | achado aqui | `13b3e91` |
-| A pré-carga renderiza o PDF num processo à parte (a interface não para mais ~85 ms) | K | `be40bab`, `8388a7a` |
+| A pré-carga renderiza o PDF num processo à parte (a interface não para mais a cada página nunca vista) | K | `be40bab`, `8388a7a` |
 | Os processos do índice da busca morrem com o programa morto à força | achado aqui | `0c0918c` |
 | Corrigir um caractere não refaz a ordem de leitura nem as linhas (validar, 13,6 → 2,8 ms) | H, pendência daqui | `ad255a8` |
 | Manter as quebras na camada nativa devolve o hífen que o core tirou | J, pendência daqui | `12dd644` |
@@ -99,7 +99,8 @@ O fitz segura o GIL: cada página nunca vista que a pré-carga renderizava parav
 mesmos pixels), e só a pré-carga o usa; a página pedida na hora renderiza aqui, que é mais
 rápido. Pelo `CacheDePaginas`, 10 páginas nunca vistas do Xadrez Vitorioso, endireitadas, duas
 rodadas: a maior parada da thread principal foi de 81–89 ms para 13–14 ms, e as paradas acima
-de 20 ms de uma por página para nenhuma; cada pré-carga leva ~20–30 ms a mais (~500 ms com a
+de 20 ms de uma por página para nenhuma (esses números são da medida de então, fora do método
+da §15.3; o portão do fechamento dos passos, `docs/medidas/2026-10-28-passo-fechamento.json`, mede quem folheia: a maior parada p95 6,4 ms); cada pré-carga leva ~20–30 ms a mais (~500 ms com a
 medida da inclinação). A revisão de código (`8388a7a`) pegou o que acontece quando o filho
 trava: quem pede a página espera a pré-carga dele no máximo 1 s e renderiza aqui, o filho que
 não responde é morto, o PDF trocado no mesmo lugar é lido de novo, e o filho fecha ocioso e

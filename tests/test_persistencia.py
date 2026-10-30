@@ -111,6 +111,24 @@ def test_tres_falhas_e_depois_sucesso_grava_o_novo(tmp_path, monkeypatch, chamad
     assert not list(tmp_path.glob("*.tmp")) and sistema.fds_abertos() == []
 
 
+def test_apagar_tenta_de_novo_como_a_gravacao(tmp_path, monkeypatch):
+    """SPEC-qualidade Q-P2: o antivírus que segura o arquivo um instante não faz o apagar
+    falhar (nem deixar uma sobra)."""
+    arquivo = tmp_path / "a.json"
+    arquivo.write_text("antigo", encoding="utf-8")
+    real, falhas = os.unlink, []
+
+    def unlink(caminho, *args, **kwargs):
+        if Path(caminho) == arquivo and len(falhas) < 3:
+            falhas.append(caminho)
+            raise PermissionError("injetada")
+        return real(caminho, *args, **kwargs)
+
+    monkeypatch.setattr(os, "unlink", unlink)
+    gv.apagar(arquivo)
+    assert not arquivo.exists() and len(falhas) == 3
+
+
 @pytest.mark.parametrize("chamada", CHAMADAS)
 def test_falha_permanente_deixa_o_antigo_sem_temporario_nem_fd(tmp_path, monkeypatch, chamada):
     arquivo = tmp_path / "a.json"

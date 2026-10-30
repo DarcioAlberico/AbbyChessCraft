@@ -144,6 +144,30 @@ def test_reordenar_antes_de_ler_a_v1_mostra_cada_pagina_com_os_glifos_dela(proje
     conferir(ProjetoDeLivro.abrir(projeto_v1))
 
 
+def test_um_arquivo_v1_que_nao_saiu_nao_regrava_a_pagina_migrada(projeto_v1, monkeypatch):
+    """CA-Q-P2: a migração grava a página e não consegue apagar o v1 das áreas dela (o
+    antivírus, para sempre): o projeto abre para gravar, com a página inteira, e a próxima
+    abertura tira a sobra sem migrá-la de novo por cima da página."""
+    verdade = _verdade_v1(projeto_v1)
+    zonas = projeto_v1 / "zonas" / "0001.json"
+    apagar = gv.apagar
+
+    def recusar_as_zonas(caminho):
+        if Path(caminho) == zonas:
+            raise PermissionError("o antivírus está com ele")
+        apagar(caminho)
+
+    monkeypatch.setattr(gv, "apagar", recusar_as_zonas)
+    projeto = ProjetoDeLivro.abrir(projeto_v1)
+    assert not projeto.somente_leitura and zonas.is_file()
+    _conferir(projeto, verdade)
+    assert projeto.fechar()
+
+    monkeypatch.setattr(gv, "apagar", apagar)
+    _conferir(ProjetoDeLivro.abrir(projeto_v1), verdade)
+    assert not zonas.exists()
+
+
 def _instantaneo(pasta: Path) -> dict:
     return {str(p.relative_to(pasta)): (p.stat().st_mtime_ns,
                                         hashlib.sha256(p.read_bytes()).hexdigest())

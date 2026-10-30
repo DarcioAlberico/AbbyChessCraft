@@ -155,6 +155,8 @@ class ControladorDePagina:
         self._enviados: frozenset = frozenset()
         #: Os gids aguardando cuja leitura já foi pedida ao servidor.
         self._em_leitura: set = set()
+        #: Os pids das páginas com um F5 (ou Ctrl+Shift+R) entre o preparar e o pronto.
+        self.lendo_no_f5: set = set()
         #: O palpite da rede para os glifos que ninguém leu (§9.2): gid -> (o `BoxEntry`
         #: de quando foi pedido, `(char, confiança)` ou None). Vale enquanto o glifo é o mesmo
         #: objeto; os pedidos em curso ficam em `_sugerindo`.
@@ -471,6 +473,7 @@ class ControladorDePagina:
         self.servidor = servidor
         self._enviados = self.padroes_de(leitor) if servidor is not None else frozenset()
         self._em_leitura = set()
+        self.lendo_no_f5 = set()
         self._sugestoes, self._sugerindo = {}, set()
         self._margens = {}                      # os pid se repetem de um projeto a outro
         self.geracao += 1
@@ -1230,7 +1233,7 @@ class ControladorDePagina:
             return
         indice = self.indice
         self.tarefa("Reconhecendo a página", lambda: self._preparar_reconhecer(indice),
-                    falhou=self._falhou("Reconhecer página"))
+                    falhou=self._sem_o_f5(indice, self._falhou("Reconhecer página")))
 
     def reconhecer_zona(self, zona) -> None:
         """Ctrl+Shift+R: reconhece somente uma zona e conserva o restante da página."""
@@ -1239,12 +1242,24 @@ class ControladorDePagina:
         indice = self.indice
         self.tarefa("Reconhecendo a área",
                     lambda: self._preparar_reconhecer(indice, zona),
-                    falhou=self._falhou("Reconhecer área"))
+                    falhou=self._sem_o_f5(indice, self._falhou("Reconhecer área")))
+
+    def _sem_o_f5(self, indice: int, falhou):
+        """O `falhou` do F5, que também tira a página de `lendo_no_f5`."""
+        pid = self.projeto.pid_da_pagina(indice)
+
+        def sem(mensagem: str) -> None:
+            self.lendo_no_f5.discard(pid)
+            falhou(mensagem)
+        return sem
 
     def _preparar_reconhecer(self, indice: int, zona=None):
         if indice != self.indice or not self._pode_ler(avisar=False):
             return None
         pagina = self._pagina_para_editar()
+        # Do preparar ao pronto, o lote deixa a página para reler depois (CA-Q-C2): com o
+        # servidor ele grava fora do executor, e o pronto passaria por cima da leitura dele.
+        self.lendo_no_f5.add(pagina.pid)
         imagem, leitor = self.imagem, self.leitor
         zonas = [zona] if zona is not None else list(pagina.zonas)
         antes = self._instantaneo()
@@ -1268,6 +1283,7 @@ class ControladorDePagina:
             return lida
 
         def pronto(lida: Optional[sl.PaginaLida]):
+            self.lendo_no_f5.discard(pagina.pid)
             if lida is None:
                 return
             lidos = lida.diagramas

@@ -347,6 +347,8 @@ class CondutorDoLote:
         pid = p.projeto.pid_da_pagina(indice)
         if pid != pedida.pid or p.historico.versao(pid) != pedida.versao:
             return RELER_DEPOIS
+        if pid in p.lendo_no_f5:                # o pronto do F5 viria por cima (CA-Q-C2)
+            return RELER_DEPOIS
         return None
 
     def _ler_numa_thread(self, ler, voltou) -> None:

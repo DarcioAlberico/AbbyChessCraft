@@ -246,6 +246,8 @@ class ProjetoDeLivro:
         #: que mudou.
         self._modelos: "OrderedDict[int, Pagina]" = OrderedDict()
         self._estados: Dict[int, Dict[int, int]] = {}
+        #: O pid da página aberta na janela (`prender`), que o cache não despeja.
+        self._presa: Optional[int] = None
         #: pid -> (o carimbo do arquivo, o contador de gids) da última página que
         #: `trocar_paginas` gravou: o desfazer de uma divisão confere pelo carimbo, sem reler
         #: as 460 páginas de um livro dividido (o arquivo que mudou depois é relido).
@@ -723,6 +725,13 @@ class ProjetoDeLivro:
         if livro:
             self._atualizar_livro(pagina.pid, self._resumo_do_modelo(pagina))
 
+    def prender(self, pid: Optional[int]) -> None:
+        """A página aberta na janela (None: nenhuma): o cache não a despeja, por mais páginas
+        que um lote leia, e quem a pede de novo (o lote, a busca) recebe o mesmo objeto que a
+        janela edita, e não outro lido do disco (SPEC-qualidade Q-P3)."""
+        with self._trava_do_cache:
+            self._presa = pid
+
     def _guardar_no_cache(self, pagina: Pagina, *, foto_nova: bool = False,
                           foto: bool = True) -> None:
         """Põe a página no cache; `foto_nova` (a página veio do disco) refaz a foto dos
@@ -744,8 +753,8 @@ class ProjetoDeLivro:
             if len(self._modelos) <= PAGINAS_EM_MEMORIA:
                 break
             saiu = self._modelos[pid]
-            if pid in sujas or saiu is pagina:
-                continue                    # a página com gravação pendente fica
+            if pid in sujas or saiu is pagina or pid == self._presa:
+                continue                    # a página com gravação pendente fica, e a aberta
             del self._modelos[pid]
             self._estados.pop(pid, None)
 

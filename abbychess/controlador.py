@@ -163,8 +163,7 @@ class ControladorDePagina:
         self.matriz: Optional[np.ndarray] = None
         #: A imagem de que a `matriz` é o cinza (quem troca `imagem` à mão não a leva junto).
         self._matriz_da_imagem = None
-        #: A página no modelo; `None` enquanto nada dela foi gravado (nasce na 1ª mudança).
-        self.modelo: Optional[Pagina] = None
+        self._modelo: Optional[Pagina] = None
         #: O glifo em revisão, os pulados e a seleção do modo de treino, por gid.
         self.atual: Optional[int] = None
         self.pulados: set = set()
@@ -442,6 +441,19 @@ class ControladorDePagina:
     # ------------------------------------------------------------------
     # Projeto e páginas
     # ------------------------------------------------------------------
+    @property
+    def modelo(self) -> Optional[Pagina]:
+        """A página no modelo; `None` enquanto nada dela foi gravado (nasce na 1ª mudança)."""
+        return self._modelo
+
+    @modelo.setter
+    def modelo(self, pagina: Optional[Pagina]) -> None:
+        # O projeto a prende no cache (SPEC-qualidade Q-P3): o lote e a busca leem o mesmo
+        # objeto que a janela edita, por maior que seja o lote.
+        self._modelo = pagina
+        if self.projeto is not None:
+            self.projeto.prender(None if pagina is None else pagina.pid)
+
     def ligar(self, projeto, fonte, leitor, servidor: Optional[sl.ServidorDeLeitura] = None
               ) -> None:
         """O projeto aberto, a fonte das páginas e o leitor (os modelos já carregados; ou,

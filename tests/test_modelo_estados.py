@@ -353,6 +353,9 @@ class _ProjetoNaMemoria:
     def posicao_do_pid(self, pid):                  # a página única, na posição 0
         return 0 if pid == self.pagina.pid else None
 
+    def prender(self, pid):                         # sem cache, nada a despejar
+        pass
+
     def agendar(self, pagina):
         self.agendadas += 1
         return True

@@ -638,6 +638,13 @@ menor que a margem configurada (matriz montada à mão).
   seleção múltipla, desfazer (que é o *Back* do FineReader).
 - **Efeitos**: negrito e itálico (`core.negrito`) guardados com a amostra; o k-NN só compara
   amostras do mesmo efeito quando o efeito do glifo é conhecido.
+  **Na página escaneada** (2026-10-30, `ferramentas/medir_efeitos.py`): o negrito mede a
+  espessura do traço em tons de cinza e decide com a **régua do livro** — cada página guarda,
+  por caractere, a contagem, o quantil 25 e a mediana das espessuras (no arquivo dela e no
+  `livro.json`), e o lote e o F5 mandam a régua das outras páginas com o pedido de leitura;
+  na página de partida, a página sozinha não tem o redondo dos algarismos e das casas. O
+  itálico mede a inclinação pela projeção cisalhada da tinta, que vale também na página em
+  preto e branco.
 - **Ligaduras**: padrão de vários caracteres (`ﬁ` como "fi"); no Documento, cada letra
   sincroniza com o mesmo gid.
 - A faixa Linha no lugar do rótulo "Na linha".

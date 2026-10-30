@@ -187,6 +187,67 @@ do leitor. Nenhum problema.
 No celular, os mesmos dois EPUB abertos no ReadEra pelo usuário, no mesmo dia: tudo
 normal, com os símbolos de avaliação e as figurinas das peças.
 
+## O negrito e o itálico na página escaneada
+
+Pedido do usuário em 2026-10-30, depois do EPUB conferido: "o que falta são melhorias no
+reconhecimento de itálicos, negrito". As duas réguas só tinham sido medidas no Odds & Ends
+renderizado do PDF digital (o itálico) e no Dvoretsky (o negrito, no core).
+
+**A medida** (`ferramentas/medir_efeitos.py`, `f2c66f8`): o Odds & Ends com o negrito e o
+itálico pela camada, a página renderizada e degradada como um escâner — `escaneado` (220
+dpi, borrão, ruído, 0,3° de giro, JPEG), `binario` (o mesmo em preto e branco), `ruim` (150
+dpi, mais borrão e giro). As mesmas páginas de ajuste e de validação do `medir_italico`. O
+gabarito precisou de uma correção: o ChessBase imprime os lances da linha principal e o
+cabeçalho das partidas (p. 75–86) num negrito falso, o mesmo glifo desenhado quatro vezes
+com 0,24 pt de passo numa fonte que se diz redonda; sem isso, os acertos da régua contavam
+como ~700 falsos.
+
+**O que estava errado:**
+
+- O negrito comparava a espessura de cada glifo com a do mesmo caractere **na página**. Numa
+  página de partida, quase todo algarismo e letra de casa está num lance negrito: o
+  "redondo" deles sai negrito, e o negrito some (o core mede com o livro inteiro por isso).
+- A espessura era a da tinta binarizada: o traço do corpo tem ~2 px, e o mesmo "t" redondo
+  media 1,00 ou 1,18 conforme a fase na grade.
+- O itálico media a inclinação pela direção do gradiente das bordas: na página em preto e
+  branco a borda inclinada é uma escada de degraus verticais, e o itálico sumia (0%).
+
+**O que mudou** (`ec5b145`, `cd499b4`): a espessura pela massa da tinta em tons de cinza ÷ o
+perímetro; a régua do livro (`abbychess/regua_do_negrito.py`: cada página guarda, por
+caractere, a contagem, o quantil 25 e a mediana, no arquivo e no `livro.json`, e o lote e o
+F5 mandam a das outras páginas com o pedido); o itálico pela projeção cisalhada da tinta,
+entre 7° e 22° além das retas, com o ganho de 1,03 (o teto tira as palavras de diagonais,
+v, w, y, que a projeção afia a 25–30°).
+
+**Medido** nas páginas de validação (`docs/medidas/2026-10-30-efeitos-linha-de-base.json`,
+`2026-10-30-efeitos.json`, no `cd499b4`), o negrito com a régua das páginas lidas antes,
+como o lote:
+
+| perfil | itálico antes | itálico agora | negrito antes | negrito agora | falsos do negrito |
+|---|---|---|---|---|---|
+| limpo | 95,9% | 99,8% | 78,6% | 98,9% | 228 → 132 em 16.641 |
+| escaneado | 88,7% | 98,9% | 39,7% | 90,8% | 75 → 103 em 16.582 |
+| preto e branco | 0% | 99,1% | 70,7% | 94,5% | 83 → 61 em 16.582 |
+| ruim | 37,8% | 99,0% | 23,4% | 71,0% | 107 → 115 em 16.305 |
+
+O itálico continua sem falso. Dos falsos do negrito que sobram na página limpa, boa parte é
+do gabarito: as p. 7 e 15 têm a camada com os caracteres trocados ("very" vem "2222"), o
+"½–½" do fim das partidas é negrito falso que escapa da detecção, e as ligaduras (ﬁ, Th)
+vêm como um caractere da camada. Os de verdade são palavras de 2 glifos ("by", "be"),
+números em itálico e uma página em fonte sem serifa (p. 587: a régua mede peso, não
+família). Uma regra para as palavras curtas (negrito só com a vizinha firme, ou com o peso
+1,3 vez o normal) tirou 10 dos 35 falsos do escaneado no ajuste e custou 0,5 ponto de
+acerto: ficou de fora.
+
+**O Karolyi** (`2026-10-30-efeitos-karolyi.json`), com a camada ClearScan do Acrobat como
+segunda opinião (o palpite do OCR dele, não um gabarito): concordamos em 86% do negrito
+dele, e as 358 palavras que marcamos e ele não são, na maior parte, lances da linha principal
+em negrito que o Acrobat leu como redondos (p. 61). O itálico dele tem 9 palavras: sem
+conclusão.
+
+**O custo**: os efeitos da página passam de ~105 para ~250 ms (a espessura nova, ~100 ms
+pelo histograma dos tons; o `np.percentile` custava 290), +2% no lote.
+
 ## A revisão de código
 
 Uma rodada, de um revisor independente sobre os seis primeiros commits: nada grave. As quatro

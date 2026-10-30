@@ -13,6 +13,11 @@ Cada página guarda a régua dela (`regua_da_pagina`: por caractere, a contagem,
 a mediana), que vai ao resumo do livro (`livro.json`) com as outras contas da página; o
 projeto junta as das outras páginas (`juntar`) e a manda com o pedido de leitura. A página
 apagada sai da régua com o resumo dela, e a página relida troca a régua dela.
+
+Medido no Odds & Ends (`ferramentas/medir_efeitos.py`, as páginas de validação lidas em
+ordem, cada uma com a régua das de antes, como o lote): 98,9% das palavras em negrito na
+página limpa, 90,8% na escaneada, 94,5% na escaneada em preto e branco (com a régua da página
+só, 84%, 64% e 75%; antes da espessura em tons de cinza, 79%, 40% e 71%).
 """
 
 from __future__ import annotations

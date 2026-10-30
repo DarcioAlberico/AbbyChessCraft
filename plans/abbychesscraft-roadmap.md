@@ -1075,6 +1075,11 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   links deles, os links internos, os símbolos e o modo escuro saíram certos.
 - O EPUB no celular, conferido pelo usuário (2026-10-30): os mesmos dois no ReadEra, com
   os símbolos de avaliação e as figurinas normais.
+- O negrito e o itálico na página escaneada (2026-10-30, com o pedido do usuário;
+  `docs/revisoes/pendencias.md`): medidos no Odds & Ends limpo e degradado como escaneado
+  (`ferramentas/medir_efeitos.py`). Nas páginas de validação, o itálico achado passa de
+  95,9 / 88,7 / 0 / 37,8% (limpa, escaneada, preto e branco, ruim) a 99,8 / 98,9 / 99,1 /
+  99,0%, sem falsos; o negrito, de 78,6 / 39,7 / 70,7 / 23,4% a 98,9 / 90,8 / 94,5 / 71,0%.
 
 Continuam: a conferência cega da fatia. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).

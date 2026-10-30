@@ -783,8 +783,9 @@ def espessura_do_traco(recorte: np.ndarray) -> Optional[float]:
     pixel: o mesmo "t" redondo media 1,00 numa ocorrência e 1,18 na outra, conforme a fase do
     traço na grade. A massa em tons de cinza guarda a fração do pixel da borda. Medido no Odds
     & Ends (`ferramentas/medir_efeitos.py`, o negrito pela camada, com o negrito falso do
-    ChessBase), a régua da página acha 87% das palavras em negrito na página limpa (77% com a
-    medida do core) e 66% na escaneada (16%), com os falsos de 0,7% para 0,3%.
+    ChessBase; as páginas de validação), a régua da página acha 84% das palavras em negrito na
+    página limpa (79% com a medida do core) e 64% na escaneada (40%), e os falsos da limpa
+    caem de 1,4% para 0,4%; com a régua do livro (`regua_do_negrito`), 99% e 91%.
 
     O fundo e a tinta são os do próprio recorte (os quantis 90 e 10), e a massa só conta perto
     da tinta: o ruído do papel não engorda o traço."""
@@ -920,7 +921,7 @@ def decidir_negritos(boxes: Sequence[BoxEntry], palavras: Sequence[List[int]],
 #: `GANHO_DO_ITALICO` vezes mais afiada que a de pé, medida em `MINIMO_DE_LETRAS_DO_ITALICO`
 #: letras ou mais. Ajustados no Odds & Ends (o itálico pela fonte do PDF, a página limpa e
 #: degradada como escaneada, `ferramentas/medir_efeitos.py`): nas páginas que não entraram
-#: no ajuste, 0 falsos em ~11.500 palavras retas e 99,8% das itálicas na página limpa, 98,8%
+#: no ajuste, 0 falsos em ~11.500 palavras retas e 99,8% das itálicas na página limpa, 98,9%
 #: na escaneada, 99,1% na escaneada em preto e branco e 99,0% na ruim (a régua de antes, pelo
 #: gradiente das bordas: 95,9%, 88,7%, 0% e 37,8%).
 INCLINACAO_DO_ITALICO = 7.0

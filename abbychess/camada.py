@@ -20,12 +20,11 @@ a página do livro inteira (sem quadro nem giro): a camada está nas coordenadas
 
 from __future__ import annotations
 
-import re
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import List, Sequence, Tuple
 
 from core.box_model import BoxEntry
 

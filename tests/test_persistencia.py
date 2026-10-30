@@ -25,6 +25,7 @@ from abbychess import gravacao as gv
 from abbychess import pagina as pg
 from abbychess import verificacao as vf
 from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL, FONTE_NENHUMA, LeitorDoLivro
+from abbychess.modelo import NAO_RECONHECIDA
 from abbychess.padroes import PadroesDoLivro
 from abbychess.projeto import (ARQUIVO_DO_LIVRO, VERSAO_DO_LIVRO, Limiares, ProjetoDeLivro, ProjetoInvalido,
                                pendentes_pelo_histograma, resumo_das_confiancas)
@@ -313,6 +314,34 @@ def test_metadados_dos_padroes_ilegiveis_ficam_guardados_e_nao_sao_sobrescritos(
     guardados = sorted(pasta.glob("metadados*corrompido*"))
     assert [g.read_bytes() for g in guardados] == [estragado]
     assert any("metadados" in r.getMessage() for r in caplog.records)
+
+
+def test_a_pagina_ilegivel_fica_guardada_e_e_nao_reconhecida_em_todo_lugar(projeto):
+    """SPEC-qualidade CA-Q-P7: um p<pid>.json truncado não é "reconhecida" no livro e
+    "nada gravado" na busca, nem levanta ao abrir a página: na primeira leitura ele vai
+    inteiro para p<pid>.corrompido.json, sai do livro.json, e a página é não reconhecida para
+    todos (a busca, a aba Diagramas, a janela, a exportação); o aviso sai uma vez."""
+    projeto.salvar_pagina(0, [_box()], reconhecida=True)
+    assert projeto.fechar()
+    arquivo = projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(0)}.json"
+    estragado = arquivo.read_bytes()[:-9]
+    arquivo.write_bytes(estragado)
+
+    aberto = ProjetoDeLivro.abrir(projeto.pasta)
+    avisos = []
+    aberto.ao_achar_ilegivel = lambda posicao, guardado: avisos.append((posicao, guardado))
+    assert aberto.ler_sem_migrar(0) is None              # a busca, numa thread
+    assert aberto.ler_sem_guardar(0) is None             # a aba Diagramas
+    assert aberto.carregar_modelo(0) is None             # a janela: não levanta
+    assert aberto.estado_da_pagina(0) == NAO_RECONHECIDA and aberto.paginas_lidas() == []
+    [guardado] = sorted((projeto.pasta / "paginas").glob("p*.corrompido*.json"))
+    assert guardado.read_bytes() == estragado and not arquivo.exists()
+    assert avisos == [(0, guardado.name)]
+    assert aberto.fechar()
+
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert reaberto.carregar_modelo(0) is None and reaberto.paginas_lidas() == []
+    assert len(list((projeto.pasta / "paginas").glob("p*.corrompido*.json"))) == 1
 
 
 def test_temporarios_sobrando_sao_apagados_ao_abrir(projeto):

@@ -339,7 +339,7 @@ class ProjetoDeLivro:
             # A trava por último: uma falha antes dela não deixa a pasta travada sem dono.
             projeto.somente_leitura = projeto._travado = True
             gv.proteger(pasta)
-            projeto._guardar_a_v1_na_memoria()
+            projeto._guardar_a_v1_na_memoria(v1_vence=False)
             try:
                 projeto.sequencia       # só na memória: nada é gravado
             except ProjetoInvalido:     # a sequência de um formato que esta versão não lê
@@ -372,7 +372,7 @@ class ProjetoDeLivro:
                     projeto.migrado = True
                 # As páginas v1 migram todas aqui, antes de qualquer leitura (SPEC-qualidade
                 # Q-P1): a queda no meio da cadeia, ou um arquivo v1 copiado de volta, também.
-                projeto._migrar_a_v1()
+                projeto._migrar_a_v1(v1_vence=versao_de_antes < 2)
                 if dados.versao < VERSAO and projeto.fonte.is_file():
                     projeto._migrar_para_v3()
                     projeto.backups_da_migracao.append(pasta / PASTA_DO_BACKUP_V2)
@@ -392,7 +392,7 @@ class ProjetoDeLivro:
                     f"gravar na pasta dele ({erro}). Ele abre só para leitura.")
                 projeto.somente_leitura = projeto._travado = True
                 gv.proteger(pasta)
-                projeto._guardar_a_v1_na_memoria()
+                projeto._guardar_a_v1_na_memoria(v1_vence=versao_de_antes < 2)
                 projeto.sequencia
                 return projeto
         if mudou:
@@ -1012,22 +1012,39 @@ class ProjetoDeLivro:
             pagina.zonas = zn.com_ids([Zona.de_dict(z) for z in bruto.get("zonas", [])])
         return pagina
 
-    def _migrar_a_v1(self) -> None:
-        """Na abertura, antes de qualquer leitura (SPEC-qualidade Q-P1): grava como v2 cada
-        página v1 da pasta e tira os arquivos v1 dela (a cópia está em `backup-v1/`). O
-        número do arquivo v1 é a página do PDF, que é o `pid` dela, e não a posição no livro,
-        que reordenar muda. Um arquivo v1 presente vence o v2 de mesmo pid: é o `backup-v1/`
-        copiado de volta (CA-4.5)."""
-        for pid in self._indices_v1():
-            self._gravar(self._ler_v1(pid))
-            gv.apagar(self._arquivo_v1(pid))
-            gv.apagar(self.pasta / PASTA_DE_ZONAS / f"{pid + 1:04d}.json")
+    def _pids_v1(self, v1_vence: bool) -> List[int]:
+        """As páginas v1 da pasta que valem como página: todas quando o `projeto.json` é o
+        da v1 (a primeira abertura, ou o `backup-v1/` copiado de volta, que vence o v2 de
+        mesmo pid: CA-4.5); senão, só as que não têm o `p<pid>.json`. O arquivo v1 de uma
+        página que já o tem é a sobra de uma migração que gravou a página e não conseguiu
+        apagá-lo: migrá-lo de novo passaria a página por cima (SPEC-qualidade Q-P2)."""
+        return [pid for pid in self._indices_v1()
+                if v1_vence or not self._arquivo_v2(pid).is_file()]
 
-    def _guardar_a_v1_na_memoria(self) -> None:
-        """Só para leitura (nada migra): cada página v1 da pasta, lida uma vez, como o JSON v2
-        que a migração gravaria (`_gravada` a lê daqui); a ilegível fica de fora."""
-        self._v1_so_leitura = {}
+    def _migrar_a_v1(self, v1_vence: bool) -> None:
+        """Na abertura, antes de qualquer leitura (SPEC-qualidade Q-P1): grava como v2 cada
+        página v1 da pasta (`_pids_v1`) e tira os arquivos v1 (a cópia está em
+        `backup-v1/`). O número do arquivo v1 é a página do PDF, que é o `pid` dela, e não a
+        posição no livro, que reordenar muda. Um arquivo que não sai fica como sobra: a página
+        já está gravada, e a próxima abertura o apaga."""
+        migrar = set(self._pids_v1(v1_vence))
         for pid in self._indices_v1():
+            if pid in migrar:
+                self._gravar(self._ler_v1(pid))
+            for arquivo in (self._arquivo_v1(pid),
+                            self.pasta / PASTA_DE_ZONAS / f"{pid + 1:04d}.json"):
+                try:
+                    gv.apagar(arquivo)
+                except OSError as erro:
+                    log.warning("o arquivo v1 %s ficou (%s); a próxima abertura o apaga",
+                                arquivo, erro)
+
+    def _guardar_a_v1_na_memoria(self, v1_vence: bool) -> None:
+        """Só para leitura (nada migra): cada página v1 da pasta (`_pids_v1`), lida uma vez,
+        como o JSON v2 que a migração gravaria (`_gravada` a lê daqui); a ilegível fica de
+        fora."""
+        self._v1_so_leitura = {}
+        for pid in self._pids_v1(v1_vence):
             try:
                 self._v1_so_leitura[pid] = _pagina_para_json(self._ler_v1(pid), pid)
             except (OSError, ValueError, TypeError, KeyError) as erro:

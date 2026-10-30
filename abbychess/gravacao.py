@@ -142,10 +142,18 @@ def gravar_json(caminho: Caminho, dados) -> None:
 
 
 def apagar(caminho: Caminho) -> None:
-    """Remove um arquivo do projeto, se existir; recusa em projeto só para leitura."""
+    """Remove um arquivo do projeto, se existir, com as novas tentativas da gravação (o
+    antivírus que o segura um instante); recusa em projeto só para leitura."""
     caminho = Path(caminho)
     _recusar_se_protegida(caminho)
-    caminho.unlink(missing_ok=True)
+    for tentativa in range(TENTATIVAS):
+        try:
+            caminho.unlink(missing_ok=True)
+            return
+        except PermissionError:
+            if tentativa == TENTATIVAS - 1:
+                raise
+            time.sleep(ESPERA)
 
 
 def limpar_temporarios(pasta: Caminho) -> List[Path]:

@@ -146,6 +146,42 @@ def test_ca_11_4_a_pagina_aberta_e_suja_nao_e_sobrescrita(ctl, projeto):
     assert p.box(p.gids[0]).char == "Z"
 
 
+def test_a_pagina_aberta_nao_sai_do_cache_num_lote_maior_que_ele(ctl, projeto, monkeypatch):
+    """CA-Q-P3: o lote de mais páginas que o cache (aqui o cache de 1 e o lote de 3) não
+    despeja a página aberta e limpa: o lote que a relê depois mostra a leitura nova na
+    janela, e a correção seguinte, feita lá, não a apaga do disco."""
+    from abbychess import lote
+    from abbychess import projeto as modulo
+
+    p = ctl.pagina
+    ctl.reconhecer([0], refazer=False)
+    ctl.executor.tudo()
+    projeto.descarregar(10)
+    monkeypatch.setattr(modulo, "PAGINAS_EM_MEMORIA", 1)
+    ctl.reconhecer([1, 2], refazer=False)
+    ctl.executor.tudo()
+
+    ler_pagina = lote.sl.ler_pagina
+
+    def outra_leitura(*args, **kwargs):          # a releitura acha outra letra no 1º glifo
+        lida = ler_pagina(*args, **kwargs)
+        lida.boxes[0].char = "W"
+        return lida
+
+    monkeypatch.setattr(lote.sl, "ler_pagina", outra_leitura)
+    primeiro, segundo = p.gids[0], p.gids[1]
+    ctl.reconhecer([0], refazer=True)
+    ctl.executor.tudo()
+    assert ctl.fins[-1].lidas == [0]
+    assert p.box(primeiro).char == "W"           # a janela mostra o que o lote leu
+    p.escolher(segundo)
+    p.corrigir("Z")
+    projeto.descarregar(10)
+    gravada = {b.gid: b.entry.char for b in ProjetoDeLivro.abrir(projeto.pasta)
+               .carregar_modelo(0).boxes}
+    assert (gravada[primeiro], gravada[segundo]) == ("W", "Z")
+
+
 def test_sem_servidor_a_edicao_espera_a_pagina_do_lote_e_vale_depois(ctl, projeto):
     """Sem servidor, a leitura do lote prende o leitor da interface: a edição pedida no meio
     entra na fila e roda depois da página (com o servidor, roda na hora, e a página vai

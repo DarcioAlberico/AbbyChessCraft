@@ -97,6 +97,10 @@ grava o mesmo `p<pid>.json` por dois caminhos (Q-P4).
 **Pronto quando:** os quatro CA passam; `-m processo` e o portão `livro_real` passam; o
 comentário de `projeto.py:234` está certo.
 
+**Feito** em 2026-10-30, ramo `qualidade-q1` (`docs/revisoes/qualidade-Q1.md`): os quatro CA
+e o comentário. O portão `livro_real` passa em 20 de 21; o que reprova (o índice da busca
+pela janela, CA-7.1, 2,5 s para a meta de 2 s × 1,2) reprova igual na base `bc4c6c5`.
+
 ## Passo Q2 — Nenhum erro some
 
 **Contexto.** `app/trabalho.py:_fim` deixa a exceção do `pronto` sair sem log (Q-C1); há

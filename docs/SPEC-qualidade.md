@@ -83,6 +83,9 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
 - **Correção mínima:** `_tem_v1`/`_ler_v1` por pid; ou `migrar_tudo()` dentro de
   `_migrar_para_v3`, para que a v3 nunca conviva com v1 pendente (preferível: tira a v1 do
   caminho de leitura, §3 Q-P8).
+- **Feito** no Q1 (`92f7a79` o teste, `7eedd90` a correção), pela decisão §13.1: a v1 migra
+  inteira na abertura, pelo pid; só para leitura ela fica na memória, também por pid, e a
+  leitura das páginas não conhece mais a v1.
 
 ### Q-P2 (Alta, confirmado) — um arquivo v1 que sobrou regrava a página vazia
 
@@ -94,8 +97,13 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
   migrada continua com todos os glifos depois de reabrir.
 - **Correção mínima:** apagar primeiro o v1 de zonas e por último o de página (o de página
   marca "migrada"); `apagar` com as mesmas novas tentativas de `gravar_bytes`.
+- **Feito** no Q1 (`0c99af5`, `499aff4`), por outro caminho: nenhuma ordem de apagar é
+  segura sozinha (sobrar o de página perde as áreas). Vale como página o arquivo v1 cujo pid
+  ainda não tem o `p<pid>.json`, ou todos quando o `projeto.json` é o da v1 (CA-4.5); o resto
+  é sobra e sai. A falha de apagar fica no log e não derruba a abertura para só leitura.
+  Antes, fora do pytest, a cena perdia os 15 glifos da página 0.
 
-### Q-P3 (Alta, suspeita) — a página aberta pode sair do cache durante o lote
+### Q-P3 (Alta, confirmado no Q1) — a página aberta pode sair do cache durante o lote
 
 - **Evidência:** o LRU de 16 páginas (`projeto.py:747-755`) só poupa as sujas; `lote.py:381`
   e `421` comparam `pagina is p.modelo`.
@@ -105,6 +113,9 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
   termina com a leitura do lote visível na janela e no disco, e uma edição seguinte não a
   apaga.
 - **Correção mínima:** `projeto.fixar(pid)` para a página aberta.
+- **Feito** no Q1 (`b1bd35d`, `b26f117`): o teste (o cache de 1 e o lote de 3) confirmou a
+  suspeita; com o cache de sempre o mesmo teste passava. O `modelo` do controlador virou
+  propriedade, e trocar a página aberta chama `projeto.prender(pid)`.
 
 ### Q-P4 (Média, confirmado) — o escritor único de `p<pid>.json` é convenção
 
@@ -117,6 +128,11 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
   500 repetições.
 - **Correção mínima:** `salvar_modelo` passa pelo gravador (`agendar` + `descarregar`);
   temporário com sufixo único.
+- **Feito** no Q1 (`d9f2121`, `0cea755`), por outro caminho: passar pelo gravador tiraria o
+  erro de quem grava em síncrono, e o sufixo único não resolve a ordem. Cada conteúdo ganha um
+  bilhete quando é fotografado, toda gravação do arquivo passa por um lugar só, uma por vez,
+  e o arquivo nunca recebe um bilhete mais velho que o último. O teste força a ordem ruim (o
+  gravador preso com o instantâneo velho) em vez de 500 sorteios, e passou 10 vezes seguidas.
 
 ### Q-P5 (Média, confirmado) — nada impede dois processos no mesmo projeto
 
@@ -463,8 +479,8 @@ teste usa como o usuário; senão saem. Os 3 F401 de `camada.py` saem já (o por
 
 ## 13. Decisões em aberto
 
-1. **Q-P1:** migrar toda a v1 na abertura (some a migração preguiçosa) ou só passar a busca a
-   pid? A primeira tira código; a segunda é menor.
+1. ~~**Q-P1:** migrar toda a v1 na abertura ou só passar a busca a pid?~~ **Decidido**
+   (2026-10-30): migrar toda a v1 na abertura.
 2. **Faixas de páginas:** o "–" do lote e o "-" do diálogo são de propósito (mostrar contra
    digitar)?
 3. **Q-P5:** o segundo processo abre só para leitura ou recusa?

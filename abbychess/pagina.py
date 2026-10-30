@@ -799,8 +799,8 @@ def espessura_do_traco(recorte: np.ndarray) -> Optional[float]:
     if len(ys) < negrito.MINIMO_DE_TINTA or len(ys) == tinta.size:
         return None
     tons = recorte.astype(np.float32)
-    fundo = float(np.percentile(tons, 90))
-    escuro = float(np.percentile(tons[tinta > 0], 10))
+    fundo = _quantil_dos_tons(recorte, 0.90)
+    escuro = _quantil_dos_tons(recorte[tinta > 0], 0.10)
     if fundo - escuro < CONTRASTE_MINIMO_DO_TRACO:
         return None
     perto = cv2.dilate(tinta, np.ones((3, 3), np.uint8)) > 0
@@ -818,6 +818,13 @@ def espessura_do_traco(recorte: np.ndarray) -> Optional[float]:
 #: A diferença de tom entre o papel e a tinta abaixo da qual o recorte não tem traço que se
 #: meça (um borrão, um pedaço de fundo).
 CONTRASTE_MINIMO_DO_TRACO = 30
+
+
+def _quantil_dos_tons(tons: np.ndarray, q: float) -> float:
+    """O quantil `q` de tons de 0 a 255, pelo histograma: o `np.percentile` ordena o recorte
+    e custava 250 ms por página (duas vezes por glifo)."""
+    acumulado = np.cumsum(np.bincount(np.asarray(tons, np.uint8).ravel(), minlength=256))
+    return float(np.searchsorted(acumulado, q * (acumulado[-1] - 1), side="right"))
 
 
 @dataclass

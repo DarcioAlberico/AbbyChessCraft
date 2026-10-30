@@ -26,12 +26,16 @@ diferem): **a letra onde o lance ou o número pede algarismo** — "l.♗h7!", "
 um lance com figurina ou algarismo de verdade, ou um número: o "el" do espanhol fica.
 
 E a linha decide o que a palavra não vê (`_pela_linha`), pelo desenho igual em dois tamanhos
-ou em duas alturas:
+ou em duas alturas, e pela palavra seguinte (o "l" solto antes de "...d3" é o número):
 
 - **a vírgula no alto da linha é apóstrofo** ("pawn,s", "couldn,t"), e o apóstrofo encostado
   na base é vírgula ("Linares' 2005"): na fonte do Mirkovic os dois são o mesmo glifo;
 - **a minúscula do tamanho das maiúsculas é maiúscula** ("white moves", "oPPOSITIoN"), e o
   contrário, nas letras de mesmo desenho nas duas caixas (c, o, s, v, w, x, z).
+
+A página decide a figurina larga demais (`_figurinas_largas`): as figurinas de um livro têm
+todas a mesma largura, e a que passa disso engoliu a letra colada nela ("♘f4" lido "♘4" na
+p. 88 do Mirkovic, com confiança alta). Ela não tem sugestão: a revisão a divide.
 
 Cada improvável traz a sugestão quando há uma (`sugestoes`): o painel a põe no campo e o
 Enter a ensina.
@@ -230,6 +234,56 @@ def _pela_linha(linhas: Sequence[Sequence[Sequence[int]]], por_gid) -> Tuple[dic
     return saida, alturas
 
 
+def _numeros_soltos(linhas: Sequence[Sequence[Sequence[int]]], char) -> Dict[int, str]:
+    """{gid: algarismo} da letra solta que é o número do lance das pretas logo depois,
+    separado das reticências ("l ...d3", `lances._NUMERO_SEPARADO`)."""
+    saida = {}
+    for linha in linhas:
+        for palavra, seguinte in zip(linha, linha[1:]):
+            chars = [char[g] for g in palavra]
+            numero = "".join(_ALGARISMO_DA_LETRA.get(c, c) for c in chars)
+            if not numero.isdigit() or numero.startswith("0"):    # "o ...Cf6" é o artigo
+                continue
+            depois = "".join(char[g] for g in seguinte)
+            lance = depois.lstrip(".…")
+            if len(depois) - len(lance) >= 2 or depois.startswith("…"):
+                if lance and _e_lance(list(lance)):
+                    saida.update((g, _ALGARISMO_DA_LETRA[c]) for g, c in zip(palavra, chars)
+                                 if c in _ALGARISMO_DA_LETRA)
+    return saida
+
+
+#: Quanto a figurina pode passar da largura das outras iguais da página, em frações da altura
+#: dela: as do Mirkovic variam 2 px em 36, e uma letra colada acrescenta pelo menos um "l".
+FOLGA_DA_FIGURINA = 0.2
+#: Quantas figurinas iguais a página precisa ter para a mediana delas medir a largura; com
+#: menos, a medida é a de todas as figurinas da página.
+FIGURINAS_DA_MEDIDA = 3
+
+
+def _figurinas_largas(pagina) -> FrozenSet[int]:
+    """Os gids das figurinas mais largas que as outras da página (`FOLGA_DA_FIGURINA`)."""
+    from statistics import median
+
+    from core.notacao import FIGURINAS
+
+    figurinas = [b for b in pagina.boxes if b.entry.char and b.entry.char in FIGURINAS]
+    if len(figurinas) < FIGURINAS_DA_MEDIDA:
+        return frozenset()
+    larguras: Dict[str, List[int]] = {}
+    for b in figurinas:
+        larguras.setdefault(b.entry.char, []).append(b.entry.x2 - b.entry.x1)
+    todas = median(w for ws in larguras.values() for w in ws)
+    saida = set()
+    for b in figurinas:
+        e = b.entry
+        iguais = larguras[e.char]
+        medida = median(iguais) if len(iguais) >= FIGURINAS_DA_MEDIDA else todas
+        if e.x2 - e.x1 > medida + FOLGA_DA_FIGURINA * (e.y2 - e.y1):
+            saida.add(b.gid)
+    return frozenset(saida)
+
+
 #: As últimas páginas julgadas: chave -> {gid: sugestão}, a mais recente no fim. A fila da
 #: janela pergunta várias vezes por ação (~2–3 ms cada numa página do livro); a chave custa
 #: uma fração disso. Mais de uma: o resumo da página gravada (`improvaveis_da_lista`, com os
@@ -270,6 +324,8 @@ def julgar(pagina) -> Dict[int, str]:
                 # "whereWhite": o W tem a altura de maiúscula; o que falta é o espaço.
                 sugestao = ""
             saida[gid] = sugestao
+    saida.update(_numeros_soltos(linhas, char))
+    saida.update((g, "") for g in _figurinas_largas(pagina) if g not in saida)
     julgada = MappingProxyType(saida)
     with _TRAVA:
         _JULGADAS[chave] = julgada

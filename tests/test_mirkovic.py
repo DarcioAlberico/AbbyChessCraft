@@ -1,8 +1,9 @@
 """O que o *Chess School 1* do Mirkovic (PDF ClearScan, 2013) mostrou que faltava.
 
-As medidas são das pp. 10, 18, 19, 89 e 160 do livro, lidas no projeto do usuário: os lances
-colados pelo negrito apertado, a numeração dos diagramas em duas colunas, a linha que
-atravessa a calha, o fio embaixo do cabeçalho corrido e o idioma do projeto.
+As medidas são das pp. 10, 18, 19, 88, 89 e 160 do livro, lidas no projeto do usuário: os
+lances colados pelo negrito apertado, a numeração dos diagramas em duas colunas, a linha que
+atravessa a calha, o fio embaixo do cabeçalho corrido, o idioma do projeto, o número separado
+das reticências da variante e a figurina que engoliu a letra colada nela.
 """
 
 from __future__ import annotations
@@ -199,3 +200,57 @@ def test_possessivo_e_hifen_pelas_partes():
     assert not vf.conhecida_pelas_partes(lex, "pawn,s") and not vf.conhecida_pelas_partes(lex, "knight's")
     boxes = _boxes_da_linha("the pawn's h-pawn knight's", 40, 100)
     assert [d.palavra for d in vf.desconhecidas(boxes, _lex("the", "pawn"))] == ["knight's"]
+
+
+# ----------------------------------------------------------------------
+# P. 88: o número separado da variante e a figurina larga
+# ----------------------------------------------------------------------
+
+#: Blackburne - Pillsbury, corr. 1897 (p. 88), as brancas jogam.
+BLACKBURNE = "3r3r/5p2/4b1pb/4P3/NkppB1Pp/1P3P2/7P/3RR2K"
+
+
+def test_o_numero_separado_das_reticencias_fecha_a_linha():
+    from abbychess import lances as lc
+
+    linha = lc.primeira_linha("1.bc4! ♔a4 l ...d3 2.♖b1 ♔c4 3.♗b7 d2", "en")
+    assert [lance.san for lance in linha] == ["bc4", "Ka4"]
+    assert lc.validar(BLACKBURNE, linha, lado="w").confiavel
+    # "o ...Cf6" é o artigo: a linha segue.
+    linha = lc.primeira_linha("1.e4 e5 o ...Cf6 seria ruim 2.Cf3", "pt")
+    assert [lance.san for lance in linha] == ["e4", "e5", "Nf3"]
+
+
+def test_o_numero_separado_sugere_o_algarismo():
+    from abbychess import contexto
+
+    pagina = tx.pagina_avulsa(_boxes_da_linha("♔a4 l ...d3 2.♖b1", 40, 100))
+    assert contexto.sugestoes(pagina) == {pagina.boxes[3].gid: "1"}
+    for texto in ("e5 o ...Cf6 2.Cf3", "and l ... then"):
+        pagina = tx.pagina_avulsa(_boxes_da_linha(texto, 40, 100))
+        letras = {b.gid for b in pagina.boxes if b.entry.char in "lo"}
+        assert not letras & set(contexto.improvaveis(pagina)), texto
+
+
+def _figurinas(larguras, y: int = 100) -> list:
+    """Figurinas de 36 px de altura com as larguras dadas, cada uma num lance ("♘f4")."""
+    boxes, x = [], 40
+    for k, largura in enumerate(larguras):
+        boxes.append(BoxEntry("♘♔♕"[k % 3], x, y, x + largura, y + 36, 0.98, "neural"))
+        boxes.append(BoxEntry("4", x + largura + 1, y + 2, x + largura + 20, y + 33, 0.99,
+                              "neural"))
+        x += largura + 40
+    return boxes
+
+
+def test_a_figurina_larga_demais_vai_para_a_revisao_sem_sugestao():
+    """"1...♘f4!" lido "1...♘4!": o ♘ de 52 px, os outros de 36."""
+    from abbychess import contexto
+
+    pagina = tx.pagina_avulsa(_figurinas([36, 37, 36, 52, 35, 36, 37]))
+    larga = pagina.boxes[6].gid
+    assert set(contexto.improvaveis(pagina)) == {larga}
+    assert larga not in contexto.sugestoes(pagina)
+    # As que variam um ou dois pixels passam, e com poucas figurinas não há medida.
+    assert not contexto.improvaveis(tx.pagina_avulsa(_figurinas([34, 36, 38, 37, 35, 36])))
+    assert not contexto.improvaveis(tx.pagina_avulsa(_figurinas([36, 52])))

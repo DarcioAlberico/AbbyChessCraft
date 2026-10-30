@@ -74,6 +74,11 @@ _NUMERO = re.compile(r"^(\d{1,3})(\.{2,}|…|\.)(.*)$")
 #: Sem algarismo de verdade, só vale colado a um lance: "lo." no fim de uma frase é palavra.
 _NUMERO_DO_OCR = re.compile(r"^([0-9lI|Oo]{1,3})(\.{2,}|…|\.)(.*)$")
 _ALGARISMOS_DO_OCR = str.maketrans("lI|Oo", "11100")
+#: O número separado das reticências da variante ("l ...d3", "1 ...♖e8"; Mirkovic, p. 88): o
+#: lance das pretas sem número continuaria a linha principal. Não começa por O ou o: o
+#: "o ...Cf6" do português é o artigo.
+_NUMERO_SEPARADO = re.compile(r"(?<!\S)([(\[{]?[1-9lI|][0-9lI|Oo]{0,2})\s+"
+                              r"(?=(?:\.{2,}|…)[^\s.…])")
 #: O `1` da casa lido como `l` ("♕el", "♖adl", "♔hl"): só no lance de peça ou de captura,
 #: senão o "el" de um livro em espanhol viraria e1.
 _FILEIRA_1_DO_OCR = re.compile(r"(?<=[a-h])[lI|](?=[+#!?‼⁇⁈⁉]*$)")
@@ -197,7 +202,7 @@ def _tokens(texto: str, idioma: str):
     """(tipo, valor) do texto: "numero" (n, pretas), "lance" Lance, "sinal", "prosa",
     "variante" (abre ou fecha) e "fim" (ponto e vírgula)."""
     tabela = _tabela(idioma)
-    for palavra in texto.split():
+    for palavra in _NUMERO_SEPARADO.sub(r"\1", texto).split():
         abre = palavra[:1] in "([{"
         nucleo = palavra.lstrip("([{")
         fecha = nucleo.rstrip(_BORDA)[-1:] in (")", "]", "}") if nucleo else False

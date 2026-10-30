@@ -220,6 +220,45 @@ def test_pagina_com_gravacao_pendente_nao_sai_da_memoria(projeto, monkeypatch):
     assert projeto.descarregar(10)
 
 
+def test_a_gravacao_sincrona_nao_perde_para_o_instantaneo_velho_do_gravador(projeto,
+                                                                            monkeypatch):
+    """CA-Q-P4: o gravador tira da fila o instantâneo da edição "y" e, antes de gravá-lo, a
+    gravação síncrona (`salvar_modelo`) grava a página com a edição seguinte, "z". O arquivo
+    e o `livro.json` ficam com a mais nova, como se as duas tivessem gravado em ordem."""
+    pagina = _pagina(projeto, 0)
+    projeto.salvar_modelo(pagina)
+    arquivo = projeto.pasta / "paginas" / f"p{pagina.pid}.json"
+    original = gv.gravar_json
+    chegou, solto = threading.Event(), threading.Event()
+
+    def gravar(caminho, dados):
+        if caminho == arquivo and threading.current_thread().name == "gravador" \
+                and not solto.is_set():
+            chegou.set()                         # o gravador com o "y", antes do disco
+            solto.wait(10)
+        original(caminho, dados)
+
+    monkeypatch.setattr(gv, "gravar_json", gravar)
+    gid = pagina.boxes[0].gid
+    ed.corrigir(pagina, gid, "y")
+    projeto.agendar(pagina)
+    assert chegou.wait(10)
+    ed.corrigir(pagina, gid, "z")
+    sincrona = threading.Thread(target=projeto.salvar_modelo, args=(pagina,))
+    sincrona.start()
+    sincrona.join(0.5)                           # ela pode esperar a vez do gravador
+    solto.set()
+    sincrona.join(10)
+    assert not sincrona.is_alive() and projeto.descarregar(10)
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    try:
+        assert reaberto.carregar_pagina(0)[0].char == "z"
+        gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
+        assert gravado == reaberto.recalcular_livro()
+    finally:
+        reaberto.fechar()
+
+
 @pytest.mark.parametrize("semente", range(4))
 def test_livro_json_igual_ao_recalculado_depois_de_gravacoes_assincronas(projeto, semente):
     sorteio = random.Random(semente)

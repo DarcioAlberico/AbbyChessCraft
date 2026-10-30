@@ -23,6 +23,27 @@ from abbychess.projeto import ProjetoDeLivro
 from tests.test_treino_por_livro import _pagina_sintetica
 
 
+def test_um_ouvinte_que_falha_nao_cala_os_seguintes_nem_o_comando(caplog):
+    """SPEC-qualidade Q-C4: `glifos_mudaram` tem três ouvintes ou mais; o que levanta vai ao
+    log com o rastro, os outros ouvem, e a exceção não sobe para o comando que emitiu (ele
+    já mudou a página e continua)."""
+    import logging
+
+    from abbychess.controlador import Eventos
+
+    eventos, ouvidos = Eventos(), []
+
+    def quebrado(*_args):
+        raise ValueError("o painel quebrou")
+
+    eventos.ligar("glifos_mudaram", quebrado)
+    eventos.ligar("glifos_mudaram", lambda *args: ouvidos.append(args))
+    with caplog.at_level(logging.ERROR, logger="abbychess.controlador"):
+        eventos.emitir("glifos_mudaram", None)
+    assert ouvidos == [(None,)]
+    assert [r for r in caplog.records if r.exc_info and "glifos_mudaram" in r.getMessage()]
+
+
 class ExecutorManual:
     """Guarda as tarefas; `comecar()` roda o preparar e o trabalho da primeira e devolve o
     pronto com o resultado, para o teste chamar quando quiser."""

@@ -293,6 +293,28 @@ def test_padrao_ensinado_esquecido_e_restaurado_passam_pela_gravacao(projeto, mo
     assert png.resolve() in [g.resolve() for g in gravados] and png.exists()
 
 
+def test_metadados_dos_padroes_ilegiveis_ficam_guardados_e_nao_sao_sobrescritos(projeto, caplog):
+    """SPEC-qualidade Q-C4: o `metadados.json` ilegível (a altura e o efeito de cada padrão)
+    não vira `{}` em silêncio para ser apagado na gravação seguinte: os bytes dele ficam ao
+    lado, e o log avisa."""
+    import logging
+
+    import numpy as np
+
+    pasta = Path(projeto.pasta_de_padroes)
+    PadroesDoLivro(pasta).ensinar(np.full((20, 10), 255, np.uint8), "a", origem="x",
+                                  altura_relativa=0.5)
+    metadados = pasta / "metadados.json"
+    estragado = metadados.read_bytes()[:-7]          # truncado: a queda de um editor
+    metadados.write_bytes(estragado)
+    with caplog.at_level(logging.WARNING, logger="abbychess.padroes"):
+        padroes = PadroesDoLivro(pasta)
+    padroes.ensinar(np.full((20, 10), 0, np.uint8), "b", origem="y")   # grava os metadados
+    guardados = sorted(pasta.glob("metadados*corrompido*"))
+    assert [g.read_bytes() for g in guardados] == [estragado]
+    assert any("metadados" in r.getMessage() for r in caplog.records)
+
+
 def test_temporarios_sobrando_sao_apagados_ao_abrir(projeto):
     sobras = [projeto.pasta / "projeto.json.tmp", projeto.pasta / "paginas" / "0001.json.tmp",
               projeto.pasta_de_padroes / "metadados.json.tmp"]

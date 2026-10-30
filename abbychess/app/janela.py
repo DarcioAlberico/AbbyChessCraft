@@ -315,7 +315,9 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         if self.executor.ocupado:
             self.executor.esvaziar()
             self.statusBar().showMessage("Esperando a tarefa em andamento terminar…")
-            self.executor.esperar()
+            if not self.executor.esperar():     # Q-C4: fecha mesmo assim, mas não calado
+                log.warning("a tarefa %r não terminou em 30 s; o projeto fecha com ela rodando",
+                            self.executor.titulo)
             QApplication.processEvents()        # o fim da tarefa chega antes de fechar
 
     def _fechar_projeto(self) -> bool:

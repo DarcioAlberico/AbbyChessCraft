@@ -49,6 +49,7 @@ pode ser promovida para lá. A leitura e a gravação usam `np.fromfile` e
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -60,6 +61,8 @@ import numpy as np
 from core.learner import char_to_folder, folder_to_char
 
 from abbychess import gravacao as gv
+
+log = logging.getLogger(__name__)
 
 LADO = 32
 METADADOS = "metadados.json"
@@ -183,6 +186,7 @@ class PadroesDoLivro:
                                            if arquivo.is_file() else {})
         except ValueError:
             self._meta = {}
+            self._guardar_os_metadados_ilegiveis(arquivo)
         vetores, chars, alturas, proporcoes, efeitos, caminhos = [], [], [], [], [], []
         subpastas = self.pasta.iterdir() if self.pasta.is_dir() else ()
         for pasta in sorted(p for p in subpastas if p.is_dir()):
@@ -204,6 +208,23 @@ class PadroesDoLivro:
         self._alturas = np.array(alturas, dtype=np.float32)
         self._proporcoes = np.array(proporcoes, dtype=np.float32)
         self._efeitos = efeitos
+
+    def _guardar_os_metadados_ilegiveis(self, arquivo: Path) -> None:
+        """O `metadados.json` ilegível vai inteiro para `metadados.corrompido[-N].json` antes
+        que a próxima gravação o substitua (SPEC-qualidade Q-C4): a altura e o efeito dos
+        padrões não somem sem rastro."""
+        destino, n = self.pasta / "metadados.corrompido.json", 1
+        while destino.exists():
+            n += 1
+            destino = self.pasta / f"metadados.corrompido-{n}.json"
+        try:
+            gv.gravar_bytes(destino, arquivo.read_bytes())
+        except OSError:
+            log.warning("o %s dos padrões está ilegível e não foi guardado à parte",
+                        arquivo, exc_info=True)
+            return
+        log.warning("o %s dos padrões está ilegível: a altura e o efeito deles recomeçam, e o "
+                    "arquivo foi guardado em %s", arquivo, destino.name)
 
     def _chave(self, caminho: Path) -> str:
         """A chave do `metadados.json`: o caminho relativo à pasta dos padrões. Aceita também

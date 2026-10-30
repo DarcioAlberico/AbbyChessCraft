@@ -91,8 +91,13 @@ class Eventos:
         self._ouvintes[nome].append(funcao)
 
     def emitir(self, nome: str, *args) -> None:
+        """Chama cada ouvinte; o que levanta vai ao log com o rastro, e os outros ouvem do
+        mesmo jeito: o comando que emitiu já mudou o modelo e segue (SPEC-qualidade Q-C4)."""
         for funcao in list(self._ouvintes.get(nome, ())):
-            funcao(*args)
+            try:
+                funcao(*args)
+            except Exception:
+                log.exception("um ouvinte de %r falhou", nome)
 
 
 class ExecutorSincrono:

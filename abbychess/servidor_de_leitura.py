@@ -574,8 +574,8 @@ class ServidorDeLeitura:
                 return
             try:
                 self.processo.join(0.1)
-            except Exception:
-                pass
+            except Exception:                   # o filho que caiu pode nem ter começado
+                log.debug("a espera do filho que caiu falhou", exc_info=True)
             if self.reinicios >= 1:
                 self.desistiu = True
                 pendentes, self._pendentes = list(self._pendentes.values()), {}

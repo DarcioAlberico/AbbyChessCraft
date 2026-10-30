@@ -133,7 +133,8 @@ class RenderEmProcesso:
             resultado = pool.submit(_renderizar_no_filho, str(caminho), arquivo,
                                     indice).result(self.limite_s)
         except Exception as erro:  # noqa: BLE001 — processo quebrado, tempo esgotado, pickle
-            log.warning("o render em processo da página %d falhou: %r", indice + 1, erro)
+            log.warning("o render em processo da página %d falhou: %r", indice + 1, erro,
+                        exc_info=True)
             with self._trava:
                 self._falhas += 1
                 if self._pool is pool:

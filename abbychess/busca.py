@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re as _re
 import threading
@@ -33,6 +34,8 @@ from typing import Callable, Dict, FrozenSet, Iterable, List, Mapping, Optional,
 import regex
 
 from abbychess.modelo import FIGURINAS, Pagina
+
+log = logging.getLogger(__name__)
 
 PROSA, NOTACAO, LEGENDA, CABECALHO, FEN = "prosa", "notacao", "legenda", "cabecalho", "fen"
 ETIQUETAS = (PROSA, NOTACAO, FEN, LEGENDA, CABECALHO)
@@ -238,6 +241,8 @@ class PoolDoIndice:
                 try:
                     list(self._pool.map(_aquecer, range(n)))
                 except Exception:               # o pool quebrado: o índice monta sem ele
+                    log.warning("o pool do índice da busca não abriu; o índice monta sem "
+                                "ele, mais devagar", exc_info=True)
                     self._pool.shutdown(wait=False, cancel_futures=True)
                     self._pool = None
             self._pronto.set()

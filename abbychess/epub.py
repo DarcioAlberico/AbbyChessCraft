@@ -651,6 +651,7 @@ def png_otimizado(dados: bytes) -> bytes:
             info = {k: v for k, v in aberta.info.items() if k == "dpi"}
             de_cor = {"icc_profile", "gamma", "chromaticity", "srgb"} & set(aberta.info)
     except Exception:                          # PNG estragado: o escritor decide
+        log.warning("o PNG não foi otimizado; vai como estava", exc_info=True)
         return dados
     if de_cor or original.mode not in ("1", "L", "LA", "P", "RGB", "RGBA"):
         return dados

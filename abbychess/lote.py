@@ -322,7 +322,8 @@ class CondutorDoLote:
             self._avancar()
             return
         if isinstance(resultado, Exception):
-            log.warning("a página %d não foi reconhecida: %s", indice + 1, resultado)
+            log.warning("a página %d não foi reconhecida: %s", indice + 1, resultado,
+                        exc_info=resultado)
             self.restante.popleft()
             self.resultado.falhas[indice] = str(resultado)
             self._avancar()

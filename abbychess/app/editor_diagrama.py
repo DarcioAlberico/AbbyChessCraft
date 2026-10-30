@@ -22,6 +22,7 @@ legalidade) é o `core.tabuleiro_edicao.TabuleiroEdicao`, e o desenho da posiç�
 
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from typing import Dict, List, Optional, Tuple
 
@@ -36,6 +37,8 @@ from core.tabuleiro_edicao import AVISO_CONVENCAO, SIMBOLOS, TabuleiroEdicao
 from abbychess import lances
 from abbychess.diagramas import LADO_DA_LEGENDA, DiagramaLido, afirmar_lado
 from abbychess.app import estilo, teclado
+
+log = logging.getLogger(__name__)
 
 #: O lado de uma casa no Inspetor (o tabuleiro cabe nos 296 px de 1366, §3.1).
 LADO_CASA = 32                  # §3.2: a casa do tabuleiro do Inspetor, ≥ 32 px
@@ -194,6 +197,7 @@ def _desenhar_posicao(fen_das_pecas: str, orientacao: str, lado_px: int) -> Opti
         png, _largura, _altura = render_diagrama.desenhar(
             fen_das_pecas, lado_px=lado_px, moldura="sem", orientacao=orientacao, tons=0)
     except Exception:  # fonte de diagrama ausente ou ilegível: o widget cai nos glifos
+        log.warning("o diagrama não foi desenhado; o editor mostra os glifos", exc_info=True)
         return None
     pixmap = QPixmap()
     return pixmap if pixmap.loadFromData(png, "PNG") else None

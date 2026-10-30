@@ -1197,7 +1197,7 @@ def paginas_da_camada(projeto: ProjetoDeLivro, indices: Sequence[int]) -> Dict[i
             extracao = pdf_nativo.extrair(str(projeto.fonte), sorted(do_pdf), idioma=idioma)
         except Exception as erro:  # noqa: BLE001 — o livro sai dos boxes, e não falha
             log.warning("A camada de texto do PDF não foi lida (%s: %s); as páginas saem dos "
-                        "boxes.", type(erro).__name__, erro)
+                        "boxes.", type(erro).__name__, erro, exc_info=True)
             return {}
         for pagina in extracao.paginas:
             posicao = do_pdf.get(pagina.numero)
@@ -1517,7 +1517,7 @@ def _texto_visivel(page) -> bool:
     try:
         return any(traco.get("type") != 3 for traco in page.get_texttrace())
     except Exception as erro:  # PDF estranho: na dúvida, é texto de verdade
-        log.debug("o rastro do texto não saiu (%s)", erro)
+        log.debug("o rastro do texto não saiu (%s)", erro, exc_info=True)
         return bool(page.get_text("text").strip())
 
 
@@ -1745,11 +1745,11 @@ def exportar_pdf_pesquisavel(projeto: ProjetoDeLivro, caminho: str | Path,
         try:
             _marcar_o_pdf(doc, projeto, alvo, resumo, tinha_rotulos)
         except Exception as erro:  # noqa: BLE001 — sem marcadores o PDF continua bom
-            log.warning("os marcadores e os rótulos do PDF não saíram (%s)", erro)
+            log.warning("os marcadores e os rótulos do PDF não saíram (%s)", erro, exc_info=True)
         try:
             doc.subset_fonts()
         except Exception as erro:  # sem subset o arquivo só fica maior
-            log.info("as fontes do PDF não foram reduzidas (%s)", erro)
+            log.info("as fontes do PDF não foram reduzidas (%s)", erro, exc_info=True)
         _gravar_pdf(doc, Path(caminho))
     finally:
         doc.close()

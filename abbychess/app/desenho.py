@@ -7,6 +7,7 @@ lê o estado dos controladores e desenha; nenhum decide nada.
 
 from __future__ import annotations
 
+import functools
 import time
 from pathlib import Path
 
@@ -216,8 +217,7 @@ class DesenhoDaJanela:
         posição de agora (`projeto.origem_da_amostra`), ou None se ela saiu do livro."""
         if self.fonte is None or pagina is None or not 0 <= pagina < self.fonte.total:
             if pagina is None:
-                self.statusBar().showMessage("A página de origem desta amostra saiu do livro.",
-                                             6000)
+                self._origem_fora_do_livro(gid)
             return
         if pagina != self.pagina.indice:
             self.ir_para_pagina(pagina)
@@ -229,6 +229,30 @@ class DesenhoDaJanela:
             self.statusBar().showMessage("O glifo de origem desta amostra saiu da página (o "
                                          "corte o deixou de fora; tirar o corte o devolve).",
                                          8000)
+
+    def _origem_fora_do_livro(self, gid) -> None:
+        """A origem numa página apagada (§12.4): a pergunta na barra para restaurá-la, e o
+        Enter a devolve ao lugar e vai ao glifo. A amostra antiga, sem `gid`, não diz qual das
+        apagadas era: fica o aviso, e Página › Páginas apagadas… a devolve."""
+        from abbychess.modelo import pid_de
+
+        projeto = self.projeto
+        apagada = (projeto.sequencia.apagada(pid_de(gid))
+                   if projeto is not None and gid is not None else None)
+        if apagada is None:
+            self.statusBar().showMessage("A página de origem desta amostra saiu do livro.",
+                                         6000)
+            return
+        lugar = (f"depois da página {apagada.posicao}" if apagada.posicao
+                 else "no começo do livro")
+        self.confirmacao.perguntar(
+            f"A página de origem desta amostra foi apagada (estava {lugar}). Restaurá-la e ir "
+            "ao glifo? Enter restaura · Esc não",
+            functools.partial(self._restaurar_a_origem, apagada.entrada.pid, gid))
+
+    def _restaurar_a_origem(self, pid: int, gid: int) -> None:
+        if self.pagina.restaurar_paginas([pid]):
+            self.ir_a_origem(self.projeto.sequencia.posicao_de(pid), gid)
 
     def _layout_mudou(self) -> None:
         self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual, self.areas.ordem_clicada)

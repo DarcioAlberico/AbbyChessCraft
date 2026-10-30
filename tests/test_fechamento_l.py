@@ -250,6 +250,34 @@ def test_ir_a_origem_diz_que_o_glifo_saiu_da_pagina_ou_do_livro(app, janela):
     assert "saiu da página" in janela.statusBar().currentMessage()
     janela.ir_a_origem(None, gid)
     assert "saiu do livro" in janela.statusBar().currentMessage()
+    assert not janela.confirmacao.aberta          # a página está no livro: nada a restaurar
+
+
+def test_a_origem_numa_pagina_apagada_oferece_restaura_la(app, janela):
+    """§12.4: a amostra que vem de uma página apagada pergunta na barra; o Enter devolve a
+    página ao lugar e vai ao glifo, e o Esc não muda nada."""
+    projeto = janela.projeto
+    _ler(projeto, 3)
+    gid = projeto.carregar_modelo(3).boxes[0].gid
+    janela.pagina.apagar_paginas([3])
+    assert projeto.sequencia.posicao_de(gid >> 20) is None
+    janela.ir_a_origem(None, gid)
+    assert janela.confirmacao.aberta
+    assert "depois da página 3" in janela.confirmacao.pergunta.text()
+    janela.confirmacao.recusar()
+    assert projeto.sequencia.posicao_de(gid >> 20) is None
+    janela.ir_a_origem(None, gid)
+    janela.confirmacao.aceitar.click()
+    assert projeto.sequencia.posicao_de(gid >> 20) == 3
+    assert janela.pagina.indice == 3 and janela.pagina.atual == gid
+    janela.pagina.desfazer()                      # o Ctrl+Z apaga de novo
+    assert projeto.sequencia.posicao_de(gid >> 20) is None
+
+
+def test_a_amostra_antiga_sem_gid_numa_pagina_apagada_so_avisa(app, janela):
+    janela.ir_a_origem(None, None)
+    assert "saiu do livro" in janela.statusBar().currentMessage()
+    assert not janela.confirmacao.aberta
 
 
 def test_a_busca_le_a_pagina_girada_fora_da_memoria_na_geometria_da_entrada(projeto, ctl):

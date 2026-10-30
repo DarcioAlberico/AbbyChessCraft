@@ -839,9 +839,10 @@ A partir do L:
   `gids_movidos`; o nome do arquivo da amostra (com o número antigo da página) não é
   renomeado e não é usado para navegar. As amostras antigas sem `_g` vão à entrada
   `fonte="livro"` da página do nome (a metade esquerda, se ela foi dividida). Origem numa
-  página apagada: "a página de origem saiu do livro" (restaurar é por **Páginas
-  apagadas…**; oferecer na hora fica para depois, fechamento do L); glifo cortado fora: "o
-  glifo de origem saiu da página".
+  página apagada: a pergunta na barra (§8.4) oferece restaurá-la na hora (2026-10-30), e o
+  Enter a devolve ao lugar e vai ao glifo (o Ctrl+Z apaga de novo); a amostra antiga, sem
+  `_g`, não diz qual das apagadas era: "a página de origem saiu do livro", e restaurar é por
+  **Páginas apagadas…**. Glifo cortado fora: "o glifo de origem saiu da página".
 - **Cada operação é uma transação do desfazer** (§14.2): a sequência antes e depois (aplica
   só se a sequência atual é a de depois) e a `Diferenca` de cada página cujos boxes mudaram.
   Desfazer uma divisão aposenta o `pid` novo (nunca reaproveitado) e tira os `gids_movidos`

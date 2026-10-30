@@ -112,6 +112,22 @@ def {nome}(itens, prefixo):
 '''
 
 
+def test_o_resumo_da_qualidade_le_a_primeira_linha_de_cada_relatorio(tmp_path):
+    sys.path.insert(0, str(FERRAMENTAS))
+    import qualidade
+
+    cobertura = {"totals": {"num_statements": 200, "missing_lines": 20, "percent_covered": 90.04}}
+    crap, _achadas = _crapper(tmp_path, [], _linhas_de("ramos"), limite=10)   # grava o pacote
+    git = {"commit": "abc1234", "arvore_suja": False, "arquivos_sujos": []}
+    dados = qualidade.resumo(cobertura, crap, _rodar("dryer.py", tmp_path / "pacote", 0.8, 20),
+                             git, {"rapida": 0, "processo": 0})
+    assert dados["ambiente"]["commit"] == "abc1234"
+    assert dados["cobertura"] == {"linhas": 200, "faltando": 20, "percentual": 90.0}
+    assert dados["crap"] == {"funcoes": 5, "acima_de_10": 1}
+    assert dados["duplicacao"] == {"pares_acima_de_0_8": 0}
+    assert dados["camadas"] == {"rapida": 0, "processo": 0}
+
+
 def _pares_do_dryer(pacote):
     texto = _rodar("dryer.py", pacote, 0.8, 20)
     return [linha for linha in texto.splitlines()[1:] if linha.strip()]

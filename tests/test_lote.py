@@ -358,6 +358,41 @@ def test_g2_a_correcao_feita_durante_a_leitura_numa_pagina_deixada_fica(ctl, pro
     assert projeto.carregar_modelo(0).box(gid).entry.char != "Q"
 
 
+def test_o_lote_deixa_para_depois_a_pagina_com_um_f5_em_voo(ctl, projeto, com_servidor,
+                                                             monkeypatch):
+    """CA-Q-C2: com o servidor, o lote grava pela fila da interface, fora do executor. Um F5
+    da página aberta já leu e espera o `pronto`; o lote que termina a mesma página nesse meio
+    a deixa para reler depois (vale o comando do usuário), e o Ctrl+Z do F5 volta à página de
+    antes dele, sem desfazer nem misturar uma leitura do lote."""
+    from abbychess import lote
+    from tests.servidor_falso import entregar
+
+    _servidor, fila = com_servidor
+    p = ctl.pagina
+    gid = p.gids[0]
+    antes = p.box(gid).char
+    p.reconhecer()
+    fim_do_f5 = ctl.executor.comecar()                    # o F5 leu; o pronto não veio
+    ler_pagina = lote.sl.ler_pagina
+
+    def outra_leitura(*args, **kwargs):                  # o lote acha outra letra no 1º glifo
+        lida = ler_pagina(*args, **kwargs)
+        lida.boxes[0].char = "W"
+        return lida
+
+    monkeypatch.setattr(lote.sl, "ler_pagina", outra_leitura)
+    ctl.reconhecer([0], refazer=True)
+    entregar(fila, esperar_por=1)
+    fim_do_f5()
+    ctl.executor.tudo()
+    assert ctl.fins[-1].reler_depois == [0] and ctl.fins[-1].lidas == []
+    assert p.box(gid).char != "W"
+    p.desfazer()
+    assert p.box(gid).char == antes
+    projeto.descarregar(10)
+    assert ProjetoDeLivro.abrir(projeto.pasta).carregar_modelo(0).box(gid).entry.char == antes
+
+
 def test_a_procedencia_volta_do_servidor_com_a_leitura(ctl, projeto, com_servidor):
     from tests.servidor_falso import entregar
 

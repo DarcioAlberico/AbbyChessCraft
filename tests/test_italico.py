@@ -70,19 +70,28 @@ def test_a_pagina_quase_toda_em_italico_nao_puxa_a_referencia(tmp_path):
     assert _fracao_italica(medidas[2]) == 0.0
 
 
-@pytest.mark.parametrize("cisalhamento, esperado", [(0.0, 0), (0.2, 11), (0.3, 17), (-0.2, -11)])
-def test_a_inclinacao_das_bordas_de_hastes_cisalhadas(cisalhamento, esperado):
-    """Hastes verticais cisalhadas: o pico fica no ângulo do cisalhamento (atan 0,2 ≈ 11°).
-    Desenhadas a 4× e reduzidas, com a borda suave de um render de verdade (a escada de um
-    pixel tem as bordas todas verticais)."""
+def _hastes(cisalhamento: float, preto_e_branco: bool = False) -> np.ndarray:
+    """Hastes verticais cisalhadas, desenhadas a 4× e reduzidas (a borda suave de um render
+    de verdade); em preto e branco, a escada de um pixel do escâner de 1 bit."""
     grande = np.full((240, 480), 255, np.uint8)
     for x0 in range(80, 400, 64):
         for y in range(40, 200):
             x = int(round(x0 + cisalhamento * (120 - y)))
             grande[y, x:x + 16] = 0
     recorte = np.asarray(Image.fromarray(grande).resize((120, 60), Image.Resampling.BOX))
-    medida = pg._inclinacao_das_bordas(recorte, np.ones_like(recorte, bool))
-    assert medida is not None and abs(medida[0] - esperado) <= 2 and medida[1] >= 1.0
+    return np.where(recorte < 128, 0, 255).astype(np.uint8) if preto_e_branco else recorte
+
+
+@pytest.mark.parametrize("preto_e_branco", [False, True])
+@pytest.mark.parametrize("cisalhamento, esperado", [(0.0, 0), (0.2, 11), (0.3, 17), (-0.2, -11)])
+def test_a_inclinacao_de_hastes_cisalhadas(cisalhamento, esperado, preto_e_branco):
+    """O pico fica no ângulo do cisalhamento (atan 0,2 ≈ 11°), também em 1 bit, onde a borda
+    inclinada é uma escada de degraus verticais (a régua de antes, pelo gradiente, via 0°)."""
+    recorte = _hastes(cisalhamento, preto_e_branco)
+    medida = pg._inclinacao_por_projecao(recorte, np.ones_like(recorte, bool))
+    assert medida is not None and abs(medida[0] - esperado) <= 1.5 and medida[1] >= 1.0
+    if cisalhamento:
+        assert medida[1] > pg.GANHO_DO_ITALICO
 
 
 def test_algarismos_e_palavras_curtas_nao_tem_italico_medido():

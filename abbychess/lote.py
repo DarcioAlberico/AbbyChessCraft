@@ -253,9 +253,11 @@ class CondutorDoLote:
             marcados = (pg.a_manter_na_releitura(modelo.boxes, modelo.estado in LIDAS)
                         if modelo is not None else [])                     # §4.6
             imagem = fonte.pagina_da_entrada(entrada)
+            regua = projeto.regua_do_negrito(sem_o_pid=pid)
             if servidor is None:
-                return sl.ler_pagina(imagem, zonas, marcados, leitor, cancelado=cancelado)
-            return self._ler_no_servidor(servidor, (imagem, zonas, marcados), cancelado)
+                return sl.ler_pagina(imagem, zonas, marcados, leitor, regua_do_livro=regua,
+                                     cancelado=cancelado)
+            return self._ler_no_servidor(servidor, (imagem, zonas, marcados, regua), cancelado)
 
         def voltou(resultado) -> None:
             self._pedido = None
@@ -383,6 +385,8 @@ class CondutorDoLote:
             projeto.guardar_antes_do_lote(pagina)                         # §4.6
         de_antes = list(pagina.boxes)
         estilos = lida.estilos()
+        if lida.regua_do_negrito:
+            pagina.regua_do_negrito = dict(lida.regua_do_negrito)
         novos, dif = reconciliar(pagina.boxes, lida.boxes, pagina.alocar, procedencia.amostra_de,
                                  estilo_de=lambda entry: estilos.get(id(entry)),
                                  iou_minimo=IOU_DA_RELEITURA)

@@ -774,47 +774,130 @@ def efeitos_de_impressao(imagem: Image.Image, boxes: Sequence[BoxEntry]) -> List
     return efeitos_da_pagina(imagem, boxes)[0]
 
 
-def efeitos_da_pagina(imagem: Image.Image, boxes: Sequence[BoxEntry]
-                      ) -> Tuple[List[Optional[bool]], List[Optional[bool]]]:
+def espessura_do_traco(recorte: np.ndarray) -> Optional[float]:
+    """A meia largura do traço do glifo em alturas da tinta, como `core.negrito.espessura`,
+    mas pela massa da tinta em tons de cinza: `massa ÷ perímetro`, e não pela transformada de
+    distância da tinta binarizada. ``None`` se o recorte não tem o que medir.
+
+    **O traço do corpo de texto tem uns 2 px a 300 dpi**, e a medida binária anda de pixel em
+    pixel: o mesmo "t" redondo media 1,00 numa ocorrência e 1,18 na outra, conforme a fase do
+    traço na grade. A massa em tons de cinza guarda a fração do pixel da borda. Medido no Odds
+    & Ends (`ferramentas/medir_efeitos.py`, o negrito pela camada, com o negrito falso do
+    ChessBase), a régua da página acha 87% das palavras em negrito na página limpa (77% com a
+    medida do core) e 66% na escaneada (16%), com os falsos de 0,7% para 0,3%.
+
+    O fundo e a tinta são os do próprio recorte (os quantis 90 e 10), e a massa só conta perto
+    da tinta: o ruído do papel não engorda o traço."""
+    import cv2
+
+    from core import negrito, preprocess
+
+    if recorte.size == 0:
+        return None
+    tinta = preprocess.binarize(recorte, "otsu")
+    ys, _xs = np.nonzero(tinta)
+    if len(ys) < negrito.MINIMO_DE_TINTA or len(ys) == tinta.size:
+        return None
+    tons = recorte.astype(np.float32)
+    fundo = float(np.percentile(tons, 90))
+    escuro = float(np.percentile(tons[tinta > 0], 10))
+    if fundo - escuro < CONTRASTE_MINIMO_DO_TRACO:
+        return None
+    perto = cv2.dilate(tinta, np.ones((3, 3), np.uint8)) > 0
+    massa = float(np.clip((fundo - tons[perto]) / (fundo - escuro), 0.0, 1.0).sum())
+    contornos, _ = cv2.findContours(tinta, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+    perimetro = sum(cv2.arcLength(c, True) for c in contornos)
+    if perimetro <= 0:
+        return None
+    altura = int(ys.max() - ys.min()) + 1
+    # Num traço de largura w e comprimento L, a massa é wL e o perímetro, 2L: massa ÷
+    # perímetro é a meia largura, a mesma grandeza da medida do core.
+    return massa / perimetro / altura
+
+
+#: A diferença de tom entre o papel e a tinta abaixo da qual o recorte não tem traço que se
+#: meça (um borrão, um pedaço de fundo).
+CONTRASTE_MINIMO_DO_TRACO = 30
+
+
+@dataclass
+class Efeitos:
+    """O negrito e o itálico de cada glifo de uma página (`medir_efeitos`), e a régua do
+    negrito dela (`regua_do_negrito.regua_da_pagina`), que vai ao resumo do livro."""
+
+    negritos: List[Optional[bool]]
+    italicos: List[Optional[bool]]
+    regua: dict
+
+
+def medir_efeitos(imagem: Image.Image, boxes: Sequence[BoxEntry],
+                  regua_do_livro: Optional[dict] = None) -> Efeitos:
     """O negrito e o itálico de cada glifo, medidos por palavra.
 
     ``None`` quando a palavra não basta para uma decisão, ``False``/``True`` quando o efeito
-    é conhecido. O negrito é a régua pública do core (`_negritos`); o itálico, a inclinação
-    das bordas das letras (`_italicos`), porque o core não tem régua do itálico."""
+    é conhecido. O negrito é a régua do core sobre a espessura em tons de cinza
+    (`decidir_negritos`), com a régua das outras páginas do livro quando ela é dada; o
+    itálico, a inclinação das bordas das letras (`_italicos`), porque o core não tem régua do
+    itálico."""
+    from abbychess import regua_do_negrito as rn
     from core.notacao import palavras_da_pagina
 
     if not boxes:
-        return [], []
+        return Efeitos([], [], {})
     # A página em tons de cinza uma vez: convertê-la a cada glifo dobrava o tempo do lote.
     pagina = cinza(imagem)
     palavras = [[simbolo.indice for simbolo in palavra.simbolos]
                 for linha in palavras_da_pagina(list(boxes)) for palavra in linha]
-    return _negritos(pagina, boxes, palavras), _italicos(pagina, boxes, palavras)
+    medidas = espessuras_da_pagina(pagina, boxes)
+    regua = rn.regua_da_pagina([box.char for box in boxes], medidas)
+    return Efeitos(decidir_negritos(boxes, palavras, medidas, regua, regua_do_livro),
+                   _italicos(pagina, boxes, palavras), regua)
 
 
-def _negritos(pagina: np.ndarray, boxes: Sequence[BoxEntry], palavras: Sequence[List[int]]
-              ) -> List[Optional[bool]]:
-    """O negrito de cada glifo, medido por palavra com a régua pública do core. A referência
-    é a página inteira: a régua compara a espessura de cada caractere com as outras
-    ocorrências dele, como :mod:`core.negrito` exige."""
+def efeitos_da_pagina(imagem: Image.Image, boxes: Sequence[BoxEntry],
+                      regua_do_livro: Optional[dict] = None
+                      ) -> Tuple[List[Optional[bool]], List[Optional[bool]]]:
+    """`(negritos, itálicos)` de `medir_efeitos`."""
+    efeitos = medir_efeitos(imagem, boxes, regua_do_livro)
+    return efeitos.negritos, efeitos.italicos
+
+
+def espessuras_da_pagina(pagina: np.ndarray, boxes: Sequence[BoxEntry]
+                         ) -> List[Optional[float]]:
+    """A espessura do traço de cada glifo (`espessura_do_traco`) na página em tons de cinza."""
+    return [espessura_do_traco(recorte(pagina, box)) for box in boxes]
+
+
+def decidir_negritos(boxes: Sequence[BoxEntry], palavras: Sequence[List[int]],
+                     medidas: Sequence[Optional[float]], regua_da_pagina: dict,
+                     regua_do_livro: Optional[dict] = None) -> List[Optional[bool]]:
+    """O negrito de cada glifo, decidido por palavra com a régua pública do core: a espessura
+    de cada glifo contra a do mesmo caractere no peso redondo, e o peso da palavra contra o
+    peso normal. Com a régua do livro (`regua_do_negrito.referencia_e_normal`), as duas vêm do
+    livro com a página; sem ela, ou com o livro ainda curto, da página só."""
     from collections import defaultdict
     from math import isnan
 
+    from abbychess import regua_do_negrito as rn
     from core import negrito
 
-    medidas = [negrito.espessura(recorte(pagina, box)) for box in boxes]
-    amostras = defaultdict(list)
-    for box, medida in zip(boxes, medidas):
-        if box.char and medida is not None and not isnan(medida):
-            amostras[box.char].append(medida)
-    referencia = negrito.referencia(amostras)
+    do_livro = rn.referencia_e_normal(regua_da_pagina, regua_do_livro)
+    if do_livro is not None:
+        referencia, normal = do_livro
+    else:
+        amostras = defaultdict(list)
+        for box, medida in zip(boxes, medidas):
+            if box.char and medida is not None and not isnan(medida):
+                amostras[box.char].append(medida)
+        referencia, normal = negrito.referencia(amostras), None
 
     pesos = []
     for indices in palavras:
         glifos = [(boxes[i].char, medidas[i]) for i in indices
                   if boxes[i].char and medidas[i] is not None and not isnan(medidas[i])]
         pesos.append(negrito.relativo(glifos, referencia) if len(glifos) >= 2 else None)
-    normal = negrito.escala([peso for peso in pesos if peso is not None])
+    if normal is None:
+        normal = negrito.escala([peso for peso in pesos if peso is not None])
     efeitos: List[Optional[bool]] = [None] * len(boxes)
     for indices, peso in zip(palavras, pesos):
         if peso is None:
@@ -825,58 +908,71 @@ def _negritos(pagina: np.ndarray, boxes: Sequence[BoxEntry], palavras: Sequence[
     return efeitos
 
 
-#: O itálico (`_italicos`): a palavra cujas bordas quase verticais pendem
-#: `INCLINACAO_DO_ITALICO` graus além das da página, com o pico `FORCA_DO_ITALICO` vezes o da
-#: vertical, medida em `MINIMO_DE_LETRAS_DO_ITALICO` letras ou mais. Ajustados no Odds & Ends
-#: (o itálico pela fonte do PDF): 0 falsos em 17.950 palavras retas e 95,8% das itálicas nas
-#: páginas que não entraram no ajuste (`ferramentas/medir_italico.py`).
+#: O itálico (`_italicos`): a palavra cujas letras pendem de `INCLINACAO_DO_ITALICO` a
+#: `TETO_DO_ITALICO` graus além das retas da página, com a projeção da inclinação
+#: `GANHO_DO_ITALICO` vezes mais afiada que a de pé, medida em `MINIMO_DE_LETRAS_DO_ITALICO`
+#: letras ou mais. Ajustados no Odds & Ends (o itálico pela fonte do PDF, a página limpa e
+#: degradada como escaneada, `ferramentas/medir_efeitos.py`): nas páginas que não entraram
+#: no ajuste, 0 falsos em ~11.500 palavras retas e 99,8% das itálicas na página limpa, 98,8%
+#: na escaneada, 99,1% na escaneada em preto e branco e 99,0% na ruim (a régua de antes, pelo
+#: gradiente das bordas: 95,9%, 88,7%, 0% e 37,8%).
 INCLINACAO_DO_ITALICO = 7.0
-FORCA_DO_ITALICO = 2.0
+#: O itálico dos livros pende 10–20° (no Odds & Ends, o p99 das itálicas é 20°); as palavras
+#: que passam de 22° são as de diagonais (v, w, y, A), que a projeção afia na diagonal.
+TETO_DO_ITALICO = 22.0
+GANHO_DO_ITALICO = 1.03
 MINIMO_DE_LETRAS_DO_ITALICO = 3
-#: Até quantos graus da vertical uma borda conta: o itálico dos livros pende ~10–17°; a
-#: diagonal do Z (~34°) e a da perna do y (~22°, fraca) ficam de fora ou não vencem.
-JANELA_DO_ITALICO = 25
+#: Os ângulos que a projeção experimenta, em graus (positivo com o topo à direita).
+ANGULOS_DO_ITALICO = np.arange(-20.0, 31.0, 1.0)
 #: A inclinação até a qual a palavra conta como reta na referência da página (a página quase
 #: toda em itálico não puxa a referência para o itálico).
 RETA_ATE = 5.0
 
 
-def _inclinacao_das_bordas(recorte: np.ndarray, mascara: np.ndarray
-                           ) -> Optional[Tuple[float, float]]:
-    """`(graus, força)`: a inclinação mais comum das bordas quase verticais da tinta (positiva
-    com o topo à direita) e quantas vezes o pico pesa o que pesa a vertical. As hastes e os
-    lados das letras redondas fazem o pico; as diagonais (v, w, y) se espalham dos dois lados.
-    `None` com borda de menos."""
-    import cv2
+def _inclinacao_por_projecao(recorte: np.ndarray, mascara: np.ndarray
+                             ) -> Optional[Tuple[float, float]]:
+    """`(graus, ganho)`: o cisalhamento que deixa as letras mais de pé (positivo com o topo à
+    direita) e quanto ele afia a projeção da tinta contra a de pé. ``None`` com tinta de
+    menos.
 
-    tons = recorte.astype(np.float32)
-    gx = cv2.Sobel(tons, cv2.CV_32F, 1, 0, ksize=3)
-    gy = cv2.Sobel(tons, cv2.CV_32F, 0, 1, ksize=3)
-    magnitude = np.hypot(gx, gy)
-    if not magnitude.size or magnitude.max() <= 0:
+    A tinta da palavra é cisalhada por cada ângulo de `ANGULOS_DO_ITALICO` e projetada nas
+    colunas; as hastes e os lados das letras redondas se empilham na mesma coluna quando o
+    cisalhamento desfaz a inclinação, e a soma dos quadrados da projeção chega ao pico. **Não
+    depende da direção do gradiente**, que a régua de antes media: na página escaneada em
+    preto e branco a borda inclinada vira uma escada de degraus verticais, e o itálico sumia
+    (0% no Odds & Ends em 1 bit)."""
+    from core import preprocess
+
+    tinta = (preprocess.binarize(recorte.astype(np.uint8), "otsu") > 0) & mascara
+    ys, xs = np.nonzero(tinta)
+    if len(ys) < 30:
         return None
-    usar = mascara & (magnitude > 0.25 * magnitude.max()) & (np.abs(gx) > 1e-3)
-    if usar.sum() < 30:
-        return None
-    # A borda que pende α da vertical tem o gradiente em α da horizontal: tan α = gy/gx.
-    angulo = np.degrees(np.arctan(gy[usar] / gx[usar]))
-    dentro = np.abs(angulo) <= JANELA_DO_ITALICO
-    if dentro.sum() < 20:
-        return None
-    janela = JANELA_DO_ITALICO
-    h = np.bincount(np.round(angulo[dentro]).astype(int) + janela,
-                    weights=magnitude[usar][dentro], minlength=2 * janela + 1)
-    h = np.convolve(h, np.exp(-0.5 * (np.arange(-6, 7) / 2.0) ** 2), mode="same")
-    pico = int(np.argmax(h))
-    return float(pico - janela), float(h[pico] / max(h[janela], 1e-9))
+    ys = ys - ys.mean()
+    deslocados = np.rint(xs[None, :] + ys[None, :] * np.tan(np.radians(ANGULOS_DO_ITALICO))[:, None]
+                         ).astype(np.int64)
+    deslocados -= deslocados.min(axis=1, keepdims=True)
+    largura = int(deslocados.max()) + 1
+    # Uma bincount só para todos os ângulos: cada ângulo na sua faixa de colunas.
+    faixas = deslocados + (np.arange(len(ANGULOS_DO_ITALICO)) * largura)[:, None]
+    projecoes = np.bincount(faixas.ravel(), minlength=largura * len(ANGULOS_DO_ITALICO))
+    pontos = (projecoes.reshape(len(ANGULOS_DO_ITALICO), largura).astype(np.float64) ** 2).sum(1)
+    k = int(np.argmax(pontos))
+    desvio = 0.0
+    if 0 < k < len(pontos) - 1:                 # o pico entre os ângulos, pela parábola
+        a, b, c = pontos[k - 1], pontos[k], pontos[k + 1]
+        if a - 2 * b + c != 0:
+            desvio = float((a - c) / (2 * (a - 2 * b + c)))
+    de_pe = pontos[int(np.argmin(np.abs(ANGULOS_DO_ITALICO)))]
+    return float(ANGULOS_DO_ITALICO[k] + desvio), float(pontos[k] / max(de_pe, 1e-9))
 
 
 def _italicos(pagina: np.ndarray, boxes: Sequence[BoxEntry], palavras: Sequence[List[int]]
               ) -> List[Optional[bool]]:
-    """O itálico de cada glifo, pela inclinação das letras da palavra (`_inclinacao_das_bordas`)
-    contra a das palavras retas da página (a página escaneada torta não vira itálico). Só as
-    letras de pé contam: algarismos, figurinas e a barra do ½ têm diagonais que não são
-    itálico. A palavra inteira leva o resultado; sem letras que bastem, `None`."""
+    """O itálico de cada glifo, pela inclinação das letras da palavra
+    (`_inclinacao_por_projecao`) contra a das palavras retas da página (a página escaneada
+    torta não vira itálico). Só as letras de pé contam: algarismos, figurinas e a barra do ½
+    têm diagonais que não são itálico. A palavra inteira leva o resultado; sem letras que
+    bastem, `None`."""
     from statistics import median
 
     altura, largura = pagina.shape[:2]
@@ -895,7 +991,7 @@ def _italicos(pagina: np.ndarray, boxes: Sequence[BoxEntry], palavras: Sequence[
                 for b in letras:
                     mascara[max(0, b.y1 - y1):max(0, b.y2 - y1),
                             max(0, b.x1 - x1):max(0, b.x2 - x1)] = True
-                medida = _inclinacao_das_bordas(pagina[y1:y2, x1:x2], mascara)
+                medida = _inclinacao_por_projecao(pagina[y1:y2, x1:x2], mascara)
         medidas.append(medida)
     retas = [m[0] for m in medidas if m is not None and abs(m[0]) <= RETA_ATE]
     normal = median(retas) if retas else 0.0
@@ -903,8 +999,8 @@ def _italicos(pagina: np.ndarray, boxes: Sequence[BoxEntry], palavras: Sequence[
     for indices, medida in zip(palavras, medidas):
         if medida is None:
             continue
-        inclinada = (medida[0] - normal >= INCLINACAO_DO_ITALICO
-                     and medida[1] >= FORCA_DO_ITALICO)
+        inclinada = (INCLINACAO_DO_ITALICO <= medida[0] - normal <= TETO_DO_ITALICO
+                     and medida[1] >= GANHO_DO_ITALICO)
         for i in indices:
             efeitos[i] = inclinada
     return efeitos

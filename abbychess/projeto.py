@@ -1226,6 +1226,23 @@ class ProjetoDeLivro:
         # Cópia funda: o cache não vaza.
         return {i: json.loads(json.dumps(resumo[i])) for i in sorted(resumo)}
 
+    def regua_do_negrito(self, sem_o_pid: Optional[int] = None) -> dict:
+        """A régua do negrito do livro (`regua_do_negrito.juntar`): a das páginas gravadas
+        que estão na sequência, sem a `sem_o_pid` (a que se vai ler, que traz a dela)."""
+        from abbychess import regua_do_negrito as rn
+
+        sequencia = self.sequencia
+        with self._trava_do_cache:
+            pendentes = {pid: r for pid, (_, r) in self._a_gravar.items()}
+        livro = self._livro                     # trocado inteiro a cada gravação
+        if livro is None:
+            with self._trava_do_livro:
+                livro = self._carregar_livro()
+        por_pid = {int(k): v for k, v in livro["paginas"].items()}
+        por_pid.update(pendentes)
+        return rn.juntar(r.get("regua_do_negrito") for pid, r in por_pid.items()
+                         if pid != sem_o_pid and sequencia.posicao_de(pid) is not None)
+
     # ------------------------------------------------------------------
     # A sequência do livro (§12.4)
     # ------------------------------------------------------------------
@@ -1830,6 +1847,8 @@ class ProjetoDeLivro:
     def _resumo_do_modelo(self, pagina: Pagina) -> dict:
         tabuleiros = len(pagina.tabuleiros)
         conferidos = sum(1 for d in pagina.diagramas if d.conferido)
+        # A régua do negrito dela, para a do livro (`regua_do_negrito`), quando foi medida.
+        regua = {"regua_do_negrito": pagina.regua_do_negrito} if pagina.regua_do_negrito else {}
         return {"pid": pagina.pid, "pagina_da_fonte": self._pagina_da_fonte(pagina),
                 "estado": pagina.estado,
                 **resumo_das_confiancas(pagina.entries(), self.dados.limiares,
@@ -1837,7 +1856,7 @@ class ProjetoDeLivro:
                 "diagramas": tabuleiros,
                 "diagramas_por_conferir": max(0, tabuleiros - conferidos),
                 # Alguma figurina lida (o modo "livro" das peças, §6.4, sem abrir as páginas).
-                "figurinas": any(b.entry.char in FIGURINAS for b in pagina.boxes)}
+                "figurinas": any(b.entry.char in FIGURINAS for b in pagina.boxes), **regua}
 
 
 def _inteiro(valor) -> Optional[int]:
@@ -1871,6 +1890,7 @@ def _pagina_para_json(pagina: Pagina, pagina_da_fonte: Optional[int] = None) -> 
         "diagramas": [d.para_json() for d in pagina.diagramas],
         "zonas": [z.como_dict() for z in pagina.zonas],
         "decisoes": pagina.decisoes.para_json(),
+        "regua_do_negrito": pagina.regua_do_negrito,
     }
 
 
@@ -1893,7 +1913,8 @@ def _pagina_de_json(bruto: dict) -> Pagina:
                   fora=tuple((int(lugar), Box.de_json(b)) for lugar, b in bruto.get("fora", [])),
                   areas_fora=tuple((tipo, int(lugar), _area_de_json(tipo, objeto), bool(aparada))
                                    for tipo, lugar, objeto, aparada
-                                   in bruto.get("areas_fora", [])))
+                                   in bruto.get("areas_fora", [])),
+                  regua_do_negrito=dict(bruto.get("regua_do_negrito") or {}))
 
 
 def _vazia(pagina: Pagina) -> bool:

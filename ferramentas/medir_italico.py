@@ -194,9 +194,10 @@ def main(argv=None) -> int:
     resultado = {
         "data": datetime.date.today().isoformat(), "git": estado_do_git(),
         "pdf": args.pdf.name,
-        "regra": {"inclinacao_graus": pg.INCLINACAO_DO_ITALICO, "forca": pg.FORCA_DO_ITALICO,
+        "regra": {"inclinacao_graus": pg.INCLINACAO_DO_ITALICO, "teto_graus": pg.TETO_DO_ITALICO,
+                  "ganho": pg.GANHO_DO_ITALICO,
                   "minimo_de_letras": pg.MINIMO_DE_LETRAS_DO_ITALICO,
-                  "janela_graus": pg.JANELA_DO_ITALICO, "reta_ate_graus": pg.RETA_ATE},
+                  "reta_ate_graus": pg.RETA_ATE},
         "ajuste": medir_pdf(args.pdf, paginas(args.ajuste)),
         "validacao": medir_pdf(args.pdf, paginas(args.validacao)),
     }

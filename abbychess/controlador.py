@@ -1236,12 +1236,14 @@ class ControladorDePagina:
             marcados = [b for b in marcados
                         if zona.contem((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)]
         servidor = self._servidor_para_pedir()
+        regua = self.projeto.regua_do_negrito(sem_o_pid=pagina.pid)
 
         def trabalho(progresso):
             if servidor is None:
-                return sl.ler_pagina(imagem, zonas, marcados, leitor, progresso=progresso)
+                return sl.ler_pagina(imagem, zonas, marcados, leitor, regua_do_livro=regua,
+                                     progresso=progresso)
             try:
-                lida = servidor.chamar("ler_pagina", (imagem, zonas, marcados),
+                lida = servidor.chamar("ler_pagina", (imagem, zonas, marcados, regua),
                                        timeout=TEMPO_DO_PEDIDO)
             except sl.Cancelado:                # o projeto fechou: nada a pôr
                 return None
@@ -1254,6 +1256,8 @@ class ControladorDePagina:
             lidos = lida.diagramas
             de_antes = list(pagina.boxes)
             estilos = lida.estilos()
+            if zona is None and lida.regua_do_negrito:   # a de uma área só não é a da página
+                pagina.regua_do_negrito = dict(lida.regua_do_negrito)
             depois = list(lida.boxes)
             if zona is not None:
                 from core.services.box_service import BoxService

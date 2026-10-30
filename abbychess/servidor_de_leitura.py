@@ -80,6 +80,9 @@ class PaginaLida:
     negritos: list = field(default_factory=list)
     #: O mesmo para o itálico (vazio: não medido, como no servidor falso dos testes).
     italicos: list = field(default_factory=list)
+    #: A régua do negrito da página (`regua_do_negrito.regua_da_pagina`), que a interface
+    #: grava com ela (vazia: não medida).
+    regua_do_negrito: dict = field(default_factory=dict)
 
     def estilos(self) -> dict:
         """`{id(entry): Estilo}` dos boxes com o negrito ou o itálico medido; o eixo sem
@@ -94,9 +97,10 @@ class PaginaLida:
                 if negrito is not None or italico is not None}
 
 
-def ler_pagina(imagem, zonas, marcados, leitor, *, progresso=None,
-               cancelado: Callable[[], bool] = lambda: False) -> PaginaLida:
-    """Segmenta pelas áreas, põe no lugar os glifos que ficam (§4.6), lê e acha os diagramas."""
+def ler_pagina(imagem, zonas, marcados, leitor, *, regua_do_livro: Optional[dict] = None,
+               progresso=None, cancelado: Callable[[], bool] = lambda: False) -> PaginaLida:
+    """Segmenta pelas áreas, põe no lugar os glifos que ficam (§4.6), lê e acha os diagramas.
+    O negrito é decidido com a régua do livro (`projeto.regua_do_negrito`), quando dada."""
     from abbychess import diagramas as dg
     from abbychess import pagina as pg
     from abbychess import procedencia
@@ -110,10 +114,11 @@ def ler_pagina(imagem, zonas, marcados, leitor, *, progresso=None,
         raise Cancelado
     lidos = dg.ler_diagramas(imagem, segmentada.tabuleiros, escala=segmentada.escala,
                              classificar=leitor.arbitro, boxes=segmentada.boxes)
-    negritos, italicos = pg.efeitos_da_pagina(imagem, segmentada.boxes)
-    pg.reler_pelo_efeito(imagem, segmentada.boxes, leitor, negritos, italicos)
+    efeitos = pg.medir_efeitos(imagem, segmentada.boxes, regua_do_livro)
+    pg.reler_pelo_efeito(imagem, segmentada.boxes, leitor, efeitos.negritos, efeitos.italicos)
     return PaginaLida(segmentada.boxes, [procedencia.amostra_de(b) for b in segmentada.boxes],
-                      list(segmentada.tabuleiros), segmentada.escala, lidos, negritos, italicos)
+                      list(segmentada.tabuleiros), segmentada.escala, lidos, efeitos.negritos,
+                      efeitos.italicos, efeitos.regua)
 
 
 def reler_boxes(imagem, boxes, leitor, *, so_pendentes: bool, progresso=None):
@@ -346,8 +351,10 @@ class _Laco:
     def _operar(self, operacao: str, argumentos):
         leitor = self.leitor
         if operacao == "ler_pagina":
-            imagem, zonas, marcados = argumentos
-            return ler_pagina(imagem, zonas, marcados, leitor)
+            # A régua do livro é o quarto argumento (os pedidos de antes dela têm três).
+            imagem, zonas, marcados, *regua = argumentos
+            return ler_pagina(imagem, zonas, marcados, leitor,
+                              regua_do_livro=regua[0] if regua else None)
         if operacao == "reler_boxes":
             imagem, boxes, so_pendentes = argumentos
             return reler_boxes(imagem, boxes, leitor, so_pendentes=so_pendentes)

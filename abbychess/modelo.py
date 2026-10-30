@@ -349,6 +349,9 @@ class Pagina:
     #: "zona", "tabuleiro" ou "diagrama"; `aparada` diz que a área está na página, cortada,
     #: e o objeto guardado é ela inteira (ela volta inteira se ninguém a mexer).
     areas_fora: tuple = ()
+    #: A régua do negrito da página (`regua_do_negrito.regua_da_pagina`), da última leitura
+    #: dela: vai ao resumo do livro, de onde sai a régua do livro para ler as outras.
+    regua_do_negrito: dict = field(default_factory=dict)
 
     def alocar(self) -> int:
         """Um gid novo desta página (nunca um já usado)."""
@@ -384,7 +387,7 @@ class Pagina:
                       zonas=tuple(self.zonas), decisoes=self.decisoes, estado=self.estado,
                       proximo_n=self.proximo_n, geometria=self.geometria,
                       tamanho=self.tamanho, fora=tuple(self.fora),
-                      areas_fora=tuple(self.areas_fora))
+                      areas_fora=tuple(self.areas_fora), regua_do_negrito=self.regua_do_negrito)
 
     def aplicar(self, diferenca: Diferenca, nova_ordem: Sequence[Box]) -> Diferenca:
         """Põe na página a lista de boxes depois da edição e leva as decisões aos sucessores.

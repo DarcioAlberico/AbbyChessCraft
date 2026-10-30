@@ -58,8 +58,9 @@ class ServidorFalso:
                     raise sl.Cancelado
                 if self.desistiu:
                     raise RuntimeError("o servidor de leitura caiu duas vezes")
-                imagem, zonas, marcados = argumentos
-                resultado = sl.ler_pagina(imagem, zonas, marcados, self.leitor)
+                imagem, zonas, marcados, *regua = argumentos
+                resultado = sl.ler_pagina(imagem, zonas, marcados, self.leitor,
+                                          regua_do_livro=regua[0] if regua else None)
             elif pedido.operacao == "reler_boxes":
                 imagem, boxes, so_pendentes = argumentos
                 resultado = sl.reler_boxes(imagem, boxes, self.leitor, so_pendentes=so_pendentes)

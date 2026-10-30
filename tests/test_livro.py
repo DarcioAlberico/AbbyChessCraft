@@ -82,7 +82,7 @@ def test_negrito_e_medido_por_palavra_com_a_referencia_da_pagina(monkeypatch):
     boxes = [BoxEntry("a", x, 0, x + 8, 20) for x in (0, 10, 40, 50)]
     pesos = {0: 1.0, 10: 1.0, 40: 2.0, 50: 2.0}
     monkeypatch.setattr(pg, "recorte", lambda _imagem, box: np.array([[box.x1]]))
-    monkeypatch.setattr("core.negrito.espessura", lambda imagem: pesos[int(imagem[0, 0])])
+    monkeypatch.setattr(pg, "espessura_do_traco", lambda imagem: pesos[int(imagem[0, 0])])
 
     assert pg.efeitos_de_impressao(Image.new("L", (80, 30)), boxes) == [False, False, True, True]
 

@@ -16,6 +16,12 @@ escaneado (o Karolyi), são o palpite do OCR do Acrobat, e a medida diz onde dis
 `ruim` passa por 150 dpi, borra e gira mais. O rótulo segue o glifo pela transformação
 inversa do giro.
 
+**A régua do livro** (`--livros`): o negrito de cada página se decide com a régua das
+outras (`abbychess.regua_do_negrito`), como a leitura faz. `pagina`: só a página (a régua de
+antes, e a do livro que ainda não mediu o bastante); `acumulado`: as páginas lidas antes, na
+ordem do conjunto, como o lote lê um livro novo; `todas`: todas as outras, como uma releitura
+depois do lote.
+
 **A conta é por palavra** (`core.notacao.palavras_da_pagina`), como a régua decide. Itálico:
 as palavras de 3 letras ou mais com o rótulo igual em todas as letras. Negrito: as de 2 glifos
 ou mais com o rótulo igual em todos (os lances em negrito contam). Com `--folhas`, uma imagem
@@ -151,17 +157,18 @@ class _Conta:
         self.vp = self.fp = self.fn = self.vn = self.sem_medida = 0
         self.falsos, self.perdidos = [], []
 
-    def somar(self, medido, certo, exemplo) -> None:
+    def somar(self, medido, certo, rotulo: str, recortar) -> None:
+        """`recortar()` dá o recorte da palavra, guardado só nos erros (para a folha)."""
         if medido is None:
             self.sem_medida += 1
         elif medido and certo:
             self.vp += 1
         elif medido:
             self.fp += 1
-            self.falsos.append(exemplo)
+            self.falsos.append((rotulo, recortar() if len(self.falsos) < POR_FOLHA else None))
         elif certo:
             self.fn += 1
-            self.perdidos.append(exemplo)
+            self.perdidos.append((rotulo, recortar() if len(self.perdidos) < POR_FOLHA else None))
         else:
             self.vn += 1
 
@@ -176,57 +183,119 @@ class _Conta:
                 "perdidos_exemplos": [e[0] for e in self.perdidos[:25]]}
 
 
-def medir(pdf: Path, indices: list, perfil: Perfil) -> tuple:
-    """`(resumo, contas)` do perfil nas páginas: o itálico e o negrito por palavra."""
-    import fitz
+#: Quantos erros de cada tipo a folha mostra.
+POR_FOLHA = 40
+
+#: Os modos da régua do livro (`--livros`).
+LIVROS = ("pagina", "acumulado", "todas")
+
+
+@dataclass
+class _Medida:
+    """O que a primeira passada guarda de uma página: o bastante para decidir o negrito de
+    novo com outra régua do livro, sem a imagem."""
+    indice: int
+    boxes: list
+    rotulos: list
+    palavras: list
+    espessuras: list
+    regua: dict
+    italicos: list
+    recortes: dict
+
+
+def _medir_pagina(fonte, doc, indice: int, perfil: Perfil) -> _Medida:
     import numpy as np
 
     from abbychess import pagina as pg
+    from abbychess import regua_do_negrito as rn
     from core.notacao import palavras_da_pagina
+
+    renderizada = fonte.pagina(indice)
+    imagem, inversa = degradar(renderizada, perfil, semente=indice)
+    page = doc[indice]
+    escala = renderizada.width / page.rect.width
+    glifos = _glifos_da_camada(page)
+    boxes = pg.segmentar(imagem)
+    rotulos = []
+    for b in boxes:
+        cx, cy = inversa @ np.array([(b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2, 1.0])
+        cx, cy = cx / escala, cy / escala
+        achado = next((g for g in glifos if g[0] <= cx <= g[2] and g[1] <= cy <= g[3]), None)
+        b.char = achado[4] if achado else ""
+        rotulos.append(achado[5:] if achado else None)
+    efeitos = pg.medir_efeitos(imagem, boxes)
+    cinza = pg.cinza(imagem)
+    espessuras = pg.espessuras_da_pagina(cinza, boxes)
+    palavras = [[s.indice for s in palavra.simbolos]
+                for linha in palavras_da_pagina(boxes) for palavra in linha]
+    recortes = {}
+    for k, todos in enumerate(palavras):
+        x1, y1 = min(boxes[i].x1 for i in todos), min(boxes[i].y1 for i in todos)
+        x2, y2 = max(boxes[i].x2 for i in todos), max(boxes[i].y2 for i in todos)
+        recortes[k] = (max(0, x1 - 4), max(0, y1 - 4), x2 + 4, y2 + 4)
+    medida = _Medida(indice, boxes, rotulos, palavras, espessuras,
+                     rn.regua_da_pagina([b.char for b in boxes], espessuras),
+                     efeitos.italicos, recortes)
+    medida.cinza = cinza                  # só enquanto os recortes dos erros não saem
+    return medida
+
+
+def medir(pdf: Path, indices: list, perfil: Perfil, livros=LIVROS) -> dict:
+    """`{modo do livro: (resumo, contas)}` do perfil nas páginas: o itálico (que não depende
+    do livro) e o negrito por palavra."""
+    import fitz
+
+    from abbychess import pagina as pg
+    from abbychess import regua_do_negrito as rn
 
     fonte = pg.FonteDePaginas(pdf)
     doc = fitz.open(pdf)
-    italico, negrito = _Conta(), _Conta()
-    tempos = []
+    medidas, tempos = [], []
     for indice in indices:
-        renderizada = fonte.pagina(indice)
-        imagem, inversa = degradar(renderizada, perfil, semente=indice)
-        page = doc[indice]
-        escala = renderizada.width / page.rect.width
-        glifos = _glifos_da_camada(page)
-        boxes = pg.segmentar(imagem)
-        rotulos = []
-        for b in boxes:
-            cx, cy = inversa @ np.array([(b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2, 1.0])
-            cx, cy = cx / escala, cy / escala
-            achado = next((g for g in glifos if g[0] <= cx <= g[2] and g[1] <= cy <= g[3]), None)
-            b.char = achado[4] if achado else ""
-            rotulos.append(achado[5:] if achado else None)
         t0 = time.perf_counter()
-        negritos, italicos = pg.efeitos_da_pagina(imagem, boxes)
+        medidas.append(_medir_pagina(fonte, doc, indice, perfil))
         tempos.append((time.perf_counter() - t0) * 1000)
-        cinza = np.asarray(imagem)
-        for linha in palavras_da_pagina(boxes):
-            for palavra in linha:
-                todos = [s.indice for s in palavra.simbolos]
-                if any(rotulos[i] is None for i in todos):
-                    continue
-                texto = "".join(boxes[i].char for i in todos)
-                caixa = (min(boxes[i].x1 for i in todos), min(boxes[i].y1 for i in todos),
-                         max(boxes[i].x2 for i in todos), max(boxes[i].y2 for i in todos))
-                exemplo = (f"p{indice + 1} {texto}", (indice, caixa, cinza))
-                letras = [i for i in todos if boxes[i].char.isalpha()]
-                rotulo_i = {rotulos[i][0] for i in letras}
-                if len(letras) >= 3 and len(rotulo_i) == 1:
-                    italico.somar(italicos[letras[0]], rotulo_i.pop(), exemplo)
-                rotulo_n = {rotulos[i][1] for i in todos}
-                if len(todos) >= 2 and len(rotulo_n) == 1:
-                    negrito.somar(negritos[todos[0]], rotulo_n.pop(), exemplo)
     tempos.sort()
-    resumo = {"paginas": [i + 1 for i in indices], "italico": italico.resumo(),
-              "negrito": negrito.resumo(),
-              "ms_por_pagina_p50": round(tempos[len(tempos) // 2], 1) if tempos else None}
-    return resumo, {"italico": italico, "negrito": negrito}
+
+    saida = {}
+    for modo in livros:
+        italico, negrito = _Conta(), _Conta()
+        for k, m in enumerate(medidas):
+            if modo == "pagina":
+                livro = None
+            elif modo == "acumulado":
+                livro = rn.juntar(x.regua for x in medidas[:k])
+            else:
+                livro = rn.juntar(x.regua for j, x in enumerate(medidas) if j != k)
+            negritos = pg.decidir_negritos(m.boxes, m.palavras, m.espessuras, m.regua, livro)
+            for p, todos in enumerate(m.palavras):
+                if any(m.rotulos[i] is None for i in todos):
+                    continue
+                texto = "".join(m.boxes[i].char for i in todos)
+                rotulo = f"p{m.indice + 1} {texto}"
+                x1, y1, x2, y2 = m.recortes[p]
+
+                def recortar(m=m, x1=x1, y1=y1, x2=x2, y2=y2):
+                    return m.cinza[y1:y2, x1:x2].copy()
+
+                letras = [i for i in todos if m.boxes[i].char.isalpha()]
+                rotulo_i = {m.rotulos[i][0] for i in letras}
+                if len(letras) >= 3 and len(rotulo_i) == 1 and modo == livros[0]:
+                    italico.somar(m.italicos[letras[0]], rotulo_i.pop(), rotulo, recortar)
+                rotulo_n = {m.rotulos[i][1] for i in todos}
+                if len(todos) >= 2 and len(rotulo_n) == 1:
+                    negrito.somar(negritos[todos[0]], rotulo_n.pop(), rotulo, recortar)
+        resumo = {"paginas": [i + 1 for i in indices], "negrito": negrito.resumo(),
+                  "ms_por_pagina_p50": round(tempos[len(tempos) // 2], 1) if tempos else None}
+        contas = {"negrito": negrito}
+        if modo == livros[0]:
+            resumo["italico"] = italico.resumo()
+            contas["italico"] = italico
+        saida[modo] = (resumo, contas)
+    for m in medidas:
+        del m.cinza
+    return saida
 
 
 def folha(contas: dict, destino: Path, por_tipo: int = 40) -> None:
@@ -240,9 +309,9 @@ def folha(contas: dict, destino: Path, por_tipo: int = 40) -> None:
             if not lista:
                 continue
             faixas.append((f"{efeito} {nome} ({len(lista)})", None))
-            for rotulo, (_indice, (x1, y1, x2, y2), cinza) in lista[:por_tipo]:
-                recorte = cinza[max(0, y1 - 4):y2 + 4, max(0, x1 - 4):x2 + 4]
-                faixas.append((rotulo, recorte))
+            for rotulo, recorte in lista[:por_tipo]:
+                if recorte is not None:
+                    faixas.append((rotulo, recorte))
     if not faixas:
         return
     largura = max([r.shape[1] for _, r in faixas if r is not None] + [200]) + 260
@@ -269,15 +338,22 @@ def main(argv=None) -> int:
     analisador.add_argument("--perfis", default="limpo,escaneado,binario,ruim")
     analisador.add_argument("--folhas", type=Path, help="a pasta das imagens dos erros")
     analisador.add_argument("--nome", default="efeitos", help="o nome-base do JSON")
+    analisador.add_argument("--livros", default=",".join(LIVROS),
+                            help="os modos da régua do livro: pagina, acumulado, todas")
     args = analisador.parse_args(argv)
 
     from abbychess import pagina as pg
 
+    from abbychess import regua_do_negrito as rn
+
     resultado = {
         "data": datetime.date.today().isoformat(), "git": estado_do_git(), "pdf": args.pdf.name,
-        "regra": {"inclinacao_graus": pg.INCLINACAO_DO_ITALICO, "forca": pg.FORCA_DO_ITALICO,
+        "negrito": {"minimo_do_livro": rn.MINIMO_DO_LIVRO,
+                    "contraste_minimo": pg.CONTRASTE_MINIMO_DO_TRACO},
+        "regra": {"inclinacao_graus": pg.INCLINACAO_DO_ITALICO, "teto_graus": pg.TETO_DO_ITALICO,
+                  "ganho": pg.GANHO_DO_ITALICO,
                   "minimo_de_letras": pg.MINIMO_DE_LETRAS_DO_ITALICO,
-                  "janela_graus": pg.JANELA_DO_ITALICO, "reta_ate_graus": pg.RETA_ATE},
+                  "reta_ate_graus": pg.RETA_ATE},
         "perfis": {},
     }
     for nome in args.perfis.split(","):
@@ -286,17 +362,20 @@ def main(argv=None) -> int:
         for conjunto, texto in (("ajuste", args.ajuste), ("validacao", args.validacao)):
             if not texto:
                 continue
-            resumo, contas = medir(args.pdf, paginas(texto), perfil)
-            resultado["perfis"][nome][conjunto] = resumo
-            for efeito in ("italico", "negrito"):
-                r = resumo[efeito]
-                print(f"{nome:9s} {conjunto:9s} {efeito:7s}: {r['com_o_efeito']:5d} com, "
-                      f"{r['sem_o_efeito']:6d} sem; revocação {r['revocacao']}, precisão "
-                      f"{r['precisao']}, falsos {r['falsos']}, sem medida {r['sem_medida']}",
-                      flush=True)
-            if args.folhas:
-                args.folhas.mkdir(parents=True, exist_ok=True)
-                folha(contas, args.folhas / f"{args.nome}-{nome}-{conjunto}.png")
+            modos = medir(args.pdf, paginas(texto), perfil, tuple(args.livros.split(",")))
+            resultado["perfis"][nome][conjunto] = {modo: r for modo, (r, _c) in modos.items()}
+            for modo, (resumo, contas) in modos.items():
+                for efeito in ("italico", "negrito"):
+                    if efeito not in resumo:
+                        continue
+                    r = resumo[efeito]
+                    print(f"{nome:9s} {conjunto:9s} {modo:9s} {efeito:7s}: "
+                          f"{r['com_o_efeito']:5d} com, {r['sem_o_efeito']:6d} sem; revocação "
+                          f"{r['revocacao']}, precisão {r['precisao']}, falsos {r['falsos']}, "
+                          f"sem medida {r['sem_medida']}", flush=True)
+                if args.folhas:
+                    args.folhas.mkdir(parents=True, exist_ok=True)
+                    folha(contas, args.folhas / f"{args.nome}-{nome}-{conjunto}-{modo}.png")
     destino = destino_da_medida(resultado["data"], args.nome)
     destino.parent.mkdir(parents=True, exist_ok=True)
     destino.write_text(json.dumps(resultado, ensure_ascii=False, indent=1) + "\n",

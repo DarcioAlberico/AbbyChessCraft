@@ -124,6 +124,8 @@ LISTAS_DE_PAGINAS = ("intervalo_do_corpo", "candidatos_da_amostra_guiada",
 MAPAS_DE_PAGINAS = ("pendentes_iniciais_da_amostra",)
 #: Quantas páginas o projeto guarda em memória, no modelo (as outras relê do disco).
 PAGINAS_EM_MEMORIA = 16
+#: Os erros de um JSON de página que não se lê, no texto ou na forma (SPEC-qualidade Q-P7).
+ERROS_DE_PAGINA_ILEGIVEL = (ValueError, TypeError, KeyError, AttributeError)
 #: A versão do formato de `livro.json`; outra versão é refeita das páginas.
 #: 2: a confiança 1,0 ganhou a faixa 100 do histograma; 3: o `pid` de cada página e os
 #: estados de §4.4; 4: chaveado por `pid` (passo L), com o índice da página no PDF em cada
@@ -288,6 +290,10 @@ class ProjetoDeLivro:
         self._ultimo_bilhete: Dict[int, int] = {}
         #: Avisado da thread do gravador quando uma página não grava: `(indice, erro)`.
         self.ao_falhar_gravacao = None
+        #: Avisado (de qualquer thread) quando um `p<pid>.json` ilegível é isolado:
+        #: `(posição, nome do arquivo guardado, ou None)`, uma vez por página.
+        self.ao_achar_ilegivel = None
+        self._ilegiveis_avisadas: set = set()
         #: As páginas (índices) que `fechar` não conseguiu gravar.
         self.nao_gravadas: List[int] = []
 
@@ -606,22 +612,73 @@ class ProjetoDeLivro:
             return modelo.instantaneo()
         try:
             return self._gravada(indice)
-        except (OSError, ValueError):
+        except OSError:                         # o arquivo trocado agora mesmo: na próxima
             return None
 
     def _gravada(self, indice: int) -> Optional[Pagina]:
         """A página da posição `indice` como está gravada, lida de novo (fora do cache): o
-        `p<pid>.json`, ou a v1 de um projeto só para leitura; None se nada foi gravado dela."""
+        `p<pid>.json`, ou a v1 de um projeto só para leitura; None se nada foi gravado dela,
+        ou se o arquivo é ilegível (`_isolar_a_ilegivel`). O `OSError` sobe: quem lê decide."""
         pid = self._pid_em(indice)
         if pid is None:
             return None
         bruto = self._v1_so_leitura.get(pid)
-        if bruto is None:
-            arquivo = self._arquivo_v2(pid)
-            if not arquivo.is_file():
-                return None
-            bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-        return self._de_json(bruto)
+        if bruto is not None:
+            return self._de_json(bruto)
+        arquivo = self._arquivo_v2(pid)
+        if not arquivo.is_file():
+            return None
+        dados = arquivo.read_bytes()
+        try:
+            return self._de_json(json.loads(dados.decode("utf-8")))
+        except ERROS_DE_PAGINA_ILEGIVEL as erro:
+            self._isolar_a_ilegivel(pid, arquivo, erro)
+            return None
+
+    def _isolar_a_ilegivel(self, pid: int, arquivo: Path, erro: Exception) -> None:
+        """O `p<pid>.json` que não se lê (SPEC-qualidade Q-P7) vai inteiro para
+        `p<pid>.corrompido[-N].json` e sai do `livro.json`: a página passa a não reconhecida
+        para todos (a busca, a aba Diagramas, a janela, a exportação), e quem a edita começa
+        de novo sem apagar o arquivo. Só para leitura, só o resumo da memória muda. O aviso
+        (`ao_achar_ilegivel(posição, guardado)`) sai uma vez por página."""
+        guardado = None
+        with self._trava_do_livro:
+            with self._trava_das_paginas:       # o gravador não troca o arquivo no meio
+                try:
+                    dados = arquivo.read_bytes()
+                    _pagina_de_json(json.loads(dados.decode("utf-8")))
+                    return                      # regravado agora mesmo: vale o novo
+                except FileNotFoundError:
+                    return                      # outra leitura já o isolou
+                except ERROS_DE_PAGINA_ILEGIVEL:
+                    pass
+                if not self.somente_leitura:
+                    guardado, n = arquivo.with_name(f"p{pid}.corrompido.json"), 1
+                    while guardado.exists():
+                        n += 1
+                        guardado = arquivo.with_name(f"p{pid}.corrompido-{n}.json")
+                    try:
+                        gv.gravar_bytes(guardado, dados)
+                        gv.apagar(arquivo)
+                    except OSError:
+                        log.warning("a página p%d está ilegível e não foi guardada à parte",
+                                    pid, exc_info=True)
+                        guardado = None
+            livro = self._carregar_livro()
+            if str(pid) in livro["paginas"] and (guardado is not None or self.somente_leitura):
+                if self.somente_leitura:        # só na memória; troca, não muda no lugar
+                    self._livro = {**livro, "paginas": {k: v for k, v in livro["paginas"].items()
+                                                        if k != str(pid)}}
+                else:
+                    self._atualizar_livro(pid, None)
+        log.warning("a página p%d está ilegível (%s); %s", pid, erro,
+                    f"guardada em {guardado.name}" if guardado is not None else "fica como está")
+        if pid in self._ilegiveis_avisadas:
+            return
+        self._ilegiveis_avisadas.add(pid)
+        if self.ao_achar_ilegivel is not None:
+            self.ao_achar_ilegivel(self.sequencia.posicao_de(pid),
+                                   guardado.name if guardado is not None else None)
 
     def carimbo(self, indice: int) -> Optional[tuple]:
         """O (arquivo, tamanho, mtime) do JSON v2 da página, tomado antes de `ler_sem_migrar`:
@@ -963,7 +1020,7 @@ class ProjetoDeLivro:
             return em_cache
         try:
             return self._gravada(indice)
-        except (OSError, ValueError):           # gravada agora mesmo pelo gravador: na próxima
+        except OSError:                         # gravada agora mesmo pelo gravador: na próxima
             return None
 
     def carregar_diagramas(self, indice: int) -> List["DiagramaLido"]:

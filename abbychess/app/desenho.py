@@ -300,6 +300,23 @@ class DesenhoDaJanela:
         self.statusBar().showMessage(texto)
         self.registrar_aviso(av.ERRO, "Gravação", texto)
 
+    def ligar_os_avisos_do_projeto(self, projeto) -> None:
+        """Os avisos do projeto que abre: a falha de gravação e a página ilegível (que chegam
+        de qualquer thread, pelos sinais), e o registro de Avisos dele."""
+        projeto.ao_falhar_gravacao = self.falha_de_gravacao.emit
+        projeto.ao_achar_ilegivel = self.pagina_ilegivel.emit
+        self.abrir_avisos_do_projeto(projeto)
+
+    def _pagina_ilegivel(self, indice, guardado) -> None:
+        """SPEC-qualidade Q-P7: a página cujo arquivo não se lê passa a não reconhecida; o
+        aviso diz qual e onde ficou o arquivo de antes."""
+        pagina = f"A página {indice + 1}" if indice is not None else "Uma página"
+        onde = (f" O arquivo dela foi guardado em paginas/{guardado}." if guardado else "")
+        texto = (f"{pagina} estava com o arquivo ilegível e ficou como não reconhecida.{onde} "
+                 "Reconheça-a de novo (F5).")
+        self.statusBar().showMessage(texto)
+        self.registrar_aviso(av.ERRO, "Página ilegível", texto)
+
     def _ocupado_mudou(self, ocupado: bool, titulo: str) -> None:
         self.progresso.setVisible(ocupado)
         self.progresso.setRange(0, 0)

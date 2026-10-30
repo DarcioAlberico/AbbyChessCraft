@@ -74,6 +74,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
                       PaginasNaJanela, QMainWindow):
     #: Da thread do gravador: a página `indice` não gravou (o erro).
     falha_de_gravacao = Signal(object, object)
+    pagina_ilegivel = Signal(object, object)
 
     def __init__(self):
         super().__init__()
@@ -228,6 +229,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.executor.fila_mudou.connect(self._fila_mudou)
         self.executor.progresso.connect(self._progredir)
         self.falha_de_gravacao.connect(self._gravacao_falhou)
+        self.pagina_ilegivel.connect(self._pagina_ilegivel)
 
     # ------------------------------------------------------------------
     # Projeto
@@ -264,9 +266,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
             if not self._fechar_projeto():
                 projeto.fechar()                # o usuário ficou com o aberto
                 return
-        projeto.ao_falhar_gravacao = self.falha_de_gravacao.emit
         self._pixmaps.clear()                   # as páginas do projeto anterior saem
-        self.abrir_avisos_do_projeto(projeto)
+        self.ligar_os_avisos_do_projeto(projeto)
         self.verificador.esquecer_projeto()
         so_leitura = " (só leitura)" if projeto.somente_leitura else ""
         self.setWindowTitle(f"{projeto.dados.nome}{so_leitura} — {TITULO}")
@@ -279,8 +280,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
     def usar(self, projeto, fonte, leitor, servidor=None) -> None:
         """O projeto com o leitor já pronto (os testes e as medidas; a abertura passa por
         `abrir`). Com o `servidor`, o leitor é o da interface (só os padrões do livro)."""
-        projeto.ao_falhar_gravacao = self.falha_de_gravacao.emit
-        self.abrir_avisos_do_projeto(projeto)
+        self.ligar_os_avisos_do_projeto(projeto)
         self.livro.usar(projeto, fonte, leitor, servidor)
         self._espaco_do_projeto_aberto()
 

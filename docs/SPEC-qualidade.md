@@ -158,10 +158,17 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
   Diagramas pulam a página em silêncio; `_orfaos` e `recalcular_livro` capturam outro conjunto
   de exceções. O comentário de `projeto.py:1127` diz que um `inclinacoes.json` ilegível é
   ignorado, mas `pagina.py:139-141` levanta.
-- **CA-Q-P7:** um `p<pid>.json` truncado aparece como "página ilegível" na busca, nos
-  Diagramas e no relatório da exportação, nunca como "não reconhecida".
-- **Correção mínima:** `ler_pagina(arquivo) -> Pagina | PaginaIlegivel`, um conjunto de
-  exceções, log em `warning`.
+- ~~**CA-Q-P7:** um `p<pid>.json` truncado aparece como "página ilegível" na busca, nos
+  Diagramas e no relatório da exportação, nunca como "não reconhecida".~~
+- **CA-Q-P7 (revisto no Q2):** um `p<pid>.json` truncado, na primeira leitura, vai inteiro
+  para `p<pid>.corrompido.json` e sai do `livro.json`; a página é não reconhecida para todos
+  (a busca, a aba Diagramas, a janela, a exportação), abrir a página não levanta, e o aviso
+  diz qual e onde ficou o arquivo, uma vez. Um estado "ilegível" novo passaria por toda a
+  máquina de estados e por três telas; assim nada nasce, o arquivo não se perde, e é a mesma
+  regra dos metadados dos padrões.
+- **Feito** no Q2 (`b1f609f` o teste, o commit seguinte a correção): `_gravada` lê a página
+  por um caminho só, com um conjunto de exceções (`ERROS_DE_PAGINA_ILEGIVEL`); o resto
+  (`inclinacoes.json`, `_orfaos`) fica como estava.
 
 ### Q-P8 (Média) — leituras que gravam
 

@@ -1340,6 +1340,21 @@ ele compara com o texto verificado e fica preso à versão do gabarito, que o im
 `.rotulagem` fica fora do git. "p. N" nas seções mais acima é o número da página no
 programa (a do PDF, índice N − 1); os gabaritos dizem também a página impressa.
 
+### A qualidade do código
+
+A cobertura combinada da suíte rápida e da camada `processo` (em série, ~6 min, nada mais
+rodando), e sobre ela o CRAP por função e os pares de funções com a mesma forma
+(`docs\SPEC-qualidade.md` §1, §7, §8; `plans\roadmap-qualidade.md`):
+
+```text
+.venv\Scripts\python.exe ferramentas\qualidade.py
+```
+
+Grava `docs\medidas\qualidade\crap-<commit>.txt`, `duplicacao-<commit>.txt` e
+`AAAA-MM-DD-qualidade.json`. Sem rodar a suíte, sobre um `coverage.json` pronto:
+`--cobertura <arquivo>`. As duas ferramentas também rodam sozinhas:
+`ferramentas\crapper.py abbychess <coverage.json> 10` e `ferramentas\dryer.py abbychess 0.8 60`.
+
 ## Onde está o quê
 
 | Arquivo | O que faz |
@@ -1377,7 +1392,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | `docs/atalhos.yaml`, `docs/ATALHOS.md` | Os atalhos (a fonte única) e a tabela gerada |
 | `docs/medidas/` | A máquina cadastrada e cada medida, em JSON |
 | `abbychess/atalhos.py` | Ler e conferir a tabela de atalhos, sem Qt |
-| `ferramentas/` | `rotular.py` (gabaritos, conferência cega, revisão), `folha_de_conferencia.py` (a folha HTML para revisar a estrutura e os FEN), `medir.py` (qualidade), `replay_fatia.py` e `replay/comandos.yaml` (a fatia), `tempo_da_fatia.py` (CA-F.2), `atalhos.py`, `resumo_medidas.py` (as tabelas do README) |
+| `ferramentas/` | `rotular.py` (gabaritos, conferência cega, revisão), `folha_de_conferencia.py` (a folha HTML para revisar a estrutura e os FEN), `medir.py` (qualidade), `replay_fatia.py` e `replay/comandos.yaml` (a fatia), `tempo_da_fatia.py` (CA-F.2), `atalhos.py`, `resumo_medidas.py` (as tabelas do README), `qualidade.py`, `crapper.py` e `dryer.py` (a qualidade do código) |
 | `abbychess/app/registro_de_eventos.py` | O registro de gestos da CA-F.2, ligado por `ABBY_REGISTRO_DE_EVENTOS` |
 | `tests/verdade/`, `tests/dados/fatia/` | Os gabaritos e o snapshot da fatia (conteúdo de livros: não publicar) |
 | `tests/golden/caracterizacao/` | O comportamento de hoje, fixado antes da refatoração do roadmap |

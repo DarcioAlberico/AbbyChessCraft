@@ -29,9 +29,27 @@ caiba na cabeça de quem mexe. O plano de execução está em `plans/roadmap-qua
 | `ruff` com B, BLE, S110, SIM, PERF | 11 `except Exception` cegos, 2 `except: pass`, 7 propriedades lidas pelo efeito (B018) | — |
 | Teste de mutação | não medido: nenhuma ferramenta instalada (§9) | — |
 
-Ressalva sobre o CRAP: a cobertura é só a da suíte rápida. O servidor de leitura, o render em
-processo e o lote ficam com CRAP alto porque a camada `processo` não entrou na conta. Por
-isso o roadmap começa juntando as coberturas (Q0).
+A tabela acima usa só a cobertura da suíte rápida. A **linha de base do Q0** soma a camada
+`processo` (`ferramentas/qualidade.py`, no `3e2fc4d`, que só muda ferramentas, testes delas
+e o `.gitignore` em relação ao `4accb7f`):
+
+| Medida | Valor no `3e2fc4d` | Arquivo |
+|---|---|---|
+| Suíte rápida | 1844 passaram, 3 pularam, 93 s com cobertura | `docs/medidas/qualidade/2026-10-30-qualidade.json` |
+| Camada `processo` | 35 passaram, 222 s com cobertura (o teto de 60 s sobe a 600 só na medida: a matança do gravador abre 50 filhos, todos medidos) | idem |
+| Cobertura combinada | 91,7 % (22 109 linhas, 1 826 sem cobertura) | idem |
+| Funções com CRAP ≥ 10 | 286 (251 só pela complexidade; 29 com cobertura < 50 %) | `docs/medidas/qualidade/crap-3e2fc4d.txt` |
+| Pares com forma ≥ 0,8 | 16 | `docs/medidas/qualidade/duplicacao-3e2fc4d.txt` |
+| Portão `ruff --select E,F` | passa | — |
+
+Dos 45 casos de cobertura baixa da análise, 16 eram só a camada `processo` que não entrava na
+conta (o servidor de leitura: `_caiu`, `fechar`, `_abrir`, `esperar`; o lote na janela;
+`_renderizar_no_filho`; `PoolDoIndice._abrir`). `ServidorDeLeitura._ouvir` cai de 219 para
+20,5 (71 % coberta) e `RenderEmProcesso.renderizar` de 102 para 10. Os 29 que sobram são falta
+de teste de verdade, a começar por `epub.calibre` (567, 12 %: o Calibre só roda com
+`ABBY_CALIBRE`), `ControladorDaFila._outra_pagina_das_palavras` (104, 8 %), `camada.palavras`
+(49, 5 %) e `VisorDePagina._cursor_das_bordas` (47, 7 %). Daqui em diante, o CRAP de cada
+passo é medido com `ferramentas/qualidade.py`.
 
 Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/principal.py` 38 %,
 `app/lote_na_janela.py` 44 %, `servidor_de_leitura.py` 55 %, `camada.py` 74 %,

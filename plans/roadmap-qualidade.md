@@ -77,6 +77,9 @@ alto sem que se saiba se a camada `processo` os cobre.
 **Pronto quando:** o portão passa; as ferramentas têm teste; a §1 da spec traz o CRAP com a
 cobertura combinada e diz quantos dos 45 casos de cobertura baixa eram só a camada `processo`.
 
+**Feito** em 2026-10-30, ramo `qualidade-q0` (`docs/revisoes/qualidade-Q0.md`): 16 dos 45
+eram só a `processo`; a linha de base combinada é 91,7 % e 286 funções com CRAP ≥ 10.
+
 ## Passo Q1 — Persistência sem perda
 
 **Contexto.** `abbychess/projeto.py` lê a v1 pela posição e não pelo pid (Q-P1), deixa o v1

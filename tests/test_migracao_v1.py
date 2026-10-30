@@ -115,6 +115,35 @@ def test_abre_migra_grava_e_reabre_sem_perder_nada(projeto_v1):
     _conferir(ProjetoDeLivro.abrir(projeto_v1), verdade)
 
 
+def test_a_abertura_migra_toda_a_v1_antes_de_ler_qualquer_pagina(projeto_v1):
+    """SPEC-qualidade Q-P1 (§13.1): a v1 migra inteira na abertura, e não na primeira leitura
+    de cada página; depois dela, nada na pasta é v1."""
+    ProjetoDeLivro.abrir(projeto_v1)
+    assert sorted(p.name for p in (projeto_v1 / "paginas").glob("*.json")) == [
+        "marcadas.json", "p0.json", "p1.json", "p2.json"]
+    assert not list((projeto_v1 / "zonas").glob("*.json"))
+
+
+def test_reordenar_antes_de_ler_a_v1_mostra_cada_pagina_com_os_glifos_dela(projeto_v1):
+    """CA-Q-P1: o arquivo v1 é da página do PDF (o pid), não da posição no livro; mover uma
+    página antes de lê-la não troca os glifos de uma pela outra, nem na memória nem no disco."""
+    verdade = _verdade_v1(projeto_v1)
+    projeto = ProjetoDeLivro.abrir(projeto_v1)
+    sequencia = projeto.sequencia
+    projeto.gravar_sequencia(sequencia.mover([sequencia.pid_em(0)], 1))     # a 1ª depois da 2ª
+
+    def conferir(aberto: ProjetoDeLivro) -> None:
+        assert [aberto.pid_da_pagina(i) for i in range(3)] == [1, 0, 2]
+        for posicao in range(3):
+            pid = aberto.pid_da_pagina(posicao)
+            boxes = [list(b.as_state()) for b in aberto.carregar_pagina(posicao)]
+            assert boxes == verdade["paginas"][pid]["boxes"], (posicao, pid)
+
+    conferir(projeto)
+    assert projeto.fechar()
+    conferir(ProjetoDeLivro.abrir(projeto_v1))
+
+
 def _instantaneo(pasta: Path) -> dict:
     return {str(p.relative_to(pasta)): (p.stat().st_mtime_ns,
                                         hashlib.sha256(p.read_bytes()).hexdigest())
@@ -145,7 +174,6 @@ def test_copiar_o_backup_v1_de_volta_reabre_pela_versao_de_hoje(projeto_v1):
     """CA-4.5: o backup copiado por cima do projeto migrado volta a ser o projeto."""
     verdade = _verdade_v1(projeto_v1)
     projeto = ProjetoDeLivro.abrir(projeto_v1)
-    projeto.migrar_tudo()
     projeto.salvar_pagina(0, projeto.carregar_pagina(0)[:2], reconhecida=True)   # muda a 0
     backup = projeto_v1 / PASTA_DO_BACKUP_V1
     for arquivo in backup.rglob("*"):
@@ -158,7 +186,6 @@ def test_copiar_o_backup_v1_de_volta_reabre_pela_versao_de_hoje(projeto_v1):
 
 def test_volta_do_backup_com_pagina_nova_nao_repete_gid(projeto_v1):
     projeto = ProjetoDeLivro.abrir(projeto_v1)
-    projeto.migrar_tudo()
     from core.box_model import BoxEntry
 
     projeto.salvar_pagina(5, [BoxEntry("a", 0, 0, 10, 10)])         # uma página nova: pid 3
@@ -170,7 +197,6 @@ def test_volta_do_backup_com_pagina_nova_nao_repete_gid(projeto_v1):
             destino = projeto_v1 / arquivo.relative_to(backup)
             shutil.copyfile(arquivo, destino)
     reaberto = ProjetoDeLivro.abrir(projeto_v1)
-    reaberto.migrar_tudo()
     pids = [reaberto.carregar_modelo(i).pid for i in (0, 1, 2, 5)]
     assert len(set(pids)) == 4 and reaberto.dados.proximo_pid > max(pids)
     gids = [b.gid for i in (0, 1, 2, 5) for b in reaberto.carregar_modelo(i).boxes]

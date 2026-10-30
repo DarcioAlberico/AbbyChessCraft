@@ -171,9 +171,9 @@ do CA-12.3 e do teste dos links. Visto nas páginas: os diagramas, as figurinas 
 três coisas da camada do core, não do leitor: as três linhas grandes da capa ("July 2011
 Newsletter", "By", "The QC Team") saem como três títulos; duas entradas do sumário saem num
 parágrafo só; a tabela de símbolos sai com o símbolo depois da descrição. O leitor de celular
-continua por abrir.
+veio depois (seção abaixo).
 
-## O EPUB no Thorium
+## O EPUB no Thorium e no celular
 
 Conferido pelo usuário em 2026-10-30 (o Thorium não aceita a porta de depuração do
 Chromium: fecha na hora, e a conferência não se automatiza). Os EPUB do Odds & Ends (375
@@ -183,6 +183,9 @@ link do Lichess, sem erro no EPUBCheck. Visto: o sumário pelos títulos, a list
 levando à página impressa, os diagramas e o link do Lichess deles, "Diagrama N" e
 "capítulo N", as figurinas e os símbolos, e o texto no modo escuro e no tamanho de fonte
 do leitor. Nenhum problema.
+
+No celular, os mesmos dois EPUB abertos no ReadEra pelo usuário, no mesmo dia: tudo
+normal, com os símbolos de avaliação e as figurinas das peças.
 
 ## A revisão de código
 
@@ -371,8 +374,8 @@ Precisa do usuário:
   medidas deixarem de ser provisórias.~~ Feito em 2026-10-28 (`8194283`, seção abaixo).
 - **A conferência cega da fatia** (§15.2: uma página transcrita e um FEN montado sem ver o
   gabarito): é o que falta para o CA-F.1 e a qualidade deixarem de ser provisórios.
-- **O leitor do celular**; o Calibre confere, e o Thorium foi conferido pelo usuário
-  (2026-10-30, seção acima).
+- ~~**O leitor do celular**.~~ O Calibre confere, e o Thorium e o ReadEra foram conferidos
+  pelo usuário em 2026-10-30 (seção acima).
 
 Decididos como estão:
 - **A página pedida na hora renderiza na thread da interface** (~85 ms, mais a medida da

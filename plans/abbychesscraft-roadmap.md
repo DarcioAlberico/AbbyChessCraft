@@ -659,7 +659,7 @@ DOCX iguais byte a byte com o mesmo `SOURCE_DATE_EPOCH`).
 6. ~~Validação automática (EPUBCheck, Ace, referências internas e smoke tests de leitores).~~
    (EPUBCheck e Ace na rodada 2; o Calibre nas pendências, `18af9f0`; o Thorium conferido
    pelo usuário em 2026-10-30, com os EPUB do Odds & Ends e do Mirkovic exportados em
-   `2242ccf`. O leitor do celular pede quem o abra.)
+   `2242ccf`; no celular, os mesmos EPUB no ReadEra, conferidos pelo usuário no mesmo dia.)
 7. ~~Deduplicação/otimização de recursos e divisão dos XHTML por capítulo e tamanho.~~
    (A otimização sem perda das imagens, nas pendências, `3d7d66c`.)
 8. ~~`SOURCE_DATE_EPOCH` e pacote byte a byte reprodutível.~~
@@ -765,8 +765,8 @@ padrão; o relatório tem uma linha por página, que o duplo clique abre; o inte
 páginas; o PDF reproduzível; a página lida ganha as áreas automáticas (o sumário com
 capítulos no livro de referência); a exportação medida em
 `docs/medidas/2026-10-29-exportacao-xv.json` (o EPUBCheck, o Ace e o Calibre sem problema, os
-cinco formatos com os mesmos bytes). O Thorium conferido pelo usuário (2026-10-30);
-pendente: o leitor do celular.
+cinco formatos com os mesmos bytes). O Thorium e o ReadEra, no celular, conferidos pelo
+usuário (2026-10-30).
 
 ## Passo K — Aparência e teclado (§13, §3.4)
 
@@ -1073,8 +1073,10 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   235 capítulos, 217 diagramas desenhados) e do Mirkovic, exportados em `2242ccf` com o link
   do Lichess e sem erro no EPUBCheck. O sumário, as páginas impressas, os diagramas e os
   links deles, os links internos, os símbolos e o modo escuro saíram certos.
+- O EPUB no celular, conferido pelo usuário (2026-10-30): os mesmos dois no ReadEra, com
+  os símbolos de avaliação e as figurinas normais.
 
-Continuam: a conferência cega da fatia; o EPUB no celular. A página pedida na hora renderiza
+Continuam: a conferência cega da fatia. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).
 
 ---

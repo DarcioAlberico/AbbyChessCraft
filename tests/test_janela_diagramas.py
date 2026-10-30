@@ -77,7 +77,7 @@ def test_reconhecer_le_o_diagrama_e_poe_o_fen_no_texto(app, janela):
     texto = _texto(janela)
     assert f"[Diagrama 1: {FEN} w - - 0 1 — brancas a jogar (assumido: a página não diz)" in texto
     janela.projeto.descarregar()
-    gravado = json.loads(janela.projeto._arquivo_da_pagina(0).read_text(encoding="utf-8"))
+    gravado = json.loads(janela.projeto.arquivo_da_pagina(0).read_text(encoding="utf-8"))
     assert gravado["diagramas"][0]["fen"] == d.fen
 
 
@@ -165,20 +165,27 @@ def test_conferencia_sobrevive_a_reabrir_e_a_reconhecer(app, janela):
 
 
 def test_pagina_antiga_le_o_diagrama_no_primeiro_clique(app, janela):
-    """Página gravada antes da leitura: só as caixas; o clique lê e abre."""
-    imagem = janela.pagina.imagem
-    segmentada = pg.segmentar_pagina(imagem)
-    arquivo = janela.projeto.pasta / "paginas" / "0001.json"
-    arquivo.write_text(json.dumps({"pagina": 1, "boxes": [],
-                                   "tabuleiros": [list(t) for t in segmentada.tabuleiros]}),
-                       encoding="utf-8")
-    janela.ir_para_pagina(0)
-    assert len(janela.pagina.tabuleiros) == 1 and not janela.pagina.diagramas[0].lido
-    assert "[Diagrama 1: ainda não lido]" in _texto(janela)
+    """Página gravada antes da leitura, no formato v1 (só as caixas): ela migra quando o
+    projeto abre (SPEC-qualidade Q-P1), e o clique lê o diagrama e abre."""
+    segmentada = pg.segmentar_pagina(janela.pagina.imagem)
+    pasta = janela.projeto.pasta
+    (pasta / "paginas" / "0001.json").write_text(
+        json.dumps({"pagina": 1, "boxes": [],
+                    "tabuleiros": [list(t) for t in segmentada.tabuleiros]}), encoding="utf-8")
+    projeto = ProjetoDeLivro.abrir(pasta)
+    reaberta = JanelaPrincipal()
+    reaberta.usar(projeto, pg.FonteDePaginas(projeto.fonte),
+                  LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
+    try:
+        reaberta.ir_para_pagina(0)
+        assert len(reaberta.pagina.tabuleiros) == 1 and not reaberta.pagina.diagramas[0].lido
+        assert "[Diagrama 1: ainda não lido]" in _texto(reaberta)
 
-    dialogo = _clicar_no_diagrama(app, janela)
-    assert dialogo.fen.text() == FEN + " w - - 0 1"
-    assert janela.pagina.diagramas[0].lido
+        dialogo = _clicar_no_diagrama(app, reaberta)
+        assert dialogo.fen.text() == FEN + " w - - 0 1"
+        assert reaberta.pagina.diagramas[0].lido
+    finally:
+        reaberta.close()
 
 
 def test_lote_le_o_diagrama_e_a_pagina_nao_fica_por_ler(app, janela, monkeypatch):

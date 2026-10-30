@@ -35,7 +35,7 @@ def test_pagina_nova_ganha_pid_estavel_e_gids_dela(lido):
     modelo = projeto.carregar_modelo(0)
     assert modelo.pid == 0 and projeto.dados.proximo_pid == 1
     assert {pid_de(b.gid) for b in modelo.boxes} == {0}
-    assert projeto._arquivo_da_pagina(0).name == "p0.json"
+    assert projeto.arquivo_da_pagina(0).name == "p0.json"
     assert projeto.resumo_do_livro()[0]["pid"] == 0
     gids = [b.gid for b in modelo.boxes]
     projeto.salvar_pagina(0, projeto.carregar_pagina(0))
@@ -83,7 +83,7 @@ def test_procedencia_e_gid_no_padrao(lido):
     assert do_livro and all(b.amostra and b.amostra.endswith(".png") for b in do_livro)
     assert modelo.box(gid_ensinado).amostra is None                   # é a origem, não cópia
     # A procedência vai para o disco e volta.
-    bruto = json.loads(projeto._arquivo_da_pagina(0).read_text(encoding="utf-8"))
+    bruto = json.loads(projeto.arquivo_da_pagina(0).read_text(encoding="utf-8"))
     assert any(b[2] for b in bruto["boxes"])
     reaberto = ProjetoDeLivro.abrir(projeto.pasta).carregar_modelo(0)
     assert [b.amostra for b in reaberto.boxes] == [b.amostra for b in modelo.boxes]
@@ -117,7 +117,7 @@ def test_livro_sem_a_pagina_acha_o_arquivo_e_nao_duplica(lido):
 
 def test_dois_arquivos_do_mesmo_indice_vale_o_gravado_por_ultimo(lido):
     projeto, _, _ = lido
-    original = projeto._arquivo_da_pagina(0)
+    original = projeto.arquivo_da_pagina(0)
     bruto = json.loads(original.read_text(encoding="utf-8"))
     bruto.update(pid=9, gravado_em="2000-01-01T00:00:00+00:00", boxes=[])
     (projeto.pasta / "paginas" / "p9.json").write_text(json.dumps(bruto), encoding="utf-8")

@@ -212,7 +212,7 @@ def test_fen_gravado_volta_com_a_pagina(projeto):
     d = _lido(caixa=caixa).conferir(_lido().edicao())
     projeto.salvar_pagina(0, boxes, [caixa], [d])
 
-    bruto = json.loads(projeto._arquivo_da_pagina(0).read_text(encoding="utf-8"))
+    bruto = json.loads(projeto.arquivo_da_pagina(0).read_text(encoding="utf-8"))
     assert bruto["tabuleiros"] == [list(caixa)]
     assert bruto["diagramas"][0]["fen"] == d.fen
 
@@ -222,10 +222,12 @@ def test_fen_gravado_volta_com_a_pagina(projeto):
 
 
 def test_pagina_gravada_antes_da_leitura_abre_com_diagramas_por_ler(projeto):
-    """O formato antigo (v1, sem a chave "diagramas") continua valendo: a página migra."""
+    """O formato antigo (v1, sem a chave "diagramas") continua valendo: a página migra quando
+    o projeto abre (SPEC-qualidade Q-P1)."""
     arquivo = projeto.pasta / "paginas" / "0001.json"
     arquivo.write_text(json.dumps({"pagina": 1, "boxes": [], "tabuleiros": [[1, 2, 401, 402]]}),
                        encoding="utf-8")
+    projeto = ProjetoDeLivro.abrir(projeto.pasta)
     assert projeto.carregar_diagramas(0) == []
     assert projeto.carregar_tabuleiros(0) == [(1, 2, 401, 402)]
     por_ler = dg.para_caixas(projeto.carregar_tabuleiros(0), projeto.carregar_diagramas(0))

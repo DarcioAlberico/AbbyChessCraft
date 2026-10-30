@@ -22,9 +22,10 @@ L) não o muda, e os gids dos glifos (`pid << 20 | n`) continuam únicos no proj
 grava o próprio índice, e `livro.json` mapeia índice → pid.
 
 **Migração do v1** (`paginas/0001.json`, `zonas/0001.json`, `paginas/marcadas.json`): na
-primeira abertura, o v1 vai para `backup-v1/` e o projeto passa ao formato 2; cada página
-v1 migra (pid = índice) e é gravada na primeira leitura dela. Copiar `backup-v1/` de volta
-reabre o projeto como era (o arquivo v1 presente vence o v2 do mesmo pid).
+primeira abertura, o v1 vai para `backup-v1/` e o projeto passa ao formato 2; todas as
+páginas v1 migram (pid = o número do arquivo, a página do PDF) e são gravadas ali mesmo, na
+abertura. Copiar `backup-v1/` de volta reabre o projeto como era (o arquivo v1 presente vence
+o v2 do mesmo pid). Só para leitura, nada migra: as páginas v1 ficam na memória.
 
 **A janela edita o modelo** (`abbychess.controlador`, desde o passo 2a) e não grava: ela
 entrega a página a `agendar`, que guarda um instantâneo imutável para o gravador
@@ -249,6 +250,10 @@ class ProjetoDeLivro:
         #: `trocar_paginas` gravou: o desfazer de uma divisão confere pelo carimbo, sem reler
         #: as 460 páginas de um livro dividido (o arquivo que mudou depois é relido).
         self._trocadas: Dict[int, Tuple[Optional[tuple], int]] = {}
+        #: Só num projeto v1 aberto só para leitura (que não migra): pid -> o JSON v2 que a
+        #: migração gravaria de cada página v1, lido uma vez na abertura. Aberto para gravar,
+        #: a v1 migra inteira na abertura, e a leitura das páginas não a conhece.
+        self._v1_so_leitura: Dict[int, dict] = {}
         #: A sequência do livro (§12.4): a posição de cada `pid`. Montada na primeira vez que
         #: alguém pergunta (`sequencia`), dos dados da v2; `_proximo_pid` é o primeiro `pid`
         #: acima dela, para as páginas que ela ainda não tem.
@@ -334,6 +339,7 @@ class ProjetoDeLivro:
             # A trava por último: uma falha antes dela não deixa a pasta travada sem dono.
             projeto.somente_leitura = projeto._travado = True
             gv.proteger(pasta)
+            projeto._guardar_a_v1_na_memoria()
             try:
                 projeto.sequencia       # só na memória: nada é gravado
             except ProjetoInvalido:     # a sequência de um formato que esta versão não lê
@@ -357,18 +363,21 @@ class ProjetoDeLivro:
                 dados.fonte_tamanho = achada.stat().st_size
                 projeto.fonte_relocalizada = True
         versao_de_antes = dados.versao
-        if dados.versao < VERSAO:
+        if dados.versao < VERSAO or projeto._indices_v1():
             try:
                 # A cadeia (§12.4): a v1 passa à 2 (o `backup-v1/`), e a 2 à 3 (o `backup-v2/`).
                 if dados.versao < 2:
                     projeto._preparar_migracao(bytes_do_projeto)
                     projeto.backups_da_migracao.append(pasta / PASTA_DO_BACKUP_V1)
                     projeto.migrado = True
-                if projeto.fonte.is_file():
+                # As páginas v1 migram todas aqui, antes de qualquer leitura (SPEC-qualidade
+                # Q-P1): a queda no meio da cadeia, ou um arquivo v1 copiado de volta, também.
+                projeto._migrar_a_v1()
+                if dados.versao < VERSAO and projeto.fonte.is_file():
                     projeto._migrar_para_v3()
                     projeto.backups_da_migracao.append(pasta / PASTA_DO_BACKUP_V2)
                     projeto.migrado, mudou = True, False
-                else:
+                elif dados.versao < VERSAO:
                     # Sem a fonte, a v3 espera: o projeto segue na v2 (que grava as listas
                     # por posição e a sequência só na memória) até abrir com o PDF.
                     log.warning("a fonte de %s não foi achada; a passagem à v3 fica para "
@@ -383,6 +392,7 @@ class ProjetoDeLivro:
                     f"gravar na pasta dele ({erro}). Ele abre só para leitura.")
                 projeto.somente_leitura = projeto._travado = True
                 gv.proteger(pasta)
+                projeto._guardar_a_v1_na_memoria()
                 projeto.sequencia
                 return projeto
         if mudou:
@@ -556,16 +566,6 @@ class ProjetoDeLivro:
     def fonte_e_pdf(self) -> bool:
         return self.fonte.suffix.lower() == ".pdf"
 
-    def _arquivo_da_pagina(self, indice: int) -> Path:
-        """O arquivo da página: o v2 (`paginas/p<pid>.json`) se existe, senão o v1 se ela
-        ainda não migrou, senão onde o v2 vai ficar."""
-        pid = self._pid_em(indice, criar=True)
-        if self._arquivo_v2(pid).is_file():
-            return self._arquivo_v2(pid)
-        if self._arquivo_v1(indice).is_file():
-            return self._arquivo_v1(indice)
-        return self._arquivo_v2(pid)
-
     def _arquivo_v1(self, indice: int) -> Path:
         return self.pasta / PASTA_DE_PAGINAS / f"{indice + 1:04d}.json"
 
@@ -582,26 +582,30 @@ class ProjetoDeLivro:
             return self._arquivo_v2_de(indice)
 
     def ler_sem_migrar(self, indice: int) -> Optional[Pagina]:
-        """A página como está, sem passar pelo cache e sem migrar a v1 (o índice da busca,
-        numa thread: §11, um escritor só): o instantâneo da que está na memória, a v1 lida
-        como v2, ou o JSON v2 gravado; None se nada foi gravado dela."""
+        """A página como está, sem passar pelo cache (o índice da busca, numa thread: §11, um
+        escritor só): o instantâneo da que está na memória, ou a gravada; None se nada foi
+        gravado dela."""
         modelo = self.modelo_em_memoria(indice)
         if modelo is not None:
             return modelo.instantaneo()
-        if self._tem_v1(indice):
-            with self._trava_do_livro:          # a interface pode migrá-la agora
-                if self._tem_v1(indice):
-                    return self._ler_v1(indice)
-            modelo = self.modelo_em_memoria(indice)     # migrada: na memória, ou no v2
-            if modelo is not None:
-                return modelo.instantaneo()
-        arquivo = self.arquivo_da_pagina(indice)
-        if arquivo is None:
-            return None
         try:
-            return self._de_json(json.loads(arquivo.read_text(encoding="utf-8")))
+            return self._gravada(indice)
         except (OSError, ValueError):
             return None
+
+    def _gravada(self, indice: int) -> Optional[Pagina]:
+        """A página da posição `indice` como está gravada, lida de novo (fora do cache): o
+        `p<pid>.json`, ou a v1 de um projeto só para leitura; None se nada foi gravado dela."""
+        pid = self._pid_em(indice)
+        if pid is None:
+            return None
+        bruto = self._v1_so_leitura.get(pid)
+        if bruto is None:
+            arquivo = self._arquivo_v2(pid)
+            if not arquivo.is_file():
+                return None
+            bruto = json.loads(arquivo.read_text(encoding="utf-8"))
+        return self._de_json(bruto)
 
     def carimbo(self, indice: int) -> Optional[tuple]:
         """O (arquivo, tamanho, mtime) do JSON v2 da página, tomado antes de `ler_sem_migrar`:
@@ -625,7 +629,7 @@ class ProjetoDeLivro:
             if em_cache is not None:
                 return em_cache
             if (carimbo is None or self._pid_em(pagina.indice) != pagina.pid
-                    or self._tem_v1(pagina.indice) or self.carimbo(pagina.indice) != carimbo):
+                    or self.carimbo(pagina.indice) != carimbo):
                 return None
             # Girar e cortar não gravam a página (o carimbo é o mesmo): a lida na geometria
             # de antes é levada à de agora.
@@ -642,32 +646,23 @@ class ProjetoDeLivro:
             return self._modelos.get(pid)
 
     def carregar_modelo(self, indice: int) -> Optional[Pagina]:
-        """A página no modelo v2, ou `None` se nada foi gravado dela. Uma página v1 é
-        migrada e gravada aqui, na primeira leitura (§4.3)."""
+        """A página no modelo v2, ou `None` se nada foi gravado dela."""
         pid = self._pid_em(indice)              # antes das travas (a do livro, se montar)
         if pid is None:
             return None                         # fora do livro: nada gravado
-        v1 = not self.somente_leitura and self._tem_v1(indice)     # o stat, fora das travas
         with self._trava_do_cache:              # o caminho comum, sem esperar o disco
             em_cache = self._modelos.get(pid)
-            if em_cache is not None and not v1:
+            if em_cache is not None:
                 self._modelos.move_to_end(pid)
                 return em_cache
         with self._trava_do_livro:
             em_cache = self._modelos.get(pid)
-            # Um v1 que apareceu (o `backup-v1/` copiado de volta) vence a página em
-            # memória; em só leitura nada migra, e a página em memória vale.
-            v1 = (em_cache is None or not self.somente_leitura) and self._tem_v1(indice)
-            if em_cache is not None and not v1:
+            if em_cache is not None:
                 self._modelos.move_to_end(pid)
                 return em_cache
-            if v1:
-                pagina = self._migrar(indice)
-            else:
-                arquivo = self._arquivo_v2_de(indice)
-                if arquivo is None:
-                    return None
-                pagina = self._de_json(json.loads(arquivo.read_text(encoding="utf-8")))
+            pagina = self._gravada(indice)
+            if pagina is None:
+                return None
             self._guardar_no_cache(pagina, foto_nova=True)
             return pagina
 
@@ -924,8 +919,7 @@ class ProjetoDeLivro:
     def ler_sem_guardar(self, indice: int) -> Optional[Pagina]:
         """A página para só ler (a aba Diagramas percorre o livro): a do cache, se estiver
         lá (pode ter o que ainda não foi gravado), ou a do JSON, **sem entrar no cache** (a
-        leitura do livro não despeja as páginas abertas). Uma página v1 não é migrada aqui:
-        vai por `carregar_modelo`."""
+        leitura do livro não despeja as páginas abertas)."""
         pid = self._pid_em(indice)
         if pid is None:
             return None
@@ -933,13 +927,8 @@ class ProjetoDeLivro:
             em_cache = self._modelos.get(pid)
         if em_cache is not None:
             return em_cache
-        if self._tem_v1(indice):
-            return self.carregar_modelo(indice)
-        arquivo = self._arquivo_v2_de(indice)
-        if arquivo is None:
-            return None
         try:
-            return self._de_json(json.loads(arquivo.read_text(encoding="utf-8")))
+            return self._gravada(indice)
         except (OSError, ValueError):           # gravada agora mesmo pelo gravador: na próxima
             return None
 
@@ -986,10 +975,6 @@ class ProjetoDeLivro:
     # ------------------------------------------------------------------
     # A migração do v1 (§4.3)
     # ------------------------------------------------------------------
-    def _tem_v1(self, indice: int) -> bool:
-        return (self._arquivo_v1(indice).is_file()
-                or (self.pasta / PASTA_DE_ZONAS / f"{indice + 1:04d}.json").is_file())
-
     def _indices_v1(self) -> List[int]:
         indices = set()
         for pasta in (self.pasta / PASTA_DE_PAGINAS, self.pasta / PASTA_DE_ZONAS):
@@ -1027,22 +1012,32 @@ class ProjetoDeLivro:
             pagina.zonas = zn.com_ids([Zona.de_dict(z) for z in bruto.get("zonas", [])])
         return pagina
 
-    def _migrar(self, indice: int) -> Pagina:
-        """Grava a página v1 como v2 e tira os arquivos v1 dela (a cópia está em `backup-v1/`).
-        Um arquivo v1 presente vence o v2 de mesmo pid: é o `backup-v1/` copiado de volta
-        (CA-4.5)."""
-        pagina = self._ler_v1(indice)
-        if self.somente_leitura:
-            return pagina
-        self.salvar_modelo(pagina)
-        gv.apagar(self._arquivo_v1(indice))
-        gv.apagar(self.pasta / PASTA_DE_ZONAS / f"{indice + 1:04d}.json")
-        return pagina
+    def _migrar_a_v1(self) -> None:
+        """Na abertura, antes de qualquer leitura (SPEC-qualidade Q-P1): grava como v2 cada
+        página v1 da pasta e tira os arquivos v1 dela (a cópia está em `backup-v1/`). O
+        número do arquivo v1 é a página do PDF, que é o `pid` dela, e não a posição no livro,
+        que reordenar muda. Um arquivo v1 presente vence o v2 de mesmo pid: é o `backup-v1/`
+        copiado de volta (CA-4.5)."""
+        for pid in self._indices_v1():
+            self._gravar(self._ler_v1(pid))
+            gv.apagar(self._arquivo_v1(pid))
+            gv.apagar(self.pasta / PASTA_DE_ZONAS / f"{pid + 1:04d}.json")
+
+    def _guardar_a_v1_na_memoria(self) -> None:
+        """Só para leitura (nada migra): cada página v1 da pasta, lida uma vez, como o JSON v2
+        que a migração gravaria (`_gravada` a lê daqui); a ilegível fica de fora."""
+        self._v1_so_leitura = {}
+        for pid in self._indices_v1():
+            try:
+                self._v1_so_leitura[pid] = _pagina_para_json(self._ler_v1(pid), pid)
+            except (OSError, ValueError, TypeError, KeyError) as erro:
+                log.warning("a página v1 %d está ilegível (%s): fica de fora", pid + 1, erro)
+        self._livro = None                      # o resumo do livro é refeito com elas
 
     def _preparar_migracao(self, bruto_do_projeto: bytes) -> None:
         """Na primeira abertura v2 de um projeto v1: `backup-v1/` com as páginas, as áreas e o
         `projeto.json` de antes, e o contador de pids depois de todo índice v1 e todo pid já
-        gravado. As páginas migram depois, uma a uma, na primeira leitura."""
+        gravado. As páginas migram logo depois (`_migrar_a_v1`)."""
         backup = self.pasta / PASTA_DO_BACKUP_V1
         if not (backup / ARQUIVO_DO_PROJETO).is_file():
             for nome in (PASTA_DE_PAGINAS, PASTA_DE_ZONAS):
@@ -1192,14 +1187,6 @@ class ProjetoDeLivro:
             if posicao is not None and 0 <= posicao < len(self.sequencia):
                 saida.append(posicao)
         return saida
-
-    def migrar_tudo(self) -> int:
-        """Migra agora todas as páginas v1 que faltam (as ferramentas e os testes)."""
-        feitas = 0
-        for indice in self._indices_v1():
-            if self.carregar_modelo(indice) is not None:
-                feitas += 1
-        return feitas
 
     # ------------------------------------------------------------------
     # livro.json: o resumo de cada página, sem abrir as páginas
@@ -1696,8 +1683,7 @@ class ProjetoDeLivro:
         orfaos = self._orfaos(livro, gravados)
         for indice, (pid, pagina) in orfaos.items():
             gravados[indice] = pid
-        v1 = self._indices_v1()
-        for indice in v1:
+        for indice in self._v1_so_leitura:      # aberto para gravar, a v1 já migrou
             gravados[indice] = indice
         em_disco = [int(a.stem[1:]) for a in (self.pasta / PASTA_DE_PAGINAS).glob("p*.json")
                     if a.stem[1:].isdigit()]
@@ -1758,8 +1744,8 @@ class ProjetoDeLivro:
             self._livro = novo                  # o cache só muda depois de gravado
 
     def recalcular_livro(self) -> dict:
-        """O `livro.json` como ele deve ser, lendo todas as páginas gravadas (v2 e as v1 que
-        ainda não migraram, sem migrá-las)."""
+        """O `livro.json` como ele deve ser, lendo todas as páginas gravadas (as v2, e as v1
+        da memória num projeto v1 aberto só para leitura)."""
         por_indice: Dict[int, Tuple[tuple, Pagina]] = {}
         for arquivo in sorted((self.pasta / PASTA_DE_PAGINAS).glob("p*.json")):
             if not arquivo.stem[1:].isdigit():
@@ -1776,11 +1762,8 @@ class ProjetoDeLivro:
                 if ordem < por_indice[pagina.indice][0]:
                     continue
             por_indice[pagina.indice] = (ordem, pagina)
-        for indice in self._indices_v1():
-            try:
-                por_indice[indice] = ((), self._ler_v1(indice))
-            except (OSError, ValueError, TypeError, KeyError):
-                continue
+        for indice, bruto in self._v1_so_leitura.items():
+            por_indice[indice] = ((), _pagina_de_json(bruto))
         paginas = {str(p.pid): self._resumo_do_modelo(p) for _, p in por_indice.values()}
         return {"versao": VERSAO_DO_LIVRO,
                 "paginas": dict(sorted(paginas.items(), key=lambda kv: int(kv[0])))}

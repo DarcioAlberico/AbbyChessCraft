@@ -170,8 +170,19 @@ do CA-12.3 e do teste dos links. Visto nas páginas: os diagramas, as figurinas 
 (⩲ ⩱ ∓ ⯹ ∞ ⇄), o negrito, e "Diagrama 1" e "capítulo 1" levando ao lugar certo. No Odds & Ends,
 três coisas da camada do core, não do leitor: as três linhas grandes da capa ("July 2011
 Newsletter", "By", "The QC Team") saem como três títulos; duas entradas do sumário saem num
-parágrafo só; a tabela de símbolos sai com o símbolo depois da descrição. Thorium e leitor de
-celular continuam por abrir.
+parágrafo só; a tabela de símbolos sai com o símbolo depois da descrição. O leitor de celular
+continua por abrir.
+
+## O EPUB no Thorium
+
+Conferido pelo usuário em 2026-10-30 (o Thorium não aceita a porta de depuração do
+Chromium: fecha na hora, e a conferência não se automatiza). Os EPUB do Odds & Ends (375
+páginas, 235 capítulos, 217 diagramas desenhados do FEN e 241 recortados, 35 referências
+com link) e do Mirkovic (7 páginas), exportados dos projetos do usuário no `2242ccf`, com o
+link do Lichess, sem erro no EPUBCheck. Visto: o sumário pelos títulos, a lista de páginas
+levando à página impressa, os diagramas e o link do Lichess deles, "Diagrama N" e
+"capítulo N", as figurinas e os símbolos, e o texto no modo escuro e no tamanho de fonte
+do leitor. Nenhum problema.
 
 ## A revisão de código
 
@@ -360,7 +371,8 @@ Precisa do usuário:
   medidas deixarem de ser provisórias.~~ Feito em 2026-10-28 (`8194283`, seção abaixo).
 - **A conferência cega da fatia** (§15.2: uma página transcrita e um FEN montado sem ver o
   gabarito): é o que falta para o CA-F.1 e a qualidade deixarem de ser provisórios.
-- **Os leitores que não estão na máquina** (Thorium, celular); o Calibre já confere.
+- **O leitor do celular**; o Calibre confere, e o Thorium foi conferido pelo usuário
+  (2026-10-30, seção acima).
 
 Decididos como estão:
 - **A página pedida na hora renderiza na thread da interface** (~85 ms, mais a medida da

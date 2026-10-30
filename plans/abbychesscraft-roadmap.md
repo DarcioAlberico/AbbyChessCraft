@@ -657,8 +657,9 @@ DOCX iguais byte a byte com o mesmo `SOURCE_DATE_EPOCH`).
    prévia que chega depois de fechar o diálogo é ignorada, fechar o diálogo fecha a prévia e
    libera a memória, Exportar espera a prévia em curso, e a prévia do TXT é o próprio TXT.)
 6. ~~Validação automática (EPUBCheck, Ace, referências internas e smoke tests de leitores).~~
-   (EPUBCheck e Ace na rodada 2; o Calibre nas pendências, `18af9f0`. Thorium e o leitor do
-   celular pedem quem os abra.)
+   (EPUBCheck e Ace na rodada 2; o Calibre nas pendências, `18af9f0`; o Thorium conferido
+   pelo usuário em 2026-10-30, com os EPUB do Odds & Ends e do Mirkovic exportados em
+   `2242ccf`. O leitor do celular pede quem o abra.)
 7. ~~Deduplicação/otimização de recursos e divisão dos XHTML por capítulo e tamanho.~~
    (A otimização sem perda das imagens, nas pendências, `3d7d66c`.)
 8. ~~`SOURCE_DATE_EPOCH` e pacote byte a byte reprodutível.~~
@@ -764,7 +765,8 @@ padrão; o relatório tem uma linha por página, que o duplo clique abre; o inte
 páginas; o PDF reproduzível; a página lida ganha as áreas automáticas (o sumário com
 capítulos no livro de referência); a exportação medida em
 `docs/medidas/2026-10-29-exportacao-xv.json` (o EPUBCheck, o Ace e o Calibre sem problema, os
-cinco formatos com os mesmos bytes). Pendente: o Thorium e o leitor do celular.
+cinco formatos com os mesmos bytes). O Thorium conferido pelo usuário (2026-10-30);
+pendente: o leitor do celular.
 
 ## Passo K — Aparência e teclado (§13, §3.4)
 
@@ -1067,8 +1069,12 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   aos campos de porcentagem (`abbychess/app/previa_da_pagina.py`).
 - A origem da amostra numa página apagada oferece restaurá-la na hora (a outra dívida do
   fechamento do L, §12.4): a pergunta na barra, e o Enter devolve a página e vai ao glifo.
+- O EPUB no Thorium, conferido pelo usuário (2026-10-30): os do Odds & Ends (375 páginas,
+  235 capítulos, 217 diagramas desenhados) e do Mirkovic, exportados em `2242ccf` com o link
+  do Lichess e sem erro no EPUBCheck. O sumário, as páginas impressas, os diagramas e os
+  links deles, os links internos, os símbolos e o modo escuro saíram certos.
 
-Continuam: a conferência cega da fatia; o EPUB no Thorium e no celular. A página pedida na hora renderiza
+Continuam: a conferência cega da fatia; o EPUB no celular. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).
 
 ---

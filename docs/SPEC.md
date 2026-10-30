@@ -856,9 +856,13 @@ A partir do L:
   servidor está lendo glifos da página (a leitura que chega grava a página de quando foi
   pedida). Em projeto só para leitura, as operações de página ficam desligadas.
 - **Cortar e dividir são por números** (fechamento do L, 2026-10-23): as margens em
-  porcentagem do que se vê e a divisão em porcentagem da largura, conferidas na página
-  depois (o Ctrl+Z é imediato). Marcar o retângulo e a linha sobre a imagem, com prévia,
-  como no FineReader, fica para depois. Girar à direita e à esquerda são um gesto (o menu e a
+  porcentagem do que se vê e a divisão em porcentagem da largura (o Ctrl+Z é imediato).
+  **Marcados sobre a imagem, com prévia** (2026-10-30, como no FineReader): os diálogos
+  mostram a página aberta (ou, se ela não está entre as escolhidas, a primeira delas) em
+  miniatura, com o retângulo do corte (arrastar as bordas, os cantos, o retângulo inteiro,
+  ou desenhar outro) e a linha da divisão (clicar ou arrastar). A miniatura e os campos andam
+  juntos; os números continuam valendo para todas as escolhidas, e o teclado segue pelos
+  campos. Girar à direita e à esquerda são um gesto (o menu e a
   gaveta), sem diálogo; a gaveta oferece todas as operações para as páginas escolhidas, e o
   menu Página vale para as escolhidas na gaveta quando são mais de uma.
 

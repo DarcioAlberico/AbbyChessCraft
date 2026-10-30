@@ -51,7 +51,8 @@ class DialogoDasPaginas(QDialog):
     uma função das posições (que pode devolver também o texto do OK: `(prévia, ok)`);
     `validar(posições, depois_da)` diz por que a escolha não vale (o OK fica desligado), ou
     None; `ok`, o texto do botão que confirma; `sinais`, os que refazem a prévia (uma caixa
-    que muda o que o OK faz)."""
+    que muda o que o OK faz); `miniatura`, a página com o corte ou a divisão marcados
+    (`previa_da_pagina`), entre a explicação e as perguntas."""
 
     def __init__(self, parent, titulo: str, total: int, *, selecao: str = "",
                  com_selecao: bool = True, lugar: Optional[str] = None, lugar_padrao: int = 0,
@@ -59,7 +60,7 @@ class DialogoDasPaginas(QDialog):
                  efeito: Union[str, Callable[[List[int]], str]] = "{N} página(s)",
                  linhas: Sequence[Tuple[str, QWidget]] = (),
                  validar: Optional[Callable[[List[int], int], Optional[str]]] = None,
-                 ok: str = "", sinais: Sequence = ()):
+                 ok: str = "", sinais: Sequence = (), miniatura: Optional[QWidget] = None):
         super().__init__(parent)
         self.setWindowTitle(titulo)
         self.setMinimumWidth(LARGURA_DOS_DIALOGOS)
@@ -104,6 +105,8 @@ class DialogoDasPaginas(QDialog):
             nota.setWordWrap(True)
             estilo.papel(nota, "dica")
             corpo.addWidget(nota)
+        if miniatura is not None:
+            corpo.addWidget(miniatura, 0, Qt.AlignmentFlag.AlignHCenter)
         corpo.addLayout(formulario)
         corpo.addWidget(self.botoes)
         self.com_selecao = com_selecao

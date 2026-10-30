@@ -14,9 +14,31 @@ from PySide6.QtWidgets import QApplication, QCheckBox, QFileDialog, QLabel
 
 from abbychess import sequencia as sq
 from abbychess.app import dialogo_paginas as dp
+from abbychess.app import imagens
+from abbychess.app import previa_da_pagina as pp
 
 
 class PaginasNaJanela:
+    def _miniatura(self, posicoes: Sequence[int]):
+        """(pixmap, legenda) da página que a miniatura do corte e da divisão mostra: a aberta,
+        se ela está entre as escolhidas; senão a primeira delas. None se não há imagem (a
+        miniatura sai, e os números continuam)."""
+        if not posicoes or self.pagina.fonte is None:
+            return None
+        aberta = self.pagina.indice
+        posicao = aberta if aberta in posicoes else min(posicoes)
+        try:
+            if posicao == aberta and self.pagina.matriz is not None:
+                matriz = self.pagina.matriz
+            else:
+                matriz = self.pagina.cache.pagina(posicao)[1]
+        except (OSError, IndexError, AttributeError):
+            return None
+        legenda = f"A página {posicao + 1}"
+        if len(posicoes) > 1:
+            legenda += " (as outras escolhidas seguem os mesmos números)"
+        return imagens.pixmap_de_cinza(matriz), legenda
+
     def _posicoes_de_agora(self, selecionadas: Optional[Sequence[int]]) -> list:
         """As pedidas (a gaveta, pelo menu de contexto); senão as escolhidas na gaveta, se ela
         tem mais de uma (o menu Página vale para elas); senão a página aberta."""
@@ -109,18 +131,23 @@ class PaginasNaJanela:
 
     def cortar_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         margens = [dp.campo_de_porcentagem(0.0, 0.0, 95.0) for _ in range(4)]
+        posicoes = self._posicoes_de_agora(selecionadas)
+        miniatura = self._miniatura(posicoes)
+        if miniatura is not None:
+            miniatura = pp.PreviaDoCorte(miniatura[0], margens, miniatura[1])
         escolha = dp.perguntar_com(
             self, "Cortar páginas", self._total(),
             list(zip(("Margem esquerda", "Margem de cima", "Margem direita", "Margem de baixo"),
                      margens)),
             lambda: tuple(m.value() / 100 for m in margens),
-            selecao=self._selecao_de_agora(selecionadas),
+            selecao=dp.texto_da_selecao(posicoes), miniatura=miniatura,
             efeito=dp.efeito("1 página é cortada: {PAGINAS}.",
                              "{N} páginas são cortadas: {PAGINAS}."), ok="Cortar",
-            explicacao="Cada margem é a parte da imagem que se vê agora que sai, em "
-                       "porcentagem da largura ou da altura (confira na página depois: o "
-                       "corte é por números). Os glifos que ficam de fora são guardados: "
-                       "{desfazer}, ou Tirar o corte…, os devolvem.")
+            explicacao="Marque na página o que fica: arraste as bordas ou os cantos, ou "
+                       "desenhe outro retângulo. Cada margem é a parte da imagem que se vê "
+                       "agora que sai, em porcentagem da largura ou da altura. Os glifos que "
+                       "ficam de fora são guardados: {desfazer}, ou Tirar o corte…, os "
+                       "devolvem.")
         if escolha is not None:
             self.pagina.cortar_paginas(*escolha)
 
@@ -137,6 +164,10 @@ class PaginasNaJanela:
 
     def dividir_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         onde = dp.campo_de_porcentagem(50.0, 5.0, 95.0, " % da largura")
+        posicoes = self._posicoes_de_agora(selecionadas)
+        miniatura = self._miniatura(posicoes)
+        if miniatura is not None:
+            miniatura = pp.PreviaDaDivisao(miniatura[0], onde, miniatura[1])
         lidas = set(self.projeto.paginas_lidas()) if self.projeto is not None else set()
         contagem = dp.efeito("1 página dupla vira duas: {PAGINAS}.",
                              "{N} páginas duplas viram duas cada: {PAGINAS}.")
@@ -152,10 +183,11 @@ class PaginasNaJanela:
 
         escolha = dp.perguntar_com(
             self, "Dividir páginas", self._total(), [("Dividir em", onde)],
-            lambda: onde.value() / 100, selecao=self._selecao_de_agora(selecionadas),
-            efeito=efeito, ok="Dividir",
+            lambda: onde.value() / 100, selecao=dp.texto_da_selecao(posicoes),
+            miniatura=miniatura, efeito=efeito, ok="Dividir",
             explicacao="A imagem com duas páginas do livro lado a lado (a página dupla) vira "
-                       "duas: a metade esquerda fica no lugar e a direita entra logo depois, "
+                       "duas, na linha que se marca na página (clique ou arraste): a metade "
+                       "esquerda fica no lugar e a direita entra logo depois, "
                        "cada uma com os glifos dela. A que já é metade de uma divisão fica "
                        "como está. {desfazer} junta de novo.")
         if escolha is not None:

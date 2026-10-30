@@ -1062,6 +1062,10 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   agora só esperam a conferência cega (§15.2: uma página transcrita e um FEN montado às cegas);
   a qualidade, também as 28 linhas do sumário (i007) sem texto verificado.
 
+- O corte e a divisão marcados sobre a imagem, com prévia (a dívida do fechamento do L,
+  §12.4): a miniatura da página nos diálogos, com o retângulo e a linha arrastáveis, ligados
+  aos campos de porcentagem (`abbychess/app/previa_da_pagina.py`).
+
 Continuam: a conferência cega da fatia; o EPUB no Thorium e no celular. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).
 

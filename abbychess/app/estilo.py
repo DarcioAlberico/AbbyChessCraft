@@ -119,6 +119,10 @@ MARCADO = QColor(0, 128, 140)               # ciano: na seleção do modo de tre
 PALAVRA = QColor(194, 24, 91)               # rosa: a palavra na verificação de texto
 #: Em volta da página na Imagem.
 FUNDO_DA_IMAGEM = QColor(90, 90, 90)
+#: A miniatura dos diálogos de cortar e dividir (`previa_da_pagina`): o que sai do corte,
+#: escurecido (a página ainda se vê por baixo), e a metade que vira a página seguinte.
+FORA_DO_CORTE = QColor(0, 0, 0, 110)
+METADE_DA_DIREITA = QColor(0, 114, 178, 40)
 
 #: O tracejado do tabuleiro na Imagem, pelo estado do diagrama.
 DIAGRAMA_POR_LER = CINZA

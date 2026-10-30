@@ -57,6 +57,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import itertools
 import json
 import logging
 import math
@@ -232,9 +233,10 @@ class ProjetoDeLivro:
         #: Versão mais nova que a do programa: nada é gravado (`gravacao.SomenteLeitura`).
         self.somente_leitura = somente_leitura
         self._livro: Optional[dict] = None
-        #: Uma gravação de página por vez (o lote grava de outra thread): a página,
-        #: `marcadas.json` e `livro.json` mudam juntos, e o `.tmp` de cada um é um só. A
-        #: interface não espera por ela no caminho de uma edição (ver `_trava_do_cache`).
+        #: As gravações síncronas e a do `livro.json` (o gravador, numa thread, também o
+        #: grava): a página, `marcadas.json` e `livro.json` mudam juntos, e o `.tmp` de cada um
+        #: é um só. O arquivo da página tem a trava dele (`_trava_das_paginas`). A interface
+        #: não espera por ela no caminho de uma edição (ver `_trava_do_cache`).
         self._trava_do_livro = threading.RLock()
         #: O cache das páginas (`_modelos`, `_estados`, `_a_gravar`): curta, sem disco. A
         #: ordem é sempre a do livro e depois a do cache, nunca o contrário.
@@ -276,6 +278,14 @@ class ProjetoDeLivro:
         #: pid -> (instantâneo, resumo) das páginas entregues e ainda não gravadas: o
         #: resumo do livro as mostra como estão, e não como o disco ainda está.
         self._a_gravar: Dict[int, tuple] = {}
+        #: O escritor único de cada `p<pid>.json` (SPEC-qualidade Q-P4): o conteúdo ganha um
+        #: bilhete quando é fotografado (`agendar`, `_gravar`), toda gravação do arquivo passa
+        #: por `_gravar_arquivo_da_pagina`, uma por vez, e o arquivo nunca recebe um bilhete
+        #: mais velho que o último gravado nele (o instantâneo que o gravador tirou da fila
+        #: antes de uma gravação síncrona mais nova não volta por cima dela).
+        self._trava_das_paginas = threading.Lock()
+        self._bilhetes = itertools.count(1)
+        self._ultimo_bilhete: Dict[int, int] = {}
         #: Avisado da thread do gravador quando uma página não grava: `(indice, erro)`.
         self.ao_falhar_gravacao = None
         #: As páginas (índices) que `fechar` não conseguiu gravar.
@@ -445,7 +455,7 @@ class ProjetoDeLivro:
             # O resumo vale já para quem pergunta (F6, o lote, "lidas"), antes da gravação.
             self._a_gravar[pagina.pid] = (instantaneo, resumo if resumo is not None
                                           else self._resumo_do_modelo(instantaneo))
-            self.gravador.agendar(pagina.pid, instantaneo)
+            self.gravador.agendar(pagina.pid, (next(self._bilhetes), instantaneo))
         return True
 
     def descarregar(self, limite: Optional[float] = None) -> bool:
@@ -465,19 +475,23 @@ class ProjetoDeLivro:
             pids = list(self._a_gravar)
         return sorted(p for p in map(sequencia.posicao_de, pids) if p is not None)
 
-    def _gravar_instantaneo(self, pagina: Pagina) -> None:
-        """A gravação do gravador. O arquivo da página é gravado sem a trava do livro: o
-        instantâneo não muda, e só esta thread grava as páginas que a interface edita (o
-        lote, que grava as dele, começa depois de `descarregar`). A trava vale só para o
-        `livro.json`, que o lote também grava."""
-        gv.gravar_json(self._arquivo_v2(pagina.pid),
-                       _pagina_para_json(pagina, self._pagina_da_fonte(pagina)))
+    def _gravar_instantaneo(self, entregue: Tuple[int, Pagina]) -> None:
+        """A gravação do gravador: `(bilhete, instantâneo)`. O arquivo da página é gravado
+        sem a trava do livro (a interface não espera o disco), na vez dele entre as gravações
+        do mesmo arquivo; o resumo vai ao `livro.json` só se nenhuma gravação mais nova da
+        página veio antes."""
+        bilhete, pagina = entregue
+        self._gravar_arquivo_da_pagina(pagina.pid, bilhete,
+                                       _pagina_para_json(pagina, self._pagina_da_fonte(pagina)))
         with self._trava_do_livro:
-            with self._trava_do_cache:
-                # A foto é das gravações síncronas; esta página veio da interface, que não
-                # muda nada no lugar, e a reconciliação a compara com o glifo mesmo.
-                self._estados.pop(pagina.pid, None)
-            self._atualizar_livro(pagina.pid, self._resumo_do_modelo(pagina))
+            with self._trava_das_paginas:
+                vale = self._ultimo_bilhete.get(pagina.pid) == bilhete
+            if vale:
+                with self._trava_do_cache:
+                    # A foto é das gravações síncronas; esta página veio da interface, que
+                    # não muda nada no lugar, e a reconciliação a compara com o glifo mesmo.
+                    self._estados.pop(pagina.pid, None)
+                self._atualizar_livro(pagina.pid, self._resumo_do_modelo(pagina))
         with self._trava_do_cache:
             pendente = self._a_gravar.get(pagina.pid)
             if pendente is not None and pendente[0] is pagina:
@@ -717,13 +731,24 @@ class ProjetoDeLivro:
     def _gravar(self, pagina: Pagina, *, livro: bool = True) -> None:
         """A página e o resumo dela em `livro.json` (com a trava do livro); `livro=False`
         deixa o resumo para quem grava várias de uma vez (`trocar_paginas`)."""
+        bilhete = next(self._bilhetes)
         dados = _pagina_para_json(pagina, self._pagina_da_fonte(pagina))
-        gv.gravar_json(self._arquivo_v2(pagina.pid), dados)
+        self._gravar_arquivo_da_pagina(pagina.pid, bilhete, dados)
         with self._trava_do_cache:
             # A foto da gravação, do mesmo `as_state()` que foi para o JSON.
             self._estados[pagina.pid] = {b[0]: hash(tuple(b[1])) for b in dados["boxes"]}
         if livro:
             self._atualizar_livro(pagina.pid, self._resumo_do_modelo(pagina))
+
+    def _gravar_arquivo_da_pagina(self, pid: int, bilhete: int, dados: dict) -> bool:
+        """O único lugar que grava `p<pid>.json` (Q-P4), uma gravação por vez: a de bilhete
+        mais velho que o último gravado não vai ao disco (devolve falso)."""
+        with self._trava_das_paginas:
+            if bilhete < self._ultimo_bilhete.get(pid, 0):
+                return False
+            gv.gravar_json(self._arquivo_v2(pid), dados)
+            self._ultimo_bilhete[pid] = bilhete
+            return True
 
     def prender(self, pid: Optional[int]) -> None:
         """A página aberta na janela (None: nenhuma): o cache não a despeja, por mais páginas

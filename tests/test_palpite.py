@@ -40,14 +40,14 @@ def test_o_glifo_lido_nao_tem_palpite(app, janela):
     mostrar(janela, 0)
     app.processEvents()
     assert campo.text() == "a" and "Palpite" not in janela.treino.leitura.text()
-    assert janela.pagina.sugestao_do_atual() is None
+    assert janela.pagina.leitura.sugestao_do_atual() is None
 
 
 def test_sem_rede_o_campo_fica_vazio(app, janela):
     _pronta(app, janela)
     mostrar(janela, fila(janela)[0])
     app.processEvents()
-    assert janela.treino.campo.text() == "" and janela.pagina.sugestao_do_atual() is None
+    assert janela.treino.campo.text() == "" and janela.pagina.leitura.sugestao_do_atual() is None
 
 
 def test_digitar_troca_o_palpite(app, janela):
@@ -79,12 +79,12 @@ def test_o_palpite_vale_para_o_mesmo_glifo(app, janela):
     p = janela.pagina
     primeiro = fila(janela)[0]
     mostrar(janela, primeiro)
-    velho = p._sugestoes[p.atual][0]
-    assert velho is p.box_atual() and p.sugestao_do_atual() == (
+    velho = p.leitura._sugestoes[p.atual][0]
+    assert velho is p.box_atual() and p.leitura.sugestao_do_atual() == (
         leitor_falso.PALPITE, leitor_falso.CONFIANCA_DO_PALPITE)
     trocar_entries(janela, p.indice, lambda e: None)    # cópias novas
     _esperar(app, janela)
-    assert p.box_atual() is not velho and p._sugestoes[p.atual][0] is p.box_atual()
+    assert p.box_atual() is not velho and p.leitura._sugestoes[p.atual][0] is p.box_atual()
 
 
 def test_o_glifo_aguardando_ganha_o_palpite_quando_a_leitura_chega(app, janela):
@@ -100,7 +100,7 @@ def test_o_glifo_aguardando_ganha_o_palpite_quando_a_leitura_chega(app, janela):
     _esperar(app, janela)
     mostrar(janela, 0)
     app.processEvents()
-    assert campo.text() == "" and janela.pagina.sugestao_do_atual() is None
+    assert campo.text() == "" and janela.pagina.leitura.sugestao_do_atual() is None
 
     def ninguem_leu(e):
         if (e.x1, e.y1) == caixa:
@@ -161,7 +161,7 @@ def test_a_troca_pelo_contexto_vai_ao_campo(app, janela, monkeypatch):
     monkeypatch.setattr(contexto, "sugestoes", lambda pagina: {gid: "'"})
     mostrar(janela, 0)
     app.processEvents()
-    assert janela.pagina.sugestao_do_contexto() == ("'", True)
+    assert janela.pagina.leitura.sugestao_do_contexto() == ("'", True)
     assert janela.treino.campo.text() == "'"
     assert "Pelo contexto" in janela.treino.leitura.text()
     assert "corrija só esta" in janela.treino.leitura.text()

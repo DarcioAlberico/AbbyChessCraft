@@ -251,7 +251,7 @@ def test_ca_4_8_voltar_ao_estado_antes_do_lote_devolve_o_json_copiado(ctl, proje
     p.corrigir("W")                                       # manual: o refazer o mantém (§4.6)
     p.ir_para(0)                                          # a 1 não está aberta: o lote a relê
     p.escolher(p.gids[0])
-    p.ensinar("a")                                        # o lote lê os "a" da 1 pelo padrão
+    p.leitura.ensinar("a")                                        # o lote lê os "a" da 1 pelo padrão
     ctl.executor.tudo()
     projeto.descarregar(10)
     copia_esperada = (projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(1)}.json").read_bytes()
@@ -371,7 +371,7 @@ def test_o_lote_deixa_para_depois_a_pagina_com_um_f5_em_voo(ctl, projeto, com_se
     p = ctl.pagina
     gid = p.gids[0]
     antes = p.box(gid).char
-    p.reconhecer()
+    p.leitura.reconhecer()
     fim_do_f5 = ctl.executor.comecar()                    # o F5 leu; o pronto não veio
     ler_pagina = lote.sl.ler_pagina
 
@@ -399,7 +399,7 @@ def test_a_procedencia_volta_do_servidor_com_a_leitura(ctl, projeto, com_servido
     servidor, fila = com_servidor
     p = ctl.pagina
     p.escolher(p.gids[0])
-    p.ensinar("a")                                        # o padrão vai ao servidor
+    p.leitura.ensinar("a")                                        # o padrão vai ao servidor
     ctl.executor.tudo()
     ctl.reconhecer([1], refazer=True)
     entregar(fila, esperar_por=1)
@@ -463,8 +463,8 @@ def test_com_o_servidor_parado_os_comandos_avisam_e_nao_leem(ctl, projeto, com_s
     p.eventos.ligar("mensagem", lambda texto, ms: mensagens.append(texto))
     servidor.desistiu = True
     pedidos = len(servidor.pedidos)
-    p.reconhecer()
-    p.reler_pendentes()
+    p.leitura.reconhecer()
+    p.leitura.reler_pendentes()
     assert len(servidor.pedidos) == pedidos and not ctl.executor.fila
     assert sum("Reabra o projeto" in m for m in mensagens) == 2
 
@@ -652,7 +652,7 @@ def test_o_f5_tira_a_pagina_de_reler_depois(ctl, projeto):
     ctl.reconhecer([0], refazer=True)
     ctl.executor.tudo()
     assert ctl.reler_depois == [0] and (projeto.pasta / ARQUIVO_DO_LOTE).exists()
-    p.reconhecer()                                        # o F5 a releu
+    p.leitura.reconhecer()                                        # o F5 a releu
     ctl.executor.tudo()
     assert ctl.reler_depois == [] and not (projeto.pasta / ARQUIVO_DO_LOTE).exists()
 

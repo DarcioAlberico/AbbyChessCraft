@@ -70,7 +70,7 @@ def montar(janela) -> None:
     barra.addSeparator()
     j.acao_reconhecer = acao(j, "reconhecer_pagina", j.reconhecer,
                              texto="Reconhecer página", barra=barra)
-    j.acao_reler = acao(j, "reler_pendentes", lambda: p.reler_pendentes(),
+    j.acao_reler = acao(j, "reler_pendentes", lambda: p.leitura.reler_pendentes(),
                         texto="Reler pendentes", barra=barra)
     j.acao_lote = acao(j, "reconhecer_livro", j.reconhecer_livro, texto="Reconhecer o livro…")
     j.acao_proximo_do_livro = acao(j, "proxima_pagina_pendente", livro.proximo_pendente,
@@ -233,7 +233,7 @@ def montar(janela) -> None:
                               texto="Só esta ocorrência", widgets=[campo])
     j.acao_ensinar_em_lote = acao(j, "ensinar_em_lote", t.pedir_ensinar_em_lote,
                                   texto="Ensinar e corrigir em lote", widgets=[campo])
-    t.ensinar_em_lote.connect(p.ensinar_em_lote)
+    t.ensinar_em_lote.connect(p.leitura.ensinar_em_lote)
     j.acao_descartar = acao(j, "descartar_box", t.pedir_descartar, texto="Não é caractere",
                             widgets=[t])
     j.acao_dividir = acao(j, "dividir", t.pedir_dividir, texto="Dividir o box", widgets=[t])

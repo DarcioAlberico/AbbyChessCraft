@@ -117,7 +117,7 @@ def main() -> int:
         for nome, largura, altura, arranjo, docas in SEM_LEITURA:
             _capturar(app, janela, saida / f"{nome}-{args.tema}.png", largura, altura,
                       arranjo, docas)
-        janela.pagina.reconhecer()
+        janela.pagina.leitura.reconhecer()
         _esperar(app, janela)
         for nome, largura, altura, arranjo, docas in CENARIOS:
             _capturar(app, janela, saida / f"{nome}-{args.tema}.png", largura, altura,

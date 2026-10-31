@@ -118,7 +118,7 @@ def ligar(controlador, servidor: ServidorFalso) -> list:
     """Põe o servidor falso no controlador (como `ligar(..., servidor)`) e devolve a lista
     do que volta à interface; `entregar(lista)` a esvazia."""
     controlador.servidor = servidor
-    controlador._enviados = controlador.padroes()
+    controlador.leitura._enviados = controlador.padroes()
     fila: list = []
     controlador.executar.na_interface = fila.append
     return fila

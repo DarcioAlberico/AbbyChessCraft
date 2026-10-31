@@ -230,7 +230,7 @@ class CondutorDoLote:
 
     def _ler(self, indice: int) -> None:
         p = self.p
-        projeto, fonte, leitor, servidor = p.projeto, p.fonte, p.leitor, p._servidor_para_pedir()
+        projeto, fonte, leitor, servidor = p.projeto, p.fonte, p.leitor, p.leitura.servidor_para_pedir()
         # Na janela, só o pid e a versão (sem ler o JSON da página: isso, e o que o §4.6
         # mantém, vão para a thread da leitura). Uma mudança do usuário depois daqui sobe a
         # versão, e `_mudou_durante` a pega.
@@ -344,7 +344,7 @@ class CondutorDoLote:
         pid = p.projeto.pid_da_pagina(indice)
         if pid != pedida.pid or p.historico.versao(pid) != pedida.versao:
             return RELER_DEPOIS
-        if pid in p.lendo_no_f5:                # o pronto do F5 viria por cima (CA-Q-C2)
+        if pid in p.leitura.lendo_no_f5:        # o pronto do F5 viria por cima (CA-Q-C2)
             return RELER_DEPOIS
         return None
 

@@ -38,7 +38,7 @@ class ControladorDaSequencia:
                     "lugar para passar ao novo.")
         if self._p.lote_rodando:
             return "O lote está lendo o livro: espere-o terminar, ou cancele-o."
-        if self._p._em_leitura:
+        if self._p.leitura.lendo:
             # A leitura que chega grava a página de quando foi pedida.
             return "O servidor está lendo glifos da página: espere a leitura chegar."
         if not self._p._agora():

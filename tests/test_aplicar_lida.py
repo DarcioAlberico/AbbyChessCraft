@@ -50,7 +50,7 @@ def test_o_f5_e_o_lote_deixam_a_mesma_pagina(tmp_path):
     projeto_lote, ctl_lote = _controlador(tmp_path, "lote")
     assert f5.imagem is not None
 
-    trabalho, pronto = f5._preparar_reconhecer(0)
+    trabalho, pronto = f5.leitura._preparar_reconhecer(0)
     pronto(_lida())
     CondutorDoLote(ctl_lote, [0], refazer=False)._gravar(0, _lida())
 

@@ -147,7 +147,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self._montar_diagramas()                # o editor Diagrama e a aba (§10)
 
         self.treino = PainelDeTreino()
-        self.treino.ensinar.connect(p.ensinar)
+        self.treino.ensinar.connect(p.leitura.ensinar)
         self.treino.so_corrigir.connect(p.corrigir)
         self.treino.descartar.connect(p.descartar)
         self.treino.pular.connect(lambda: self.pagina.andar(+1))
@@ -334,7 +334,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.confirmar_a_sessao_aberta(agora=True)
         self.livro.esperar_a_gravacao()
         if not self._gravou_ou_perder(projeto):   # e o que ele entregou também é gravado
-            self.pagina.ler_os_aguardando()     # ficou aberto: o que foi abandonado volta
+            self.pagina.leitura.ler_os_aguardando()     # ficou aberto: o que foi abandonado volta
             return False
         self.gravar_espaco()
         self.abrir_avisos_do_projeto(None)
@@ -382,7 +382,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
                 "A página já foi reconhecida. Reconhecer de novo descarta os boxes e as "
                 "correções só desta ocorrência. Os padrões ensinados ficam. Continuar?"):
             return
-        p.reconhecer()
+        p.leitura.reconhecer()
 
     def opcoes(self) -> None:
         if not self.pagina.pronto:

@@ -345,7 +345,7 @@ def test_o_aviso_e_o_enter_recortam_da_matriz_do_cache(livro, monkeypatch):
     assert convertidas == []
     # O Enter (a parte síncrona) e a propagação dele, na tarefa, também não.
     gid = ctl.atual
-    ctl.ensinar("c")
+    ctl.leitura.ensinar("c")
     ctl.executar.tudo()
     assert ctl.modelo.box(gid).entry.char == "c" and convertidas == []
     # Quem troca a imagem à mão não leva a matriz da outra junto.

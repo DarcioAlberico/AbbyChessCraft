@@ -106,7 +106,7 @@ class ControladorDeLayout:
         if p.boxes:
             self._automaticas_prontas(zn.automaticas(p.boxes, p.tabuleiros, largura, altura))
             return
-        if p.servidor_parado():
+        if p.leitura.servidor_parado():
             return
         indice = p.indice
 
@@ -114,7 +114,7 @@ class ControladorDeLayout:
             if p.indice != indice or p.imagem is None:
                 return None
             imagem, leitor = p.imagem, p.leitor
-            servidor = p._servidor_para_pedir()
+            servidor = p.leitura.servidor_para_pedir()
 
             def trabalho(_progresso):
                 if servidor is None:
@@ -311,7 +311,7 @@ class ControladorDeLayout:
 
     def reconhecer_atual(self) -> None:
         if self.atual is not None and 0 <= self.atual < len(self.zonas):
-            self.pagina.reconhecer_zona(self.zonas[self.atual])
+            self.pagina.leitura.reconhecer_zona(self.zonas[self.atual])
 
 
 # ----------------------------------------------------------------------
@@ -503,7 +503,7 @@ class ControladorDeVerificacao:
             depois(f"'{texto}': {len(mudados)} glifo(s) corrigido(s) e ensinado(s)"
                    f"{separadas}{extra}.")
 
-        p.ensinar_gids(por_char, descricao, ensinou, juntar=passo)
+        p.leitura.ensinar_gids(por_char, descricao, ensinou, juntar=passo)
 
     def ignorar_todas(self) -> None:
         palavra = self.atual()
@@ -637,7 +637,7 @@ class ControladorDeDiagramas:
         if not any(not d.lido and not d.erro for d in diagramas):
             self._abrir(indice)
             return
-        if p.servidor_parado():
+        if p.leitura.servidor_parado():
             return
         pagina_indice = p.indice
 
@@ -650,7 +650,7 @@ class ControladorDeDiagramas:
             imagem, leitor, boxes = p.imagem, p.leitor, pagina.entries()
             caixas = [atuais[i].caixa for i in por_ler]
 
-            servidor = p._servidor_para_pedir()
+            servidor = p.leitura.servidor_para_pedir()
 
             def trabalho(_progresso):
                 if servidor is None:
@@ -869,7 +869,7 @@ class ControladorDoLivro:
                 return
             self._modelos_avisados = servidor
             self.eventos.emitir("modelos_prontos", valor)
-            self.pagina.ler_os_aguardando()     # o que a página aberta deixou esperando
+            self.pagina.leitura.ler_os_aguardando()  # o que a página aberta deixou esperando
         else:
             # O primeiro tombo só vai para os Avisos; no segundo o servidor desistiu, e a
             # janela oferece reabrir o projeto (§11).

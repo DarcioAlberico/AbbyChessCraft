@@ -144,7 +144,7 @@ class ControladorDosPadroes:
             self._p.eventos.emitir("aviso", "Esquecer padrões",
                                    f"Página {pagina.indice + 1}: estava verificada e voltou à "
                                    "revisão (o padrão esquecido lia glifos dela).")
-        self._p._emendar(transacao, antes, pagina)
+        self._p.leitura.emendar(transacao, antes, pagina)
         self._p._gravar(pagina)
         if pagina is self._p.modelo:
             if self._p.atual is None:

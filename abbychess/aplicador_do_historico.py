@@ -149,12 +149,12 @@ class AplicadorDoHistorico:
             # Um Enter cuja propagação foi descartada quando ele foi desfeito: ela roda de
             # novo (na página dele, já aberta), com os padrões de agora, e emenda a transação.
             transacao.invalidada = False
-            self._p._propagar(self._p.modelo, self._p.indice, transacao, None)
+            self._p.leitura.propagar(self._p.modelo, self._p.indice, transacao, None)
         self._p.eventos.emitir("padroes_mudaram")
         self._p.eventos.emitir("acoes_mudaram")
         # Quem mostra leituras de outras páginas (a Galeria) as relê das páginas tocadas.
         self._p.eventos.emitir("historico_aplicado", set(transacao.paginas))
-        self._p.ler_os_aguardando()                # o que voltou ainda sem leitura
+        self._p.leitura.ler_os_aguardando()        # o que voltou ainda sem leitura
         acao = "Refeito" if refazer else "Desfeito"
         self._p._avisar(f"{acao}: {transacao.descricao}.", 6000)
 

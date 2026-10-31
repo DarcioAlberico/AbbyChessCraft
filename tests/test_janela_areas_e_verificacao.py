@@ -206,7 +206,7 @@ def test_reconhecer_so_a_zona_preserva_boxes_de_fora(app, janela):  # noqa: F811
     pagina.escolher(fora.gid)
     pagina.corrigir("Z")
 
-    pagina.reconhecer_zona(alvo)
+    pagina.leitura.reconhecer_zona(alvo)
     _esperar(app, janela)
 
     assert pagina.modelo.box(fora.gid).entry.char == "Z"

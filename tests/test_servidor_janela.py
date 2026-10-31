@@ -84,7 +84,7 @@ def test_o_padrao_ensinado_vai_ao_servidor_antes_do_pedido_seguinte(app, janela)
     janela.reconhecer()
     _esperar(app, janela)
     p.escolher(p.gids[0])
-    p.ensinar("a")
+    p.leitura.ensinar("a")
     _esperar(app, janela)
     assert len(p.padroes()) == 1
     assert p.servidor.chamar("padroes", timeout=10) == 1        # CA-11.2: o delta chegou
@@ -165,7 +165,7 @@ def test_ca_11_1_e_11_2_durante_o_lote_navegar_e_ensinar_valem_na_hora(app, jane
     _ate(app, lambda: len(p.projeto.paginas_lidas()) >= 3)
     assert j.livro.lote_rodando and not j.executor.ocupado    # o lote não prende a fila
     p.escolher(p.gids[0])
-    p.ensinar("a")                                       # o primeiro glifo é um "a"
+    p.leitura.ensinar("a")                                       # o primeiro glifo é um "a"
     assert p.box(p.gids[0]).char == "a"                  # na hora, sem esperar o lote
     assert j.pagina.ir_para(1) and p.indice == 1         # navegar também
     feitas_ao_ensinar = len(p.projeto.paginas_lidas())
@@ -258,7 +258,7 @@ def test_a_procedencia_do_padrao_volta_do_filho_no_f5(app, janela):  # noqa: F81
     janela.reconhecer()
     _esperar(app, janela)
     p.escolher(p.gids[0])
-    p.ensinar("a")                                       # o primeiro glifo é um "a"
+    p.leitura.ensinar("a")                                       # o primeiro glifo é um "a"
     _esperar(app, janela)
     janela.reconhecer()                                  # os outros "a", pelo padrão, no filho
     _esperar(app, janela)
@@ -282,7 +282,7 @@ def test_ca_11_7_sem_servidor_pronto_o_glifo_fica_aguardando_sem_prender_a_fila(
         gid = p.atual
         assert pg.aguardando(p.box(gid)) and not janela.executor.ocupado
         p.escolher(p.gids[1])
-        p.ensinar("b")                                   # o Enter não espera os modelos
+        p.leitura.ensinar("b")                                   # o Enter não espera os modelos
         assert p.box(p.gids[1]).char == "b"
         _esperar(app, janela)                            # a propagação, com o "b" só
         assert pg.aguardando(p.box(gid)) and not p.servidor.pronto.is_set()

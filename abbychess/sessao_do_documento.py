@@ -259,5 +259,5 @@ class ControladorDaSessao:
             return
         self._p.escolher(gid)
         self._p.limpar_selecao()
-        self._p.ensinar_gids({char: [gid]}, f"Ensinar '{char}'",
-                             self._p._depois_de_ensinar(char, [gid]), juntar=chave)
+        self._p.leitura.ensinar_gids({char: [gid]}, f"Ensinar '{char}'",
+                                     self._p.leitura.depois_de_ensinar(char, [gid]), juntar=chave)

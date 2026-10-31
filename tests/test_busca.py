@@ -164,7 +164,7 @@ def test_o_controlador_monta_o_indice_busca_e_refaz_a_pagina_editada(tmp_path):
     try:
         executor = ExecutorManual()
         ctl = _controlador(projeto, executor)
-        ctl.reconhecer()
+        ctl.leitura.reconhecer()
         executor.tudo()
         busca = ControladorDaBusca(ctl, paralelo=False)
         fins, falhas = [], []

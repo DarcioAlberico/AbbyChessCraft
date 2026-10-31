@@ -284,7 +284,7 @@ def test_falhar_ao_gravar_o_projeto_nao_deixa_o_arquivo_da_direita(projeto, ctl,
 
 
 def test_com_leitura_do_servidor_pendente_as_operacoes_esperam(projeto, ctl):
-    ctl._em_leitura = {123}
+    ctl.leitura._em_leitura = {123}
     assert "servidor" in ctl.operacoes.motivo_para_nao_mudar_as_paginas()
     assert not ctl.operacoes.dividir_paginas([2])
 

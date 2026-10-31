@@ -112,7 +112,7 @@ def test_resultado_de_tarefa_do_projeto_anterior_nao_entra_no_novo(dois_projetos
     a, b = dois_projetos
     executor = ExecutorManual()
     ctl = _controlador(a, executor)
-    ctl.reconhecer()
+    ctl.leitura.reconhecer()
     fim = executor.comecar()                           # leu, mas o fim ainda não veio
     ctl.ligar(b, pg.FonteDePaginas(b.fonte),
               LeitorDoLivro(b.pasta_de_padroes, limiares=b.dados.limiares))
@@ -126,7 +126,7 @@ def test_tarefa_na_fila_do_projeto_anterior_nao_roda(dois_projetos):
     a, b = dois_projetos
     executor = ExecutorManual()
     ctl = _controlador(a, executor)
-    ctl.reconhecer()
+    ctl.leitura.reconhecer()
     fim = executor.comecar()                           # uma leitura em voo prende a fila
     ctl.marcar(0, 0, 300, 120)                         # na fila, ainda não rodou
     ctl.ligar(b, pg.FonteDePaginas(b.fonte),
@@ -144,7 +144,7 @@ def test_reconhecer_entra_na_pagina_que_pediu_mesmo_depois_de_trocar(tmp_path):
     try:
         executor = ExecutorManual()
         ctl = _controlador(projeto, executor)
-        ctl.reconhecer()
+        ctl.leitura.reconhecer()
         fim = executor.comecar()
         ctl.ir_para(1)                                 # o usuário foi adiante
         fim()
@@ -163,7 +163,7 @@ def test_edicao_pedida_numa_pagina_nao_roda_em_outra(tmp_path):
         executor = ExecutorManual()
         ctl = _controlador(projeto, executor)
         ctl.ir_para(1)
-        ctl.reconhecer()
+        ctl.leitura.reconhecer()
         fim = executor.comecar()                       # uma leitura em voo prende a fila
         ctl.ir_para(0)
         ctl.marcar(0, 0, 300, 120)                     # pedida na página 0, na fila
@@ -179,7 +179,7 @@ def test_comando_guarda_o_glifo_da_hora_em_que_foi_pedido(dois_projetos):
     a, _ = dois_projetos
     executor = ExecutorManual()
     ctl = _controlador(a, executor)
-    ctl.reconhecer()
+    ctl.leitura.reconhecer()
     executor.tudo()
     primeiro, segundo = ctl.gids[0], ctl.gids[1]
     ctl.mostrar(primeiro)
@@ -224,7 +224,7 @@ def test_corrigir_e_ensinar_uma_palavra_e_um_passo_so_do_desfazer(dois_projetos)
     a, _ = dois_projetos
     executor = ExecutorManual()
     ctl = _controlador(a, executor)
-    ctl.reconhecer()
+    ctl.leitura.reconhecer()
     executor.tudo()
     verificador = ControladorDeVerificacao(ctl)
     antes = [b for b in ctl.modelo.boxes]
@@ -252,7 +252,7 @@ def test_espaco_na_correcao_separa_a_palavra_e_desfaz_junto(dois_projetos):
     a, _ = dois_projetos
     executor = ExecutorManual()
     ctl = _controlador(a, executor)
-    ctl.reconhecer()
+    ctl.leitura.reconhecer()
     executor.tudo()
     verificador = ControladorDeVerificacao(ctl)
 
@@ -290,7 +290,7 @@ def test_a_sessao_do_documento_na_fila_avisa_quando_entra(dois_projetos):
     a, _b = dois_projetos
     executor = ExecutorManual()
     ctl = _controlador(a, executor)
-    ctl.reconhecer()
+    ctl.leitura.reconhecer()
     executor.tudo()
     texto, unidades = ss.texto_e_unidades(ctl.modelo)
     inicio, fim = ss.palavras_em(unidades, 0, 0)
@@ -312,7 +312,7 @@ def test_a_sessao_que_nao_pode_rodar_e_recusada(dois_projetos):
     a, _b = dois_projetos
     executor = ExecutorManual()
     ctl = _controlador(a, executor)
-    ctl.reconhecer()
+    ctl.leitura.reconhecer()
     executor.tudo()
     texto, unidades = ss.texto_e_unidades(ctl.modelo)
     inicio, fim = ss.palavras_em(unidades, 0, 0)
@@ -334,7 +334,7 @@ def test_sair_da_pagina_confirma_a_sessao_na_pagina_dela(tmp_path, na_fila):
     try:
         executor = ExecutorManual()
         ctl = _controlador(projeto, executor)
-        ctl.reconhecer()
+        ctl.leitura.reconhecer()
         executor.tudo()
         pagina = ctl.modelo
         texto, unidades = ss.texto_e_unidades(pagina)
@@ -361,7 +361,7 @@ def test_o_box_marcado_confirmado_com_a_letra_que_faltava_tira_o_virtual(dois_pr
     a, _b = dois_projetos
     executor = ExecutorManual()
     ctl = _controlador(a, executor)
-    ctl.reconhecer()
+    ctl.leitura.reconhecer()
     executor.tudo()
     texto, unidades = ss.texto_e_unidades(ctl.modelo)
     inicio, fim = ss.palavras_em(unidades, 0, 0)
@@ -385,7 +385,7 @@ def test_o_ctrl_t_espera_a_sessao_na_fila_e_fechar_aplica_na_hora(dois_projetos)
     a, _b = dois_projetos
     executor = ExecutorManual()
     ctl = _controlador(a, executor)
-    ctl.reconhecer()
+    ctl.leitura.reconhecer()
     executor.tudo()
     texto, unidades = ss.texto_e_unidades(ctl.modelo)
     inicio, fim = ss.palavras_em(unidades, 0, 0)
@@ -412,7 +412,7 @@ def test_o_modo_como_o_livro_olha_o_resumo_das_paginas_lidas(tmp_path):
     try:
         executor = ExecutorManual()
         ctl = _controlador(projeto, executor)
-        ctl.reconhecer()
+        ctl.leitura.reconhecer()
         executor.tudo()
         assert ctl.sessoes._modo_das_pecas("livro", ctl.modelo) == "letras"
         texto, unidades = ss.texto_e_unidades(ctl.modelo)
@@ -435,7 +435,7 @@ def test_fechar_aplica_as_sessoes_que_esperavam_na_fila(dois_projetos):
     a, _b = dois_projetos
     executor = ExecutorManual()
     ctl = _controlador(a, executor)
-    ctl.reconhecer()
+    ctl.leitura.reconhecer()
     executor.tudo()
     texto, unidades = ss.texto_e_unidades(ctl.modelo)
     inicio, fim = ss.palavras_em(unidades, 0, 0)
@@ -461,7 +461,7 @@ def test_a_pagina_lida_antes_do_treino_avisa_o_reler(dois_projetos):
     a, _b = dois_projetos
     executor = ExecutorManual()
     ctl = _controlador(a, executor)
-    ctl.reconhecer()
+    ctl.leitura.reconhecer()
     executor.tudo()
     ctl.modelo.estado = RECONHECIDA
     a.salvar_modelo(ctl.modelo)

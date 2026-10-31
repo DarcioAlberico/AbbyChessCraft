@@ -492,7 +492,7 @@ def test_reler_pendentes_entra_no_desfazer(app, janela):
     janela.pagina.desfazedor.desfazer()                            # o Enter e a propagação saem
     janela.leitor.padroes.restaurar_varios(janela.pagina.historico.proxima_a_refazer()
                                            .amostras_criadas[:1])  # o padrão volta por fora
-    janela.pagina.reler_pendentes()
+    janela.pagina.leitura.reler_pendentes()
     _esperar(app, janela)
     assert janela.acao_desfazer.text() == "Desfazer: Reler pendentes"
     janela.pagina.desfazedor.desfazer()

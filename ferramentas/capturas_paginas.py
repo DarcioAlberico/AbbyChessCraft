@@ -109,7 +109,7 @@ def main() -> int:
         janela.show()
         janela.usar(projeto, pg.fonte_do_projeto(projeto), leitor)
         janela.ir_para_pagina(args.indice)
-        janela.pagina.reconhecer()
+        janela.pagina.leitura.reconhecer()
         _esperar(app, janela)
         janela.visor.zoom_largura()
         gravar(janela, "0-pagina-lida")

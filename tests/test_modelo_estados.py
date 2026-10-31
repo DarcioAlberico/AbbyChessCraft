@@ -490,14 +490,14 @@ class MaquinaDoControlador(RuleBasedStateMachine):
     @rule(c=st.sampled_from("ab"))
     def ensinar(self, c):
         atual = self.ctl.atual
-        self.ctl.ensinar(c)
+        self.ctl.leitura.ensinar(c)
         if atual is not None:
             assert self.ctl.box(atual).char == c and self.ctl.box(atual).source == "manual"
 
     @rule(tudo=st.booleans())
     def reler(self, tudo):
         antes = list(self.ctl.modelo.boxes)
-        self.ctl.reler_pendentes(tudo)
+        self.ctl.leitura.reler_pendentes(tudo)
         self.mudou_por_fora |= self.ctl.modelo.boxes != antes
 
     @rule()

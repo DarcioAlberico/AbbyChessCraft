@@ -191,6 +191,28 @@ def test_ctrl_z_desfaz_o_ensinar_e_apaga_o_padrao(app, janela):
     assert sum(b.source == FONTE_LIVRO for b in boxes(janela)) == 4
 
 
+def test_o_desfazer_que_falha_nos_padroes_ja_moveu_o_historico(app, janela, monkeypatch):
+    """SPEC-qualidade Q-C5: as páginas voltam e o histórico anda junto com elas; um padrão
+    que não sai do disco é avisado, e não deixa a transação para trás, já aplicada."""
+    inicio = _reconhecida(app, janela)
+    mostrar(janela, 0)
+    janela.treino.campo.setText("a")
+    janela.treino.pedir_ensinar()
+    _esperar(app, janela)
+    avisos = []
+    janela.pagina.eventos.ligar("aviso", lambda titulo, texto: avisos.append(texto))
+
+    def disco_cheio(caminhos):
+        raise OSError("disco cheio")
+    monkeypatch.setattr(janela.leitor, "esquecer_varios", disco_cheio)
+    janela.pagina.desfazer()
+    _esperar(app, janela)
+
+    assert _caixas(boxes(janela)) == inicio
+    assert janela.pagina.historico.proxima_a_refazer().descricao == "Ensinar 'a'"
+    assert any("disco cheio" in texto for texto in avisos)
+
+
 def test_desfazer_dividir_e_descartar(app, janela):
     inicio = _reconhecida(app, janela)
     mostrar(janela, 0)

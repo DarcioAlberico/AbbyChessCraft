@@ -195,3 +195,22 @@ def test_lote_gravando_enquanto_a_janela_pede_gids(lido):
     assert erros == [] and len(set(gids)) == 5
     gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
     assert gravado == projeto.resumo.recalcular()
+
+
+def test_quem_so_le_os_boxes_nao_muda_a_pagina_do_projeto(lido):
+    """Quem só lê a página por listas de `BoxEntry` (a exportação, as ferramentas) recebe
+    cópias (SPEC-qualidade Q-P9): mudar o que recebeu não muda a página do cache, nem a
+    próxima leitura, nem o que a janela grava dela depois."""
+    projeto, _, _ = lido
+    original = projeto.carregar_pagina(0)[0].char
+    assert original != "#"
+    lidos = projeto.carregar_pagina(0)
+    lidos[0].char = "#"                                 # quem só lê mexe no que recebeu
+    assert projeto.carregar_pagina(0)[0].char == original
+    projeto.agendar(projeto.pagina_para_editar(0))      # a janela grava a página dela
+    projeto.fechar()
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    try:
+        assert reaberto.carregar_pagina(0)[0].char == original
+    finally:
+        reaberto.fechar()

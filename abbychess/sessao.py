@@ -74,13 +74,18 @@ def alinhar(original: str, novo: str, fixos: Sequence[Tuple[int, int]] = ()
     for i, j in sorted(fixos):
         if not (i0 <= i < len(original) and j0 <= j < len(novo)):
             continue
-        pares += [(None if a is None else a + i0, None if b is None else b + j0)
-                  for a, b in _levenshtein(original[i0:i], novo[j0:j])]
+        pares += _vao(original[i0:i], novo[j0:j], i0, j0)
         pares.append((i, j))
         i0, j0 = i + 1, j + 1
-    pares += [(None if a is None else a + i0, None if b is None else b + j0)
-              for a, b in _levenshtein(original[i0:], novo[j0:])]
+    pares += _vao(original[i0:], novo[j0:], i0, j0)
     return pares
+
+
+def _vao(original: str, novo: str, i0: int, j0: int) -> List[Tuple[Optional[int], Optional[int]]]:
+    """O alinhamento do vão entre dois fixos, nas posições do texto inteiro (o vão começa em
+    `i0` no original e em `j0` no novo)."""
+    return [(None if a is None else a + i0, None if b is None else b + j0)
+            for a, b in _levenshtein(original, novo)]
 
 
 #: Acima disto (caracteres do original × do novo), sem fixos, o alinhamento se ancora nas
@@ -118,6 +123,11 @@ def _troca(a: str, b: str) -> int:
 
 def _levenshtein(original: str, novo: str) -> List[Tuple[Optional[int], Optional[int]]]:
     """O alinhamento de menor custo; grande demais, só numa faixa em volta da diagonal."""
+    return _caminho(_custos(original, novo), original, novo)
+
+
+def _custos(original: str, novo: str) -> List[Dict[int, int]]:
+    """A tabela do Levenshtein (com o custo de `_troca`), linha a linha."""
     n, m = len(original), len(novo)
     infinito = n + m + 1
     faixa = abs(n - m) + FOLGA_DA_FAIXA if n * m > CELULAS_SEM_ANCORAS else None
@@ -134,8 +144,15 @@ def _levenshtein(original: str, novo: str) -> List[Tuple[Optional[int], Optional
             linha[j] = min(anterior.get(j - 1, infinito) + _troca(original[i - 1], novo[j - 1]),
                            anterior.get(j, infinito) + 1, linha.get(j - 1, infinito) + 1)
         custo.append(linha)
+    return custo
+
+
+def _caminho(custo: List[Dict[int, int]], original: str, novo: str
+             ) -> List[Tuple[Optional[int], Optional[int]]]:
+    """Os pares do alinhamento, do fim da tabela ao começo: no empate, a substituição antes
+    de apagar, e apagar antes de inserir (as lacunas ficam o mais à esquerda)."""
     pares: List[Tuple[Optional[int], Optional[int]]] = []
-    i, j = n, m
+    i, j = len(original), len(novo)
     while i or j:
         if i and j and custo[i][j] == custo[i - 1][j - 1] + _troca(original[i - 1], novo[j - 1]):
             pares.append((i - 1, j - 1))

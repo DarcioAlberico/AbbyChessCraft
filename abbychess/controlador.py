@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -53,11 +53,12 @@ from abbychess import contexto
 from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import historico as hs
+from abbychess.historico import Antes
 from abbychess import lances as lc
 from abbychess import pagina as pg
 from abbychess import procedencia
 from abbychess import servidor_de_leitura as sl
-from abbychess import sessao as ss
+from abbychess.sessao_do_documento import ControladorDaSessao
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL, FONTE_NENHUMA, precisa_revisao
 from abbychess.modelo import (LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
@@ -70,14 +71,6 @@ log = logging.getLogger(__name__)
 #: Quantas páginas guardam a conta das margens corridas (`gids_de_margem`): as do cache de
 #: páginas (§14.1) e folga.
 MARGENS_GUARDADAS = 8
-
-
-@dataclass(frozen=True)
-class Antes:
-    """A página e os padrões do livro quando uma edição começou (o "antes" da transação)."""
-
-    pagina: Optional[Pagina]
-    padroes: frozenset
 
 
 class Eventos:
@@ -171,9 +164,8 @@ class ControladorDePagina:
         #: O glifo em revisão, os pulados e a seleção do modo de treino, por gid.
         self.atual: Optional[int] = None
         self.pulados: set = set()
-        #: Conta as sessões do Documento confirmadas: a chave do passo do desfazer de cada
-        #: uma, que o ensinar do Ctrl+Enter emenda.
-        self._numero_da_sessao = 0
+        #: A sessão do Documento confirmada (§6.3), o parágrafo, os estilos e o modo das peças.
+        self.sessoes = ControladorDaSessao(self)
         #: Chamado antes de sair da página aberta (outra página, o Ctrl+T): a janela confirma
         #: ali a sessão aberta do Documento (§6.3), que não pode ficar para depois.
         self.antes_de_sair_da_pagina: Optional[Callable[[], None]] = None
@@ -182,15 +174,9 @@ class ControladorDePagina:
         self.preparar_imagem: Optional[Callable[[np.ndarray], object]] = None
         #: As visitas (Alt+←, Alt+→), a primeira, a última e o sentido da pré-carga.
         self.navegador = Navegador(self)
-        #: O livro tem figurinas lidas (o modo "livro" das peças, §6.4): o "sim" fica guardado
-        #: até outro projeto; sem ele (None), o resumo das páginas é consultado de novo.
-        self._livro_tem_figurinas: Optional[bool] = None
         #: (box, virtual, letra): o box marcado ao lado da letra virtual. Se o usuário o
         #: confirma com essa letra (Enter ou Shift+Enter), o virtual sai no mesmo passo.
         self._letra_que_faltava: Optional[Tuple[int, int, str]] = None
-        #: As sessões do Documento confirmadas que esperam a vez na fila, como [corpo, já
-        #: rodou?] (o Ctrl+T espera; fechar o projeto as aplica na hora).
-        self._sessoes_na_fila: List[list] = []
         #: A ordem da fila de glifos (§8.1): "confianca" (o menos confiável primeiro, os
         #: pulados no fim) ou "leitura" (a ordem da página).
         self.ordem_da_fila = "confianca"
@@ -465,8 +451,7 @@ class ControladorDePagina:
               ) -> None:
         """O projeto aberto, a fonte das páginas e o leitor (os modelos já carregados; ou,
         com o `servidor`, só os padrões do livro). O servidor do projeto anterior fecha."""
-        self._livro_tem_figurinas = None
-        self._sessoes_na_fila = []              # a fila do projeto anterior foi esvaziada
+        self.sessoes.zerar()                    # a fila do projeto anterior foi esvaziada
         self._letra_que_faltava = None
         if self.servidor is not None and self.servidor is not servidor:
             self.servidor.fechar()
@@ -638,7 +623,7 @@ class ControladorDePagina:
             return
         if self.antes_de_sair_da_pagina is not None:   # a sessão aberta entra antes
             self.antes_de_sair_da_pagina()
-        if self._sessoes_na_fila:
+        if self.sessoes.na_fila:
             self._avisar("A edição do texto ainda espera a vez dela na fila: marque a página "
                          "como verificada depois que ela entrar.", AVISO_LONGO_MS)
             return
@@ -1466,171 +1451,6 @@ class ControladorDePagina:
                 self.eventos.emitir("caractere_sugerido", vizinho[1])
         self._editar("Marcando", corpo, precisa_de_glifos=False)
 
-    def confirmar_sessao(self, unidades, novo: str, *, ensinar_gid: Optional[int] = None,
-                         original: Optional[str] = None, fixos=(), depois=None,
-                         agora: bool = False) -> None:
-        """§6.3: a sessão do Documento confirmada (Enter, Shift+Enter, Ctrl+Enter, sair dela):
-        as unidades originais dela e o texto de agora viram as operações da tabela, num passo
-        do desfazer, e os glifos dela com leitura ficam `revisado`. Sem mudança, é aceitar a
-        palavra. O que é do passo G recusa tudo (`sessao_recusada`, com a mensagem); o que
-        muda a estrutura avisa (`estrutural`). `ensinar_gid` (Ctrl+Enter) ensina o glifo sob o
-        cursor no mesmo passo do desfazer (`ss.LETRA_NOVA`: uma letra digitada agora, que não
-        ensina). `fixos`: os pares que nenhuma edição tocou (`sessao.alinhar`). `depois()`
-        roda quando a edição entrou na página (na hora, ou na vez dela na fila).
-        `agora`: aplica já,
-        sem a fila (fechar o projeto, que esvazia a fila)."""
-        unidades = list(unidades)
-        original = original if original is not None else "".join(u.texto for u in unidades)
-        dados = self.projeto.dados if self.projeto is not None else None
-        indice, pagina = self.indice, self.modelo
-        if dados is not None:
-            novo = ss.com_figurinas(novo, original, dados.idioma,
-                                    self._modo_das_pecas(dados.notacao, pagina))
-
-        def corpo():
-            # A página da sessão, mesmo que o usuário já tenha ido a outra (a sessão confirma
-            # ao sair da página, e a edição pode esperar a vez dela na fila).
-            aberta = pagina is self.modelo
-            virtuais = {v.gid for v in pagina.decisoes.virtuais}
-            if not aberta and self.projeto.modelo_em_memoria(indice) is not pagina:
-                # A página saiu da memória e foi lida de novo (o lote, por exemplo): a
-                # edição no objeto velho seria gravada por cima da nova.
-                self.eventos.emitir("sessao_recusada", "a página mudou antes da confirmação")
-                return
-            if any(u.glifo and u.gid not in pagina.vivos | virtuais for u in unidades):
-                self.eventos.emitir("sessao_recusada", "a página mudou antes da confirmação")
-                return
-            try:
-                plano = ss.planejar(unidades, novo, fixos)
-            except ss.Recusa as recusa:
-                self.eventos.emitir("sessao_recusada", str(recusa))
-                return
-            antes = Antes(pagina.instantaneo(), self.padroes())
-            vivos_antes = set(pagina.vivos)
-            try:
-                ss.aplicar(pagina, plano, self.imagem if aberta else None, self.leitor)
-            except Exception:
-                # Nada da sessão fica pela metade: a página volta ao instantâneo (os gids já
-                # alocados não voltam: um gid nunca se repete).
-                pagina.boxes, pagina.decisoes = list(antes.pagina.boxes), antes.pagina.decisoes
-                log.exception("a sessão do Documento falhou ao aplicar")
-                self.eventos.emitir("sessao_recusada", "a edição falhou e foi desfeita")
-                return
-            saiu = vivos_antes - pagina.vivos
-            if aberta:
-                self.pulados -= saiu
-                self.selecao -= saiu
-                if self.atual in saiu:
-                    self.atual = None
-            palavra = " ".join(novo.split())
-            descricao = (f"Editar '{palavra[:40]}'" if plano.muda
-                         else f"Aceitar '{' '.join(original.split())[:40]}'")
-            self._numero_da_sessao += 1
-            chave = ("sessao", self._numero_da_sessao)   # o Ctrl+Enter emenda nesta
-            self._mudou(pagina, indice, descricao, antes, juntar=chave)
-            tinta = aberta and bool(plano.virtuais) and self._tinta_sem_box(pagina, plano)
-            aviso = plano.estrutural(*(["há tinta sem box aqui: Ctrl+M marca o quadro"]
-                                       if tinta else []))
-            if aviso:
-                self.eventos.emitir("estrutural", aviso)
-            if aberta and ensinar_gid is not None:
-                self._ensinar_do_documento(ensinar_gid, chave)
-            if aberta and depois is not None:
-                depois()
-        # A edição que não rodou (a página sem imagem, ou outra na vez dela): o Documento
-        # volta ao modelo.
-        if pagina is None:
-            self.eventos.emitir("sessao_recusada", "a página não pode ser editada agora")
-            return
-        if agora:                               # fechar o projeto: a fila vai ser esvaziada
-            corpo()
-            return
-        if self._agora():
-            self._editar("Editando o texto", corpo, so_nesta_pagina=False,
-                         nao_rodou=lambda: self.eventos.emitir(
-                             "sessao_recusada", "a página não pode ser editada agora"))
-            return
-        espera = [corpo, False]
-        self._sessoes_na_fila.append(espera)
-
-        def rodar(funcao):
-            def rodando():
-                if espera[1]:                   # já aplicada (fechar o projeto)
-                    return
-                espera[1] = True
-                self._sessoes_na_fila.remove(espera)
-                funcao()
-            return rodando
-        self._editar("Editando o texto", rodar(corpo), so_nesta_pagina=False,
-                     nao_rodou=rodar(lambda: self.eventos.emitir(
-                         "sessao_recusada", "a página não pode ser editada agora")))
-
-    def novo_paragrafo(self, gid: Optional[int]) -> None:
-        """Ctrl+Shift+Enter: começa um parágrafo na linha do glifo indicado, num passo do
-        desfazer; de novo na mesma linha, tira o parágrafo. O parágrafo começa sempre no
-        começo da linha: o Documento e a exportação partem por linha, e uma linha não se
-        divide em dois parágrafos (antes, a palavra do meio da linha abria o bloco num e não
-        no outro)."""
-        if self.modelo is None:
-            return
-        if gid is None:
-            self._avisar("Ponha o cursor numa palavra para começar o parágrafo nela.", 5000)
-            return
-        linha = next((ln for b in self.documento().blocos for ln in b.linhas
-                      if any(gid in p.gids for p in ln.palavras)), None)
-        # O primeiro glifo da linha com leitura (não um virtual, nem um box ainda não lido:
-        # a exportação lê o parágrafo pelo primeiro glifo lido da linha).
-        lidos = {b.gid for b in self.modelo.boxes if b.entry.char}
-        inicio = next((g for p in linha.palavras for g in p.gids if g in lidos),
-                      gid if gid in lidos else None) if linha else (gid if gid in lidos else None)
-        if inicio is None:
-            self._avisar("A linha não tem glifo lido onde começar o parágrafo.", 6000)
-            return
-        tirar = inicio in self.modelo.decisoes.paragrafo_antes
-
-        def corpo():
-            antes = Antes(self.modelo.instantaneo(), self.padroes())
-            if tirar:
-                d = self.modelo.decisoes
-                self.modelo.decisoes = replace(d, paragrafo_antes=d.paragrafo_antes - {inicio})
-            else:
-                ed.paragrafo(self.modelo, inicio)
-            self._mudou(self.modelo, self.indice,
-                        "Tirar o parágrafo" if tirar else "Novo parágrafo", antes)
-            if tirar:
-                self._avisar("Parágrafo tirado: a linha volta ao parágrafo de antes · Ctrl+Z "
-                             "desfaz.", 6000)
-            elif inicio != gid:
-                self._avisar("Parágrafo novo no começo da linha (uma linha não se divide em "
-                             "dois parágrafos) · Ctrl+Z desfaz.", 7000)
-            else:
-                self._avisar("Parágrafo novo · de novo na mesma linha, tira · Ctrl+Z desfaz.",
-                             6000)
-        self._editar("Criando parágrafo", corpo)
-
-    def alternar_estilo(self, gids: Sequence[int], campo: str) -> None:
-        """Alterna negrito, itálico ou sublinhado na seleção do Documento."""
-        gids = [g for g in dict.fromkeys(gids)
-                if self.modelo is not None and g in self.modelo.vivos]
-        if not gids or self.modelo is None:
-            return
-
-        def corpo():
-            antes = Antes(self.modelo.instantaneo(), self.padroes())
-            ed.estilizar(self.modelo, gids, campo)
-            nome = {"negrito": "negrito", "italico": "itálico", "sublinhado": "sublinhado"}[campo]
-            self._mudou(self.modelo, self.indice, f"Alternar {nome}", antes)
-        self._editar("Aplicando o estilo", corpo)
-
-    def aplicar_as_sessoes_na_fila(self) -> None:
-        """Fechar o projeto (a fila vai ser esvaziada): as sessões do Documento que esperavam
-        a vez entram agora, em vez de se perder."""
-        for espera in list(self._sessoes_na_fila):
-            if not espera[1]:
-                espera[1] = True
-                self._sessoes_na_fila.remove(espera)
-                espera[0]()
-
     def _tirar_a_letra_que_faltava(self, pagina: Pagina, gids, char: str) -> None:
         """O box marcado ao lado da letra virtual foi confirmado com a letra dela: ele é a
         letra que faltava, e o virtual sai (no passo do desfazer da confirmação)."""
@@ -1641,66 +1461,6 @@ class ControladorDePagina:
         if (box in gids and char == letra and pagina is self.modelo
                 and virtual in {v.gid for v in pagina.decisoes.virtuais}):
             ed.apagar_virtual(pagina, virtual)
-
-    def _modo_das_pecas(self, notacao: str, pagina: Optional[Pagina]) -> str:
-        """O modo das peças nos lances (§6.4). "livro": figurinas se o livro tem figurinas
-        lidas (a página aberta ou, uma vez por projeto, as outras páginas lidas), senão
-        letras; uma página de prosa num livro de figurinas segue o livro."""
-        if notacao != "livro":
-            return notacao
-        if not self._livro_tem_figurinas and pagina is not None:
-            if ss.modo_da_pagina("livro", (b.entry.char for b in pagina.boxes)) == "figurinas":
-                self._livro_tem_figurinas = True
-        if not self._livro_tem_figurinas:       # o "não" não fica guardado: o lote lê mais
-            self._livro_tem_figurinas = self._figurinas_nas_paginas_lidas() or None
-        return "figurinas" if self._livro_tem_figurinas else "letras"
-
-    def _figurinas_nas_paginas_lidas(self) -> bool:
-        """Pelo resumo das páginas no `livro.json` (sem abrir nenhuma; uma página gravada
-        antes do D1 não tem o campo e conta quando for gravada de novo)."""
-        if self.projeto is None:
-            return False
-        return any(r.get("figurinas") for r in self.projeto.resumo_do_livro().values())
-
-    def _tinta_sem_box(self, pagina: Pagina, plano) -> bool:
-        """Há tinta sem box onde uma letra que faltou entrou (a letra que a segmentação não
-        viu): a faixa ao lado do glifo âncora, do tamanho das letras, até o vizinho da linha."""
-        if self.matriz is None:
-            return False
-        caixas = {b.gid: b.entry for b in pagina.boxes}
-        for letras, (lado, ancora), _nova in plano.virtuais:
-            e = caixas.get(ancora)
-            if e is None:
-                continue
-            largura = max(4, (e.x2 - e.x1)) * len(letras)
-            mesma_linha = [b for b in caixas.values() if b is not e and b.y1 < e.y2 and b.y2 > e.y1]
-            if lado == "depois":
-                x1 = e.x2 + 1
-                x2 = min([x1 + largura] + [b.x1 for b in mesma_linha if b.x1 >= e.x2])
-            else:
-                x2 = e.x1 - 1
-                x1 = max([x2 - largura] + [b.x2 for b in mesma_linha if b.x2 <= e.x1])
-            recorte = self.matriz[max(0, e.y1):e.y2, max(0, x1):max(0, x2)]
-            if recorte.size and int((recorte < 128).sum()) >= 12:
-                return True
-        return False
-
-    def _ensinar_do_documento(self, gid: int, chave) -> None:
-        """Ctrl+Enter: o glifo sob o cursor, ensinado com o caractere dele, no passo do
-        desfazer da edição (`chave`)."""
-        virtuais = {v.gid for v in self.modelo.decisoes.virtuais} if self.modelo else set()
-        if gid == ss.LETRA_NOVA or gid in virtuais:
-            self._avisar("Glifo sem tinta não ensina.", 6000)
-            return
-        if self.modelo is None or gid not in self.modelo.vivos or not self._pode_ler():
-            return
-        char = self.box(gid).char
-        if not char:
-            return
-        self.escolher(gid)
-        self.limpar_selecao()
-        self.ensinar_gids({char: [gid]}, f"Ensinar '{char}'",
-                          self._depois_de_ensinar(char, [gid]), juntar=chave)
 
     def _depois_de_editar(self, mostrar: int, descricao: str, antes: hs.Instantaneo,
                           mensagem: str, *, juntar=None, evento: str = "editar") -> None:

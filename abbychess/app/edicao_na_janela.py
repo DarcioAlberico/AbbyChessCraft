@@ -26,7 +26,7 @@ class EdicaoNoDocumento:
                 self.texto.ir_a_proxima_duvidosa(depois if depois is not None else 0)
             else:
                 self.texto.ir_a_marca(marca)
-        self.pagina.confirmar_sessao(unidades, novo, ensinar_gid=ensinar_gid, fixos=fixos,
+        self.pagina.sessoes.confirmar_sessao(unidades, novo, ensinar_gid=ensinar_gid, fixos=fixos,
                                      depois=entrou, agora=agora)
 
     def confirmar_a_sessao_aberta(self, agora: bool = False) -> None:
@@ -108,9 +108,9 @@ class EdicaoNoDocumento:
     def novo_paragrafo(self) -> None:
         gid = self.texto.primeiro_gid_da_palavra()
         self.confirmar_a_sessao_aberta()
-        self.pagina.novo_paragrafo(gid)
+        self.pagina.sessoes.novo_paragrafo(gid)
 
     def alternar_estilo(self, campo: str) -> None:
         gids = self.texto.gids_selecionados()
         self.confirmar_a_sessao_aberta()
-        self.pagina.alternar_estilo(gids, campo)
+        self.pagina.sessoes.alternar_estilo(gids, campo)

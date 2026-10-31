@@ -176,7 +176,7 @@ def test_o_controlador_monta_o_indice_busca_e_refaz_a_pagina_editada(tmp_path):
         assert sorted(busca.indice) == projeto.paginas_lidas() and not fins[-1].ocorrencias
         texto, unidades = ss.texto_e_unidades(ctl.modelo)
         inicio, fim = ss.palavras_em(unidades, 0, 0)
-        ctl.confirmar_sessao(unidades[inicio:fim], "zzqq" + texto[inicio:fim])   # uma edição
+        ctl.sessoes.confirmar_sessao(unidades[inicio:fim], "zzqq" + texto[inicio:fim])   # uma edição
         executor.tudo()
         busca.buscar(bs.Opcoes("zzqq"))
         _ate_valer(lambda: len(fins) == 2)

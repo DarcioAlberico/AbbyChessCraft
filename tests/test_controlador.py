@@ -296,7 +296,7 @@ def test_a_sessao_do_documento_na_fila_avisa_quando_entra(dois_projetos):
     inicio, fim = ss.palavras_em(unidades, 0, 0)
     executor.em_voo = False                            # uma leitura em voo prende a fila
     entrou = []
-    ctl.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim],
+    ctl.sessoes.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim],
                          depois=lambda: entrou.append(ss.texto_e_unidades(ctl.modelo)[0]))
     assert entrou == [] and executor.fila
     executor.em_voo = None
@@ -319,7 +319,7 @@ def test_a_sessao_que_nao_pode_rodar_e_recusada(dois_projetos):
     recusas = []
     ctl.eventos.ligar("sessao_recusada", recusas.append)
     ctl.imagem = None
-    ctl.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim])
+    ctl.sessoes.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim])
     assert recusas and ss.texto_e_unidades(ctl.modelo)[0] == texto
 
 
@@ -340,7 +340,7 @@ def test_sair_da_pagina_confirma_a_sessao_na_pagina_dela(tmp_path, na_fila):
         texto, unidades = ss.texto_e_unidades(pagina)
         inicio, fim = ss.palavras_em(unidades, 0, 0)
         novo = "x" + texto[inicio:fim]
-        ctl.antes_de_sair_da_pagina = lambda: ctl.confirmar_sessao(unidades[inicio:fim], novo)
+        ctl.antes_de_sair_da_pagina = lambda: ctl.sessoes.confirmar_sessao(unidades[inicio:fim], novo)
         if na_fila:
             executor.em_voo = False                    # uma leitura em voo prende a fila
         assert ctl.ir_para(1) and ctl.indice == 1
@@ -365,7 +365,7 @@ def test_o_box_marcado_confirmado_com_a_letra_que_faltava_tira_o_virtual(dois_pr
     executor.tudo()
     texto, unidades = ss.texto_e_unidades(ctl.modelo)
     inicio, fim = ss.palavras_em(unidades, 0, 0)
-    ctl.confirmar_sessao(unidades[inicio:fim], texto[inicio:fim] + "x")
+    ctl.sessoes.confirmar_sessao(unidades[inicio:fim], texto[inicio:fim] + "x")
     executor.tudo()
     [virtual] = [v.gid for v in ctl.modelo.decisoes.virtuais]
     box = ctl.modelo.boxes[0].gid
@@ -390,15 +390,15 @@ def test_o_ctrl_t_espera_a_sessao_na_fila_e_fechar_aplica_na_hora(dois_projetos)
     texto, unidades = ss.texto_e_unidades(ctl.modelo)
     inicio, fim = ss.palavras_em(unidades, 0, 0)
     executor.em_voo = False                            # uma leitura em voo prende a fila
-    ctl.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim])
+    ctl.sessoes.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim])
     ctl.verificar()
-    assert ctl.modelo.estado != "verificada" and len(ctl._sessoes_na_fila) == 1
+    assert ctl.modelo.estado != "verificada" and len(ctl.sessoes.na_fila) == 1
     executor.em_voo = None
     executor.tudo()
-    assert not ctl._sessoes_na_fila
+    assert not ctl.sessoes.na_fila
     executor.em_voo = False
     texto, unidades = ss.texto_e_unidades(ctl.modelo)
-    ctl.confirmar_sessao(unidades[inicio:fim + 1], "y" + texto[inicio:fim + 1], agora=True)
+    ctl.sessoes.confirmar_sessao(unidades[inicio:fim + 1], "y" + texto[inicio:fim + 1], agora=True)
     assert ss.texto_e_unidades(ctl.modelo)[0].startswith("y")
 
 
@@ -414,15 +414,15 @@ def test_o_modo_como_o_livro_olha_o_resumo_das_paginas_lidas(tmp_path):
         ctl = _controlador(projeto, executor)
         ctl.reconhecer()
         executor.tudo()
-        assert ctl._modo_das_pecas("livro", ctl.modelo) == "letras"
+        assert ctl.sessoes._modo_das_pecas("livro", ctl.modelo) == "letras"
         texto, unidades = ss.texto_e_unidades(ctl.modelo)
         inicio, fim = ss.palavras_em(unidades, 0, 0)
-        ctl.confirmar_sessao(unidades[inicio:fim], "♘" + texto[inicio + 1:fim])
+        ctl.sessoes.confirmar_sessao(unidades[inicio:fim], "♘" + texto[inicio + 1:fim])
         executor.tudo()
         ctl.ir_para(1)
-        ctl._livro_tem_figurinas = None                # como ao abrir o projeto
-        assert ctl._modo_das_pecas("livro", ctl.modelo) == "figurinas"
-        assert ctl._modo_das_pecas("letras", ctl.modelo) == "letras"
+        ctl.sessoes.zerar()                            # como ao abrir o projeto
+        assert ctl.sessoes._modo_das_pecas("livro", ctl.modelo) == "figurinas"
+        assert ctl.sessoes._modo_das_pecas("letras", ctl.modelo) == "letras"
     finally:
         projeto.fechar()
 
@@ -440,8 +440,8 @@ def test_fechar_aplica_as_sessoes_que_esperavam_na_fila(dois_projetos):
     texto, unidades = ss.texto_e_unidades(ctl.modelo)
     inicio, fim = ss.palavras_em(unidades, 0, 0)
     executor.em_voo = False
-    ctl.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim])
-    ctl.aplicar_as_sessoes_na_fila()
+    ctl.sessoes.confirmar_sessao(unidades[inicio:fim], "x" + texto[inicio:fim])
+    ctl.sessoes.aplicar_as_sessoes_na_fila()
     assert ss.texto_e_unidades(ctl.modelo)[0].startswith("x" + texto[inicio:fim])
     executor.em_voo = None
     executor.tudo()                                    # a tarefa da fila não aplica de novo

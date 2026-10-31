@@ -521,7 +521,7 @@ class MaquinaDoControlador(RuleBasedStateMachine):
         """D1: a sessão do Documento pelo controlador (um passo do desfazer)."""
         sessao = sessao_de_uma_palavra(self.ctl.modelo, i, acao, c)
         if sessao is not None:
-            self.ctl.confirmar_sessao(*sessao)
+            self.ctl.sessoes.confirmar_sessao(*sessao)
 
     @rule()
     def desfazer(self):

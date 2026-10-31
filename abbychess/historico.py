@@ -43,6 +43,14 @@ BYTES_POR_GLIFO = 600
 BYTES_POR_ITEM = 4000
 
 
+@dataclass(frozen=True)
+class Antes:
+    """A página e os padrões do livro quando uma edição começou (o "antes" da transação)."""
+
+    pagina: Optional[Pagina]
+    padroes: frozenset
+
+
 @dataclass
 class MudancaDaPagina:
     """O que uma transação mudou numa página."""

@@ -253,33 +253,24 @@ class Sequencia:
         dela, e assim por diante). Sem essa página no livro, vale a posição gravada (ou o
         fim, se o livro ficou mais curto). Juntas ou uma de cada vez, voltam à mesma ordem."""
         pids = set(pids)
-        voltam = sorted((a for a in self.apagadas if a.entrada.pid in pids),
-                        key=lambda a: a.posicao)
+        voltando = self._voltando(pids)
+        por_pid = {a.entrada.pid: a for a in self.apagadas}
+        entradas = list(self.entradas)
+        while voltando:
+            apagada, ancora = _proxima_a_voltar(voltando, por_pid, entradas, pids)
+            entradas.insert(_lugar_da_volta(apagada, ancora, entradas), apagada.entrada)
+        return Sequencia(tuple(entradas),
+                         tuple(a for a in self.apagadas if a.entrada.pid not in pids))
+
+    def _voltando(self, pids: set) -> List[Apagada]:
+        """As apagadas `pids` da mais nova para a mais velha (as apagadas estão na ordem em
+        que saíram): cada uma volta ao livro como ele era quando ela saiu, como um desfazer em
+        sequência. Um pid fora das apagadas levanta `ValueError`."""
+        voltam = [a for a in self.apagadas if a.entrada.pid in pids]
         if len(voltam) != len(pids):
             faltam = pids - {a.entrada.pid for a in voltam}
             raise ValueError(f"página(s) que não estão entre as apagadas: {sorted(faltam)}")
-        por_pid = {a.entrada.pid: a for a in self.apagadas}
-        entradas = list(self.entradas)
-        # Da apagada mais nova para a mais velha (as apagadas estão na ordem em que saíram):
-        # cada uma volta ao livro como ele era quando ela saiu, como um desfazer em sequência.
-        voltando = [a for a in reversed(self.apagadas) if a.entrada.pid in pids]
-        while voltando:
-            # Primeiro a que tem a âncora já no livro (as apagadas juntas voltam em cadeia).
-            no_livro = {e.pid for e in entradas}
-            for k, apagada in enumerate(voltando):
-                ancora = _ancora(apagada, por_pid, no_livro, pids)
-                if ancora is not _ESPERA:
-                    break
-            else:
-                k, ancora = 0, None             # um ciclo (não acontece): a posição gravada
-            apagada = voltando.pop(k)
-            if ancora is _SEM_ANCORA or ancora is None:
-                lugar = 0 if ancora is _SEM_ANCORA else min(apagada.posicao, len(entradas))
-            else:
-                lugar = next(i for i, e in enumerate(entradas) if e.pid == ancora) + 1
-            entradas.insert(lugar, apagada.entrada)
-        return Sequencia(tuple(entradas),
-                         tuple(a for a in self.apagadas if a.entrada.pid not in pids))
+        return voltam[::-1]
 
     def inserir(self, novas: Sequence[Entrada], na_posicao: int) -> "Sequencia":
         """As entradas novas (com `pid` novos) entram a partir da posição `na_posicao` (0: antes
@@ -343,6 +334,28 @@ def _ancora(apagada: Apagada, por_pid: Mapping[int, Apagada], no_livro: set, vol
             return None
         vistos.add(alvo)
         atual = por_pid[alvo]                   # apagada antes e que fica: a âncora dela
+
+
+def _proxima_a_voltar(voltando: List[Apagada], por_pid: Mapping[int, Apagada],
+                      entradas: Sequence[Entrada], voltam: set):
+    """Tira de `voltando` a primeira que tem a âncora já no livro (as apagadas juntas voltam
+    em cadeia) e a devolve com a âncora."""
+    no_livro = {e.pid for e in entradas}
+    for k, apagada in enumerate(voltando):
+        ancora = _ancora(apagada, por_pid, no_livro, voltam)
+        if ancora is not _ESPERA:
+            return voltando.pop(k), ancora
+    return voltando.pop(0), None                # um ciclo (não acontece): a posição gravada
+
+
+def _lugar_da_volta(apagada: Apagada, ancora, entradas: Sequence[Entrada]) -> int:
+    """A posição em que a apagada entra: logo depois da âncora; no começo, se ela era a
+    primeira; sem âncora, a posição gravada (ou o fim, se o livro ficou mais curto)."""
+    if ancora is _SEM_ANCORA:
+        return 0
+    if ancora is None:
+        return min(apagada.posicao, len(entradas))
+    return next(i for i, e in enumerate(entradas) if e.pid == ancora) + 1
 
 
 def da_v2(total: int, pids_gravados: Mapping[int, int],
@@ -409,17 +422,30 @@ def selecao(texto: str, total: int) -> List[int]:
     limpo = texto.strip().lower()
     if not limpo:
         raise ValueError("diga quais páginas: todas, pares, ímpares, ímpares 15-200 ou 3-7, 12")
+    inteiras = _por_nome(limpo, total)
+    if inteiras is not None:
+        return inteiras
+    paridade = _PARIDADE.match(limpo)
+    if paridade is not None:
+        resto = 1 if paridade.group(1) in _PARES else 0
+        intervalo = re.sub(r"\s+a\s+", "-", paridade.group(2))
+        return [p for p in selecao(intervalo, total) if p % 2 == resto]
+    return _por_faixas(limpo, total)
+
+
+def _por_nome(limpo: str, total: int) -> Optional[List[int]]:
+    """As posições de "todas", "pares" ou "ímpares" no livro inteiro (None: outro pedido)."""
     if limpo in _TODAS:
         return list(range(total))
     if limpo in _PARES:
         return list(range(1, total, 2))         # as páginas 2, 4, 6…
     if limpo in _IMPARES:
         return list(range(0, total, 2))         # as páginas 1, 3, 5…
-    paridade = _PARIDADE.match(limpo)
-    if paridade is not None:
-        resto = 1 if paridade.group(1) in _PARES else 0
-        intervalo = re.sub(r"\s+a\s+", "-", paridade.group(2))
-        return [p for p in selecao(intervalo, total) if p % 2 == resto]
+    return None
+
+
+def _por_faixas(limpo: str, total: int) -> List[int]:
+    """As posições de intervalos e números separados por vírgula ("3-7, 12")."""
     posicoes = set()
     for pedaco in limpo.split(","):
         casou = _PEDACO.match(pedaco)

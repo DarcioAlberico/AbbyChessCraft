@@ -16,6 +16,7 @@ import pytest
 from abbychess import gravacao as gv
 from abbychess import livro
 from abbychess import pagina as pg
+from abbychess.migracoes import Migracoes
 from abbychess.modelo import gid_de
 from abbychess.projeto import ProjetoDeLivro
 
@@ -151,7 +152,7 @@ def test_ca_12_7_a_queda_depois_do_projeto_json_nao_perde_as_inclinacoes(projeto
     def cair(*_a, **_k):
         raise Queda
 
-    monkeypatch.setattr(ProjetoDeLivro, "_inclinacoes_para_pids", cair)
+    monkeypatch.setattr(Migracoes, "_inclinacoes_para_pids", cair)
     with pytest.raises(Queda):
         ProjetoDeLivro.abrir(projeto_v2)
     monkeypatch.undo()

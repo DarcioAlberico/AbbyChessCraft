@@ -25,7 +25,8 @@ grava o próprio índice, e `livro.json` mapeia índice → pid.
 primeira abertura, o v1 vai para `backup-v1/` e o projeto passa ao formato 2; todas as
 páginas v1 migram (pid = o número do arquivo, a página do PDF) e são gravadas ali mesmo, na
 abertura. Copiar `backup-v1/` de volta reabre o projeto como era (o arquivo v1 presente vence
-o v2 do mesmo pid). Só para leitura, nada migra: as páginas v1 ficam na memória.
+o v2 do mesmo pid). Só para leitura, nada migra: as páginas v1 ficam na memória. A migração,
+da v1 e da v2 à v3, é da `Migracoes` (`abbychess.migracoes`, `self.migracoes`).
 
 **A janela edita o modelo** (`abbychess.controlador`, desde o passo 2a) e não grava: ela
 entrega a página a `agendar`, que guarda um instantâneo imutável para o gravador
@@ -77,11 +78,18 @@ from abbychess import gravacao as gv
 from abbychess import procedencia
 from abbychess import sequencia as sq
 from abbychess.gravador import Gravador
+from abbychess.migracoes import Migracoes
 from abbychess import zonas as zn
 from abbychess.modelo import (FIGURINAS, GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
-                              Box, Pagina, foto, gid_de, proximo_estado, reconciliar, reenquadrar)
+                              Pagina, foto, proximo_estado, reconciliar, reenquadrar)
 from abbychess.pagina_em_json import (com_ids_de_diagramas, comparavel, inteiro, pagina_de_json,
                                       pagina_para_json, vazia)
+from abbychess.pasta_do_projeto import (ARQUIVO_DO_LEXICO, ARQUIVO_DO_LIVRO, ARQUIVO_DO_PROJETO,
+                                        PASTA_ANTES_DO_LOTE, PASTA_DE_PADROES, PASTA_DE_PAGINAS,
+                                        PASTA_DO_BACKUP_V1, PASTA_DO_BACKUP_V2, VERSAO)
+# Reexportados: o espaço, a fonte, o lote e os testes da migração os importam daqui.
+from abbychess.pasta_do_projeto import (ARQUIVO_DA_JANELA, ARQUIVO_DE_INCLINACOES,  # noqa: F401
+                                        ARQUIVO_DO_LOTE, LISTAS_DE_PAGINAS, MAPAS_DE_PAGINAS)  # noqa: F401
 from abbychess.zonas import Zona
 
 if TYPE_CHECKING:
@@ -92,34 +100,6 @@ log = logging.getLogger(__name__)
 #: O `indice` gravado da página que não é uma do PDF do livro (`_pagina_da_fonte`).
 FORA_DO_PDF = -1
 
-ARQUIVO_DO_PROJETO = "projeto.json"
-PASTA_DE_PADROES = "padroes"
-PASTA_DE_PAGINAS = "paginas"
-#: A página como estava antes de o lote com "refazer" a reler (§4.6), uma por pid.
-PASTA_ANTES_DO_LOTE = ".antes-do-lote"
-#: As páginas que só têm glifos marcados à mão no modo de treino, sem o F5.
-ARQUIVO_DAS_MARCADAS = "marcadas.json"
-PASTA_DE_ZONAS = "zonas"
-ARQUIVO_DO_LEXICO = "lexico.txt"
-ARQUIVO_DO_LIVRO = "livro.json"
-#: 2: o modelo v2 (passo 1b): páginas em `paginas/p<pid>.json`, com gids e decisões.
-#: 3: a sequência do livro em `projeto.json` (passo L, §12.4): toda página tem `pid` gravado,
-#: e as listas de páginas, as inclinações, `janela.json` e `lote.json` são por `pid`.
-VERSAO = 3
-#: Onde a primeira abertura v2 guarda o projeto v1 de antes (§4.3).
-PASTA_DO_BACKUP_V1 = "backup-v1"
-#: Onde a primeira abertura v3 guarda os arquivos da v2 que ela muda (§12.4, CA-12.7).
-PASTA_DO_BACKUP_V2 = "backup-v2"
-#: Os arquivos do projeto que guardam páginas por posição até a v2 e por `pid` desde a v3.
-ARQUIVO_DE_INCLINACOES = "inclinacoes.json"
-ARQUIVO_DA_JANELA = "janela.json"
-ARQUIVO_DO_LOTE = "lote.json"
-#: As listas de posições do `projeto.json` (em `extras`) que passam a `pid` na v3: o corpo
-#: (`app.dialogos`), a amostra guiada (`livro`) e a camada de texto nativa (`nativo`).
-LISTAS_DE_PAGINAS = ("intervalo_do_corpo", "candidatos_da_amostra_guiada",
-                     "paginas_da_amostra_guiada", "paginas_da_camada_nativa")
-#: E os mapas posição -> número (os pendentes da amostra guiada ao terminar).
-MAPAS_DE_PAGINAS = ("pendentes_iniciais_da_amostra",)
 #: Quantas páginas o projeto guarda em memória, no modelo (as outras relê do disco).
 PAGINAS_EM_MEMORIA = 16
 #: Os erros de um JSON de página que não se lê, no texto ou na forma (SPEC-qualidade Q-P7).
@@ -342,6 +322,8 @@ class ProjetoDeLivro:
         self._ilegiveis_avisadas: set = set()
         #: As páginas (índices) que `fechar` não conseguiu gravar.
         self.nao_gravadas: List[int] = []
+        #: A migração dos formatos antigos, que a abertura chama (`abrir`).
+        self.migracoes = Migracoes(self)
 
     # ------------------------------------------------------------------
     # Criar e abrir
@@ -431,7 +413,7 @@ class ProjetoDeLivro:
         # A trava por último: uma falha antes dela não deixa a pasta travada sem dono.
         projeto.somente_leitura = projeto._travado = True
         gv.proteger(pasta)
-        projeto._guardar_a_v1_na_memoria(v1_vence=v1_vence)
+        projeto.migracoes.guardar_a_v1_na_memoria(v1_vence=v1_vence)
         try:
             projeto.montar_sequencia()          # só leitura: nada é gravado
         except ProjetoInvalido:         # a sequência de um formato que esta versão não lê
@@ -461,18 +443,18 @@ class ProjetoDeLivro:
                 dados.fonte_tamanho = achada.stat().st_size
                 projeto.fonte_relocalizada = True
         versao_de_antes = dados.versao
-        if dados.versao < VERSAO or projeto._indices_v1():
+        if dados.versao < VERSAO or projeto.migracoes.indices_v1():
             try:
                 # A cadeia (§12.4): a v1 passa à 2 (o `backup-v1/`), e a 2 à 3 (o `backup-v2/`).
                 if dados.versao < 2:
-                    projeto._preparar_migracao(bytes_do_projeto)
+                    projeto.migracoes.preparar_migracao(bytes_do_projeto)
                     projeto.backups_da_migracao.append(pasta / PASTA_DO_BACKUP_V1)
                     projeto.migrado = True
                 # As páginas v1 migram todas aqui, antes de qualquer leitura (SPEC-qualidade
                 # Q-P1): a queda no meio da cadeia, ou um arquivo v1 copiado de volta, também.
-                projeto._migrar_a_v1(v1_vence=versao_de_antes < 2)
+                projeto.migracoes.migrar_a_v1(v1_vence=versao_de_antes < 2)
                 if dados.versao < VERSAO and projeto.fonte.is_file():
-                    projeto._migrar_para_v3()
+                    projeto.migracoes.migrar_para_v3()
                     projeto.backups_da_migracao.append(pasta / PASTA_DO_BACKUP_V2)
                     projeto.migrado, mudou = True, False
                 elif dados.versao < VERSAO:
@@ -490,7 +472,7 @@ class ProjetoDeLivro:
                     f"gravar na pasta dele ({erro}). Ele abre só para leitura.")
                 projeto.somente_leitura = projeto._travado = True
                 gv.proteger(pasta)
-                projeto._guardar_a_v1_na_memoria(v1_vence=versao_de_antes < 2)
+                projeto.migracoes.guardar_a_v1_na_memoria(v1_vence=versao_de_antes < 2)
                 projeto.montar_sequencia()
                 return projeto
         if mudou:
@@ -500,7 +482,7 @@ class ProjetoDeLivro:
                 log.warning("não deu para gravar %s ao abrir: %s", ARQUIVO_DO_PROJETO, erro)
         projeto.montar_sequencia()
         if projeto.sequencia_gravada:
-            projeto._completar_v3()     # o que uma queda no meio da migração deixou
+            projeto.migracoes.completar_v3()    # o que uma queda no meio da migração deixou
         return projeto
 
     def fechar(self, limite: Optional[float] = 30.0) -> bool:
@@ -671,9 +653,6 @@ class ProjetoDeLivro:
     @property
     def fonte_e_pdf(self) -> bool:
         return self.fonte.suffix.lower() == ".pdf"
-
-    def _arquivo_v1(self, indice: int) -> Path:
-        return self.pasta / PASTA_DE_PAGINAS / f"{indice + 1:04d}.json"
 
     def _arquivo_v2(self, pid: int) -> Path:
         return self.pasta / PASTA_DE_PAGINAS / f"p{pid}.json"
@@ -1146,210 +1125,6 @@ class ProjetoDeLivro:
     def estado_da_pagina(self, indice: int) -> str:
         resumo = self.resumo_do_livro().get(indice)
         return resumo["estado"] if resumo is not None else NAO_RECONHECIDA
-
-    # ------------------------------------------------------------------
-    # A migração do v1 (§4.3)
-    # ------------------------------------------------------------------
-    def _indices_v1(self) -> List[int]:
-        indices = set()
-        for pasta in (self.pasta / PASTA_DE_PAGINAS, self.pasta / PASTA_DE_ZONAS):
-            if pasta.is_dir():
-                indices |= {int(p.stem) - 1 for p in pasta.glob("*.json") if p.stem.isdigit()}
-        return sorted(indices)
-
-    def _marcadas_v1(self) -> set:
-        arquivo = self.pasta / PASTA_DE_PAGINAS / ARQUIVO_DAS_MARCADAS
-        if not arquivo.is_file():
-            return set()
-        try:
-            return {int(i) - 1 for i in json.loads(arquivo.read_text(encoding="utf-8"))}
-        except (ValueError, TypeError):
-            return set()
-
-    def _ler_v1(self, indice: int) -> Pagina:
-        """A página v1 (página, áreas, marcadas) como modelo v2, sem gravar: pid = índice."""
-        from abbychess.diagramas import DiagramaLido
-
-        pagina = Pagina(pid=indice, indice=indice)
-        arquivo = self._arquivo_v1(indice)
-        if arquivo.is_file():
-            bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-            pagina.boxes = [Box(gid_de(indice, n), BoxEntry.from_state(tuple(estado)))
-                            for n, estado in enumerate(bruto.get("boxes", []))]
-            pagina.proximo_n = len(pagina.boxes)
-            pagina.tabuleiros = [tuple(int(v) for v in t) for t in bruto.get("tabuleiros", [])]
-            pagina.diagramas = com_ids_de_diagramas(
-                [DiagramaLido.de_json(d) for d in bruto.get("diagramas", [])])
-            pagina.estado = GLIFOS_MARCADOS if indice in self._marcadas_v1() else RECONHECIDA
-        zonas = self.pasta / PASTA_DE_ZONAS / f"{indice + 1:04d}.json"
-        if zonas.is_file():
-            bruto = json.loads(zonas.read_text(encoding="utf-8"))
-            pagina.zonas = zn.com_ids([Zona.de_dict(z) for z in bruto.get("zonas", [])])
-        return pagina
-
-    def _pids_v1(self, v1_vence: bool) -> List[int]:
-        """As páginas v1 da pasta que valem como página: todas quando o `projeto.json` é o
-        da v1 (a primeira abertura, ou o `backup-v1/` copiado de volta, que vence o v2 de
-        mesmo pid: CA-4.5); senão, só as que não têm o `p<pid>.json`. O arquivo v1 de uma
-        página que já o tem é a sobra de uma migração que gravou a página e não conseguiu
-        apagá-lo: migrá-lo de novo passaria a página por cima (SPEC-qualidade Q-P2)."""
-        return [pid for pid in self._indices_v1()
-                if v1_vence or not self._arquivo_v2(pid).is_file()]
-
-    def _migrar_a_v1(self, v1_vence: bool) -> None:
-        """Na abertura, antes de qualquer leitura (SPEC-qualidade Q-P1): grava como v2 cada
-        página v1 da pasta (`_pids_v1`) e tira os arquivos v1 (a cópia está em
-        `backup-v1/`). O número do arquivo v1 é a página do PDF, que é o `pid` dela, e não a
-        posição no livro, que reordenar muda. Um arquivo que não sai fica como sobra: a página
-        já está gravada, e a próxima abertura o apaga."""
-        migrar = set(self._pids_v1(v1_vence))
-        for pid in self._indices_v1():
-            if pid in migrar:
-                self._gravar(self._ler_v1(pid))
-            for arquivo in (self._arquivo_v1(pid),
-                            self.pasta / PASTA_DE_ZONAS / f"{pid + 1:04d}.json"):
-                try:
-                    gv.apagar(arquivo)
-                except OSError as erro:
-                    log.warning("o arquivo v1 %s ficou (%s); a próxima abertura o apaga",
-                                arquivo, erro)
-
-    def _guardar_a_v1_na_memoria(self, v1_vence: bool) -> None:
-        """Só para leitura (nada migra): cada página v1 da pasta (`_pids_v1`), lida uma vez,
-        como o JSON v2 que a migração gravaria (`_gravada` a lê daqui); a ilegível fica de
-        fora."""
-        self._v1_so_leitura = {}
-        for pid in self._pids_v1(v1_vence):
-            try:
-                self._v1_so_leitura[pid] = pagina_para_json(self._ler_v1(pid), pid)
-            except (OSError, ValueError, TypeError, KeyError) as erro:
-                log.warning("a página v1 %d está ilegível (%s): fica de fora", pid + 1, erro)
-        self._livro = None                      # o resumo do livro é refeito com elas
-
-    def _preparar_migracao(self, bruto_do_projeto: bytes) -> None:
-        """Na primeira abertura v2 de um projeto v1: `backup-v1/` com as páginas, as áreas e o
-        `projeto.json` de antes, e o contador de pids depois de todo índice v1 e todo pid já
-        gravado. As páginas migram logo depois (`_migrar_a_v1`)."""
-        backup = self.pasta / PASTA_DO_BACKUP_V1
-        if not (backup / ARQUIVO_DO_PROJETO).is_file():
-            for nome in (PASTA_DE_PAGINAS, PASTA_DE_ZONAS):
-                origem = self.pasta / nome
-                if origem.is_dir():
-                    for arquivo in sorted(origem.glob("*.json")):
-                        if arquivo.stem.isdigit() or arquivo.name == ARQUIVO_DAS_MARCADAS:
-                            gv.gravar_bytes(backup / nome / arquivo.name, arquivo.read_bytes())
-            gv.gravar_bytes(backup / ARQUIVO_DO_PROJETO, bruto_do_projeto)
-        pids = [int(p.stem[1:]) for p in (self.pasta / PASTA_DE_PAGINAS).glob("p*.json")
-                if p.stem[1:].isdigit()]
-        self.dados.proximo_pid = max([self.dados.proximo_pid, *(i + 1 for i in self._indices_v1()),
-                                      *(p + 1 for p in pids)])
-        self.dados.versao = 2                       # a 3 vem logo depois (`_migrar_para_v3`)
-        self.salvar()
-        gv.apagar(self.pasta / ARQUIVO_DO_LIVRO)        # o cache é refeito com os pids
-
-    def _migrar_para_v3(self) -> None:
-        """Da v2 à v3 (§12.4, CA-12.7): `backup-v2/` com os arquivos que mudam, a sequência
-        montada dos dados da v2 (toda página ganha `pid` gravado), as listas de páginas
-        passadas a `pid`, e o `projeto.json` com a sequência e a `versao` 3 numa gravação só.
-        Uma queda antes dela deixa o projeto na v2 (migra de novo na próxima abertura); depois
-        dela, `inclinacoes.json`, `janela.json` e `lote.json` são passados a `pid`, e quem os lê
-        aceita também a forma antiga (uma queda no meio não perde nada). Os JSON de página não
-        mudam."""
-        backup = self.pasta / PASTA_DO_BACKUP_V2
-        if not (backup / ARQUIVO_DO_PROJETO).is_file():
-            for nome in (ARQUIVO_DE_INCLINACOES, ARQUIVO_DA_JANELA, ARQUIVO_DO_LOTE,
-                         ARQUIVO_DO_PROJETO):        # o projeto.json por último: ele marca o backup
-                arquivo = self.pasta / nome
-                if arquivo.is_file():
-                    gv.gravar_bytes(backup / nome, arquivo.read_bytes())
-        sequencia, proximo = self._sequencia_da_v2()
-        self._listas_para_pids(sequencia)
-        self.dados.sequencia = sequencia.para_json()
-        self.dados.proximo_pid = max(self.dados.proximo_pid, proximo)
-        self.dados.versao = VERSAO
-        self.salvar()
-        self._sequencia, self._proximo_pid = sequencia, max(self._proximo_pid, proximo)
-
-    def _completar_v3(self) -> None:
-        """Os arquivos que a migração passa a `pid` depois do `projeto.json` (as inclinações,
-        `janela.json`, `lote.json`): a cada abertura da v3, só o que ainda está na forma da v2
-        (uma queda no meio da migração). Uma falha de gravação só avisa no log: quem os lê
-        aceita a forma da v2."""
-        if self.somente_leitura:
-            return
-        try:
-            self._inclinacoes_para_pids(self.sequencia)
-            self._janela_e_lote_para_pids(self.sequencia)
-        except OSError as erro:
-            log.warning("os arquivos de %s não passaram todos a pid (%s); a próxima abertura "
-                        "tenta de novo", self.pasta, erro)
-
-    def _listas_para_pids(self, sequencia: sq.Sequencia) -> None:
-        """As listas de posições do `projeto.json` (a v2 escreve o índice do PDF, que na
-        migração é a posição) passam a `pid`; a posição fora do livro sai."""
-        extras = self.dados.extras
-
-        def pid(valor) -> Optional[int]:
-            posicao = inteiro(valor)
-            if posicao is None:
-                return None
-            return sequencia.pid_em(posicao) if 0 <= posicao < len(sequencia) else None
-
-        for chave in LISTAS_DE_PAGINAS:
-            if isinstance(extras.get(chave), (list, tuple)):
-                extras[chave] = [p for p in map(pid, extras[chave]) if p is not None]
-        for chave in MAPAS_DE_PAGINAS:
-            if isinstance(extras.get(chave), dict):
-                extras[chave] = {str(p): n for k, n in extras[chave].items()
-                                 if (p := pid(k)) is not None}
-
-    def _inclinacoes_para_pids(self, sequencia: sq.Sequencia) -> None:
-        """`inclinacoes.json` por `pid` (a chave da v3, `pagina._chave_da_inclinacao`)."""
-        arquivo = self.pasta / ARQUIVO_DE_INCLINACOES
-        if not arquivo.is_file():
-            return
-        try:
-            bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return                              # ilegível: a fonte o ignora e mede de novo
-        if not any(chave.isdigit() for chave in bruto):
-            return                              # já por pid
-        do_pdf = {e.pagina: e.pid for e in sequencia.entradas if e.fonte == sq.FONTE_DO_LIVRO}
-        novo = {}
-        for chave, angulo in bruto.items():
-            if chave.isdigit() and int(chave) in do_pdf:
-                novo[f"p{do_pdf[int(chave)]}:inteira:0"] = angulo
-            elif not chave.isdigit():
-                novo[chave] = angulo
-        gv.gravar_json(arquivo, dict(sorted(novo.items())))
-
-    def _janela_e_lote_para_pids(self, sequencia: sq.Sequencia) -> None:
-        """A página aberta em `janela.json` e as páginas de `lote.json` com o `pid` delas."""
-        def pid(valor) -> Optional[int]:
-            return (sequencia.pid_em(valor) if isinstance(valor, int)
-                    and 0 <= valor < len(sequencia) else None)
-
-        for nome in (ARQUIVO_DA_JANELA, ARQUIVO_DO_LOTE):
-            arquivo = self.pasta / nome
-            if not arquivo.is_file():
-                continue
-            try:
-                bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                continue                        # ilegível: quem o lê avisa, como antes
-            if not isinstance(bruto, dict):
-                continue
-            if nome == ARQUIVO_DA_JANELA:
-                if "pid" in bruto:
-                    continue                    # já por pid
-                bruto["pid"] = pid(bruto.get("pagina"))
-            else:
-                if bruto.get("pids"):
-                    continue
-                for chave in ("paginas", "reler_depois"):
-                    bruto[chave] = [p for p in map(pid, bruto.get(chave) or []) if p is not None]
-                bruto["pids"] = True
-            gv.gravar_json(arquivo, bruto)
 
     # ------------------------------------------------------------------
     # As páginas nas listas gravadas (posição na interface, `pid` no disco)

@@ -339,7 +339,7 @@ def test_uma_busca_velha_nao_desfaz_a_pagina_relida_por_uma_mais_nova(livro_escr
     escrever(1, "relida")
     busca.marcar_velha(1)
     leitura_velha, refazer, carregar, _v = busca._paginas_a_refazer()   # a busca 1 a lê antes
-    velha = busca._refazer(refazer, carregar, lambda: True)
+    velha = busca._refazer(projeto, refazer, carregar, lambda: True)
     assert velha[1].texto == "relida"
     escrever(1, "outra")
     busca.marcar_velha(1)

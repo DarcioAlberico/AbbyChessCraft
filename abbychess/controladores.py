@@ -1511,13 +1511,13 @@ class ControladorDaBusca:
         numero, geracao = self._busca, self._geracao
         self._em_voo = numero
         leitura, refazer, carregar, velhas = self._paginas_a_refazer()
-        indice = dict(self.indice)
+        indice, projeto = dict(self.indice), self.pagina.projeto   # o de agora, não o da thread
 
         def rodar():
             vale = lambda: numero == self._busca and geracao == self._geracao   # noqa: E731
             resultado, erro, refeitas = None, None, {}
             try:
-                refeitas = self._refazer(refazer, carregar, vale)
+                refeitas = self._refazer(projeto, refazer, carregar, vale)
                 indice.update(refeitas)
                 if vale():
                     resultado = bs.buscar(indice, opcoes, cancelado=lambda: not vale(),
@@ -1533,11 +1533,12 @@ class ControladorDaBusca:
         threading.Thread(target=rodar, name="busca", daemon=True).start()
         return dica
 
-    def _refazer(self, refazer: dict, carregar: dict, vale) -> dict:
-        """Indexa as páginas a refazer (fora da thread da interface); devolve só elas."""
+    def _refazer(self, projeto, refazer: dict, carregar: dict, vale) -> dict:
+        """Indexa as páginas a refazer (fora da thread da interface), lidas do `projeto` de
+        quando a busca foi pedida; devolve só elas."""
         from abbychess import busca as bs
 
-        projeto, idioma, refeitas = self.pagina.projeto, self.idioma, {}
+        idioma, refeitas = self.idioma, {}
         for i, (pagina, versao) in refazer.items():
             refeitas[i] = bs.indexar_pagina(pagina, idioma, versao=versao)
         for i, versao in carregar.items():
@@ -1654,7 +1655,8 @@ class ControladorDaBusca:
         def rodar():
             refeitas = {}
             try:
-                refeitas = self._refazer(refazer, carregar, lambda: geracao == self._geracao)
+                refeitas = self._refazer(projeto, refazer, carregar,
+                                         lambda: geracao == self._geracao)
             except Exception:
                 log.exception("a procura dos glifos lidos pelas amostras falhou")
             indice.update(refeitas)
@@ -1687,15 +1689,16 @@ class ControladorDaBusca:
         interface (não é chamado se outro projeto foi aberto no meio)."""
         from abbychess import busca as bs
 
-        geracao, indice = self._geracao, dict(self.indice)
+        geracao, indice, projeto = self._geracao, dict(self.indice), self.pagina.projeto
         leitura, refazer, carregar, velhas = (
-            self._paginas_a_refazer() if self.pagina.projeto is not None and self.pronto.is_set()
+            self._paginas_a_refazer() if projeto is not None and self.pronto.is_set()
             else (0, {}, {}, set()))
 
         def rodar():
             refeitas, achados = {}, []
             try:
-                refeitas = self._refazer(refazer, carregar, lambda: geracao == self._geracao)
+                refeitas = self._refazer(projeto, refazer, carregar,
+                                         lambda: geracao == self._geracao)
                 indice.update(refeitas)
                 achados = bs.buscar_glifos(indice, char, fontes, minima, maxima)
             except Exception:

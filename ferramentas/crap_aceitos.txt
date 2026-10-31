@@ -5,11 +5,6 @@
 # ou testar: o passo fecha quando nenhuma linha diz isso.
 # Uma linha por função: arquivo Classe.funcao  # o motivo
 
-abbychess/ancoragem.py ancorar  # a reduzir (Q8)
-abbychess/ancoragem.py como_digitado  # a reduzir (Q8)
-abbychess/ancoragem.py palavra_nova  # a reduzir (Q8)
-abbychess/ancoragem.py palavras_da_sequencia  # a reduzir (Q8)
-abbychess/ancoragem.py vizinhos_de_fora  # a reduzir (Q8)
 abbychess/aplicador_do_historico.py AplicadorDoHistorico._voltar  # a reduzir (Q8)
 abbychess/app/acoes.py _menus  # a reduzir (Q8)
 abbychess/app/busca_na_janela.py BuscaNaJanela._andar  # a reduzir (Q8)

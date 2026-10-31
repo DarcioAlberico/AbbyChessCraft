@@ -1,0 +1,9 @@
+funções com >= 60 nós: 1338; pares com rank >= 0.8: 4
+0.92    26 linhas  abbychess/geometria_do_modelo.py:68 _glifos_na_geometria  <->  abbychess/geometria_do_modelo.py:464 _glifos_girados
+0.89    23 linhas  abbychess/geometria_do_modelo.py:295 _dividir_tabuleiros  <->  abbychess/geometria_do_modelo.py:308 _dividir_diagramas
+0.87    13 linhas  abbychess/modelo.py:547 _por_caixa  <->  abbychess/modelo.py:577 _celulas_dos_que_sobram
+0.84    17 linhas  abbychess/app/barra_de_busca.py:144 _botao  <->  abbychess/app/barra_de_busca.py:153 _acao_simples
+fora da lista de aceitos: 3; aceitos que não existem mais: 0
+novo     abbychess/geometria_do_modelo.py _dividir_diagramas  <->  abbychess/geometria_do_modelo.py _dividir_tabuleiros
+novo     abbychess/geometria_do_modelo.py _glifos_girados  <->  abbychess/geometria_do_modelo.py _glifos_na_geometria
+novo     abbychess/modelo.py _celulas_dos_que_sobram  <->  abbychess/modelo.py _por_caixa

@@ -159,7 +159,8 @@ class GaleriaNaJanela:
         e pelo JSON (sem o cache, `ler_sem_migrar`); chegam pela fila da interface."""
         self._carga_da_galeria += 1
         carga, p = self._carga_da_galeria, self.pagina
-        projeto, fonte = p.projeto, p.fonte
+        projeto, fonte, geracao = p.projeto, p.fonte, p.geracao
+        vale = lambda: carga == self._carga_da_galeria and geracao == p.geracao   # noqa: E731
         aberta = (p.indice, p.imagem, p.modelo.instantaneo() if p.modelo is not None else None)
         por_pagina = defaultdict(list)
         for item in itens:
@@ -167,7 +168,7 @@ class GaleriaNaJanela:
 
         def rodar():
             for indice, gids in sorted(por_pagina.items(), key=lambda kv: kv[0] != aberta[0]):
-                if carga != self._carga_da_galeria:
+                if not vale():                  # outra carga, ou outro projeto
                     return
                 try:
                     if indice == aberta[0] and aberta[1] is not None and aberta[2] is not None:
@@ -184,12 +185,12 @@ class GaleriaNaJanela:
                 except Exception:
                     log.exception("os recortes da página %d para a Galeria falharam", indice + 1)
                     continue
-                p.executar.na_interface(lambda r=recortes: self._recortes_chegaram(carga, r))
+                p.executar.na_interface(lambda r=recortes: self._recortes_chegaram(vale, r))
 
         threading.Thread(target=rodar, name="recortes-da-galeria", daemon=True).start()
 
-    def _recortes_chegaram(self, carga: int, recortes) -> None:
-        if carga != self._carga_da_galeria:
+    def _recortes_chegaram(self, vale, recortes) -> None:
+        if not vale():
             return
         for indice, gid, recorte in recortes:
             self.galeria.modelo.mostrar_recorte(indice, gid, recorte)

@@ -14,7 +14,6 @@ from abbychess.modelo import gid_de
 from abbychess.projeto import ProjetoDeLivro
 from abbychess.sequencia import Apagada, Entrada, Sequencia
 
-from tests.test_visor import pdf_de_60_paginas  # noqa: F401
 
 
 def _box(char, x=10):
@@ -100,7 +99,7 @@ def test_a_importacao_da_camada_segue_a_ordem_do_livro(tmp_path):
     from abbychess import nativo
     from abbychess import texto as tx
 
-    from tests.test_exportar_preciso import _pdf_digital
+    from tests.ajudantes import _pdf_digital  # noqa: E402,F401,F811
 
     pdf = _pdf_digital(tmp_path / "digital.pdf", paginas=3)
     projeto = ProjetoDeLivro.criar(tmp_path / "projetos", "Digital", pdf)

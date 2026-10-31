@@ -17,7 +17,6 @@ from abbychess.modelo import (GLIFOS_MARCADOS, Box, Decisoes, Pagina, endireitar
 from abbychess.projeto import ProjetoDeLivro
 from abbychess.zonas import Zona
 
-from tests.test_visor import pdf_de_60_paginas  # noqa: F401
 
 QUADRADO = (400, 100, 440, 140)
 

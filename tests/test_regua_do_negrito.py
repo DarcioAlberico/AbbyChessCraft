@@ -13,7 +13,6 @@ from abbychess import livro
 from abbychess import pagina as pg
 from abbychess import regua_do_negrito as rn
 
-from tests.test_livro import fonte, leitor, projeto  # noqa: F401
 
 
 def _haste(largura: float, fase: float = 0.0) -> np.ndarray:

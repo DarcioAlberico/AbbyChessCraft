@@ -33,7 +33,7 @@ def _livro_de_230(pasta, pdf_do_tamanho_da_fatia: bool = False):
     operações de página do passo L dependem disso)."""
     from abbychess.modelo import Box, Decisoes, gid_de
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_livro import PAGINAS as LINHAS, pdf_sintetico
+    from tests.ajudantes import PAGINAS as LINHAS, pdf_sintetico  # noqa: E402,F401,F811
 
     with zipfile.ZipFile(SNAPSHOT) as z:
         z.extractall(pasta / "fatia")
@@ -78,7 +78,7 @@ def _esperar(condicao, limite=120.0):
 
 def test_ca_7_2_substituir_todas_no_livro_e_um_ctrl_z(tmp_path, medidas):
     from abbychess.controladores import ControladorDaBusca, ControladorDaSubstituicao
-    from tests.test_controlador import ExecutorManual, _controlador
+    from tests.ajudantes import ExecutorManual, _controlador  # noqa: E402,F401,F811
 
     projeto = _livro_de_230(tmp_path)
     try:

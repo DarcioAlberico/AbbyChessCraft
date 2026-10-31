@@ -8,8 +8,8 @@ from abbychess.controladores import ControladorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
 from tests import leitor_falso, servidor_falso
-from tests.test_controlador import ExecutorManual
-from tests.test_exportar_preciso import _pdf_digital
+from tests.ajudantes import ExecutorManual  # noqa: E402,F401,F811
+from tests.ajudantes import _pdf_digital  # noqa: E402,F401,F811
 
 
 def test_pdf_nativo_e_oferecido_e_cria_paginas_sem_ocr(tmp_path):

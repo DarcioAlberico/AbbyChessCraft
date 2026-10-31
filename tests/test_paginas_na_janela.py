@@ -17,34 +17,14 @@ from PySide6.QtWidgets import QApplication, QDialogButtonBox, QFileDialog  # noq
 
 from abbychess.app import acoes  # noqa: E402
 from abbychess.app import dialogo_paginas as dp  # noqa: E402
-from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
-from tests.test_busca_janela import _ate, _buscar  # noqa: E402
-from tests.test_espaco import sim  # noqa: E402,F401
-from tests.test_visor import pdf_de_60_paginas  # noqa: E402,F401
+from tests.ajudantes import _ate, _buscar  # noqa: E402,F401,F811
+from tests.fixturas_paginas_na_janela import janela  # noqa: E402,F401,F811
 
 
 @pytest.fixture(scope="module")
 def app():
     return QApplication.instance() or QApplication([])
-
-
-@pytest.fixture
-def janela(app, tmp_path, pdf_de_60_paginas, sim):  # noqa: F811
-    """A janela como o programa a abre: a fonte pela sequência do projeto."""
-    from abbychess import pagina as pg
-    from abbychess.app.janela import JanelaPrincipal
-    from abbychess.leitor import LeitorDoLivro
-
-    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Janela", pdf_de_60_paginas)
-    j = JanelaPrincipal()
-    j.resize(1366, 768)
-    j.show()
-    j.usar(projeto, pg.fonte_do_projeto(projeto),
-           LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
-    QApplication.processEvents()
-    yield j
-    j.close()
 
 
 def _palavra(projeto, posicao, palavra):
@@ -93,7 +73,7 @@ def test_o_dialogo_das_apagadas_restaura_as_escolhidas_ou_todas(app):
 # O menu Página e a gaveta
 # ----------------------------------------------------------------------
 
-def test_mover_pelo_menu_e_a_busca_acha_na_posicao_nova(app, janela, monkeypatch):
+def test_mover_pelo_menu_e_a_busca_acha_na_posicao_nova(app, janela, monkeypatch):  # noqa: F811
     projeto = janela.projeto
     _palavra(projeto, 1, "cavalo")
     janela.busca.abrir()
@@ -108,7 +88,7 @@ def test_mover_pelo_menu_e_a_busca_acha_na_posicao_nova(app, janela, monkeypatch
     assert [o.pagina for o in janela.busca.ultimo_resultado.ocorrencias] == [9]
 
 
-def test_apagar_pelo_menu_muda_o_seletor_e_o_total(app, janela, monkeypatch):
+def test_apagar_pelo_menu_muda_o_seletor_e_o_total(app, janela, monkeypatch):  # noqa: F811
     monkeypatch.setattr(dp, "perguntar_paginas", lambda *_a, **_k: ([2, 6], -1))
     janela.acao_apagar_paginas.trigger()
     assert janela.fonte.total == 58 and janela.seletor.maximum() == 58
@@ -116,7 +96,7 @@ def test_apagar_pelo_menu_muda_o_seletor_e_o_total(app, janela, monkeypatch):
     assert janela.acao_paginas_apagadas.isEnabled()
 
 
-def test_inserir_pelo_menu(app, janela, monkeypatch, tmp_path):
+def test_inserir_pelo_menu(app, janela, monkeypatch, tmp_path):  # noqa: F811
     imagem = tmp_path / "nova.png"
     Image.fromarray(np.full((300, 200), 255, np.uint8)).save(imagem)
     monkeypatch.setattr(QFileDialog, "getOpenFileNames",
@@ -129,7 +109,7 @@ def test_inserir_pelo_menu(app, janela, monkeypatch, tmp_path):
     assert janela.pagina.indice == 5 and janela.pagina.imagem.size == (200, 300)
 
 
-def test_paginas_apagadas_pelo_menu_devolve(app, janela, monkeypatch):
+def test_paginas_apagadas_pelo_menu_devolve(app, janela, monkeypatch):  # noqa: F811
     projeto = janela.projeto
     pids = projeto.sequencia.pids
     janela.pagina.apagar_paginas([3])
@@ -138,7 +118,7 @@ def test_paginas_apagadas_pelo_menu_devolve(app, janela, monkeypatch):
     assert projeto.sequencia.pids == pids and not janela.acao_paginas_apagadas.isEnabled()
 
 
-def test_a_gaveta_move_e_apaga_as_selecionadas(app, janela, monkeypatch):
+def test_a_gaveta_move_e_apaga_as_selecionadas(app, janela, monkeypatch):  # noqa: F811
     vistos = []
     monkeypatch.setattr(dp, "perguntar_paginas",
                         lambda _j, _t, _n, **k: vistos.append(k["selecao"]) or ([1, 2], 9))
@@ -150,7 +130,7 @@ def test_a_gaveta_move_e_apaga_as_selecionadas(app, janela, monkeypatch):
     assert any(t.startswith("Apagar as selecionadas") for t in textos)
 
 
-def test_com_o_lote_rodando_as_operacoes_ficam_desligadas_com_o_motivo(app, janela):
+def test_com_o_lote_rodando_as_operacoes_ficam_desligadas_com_o_motivo(app, janela):  # noqa: F811
     janela.pagina.lote_rodando = True
     acoes.atualizar(janela)
     for q in janela.acoes_de_paginas:
@@ -178,7 +158,7 @@ def test_os_dialogos_de_girar_cortar_e_dividir_leem_os_campos(app):
     d.deleteLater()
 
 
-def test_girar_cortar_e_dividir_pelo_menu(app, janela, monkeypatch):
+def test_girar_cortar_e_dividir_pelo_menu(app, janela, monkeypatch):  # noqa: F811
     projeto = janela.projeto
     monkeypatch.setattr(dp, "perguntar_com", lambda *_a, **_k: ([0, 2], 90))
     janela.acao_girar_paginas.trigger()

@@ -27,7 +27,7 @@ from abbychess.atalhos import carregar as carregar_atalhos
 from abbychess.leitor import LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ferramentas"))
 import replay_fatia as rf  # noqa: E402

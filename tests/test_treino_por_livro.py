@@ -6,31 +6,15 @@ dos padrões do livro e o teste não precisar do modelo de 2,8 MB.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
-from PIL import Image, ImageDraw, ImageFont
 
 from abbychess import pagina as pg
 from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL, LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro, ProjetoInvalido, nome_de_pasta
 
 from tests.livros import PASTA_DOS_PDFS
-
-FONTE_TTF = Path("C:/Windows/Fonts/arial.ttf")
-
-
-def _pagina_sintetica(caminho: Path, linhas=("abc abc abc", "cab bca")) -> Path:
-    imagem = Image.new("L", (900, 80 + 90 * len(linhas)), 255)
-    desenho = ImageDraw.Draw(imagem)
-    if not FONTE_TTF.exists():
-        # Outra fonte daria outros glifos e outros números: o teste pula, não muda.
-        pytest.skip("a Arial não está nesta máquina")
-    fonte = ImageFont.truetype(str(FONTE_TTF), 56)
-    for i, linha in enumerate(linhas):
-        desenho.text((40, 40 + 90 * i), linha, fill=0, font=fonte)
-    imagem.save(caminho)
-    return caminho
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 
 @pytest.fixture

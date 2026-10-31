@@ -16,7 +16,7 @@ from abbychess import pagina as pg
 from abbychess import verificacao as vf
 from abbychess.leitor import FONTE_MANUAL
 
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 LINHAS = ("abc Bxf6 bca", "cab abc")
 

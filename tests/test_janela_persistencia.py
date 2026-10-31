@@ -12,39 +12,15 @@ import json
 from pathlib import Path
 
 import pytest
-from PySide6.QtWidgets import QFileDialog, QMessageBox
+from PySide6.QtWidgets import QFileDialog
 
 from abbychess import gravacao as gv
 from abbychess.app.janela import JanelaPrincipal
-from abbychess.leitor import LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_janela import _esperar, app  # noqa: F401 (fixture)
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
-
-
-@pytest.fixture
-def sem_dialogos(monkeypatch):
-    """Registra os avisos em vez de abrir caixas de diálogo."""
-    avisos = []
-    for nome in ("information", "warning"):
-        monkeypatch.setattr(QMessageBox, nome,
-                            lambda _pai, titulo, texto, *a, **k: avisos.append(texto))
-    monkeypatch.setattr(QMessageBox, "question",
-                        lambda *a, **k: QMessageBox.StandardButton.Yes)
-    return avisos                   # sem os modelos globais: o conftest (CA-Q-T1)
-
-
-@pytest.fixture
-def projeto_lido(tmp_path, app):  # noqa: F811
-    from abbychess import livro, pagina as pg
-
-    fonte = _pagina_sintetica(tmp_path / "pagina.png")
-    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Janela", fonte)
-    leitor = LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
-    livro.reconhecer_paginas(projeto, pg.fonte_do_projeto(projeto), leitor, [0])
-    return projeto
 
 
 def _instantaneo(pasta: Path) -> dict:

@@ -257,7 +257,7 @@ def test_atraso_durante_o_lote_com_o_leitor_falso(tmp_path, medidas):
     from abbychess.app.janela import JanelaPrincipal
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_livro import PAGINAS, pdf_sintetico
+    from tests.ajudantes import PAGINAS, pdf_sintetico  # noqa: E402,F401,F811
 
     app = QApplication.instance() or QApplication([])
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Falso", pdf_sintetico(tmp_path,

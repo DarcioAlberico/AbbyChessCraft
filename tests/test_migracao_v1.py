@@ -21,8 +21,7 @@ import pytest
 from abbychess import gravacao as gv
 from abbychess.modelo import gid_de
 from abbychess.projeto import PASTA_DO_BACKUP_V1, VERSAO, ProjetoDeLivro
-
-FIXTURE = Path(__file__).parent / "dados" / "projeto_v1"
+from tests.ajudantes import FIXTURE  # noqa: E402,F401,F811
 
 
 @pytest.fixture

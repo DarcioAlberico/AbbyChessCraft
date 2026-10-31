@@ -17,7 +17,7 @@ from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.zonas import Zona
 
-from tests.test_livro import _ensinar_e_ler, fonte, leitor, projeto  # noqa: F401 (fixtures)
+from tests.ajudantes import _ensinar_e_ler  # noqa: E402,F401,F811
 
 
 def _linha(texto: str, y: int, x: int = 40):

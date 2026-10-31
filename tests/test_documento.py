@@ -23,8 +23,9 @@ from abbychess.modelo import Estilo  # noqa: E402
 from abbychess.app.documento import VistaDoDocumento  # noqa: E402
 
 from tests.janela_util import atual, boxes, fila  # noqa: E402
-from tests.test_espaco import _abrir, _dentro, janela, lida, sim  # noqa: E402,F401
-from tests.test_janela import _esperar  # noqa: E402
+from tests.ajudantes import _abrir, _dentro  # noqa: E402,F401,F811
+from tests.fixturas_espaco import janela  # noqa: E402,F401,F811
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 
 
 @pytest.fixture(scope="module")
@@ -176,7 +177,7 @@ def test_o_diagrama_entra_com_o_desenho_a_linha_o_estado_e_copiar_fen(app):
 
 @pytest.fixture
 def lida_a_mao(app, janela):  # noqa: F811
-    from tests.test_janela_areas_e_verificacao import _ler_a_mao
+    from tests.ajudantes import _ler_a_mao  # noqa: E402,F401,F811
 
     _ler_a_mao(app, janela)
     janela.pintar_texto()
@@ -388,7 +389,7 @@ def test_x_height_na_linha(app, tmp_path, sim, largura, altura):  # noqa: F811
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
     from tests.livros import PASTA_DOS_PDFS
-    from tests.test_espaco import _x_height_do_gabarito
+    from tests.ajudantes import _x_height_do_gabarito  # noqa: E402,F401,F811
 
     raiz = Path(__file__).resolve().parent.parent
     verdade = json.loads((raiz / "tests" / "verdade" / "xv" / "i025.json").read_text(encoding="utf-8"))

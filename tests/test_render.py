@@ -9,7 +9,7 @@ from abbychess import pagina as pg
 from abbychess import render
 
 from tests.ajudantes import esperar
-from tests.test_livro import pdf_sintetico
+from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
 
 class _RenderFalso:

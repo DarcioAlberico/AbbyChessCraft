@@ -21,9 +21,9 @@ from abbychess.app import teclado  # noqa: E402
 from abbychess.app.janela import configuracao  # noqa: E402
 from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
-from tests.test_espaco import _abrir, _dentro, conferir_os_registrados  # noqa: E402
-from tests.test_janela import _esperar  # noqa: E402
-from tests.test_treino_por_livro import _pagina_sintetica  # noqa: E402
+from tests.ajudantes import _abrir, _dentro, conferir_os_registrados  # noqa: E402,F401,F811
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 
 @pytest.fixture(scope="module")

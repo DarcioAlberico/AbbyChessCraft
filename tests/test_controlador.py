@@ -14,13 +14,13 @@ from core.box_model import BoxEntry
 
 from abbychess import edicao as ed
 from abbychess import procedencia
-from abbychess.controlador import ControladorDePagina
 from abbychess.leitor import LeitorDoLivro
 from abbychess import pagina as pg
 from abbychess.modelo import Box, Pagina, gid_de
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
+from tests.ajudantes import ExecutorManual, _controlador  # noqa: E402,F401,F811
 
 
 def test_um_ouvinte_que_falha_nao_cala_os_seguintes_nem_o_comando(caplog):
@@ -42,42 +42,6 @@ def test_um_ouvinte_que_falha_nao_cala_os_seguintes_nem_o_comando(caplog):
         eventos.emitir("glifos_mudaram", None)
     assert ouvidos == [(None,)]
     assert [r for r in caplog.records if r.exc_info and "glifos_mudaram" in r.getMessage()]
-
-
-class ExecutorManual:
-    """Guarda as tarefas; `comecar()` roda o preparar e o trabalho da primeira e devolve o
-    pronto com o resultado, para o teste chamar quando quiser."""
-
-    def __init__(self):
-        self.fila = []
-        #: A tarefa começada cujo fim o teste ainda não chamou (e se ela é leve).
-        self.em_voo = None
-
-    def __call__(self, titulo, preparar, falhou=None, progresso=None, leve=False):
-        self.fila.append((titulo, preparar, leve))
-
-    def so_leves(self):
-        return (self.em_voo is None or self.em_voo) and all(t[2] for t in self.fila)
-
-    def comecar(self):
-        titulo, preparar, leve = self.fila.pop(0)
-        par = preparar()
-        if par is None:
-            return None
-        trabalho, pronto = par
-        resultado = trabalho(lambda *_: None)
-        self.em_voo = leve
-
-        def fim():
-            self.em_voo = None
-            pronto(resultado)
-        return fim
-
-    def tudo(self):
-        while self.fila:
-            fim = self.comecar()
-            if fim is not None:
-                fim()
 
 
 # ----------------------------------------------------------------------
@@ -144,14 +108,6 @@ def dois_projetos(tmp_path):
         p.fechar()
 
 
-def _controlador(projeto, executor):
-    ctl = ControladorDePagina(executar=executor)
-    ctl.ligar(projeto, pg.FonteDePaginas(projeto.fonte),
-              LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
-    ctl.ir_para(0)
-    return ctl
-
-
 def test_resultado_de_tarefa_do_projeto_anterior_nao_entra_no_novo(dois_projetos):
     a, b = dois_projetos
     executor = ExecutorManual()
@@ -182,7 +138,7 @@ def test_tarefa_na_fila_do_projeto_anterior_nao_roda(dois_projetos):
 
 
 def test_reconhecer_entra_na_pagina_que_pediu_mesmo_depois_de_trocar(tmp_path):
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
     try:
@@ -200,7 +156,7 @@ def test_reconhecer_entra_na_pagina_que_pediu_mesmo_depois_de_trocar(tmp_path):
 
 
 def test_edicao_pedida_numa_pagina_nao_roda_em_outra(tmp_path):
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
     try:
@@ -237,7 +193,7 @@ def test_comando_guarda_o_glifo_da_hora_em_que_foi_pedido(dois_projetos):
 def test_diagramas_lidos_entram_na_pagina_que_pediu(tmp_path, monkeypatch):
     from abbychess import diagramas as dg
     from abbychess.controladores import ControladorDeDiagramas
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
     try:
@@ -372,7 +328,7 @@ def test_sair_da_pagina_confirma_a_sessao_na_pagina_dela(tmp_path, na_fila):
     """A revisão de produto do D1 (M3): trocar de página com a sessão aberta a confirma
     antes, na página dela, também quando a edição espera a vez na fila."""
     from abbychess import sessao as ss
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
     try:
@@ -450,7 +406,7 @@ def test_o_modo_como_o_livro_olha_o_resumo_das_paginas_lidas(tmp_path):
     """A revisão de produto do D1: uma página sem figurinas num livro de figurinas segue o
     livro, pelo resumo do `livro.json` (sem abrir as páginas)."""
     from abbychess import sessao as ss
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
     try:

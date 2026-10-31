@@ -19,18 +19,15 @@ from abbychess import perturbacoes as pt
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
 
-from tests.test_diagramas import _lido
+from tests.ajudantes import _lido  # noqa: E402,F401,F811
+from tests.ajudantes import P25, TEXTO_P25  # noqa: E402,F401,F811
 
 RAIZ = Path(__file__).resolve().parent.parent
 
 #: Xadrez Vitorioso, p. 23 (Diagrama 4: sem o cavalo de b1) e p. 25 (Diagrama 5).
 P23 = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR"
-P25 = "rnbqk2r/ppp3pp/3p1n2/8/2Bb1B2/5Q2/PPP3PP/4RR1K"
 TEXTO_P23 = ("1.e4 e5 2.f4\nAs brancas mostram imediatamente que estão dispostas a entregar\n"
              "2...exf4 3.Cf3 f5?\nUm lance muito ruim. Seria melhor algo como 2...d5 (que")
-TEXTO_P25 = ("10...Rf8 11.Dd5??\nAs brancas ameaçam o mate e esperam que as pretas se\n"
-             "entusiasmem por 11...Cxd5 12.Bxd6+ + Rg8 13.Bxd5+ Be6 14.Bxe6 xeque-mate.\n"
-             "11...Dd7 12.Dxd4 Cc6")
 
 
 def _sans(linha):

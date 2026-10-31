@@ -19,9 +19,8 @@ from PySide6.QtWidgets import QApplication, QFileDialog
 from abbychess import nativo
 from abbychess.app.janela import JanelaPrincipal
 
-from tests.test_janela import _esperar, app  # noqa: F401 (fixture)
-from tests.test_janela_persistencia import sem_dialogos  # noqa: F401 (fixture)
-from tests.test_livro import pdf_sintetico
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
+from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
 pytestmark = pytest.mark.processo
 

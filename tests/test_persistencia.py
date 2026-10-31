@@ -31,7 +31,7 @@ from abbychess.projeto import (ARQUIVO_DO_LIVRO, VERSAO_DO_LIVRO, Limiares, Proj
                                pendentes_pelo_histograma, resumo_das_confiancas)
 from abbychess.zonas import Zona
 
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 
 @pytest.fixture(autouse=True)

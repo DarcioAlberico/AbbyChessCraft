@@ -5,58 +5,14 @@ busca por glifo."""
 from __future__ import annotations
 
 
-import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QDialog
 
 from abbychess.app.documento import FUNDO_DA_BUSCA, FUNDO_DA_OCORRENCIA
 
-from tests.ajudantes import esperar
-from tests.test_documento import app  # noqa: F401 (fixture)
-from tests.test_documento_edicao import _escrever, _janela_do_modulo, j  # noqa: F401 (fixtures)
-
-
-@pytest.fixture
-def jb(j):  # noqa: F811
-    """A janela do módulo com a barra de busca fechada e as opções no padrão."""
-    from abbychess import busca as bs
-
-    b = j.barra_de_busca
-    j.fechar_busca()
-    b.escolher_escopo(bs.LIVRO)
-    b.intervalo.clear()
-    for botao in (b.maiusculas, b.palavra, b.regex, b.figurina):
-        botao.setChecked(False)
-    j._selecao_congelada = None
-    b.relogio.stop()
-    return j
-
-
-def _ate(condicao, limite=10.0):
-    assert esperar(condicao, limite)
-
-
-def _pagina_lida(jb, *linhas):
-    """A página escrita, gravada e no índice da busca."""
-    pagina = _escrever(jb, *linhas)
-    jb.projeto.salvar_modelo(pagina)
-    jb.busca.abrir()
-    _ate(jb.busca.pronto.is_set)
-    return pagina
-
-
-def _buscar(jb, texto, **marcas):
-    b = jb.barra_de_busca
-    jb.localizar()
-    for nome, valor in marcas.items():
-        getattr(b, nome).setChecked(valor)
-    b.campo.setText(texto)
-    b.contador.setText("")
-    antes = jb.busca.ultimo_resultado
-    b.relogio.stop()
-    jb._buscar()
-    _ate(lambda: jb.busca.ultimo_resultado is not antes or "erro" in b.contador.text())
+from tests.ajudantes import _escrever  # noqa: E402,F401,F811
+from tests.ajudantes import _ate, _buscar, _pagina_lida  # noqa: E402,F401,F811
 
 
 def _cores(jb):

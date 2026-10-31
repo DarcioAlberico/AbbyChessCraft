@@ -6,8 +6,7 @@ import pytest
 
 from abbychess.app import dialogos
 from abbychess.projeto import ProjetoDeLivro
-from tests.test_documento import app  # noqa: F401 (fixture: o diálogo de progresso)
-from tests.test_livro import pdf_sintetico
+from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
 
 @pytest.mark.parametrize(("texto", "total", "esperado"), [

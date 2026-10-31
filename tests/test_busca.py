@@ -14,8 +14,8 @@ from abbychess import busca as bs
 from abbychess import sessao as ss
 from abbychess.modelo import Box
 
-from tests.ajudantes import esperar
-from tests.test_sessao import _pagina
+from tests.ajudantes import _pagina  # noqa: E402,F401,F811
+from tests.ajudantes import _ate_valer  # noqa: E402,F401,F811
 
 
 def _indice(*linhas, idioma="pt", indice=0):
@@ -153,15 +153,12 @@ def test_construir_sem_processos_pelos_arquivos(tmp_path):
 # O controlador (o índice em segundo plano, a busca numa thread)
 # ----------------------------------------------------------------------
 
-def _esperar(condicao, limite=20.0):
-    assert esperar(condicao, limite)
-
 
 def test_o_controlador_monta_o_indice_busca_e_refaz_a_pagina_editada(tmp_path):
     from abbychess.controladores import ControladorDaBusca
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_controlador import ExecutorManual, _controlador
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import ExecutorManual, _controlador  # noqa: E402,F401,F811
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
     try:
@@ -175,14 +172,14 @@ def test_o_controlador_monta_o_indice_busca_e_refaz_a_pagina_editada(tmp_path):
         ctl.eventos.ligar("busca_falhou", falhas.append)
         busca.abrir()
         busca.buscar(bs.Opcoes("zzqq"))                  # pedida antes do índice: espera
-        _esperar(lambda: busca.pronto.is_set() and fins)
+        _ate_valer(lambda: busca.pronto.is_set() and fins)
         assert sorted(busca.indice) == projeto.paginas_lidas() and not fins[-1].ocorrencias
         texto, unidades = ss.texto_e_unidades(ctl.modelo)
         inicio, fim = ss.palavras_em(unidades, 0, 0)
         ctl.confirmar_sessao(unidades[inicio:fim], "zzqq" + texto[inicio:fim])   # uma edição
         executor.tudo()
         busca.buscar(bs.Opcoes("zzqq"))
-        _esperar(lambda: len(fins) == 2)
+        _ate_valer(lambda: len(fins) == 2)
         [o] = fins[-1].ocorrencias
         assert o.pagina == ctl.indice and len(o.gids) == 4
         busca.buscar(bs.Opcoes("(zz", regex=True))
@@ -256,46 +253,10 @@ def test_o_tempo_limite_conta_cada_casamento(monkeypatch):
     assert len(achadas) == 100
 
 
-@pytest.fixture
-def livro_escrito(tmp_path):
-    """Um projeto de 3 páginas com o texto escrito à mão (sem reconhecer), o controlador da
-    página e o da busca (sem processos)."""
-    from abbychess.controladores import ControladorDaBusca
-    from abbychess.modelo import gid_de
-    from abbychess.projeto import ProjetoDeLivro
-    from tests.test_controlador import ExecutorManual, _controlador
-    from tests.test_livro import pdf_sintetico
-
-    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Três", pdf_sintetico(tmp_path))
-    executor = ExecutorManual()
-    ctl = _controlador(projeto, executor)
-
-    def escrever(indice, texto):
-        pagina = projeto.pagina_para_editar(indice)
-        modelo = _pagina(texto)
-        pagina.boxes = [Box(gid_de(pagina.pid, n), b.entry) for n, b in enumerate(modelo.boxes)]
-        pagina.proximo_n = len(pagina.boxes)
-        pagina.estado = "reconhecida"
-        projeto.salvar_modelo(pagina)
-        return pagina
-
-    for i, texto in enumerate(("casa velha", "outra casa", "fim")):
-        escrever(i, texto)
-    busca = ControladorDaBusca(ctl, paralelo=False)
-    eventos = {"fins": [], "falhas": [], "avisos": []}
-    ctl.eventos.ligar("busca_terminou", eventos["fins"].append)
-    ctl.eventos.ligar("busca_falhou", eventos["falhas"].append)
-    ctl.eventos.ligar("aviso", lambda titulo, texto: eventos["avisos"].append(texto))
-    busca.abrir()
-    _esperar(busca.pronto.is_set)
-    yield projeto, ctl, busca, escrever, eventos
-    projeto.fechar()
-
-
 def _buscar_e_esperar(busca, eventos, texto, **opcoes):
     antes = len(eventos["fins"]) + len(eventos["falhas"])
     busca.buscar(bs.Opcoes(texto, **opcoes))
-    _esperar(lambda: len(eventos["fins"]) + len(eventos["falhas"]) > antes)
+    _ate_valer(lambda: len(eventos["fins"]) + len(eventos["falhas"]) > antes)
     return eventos["fins"][-1] if eventos["fins"] else None
 
 
@@ -326,7 +287,7 @@ def test_a_busca_abandonada_devolve_as_relidas(livro_escrito, monkeypatch):
     assert lido.wait(5)
     busca.cancelar()                                     # o Esc no meio
     soltar.set()
-    _esperar(lambda: 2 in busca._velhas)
+    _ate_valer(lambda: 2 in busca._velhas)
     monkeypatch.setattr(projeto, "ler_sem_migrar", original)
     [o] = _buscar_e_esperar(busca, eventos, "novo").ocorrencias
     assert o.pagina == 2
@@ -344,11 +305,11 @@ def test_os_erros_nas_threads_nao_penduram_a_busca(livro_escrito, monkeypatch):
     projeto, ctl, busca, escrever, eventos = livro_escrito
     monkeypatch.setattr(bs, "buscar", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("disco")))
     busca.buscar(bs.Opcoes("casa"))
-    _esperar(lambda: eventos["falhas"])
+    _ate_valer(lambda: eventos["falhas"])
     assert "A busca falhou" in eventos["falhas"][-1]
     monkeypatch.setattr(bs, "construir", lambda *a, **k: (_ for _ in ()).throw(OSError("quebrou")))
     busca.abrir()
-    _esperar(busca.pronto.is_set)                        # pronto, com o índice parcial
+    _ate_valer(busca.pronto.is_set)                        # pronto, com o índice parcial
     assert eventos["avisos"] and "ficaram fora" in eventos["avisos"][-1]
 
 
@@ -365,7 +326,7 @@ def test_trocar_de_projeto_durante_a_montagem_fica_com_o_novo(livro_escrito, mon
     geracao = busca._geracao
     monkeypatch.setattr(bs, "construir", original)
     busca.abrir()                                        # a nova
-    _esperar(busca.pronto.is_set)
+    _ate_valer(busca.pronto.is_set)
     soltar.set()
     assert busca._geracao == geracao + 1 and sorted(busca.indice) == [0, 1, 2]
 
@@ -374,7 +335,7 @@ def test_uma_busca_velha_nao_desfaz_a_pagina_relida_por_uma_mais_nova(livro_escr
     """A busca 1 termina depois da 2, que releu a página: o texto da 2 fica."""
     projeto, ctl, busca, escrever, eventos = livro_escrito
     busca.buscar(bs.Opcoes("casa"))
-    _esperar(lambda: eventos["fins"])
+    _ate_valer(lambda: eventos["fins"])
     escrever(1, "relida")
     busca.marcar_velha(1)
     leitura_velha, refazer, carregar, _v = busca._paginas_a_refazer()   # a busca 1 a lê antes
@@ -383,24 +344,24 @@ def test_uma_busca_velha_nao_desfaz_a_pagina_relida_por_uma_mais_nova(livro_escr
     escrever(1, "outra")
     busca.marcar_velha(1)
     busca.buscar(bs.Opcoes("outra"))                     # a busca 2, mais nova, termina antes
-    _esperar(lambda: len(eventos["fins"]) == 2)
+    _ate_valer(lambda: len(eventos["fins"]) == 2)
     busca._guardar(leitura_velha, velha)                 # o fim atrasado da busca 1
     busca.buscar(bs.Opcoes("outra"))
-    _esperar(lambda: len(eventos["fins"]) == 3)
+    _ate_valer(lambda: len(eventos["fins"]) == 3)
     assert len(eventos["fins"][-1].ocorrencias) == 1
 
 
 def test_a_busca_por_glifo_roda_fora_da_interface(livro_escrito):
     projeto, ctl, busca, escrever, eventos = livro_escrito
     busca.abrir()
-    _esperar(busca.pronto.is_set)
+    _ate_valer(busca.pronto.is_set)
     fila, achados = [], []
     ctl.executar.na_interface = fila.append
     escrever(2, "aaa")
     busca.marcar_velha(2)
     busca.glifos("a", ao_terminar=achados.append)
     assert not achados                                   # volta na hora, sem ler a página
-    _esperar(lambda: fila)
+    _ate_valer(lambda: fila)
     fila.pop(0)()
     assert sum(g.pagina == 2 for g in achados[0]) == 3 and busca.indice[2].texto == "aaa"
 
@@ -410,7 +371,7 @@ def test_os_resultados_voltam_pela_fila_da_interface(livro_escrito):
     fila = []
     ctl.executar.na_interface = fila.append              # como o executor da janela
     busca.buscar(bs.Opcoes("casa"))
-    _esperar(lambda: fila)
+    _ate_valer(lambda: fila)
     assert not eventos["fins"]                           # nada chega fora da interface
     fila.pop(0)()
     assert len(eventos["fins"][-1].ocorrencias) == 2
@@ -453,7 +414,7 @@ def test_trocar_de_projeto_com_o_pool_nao_esvazia_o_indice_novo(tmp_path):
     ctl.projeto = projeto("b")
     busca.abrir()
     try:
-        _esperar(busca.pronto.is_set, 60)
+        _ate_valer(busca.pronto.is_set, 60)
         assert len(busca.indice) == 120 and not avisos
         assert busca.indice[0].texto.startswith("b pagina")
     finally:

@@ -18,7 +18,7 @@ from abbychess import exportar as ex  # noqa: E402
 from abbychess import previa as pv  # noqa: E402
 from abbychess.app import dialogo_exportacao as de  # noqa: E402
 
-from tests.test_livro import _ensinar_e_ler, fonte, leitor, projeto  # noqa: E402,F401
+from tests.ajudantes import _ensinar_e_ler  # noqa: E402,F401,F811
 
 
 @pytest.fixture(scope="module")

@@ -23,8 +23,8 @@ from abbychess.app.janela import JanelaPrincipal  # noqa: E402
 from abbychess.leitor import LeitorDoLivro  # noqa: E402
 from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
-from tests.test_diagramas import FEN, pagina_com_diagrama, sem_modelo  # noqa: E402
-from tests.test_janela import _esperar  # noqa: E402
+from tests.ajudantes import FEN, pagina_com_diagrama, sem_modelo  # noqa: E402,F401,F811
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
 pytestmark = sem_modelo
@@ -274,7 +274,7 @@ def _texto(janela) -> str:
 
 def test_a_conferencia_valida_pelos_lances_e_oferece_o_roque_inferido(app):
     from abbychess import lances as lc
-    from tests.test_diagramas import _lido
+    from tests.ajudantes import _lido  # noqa: E402,F401,F811
 
     linha = lc.primeira_linha("12.O-O-O Cxd4 13.Cxd4", "pt")
     dialogo = dd.EditorDeDiagrama()
@@ -327,7 +327,7 @@ def test_pgdn_na_ponta_do_livro_avisa_e_fica(app, janela):
 def test_estado_e_filtros_da_aba():
     from abbychess import lances as lc
     from abbychess.app import painel_diagramas as pd
-    from tests.test_diagramas import _lido
+    from tests.ajudantes import _lido  # noqa: E402,F401,F811
 
     lido, conferido = _lido(), replace(_lido(), conferido=True)
     duvidoso = replace(_lido(), motivo="casa duvidosa")
@@ -422,7 +422,7 @@ def test_o_lado_dos_lances_nao_ganha_o_aviso_de_brancas_assumidas(app):
     from core.tabuleiro_edicao import AVISO_CONVENCAO
 
     from abbychess import lances as lc
-    from tests.test_diagramas import _lido
+    from tests.ajudantes import _lido  # noqa: E402,F401,F811
 
     d = replace(_lido(), lado="b", lado_origem=lc.LADO_DOS_LANCES, lado_trecho="10...Rf8")
     editor = dd.EditorDeDiagrama()

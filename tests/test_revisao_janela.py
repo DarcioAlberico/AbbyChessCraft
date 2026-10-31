@@ -6,9 +6,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 
-from tests.test_busca_janela import _ate, _pagina_lida, jb  # noqa: F401 (fixture)
-from tests.test_documento import app  # noqa: F401 (fixture)
-from tests.test_documento_edicao import _janela_do_modulo, j  # noqa: F401 (fixtures)
+from tests.ajudantes import _ate, _pagina_lida  # noqa: E402,F401,F811
 
 
 def _uns(jb, quantos):  # noqa: F811

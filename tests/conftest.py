@@ -1,9 +1,9 @@
 """Configuração comum dos testes: o Qt sem tela (`offscreen`) e o portão das camadas lentas.
 
-As fixtures da janela (`app`, `janela`) e a página sintética ainda moram em
-`tests/test_janela.py` e `tests/test_treino_por_livro.py`, importadas pelos outros
-módulos; elas vêm para cá no passo 2a, quando a janela passa a ser montada pelo
-controlador e as fixtures mudam de qualquer jeito.
+Nenhum teste importa de outro (SPEC-qualidade Q-T5): a `app` é daqui; as fixtures de mais
+de um módulo moram em `tests/fixturas.py` e chegam a todos por aqui, menos as três `janela`
+de nome repetido (`tests/fixturas_<origem>.py`, importadas por quem as usa); as páginas, os
+PDFs, os falsos e a espera única (`esperar`), em `tests/ajudantes.py`.
 
 O portão (SPEC §15.1): com `ABBY_PORTAO=1`, um teste `livro_real` que pularia por
 falta do PDF ou do modelo **falha** (na preparação, numa fixture ou na chamada; um xfail
@@ -33,6 +33,9 @@ os.environ.setdefault("ABBY_RENDER_EM_PROCESSO", "0")
 if os.name == "nt":
     os.environ.setdefault("QT_QPA_FONTDIR", os.path.join(os.environ.get("WINDIR", r"C:\Windows"),
                                                          "Fonts"))
+
+from tests.fixturas import *  # noqa: E402,F401,F403 (as fixtures de mais de um módulo)
+from tests.fixturas import _janela_do_modulo  # noqa: E402,F401 (o `*` não traz o `_`)
 
 
 def pytest_configure(config):
@@ -83,6 +86,14 @@ def gravadores_descarregados():
                 gravador.descarregar(2.0)
             except Exception:  # noqa: BLE001 — o gravador de um teste que o quebrou de propósito
                 pass
+
+
+@pytest.fixture(scope="session")
+def app():
+    """A `QApplication` da suíte, uma por processo (SPEC §15.1, SPEC-qualidade Q-T5)."""
+    from PySide6.QtWidgets import QApplication
+
+    return QApplication.instance() or QApplication([])
 
 
 @pytest.fixture(autouse=True)

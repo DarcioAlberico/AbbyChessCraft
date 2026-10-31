@@ -17,7 +17,7 @@ from abbychess import zonas as zn
 from abbychess.diagramas import DiagramaLido
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 
 @pytest.fixture

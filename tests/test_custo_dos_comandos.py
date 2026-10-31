@@ -25,11 +25,12 @@ from abbychess.app.registro_de_eventos import tipo_do_gesto
 from abbychess.leitor import FONTE_MANUAL
 
 from tests import leitor_falso, test_janela, test_janela_diagramas
-from tests.test_janela import _esperar
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ferramentas"))
 import replay_fatia as rf  # noqa: E402
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
+from tests.ajudantes import _pronta  # noqa: E402,F401,F811
 
 app = test_janela.app
 janela = test_janela.janela
@@ -59,16 +60,6 @@ def contador(app):
     QApplication.instance().installEventFilter(c)
     yield c
     QApplication.instance().removeEventFilter(c)
-
-
-def _pronta(app, janela):
-    janela.reconhecer()
-    _esperar(app, janela)
-    janela.show()
-    janela.activateWindow()
-    janela.visor.resetTransform()
-    app.processEvents()
-    return janela
 
 
 def _no_visor(janela, x, y):
@@ -115,7 +106,7 @@ def janela_de_duas_paginas(app, tmp_path, monkeypatch):
     from abbychess.app.janela import JanelaPrincipal
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_treino_por_livro import _pagina_sintetica
+    from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
     monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
     png = _pagina_sintetica(tmp_path / "pagina.png")
@@ -246,7 +237,7 @@ def janela_com_diagrama(app, tmp_path, monkeypatch):
     from abbychess.app.janela import JanelaPrincipal
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_diagramas import pagina_com_diagrama
+    from tests.ajudantes import pagina_com_diagrama  # noqa: E402,F401,F811
 
     monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Diagramas",

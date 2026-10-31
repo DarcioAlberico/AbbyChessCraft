@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import zipfile
 
-import fitz
 import pytest
 from PIL import Image
 
@@ -27,6 +26,7 @@ from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.modelo import Box, Pagina
 from abbychess.projeto import ProjetoDeLivro
+from tests.ajudantes import _pdf_digital  # noqa: E402,F401,F811
 
 
 def _linha(texto, y, x=300, altura=50, largura=30, alturas=None):
@@ -210,24 +210,6 @@ def test_a_pagina_de_uma_coluna_detecta_as_colunas_uma_vez(monkeypatch, saida):
 # ----------------------------------------------------------------------
 # A camada de texto do PDF nascido digital
 # ----------------------------------------------------------------------
-
-PROSA = ("The knight on d5 is strong and the bishop has no square. It is not easy for "
-         "Black to defend the king, and White has a clear plan after the exchange of the "
-         "queens on the long diagonal of the board.")
-
-
-def _pdf_digital(caminho, paginas=2):
-    doc = fitz.open()
-    for numero in range(paginas):
-        p = doc.new_page(width=480, height=680)
-        p.insert_text((40, 60), f"Chapter {numero + 1}", fontname="hebo", fontsize=18)
-        palavras = (PROSA + " " + PROSA).split()
-        for k in range(0, len(palavras), 8):
-            p.insert_text((40, 100 + 14 * (k // 8)), " ".join(palavras[k:k + 8]),
-                          fontname="helv", fontsize=11)
-    doc.save(caminho)
-    doc.close()
-    return caminho
 
 
 def _projeto_digital(tmp_path):

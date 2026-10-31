@@ -20,7 +20,7 @@ from abbychess import pagina as pg
 from abbychess.leitor import LeitorDoLivro
 from abbychess.projeto import ARQUIVO_DO_PROJETO, ProjetoDeLivro
 
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 LINHAS = ("abc abc abc abc abc", "cab bca cab bca", "abc cab bca abc")
 

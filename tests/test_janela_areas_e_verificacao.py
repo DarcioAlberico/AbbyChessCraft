@@ -13,19 +13,10 @@ from core import lexico
 from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL
 
-from tests.test_janela import _esperar, app, janela  # noqa: F401  (fixtures)
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
+from tests.fixturas_janela import janela  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
-
-
-def _ler_a_mao(app, janela):  # noqa: F811
-    """Reconhece e dá aos glifos a leitura certa, como se a rede tivesse lido."""
-    letras = list("abcabcabc" + "cabbca")
-    janela.reconhecer()
-    _esperar(app, janela)
-    assert len(boxes(janela)) == len(letras)
-    for b, c in zip(boxes(janela), letras):
-        b.char, b.source, b.confidence = c, "neural", 0.99
-    janela._glifos_mudaram()
+from tests.ajudantes import _ler_a_mao  # noqa: E402,F401,F811
 
 
 # ----------------------------------------------------------------------

@@ -19,7 +19,7 @@ from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL  # noqa: E402
 from abbychess.padroes import PadroesDoLivro  # noqa: E402
 
 from tests import test_janela  # noqa: E402
-from tests.test_janela import _esperar  # noqa: E402
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
 # As fixtures da janela de `test_janela`, com o mesmo nome aqui.
@@ -246,7 +246,7 @@ def test_desfazer_e_do_projeto_e_mostra_a_pagina_que_volta(app, tmp_path, monkey
     from abbychess.app.janela import JanelaPrincipal
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
@@ -376,7 +376,7 @@ def test_desfazer_depois_de_a_pagina_sair_da_memoria(app, tmp_path, monkeypatch)
     from abbychess.app.janela import JanelaPrincipal
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     avisos = []
     monkeypatch.setattr(QMessageBox, "warning", lambda _p, _t, texto, *a: avisos.append(texto))
@@ -500,7 +500,7 @@ def test_refazer_noutra_pagina_abre_a_do_enter_e_propaga(app, tmp_path, monkeypa
     from abbychess.app.janela import JanelaPrincipal
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))

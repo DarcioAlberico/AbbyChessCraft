@@ -18,9 +18,7 @@ from abbychess.app import dialogo_paginas as dp  # noqa: E402
 from abbychess.app import imagens  # noqa: E402
 from abbychess.app import previa_da_pagina as pp  # noqa: E402
 
-from tests.test_espaco import sim  # noqa: E402,F401
-from tests.test_paginas_na_janela import app, janela  # noqa: E402,F401
-from tests.test_visor import pdf_de_60_paginas  # noqa: E402,F401
+from tests.fixturas_paginas_na_janela import janela  # noqa: E402,F401,F811
 
 
 def _pixmap(largura=400, altura=600):

@@ -19,7 +19,7 @@ import pytest
 
 from tests.desempenho.conftest import AQUECIMENTOS, REPETICOES, cronometrar, p95, percentil
 from tests.livros import PASTA_DOS_PDFS
-from tests.test_janela import _esperar
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar
 
 pytestmark = [pytest.mark.desempenho, pytest.mark.livro_real, pytest.mark.timeout(1800)]

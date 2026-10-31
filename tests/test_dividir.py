@@ -16,7 +16,6 @@ from abbychess.leitor import LeitorDoLivro, nome_de_origem
 from abbychess.modelo import Box, Decisoes, GlifoVirtual, Pagina, dividir, pid_de
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_visor import pdf_de_60_paginas  # noqa: F401
 
 
 @pytest.fixture

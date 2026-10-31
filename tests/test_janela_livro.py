@@ -24,8 +24,8 @@ from abbychess.app.janela import JanelaPrincipal  # noqa: E402
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro  # noqa: E402
 from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
-from tests.test_janela import _esperar  # noqa: E402
-from tests.test_livro import pdf_sintetico  # noqa: E402
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
+from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 from tests.janela_util import trocar_entries  # noqa: E402
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 

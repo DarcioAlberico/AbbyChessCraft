@@ -19,7 +19,6 @@ from abbychess import pagina as pg
 from abbychess.modelo import gid_de
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_visor import pdf_de_60_paginas  # noqa: F401
 
 ESTADO = ["a", 1, 1, 5, 5, 1.0, "manual", 0, False, -1.0, False]
 
@@ -178,7 +177,7 @@ def test_ca_12_7_sem_gravar_na_pasta_abre_so_para_leitura_com_a_sequencia_na_mem
 
 
 def test_ca_12_7_o_projeto_v1_vai_direto_a_v3(tmp_path):
-    from tests.test_migracao_v1 import FIXTURE
+    from tests.ajudantes import FIXTURE  # noqa: E402,F401,F811
 
     pasta = tmp_path / "v1"
     shutil.copytree(FIXTURE, pasta)

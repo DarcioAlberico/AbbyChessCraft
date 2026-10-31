@@ -33,7 +33,7 @@ def test_dividir_e_girar_o_livro_inteiro(tmp_path, medidas):
     from abbychess.controlador import ControladorDePagina
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_controlador import ExecutorManual
+    from tests.ajudantes import ExecutorManual  # noqa: E402,F401,F811
 
     projeto = _livro_de_230(tmp_path, pdf_do_tamanho_da_fatia=True)
     try:

@@ -14,7 +14,6 @@ from core.box_model import BoxEntry
 from abbychess import sequencia as sq
 from abbychess.projeto import ARQUIVO_DO_LIVRO, VERSAO_DO_LIVRO, ProjetoDeLivro
 
-from tests.test_visor import pdf_de_60_paginas  # noqa: F401
 
 
 def _box(x=10, char="a"):

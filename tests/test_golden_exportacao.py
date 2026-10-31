@@ -36,7 +36,7 @@ from abbychess.leitor import FONTE_MANUAL, Limiares
 from abbychess.modelo import Decisoes, Estilo
 from abbychess.zonas import Zona
 
-from tests.test_diagramas import _lido
+from tests.ajudantes import _lido  # noqa: E402,F401,F811
 
 GOLDEN = Path(__file__).with_name("golden")
 _W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"

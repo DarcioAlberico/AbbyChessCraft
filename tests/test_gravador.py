@@ -22,7 +22,7 @@ from abbychess.modelo import Box, RECONHECIDA, gid_de
 from abbychess.projeto import ARQUIVO_DO_LIVRO, PAGINAS_EM_MEMORIA, ProjetoDeLivro
 
 from tests.ajudantes import esperar
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 
 class _Disco:
@@ -362,7 +362,7 @@ def test_pagina_falhando_nao_tenta_a_cada_edicao():
 
 
 def test_salvar_pagina_nao_muda_a_pagina_que_a_interface_mostra(projeto):
-    from tests.test_treino_por_livro import _pagina_sintetica  # noqa: F401 (a fonte já existe)
+    from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
     mostrada = _pagina(projeto, 0)
     projeto.agendar(mostrada)

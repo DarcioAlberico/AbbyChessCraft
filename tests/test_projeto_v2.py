@@ -17,7 +17,7 @@ from abbychess.leitor import FONTE_LIVRO, LeitorDoLivro
 from abbychess.modelo import EM_REVISAO, GLIFOS_MARCADOS, RECONHECIDA, pid_de
 from abbychess.projeto import ARQUIVO_DO_LIVRO, ProjetoDeLivro
 
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 
 @pytest.fixture

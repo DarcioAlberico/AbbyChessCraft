@@ -18,9 +18,8 @@ from abbychess.app.janela import JanelaPrincipal
 
 from tests import leitor_falso
 from tests.janela_util import boxes
-from tests.test_janela import _esperar, app  # noqa: F401 (fixture)
-from tests.test_janela_persistencia import projeto_lido, sem_dialogos  # noqa: F401 (fixtures)
-from tests.test_livro import PAGINAS, pdf_sintetico
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
+from tests.ajudantes import PAGINAS, pdf_sintetico  # noqa: E402,F401,F811
 
 pytestmark = pytest.mark.processo
 

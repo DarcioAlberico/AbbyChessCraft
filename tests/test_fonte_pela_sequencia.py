@@ -14,7 +14,6 @@ from abbychess import pagina as pg
 from abbychess import sequencia as sq
 from abbychess.sequencia import Apagada, Entrada, Sequencia
 
-from tests.test_visor import pdf_de_60_paginas  # noqa: F401
 
 
 def _matriz(imagem):

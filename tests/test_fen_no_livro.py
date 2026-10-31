@@ -19,7 +19,7 @@ from abbychess import pagina as pg
 from abbychess.leitor import LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_diagramas import FEN, _lido, pagina_com_diagrama, sem_modelo
+from tests.ajudantes import FEN, _lido, pagina_com_diagrama, sem_modelo  # noqa: E402,F401,F811
 
 
 @pytest.fixture

@@ -20,7 +20,7 @@ from abbychess.projeto import Limiares
 
 from tests import leitor_falso
 from tests.ajudantes import esperar
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 
 @pytest.fixture

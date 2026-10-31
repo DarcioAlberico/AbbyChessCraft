@@ -26,7 +26,7 @@ from abbychess import pagina as pg
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 GOLDEN = Path(__file__).with_name("golden") / "caracterizacao"
 

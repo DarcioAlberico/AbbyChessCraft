@@ -12,8 +12,8 @@ from abbychess import sessao as ss
 from abbychess import substituir as sb
 from abbychess.leitor import FONTE_MANUAL
 
-from tests.test_busca import _esperar, livro_escrito  # noqa: F401 (fixture)
-from tests.test_sessao import _pagina
+from tests.ajudantes import _ate_valer  # noqa: E402,F401,F811
+from tests.ajudantes import _pagina  # noqa: E402,F401,F811
 
 
 def _casos(pagina, padrao, modelo, alvo=sb.PROSA, **opcoes):
@@ -122,7 +122,7 @@ def _aplicar(s, previas, descricao="Substituir"):
 def _previa(s, eventos, padrao, modelo, alvo=sb.PROSA, **opcoes):
     antes = len(eventos["previas"])
     assert s.previa(bs.Opcoes(padrao, escopo=bs.LIVRO, **opcoes), modelo, alvo)
-    _esperar(lambda: len(eventos["previas"]) > antes)
+    _ate_valer(lambda: len(eventos["previas"]) > antes)
     return eventos["previas"][-1]
 
 
@@ -133,7 +133,7 @@ def _textos(projeto):
 def test_ca_7_5_fora_da_pagina_so_aplica_depois_da_previa(sub):
     projeto, ctl, s, escrever, eventos = sub
     assert s.previa(bs.Opcoes("casa", escopo=bs.LIVRO), "lata", sb.PROSA)
-    _esperar(lambda: eventos["previas"])
+    _ate_valer(lambda: eventos["previas"])
     previas = eventos["previas"][-1]
     assert [p.indice for p in previas] == [0, 1]
     assert _textos(projeto) == ["casa velha", "outra casa", "fim"]   # nada aplicado ainda
@@ -146,7 +146,7 @@ def test_ca_7_5_fora_da_pagina_so_aplica_depois_da_previa(sub):
 def test_ca_7_2_um_ctrl_z_volta_todas_as_paginas(sub):
     projeto, ctl, s, escrever, eventos = sub
     s.previa(bs.Opcoes("a", escopo=bs.LIVRO), "o", sb.PROSA)
-    _esperar(lambda: eventos["previas"])
+    _ate_valer(lambda: eventos["previas"])
     _aplicar(s, eventos["previas"][-1])
     ctl.executar.tudo()
     assert _textos(projeto) == ["coso velho", "outro coso", "fim"]
@@ -173,7 +173,7 @@ def test_na_pagina_aberta_aplica_direto_um_caso_ou_todos(sub):
 def test_a_pagina_editada_depois_da_previa_aplica_na_de_agora_ou_fica_de_fora(sub):
     projeto, ctl, s, escrever, eventos = sub
     s.previa(bs.Opcoes("casa", escopo=bs.LIVRO), "lata", sb.PROSA)
-    _esperar(lambda: eventos["previas"])
+    _ate_valer(lambda: eventos["previas"])
     escrever(1, "nada aqui")                             # a página 2 mudou
     _aplicar(s, eventos["previas"][-1])
     ctl.executar.tudo()
@@ -258,7 +258,7 @@ def test_o_padrao_lento_aborta_a_previa(sub, monkeypatch):
     escrever(2, "a" * 300 + "!")
     monkeypatch.setattr(bs, "TEMPO_LIMITE", 0.01)
     assert s.previa(bs.Opcoes(r"(\w+)+$", escopo=bs.LIVRO, regex=True), "x", sb.PROSA)
-    _esperar(lambda: eventos["erros"])
+    _ate_valer(lambda: eventos["erros"])
     assert "abortada" in eventos["erros"][-1]
 
 

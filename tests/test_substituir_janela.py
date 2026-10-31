@@ -10,9 +10,7 @@ from PySide6.QtTest import QTest
 from abbychess import busca as bs
 from abbychess import sessao as ss
 
-from tests.test_busca_janela import _ate, _buscar, _pagina_lida, jb  # noqa: F401 (fixture)
-from tests.test_documento import app  # noqa: F401 (fixture)
-from tests.test_documento_edicao import _janela_do_modulo, j  # noqa: F401 (fixtures)
+from tests.ajudantes import _ate, _buscar, _pagina_lida  # noqa: E402,F401,F811
 
 
 def _texto(jb):  # noqa: F811

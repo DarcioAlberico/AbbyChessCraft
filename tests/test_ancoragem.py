@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 from abbychess import ancoragem as ag
-from tests.test_sessao import _pagina
+from tests.ajudantes import _pagina  # noqa: E402,F401,F811
 
 V1, V2, V3 = 101, 102, 103                                # os virtuais dos casos
 VIRTUAIS = {V1, V2, V3}
@@ -61,7 +61,7 @@ def test_o_virtual_vizinho_do_box_marcado():
     from core.box_model import BoxEntry
 
     from abbychess.modelo import Box
-    from tests.test_sessao import _editar
+    from tests.ajudantes import _editar  # noqa: E402,F401,F811
 
     p = _pagina("cs")
     _editar(p, "cs", "cas")                              # o "a" virtual

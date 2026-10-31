@@ -15,7 +15,6 @@ from abbychess.controlador import ControladorDePagina
 from abbychess.leitor import LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_visor import pdf_de_60_paginas  # noqa: F401
 
 
 @pytest.fixture

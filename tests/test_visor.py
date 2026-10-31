@@ -29,7 +29,7 @@ from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
 from tests.ajudantes import esperar  # noqa: E402
 from tests.janela_util import boxes, mostrar  # noqa: E402
-from tests.test_janela import _esperar  # noqa: E402
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 
 
 @pytest.fixture(scope="module")
@@ -72,18 +72,6 @@ def test_cada_estado_tem_traco_distinto():
 # ----------------------------------------------------------------------
 # O cache de páginas e as visitas
 # ----------------------------------------------------------------------
-
-@pytest.fixture
-def pdf_de_60_paginas(tmp_path):
-    import fitz
-
-    caminho = tmp_path / "sessenta.pdf"
-    with fitz.open() as doc:
-        for k in range(60):
-            pagina = doc.new_page(width=200, height=300)
-            pagina.insert_text((20, 40), f"Pagina {k + 1}", fontsize=14)
-        doc.save(str(caminho))
-    return caminho
 
 
 def test_cache_guarda_as_ultimas_e_pre_carrega(pdf_de_60_paginas):
@@ -199,7 +187,7 @@ def test_os_modos_de_zoom(app, janela_de_60):
 
 @pytest.fixture
 def janela(app, tmp_path, monkeypatch):
-    from tests.test_treino_por_livro import _pagina_sintetica
+    from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
     monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Teste",
@@ -262,7 +250,7 @@ def test_seguir_deixa_o_item_atual_a_120_px_da_borda(app, janela):
 
 def test_f8_vai_ao_proximo_diagrama_por_conferir_do_livro(app, tmp_path, monkeypatch):
     from abbychess import diagramas as dg
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
@@ -432,7 +420,7 @@ def test_visitas_cortam_o_que_vinha_depois_ao_navegar_no_meio(app, janela_de_60)
 
 
 def test_ligar_outro_projeto_troca_o_cache(app, janela_de_60, tmp_path):
-    from tests.test_treino_por_livro import _pagina_sintetica
+    from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
     antigo = janela_de_60.pagina.cache
     outro = ProjetoDeLivro.criar(tmp_path / "outros", "Outro",

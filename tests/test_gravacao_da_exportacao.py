@@ -11,7 +11,7 @@ from abbychess import epub
 from abbychess import exportar as ex
 from abbychess import gravacao as gv
 
-from tests.test_livro import _ensinar_e_ler, fonte, leitor, projeto  # noqa: F401 (fixtures)
+from tests.ajudantes import _ensinar_e_ler  # noqa: E402,F401,F811
 
 FORMATOS = ("txt", "docx", "epub", "pdf")
 

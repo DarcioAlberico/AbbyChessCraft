@@ -15,8 +15,8 @@ from abbychess.leitor import FONTE_MANUAL
 
 from tests import leitor_falso, servidor_falso, test_janela
 from tests.janela_util import boxes, fila, mostrar, trocar_entries
-from tests.test_custo_dos_comandos import _pronta
-from tests.test_janela import _esperar
+from tests.ajudantes import _pronta  # noqa: E402,F401,F811
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 
 app = test_janela.app
 janela = test_janela.janela

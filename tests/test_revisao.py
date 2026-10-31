@@ -35,8 +35,8 @@ def livro(tmp_path):
     """Três páginas: a 1 e a 3 com glifos a revisar (confiança abaixo de 0,90), a 2 sem."""
     from abbychess.controladores import ControladorDaFila
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_controlador import ExecutorManual, _controlador
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import ExecutorManual, _controlador  # noqa: E402,F401,F811
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Três", pdf_sintetico(tmp_path))
     _escrever(projeto, 0, "cab bca", [0.5, 0.2, 0.95, 0.3, 0.6, 0.4])
@@ -220,7 +220,7 @@ def test_a_galeria_em_duas_paginas_com_leituras_diferentes_e_um_passo(livro):
 def test_a_galeria_que_corrige_a_legenda_refaz_o_lado_do_diagrama(livro):
     """Corrigir pela Galeria um glifo da legenda numa página fechada faz o que toda edição
     faz: o lado do diagrama sai de novo da legenda, sem esperar o F5."""
-    from tests.test_diagramas import _CAIXA, _legenda, _lido
+    from tests.ajudantes import _CAIXA, _legenda, _lido  # noqa: E402,F401,F811
 
     projeto, ctl, fila = livro
     pagina = projeto.pagina_para_editar(2)

@@ -24,8 +24,6 @@ from abbychess.controlador import ControladorDePagina  # noqa: E402
 from abbychess.leitor import LeitorDoLivro  # noqa: E402
 from abbychess.projeto import FORA_DO_PDF, ProjetoDeLivro  # noqa: E402
 
-from tests.test_espaco import sim  # noqa: E402,F401
-from tests.test_visor import pdf_de_60_paginas  # noqa: E402,F401
 
 
 class _Medidas:

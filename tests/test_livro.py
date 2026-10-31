@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import io
 import zipfile
-from pathlib import Path
 
 import fitz
 import numpy as np
@@ -24,41 +23,8 @@ from abbychess import pagina as pg
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_treino_por_livro import _pagina_sintetica
-
-PAGINAS = (("abc abc abc", "cab bca"), ("bca cab", "abc"), ("cba cba", "bac abc"))
-
-
-def pdf_sintetico(pasta: Path, paginas=PAGINAS, *, camada_antiga: bool = False) -> Path:
-    """Um PDF de imagens, uma página por grupo de linhas, como um livro digitalizado."""
-    doc = fitz.open()
-    for i, linhas in enumerate(paginas):
-        caminho = _pagina_sintetica(pasta / f"p{i}.png", linhas)
-        with Image.open(caminho) as imagem:
-            largura, altura = imagem.size
-        page = doc.new_page(width=largura * 72 / 300, height=altura * 72 / 300)
-        page.insert_image(page.rect, filename=str(caminho))
-        if camada_antiga:
-            page.insert_text((5, 15), "hb7 lixo", fontsize=8, render_mode=3)
-    destino = pasta / "livro.pdf"
-    doc.save(destino)
-    doc.close()
-    return destino
-
-
-@pytest.fixture
-def projeto(tmp_path):
-    return ProjetoDeLivro.criar(tmp_path / "livros", "Livro de Teste", pdf_sintetico(tmp_path))
-
-
-@pytest.fixture
-def leitor(projeto):
-    return LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
-
-
-@pytest.fixture
-def fonte(projeto):
-    return pg.FonteDePaginas(projeto.fonte)
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
+from tests.ajudantes import _ensinar_e_ler, pdf_sintetico  # noqa: E402,F401,F811
 
 
 # ----------------------------------------------------------------------
@@ -211,13 +177,6 @@ def test_sem_pendentes_no_livro_nao_ha_proxima(projeto, fonte, leitor):
 # ----------------------------------------------------------------------
 # Exportar
 # ----------------------------------------------------------------------
-
-def _ensinar_e_ler(projeto, fonte, leitor):
-    imagem = fonte.pagina(0)
-    boxes = pg.segmentar(imagem)
-    for indice, char in enumerate("abc"):
-        pg.ensinar(imagem, boxes, indice, char, leitor, projeto, pagina=0, propagar=False)
-    livro.reconhecer_paginas(projeto, fonte, leitor, range(3), refazer=True)
 
 
 def test_paragrafos_cortam_no_vao_e_juntam_hifen():

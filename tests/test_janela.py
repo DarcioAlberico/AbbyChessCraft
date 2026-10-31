@@ -15,14 +15,14 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
-from abbychess.app.janela import JanelaPrincipal  # noqa: E402
-from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL, LeitorDoLivro  # noqa: E402
-from abbychess import pagina as pg  # noqa: E402
+from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL  # noqa: E402
 from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
 from tests.ajudantes import esperar  # noqa: E402
-from tests.test_treino_por_livro import _pagina_sintetica  # noqa: E402
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
+from tests.fixturas_janela import janela  # noqa: E402,F401,F811
 
 
 @pytest.fixture(scope="module")
@@ -30,33 +30,12 @@ def app():
     return QApplication.instance() or QApplication([])
 
 
-@pytest.fixture
-def janela(app, tmp_path, monkeypatch):
-    # Toda pergunta é respondida com "sim", para o teste não esperar clique.
-    monkeypatch.setattr(QMessageBox, "question",
-                        lambda *a, **k: QMessageBox.StandardButton.Yes)
-    fonte = _pagina_sintetica(tmp_path / "pagina.png")
-    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Teste", fonte)
-    j = JanelaPrincipal()
-    j.usar(projeto, pg.FonteDePaginas(projeto.fonte),
-          LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
-    yield j
-    j.close()
-
-
-def _esperar(app, janela, limite=20.0):
-    assert esperar(lambda: not janela.executor.ocupado, limite), "a tarefa não terminou no prazo"
-    app.processEvents()
-    if janela.relogio_do_texto.isActive():          # o texto da página, sem esperar o relógio
-        janela.pintar_texto()
-
-
-def test_pagina_nova_pede_reconhecimento(janela):
+def test_pagina_nova_pede_reconhecimento(janela):  # noqa: F811
     assert boxes(janela) == []
     assert "F5" in janela.treino.leitura.text()
 
 
-def test_reconhecer_poe_o_primeiro_pendente_no_painel(app, janela):
+def test_reconhecer_poe_o_primeiro_pendente_no_painel(app, janela):  # noqa: F811
     janela.reconhecer()
     _esperar(app, janela)
     assert len(boxes(janela)) >= 15
@@ -65,7 +44,7 @@ def test_reconhecer_poe_o_primeiro_pendente_no_painel(app, janela):
     assert janela.projeto.carregar_pagina(0) == boxes(janela)
 
 
-def test_enter_ensina_e_resolve_as_repeticoes(app, janela):
+def test_enter_ensina_e_resolve_as_repeticoes(app, janela):  # noqa: F811
     janela.reconhecer()
     _esperar(app, janela)
     mostrar(janela, 0)  # o primeiro "a" da página
@@ -83,7 +62,7 @@ def test_enter_ensina_e_resolve_as_repeticoes(app, janela):
     assert janela.projeto.carregar_pagina(0)[0].source == FONTE_MANUAL
 
 
-def test_shift_enter_corrige_sem_gravar_padrao(app, janela):
+def test_shift_enter_corrige_sem_gravar_padrao(app, janela):  # noqa: F811
     janela.reconhecer()
     _esperar(app, janela)
     mostrar(janela, 1)
@@ -93,7 +72,7 @@ def test_shift_enter_corrige_sem_gravar_padrao(app, janela):
     assert janela.leitor.padroes_por_caractere() == {}
 
 
-def test_descartar_tira_o_box_e_mantem_os_pulados_coerentes(app, janela):
+def test_descartar_tira_o_box_e_mantem_os_pulados_coerentes(app, janela):  # noqa: F811
     janela.reconhecer()
     _esperar(app, janela)
     total = len(boxes(janela))
@@ -105,7 +84,7 @@ def test_descartar_tira_o_box_e_mantem_os_pulados_coerentes(app, janela):
     assert pulados(janela) == {2}
 
 
-def test_pular_manda_o_box_para_o_fim_da_fila(app, janela):
+def test_pular_manda_o_box_para_o_fim_da_fila(app, janela):  # noqa: F811
     janela.reconhecer()
     _esperar(app, janela)
     primeiro = atual(janela)
@@ -114,7 +93,7 @@ def test_pular_manda_o_box_para_o_fim_da_fila(app, janela):
     assert fila(janela)[-1] == primeiro
 
 
-def test_esquecer_rele_a_pagina_sem_o_padrao(app, janela):
+def test_esquecer_rele_a_pagina_sem_o_padrao(app, janela):  # noqa: F811
     janela.reconhecer()
     _esperar(app, janela)
     mostrar(janela, 0)
@@ -130,7 +109,7 @@ def test_esquecer_rele_a_pagina_sem_o_padrao(app, janela):
     assert boxes(janela)[0].source == FONTE_MANUAL  # a decisão do usuário fica
 
 
-def _colar_os_dois_primeiros(app, janela):
+def _colar_os_dois_primeiros(app, janela):  # noqa: F811
     """Reconhece e junta o primeiro "a" com o "b": o box colado a dividir."""
     janela.reconhecer()
     _esperar(app, janela)
@@ -140,7 +119,7 @@ def _colar_os_dois_primeiros(app, janela):
     return a, b
 
 
-def test_ctrl_j_junta_com_o_seguinte_e_remapeia_os_pulados(app, janela):
+def test_ctrl_j_junta_com_o_seguinte_e_remapeia_os_pulados(app, janela):  # noqa: F811
     janela.reconhecer()
     _esperar(app, janela)
     total = len(boxes(janela))
@@ -154,7 +133,7 @@ def test_ctrl_j_junta_com_o_seguinte_e_remapeia_os_pulados(app, janela):
     assert len(janela.projeto.carregar_pagina(0)) == total - 1
 
 
-def test_juntar_sem_vizinho_na_linha_nao_muda_nada(app, janela):
+def test_juntar_sem_vizinho_na_linha_nao_muda_nada(app, janela):  # noqa: F811
     janela.reconhecer()
     _esperar(app, janela)
     total = len(boxes(janela))
@@ -164,7 +143,7 @@ def test_juntar_sem_vizinho_na_linha_nao_muda_nada(app, janela):
     assert "anterior" in janela.statusBar().currentMessage()
 
 
-def test_dividir_no_ponto_clicado_do_recorte(app, janela):
+def test_dividir_no_ponto_clicado_do_recorte(app, janela):  # noqa: F811
     from PySide6.QtCore import QPoint, Qt
     from PySide6.QtTest import QTest
 
@@ -193,7 +172,7 @@ def test_dividir_no_ponto_clicado_do_recorte(app, janela):
     assert janela.treino.corte is None
 
 
-def test_dividir_remapeia_os_pulados_e_ensina_cada_parte(app, janela):
+def test_dividir_remapeia_os_pulados_e_ensina_cada_parte(app, janela):  # noqa: F811
     a, b = _colar_os_dois_primeiros(app, janela)
     mostrar(janela, 4)
     janela.pagina.andar(+1)            # pula o 4
@@ -211,7 +190,7 @@ def test_dividir_remapeia_os_pulados_e_ensina_cada_parte(app, janela):
     assert set(janela.leitor.padroes_por_caractere()) == {"a", "b"}
 
 
-def test_menu_do_visor_divide_no_ponto(app, janela):
+def test_menu_do_visor_divide_no_ponto(app, janela):  # noqa: F811
     a, b = _colar_os_dois_primeiros(app, janela)
     total = len(boxes(janela))
     menu = janela.visor.menu_do_box(0, (a.x2 + b.x1) // 2)
@@ -221,7 +200,7 @@ def test_menu_do_visor_divide_no_ponto(app, janela):
     assert (boxes(janela)[0].x2, boxes(janela)[1].x1) == (a.x2, b.x1)
 
 
-def test_alt_seta_move_as_bordas(app, janela):
+def test_alt_seta_move_as_bordas(app, janela):  # noqa: F811
     janela.reconhecer()
     _esperar(app, janela)
     mostrar(janela, 0)
@@ -236,12 +215,12 @@ def test_alt_seta_move_as_bordas(app, janela):
     assert janela.projeto.carregar_pagina(0)[0].x2 == x2 + 1
 
 
-def _no_visor(janela, x, y):
+def _no_visor(janela, x, y):  # noqa: F811
     """O ponto da página (cena) em coordenadas do viewport do visor."""
     return janela.visor.mapFromScene(x, y)
 
 
-def test_ferramentas_tem_o_modo_de_treino_e_as_opcoes(janela):
+def test_ferramentas_tem_o_modo_de_treino_e_as_opcoes(janela):  # noqa: F811
     textos = [a.text() for a in janela.menu_ferramentas.actions()]
     # A tecla não vai no nome: o menu a mostra ao lado, e a dica cita a do perfil (passo K).
     assert "Marcar glifo à mão" in textos and "Opções…" in textos and "Teclado…" in textos
@@ -250,7 +229,7 @@ def test_ferramentas_tem_o_modo_de_treino_e_as_opcoes(janela):
     assert janela.acao_modo_treino.isCheckable()
 
 
-def test_modo_treino_arraste_marca_um_glifo_e_enter_o_ensina(app, janela):
+def test_modo_treino_arraste_marca_um_glifo_e_enter_o_ensina(app, janela):  # noqa: F811
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest
 
@@ -280,7 +259,7 @@ def test_modo_treino_arraste_marca_um_glifo_e_enter_o_ensina(app, janela):
     assert "ab" in janela.leitor.padroes_por_caractere()
 
 
-def test_ctrl_clique_seleciona_e_enter_ensina_todos(app, janela):
+def test_ctrl_clique_seleciona_e_enter_ensina_todos(app, janela):  # noqa: F811
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest
 
@@ -307,7 +286,7 @@ def test_ctrl_clique_seleciona_e_enter_ensina_todos(app, janela):
     assert sum(b.char == "a" and b.source == FONTE_LIVRO for b in boxes(janela)) == 2
 
 
-def test_ctrl_clique_de_novo_tira_da_selecao_e_esc_esvazia(app, janela):
+def test_ctrl_clique_de_novo_tira_da_selecao_e_esc_esvazia(app, janela):  # noqa: F811
     janela.reconhecer()
     _esperar(app, janela)
     mostrar(janela, 0)
@@ -325,7 +304,7 @@ def test_ctrl_clique_de_novo_tira_da_selecao_e_esc_esvazia(app, janela):
     assert selecao(janela) == set() and janela.treino.selecao.text() == ""
 
 
-def test_opcoes_gravam_os_limiares_e_refazem_a_fila(app, janela):
+def test_opcoes_gravam_os_limiares_e_refazem_a_fila(app, janela):  # noqa: F811
     from abbychess.projeto import Limiares
 
     janela.reconhecer()
@@ -342,7 +321,7 @@ def test_opcoes_gravam_os_limiares_e_refazem_a_fila(app, janela):
     assert janela.leitor.padroes.distancia_maxima < 5
 
 
-def test_opcoes_refazem_os_pendentes_do_livro_json(app, janela):
+def test_opcoes_refazem_os_pendentes_do_livro_json(app, janela):  # noqa: F811
     import json
 
     from abbychess.projeto import ARQUIVO_DO_LIVRO, Limiares
@@ -359,7 +338,7 @@ def test_opcoes_refazem_os_pendentes_do_livro_json(app, janela):
 # Passo 2a: a fila visível e o gravador
 # ----------------------------------------------------------------------
 
-def test_comando_com_tarefa_rodando_entra_na_fila_e_aparece(app, janela):
+def test_comando_com_tarefa_rodando_entra_na_fila_e_aparece(app, janela):  # noqa: F811
     import threading
 
     trava = threading.Event()
@@ -371,7 +350,7 @@ def test_comando_com_tarefa_rodando_entra_na_fila_e_aparece(app, janela):
     assert len(boxes(janela)) >= 15           # e rodou depois
 
 
-def test_editar_nao_grava_na_hora_e_fechar_grava(app, janela):
+def test_editar_nao_grava_na_hora_e_fechar_grava(app, janela):  # noqa: F811
     janela.reconhecer()
     _esperar(app, janela)
     janela.projeto.gravador.atraso = 30       # nada grava sozinho durante o teste
@@ -388,7 +367,7 @@ def test_editar_nao_grava_na_hora_e_fechar_grava(app, janela):
         reaberto.fechar()
 
 
-def test_falha_de_gravacao_aparece_na_barra(app, janela, monkeypatch):
+def test_falha_de_gravacao_aparece_na_barra(app, janela, monkeypatch):  # noqa: F811
     from abbychess import gravacao as gv
 
     janela.reconhecer()
@@ -410,7 +389,7 @@ def test_falha_de_gravacao_aparece_na_barra(app, janela, monkeypatch):
         monkeypatch.undo()                   # o fechar da fixture grava (e não pergunta)
 
 
-def test_tarefa_pedida_dentro_de_outra_espera_a_vez_e_o_executor_continua_certo(app, janela):
+def test_tarefa_pedida_dentro_de_outra_espera_a_vez_e_o_executor_continua_certo(app, janela):  # noqa: F811
     ordem = []
 
     def segunda():
@@ -429,7 +408,7 @@ def test_tarefa_pedida_dentro_de_outra_espera_a_vez_e_o_executor_continua_certo(
     assert not janela.executor.ocupado
 
 
-def test_fechar_com_pagina_que_nao_grava_pergunta_e_pode_ficar_aberta(app, janela, monkeypatch):
+def test_fechar_com_pagina_que_nao_grava_pergunta_e_pode_ficar_aberta(app, janela, monkeypatch):  # noqa: F811
     from PySide6.QtGui import QCloseEvent
 
     from abbychess import gravacao as gv
@@ -459,7 +438,7 @@ def test_fechar_com_pagina_que_nao_grava_pergunta_e_pode_ficar_aberta(app, janel
     assert evento.isAccepted() and janela.projeto is None
 
 
-def test_trocar_de_projeto_com_tarefa_em_voo_termina_no_projeto_dela(app, janela, tmp_path,
+def test_trocar_de_projeto_com_tarefa_em_voo_termina_no_projeto_dela(app, janela, tmp_path,  # noqa: F811
                                                                     monkeypatch):
     import threading
 
@@ -486,7 +465,7 @@ def test_trocar_de_projeto_com_tarefa_em_voo_termina_no_projeto_dela(app, janela
         reaberto.fechar()
 
 
-def test_tarefa_pedida_por_quem_ouve_livre_tambem_roda(app, janela):
+def test_tarefa_pedida_por_quem_ouve_livre_tambem_roda(app, janela):  # noqa: F811
     ordem = []
     pedida = []
 
@@ -504,7 +483,7 @@ def test_tarefa_pedida_por_quem_ouve_livre_tambem_roda(app, janela):
     assert ordem == ["antes", "depois"]
 
 
-def test_fechar_pergunta_de_novo_pelo_que_a_tarefa_em_voo_entregou(app, janela, monkeypatch):
+def test_fechar_pergunta_de_novo_pelo_que_a_tarefa_em_voo_entregou(app, janela, monkeypatch):  # noqa: F811
     from PySide6.QtGui import QCloseEvent
 
     perguntas = []
@@ -519,7 +498,7 @@ def test_fechar_pergunta_de_novo_pelo_que_a_tarefa_em_voo_entregou(app, janela, 
     monkeypatch.undo()
 
 
-def test_depois_do_enter_e_do_f5_o_foco_fica_no_campo_do_caractere(app, janela):
+def test_depois_do_enter_e_do_f5_o_foco_fica_no_campo_do_caractere(app, janela):  # noqa: F811
     """O ciclo do treino é digitar e Enter, glifo após glifo: o foco não pode sair do campo
     (no 2a o Enter virou tarefa, e o painel desligado durante ela perdia o foco)."""
     from PySide6.QtCore import Qt
@@ -540,7 +519,7 @@ def test_depois_do_enter_e_do_f5_o_foco_fica_no_campo_do_caractere(app, janela):
     assert set(janela.leitor.padroes_por_caractere()) == {"a", "b"}
 
 
-def test_durante_o_lote_editar_vale_na_hora(app, janela):
+def test_durante_o_lote_editar_vale_na_hora(app, janela):  # noqa: F811
     """Passo E: o lote grava entre um comando e outro; nada é recusado."""
     janela.reconhecer()
     _esperar(app, janela)
@@ -556,7 +535,7 @@ def test_durante_o_lote_editar_vale_na_hora(app, janela):
         janela.pagina.lote_rodando = False
 
 
-def test_edicao_que_perde_a_vez_avisa(app, janela):
+def test_edicao_que_perde_a_vez_avisa(app, janela):  # noqa: F811
     import threading
 
     janela.reconhecer()
@@ -572,7 +551,7 @@ def test_edicao_que_perde_a_vez_avisa(app, janela):
     janela.pagina.indice = 0
 
 
-def test_alt_seta_redesenha_a_caixa_no_visor(app, janela):
+def test_alt_seta_redesenha_a_caixa_no_visor(app, janela):  # noqa: F811
     """O repintar só dos glifos que mudaram também move a caixa (a borda direita e a de
     baixo não mexem no canto de cima)."""
     janela.reconhecer()
@@ -584,8 +563,7 @@ def test_alt_seta_redesenha_a_caixa_no_visor(app, janela):
     assert janela.visor.item_dos_boxes.grade.caixas[0] == (b.x1, b.y1, b.x2, b.y2)
 
 
-
-def _enter_com_propagacao_presa(app, janela, monkeypatch):
+def _enter_com_propagacao_presa(app, janela, monkeypatch):  # noqa: F811
     import threading
 
     from abbychess import pagina as pg
@@ -602,7 +580,7 @@ def _enter_com_propagacao_presa(app, janela, monkeypatch):
     return solto
 
 
-def test_propagacao_que_resolve_o_glifo_mostrado_avanca_se_nada_foi_digitado(app, janela,
+def test_propagacao_que_resolve_o_glifo_mostrado_avanca_se_nada_foi_digitado(app, janela,  # noqa: F811
                                                                           monkeypatch):
     solto = _enter_com_propagacao_presa(app, janela, monkeypatch)
     mostrar(janela, 3)                                    # outro "a", posto (não escolhido)
@@ -612,7 +590,7 @@ def test_propagacao_que_resolve_o_glifo_mostrado_avanca_se_nada_foi_digitado(app
     assert janela.pagina.atual != mostrado               # ele se resolveu: o painel anda
 
 
-def test_propagacao_nao_tira_o_glifo_em_que_o_usuario_digita(app, janela, monkeypatch):
+def test_propagacao_nao_tira_o_glifo_em_que_o_usuario_digita(app, janela, monkeypatch):  # noqa: F811
     from PySide6.QtTest import QTest
 
     solto = _enter_com_propagacao_presa(app, janela, monkeypatch)
@@ -625,7 +603,7 @@ def test_propagacao_nao_tira_o_glifo_em_que_o_usuario_digita(app, janela, monkey
     assert janela.pagina.atual == mostrado and janela.treino.campo.text() == "q"
 
 
-def test_propagacao_nao_tira_o_glifo_escolhido_por_clique(app, janela, monkeypatch):
+def test_propagacao_nao_tira_o_glifo_escolhido_por_clique(app, janela, monkeypatch):  # noqa: F811
     solto = _enter_com_propagacao_presa(app, janela, monkeypatch)
     janela.pagina.clicar(3)                               # um "a", escolhido por clique
     escolhido = janela.pagina.atual

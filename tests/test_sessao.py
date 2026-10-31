@@ -15,34 +15,11 @@ from abbychess import sessao as ss
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.modelo import Box, Pagina, gid_de
-
-
-def _pagina(*linhas: str) -> Pagina:
-    """Cada letra um box de 18 px (passo de 22 na palavra, 30 a mais entre palavras)."""
-    boxes, n = [], 0
-    for k, linha in enumerate(linhas):
-        x, y = 20, 20 + 60 * k
-        for palavra in linha.split(" "):
-            for letra in palavra:
-                boxes.append(Box(gid_de(1, n), BoxEntry(letra, x, y, x + 18, y + 30, 0.9, "net")))
-                n += 1
-                x += 22
-            x += 30
-    return Pagina(pid=1, indice=0, boxes=boxes, estado="reconhecida", proximo_n=n)
+from tests.ajudantes import _editar, _pagina  # noqa: E402,F401,F811
 
 
 def _texto(pagina) -> str:
     return ss.texto_e_unidades(pagina)[0]
-
-
-def _editar(pagina, de: str, para: str) -> ss.Plano:
-    """Troca a primeira ocorrência de `de` (palavras inteiras) por `para`, como a vista faz:
-    a sessão é a menor sequência de palavras que cobre o trecho."""
-    texto, unidades = ss.texto_e_unidades(pagina)
-    inicio = texto.index(de)
-    a, b = ss.palavras_em(unidades, inicio, inicio + len(de))
-    novo = texto[a:inicio] + para + texto[inicio + len(de):b]
-    return ss.editar(pagina, unidades[a:b], novo)
 
 
 def test_ca_6_2_trocar_o_1_por_l_corrige_um_box_sem_virtual():

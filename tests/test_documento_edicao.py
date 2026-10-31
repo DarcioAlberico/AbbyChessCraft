@@ -9,7 +9,6 @@ CA-6.4 (as linhas D1, cada uma desfeita com um Ctrl+Z), CA-6.7, CA-6.8 e CA-6.9.
 from __future__ import annotations
 
 import pytest
-from core.box_model import BoxEntry
 from PySide6.QtCore import QMimeData, Qt
 from PySide6.QtGui import QInputMethodEvent
 from PySide6.QtTest import QTest
@@ -18,32 +17,8 @@ from PySide6.QtWidgets import QApplication
 from abbychess import diagramas as dg
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.app.documento import FUNDO_DA_SESSAO
-from abbychess.modelo import Box
 
-from tests.test_documento import app  # noqa: F401 (fixture)
-
-
-def _escrever(j, *linhas, estados=None):
-    """A página aberta com estas linhas, cada letra um box (0,9 de confiança, "net")."""
-    p = j.pagina
-    pagina = p._pagina_para_editar()
-    boxes = []
-    for k, linha in enumerate(linhas):
-        x, y = 20, 20 + 60 * k
-        for palavra in linha.split(" "):
-            for letra in palavra:
-                boxes.append(Box(pagina.alocar(), BoxEntry(letra, x, y, x + 18, y + 30, 0.9, "net")))
-                x += 22
-            x += 30
-    pagina.boxes = boxes
-    pagina.decisoes = type(pagina.decisoes)()
-    pagina.tabuleiros, pagina.diagramas = [], []
-    pagina.estado = "reconhecida"
-    p.ir_para(0)
-    j.pintar_texto()
-    j.texto.setFocus()
-    QApplication.processEvents()
-    return pagina
+from tests.ajudantes import _escrever  # noqa: E402,F401,F811
 
 
 def _por_o_cursor(j, posicao: int, ate: int = None):
@@ -63,40 +38,6 @@ def _tecla(j, tecla, modificadores=Qt.KeyboardModifier.NoModifier):
 
 def _texto(j) -> str:
     return j.texto.toPlainText()
-
-
-@pytest.fixture(scope="module")
-def _janela_do_modulo(app, tmp_path_factory):  # noqa: F811
-    """Uma janela para o módulo (abrir uma por teste custava ~2,5 s da suíte rápida)."""
-    from PySide6.QtWidgets import QMessageBox
-
-    from abbychess.projeto import ProjetoDeLivro
-    from tests.test_espaco import _abrir
-    from tests.test_treino_por_livro import _pagina_sintetica
-
-    remendo = pytest.MonkeyPatch()
-    remendo.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
-    pasta = tmp_path_factory.mktemp("edicao")
-    janela = _abrir(ProjetoDeLivro.criar(pasta / "livros", "Edição",
-                                         _pagina_sintetica(pasta / "pagina.png")))
-    yield janela
-    janela.close()
-    remendo.undo()
-
-
-@pytest.fixture
-def j(_janela_do_modulo):
-    """A janela do módulo com o desfazer, a sessão e o modo do livro de volta ao começo."""
-    from abbychess import historico as hs
-
-    janela = _janela_do_modulo
-    if janela.texto.tem_sessao:
-        janela.texto.restaurar()
-    janela.texto._restaurada = None
-    janela.pagina.historico = hs.HistoricoDoProjeto()
-    janela.projeto.dados.idioma, janela.projeto.dados.notacao = "pt", "figurinas"
-    janela.linha.avisar("")
-    return janela
 
 
 def test_digitar_abre_uma_sessao_e_o_modelo_so_muda_ao_confirmar(j):
@@ -325,7 +266,6 @@ def test_a_letra_que_faltou_sobre_tinta_sem_box_oferece_o_ctrl_m(j):
     _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
     assert len(pagina.decisoes.virtuais) == 1
     assert "Ctrl+M marca o quadro" in j.linha.aviso
-
 
 
 # ----------------------------------------------------------------------

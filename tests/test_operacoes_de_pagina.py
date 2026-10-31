@@ -19,7 +19,6 @@ from abbychess.leitor import LeitorDoLivro, nome_de_origem
 from abbychess.modelo import pid_de
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_visor import pdf_de_60_paginas  # noqa: F401
 
 
 def _box(char, x=10):

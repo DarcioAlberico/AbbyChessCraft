@@ -349,7 +349,7 @@ de entrada.
 
 | Classe | Tamanho | Corte proposto |
 |---|---|---|
-| `ControladorDePagina` (`controlador.py:138`) | 138 métodos, ~2 400 linhas; 9 das 15 funções mais complexas | `Navegador` (480-602), `ControladorDaSequencia` (§12.4, 604-1006), fila e margens para o `ControladorDaFila` que já existe, `PonteDeLeitura` (1533-1710), `AplicadorDoHistorico` (2177-2320), `ControladorDaSessao` |
+| `ControladorDePagina` (`controlador.py:138`) | 138 métodos, ~2 400 linhas; 9 das 15 funções mais complexas | `Navegador` (480-602), `ControladorDaSequencia` (§12.4, 604-1006), fila e margens para o `ControladorDaFila` que já existe, `PonteDeLeitura` (1533-1710), `AplicadorDoHistorico` (2177-2320), `ControladorDaSessao`. **Feito no Q7, corte 3** (`docs/revisoes/qualidade-Q7.md`): esses e o `ControladorDosPadroes`; a fila virou `FilaDaPagina` (o `ControladorDaFila` é da janela); 888 linhas e 61 métodos |
 | `ProjetoDeLivro` (`projeto.py`) | ~1 640 linhas | `CacheDePaginas` (com páginas presas, Q-P3), `ResumoDoLivro`, `Migracoes`, `Fonte` |
 | `JanelaPrincipal` (`app/janela.py:72`) | 447 linhas, mas 9 mixins somam ~3 000 na MRO | composição: um objeto por painel, com só os controladores de que precisa |
 | `exportar.py` | ~2 000 linhas | Q-E6 |

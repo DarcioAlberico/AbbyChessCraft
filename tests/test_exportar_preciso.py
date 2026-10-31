@@ -275,8 +275,10 @@ def test_o_idioma_do_livro_e_lido_uma_vez_por_exportacao(tmp_path, monkeypatch):
 
 
 def test_o_idioma_do_arquivo():
-    assert ex.idioma_do_arquivo("pt") == "pt-BR"
-    assert ex.idioma_do_arquivo("en") == "en"
+    from abbychess import pedido
+
+    assert pedido.idioma_do_arquivo("pt") == "pt-BR"
+    assert pedido.idioma_do_arquivo("en") == "en"
 
 
 def test_a_captura_sai_em_minuscula():

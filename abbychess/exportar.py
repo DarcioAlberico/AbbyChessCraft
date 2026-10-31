@@ -55,7 +55,7 @@ from abbychess.montagem import (
     _quebras_da_camada, pagina_extraida)
 from abbychess.margens import _funcoes_das_margens, numeros_impressos
 from abbychess.pedido import (
-    NadaParaExportar, Opcoes, Progresso, _alvo, idioma_do_arquivo, idioma_do_livro)
+    NadaParaExportar, Opcoes, Pedido, Progresso, _alvo)
 from abbychess.pdf_pesquisavel import CAMADA, exportar_pdf_pesquisavel
 
 log = logging.getLogger(__name__)
@@ -195,7 +195,8 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
                        indices: Optional[Iterable[int]] = None, *,
                        progresso: Optional[Progresso] = None,
                        camada: str = "auto", opcoes: Optional[Opcoes] = None,
-                       relatorio: Optional[Relatorio] = None) -> List[PaginaExtraida]:
+                       relatorio: Optional[Relatorio] = None,
+                       pedido: Optional[Pedido] = None) -> List[PaginaExtraida]:
     """
     As páginas reconhecidas do projeto, as de `indices` ou todas.
 
@@ -206,17 +207,19 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
     rodapé. Depois, as duas passadas de livro, sobre as páginas dos dois caminhos: o
     parágrafo que a paginação partiu volta a ser um, e o diagrama sem lado lido ganha o
     do lance antes dele, conferido no tabuleiro e no lance seguinte. O `relatorio`, se
-    vier, recebe o que saiu e o que ficou de fora (§12.2).
+    vier, recebe o que saiu e o que ficou de fora (§12.2). O `pedido` da exportação traz as
+    opções, as páginas e o idioma; sem ele, valem os `indices` e as `opcoes`.
     """
     from core import pdf_nativo
 
-    opcoes = opcoes or Opcoes()
+    pedido = pedido or Pedido(projeto, opcoes or Opcoes(), indices)
+    opcoes = pedido.opcoes
     relatorio = relatorio if relatorio is not None else Relatorio()
     if camada not in CAMADA:
         raise ValueError(f"camada inválida: {camada!r} (use um de {CAMADA})")
-    alvo = _alvo(projeto, indices, opcoes)
+    alvo = pedido.alvo()
     estados = {i: r.get("estado") for i, r in projeto.resumo.do_livro().items()}
-    nativas = paginas_da_camada(projeto, alvo) if camada == "auto" else {}
+    nativas = paginas_da_camada(projeto, alvo, pedido) if camada == "auto" else {}
     pelos_boxes = [i for i in alvo if i not in nativas]
     lidos, estruturas = {}, {}
     limiares = projeto.dados.limiares         # os duvidosos: o realce e o relatório
@@ -306,7 +309,8 @@ def _paginas_no_relatorio(relatorio: Relatorio, projeto: ProjetoDeLivro,
                     relatorio.recortados.append((i, bloco.aviso or "recorte da página"))
 
 
-def paginas_da_camada(projeto: ProjetoDeLivro, indices: Sequence[int]) -> Dict[int, PaginaExtraida]:
+def paginas_da_camada(projeto: ProjetoDeLivro, indices: Sequence[int],
+                      pedido: Optional[Pedido] = None) -> Dict[int, PaginaExtraida]:
     """
     `{índice: página}` das páginas que saem da camada de texto do PDF.
 
@@ -327,7 +331,7 @@ def paginas_da_camada(projeto: ProjetoDeLivro, indices: Sequence[int]) -> Dict[i
     trechos = sq.trechos_do_pdf(projeto.sequencia, indices)
     if not trechos:
         return {}
-    idioma = idioma_do_livro(projeto)
+    idioma = (pedido or Pedido(projeto, Opcoes())).idioma
     paginas = {}
     for trecho in trechos:
         do_pdf = dict(trecho)
@@ -579,17 +583,17 @@ def previa(projeto: ProjetoDeLivro, formato: str, indices: Optional[Iterable[int
 
     if formato not in FORMATOS or formato == "pdf":
         raise ValueError(f"Sem pré-visualização para {formato.upper()}.")
-    opcoes = opcoes or Opcoes()
-    indices = opcoes.indices(indices)
+    pedido = Pedido.de(projeto, indices, opcoes)
+    opcoes, indices = pedido.opcoes, pedido.indices
     relatorio = Relatorio(formato=formato)
-    idioma = idioma_do_arquivo(idioma_do_livro(projeto))
+    idioma = pedido.idioma_do_arquivo
     titulo = metadados_do_projeto(projeto, idioma, metadados).titulo
     if formato == "pgn":
         texto = pgn_do_livro(projeto, indices, relatorio, opcoes)
         return pv.html_do_texto(texto, relatorio.texto().splitlines(), titulo, idioma), relatorio
     fonte = pg.fonte_do_projeto(projeto)
     paginas = paginas_do_projeto(projeto, fonte, indices, progresso=progresso, opcoes=opcoes,
-                                 relatorio=relatorio)
+                                 relatorio=relatorio, pedido=pedido)
     linhas = relatorio.texto().splitlines()
     if formato == "txt":                        # o TXT como ele sai, não o livro formatado
         texto = texto_do_livro(paginas[:pv.LIMITE], marcas_de_pagina=opcoes.marcas_de_pagina)
@@ -621,12 +625,11 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
     caminho = Path(caminho)
     if _mesmo_arquivo(caminho, Path(projeto.fonte)):
         raise ValueError("O destino é o próprio arquivo de origem do livro: escolha outro nome.")
-    opcoes = opcoes or Opcoes()
-    indices = opcoes.indices(indices)
+    pedido = Pedido.de(projeto, indices, opcoes)
+    opcoes, indices = pedido.opcoes, pedido.indices
     relatorio = Relatorio(formato=formato)
     if formato == "pdf":
-        resumo = exportar_pdf_pesquisavel(projeto, caminho, _alvo(projeto, indices, opcoes),
-                                          progresso=progresso)
+        resumo = exportar_pdf_pesquisavel(projeto, caminho, pedido.alvo(), progresso=progresso)
         partes = [f"{resumo.paginas} página(s), {resumo.caracteres} caracteres na camada"]
         if resumo.camadas_trocadas:
             partes.append(f"camada antiga trocada em {resumo.camadas_trocadas}")
@@ -654,8 +657,8 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
         return relatorio.resumo(), relatorio
     fonte = pg.fonte_do_projeto(projeto)
     paginas = paginas_do_projeto(projeto, fonte, indices, progresso=progresso,
-                                 opcoes=opcoes, relatorio=relatorio)
-    idioma = idioma_do_arquivo(idioma_do_livro(projeto))
+                                 opcoes=opcoes, relatorio=relatorio, pedido=pedido)
+    idioma = pedido.idioma_do_arquivo
     if formato == "txt":
         _gravar_texto(caminho, texto_do_livro(paginas, marcas_de_pagina=opcoes.marcas_de_pagina))
         return relatorio.resumo(), relatorio

@@ -5,6 +5,7 @@ livro, resolvidos uma vez para todos os formatos (SPEC-qualidade Q-E6). À parte
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Callable, Iterable, List, Optional, Tuple
 
 from abbychess import links_de_analise
@@ -63,6 +64,36 @@ class Opcoes:
             return indices
         dentro = range(self.intervalo[0], self.intervalo[1] + 1)
         return dentro if indices is None else [i for i in indices if i in dentro]
+
+
+@dataclass(frozen=True)
+class Pedido:
+    """Uma exportação resolvida uma vez (SPEC-qualidade Q-E6): o projeto, as opções e os
+    `indices` pedidos. Os formatos e as páginas leem daqui o que antes perguntavam cada um
+    ao projeto: o idioma do livro pela camada do PDF, que abre o livro, sai uma vez só."""
+
+    projeto: ProjetoDeLivro
+    opcoes: Opcoes
+    indices: Optional[Iterable[int]] = None
+
+    @classmethod
+    def de(cls, projeto: ProjetoDeLivro, indices: Optional[Iterable[int]] = None,
+           opcoes: Optional[Opcoes] = None) -> "Pedido":
+        """O pedido do diálogo: os `indices` cortados pelo `intervalo` das `opcoes`."""
+        opcoes = opcoes or Opcoes()
+        return cls(projeto, opcoes, opcoes.indices(indices))
+
+    @cached_property
+    def idioma(self) -> str:
+        """O idioma do livro (`idioma_do_livro`), pedido na primeira vez que alguém o lê."""
+        return idioma_do_livro(self.projeto)
+
+    @property
+    def idioma_do_arquivo(self) -> str:
+        return idioma_do_arquivo(self.idioma)
+
+    def alvo(self) -> List[int]:
+        return _alvo(self.projeto, self.indices, self.opcoes)
 
 
 def _alvo(projeto: ProjetoDeLivro, indices: Optional[Iterable[int]],

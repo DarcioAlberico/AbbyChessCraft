@@ -221,10 +221,18 @@ class PoolDoIndice:
         relogio.start()
 
     def _fechar_se_ocioso(self) -> None:
+        self._fechar(lambda: self._usos == 0)
+
+    def _fechar(self, se: Callable[[], bool]) -> None:
+        """Tira o pool na mesma trava em que confere `se` (um `obter` de outra thread nunca
+        recebe o pool que vai ser fechado: o seguinte abre outro), e o fecha fora dela."""
         with self._trava:
-            ocioso = self._usos == 0
-        if ocioso:
-            self.liberar()
+            pool = None
+            if se():
+                pool, self._pool = self._pool, None
+                self._pronto.clear()
+        if pool is not None:
+            pool.shutdown(wait=False, cancel_futures=True)
 
     def _abrir(self) -> Optional[ProcessPoolExecutor]:
         import multiprocessing
@@ -258,22 +266,15 @@ class PoolDoIndice:
     def devolver(self) -> None:
         """O fim de um uso; o último fecha os processos (as tarefas de outro uso nunca são
         canceladas por este)."""
-        with self._trava:                       # o último tira o pool na mesma trava: um
-            self._usos = max(0, self._usos - 1)  # obter() que vem depois abre outro
-            pool = None
-            if self._usos == 0:
-                pool, self._pool = self._pool, None
-                self._pronto.clear()
-        if pool is not None:
-            pool.shutdown(wait=False, cancel_futures=True)
+        def ultimo() -> bool:
+            self._usos = max(0, self._usos - 1)
+            return self._usos == 0
+
+        self._fechar(ultimo)
 
     def liberar(self) -> None:
         """Fecha os processos agora."""
-        with self._trava:
-            pool, self._pool = self._pool, None
-            self._pronto.clear()
-        if pool is not None:
-            pool.shutdown(wait=False, cancel_futures=True)
+        self._fechar(lambda: True)
 
 
 def construir(fontes: Mapping[int, Tuple[object, int]], idioma: str = "pt", *,

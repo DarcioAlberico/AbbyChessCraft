@@ -150,8 +150,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.treino.ensinar.connect(p.leitura.ensinar)
         self.treino.so_corrigir.connect(p.corrigir)
         self.treino.descartar.connect(p.descartar)
-        self.treino.pular.connect(lambda: self.pagina.andar(+1))
-        self.treino.anterior.connect(lambda: self.pagina.andar(-1))
+        self.treino.pular.connect(lambda: self.pagina.fila_da_pagina.andar(+1))
+        self.treino.anterior.connect(lambda: self.pagina.fila_da_pagina.andar(-1))
         self.treino.dividir.connect(p.dividir)
         self.treino.juntar.connect(p.juntar)
         self.treino.ajustar.connect(p.ajustar)
@@ -187,7 +187,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.relogio_do_texto.timeout.connect(self.pintar_texto)
         # E com ele a conta das margens corridas da fila (~25 ms), que o Enter e a releitura
         # não esperam: `pintar_texto` a refaz e mostra a fila de novo se ela mudou.
-        self.pagina.margens_com_o_texto = True
+        self.pagina.fila_da_pagina.margens_com_o_texto = True
 
     def _ligar_eventos(self) -> None:
         e = self.eventos
@@ -480,7 +480,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         if self.pagina.escolhido and self.pagina.box_atual() is not None:
             self.pagina.escolher(self.pagina.atual)     # fica, com a leitura de agora
         else:
-            self.pagina.ir_ao_primeiro_pendente()
+            self.pagina.fila_da_pagina.ir_ao_primeiro_pendente()
 
     def _recusa(self, refazer: bool, texto: str) -> None:
         pilha = "refazer" if refazer else "desfazer"

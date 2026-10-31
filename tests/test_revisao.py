@@ -57,11 +57,11 @@ def _letras(ctl, gids):
 def test_os_modos_ordenam_a_fila(livro):
     projeto, ctl, fila = livro
     fila.definir("confianca")
-    assert _letras(ctl, ctl.fila()) == "abacc"            # 0,2 0,3 0,4 0,5 0,6
+    assert _letras(ctl, ctl.fila_da_pagina.fila()) == "abacc"  # 0,2 0,3 0,4 0,5 0,6
     fila.definir("leitura")
-    assert _letras(ctl, ctl.fila()) == "cabca"            # a ordem da página, sem o 0,95
+    assert _letras(ctl, ctl.fila_da_pagina.fila()) == "cabca"  # a ordem da página, sem o 0,95
     fila.definir("caractere")
-    assert _letras(ctl, ctl.fila()) == "aabcc"            # pela leitura; em cada uma, a confiança
+    assert _letras(ctl, ctl.fila_da_pagina.fila()) == "aabcc"  # pela leitura; em cada uma, a confiança
     fila.ciclar()
     assert fila.modo == "palavras"
 
@@ -70,22 +70,22 @@ def test_no_escopo_livro_o_fim_da_pagina_leva_a_proxima_com_pendentes(livro):
     projeto, ctl, fila = livro
     fila.definir("leitura")
     fila.definir_escopo("livro")
-    ctl.escolher(ctl.fila()[-1])
+    ctl.escolher(ctl.fila_da_pagina.fila()[-1])
     fila.andar(+1)                                        # a página 2 não tem pendentes
-    assert ctl.indice == 2 and ctl.atual == ctl.fila()[0]
+    assert ctl.indice == 2 and ctl.atual == ctl.fila_da_pagina.fila()[0]
     fila.andar(-1)                                        # o começo da 3 volta ao fim da 1
-    assert ctl.indice == 0 and ctl.atual == ctl.fila()[-1]
+    assert ctl.indice == 0 and ctl.atual == ctl.fila_da_pagina.fila()[-1]
     assert fila.contador() == "5/5 · livro 8"
     fila.alternar_escopo()                                # Shift+F7: só a página
     fila.andar(+1)
-    assert ctl.indice == 0 and ctl.atual == ctl.fila()[0]
+    assert ctl.indice == 0 and ctl.atual == ctl.fila_da_pagina.fila()[0]
 
 
 def test_na_confianca_o_livro_segue_depois_de_pular_todos(livro):
     projeto, ctl, fila = livro
     fila.definir("confianca")
     fila.definir_escopo("livro")
-    ctl.ir_ao_primeiro_pendente()
+    ctl.fila_da_pagina.ir_ao_primeiro_pendente()
     for _ in range(4):                                    # os 4 primeiros vão para o fim
         fila.andar(+1)
     assert ctl.indice == 0
@@ -391,11 +391,11 @@ def test_alt_baixo_fora_da_fila_vai_ao_primeiro_dela(livro):
     fila.definir("confianca")
     confiavel = next(b.gid for b in ctl.modelo.boxes if b.entry.confidence >= 0.9)
     ctl.escolher(confiavel)
-    ctl.andar(+1)
-    assert ctl.atual == ctl.fila()[0]
+    ctl.fila_da_pagina.andar(+1)
+    assert ctl.atual == ctl.fila_da_pagina.fila()[0]
     ctl.escolher(confiavel)
-    ctl.andar(-1)
-    assert ctl.atual == ctl.fila()[-1]
+    ctl.fila_da_pagina.andar(-1)
+    assert ctl.atual == ctl.fila_da_pagina.fila()[-1]
 
 
 def test_o_ctrl_t_da_pergunta_nao_marca_outra_pagina(livro):

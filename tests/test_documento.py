@@ -523,13 +523,13 @@ def test_as_margens_seguem_o_texto_e_a_posicao_dos_glifos(app):
     p = ControladorDePagina(Eventos(), ExecutorSincrono())
     p.imagem = Image.new("L", (2000, 2800), 255)
     p.modelo = pagina("12", 60)
-    assert 1 in p.gids_de_margem()                         # "12": o número da página
+    assert 1 in p.fila_da_pagina.gids_de_margem()          # "12": o número da página
     p.modelo = pagina("lz", 60)                            # os mesmos gids, outro texto
-    assert 1 not in p.gids_de_margem()
+    assert 1 not in p.fila_da_pagina.gids_de_margem()
     p.modelo = pagina("12", 60)
-    assert 1 in p.gids_de_margem()
+    assert 1 in p.fila_da_pagina.gids_de_margem()
     p.modelo = pagina("12", 1300)                          # no meio da página: não é margem
-    assert 1 not in p.gids_de_margem()
+    assert 1 not in p.fila_da_pagina.gids_de_margem()
 
 
 def test_a_pagina_reconhecida_e_vazia_diz_nada_reconhecido(app, janela, monkeypatch):  # noqa: F811

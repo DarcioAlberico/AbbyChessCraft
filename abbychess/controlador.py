@@ -2,10 +2,11 @@
 
 A janela só liga sinais a comandos e desenha o que os eventos dizem. Quem guarda a página
 aberta, a fila de revisão, a seleção, o desfazer e decide o que cada comando faz é o
-`ControladorDePagina`, com os colaboradores dele, cada um à parte (SPEC-qualidade Q-A1): as
-visitas (`navegador`), as operações de página (`operacoes`), o Ctrl+Z e o Ctrl+Y
-(`desfazedor`), a sessão do Documento (`sessoes`), os padrões do livro (`padroes_do_livro`) e
-o que vai ao leitor e ao servidor de leitura (`leitura`, a `PonteDeLeitura`).
+`ControladorDePagina`, com os colaboradores dele, cada um à parte (SPEC-qualidade Q-A1): a
+fila de glifos e o andar nela (`fila_da_pagina`, a `FilaDaPagina`), as visitas
+(`navegador`), as operações de página (`operacoes`), o Ctrl+Z e o Ctrl+Y (`desfazedor`), a
+sessão do Documento (`sessoes`), os padrões do livro (`padroes_do_livro`) e o que vai ao
+leitor e ao servidor de leitura (`leitura`, a `PonteDeLeitura`).
 
 Tudo é **por gid** (§4.1): a fila, os pulados, a seleção e o glifo em revisão sobrevivem a
 dividir, juntar e marcar sem remapear índices, e a edição muda o modelo (`abbychess.edicao`),
@@ -53,29 +54,24 @@ from abbychess import ancoragem as ag
 from abbychess.aplicador_do_historico import AplicadorDoHistorico
 from abbychess import arrumacao
 from abbychess.avisos import AVISO_LONGO_MS
-from abbychess import contexto
 from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import historico as hs
 from abbychess.historico import Antes
 from abbychess import lances as lc
 from abbychess import pagina as pg
+from abbychess.fila_da_pagina import FilaDaPagina
 from abbychess.padroes_do_livro import ControladorDosPadroes
 from abbychess.ponte_de_leitura import PonteDeLeitura
 from abbychess import servidor_de_leitura as sl
 from abbychess.sessao_do_documento import ControladorDaSessao
 from abbychess import texto as tx
-from abbychess.leitor import precisa_revisao
 from abbychess.modelo import (LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
                               Diferenca, Pagina, proximo_estado)
 from abbychess.navegador import Navegador
 from abbychess.operacoes_de_pagina import ControladorDaSequencia
 
 log = logging.getLogger(__name__)
-
-#: Quantas páginas guardam a conta das margens corridas (`gids_de_margem`): as do cache de
-#: páginas (§14.1) e folga.
-MARGENS_GUARDADAS = 8
 
 
 class Eventos:
@@ -173,27 +169,10 @@ class ControladorDePagina:
         #: (box, virtual, letra): o box marcado ao lado da letra virtual. Se o usuário o
         #: confirma com essa letra (Enter ou Shift+Enter), o virtual sai no mesmo passo.
         self._letra_que_faltava: Optional[Tuple[int, int, str]] = None
-        #: A ordem da fila de glifos (§8.1): "confianca" (o menos confiável primeiro, os
-        #: pulados no fim) ou "leitura" (a ordem da página).
-        self.ordem_da_fila = "confianca"
-        #: gid -> (o que decide, se ele vai para a fila): a fila julga de novo só os glifos
-        #: que mudaram (a leitura, a fonte, a confiança ou o revisado), e todos quando o
-        #: limiar muda.
-        self._pendencia: dict = {}
-        self._limiar_da_pendencia = None
-        #: Na ordem de leitura: (página, posição na ordem da página) do último glifo mostrado,
-        #: para a decisão seguir em frente mesmo quando o glifo sai (descartar, juntar).
-        self._lugar_de_leitura = (-1, 0)
+        #: A fila de glifos (§8.1): a ordem, as margens corridas, o primeiro pendente e o andar.
+        self.fila_da_pagina = FilaDaPagina(self)
         #: Mover, apagar, girar, cortar, dividir… as páginas (§12.4).
         self.operacoes = ControladorDaSequencia(self)
-        #: pid -> (chave, gids) da última conta das margens corridas de cada página
-        #: (`gids_de_margem`), das `MARGENS_GUARDADAS` páginas vistas por último.
-        self._margens: dict = {}
-        #: A fila usa a última conta das margens da página (`margens_da_fila`), mesmo de antes
-        #: da última mudança, e quem liga isto a refaz (`gids_de_margem`) depois: a janela,
-        #: com o texto da página, 150 ms depois da última mudança. Desligado, a fila refaz a
-        #: conta a cada mudança (~25 ms numa página cheia; uma releitura muda a página 2 vezes).
-        self.margens_com_o_texto = False
         self.selecao: set = set()
         #: O desfazer do projeto (§14.2), da sessão.
         self.historico = hs.HistoricoDoProjeto()
@@ -269,58 +248,6 @@ class ControladorDePagina:
         """Há projeto, fonte e leitor: os comandos valem."""
         return self.projeto is not None and self.leitor is not None and self.fonte is not None
 
-    def fila(self) -> List[int]:
-        """Os gids a revisar (§8.1): do menos confiável ao mais, com os pulados no fim; na
-        ordem de leitura (`ordem_da_fila`), na ordem da página; por caractere, agrupados pela
-        leitura (os sem leitura no fim) e, em cada grupo, do menos confiável ao mais. O glifo
-        `revisado` (visto e aceito no Documento, §6.3) não volta.
-
-        Por confiança e por caractere, o que a exportação tira (`gids_fora_do_texto`: o
-        cabeçalho e o rodapé corridos, as áreas de margem) vem depois do resto e antes dos
-        pulados: no Xadrez Vitorioso o □ do título corrido abria a fila de toda página. Na
-        ordem de leitura, não: `andar` e o fim da página contam com a fila na ordem dela. As
-        margens corridas são as de `margens_da_fila` (na janela, a última conta da página)."""
-        if self.leitor is None or self.modelo is None:
-            return []
-        boxes = self.modelo.boxes
-        indices = self._pendentes()
-        if self.ordem_da_fila == "caractere":
-            indices = sorted(indices, key=lambda i: (boxes[i].entry.char or "\uffff",
-                                                     round(boxes[i].entry.confidence, 2), i))
-        elif self.ordem_da_fila != "leitura":
-            indices = sorted(indices, key=lambda i: (round(boxes[i].entry.confidence, 2), i))
-        fila = [boxes[i].gid for i in indices]
-        if self.ordem_da_fila == "leitura":
-            return fila
-        fora = self.gids_fora_do_texto(self.margens_da_fila()) if fila else frozenset()
-        return ([g for g in fila if g not in self.pulados and g not in fora]
-                + [g for g in fila if g not in self.pulados and g in fora]
-                + [g for g in fila if g in self.pulados])
-
-    def _pendentes(self) -> List[int]:
-        """Os índices dos glifos que vão para a fila, na ordem da página. Só os glifos que
-        mudaram são julgados de novo (§8.1: a fila recalculada só para os gids tocados)."""
-        limiares = self.leitor.limiares
-        chave = limiares.revisao                 # o único limiar que decide a fila
-        anterior = self._pendencia if chave == self._limiar_da_pendencia else {}
-        contra = contexto.improvaveis(self.modelo)       # a palavra desmente a leitura
-        nova, indices = {}, []
-        for i, box in enumerate(self.modelo.boxes):
-            e = box.entry
-            estado = (e.char, e.source, e.confidence, box.revisado, box.gid in contra)
-            visto = anterior.get(box.gid)
-            if visto is not None and visto[0] == estado:
-                pendente = visto[1]
-            else:
-                pendente = not box.revisado and (
-                    precisa_revisao(e.char, e.source, e.confidence, limiares)
-                    or (box.gid in contra and contexto.volta_pelo_contexto(e.source)))
-            nova[box.gid] = (estado, pendente)
-            if pendente:
-                indices.append(i)
-        self._pendencia, self._limiar_da_pendencia = nova, chave
-        return indices
-
     def alvos(self) -> List[int]:
         """O que a decisão vale: a seleção inteira, ou só o glifo em revisão (por gid, na
         ordem de leitura)."""
@@ -328,13 +255,6 @@ class ControladorDePagina:
             return []
         escolhidos = self.selecao | {self.atual}
         return [g for g in self.gids if g in escolhidos]
-
-    def posicao_do_atual(self) -> str:
-        """O que o Glifo diz da posição: nada, se o glifo está na fila (o contador do Inspetor
-        a mostra); "fora da fila", se não."""
-        if self.atual in self.fila():
-            return ""
-        return "Box fora da fila (já confirmado ou confiável)"
 
     def texto(self) -> str:
         """O texto da página (com as decisões e os diagramas), como no painel de baixo."""
@@ -366,53 +286,6 @@ class ControladorDePagina:
         idioma = self.projeto.dados.idioma if self.projeto is not None else "pt"
         textos = lc.textos_depois(tx.montar(pagina))
         return [lc.primeira_linha(textos.get(d.id, ""), idioma) for d in pagina.diagramas]
-
-    def gids_de_margem(self) -> frozenset:
-        """Os glifos do cabeçalho e do rodapé corridos da página, pela regra da exportação
-        (`exportar.margens_corridas`: a faixa, o vão e o número da página), até o layout do
-        passo F dar a função às áreas. O glifo sem leitura conta (`exportar.margens_da_pagina`):
-        o □ do título corrido é título corrido."""
-        if self.modelo is None or self.imagem is None:
-            return frozenset()
-        from abbychess import exportar as ex
-
-        boxes = self.modelo.boxes
-        # A regra olha as linhas inteiras da página (~25 ms numa página cheia): o resultado
-        # fica, por página, enquanto o que ela lê não muda (o texto, a posição de cada glifo e
-        # a altura da página); montar a chave custa uma fração de milissegundo. Guardar só a
-        # última página refazia a conta em toda troca entre duas páginas.
-        chave = (self.imagem.height,
-                 tuple((b.gid, b.entry.char, b.entry.x1, b.entry.y1, b.entry.x2, b.entry.y2)
-                       for b in boxes))
-        guardada = self._margens.pop(self.modelo.pid, None)
-        if guardada is None or guardada[0] != chave:
-            indices = ex.margens_da_pagina([b.entry for b in boxes], self.imagem.height)
-            guardada = (chave, frozenset(boxes[i].gid for i in indices if i < len(boxes)))
-        self._margens[self.modelo.pid] = guardada          # a vista por último, no fim
-        while len(self._margens) > MARGENS_GUARDADAS:
-            del self._margens[next(iter(self._margens))]
-        return guardada[1]
-
-    def margens_da_fila(self) -> frozenset:
-        """As margens corridas que a fila usa: as de `gids_de_margem` ou, com
-        `margens_com_o_texto`, a última conta desta página, se há uma."""
-        if self.margens_com_o_texto and self.modelo is not None:
-            guardada = self._margens.get(self.modelo.pid)
-            if guardada is not None:
-                return guardada[1]
-        return self.gids_de_margem()
-
-    def gids_fora_do_texto(self, margens: Optional[frozenset] = None) -> frozenset:
-        """Os glifos que a exportação tira: os de `gids_de_margem` (ou `margens`) e os das
-        áreas de cabeçalho, rodapé, número de página e ignorar (`exportar.FORA_DA_EXPORTACAO`)."""
-        if self.modelo is None:
-            return frozenset()
-        from abbychess import exportar as ex
-
-        areas = [z for z in self.modelo.zonas if z.funcao in ex.FORA_DA_EXPORTACAO]
-        nas_areas = {b.gid for b in self.modelo.boxes
-                     if any(z.contem_o_centro(b.entry) for z in areas)} if areas else set()
-        return (self.gids_de_margem() if margens is None else margens) | nas_areas
 
     def gids_virtuais(self) -> frozenset:
         """Os gids dos glifos virtuais (sem caixa) da página."""
@@ -455,7 +328,7 @@ class ControladorDePagina:
             self.servidor.fechar()
         self.servidor = servidor
         self.leitura.zerar(leitor, servidor)
-        self._margens = {}                      # os pid se repetem de um projeto a outro
+        self.fila_da_pagina.zerar()             # os pid se repetem de um projeto a outro
         self.geracao += 1
         self.lote_rodando = False               # o lote do projeto anterior não vale aqui
         self.projeto, self.fonte, self.leitor = projeto, fonte, leitor
@@ -497,7 +370,7 @@ class ControladorDePagina:
         self.eventos.emitir("pagina_trocou")
         self.eventos.emitir("glifos_mudaram", None)
         if self.boxes:
-            self.ir_ao_primeiro_pendente()
+            self.fila_da_pagina.ir_ao_primeiro_pendente()
             self.leitura.ler_os_aguardando_de(self.modelo, indice, None)
             if not self.reconhecida:
                 self._avisar(f"Página com {len(self.boxes)} glifo(s) marcados à mão e ainda não "
@@ -548,15 +421,9 @@ class ControladorDePagina:
         if gid is not None and self.indice_de(gid) is None:
             return
         self.atual = gid
-        self._guardar_lugar()
+        self.fila_da_pagina.guardar_lugar()
         self.escolhido = False                  # `escolher` o liga depois, se foi o usuário
         self.eventos.emitir("atual_mudou")
-
-    def _guardar_lugar(self) -> None:
-        if self.atual is not None and self.ordem_da_fila == "leitura":
-            gids = self.gids
-            if self.atual in gids:
-                self._lugar_de_leitura = (self.indice, gids.index(self.atual))
 
     def clicar(self, indice: int) -> None:
         """O box clicado no visor (pela posição na lista)."""
@@ -566,49 +433,6 @@ class ControladorDePagina:
         """O glifo que o usuário escolheu (clique, Tab): a propagação não o troca sozinha."""
         self.mostrar(gid)
         self.escolhido = self.atual is not None
-
-    def ir_ao_primeiro_pendente(self) -> None:
-        """O próximo a revisar depois de uma decisão: o primeiro da fila; na ordem de
-        leitura, o primeiro pendente a partir do lugar do glifo decidido (e, no fim da
-        página, o primeiro dela)."""
-        fila = self.fila()
-        if self.ordem_da_fila == "leitura" and fila:
-            ordem = {g: n for n, g in enumerate(self.gids)}
-            pagina, lugar = self._lugar_de_leitura
-            lugar = ordem.get(self.atual, lugar if pagina == self.indice else 0)
-            adiante = [g for g in fila if ordem[g] >= lugar]
-            self.atual = adiante[0] if adiante else fila[0]
-        else:
-            self.atual = fila[0] if fila else None
-        self._guardar_lugar()
-        self.escolhido = False
-        self.eventos.emitir("atual_mudou")
-
-    def andar(self, passo: int) -> None:
-        """Pula (passo > 0: o atual vai para o fim da fila) ou volta na fila. Na ordem de
-        leitura, anda para o pendente seguinte (ou anterior) na página, sem pular."""
-        fila = self.fila()
-        if not fila:
-            self.ir_ao_primeiro_pendente()
-            return
-        if self.ordem_da_fila == "leitura":
-            ordem = {g: n for n, g in enumerate(self.gids)}
-            aqui = ordem.get(self.atual, -1)
-            if passo > 0:
-                seguintes = [g for g in fila if ordem[g] > aqui]
-                self.escolher(seguintes[0] if seguintes else fila[0])
-            else:
-                anteriores = [g for g in fila if ordem[g] < aqui]
-                self.escolher(anteriores[-1] if anteriores else fila[-1])
-            return
-        if passo > 0 and self.atual in fila:
-            self.pulados.add(self.atual)
-            self.escolher(self.fila()[0])
-            return
-        if self.atual not in fila:               # fora da fila: o primeiro (ou o último) dela
-            self.escolher(fila[0] if passo > 0 else fila[-1])
-            return
-        self.escolher(fila[(fila.index(self.atual) + passo) % len(fila)])
 
     def verificar(self, indice: Optional[int] = None) -> None:
         """Ctrl+T: a página está verificada (§4.4), e a próxima página não verificada abre.
@@ -765,7 +589,7 @@ class ControladorDePagina:
             self.selecao = set()
             self._mudou(self.modelo, self.indice, f"Corrigir para '{char}'", antes)
             self.eventos.emitir("selecao_mudou")
-            self.ir_ao_primeiro_pendente()
+            self.fila_da_pagina.ir_ao_primeiro_pendente()
         self._editar("Corrigindo", corpo)
 
     def corrigir_no_livro(self, alvos, char, recortes=None) -> None:
@@ -854,7 +678,7 @@ class ControladorDePagina:
             self.selecao = set()
             self._mudou(self.modelo, self.indice, "Descartar box", antes)
             self.eventos.emitir("selecao_mudou")
-            self.ir_ao_primeiro_pendente()
+            self.fila_da_pagina.ir_ao_primeiro_pendente()
         self._editar("Descartando", corpo)
 
     def dividir(self, coluna: Optional[int] = None, gid: Optional[int] = None) -> None:

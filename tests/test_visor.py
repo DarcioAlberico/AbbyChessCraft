@@ -239,7 +239,7 @@ def test_seguir_deixa_o_item_atual_a_120_px_da_borda(app, janela):
     janela.visor.definir_zoom(3.0)
     assert janela.acao_seguir.isChecked()
     for _ in range(4):
-        janela.pagina.andar(+1)
+        janela.pagina.fila_da_pagina.andar(+1)
         b = boxes(janela)[janela.pagina.indice_de(janela.pagina.atual)]
         topo = janela.visor.mapFromScene(b.x1, b.y1)
         fundo = janela.visor.mapFromScene(b.x2, b.y2)
@@ -320,7 +320,7 @@ def test_seguir_desligado_nao_move_a_vista(app, janela):
     barra_h.setValue(0)
     barra_v.setValue(0)
     for _ in range(4):
-        janela.pagina.andar(+1)
+        janela.pagina.fila_da_pagina.andar(+1)
     assert (barra_h.value(), barra_v.value()) == (0, 0)
 
 

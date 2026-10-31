@@ -19,7 +19,7 @@ def atual(janela) -> Optional[int]:
 
 def fila(janela) -> List[int]:
     p = janela.pagina
-    return [p.indice_de(g) for g in p.fila()]
+    return [p.indice_de(g) for g in p.fila_da_pagina.fila()]
 
 
 def pulados(janela) -> Set[int]:

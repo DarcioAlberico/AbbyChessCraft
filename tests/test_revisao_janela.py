@@ -138,7 +138,7 @@ def test_a_galeria_com_leituras_misturadas_e_um_passo_so(jb):  # noqa: F811
 def test_trocar_de_pagina_fecha_a_pergunta_do_ctrl_t(jb, monkeypatch):  # noqa: F811
     _uns(jb, 3)
     marcadas = []
-    monkeypatch.setattr(jb.pagina, "fila", lambda: [1, 2])      # com pendentes: a pergunta
+    monkeypatch.setattr(jb.pagina.fila_da_pagina, "fila", lambda: [1, 2])  # com pendentes: a pergunta
     jb.pagina.verificar = lambda indice=None: marcadas.append(indice)
     jb.verificar_pagina()
     assert jb.confirmacao.aberta and "página 1" in jb.confirmacao.pergunta.text()

@@ -106,7 +106,7 @@ class DesenhoDaJanela:
     def _glifos_mudaram(self, gids=None) -> None:
         """`gids`: só esses mudaram (a leitura, não a caixa nem a lista); None: tudo."""
         p = self.pagina
-        na_fila = set(p.fila())
+        na_fila = set(p.fila_da_pagina.fila())
         todos = p.gids
         pendentes = {i for i, g in enumerate(todos) if g in na_fila}
         mudados = None if gids is None else [i for i, g in enumerate(todos) if g in gids]
@@ -134,7 +134,7 @@ class DesenhoDaJanela:
                                + teclado.com_teclas("ou vá para o próximo pendente do livro "
                                                     "({proxima_pagina_pendente})."))
             return
-        self.treino.mostrar(p.matriz, p.box_atual(), p.posicao_do_atual())
+        self.treino.mostrar(p.matriz, p.box_atual(), p.fila_da_pagina.posicao_do_atual())
         if (sugestao := p.leitura.sugestao_do_atual()) is not None:    # §9.2: o palpite da rede
             self.treino.sugerir(*sugestao)
         elif (troca := p.leitura.sugestao_do_contexto()) is not None:  # a palavra ou a linha desmente
@@ -153,8 +153,8 @@ class DesenhoDaJanela:
         """O Documento da página, com o realce de cada glifo (§6.1), sem perder o lugar."""
         self.relogio_do_texto.stop()
         p, v = self.pagina, self.verificador
-        na_fila = set(p.fila())
-        da_fila = p.margens_da_fila()           # a conta que a fila usou, talvez de antes
+        na_fila = set(p.fila_da_pagina.fila())
+        da_fila = p.fila_da_pagina.margens_da_fila()  # a conta que a fila usou, talvez de antes
         estados = {b.gid: gd.estado(b.entry, b.gid in na_fila) for b in p.modelo.boxes} \
             if p.modelo is not None else {}
         aviso = vazios.nada_reconhecido() if p.reconhecida else vazios.pagina_nao_reconhecida()
@@ -164,7 +164,7 @@ class DesenhoDaJanela:
                 aviso = f"{vazios.saude_do_livro(saude)}\n\n{aviso}"
         # A palavra fora do léxico que o usuário aceitou (Enter: revisada) não é mais duvidosa.
         revisados = {b.gid for b in p.modelo.boxes if b.revisado} if p.modelo is not None else set()
-        margens = p.gids_de_margem()
+        margens = p.fila_da_pagina.gids_de_margem()
         self.texto.montar(p.documento(), p.diagramas, estados, v.gids_desconhecidos() - revisados,
                           p.gids_virtuais(), p.matriz, margens, aviso)
         self._mostrar_a_linha()

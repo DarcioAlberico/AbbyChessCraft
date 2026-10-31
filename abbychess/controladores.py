@@ -1117,15 +1117,15 @@ class ControladorDoLivro:
         p = self.pagina
         if not p.pronto:
             return
-        if p.fila():
-            p.ir_ao_primeiro_pendente()
+        if p.fila_da_pagina.fila():
+            p.fila_da_pagina.ir_ao_primeiro_pendente()
             return
         proxima = livro.proxima_com_pendentes(p.projeto, p.leitor.limiares, p.indice)
         if proxima is None or proxima == p.indice:
             p._avisar("Nada a revisar nas páginas reconhecidas do livro.", AVISO_LONGO_MS)
             return
         p.ir_para(proxima)
-        p._avisar(f"Página {proxima + 1}: {len(p.fila())} a revisar.", 6000)
+        p._avisar(f"Página {proxima + 1}: {len(p.fila_da_pagina.fila())} a revisar.", 6000)
 
     def previa(self, formato: str, opcoes: Optional["ex.Opcoes"], metadados: Optional[dict],
                pronto, falhou=None) -> None:
@@ -1236,7 +1236,7 @@ class ControladorDaFila:
             raise ValueError(f"modo da fila desconhecido: {modo!r}")
         self.modo = modo
         if modo in self.DE_GLIFOS:
-            self.pagina.ordem_da_fila = modo
+            self.pagina.fila_da_pagina.ordem_da_fila = modo
             self.pagina.pulados = set()
         self.eventos.emitir("modo_da_fila_mudou", modo)
 
@@ -1254,7 +1254,7 @@ class ControladorDaFila:
             if self.escopo == "livro" and self._na_ponta(passo):
                 self._outra_pagina(passo)
             else:
-                self.pagina.andar(passo)
+                self.pagina.fila_da_pagina.andar(passo)
         elif self.modo == "palavras":
             v = self.verificador
             total = len(v.desconhecidas)
@@ -1270,13 +1270,13 @@ class ControladorDaFila:
         """O atual é o último da fila da página (Alt+↓) ou o primeiro (Alt+↑), ou ela está
         vazia: a próxima ida sai da página."""
         p = self.pagina
-        fila = p.fila()
+        fila = p.fila_da_pagina.fila()
         if not fila:
             return True
         if p.atual not in fila:
             return False
         if passo > 0:
-            if p.ordem_da_fila == "confianca":   # o Alt+↓ põe o atual no fim (os pulados)
+            if p.fila_da_pagina.ordem_da_fila == "confianca":  # o Alt+↓ põe o atual no fim (os pulados)
                 return all(g in p.pulados or g == p.atual for g in fila)
             return fila.index(p.atual) == len(fila) - 1
         return fila.index(p.atual) == 0
@@ -1291,11 +1291,11 @@ class ControladorDaFila:
         alvo = ir(p.projeto, p.leitor.limiares, p.indice)
         if alvo is None or alvo == p.indice:
             p.pulados = set()
-            p.ir_ao_primeiro_pendente()
+            p.fila_da_pagina.ir_ao_primeiro_pendente()
             p._avisar("Não há mais o que revisar no livro.", 5000)
             return
         p.ir_para(alvo)
-        fila = p.fila()
+        fila = p.fila_da_pagina.fila()
         if fila:
             p.escolher(fila[0] if passo > 0 else fila[-1])
 
@@ -1317,7 +1317,7 @@ class ControladorDaFila:
         """"12/204": a posição do item atual na fila do modo, e o tamanho dela."""
         p = self.pagina
         if self.modo in self.DE_GLIFOS:
-            fila = p.fila()
+            fila = p.fila_da_pagina.fila()
             n = fila.index(p.atual) + 1 if p.atual in fila else 0
             if self.escopo == "livro" and p.projeto is not None and p.leitor is not None:
                 from abbychess import livro as lv

@@ -444,7 +444,7 @@ class MaquinaDoControlador(RuleBasedStateMachine):
 
     @rule(passo=st.sampled_from([+1, -1]))
     def pular(self, passo):
-        self.ctl.andar(passo)
+        self.ctl.fila_da_pagina.andar(passo)
 
     @rule(i=st.integers(0, 10_000))
     def selecionar(self, i):
@@ -556,7 +556,7 @@ class MaquinaDoControlador(RuleBasedStateMachine):
 
     @invariant()
     def fila_e_uma_permutacao_dos_pendentes(self):
-        fila = self.ctl.fila()
+        fila = self.ctl.fila_da_pagina.fila()
         assert len(fila) == len(set(fila)) and set(fila) <= set(self.ctl.gids)
 
     @invariant()

@@ -250,7 +250,7 @@ def test_f7_cicla_o_modo_e_o_editor_do_inspetor(app, lida, monkeypatch):
     monkeypatch.setattr(j.verificador, "verificar", lambda: False)    # sem carregar o léxico
     assert j.fila.modo == "confianca" and j.inspetor.atual() == "glifo"
     QTest.keyClick(j.visor, Qt.Key.Key_F7)
-    assert j.fila.modo == "leitura" and j.pagina.ordem_da_fila == "leitura"
+    assert j.fila.modo == "leitura" and j.pagina.fila_da_pagina.ordem_da_fila == "leitura"
     assert fila(j) == sorted(fila(j), key=j.pagina.gids.index)       # na ordem da página
     QTest.keyClick(j.visor, Qt.Key.Key_F7)
     assert j.fila.modo == "caractere" and j.inspetor.atual() == "glifo"   # passo C

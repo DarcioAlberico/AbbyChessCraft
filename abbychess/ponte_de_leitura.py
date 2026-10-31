@@ -130,7 +130,7 @@ class PonteDeLeitura:
             if pagina is self._p.modelo and pagina.zonas:
                 self._p.eventos.emitir("layout_mudou")   # os rótulos das áreas reclassificadas
             if pagina is self._p.modelo:
-                self._p.ir_ao_primeiro_pendente()
+                self._p.fila_da_pagina.ir_ao_primeiro_pendente()
                 resumo = pg.resumir(pagina.entries(), leitor)
                 areas = f", pelas {len(zonas)} área(s) da página" if zonas else ""
                 self._p._avisar(f"{resumo.boxes} boxes, {resumo.pendentes} a revisar, "
@@ -195,7 +195,7 @@ class PonteDeLeitura:
                 self._p._gravar(pagina)
             if pagina is self._p.modelo:
                 self._p.eventos.emitir("glifos_mudaram", dif.mudados)
-                self._p.ir_ao_primeiro_pendente()
+                self._p.fila_da_pagina.ir_ao_primeiro_pendente()
                 self._p._avisar(f"Relida. {resumo.pendentes} a revisar.", 6000)
 
         return trabalho, pronto
@@ -225,14 +225,14 @@ class PonteDeLeitura:
             self._p.pulados.difference_update(alvos)
             self._p.selecao = set()
             self._p.eventos.emitir("selecao_mudou")
-            self._p.ir_ao_primeiro_pendente()
+            self._p.fila_da_pagina.ir_ao_primeiro_pendente()
             self._p._avisar(f"Padrão '{char}' ensinado{amostras}; propagando pela página…", 5000)
 
         def propagou(resolvidos: int) -> None:          # depois da propagação
             if resolvidos:
                 self._p._avisar(f"Padrão '{char}' ensinado{amostras} e resolveu mais "
                                 f"{resolvidos} na página.", 5000)
-            if self._p.atual is None or self._p.atual not in self._p.fila():
+            if self._p.atual is None or self._p.atual not in self._p.fila_da_pagina.fila():
                 # O glifo mostrado se resolveu: a janela avança (ou, se o usuário o escolheu,
                 # mostra a leitura nova dele), a não ser que ele já esteja digitando
                 # (`atual_resolvido`).
@@ -412,7 +412,7 @@ class PonteDeLeitura:
             if pagina is self._p.modelo:
                 self._p.eventos.emitir("glifos_mudaram", dif.mudados)
                 if self._p.atual is None:
-                    self._p.ir_ao_primeiro_pendente()
+                    self._p.fila_da_pagina.ir_ao_primeiro_pendente()
             self._p.eventos.emitir("acoes_mudaram")
 
         servidor.pedir("ler_recortes", recortes,

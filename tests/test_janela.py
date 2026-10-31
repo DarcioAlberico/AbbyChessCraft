@@ -77,7 +77,7 @@ def test_descartar_tira_o_box_e_mantem_os_pulados_coerentes(app, janela):  # noq
     _esperar(app, janela)
     total = len(boxes(janela))
     mostrar(janela, 3)
-    janela.pagina.andar(+1)            # pula o 3
+    janela.pagina.fila_da_pagina.andar(+1)  # pula o 3
     mostrar(janela, 0)
     janela.treino.pedir_descartar()           # tira o 0: o pulado vira o 2
     assert len(boxes(janela)) == total - 1
@@ -88,7 +88,7 @@ def test_pular_manda_o_box_para_o_fim_da_fila(app, janela):  # noqa: F811
     janela.reconhecer()
     _esperar(app, janela)
     primeiro = atual(janela)
-    janela.pagina.andar(+1)
+    janela.pagina.fila_da_pagina.andar(+1)
     assert atual(janela) != primeiro
     assert fila(janela)[-1] == primeiro
 
@@ -124,7 +124,7 @@ def test_ctrl_j_junta_com_o_seguinte_e_remapeia_os_pulados(app, janela):  # noqa
     _esperar(app, janela)
     total = len(boxes(janela))
     mostrar(janela, 5)
-    janela.pagina.andar(+1)            # pula o 5
+    janela.pagina.fila_da_pagina.andar(+1)  # pula o 5
     mostrar(janela, 1)
     janela.treino.pedir_juntar(-1)            # junta o 1 com o 0: o pulado vira o 4
     assert len(boxes(janela)) == total - 1
@@ -175,7 +175,7 @@ def test_dividir_no_ponto_clicado_do_recorte(app, janela):  # noqa: F811
 def test_dividir_remapeia_os_pulados_e_ensina_cada_parte(app, janela):  # noqa: F811
     a, b = _colar_os_dois_primeiros(app, janela)
     mostrar(janela, 4)
-    janela.pagina.andar(+1)            # pula o 4
+    janela.pagina.fila_da_pagina.andar(+1)  # pula o 4
     mostrar(janela, 0)
     janela.treino.pedir_dividir()             # corte pela tinta; o pulado vira o 5
     assert pulados(janela) == {5}

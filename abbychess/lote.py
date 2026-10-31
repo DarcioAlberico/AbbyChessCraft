@@ -404,7 +404,7 @@ class CondutorDoLote:
             p.atual, p.pulados, p.selecao = None, set(), set()
             p.eventos.emitir("glifos_mudaram", None)
             p.eventos.emitir("selecao_mudou")
-            p.ir_ao_primeiro_pendente()
+            p.fila_da_pagina.ir_ao_primeiro_pendente()
         self.ao_gravar(indice)
 
     def _avancar(self) -> None:

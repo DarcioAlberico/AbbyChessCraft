@@ -82,22 +82,23 @@ def _controlador(zonas=()):
 def test_a_fila_da_janela_poe_as_margens_depois_do_texto_e_antes_dos_pulados():
     p, n = _controlador()
     gids = [b.gid for b in p.modelo.boxes]
-    assert gids[5] in p.gids_de_margem()
+    assert gids[5] in p.fila_da_pagina.gids_de_margem()
     for ordem in ("confianca", "caractere"):
-        p.ordem_da_fila = ordem
-        fila = p.fila()
+        p.fila_da_pagina.ordem_da_fila = ordem
+        fila = p.fila_da_pagina.fila()
         # Do título corrido só o "U" está na fila (os outros têm confiança alta), e no fim.
         assert [g for g in fila if g in gids[:n]] == [gids[5]], ordem
         assert fila[-1] == gids[5] and len(fila) == 1 + len(gids) - n, ordem
     # Na ordem de leitura a fila fica na ordem da página: andar e o fim da página contam com ela.
-    p.ordem_da_fila = "leitura"
-    assert p.fila() == sorted(p.fila(), key=gids.index) and p.fila()[0] == gids[5]
+    p.fila_da_pagina.ordem_da_fila = "leitura"
+    assert (p.fila_da_pagina.fila() == sorted(p.fila_da_pagina.fila(), key=gids.index)
+            and p.fila_da_pagina.fila()[0] == gids[5])
     p.escolher(gids[n + 10])
-    p.andar(-1)
+    p.fila_da_pagina.andar(-1)
     assert p.atual == gids[n + 9]
-    p.ordem_da_fila = "confianca"
+    p.fila_da_pagina.ordem_da_fila = "confianca"
     p.pulados.add(gids[n])
-    assert p.fila()[-2:] == [gids[5], gids[n]]
+    assert p.fila_da_pagina.fila()[-2:] == [gids[5], gids[n]]
 
 
 def test_o_glifo_numa_area_de_margem_tambem_vai_para_o_fim():
@@ -106,8 +107,8 @@ def test_o_glifo_numa_area_de_margem_tambem_vai_para_o_fim():
     p, n = _controlador([zona])
     gids = [b.gid for b in p.modelo.boxes]
     primeira_linha = set(gids[n:n + 5])
-    assert primeira_linha <= p.gids_fora_do_texto()
-    assert set(p.fila()[-6:]) == {gids[5]} | primeira_linha
+    assert primeira_linha <= p.fila_da_pagina.gids_fora_do_texto()
+    assert set(p.fila_da_pagina.fila()[-6:]) == {gids[5]} | primeira_linha
 
 
 def _sem_o_numero(p):
@@ -130,10 +131,10 @@ def test_a_conta_das_margens_fica_por_pagina(monkeypatch):
     monkeypatch.setattr(ex, "margens_da_pagina", lambda *x: contas.append(1) or regra(*x))
     for modelo in (a, b, a, b, a):
         p.modelo = modelo
-        p.gids_de_margem()
+        p.fila_da_pagina.gids_de_margem()
     assert len(contas) == 2
     _sem_o_numero(p)                    # mudou o que a regra lê: a conta é refeita
-    assert p.gids_de_margem() == frozenset() and len(contas) == 3
+    assert p.fila_da_pagina.gids_de_margem() == frozenset() and len(contas) == 3
 
 
 def test_na_janela_a_fila_usa_a_ultima_conta_das_margens():
@@ -142,14 +143,14 @@ def test_na_janela_a_fila_usa_a_ultima_conta_das_margens():
     ele, a fila segue a página na hora."""
     p, n = _controlador()
     gids = [b.gid for b in p.modelo.boxes]
-    assert p.fila()[-1] == gids[5]
+    assert p.fila_da_pagina.fila()[-1] == gids[5]
     _sem_o_numero(p)
-    assert p.fila()[0] == gids[5]       # o "U" sem leitura, confiança 0, abre a fila
+    assert p.fila_da_pagina.fila()[0] == gids[5]   # o "U" sem leitura, confiança 0, abre a fila
 
     p, n = _controlador()
-    p.margens_com_o_texto = True
-    assert p.fila()[-1] == gids[5]      # sem conta guardada, a fila a faz
+    p.fila_da_pagina.margens_com_o_texto = True
+    assert p.fila_da_pagina.fila()[-1] == gids[5]  # sem conta guardada, a fila a faz
     _sem_o_numero(p)
-    assert p.fila()[-1] == gids[5] and gids[5] in p.margens_da_fila()
-    assert p.gids_de_margem() == frozenset()            # o texto refaz a conta
-    assert p.fila()[0] == gids[5] and p.margens_da_fila() == frozenset()
+    assert p.fila_da_pagina.fila()[-1] == gids[5] and gids[5] in p.fila_da_pagina.margens_da_fila()
+    assert p.fila_da_pagina.gids_de_margem() == frozenset()  # o texto refaz a conta
+    assert p.fila_da_pagina.fila()[0] == gids[5] and p.fila_da_pagina.margens_da_fila() == frozenset()

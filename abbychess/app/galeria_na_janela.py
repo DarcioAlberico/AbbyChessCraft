@@ -93,7 +93,7 @@ class GaleriaNaJanela:
     def verificar_pagina(self) -> None:
         """Ctrl+T: com glifos a revisar, pergunta na barra (§8.4: Enter aceita, Esc não
         marca e fecha só a pergunta) antes de marcar a página como verificada."""
-        pendentes = len(self.pagina.fila()) if self.pagina.modelo is not None else 0
+        pendentes = len(self.pagina.fila_da_pagina.fila()) if self.pagina.modelo is not None else 0
         if pendentes:
             indice = self.pagina.indice           # só a página da pergunta (§8.4)
             self.confirmacao.perguntar(

@@ -50,7 +50,7 @@ def test_digitar_abre_uma_sessao_e_o_modelo_so_muda_ao_confirmar(j):
     assert not j.texto.tem_sessao
     assert pagina.boxes[7].entry.char == "l" and pagina.boxes[7].entry.source == FONTE_MANUAL
     assert not pagina.decisoes.virtuais and _texto(j) == "vou concluir hoje"
-    assert pagina.boxes[7].gid not in j.pagina.fila()
+    assert pagina.boxes[7].gid not in j.pagina.fila_da_pagina.fila()
 
 
 def test_ca_6_3_o_espaco_digitado_parte_a_palavra(j):
@@ -80,7 +80,7 @@ def test_ca_6_9_enter_numa_palavra_sem_mudanca_a_tira_da_fila(j):
     _por_o_cursor(j, 2)
     _tecla(j, Qt.Key.Key_Return)
     casa = {b.gid for b in pagina.boxes[:4]}
-    assert casa.isdisjoint(j.pagina.fila()) and all(b.revisado for b in pagina.boxes[:4])
+    assert casa.isdisjoint(j.pagina.fila_da_pagina.fila()) and all(b.revisado for b in pagina.boxes[:4])
     assert {b.entry.source for b in pagina.boxes[:4]} == {"net"}   # a fonte não muda
     assert j.texto.textCursor().position() == 5           # a próxima duvidosa: "velha"
 

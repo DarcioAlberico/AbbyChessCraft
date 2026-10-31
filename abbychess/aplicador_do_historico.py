@@ -138,7 +138,7 @@ class AplicadorDoHistorico:
             self._p.atual, self._p.pulados, self._p.selecao = None, set(), set()
             self._p.eventos.emitir("glifos_mudaram", None)
             self._p.eventos.emitir("selecao_mudou")
-            self._p.ir_ao_primeiro_pendente()
+            self._p.fila_da_pagina.ir_ao_primeiro_pendente()
         if refazer and transacao.invalidada and transacao.esquecidas:
             # Um esquecer desfeito antes de a procura no livro voltar: o refazer só trouxe o
             # que a transação guardou (a página aberta); a procura roda de novo.

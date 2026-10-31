@@ -85,7 +85,7 @@ def test_ca_9_4_do_ctrl_n_ao_primeiro_enter_em_3_gestos(app, tmp_path, sem_dialo
         _ate(app, lambda: terminou, limite=120)            # os modelos e a amostra no fundo
         _esperar(app, janela)
         p = janela.pagina
-        assert p.atual is not None and p.atual in p.fila()   # o primeiro glifo no Glifo
+        assert p.atual is not None and p.atual in p.fila_da_pagina.fila()  # o primeiro glifo no Glifo
         antes = janela.leitor.arquivos_de_padrao()
         janela.activateWindow()                          # (o offscreen não devolve sozinho)
         assert QTest.qWaitForWindowActive(janela, 5000)

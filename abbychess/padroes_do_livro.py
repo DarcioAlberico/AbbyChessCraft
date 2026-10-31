@@ -148,7 +148,7 @@ class ControladorDosPadroes:
         self._p._gravar(pagina)
         if pagina is self._p.modelo:
             if self._p.atual is None:
-                self._p.ir_ao_primeiro_pendente()
+                self._p.fila_da_pagina.ir_ao_primeiro_pendente()
             self._p.eventos.emitir("glifos_mudaram", None)
         return n
 
@@ -227,7 +227,7 @@ class ControladorDosPadroes:
             self._p.servidor.trocar_limiares(limiares)
         self._p.eventos.emitir("glifos_mudaram", None)
         if self._p.boxes:
-            self._p.ir_ao_primeiro_pendente()
+            self._p.fila_da_pagina.ir_ao_primeiro_pendente()
         if gravou:
             mensagem = "Limiares do livro gravados."
         elif projeto.somente_leitura:

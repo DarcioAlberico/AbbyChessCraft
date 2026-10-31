@@ -32,7 +32,7 @@ class LoteNaJanela:
         alvo = (com_fila or list(paginas) or [p.indice])[0]
         if alvo != p.indice:
             p.ir_para(alvo)
-        p.ir_ao_primeiro_pendente()
+        p.fila_da_pagina.ir_ao_primeiro_pendente()
         self.atualizar_fila()
         self.relogio_das_paginas.start()
         self.vista.setCurrentWidget(self.painel_do_documento)

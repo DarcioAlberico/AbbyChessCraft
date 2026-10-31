@@ -363,6 +363,19 @@ def da_v2(total: int, pids_gravados: Mapping[int, int],
 # A seleção de páginas (§12.4, CA-12.15)
 # ----------------------------------------------------------------------
 
+def faixas_de_paginas(posicoes: Iterable[int], separador: str = "–") -> str:
+    """As posições (de 0) como os números da página (de 1), com as seguidas em faixa: "2–51,
+    60". O travessão é o de mostrar; o campo que o usuário edita (e `selecao` lê) usa o
+    hífen (decisão §13.2 da SPEC-qualidade: uma regra, o separador de quem a pede)."""
+    faixas: List[List[int]] = []
+    for n in sorted({int(p) + 1 for p in posicoes}):
+        if faixas and n == faixas[-1][1] + 1:
+            faixas[-1][1] = n
+        else:
+            faixas.append([n, n])
+    return ", ".join(str(a) if a == b else f"{a}{separador}{b}" for a, b in faixas)
+
+
 _PARES = {"pares", "par"}
 _IMPARES = {"impares", "ímpares", "impar", "ímpar"}
 _TODAS = {"todas", "tudo"}

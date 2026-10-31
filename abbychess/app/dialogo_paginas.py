@@ -22,13 +22,7 @@ from abbychess.app import estilo, teclado
 
 def texto_da_selecao(posicoes: Sequence[int]) -> str:
     """As posições como o usuário as escreve: "2-4, 7" (os números da página, de 1)."""
-    numeros, faixas = sorted({p + 1 for p in posicoes}), []
-    for n in numeros:
-        if faixas and n == faixas[-1][1] + 1:
-            faixas[-1][1] = n
-        else:
-            faixas.append([n, n])
-    return ", ".join(str(a) if a == b else f"{a}-{b}" for a, b in faixas)
+    return sq.faixas_de_paginas(posicoes, "-")
 
 
 def efeito(um: str, varios: str) -> Callable[[List[int]], str]:

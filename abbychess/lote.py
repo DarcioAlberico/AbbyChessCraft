@@ -445,13 +445,9 @@ class CondutorDoLote:
 
 def _paginas(indices) -> str:
     """As páginas como o usuário as vê, com as seguidas em faixa: "2–51, 60"."""
-    faixas, numeros = [], sorted({int(i) + 1 for i in indices})
-    for n in numeros:
-        if faixas and n == faixas[-1][1] + 1:
-            faixas[-1][1] = n
-        else:
-            faixas.append([n, n])
-    return ", ".join(f"{a}–{b}" if b > a else str(a) for a, b in faixas)
+    from abbychess import sequencia as sq
+
+    return sq.faixas_de_paginas(indices)
 
 
 def tem_detalhe(resultado: ResultadoDoLote) -> bool:

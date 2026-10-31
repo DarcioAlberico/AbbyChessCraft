@@ -173,10 +173,7 @@ class ControladorDeVerificacao:
 
     def _corrigir(self, gids, posicao: int, texto: str, ensinar: bool) -> None:
         p = self.pagina
-        if gids is None or p._vivos(gids) != gids:
-            self.recontar()
-            p._avisar("A página mudou desde a contagem; as palavras foram contadas de novo.",
-                      6000)
+        if self._mudou_desde_a_contagem(gids):
             return
         antes = p._instantaneo()
         entries = [ed.copia(p.box(g)) for g in gids]
@@ -187,11 +184,7 @@ class ControladorDeVerificacao:
         except ValueError as erro:
             p._avisar(f"Não corrigiu: {erro}", AVISO_LONGO_MS)
             return
-        for k, _char in mudados:
-            ed.trocar(p.modelo, gids[k], entries[k])
-        espacos = [k for k in espacos if gids[k] not in p.modelo.decisoes.quebras]
-        for k in espacos:                         # o espaço que a leitura não viu
-            ed.quebrar(p.modelo, gids[k])
+        espacos = _gravar_a_correcao(p.modelo, gids, entries, mudados, espacos)
         descricao = f"Corrigir '{texto}'"
         # A correção e o ensino que vem dela são um passo só do desfazer.
         passo = ("palavra", object())             # uma chave só deste comando
@@ -208,16 +201,24 @@ class ControladorDeVerificacao:
         if not ensinar or not mudados or p.leitor is None:
             depois(f"'{texto}': {len(mudados)} glifo(s) corrigido(s){separadas}.")
             return
-        por_char: dict = {}
-        for k, char in mudados:
-            por_char.setdefault(char, []).append(gids[k])
 
         def ensinou(resolvidos: int) -> None:
             extra = f"; os padrões resolveram mais {resolvidos} na página" if resolvidos else ""
             depois(f"'{texto}': {len(mudados)} glifo(s) corrigido(s) e ensinado(s)"
                    f"{separadas}{extra}.")
 
-        p.leitura.ensinar_gids(por_char, descricao, ensinou, juntar=passo)
+        p.leitura.ensinar_gids(_gids_por_caractere(mudados, gids), descricao, ensinou,
+                               juntar=passo)
+
+    def _mudou_desde_a_contagem(self, gids) -> bool:
+        """Algum glifo da palavra saiu ou mudou desde a contagem: conta as palavras de novo e
+        avisa (a correção não entra)."""
+        p = self.pagina
+        if gids is not None and p._vivos(gids) == gids:
+            return False
+        self.recontar()
+        p._avisar("A página mudou desde a contagem; as palavras foram contadas de novo.", 6000)
+        return True
 
     def ignorar_todas(self) -> None:
         palavra = self.atual()
@@ -247,6 +248,25 @@ class ControladorDeVerificacao:
         if 0 <= indice < len(self._gids) and self._gids[indice] in set(self.pagina.gids):
             return self._gids[indice]
         return None
+
+
+def _gravar_a_correcao(modelo, gids: List[int], entries, mudados, espacos) -> List[int]:
+    """Troca na página os glifos que a correção mudou e quebra a palavra nos espaços que a
+    leitura não viu; devolve esses espaços, sem os que já eram quebra decidida."""
+    for k, _char in mudados:
+        ed.trocar(modelo, gids[k], entries[k])
+    espacos = [k for k in espacos if gids[k] not in modelo.decisoes.quebras]
+    for k in espacos:                         # o espaço que a leitura não viu
+        ed.quebrar(modelo, gids[k])
+    return espacos
+
+
+def _gids_por_caractere(mudados, gids: List[int]) -> dict:
+    """Os gids corrigidos de cada caractere novo, para ensinar (`ensinar_gids`)."""
+    por_char: dict = {}
+    for k, char in mudados:
+        por_char.setdefault(char, []).append(gids[k])
+    return por_char
 
 
 # ----------------------------------------------------------------------
@@ -366,9 +386,7 @@ class ControladorDaFila:
         lidas = sorted(p.projeto.resumo.paginas_lidas())
         if not lidas:
             return
-        depois = [i for i in lidas if (i > p.indice if passo > 0 else i < p.indice)]
-        alvo = (depois[0] if passo > 0 else depois[-1]) if depois else \
-            (lidas[0] if passo > 0 else lidas[-1])
+        alvo = _lida_vizinha(lidas, p.indice, passo)
         if alvo != p.indice:
             p.ir_para(alvo)
         self.verificador.verificar()
@@ -377,15 +395,7 @@ class ControladorDaFila:
         """"12/204": a posição do item atual na fila do modo, e o tamanho dela."""
         p = self.pagina
         if self.modo in self.DE_GLIFOS:
-            fila = p.fila_da_pagina.fila()
-            n = fila.index(p.atual) + 1 if p.atual in fila else 0
-            if self.escopo == "livro" and p.projeto is not None and p.leitor is not None:
-                from abbychess import livro as lv
-
-                outras = lv.pendentes_por_pagina(p.projeto, p.leitor.limiares)
-                total = sum(v for i, v in outras.items() if i != p.indice) + len(fila)
-                return f"{n}/{len(fila)} · livro {total}"
-            return f"{n}/{len(fila)}"
+            return self._contador_dos_glifos()
         if self.modo == "palavras":
             total = len(self.verificador.desconhecidas)
             return f"{self.verificador.posicao + 1 if total else 0}/{total}"
@@ -393,6 +403,29 @@ class ControladorDaFila:
             return "0"
         resumo = p.projeto.resumo.do_livro()
         return str(sum(r.get("diagramas_por_conferir", 0) for r in resumo.values()))
+
+    def _contador_dos_glifos(self) -> str:
+        """O contador dos modos de glifos: a posição na fila da página e o tamanho dela; no
+        escopo livro, também os pendentes do livro todo (os das outras páginas pelo resumo)."""
+        p = self.pagina
+        fila = p.fila_da_pagina.fila()
+        n = fila.index(p.atual) + 1 if p.atual in fila else 0
+        if self.escopo == "livro" and p.projeto is not None and p.leitor is not None:
+            from abbychess import livro as lv
+
+            outras = lv.pendentes_por_pagina(p.projeto, p.leitor.limiares)
+            total = sum(v for i, v in outras.items() if i != p.indice) + len(fila)
+            return f"{n}/{len(fila)} · livro {total}"
+        return f"{n}/{len(fila)}"
+
+
+def _lida_vizinha(lidas: List[int], indice: int, passo: int) -> int:
+    """A página lida depois de `indice` (`passo` > 0) ou a antes dela; na ponta, dá a volta no
+    livro (a primeira, ou a última, das `lidas`)."""
+    depois = [i for i in lidas if (i > indice if passo > 0 else i < indice)]
+    if not depois:
+        return lidas[0] if passo > 0 else lidas[-1]
+    return depois[0] if passo > 0 else depois[-1]
 
 
 # ----------------------------------------------------------------------

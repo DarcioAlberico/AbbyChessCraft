@@ -294,11 +294,16 @@ class DesenhoDaJanela:
 
     def _gravacao_falhou(self, indice, erro) -> None:
         """CA-4.2 (A2): a falha de gravação vai para Avisos, além da barra."""
+        self._avisar_da_pagina("Gravação", indice, (
+            f"não foi gravada ({erro}). Ela continua com as mudanças em memória e o programa "
+            "tenta de novo; não feche antes de liberar o disco."))
+
+    def _avisar_da_pagina(self, titulo: str, indice, resto: str) -> None:
+        """O aviso de uma página na barra e em Avisos: "A página N " + `resto`."""
         pagina = f"A página {indice + 1}" if indice is not None else "Uma página"
-        texto = (f"{pagina} não foi gravada ({erro}). Ela continua com as mudanças em memória "
-                 "e o programa tenta de novo; não feche antes de liberar o disco.")
+        texto = f"{pagina} {resto}"
         self.statusBar().showMessage(texto)
-        self.registrar_aviso(av.ERRO, "Gravação", texto)
+        self.registrar_aviso(av.ERRO, titulo, texto)
 
     def ligar_os_avisos_do_projeto(self, projeto) -> None:
         """Os avisos do projeto que abre: a falha de gravação e a página ilegível (que chegam
@@ -310,12 +315,10 @@ class DesenhoDaJanela:
     def _pagina_ilegivel(self, indice, guardado) -> None:
         """SPEC-qualidade Q-P7: a página cujo arquivo não se lê passa a não reconhecida; o
         aviso diz qual e onde ficou o arquivo de antes."""
-        pagina = f"A página {indice + 1}" if indice is not None else "Uma página"
         onde = (f" O arquivo dela foi guardado em paginas/{guardado}." if guardado else "")
-        texto = (f"{pagina} estava com o arquivo ilegível e ficou como não reconhecida.{onde} "
-                 "Reconheça-a de novo (F5).")
-        self.statusBar().showMessage(texto)
-        self.registrar_aviso(av.ERRO, "Página ilegível", texto)
+        self._avisar_da_pagina("Página ilegível", indice, (
+            f"estava com o arquivo ilegível e ficou como não reconhecida.{onde} Reconheça-a de "
+            "novo (F5)."))
 
     def _ocupado_mudou(self, ocupado: bool, titulo: str) -> None:
         self.progresso.setVisible(ocupado)

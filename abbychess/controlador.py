@@ -1229,29 +1229,26 @@ class ControladorDePagina:
         """F5: segmenta pelas áreas, lê e acha os diagramas. Mantém os glifos marcados à mão
         de uma página ainda não reconhecida; numa já reconhecida, os glifos novos herdam o
         gid (e as decisões) de quem estava no mesmo lugar (`modelo.reconciliar`)."""
-        if not self._pode_ler() or self.servidor_parado():
-            return
-        indice = self.indice
-        self.tarefa("Reconhecendo a página", lambda: self._preparar_reconhecer(indice),
-                    falhou=self._sem_o_f5(indice, self._falhou("Reconhecer página")))
+        self._reconhecer(None)
 
     def reconhecer_zona(self, zona) -> None:
         """Ctrl+Shift+R: reconhece somente uma zona e conserva o restante da página."""
+        self._reconhecer(zona)
+
+    def _reconhecer(self, zona) -> None:
         if not self._pode_ler() or self.servidor_parado():
             return
         indice = self.indice
-        self.tarefa("Reconhecendo a área",
-                    lambda: self._preparar_reconhecer(indice, zona),
-                    falhou=self._sem_o_f5(indice, self._falhou("Reconhecer área")))
-
-    def _sem_o_f5(self, indice: int, falhou):
-        """O `falhou` do F5, que também tira a página de `lendo_no_f5`."""
         pid = self.projeto.pid_da_pagina(indice)
+        titulo, falha = (("Reconhecendo a página", "Reconhecer página") if zona is None
+                         else ("Reconhecendo a área", "Reconhecer área"))
+        avisar = self._falhou(falha)
 
-        def sem(mensagem: str) -> None:
+        def falhou(mensagem: str) -> None:      # a página sai de `lendo_no_f5` também aqui
             self.lendo_no_f5.discard(pid)
-            falhou(mensagem)
-        return sem
+            avisar(mensagem)
+
+        self.tarefa(titulo, lambda: self._preparar_reconhecer(indice, zona), falhou=falhou)
 
     def _preparar_reconhecer(self, indice: int, zona=None):
         if indice != self.indice or not self._pode_ler(avisar=False):

@@ -65,15 +65,41 @@ def test_ca_q_t2_a_suite_rapida_nao_dorme_nem_mede_o_relogio():
     assert achados == []
 
 
+#: Os testes das regras da própria suíte leem outro teste de propósito (este arquivo).
+PODEM_LER_TESTES = {"test_suite.py"}
+
+
+def imports_de_teste(fonte: str) -> list:
+    """(linha, módulo) de cada import de um arquivo de teste, em qualquer forma:
+    `from tests.test_x import f`, `from tests import test_x`, `import tests.test_x`."""
+    achados = []
+    for no in ast.walk(ast.parse(fonte)):
+        if isinstance(no, ast.ImportFrom) and (no.module or "").startswith("tests.test_"):
+            achados.append((no.lineno, no.module))
+        elif isinstance(no, ast.ImportFrom) and no.module == "tests":
+            achados += [(no.lineno, f"tests.{a.name}") for a in no.names if a.name.startswith("test_")]
+        elif isinstance(no, ast.Import):
+            achados += [(no.lineno, a.name) for a in no.names if a.name.startswith("tests.test_")]
+    return achados
+
+
 def test_ca_q_t5_nenhum_teste_importa_de_outro_teste():
     """CA-Q-T5: o que mais de um teste usa mora num módulo de apoio (`tests/ajudantes.py`,
     `tests/fixturas*.py`) ou no conftest, e não num arquivo de teste: rodar um arquivo não
     importa (nem coleta de novo) o outro, e mudar um teste não quebra o vizinho."""
-    achados = [f"{arquivo.relative_to(TESTES).as_posix()}:{no.lineno} ({no.module})"
-               for arquivo in sorted(TESTES.rglob("*.py"))
-               for no in ast.walk(ast.parse(arquivo.read_text(encoding="utf-8")))
-               if isinstance(no, ast.ImportFrom) and (no.module or "").startswith("tests.test_")]
+    achados = [f"{arquivo.relative_to(TESTES).as_posix()}:{linha} ({modulo})"
+               for arquivo in sorted(TESTES.rglob("*.py")) if arquivo.name not in PODEM_LER_TESTES
+               for linha, modulo in imports_de_teste(arquivo.read_text(encoding="utf-8"))]
     assert achados == []
+
+
+def test_a_regra_dos_imports_pega_as_tres_formas_e_poupa_o_apoio():
+    fonte = ("from tests.test_a import f\n"
+             "from tests import ajudantes, test_b\n"
+             "import tests.test_c as c\n"
+             "import tests.fixturas\n"
+             "from tests.ajudantes import esperar\n")
+    assert imports_de_teste(fonte) == [(1, "tests.test_a"), (2, "tests.test_b"), (3, "tests.test_c")]
 
 
 def _pytest_filho(pasta, *args, codigo=None, **ambiente):

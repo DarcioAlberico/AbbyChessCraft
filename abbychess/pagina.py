@@ -1122,7 +1122,7 @@ def fila_de_revisao(boxes: List[BoxEntry], leitor: LeitorDoLivro,
     Em empate de confiança fica a ordem de leitura, para o usuário andar pela
     página e não pular de um canto para outro. O glifo que a palavra desmente
     (`contexto`) entra mesmo com a confiança alta. Os de `no_fim` (as margens que a
-    exportação tira, `exportar.margens_da_pagina`) vêm depois de todos os outros.
+    exportação tira, `margens.margens_da_pagina`) vêm depois de todos os outros.
     """
     pendentes = [i for i, p in enumerate(contexto.pendentes(boxes, leitor.limiares)) if p]
     no_fim = set(no_fim)

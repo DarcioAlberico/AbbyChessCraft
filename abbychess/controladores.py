@@ -25,6 +25,7 @@ from typing import List, Optional, Sequence
 from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import exportar as ex
+from abbychess import margens as mg
 from abbychess import metadados as mtd
 from abbychess import historico as hs
 from abbychess import lances as lc
@@ -158,10 +159,9 @@ class ControladorDeLayout:
             # evita renderizar as demais só para aprender a margem; pequenas variações de
             # mídia não atravessam as faixas conservadoras de 10% e 3%.
             paginas[indice] = (lidos, p.imagem.height)
-        if p.indice not in paginas:
-            lidos = [b.entry for b in (p.modelo.boxes if p.modelo else []) if b.entry.char]
-            paginas[p.indice] = (lidos, p.imagem.height)
-        funcoes = ex.funcoes_das_margens(paginas).get(p.indice, {})
+        paginas.setdefault(p.indice, ([b.entry for b in (p.modelo.boxes if p.modelo else [])
+                                       if b.entry.char], p.imagem.height))
+        funcoes = mg.funcoes_das_margens(paginas).get(p.indice, {})
         return zn.aplicar_funcoes_de_margem(zonas, paginas[p.indice][0], funcoes)
 
     def desenhar(self, x1: int, y1: int, x2: int, y2: int) -> None:

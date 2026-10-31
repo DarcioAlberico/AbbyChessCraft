@@ -13,6 +13,7 @@ from core.pagina import PaginaExtraida, Paragrafo
 
 from abbychess import epub
 from abbychess import exportar as ex
+from abbychess import margens as mg
 from abbychess import montagem as mo
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
@@ -45,13 +46,13 @@ def test_o_deslocamento_mais_votado_vale_para_o_livro_todo():
     paginas = {20: _pagina_com_rodape("21"), 21: _pagina_com_rodape("22"),
                22: _pagina_com_rodape("2l"),                  # o OCR errou: não vota
                23: _pagina_com_rodape("99")}                  # um número qualquer: perde
-    numeros = ex.numeros_impressos(paginas, {}, todas=range(20, 26))
+    numeros = mg.numeros_impressos(paginas, {}, todas=range(20, 26))
     assert numeros == {i: i + 1 for i in range(20, 26)}
 
 
 def test_sem_acordo_nao_ha_numero():
     paginas = {0: _pagina_com_rodape("7"), 1: _pagina_com_rodape("40")}
-    assert ex.numeros_impressos(paginas, {}) == {}
+    assert mg.numeros_impressos(paginas, {}) == {}
 
 
 # ----------------------------------------------------------------------
@@ -142,7 +143,7 @@ def test_o_encarte_sem_numero_muda_o_deslocamento_dali_em_diante():
     # 10 e 11 são as páginas 11 e 12; depois de um encarte de 4 páginas, 16 e 17 são 13 e 14.
     paginas = {10: _pagina_com_rodape("11"), 11: _pagina_com_rodape("12"),
                16: _pagina_com_rodape("13"), 17: _pagina_com_rodape("14")}
-    numeros = ex.numeros_impressos(paginas, {}, todas=[10, 11, 16, 17, 18])
+    numeros = mg.numeros_impressos(paginas, {}, todas=[10, 11, 16, 17, 18])
     assert numeros == {10: 11, 11: 12, 16: 13, 17: 14, 18: 15}
 
 

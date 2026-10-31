@@ -15,7 +15,7 @@ from PIL import Image
 
 from core.box_model import BoxEntry
 
-from abbychess import exportar as ex
+from abbychess import margens as mg
 from abbychess import pagina as pg
 from abbychess.controlador import ControladorDePagina, Eventos, ExecutorSincrono
 from abbychess.leitor import FONTE_NENHUMA
@@ -40,11 +40,11 @@ def _entries():
 def test_as_margens_da_pagina_contam_o_glifo_sem_leitura():
     cabecalho, corpo = _entries()
     boxes = cabecalho + corpo
-    assert ex.margens_da_pagina(boxes, ALTURA) == set(range(len(cabecalho)))
+    assert mg.margens_da_pagina(boxes, ALTURA) == set(range(len(cabecalho)))
     # Um cisco sem leitura logo abaixo do título não fecha o vão que a regra pede: ela roda
     # nos lidos, como na exportação, e o cisco, fora da altura do título, não entra.
     cisco = BoxEntry("", 400, 100, 410, 112, 0.0, FONTE_NENHUMA)
-    assert ex.margens_da_pagina(cabecalho + [cisco] + corpo, ALTURA) == set(range(len(cabecalho)))
+    assert mg.margens_da_pagina(cabecalho + [cisco] + corpo, ALTURA) == set(range(len(cabecalho)))
 
 
 def test_o_cisco_sem_leitura_na_borda_da_pagina_e_margem():
@@ -54,7 +54,7 @@ def test_o_cisco_sem_leitura_na_borda_da_pagina_e_margem():
     no_pe = BoxEntry("", 168, ALTURA - 34, 171, ALTURA - 14, 0.0, FONTE_NENHUMA)
     no_meio = BoxEntry("", 1500, 1400, 1508, 1406, 0.0, FONTE_NENHUMA)
     boxes = cabecalho + corpo + [no_pe, no_meio]
-    margens = ex.margens_da_pagina(boxes, ALTURA)
+    margens = mg.margens_da_pagina(boxes, ALTURA)
     assert len(boxes) - 2 in margens and len(boxes) - 1 not in margens
 
 
@@ -63,7 +63,7 @@ def test_a_fila_da_lista_manda_as_margens_para_o_fim():
     boxes = cabecalho + corpo
     leitor = SimpleNamespace(limiares=Limiares())
     assert pg.fila_de_revisao(boxes, leitor)[0] == 5                # confiança 0 na frente
-    fila = pg.fila_de_revisao(boxes, leitor, ex.margens_da_pagina(boxes, ALTURA))
+    fila = pg.fila_de_revisao(boxes, leitor, mg.margens_da_pagina(boxes, ALTURA))
     assert fila[0] == len(cabecalho) and fila[-1] == 5
     assert sorted(fila) == sorted(pg.fila_de_revisao(boxes, leitor))  # a mesma fila, na ordem
 
@@ -127,8 +127,8 @@ def test_a_conta_das_margens_fica_por_pagina(monkeypatch):
     a = p.modelo
     b = Pagina(pid=1, indice=1, boxes=[Box(2000 + k, bx.entry) for k, bx in enumerate(a.boxes)])
     contas = []
-    regra = ex.margens_da_pagina
-    monkeypatch.setattr(ex, "margens_da_pagina", lambda *x: contas.append(1) or regra(*x))
+    regra = mg.margens_da_pagina
+    monkeypatch.setattr(mg, "margens_da_pagina", lambda *x: contas.append(1) or regra(*x))
     for modelo in (a, b, a, b, a):
         p.modelo = modelo
         p.fila_da_pagina.gids_de_margem()

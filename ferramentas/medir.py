@@ -401,7 +401,7 @@ def medir(livro: str, pdf: Path, indices) -> dict:
 
 
 def _medir(livro: str, pdf: Path, indices, pasta: Path) -> dict:
-    from abbychess import exportar as ex
+    from abbychess import margens as mg
     from abbychess import montagem as mo
     from abbychess import livro as lv
     from abbychess import pagina as pg
@@ -426,10 +426,10 @@ def _medir(livro: str, pdf: Path, indices, pasta: Path) -> dict:
     boxes = {i: [b for b in (projeto.carregar_pagina(i) or []) if b.char] for i in indices}
     alturas = {i: fonte.pagina(i).height for i in indices}
     larguras = {i: fonte.pagina(i).width for i in indices}
-    tirados = ex.margens_corridas({i: (boxes[i], alturas[i]) for i in indices})
+    tirados = mg.margens_corridas({i: (boxes[i], alturas[i]) for i in indices})
     # As funções das zonas (CA-5.1): as automáticas de cada página, com as margens aprendidas
     # pelas páginas lidas juntas, como o modo Áreas faz.
-    funcoes_das_margens = ex.funcoes_das_margens({i: (boxes[i], alturas[i]) for i in indices})
+    funcoes_das_margens = mg.funcoes_das_margens({i: (boxes[i], alturas[i]) for i in indices})
 
     paginas = {}
     for i in indices:
@@ -440,7 +440,7 @@ def _medir(livro: str, pdf: Path, indices, pasta: Path) -> dict:
                        max(boxes[i][k].x2 for k in ln.indices), ln.pe)) for ln in linhas]
         # A poeira da borda, que a mesma regra tira, não conta: ela é `ignorar` no
         # gabarito e não é margem de ninguém.
-        poeira = set(ex._margem_da_pagina(boxes[i], alturas[i]).poeira)
+        poeira = set(mg._margem_da_pagina(boxes[i], alturas[i]).poeira)
         margens = [c for c, ln in zip(caixas, linhas)
                    if set(ln.indices) & tirados[i] and not set(ln.indices) <= poeira]
         lidos = projeto.carregar_diagramas(i)

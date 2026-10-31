@@ -130,7 +130,7 @@ _LINHA_DE_MARGEM = _re.compile(r"\d")
 
 def _margens_pelas_linhas(pagina: Pagina, texto: str, gids: Sequence[Optional[int]]) -> set:
     """Os gids do cabeçalho e do rodapé, pelas linhas já montadas (barato: a regra da
-    exportação, `exportar.margens_corridas`, monta as linhas de novo e custa ~15 ms por
+    exportação, `margens.margens_corridas`, monta as linhas de novo e custa ~15 ms por
     página): a primeira e a última linha, curtas (até 60 caracteres), com um número, e
     separadas do texto por um vão maior que 1,5 vez o vão mediano entre as linhas."""
     caixa = {b.gid: b.entry for b in pagina.boxes}

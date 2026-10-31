@@ -18,6 +18,7 @@ from PySide6.QtWidgets import QMessageBox  # noqa: E402
 from core.box_model import BoxEntry  # noqa: E402
 
 from abbychess import exportar as ex  # noqa: E402
+from abbychess import margens as mg
 from abbychess import livro  # noqa: E402
 from abbychess import pagina as pg  # noqa: E402
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro  # noqa: E402
@@ -59,19 +60,19 @@ def _tirados(boxes, tirar):
 
 def test_cabecalho_com_numero_sai_e_o_texto_fica():
     boxes = _linha("22 YASSER SEIRAWAN", 190) + _corpo()
-    tirar = ex.margens_corridas({21: (boxes, ALTURA)})[21]
+    tirar = mg.margens_corridas({21: (boxes, ALTURA)})[21]
     assert _tirados(boxes, tirar) == "22YASSERSEIRAWAN"
 
 
 def test_rodape_com_numero_sai():
     boxes = _corpo(2900) + _linha("- 22 -", 3350)
-    tirar = ex.margens_corridas({21: (boxes, ALTURA)})[21]
+    tirar = mg.margens_corridas({21: (boxes, ALTURA)})[21]
     assert _tirados(boxes, tirar) == "-22-"
 
 
 def test_titulo_que_se_repete_sai_mesmo_sem_numero():
     paginas = {i: (_linha("XADREZ VITORIOSO", 180) + _corpo(), ALTURA) for i in (20, 22)}
-    tirar = ex.margens_corridas(paginas)
+    tirar = mg.margens_corridas(paginas)
     assert all(_tirados(paginas[i][0], tirar[i]) == "XADREZVITORIOSO" for i in (20, 22))
 
 
@@ -82,7 +83,7 @@ def test_margens_aprendem_a_funcao_semantica_de_cada_linha():
         22: (_linha("XADREZ VITORIOSO", 180) + _corpo(), ALTURA),
     }
 
-    funcoes = ex.funcoes_das_margens(paginas)
+    funcoes = mg.funcoes_das_margens(paginas)
 
     assert set(funcoes[20].values()) == {"cabecalho"}
     assert set(funcoes[21].values()) == {"numero_de_pagina"}
@@ -92,19 +93,19 @@ def test_margens_aprendem_a_funcao_semantica_de_cada_linha():
 def test_titulo_de_capitulo_sem_numero_nem_repeticao_fica():
     paginas = {20: (_linha("CAPITULO UM", 180) + _corpo(), ALTURA),
                21: (_linha("OUTRA COISA BEM DIFERENTE", 180) + _corpo(), ALTURA)}
-    tirar = ex.margens_corridas(paginas)
+    tirar = mg.margens_corridas(paginas)
     assert tirar == {20: set(), 21: set()}
 
 
 def test_primeira_linha_colada_no_texto_fica():
     """Sem o vão maior que o das linhas, a primeira linha é texto, mesmo com número."""
     boxes = _linha("12 lances depois", 300) + _corpo(360)
-    assert ex.margens_corridas({0: (boxes, ALTURA)}) == {0: set()}
+    assert mg.margens_corridas({0: (boxes, ALTURA)}) == {0: set()}
 
 
 def test_poeira_da_borda_sai():
     boxes = _linha("l", 1, x=2000, altura=33) + _corpo() + _linha(".", 3480, x=2000, altura=3)
-    tirar = ex.margens_corridas({0: (boxes, ALTURA)})[0]
+    tirar = mg.margens_corridas({0: (boxes, ALTURA)})[0]
     assert _tirados(boxes, tirar) == "l."
 
 

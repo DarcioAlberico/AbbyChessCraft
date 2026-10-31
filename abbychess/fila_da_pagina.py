@@ -110,12 +110,12 @@ class FilaDaPagina:
 
     def gids_de_margem(self) -> frozenset:
         """Os glifos do cabeçalho e do rodapé corridos da página, pela regra da exportação
-        (`exportar.margens_corridas`: a faixa, o vão e o número da página), até o layout do
-        passo F dar a função às áreas. O glifo sem leitura conta (`exportar.margens_da_pagina`):
+        (`margens.margens_corridas`: a faixa, o vão e o número da página), até o layout do
+        passo F dar a função às áreas. O glifo sem leitura conta (`margens.margens_da_pagina`):
         o □ do título corrido é título corrido."""
         if self._p.modelo is None or self._p.imagem is None:
             return frozenset()
-        from abbychess import exportar as ex
+        from abbychess import margens as mg
 
         boxes = self._p.modelo.boxes
         # A regra olha as linhas inteiras da página (~25 ms numa página cheia): o resultado
@@ -127,7 +127,7 @@ class FilaDaPagina:
                        for b in boxes))
         guardada = self._margens.pop(self._p.modelo.pid, None)
         if guardada is None or guardada[0] != chave:
-            indices = ex.margens_da_pagina([b.entry for b in boxes], self._p.imagem.height)
+            indices = mg.margens_da_pagina([b.entry for b in boxes], self._p.imagem.height)
             guardada = (chave, frozenset(boxes[i].gid for i in indices if i < len(boxes)))
         self._margens[self._p.modelo.pid] = guardada       # a vista por último, no fim
         while len(self._margens) > MARGENS_GUARDADAS:

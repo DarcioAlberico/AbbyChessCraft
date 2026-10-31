@@ -135,7 +135,7 @@ def _rascunho(livro: str, pdf: Path, indices, pasta: Path, com_modelos: bool) ->
     from PIL import Image, ImageDraw, ImageFont
 
     from abbychess import diagramas as dg
-    from abbychess import exportar as ex
+    from abbychess import margens as mg
     from abbychess import montagem as mo
     from abbychess import pagina as pg
     from abbychess.leitor import LeitorDoLivro
@@ -153,7 +153,7 @@ def _rascunho(livro: str, pdf: Path, indices, pasta: Path, com_modelos: bool) ->
                 b.char = "?"            # sem leitura: entra na linha, para a linha existir
         lidos[indice] = (imagem, segmentada)
     alturas = {i: lidos[i][0].height for i in indices}
-    margens = ex.margens_corridas({i: (lidos[i][1].boxes, alturas[i]) for i in indices})
+    margens = mg.margens_corridas({i: (lidos[i][1].boxes, alturas[i]) for i in indices})
 
     gravados = []
     destino = VERDADE / livro

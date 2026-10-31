@@ -517,7 +517,7 @@ def _colado(dif: Diferencas, boxes, sem_colado: set, disponiveis: dict, imagem, 
 
 def _fila(boxes, leitor, altura=None) -> list:
     """A fila de revisão da janela, com as margens no fim quando o código as tem
-    (`exportar.margens_da_pagina`, desde o `2e3d9a1`; a linha de base roda este arquivo no
+    (`margens.margens_da_pagina`, desde o `2e3d9a1`; a linha de base roda este arquivo no
     código do passo 0, que não as tem)."""
     from abbychess import exportar as ex
     from abbychess import pagina as pg

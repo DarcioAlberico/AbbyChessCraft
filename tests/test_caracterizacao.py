@@ -21,7 +21,7 @@ import pytest
 from core.box_model import BoxEntry
 
 from abbychess import diagramas as dg
-from abbychess import exportar as ex
+from abbychess import margens as mg
 from abbychess import montagem as mo
 from abbychess import pagina as pg
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro
@@ -145,5 +145,5 @@ def test_margens_corridas(request):
                                           "o plano consiste em atacar", "e a Dama sob ataque"))
              for b in _linha(frase, 200 + 50 * k)]
     boxes = cabecalho + corpo
-    tirar = ex.margens_corridas({21: (boxes, 1000)})[21]
+    tirar = mg.margens_corridas({21: (boxes, 1000)})[21]
     _conferir(request, "margens.json", sorted(tirar))

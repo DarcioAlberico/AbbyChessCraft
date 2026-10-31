@@ -22,6 +22,7 @@ from PIL import Image
 from core.box_model import BoxEntry
 
 from abbychess import exportar as ex
+from abbychess import margens as mg
 from abbychess import montagem as mo
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
@@ -93,9 +94,9 @@ def test_linha_de_lances_no_pe_da_pagina_nao_e_rodape():
     corpo = [b for k in range(6) for b in _linha(FRASES[k], 400 + 60 * k)]
     # A contraprova: no mesmo lugar, o rodapé com o número da página sai.
     rodape = _linha("22 YASSER SEIRAWAN", 3300)
-    assert ex.margens_corridas({0: (corpo + rodape, 3500)})[0]
+    assert mg.margens_corridas({0: (corpo + rodape, 3500)})[0]
     lances = _linha("13.Qb3 0-0-0", 3300)
-    assert not ex.margens_corridas({0: (corpo + lances, 3500)})[0]
+    assert not mg.margens_corridas({0: (corpo + lances, 3500)})[0]
 
 
 #: Linhas de tamanhos diferentes: com o mesmo texto em todas, os espaços se

@@ -129,6 +129,74 @@ def test_conferir_acusa_hiperlink_sem_marcador(tmp_path):
     assert ed.conferir(tmp_path / "nao-existe.docx")[0].startswith("o DOCX não abre")
 
 
+@pytest.fixture(scope="module")
+def partes_de_um_docx(tmp_path_factory):
+    """As partes de um DOCX são, sem símbolos (sem fonte embutida): três páginas com
+    marcador, um hiperlink para a página 12 e duas figuras, escrito uma vez."""
+    paginas = [PaginaExtraida(numero=0, blocos=[Paragrafo("Capítulo Um", titulo=True, nivel=1),
+                                                Paragrafo("A solução está na página 12.")]),
+               PaginaExtraida(numero=1, blocos=[Figura(_png(0), 16, 16, fen=FEN, origem="render"),
+                                                Figura(_png(200), 16, 24, origem="recorte")]),
+               PaginaExtraida(numero=2, blocos=[Paragrafo("A solução.")])]
+    destino = tmp_path_factory.mktemp("conferir") / "a.docx"
+    ed.escrever(paginas, destino, _meta(), numeros={0: 10, 1: 11, 2: 12})
+    with zipfile.ZipFile(destino) as z:
+        return {n: z.read(n) for n in z.namelist()}
+
+
+def _trocar(nome, de, para):
+    def estragar(partes):
+        assert de in partes[nome]
+        partes[nome] = partes[nome].replace(de, para)
+    return estragar
+
+
+def _tirar(nome):
+    def estragar(partes):
+        del partes[nome]
+    return estragar
+
+
+def _fonte_embutida(alvo=None):
+    def estragar(partes):
+        _trocar("word/fontTable.xml", b"</w:fonts>",
+                b'<w:font w:name="S"><w:embedRegular/></w:font></w:fonts>')(partes)
+        if alvo:
+            partes["word/_rels/fontTable.xml.rels"] = (
+                b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/'
+                b'relationships"><Relationship Id="rIdFonte1" Target="' + alvo + b'"/>'
+                b"</Relationships>")
+    return estragar
+
+
+DOCUMENTO = "word/document.xml"
+
+
+@pytest.mark.parametrize("estragar,esperado", [
+    (_tirar(DOCUMENTO), "falta word/document.xml"),
+    (_trocar(DOCUMENTO, b"</w:document>", b""), "XML ilegível ("),
+    (_tirar("word/media/image1.png"), "a imagem rId"),
+    (_trocar(DOCUMENTO, b'w:name="pg2"', b'w:name="pg1"'), "o marcador pg1 se repete"),
+    (_trocar(DOCUMENTO, b'<w:bookmarkStart w:id="2"', b'<w:bookmarkStart w:id="1"'),
+     "o id de marcador 1 se repete"),
+    (_trocar(DOCUMENTO, b'<w:bookmarkEnd w:id="3"/>', b""), "o marcador de id 3 não fecha"),
+    (_trocar(DOCUMENTO, b'w:anchor="pg3"', b'w:tooltip="pg3"'), "hiperlink sem destino"),
+    (_trocar(DOCUMENTO, b'id="2" name="Diagrama 2"', b'id="1" name="Diagrama 2"'),
+     "ids de figura repetidos"),
+    (_fonte_embutida(), "a fonte embutida não tem relacionamento"),
+    (_fonte_embutida(b"fonts/fonte1.odttf"), "a fonte fonts/fonte1.odttf não está no pacote"),
+])
+def test_conferir_acusa_o_que_o_word_recusaria(partes_de_um_docx, tmp_path, estragar, esperado):
+    partes = dict(partes_de_um_docx)
+    estragar(partes)
+    ruim = tmp_path / "ruim.docx"
+    with zipfile.ZipFile(ruim, "w", zipfile.ZIP_DEFLATED) as z:
+        for nome, dados in partes.items():
+            z.writestr(nome, dados)
+    problemas = ed.conferir(ruim)
+    assert any(p.startswith(esperado) for p in problemas), problemas
+
+
 # ----------------------------------------------------------------------
 # A revisão de código (rodada 1)
 # ----------------------------------------------------------------------

@@ -116,6 +116,12 @@ jeitos (Q-P7); o lote e o F5 podem gravar a mesma página (Q-C2, suspeita).
 
 **Pronto quando:** os CA passam e o teste de arquitetura está na suíte rápida.
 
+**Feito** em 2026-10-30, ramo `qualidade-q2` (`docs/revisoes/qualidade-Q2.md`): os quatro CA
+e o teste de arquitetura. O CA-Q-P7 mudou (a página ilegível fica guardada e é não
+reconhecida, em vez de um estado novo), e o dano do Q-C2 era outro (a leitura do lote
+perdida, e não o Ctrl+Z). O portão `livro_real` segue com a falha de tempo do CA-7.1, que
+vem da base.
+
 ## Passo Q3 — Exportação fiel
 
 **Contexto.** A exportação refaz o texto dos boxes em vez de ler o Documento (Q-E1, a §12.1

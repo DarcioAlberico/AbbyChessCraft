@@ -201,8 +201,10 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
   `falhou` da tarefa (aviso na barra) e a fila segue.
 - **Correção mínima:** `except Exception` em `_fim` com log e `falhou`; `excepthook` em
   `app/principal.py`.
+- **Feito** no Q2 (`e52ae33`, `4822e69`), como a correção mínima; o gancho também pega o
+  erro solto de uma thread (`threading.excepthook`).
 
-### Q-C2 (Média, suspeita) — o lote e o F5 na mesma página
+### Q-C2 (Média, confirmado no Q2, com outro dano) — o lote e o F5 na mesma página
 
 - **Evidência:** `lote._gravar` e o `chegou` dos aguardando entram por `na_interface`, fora do
   executor (`lote.py:378-425`, `controlador.py:1560-1587`); `_mudou_durante`
@@ -210,6 +212,11 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
 - **CA-Q-C2:** F5 em voo + lote que termina a mesma página antes: o resultado final é um só
   dos dois, e o Ctrl+Z do F5 não desfaz a escrita do lote.
 - **Correção mínima:** no `pronto`, comparar a versão do pid com a da hora do `preparar`.
+- **Feito** no Q2 (`76b88b5`, `47aa314`). O teste mostrou outro dano: o Ctrl+Z do F5 voltava
+  certo; o que se perdia era a leitura do lote, que o `pronto` do F5 sobrescrevia enquanto o
+  relatório a dava por lida. A versão não serve (o F5 que começa antes do pedido do lote tem
+  a mesma): o controlador guarda os pids com um F5 entre o preparar e o pronto
+  (`lendo_no_f5`), e o lote deixa a página para reler depois.
 
 ### Q-C3 (Média, suspeita) — a rede do servidor usada por duas threads
 
@@ -234,6 +241,14 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
 - **CA-Q-C4:** um teste de arquitetura reprova `except Exception` sem `log.exception` (ou
   re-raise) em `abbychess/`, com uma lista de exceções justificadas; cada linha da tabela tem
   um teste que injeta a falha e confere o log e o estado.
+- **Feito** no Q2: o teste de arquitetura (`21c6a83`, `e42ba60`) aceita o que levanta, o que
+  registra o rastro e as sete funções de `LEVAM_O_ERRO` (que levam o erro adiante como
+  valor), e achou nove que engoliam; ganharam teste próprio as linhas que perdem mais que o
+  log (`d7b4bd2`, `b7461aa`): os metadados dos padrões (agora guardados à parte, como a página
+  ilegível do Q-P7) e o ouvinte que calava os outros. A camada do PDF não descartava nada:
+  a extração é uma chamada só, e ela ganhou o rastro; o resto (o relatório) é do Q3. O
+  fechamento com a tarefa presa só ganhou o log, sem teste: uma janela com uma tarefa presa
+  30 s não cabe na suíte rápida.
 
 ### Q-C5 (Baixa) — corridas menores
 

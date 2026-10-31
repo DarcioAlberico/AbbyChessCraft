@@ -172,6 +172,17 @@ def test_nome_com_iniciais_entra_no_dicionario(tmp_path):
     assert vf.carregar_lexico("xx", arquivo).conhece("L.Shamkovich")
 
 
+def test_as_listas_extras_valem_sem_ir_para_o_dicionario_do_livro(tmp_path):
+    """A lista que o PyBoxEditor guarda ao lado do PDF vale na verificação, e a que não
+    existe é pulada; nada delas vai para o `lexico.txt` do projeto."""
+    extra = tmp_path / "livro.lexico.txt"
+    extra.write_text("nimzowitsch\n", encoding="utf-8")
+    arquivo = tmp_path / "lexico.txt"
+    lex = vf.carregar_lexico("xx", arquivo, extras=[extra, tmp_path / "nao_existe.txt"])
+    assert lex.conhece("Nimzowitsch") and not lex.conhece("Capablanca")
+    assert not arquivo.exists()
+
+
 def test_recorte_da_palavra_tem_a_palavra_e_folga(imagem, boxes, lex):
     import numpy as np
 

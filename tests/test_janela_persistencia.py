@@ -55,7 +55,8 @@ def test_versao_mais_nova_abre_so_para_leitura_e_nada_e_gravado(app, projeto_lid
         janela.areas.desenhar(1, 1, 60, 60)              # nem a área nova
         from abbychess.projeto import Limiares
 
-        janela.pagina.aplicar_limiares(Limiares(revisao=0.5))   # vale na sessão, não no disco
+        # Vale na sessão, não no disco.
+        janela.pagina.padroes_do_livro.aplicar_limiares(Limiares(revisao=0.5))
         assert "nesta sessão" in janela.statusBar().currentMessage()
         janela.ir_para_pagina(0)                         # a troca de página grava, se puder
         assert _instantaneo(projeto_lido.pasta) == antes
@@ -172,7 +173,7 @@ def test_limiares_que_nao_gravam_avisam_e_nao_dizem_gravados(app, projeto_lido, 
             raise PermissionError("disco")
 
         monkeypatch.setattr(gv, "gravar_bytes", falhar)
-        janela.pagina.aplicar_limiares(Limiares(revisao=0.5))
+        janela.pagina.padroes_do_livro.aplicar_limiares(Limiares(revisao=0.5))
         assert any("não foram gravados" in a for a in sem_dialogos)
         assert janela.statusBar().currentMessage() == ("Limiares aplicados nesta sessão "
                                                        "(não foram gravados).")

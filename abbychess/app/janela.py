@@ -391,10 +391,10 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
                                   notacao=self.projeto.dados.notacao,
                                   idioma=self.projeto.dados.idioma)
         if dialogo.exec() == DialogoDeOpcoes.DialogCode.Accepted:
-            self.pagina.definir_notacao(dialogo.notacao())
-            if self.pagina.definir_idioma(dialogo.idioma()):
+            self.pagina.padroes_do_livro.definir_notacao(dialogo.notacao())
+            if self.pagina.padroes_do_livro.definir_idioma(dialogo.idioma()):
                 self.verificador.esquecer_projeto()     # o léxico do idioma novo, no próximo F7
-            self.pagina.aplicar_limiares(dialogo.limiares())
+            self.pagina.padroes_do_livro.aplicar_limiares(dialogo.limiares())
 
     def reconhecer_livro(self) -> None:
         """Reconhece um intervalo de páginas em segundo plano, gravando cada uma."""

@@ -143,7 +143,7 @@ class AplicadorDoHistorico:
             # Um esquecer desfeito antes de a procura no livro voltar: o refazer só trouxe o
             # que a transação guardou (a página aberta); a procura roda de novo.
             transacao.invalidada = False
-            self._p._procurar_no_livro(transacao)
+            self._p.padroes_do_livro.procurar_no_livro(transacao)
         repropagar = refazer and transacao.invalidada and transacao.amostras_criadas
         if repropagar and self._p.modelo is not None and self._p.modelo.pid in transacao.paginas:
             # Um Enter cuja propagação foi descartada quando ele foi desfeito: ela roda de

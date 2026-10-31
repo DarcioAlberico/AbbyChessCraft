@@ -105,7 +105,7 @@ class GaleriaNaJanela:
 
     def esquecer(self, caminhos: list) -> None:
         if self.leitor is not None:              # sem pergunta: o Ctrl+Z desfaz (§8.3)
-            self.pagina.esquecer(caminhos)
+            self.pagina.padroes_do_livro.esquecer(caminhos)
 
     # ------------------------------------------------------------------
     def abrir_galeria(self, char=None, escopo=None) -> None:

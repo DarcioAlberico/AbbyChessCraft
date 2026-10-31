@@ -180,7 +180,7 @@ class DesenhoDaJanela:
         """O efeito e o conflito de ensinar o caractere do campo (§8.3); no escopo livro da
         fila, também quantos glifos do livro têm a mesma leitura (pelo índice da busca)."""
         p = self.pagina
-        efeito, conflito = p.aviso_de_ensino(self.treino.campo.text())
+        efeito, conflito = p.padroes_do_livro.aviso_de_ensino(self.treino.campo.text())
         livro = ""
         if efeito and self.fila.escopo == "livro" and p.atual is not None:
             i = p.indice_de(p.atual)

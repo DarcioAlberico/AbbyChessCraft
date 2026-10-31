@@ -87,7 +87,7 @@ def test_ca_8_3_do_abrir_ao_painel_de_paginas(tmp_path, medidas, monkeypatch):
                             lambda i: (abertas.append(i), original(i))[1])
         limiares = type(p.leitor.limiares)(**{**vars(p.leitor.limiares), "revisao": 0.5})
         inicio = time.perf_counter()
-        p.aplicar_limiares(limiares)
+        p.padroes_do_livro.aplicar_limiares(limiares)
         while janela.executor.ocupado:
             app.processEvents()
         t_limiares = (time.perf_counter() - inicio) * 1000

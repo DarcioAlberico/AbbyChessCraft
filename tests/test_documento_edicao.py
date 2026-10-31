@@ -248,8 +248,8 @@ def test_o_modo_das_pecas_fica_nas_opcoes_do_livro(j):
 
     dialogo = DialogoDeOpcoes(j.projeto.dados.limiares, j, notacao="letras")
     assert dialogo.notacao() == "letras"
-    j.pagina.definir_notacao("letras")
-    j.pagina._aplicar_limiares(j.projeto.dados.limiares)  # grava o projeto
+    j.pagina.padroes_do_livro.definir_notacao("letras")
+    j.pagina.padroes_do_livro._aplicar_limiares(j.projeto.dados.limiares)  # grava o projeto
     bruto = json.loads((j.projeto.pasta / "projeto.json").read_text(encoding="utf-8"))
     assert bruto["notacao"] == "letras"
 

@@ -295,7 +295,8 @@ def test_o_texto_noutro_idioma_avisa_uma_vez(app, janela, monkeypatch):  # noqa:
     janela.verificador.recontar(0)
     assert "parece em" not in janela.statusBar().currentMessage()
     # Trocar o idioma nas opções esquece o léxico (o do idioma novo vem no próximo F7).
-    assert janela.pagina.definir_idioma("en") and not janela.pagina.definir_idioma("en")
+    opcoes = janela.pagina.padroes_do_livro
+    assert opcoes.definir_idioma("en") and not opcoes.definir_idioma("en")
 
 
 def test_a_camada_do_pdf_sugere_no_campo(app, janela, monkeypatch):  # noqa: F811

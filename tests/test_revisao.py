@@ -129,7 +129,7 @@ def _amostra_em_tres_paginas(livro):
     fila_da_interface = []
     ctl.executar.na_interface = fila_da_interface.append
     busca = ControladorDaBusca(ctl, paralelo=False)
-    ctl.lidos_pelas_amostras = busca.lidos_por
+    ctl.padroes_do_livro.lidos_pelas_amostras = busca.lidos_por
     busca.abrir()
 
     def na_interface():
@@ -158,7 +158,7 @@ def test_ca_8_4_esquecer_devolve_a_fila_os_lidos_no_livro_e_desfazer_os_tira(liv
 
     c = _amostra_em_tres_paginas(livro)
     assert c.da_amostra() == 30 and c.na_fila() == 0
-    c.ctl.esquecer([c.caminho])
+    c.ctl.padroes_do_livro.esquecer([c.caminho])
     c.ctl.executar.tudo()
     c.esperar(lambda: c.na_fila() == 30)
     assert c.da_amostra() == 0 and c.projeto.carregar_modelo(1).estado == EM_REVISAO
@@ -174,7 +174,7 @@ def test_refazer_o_esquecer_desfeito_antes_da_procura_devolve_os_30(livro):
     """O Ctrl+Z antes de a procura no livro voltar descarta o resultado dela; o Ctrl+Y procura
     de novo (e não fica só com a página aberta)."""
     c = _amostra_em_tres_paginas(livro)
-    c.ctl.esquecer([c.caminho])
+    c.ctl.padroes_do_livro.esquecer([c.caminho])
     c.ctl.executar.tudo()
     assert c.na_fila() == 10                            # só a página aberta, por enquanto
     c.ctl.desfazedor.desfazer()                                    # a procura ainda não voltou
@@ -191,7 +191,7 @@ def test_a_ordem_que_muda_durante_a_procura_do_esquecer_procura_de_novo(livro):
     """Mover páginas enquanto a procura do esquecer roda: as posições achadas são as de antes;
     a procura roda de novo pela ordem nova, e os 30 glifos voltam à fila nas páginas certas."""
     c = _amostra_em_tres_paginas(livro)
-    c.ctl.esquecer([c.caminho])
+    c.ctl.padroes_do_livro.esquecer([c.caminho])
     c.ctl.executar.tudo()
     assert c.na_fila() == 10                            # só a página aberta, por enquanto
     assert c.ctl.operacoes.mover_paginas([2], -1)                 # a 3ª vai para o começo
@@ -320,11 +320,11 @@ def test_o_aviso_de_ensino_diz_o_efeito_e_o_conflito(livro):
     projeto, ctl, fila = livro
     fila.definir("leitura")
     ctl.escolher(ctl.modelo.boxes[0].gid)                 # o primeiro "c" (há outro)
-    efeito, conflito = ctl.aviso_de_ensino("e")
+    efeito, conflito = ctl.padroes_do_livro.aviso_de_ensino("e")
     assert efeito == "Enter ensina 'e' · 1 iguais nesta página" and conflito == ""
     recorte = pg.recorte(ctl.imagem, ctl.modelo.boxes[0].entry)
     ctl.leitor.ensinar(recorte, "o", origem="teste")
-    efeito, conflito = ctl.aviso_de_ensino("e")
+    efeito, conflito = ctl.padroes_do_livro.aviso_de_ensino("e")
     assert "amostra(s) de 'o'" in conflito
 
 
@@ -341,7 +341,7 @@ def test_o_aviso_e_o_enter_recortam_da_matriz_do_cache(livro, monkeypatch):
     original = Image.Image.convert
     monkeypatch.setattr(Image.Image, "convert",
                         lambda self, *a, **k: convertidas.append(1) or original(self, *a, **k))
-    ctl.aviso_de_ensino("e")
+    ctl.padroes_do_livro.aviso_de_ensino("e")
     assert convertidas == []
     # O Enter (a parte síncrona) e a propagação dele, na tarefa, também não.
     gid = ctl.atual

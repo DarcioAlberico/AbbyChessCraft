@@ -101,7 +101,7 @@ def test_esquecer_rele_a_pagina_sem_o_padrao(app, janela):  # noqa: F811
     janela.treino.pedir_ensinar()
     _esperar(app, janela)
 
-    janela.pagina.esquecer([str(p) for p in janela.leitor.padroes_por_caractere()["a"]])
+    janela.pagina.padroes_do_livro.esquecer([str(p) for p in janela.leitor.padroes_por_caractere()["a"]])
     _esperar(app, janela)
 
     assert janela.leitor.padroes_por_caractere() == {}
@@ -316,7 +316,7 @@ def test_opcoes_gravam_os_limiares_e_refazem_a_fila(app, janela):  # noqa: F811
     assert sum(b.source == FONTE_LIVRO for b in boxes(janela)) == 4
 
     # Livro exigente demais: nenhum padrão aceito na próxima leitura.
-    janela.pagina.aplicar_limiares(Limiares(livro=0.999))
+    janela.pagina.padroes_do_livro.aplicar_limiares(Limiares(livro=0.999))
     assert ProjetoDeLivro.abrir(janela.projeto.pasta).dados.limiares.livro == 0.999
     assert janela.leitor.padroes.distancia_maxima < 5
 
@@ -329,7 +329,7 @@ def test_opcoes_refazem_os_pendentes_do_livro_json(app, janela):  # noqa: F811
     janela.reconhecer()
     _esperar(app, janela)
     for revisao in (0.5, 1.0, 0.0):
-        janela.pagina.aplicar_limiares(Limiares(revisao=revisao))
+        janela.pagina.padroes_do_livro.aplicar_limiares(Limiares(revisao=revisao))
         gravado = json.loads((janela.projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
         assert gravado == janela.projeto.recalcular_livro(), revisao
 

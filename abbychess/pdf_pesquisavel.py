@@ -24,6 +24,7 @@ from abbychess.margens import _funcoes_dos_candidatos, numeros_impressos
 from abbychess.montagem import DPI_DA_LEITURA, Estrutura, palavras, titulos_das_paginas
 from abbychess.pedido import NadaParaExportar, Progresso
 from abbychess.projeto import ProjetoDeLivro
+from abbychess.verificacao import caixa_da_palavra
 
 log = logging.getLogger(__name__)
 
@@ -109,25 +110,42 @@ def _escrever_camada(page, boxes: Sequence[BoxEntry], escala: float, fontes, res
     faz ocupar essa largura. A palavra girada, ou com caractere que a fonte
     principal não desenha, cai para o caminho de lá, caractere a caractere.
     """
+    from core.searchable_pdf import FONTE_OCR
+
+    _inserir_as_fontes(page, fontes)
+    lidos = [b for b in boxes if b.char]
+    for linha in palavras(lidos):
+        _escrever_linha(page, linha, lidos, escala, fontes, resumo, FONTE_OCR)
+
+
+def _inserir_as_fontes(page, fontes) -> None:
     from core.searchable_pdf import FONTE_OCR, FONTE_SIMBOLOS
 
-    fonte, caminho, fonte_sym, caminho_sym = fontes
+    _, caminho, fonte_sym, caminho_sym = fontes
     page.insert_font(fontname=FONTE_OCR, fontfile=caminho)
     if fonte_sym is not None:
         page.insert_font(fontname=FONTE_SIMBOLOS, fontfile=caminho_sym)
-    lidos = [b for b in boxes if b.char]
-    for linha in palavras(lidos):
-        for texto, indices in linha:
-            grupo = [lidos[i] for i in indices]
-            if (texto and all(not (b.angulo or 0) % 360 for b in grupo)
-                    and all(fonte.has_glyph(ord(c)) for c in texto)):
-                caixa = BoxEntry(texto, min(b.x1 for b in grupo), min(b.y1 for b in grupo),
-                                 max(b.x2 for b in grupo), max(b.y2 for b in grupo))
-                _escrever(page, caixa, texto, FONTE_OCR, fonte, escala)
-                resumo.caracteres += len(texto)
-                continue
-            for b in grupo:
-                _escrever_box(page, b, escala, fontes, resumo)
+
+
+def _escrever_linha(page, linha, lidos: Sequence[BoxEntry], escala: float, fontes, resumo,
+                    nome: str) -> None:
+    """Cada palavra da linha inteira no retângulo dos boxes dela, ou caractere a caractere."""
+    fonte = fontes[0]
+    for texto, indices in linha:
+        grupo = [lidos[i] for i in indices]
+        if _cabe_inteira(texto, grupo, fonte):
+            caixa = BoxEntry(texto, *caixa_da_palavra(lidos, indices))
+            _escrever(page, caixa, texto, nome, fonte, escala)
+            resumo.caracteres += len(texto)
+            continue
+        for b in grupo:
+            _escrever_box(page, b, escala, fontes, resumo)
+
+
+def _cabe_inteira(texto: str, grupo: Sequence[BoxEntry], fonte) -> bool:
+    """A palavra não está girada e a fonte principal desenha todo caractere dela."""
+    return bool(texto) and all(not (b.angulo or 0) % 360 for b in grupo) \
+        and all(fonte.has_glyph(ord(c)) for c in texto)
 
 
 def _escrever_fens(page, diagramas: Sequence[DiagramaLido], escala: float, fontes,
@@ -253,68 +271,98 @@ def exportar_pdf_pesquisavel(projeto: ProjetoDeLivro, caminho: str | Path,
     O projeto que endireita as páginas tem os boxes nas coordenadas da página
     endireitada; no PDF original eles voltam ao lugar da página torta.
     """
-    import fitz
-
     lidas = set(projeto.resumo.paginas_lidas())
     alvo = sorted(lidas if indices is None else lidas.intersection(indices))
     if not alvo:
         raise NadaParaExportar("Nenhuma página reconhecida para exportar.")
     resumo = ResumoDoPdf()
     fontes = _fontes()
-    tinha_rotulos = False
     fonte = pg.fonte_do_projeto(projeto)
-    # A posição no livro -> a página do PDF (§12.4); a que não sai do original, a imagem.
-    entradas = [projeto.sequencia.entrada_em(i) for i in alvo]
-    imagens = {i for i, e in zip(alvo, entradas)
-               if not projeto.origem.e_pdf or not e.do_livro_sem_geometria}
-    paginas_do_pdf = [e.pagina for e in entradas]
-    #: O livro na ordem do PDF: o sumário e os rótulos do original ainda servem. Reordenado,
-    #: eles saem e são refeitos pelos títulos e pelos números impressos do Documento.
-    na_ordem = paginas_do_pdf == sorted(paginas_do_pdf)
-    if not imagens:
-        doc = fitz.open(projeto.fonte)
-        # O `select` apaga os rótulos de página do original: o que ele tinha é lido antes.
-        tinha_rotulos = na_ordem and bool(doc.get_page_labels())
-        doc.select(paginas_do_pdf)                  # o `select` aceita qualquer ordem
-        if not na_ordem:
-            doc.set_toc([])                         # o sumário do original, fora de ordem
-    else:
-        doc = _pdf_com_imagens(projeto, fonte, alvo, entradas, imagens)
+    doc, imagens, tinha_rotulos = _abrir_o_pdf(projeto, fonte, alvo)
     escala = 72.0 / DPI_DA_LEITURA
     try:
         for feitas, (page, indice) in enumerate(zip(doc, alvo), start=1):
-            if indice not in imagens and _texto_visivel(page):
-                resumo.com_texto_proprio.append(indice)
-            else:
-                if indice not in imagens and _tirar_camada_invisivel(page):
-                    resumo.camadas_trocadas += 1
-                boxes = projeto.carregar_pagina(indice) or []
-                diagramas = projeto.carregar_diagramas(indice)
-                # A imagem da entrada já é a endireitada; a página do original, não.
-                angulo = 0.0 if indice in imagens else fonte.inclinacao(indice)
-                if angulo:
-                    largura = round(page.rect.width / escala)
-                    altura = round(page.rect.height / escala)
-                    boxes = [_na_original(b, angulo, largura, altura) for b in boxes]
-                    diagramas = [replace(d, caixa=_na_original(d.caixa, angulo, largura, altura))
-                                 for d in diagramas]
-                _escrever_camada(page, boxes, escala, fontes, resumo)
-                _escrever_fens(page, diagramas, escala, fontes, resumo)
+            _camada_da_pagina(page, projeto, fonte, indice, indice not in imagens, escala,
+                              fontes, resumo)
             resumo.paginas += 1
             if progresso:
                 progresso(feitas, len(alvo))
-        try:
-            _marcar_o_pdf(doc, projeto, alvo, resumo, tinha_rotulos)
-        except Exception as erro:  # noqa: BLE001 — sem marcadores o PDF continua bom
-            log.warning("os marcadores e os rótulos do PDF não saíram (%s)", erro, exc_info=True)
-        try:
-            doc.subset_fonts()
-        except Exception as erro:  # sem subset o arquivo só fica maior
-            log.info("as fontes do PDF não foram reduzidas (%s)", erro, exc_info=True)
-        _gravar_pdf(doc, Path(caminho))
+        _marcar_reduzir_e_gravar(doc, projeto, alvo, resumo, tinha_rotulos, Path(caminho))
     finally:
         doc.close()
     return resumo
+
+
+def _abrir_o_pdf(projeto: ProjetoDeLivro, fonte: pg.FonteDePaginas, alvo: Sequence[int]):
+    """(o PDF das páginas do alvo, as posições que saem como imagem, se o original tinha
+    rótulos de página). A posição no livro -> a página do PDF (§12.4); a que não sai do
+    original, a imagem."""
+    entradas = [projeto.sequencia.entrada_em(i) for i in alvo]
+    imagens = {i for i, e in zip(alvo, entradas)
+               if not projeto.origem.e_pdf or not e.do_livro_sem_geometria}
+    if imagens:
+        return _pdf_com_imagens(projeto, fonte, alvo, entradas, imagens), imagens, False
+    doc, tinha_rotulos = _pdf_do_original(projeto, [e.pagina for e in entradas])
+    return doc, imagens, tinha_rotulos
+
+
+def _pdf_do_original(projeto: ProjetoDeLivro, paginas_do_pdf: List[int]):
+    """(o PDF original só com as páginas do alvo, se ele tinha rótulos de página)."""
+    import fitz
+
+    #: O livro na ordem do PDF: o sumário e os rótulos do original ainda servem. Reordenado,
+    #: eles saem e são refeitos pelos títulos e pelos números impressos do Documento.
+    na_ordem = paginas_do_pdf == sorted(paginas_do_pdf)
+    doc = fitz.open(projeto.fonte)
+    # O `select` apaga os rótulos de página do original: o que ele tinha é lido antes.
+    tinha_rotulos = na_ordem and bool(doc.get_page_labels())
+    doc.select(paginas_do_pdf)                  # o `select` aceita qualquer ordem
+    if not na_ordem:
+        doc.set_toc([])                         # o sumário do original, fora de ordem
+    return doc, tinha_rotulos
+
+
+def _camada_da_pagina(page, projeto: ProjetoDeLivro, fonte: pg.FonteDePaginas, indice: int,
+                      do_original: bool, escala: float, fontes, resumo: ResumoDoPdf) -> None:
+    """A camada invisível e os FEN da página; a do original com texto visível próprio fica
+    como está, e a camada de OCR que ela trazia sai."""
+    if do_original and _texto_visivel(page):
+        resumo.com_texto_proprio.append(indice)
+        return
+    if do_original and _tirar_camada_invisivel(page):
+        resumo.camadas_trocadas += 1
+    boxes, diagramas = _leitura_no_lugar(page, projeto, fonte, indice, do_original, escala)
+    _escrever_camada(page, boxes, escala, fontes, resumo)
+    _escrever_fens(page, diagramas, escala, fontes, resumo)
+
+
+def _leitura_no_lugar(page, projeto: ProjetoDeLivro, fonte: pg.FonteDePaginas, indice: int,
+                      do_original: bool, escala: float):
+    """Os boxes e os diagramas da página, no lugar deles na página do PDF."""
+    boxes = projeto.carregar_pagina(indice) or []
+    diagramas = projeto.carregar_diagramas(indice)
+    # A imagem da entrada já é a endireitada; a página do original, não.
+    angulo = fonte.inclinacao(indice) if do_original else 0.0
+    if not angulo:
+        return boxes, diagramas
+    largura = round(page.rect.width / escala)
+    altura = round(page.rect.height / escala)
+    return ([_na_original(b, angulo, largura, altura) for b in boxes],
+            [replace(d, caixa=_na_original(d.caixa, angulo, largura, altura))
+             for d in diagramas])
+
+
+def _marcar_reduzir_e_gravar(doc, projeto: ProjetoDeLivro, alvo: Sequence[int],
+                             resumo: ResumoDoPdf, tinha_rotulos: bool, caminho: Path) -> None:
+    try:
+        _marcar_o_pdf(doc, projeto, alvo, resumo, tinha_rotulos)
+    except Exception as erro:  # noqa: BLE001 — sem marcadores o PDF continua bom
+        log.warning("os marcadores e os rótulos do PDF não saíram (%s)", erro, exc_info=True)
+    try:
+        doc.subset_fonts()
+    except Exception as erro:  # sem subset o arquivo só fica maior
+        log.info("as fontes do PDF não foram reduzidas (%s)", erro, exc_info=True)
+    _gravar_pdf(doc, caminho)
 
 
 def _pdf_com_imagens(projeto: ProjetoDeLivro, fonte: pg.FonteDePaginas, alvo: Sequence[int],
@@ -359,17 +407,27 @@ def _marcar_o_pdf(doc, projeto: ProjetoDeLivro, alvo: Sequence[int], resumo: Res
     modelos são carregados uma vez só para as duas coisas."""
     posicao = {indice: k for k, indice in enumerate(alvo)}
     lidos = {indice: Estrutura.da_pagina(projeto.carregar_modelo(indice)) for indice in alvo}
+    _marcadores(doc, projeto, alvo, posicao, lidos, resumo)
+    if not tinha_rotulos:
+        _rotulos(doc, alvo, posicao, lidos, resumo)
+
+
+def _marcadores(doc, projeto: ProjetoDeLivro, alvo: Sequence[int], posicao: dict, lidos: dict,
+                resumo: ResumoDoPdf) -> None:
+    """O sumário do original, se ele tinha; senão, um marcador por título do Documento."""
     # Depois do `select`, os marcadores das páginas que ficaram de fora já saíram.
     original = [m for m in doc.get_toc() if m[2] > 0]
     if original:
         resumo.marcadores_do_original = len(original)
-    else:
-        titulos = titulos_das_paginas(projeto, alvo, lidos)
-        if titulos:
-            doc.set_toc([[1, titulo, posicao[indice] + 1] for indice, titulo in titulos])
-            resumo.marcadores = len(titulos)
-    if tinha_rotulos:
         return
+    titulos = titulos_das_paginas(projeto, alvo, lidos)
+    if titulos:
+        doc.set_toc([[1, titulo, posicao[indice] + 1] for indice, titulo in titulos])
+        resumo.marcadores = len(titulos)
+
+
+def _rotulos(doc, alvo: Sequence[int], posicao: dict, lidos: dict, resumo: ResumoDoPdf) -> None:
+    """Os rótulos de página pelo número impresso, quando o livro diz algum."""
     # A altura de cada página sai do próprio PDF aberto (a 300 dpi, como os boxes).
     funcoes = _funcoes_dos_candidatos(
         {i: (lidos[i][0], round(doc[posicao[i]].rect.height * DPI_DA_LEITURA / 72))
@@ -377,6 +435,12 @@ def _marcar_o_pdf(doc, projeto: ProjetoDeLivro, alvo: Sequence[int], resumo: Res
     numeros = numeros_impressos(lidos, funcoes, alvo)
     if not numeros:
         return
+    doc.set_page_labels(_regras_dos_rotulos(alvo, posicao, numeros))
+    resumo.rotulos = True
+
+
+def _regras_dos_rotulos(alvo: Sequence[int], posicao: dict, numeros: dict) -> List[dict]:
+    """Uma regra por trecho de números seguidos; as páginas sem número, em romanos."""
     regras: List[dict] = []
     anterior: Optional[int] = None
     for indice in alvo:
@@ -393,8 +457,7 @@ def _marcar_o_pdf(doc, projeto: ProjetoDeLivro, alvo: Sequence[int], resumo: Res
             regras.append({"startpage": posicao[indice], "prefix": "", "style": "D",
                            "firstpagenum": numero})
         anterior = numero
-    doc.set_page_labels(regras)
-    resumo.rotulos = True
+    return regras
 
 
 def _gravar_pdf(doc, caminho: Path) -> None:

@@ -94,6 +94,20 @@ def test_o_sumario_do_pdf_original_fica(tmp_path):
     assert resumo.marcadores_do_original == 1 and resumo.marcadores == 0
 
 
+def test_o_resumo_do_pdf_diz_o_que_a_camada_levou():
+    """A linha da barra de status depois do PDF pesquisável (`exportar_com_relatorio`)."""
+    assert pdfp.ResumoDoPdf(paginas=2, caracteres=40).resumo() == (
+        "2 página(s), 40 caracteres na camada.")
+    resumo = pdfp.ResumoDoPdf(paginas=9, caracteres=900, camadas_trocadas=3,
+                              com_texto_proprio=[4, 5], fens=2, sem_glifo=1, marcadores=6,
+                              marcadores_do_original=7, rotulos=True)
+    assert resumo.resumo() == (
+        "9 página(s), 900 caracteres na camada; camada antiga trocada em 3; 2 com texto próprio "
+        "ficaram sem camada; 2 diagrama(s) com o FEN pesquisável; 1 sem glifo na fonte; "
+        "6 marcador(es) pelos títulos; o sumário do PDF original ficou (7 marcadores); "
+        "páginas com o número impresso como rótulo.")
+
+
 # ----------------------------------------------------------------------
 # Os links internos do EPUB
 # ----------------------------------------------------------------------

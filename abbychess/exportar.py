@@ -112,6 +112,10 @@ class Relatorio:
             if self.fora_do_pgn:
                 partes.append(f"{len(self.fora_do_pgn)} de fora (ver Resultados)")
             return "; ".join(partes) + "."
+        return "; ".join(self._partes_do_texto() + self._partes_do_arquivo()) + "."
+
+    def _partes_do_texto(self) -> List[str]:
+        """O que entrou do livro e o que ficou de fora dele."""
         partes = [f"{len(self.paginas)} página(s), {self.caracteres} caracteres"]
         if self.titulos:
             partes.append(f"{len(self.titulos)} título(s)")
@@ -126,6 +130,11 @@ class Relatorio:
             partes.append(f"{len(self.nao_verificadas)} página(s) não verificada(s)")
         if self.sinalizadas:
             partes.append(f"{sum(self.sinalizadas.values())} palavra(s) sinalizada(s)")
+        return partes
+
+    def _partes_do_arquivo(self) -> List[str]:
+        """O que o arquivo escrito ganhou: capítulos, links, a paginação e as imagens."""
+        partes = []
         if self.capitulos:
             partes.append(f"{self.capitulos} capítulo(s)")
         if self.links:
@@ -140,7 +149,7 @@ class Relatorio:
             partes.append(f"{self.imagens_reutilizadas} imagem(ns) reaproveitada(s)")
         if self.bytes_poupados >= 1024:
             partes.append(f"imagens {self.bytes_poupados // 1024} KB menores, sem perda")
-        return "; ".join(partes) + "."
+        return partes
 
     def pagina(self, indice: int) -> str:
         """A página do item: "página 25" (a posição no PDF, que o duplo clique em Avisos
@@ -154,6 +163,17 @@ class Relatorio:
         """O resumo e uma linha por página com o que houve nela (os itens separados por
         ";"): em Avisos, cada linha é um aviso, e o duplo clique abre a página. Uma por
         página, e não por item, para o livro inteiro não lotar os Avisos."""
+        itens = self._itens_por_pagina()
+        linhas = [self.resumo()]
+        linhas += [f"{self.pagina(p)}: " + "; ".join(itens[p]) for p in sorted(itens)]
+        if self.nao_verificadas:
+            linhas.append("Páginas não verificadas: "
+                          + ", ".join(str(i + 1) for i in self.nao_verificadas))
+        return linhas
+
+    def _itens_por_pagina(self) -> Dict[int, List[str]]:
+        """Página -> os itens dela, na ordem: títulos, margens, recortes, os de fora do PGN,
+        as palavras sinalizadas e os glifos pendentes."""
         itens: Dict[int, List[str]] = {}
         for pagina, titulo in self.titulos:
             itens.setdefault(pagina, []).append(f"título “{titulo}”")
@@ -169,12 +189,7 @@ class Relatorio:
         for pagina, n in sorted(self.pendentes.items()):
             if n:
                 itens.setdefault(pagina, []).append(f"{n} glifo(s) pendente(s)")
-        linhas = [self.resumo()]
-        linhas += [f"{self.pagina(p)}: " + "; ".join(itens[p]) for p in sorted(itens)]
-        if self.nao_verificadas:
-            linhas.append("Páginas não verificadas: "
-                          + ", ".join(str(i + 1) for i in self.nao_verificadas))
-        return linhas
+        return itens
 
     def texto(self) -> str:
         """O relatório inteiro, uma linha por item, com a página (para Resultados)."""
@@ -210,17 +225,42 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
     vier, recebe o que saiu e o que ficou de fora (§12.2). O `pedido` da exportação traz as
     opções, as páginas e o idioma; sem ele, valem os `indices` e as `opcoes`.
     """
-    from core import pdf_nativo
-
     pedido = pedido or Pedido(projeto, opcoes or Opcoes(), indices)
     opcoes = pedido.opcoes
     relatorio = relatorio if relatorio is not None else Relatorio()
+    alvo, estados, nativas, pelos_boxes = _caminhos_das_paginas(projeto, pedido, camada)
+    lidos, estruturas, tirar = _boxes_e_margens(projeto, pelos_boxes, alvo, opcoes, relatorio)
+    paginas = []
+    for feitas, indice in enumerate(alvo, start=1):
+        if indice in nativas:
+            paginas.append(nativas[indice])
+        else:
+            paginas.append(_pagina_pelos_boxes(projeto, fonte, indice, lidos[indice],
+                                               estruturas[indice], tirar.get(indice, set()),
+                                               opcoes, relatorio))
+        if progresso:
+            progresso(feitas, len(alvo))
+    _passadas_do_livro(paginas, nativas, opcoes)
+    _paginas_no_relatorio(relatorio, projeto, paginas, estados, nativas)
+    return paginas
+
+
+def _caminhos_das_paginas(projeto: ProjetoDeLivro, pedido: Pedido, camada: str
+                          ) -> Tuple[List[int], dict, Dict[int, PaginaExtraida], List[int]]:
+    """(as páginas do pedido, o estado de cada uma, as que saem da camada de texto, as que
+    saem dos boxes)."""
     if camada not in CAMADA:
         raise ValueError(f"camada inválida: {camada!r} (use um de {CAMADA})")
     alvo = pedido.alvo()
     estados = {i: r.get("estado") for i, r in projeto.resumo.do_livro().items()}
     nativas = paginas_da_camada(projeto, alvo, pedido) if camada == "auto" else {}
-    pelos_boxes = [i for i in alvo if i not in nativas]
+    return alvo, estados, nativas, [i for i in alvo if i not in nativas]
+
+
+def _boxes_e_margens(projeto: ProjetoDeLivro, pelos_boxes: Sequence[int], alvo: Sequence[int],
+                     opcoes: Opcoes, relatorio: Relatorio):
+    """(os boxes e a `Estrutura` de cada página, o que sai dela pela regra das margens);
+    o número impresso de cada página vai ao `relatorio`."""
     lidos, estruturas = {}, {}
     limiares = projeto.dados.limiares         # os duvidosos: o realce e o relatório
     for i in pelos_boxes:
@@ -234,26 +274,31 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
         i: set(margens[i].poeira) | set(funcoes[i]) for i in pelos_boxes}
     relatorio.numeros_impressos = numeros_impressos(
         {i: (lidos[i], estruturas[i]) for i in pelos_boxes}, funcoes, alvo)
-    paginas = []
-    for feitas, indice in enumerate(alvo, start=1):
-        if indice in nativas:
-            paginas.append(nativas[indice])
-        else:
-            tabuleiros = projeto.carregar_tabuleiros(indice)
-            imagem = fonte.pagina(indice) if fonte is not None and tabuleiros else None
-            fora = {k for k in tirar.get(indice, set())
-                    if id(lidos[indice][k]) not in estruturas[indice].protegidos}
-            texto = [b for k, b in enumerate(lidos[indice]) if k not in fora]
-            _margens_no_relatorio(relatorio, indice, lidos[indice], fora, estruturas[indice],
-                                  opcoes.manter_margens)
-            paginas.append(pagina_extraida(indice, texto, tabuleiros, imagem,
-                                           projeto.carregar_diagramas(indice),
-                                           estrutura=estruturas[indice],
-                                           manter_margens=opcoes.manter_margens,
-                                           desenhar_diagramas=opcoes.desenhar_diagramas,
-                                           manter_quebras=opcoes.manter_quebras))
-        if progresso:
-            progresso(feitas, len(alvo))
+    return lidos, estruturas, tirar
+
+
+def _pagina_pelos_boxes(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePaginas],
+                        indice: int, boxes: Sequence[BoxEntry], estrutura: Estrutura,
+                        tirar: set, opcoes: Opcoes, relatorio: Relatorio) -> PaginaExtraida:
+    """A página pelos boxes, sem as margens que a regra tirou (salvo as que o usuário marcou
+    como texto), com os diagramas dela."""
+    tabuleiros = projeto.carregar_tabuleiros(indice)
+    imagem = fonte.pagina(indice) if fonte is not None and tabuleiros else None
+    fora = {k for k in tirar if id(boxes[k]) not in estrutura.protegidos}
+    texto = [b for k, b in enumerate(boxes) if k not in fora]
+    _margens_no_relatorio(relatorio, indice, boxes, fora, estrutura, opcoes.manter_margens)
+    return pagina_extraida(indice, texto, tabuleiros, imagem, projeto.carregar_diagramas(indice),
+                           estrutura=estrutura, manter_margens=opcoes.manter_margens,
+                           desenhar_diagramas=opcoes.desenhar_diagramas,
+                           manter_quebras=opcoes.manter_quebras)
+
+
+def _passadas_do_livro(paginas: List[PaginaExtraida], nativas: Dict[int, PaginaExtraida],
+                       opcoes: Opcoes) -> None:
+    """O parágrafo que a paginação partiu volta a ser um (ou, com as quebras mantidas, a
+    quebra volta à camada nativa), e o diagrama sem lado lido ganha o do lance antes dele."""
+    from core import pdf_nativo
+
     if opcoes.manter_quebras:
         # A camada nativa já vem refluída: a quebra volta onde cada linha impressa começa.
         for indice in nativas:
@@ -261,8 +306,6 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
     else:
         _juntar_entre_paginas(paginas)
     pdf_nativo.lados_pelos_lances(paginas)
-    _paginas_no_relatorio(relatorio, projeto, paginas, estados, nativas)
-    return paginas
 
 
 def _margens_no_relatorio(relatorio: Relatorio, indice: int, boxes: Sequence[BoxEntry],
@@ -280,33 +323,44 @@ def _margens_no_relatorio(relatorio: Relatorio, indice: int, boxes: Sequence[Box
 def _paginas_no_relatorio(relatorio: Relatorio, projeto: ProjetoDeLivro,
                           paginas: Sequence[PaginaExtraida], estados: dict,
                           nativas: dict) -> None:
-    from abbychess.modelo import VERIFICADA
-
     resumo = projeto.resumo.do_livro()
     for pagina in paginas:
-        i = pagina.numero
-        relatorio.paginas.append(i)
-        relatorio.caracteres += pagina.caracteres
-        if i in nativas:
-            relatorio.da_camada.append(i)
-        if estados.get(i) != VERIFICADA:
-            relatorio.nao_verificadas.append(i)
-        pendentes = resumo.get(i, {}).get("pendentes")
-        if pendentes:
-            relatorio.pendentes[i] = int(pendentes)
-        # As palavras, não os trechos (`_unir_trechos` junta as vizinhas num trecho só).
-        sinalizadas = sum(len(b.texto[a:z].split()) for b in pagina.blocos
-                          for a, z in getattr(b, "duvidosos", ()))
-        if sinalizadas:
-            relatorio.sinalizadas[i] = sinalizadas
-        for bloco in pagina.blocos:
-            if isinstance(bloco, Paragrafo) and bloco.titulo and bloco.nivel == 1:
-                relatorio.titulos.append((i, bloco.texto))
-            elif isinstance(bloco, Figura):
-                if bloco.origem == "render":
-                    relatorio.desenhados += 1
-                else:
-                    relatorio.recortados.append((i, bloco.aviso or "recorte da página"))
+        _pagina_no_relatorio(relatorio, pagina, resumo, estados, nativas)
+        _blocos_no_relatorio(relatorio, pagina.numero, pagina.blocos)
+
+
+def _pagina_no_relatorio(relatorio: Relatorio, pagina: PaginaExtraida, resumo: dict,
+                         estados: dict, nativas: dict) -> None:
+    """A página, os caracteres, a camada, a verificação, os pendentes e as sinalizadas."""
+    from abbychess.modelo import VERIFICADA
+
+    i = pagina.numero
+    relatorio.paginas.append(i)
+    relatorio.caracteres += pagina.caracteres
+    if i in nativas:
+        relatorio.da_camada.append(i)
+    if estados.get(i) != VERIFICADA:
+        relatorio.nao_verificadas.append(i)
+    pendentes = resumo.get(i, {}).get("pendentes")
+    if pendentes:
+        relatorio.pendentes[i] = int(pendentes)
+    # As palavras, não os trechos (`_unir_trechos` junta as vizinhas num trecho só).
+    sinalizadas = sum(len(b.texto[a:z].split()) for b in pagina.blocos
+                      for a, z in getattr(b, "duvidosos", ()))
+    if sinalizadas:
+        relatorio.sinalizadas[i] = sinalizadas
+
+
+def _blocos_no_relatorio(relatorio: Relatorio, i: int, blocos: Sequence) -> None:
+    """Os títulos de capítulo, os diagramas desenhados e os recortes, com o motivo."""
+    for bloco in blocos:
+        if isinstance(bloco, Paragrafo) and bloco.titulo and bloco.nivel == 1:
+            relatorio.titulos.append((i, bloco.texto))
+        elif isinstance(bloco, Figura):
+            if bloco.origem == "render":
+                relatorio.desenhados += 1
+            else:
+                relatorio.recortados.append((i, bloco.aviso or "recorte da página"))
 
 
 def paginas_da_camada(projeto: ProjetoDeLivro, indices: Sequence[int],
@@ -538,23 +592,25 @@ def pgn_do_livro(projeto: ProjetoDeLivro, indices: Optional[Iterable[int]] = Non
 
 def _fora_do_pgn(d: DiagramaLido) -> str:
     """Por que o diagrama não entra no PGN; vazio se entra."""
-    import chess
-
     if not d.lido:
         return d.erro or "não lido"
-    try:
-        legal = chess.Board(d.fen).is_valid()
-    except ValueError:
-        legal = False
-    if not legal:
+    if not _posicao_legal(d.fen):
         return "a posição não é legal"
     if d.conferido:
         return ""
-    if d.validacao is not None and not d.validacao.confiavel:
-        return d.validacao.aviso
-    if d.validacao is not None and d.validacao.confiavel:
-        return ""
+    if d.validacao is not None:
+        return "" if d.validacao.confiavel else d.validacao.aviso
     return "nem conferido nem confiável pelos lances"
+
+
+def _posicao_legal(fen: str) -> bool:
+    """O python-chess aceita o FEN, e a posição é legal."""
+    import chess
+
+    try:
+        return chess.Board(fen).is_valid()
+    except ValueError:
+        return False
 
 
 def _mesmo_arquivo(a: Path, b: Path) -> bool:
@@ -630,24 +686,8 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
     relatorio = Relatorio(formato=formato)
     if formato == "pdf":
         resumo = exportar_pdf_pesquisavel(projeto, caminho, pedido.alvo(), progresso=progresso)
-        partes = [f"{resumo.paginas} página(s), {resumo.caracteres} caracteres na camada"]
-        if resumo.camadas_trocadas:
-            partes.append(f"camada antiga trocada em {resumo.camadas_trocadas}")
-        if resumo.com_texto_proprio:
-            partes.append(f"{len(resumo.com_texto_proprio)} com texto próprio ficaram sem camada")
-        if resumo.fens:
-            partes.append(f"{resumo.fens} diagrama(s) com o FEN pesquisável")
-        if resumo.sem_glifo:
-            partes.append(f"{resumo.sem_glifo} sem glifo na fonte")
-        if resumo.marcadores:
-            partes.append(f"{resumo.marcadores} marcador(es) pelos títulos")
-        if resumo.marcadores_do_original:
-            partes.append(f"o sumário do PDF original ficou ({resumo.marcadores_do_original} "
-                          "marcadores)")
-        if resumo.rotulos:
-            partes.append("páginas com o número impresso como rótulo")
         relatorio.marcadores = resumo.marcadores
-        relatorio.resumo_do_pdf = "; ".join(partes) + "."
+        relatorio.resumo_do_pdf = resumo.resumo()
         return relatorio.resumo_do_pdf, relatorio
     if formato == "pgn":
         texto = pgn_do_livro(projeto, indices, relatorio, opcoes)
@@ -655,13 +695,22 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
             raise NadaParaExportar("Nenhum diagrama entrou no PGN.\n\n" + relatorio.texto())
         _gravar_texto(caminho, texto)
         return relatorio.resumo(), relatorio
+    _exportar_as_paginas(projeto, caminho, formato, pedido, relatorio, progresso, metadados)
+    return relatorio.resumo(), relatorio
+
+
+def _exportar_as_paginas(projeto: ProjetoDeLivro, caminho: Path, formato: str, pedido: Pedido,
+                         relatorio: Relatorio, progresso: Optional[Progresso],
+                         metadados: Optional[dict]) -> None:
+    """O TXT, o DOCX e o EPUB: das páginas do projeto, pelas opções do pedido."""
+    opcoes = pedido.opcoes
     fonte = pg.fonte_do_projeto(projeto)
-    paginas = paginas_do_projeto(projeto, fonte, indices, progresso=progresso,
+    paginas = paginas_do_projeto(projeto, fonte, pedido.indices, progresso=progresso,
                                  opcoes=opcoes, relatorio=relatorio, pedido=pedido)
     idioma = pedido.idioma_do_arquivo
     if formato == "txt":
         _gravar_texto(caminho, texto_do_livro(paginas, marcas_de_pagina=opcoes.marcas_de_pagina))
-        return relatorio.resumo(), relatorio
+        return
     meta = metadados_do_projeto(projeto, idioma, metadados)
     if formato == "docx":
         exportar_docx(paginas, caminho, titulo=meta.titulo, idioma=idioma, metadados=meta,
@@ -671,4 +720,3 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
         exportar_epub(paginas, caminho, titulo=meta.titulo, idioma=idioma, metadados=meta,
                       relatorio=relatorio, quebras=opcoes.manter_quebras,
                       analise=opcoes.links_de_analise)
-    return relatorio.resumo(), relatorio

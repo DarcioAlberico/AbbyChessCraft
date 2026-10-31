@@ -52,6 +52,26 @@ class ResumoDoPdf:
     #: As páginas ganharam o número impresso como rótulo (o "23" que o leitor mostra).
     rotulos: bool = False
 
+    def resumo(self) -> str:
+        """Uma linha, para a barra de status (o relatório da exportação, `exportar`)."""
+        partes = [f"{self.paginas} página(s), {self.caracteres} caracteres na camada"]
+        if self.camadas_trocadas:
+            partes.append(f"camada antiga trocada em {self.camadas_trocadas}")
+        if self.com_texto_proprio:
+            partes.append(f"{len(self.com_texto_proprio)} com texto próprio ficaram sem camada")
+        if self.fens:
+            partes.append(f"{self.fens} diagrama(s) com o FEN pesquisável")
+        if self.sem_glifo:
+            partes.append(f"{self.sem_glifo} sem glifo na fonte")
+        if self.marcadores:
+            partes.append(f"{self.marcadores} marcador(es) pelos títulos")
+        if self.marcadores_do_original:
+            partes.append(f"o sumário do PDF original ficou ({self.marcadores_do_original} "
+                          "marcadores)")
+        if self.rotulos:
+            partes.append("páginas com o número impresso como rótulo")
+        return "; ".join(partes) + "."
+
 
 def _texto_visivel(page) -> bool:
     """A página tem texto que aparece, e não só uma camada de OCR invisível."""

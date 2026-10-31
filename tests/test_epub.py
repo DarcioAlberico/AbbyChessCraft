@@ -245,6 +245,75 @@ def test_conferir_acusa_id_repetido_e_toc_vazio(tmp_path):
     assert "o toc do nav está vazio" in problemas
 
 
+@pytest.fixture(scope="module")
+def partes_de_um_livro(tmp_path_factory):
+    """As entradas de um EPUB são (um capítulo, sem imagem), escrito uma vez."""
+    destino = tmp_path_factory.mktemp("conferir") / "a.epub"
+    epub.escrever([PaginaExtraida(numero=0, blocos=[Paragrafo("T", titulo=True, nivel=1),
+                                                    Paragrafo("x")])],
+                  destino, epub.Metadados("L"))
+    return {n: v.decode("utf-8") for n, v in _ler(destino)[0].items()}
+
+
+def _trocar(nome, de, para):
+    def estragar(partes):
+        partes[nome] = partes[nome].replace(de, para)
+    return estragar
+
+
+def _tirar(nome):
+    def estragar(partes):
+        del partes[nome]
+    return estragar
+
+
+OPF, NAV, CSS = "OEBPS/content.opf", "OEBPS/nav.xhtml", "OEBPS/estilo.css"
+CAPITULO = "OEBPS/texto/capitulo-001.xhtml"
+
+
+@pytest.mark.parametrize("estragar,esperado", [
+    (_trocar("mimetype", "epub+zip", "zip"), "o mimetype não é application/epub+zip"),
+    (_tirar("META-INF/container.xml"), "o META-INF/container.xml falta ou não aponta o OPF"),
+    (_trocar("META-INF/container.xml", "content.opf", "outro.opf"),
+     "o OPF OEBPS/outro.opf não está no pacote"),
+    (_trocar(OPF, "</package>", ""), "o OPF não é XML legível ("),
+    (_trocar(OPF, "<dc:title>L</dc:title>", ""), "o OPF não tem dc:title"),
+    (_trocar(OPF, '"dcterms:modified"', '"x"'), "o OPF não tem dcterms:modified"),
+    (_trocar(OPF, 'id="c1"', 'id="css"'), "o id css se repete no manifesto"),
+    (_trocar(OPF, 'href="estilo.css" ', ""), "o item css não tem href"),
+    (_tirar(CSS), "o item estilo.css do manifesto não está no pacote"),
+    (_trocar(OPF, '<itemref idref="c1"/><itemref idref="nav" linear="no"/>', ""),
+     "a espinha está vazia"),
+    (_trocar(OPF, 'idref="c1"', 'idref="c9"'), "o itemref c9 não está no manifesto"),
+    (_trocar(OPF, ' properties="nav"', ""), "o manifesto tem 0 nav (precisa de um)"),
+    (_trocar(CAPITULO, "</body>", ""), f"{CAPITULO}: XML inválido ("),
+    (_trocar(OPF, '<itemref idref="nav" linear="no"/>', ""),
+     f"{NAV}: link para fora da espinha nav.xhtml#toc"),
+    (_trocar(CSS, "body {", 'body { background: url("fundo.png");'),
+     f"{CSS}: url() quebrada fundo.png"),
+    (_trocar(NAV, 'epub:type="page-list"', 'epub:type="x"'), "o nav não tem page-list"),
+])
+def test_conferir_acusa_o_que_um_leitor_recusaria(partes_de_um_livro, tmp_path, estragar,
+                                                  esperado):
+    partes = dict(partes_de_um_livro)
+    estragar(partes)
+    ruim = tmp_path / "ruim.epub"
+    with zipfile.ZipFile(ruim, "w") as z:
+        z.writestr(zipfile.ZipInfo("mimetype"), partes.pop("mimetype"))
+        for nome in sorted(partes):
+            z.writestr(nome, partes[nome], zipfile.ZIP_DEFLATED)
+    problemas = validacao.conferir(ruim)
+    assert any(p.startswith(esperado) for p in problemas), problemas
+
+
+def test_conferir_acusa_o_mimetype_comprimido(partes_de_um_livro, tmp_path):
+    ruim = tmp_path / "ruim.epub"
+    with zipfile.ZipFile(ruim, "w", zipfile.ZIP_DEFLATED) as z:
+        for nome, texto in partes_de_um_livro.items():       # o mimetype primeiro
+            z.writestr(nome, texto)
+    assert validacao.conferir(ruim) == ["o mimetype está comprimido"]
+
+
 def test_metadados_nulos_e_capa_fora_da_pasta(tmp_path):
     projeto_dir = tmp_path / "projeto"
     projeto_dir.mkdir()

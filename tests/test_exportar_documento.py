@@ -97,6 +97,23 @@ def test_ca_q_e1_a_exportacao_leva_as_decisoes_de_palavra_do_documento():
     assert ex.texto_do_livro([extraida]) == documento + "\n"
 
 
+def test_ca_q_e1_o_glifo_nao_lido_no_meio_da_palavra_fica_como_no_texto_do_documento():
+    """O glifo que ninguém leu (sem caractere) não entra no texto nem na exportação: a
+    palavra fica partida no buraco dele, como no `texto.montar` (a vista do Documento, que o
+    mostra, não é a referência). Na fatia do xv, "ca o", "princ pio" e "Dia rama" saíam
+    juntos ("cao") quando as palavras vinham da vista."""
+    entries = _linha("nesse caso fica", 10)
+    x_do_s = 40 + 14 * len("nesse ca")
+    for b in entries:
+        if b.x1 == x_do_s:
+            b.char = ""                                  # o "s" que ninguém leu
+    pagina = tx.pagina_avulsa(entries)
+    documento = tx.texto(tx.montar(pagina))
+    entries, estrutura = ex.Estrutura.da_pagina(pagina)
+    assert [p.texto for p in _paragrafos(ex.pagina_extraida(0, entries, estrutura=estrutura))] \
+        == [documento]
+
+
 def test_manter_margens_deixa_o_cabecalho_da_area():
     pagina, _ = _pagina()
     entries, estrutura = ex.Estrutura.da_pagina(pagina)

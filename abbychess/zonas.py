@@ -32,6 +32,7 @@ from typing import Iterable, List, Optional, Sequence, Tuple
 
 from core.box_model import BoxEntry
 
+from abbychess.layout import partes_pelo_vao
 from abbychess.modelo import LETRAS_DAS_PECAS
 
 TEXTO = "texto"
@@ -709,22 +710,10 @@ def _partir_no_vao(boxes: Sequence[BoxEntry]) -> List[List[int]]:
     zona só ligada a um diagrama só (a mesma regra da `layout.partir_nos_vaos`)."""
     ordem = sorted(boxes, key=lambda b: b.x1)
     altura = max(1, median(b.y2 - b.y1 for b in ordem))
+    partes = partes_pelo_vao(ordem, lambda atual, b: b.x1 - max(x.x2 for x in atual),
+                             VAO_QUE_PARTE * altura, GLIFOS_DE_CADA_LADO)
     return [[min(x.x1 for x in p), min(x.y1 for x in p), max(x.x2 for x in p), max(x.y2 for x in p)]
-            for p in _partes_no_vao(ordem, altura)]
-
-
-def _partes_no_vao(ordem: Sequence[BoxEntry], altura: float) -> List[List[BoxEntry]]:
-    """Os glifos da linha (da esquerda para a direita) partidos em cada vão de mais de
-    `VAO_QUE_PARTE` alturas com `GLIFOS_DE_CADA_LADO` glifos ou mais de cada lado."""
-    partes, atual = [], [ordem[0]]
-    for k, (a, b) in enumerate(zip(ordem, ordem[1:]), start=1):
-        if (b.x1 - max(x.x2 for x in atual) > VAO_QUE_PARTE * altura
-                and len(atual) >= GLIFOS_DE_CADA_LADO and len(ordem) - k >= GLIFOS_DE_CADA_LADO):
-            partes.append(atual)
-            atual = []
-        atual.append(b)
-    partes.append(atual)
-    return partes
+            for p in partes]
 
 
 def _blocos(linhas: List[List[int]], escala: float) -> List[Caixa]:

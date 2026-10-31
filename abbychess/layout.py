@@ -72,29 +72,10 @@ class OrdemDeLeitura:
         if len(colunas) < 2:
             return cls(deteccao=deteccao)
         altura = statistics.median(b.y2 - b.y1 for b in boxes)
-        filas = [{round(((b.y1 + b.y2) / 2) / max(1.0, altura)) for b in boxes
-                  if inicio <= (b.x1 + b.x2) / 2 <= fim} for inicio, fim in colunas]
-        if min(len(fila) for fila in filas) < FILAS_DE_COLUNA:
+        if _filas_de_cada_coluna(boxes, colunas, altura) < FILAS_DE_COLUNA:
             return cls(deteccao=deteccao)
-        calhas = []
-        for esquerda, direita in zip(colunas, colunas[1:]):
-            largura = direita[0] - esquerda[1]
-            calhas.append((esquerda[1] + MARGEM_DA_CALHA * largura,
-                           direita[0] - MARGEM_DA_CALHA * largura,
-                           (esquerda[1] + direita[0]) / 2))
-        na_calha = sorted(
-            (b for b in boxes if b.height >= 0.5 * altura and any(
-                inicio < (b.x1 + b.x2) / 2 < fim or b.x1 < meio < b.x2
-                for inicio, fim, meio in calhas)),
-            key=lambda b: b.y1)
-        grupos: List[List[BoxEntry]] = []
-        for box in na_calha:
-            if grupos and box.y1 <= max(outro.y2 for outro in grupos[-1]):
-                grupos[-1].append(box)
-            else:
-                grupos.append([box])
-        faixas = [(min(b.y1 for b in grupo), max(b.y2 for b in grupo)) for grupo in grupos
-                  if len(grupo) >= 2 or max(b.height for b in grupo) >= 1.5 * altura]
+        grupos = _grupos_pela_altura(_na_calha(boxes, _calhas(colunas), altura))
+        faixas = _faixas_dos_grupos(grupos, altura)
         faixas += _linhas_que_atravessam(boxes, colunas, altura)
         return cls(tuple(tuple(c) for c in colunas), _unidas(faixas))
 
@@ -135,6 +116,53 @@ class OrdemDeLeitura:
         if len(indices) < len(boxes):
             linhas = partir_pela_pagina(linhas, trecho, boxes)
         return partir_nos_vaos(partir_depois_do_f(linhas, trecho), trecho)
+
+
+def _filas_de_cada_coluna(boxes: Sequence[BoxEntry], colunas, altura: float) -> int:
+    """Quantas filas de texto (alturas de glifo) tem a coluna que tem menos."""
+    filas = [{round(((b.y1 + b.y2) / 2) / max(1.0, altura)) for b in boxes
+              if inicio <= (b.x1 + b.x2) / 2 <= fim} for inicio, fim in colunas]
+    return min(len(fila) for fila in filas)
+
+
+def _calhas(colunas) -> List[Tuple[float, float, float]]:
+    """(início, fim, meio) de cada calha, sem `MARGEM_DA_CALHA` de cada lado."""
+    calhas = []
+    for esquerda, direita in zip(colunas, colunas[1:]):
+        largura = direita[0] - esquerda[1]
+        calhas.append((esquerda[1] + MARGEM_DA_CALHA * largura,
+                       direita[0] - MARGEM_DA_CALHA * largura,
+                       (esquerda[1] + direita[0]) / 2))
+    return calhas
+
+
+def _na_calha(boxes: Sequence[BoxEntry], calhas, altura: float) -> List[BoxEntry]:
+    """Os glifos de meia altura ou mais com o centro numa calha, ou por cima do meio dela,
+    de cima para baixo."""
+    return sorted(
+        (b for b in boxes if b.height >= 0.5 * altura and any(
+            inicio < (b.x1 + b.x2) / 2 < fim or b.x1 < meio < b.x2
+            for inicio, fim, meio in calhas)),
+        key=lambda b: b.y1)
+
+
+def _grupos_pela_altura(na_calha: Sequence[BoxEntry]) -> List[List[BoxEntry]]:
+    """Os glifos (de cima para baixo) em grupos: o que começa antes do pé do grupo de cima
+    entra nele."""
+    grupos: List[List[BoxEntry]] = []
+    for box in na_calha:
+        if grupos and box.y1 <= max(outro.y2 for outro in grupos[-1]):
+            grupos[-1].append(box)
+        else:
+            grupos.append([box])
+    return grupos
+
+
+def _faixas_dos_grupos(grupos: Sequence[List[BoxEntry]], altura: float
+                       ) -> List[Tuple[float, float]]:
+    """A faixa de cada grupo da calha com dois glifos ou mais, ou com um de 1,5 altura."""
+    return [(min(b.y1 for b in grupo), max(b.y2 for b in grupo)) for grupo in grupos
+            if len(grupo) >= 2 or max(b.height for b in grupo) >= 1.5 * altura]
 
 
 def _linhas_que_atravessam(boxes: Sequence[BoxEntry], colunas, altura: float
@@ -242,31 +270,59 @@ def partir_depois_do_f(linhas: list, trecho: Sequence[BoxEntry]) -> list:
 
     **Com um box sem leitura entre o "f" e a letra** ("fo|llowed" sem o "o"), a palavra fica
     como o core a fez: ele não faz símbolo do box, mas mede a lacuna por ele."""
-    from core.notacao import LIMIAR_ESPACO, Palavra
+    from core.notacao import LIMIAR_ESPACO
 
-    def depois_do_f(a, b) -> bool:
-        return a.char == "f" and b.char[:1].isalpha()
-
-    def lacuna(a, b) -> int:
-        return trecho[b.indice].x1 - trecho[a.indice].x2
-
-    def nada_no_meio(a, b) -> bool:
-        """Nenhum box entre os dois (só para quem vai ser partido)."""
-        esquerdo, direito = trecho[a.indice], trecho[b.indice]
-        return not any(c.x1 < direito.x1 and c.x2 > esquerdo.x2
-                       and c.y1 < esquerdo.y2 and c.y2 > esquerdo.y1
-                       and c is not esquerdo and c is not direito for c in trecho)
-
-    pares = [(a, b) for linha in linhas for p in linha for a, b in zip(p.simbolos, p.simbolos[1:])]
-    comuns = [lacuna(a, b) for a, b in pares if not depois_do_f(a, b)]
-    if not comuns:
-        return linhas
-    comum = statistics.median(comuns)
-    dentro = [lacuna(a, b) for a, b in pares if depois_do_f(a, b) and lacuna(a, b) <= comum]
-    gancho = comum - statistics.median(dentro) if len(dentro) >= AMOSTRAS_DO_GANCHO else 0
+    gancho = _gancho_do_f(linhas, trecho)
     if gancho <= 0:
         return linhas
-    limiar = LIMIAR_ESPACO * largura_mediana(trecho) - gancho
+    return _partidas_depois_do_f(linhas, trecho, LIMIAR_ESPACO * largura_mediana(trecho) - gancho)
+
+
+def _depois_do_f(a, b) -> bool:
+    return a.char == "f" and b.char[:1].isalpha()
+
+
+def _lacuna(trecho: Sequence[BoxEntry], a, b) -> int:
+    return trecho[b.indice].x1 - trecho[a.indice].x2
+
+
+def _nada_no_meio(trecho: Sequence[BoxEntry], a, b) -> bool:
+    """Nenhum box entre os dois (só para quem vai ser partido)."""
+    esquerdo, direito = trecho[a.indice], trecho[b.indice]
+    return not any(c.x1 < direito.x1 and c.x2 > esquerdo.x2
+                   and c.y1 < esquerdo.y2 and c.y2 > esquerdo.y1
+                   and c is not esquerdo and c is not direito for c in trecho)
+
+
+def _gancho_do_f(linhas: list, trecho: Sequence[BoxEntry]) -> float:
+    """O gancho do "f" no trecho: a lacuna comum dentro da palavra menos a mediana das
+    lacunas depois do "f" que não passam dela; 0 sem lacuna comum ou com menos de
+    `AMOSTRAS_DO_GANCHO` amostras."""
+    comuns, do_f = _lacunas_dentro_da_palavra(linhas, trecho)
+    if not comuns:
+        return 0
+    comum = statistics.median(comuns)
+    dentro = [lacuna for lacuna in do_f if lacuna <= comum]
+    return comum - statistics.median(dentro) if len(dentro) >= AMOSTRAS_DO_GANCHO else 0
+
+
+def _lacunas_dentro_da_palavra(linhas: list, trecho: Sequence[BoxEntry]
+                               ) -> Tuple[List[int], List[int]]:
+    """As lacunas entre letras vizinhas de cada palavra, em ordem: as comuns e as depois do
+    "f"."""
+    comuns: List[int] = []
+    do_f: List[int] = []
+    for linha in linhas:
+        for p in linha:
+            for a, b in zip(p.simbolos, p.simbolos[1:]):
+                (do_f if _depois_do_f(a, b) else comuns).append(_lacuna(trecho, a, b))
+    return comuns, do_f
+
+
+def _partidas_depois_do_f(linhas: list, trecho: Sequence[BoxEntry], limiar: float) -> list:
+    """Cada palavra partida entre o "f" e a letra seguinte com a lacuna acima do `limiar` e
+    nenhum box entre os dois."""
+    from core.notacao import Palavra
 
     saida = []
     for linha in linhas:
@@ -274,8 +330,8 @@ def partir_depois_do_f(linhas: list, trecho: Sequence[BoxEntry]) -> list:
         for palavra in linha:
             atual = []
             for s in palavra.simbolos:
-                if (atual and depois_do_f(atual[-1], s) and lacuna(atual[-1], s) > limiar
-                        and nada_no_meio(atual[-1], s)):
+                if (atual and _depois_do_f(atual[-1], s) and _lacuna(trecho, atual[-1], s) > limiar
+                        and _nada_no_meio(trecho, atual[-1], s)):
                     palavras.append(Palavra(atual))
                     atual = []
                 atual.append(s)
@@ -306,21 +362,38 @@ def partir_nos_vaos(linhas: list, trecho: Sequence[BoxEntry]) -> list:
     junta numa linha o que está na mesma altura, e as legendas lado a lado viravam uma frase."""
     saida = []
     for linha in linhas:
-        palavras = [p for p in linha if p.simbolos]
-        if len(palavras) < 2 * PALAVRAS_DE_CADA_LADO:
-            saida.append(linha)
-            continue
-        altura = statistics.median(trecho[s.indice].y2 - trecho[s.indice].y1
-                                   for p in palavras for s in p.simbolos)
-        partes, atual = [], [palavras[0]]
-        for k, (p, q) in enumerate(zip(palavras, palavras[1:]), start=1):
-            vao = (min(trecho[s.indice].x1 for s in q.simbolos)
-                   - max(trecho[s.indice].x2 for s in p.simbolos))
-            if (vao > VAO_QUE_PARTE * max(1, altura) and len(atual) >= PALAVRAS_DE_CADA_LADO
-                    and len(palavras) - k >= PALAVRAS_DE_CADA_LADO):
-                partes.append(atual)
-                atual = []
-            atual.append(q)
-        partes.append(atual)
-        saida.extend(partes if len(partes) > 1 else [linha])
+        saida.extend(_linha_partida_nos_vaos(linha, trecho))
     return saida
+
+
+def _linha_partida_nos_vaos(linha: list, trecho: Sequence[BoxEntry]) -> list:
+    """As partes da linha (a linha inteira, se ela não parte)."""
+    palavras = [p for p in linha if p.simbolos]
+    if len(palavras) < 2 * PALAVRAS_DE_CADA_LADO:
+        return [linha]
+    altura = statistics.median(trecho[s.indice].y2 - trecho[s.indice].y1
+                               for p in palavras for s in p.simbolos)
+
+    def vao(atual: list, q) -> float:
+        """Da última palavra da parte até a palavra `q`."""
+        return (min(trecho[s.indice].x1 for s in q.simbolos)
+                - max(trecho[s.indice].x2 for s in atual[-1].simbolos))
+
+    partes = partes_pelo_vao(palavras, vao, VAO_QUE_PARTE * max(1, altura), PALAVRAS_DE_CADA_LADO)
+    return partes if len(partes) > 1 else [linha]
+
+
+def partes_pelo_vao(itens: Sequence, vao, limite: float, de_cada_lado: int) -> List[list]:
+    """Os itens, em ordem, partidos antes de cada um cujo `vao(parte, item)` até a parte
+    corrente passa de `limite`, com `de_cada_lado` itens ou mais de cada lado do corte. A
+    regra das linhas do Documento (`partir_nos_vaos`, entre palavras) e da linha das zonas
+    automáticas (`zonas._partir_no_vao`, entre glifos)."""
+    partes, atual = [], [itens[0]]
+    for k, item in enumerate(itens[1:], start=1):
+        if (vao(atual, item) > limite and len(atual) >= de_cada_lado
+                and len(itens) - k >= de_cada_lado):
+            partes.append(atual)
+            atual = []
+        atual.append(item)
+    partes.append(atual)
+    return partes

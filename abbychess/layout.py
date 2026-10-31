@@ -175,33 +175,59 @@ def _linhas_que_atravessam(boxes: Sequence[BoxEntry], colunas, altura: float
     da outra. Aqui vale a linha: perto da calha, com texto dos dois lados, e o vão nela menor
     que `VAO_DA_LINHA_NA_CALHA` da largura da calha. O título centrado com o espaço bem na
     calha ("NO PAIN | NO GAIN", p. 10) também."""
-    faixas = []
+    faixas: List[Tuple[float, float]] = []
     for esquerda, direita in zip(colunas, colunas[1:]):
-        largura = direita[0] - esquerda[1]
-        if largura <= 0:
-            continue
-        meio = (esquerda[1] + direita[0]) / 2
-        perto = sorted((b for b in boxes if b.x2 >= esquerda[1] - 3 * altura
-                        and b.x1 <= direita[0] + 3 * altura and b.height > 0),
-                       key=lambda b: (b.y1 + b.y2) / 2)
-        filas: List[List[BoxEntry]] = []
-        for box in perto:
-            centro = (box.y1 + box.y2) / 2
-            if filas and min(b.y1 for b in filas[-1]) <= centro <= max(b.y2 for b in filas[-1]):
-                filas[-1].append(box)
-            else:
-                filas.append([box])
-        for fila in filas:
-            antes = [b for b in fila if (b.x1 + b.x2) / 2 < meio]
-            depois = [b for b in fila if (b.x1 + b.x2) / 2 >= meio]
-            if not antes or not depois:
-                continue
-            vao = min(b.x1 for b in depois) - max(b.x2 for b in antes)
-            if vao < VAO_DA_LINHA_NA_CALHA * largura:
-                topo, pe = min(f.y1 for f in fila), max(f.y2 for f in fila)     # uma vez por fila
-                linha = [b for b in boxes if topo <= (b.y1 + b.y2) / 2 <= pe]
-                faixas.append((min(b.y1 for b in linha), max(b.y2 for b in linha)))
+        if direita[0] - esquerda[1] > 0:
+            faixas += _atravessam_a_calha(boxes, esquerda, direita, altura)
     return faixas
+
+
+def _atravessam_a_calha(boxes: Sequence[BoxEntry], esquerda, direita, altura: float
+                        ) -> List[Tuple[float, float]]:
+    """As faixas das linhas que atravessam a calha entre as colunas `esquerda` e `direita`."""
+    largura = direita[0] - esquerda[1]
+    meio = (esquerda[1] + direita[0]) / 2
+    perto = sorted((b for b in boxes if b.x2 >= esquerda[1] - 3 * altura
+                    and b.x1 <= direita[0] + 3 * altura and b.height > 0),
+                   key=lambda b: (b.y1 + b.y2) / 2)
+    return [_faixa_da_linha(boxes, fila) for fila in _filas(perto)
+            if _sem_o_vao_da_calha(fila, meio, largura)]
+
+
+def _filas(perto: Sequence[BoxEntry]) -> List[List[BoxEntry]]:
+    """Os glifos, na ordem do centro vertical, em filas: o que tem o centro dentro da fila
+    anterior a continua."""
+    filas: List[List[BoxEntry]] = []
+    for box in perto:
+        centro = (box.y1 + box.y2) / 2
+        if filas and min(b.y1 for b in filas[-1]) <= centro <= max(b.y2 for b in filas[-1]):
+            filas[-1].append(box)
+        else:
+            filas.append([box])
+    return filas
+
+
+def _sem_o_vao_da_calha(fila: Sequence[BoxEntry], meio: float, largura: float) -> bool:
+    """A fila com texto dos dois lados do meio da calha e o vão nela menor que
+    `VAO_DA_LINHA_NA_CALHA` da largura da calha."""
+    antes, depois = _dos_lados(fila, meio)
+    if not antes or not depois:
+        return False
+    return min(b.x1 for b in depois) - max(b.x2 for b in antes) < VAO_DA_LINHA_NA_CALHA * largura
+
+
+def _dos_lados(fila: Sequence[BoxEntry], meio: float) -> Tuple[list, list]:
+    """Os glifos da fila com o centro antes do meio, e os do meio em diante."""
+    return ([b for b in fila if (b.x1 + b.x2) / 2 < meio],
+            [b for b in fila if (b.x1 + b.x2) / 2 >= meio])
+
+
+def _faixa_da_linha(boxes: Sequence[BoxEntry], fila: Sequence[BoxEntry]) -> Tuple[float, float]:
+    """O topo e o pé da linha inteira da página na altura da fila (todos os glifos com o centro
+    entre o topo e o pé dela)."""
+    topo, pe = min(f.y1 for f in fila), max(f.y2 for f in fila)     # uma vez por fila
+    linha = [b for b in boxes if topo <= (b.y1 + b.y2) / 2 <= pe]
+    return (min(b.y1 for b in linha), max(b.y2 for b in linha))
 
 
 def _unidas(faixas: Sequence[Tuple[float, float]]) -> Tuple[Tuple[float, float], ...]:

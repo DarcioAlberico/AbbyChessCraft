@@ -203,7 +203,6 @@ abbychess/sequencia_do_livro.py SequenciaDoLivro.trocar_paginas  # a reduzir (Q8
 abbychess/servidor_de_leitura.py ServidorDeLeitura._ouvir  # a reduzir (Q8)
 abbychess/servidor_de_leitura.py _Laco._operar  # a reduzir (Q8)
 abbychess/servidor_de_leitura.py _Laco._receber  # a reduzir (Q8)
-abbychess/sessao.py _dividir_ligaduras_repetidas  # a reduzir (Q8)
 abbychess/sessao_do_documento.py ControladorDaSessao._tinta_sem_box  # a reduzir (Q8)
 abbychess/sessao_do_documento.py ControladorDaSessao.confirmar_sessao.corpo  # a reduzir (Q8)
 abbychess/sessao_do_documento.py ControladorDaSessao.novo_paragrafo  # a reduzir (Q8)

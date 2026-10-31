@@ -410,23 +410,43 @@ def _itens_do_original(plano: Plano) -> List[Tuple[str, object]]:
 
 def _dividir_ligaduras_repetidas(plano, itens, unidades, novo, pares) -> None:
     """Uma inserção no meio de um box multicaractere transforma-o em ``1 -> k``."""
-    vezes = Counter(v for t, v in itens if t == "glifo")      # uma passada: a página inteira
-    repetidos = [gid for gid, n in vezes.items() if n > 1]
-    for gid in repetidos:
-        posicoes = [p for p, (i, _j) in enumerate(pares)
-                    if i is not None and unidades[i].glifo and unidades[i].gid == gid]
+    for gid in _glifos_repetidos(itens):
+        posicoes = _posicoes_do_glifo(gid, unidades, pares)
         if not posicoes:
             continue
-        js = [j for _i, j in pares[posicoes[0]:posicoes[-1] + 1]
-              if j is not None and novo[j] != " "]
-        chars = "".join(novo[j] for j in js)
-        primeiro = next(k for k, x in enumerate(itens) if x == ("glifo", gid))
-        ultimo = len(itens) - 1 - next(k for k, x in enumerate(reversed(itens))
-                                      if x == ("glifo", gid))
+        chars = _caracteres_entre(posicoes, novo, pares)
+        primeiro, ultimo = _trecho_do_glifo(itens, gid)
         if chars and all(t in ("glifo", "letra") for t, _v in itens[primeiro:ultimo + 1]):
             indice = len(plano.dividir_boxes)
             plano.dividir_boxes.append((gid, chars))
             itens[primeiro:ultimo + 1] = [("dividir", indice)]
+
+
+def _glifos_repetidos(itens) -> List[int]:
+    """Os gids que aparecem mais de uma vez nos itens, na ordem da primeira vez."""
+    vezes = Counter(v for t, v in itens if t == "glifo")      # uma passada: a página inteira
+    return [gid for gid, n in vezes.items() if n > 1]
+
+
+def _posicoes_do_glifo(gid: int, unidades, pares) -> List[int]:
+    """As posições do alinhamento cujo lado original é uma unidade do glifo `gid`."""
+    return [p for p, (i, _j) in enumerate(pares)
+            if i is not None and unidades[i].glifo and unidades[i].gid == gid]
+
+
+def _caracteres_entre(posicoes: List[int], novo: str, pares) -> str:
+    """Os caracteres novos (sem espaço) da primeira à última posição do glifo."""
+    js = [j for _i, j in pares[posicoes[0]:posicoes[-1] + 1]
+          if j is not None and novo[j] != " "]
+    return "".join(novo[j] for j in js)
+
+
+def _trecho_do_glifo(itens, gid: int) -> Tuple[int, int]:
+    """O primeiro e o último índice dos itens que são o glifo `gid`."""
+    primeiro = next(k for k, x in enumerate(itens) if x == ("glifo", gid))
+    ultimo = len(itens) - 1 - next(k for k, x in enumerate(reversed(itens))
+                                  if x == ("glifo", gid))
+    return primeiro, ultimo
 
 
 def _operacoes_estruturais(unidades, novo, pares):

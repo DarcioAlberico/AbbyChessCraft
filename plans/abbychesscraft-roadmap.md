@@ -30,7 +30,8 @@ Paralelos, só com git e worktrees e com arquivos disjuntos:
   passo depois do 2a).
 - Atalho novo entra primeiro em `docs/atalhos.yaml` (CA-3.7).
 - Verificação, sempre:
-  - `.venv\Scripts\python.exe -m pytest -q -n auto` (< 60 s; em paralelo desde 2026-10-23,
+  - `.venv\Scripts\python.exe -m pytest -q -n auto` (< 90 s, o `conftest` reprova acima,
+    desde 2026-10-30; era < 60 s; em paralelo desde 2026-10-23,
     no máximo 4 workers desde 2026-10-28); uma carga pesada por vez: nunca duas suítes, ou uma
     suíte e uma medida, ao mesmo tempo em sessões ou subagentes;
   - `-m processo` quando o passo toca processo ou gravação;

@@ -24,13 +24,12 @@ from abbychess import pagina as pg  # noqa: E402
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro  # noqa: E402
 from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
-from tests import test_janela  # noqa: E402
+from tests import fixturas_janela  # noqa: E402
+janela = fixturas_janela.janela  # a fixture do apoio, com o nome que os testes pedem
 from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
-app = test_janela.app
-janela = test_janela.janela
 
 ALTURA = 3500
 

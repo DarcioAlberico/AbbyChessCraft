@@ -24,7 +24,10 @@ from PySide6.QtWidgets import QApplication, QPushButton
 from abbychess.app.registro_de_eventos import tipo_do_gesto
 from abbychess.leitor import FONTE_MANUAL
 
-from tests import leitor_falso, test_janela, test_janela_diagramas
+from tests import leitor_falso
+from tests.ajudantes import sem_modelo
+from tests import fixturas_janela  # noqa: E402
+janela = fixturas_janela.janela  # a fixture do apoio, com o nome que os testes pedem
 from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ferramentas"))
@@ -32,8 +35,6 @@ import replay_fatia as rf  # noqa: E402
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 from tests.ajudantes import _pronta  # noqa: E402,F401,F811
 
-app = test_janela.app
-janela = test_janela.janela
 CUSTO = {c["id"]: c["custo"] for c in rf.carregar_catalogo()["comandos"] if str(c["passo"]) == "0"}
 CUSTO_D1 = {c["id"]: c["custo"] for c in rf.carregar_catalogo()["comandos"]
             if str(c["passo"]) == "D1"}
@@ -249,7 +250,7 @@ def janela_com_diagrama(app, tmp_path, monkeypatch):
     j.close()
 
 
-@test_janela_diagramas.sem_modelo
+@sem_modelo
 def test_conferir_um_diagrama(app, janela_com_diagrama, contador):
     """Abrir com um clique no diagrama, corrigir uma casa, conferir com Ctrl+Enter."""
     from abbychess.app import editor_diagrama as dd

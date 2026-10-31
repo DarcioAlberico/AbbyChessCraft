@@ -226,10 +226,13 @@ def test_ca_12_3_a_opcao_produz_so_a_diferenca_declarada(tmp_path, nome):
     declarada = _declaracao()[nome]
     if declarada.get("escopo") == "livro":
         # A opção escolhe páginas do projeto, não muda a página: os testes que ela cita.
-        import tests.test_exportar_documento as documento
+        import ast
 
+        arquivo = Path(__file__).with_name("test_exportar_documento.py")
+        existentes = {no.name for no in ast.parse(arquivo.read_text(encoding="utf-8")).body
+                      if isinstance(no, ast.FunctionDef)}
         for teste in declarada["testes"]:
-            assert hasattr(documento, teste), teste
+            assert teste in existentes, teste
         return
     padrao = getattr(ex.Opcoes(), nome)
     ligada = declarada.get("valor", not padrao)

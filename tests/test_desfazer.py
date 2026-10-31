@@ -18,13 +18,11 @@ from abbychess.modelo import Box, Pagina  # noqa: E402
 from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL  # noqa: E402
 from abbychess.padroes import PadroesDoLivro  # noqa: E402
 
-from tests import test_janela  # noqa: E402
+from tests import fixturas_janela  # noqa: E402
+janela = fixturas_janela.janela  # a fixture do apoio, com o nome que os testes pedem
 from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
-# As fixtures da janela de `test_janela`, com o mesmo nome aqui.
-app = test_janela.app
-janela = test_janela.janela
 
 
 def _caixas(boxes):

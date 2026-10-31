@@ -13,13 +13,13 @@ from PySide6.QtTest import QTest
 
 from abbychess.leitor import FONTE_MANUAL
 
-from tests import leitor_falso, servidor_falso, test_janela
+from tests import leitor_falso, servidor_falso
+from tests import fixturas_janela
 from tests.janela_util import boxes, fila, mostrar, trocar_entries
 from tests.ajudantes import _pronta  # noqa: E402,F401,F811
 from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 
-app = test_janela.app
-janela = test_janela.janela
+janela = fixturas_janela.janela  # a fixture do apoio, com o nome que os testes pedem
 
 
 def _com_rede(app, janela):

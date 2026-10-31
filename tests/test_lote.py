@@ -524,6 +524,30 @@ def test_o_que_falta_retomar_fica_no_projeto_e_volta_ao_reabrir(ctl, projeto):
     assert not arquivo.exists() and ctl.restante is None
 
 
+def test_o_lote_a_retomar_gravado_por_posicao_volta_sem_as_de_fora_do_livro(ctl, projeto):
+    """O `lote.json` da v2 é por posição (sem "pids"): as páginas fora do livro saem."""
+    from abbychess.controlador_do_livro import ARQUIVO_DO_LOTE
+
+    (projeto.pasta / ARQUIVO_DO_LOTE).write_text(json.dumps(
+        {"paginas": [1, 2, 7], "refazer": False, "reler_depois": [0, 9]}), encoding="utf-8")
+    p = ctl.pagina                                        # reabre o projeto
+    ctl.usar(projeto, p.fonte, p.leitor)
+    assert ctl.restante == ([1, 2], False) and ctl.reler_depois == [0] and ctl.pode_retomar
+
+
+def test_o_lote_a_retomar_ilegivel_nao_impede_abrir(ctl, projeto, caplog):
+    import logging
+
+    from abbychess.controlador_do_livro import ARQUIVO_DO_LOTE
+
+    (projeto.pasta / ARQUIVO_DO_LOTE).write_text('{"paginas": [1', encoding="utf-8")
+    p = ctl.pagina
+    with caplog.at_level(logging.WARNING, logger="abbychess.controlador_do_livro"):
+        ctl.usar(projeto, p.fonte, p.leitor)
+    assert ctl.restante is None and ctl.reler_depois == [] and not ctl.pode_retomar
+    assert any("não abriu" in r.getMessage() for r in caplog.records)
+
+
 def test_o_servidor_que_desiste_para_o_lote_e_retomar_vale_ao_reabrir(ctl, projeto,
                                                                       com_servidor):
     from tests import servidor_falso

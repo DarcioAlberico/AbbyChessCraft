@@ -220,22 +220,21 @@ class ControladorDeLayout:
         self.pagina._avisar(f"Área apagada.{aviso}", 6000)
 
     def trocar_tipo(self, indice: int, tipo: str) -> None:
-        self._parar_a_ordenacao()
-        zonas = self.zonas
-        if not 0 <= indice < len(zonas):
-            return
-        zn.trocar_tipo(zonas, indice, tipo)
-        self._trocar(zonas, indice, "Trocar o tipo da área")
-        self.pagina._avisar(f"Área {indice + 1}: {zn.NOMES[tipo].lower()}.", 5000)
+        self._trocar_na_area(indice, zn.trocar_tipo, tipo, "Trocar o tipo da área", zn.NOMES)
 
     def trocar_funcao(self, indice: int, funcao: str) -> None:
+        self._trocar_na_area(indice, zn.trocar_funcao, funcao, "Trocar a função da área",
+                             zn.NOMES_DAS_FUNCOES)
+
+    def _trocar_na_area(self, indice: int, trocar, valor: str, descricao: str, nomes) -> None:
+        """O tipo ou a função da área `indice` (`trocar` é o de `zonas`), com o aviso."""
         self._parar_a_ordenacao()
         zonas = self.zonas
         if not 0 <= indice < len(zonas):
             return
-        zn.trocar_funcao(zonas, indice, funcao)
-        self._trocar(zonas, indice, "Trocar a função da área")
-        self.pagina._avisar(f"Área {indice + 1}: {zn.NOMES_DAS_FUNCOES[funcao].lower()}.", 5000)
+        trocar(zonas, indice, valor)
+        self._trocar(zonas, indice, descricao)
+        self.pagina._avisar(f"Área {indice + 1}: {nomes[valor].lower()}.", 5000)
 
     def trocar_funcao_atual(self, funcao: str) -> None:
         if self.atual is not None:

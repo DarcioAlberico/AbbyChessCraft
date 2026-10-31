@@ -25,6 +25,7 @@ em `abbychess.texto`.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from enum import StrEnum
 from typing import Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
 
 from core.box_model import BoxEntry
@@ -275,12 +276,23 @@ class Diferenca:
 # O estado da página (§4.4)
 # ----------------------------------------------------------------------
 
-NAO_RECONHECIDA = "nao_reconhecida"
-GLIFOS_MARCADOS = "glifos_marcados"
-RECONHECIDA = "reconhecida"
-EM_REVISAO = "em_revisao"
-VERIFICADA = "verificada"
-ESTADOS = (NAO_RECONHECIDA, GLIFOS_MARCADOS, RECONHECIDA, EM_REVISAO, VERIFICADA)
+class Estado(StrEnum):
+    """O estado da página. É texto (o JSON e as comparações não mudam), e `Estado(texto)`
+    recusa o que não é estado: a entrada do disco o valida (SPEC-qualidade Q-P9)."""
+
+    NAO_RECONHECIDA = "nao_reconhecida"
+    GLIFOS_MARCADOS = "glifos_marcados"
+    RECONHECIDA = "reconhecida"
+    EM_REVISAO = "em_revisao"
+    VERIFICADA = "verificada"
+
+
+NAO_RECONHECIDA = Estado.NAO_RECONHECIDA
+GLIFOS_MARCADOS = Estado.GLIFOS_MARCADOS
+RECONHECIDA = Estado.RECONHECIDA
+EM_REVISAO = Estado.EM_REVISAO
+VERIFICADA = Estado.VERIFICADA
+ESTADOS = tuple(Estado)
 #: Os estados de página que já passaram pelo F5 ou pelo lote (contam como lidas).
 LIDAS = (RECONHECIDA, EM_REVISAO, VERIFICADA)
 

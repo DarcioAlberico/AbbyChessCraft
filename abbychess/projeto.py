@@ -66,6 +66,7 @@ import threading
 from collections import OrderedDict
 import unicodedata
 from dataclasses import asdict, dataclass, field, fields
+from enum import StrEnum
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -78,7 +79,7 @@ from abbychess import sequencia as sq
 from abbychess.gravador import Gravador
 from abbychess import zonas as zn
 from abbychess.modelo import (FIGURINAS, GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
-                              Box, Decisoes,
+                              Box, Decisoes, Estado,
                               Pagina, foto, gid_de, proximo_estado, reconciliar, reenquadrar)
 from abbychess.zonas import Zona
 
@@ -142,6 +143,15 @@ EXTENSOES_DE_IMAGEM = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}
 
 class ProjetoInvalido(ValueError):
     """O projeto não pode ser criado ou aberto, com o motivo para o usuário."""
+
+
+class Notacao(StrEnum):
+    """Como o livro escreve as peças nos lances (`Projeto.notacao`, §6.4); a entrada do
+    `projeto.json` recusa o resto (SPEC-qualidade Q-P9)."""
+
+    LIVRO = "livro"
+    FIGURINAS = "figurinas"
+    LETRAS = "letras"
 
 
 @dataclass
@@ -222,6 +232,8 @@ TIPOS_DO_PROJETO = {
     "gids_movidos": dict,
 }
 TIPOS_DOS_LIMIARES = {f.name: (int, float) for f in fields(Limiares)}
+#: Os campos de texto que só aceitam alguns valores.
+VALORES_DO_PROJETO = {"notacao": tuple(Notacao)}
 _NOMES_DOS_TIPOS = {str: "texto", int: "inteiro", float: "número", bool: "sim ou não",
                     dict: "objeto"}
 
@@ -237,6 +249,14 @@ def _conferir_tipos(valores: dict, tipos: dict, prefixo: str = "") -> None:
         if not isinstance(valor, aceitos) or (isinstance(valor, bool) and bool not in aceitos):
             esperado = " ou ".join(_NOMES_DOS_TIPOS[t] for t in aceitos if t is not _NADA)
             raise ValueError(f"o campo {prefixo}{nome} devia ser {esperado}, e é {valor!r}")
+
+
+def _conferir_valores(valores: dict) -> None:
+    """`ValueError` com o nome do campo de texto que só aceita alguns valores e tem outro."""
+    for nome, aceitos in VALORES_DO_PROJETO.items():
+        if nome in valores and valores[nome] not in set(aceitos):
+            raise ValueError(f"o campo {nome} devia ser {', '.join(aceitos)}, e é "
+                             f"{valores[nome]!r}")
 
 
 def _separar(bruto: dict, classe) -> Tuple[dict, dict]:
@@ -371,6 +391,7 @@ class ProjetoDeLivro:
                 raise ValueError("não é um objeto JSON")
             _conferir_tipos(bruto, TIPOS_DO_PROJETO)
             _conferir_tipos(bruto.get("limiares") or {}, TIPOS_DOS_LIMIARES, "limiares.")
+            _conferir_valores(bruto)
             conhecidos, desconhecidos = _separar(bruto, Projeto)
             extras = dict(conhecidos.pop("extras", None) or {})
             dos_limiares, outros_limiares = _separar(conhecidos.pop("limiares", None) or {},
@@ -2078,7 +2099,7 @@ def _pagina_de_json(bruto: dict) -> Pagina:
                   diagramas=[DiagramaLido.de_json(d) for d in bruto.get("diagramas", [])],
                   zonas=[Zona.de_dict(z) for z in bruto.get("zonas", [])],
                   decisoes=Decisoes.de_json(bruto.get("decisoes")),
-                  estado=bruto.get("estado", RECONHECIDA),
+                  estado=Estado(bruto.get("estado", RECONHECIDA)),   # ValueError: ilegível
                   proximo_n=int(bruto.get("proximo_n", 0)),
                   geometria=_geometria_de(bruto.get("geometria")),
                   tamanho=None if bruto.get("tamanho") is None

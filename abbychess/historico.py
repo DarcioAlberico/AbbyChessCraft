@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from abbychess.leitor import FONTE_MANUAL
-from abbychess.modelo import Box, Decisoes, Pagina, decisoes_dos_vivos
+from abbychess.modelo import NAO_RECONHECIDA, Box, Decisoes, Pagina, decisoes_dos_vivos
 
 #: O que o desfazer do projeto guarda, no máximo (estimado); as mais antigas saem.
 LIMITE_DE_MEMORIA = 50 * 2**20
@@ -175,7 +175,7 @@ def _vizinhos(ordem: Sequence[int], quais: set) -> Dict[int, Tuple[int, ...]]:
 
 
 def _vazio(campo: str):
-    return {"decisoes": Decisoes(), "estado": "nao_reconhecida"}.get(campo, ())
+    return {"decisoes": Decisoes(), "estado": NAO_RECONHECIDA}.get(campo, ())
 
 
 def _congelar(valor):

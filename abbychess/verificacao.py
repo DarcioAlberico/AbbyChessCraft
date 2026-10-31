@@ -73,27 +73,31 @@ def carregar_lexico(idioma: str = "pt", usuario: Optional[Path] = None,
     from core import lexico
 
     usuario_str = str(usuario) if usuario else None
-    nenhum = os.path.join(os.path.dirname(lexico.CAMINHO_PADRAO), "nenhum")
-    caminho = caminho_do_lexico_do_idioma(idioma)
-    if caminho and caminho.endswith(".hunspell.gz"):
-        from core import afixos
-
-        flexoes = afixos.Afixos.carregar(caminho)
-        lex = lexico.carregar(caminho=nenhum, caminho_usuario=usuario_str, idioma=idioma,
-                              nomes=False)
-        lex.palavras.update(flexoes.raizes)
-        lex.flexoes = flexoes
-    elif caminho:
-        lex = lexico.carregar(caminho=caminho, caminho_usuario=usuario_str, idioma=idioma,
-                              nomes=False)
-    else:
-        lex = lexico.carregar(caminho=nenhum, caminho_usuario=usuario_str, idioma=idioma,
-                              nomes=False)
+    lex = _lexico_do_idioma(idioma, usuario_str)
     if lex.palavras and os.path.exists(lexico.CAMINHO_NOMES):
         lex.palavras.update(lexico._ler(lexico.CAMINHO_NOMES))
     for extra in extras:
         if extra and Path(extra).is_file():
             lex.palavras.update(lexico._ler(str(extra)))
+    return lex
+
+
+def _lexico_do_idioma(idioma: str, usuario: Optional[str]):
+    """O léxico da lista do idioma (o pacote Hunspell, com as flexões, ou a lista de
+    palavras) e do dicionário do livro; sem lista, só o do livro."""
+    from core import lexico
+
+    nenhum = os.path.join(os.path.dirname(lexico.CAMINHO_PADRAO), "nenhum")
+    caminho = caminho_do_lexico_do_idioma(idioma)
+    if not (caminho and caminho.endswith(".hunspell.gz")):
+        return lexico.carregar(caminho=caminho or nenhum, caminho_usuario=usuario,
+                               idioma=idioma, nomes=False)
+    from core import afixos
+
+    flexoes = afixos.Afixos.carregar(caminho)
+    lex = lexico.carregar(caminho=nenhum, caminho_usuario=usuario, idioma=idioma, nomes=False)
+    lex.palavras.update(flexoes.raizes)
+    lex.flexoes = flexoes
     return lex
 
 
@@ -267,23 +271,7 @@ def _pelos_glifos(antigos: Sequence[str], letras: str) -> Optional[List[str]]:
     sem jeito nenhum e `[]` quando o melhor jeito não é único.
     """
     n, m = len(antigos), len(letras)
-    #: (i, j) -> (custo, caminhos, (j de antes, pedaço do glifo i - 1))
-    melhor = {(0, 0): ((0, 0), 1, None)}
-    for i, antigo in enumerate(antigos):
-        for j in range(m):
-            if (i, j) not in melhor:
-                continue
-            (mudados, editadas), caminhos, _ = melhor[(i, j)]
-            for t in range(1, max(1, len(antigo)) + 1):
-                if j + t > m:
-                    break
-                pedaco = letras[j:j + t]
-                custo = (mudados + (pedaco != antigo), editadas + _distancia(antigo, pedaco))
-                atual = melhor.get((i + 1, j + t))
-                if atual is None or custo < atual[0]:
-                    melhor[(i + 1, j + t)] = (custo, caminhos, (j, pedaco))
-                elif custo == atual[0]:
-                    melhor[(i + 1, j + t)] = (custo, atual[1] + caminhos, atual[2])
+    melhor = _melhores_caminhos(antigos, letras)
     fim = melhor.get((n, m))
     if fim is None:
         return None
@@ -295,6 +283,33 @@ def _pelos_glifos(antigos: Sequence[str], letras: str) -> Optional[List[str]]:
         pedacos.append(pedaco)
         i -= 1
     return pedacos[::-1]
+
+
+def _melhores_caminhos(antigos: Sequence[str], letras: str) -> dict:
+    """(i, j) -> (custo, caminhos, (j de antes, pedaço do glifo i - 1)): o melhor custo de
+    pôr as `j` primeiras letras nos `i` primeiros glifos, e quantos caminhos o dão."""
+    melhor = {(0, 0): ((0, 0), 1, None)}
+    for i, antigo in enumerate(antigos):
+        for j in range(len(letras)):
+            if (i, j) in melhor:
+                _estender(melhor, i, j, antigo, letras)
+    return melhor
+
+
+def _estender(melhor: dict, i: int, j: int, antigo: str, letras: str) -> None:
+    """Os caminhos de (i, j) que dão ao glifo `antigo` uma letra, ou até tantas quanto ele
+    tem."""
+    (mudados, editadas), caminhos, _ = melhor[(i, j)]
+    for t in range(1, max(1, len(antigo)) + 1):
+        if j + t > len(letras):
+            break
+        pedaco = letras[j:j + t]
+        custo = (mudados + (pedaco != antigo), editadas + _distancia(antigo, pedaco))
+        atual = melhor.get((i + 1, j + t))
+        if atual is None or custo < atual[0]:
+            melhor[(i + 1, j + t)] = (custo, caminhos, (j, pedaco))
+        elif custo == atual[0]:
+            melhor[(i + 1, j + t)] = (custo, atual[1] + caminhos, atual[2])
 
 
 def _distancia(a: str, b: str) -> int:

@@ -317,6 +317,12 @@ class Estrutura:
     protegidos: set = field(default_factory=set)
     #: Os `BoxEntry` da estrutura, vivos enquanto ela viver: as chaves são `id()`.
     vivos: list = field(default_factory=list)
+    #: As palavras do Documento em ordem de leitura (`texto.linhas_dos_gids`: as quebras, as
+    #: junções, os lances colados partidos e os virtuais), cada uma como os `id()` dos
+    #: glifos dela e, no lugar dos virtuais (sem box), o caractere (SPEC-qualidade Q-E1).
+    palavras_do_documento: list = field(default_factory=list)
+    #: O `id()` de cada glifo -> a posição da palavra dele em `palavras_do_documento`.
+    palavra_de: Dict[int, int] = field(default_factory=dict)
 
     def funcao(self, b: BoxEntry) -> str:
         return self.funcoes.get(id(b), "texto")
@@ -361,6 +367,18 @@ class Estrutura:
         for ultimo, primeiro in decisoes.juncoes:
             if ultimo in entrada_do and primeiro in entrada_do:
                 estrutura.juncoes.add((id(entrada_do[ultimo]), id(entrada_do[primeiro])))
+        from abbychess import texto as tx
+
+        virtuais = {v.gid: v.char for v in decisoes.virtuais}
+        for linha in tx.linhas_dos_gids(pagina):
+            for p in linha:                     # o não lido (sem char) não entra
+                itens = tuple(id(entrada_do[g]) if g in entrada_do else virtuais[g]
+                              for g in p if g in entrada_do or g in virtuais)
+                if itens:
+                    estrutura.palavra_de.update(
+                        (item, len(estrutura.palavras_do_documento))
+                        for item in itens if not isinstance(item, str))
+                    estrutura.palavras_do_documento.append(itens)
         return list(estrutura.vivos), estrutura
 
 
@@ -400,22 +418,62 @@ def palavras(boxes: Sequence[BoxEntry]) -> List[List[Tuple[str, List[int]]]]:
     return [linha for _trecho, linha in _palavras_por_trecho(boxes)]
 
 
-def _palavras_por_trecho(boxes: Sequence[BoxEntry], leitura: Optional[OrdemDeLeitura] = None
+def _palavras_por_trecho(boxes: Sequence[BoxEntry], leitura: Optional[OrdemDeLeitura] = None,
+                         estrutura: Optional[Estrutura] = None
                          ) -> List[Tuple[Tuple[int, int], List[Tuple[str, List[int]]]]]:
-    """As linhas de `palavras`, cada uma com o trecho de leitura em que está."""
+    """As linhas de `palavras`, cada uma com o trecho de leitura em que está. Com a
+    `Estrutura`, as palavras de cada linha são as do Documento (`_pelo_documento`)."""
     from abbychess import texto as tx
 
     normalizar_saida = tx.normalizador(tx.IMPRESSO)   # sem as ligaduras, como o Documento
     leitura = leitura or OrdemDeLeitura.da_pagina(boxes)
+    documento = estrutura if estrutura is not None and estrutura.palavras_do_documento else None
     saida = []
     for chave, trecho in leitura.trechos(boxes):
         for linha in leitura.linhas_do_trecho(trecho, boxes):
             indices = [trecho[s.indice] for p in linha for s in p.simbolos]
             caixa = _caixa_pela_altura(boxes, indices)
-            saida.append((chave, [(_captura_minuscula("".join(
-                normalizar_saida(caixa.get(trecho[s.indice], boxes[trecho[s.indice]].char))
-                for s in p.simbolos)), [trecho[s.indice] for s in p.simbolos])
+
+            def letra(i: int) -> str:
+                return normalizar_saida(caixa.get(i, boxes[i].char))
+
+            pelo_documento = (_pelo_documento(indices, boxes, documento, letra, normalizar_saida)
+                              if documento is not None else None)
+            saida.append((chave, pelo_documento if pelo_documento is not None else [
+                (_captura_minuscula("".join(letra(trecho[s.indice]) for s in p.simbolos)),
+                 [trecho[s.indice] for s in p.simbolos])
                 for p in linha if p.simbolos]))
+    return saida
+
+
+def _pelo_documento(indices: Sequence[int], boxes: Sequence[BoxEntry], estrutura: Estrutura,
+                    letra, normalizar) -> Optional[List[Tuple[str, List[int]]]]:
+    """As palavras da linha (os `indices` dos boxes dela) partidas como o Documento as parte
+    (SPEC-qualidade Q-E1), na ordem dele: a quebra e os lances colados partidos, a junção
+    sem espaço, e o virtual (a letra digitada, sem box) no lugar dele. O virtual entra com a
+    palavra que tem um glifo nesta linha; a palavra só de virtuais, depois da palavra do
+    Documento que vem antes dela. None se algum glifo da linha não está no Documento (a
+    linha sai pela geometria, como antes)."""
+    palavras_do_documento, palavra_de = estrutura.palavras_do_documento, estrutura.palavra_de
+    indice_de = {id(boxes[i]): i for i in indices}
+    if any(chave not in palavra_de for chave in indice_de):
+        return None
+    na_linha = sorted({palavra_de[chave] for chave in indice_de})
+    escolhidas = []
+    for k in na_linha:
+        escolhidas.append(k)
+        seguinte = k + 1
+        while (seguinte < len(palavras_do_documento) and seguinte not in na_linha
+               and all(isinstance(item, str) for item in palavras_do_documento[seguinte])):
+            escolhidas.append(seguinte)
+            seguinte += 1
+    saida = []
+    for k in escolhidas:
+        grupo = [indice_de[item] for item in palavras_do_documento[k] if item in indice_de]
+        texto = "".join(normalizar(item) if isinstance(item, str) else letra(indice_de[item])
+                        for item in palavras_do_documento[k]
+                        if isinstance(item, str) or item in indice_de)
+        saida.append((_captura_minuscula(texto), grupo))
     return saida
 
 
@@ -468,7 +526,7 @@ def _caixa_pela_altura(boxes: Sequence[BoxEntry], indices: Sequence[int]) -> Dic
 def _linhas(boxes: Sequence[BoxEntry], leitura: Optional[OrdemDeLeitura] = None,
             estrutura: Optional[Estrutura] = None) -> List[_Linha]:
     linhas = []
-    for trecho, linha in _palavras_por_trecho(boxes, leitura):
+    for trecho, linha in _palavras_por_trecho(boxes, leitura, estrutura):
         indices = [i for _, grupo in linha for i in grupo]
         texto = " ".join(t for t, _ in linha if t).strip()
         if not texto or not indices:

@@ -93,56 +93,100 @@ class Estrutura:
     @classmethod
     def da_pagina(cls, pagina, limiares=None) -> Tuple[List[BoxEntry], "Estrutura"]:
         """Os boxes lidos da página do modelo (`modelo.Pagina`) e a estrutura deles; sem
-        modelo, nada. Com os `limiares` do livro, também os duvidosos."""
-        from abbychess import contexto
-        from abbychess import zonas as zn
-        from abbychess.leitor import precisa_revisao
+        modelo, nada. Com os `limiares` do livro, também os duvidosos.
 
+        Uma passada pelos glifos para cada coisa que a estrutura sabe deles (as áreas, os
+        estilos e as decisões, os duvidosos), sem chamada a mais por glifo."""
         if pagina is None:
             return [], cls()
         lidos = [b for b in pagina.boxes if b.entry.char]
-        contra = contexto.improvaveis(pagina) if limiares is not None else set()
-        areas = [z for z in pagina.zonas if z.tipo in (zn.TEXTO, zn.IGNORAR)]
         estrutura = cls(vivos=[b.entry for b in lidos])
-        decisoes = pagina.decisoes
+        estrutura._das_areas(pagina.zonas, lidos)
+        estrutura._dos_estilos_e_decisoes(lidos, pagina.decisoes)
+        if limiares is not None:
+            estrutura._dos_duvidosos(pagina, lidos, limiares)
+        entrada_do = {b.gid: b.entry for b in lidos}
+        estrutura._das_juncoes(pagina.decisoes, entrada_do)
+        estrutura._das_palavras(pagina, entrada_do)
+        return list(estrutura.vivos), estrutura
+
+    def _das_areas(self, zonas, lidos) -> None:
+        """A função da área de cada glifo; protegido, o da área desenhada pelo usuário com
+        função de texto."""
+        from abbychess import zonas as zn
+
+        areas = [z for z in zonas if z.tipo in (zn.TEXTO, zn.IGNORAR)]
+        funcao_da, protege = _funcoes_das_areas(areas)
         for b in lidos:
             e = b.entry
-            cx, cy = (e.x1 + e.x2) / 2, (e.y1 + e.y2) / 2
-            area = zn.zona_que_vale(areas, cx, cy)
-            if area is not None:
-                funcao = "ignorar" if area.tipo == zn.IGNORAR else area.funcao or "texto"
-                estrutura.funcoes[id(e)] = funcao
-                if not area.automatica and funcao not in FORA_DA_EXPORTACAO:
-                    estrutura.protegidos.add(id(e))
+            area = zn.zona_que_vale(areas, (e.x1 + e.x2) / 2, (e.y1 + e.y2) / 2)
+            if area is None:
+                continue
+            self.funcoes[id(e)] = funcao_da[id(area)]
+            if protege[id(area)]:
+                self.protegidos.add(id(e))
+
+    def _dos_estilos_e_decisoes(self, lidos, decisoes) -> None:
+        for b in lidos:
+            chave = id(b.entry)
             if b.estilo.negrito:
-                estrutura.negrito.add(id(e))
+                self.negrito.add(chave)
             if b.estilo.italico:
-                estrutura.italico.add(id(e))
+                self.italico.add(chave)
             if b.gid in decisoes.paragrafo_antes:
-                estrutura.paragrafo_antes.add(id(e))
+                self.paragrafo_antes.add(chave)
             if b.gid in decisoes.hifen_de_quebra:
-                estrutura.hifen_de_quebra.add(id(e))
-            if limiares is not None and (
-                    precisa_revisao(e.char, e.source, e.confidence, limiares)
+                self.hifen_de_quebra.add(chave)
+
+    def _dos_duvidosos(self, pagina, lidos, limiares) -> None:
+        """Os glifos que a fila de revisão pede: pela confiança, ou pelo contexto."""
+        from abbychess import contexto
+        from abbychess.leitor import precisa_revisao
+
+        contra = contexto.improvaveis(pagina)
+        for b in lidos:
+            e = b.entry
+            if (precisa_revisao(e.char, e.source, e.confidence, limiares)
                     or (b.gid in contra and contexto.volta_pelo_contexto(e.source))):
-                estrutura.duvidosos.add(id(e))
-        entrada_do = {b.gid: b.entry for b in lidos}
+                self.duvidosos.add(id(e))
+
+    def _das_juncoes(self, decisoes, entrada_do: dict) -> None:
         for ultimo, primeiro in decisoes.juncoes:
             if ultimo in entrada_do and primeiro in entrada_do:
-                estrutura.juncoes.add((id(entrada_do[ultimo]), id(entrada_do[primeiro])))
+                self.juncoes.add((id(entrada_do[ultimo]), id(entrada_do[primeiro])))
+
+    def _das_palavras(self, pagina, entrada_do: dict) -> None:
+        """As palavras do texto do Documento e a palavra de cada glifo (Q-E1)."""
         from abbychess import texto as tx
 
-        virtuais = {v.gid: v.char for v in decisoes.virtuais}
+        virtuais = {v.gid: v.char for v in pagina.decisoes.virtuais}
         for linha in tx.linhas_dos_gids(pagina, com_os_nao_lidos=False):
             for p in linha:
-                itens = tuple(id(entrada_do[g]) if g in entrada_do else virtuais[g]
-                              for g in p if g in entrada_do or g in virtuais)
+                itens = _itens_da_palavra(p, entrada_do, virtuais)
                 if itens:
-                    estrutura.palavra_de.update(
-                        (item, len(estrutura.palavras_do_documento))
+                    self.palavra_de.update(
+                        (item, len(self.palavras_do_documento))
                         for item in itens if not isinstance(item, str))
-                    estrutura.palavras_do_documento.append(itens)
-        return list(estrutura.vivos), estrutura
+                    self.palavras_do_documento.append(itens)
+
+
+def _funcoes_das_areas(areas) -> Tuple[Dict[int, str], Dict[int, bool]]:
+    """A função de cada área (pelo `id`) e se ela protege os glifos dela da regra das
+    margens (a desenhada pelo usuário, com função de texto)."""
+    from abbychess import zonas as zn
+
+    funcao_da, protege = {}, {}
+    for area in areas:
+        funcao = "ignorar" if area.tipo == zn.IGNORAR else area.funcao or "texto"
+        funcao_da[id(area)] = funcao
+        protege[id(area)] = not area.automatica and funcao not in FORA_DA_EXPORTACAO
+    return funcao_da, protege
+
+
+def _itens_da_palavra(gids, entrada_do: dict, virtuais: dict) -> tuple:
+    """Os `id()` dos glifos da palavra e, no lugar dos virtuais, o caractere."""
+    return tuple(id(entrada_do[g]) if g in entrada_do else virtuais[g]
+                 for g in gids if g in entrada_do or g in virtuais)
 
 
 @dataclass

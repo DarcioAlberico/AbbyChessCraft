@@ -14,6 +14,7 @@ from PySide6.QtCore import QSettings  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from abbychess import exportar as ex  # noqa: E402
+from abbychess import metadados as mtd
 from abbychess import gravacao as gv  # noqa: E402
 from abbychess.app import dialogo_exportacao as de  # noqa: E402
 
@@ -28,11 +29,11 @@ def _projeto(pasta):
 
 
 def test_normalizar_tira_vazios_parte_as_listas_e_recusa_data_ruim():
-    assert ex.normalizar_metadados({"titulo": "  T ", "autores": "A; ;B", "editora": "",
+    assert mtd.normalizar_metadados({"titulo": "  T ", "autores": "A; ;B", "editora": "",
                                     "assuntos": [None, "X"], "outro": "fica de fora"}) == {
         "titulo": "T", "autores": ["A", "B"], "assuntos": ["X"]}
     with pytest.raises(ValueError, match="AAAA"):
-        ex.normalizar_metadados({"data": "maio de 2012"})
+        mtd.normalizar_metadados({"data": "maio de 2012"})
 
 
 def test_gravar_metadados_copia_a_capa_para_o_projeto(tmp_path):
@@ -40,12 +41,12 @@ def test_gravar_metadados_copia_a_capa_para_o_projeto(tmp_path):
     pasta.mkdir()
     capa = tmp_path / "foto.JPG"
     capa.write_bytes(b"\xff\xd8\xffcapa")
-    gravado = ex.gravar_metadados(_projeto(pasta), {"autores": "A; B", "data": "2012"}, capa)
+    gravado = mtd.gravar_metadados(_projeto(pasta), {"autores": "A; B", "data": "2012"}, capa)
     assert gravado == {"autores": ["A", "B"], "data": "2012", "capa": "capa.jpg"}
     assert (pasta / "capa.jpg").read_bytes() == b"\xff\xd8\xffcapa"
-    assert json.loads((pasta / ex.ARQUIVO_DE_METADADOS).read_text(encoding="utf-8")) == gravado
-    assert ex.ler_metadados(_projeto(pasta)) == gravado
-    m = ex.metadados_do_projeto(_projeto(pasta), "pt-BR")
+    assert json.loads((pasta / mtd.ARQUIVO_DE_METADADOS).read_text(encoding="utf-8")) == gravado
+    assert mtd.ler_metadados(_projeto(pasta)) == gravado
+    m = mtd.metadados_do_projeto(_projeto(pasta), "pt-BR")
     assert m.autores == ("A", "B") and m.capa == b"\xff\xd8\xffcapa"
 
 
@@ -53,7 +54,7 @@ def test_projeto_so_de_leitura_recusa_gravar(tmp_path):
     gv.proteger(tmp_path)
     try:
         with pytest.raises(gv.SomenteLeitura):
-            ex.gravar_metadados(_projeto(tmp_path), {"autores": "A"})
+            mtd.gravar_metadados(_projeto(tmp_path), {"autores": "A"})
     finally:
         gv.liberar(tmp_path)
 
@@ -101,20 +102,20 @@ def test_as_opcoes_sao_lembradas(app, tmp_path):
 # ----------------------------------------------------------------------
 
 def test_gravar_mantem_as_chaves_proprias_e_troca_o_autor_antigo(tmp_path):
-    (tmp_path / ex.ARQUIVO_DE_METADADOS).write_text(json.dumps(
+    (tmp_path / mtd.ARQUIVO_DE_METADADOS).write_text(json.dumps(
         {"colecao": "Clássicos", "autor": "Velho", "editora": "X"}), encoding="utf-8")
-    gravado = ex.gravar_metadados(_projeto(tmp_path), {"autores": "Novo", "editora": ""})
+    gravado = mtd.gravar_metadados(_projeto(tmp_path), {"autores": "Novo", "editora": ""})
     assert gravado == {"colecao": "Clássicos", "autores": ["Novo"]}
 
 
 def test_a_capa_nova_tira_a_de_outra_extensao_e_a_mesma_nao_e_recopiada(tmp_path):
     png = b"\x89PNG\r\n\x1a\n" + b"x" * 10
     (tmp_path / "capa.png").write_bytes(png)
-    ex.gravar_metadados(_projeto(tmp_path), {}, tmp_path / "capa.png")    # a mesma
+    mtd.gravar_metadados(_projeto(tmp_path), {}, tmp_path / "capa.png")    # a mesma
     assert (tmp_path / "capa.png").read_bytes() == png
     jpg = tmp_path / "nova.jpg"
     jpg.write_bytes(b"\xff\xd8\xff" + b"y" * 10)
-    gravado = ex.gravar_metadados(_projeto(tmp_path), {}, jpg)
+    gravado = mtd.gravar_metadados(_projeto(tmp_path), {}, jpg)
     assert gravado["capa"] == "capa.jpg" and not (tmp_path / "capa.png").exists()
 
 
@@ -122,7 +123,7 @@ def test_capa_que_nao_e_imagem_e_recusada(tmp_path):
     falsa = tmp_path / "capa.png"
     falsa.write_bytes(b"isto nao e imagem")
     with pytest.raises(ValueError, match="não é uma imagem"):
-        ex.gravar_metadados(_projeto(tmp_path), {}, falsa)
+        mtd.gravar_metadados(_projeto(tmp_path), {}, falsa)
 
 
 def test_metadados_ruins_escritos_a_mao_nao_travam_os_outros_formatos(app, tmp_path):
@@ -134,7 +135,7 @@ def test_metadados_ruins_escritos_a_mao_nao_travam_os_outros_formatos(app, tmp_p
     assert d.autores.text() == "5"
     with pytest.raises(ValueError):
         d.metadados()                                 # no EPUB a data ruim é recusada
-    assert ex.normalizar_metadados({"autores": 5}) == {"autores": ["5"]}
+    assert mtd.normalizar_metadados({"autores": 5}) == {"autores": ["5"]}
 
 
 def test_escolher_capa_nova_mantem_a_antiga_no_formulario(app, tmp_path):

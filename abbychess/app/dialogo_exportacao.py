@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QDia
                                QVBoxLayout, QWidget)
 
 from abbychess import exportar as ex
+from abbychess import metadados as mtd
 from abbychess import links_de_analise as la
 
 #: Os formatos com metadados (o PDF guarda o do arquivo original; TXT e PGN não têm).
@@ -237,7 +238,7 @@ class DialogoDeExportacao(QDialog):
                  "identificador": self.identificador.text(), "fonte": self.fonte.text()}
         if self.capa.text() and self.capa_atual:
             bruto["capa"] = self.capa_atual
-        return ex.normalizar_metadados(bruto)
+        return mtd.normalizar_metadados(bruto)
 
     def escolha(self) -> Escolha:
         return Escolha(self.opcoes(), self.metadados(), self.capa_escolhida)
@@ -371,7 +372,7 @@ def perguntar(janela, projeto, destino: Path) -> Optional[Escolha]:
     """O diálogo para o `destino`; `None` se o usuário cancelar."""
     formato = ex.formato_do_caminho(destino)
     dialogo = DialogoDeExportacao(janela, formato, opcoes_lembradas(janela.config),
-                                  ex.ler_metadados(projeto), projeto.pasta, projeto.dados.nome,
+                                  mtd.ler_metadados(projeto), projeto.pasta, projeto.dados.nome,
                                   len(projeto.sequencia))     # as páginas do livro, não do PDF
 
     def previsualizar(formato_, opcoes, metadados):

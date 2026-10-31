@@ -16,6 +16,7 @@ from core.pagina import Figura, PaginaExtraida, Paragrafo
 
 from abbychess import epub
 from abbychess import exportar as ex
+from abbychess import metadados as mtd
 
 FEN = "r3k2r/pp3ppp/2n5/3q4/3P4/2N2N2/PP3PPP/R3K2R w - - 0 1"
 
@@ -149,15 +150,15 @@ def test_conferir_acusa_link_quebrado_e_mimetype_fora_do_lugar(tmp_path):
 
 def test_metadados_do_projeto_pelo_arquivo(tmp_path):
     (tmp_path / "capa.png").write_bytes(_png(9))
-    (tmp_path / ex.ARQUIVO_DE_METADADOS).write_text(json.dumps({
+    (tmp_path / mtd.ARQUIVO_DE_METADADOS).write_text(json.dumps({
         "autores": ["Jacob Aagaard"], "editora": "Quality Chess", "data": "2012",
         "assuntos": "Chess", "capa": "capa.png"}), encoding="utf-8")
     projeto = SimpleNamespace(pasta=tmp_path, dados=SimpleNamespace(nome="Endgame"))
-    m = ex.metadados_do_projeto(projeto, "en")
+    m = mtd.metadados_do_projeto(projeto, "en")
     assert (m.titulo, m.idioma, m.autores, m.editora, m.assuntos) == (
         "Endgame", "en", ("Jacob Aagaard",), "Quality Chess", ("Chess",))
     assert m.capa == _png(9)
-    vazio = ex.metadados_do_projeto(SimpleNamespace(pasta=tmp_path / "x",
+    vazio = mtd.metadados_do_projeto(SimpleNamespace(pasta=tmp_path / "x",
                                                     dados=SimpleNamespace(nome="T")), "pt-BR")
     assert vazio.titulo == "T" and vazio.capa is None
 
@@ -247,9 +248,9 @@ def test_metadados_nulos_e_capa_fora_da_pasta(tmp_path):
     projeto_dir = tmp_path / "projeto"
     projeto_dir.mkdir()
     (tmp_path / "fora.png").write_bytes(_png(1))
-    (projeto_dir / ex.ARQUIVO_DE_METADADOS).write_text(json.dumps({
+    (projeto_dir / mtd.ARQUIVO_DE_METADADOS).write_text(json.dumps({
         "editora": None, "autores": [None, "A"], "capa": "../fora.png"}), encoding="utf-8")
-    m = ex.metadados_do_projeto(SimpleNamespace(pasta=projeto_dir,
+    m = mtd.metadados_do_projeto(SimpleNamespace(pasta=projeto_dir,
                                                 dados=SimpleNamespace(nome="T")), "pt-BR")
     assert m.editora == "" and m.autores == ("A",) and m.capa is None
 

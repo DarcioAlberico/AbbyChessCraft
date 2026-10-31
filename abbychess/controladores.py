@@ -25,6 +25,7 @@ from typing import List, Optional, Sequence
 from abbychess import diagramas as dg
 from abbychess import edicao as ed
 from abbychess import exportar as ex
+from abbychess import metadados as mtd
 from abbychess import historico as hs
 from abbychess import lances as lc
 from abbychess import livro
@@ -1161,17 +1162,16 @@ class ControladorDoLivro:
         sufixo), com as `opcoes` do diálogo. Os `metadados` do formulário vão antes para o
         `metadados.json` do projeto (com a `capa` copiada para a pasta); num projeto só de
         leitura, ou se a gravação falhar, valem só nesta exportação, sem a capa nova."""
-        p = self.pagina
-        projeto = p.projeto
+        p, projeto = self.pagina, self.pagina.projeto
         if metadados is not None:
             try:
-                metadados = ex.gravar_metadados(projeto, metadados, capa)
+                metadados = mtd.gravar_metadados(projeto, metadados, capa)
             except (OSError, ValueError) as erro:   # SomenteLeitura é um OSError
                 nova = " A capa nova ficou de fora; vale a de antes." if capa is not None else ""
                 p._avisar(f"Os metadados não foram gravados no projeto ({erro}); valem só "
                           f"nesta exportação.{nova}", 10000)
                 try:
-                    metadados = ex.normalizar_metadados(metadados)
+                    metadados = mtd.normalizar_metadados(metadados)
                 except ValueError:
                     metadados = None            # o arquivo, como estava
 

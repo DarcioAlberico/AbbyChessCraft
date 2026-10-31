@@ -7,7 +7,9 @@ em pé (`recorte`) e a leitura no box (`por_leitura`).
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
+from math import isnan
 from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -130,9 +132,6 @@ def decidir_negritos(boxes: Sequence[BoxEntry], palavras: Sequence[List[int]],
     de cada glifo contra a do mesmo caractere no peso redondo, e o peso da palavra contra o
     peso normal. Com a régua do livro (`regua_do_negrito.referencia_e_normal`), as duas vêm do
     livro com a página; sem ela, ou com o livro ainda curto, da página só."""
-    from collections import defaultdict
-    from math import isnan
-
     from abbychess import regua_do_negrito as rn
     from core import negrito
 
@@ -140,26 +139,48 @@ def decidir_negritos(boxes: Sequence[BoxEntry], palavras: Sequence[List[int]],
     if do_livro is not None:
         referencia, normal = do_livro
     else:
-        amostras = defaultdict(list)
-        for box, medida in zip(boxes, medidas):
-            if box.char and medida is not None and not isnan(medida):
-                amostras[box.char].append(medida)
-        referencia, normal = negrito.referencia(amostras), None
+        referencia, normal = negrito.referencia(_amostras_do_traco(boxes, medidas)), None
+    medidos = [_medidos(boxes, medidas, indices) for indices in palavras]
+    pesos = [negrito.relativo(glifos, referencia) if len(glifos) >= 2 else None
+             for glifos in medidos]
+    return _por_palavra(len(boxes), palavras, _negritos_dos_pesos(pesos, normal))
 
-    pesos = []
-    for indices in palavras:
-        glifos = [(boxes[i].char, medidas[i]) for i in indices
-                  if boxes[i].char and medidas[i] is not None and not isnan(medidas[i])]
-        pesos.append(negrito.relativo(glifos, referencia) if len(glifos) >= 2 else None)
+
+def _amostras_do_traco(boxes: Sequence[BoxEntry], medidas: Sequence[Optional[float]]) -> dict:
+    """As espessuras medidas de cada caractere da página (a referência do peso redondo)."""
+    amostras = defaultdict(list)
+    for box, medida in zip(boxes, medidas):
+        if box.char and medida is not None and not isnan(medida):
+            amostras[box.char].append(medida)
+    return amostras
+
+
+def _medidos(boxes: Sequence[BoxEntry], medidas: Sequence[Optional[float]], indices
+             ) -> List[Tuple[str, float]]:
+    """`(caractere, espessura)` dos glifos da palavra que têm caractere e medida."""
+    return [(boxes[i].char, medidas[i]) for i in indices
+            if boxes[i].char and medidas[i] is not None and not isnan(medidas[i])]
+
+
+def _negritos_dos_pesos(pesos: Sequence[Optional[float]], normal) -> List[Optional[bool]]:
+    """O negrito de cada palavra pelo peso dela contra o normal (o da página, sem o do livro);
+    None na palavra sem peso."""
+    from core import negrito
+
     if normal is None:
         normal = negrito.escala([peso for peso in pesos if peso is not None])
-    efeitos: List[Optional[bool]] = [None] * len(boxes)
-    for indices, peso in zip(palavras, pesos):
-        if peso is None:
+    return [None if peso is None else negrito.e_negrito(peso, normal) for peso in pesos]
+
+
+def _por_palavra(n: int, palavras: Sequence[List[int]], decididos: Sequence[Optional[bool]]
+                 ) -> List[Optional[bool]]:
+    """O efeito de cada um dos `n` glifos: o da palavra dele (None fora de palavra decidida)."""
+    efeitos: List[Optional[bool]] = [None] * n
+    for indices, decidido in zip(palavras, decididos):
+        if decidido is None:
             continue
-        forte = negrito.e_negrito(peso, normal)
         for i in indices:
-            efeitos[i] = forte
+            efeitos[i] = decidido
     return efeitos
 
 
@@ -228,37 +249,69 @@ def _italicos(pagina: np.ndarray, boxes: Sequence[BoxEntry], palavras: Sequence[
     torta não vira itálico). Só as letras de pé contam: algarismos, figurinas e a barra do ½
     têm diagonais que não são itálico. A palavra inteira leva o resultado; sem letras que
     bastem, `None`."""
+    altura, largura = pagina.shape[:2]
+    medidas = [_inclinacao_da_palavra(pagina, altura, largura, _letras_de_pe(boxes, indices))
+               for indices in palavras]
+    normal = _inclinacao_das_retas(medidas)
+    return _por_palavra(len(boxes), palavras, [_inclinada(m, normal) for m in medidas])
+
+
+def _letras_de_pe(boxes: Sequence[BoxEntry], indices: List[int]) -> List[BoxEntry]:
+    """As letras da palavra que contam para o itálico: sem algarismos, figurinas e a barra do
+    ½ (as diagonais deles não são itálico), nem os glifos girados ou em negativo."""
+    return [boxes[i] for i in indices
+            if boxes[i].char.isalpha() and not boxes[i].angulo
+            and not getattr(boxes[i], "negativo", False)]
+
+
+def _inclinacao_da_palavra(pagina: np.ndarray, altura: int, largura: int,
+                           letras: List[BoxEntry]) -> Optional[Tuple[float, float]]:
+    """`(graus, ganho)` das letras da palavra na caixa delas (`_inclinacao_por_projecao`);
+    None com letras de menos ou com a caixa estreita demais."""
+    if len(letras) < MINIMO_DE_LETRAS_DO_ITALICO:
+        return None
+    x1, y1, x2, y2 = _caixa_das_letras(letras, altura, largura)
+    if x2 - x1 <= 2 or y2 - y1 <= 2:
+        return None
+    return _inclinacao_por_projecao(pagina[y1:y2, x1:x2],
+                                    _mascara_das_letras(letras, x1, y1, x2, y2))
+
+
+def _caixa_das_letras(letras: List[BoxEntry], altura: int, largura: int
+                      ) -> Tuple[int, int, int, int]:
+    """A caixa que cobre as letras, dentro da página."""
+    x1, y1 = max(0, min(b.x1 for b in letras)), max(0, min(b.y1 for b in letras))
+    x2 = min(largura, max(b.x2 for b in letras))
+    y2 = min(altura, max(b.y2 for b in letras))
+    return x1, y1, x2, y2
+
+
+def _mascara_das_letras(letras: List[BoxEntry], x1: int, y1: int, x2: int, y2: int
+                        ) -> np.ndarray:
+    """Os pixels da caixa que estão dentro de alguma letra (a tinta de fora não conta)."""
+    mascara = np.zeros((y2 - y1, x2 - x1), bool)
+    for b in letras:
+        mascara[max(0, b.y1 - y1):max(0, b.y2 - y1),
+                max(0, b.x1 - x1):max(0, b.x2 - x1)] = True
+    return mascara
+
+
+def _inclinacao_das_retas(medidas: Sequence[Optional[Tuple[float, float]]]) -> float:
+    """A inclinação das palavras retas da página (a referência: a página escaneada torta não
+    vira itálico); 0 sem nenhuma."""
     from statistics import median
 
-    altura, largura = pagina.shape[:2]
-    medidas = []
-    for indices in palavras:
-        letras = [boxes[i] for i in indices
-                  if boxes[i].char.isalpha() and not boxes[i].angulo
-                  and not getattr(boxes[i], "negativo", False)]
-        medida = None
-        if len(letras) >= MINIMO_DE_LETRAS_DO_ITALICO:
-            x1, y1 = max(0, min(b.x1 for b in letras)), max(0, min(b.y1 for b in letras))
-            x2 = min(largura, max(b.x2 for b in letras))
-            y2 = min(altura, max(b.y2 for b in letras))
-            if x2 - x1 > 2 and y2 - y1 > 2:
-                mascara = np.zeros((y2 - y1, x2 - x1), bool)
-                for b in letras:
-                    mascara[max(0, b.y1 - y1):max(0, b.y2 - y1),
-                            max(0, b.x1 - x1):max(0, b.x2 - x1)] = True
-                medida = _inclinacao_por_projecao(pagina[y1:y2, x1:x2], mascara)
-        medidas.append(medida)
     retas = [m[0] for m in medidas if m is not None and abs(m[0]) <= RETA_ATE]
-    normal = median(retas) if retas else 0.0
-    efeitos: List[Optional[bool]] = [None] * len(boxes)
-    for indices, medida in zip(palavras, medidas):
-        if medida is None:
-            continue
-        inclinada = (INCLINACAO_DO_ITALICO <= medida[0] - normal <= TETO_DO_ITALICO
-                     and medida[1] >= GANHO_DO_ITALICO)
-        for i in indices:
-            efeitos[i] = inclinada
-    return efeitos
+    return median(retas) if retas else 0.0
+
+
+def _inclinada(medida: Optional[Tuple[float, float]], normal: float) -> Optional[bool]:
+    """A palavra é itálica: pende de `INCLINACAO_DO_ITALICO` a `TETO_DO_ITALICO` graus além
+    da referência, com a projeção `GANHO_DO_ITALICO` vezes mais afiada; None sem medida."""
+    if medida is None:
+        return None
+    return (INCLINACAO_DO_ITALICO <= medida[0] - normal <= TETO_DO_ITALICO
+            and medida[1] >= GANHO_DO_ITALICO)
 
 
 def reler_pelo_efeito(imagem: Image.Image, boxes: Sequence[BoxEntry], leitor: LeitorDoLivro,
@@ -268,9 +321,25 @@ def reler_pelo_efeito(imagem: Image.Image, boxes: Sequence[BoxEntry], leitor: Le
     o efeito ser medido (a medida precisa das palavras lidas), e um glifo lido por uma
     amostra de efeito incompatível com o medido (uma legenda em negrito vizinha do corpo
     reto) é lido de novo com o efeito. Devolve quantos foram relidos."""
+    alvos = _lidos_com_outro_efeito(boxes, leitor.padroes, negritos, italicos)
+    if not alvos:
+        return 0
+    pagina = np.asarray(imagem.convert("L"))
+    referencia = proporcao.altura_de_referencia(list(boxes))
+    for i, efeito in alvos:
+        box = boxes[i]
+        por_leitura(box, leitor.ler(vertical.recorte_de_pe(pagina, box),
+                                    altura_de_referencia=referencia, efeito=efeito))
+    return len(alvos)
+
+
+def _lidos_com_outro_efeito(boxes: Sequence[BoxEntry], padroes,
+                            negritos: Sequence[Optional[bool]],
+                            italicos: Sequence[Optional[bool]]) -> list:
+    """`(índice, (negrito, itálico))` de cada glifo com o efeito medido que foi lido por uma
+    amostra do livro de efeito incompatível com ele."""
     from abbychess.padroes import efeitos_compativeis
 
-    padroes = leitor.padroes
     alvos = []
     for i, box in enumerate(boxes):
         negrito = negritos[i] if i < len(negritos) else None
@@ -282,12 +351,4 @@ def reler_pelo_efeito(imagem: Image.Image, boxes: Sequence[BoxEntry], leitor: Le
             continue
         if not efeitos_compativeis(padroes.efeito_de(amostra), (negrito, italico)):
             alvos.append((i, (negrito, italico)))
-    if not alvos:
-        return 0
-    pagina = np.asarray(imagem.convert("L"))
-    referencia = proporcao.altura_de_referencia(list(boxes))
-    for i, efeito in alvos:
-        box = boxes[i]
-        por_leitura(box, leitor.ler(vertical.recorte_de_pe(pagina, box),
-                                    altura_de_referencia=referencia, efeito=efeito))
-    return len(alvos)
+    return alvos

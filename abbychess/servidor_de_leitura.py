@@ -242,8 +242,7 @@ class _Laco:
     def rodar(self) -> None:
         self.leitor = _fabrica(self.fabrica)(self.pasta, self.limiares)
         _baixar_a_prioridade()
-        ler_original = self.leitor.ler
-        self.leitor.ler = lambda recorte, **k: self._ler_com_vez(ler_original, recorte, **k)
+        self.dar_a_vez()
         self.saida.put(("pronto", os.getpid(), estado_do_leitor(self.leitor)))
         while not self.sair:
             self._receber(bloquear=not (self.interativos or (self.lotes and not self._no_lote())))
@@ -296,6 +295,11 @@ class _Laco:
             elif tipo == "sair":
                 self.sair = True
                 return
+
+    def dar_a_vez(self) -> None:
+        """Os métodos do leitor que as duas threads chamam passam pela vez (`_ler_com_vez`)."""
+        ler_original = self.leitor.ler
+        self.leitor.ler = lambda recorte, **k: self._ler_com_vez(ler_original, recorte, **k)
 
     def _ler_com_vez(self, ler, recorte, **k):
         """Um glifo. O do lote espera os interativos em curso e para se foi cancelado (ou se

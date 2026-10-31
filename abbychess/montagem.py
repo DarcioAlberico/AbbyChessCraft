@@ -238,19 +238,32 @@ def _palavras_por_trecho(boxes: Sequence[BoxEntry], leitura: Optional[OrdemDeLei
     saida = []
     for chave, trecho in leitura.trechos(boxes):
         for linha in leitura.linhas_do_trecho(trecho, boxes):
-            indices = [trecho[s.indice] for p in linha for s in p.simbolos]
-            caixa = _caixa_pela_altura(boxes, indices)
-
-            def letra(i: int) -> str:
-                return normalizar_saida(caixa.get(i, boxes[i].char))
-
-            pelo_documento = (_pelo_documento(indices, boxes, documento, letra, normalizar_saida)
-                              if documento is not None else None)
-            saida.append((chave, pelo_documento if pelo_documento is not None else [
-                (_captura_minuscula("".join(letra(trecho[s.indice]) for s in p.simbolos)),
-                 [trecho[s.indice] for s in p.simbolos])
-                for p in linha if p.simbolos]))
+            saida.append((chave, _palavras_da_linha(linha, trecho, boxes, documento,
+                                                    normalizar_saida)))
     return saida
+
+
+def _palavras_da_linha(linha, trecho, boxes: Sequence[BoxEntry], documento: Optional[Estrutura],
+                       normalizar_saida) -> List[Tuple[str, List[int]]]:
+    """As palavras de uma linha do trecho: as do Documento, quando ele as tem todas; senão,
+    as da geometria. A letra de cada glifo já com a caixa pela altura."""
+    indices = [trecho[s.indice] for p in linha for s in p.simbolos]
+    caixa = _caixa_pela_altura(boxes, indices)
+
+    def letra(i: int) -> str:
+        return normalizar_saida(caixa.get(i, boxes[i].char))
+
+    pelo_documento = (_pelo_documento(indices, boxes, documento, letra, normalizar_saida)
+                      if documento is not None else None)
+    if pelo_documento is not None:
+        return pelo_documento
+    return _pela_geometria(linha, trecho, letra)
+
+
+def _pela_geometria(linha, trecho, letra) -> List[Tuple[str, List[int]]]:
+    return [(_captura_minuscula("".join(letra(trecho[s.indice]) for s in p.simbolos)),
+             [trecho[s.indice] for s in p.simbolos])
+            for p in linha if p.simbolos]
 
 
 def _pelo_documento(indices: Sequence[int], boxes: Sequence[BoxEntry], estrutura: Estrutura,
@@ -265,7 +278,15 @@ def _pelo_documento(indices: Sequence[int], boxes: Sequence[BoxEntry], estrutura
     indice_de = {id(boxes[i]): i for i in indices}
     if any(chave not in palavra_de for chave in indice_de):
         return None
-    na_linha = sorted({palavra_de[chave] for chave in indice_de})
+    escolhidas = _com_as_so_de_virtuais(sorted({palavra_de[chave] for chave in indice_de}),
+                                        palavras_do_documento)
+    return [_palavra_do_documento(palavras_do_documento[k], indice_de, letra, normalizar)
+            for k in escolhidas]
+
+
+def _com_as_so_de_virtuais(na_linha: List[int], palavras_do_documento: list) -> List[int]:
+    """As palavras do Documento na linha e, depois de cada uma, as só de virtuais que a
+    seguem."""
     escolhidas = []
     for k in na_linha:
         escolhidas.append(k)
@@ -274,14 +295,17 @@ def _pelo_documento(indices: Sequence[int], boxes: Sequence[BoxEntry], estrutura
                and all(isinstance(item, str) for item in palavras_do_documento[seguinte])):
             escolhidas.append(seguinte)
             seguinte += 1
-    saida = []
-    for k in escolhidas:
-        grupo = [indice_de[item] for item in palavras_do_documento[k] if item in indice_de]
-        texto = "".join(normalizar(item) if isinstance(item, str) else letra(indice_de[item])
-                        for item in palavras_do_documento[k]
-                        if isinstance(item, str) or item in indice_de)
-        saida.append((_captura_minuscula(texto), grupo))
-    return saida
+    return escolhidas
+
+
+def _palavra_do_documento(itens, indice_de: Dict[int, int], letra, normalizar
+                          ) -> Tuple[str, List[int]]:
+    """(o texto, os índices dos boxes) da palavra do Documento: a letra de cada glifo da
+    linha e o caractere de cada virtual."""
+    grupo = [indice_de[item] for item in itens if item in indice_de]
+    texto = "".join(normalizar(item) if isinstance(item, str) else letra(indice_de[item])
+                    for item in itens if isinstance(item, str) or item in indice_de)
+    return _captura_minuscula(texto), grupo
 
 
 #: O `X` de captura entre a peça (ou a coluna do peão) e a casa: `♖Xf2` é `♖xf2`.
@@ -303,28 +327,38 @@ def _caixa_pela_altura(boxes: Sequence[BoxEntry], indices: Sequence[int]) -> Dic
     lido pelo padrão do livro tinha 19 px, a altura do `c` e do `s`, e o `C`
     maiúsculo 31.
     """
-    def altura(i: int) -> int:
-        return boxes[i].y2 - boxes[i].y1
-
-    baixas = [altura(i) for i in indices if boxes[i].char in _ALTURA_X]
-    altas = [altura(i) for i in indices if boxes[i].char in _ALTURA_DE_MAIUSCULA]
+    baixas = _alturas(boxes, indices, _ALTURA_X)
+    altas = _alturas(boxes, indices, _ALTURA_DE_MAIUSCULA)
     if not baixas:
         return {}
     x = statistics.median(baixas)
     maiuscula = statistics.median(altas) if altas else None
     if maiuscula is not None and maiuscula < 1.25 * x:
         return {}
+    return _trocas_de_caixa(boxes, indices, x, maiuscula)
+
+
+def _alturas(boxes: Sequence[BoxEntry], indices: Sequence[int], letras) -> List[int]:
+    """A altura de cada glifo da linha cuja letra está em `letras`."""
+    return [boxes[i].y2 - boxes[i].y1 for i in indices if boxes[i].char in letras]
+
+
+def _trocas_de_caixa(boxes: Sequence[BoxEntry], indices: Sequence[int], x: float,
+                     maiuscula: Optional[float]) -> Dict[int, str]:
+    """A letra de caixa ambígua cuja altura, na régua da linha (a altura-x `x` e a da
+    `maiuscula`), desmente a caixa lida."""
     trocas = {}
     for i in indices:
         letra = boxes[i].char
         if letra not in LETRAS_DE_CAIXA_PELA_ALTURA:
             continue
+        altura = boxes[i].y2 - boxes[i].y1
         if maiuscula is None:
             # Só a minúscula se prova sem régua de maiúscula.
-            certa = letra.lower() if altura(i) <= FOLGA_DA_ALTURA_X * x else letra
+            certa = letra.lower() if altura <= FOLGA_DA_ALTURA_X * x else letra
         else:
             corte = x + CORTE_DA_CAIXA * (maiuscula - x)
-            certa = letra.lower() if altura(i) < corte else letra.upper()
+            certa = letra.lower() if altura < corte else letra.upper()
         if certa != letra:
             trocas[i] = certa
     return trocas
@@ -338,12 +372,17 @@ def _linhas(boxes: Sequence[BoxEntry], leitura: Optional[OrdemDeLeitura] = None,
         texto = " ".join(t for t, _ in linha if t).strip()
         if not texto or not indices:
             continue
-        nova = _Linha(texto, min(boxes[i].y1 for i in indices),
-                      max(boxes[i].y2 for i in indices), indices, trecho)
-        if estrutura is not None:
-            _com_a_estrutura(nova, linha, boxes, estrutura)
-        linhas.append(nova)
+        linhas.append(_linha_nova(texto, indices, trecho, linha, boxes, estrutura))
     return linhas
+
+
+def _linha_nova(texto: str, indices: List[int], trecho, palavras_da_linha,
+                boxes: Sequence[BoxEntry], estrutura: Optional[Estrutura]) -> _Linha:
+    nova = _Linha(texto, min(boxes[i].y1 for i in indices),
+                  max(boxes[i].y2 for i in indices), indices, trecho)
+    if estrutura is not None:
+        _com_a_estrutura(nova, palavras_da_linha, boxes, estrutura)
+    return nova
 
 
 def _com_a_estrutura(linha: _Linha, palavras_da_linha, boxes: Sequence[BoxEntry],
@@ -360,20 +399,31 @@ def _com_a_estrutura(linha: _Linha, palavras_da_linha, boxes: Sequence[BoxEntry]
                            ("duvidosos", estrutura.duvidosos)):
         # O estilo cobre o glifo de vários caracteres só se todos o têm; a dúvida, se um
         # só a tem (a palavra inteira é onde olhar).
-        basta_um = nome == "duvidosos"
-        trechos: List[Tuple[int, int]] = []
-        posicao = 0
-        for texto, grupo in palavras_da_linha:
-            if not texto:
-                continue
-            if len(texto) == len(grupo):            # um caractere por glifo: letra a letra
-                for k, i in enumerate(grupo):
-                    if id(boxes[i]) in marcados:
-                        trechos.append((posicao + k, posicao + k + 1))
-            elif (any if basta_um else all)(id(boxes[i]) in marcados for i in grupo):
-                trechos.append((posicao, posicao + len(texto)))
-            posicao += len(texto) + 1
+        trechos = _trechos_da_linha(palavras_da_linha, boxes, marcados, nome == "duvidosos")
         setattr(linha, nome, _unir_trechos(trechos, linha.texto))
+
+
+def _trechos_da_linha(palavras_da_linha, boxes: Sequence[BoxEntry], marcados: set,
+                      basta_um: bool) -> List[Tuple[int, int]]:
+    """Os trechos `(início, fim)` da linha com os glifos `marcados`: letra a letra quando a
+    palavra tem um caractere por glifo; senão, a palavra inteira."""
+    trechos: List[Tuple[int, int]] = []
+    posicao = 0
+    for texto, grupo in palavras_da_linha:
+        if not texto:
+            continue
+        if len(texto) == len(grupo):            # um caractere por glifo: letra a letra
+            trechos += _letra_a_letra(grupo, posicao, boxes, marcados)
+        elif (any if basta_um else all)(id(boxes[i]) in marcados for i in grupo):
+            trechos.append((posicao, posicao + len(texto)))
+        posicao += len(texto) + 1
+    return trechos
+
+
+def _letra_a_letra(grupo: List[int], posicao: int, boxes: Sequence[BoxEntry],
+                   marcados: set) -> List[Tuple[int, int]]:
+    return [(posicao + k, posicao + k + 1) for k, i in enumerate(grupo)
+            if id(boxes[i]) in marcados]
 
 
 def _unir_trechos(trechos: Sequence[Tuple[int, int]], texto: str = "") -> List[Tuple[int, int]]:
@@ -398,37 +448,45 @@ def _juntar(linhas: Sequence[_Linha], manter_quebras: bool = False
     O hífen de quebra decidido no Documento (§6.3) sai sempre; o não decidido sai pela
     regra da letra antes e da minúscula depois. Com `manter_quebras`, as
     linhas se juntam por `\\n` e todo hífen fica, como impresso."""
-    texto, negrito, italico, duvidosos = "", [], [], []
+    texto = ""
+    trechos: Tuple[list, list, list] = ([], [], [])          # o negrito, o itálico, a dúvida
     anterior: Optional[_Linha] = None
     for linha in linhas:
-        if anterior is None:
-            base = 0
-        elif manter_quebras:
-            texto += "\n"
-            base = len(texto)
-        elif (anterior.ultimo, linha.primeiro) in linha.juncoes:
-            base = len(texto)                   # a palavra que o hífen apagado partia
-        elif anterior.hifen or (texto.endswith("-") and len(texto) > 1 and texto[-2].isalpha()
-                                and linha.texto[:1].islower()):
-            texto = texto[:-1]
-            base = len(texto)
+        texto, base, cortou = _emenda(texto, anterior, linha, manter_quebras)
+        if cortou:
             # O trecho que acabava no hífen não pode cobrir a letra da linha seguinte.
-            negrito = [(a, min(b, base)) for a, b in negrito if a < base]
-            italico = [(a, min(b, base)) for a, b in italico if a < base]
-            duvidosos = [(a, min(b, base)) for a, b in duvidosos if a < base]
-        else:
-            texto += " "
-            base = len(texto)
+            trechos = tuple([(a, min(b, base)) for a, b in t if a < base] for t in trechos)
         texto += linha.texto
-        negrito += [(base + a, base + b) for a, b in linha.negrito]
-        italico += [(base + a, base + b) for a, b in linha.italico]
-        duvidosos += [(base + a, base + b) for a, b in linha.duvidosos]
+        for juntos, da_linha in zip(trechos, (linha.negrito, linha.italico, linha.duvidosos)):
+            juntos += [(base + a, base + b) for a, b in da_linha]
         anterior = linha
 
     def cortados(trechos):
         return _unir_trechos([(a, min(b, len(texto))) for a, b in trechos if a < len(texto)],
                              texto)
+    negrito, italico, duvidosos = trechos
     return texto, cortados(negrito), cortados(italico), cortados(duvidosos)
+
+
+def _emenda(texto: str, anterior: Optional[_Linha], linha: _Linha, manter_quebras: bool
+            ) -> Tuple[str, int, bool]:
+    """(o texto pronto para receber a linha, onde ela começa nele, se o hífen de quebra
+    saiu): a quebra mantida, a junção sem espaço, o hífen tirado ou o espaço."""
+    if anterior is None:
+        return texto, 0, False
+    if manter_quebras:
+        return texto + "\n", len(texto) + 1, False
+    if (anterior.ultimo, linha.primeiro) in linha.juncoes:
+        return texto, len(texto), False         # a palavra que o hífen apagado partia
+    if _hifen_de_quebra(texto, anterior, linha):
+        return texto[:-1], len(texto) - 1, True
+    return texto + " ", len(texto) + 1, False
+
+
+def _hifen_de_quebra(texto: str, anterior: _Linha, linha: _Linha) -> bool:
+    """O hífen decidido no Documento, ou o da regra: a letra antes e a minúscula depois."""
+    return anterior.hifen or (texto.endswith("-") and len(texto) > 1 and texto[-2].isalpha()
+                              and linha.texto[:1].islower())
 
 
 @dataclass
@@ -449,14 +507,18 @@ def _juntar_entre_paginas(paginas: Sequence[PaginaExtraida]) -> None:
     for atual, seguinte, primeiro in zip(paginas, paginas[1:], primeiros[1:]):
         if primeiro is None or (seguinte.blocos and seguinte.blocos[0] is primeiro):
             continue
-        antes = atual.blocos[-1]
-        trechos = getattr(primeiro, "duvidosos", None)
-        if trechos and isinstance(antes, ParagrafoExportado):
-            # O core escreve `fim + " " + começo`: o texto de depois acaba no fim do novo.
-            deslocamento = len(antes.texto) - len(primeiro.texto)
-            antes.duvidosos = list(antes.duvidosos) + [
-                (a + deslocamento, z + deslocamento) for a, z in trechos
-                if a + deslocamento >= 0]
+        _levar_os_duvidosos(atual.blocos[-1], primeiro)
+
+
+def _levar_os_duvidosos(antes, primeiro) -> None:
+    """Os duvidosos do parágrafo `primeiro`, que voltou para o fim de `antes`."""
+    trechos = getattr(primeiro, "duvidosos", None)
+    if trechos and isinstance(antes, ParagrafoExportado):
+        # O core escreve `fim + " " + começo`: o texto de depois acaba no fim do novo.
+        deslocamento = len(antes.texto) - len(primeiro.texto)
+        antes.duvidosos = list(antes.duvidosos) + [
+            (a + deslocamento, z + deslocamento) for a, z in trechos
+            if a + deslocamento >= 0]
 
 
 def _quebras_da_camada(pagina: PaginaExtraida) -> None:
@@ -470,37 +532,53 @@ def _quebras_da_camada(pagina: PaginaExtraida) -> None:
     from core.lexico import HIFENS
 
     for bloco in pagina.blocos:
-        if not isinstance(bloco, Paragrafo) or bloco.titulo or not bloco.inicios:
+        if isinstance(bloco, Paragrafo) and not bloco.titulo and bloco.inicios:
+            _quebras_do_paragrafo(bloco, HIFENS)
+
+
+def _quebras_do_paragrafo(bloco: Paragrafo, hifens) -> None:
+    letras = list(bloco.texto)
+    inseridas = _o_que_entra(letras, bloco.inicios, hifens)
+    for inicio, texto in sorted(inseridas, reverse=True):
+        letras[inicio:inicio] = list(texto)
+    if inseridas:
+        _andar_os_trechos(bloco, inseridas)
+    bloco.texto = "".join(letras)
+
+
+def _o_que_entra(letras: List[str], inicios: Sequence[int], hifens
+                 ) -> List[Tuple[int, str]]:
+    """(posição no texto de antes, o que entra) em cada início de linha impressa; o espaço
+    antes dele vira `\\n` em `letras`, sem mudar o comprimento."""
+    inseridas: List[Tuple[int, str]] = []
+    for inicio in inicios:
+        if not 0 < inicio <= len(letras):
             continue
-        letras = list(bloco.texto)
-        inseridas: List[Tuple[int, str]] = []    # (posição no texto de antes, o que entra)
-        for inicio in bloco.inicios:
-            if not 0 < inicio <= len(letras):
-                continue
-            if letras[inicio - 1] == " ":
-                letras[inicio - 1] = "\n"
-            elif letras[inicio - 1] in HIFENS:
-                inseridas.append((inicio, "\n"))
-            elif (inicio < len(letras) and letras[inicio - 1].isalnum()
-                  and letras[inicio].isalnum()):
-                inseridas.append((inicio, "-\n"))
-        for inicio, texto in sorted(inseridas, reverse=True):
-            letras[inicio:inicio] = list(texto)
-        if inseridas:
-            def andar(p: int) -> int:
-                return p + sum(len(t) for i, t in inseridas if i <= p)
+        if letras[inicio - 1] == " ":
+            letras[inicio - 1] = "\n"
+        elif letras[inicio - 1] in hifens:
+            inseridas.append((inicio, "\n"))
+        elif (inicio < len(letras) and letras[inicio - 1].isalnum()
+              and letras[inicio].isalnum()):
+            inseridas.append((inicio, "-\n"))
+    return inseridas
 
-            def andar_fim(p: int) -> int:           # o fim exclusivo não leva o `\n` dele,
-                return p + sum(len(t) if i < p else len(t) - 1     # mas leva o hífen que
-                               for i, t in inseridas if i <= p)    # volta
 
-            for nome in ("negrito", "italico", "duvidosos"):
-                trechos = getattr(bloco, nome, None)
-                if trechos:
-                    setattr(bloco, nome, [(andar(a), andar_fim(z)) for a, z in trechos])
-            bloco.inicios = [andar(i) for i in bloco.inicios]
-            bloco.pesos = bloco.lacunas = None    # uma medida por caractere: não bate mais
-        bloco.texto = "".join(letras)
+def _andar_os_trechos(bloco: Paragrafo, inseridas: List[Tuple[int, str]]) -> None:
+    """Os trechos de estilo e os inícios andam o que entrou antes deles."""
+    def andar(p: int) -> int:
+        return p + sum(len(t) for i, t in inseridas if i <= p)
+
+    def andar_fim(p: int) -> int:           # o fim exclusivo não leva o `\n` dele,
+        return p + sum(len(t) if i < p else len(t) - 1     # mas leva o hífen que
+                       for i, t in inseridas if i <= p)    # volta
+
+    for nome in ("negrito", "italico", "duvidosos"):
+        trechos = getattr(bloco, nome, None)
+        if trechos:
+            setattr(bloco, nome, [(andar(a), andar_fim(z)) for a, z in trechos])
+    bloco.inicios = [andar(i) for i in bloco.inicios]
+    bloco.pesos = bloco.lacunas = None    # uma medida por caractere: não bate mais
 
 
 def paragrafos(boxes: Sequence[BoxEntry], cortes: Sequence[int] = ()) -> List[Paragrafo]:
@@ -526,29 +604,41 @@ def _paragrafos_por_trecho(boxes: Sequence[BoxEntry], cortes: Sequence[int] = ()
     linhas = _linhas(boxes, leitura, estrutura)
     if not linhas:
         return []
-    passos = [b.topo - a.topo for a, b in zip(linhas, linhas[1:])
-              if b.topo > a.topo and a.trecho == b.trecho]
-    passo = statistics.median(passos) if passos else 0
+    passo = _passo_mediano(linhas, no_trecho=True)
     grupos: List[List[_Linha]] = [[linhas[0]]]
     for anterior, linha in zip(linhas, linhas[1:]):
-        salto = linha.topo - anterior.topo
-        # Outro trecho (a coluna seguinte, a faixa que atravessa) também abre
-        # parágrafo, como voltar para cima.
-        if (salto <= 0 or linha.trecho != anterior.trecho
-                or (passo and salto > SALTO_DE_PARAGRAFO * passo)
-                or any(anterior.pe <= y < linha.topo for y in cortes)
-                or linha.funcao != anterior.funcao or linha.paragrafo):
+        if _abre_paragrafo(anterior, linha, passo, cortes):
             grupos.append([linha])
         else:
             grupos[-1].append(linha)
-    saida = []
-    for g in grupos:
-        texto, negrito, italico, duvidosos = _juntar(g, manter_quebras)
-        titulo = g[0].funcao == "titulo"
-        saida.append((g[0].trecho, ParagrafoExportado(
-            texto, titulo=titulo, nivel=1 if titulo else 2, negrito=negrito, italico=italico,
-            topo=g[0].topo, pe=g[-1].pe, duvidosos=duvidosos)))
-    return saida
+    return [_paragrafo_do_grupo(g, manter_quebras) for g in grupos]
+
+
+def _passo_mediano(linhas: List[_Linha], *, no_trecho: bool = False) -> float:
+    """O passo mediano entre linhas seguidas que descem; com `no_trecho`, só entre as do
+    mesmo trecho (as margens olham a página inteira, `margens._margem_da_pagina`)."""
+    passos = [b.topo - a.topo for a, b in zip(linhas, linhas[1:])
+              if b.topo > a.topo and (not no_trecho or a.trecho == b.trecho)]
+    return statistics.median(passos) if passos else 0
+
+
+def _abre_paragrafo(anterior: _Linha, linha: _Linha, passo: float, cortes: Sequence[int]) -> bool:
+    """O vão cresce, a linha volta para cima, muda de trecho (a coluna seguinte, a faixa que
+    atravessa) ou de função, passa por um corte, ou o Documento pediu."""
+    salto = linha.topo - anterior.topo
+    return (salto <= 0 or linha.trecho != anterior.trecho
+            or (passo and salto > SALTO_DE_PARAGRAFO * passo)
+            or any(anterior.pe <= y < linha.topo for y in cortes)
+            or linha.funcao != anterior.funcao or linha.paragrafo)
+
+
+def _paragrafo_do_grupo(g: List[_Linha], manter_quebras: bool
+                        ) -> Tuple[Tuple[int, int], Paragrafo]:
+    texto, negrito, italico, duvidosos = _juntar(g, manter_quebras)
+    titulo = g[0].funcao == "titulo"
+    return (g[0].trecho, ParagrafoExportado(
+        texto, titulo=titulo, nivel=1 if titulo else 2, negrito=negrito, italico=italico,
+        topo=g[0].topo, pe=g[-1].pe, duvidosos=duvidosos))
 
 
 def _figura(imagem: Image.Image, caixa: Tuple[int, int, int, int],
@@ -671,28 +761,46 @@ def pagina_extraida(indice: int, boxes: Sequence[BoxEntry],
     ficam com `manter_margens`), e títulos, estilos e parágrafos seguem o Documento.
     """
     cortes = [t[1] for t in tabuleiros] if imagem is not None else []
-    texto = _sem_coordenadas([b for b in boxes if b.char], tabuleiros)
-    if estrutura is not None:
-        fora = ("ignorar",) if manter_margens else FORA_DA_EXPORTACAO
-        texto = [b for b in texto if estrutura.funcao(b) not in fora]
+    texto = _texto_da_pagina(boxes, tabuleiros, estrutura, manter_margens)
     leitura = OrdemDeLeitura.da_pagina(texto)
     com_trecho = _paragrafos_por_trecho(texto, cortes, leitura, estrutura, manter_quebras)
     blocos: list = [p for _trecho, p in com_trecho]
     figuras = []
     if imagem is not None:
-        # Cada figura no trecho da coluna dela, e na altura dela dentro do trecho:
-        # só pela altura, o diagrama da esquerda caía entre os parágrafos da direita.
-        figuras = [(leitura.chave((d.caixa[0] + d.caixa[2]) / 2, d.caixa[1]), d.caixa[1],
-                    figura_do_diagrama(imagem, d) if desenhar_diagramas
-                    else _figura(imagem, d.caixa, RECORTE_PEDIDO))
-                   for d in para_caixas(tabuleiros, diagramas)]
-        ordem = [(trecho, p.topo or 0, p) for trecho, p in com_trecho] + figuras
-        blocos = [b for _t, _y, b in sorted(ordem, key=lambda item: (item[0], item[1]))]
+        figuras = _figuras_da_pagina(imagem, leitura, tabuleiros, diagramas, desenhar_diagramas)
+        blocos = _na_ordem_de_leitura(com_trecho, figuras)
     largura, altura = imagem.size if imagem is not None else (0, 0)
     return PaginaExtraida(numero=indice, blocos=blocos,
                           caracteres=sum(len(b.char) for b in boxes if b.char),
                           diagramas=len(figuras), altura=altura, largura=largura,
                           dpi=DPI_DA_LEITURA)
+
+
+def _texto_da_pagina(boxes: Sequence[BoxEntry], tabuleiros, estrutura: Optional[Estrutura],
+                     manter_margens: bool) -> List[BoxEntry]:
+    """Os boxes do texto: sem os do tabuleiro e as coordenadas dele e, com a `Estrutura`,
+    sem as áreas de margem (salvo `manter_margens`) e as de ignorar."""
+    texto = _sem_coordenadas([b for b in boxes if b.char], tabuleiros)
+    if estrutura is None:
+        return texto
+    fora = ("ignorar",) if manter_margens else FORA_DA_EXPORTACAO
+    return [b for b in texto if estrutura.funcao(b) not in fora]
+
+
+def _figuras_da_pagina(imagem: Image.Image, leitura: OrdemDeLeitura, tabuleiros,
+                       diagramas: Sequence[DiagramaLido], desenhar_diagramas: bool) -> list:
+    """(trecho, altura, figura) de cada diagrama: cada figura no trecho da coluna dela, e na
+    altura dela dentro do trecho (só pela altura, o diagrama da esquerda caía entre os
+    parágrafos da direita)."""
+    return [(leitura.chave((d.caixa[0] + d.caixa[2]) / 2, d.caixa[1]), d.caixa[1],
+             figura_do_diagrama(imagem, d) if desenhar_diagramas
+             else _figura(imagem, d.caixa, RECORTE_PEDIDO))
+            for d in para_caixas(tabuleiros, diagramas)]
+
+
+def _na_ordem_de_leitura(com_trecho, figuras) -> list:
+    ordem = [(trecho, p.topo or 0, p) for trecho, p in com_trecho] + figuras
+    return [b for _t, _y, b in sorted(ordem, key=lambda item: (item[0], item[1]))]
 
 
 def titulos_das_paginas(projeto: ProjetoDeLivro, indices: Sequence[int],

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import difflib
 import re
-import statistics
 import unicodedata
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
@@ -15,7 +14,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 from core.box_model import BoxEntry
 
 from abbychess.layout import OrdemDeLeitura
-from abbychess.montagem import FUNCOES_DE_MARGEM, Estrutura, _Linha, _linhas
+from abbychess.montagem import FUNCOES_DE_MARGEM, Estrutura, _Linha, _linhas, _passo_mediano
 
 
 #: A faixa de cima e a de baixo da página, em frações da altura, onde moram o
@@ -81,11 +80,6 @@ def _e_poeira(linha: _Linha, altura: int) -> bool:
     """Um ou dois caracteres na borda extrema da página (`FAIXA_DA_POEIRA`)."""
     return len(linha.texto.replace(" ", "")) <= 2 and (
         linha.pe < FAIXA_DA_POEIRA * altura or linha.topo > (1 - FAIXA_DA_POEIRA) * altura)
-
-
-def _passo_mediano(linhas: List[_Linha]) -> float:
-    passos = [b.topo - a.topo for a, b in zip(linhas, linhas[1:]) if b.topo > a.topo]
-    return statistics.median(passos) if passos else 0
 
 
 def _candidatos_da_margem(linhas: List[_Linha], altura: int, passo: float

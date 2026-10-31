@@ -76,6 +76,57 @@ def test_ca_q_t5_nenhum_teste_importa_de_outro_teste():
     assert achados == []
 
 
+def _pytest_filho(pasta, *args, codigo=None, **ambiente):
+    """Um pytest noutro processo, com o conftest da suíte; `codigo` é um arquivo de teste de
+    brinquedo em `pasta` (sem ele, roda `args` no checkout)."""
+    import os
+    import subprocess
+    import sys
+
+    alvo = []
+    if codigo is not None:
+        (pasta / "test_brinquedo.py").write_text(codigo, encoding="utf-8")
+        alvo = [str(pasta / "test_brinquedo.py"), "-p", "tests.conftest", "--rootdir", str(pasta)]
+    return subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *alvo, *args],
+        cwd=pasta if codigo is not None else TESTES.parent, capture_output=True, text=True,
+        encoding="utf-8", timeout=180,
+        env={**os.environ, "PYTHONPATH": str(TESTES.parent), "PYTHONIOENCODING": "utf-8",
+             **ambiente})
+
+
+def test_ca_q_t4_a_suite_rapida_acima_do_teto_reprova(tmp_path):
+    """CA-Q-T4 (§13.5: 90 s com -n 4): passar do teto reprova a rodada que passaria; o teto
+    zero o mostra num teste de brinquedo."""
+    codigo = "def test_passa():\n    assert True\n"
+    assert _pytest_filho(tmp_path, codigo=codigo).returncode == 0
+    acima = _pytest_filho(tmp_path, codigo=codigo, ABBY_TETO_DA_RAPIDA_S="0")
+    assert acima.returncode != 0 and "teto da suíte rápida" in acima.stdout, acima.stdout
+
+
+def test_ca_q_t4_o_fim_da_rodada_conta_os_pulos_por_motivo(tmp_path):
+    codigo = ("import pytest\n\n"
+              "@pytest.mark.parametrize('n', [1, 2])\n"
+              "def test_sem_fonte(n):\n    pytest.skip('a Arial não está nesta máquina')\n\n"
+              "def test_sem_pdf():\n    pytest.skip('o PDF do livro não está aqui')\n")
+    saida = _pytest_filho(tmp_path, codigo=codigo).stdout
+    assert "pulados por motivo" in saida, saida
+    assert "2 × a Arial não está nesta máquina" in saida and "1 × o PDF do livro" in saida
+
+
+def test_ca_q_t4_o_noturno_seleciona_as_maquinas_de_estado_com_5000_exemplos(tmp_path):
+    from tests import test_modelo_estados as estados
+
+    noturno = _pytest_filho(tmp_path, "--collect-only", "-m", "noturno",
+                            "tests/test_modelo_estados.py").stdout
+    rapida = _pytest_filho(tmp_path, "--collect-only", "tests/test_modelo_estados.py").stdout
+    assert "test_maquina_da_pagina_noturna" in noturno, noturno
+    assert "test_maquina_do_controlador_noturna" in noturno
+    assert "noturna" not in rapida and "test_maquina_da_pagina" in rapida
+    assert estados.test_maquina_da_pagina.settings.max_examples == 100
+    assert estados.test_maquina_da_pagina_noturna.settings.max_examples == 5000
+
+
 def test_a_regra_do_relogio_pega_o_sleep_e_o_assert_e_poupa_as_camadas_lentas():
     fonte = '''
 import time

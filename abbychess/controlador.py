@@ -1251,7 +1251,7 @@ class ControladorDePagina:
         self.tarefa(titulo, lambda: self._preparar_reconhecer(indice, zona), falhou=falhou)
 
     def _preparar_reconhecer(self, indice: int, zona=None):
-        if indice != self.indice or not self._pode_ler(avisar=False):
+        if indice != self.indice or not self._pode_ler():
             return None
         pagina = self._pagina_para_editar()
         # Do preparar ao pronto, o lote deixa a página para reler depois (CA-Q-C2): com o
@@ -2572,7 +2572,7 @@ class ControladorDePagina:
             self.eventos.emitir("falha", titulo, mensagem)
         return falhou
 
-    def _pode_ler(self, avisar: bool = True) -> bool:
+    def _pode_ler(self) -> bool:
         return self.pronto and self.imagem is not None
 
     def _pode_editar(self, precisa_de_glifos: bool = True) -> bool:

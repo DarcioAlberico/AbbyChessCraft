@@ -422,6 +422,8 @@ class Pedido:
     ok: bool = False
     resultado: Any = None
     enviado_em: float = field(default_factory=time.perf_counter)
+    #: O cancelar foi pedido: o filho reaberto depois de uma queda o recebe de novo.
+    cancelar_pedido: bool = False
 
     @property
     def cancelado(self) -> bool:
@@ -518,6 +520,7 @@ class ServidorDeLeitura:
         responde "cancelado" na vez dele)."""
         with self._trava:
             if not pedido.feito.is_set() and not self._fechando:
+                pedido.cancelar_pedido = True
                 self._entrada.put(("cancelar", pedido.id))
 
     def abandonar_pendentes(self) -> None:
@@ -603,6 +606,8 @@ class ServidorDeLeitura:
                 self._abrir()
                 for pedido in self._pendentes.values():
                     self._entrada.put(pedido.mensagem)
+                    if pedido.cancelar_pedido:     # o cancelar foi ao filho que caiu
+                        self._entrada.put(("cancelar", pedido.id))
         if pendentes is None:
             self._avisar(f"O servidor de leitura parou ({motivo}) e foi aberto de novo; os "
                          "pedidos em curso foram reenviados.", False)

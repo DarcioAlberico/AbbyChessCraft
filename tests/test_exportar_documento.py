@@ -75,6 +75,28 @@ def test_a_exportacao_segue_as_areas_os_estilos_e_as_decisoes():
     assert corpo.texto[slice(*corpo.negrito[0])] == "negrito"
 
 
+def test_ca_q_e1_a_exportacao_leva_as_decisoes_de_palavra_do_documento():
+    """SPEC-qualidade CA-Q-E1 (§12.1: a exportação lê o Documento): a letra digitada à mão
+    (o virtual, sem box), a palavra partida pelo usuário e os lances que o OCR colou saem no
+    texto exportado como no Documento, e não como a geometria dos boxes os junta."""
+    from abbychess.modelo import GlifoVirtual
+
+    pagina = tx.pagina_avulsa(_linha("o cavlo vai a f6 maisum ♘f62.c4 fim", 10))
+    gid_do = {b.entry.x1: b.gid for b in pagina.boxes}
+    x_do_v = 40 + 14 * len("o cav") - 14              # o "v" de "cavlo"
+    x_do_u = 40 + 14 * len("o cavlo vai a f6 mais")   # o "u" de "maisum"
+    pagina.decisoes = Decisoes(
+        quebras=frozenset({gid_do[x_do_u]}),
+        virtuais=(GlifoVirtual(pagina.alocar(), "a", gid_do[x_do_v]),))
+    documento = tx.texto(tx.montar(pagina))
+    assert documento == "o cavalo vai a f6 mais um ♘f6 2.c4 fim"
+
+    entries, estrutura = ex.Estrutura.da_pagina(pagina)
+    extraida = ex.pagina_extraida(0, entries, estrutura=estrutura)
+    assert [p.texto for p in _paragrafos(extraida)] == [documento]
+    assert ex.texto_do_livro([extraida]) == documento + "\n"
+
+
 def test_manter_margens_deixa_o_cabecalho_da_area():
     pagina, _ = _pagina()
     entries, estrutura = ex.Estrutura.da_pagina(pagina)

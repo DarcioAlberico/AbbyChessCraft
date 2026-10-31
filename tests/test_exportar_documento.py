@@ -98,6 +98,22 @@ def test_ca_q_e1_a_exportacao_leva_as_decisoes_de_palavra_do_documento():
     assert ex.texto_do_livro([extraida]) == documento + "\n"
 
 
+def test_ca_q_e1_a_palavra_digitada_sozinha_sai_no_lugar_dela():
+    """O virtual que abre palavra (sem glifo nenhum dela na linha) sai depois da palavra do
+    Documento que vem antes dele, como no texto do Documento."""
+    from abbychess.modelo import GlifoVirtual
+
+    pagina = tx.pagina_avulsa(_linha("ab cd", 10))
+    gid_do = {b.entry.char: b.gid for b in pagina.boxes}
+    pagina.decisoes = Decisoes(virtuais=(GlifoVirtual(pagina.alocar(), "Z", gid_do["b"],
+                                                      palavra_nova=True),))
+    documento = tx.texto(tx.montar(pagina))
+    assert documento == "ab Z cd"
+    entries, estrutura = mo.Estrutura.da_pagina(pagina)
+    assert [p.texto for p in _paragrafos(mo.pagina_extraida(0, entries, estrutura=estrutura))] \
+        == [documento]
+
+
 def test_ca_q_e1_o_glifo_nao_lido_no_meio_da_palavra_fica_como_no_texto_do_documento():
     """O glifo que ninguém leu (sem caractere) não entra no texto nem na exportação: a
     palavra fica partida no buraco dele, como no `texto.montar` (a vista do Documento, que o

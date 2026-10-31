@@ -93,6 +93,28 @@ def test_na_confianca_o_livro_segue_depois_de_pular_todos(livro):
     assert ctl.indice == 2
 
 
+def test_nas_palavras_o_livro_vai_a_pagina_lida_vizinha_e_da_a_volta(livro):
+    """Nas palavras desconhecidas, no escopo livro, passar da última palavra da página (ou da
+    página sem nenhuma) leva à página lida seguinte; da última, à primeira. A página só com
+    glifos marcados não foi lida e fica de fora."""
+    from abbychess.modelo import GLIFOS_MARCADOS
+
+    projeto, ctl, fila = livro
+    marcada = projeto.pagina_para_editar(1)
+    marcada.estado = GLIFOS_MARCADOS
+    projeto.salvar_modelo(marcada)
+    fila.definir("palavras")
+    fila.definir_escopo("livro")
+    paginas = []
+    for passo in (+1, +1, -1, -1):
+        fila.andar(passo)
+        paginas.append(ctl.indice)
+    assert paginas == [2, 0, 2, 0]
+    fila.alternar_escopo()                                # Shift+F7: só a página
+    fila.andar(+1)
+    assert ctl.indice == 0
+
+
 def test_o_f6_conta_pelo_resumo_sem_abrir_as_paginas(livro, monkeypatch):
     projeto, ctl, fila = livro
     assert projeto.paginas_em_memoria.descarregar(10)

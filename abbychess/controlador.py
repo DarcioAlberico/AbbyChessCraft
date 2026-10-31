@@ -480,10 +480,10 @@ class ControladorDePagina:
         gid = self.gid_em(indice)
         if gid is None:
             return
-        if gid in self.selecao or (gid == self.atual and not self.selecao):
+        if _escolhido(self, gid):
             self.selecao.discard(gid)
             if gid == self.atual and self.selecao:
-                self.mostrar(next(g for g in self.gids if g in self.selecao))
+                self.mostrar(_primeiro_da_selecao(self))
         else:
             if self.atual is not None:
                 self.selecao.add(self.atual)
@@ -600,55 +600,19 @@ class ControladorDePagina:
         `recortes` ((página, gid) -> o recorte do glifo), cada um também é ensinado: uma
         amostra por glifo (Enter), gravadas de uma vez. Os glifos ficam `manual`; a página
         editada sai de verificada."""
-        from core import proporcao
-
-        from abbychess.leitor import nome_de_origem
-
         alvos = {int(i): list(g) for i, g in alvos.items() if g}
         char_de = (char.get if isinstance(char, dict) else (lambda _chave: char))
         if not alvos or not char:
             return
 
         def corpo():
-            n = sum(len(g) for g in alvos.values())
-            chars = {char_de((i, g)) for i, gids in alvos.items() for g in gids} - {None, ""}
-            nome = f"'{next(iter(chars))}'" if len(chars) == 1 else "as leituras"
-            acao = "Ensinar" if recortes else "Corrigir para"
-            transacao = hs.Transacao(f"{acao} {nome} ({n} glifo(s), Galeria)")
-            aberta, feitos, mudadas, pedidos = False, 0, [], []
-            for indice, gids in sorted(alvos.items()):
-                if self.modelo is not None and indice == self.indice:
-                    pagina, aberta = self.modelo, True
-                else:
-                    pagina = self.projeto.pagina_para_editar(indice)
-                vivos = set(pagina.vivos)
-                gids = [g for g in gids if g in vivos and char_de((indice, g))]
-                if not gids:
-                    continue
-                antes = pagina.instantaneo()
-                referencia = (proporcao.altura_de_referencia(pagina.entries())
-                              if recortes else None)
-                for gid in gids:
-                    letra = char_de((indice, gid))
-                    recorte = (recortes or {}).get((indice, gid))
-                    if recorte is not None and self.leitor is not None:
-                        pedidos.append((recorte, letra, referencia, nome_de_origem(
-                            self.projeto.dados.nome, indice, pagina.indice_de(gid), gid)))
-                    ed.corrigir(pagina, gid, letra)
-                    feitos += 1
-                # Como toda edição: o estado, o lado dos diagramas pela legenda corrigida e a
-                # validação pelos lances (um lance do texto pode ter mudado).
-                depois_de_editar(pagina, antes, self.projeto.dados.idioma)
-                mudadas.append((pagina, antes))
+            transacao = hs.Transacao(_descricao_da_galeria(alvos, char_de, recortes))
+            aberta, feitos, mudadas, pedidos = _corrigir_nas_paginas(self, alvos, char_de,
+                                                                     recortes)
             if not mudadas:
                 self._avisar("Os glifos escolhidos na Galeria saíram das páginas.", 6000)
                 return
-            for caminho in (self.leitor.ensinar_varios(pedidos) if pedidos else []):
-                transacao.amostras_criadas.append(self.leitor.padroes.guardar(caminho))
-            for pagina, antes in mudadas:
-                transacao.paginas[pagina.pid] = hs.mudanca(antes, pagina.instantaneo())
-                self._gravar(pagina)
-            self.historico.registrar(transacao)
+            _registrar_a_galeria(self, transacao, mudadas, pedidos)
             if transacao.amostras_criadas:
                 self.eventos.emitir("padroes_mudaram")
             if aberta:
@@ -658,10 +622,8 @@ class ControladorDePagina:
             self.eventos.emitir("acoes_mudaram")
             # As leituras aplicadas vão no evento: a Galeria troca a grade por elas (uma ação
             # ainda na fila não confunde a grade da anterior).
-            aplicadas = {(i, g): char_de((i, g)) for i, gids in alvos.items() for g in gids
-                         if char_de((i, g))}
             self.eventos.emitir("galeria_aplicada", feitos, len(transacao.paginas),
-                                bool(transacao.amostras_criadas), aplicadas)
+                                bool(transacao.amostras_criadas), _aplicadas(alvos, char_de))
         self._editar("Galeria", corpo, so_nesta_pagina=False, precisa_de_glifos=False)
 
     def descartar(self) -> None:
@@ -858,15 +820,8 @@ class ControladorDePagina:
         Ensinar, corrigir, dividir ou juntar um box da legenda muda o que ela diz: o lado
         dos diagramas não conferidos sai de novo dela aqui, sem reler os tabuleiros, e
         entra no mesmo passo do desfazer (`diagramas.rederivar_lados`). O F5 já leu tudo."""
-        if evento is not None:              # mudar só as áreas não é editar a página (§4.4)
-            pagina.estado = proximo_estado(pagina.estado, evento)
-        if evento not in (None, "reconhecer") and pagina.diagramas and antes.pagina is not None:
-            pagina.diagramas = dg.rederivar_lados(pagina.diagramas, antes.pagina.entries(),
-                                                  pagina.entries())
-        criados = []
-        if self.leitor is not None:
-            for caminho in sorted(self.padroes() - antes.padroes):
-                criados.append(self.leitor.padroes.guardar(caminho))
+        _com_o_estado_e_os_lados(pagina, antes, evento)
+        criados = _amostras_novas(self, antes)
         arrumacao.arrumar(pagina, self.projeto.dados.idioma)
         transacao = self.historico.registrar(hs.Transacao(
             descricao, {pagina.pid: hs.mudanca(antes.pagina, pagina.instantaneo())},
@@ -875,15 +830,124 @@ class ControladorDePagina:
         self.leitura.ler_os_aguardando_de(pagina, indice, transacao)
         if pagina is self.modelo:
             m = transacao.paginas.get(pagina.pid)
-            # Só a leitura de alguns glifos mudou (a lista e as caixas, não): a janela
-            # repinta só eles; senão, tudo.
-            so_leitura = (m is not None and m.ordem is None and not m.campos.keys() - {"estado"}
-                          and all(a is not None and d is not None for a, d in
-                                  zip(m.antes.values(), m.depois.values())))
-            self.eventos.emitir("glifos_mudaram", set(m.antes) if so_leitura else None)
+            self.eventos.emitir("glifos_mudaram", set(m.antes) if _so_a_leitura(m) else None)
         self.eventos.emitir("acoes_mudaram")
         return transacao
 
     def _gravar(self, pagina: Pagina) -> None:
         if not self.projeto.paginas_em_memoria.agendar(pagina):
             self._avisar("Projeto aberto só para leitura: nada é gravado.", 6000)
+
+
+# ----------------------------------------------------------------------
+# As partes da seleção, do `_mudou` e da Galeria
+# ----------------------------------------------------------------------
+
+def _escolhido(p: ControladorDePagina, gid: int) -> bool:
+    """O glifo já está escolhido: na seleção, ou é o atual de uma seleção vazia."""
+    return gid in p.selecao or (gid == p.atual and not p.selecao)
+
+
+def _primeiro_da_selecao(p: ControladorDePagina) -> int:
+    """O primeiro glifo da seleção na ordem da página."""
+    return next(g for g in p.gids if g in p.selecao)
+
+
+def _com_o_estado_e_os_lados(pagina: Pagina, antes: Antes, evento: Optional[str]) -> None:
+    """O estado da página depois do `evento` (§4.4) e o lado dos diagramas pela legenda que a
+    edição mudou (não no reconhecer, que já leu tudo)."""
+    if evento is not None:              # mudar só as áreas não é editar a página (§4.4)
+        pagina.estado = proximo_estado(pagina.estado, evento)
+    if evento not in (None, "reconhecer") and pagina.diagramas and antes.pagina is not None:
+        pagina.diagramas = dg.rederivar_lados(pagina.diagramas, antes.pagina.entries(),
+                                              pagina.entries())
+
+
+def _amostras_novas(p: ControladorDePagina, antes: Antes) -> list:
+    """As amostras que a edição criou no livro, guardadas para o desfazer."""
+    criados = []
+    if p.leitor is not None:
+        for caminho in sorted(p.padroes() - antes.padroes):
+            criados.append(p.leitor.padroes.guardar(caminho))
+    return criados
+
+
+def _so_a_leitura(m) -> bool:
+    """Só a leitura de alguns glifos mudou (a lista e as caixas, não): a janela repinta só
+    eles; senão, tudo."""
+    return (m is not None and m.ordem is None and not m.campos.keys() - {"estado"}
+            and all(a is not None and d is not None for a, d in
+                    zip(m.antes.values(), m.depois.values())))
+
+
+def _descricao_da_galeria(alvos: dict, char_de, recortes) -> str:
+    """O nome do passo da Galeria no desfazer ("Corrigir para 'e' (12 glifo(s), Galeria)")."""
+    n = sum(len(g) for g in alvos.values())
+    chars = {char_de((i, g)) for i, gids in alvos.items() for g in gids} - {None, ""}
+    nome = f"'{next(iter(chars))}'" if len(chars) == 1 else "as leituras"
+    acao = "Ensinar" if recortes else "Corrigir para"
+    return f"{acao} {nome} ({n} glifo(s), Galeria)"
+
+
+def _corrigir_nas_paginas(p: ControladorDePagina, alvos: dict, char_de, recortes):
+    """`(a aberta foi tocada, glifos corrigidos, [(página, antes)], pedidos de ensino)`: a
+    leitura da Galeria nos glifos que ainda estão em cada página."""
+    aberta, feitos, mudadas, pedidos = False, 0, [], []
+    for indice, gids in sorted(alvos.items()):
+        pagina, desta = _pagina_da_galeria(p, indice)
+        aberta = aberta or desta
+        vivos = set(pagina.vivos)
+        gids = [g for g in gids if g in vivos and char_de((indice, g))]
+        if not gids:
+            continue
+        antes = pagina.instantaneo()
+        feitos += _corrigir_os_glifos(p, pagina, indice, gids, char_de, recortes, pedidos)
+        # Como toda edição: o estado, o lado dos diagramas pela legenda corrigida e a
+        # validação pelos lances (um lance do texto pode ter mudado).
+        depois_de_editar(pagina, antes, p.projeto.dados.idioma)
+        mudadas.append((pagina, antes))
+    return aberta, feitos, mudadas, pedidos
+
+
+def _pagina_da_galeria(p: ControladorDePagina, indice: int):
+    """`(a página a editar, se é a aberta)`."""
+    if p.modelo is not None and indice == p.indice:
+        return p.modelo, True
+    return p.projeto.pagina_para_editar(indice), False
+
+
+def _corrigir_os_glifos(p: ControladorDePagina, pagina: Pagina, indice: int, gids, char_de,
+                        recortes, pedidos: list) -> int:
+    """A leitura nos glifos da página; os que têm recorte vão a `pedidos`, para ensinar de uma
+    vez. Devolve quantos."""
+    from core import proporcao
+
+    from abbychess.leitor import nome_de_origem
+
+    referencia = proporcao.altura_de_referencia(pagina.entries()) if recortes else None
+    for gid in gids:
+        letra = char_de((indice, gid))
+        recorte = (recortes or {}).get((indice, gid))
+        if recorte is not None and p.leitor is not None:
+            pedidos.append((recorte, letra, referencia, nome_de_origem(
+                p.projeto.dados.nome, indice, pagina.indice_de(gid), gid)))
+        ed.corrigir(pagina, gid, letra)
+    return len(gids)
+
+
+def _registrar_a_galeria(p: ControladorDePagina, transacao: hs.Transacao, mudadas, pedidos
+                         ) -> None:
+    """As amostras ensinadas de uma vez e as páginas mudadas na `transacao`, gravadas; ela vai
+    ao desfazer."""
+    for caminho in (p.leitor.ensinar_varios(pedidos) if pedidos else []):
+        transacao.amostras_criadas.append(p.leitor.padroes.guardar(caminho))
+    for pagina, antes in mudadas:
+        transacao.paginas[pagina.pid] = hs.mudanca(antes, pagina.instantaneo())
+        p._gravar(pagina)
+    p.historico.registrar(transacao)
+
+
+def _aplicadas(alvos: dict, char_de) -> dict:
+    """(página, gid) -> a leitura aplicada, para a Galeria trocar a grade."""
+    return {(i, g): char_de((i, g)) for i, gids in alvos.items() for g in gids
+            if char_de((i, g))}

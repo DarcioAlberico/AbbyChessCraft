@@ -257,6 +257,23 @@ def test_o_epub_leva_o_idioma_do_livro(tmp_path):
     assert "1 página(s) lida(s) da camada de texto do PDF" in resumo
 
 
+def test_o_idioma_do_livro_e_lido_uma_vez_por_exportacao(tmp_path, monkeypatch):
+    """O idioma pela camada do PDF abre o livro: a exportação e a prévia o pedem uma vez, e a
+    camada de texto e os metadados levam o mesmo (SPEC-qualidade Q-E5, Q-E6)."""
+    from core import pdf_nativo
+
+    projeto = _projeto_digital(tmp_path)
+    pedidos = []
+    original = pdf_nativo.idioma_do_pdf
+    monkeypatch.setattr(pdf_nativo, "idioma_do_pdf",
+                        lambda *a, **k: pedidos.append(1) or original(*a, **k))
+    ex.exportar(projeto, tmp_path / "livro.epub")
+    assert len(pedidos) == 1
+    pedidos.clear()
+    ex.previa(projeto, "docx")
+    assert len(pedidos) == 1
+
+
 def test_o_idioma_do_arquivo():
     assert ex.idioma_do_arquivo("pt") == "pt-BR"
     assert ex.idioma_do_arquivo("en") == "en"

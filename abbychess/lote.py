@@ -33,14 +33,11 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Callable, Deque, Dict, List, Optional, Sequence
 
-from abbychess import diagramas as dg
-from abbychess import lances as lc
+from abbychess import arrumacao
 from abbychess import pagina as pg
-from abbychess import procedencia
 from abbychess import servidor_de_leitura as sl
 from abbychess.servidor_de_leitura import TEMPO_DO_PEDIDO
-from abbychess.modelo import (IOU_DA_RELEITURA, LIDAS, VERIFICADA, descrever_caidas,
-                              proximo_estado, reconciliar)
+from abbychess.modelo import LIDAS, VERIFICADA
 
 log = logging.getLogger(__name__)
 
@@ -386,34 +383,16 @@ class CondutorDoLote:
         if (self.refazer or indice in self.forcar) and pagina.estado in LIDAS \
                 and not projeto.somente_leitura:
             projeto.guardar_antes_do_lote(pagina)                         # §4.6
-        de_antes = list(pagina.boxes)
-        estilos = lida.estilos()
-        if lida.regua_do_negrito:
-            pagina.regua_do_negrito = dict(lida.regua_do_negrito)
-        novos, dif = reconciliar(pagina.boxes, lida.boxes, pagina.alocar, procedencia.amostra_de,
-                                 estilo_de=lambda entry: estilos.get(id(entry)),
-                                 iou_minimo=IOU_DA_RELEITURA)
-        pagina.aplicar(dif, novos)
-        if dif.caidas:
-            self.resultado.caidas[indice] = descrever_caidas(dif.caidas, de_antes)
-        pagina.tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
-        pagina.diagramas = dg.com_ids(dg.mesclar(lida.diagramas, dg.para_caixas(pagina.tabuleiros,
-                                                                     pagina.diagramas)))
+        tamanho = None
         if p.fonte is not None:
-            # Como no F5: a página sem áreas ganha as automáticas; as automáticas feitas
-            # antes de ler (o modelo aplicado ao livro antes do lote), a função pelo texto.
             from abbychess import geometria as geo
-            from abbychess import zonas as zn
 
             entrada = p.fonte.entrada(indice)
             tamanho = geo.tamanho_da_imagem((entrada.quadro, entrada.giro),
                                             p.fonte.tamanho_da_fonte(entrada))
-            pagina.zonas = zn.vincular_legendas(
-                zn.depois_de_ler(pagina.zonas, pagina.entries(), pagina.tabuleiros,
-                                 pagina.diagramas, *tamanho),
-                pagina.diagramas)
-        pagina.diagramas = lc.validar_pagina(pagina, projeto.dados.idioma)
-        pagina.estado = proximo_estado(pagina.estado, "reconhecer")
+        caidas = arrumacao.aplicar_lida(pagina, lida, projeto.dados.idioma, tamanho=tamanho)
+        if caidas:
+            self.resultado.caidas[indice] = caidas
         p._gravar(pagina)
         self.resultado.lidas.append(indice)
         self.resultado.pendentes[indice] = pg.resumir(

@@ -46,6 +46,7 @@ import numpy as np
 from core.box_model import BoxEntry
 
 from abbychess import ancoragem as ag
+from abbychess import arrumacao
 from abbychess import contexto
 from abbychess import diagramas as dg
 from abbychess import edicao as ed
@@ -57,10 +58,9 @@ from abbychess import servidor_de_leitura as sl
 from abbychess import sequencia as sq
 from abbychess import sessao as ss
 from abbychess import texto as tx
-from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL, FONTE_NENHUMA, precisa_revisao
-from abbychess.modelo import (IOU_DA_RELEITURA, LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
-                              Diferenca, Pagina, descrever_caidas, pid_de, proximo_estado, reconciliar)
+from abbychess.modelo import (LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
+                              Diferenca, Pagina, pid_de, proximo_estado)
 
 log = logging.getLogger(__name__)
 
@@ -134,10 +134,7 @@ def depois_de_editar(pagina, antes, idioma: str = "pt") -> None:
     if pagina.diagramas:
         pagina.diagramas = dg.rederivar_lados(list(pagina.diagramas), antes.entries(),
                                               pagina.entries())
-    pagina.zonas = zn.com_ids(list(pagina.zonas))
-    pagina.diagramas = dg.com_ids(list(pagina.diagramas))
-    pagina.zonas = zn.vincular_legendas(pagina.zonas, pagina.diagramas)
-    pagina.diagramas = lc.validar_pagina(pagina, idioma)
+    arrumacao.arrumar(pagina, idioma)
 
 
 class ControladorDePagina:
@@ -1282,44 +1279,17 @@ class ControladorDePagina:
             self.lendo_no_f5.discard(pagina.pid)
             if lida is None:
                 return
-            lidos = lida.diagramas
-            de_antes = list(pagina.boxes)
-            estilos = lida.estilos()
-            if zona is None and lida.regua_do_negrito:   # a de uma área só não é a da página
-                pagina.regua_do_negrito = dict(lida.regua_do_negrito)
-            depois = list(lida.boxes)
-            if zona is not None:
-                from core.services.box_service import BoxService
-
-                fora = [b.entry for b in pagina.boxes if not zona.contem_o_centro(b.entry)]
-                depois = BoxService.sort_boxes_reading_order(fora + depois)
-            novos, dif = reconciliar(pagina.boxes, depois, pagina.alocar,
-                                     procedencia.amostra_de,
-                                     estilo_de=lambda entry: estilos.get(id(entry)),
-                                     iou_minimo=IOU_DA_RELEITURA)
-            pagina.aplicar(dif, novos)
-            if dif.caidas:                      # §4.6: o que não pôde seguir os glifos novos
+            caidas = arrumacao.aplicar_lida(pagina, lida, self.projeto.dados.idioma, zona=zona,
+                                            tamanho=None if imagem is None else imagem.size)
+            if caidas:                          # §4.6: o que não pôde seguir os glifos novos
                 self.eventos.emitir("resultado", "Reconhecer a página", (
                     f"Página {indice + 1}: decisões que não puderam seguir os glifos relidos: "
-                    + "; ".join(descrever_caidas(dif.caidas, de_antes))))
-            tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
-            if zona is not None:
-                tabuleiros = [t for t in pagina.tabuleiros
-                              if not zona.contem((t[0] + t[2]) / 2, (t[1] + t[3]) / 2)] + tabuleiros
-            pagina.tabuleiros = tabuleiros
-            # A conferência de antes vale mais que a releitura do mesmo tabuleiro.
-            pagina.diagramas = dg.mesclar(lidos, dg.para_caixas(pagina.tabuleiros,
-                                                                pagina.diagramas))
-            if imagem is not None:
-                # A página sem áreas ganha as automáticas; as automáticas feitas antes de
-                # ler, a função pelo texto lido.
-                pagina.zonas = zn.depois_de_ler(pagina.zonas, pagina.entries(),
-                                                pagina.tabuleiros, pagina.diagramas,
-                                                *imagem.size)
+                    + "; ".join(caidas)))
             if pagina is self.modelo:
                 self.atual, self.pulados, self.selecao = None, set(), set()
             descricao = "Reconhecer a área" if zona is not None else "Reconhecer a página"
-            self._mudou(pagina, indice, descricao, antes, evento="reconhecer")
+            # O estado já é o do reconhecer (`aplicar_lida`).
+            self._mudou(pagina, indice, descricao, antes, evento=None)
             self.eventos.emitir("pagina_reconhecida", indice)
             if pagina is self.modelo and pagina.zonas:
                 self.eventos.emitir("layout_mudou")   # os rótulos das áreas reclassificadas
@@ -2628,12 +2598,7 @@ class ControladorDePagina:
         if self.leitor is not None:
             for caminho in sorted(self.padroes() - antes.padroes):
                 criados.append(self.leitor.padroes.guardar(caminho))
-        # Os ids das áreas e dos diagramas nascem antes de medir: o que a transação guarda é
-        # o que vai para o disco (e o desfazer compara com o que a página tem).
-        pagina.zonas = zn.com_ids(pagina.zonas)
-        pagina.diagramas = dg.com_ids(pagina.diagramas)
-        pagina.zonas = zn.vincular_legendas(pagina.zonas, pagina.diagramas)
-        pagina.diagramas = lc.validar_pagina(pagina, self.projeto.dados.idioma)
+        arrumacao.arrumar(pagina, self.projeto.dados.idioma)
         transacao = self.historico.registrar(hs.Transacao(
             descricao, {pagina.pid: hs.mudanca(antes.pagina, pagina.instantaneo())},
             amostras_criadas=criados, juntar=juntar))

@@ -118,6 +118,8 @@ FIGURINAS = frozenset("♔♕♖♗♘♙♚♛♜♝♞♟")
 #: As letras das peças em cada idioma, na ordem rei, dama, torre, bispo, cavalo: as do lance
 #: na prosa do livro (a sessão, a busca, o PGN). Uma definição só (SPEC-qualidade Q-E5).
 PECAS = {"pt": "RDTBC", "en": "KQRBN", "es": "RDTAC", "de": "KDTLS", "fr": "RDTFC"}
+#: As letras das peças de todos os idiomas: as que dizem lance sem saber o idioma do livro.
+LETRAS_DAS_PECAS = "".join(sorted(set("".join(PECAS.values()))))
 
 
 @dataclass(frozen=True, slots=True)

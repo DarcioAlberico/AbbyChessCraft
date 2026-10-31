@@ -32,6 +32,8 @@ from typing import Iterable, List, Optional, Sequence, Tuple
 
 from core.box_model import BoxEntry
 
+from abbychess.modelo import LETRAS_DAS_PECAS
+
 TEXTO = "texto"
 DIAGRAMA = "diagrama"
 IMAGEM = "imagem"
@@ -93,9 +95,10 @@ VAO_QUE_PARTE, GLIFOS_DE_CADA_LADO = 8.0, 3
 _LANCE = re.compile(r"\b\d{1,3}\s*\.{1,3}\s*\S")
 #: Um lance pela casa de chegada ("exf4", "Cf3", "f5", "O-O"), também no texto da área,
 #: que vem sem espaços: a linha de lances com o número mal lido ("2lI.exf4") ainda tem as
-#: casas. E o que só lance tem: a peça, a captura ou o sinal colado na casa.
-_CASA_DO_LANCE = re.compile(r"[KQRBNCDTF]?x?[a-h][1-8]|[O0]-[O0]")
-_SO_DE_LANCE = re.compile(r"[KQRBNCDTF][a-h]?[1-8]?x?[a-h][1-8]|[a-h]x[a-h][1-8]"
+#: casas. E o que só lance tem: a peça (a letra de qualquer idioma, `modelo.LETRAS_DAS_PECAS`),
+#: a captura ou o sinal colado na casa.
+_CASA_DO_LANCE = re.compile(rf"[{LETRAS_DAS_PECAS}]?x?[a-h][1-8]|[O0]-[O0]")
+_SO_DE_LANCE = re.compile(rf"[{LETRAS_DAS_PECAS}][a-h]?[1-8]?x?[a-h][1-8]|[a-h]x[a-h][1-8]"
                           r"|[a-h][1-8][+#?!]|[O0]-[O0]")
 
 

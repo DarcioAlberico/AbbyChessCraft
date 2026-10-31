@@ -48,12 +48,15 @@ import threading
 from types import MappingProxyType
 from typing import Collection, Dict, FrozenSet, List, Optional, Sequence, Tuple
 
-#: Um lance em SAN, com as letras das peças em inglês e em português (a figurina vira a letra
-#: antes, `core.notacao.FIGURINAS`), o número do lance antes e a pontuação depois: a casa
-#: ("Cxh2", "a8=D", "exd6e.p."), a troca entre peças ("NxN", "DxD+") ou o roque. Basta
-#: reconhecer a palavra, não validar o lance.
-_LANCE = re.compile(r"^[(\[]?(\d+\.+)?([KQRBNDTCP]?[a-h]?[1-8]?[x:]?[a-h][1-8](=?[KQRBNDTC])?"
-                    r"(e\.p\.)?|[KQRBNDTCP][x:][KQRBNDTCP]|[O0][-–—][O0]([-–—][O0])?)"
+from abbychess.modelo import LETRAS_DAS_PECAS
+
+#: Um lance em SAN, com as letras das peças de todos os idiomas (`modelo.LETRAS_DAS_PECAS`, e
+#: o P do peão; a figurina vira a letra antes, `core.notacao.FIGURINAS`), o número do lance
+#: antes e a pontuação depois: a casa ("Cxh2", "a8=D", "exd6e.p."), a troca entre peças
+#: ("NxN", "DxD+", "LxS") ou o roque. Basta reconhecer a palavra, não validar o lance.
+_PECA, _PROMOCAO = f"[{LETRAS_DAS_PECAS}P]", f"[{LETRAS_DAS_PECAS}]"
+_LANCE = re.compile(rf"^[(\[]?(\d+\.+)?({_PECA}?[a-h]?[1-8]?[x:]?[a-h][1-8](=?{_PROMOCAO})?"
+                    rf"(e\.p\.)?|{_PECA}[x:]{_PECA}|[O0][-–—][O0]([-–—][O0])?)"
                     r"[+#‡†]*[!?]*[)\],.;:]*$")
 
 

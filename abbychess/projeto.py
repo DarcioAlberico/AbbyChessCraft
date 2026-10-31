@@ -42,7 +42,9 @@ projeto de versão mais nova abre só para leitura (`somente_leitura`): nada é
 gravado nele. A fonte fica com caminho relativo quando está dentro da pasta do
 projeto; se ela sumir, `abrir` procura o mesmo arquivo (pelo SHA-256 dos primeiros
 4 MB e pelo tamanho) na pasta do caminho antigo, na do projeto e na pasta-mãe do
-projeto, e senão `fonte_ausente` diz à janela que peça ao usuário (`relocalizar`).
+projeto, e senão `origem.ausente` diz à janela que peça ao usuário
+(`origem.relocalizar`). A fonte é da `FonteDoLivro` (`abbychess.fonte_do_livro`,
+`self.origem`).
 
 `padroes/` usa o mesmo formato da base de treino do PyBoxEditor
 (`core.learner.char_to_folder`) mais um `metadados.json` com a altura de cada
@@ -76,6 +78,7 @@ from core.box_model import BoxEntry
 from abbychess import gravacao as gv
 from abbychess import procedencia
 from abbychess.antes_do_lote import AntesDoLote
+from abbychess.fonte_do_livro import FonteDoLivro, caminho_gravado, sha_da_fonte
 from abbychess import sequencia as sq
 from abbychess.gravador import Gravador
 from abbychess.migracoes import Migracoes
@@ -109,11 +112,6 @@ FORA_DO_PDF = -1
 PAGINAS_EM_MEMORIA = 16
 #: Os erros de um JSON de página que não se lê, no texto ou na forma (SPEC-qualidade Q-P7).
 ERROS_DE_PAGINA_ILEGIVEL = (ValueError, TypeError, KeyError, AttributeError)
-#: Quanto da fonte entra no SHA-256 que a reconhece depois de movida.
-BYTES_DO_SHA = 4 * 2**20
-#: Quantos arquivos do tamanho certo, no máximo, `abrir` lê ao procurar a fonte sumida
-#: (os de outro tamanho nem são lidos e não contam).
-CANDIDATOS_DA_FONTE = 200
 
 EXTENSOES_DE_IMAGEM = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}
 
@@ -191,12 +189,6 @@ class Projeto:
     #: Os glifos que mudaram de página ao dividi-la (§12.4): gid velho -> gid novo (as chaves
     #: em texto, como no JSON). A amostra ensinada antes acha o glifo de origem por aqui.
     gids_movidos: Dict[str, int] = field(default_factory=dict)
-
-
-def sha_da_fonte(caminho: Path) -> str:
-    """O SHA-256 dos primeiros `BYTES_DO_SHA` bytes do arquivo."""
-    with open(caminho, "rb") as arquivo:
-        return hashlib.sha256(arquivo.read(BYTES_DO_SHA)).hexdigest()
 
 
 _NADA = type(None)
@@ -327,6 +319,8 @@ class ProjetoDeLivro:
         self.antes_do_lote = AntesDoLote(self)
         #: O resumo de cada página no `livro.json` (§4.3), sem abrir as páginas.
         self.resumo = ResumoDoLivro(self)
+        #: A fonte do livro (§4.3): onde ela está, e achá-la se ela sumiu.
+        self.origem = FonteDoLivro(self)
 
     # ------------------------------------------------------------------
     # Criar e abrir
@@ -347,7 +341,7 @@ class ProjetoDeLivro:
         if not gv.tomar_a_pasta(pasta):
             raise ProjetoInvalido(f"Outra janela do AbbyChessCraft está criando {pasta}.")
         try:
-            dados = Projeto(nome=nome, fonte=_caminho_gravado(fonte, pasta),
+            dados = Projeto(nome=nome, fonte=caminho_gravado(fonte, pasta),
                             criado=datetime.now(timezone.utc).isoformat(timespec="seconds"),
                             endireitar=True, fonte_sha256=sha_da_fonte(fonte),
                             fonte_tamanho=fonte.stat().st_size)
@@ -409,8 +403,8 @@ class ProjetoDeLivro:
         tem aberto): a fonte achada pelo SHA-256, a v1 e a sequência só na memória."""
         projeto = cls(pasta, dados, somente_leitura=False)
         projeto.motivo_so_leitura = motivo
-        if projeto.fonte_ausente:
-            achada = projeto._procurar_fonte()
+        if projeto.origem.ausente:
+            achada = projeto.origem.procurar()
             if achada is not None:              # só na memória: nada é gravado
                 dados.fonte, projeto.fonte_relocalizada = str(achada), True
         # A trava por último: uma falha antes dela não deixa a pasta travada sem dono.
@@ -440,9 +434,9 @@ class ProjetoDeLivro:
                 dados.fonte_sha256 = sha_da_fonte(projeto.fonte)
                 dados.fonte_tamanho, mudou = projeto.fonte.stat().st_size, True
         else:
-            achada = projeto._procurar_fonte()
+            achada = projeto.origem.procurar()
             if achada is not None:
-                dados.fonte, mudou = _caminho_gravado(achada, pasta), True
+                dados.fonte, mudou = caminho_gravado(achada, pasta), True
                 dados.fonte_tamanho = achada.stat().st_size
                 projeto.fonte_relocalizada = True
         versao_de_antes = dados.versao
@@ -583,65 +577,6 @@ class ProjetoDeLivro:
             gv.gravar_json(self.pasta / ARQUIVO_DO_PROJETO, asdict(self.dados))
 
     # ------------------------------------------------------------------
-    # A fonte do livro
-    # ------------------------------------------------------------------
-    @property
-    def fonte_ausente(self) -> bool:
-        return not self.fonte.is_file()
-
-    def relocalizar(self, caminho: str | Path) -> None:
-        """A fonte foi movida para `caminho`: confere que é o mesmo arquivo e grava.
-
-        Projeto antigo, sem o SHA-256 gravado, aceita o arquivo e passa a ter o dele.
-        """
-        caminho = Path(caminho).resolve()
-        if not caminho.is_file():
-            raise ProjetoInvalido(f"A fonte não existe: {caminho}")
-        sha, tamanho = sha_da_fonte(caminho), caminho.stat().st_size
-        if self.dados.fonte_sha256 and (sha != self.dados.fonte_sha256 or (
-                self.dados.fonte_tamanho and tamanho != self.dados.fonte_tamanho)):
-            raise ProjetoInvalido(
-                f"{caminho.name} não é a fonte deste projeto: o conteúdo é outro.")
-        antes = (self.dados.fonte, self.dados.fonte_sha256, self.dados.fonte_tamanho)
-        self.dados.fonte = _caminho_gravado(caminho, self.pasta)
-        self.dados.fonte_sha256, self.dados.fonte_tamanho = sha, tamanho
-        if self.somente_leitura:
-            return              # vale nesta sessão; o arquivo do projeto não muda
-        try:
-            self.salvar()
-        except BaseException:
-            self.dados.fonte, self.dados.fonte_sha256, self.dados.fonte_tamanho = antes
-            raise
-
-    def _procurar_fonte(self) -> Optional[Path]:
-        """O arquivo com o SHA-256 e o tamanho da fonte: na pasta do caminho antigo, na do
-        projeto ou na pasta-mãe do projeto."""
-        if not self.dados.fonte_sha256:
-            return None
-        antigo = self.fonte
-        vistos, lidos = set(), 0
-        for pasta in (antigo.parent, self.pasta, self.pasta.parent):
-            if not pasta.is_dir():
-                continue
-            for candidato in sorted(pasta.glob("*" + antigo.suffix)):
-                chave = candidato.resolve()
-                if chave in vistos or not candidato.is_file():
-                    continue
-                vistos.add(chave)
-                try:
-                    tamanho = self.dados.fonte_tamanho
-                    if tamanho and candidato.stat().st_size != tamanho:
-                        continue        # tamanho diferente: nem é preciso ler
-                    lidos += 1
-                    if lidos > CANDIDATOS_DA_FONTE:
-                        return None
-                    if sha_da_fonte(candidato) == self.dados.fonte_sha256:
-                        return chave
-                except OSError:
-                    continue
-        return None
-
-    # ------------------------------------------------------------------
     # Caminhos
     # ------------------------------------------------------------------
     @property
@@ -650,12 +585,8 @@ class ProjetoDeLivro:
 
     @property
     def fonte(self) -> Path:
-        caminho = Path(self.dados.fonte)
-        return caminho if caminho.is_absolute() else self.pasta / caminho
-
-    @property
-    def fonte_e_pdf(self) -> bool:
-        return self.fonte.suffix.lower() == ".pdf"
+        """O caminho da fonte do livro (`origem.caminho`)."""
+        return self.origem.caminho
 
     def _arquivo_v2(self, pid: int) -> Path:
         return self.pasta / PASTA_DE_PAGINAS / f"p{pid}.json"
@@ -1437,20 +1368,6 @@ class ProjetoDeLivro:
         """A posição no livro da página `pid`, ou None (fora da sequência)."""
         return self.sequencia.posicao_de(pid)
 
-    def total_de_paginas(self) -> int:
-        """Quantas páginas a fonte do livro tem (sem a fonte: 0)."""
-        if not self.fonte.is_file():
-            return 0
-        if not self.fonte_e_pdf:
-            return 1
-        import fitz
-
-        try:
-            with fitz.open(str(self.fonte)) as documento:
-                return documento.page_count
-        except (RuntimeError, ValueError, OSError):
-            return 0
-
     def _montar_sequencia(self, gravar: bool) -> Tuple[sq.Sequencia, int]:
         """A sequência gravada (v3), ou a montada dos dados da v2. O projeto da v3 sem ela
         (o projeto novo, ou um `projeto.json` que a perdeu) a monta pela ordem do PDF e, com
@@ -1518,7 +1435,7 @@ class ProjetoDeLivro:
                        *(p + 1 for p in sequencia.todos_os_pids)])
         # As páginas do PDF que não estão em entrada nenhuma (uma sequência gravada curta, de
         # antes de a fonte voltar): no fim do livro, com pid novo.
-        faltam = [k for k in range(self.total_de_paginas()) if k not in do_pdf]
+        faltam = [k for k in range(self.origem.total_de_paginas()) if k not in do_pdf]
         novas = tuple(sq.Entrada(proximo + n, sq.FONTE_DO_LIVRO, k) for n, k in enumerate(faltam))
         proximo += len(novas)
         if orfaos or novas:
@@ -1557,7 +1474,7 @@ class ProjetoDeLivro:
         em_disco = [int(a.stem[1:]) for a in (self.pasta / PASTA_DE_PAGINAS).glob("p*.json")
                     if a.stem[1:].isdigit()]
         piso = max([self.dados.proximo_pid, *(p + 1 for p in em_disco)])
-        total = max([self.total_de_paginas(), *(i + 1 for i in gravados)], default=0)
+        total = max([self.origem.total_de_paginas(), *(i + 1 for i in gravados)], default=0)
         sequencia, proximo = sq.da_v2(total, gravados, piso)
         for indice, (pid, pagina) in orfaos.items():
             self.resumo.citar(pid, self.resumo.do_modelo(pagina), gravar)
@@ -1612,12 +1529,3 @@ class ProjetoDeLivro:
         if entrada.fonte == sq.FONTE_DO_LIVRO and entrada.metade != "direita":
             return entrada.pagina
         return FORA_DO_PDF
-
-
-def _caminho_gravado(fonte: Path, pasta: Path) -> str:
-    """Relativo (com /) quando a fonte está dentro da pasta do projeto; senão absoluto."""
-    fonte, pasta = Path(fonte).resolve(), Path(pasta).resolve()
-    try:
-        return fonte.relative_to(pasta).as_posix()
-    except ValueError:
-        return str(fonte)

@@ -231,7 +231,7 @@ def abrir_pasta(janela, pasta: str) -> Optional[ProjetoDeLivro]:
 def preparar_abertura(janela, projeto: ProjetoDeLivro) -> Optional[pg.FonteDePaginas]:
     """A fonte do projeto, pedindo ao usuário se ela sumiu, e o aviso do só leitura.
     `None` (e o projeto fechado) se não deu: o projeto aberto antes continua."""
-    if projeto.fonte_ausente and not localizar_fonte(janela, projeto):
+    if projeto.origem.ausente and not localizar_fonte(janela, projeto):
         projeto.fechar()
         janela.statusBar().showMessage("O projeto não foi aberto: a fonte do livro não foi "
                                        "indicada.", AVISO_LONGO_MS)
@@ -269,7 +269,7 @@ def localizar_fonte(janela, projeto: ProjetoDeLivro) -> bool:
         if not caminho:
             return False
         try:
-            projeto.relocalizar(caminho)
+            projeto.origem.relocalizar(caminho)
             return True
         except (ProjetoInvalido, OSError) as erro:
             QMessageBox.warning(janela, "Abrir projeto", str(erro))

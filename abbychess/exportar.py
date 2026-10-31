@@ -1242,7 +1242,7 @@ def paginas_da_camada(projeto: ProjetoDeLivro, indices: Sequence[int]) -> Dict[i
     diagrama da camada no mesmo lugar. Um PDF que não abre, ou uma página que a
     leitura não monta, fica com os boxes — o log diz por quê.
     """
-    if not projeto.fonte_e_pdf or not indices:
+    if not projeto.origem.e_pdf or not indices:
         return {}
     from core import pdf_nativo
 
@@ -1310,7 +1310,7 @@ def idioma_do_livro(projeto: ProjetoDeLivro) -> str:
     saía com `dc:language` `pt-BR`. A camada responde por centenas de palavras
     (`pdf_nativo.idioma_do_pdf`); sem camada (a digitalização), vale o do projeto.
     """
-    if projeto.fonte_e_pdf:
+    if projeto.origem.e_pdf:
         from core import pdf_nativo
 
         try:
@@ -1337,7 +1337,7 @@ def _altura_da_pagina(projeto: ProjetoDeLivro, indice: int) -> int:
 
         tamanho = entrada.tamanho or pg.fonte_do_projeto(projeto).tamanho_da_fonte(entrada)
         return geo.tamanho_da_imagem(entrada.geometria, tamanho)[1]
-    if projeto.fonte_e_pdf:
+    if projeto.origem.e_pdf:
         import fitz
 
         with fitz.open(projeto.fonte) as doc:
@@ -1765,7 +1765,7 @@ def exportar_pdf_pesquisavel(projeto: ProjetoDeLivro, caminho: str | Path,
     # A posição no livro -> a página do PDF (§12.4); a que não sai do original, a imagem.
     entradas = [projeto.sequencia.entrada_em(i) for i in alvo]
     imagens = {i for i, e in zip(alvo, entradas)
-               if not projeto.fonte_e_pdf or not e.do_livro_sem_geometria}
+               if not projeto.origem.e_pdf or not e.do_livro_sem_geometria}
     paginas_do_pdf = [e.pagina for e in entradas]
     #: O livro na ordem do PDF: o sumário e os rótulos do original ainda servem. Reordenado,
     #: eles saem e são refeitos pelos títulos e pelos números impressos do Documento.
@@ -1827,7 +1827,7 @@ def _pdf_com_imagens(projeto: ProjetoDeLivro, fonte: pg.FonteDePaginas, alvo: Se
     original = None
     escala = 72.0 / DPI_DA_LEITURA
     try:
-        if projeto.fonte_e_pdf:
+        if projeto.origem.e_pdf:
             original = fitz.open(projeto.fonte)
         for indice, entrada in zip(alvo, entradas):
             if indice not in imagens:

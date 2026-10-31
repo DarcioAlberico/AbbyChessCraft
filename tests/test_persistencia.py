@@ -452,7 +452,7 @@ def test_fonte_dentro_do_projeto_fica_relativa_e_o_projeto_pode_mudar_de_pasta(t
     movida = tmp_path / "outro_lugar" / "dentro"
     shutil.move(str(pasta), str(movida))
     reaberto = ProjetoDeLivro.abrir(movida)
-    assert reaberto.fonte == movida.resolve() / "pagina.png" and not reaberto.fonte_ausente
+    assert reaberto.fonte == movida.resolve() / "pagina.png" and not reaberto.origem.ausente
 
 
 def test_fonte_renomeada_e_achada_pelo_sha(projeto):
@@ -460,7 +460,7 @@ def test_fonte_renomeada_e_achada_pelo_sha(projeto):
     nova = antiga.with_name("renomeada.png")
     antiga.rename(nova)
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.fonte == nova.resolve() and not reaberto.fonte_ausente
+    assert reaberto.fonte == nova.resolve() and not reaberto.origem.ausente
     gravado = json.loads((projeto.pasta / "projeto.json").read_text(encoding="utf-8"))
     assert Path(gravado["fonte"]) == nova.resolve()
 
@@ -472,11 +472,11 @@ def test_fonte_sumida_sem_copia_fica_ausente_e_relocalizar_confere_o_conteudo(pr
     antiga.rename(guardada)
     outra = _pagina_sintetica(tmp_path / "longe" / "outra.png", ("xyz",))
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.fonte_ausente
+    assert reaberto.origem.ausente
     with pytest.raises(ProjetoInvalido, match="não é a fonte"):
-        reaberto.relocalizar(outra)
-    reaberto.relocalizar(guardada)
-    assert reaberto.fonte == guardada.resolve() and not reaberto.fonte_ausente
+        reaberto.origem.relocalizar(outra)
+    reaberto.origem.relocalizar(guardada)
+    assert reaberto.fonte == guardada.resolve() and not reaberto.origem.ausente
     assert ProjetoDeLivro.abrir(projeto.pasta).fonte == guardada.resolve()
 
 
@@ -599,7 +599,7 @@ def test_so_leitura_acha_a_fonte_renomeada_e_relocaliza_so_na_memoria(projeto, t
         longe = tmp_path / "longe"
         longe.mkdir()
         nova.rename(longe / "outra.png")
-        aberto.relocalizar(longe / "outra.png")     # não levanta, não grava
+        aberto.origem.relocalizar(longe / "outra.png")     # não levanta, não grava
         assert aberto.fonte == (longe / "outra.png").resolve()
         assert _instantaneo(projeto.pasta) == antes
     finally:
@@ -616,7 +616,7 @@ def test_relocalizar_que_falha_ao_gravar_nao_muda_a_memoria(projeto, tmp_path, m
 
     monkeypatch.setattr(gv, "gravar_bytes", falhar)
     with pytest.raises(PermissionError):
-        projeto.relocalizar(nova)
+        projeto.origem.relocalizar(nova)
     assert (projeto.dados.fonte, projeto.dados.fonte_sha256) == antes
 
 
@@ -627,9 +627,9 @@ def test_fonte_de_mesmo_comeco_e_tamanho_diferente_nao_e_a_fonte(projeto, tmp_pa
     projeto.fonte.rename(longe / "guardada.png")
     (projeto.fonte.parent / "parecida.png").write_bytes(conteudo + b"anexo")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.fonte_ausente                    # mesmo SHA dos 4 MB, outro tamanho
+    assert reaberto.origem.ausente                    # mesmo SHA dos 4 MB, outro tamanho
     with pytest.raises(ProjetoInvalido, match="não é a fonte"):
-        reaberto.relocalizar(projeto.fonte.parent / "parecida.png")
+        reaberto.origem.relocalizar(projeto.fonte.parent / "parecida.png")
 
 
 def test_abrir_em_midia_so_de_leitura_abre_sem_gravar_o_ajuste(projeto, monkeypatch):
@@ -714,17 +714,17 @@ def _copias_da_fonte(conteudo: bytes, pasta: Path, n: int, outro_tamanho: int):
 
 
 def test_busca_da_fonte_desiste_depois_do_limite_de_arquivos_do_tamanho_certo(projeto, monkeypatch):
-    import abbychess.projeto as modulo
+    import abbychess.fonte_do_livro as modulo
 
     monkeypatch.setattr(modulo, "CANDIDATOS_DA_FONTE", 2)
     pasta, conteudo = projeto.fonte.parent, projeto.fonte.read_bytes()
     projeto.fonte.rename(pasta / "zz-renomeada.png")          # vem depois das cópias
     _copias_da_fonte(conteudo, pasta, n=3, outro_tamanho=0)
-    assert ProjetoDeLivro.abrir(projeto.pasta).fonte_ausente
+    assert ProjetoDeLivro.abrir(projeto.pasta).origem.ausente
 
 
 def test_arquivos_de_outro_tamanho_nao_contam_no_limite(projeto, monkeypatch):
-    import abbychess.projeto as modulo
+    import abbychess.fonte_do_livro as modulo
 
     monkeypatch.setattr(modulo, "CANDIDATOS_DA_FONTE", 2)
     pasta, conteudo = projeto.fonte.parent, projeto.fonte.read_bytes()

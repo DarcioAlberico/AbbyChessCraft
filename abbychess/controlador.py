@@ -2293,21 +2293,29 @@ class ControladorDePagina:
             # A propagação dela, se ainda roda, não entra; e o refazer não a roda de novo
             # (refaz o que a transação guardou: o Ctrl+R relê os pendentes).
             transacao.invalidada = True
+        # O histórico anda com as páginas, antes do disco (SPEC-qualidade Q-C5): o que falhar
+        # depois não deixa a transação, já aplicada, na pilha de onde saiu.
+        if refazer:
+            h.refeita()
+        else:
+            h.desfeita()
         for pagina in paginas.values():
             self._gravar(pagina)
         # Cada lista de uma vez (os padrões relidos uma vez só, e não por amostra: desfazer o
         # esquecer de 40 amostras levava ~0,6 s por amostra).
         voltam, saem = ((transacao.amostras_criadas, transacao.amostras_apagadas) if refazer
                         else (transacao.amostras_apagadas, transacao.amostras_criadas))
-        if voltam:
-            self.leitor.padroes.restaurar_varios(voltam)
-        existentes = [a.caminho for a in saem if a.caminho.exists()]
-        if existentes:
-            self.leitor.esquecer_varios(existentes)
-        if refazer:
-            h.refeita()
-        else:
-            h.desfeita()
+        try:
+            if voltam:
+                self.leitor.padroes.restaurar_varios(voltam)
+            existentes = [a.caminho for a in saem if a.caminho.exists()]
+            if existentes:
+                self.leitor.esquecer_varios(existentes)
+        except OSError as erro:
+            log.exception("os padrões de %r não voltaram", transacao.descricao)
+            self.eventos.emitir("aviso", "Refazer" if refazer else "Desfazer",
+                                f"“{transacao.descricao}” voltou nas páginas, mas os "
+                                f"padrões do livro não ({erro}).")
         aberta = self.modelo is not None and self.modelo.pid in transacao.paginas
         posicoes = sorted(p for p in map(self.projeto.posicao_do_pid, transacao.paginas)
                           if p is not None)

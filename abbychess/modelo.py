@@ -545,11 +545,16 @@ class _Reconciliacao:
                 self.manter(i, velho, entry, self.estados.get(velho.gid, foto(velho.entry)))
 
     def _por_caixa(self) -> Dict[tuple, List[Box]]:
-        por_caixa: Dict[tuple, List[Box]] = {}
+        return self._dos_que_sobram(lambda entry: (_caixa(entry),))
+
+    def _dos_que_sobram(self, chaves) -> Dict[tuple, List[Box]]:
+        """Os glifos de `antes` ainda não usados, sob cada chave que `chaves(entry)` dá."""
+        indice: Dict[tuple, List[Box]] = {}
         for b in self.antes:
             if b.gid not in self.usados:
-                por_caixa.setdefault(_caixa(b.entry), []).append(b)
-        return por_caixa
+                for chave in chaves(b.entry):
+                    indice.setdefault(chave, []).append(b)
+        return indice
 
     def pela_sobreposicao(self, iou_minimo: float) -> None:
         """Os que sobram casam um a um, da maior IoU para a menor."""
@@ -575,12 +580,7 @@ class _Reconciliacao:
         return pares
 
     def _celulas_dos_que_sobram(self) -> Dict[tuple, List[Box]]:
-        celulas: Dict[tuple, List[Box]] = {}       # só os vizinhos, não a página inteira
-        for b in self.antes:
-            if b.gid not in self.usados:
-                for celula in _celulas(b.entry):
-                    celulas.setdefault(celula, []).append(b)
-        return celulas
+        return self._dos_que_sobram(_celulas)       # só os vizinhos, não a página inteira
 
     def nascidos(self, alocar) -> None:
         """O que sobra de `depois` nasce com gid novo."""

@@ -294,28 +294,29 @@ def _dividir_glifos(pagina: Pagina, divisao: _Divisao, direita_pg: Pagina):
 
 def _dividir_tabuleiros(tabuleiros, divisao: _Divisao, areas_fora: list) -> Tuple[list, list]:
     """Os tabuleiros de cada metade, pelo centro; o que não cabe vai para `areas_fora`."""
-    metades: Tuple[list, list] = ([], [])
-    for lugar, tabuleiro in enumerate(tabuleiros):
-        k = divisao.lado(tabuleiro)
-        caixa = divisao.na_metade(tabuleiro, k)
-        if caixa is None:
-            areas_fora.append(("tabuleiro", lugar, divisao.na_fonte(tabuleiro), False))
-        else:
-            metades[k].append(tuple(caixa))
-    return metades
+    return _dividir_pelo_centro(tabuleiros, "tabuleiro", divisao, areas_fora,
+                                caixa_de=lambda t: t, com_caixa=lambda _t, caixa: caixa)
 
 
 def _dividir_diagramas(diagramas, divisao: _Divisao, areas_fora: list) -> Tuple[list, list]:
     """Os diagramas de cada metade, pelo centro; o que não cabe vai para `areas_fora`."""
+    return _dividir_pelo_centro(diagramas, "diagrama", divisao, areas_fora,
+                                caixa_de=lambda d: d.caixa,
+                                com_caixa=lambda d, caixa: replace(d, caixa=caixa))
+
+
+def _dividir_pelo_centro(itens, tipo: str, divisao: _Divisao, areas_fora: list, *, caixa_de,
+                         com_caixa) -> Tuple[list, list]:
+    """Cada item vai à metade do centro da caixa dele (`caixa_de`), com a caixa dela
+    (`com_caixa`); o que não cabe vai para `areas_fora` com a caixa na fonte."""
     metades: Tuple[list, list] = ([], [])
-    for lugar, diagrama in enumerate(diagramas):
-        k = divisao.lado(diagrama.caixa)
-        caixa = divisao.na_metade(diagrama.caixa, k)
+    for lugar, item in enumerate(itens):
+        k = divisao.lado(caixa_de(item))
+        caixa = divisao.na_metade(caixa_de(item), k)
         if caixa is None:
-            areas_fora.append(("diagrama", lugar,
-                               replace(diagrama, caixa=divisao.na_fonte(diagrama.caixa)), False))
+            areas_fora.append((tipo, lugar, com_caixa(item, divisao.na_fonte(caixa_de(item))), False))
         else:
-            metades[k].append(replace(diagrama, caixa=tuple(caixa)))
+            metades[k].append(com_caixa(item, tuple(caixa)))
     return metades
 
 
@@ -464,17 +465,9 @@ def endireitar(pagina: Pagina, delta: float, tamanho: Tuple[int, int], manter) -
 def _glifos_girados(marcados: list, delta: float, de, tamanho: Tuple[int, int]):
     """Os glifos com o centro girado `delta` graus em volta do centro da página: os que
     ficam no quadro e os que o giro tira dele, com o lugar deles."""
-    from abbychess import geometria as geo
-
-    boxes, fora = [], []
-    for lugar, (box, fonte, angulo) in enumerate(marcados):
-        fonte = _girada_no_centro(fonte, delta, tamanho)
-        caixa = geo.da_fonte(fonte, de, tamanho)
-        if caixa is None:
-            fora.append((lugar, _na_caixa(box, fonte, angulo)))
-        else:
-            boxes.append(_na_caixa(box, caixa, angulo - de[1]))
-    return boxes, fora
+    girados = [(box, _girada_no_centro(fonte, delta, tamanho), angulo)
+               for box, fonte, angulo in marcados]
+    return _glifos_na_geometria(girados, de, tamanho)
 
 
 def _zonas_do_usuario_giradas(zonas, delta: float, de, tamanho: Tuple[int, int]) -> list:

@@ -248,41 +248,46 @@ class ControladorDoLivro:
         # para "Retomar o lote", guardadas no projeto (`lote.json`).
         faltam = condutor.posicoes_restantes() if resultado.cancelado else []
         self._guardar(faltam, condutor.refazer, self._reler_depois_de(condutor))
-        mensagem = lt.resumo_do_fim(resultado)
-        if resultado.servidor_parou and faltam:
-            mensagem += " Reabra o projeto e use Projeto › Retomar o lote."
-        elif self.pode_retomar:
-            mensagem += " Projeto › Retomar o lote continua."
+        mensagem = lt.resumo_do_fim(resultado) + self._como_retomar(resultado, faltam)
         self.eventos.emitir("lote_mudou")
         self.eventos.emitir("acoes_mudaram")
         self.eventos.emitir("lote_terminou", mensagem, resultado)
         if era_amostra:
-            from abbychess import livro as lv
-
-            completa = (not resultado.cancelado and not resultado.servidor_parou
-                        and not resultado.falhas
-                        and set(paginas_da_amostra) <= set(resultado.lidas + resultado.puladas))
-            extras = self.pagina.projeto.dados.extras
-            extras["amostra_guiada_pendente"] = not completa
-            if completa:
-                projeto = self.pagina.projeto
-                resumo = projeto.resumo.do_livro()
-                # Pelo valor gravado da página (o `pid`, §12.4), como a lista da amostra.
-                extras[lv.CHAVE_DOS_PENDENTES_INICIAIS] = {
-                    str(g): int(resumo.get(i, {}).get("pendentes", 0) or 0)
-                    for i in paginas_da_amostra
-                    for g in projeto.ordem.paginas_para_gravar([i])
-                }
-            self.pagina.projeto.salvar()
-            if completa:
-                # A mensagem da amostra é a que fica (antes, o resumo do lote a apagava).
-                mensagem = (f"Amostra pronta nas páginas "
-                            f"{', '.join(str(i + 1) for i in paginas_da_amostra)}: revise por "
-                            "caractere e ensine com Enter. O cartão Saúde, na gaveta, mostra o "
-                            "que falta para o livro inteiro.")
-                self.eventos.emitir("amostra_terminou", paginas_da_amostra)
+            # A mensagem da amostra é a que fica (antes, o resumo do lote a apagava).
+            mensagem = self._fim_da_amostra(paginas_da_amostra, resultado) or mensagem
         detalhe = " Detalhes em Avisos (⚠)." if lt.tem_detalhe(resultado) else ""
         self.pagina._avisar(mensagem + detalhe, 20000)
+
+    def _como_retomar(self, resultado, faltam: Sequence[int]) -> str:
+        """O fim da mensagem do lote: como retomar o que faltou, se dá."""
+        if resultado.servidor_parou and faltam:
+            return " Reabra o projeto e use Projeto › Retomar o lote."
+        if self.pode_retomar:
+            return " Projeto › Retomar o lote continua."
+        return ""
+
+    def _fim_da_amostra(self, paginas_da_amostra, resultado) -> Optional[str]:
+        """O fim do lote da amostra guiada: ela fica pendente se não leu todas as páginas; a
+        completa guarda os pendentes de cada uma (o ponto de partida do cartão Saúde), avisa
+        `amostra_terminou` e devolve a mensagem dela."""
+        from abbychess import livro as lv
+
+        completa = _amostra_completa(paginas_da_amostra, resultado)
+        projeto = self.pagina.projeto
+        extras = projeto.dados.extras
+        extras["amostra_guiada_pendente"] = not completa
+        if completa:
+            extras[lv.CHAVE_DOS_PENDENTES_INICIAIS] = _pendentes_iniciais(projeto,
+                                                                          paginas_da_amostra)
+        projeto.salvar()
+        if not completa:
+            return None
+        mensagem = (f"Amostra pronta nas páginas "
+                    f"{', '.join(str(i + 1) for i in paginas_da_amostra)}: revise por "
+                    "caractere e ensine com Enter. O cartão Saúde, na gaveta, mostra o "
+                    "que falta para o livro inteiro.")
+        self.eventos.emitir("amostra_terminou", paginas_da_amostra)
+        return mensagem
 
     def _reler_depois_de(self, condutor) -> List[int]:
         """As páginas para reler depois: as de antes deste lote que ele não leu, e as dele."""
@@ -324,12 +329,7 @@ class ControladorDoLivro:
         try:
             bruto = json.loads(arquivo.read_text(encoding="utf-8"))
             projeto, total = self.pagina.projeto, self.pagina.fonte.total
-            if bruto.get("pids"):               # v3: por pid
-                paginas = projeto.ordem.posicoes_das_gravadas(bruto["paginas"])
-                reler = projeto.ordem.posicoes_das_gravadas(bruto.get("reler_depois", []))
-            else:                               # o da v2, por posição (a migração o passa)
-                paginas = [int(i) for i in bruto["paginas"] if 0 <= int(i) < total]
-                reler = [int(i) for i in bruto.get("reler_depois", []) if 0 <= int(i) < total]
+            paginas, reler = _paginas_do_lote(bruto, projeto.ordem, total)
             self.restante = (paginas, bool(bruto["refazer"])) if paginas else None
             self.reler_depois = reler
         except (OSError, ValueError, KeyError, TypeError) as erro:
@@ -482,3 +482,34 @@ class ControladorDoLivro:
 
         p.tarefa(f"Exportando {destino.suffix[1:].upper()}", preparar,
                    falhou=p._falhou("Exportar"))
+
+
+def _amostra_completa(paginas_da_amostra, resultado) -> bool:
+    """O lote da amostra leu (ou pulou, verificadas) todas as páginas dela, sem cancelar, sem
+    o servidor parar e sem falha."""
+    return (not resultado.cancelado and not resultado.servidor_parou and not resultado.falhas
+            and set(paginas_da_amostra) <= set(resultado.lidas + resultado.puladas))
+
+
+def _pendentes_iniciais(projeto, paginas_da_amostra) -> dict:
+    """Os pendentes de cada página da amostra, pelo resumo do livro."""
+    resumo = projeto.resumo.do_livro()
+    # Pelo valor gravado da página (o `pid`, §12.4), como a lista da amostra.
+    return {str(g): int(resumo.get(i, {}).get("pendentes", 0) or 0)
+            for i in paginas_da_amostra
+            for g in projeto.ordem.paginas_para_gravar([i])}
+
+
+def _paginas_do_lote(bruto: dict, ordem, total: int):
+    """`(a retomar, a reler depois)` do `lote.json`, em posições do livro: por pid desde a v3;
+    no da v2, por posição (a migração o passa), sem as de fora do livro."""
+    if bruto.get("pids"):
+        return (ordem.posicoes_das_gravadas(bruto["paginas"]),
+                ordem.posicoes_das_gravadas(bruto.get("reler_depois", [])))
+    return (_por_posicao(bruto["paginas"], total),
+            _por_posicao(bruto.get("reler_depois", []), total))
+
+
+def _por_posicao(valores, total: int) -> List[int]:
+    """As posições de `valores` que estão no livro (de 0 a `total` − 1)."""
+    return [int(i) for i in valores if 0 <= int(i) < total]

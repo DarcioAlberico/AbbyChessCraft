@@ -19,7 +19,7 @@ def editar_sem_parar(pasta: str, registro: str, intervalo: float, atraso: float)
     `k` e agenda a gravação; grava `k carimbo` em `registro` (sem fsync: um processo morto
     não perde o que já escreveu no arquivo, só o que estava no buffer dele)."""
     projeto = ProjetoDeLivro.abrir(pasta)
-    projeto.gravador.atraso = atraso
+    projeto.paginas_em_memoria.gravador.atraso = atraso
     pagina = projeto.pagina_para_editar(0)
     if not pagina.boxes:
         pagina.boxes = [Box(pagina.alocar(), BoxEntry("a", 10 * k, 0, 10 * k + 8, 9, 0.9, "rede"))
@@ -29,7 +29,7 @@ def editar_sem_parar(pasta: str, registro: str, intervalo: float, atraso: float)
         k = 0
         while True:
             ed.virtual(pagina, str(k), pagina.boxes[0].gid)
-            projeto.agendar(pagina)
+            projeto.paginas_em_memoria.agendar(pagina)
             saida.write(f"{k} {time.monotonic():.6f}\n")
             k += 1
             time.sleep(intervalo)

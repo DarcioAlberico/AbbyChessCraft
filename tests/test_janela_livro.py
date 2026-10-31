@@ -211,7 +211,7 @@ def test_a_pergunta_do_lote_diz_que_as_correcoes_ficam_e_conta_as_verificadas_a_
     respostas["intervalo"] = "1-3"
     janela.reconhecer_livro()
     _esperar(app, janela)
-    janela.projeto.descarregar(10)
+    janela.projeto.paginas_em_memoria.descarregar(10)
     pagina = janela.projeto.carregar_modelo(2)
     pagina.estado = VERIFICADA
     janela.projeto.salvar_modelo(pagina)

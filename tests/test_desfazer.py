@@ -386,7 +386,7 @@ def test_desfazer_e_refazer_uma_area(app, janela):
     assert janela.areas.zonas == []
     janela.pagina.desfazedor.refazer()
     assert janela.areas.zonas == criada
-    janela.projeto.descarregar(5)
+    janela.projeto.paginas_em_memoria.descarregar(5)
     assert janela.projeto.carregar_zonas(0) == criada
 
 
@@ -412,8 +412,8 @@ def test_desfazer_depois_de_a_pagina_sair_da_memoria(app, tmp_path, monkeypatch)
         mostrar(j, 0)
         j.pagina.corrigir("Z")
         j.ir_para_pagina(1)
-        projeto.descarregar(5)
-        projeto._modelos.pop(0)                         # como se 16 páginas tivessem passado
+        projeto.paginas_em_memoria.descarregar(5)
+        projeto.paginas_em_memoria._modelos.pop(0)     # como se 16 páginas tivessem passado
         j.pagina.desfazedor.desfazer()
         assert avisos == [] and j.pagina.indice == 0 and boxes(j)[0].char != "Z"
     finally:

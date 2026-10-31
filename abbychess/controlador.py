@@ -10,7 +10,7 @@ leitor e ao servidor de leitura (`leitura`, a `PonteDeLeitura`).
 
 Tudo é **por gid** (§4.1): a fila, os pulados, a seleção e o glifo em revisão sobrevivem a
 dividir, juntar e marcar sem remapear índices, e a edição muda o modelo (`abbychess.edicao`),
-que o gravador grava (`ProjetoDeLivro.agendar`).
+que o gravador grava (`CacheDoProjeto.agendar`).
 
 **Eventos** (`Eventos`): `pagina_trocou`, `glifos_mudaram(gids)`, `atual_mudou`,
 `selecao_mudou`, `padroes_mudaram`, `acoes_mudaram`, `mensagem(texto, ms)`,
@@ -316,7 +316,7 @@ class ControladorDePagina:
         # objeto que a janela edita, por maior que seja o lote.
         self._modelo = pagina
         if self.projeto is not None:
-            self.projeto.prender(None if pagina is None else pagina.pid)
+            self.projeto.paginas_em_memoria.prender(None if pagina is None else pagina.pid)
 
     def ligar(self, projeto, fonte, leitor, servidor: Optional[sl.ServidorDeLeitura] = None
               ) -> None:
@@ -884,5 +884,5 @@ class ControladorDePagina:
         return transacao
 
     def _gravar(self, pagina: Pagina) -> None:
-        if not self.projeto.agendar(pagina):
+        if not self.projeto.paginas_em_memoria.agendar(pagina):
             self._avisar("Projeto aberto só para leitura: nada é gravado.", 6000)

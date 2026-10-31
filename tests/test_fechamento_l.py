@@ -101,7 +101,7 @@ def test_a_inserida_e_a_metade_direita_nao_gravam_o_indice_do_pdf(projeto, ctl, 
     _ler(projeto, 5)
     _ler(projeto, 8)
     ctl.operacoes.dividir_paginas([8])
-    projeto.descarregar()
+    projeto.paginas_em_memoria.descarregar()
     livro = json.loads((projeto.pasta / "livro.json").read_text(encoding="utf-8"))
     por_pid = {int(k): v["pagina_da_fonte"] for k, v in livro["paginas"].items()}
     assert por_pid[projeto.pid_da_pagina(5)] == FORA_DO_PDF          # a inserida
@@ -303,12 +303,12 @@ def test_o_ctrl_z_da_divisao_pelo_carimbo_com_o_cache_vazio(projeto, ctl):
     intocada e recusa a que mudou por fora."""
     _ler(projeto, 2)
     ctl.operacoes.dividir_paginas([2])
-    with projeto._trava_do_cache:
-        projeto._modelos.clear()
+    with projeto.paginas_em_memoria._trava_do_cache:
+        projeto.paginas_em_memoria._modelos.clear()
     assert ctl.desfazedor.desfazer() is None and len(projeto.sequencia) == 60   # intocada: desfaz
     ctl.desfazedor.refazer()
-    with projeto._trava_do_cache:
-        projeto._modelos.clear()
+    with projeto.paginas_em_memoria._trava_do_cache:
+        projeto.paginas_em_memoria._modelos.clear()
     arquivo = projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(3)}.json"
     bruto = json.loads(arquivo.read_text(encoding="utf-8"))
     bruto["estado"] = "verificada"                                  # mudou por fora

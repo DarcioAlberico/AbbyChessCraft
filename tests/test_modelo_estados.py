@@ -353,6 +353,7 @@ class _ProjetoNaMemoria:
     def __init__(self, pagina):
         self.pagina = pagina
         self.agendadas = 0
+        self.paginas_em_memoria = self             # prender e agendar, como o cache
 
     def carregar_modelo(self, indice):
         return self.pagina

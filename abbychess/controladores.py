@@ -296,7 +296,7 @@ class ControladorDeLayout:
             pagina.zonas = zonas
             pagina.zonas = zn.vincular_legendas(zn.com_ids(pagina.zonas), pagina.diagramas)
             mudancas[pagina.pid] = hs.mudanca(antes, pagina.instantaneo())
-            p.projeto.agendar(pagina)
+            p.projeto.paginas_em_memoria.agendar(pagina)
         if mudancas:
             p.historico.registrar(hs.Transacao("Aplicar modelo de áreas", mudancas))
             p.eventos.emitir("acoes_mudaram")
@@ -1422,7 +1422,7 @@ class ControladorDaBusca:
         fontes, a_ler = {}, {}
         for indice in projeto.resumo.paginas_lidas():
             versao = historico.versao(projeto.pid_da_pagina(indice))
-            modelo = projeto.modelo_em_memoria(indice)
+            modelo = projeto.paginas_em_memoria.pagina(indice)
             caminho = None if modelo is not None else projeto.arquivo_da_pagina(indice)
             if modelo is not None:              # na memória (talvez sem gravar): o instantâneo
                 fontes[indice] = (modelo.instantaneo(), versao)
@@ -1563,7 +1563,7 @@ class ControladorDaBusca:
             indexada = self.indice.get(i)
             if indexada is not None and indexada.versao == versao and i not in self._velhas:
                 continue
-            modelo = projeto.modelo_em_memoria(i)
+            modelo = projeto.paginas_em_memoria.pagina(i)
             if modelo is not None:
                 refazer[i] = (modelo.instantaneo(), versao)
             else:
@@ -1828,7 +1828,7 @@ class ControladorDaSubstituicao:
                             indexada.texto, concurrent=True, timeout=bs.TEMPO_LIMITE) is None:
                         continue                # o índice em dia: sem casamento, sem ler
                     # O carimbo antes de ler: se o arquivo mudar depois, aplicar o vê.
-                    carimbo = (projeto.carimbo(i) if projeto.modelo_em_memoria(i) is None
+                    carimbo = (projeto.carimbo(i) if projeto.paginas_em_memoria.pagina(i) is None
                                else None)
                     pagina = projeto.ler_sem_migrar(i)
                     if pagina is None:
@@ -2012,7 +2012,7 @@ class ControladorDaSubstituicao:
             passos = pc.historico.passos
             pc.historico.registrar(transacao)
             saidos = max(0, passos + 1 - pc.historico.passos)
-            gravou = all([projeto.agendar(p, resumo) for p, resumo in mudadas])
+            gravou = all([projeto.paginas_em_memoria.agendar(p, resumo) for p, resumo in mudadas])
             if not gravou:
                 pc._avisar("Projeto aberto só para leitura: nada é gravado.", 6000)
             if any(p is pc.modelo for p, _r in mudadas):

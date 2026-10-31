@@ -281,7 +281,7 @@ def test_a_busca_abandonada_devolve_as_relidas(livro_escrito, monkeypatch):
         lido.set()
         soltar.wait(5)
         return original(i)
-    monkeypatch.setattr(projeto, "modelo_em_memoria", lambda i: None)
+    monkeypatch.setattr(projeto.paginas_em_memoria, "pagina", lambda i: None)
     monkeypatch.setattr(projeto, "ler_sem_migrar", devagar)
     busca.buscar(bs.Opcoes("novo"))
     assert lido.wait(5)
@@ -400,7 +400,8 @@ def test_trocar_de_projeto_com_o_pool_nao_esvazia_o_indice_novo(tmp_path):
 
         return SimpleNamespace(dados=SimpleNamespace(idioma="pt"),
                                resumo=SimpleNamespace(paginas_lidas=lambda: range(120)),
-                               pid_da_pagina=lambda i: i, modelo_em_memoria=lambda i: None,
+                               pid_da_pagina=lambda i: i,
+                               paginas_em_memoria=SimpleNamespace(pagina=lambda i: None),
                                arquivo_da_pagina=lambda i: pasta / f"p{i}.json",
                                sequencia=Sequencia.do_livro(range(120)))
     ctl = SimpleNamespace(projeto=projeto("a"), eventos=Eventos(), executar=SimpleNamespace(),

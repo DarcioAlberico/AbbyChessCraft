@@ -122,7 +122,7 @@ def main() -> int:
         for nome, largura, altura, arranjo, docas in CENARIOS:
             _capturar(app, janela, saida / f"{nome}-{args.tema}.png", largura, altura,
                       arranjo, docas)
-        janela.pagina.projeto.descarregar(10)
+        janela.pagina.projeto.paginas_em_memoria.descarregar(10)
         janela.close()
     return 0
 

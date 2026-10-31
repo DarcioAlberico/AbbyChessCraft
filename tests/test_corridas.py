@@ -51,7 +51,7 @@ def test_a_busca_le_as_paginas_do_projeto_de_quando_foi_pedida(livro_escrito, mo
     projeto, ctl, busca, escrever, eventos = livro_escrito
     escrever(2, "fim novo")
     busca.marcar_velha(2)                                 # para ler do disco, na thread
-    monkeypatch.setattr(projeto, "modelo_em_memoria", lambda i: None)
+    monkeypatch.setattr(projeto.paginas_em_memoria, "pagina", lambda i: None)
     adiadas, Thread = [], threading.Thread
 
     def thread_adiada(*args, name=None, target=None, **k):   # a da busca não começa já

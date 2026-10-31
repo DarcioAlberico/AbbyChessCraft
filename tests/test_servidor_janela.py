@@ -184,7 +184,7 @@ def test_ca_11_1_e_11_2_durante_o_lote_navegar_e_ensinar_valem_na_hora(app, jane
     assert feitas_ao_ensinar < 49
     assert any(b.entry.char == "a" and b.entry.source == "livro" for b in ultima.boxes)
     # CA-4.4: o livro.json é o recalculado, com as páginas que vieram do servidor.
-    assert p.projeto.descarregar(10)
+    assert p.projeto.paginas_em_memoria.descarregar(10)
     gravado = json.loads((p.projeto.pasta / "livro.json").read_text(encoding="utf-8"))
     assert gravado == p.projeto.resumo.recalcular()
 

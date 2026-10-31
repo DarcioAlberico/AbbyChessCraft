@@ -49,7 +49,7 @@ def livro_de_230(tmp_path_factory):
         lidas = projeto.resumo.paginas_lidas()
         for i in lidas:
             projeto.carregar_modelo(i)                # a migração para o v2
-        assert projeto.descarregar(30)
+        assert projeto.paginas_em_memoria.descarregar(30)
         originais = [json.loads(projeto.arquivo_da_pagina(i).read_text(encoding="utf-8"))
                      for i in lidas]
     finally:
@@ -237,7 +237,7 @@ def _projeto_de_230(pasta: Path) -> Path:
             pagina.diagramas = [replace(d) for d in molde.diagramas]
             pagina.estado = molde.estado
             projeto.salvar_modelo(pagina)
-        assert projeto.descarregar(60)
+        assert projeto.paginas_em_memoria.descarregar(60)
         assert len(projeto.resumo.paginas_lidas()) >= PAGINAS
         return projeto.pasta
     finally:

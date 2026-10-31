@@ -344,9 +344,9 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
 
     def _gravou_ou_perder(self, projeto) -> bool:
         """Verdadeiro se o gravador gravou tudo, ou se o usuário aceita perder o que falta."""
-        if projeto.descarregar(10):
+        if projeto.paginas_em_memoria.descarregar(10):
             return True
-        paginas = ", ".join(str(i + 1) for i in projeto.paginas_sujas())
+        paginas = ", ".join(str(i + 1) for i in projeto.paginas_em_memoria.paginas_sujas())
         return dialogos.confirmar(self, "Gravar", f"As mudanças da(s) página(s) {paginas} não "
                                   "puderam ser gravadas (veja a barra de status). Fechar mesmo "
                                   "assim e perder essas mudanças?")

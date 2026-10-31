@@ -353,12 +353,12 @@ def test_comando_com_tarefa_rodando_entra_na_fila_e_aparece(app, janela):  # noq
 def test_editar_nao_grava_na_hora_e_fechar_grava(app, janela):  # noqa: F811
     janela.reconhecer()
     _esperar(app, janela)
-    janela.projeto.gravador.atraso = 30       # nada grava sozinho durante o teste
+    janela.projeto.paginas_em_memoria.gravador.atraso = 30       # nada grava sozinho durante o teste
     mostrar(janela, 1)
     janela.treino.campo.setText("q")
     janela.treino.pedir_so_corrigir()
     projeto = janela.projeto
-    assert projeto.sujas                      # entregue ao gravador, ainda não gravado
+    assert projeto.paginas_em_memoria.sujas                      # entregue ao gravador, ainda não gravado
     janela.close()
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     try:
@@ -381,10 +381,10 @@ def test_falha_de_gravacao_aparece_na_barra(app, janela, monkeypatch):  # noqa: 
         mostrar(janela, 1)
         janela.treino.campo.setText("q")
         janela.treino.pedir_so_corrigir()
-        janela.projeto.descarregar(5)
+        janela.projeto.paginas_em_memoria.descarregar(5)
         esperar(lambda: "não foi gravada" in janela.statusBar().currentMessage(), 5)
         assert "A página 1 não foi gravada (disco cheio)" in janela.statusBar().currentMessage()
-        assert janela.projeto.sujas
+        assert janela.projeto.paginas_em_memoria.sujas
     finally:
         monkeypatch.undo()                   # o fechar da fixture grava (e não pergunta)
 
@@ -491,7 +491,8 @@ def test_fechar_pergunta_de_novo_pelo_que_a_tarefa_em_voo_entregou(app, janela, 
                         lambda _p, _t, texto, *a, **k: (perguntas.append(texto),
                                                         QMessageBox.StandardButton.No)[1])
     resultados = iter([True, False])                 # antes da tarefa grava; depois, não
-    monkeypatch.setattr(janela.projeto, "descarregar", lambda limite=None: next(resultados))
+    monkeypatch.setattr(janela.projeto.paginas_em_memoria, "descarregar",
+                        lambda limite=None: next(resultados))
     evento = QCloseEvent()
     janela.closeEvent(evento)
     assert len(perguntas) == 1 and not evento.isAccepted() and janela.projeto is not None

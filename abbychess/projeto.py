@@ -29,13 +29,14 @@ o v2 do mesmo pid). Só para leitura, nada migra: as páginas v1 ficam na memór
 da v1 e da v2 à v3, é da `Migracoes` (`abbychess.migracoes`, `self.migracoes`).
 
 **A janela edita o modelo** (`abbychess.controlador`, desde o passo 2a) e não grava: ela
-entrega a página a `agendar`, que guarda um instantâneo imutável para o gravador
-(`abbychess.gravador`), uma thread só, com coalescência de meio segundo. `fechar` espera o
-gravador. As funções de listas de `BoxEntry` (`carregar_pagina`, `salvar_pagina`) ficam
-para o lote, as ferramentas e os testes: a gravação delas é síncrona e reconcilia a lista
-com o modelo (`modelo.reconciliar`), mantendo os gids. As páginas lidas ficam em memória,
-no modelo, as `PAGINAS_EM_MEMORIA` mais recentes, e uma página com gravação pendente não
-sai da memória.
+entrega a página a `paginas_em_memoria.agendar`, que guarda um instantâneo imutável para o
+gravador (`abbychess.gravador`), uma thread só, com coalescência de meio segundo. `fechar`
+espera o gravador. As funções de listas de `BoxEntry` (`carregar_pagina`, `salvar_pagina`)
+ficam para o lote, as ferramentas e os testes: a gravação delas é síncrona e reconcilia a
+lista com o modelo (`modelo.reconciliar`), mantendo os gids. As páginas lidas ficam em
+memória, no modelo, as `PAGINAS_EM_MEMORIA` mais recentes, e uma página com gravação
+pendente não sai da memória: o cache e o gravador são da `CacheDoProjeto`
+(`abbychess.cache_do_projeto`, `self.paginas_em_memoria`).
 
 Todo arquivo é gravado por `abbychess.gravacao` (temporário, `fsync`, troca). Um
 projeto de versão mais nova abre só para leitura (`somente_leitura`): nada é
@@ -65,7 +66,6 @@ import json
 import logging
 import re
 import threading
-from collections import OrderedDict
 import unicodedata
 from dataclasses import asdict, dataclass, field, fields
 from enum import StrEnum
@@ -78,14 +78,16 @@ from core.box_model import BoxEntry
 from abbychess import gravacao as gv
 from abbychess import procedencia
 from abbychess.antes_do_lote import AntesDoLote
+from abbychess.cache_do_projeto import CacheDoProjeto
+# Reexportado: os testes do gravador o importam daqui.
+from abbychess.cache_do_projeto import PAGINAS_EM_MEMORIA  # noqa: F401
 from abbychess.fonte_do_livro import FonteDoLivro, caminho_gravado, sha_da_fonte
 from abbychess import sequencia as sq
-from abbychess.gravador import Gravador
 from abbychess.migracoes import Migracoes
 from abbychess.resumo_do_livro import ResumoDoLivro
 from abbychess import zonas as zn
 from abbychess.modelo import (GLIFOS_MARCADOS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
-                              Pagina, foto, proximo_estado, reconciliar, reenquadrar)
+                              Pagina, proximo_estado, reconciliar, reenquadrar)
 from abbychess.pagina_em_json import (com_ids_de_diagramas, comparavel, inteiro, pagina_de_json,
                                       pagina_para_json, vazia)
 from abbychess.pasta_do_projeto import (ARQUIVO_DO_LEXICO, ARQUIVO_DO_PROJETO, PASTA_DE_PADROES,
@@ -108,8 +110,6 @@ log = logging.getLogger(__name__)
 #: O `indice` gravado da página que não é uma do PDF do livro (`_pagina_da_fonte`).
 FORA_DO_PDF = -1
 
-#: Quantas páginas o projeto guarda em memória, no modelo (as outras relê do disco).
-PAGINAS_EM_MEMORIA = 16
 #: Os erros de um JSON de página que não se lê, no texto ou na forma (SPEC-qualidade Q-P7).
 ERROS_DE_PAGINA_ILEGIVEL = (ValueError, TypeError, KeyError, AttributeError)
 
@@ -253,22 +253,11 @@ class ProjetoDeLivro:
         #: As gravações síncronas e a do `livro.json` (o gravador, numa thread, também o
         #: grava): a página, `marcadas.json` e `livro.json` mudam juntos, e o `.tmp` de cada um
         #: é um só. O arquivo da página tem a trava dele (`_trava_das_paginas`). A interface
-        #: não espera por ela no caminho de uma edição (ver `_trava_do_cache`).
+        #: não espera por ela no caminho de uma edição (a trava do cache das páginas).
         self._trava_do_livro = threading.RLock()
-        #: O cache das páginas (`_modelos`, `_estados`, `_a_gravar`): curta, sem disco. A
-        #: ordem é sempre a do livro e depois a do cache, nunca o contrário.
-        self._trava_do_cache = threading.RLock()
         self._travado = somente_leitura         # este objeto segura uma trava de só leitura
         #: Este objeto segura a pasta contra outro processo (`gravacao.tomar_a_pasta`).
         self._dono_da_pasta = False
-        #: As páginas lidas, no modelo (as mais recentes), por `pid`, e a foto
-        #: (`modelo.foto`) de cada glifo na última gravação síncrona: quem grava listas de
-        #: `BoxEntry` (o lote, as ferramentas) pode tê-los mudado no lugar, e só a foto diz o
-        #: que mudou.
-        self._modelos: "OrderedDict[int, Pagina]" = OrderedDict()
-        self._estados: Dict[int, Dict[int, int]] = {}
-        #: O pid da página aberta na janela (`prender`), que o cache não despeja.
-        self._presa: Optional[int] = None
         #: pid -> (o carimbo do arquivo, o contador de gids) da última página que
         #: `trocar_paginas` gravou: o desfazer de uma divisão confere pelo carimbo, sem reler
         #: as 460 páginas de um livro dividido (o arquivo que mudou depois é relido).
@@ -292,16 +281,11 @@ class ProjetoDeLivro:
         self.backups_da_migracao: List[Path] = []
         #: Por que um projeto que não é de versão mais nova abriu só para leitura.
         self.motivo_so_leitura = ""
-        #: O gravador das páginas que a janela edita, criado na primeira entrega.
-        self._gravador: Optional[Gravador] = None
-        #: pid -> (instantâneo, resumo) das páginas entregues e ainda não gravadas: o
-        #: resumo do livro as mostra como estão, e não como o disco ainda está.
-        self._a_gravar: Dict[int, tuple] = {}
         #: O escritor único de cada `p<pid>.json` (SPEC-qualidade Q-P4): o conteúdo ganha um
-        #: bilhete quando é fotografado (`agendar`, `_gravar`), toda gravação do arquivo passa
-        #: por `_gravar_arquivo_da_pagina`, uma por vez, e o arquivo nunca recebe um bilhete
-        #: mais velho que o último gravado nele (o instantâneo que o gravador tirou da fila
-        #: antes de uma gravação síncrona mais nova não volta por cima dela).
+        #: bilhete quando é fotografado (`paginas_em_memoria.agendar`, `_gravar`), toda gravação
+        #: do arquivo passa por `_gravar_arquivo_da_pagina`, uma por vez, e o arquivo nunca recebe
+        #: um bilhete mais velho que o último gravado nele (o instantâneo que o gravador tirou da
+        #: fila antes de uma gravação síncrona mais nova não volta por cima dela).
         self._trava_das_paginas = threading.Lock()
         self._bilhetes = itertools.count(1)
         self._ultimo_bilhete: Dict[int, int] = {}
@@ -313,6 +297,8 @@ class ProjetoDeLivro:
         self._ilegiveis_avisadas: set = set()
         #: As páginas (índices) que `fechar` não conseguiu gravar.
         self.nao_gravadas: List[int] = []
+        #: As páginas na memória (§4.3): as lidas, a aberta e as entregues ao gravador.
+        self.paginas_em_memoria = CacheDoProjeto(self)
         #: A migração dos formatos antigos, que a abertura chama (`abrir`).
         self.migracoes = Migracoes(self)
         #: A cópia de cada página de antes de o lote a reler (§4.6).
@@ -486,11 +472,7 @@ class ProjetoDeLivro:
         """Espera o gravador gravar o que está pendente e solta as travas que este objeto
         segura (a de só leitura e a entre processos, uma vez só). Devolve se ficou tudo
         gravado."""
-        gravou = True
-        if self._gravador is not None:
-            gravou = self._gravador.fechar(limite)
-            self.nao_gravadas = [] if gravou else self.paginas_sujas()
-            self._gravador = None
+        gravou = self.paginas_em_memoria.fechar(limite)
         if self._travado:
             self._travado = False
             gv.liberar(self.pasta)
@@ -498,51 +480,6 @@ class ProjetoDeLivro:
             self._dono_da_pasta = False
             gv.soltar_a_pasta(self.pasta)
         return gravou
-
-    # ------------------------------------------------------------------
-    # O gravador (§4.3): a janela entrega, a thread dele grava
-    # ------------------------------------------------------------------
-    @property
-    def gravador(self) -> Gravador:
-        if self._gravador is None:
-            self._gravador = Gravador(self._gravar_instantaneo, ao_falhar=self._falhou)
-        return self._gravador
-
-    def agendar(self, pagina: Pagina, resumo: Optional[dict] = None) -> bool:
-        """A página mudou: o gravador a grava em até meio segundo. Em só leitura, recusa
-        (devolve falso e nada é gravado). `resumo`: o de `resumo.do_modelo`, se quem chama
-        já o calculou fora da interface (substituir no livro inteiro)."""
-        if self.somente_leitura:
-            return False
-        with self._trava_do_cache:              # sem a trava do livro: não espera o disco
-            # Os ids das áreas e dos diagramas nascem aqui, na página viva, e não só no
-            # instantâneo: o que for gravado é o que a página tem.
-            pagina.diagramas = com_ids_de_diagramas(pagina.diagramas)
-            pagina.zonas = zn.com_ids(pagina.zonas)
-            self._guardar_no_cache(pagina, foto=False)
-            instantaneo = pagina.instantaneo()
-            # O resumo vale já para quem pergunta (F6, o lote, "lidas"), antes da gravação.
-            self._a_gravar[pagina.pid] = (instantaneo, resumo if resumo is not None
-                                          else self.resumo.do_modelo(instantaneo))
-            self.gravador.agendar(pagina.pid, (next(self._bilhetes), instantaneo))
-        return True
-
-    def descarregar(self, limite: Optional[float] = None) -> bool:
-        """Grava agora o que o gravador tem pendente e espera (antes do lote, que grava na
-        thread dele, por exemplo). Não chame segurando a trava do livro."""
-        return self._gravador.descarregar(limite) if self._gravador is not None else True
-
-    @property
-    def sujas(self) -> set:
-        """Os pids com mudança ainda não gravada."""
-        return self._gravador.sujas if self._gravador is not None else set()
-
-    def paginas_sujas(self) -> List[int]:
-        """As posições das páginas entregues ao gravador e ainda não gravadas."""
-        sequencia = self.sequencia
-        with self._trava_do_cache:
-            pids = list(self._a_gravar)
-        return sorted(p for p in map(sequencia.posicao_de, pids) if p is not None)
 
     def _gravar_instantaneo(self, entregue: Tuple[int, Pagina]) -> None:
         """A gravação do gravador: `(bilhete, instantâneo)`. O arquivo da página é gravado
@@ -556,19 +493,11 @@ class ProjetoDeLivro:
             with self._trava_das_paginas:
                 vale = self._ultimo_bilhete.get(pagina.pid) == bilhete
             if vale:
-                with self._trava_do_cache:
-                    # A foto é das gravações síncronas; esta página veio da interface, que
-                    # não muda nada no lugar, e a reconciliação a compara com o glifo mesmo.
-                    self._estados.pop(pagina.pid, None)
+                # A foto é das gravações síncronas; esta página veio da interface, que não
+                # muda nada no lugar, e a reconciliação a compara com o glifo mesmo.
+                self.paginas_em_memoria.esquecer_a_foto(pagina.pid)
                 self.resumo.atualizar(pagina.pid, self.resumo.do_modelo(pagina))
-        with self._trava_do_cache:
-            pendente = self._a_gravar.get(pagina.pid)
-            if pendente is not None and pendente[0] is pagina:
-                del self._a_gravar[pagina.pid]
-
-    def _falhou(self, pid: int, erro: BaseException) -> None:
-        if self.ao_falhar_gravacao is not None:
-            self.ao_falhar_gravacao(self.sequencia.posicao_de(pid), erro)
+        self.paginas_em_memoria.gravada(pagina)
 
     def salvar(self) -> None:
         # Na trava do livro: a interface e o gravador (a sequência que cresce) gravam o mesmo
@@ -604,7 +533,7 @@ class ProjetoDeLivro:
         """A página como está, sem passar pelo cache (o índice da busca, numa thread: §11, um
         escritor só): o instantâneo da que está na memória, ou a gravada; None se nada foi
         gravado dela."""
-        modelo = self.modelo_em_memoria(indice)
+        modelo = self.paginas_em_memoria.pagina(indice)
         if modelo is not None:
             return modelo.instantaneo()
         try:
@@ -694,7 +623,7 @@ class ProjetoDeLivro:
         arquivo tem o mesmo `carimbo`. Devolve a do cache (a adotada, ou a que já estava lá),
         ou None (leia com `pagina_para_editar`). Só a interface adota."""
         with self._trava_do_livro:
-            em_cache = self.modelo_em_memoria(pagina.indice)
+            em_cache = self.paginas_em_memoria.pagina(pagina.indice)
             if em_cache is not None:
                 return em_cache
             if (carimbo is None or self._pid_em(pagina.indice) != pagina.pid
@@ -703,36 +632,25 @@ class ProjetoDeLivro:
             # Girar e cortar não gravam a página (o carimbo é o mesmo): a lida na geometria
             # de antes é levada à de agora.
             self._na_geometria_da_entrada(pagina)
-            self._guardar_no_cache(pagina, foto_nova=True)
+            self.paginas_em_memoria.guardar(pagina, foto_nova=True)
             return pagina
-
-    def modelo_em_memoria(self, indice: int) -> Optional[Pagina]:
-        """A página do cache, sem ler o disco (None se ela não está na memória)."""
-        pid = self._pid_em(indice)
-        if pid is None:
-            return None
-        with self._trava_do_cache:
-            return self._modelos.get(pid)
 
     def carregar_modelo(self, indice: int) -> Optional[Pagina]:
         """A página no modelo v2, ou `None` se nada foi gravado dela."""
         pid = self._pid_em(indice)              # antes das travas (a do livro, se montar)
         if pid is None:
             return None                         # fora do livro: nada gravado
-        with self._trava_do_cache:              # o caminho comum, sem esperar o disco
-            em_cache = self._modelos.get(pid)
-            if em_cache is not None:
-                self._modelos.move_to_end(pid)
-                return em_cache
+        em_cache = self.paginas_em_memoria.usar(pid)               # o caminho comum, sem esperar o disco
+        if em_cache is not None:
+            return em_cache
         with self._trava_do_livro:
-            em_cache = self._modelos.get(pid)
+            em_cache = self.paginas_em_memoria.usar(pid)
             if em_cache is not None:
-                self._modelos.move_to_end(pid)
                 return em_cache
             pagina = self._gravada(indice)
             if pagina is None:
                 return None
-            self._guardar_no_cache(pagina, foto_nova=True)
+            self.paginas_em_memoria.guardar(pagina, foto_nova=True)
             return pagina
 
     def _de_json(self, bruto: dict) -> Pagina:
@@ -779,7 +697,7 @@ class ProjetoDeLivro:
             pagina.diagramas = com_ids_de_diagramas(pagina.diagramas)
             pagina.zonas = zn.com_ids(pagina.zonas)
             self._gravar(pagina)
-            self._guardar_no_cache(pagina)
+            self.paginas_em_memoria.guardar(pagina)
 
     def _gravar(self, pagina: Pagina, *, livro: bool = True) -> None:
         """A página e o resumo dela em `livro.json` (com a trava do livro); `livro=False`
@@ -787,9 +705,8 @@ class ProjetoDeLivro:
         bilhete = next(self._bilhetes)
         dados = pagina_para_json(pagina, self._pagina_da_fonte(pagina))
         self._gravar_arquivo_da_pagina(pagina.pid, bilhete, dados)
-        with self._trava_do_cache:
-            # A foto da gravação, do mesmo `as_state()` que foi para o JSON.
-            self._estados[pagina.pid] = {b[0]: hash(tuple(b[1])) for b in dados["boxes"]}
+        # A foto da gravação, do mesmo `as_state()` que foi para o JSON.
+        self.paginas_em_memoria.fotografar(pagina.pid, {b[0]: hash(tuple(b[1])) for b in dados["boxes"]})
         if livro:
             self.resumo.atualizar(pagina.pid, self.resumo.do_modelo(pagina))
 
@@ -802,39 +719,6 @@ class ProjetoDeLivro:
             gv.gravar_json(self._arquivo_v2(pid), dados)
             self._ultimo_bilhete[pid] = bilhete
             return True
-
-    def prender(self, pid: Optional[int]) -> None:
-        """A página aberta na janela (None: nenhuma): o cache não a despeja, por mais páginas
-        que um lote leia, e quem a pede de novo (o lote, a busca) recebe o mesmo objeto que a
-        janela edita, e não outro lido do disco (SPEC-qualidade Q-P3)."""
-        with self._trava_do_cache:
-            self._presa = pid
-
-    def _guardar_no_cache(self, pagina: Pagina, *, foto_nova: bool = False,
-                          foto: bool = True) -> None:
-        """Põe a página no cache; `foto_nova` (a página veio do disco) refaz a foto dos
-        estados, que de outro modo seria a de outra versão da mesma página. `foto=False` é a
-        página que a interface entrega ao gravador: ela não muda nada no lugar, e a foto
-        (um hash por glifo) não é calculada a cada edição."""
-        with self._trava_do_cache:
-            self._no_cache(pagina, foto_nova, foto)
-
-    def _no_cache(self, pagina: Pagina, foto_nova: bool, com_foto: bool) -> None:
-        self._modelos[pagina.pid] = pagina
-        self._modelos.move_to_end(pagina.pid)
-        if not com_foto:
-            self._estados.pop(pagina.pid, None)
-        elif foto_nova or pagina.pid not in self._estados:
-            self._estados[pagina.pid] = {b.gid: foto(b.entry) for b in pagina.boxes}
-        sujas = self.sujas
-        for pid in list(self._modelos):
-            if len(self._modelos) <= PAGINAS_EM_MEMORIA:
-                break
-            saiu = self._modelos[pid]
-            if pid in sujas or saiu is pagina or pid == self._presa:
-                continue                    # a página com gravação pendente fica, e a aberta
-            del self._modelos[pid]
-            self._estados.pop(pid, None)
 
     def pagina_para_editar(self, indice: int) -> Pagina:
         """A página no modelo, criada (com pid novo) se nada foi gravado dela: é a que a
@@ -857,12 +741,12 @@ class ProjetoDeLivro:
             pagina = Pagina(pid=pid, indice=indice)
             if entrada is not None:
                 pagina.geometria, pagina.tamanho = entrada.geometria, entrada.tamanho
-            self._guardar_no_cache(pagina)
+            self.paginas_em_memoria.guardar(pagina)
         return pagina
 
     def _reconciliar(self, pagina: Pagina, boxes: Sequence[BoxEntry]):
         novos, dif = reconciliar(pagina.boxes, boxes, pagina.alocar, procedencia.amostra_de,
-                                 self._estados.get(pagina.pid))
+                                 self.paginas_em_memoria.foto_de(pagina.pid))
         pagina.aplicar(dif, novos)
         return dif
 
@@ -957,8 +841,7 @@ class ProjetoDeLivro:
         pid = self._pid_em(indice)
         if pid is None:
             return None
-        with self._trava_do_cache:
-            em_cache = self._modelos.get(pid)
+        em_cache = self.paginas_em_memoria.do_pid(pid)
         if em_cache is not None:
             return em_cache
         try:
@@ -1113,7 +996,7 @@ class ProjetoDeLivro:
             antes = velha.entrada_de(entrada.pid)
             if antes is None or antes.quadro == entrada.quadro:
                 continue
-            if self.modelo_em_memoria(posicao) is None and self._arquivo_v2_de(posicao) is None:
+            if self.paginas_em_memoria.pagina(posicao) is None and self._arquivo_v2_de(posicao) is None:
                 continue                            # nada gravado: nada a levar
             try:
                 pagina = self.carregar_modelo(posicao)
@@ -1122,7 +1005,7 @@ class ProjetoDeLivro:
                             erro)
                 continue
             if pagina is not None:
-                self.agendar(pagina)
+                self.paginas_em_memoria.agendar(pagina)
 
     def inserir_arquivo(self, caminho: str | Path) -> List[sq.Entrada]:
         """Copia o PDF ou a imagem para `inseridas/` (o nome pelo SHA-256: o mesmo arquivo
@@ -1168,12 +1051,7 @@ class ProjetoDeLivro:
         with self._trava_do_livro:
             self._sequencia = nova
             self._proximo_pid = max([self._proximo_pid, *(p + 1 for p in nova.todos_os_pids)])
-            with self._trava_do_cache:
-                for pid, pagina in self._modelos.items():
-                    posicao = nova.posicao_de(pid)
-                    if posicao is not None:
-                        pagina.indice = posicao
-                        self._na_geometria_da_entrada(pagina)
+            self.paginas_em_memoria.reposicionar(nova, self._na_geometria_da_entrada)
 
     def origem_da_amostra(self, origem: str) -> Optional[Tuple[Optional[int], Optional[int]]]:
         """(posição de agora, gid) do glifo de onde a amostra veio, pelo nome de origem dela
@@ -1227,8 +1105,7 @@ class ProjetoDeLivro:
         """A página `pid` como está (a do cache, ou a do arquivo, sem pô-la no cache); None
         se nada foi gravado dela. Também a de fora da sequência."""
         with self._trava_do_livro:
-            with self._trava_do_cache:
-                em_cache = self._modelos.get(pid)
+            em_cache = self.paginas_em_memoria.do_pid(pid)
             if em_cache is not None:
                 return em_cache
             arquivo = self._arquivo_v2(pid)
@@ -1250,9 +1127,8 @@ class ProjetoDeLivro:
         registro = self._trocadas.get(pid)
         if registro is None:
             return None
-        with self._trava_do_cache:
-            if pid in self._modelos:
-                return None
+        if self.paginas_em_memoria.do_pid(pid) is not None:
+            return None
         carimbo = self._carimbo_do_pid(pid)
         return registro[1] if carimbo is not None and carimbo == registro[0] else None
 
@@ -1298,7 +1174,7 @@ class ProjetoDeLivro:
             raise OSError("o projeto está aberto só para leitura")
         if not self.sequencia_gravada:
             raise OSError("o projeto ainda está no formato antigo")
-        pendentes = set(paginas) & self.sujas
+        pendentes = set(paginas) & self.paginas_em_memoria.sujas
         if pendentes:
             raise OSError("há página com gravação pendente: tente de novo")
         with self._trava_do_livro:
@@ -1332,10 +1208,7 @@ class ProjetoDeLivro:
                         log.warning("p%d.json ficou (vai para as apagadas)", pid,
                                     exc_info=True)
                 raise
-            with self._trava_do_cache:
-                for pid in paginas:             # a velha não é levada à geometria nova
-                    self._modelos.pop(pid, None)
-                    self._estados.pop(pid, None)
+            self.paginas_em_memoria.tirar(paginas)        # a velha não é levada à geometria nova
             self._trocar_sequencia(nova)
             resumos: Dict[int, Optional[dict]] = {}
             for pid, pagina in paginas.items():
@@ -1345,11 +1218,11 @@ class ProjetoDeLivro:
                     self._gravar(pagina, livro=False)
                 except OSError:
                     log.warning("a página p%d fica com o gravador", pid, exc_info=True)
-                    self.agendar(pagina)
+                    self.paginas_em_memoria.agendar(pagina)
                 else:
                     resumos[pid] = self.resumo.do_modelo(pagina)
                     self._trocadas[pid] = (self._carimbo_do_pid(pid), pagina.proximo_n)
-                    self._guardar_no_cache(pagina, foto_nova=True)
+                    self.paginas_em_memoria.guardar(pagina, foto_nova=True)
             for pid, pagina in paginas.items():
                 if pagina is None:
                     try:

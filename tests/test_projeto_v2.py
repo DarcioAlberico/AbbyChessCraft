@@ -154,13 +154,13 @@ def test_so_leitura_com_pagina_v2_nao_grava_nem_ao_pedir_gid(lido):
 
 
 def test_pagina_que_sai_da_memoria_volta_com_os_mesmos_gids(lido, monkeypatch):
-    import abbychess.projeto as modulo
+    import abbychess.cache_do_projeto as modulo
 
     projeto, _, imagem = lido
     monkeypatch.setattr(modulo, "PAGINAS_EM_MEMORIA", 1)
     gids = [b.gid for b in projeto.carregar_modelo(0).boxes]
     projeto.salvar_pagina(1, pg.segmentar(imagem)[:2], reconhecida=False)   # expulsa a 0
-    assert 0 not in projeto._modelos
+    assert 0 not in projeto.paginas_em_memoria._modelos
     boxes = projeto.carregar_pagina(0)
     projeto.salvar_pagina(0, boxes)
     assert [b.gid for b in projeto.carregar_modelo(0).boxes] == gids
@@ -207,7 +207,7 @@ def test_quem_so_le_os_boxes_nao_muda_a_pagina_do_projeto(lido):
     lidos = projeto.carregar_pagina(0)
     lidos[0].char = "#"                                 # quem só lê mexe no que recebeu
     assert projeto.carregar_pagina(0)[0].char == original
-    projeto.agendar(projeto.pagina_para_editar(0))      # a janela grava a página dela
+    projeto.paginas_em_memoria.agendar(projeto.pagina_para_editar(0))      # a janela grava a página dela
     projeto.fechar()
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     try:

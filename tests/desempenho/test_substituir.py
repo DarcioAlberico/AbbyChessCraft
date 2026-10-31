@@ -65,7 +65,7 @@ def _livro_de_230(pasta, pdf_do_tamanho_da_fatia: bool = False):
         pagina.diagramas = [replace(d) for d in molde.diagramas]
         pagina.estado = molde.estado
         projeto.salvar_modelo(pagina)
-    assert projeto.descarregar(60)
+    assert projeto.paginas_em_memoria.descarregar(60)
     return projeto
 
 

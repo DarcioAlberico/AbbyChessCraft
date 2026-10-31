@@ -95,7 +95,7 @@ def test_na_confianca_o_livro_segue_depois_de_pular_todos(livro):
 
 def test_o_f6_conta_pelo_resumo_sem_abrir_as_paginas(livro, monkeypatch):
     projeto, ctl, fila = livro
-    assert projeto.descarregar(10)
+    assert projeto.paginas_em_memoria.descarregar(10)
     monkeypatch.setattr(projeto, "carregar_modelo", lambda i: (_ for _ in ()).throw(
         AssertionError("abriu a página")))
     limiares = ctl.leitor.limiares

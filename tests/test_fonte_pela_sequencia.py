@@ -164,7 +164,7 @@ def test_o_lote_pula_a_pagina_que_saiu_do_livro_e_segue_a_que_mudou_de_lugar(
                                         (Apagada(entradas[1], 1),)))
     assert condutor.posicoes_restantes() == [1, 0]
     condutor.comecar()
-    projeto.descarregar(30)
+    projeto.paginas_em_memoria.descarregar(30)
     assert condutor.resultado.fora_do_livro == [pids[1]]
     assert sorted(condutor.resultado.lidas) == [0, 1]
     assert projeto.carregar_modelo(0).pid == pids[2] and projeto.carregar_modelo(1).pid == pids[0]
@@ -212,7 +212,7 @@ def test_a_pagina_que_muda_de_lugar_durante_a_leitura_e_gravada_no_lugar_novo(
     controlador.fonte.pagina_da_entrada = no_meio_da_leitura
     condutor = CondutorDoLote(controlador, [0], refazer=False)
     condutor.comecar()
-    projeto.descarregar(30)
+    projeto.paginas_em_memoria.descarregar(30)
     assert vistos == [pids[0]]                  # a imagem é a da página pedida
     assert condutor.resultado.lidas == [2] and not condutor.resultado.reler_depois
     assert projeto.carregar_modelo(2).pid == pids[0] and projeto.carregar_modelo(2).boxes
@@ -227,5 +227,5 @@ def test_o_progresso_chega_ao_total_com_posicoes_fora_do_livro(tmp_path, pdf_de_
                               ao_progresso=lambda feitas, total, _e: progresso.append(
                                   (feitas, total)))
     condutor.comecar()
-    projeto.descarregar(30)
+    projeto.paginas_em_memoria.descarregar(30)
     assert progresso[-1] == (2, 2) and 7 in condutor.resultado.falhas

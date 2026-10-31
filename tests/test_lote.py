@@ -130,18 +130,18 @@ def test_ca_11_4_a_pagina_aberta_e_suja_nao_e_sobrescrita(ctl, projeto):
     p = ctl.pagina
     ctl.reconhecer([0], refazer=False)
     ctl.executor.tudo()
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     antes = _hash(projeto, 0)
     p.escolher(p.gids[0])
     p.corrigir("Z")                                       # a aberta, com um passo no desfazer
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     gravado = _hash(projeto, 0)
     assert gravado != antes
     ctl.reconhecer([0, 1], refazer=True)
     ctl.executor.tudo()
     resultado = ctl.fins[-1]
     assert resultado.reler_depois == [0] and resultado.lidas == [1]
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     assert _hash(projeto, 0) == gravado                   # o arquivo não mudou
     assert p.box(p.gids[0]).char == "Z"
 
@@ -151,12 +151,12 @@ def test_a_pagina_aberta_nao_sai_do_cache_num_lote_maior_que_ele(ctl, projeto, m
     despeja a página aberta e limpa: o lote que a relê depois mostra a leitura nova na
     janela, e a correção seguinte, feita lá, não a apaga do disco."""
     from abbychess import lote
-    from abbychess import projeto as modulo
+    from abbychess import cache_do_projeto as modulo
 
     p = ctl.pagina
     ctl.reconhecer([0], refazer=False)
     ctl.executor.tudo()
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     monkeypatch.setattr(modulo, "PAGINAS_EM_MEMORIA", 1)
     ctl.reconhecer([1, 2], refazer=False)
     ctl.executor.tudo()
@@ -176,7 +176,7 @@ def test_a_pagina_aberta_nao_sai_do_cache_num_lote_maior_que_ele(ctl, projeto, m
     assert p.box(primeiro).char == "W"           # a janela mostra o que o lote leu
     p.escolher(segundo)
     p.corrigir("Z")
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     gravada = {b.gid: b.entry.char for b in ProjetoDeLivro.abrir(projeto.pasta)
                .carregar_modelo(0).boxes}
     assert (gravada[primeiro], gravada[segundo]) == ("W", "Z")
@@ -202,7 +202,7 @@ def test_sem_servidor_a_edicao_espera_a_pagina_do_lote_e_vale_depois(ctl, projet
 def test_ca_8_5_o_lote_pula_as_verificadas_mesmo_com_refazer(ctl, projeto):
     ctl.reconhecer([0, 1], refazer=False)
     ctl.executor.tudo()
-    projeto.descarregar(10)                               # o gravador não passa por cima
+    projeto.paginas_em_memoria.descarregar(10)                               # o gravador não passa por cima
     pagina = projeto.carregar_modelo(1)
     pagina.estado = VERIFICADA
     projeto.salvar_modelo(pagina)
@@ -232,13 +232,13 @@ def test_ca_11_5_cancelar_e_retomar_le_cada_pagina_uma_vez(ctl, projeto):
 def test_cancelar_no_meio_da_leitura_deixa_a_pagina_como_estava(ctl, projeto):
     ctl.reconhecer([0], refazer=False)
     ctl.executor.tudo()
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     antes = _hash(projeto, 0)
     ctl.reconhecer([0], refazer=True)
     ctl.cancelar()                                        # antes de a leitura começar
     ctl.executor.tudo()
     assert ctl.fins[-1].cancelado and ctl.fins[-1].lidas == []
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     assert _hash(projeto, 0) == antes and ctl.restante == ([0], True)
 
 
@@ -253,13 +253,13 @@ def test_ca_4_8_voltar_ao_estado_antes_do_lote_devolve_o_json_copiado(ctl, proje
     p.escolher(p.gids[0])
     p.leitura.ensinar("a")                                        # o lote lê os "a" da 1 pelo padrão
     ctl.executor.tudo()
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     copia_esperada = (projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(1)}.json").read_bytes()
     assert not any(b.entry.source == "livro" for b in projeto.carregar_modelo(1).boxes)
     ctl.reconhecer([1], refazer=True)
     ctl.executor.tudo()
     assert ctl.fins[-1].lidas == [1]
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     pid = projeto.pid_da_pagina(1)
     copia = projeto.pasta / "paginas" / ".antes-do-lote" / f"p{pid}.json"
     relida = projeto.carregar_modelo(1)
@@ -274,7 +274,7 @@ def test_ca_4_8_voltar_ao_estado_antes_do_lote_devolve_o_json_copiado(ctl, proje
     recusas = []
     p.eventos.ligar("recusa", lambda refazer, texto: recusas.append(texto))
     ctl.voltar_ao_antes_do_lote()
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     assert (projeto.pasta / "paginas" / f"p{pid}.json").read_bytes() == guardado
     assert not copia.exists() and not projeto.antes_do_lote.tem(1)
     assert not any(b.source == "livro" for b in p.boxes)       # a aberta mostra a de antes
@@ -290,7 +290,7 @@ def test_voltar_ao_antes_do_lote_nao_grava_no_projeto_so_de_leitura(ctl, projeto
     p.ir_para(1)
     ctl.reconhecer([0], refazer=True)
     ctl.executor.tudo()
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     p.ir_para(0)
     antes = _hash(projeto, 0)
     avisos = []
@@ -389,7 +389,7 @@ def test_o_lote_deixa_para_depois_a_pagina_com_um_f5_em_voo(ctl, projeto, com_se
     assert p.box(gid).char != "W"
     p.desfazedor.desfazer()
     assert p.box(gid).char == antes
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     assert ProjetoDeLivro.abrir(projeto.pasta).carregar_modelo(0).box(gid).entry.char == antes
 
 

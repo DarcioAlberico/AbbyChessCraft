@@ -49,7 +49,7 @@ def test_dividir_e_girar_o_livro_inteiro(tmp_path, medidas):
         girar = _segundos(lambda: ctl.operacoes.girar_paginas(todas, 90))
         desfazer_girar = _segundos(ctl.desfazedor.desfazer)
         assert projeto.sequencia.entrada_em(0).giro == 0
-        assert projeto.descarregar(120)
+        assert projeto.paginas_em_memoria.descarregar(120)
 
         def um_giro(i):
             ctl.operacoes.girar_paginas([3], 90 if i % 2 == 0 else 270)

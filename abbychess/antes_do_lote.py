@@ -56,7 +56,7 @@ class AntesDoLote:
         só para leitura, também não."""
         if self._p.somente_leitura:
             raise OSError("o projeto está aberto só para leitura")
-        if not self._p.descarregar(10):
+        if not self._p.paginas_em_memoria.descarregar(10):
             raise OSError("há páginas que não puderam ser gravadas (veja a barra de status); "
                           "nada foi mudado")
         pid = self._p._pid_em(indice)
@@ -67,7 +67,7 @@ class AntesDoLote:
             dados = copia.read_bytes()
             gv.gravar_bytes(self._p._arquivo_v2(pid), dados)
             pagina = self._p._de_json(json.loads(dados.decode("utf-8")))
-            self._p._guardar_no_cache(pagina, foto_nova=True)
+            self._p.paginas_em_memoria.guardar(pagina, foto_nova=True)
             self._p.resumo.atualizar(pid, self._p.resumo.do_modelo(pagina))
             gv.apagar(copia)
             return pagina

@@ -79,7 +79,7 @@ def test_ca_12_11_girar_as_impares_leva_imagem_e_boxes(projeto, ctl):
             assert np.array_equal(depois[gid], np.rot90(recorte, k=k)), (i, gid)
     # girar grava só a sequência (nenhum glifo sai): os arquivos ficam na geometria de antes,
     # e cada página é levada ao giro quando é lida
-    projeto.descarregar()
+    projeto.paginas_em_memoria.descarregar()
     for i in range(10):
         bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(i)}.json")
                            .read_text(encoding="utf-8"))
@@ -107,7 +107,7 @@ def test_ca_12_11_reabrir_sem_gravar_as_paginas_os_boxes_estao_no_lugar(projeto,
     levada à geometria nova quando é lida (o arquivo dela diz a geometria de antes)."""
     _gravar(projeto, 1)
     recortes = _recortes(ctl, projeto, 1)
-    monkeypatch.setattr(projeto, "agendar", lambda *_a, **_k: True)   # a queda
+    monkeypatch.setattr(projeto.paginas_em_memoria, "agendar", lambda *_a, **_k: True)   # a queda
     ctl.operacoes.girar_paginas([1], 270)
     projeto.fechar()
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)

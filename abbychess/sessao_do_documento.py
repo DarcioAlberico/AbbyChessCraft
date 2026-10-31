@@ -63,7 +63,7 @@ class ControladorDaSessao:
             # ao sair da página, e a edição pode esperar a vez dela na fila).
             aberta = pagina is self._p.modelo
             virtuais = {v.gid for v in pagina.decisoes.virtuais}
-            if not aberta and self._p.projeto.modelo_em_memoria(indice) is not pagina:
+            if not aberta and self._p.projeto.paginas_em_memoria.pagina(indice) is not pagina:
                 # A página saiu da memória e foi lida de novo (o lote, por exemplo): a
                 # edição no objeto velho seria gravada por cima da nova.
                 self._p.eventos.emitir("sessao_recusada", "a página mudou antes da confirmação")

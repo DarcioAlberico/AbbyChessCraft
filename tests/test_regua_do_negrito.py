@@ -114,7 +114,7 @@ def test_a_regua_da_pagina_vai_ao_arquivo_e_ao_resumo_do_livro(projeto):  # noqa
     pagina = projeto.pagina_para_editar(1)
     pagina.regua_do_negrito = {"a": [3, 0.1, 0.11]}
     projeto.salvar_modelo(pagina)
-    projeto.descarregar(30)
+    projeto.paginas_em_memoria.descarregar(30)
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     assert reaberto.carregar_modelo(1).regua_do_negrito == {"a": [3, 0.1, 0.11]}
     assert reaberto.resumo.do_livro()[1]["regua_do_negrito"] == {"a": [3, 0.1, 0.11]}

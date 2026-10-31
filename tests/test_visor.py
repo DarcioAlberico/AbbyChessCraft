@@ -256,7 +256,7 @@ def test_f8_vai_ao_proximo_diagrama_por_conferir_do_livro(app, tmp_path, monkeyp
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
     modelo = projeto.pagina_para_editar(2)
     modelo.tabuleiros = [(10, 10, 210, 210)]
-    projeto.agendar(modelo)
+    projeto.paginas_em_memoria.agendar(modelo)
     j = _janela(projeto)
     try:
         abertas = []

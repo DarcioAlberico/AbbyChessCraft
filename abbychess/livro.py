@@ -173,8 +173,9 @@ def reconhecer_paginas(projeto: ProjetoDeLivro, fonte: pg.FonteDePaginas,
         ao_progresso=(lambda feitas, total, _estimativa: progresso(feitas, total))
         if progresso else None, ao_fim=fim.append)
     condutor.comecar()
-    if not projeto.descarregar(60):
-        log.warning("o lote leu, mas o gravador não gravou tudo: %s", projeto.paginas_sujas())
+    if not projeto.paginas_em_memoria.descarregar(60):
+        log.warning("o lote leu, mas o gravador não gravou tudo: %s",
+                    projeto.paginas_em_memoria.paginas_sujas())
     return fim[0] if fim else condutor.resultado
 
 

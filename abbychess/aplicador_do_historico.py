@@ -54,7 +54,7 @@ class AplicadorDoHistorico:
                 if self._p.projeto.sequencia != esperada:
                     raise hs.Recusa("a ordem do livro mudou depois (por outra ação)")
                 if transacao.inteiras:
-                    self._p.projeto.descarregar()
+                    self._p.projeto.paginas_em_memoria.descarregar()
                 for pid, (velha, nova) in transacao.inteiras.items():
                     contador = self._p.projeto.proximo_n_de(pid)
                     for guardada in (velha, nova):

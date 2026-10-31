@@ -60,8 +60,7 @@ class ResumoDoLivro:
         sequencia = self._p.sequencia
         # Os pendentes antes do livro: uma página que o gravador termine entre as duas
         # leituras já está no livro lido, e não some por uma chamada.
-        with self._p._trava_do_cache:
-            pendentes = {pid: r for pid, (_, r) in self._p._a_gravar.items()}
+        pendentes = self._p.paginas_em_memoria.resumos_pendentes()
         livro = self._livro                     # trocado inteiro a cada gravação
         if livro is None:
             with self._p._trava_do_livro:
@@ -82,8 +81,7 @@ class ResumoDoLivro:
         from abbychess import regua_do_negrito as rn
 
         sequencia = self._p.sequencia
-        with self._p._trava_do_cache:
-            pendentes = {pid: r for pid, (_, r) in self._p._a_gravar.items()}
+        pendentes = self._p.paginas_em_memoria.resumos_pendentes()
         livro = self._livro                     # trocado inteiro a cada gravação
         if livro is None:
             with self._p._trava_do_livro:

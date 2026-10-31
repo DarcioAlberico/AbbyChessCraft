@@ -149,10 +149,10 @@ def _pagina(projeto, indice, n=5):
 
 def test_agendar_nao_grava_na_hora_e_o_resumo_ja_ve(projeto):
     pagina = _pagina(projeto, 0)
-    assert projeto.agendar(pagina)
+    assert projeto.paginas_em_memoria.agendar(pagina)
     assert not (projeto.pasta / "paginas" / f"p{pagina.pid}.json").exists()
     assert projeto.resumo.paginas_lidas() == [0]        # o resumo não espera o disco
-    assert projeto.descarregar(5)
+    assert projeto.paginas_em_memoria.descarregar(5)
     gravado = json.loads((projeto.pasta / "paginas" / f"p{pagina.pid}.json").read_text("utf-8"))
     assert len(gravado["boxes"]) == 5
     assert projeto.resumo.paginas_lidas() == [0]
@@ -160,9 +160,9 @@ def test_agendar_nao_grava_na_hora_e_o_resumo_ja_ve(projeto):
 
 def test_fechar_com_a_pagina_suja_grava_antes_de_voltar(projeto):
     pagina = _pagina(projeto, 0)
-    projeto.agendar(pagina)
+    projeto.paginas_em_memoria.agendar(pagina)
     ed.corrigir(pagina, pagina.boxes[0].gid, "z")
-    projeto.agendar(pagina)
+    projeto.paginas_em_memoria.agendar(pagina)
     assert projeto.fechar()
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     try:
@@ -180,17 +180,17 @@ def test_falha_de_gravacao_avisa_pelo_projeto_e_a_pagina_fica_suja(projeto, monk
         raise PermissionError("antivírus")
 
     monkeypatch.setattr(gv, "gravar_json", falhar)
-    projeto.agendar(pagina)
-    assert not projeto.descarregar(5)
-    assert avisos == [(3, "antivírus")] and pagina.pid in projeto.sujas
+    projeto.paginas_em_memoria.agendar(pagina)
+    assert not projeto.paginas_em_memoria.descarregar(5)
+    assert avisos == [(3, "antivírus")] and pagina.pid in projeto.paginas_em_memoria.sujas
     monkeypatch.undo()
-    projeto.agendar(pagina)
-    assert projeto.descarregar(5) and not projeto.sujas
+    projeto.paginas_em_memoria.agendar(pagina)
+    assert projeto.paginas_em_memoria.descarregar(5) and not projeto.paginas_em_memoria.sujas
 
 
 def test_so_leitura_recusa_e_nada_e_gravado(projeto, tmp_path):
     pagina = _pagina(projeto, 0)
-    projeto.agendar(pagina)
+    projeto.paginas_em_memoria.agendar(pagina)
     projeto.fechar()
     arquivo = projeto.pasta / "projeto.json"
     dados = json.loads(arquivo.read_text(encoding="utf-8"))
@@ -201,8 +201,8 @@ def test_so_leitura_recusa_e_nada_e_gravado(projeto, tmp_path):
         modelo = so_leitura.carregar_modelo(0)
         antes = (projeto.pasta / "paginas" / f"p{modelo.pid}.json").read_bytes()
         ed.corrigir(modelo, modelo.boxes[0].gid, "z")
-        assert not so_leitura.agendar(modelo)
-        assert so_leitura.descarregar(1)
+        assert not so_leitura.paginas_em_memoria.agendar(modelo)
+        assert so_leitura.paginas_em_memoria.descarregar(1)
         assert (projeto.pasta / "paginas" / f"p{modelo.pid}.json").read_bytes() == antes
     finally:
         so_leitura.fechar()
@@ -211,15 +211,15 @@ def test_so_leitura_recusa_e_nada_e_gravado(projeto, tmp_path):
 def test_pagina_com_gravacao_pendente_nao_sai_da_memoria(projeto, monkeypatch):
     bloqueio = threading.Event()
     original = projeto._gravar_instantaneo
-    monkeypatch.setattr(projeto.gravador, "_gravar",
+    monkeypatch.setattr(projeto.paginas_em_memoria.gravador, "_gravar",
                         lambda inst: (bloqueio.wait(10), original(inst)))
     suja = _pagina(projeto, 0)
-    projeto.agendar(suja)
+    projeto.paginas_em_memoria.agendar(suja)
     for k in range(1, PAGINAS_EM_MEMORIA + 4):   # enche o cache com outras
         _pagina(projeto, k)
     assert projeto.carregar_modelo(0) is suja
     bloqueio.set()
-    assert projeto.descarregar(10)
+    assert projeto.paginas_em_memoria.descarregar(10)
 
 
 def test_a_gravacao_sincrona_nao_perde_para_o_instantaneo_velho_do_gravador(projeto,
@@ -243,7 +243,7 @@ def test_a_gravacao_sincrona_nao_perde_para_o_instantaneo_velho_do_gravador(proj
     monkeypatch.setattr(gv, "gravar_json", gravar)
     gid = pagina.boxes[0].gid
     ed.corrigir(pagina, gid, "y")
-    projeto.agendar(pagina)
+    projeto.paginas_em_memoria.agendar(pagina)
     assert chegou.wait(10)
     ed.corrigir(pagina, gid, "z")
     sincrona = threading.Thread(target=projeto.salvar_modelo, args=(pagina,))
@@ -251,7 +251,7 @@ def test_a_gravacao_sincrona_nao_perde_para_o_instantaneo_velho_do_gravador(proj
     sincrona.join(0.5)                           # ela pode esperar a vez do gravador
     solto.set()
     sincrona.join(10)
-    assert not sincrona.is_alive() and projeto.descarregar(10)
+    assert not sincrona.is_alive() and projeto.paginas_em_memoria.descarregar(10)
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     try:
         assert reaberto.carregar_pagina(0)[0].char == "z"
@@ -274,10 +274,10 @@ def test_livro_json_igual_ao_recalculado_depois_de_gravacoes_assincronas(projeto
             ed.descartar(pagina, sorteio.choice(pagina.boxes).gid)
         else:
             pagina.boxes = pagina.boxes + [Box(pagina.alocar(), BoxEntry("", 1, 50, 9, 59))]
-        projeto.agendar(pagina)
+        projeto.paginas_em_memoria.agendar(pagina)
         if sorteio.random() < 0.2:
-            projeto.descarregar(5)
-    assert projeto.descarregar(5)
+            projeto.paginas_em_memoria.descarregar(5)
+    assert projeto.paginas_em_memoria.descarregar(5)
     gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
     assert gravado == projeto.resumo.recalcular()
 
@@ -307,20 +307,20 @@ def test_a_interface_nao_espera_o_disco_do_gravador(projeto, monkeypatch):
 
     pagina = _pagina(projeto, 0)
     outra = _pagina(projeto, 1)
-    projeto.descarregar(5)
+    projeto.paginas_em_memoria.descarregar(5)
     monkeypatch.setattr(gv, "gravar_json", gravar)
-    projeto.agendar(pagina)
-    projeto.gravador.descarregar(0)              # começa já
+    projeto.paginas_em_memoria.agendar(pagina)
+    projeto.paginas_em_memoria.gravador.descarregar(0)              # começa já
     assert preso.wait(5)
     try:
         ed.corrigir(outra, outra.boxes[0].gid, "z")
-        projeto.agendar(outra)
+        projeto.paginas_em_memoria.agendar(outra)
         assert projeto.carregar_modelo(1) is outra
         assert 1 in projeto.resumo.do_livro()
         assert not saiu.is_set()                 # voltaram com o gravador ainda preso
     finally:
         solto.set()
-    assert projeto.descarregar(5)
+    assert projeto.paginas_em_memoria.descarregar(5)
 
 
 def test_aviso_que_falha_nao_para_o_gravador():
@@ -365,8 +365,8 @@ def test_salvar_pagina_nao_muda_a_pagina_que_a_interface_mostra(projeto):
     from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
     mostrada = _pagina(projeto, 0)
-    projeto.agendar(mostrada)
-    projeto.descarregar(5)
+    projeto.paginas_em_memoria.agendar(mostrada)
+    projeto.paginas_em_memoria.descarregar(5)
     antes = list(mostrada.boxes)
     projeto.salvar_pagina(0, [BoxEntry("q", 0, 0, 5, 5, 1.0, "manual")], reconheceu=True)
     assert mostrada.boxes == antes                     # a da interface não mudou
@@ -375,14 +375,14 @@ def test_salvar_pagina_nao_muda_a_pagina_que_a_interface_mostra(projeto):
 
 
 def test_agendar_nao_calcula_a_foto_dos_glifos(projeto, monkeypatch):
-    from abbychess import projeto as projeto_mod
+    from abbychess import cache_do_projeto as cache_mod
 
     chamadas = []
-    original = projeto_mod.foto
-    monkeypatch.setattr(projeto_mod, "foto", lambda e: (chamadas.append(1), original(e))[1])
+    original = cache_mod.foto
+    monkeypatch.setattr(cache_mod, "foto", lambda e: (chamadas.append(1), original(e))[1])
     pagina = _pagina(projeto, 0, n=50)
     for k in range(5):
-        projeto.agendar(pagina)
-        projeto.descarregar(5)                   # a gravação tira a foto; a edição não a refaz
+        projeto.paginas_em_memoria.agendar(pagina)
+        projeto.paginas_em_memoria.descarregar(5)   # a gravação tira a foto; a edição não a refaz
         ed.corrigir(pagina, pagina.boxes[k].gid, "z")
     assert chamadas == []

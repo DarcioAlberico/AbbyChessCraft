@@ -188,7 +188,7 @@ class ControladorDaSequencia:
 
         def fazer(s):
             projeto = self._p.projeto
-            projeto.descarregar()               # nada do gravador chega depois da divisão
+            projeto.paginas_em_memoria.descarregar()               # nada do gravador chega depois da divisão
             movidos = dict(projeto.dados.gids_movidos)
             nova, paginas, metades = s, {}, 0
             for pid in sq.pids_da_selecao(s, posicoes):
@@ -265,7 +265,7 @@ class ControladorDaSequencia:
 
         def fazer(s):
             projeto = self._p.projeto
-            projeto.descarregar()
+            projeto.paginas_em_memoria.descarregar()
             nova, paginas = s, {}
             for pid in sq.pids_da_selecao(s, posicoes):
                 e = nova.entrada_de(pid)

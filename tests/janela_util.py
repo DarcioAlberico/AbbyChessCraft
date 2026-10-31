@@ -49,6 +49,6 @@ def trocar_entries(janela, indice_da_pagina: int, mudar) -> None:
         mudar(e)
         novos.append(replace(b, entry=e))
     pagina.boxes = novos
-    projeto.agendar(pagina)
+    projeto.paginas_em_memoria.agendar(pagina)
     if indice_da_pagina == janela.pagina.indice:
         janela.pagina.eventos.emitir("glifos_mudaram", None)

@@ -119,7 +119,7 @@ def test_resultado_de_tarefa_do_projeto_anterior_nao_entra_no_novo(dois_projetos
     ctl.ir_para(0)
     fim()
     assert ctl.boxes == [] and b.carregar_modelo(0) is None
-    assert not b.sujas and b.resumo.paginas_lidas() == []
+    assert not b.paginas_em_memoria.sujas and b.resumo.paginas_lidas() == []
 
 
 def test_tarefa_na_fila_do_projeto_anterior_nao_roda(dois_projetos):
@@ -199,7 +199,7 @@ def test_diagramas_lidos_entram_na_pagina_que_pediu(tmp_path, monkeypatch):
     try:
         modelo = projeto.pagina_para_editar(0)
         modelo.tabuleiros = [(10, 10, 210, 210)]
-        projeto.agendar(modelo)
+        projeto.paginas_em_memoria.agendar(modelo)
         executor = ExecutorManual()
         ctl = _controlador(projeto, executor)
         abertas = []

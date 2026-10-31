@@ -114,7 +114,7 @@ def medir(livro: str) -> dict:
                 dados["calibre"] = epub.calibre(destino)
             formatos[formato] = dados
             print(formato, dados["tempo"], "mesmos bytes:", dados["mesmos_bytes"], flush=True)
-        projeto.descarregar(30)
+        projeto.paginas_em_memoria.descarregar(30)
     validadores = {nome: formatos["epub"][nome] for nome in ("epubcheck", "ace", "calibre")}
     return {
         "livro": livro, "paginas": [i + 1 for i in indices], "pdf": pdf.name,

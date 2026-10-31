@@ -236,17 +236,17 @@ def test_o_arquivo_mudado_fora_do_cache_nao_e_adotado(sub):
     from abbychess.pagina_em_json import pagina_para_json
 
     projeto, ctl, s, escrever, eventos = sub
-    assert projeto.descarregar(10)
-    with projeto._trava_do_cache:                        # a página 2 sai da memória
-        projeto._modelos.pop(1, None)
+    assert projeto.paginas_em_memoria.descarregar(10)
+    with projeto.paginas_em_memoria._trava_do_cache:                        # a página 2 sai da memória
+        projeto.paginas_em_memoria._modelos.pop(1, None)
     previas = _previa(s, eventos, "casa", "lata")
     assert next(p for p in previas if p.indice == 1).carimbo is not None
     nova = escrever(1, "nada aqui")                      # o lote gravou outra coisa nela
-    assert projeto.descarregar(10)
+    assert projeto.paginas_em_memoria.descarregar(10)
     arquivo = projeto.arquivo_da_pagina(1)
     arquivo.write_text(json.dumps(pagina_para_json(nova)) + " ", encoding="utf-8")
-    with projeto._trava_do_cache:
-        projeto._modelos.pop(1, None)
+    with projeto.paginas_em_memoria._trava_do_cache:
+        projeto.paginas_em_memoria._modelos.pop(1, None)
     _aplicar(s, previas)
     ctl.executar.tudo()
     assert _textos(projeto) == ["lata velha", "nada aqui", "fim"]

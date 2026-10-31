@@ -127,7 +127,7 @@ def test_gravar_depois_de_reordenar_guarda_a_pagina_do_pdf_e_nao_a_posicao(proje
 
 def test_perguntar_fora_do_livro_nao_cria_paginas(projeto):
     assert projeto.pid_da_pagina(500) is None
-    assert projeto.carregar_modelo(500) is None and projeto.modelo_em_memoria(500) is None
+    assert projeto.carregar_modelo(500) is None and projeto.paginas_em_memoria.pagina(500) is None
     assert projeto.resumo.estado_da_pagina(500) == "nao_reconhecida"
     assert len(projeto.sequencia) == 60
 
@@ -172,10 +172,10 @@ def test_sem_a_fonte_a_pagina_gravada_continua_no_lugar(projeto):
 def test_pagina_pendente_no_gravador_segue_a_posicao(projeto):
     pagina = projeto.pagina_para_editar(4)
     _reordenar(projeto, [4, *range(4), *range(5, 60)])
-    assert projeto.agendar(pagina)
-    assert projeto.paginas_sujas() == [0]
+    assert projeto.paginas_em_memoria.agendar(pagina)
+    assert projeto.paginas_em_memoria.paginas_sujas() == [0]
     assert 0 in projeto.resumo.do_livro()
-    assert projeto.fechar(10) and projeto.paginas_sujas() == []
+    assert projeto.fechar(10) and projeto.paginas_em_memoria.paginas_sujas() == []
 
 
 def test_o_desfazer_acha_a_pagina_pelo_pid_depois_de_reordenar(tmp_path, pdf_de_60_paginas):  # noqa: F811

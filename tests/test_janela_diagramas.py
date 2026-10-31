@@ -76,7 +76,7 @@ def test_reconhecer_le_o_diagrama_e_poe_o_fen_no_texto(app, janela):
     assert d.lado is None
     texto = _texto(janela)
     assert f"[Diagrama 1: {FEN} w - - 0 1 — brancas a jogar (assumido: a página não diz)" in texto
-    janela.projeto.descarregar()
+    janela.projeto.paginas_em_memoria.descarregar()
     gravado = json.loads(janela.projeto.arquivo_da_pagina(0).read_text(encoding="utf-8"))
     assert gravado["diagramas"][0]["fen"] == d.fen
 

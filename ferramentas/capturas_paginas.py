@@ -144,7 +144,7 @@ def main() -> int:
                 gravar(janela, "4-dividida-direita")
             p.desfazedor.desfazer()
             _esperar(app, janela)
-        janela.pagina.projeto.descarregar(10)
+        janela.pagina.projeto.paginas_em_memoria.descarregar(10)
         janela.close()
     return 0
 

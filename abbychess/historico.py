@@ -29,7 +29,8 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from abbychess.leitor import FONTE_MANUAL
-from abbychess.modelo import NAO_RECONHECIDA, Box, Decisoes, Pagina, decisoes_dos_vivos
+from abbychess.geometria_do_modelo import decisoes_dos_vivos
+from abbychess.modelo import NAO_RECONHECIDA, Box, Decisoes, Pagina
 
 #: O que o desfazer do projeto guarda, no máximo (estimado); as mais antigas saem.
 LIMITE_DE_MEMORIA = 50 * 2**20

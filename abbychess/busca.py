@@ -164,7 +164,7 @@ def _indexar_tarefa(tarefa) -> Optional[PaginaIndexada]:
     fonte, idioma, versao = tarefa
     if isinstance(fonte, Pagina):
         return indexar_pagina(fonte, idioma, versao=versao)
-    from abbychess.modelo import reenquadrar
+    from abbychess.geometria_do_modelo import reenquadrar
     from abbychess.pagina_em_json import pagina_de_json
 
     caminho, posicao, geometria, tamanho = (fonte if isinstance(fonte, tuple)

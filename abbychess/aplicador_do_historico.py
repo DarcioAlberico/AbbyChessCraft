@@ -86,7 +86,7 @@ class AplicadorDoHistorico:
             antes, depois = transacao.sequencia
             gravar = None
             if transacao.inteiras:
-                from abbychess.modelo import viva
+                from abbychess.geometria_do_modelo import viva
 
                 lado = 1 if refazer else 0
                 alvo = {pid: None if par[lado] is None else viva(par[lado])

@@ -13,7 +13,8 @@ from core.box_model import BoxEntry
 from abbychess import pagina as pg
 from abbychess.controlador import ControladorDePagina
 from abbychess.leitor import LeitorDoLivro, nome_de_origem
-from abbychess.modelo import Box, Decisoes, GlifoVirtual, Pagina, dividir, pid_de
+from abbychess.geometria_do_modelo import dividir
+from abbychess.modelo import Box, Decisoes, GlifoVirtual, Pagina, pid_de
 from abbychess.projeto import ProjetoDeLivro
 
 
@@ -189,7 +190,7 @@ def test_ca_4_6_nenhum_gid_se_repete_depois_de_dividir(projeto, ctl):
 
 
 # ----------------------------------------------------------------------
-# modelo.dividir: as decisões, as áreas, os diagramas
+# geometria_do_modelo.dividir: as decisões, as áreas, os diagramas
 # ----------------------------------------------------------------------
 
 def _box(gid, x):

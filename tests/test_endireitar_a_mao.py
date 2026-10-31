@@ -13,7 +13,8 @@ from abbychess import pagina as pg
 from abbychess.controlador import ControladorDePagina
 from abbychess.diagramas import DiagramaLido
 from abbychess.leitor import LeitorDoLivro
-from abbychess.modelo import (GLIFOS_MARCADOS, Box, Decisoes, Pagina, endireitar)
+from abbychess.geometria_do_modelo import endireitar
+from abbychess.modelo import GLIFOS_MARCADOS, Box, Decisoes, Pagina
 from abbychess.projeto import ProjetoDeLivro
 from abbychess.zonas import Zona
 

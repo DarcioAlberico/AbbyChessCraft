@@ -798,7 +798,7 @@ A partir do L:
   diagramas e os tabuleiros com conta exata (`abbychess.geometria`; o `gid` fica). **Cada
   JSON de página (versão 3) grava a `geometria` (quadro e giro) em que os boxes estão** e o
   tamanho da fonte; ao carregar, se ela difere da entrada da sequência, os boxes são levados
-  nessa hora (`modelo.reenquadrar`). Assim o Ctrl+Z de girar e cortar é a sequência de
+  nessa hora (`geometria_do_modelo.reenquadrar`). Assim o Ctrl+Z de girar e cortar é a sequência de
   antes, e uma queda no meio não deixa boxes no quadro errado: a sequência é gravada
   primeiro, e só depois as páginas gravadas vão ao gravador já levadas à geometria nova (o
   arquivo, o `livro.json` e a busca seguem a imagem; rodada 4). **O glifo que

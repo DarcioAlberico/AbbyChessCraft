@@ -208,7 +208,7 @@ def _pagina_com_areas():
 
 
 def test_cortar_e_voltar_devolve_areas_tabuleiros_e_diagramas():
-    from abbychess.modelo import reenquadrar
+    from abbychess.geometria_do_modelo import reenquadrar
 
     pagina = _pagina_com_areas()
     antes = (list(pagina.zonas), list(pagina.tabuleiros), list(pagina.diagramas))
@@ -223,7 +223,7 @@ def test_cortar_e_voltar_devolve_areas_tabuleiros_e_diagramas():
 def test_a_area_aparada_e_mexida_fica_como_o_usuario_a_deixou():
     from dataclasses import replace
 
-    from abbychess.modelo import reenquadrar
+    from abbychess.geometria_do_modelo import reenquadrar
 
     pagina = _pagina_com_areas()
     reenquadrar(pagina, ((0, 0, 300, 400), 0), None)
@@ -235,7 +235,7 @@ def test_a_area_aparada_e_mexida_fica_como_o_usuario_a_deixou():
 def test_o_diagrama_que_volta_com_o_id_tomado_ganha_outro():
     from dataclasses import replace
 
-    from abbychess.modelo import reenquadrar
+    from abbychess.geometria_do_modelo import reenquadrar
 
     pagina = _pagina_com_areas()
     reenquadrar(pagina, ((0, 0, 300, 400), 0), None)
@@ -265,7 +265,8 @@ def test_as_areas_fora_sobrevivem_a_gravar_e_reabrir(projeto, ctl):
     (90, 90, 0), (90, 0, 270), (270, 270, 0), (180, 90, 270)])
 def test_girar_leva_o_angulo_do_texto(graus, angulo, esperado):
     """O texto que sobe (90) fica de pé quando a página gira 90° à direita."""
-    from abbychess.modelo import Box, Pagina, reenquadrar
+    from abbychess.geometria_do_modelo import reenquadrar
+    from abbychess.modelo import Box, Pagina
 
     entry = BoxEntry(char="a", x1=10, y1=10, x2=20, y2=40, angulo=angulo)
     pagina = Pagina(pid=1, indice=0, tamanho=(100, 200), boxes=[Box(gid=1, entry=entry)])

@@ -96,7 +96,7 @@ class ControladorDaSequencia:
 
     def girar_paginas(self, posicoes: Sequence[int], graus: int) -> bool:
         """Gira as páginas `graus` (90, 180 ou 270) no sentido horário (§12.4). Os boxes vão
-        juntos, com conta exata (`modelo.reenquadrar`); a página com boxes guarda o ângulo de
+        juntos, com conta exata (`geometria_do_modelo.reenquadrar`); a página com boxes guarda o ângulo de
         endireitar em que foi lida (`aplicar_sequencia`, também no Ctrl+Z)."""
         graus %= 360
         if graus not in (90, 180, 270):
@@ -178,7 +178,7 @@ class ControladorDaSequencia:
         direita recebe o ângulo guardado da página, e sem ele mede o mesmo, da mesma página
         inteira, quando abrir."""
         from abbychess import geometria as geo
-        from abbychess import modelo as md
+        from abbychess import geometria_do_modelo as gm
 
         fracao = float(fracao)
         if not 0 < fracao < 1:
@@ -214,7 +214,7 @@ class ControladorDaSequencia:
                 if pagina is None:
                     paginas[pid] = paginas[pid_novo] = (None, None)
                 else:
-                    pagina_e, pagina_d, m = md.dividir(pagina, corte, esquerda.geometria,
+                    pagina_e, pagina_d, m = gm.dividir(pagina, corte, esquerda.geometria,
                                                        direita.geometria, tamanho, pid_novo)
                     paginas[pid] = (pagina.instantaneo(), pagina_e)
                     paginas[pid_novo] = (None, pagina_d)
@@ -247,8 +247,8 @@ class ControladorDaSequencia:
         `pagina.girar`) vence o medido; None volta ao medido. A leitura da página com glifos
         se desfaz: ficam os marcados à mão (a leitura digitada, ou o glifo aceito na revisão),
         girados em volta do centro, e as áreas do usuário; o resto sai, e a página vai a
-        `glifos_marcados` (`modelo.endireitar`). O Ctrl+Z devolve o ângulo e a página."""
-        from abbychess import modelo as md
+        `glifos_marcados` (`geometria_do_modelo.endireitar`). O Ctrl+Z devolve o ângulo e a página."""
+        from abbychess import geometria_do_modelo as gm
         from abbychess.leitor import FONTE_MANUAL
 
         if angulo is not None:
@@ -281,7 +281,7 @@ class ControladorDaSequencia:
                     self._p.fonte.inclinacao_da_entrada(e)
                 if delta:
                     paginas[pid] = (pagina.instantaneo(),
-                                    md.endireitar(pagina, delta, tamanho, manter))
+                                    gm.endireitar(pagina, delta, tamanho, manter))
             if paginas:
                 movidos = dict(projeto.dados.gids_movidos)
                 troca.update(paginas=paginas, movidos=(movidos, movidos))

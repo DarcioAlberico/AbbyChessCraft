@@ -88,8 +88,9 @@ from abbychess.migracoes import Migracoes
 from abbychess.resumo_do_livro import ResumoDoLivro
 from abbychess.sequencia_do_livro import SequenciaDoLivro
 from abbychess import zonas as zn
+from abbychess.geometria_do_modelo import reenquadrar
 from abbychess.modelo import (GLIFOS_MARCADOS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
-                              Pagina, proximo_estado, reconciliar, reenquadrar)
+                              Pagina, proximo_estado, reconciliar)
 from abbychess.pagina_em_json import (com_ids_de_diagramas, comparavel, inteiro, pagina_de_json,
                                       pagina_para_json, vazia)
 from abbychess.pasta_do_projeto import (ARQUIVO_DO_LEXICO, ARQUIVO_DO_PROJETO, PASTA_DE_PADROES,

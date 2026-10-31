@@ -198,8 +198,8 @@ def _linhas_que_atravessam(boxes: Sequence[BoxEntry], colunas, altura: float
                 continue
             vao = min(b.x1 for b in depois) - max(b.x2 for b in antes)
             if vao < VAO_DA_LINHA_NA_CALHA * largura:
-                linha = [b for b in boxes
-                         if min(f.y1 for f in fila) <= (b.y1 + b.y2) / 2 <= max(f.y2 for f in fila)]
+                topo, pe = min(f.y1 for f in fila), max(f.y2 for f in fila)     # uma vez por fila
+                linha = [b for b in boxes if topo <= (b.y1 + b.y2) / 2 <= pe]
                 faixas.append((min(b.y1 for b in linha), max(b.y2 for b in linha)))
     return faixas
 

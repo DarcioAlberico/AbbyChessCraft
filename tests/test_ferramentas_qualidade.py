@@ -97,6 +97,41 @@ def test_o_crapper_pesa_a_falta_de_cobertura_e_filtra_pelo_limite(tmp_path):
     assert texto.startswith("funções: 5; CRAP >= 10: 1")
 
 
+def test_o_crapper_falha_com_funcao_fora_da_lista_de_aceitos_e_com_aceita_que_sumiu(tmp_path):
+    _crapper(tmp_path, [], _linhas_de("ramos"), limite=10)   # grava o pacote e a cobertura
+    lista = tmp_path / "aceitos.txt"
+
+    def crapper(texto):
+        lista.write_text(texto, encoding="utf-8")
+        saida = subprocess.run([sys.executable, "-I", str(FERRAMENTAS / "crapper.py"),
+                                str(tmp_path / "pacote"), str(tmp_path / "coverage.json"), "10",
+                                "--aceitos", str(lista)], capture_output=True)
+        return saida.returncode, saida.stdout.decode("utf-8")
+
+    aceita = "pacote/mod.py ramos  # o motivo\n"
+    codigo, texto = crapper(aceita)
+    assert codigo == 0
+    assert "fora da lista de aceitos: 0; aceitos que não existem mais: 0" in texto
+    codigo, texto = crapper("# nenhuma aceita\n")
+    assert codigo == 1 and "novo" in texto and "ramos" in texto
+    # `simples` existe mas está abaixo do limite: a lista não guarda o que já foi reduzido.
+    codigo, texto = crapper(aceita + "pacote/mod.py simples  # já reduzida\n")
+    assert codigo == 1 and "sumiu" in texto and "simples" in texto
+
+
+def test_o_resumo_da_qualidade_conta_as_funcoes_fora_da_lista_do_crap():
+    sys.path.insert(0, str(FERRAMENTAS))
+    import qualidade
+
+    cobertura = {"totals": {"num_statements": 1, "missing_lines": 0, "percent_covered": 100.0}}
+    crap = ("funções: 9; CRAP >= 10: 2\n"
+            "fora da lista de aceitos: 1; aceitos que não existem mais: 1\n")
+    duplicacao = "funções com >= 60 nós: 9; pares com rank >= 0.8: 0\n"
+    dados = qualidade.resumo(cobertura, crap, duplicacao, {}, {})
+    assert dados["crap"] == {"funcoes": 9, "acima_de_10": 2, "fora_da_lista": 1,
+                             "aceitos_sumidos": 1}
+
+
 def _par(nome, a, b):
     return f'''\
 def {nome}(itens, prefixo):

@@ -135,6 +135,57 @@ def test_emendar_junta_a_propagacao_no_depois():
     assert [b.entry.char for b in p.boxes] == ["a", "b", "c"]
 
 
+def test_emendar_a_propagacao_que_descarta_reordena_e_muda_o_estado():
+    """A propagação descarta o glifo do Enter, reordena a página e muda o estado: desfazer a
+    transação emendada volta à página de antes do Enter, e refazer, à de depois de tudo."""
+    from abbychess import edicao as ed
+    from abbychess.modelo import NAO_RECONHECIDA, RECONHECIDA
+
+    p = _pagina("abcd")
+    inicial = list(p.boxes)
+    t = _transacao(p, lambda pg: ed.corrigir(pg, pg.boxes[0].gid, "z"))
+    foto = p.instantaneo()
+    ed.descartar(p, p.boxes[0].gid)                    # o glifo do Enter sai
+    p.boxes = [p.boxes[1], p.boxes[0], p.boxes[2]]     # e a ordem muda
+    p.estado = RECONHECIDA
+    hs.emendar(t.paginas[1], hs.mudanca(foto, p.instantaneo()))
+    m = t.paginas[1]
+    hs.conferir(m, p, para_tras=True)
+    hs.aplicar(m, p, para_tras=True)
+    assert p.boxes == inicial and p.estado == NAO_RECONHECIDA
+    hs.conferir(m, p, para_tras=False)
+    hs.aplicar(m, p, para_tras=False)
+    assert [b.entry.char for b in p.boxes] == ["c", "b", "d"] and p.estado == RECONHECIDA
+
+
+def test_emendar_esquece_o_que_a_propagacao_desfez_e_guarda_o_que_ela_criou():
+    """O glifo que o Enter criou e a propagação descartou, e o estado que ela voltou, saem da
+    transação; o glifo que a propagação criou entra, e desfazer o tira."""
+    from abbychess.modelo import NAO_RECONHECIDA, RECONHECIDA
+
+    p = _pagina("abc")
+    inicial = list(p.boxes)
+    criado = Box((1 << 20) | 9, BoxEntry("x", 40, 0, 48, 9))
+
+    def enter(pg):
+        pg.boxes = pg.boxes + [criado]
+        pg.estado = RECONHECIDA
+
+    t = _transacao(p, enter)
+    foto = p.instantaneo()
+    da_propagacao = Box((1 << 20) | 10, BoxEntry("y", 50, 0, 58, 9))
+    p.boxes = inicial[:2] + [da_propagacao] + inicial[2:]
+    p.estado = NAO_RECONHECIDA
+    hs.emendar(t.paginas[1], hs.mudanca(foto, p.instantaneo()))
+    m = t.paginas[1]
+    assert set(m.antes) == {da_propagacao.gid} and m.campos == {}
+    hs.conferir(m, p, para_tras=True)
+    hs.aplicar(m, p, para_tras=True)
+    assert p.boxes == inicial
+    hs.aplicar(m, p, para_tras=False)
+    assert [b.entry.char for b in p.boxes] == ["a", "b", "y", "c"]
+
+
 def test_padrao_guardado_volta_inteiro(tmp_path):
     import numpy as np
 

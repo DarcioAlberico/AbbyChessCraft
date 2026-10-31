@@ -217,6 +217,122 @@ def test_diagramas_lidos_entram_na_pagina_que_pediu(tmp_path, monkeypatch):
         projeto.fechar()
 
 
+# ----------------------------------------------------------------------
+# A conferência dos diagramas pelo livro
+# ----------------------------------------------------------------------
+
+#: As caixas dos tabuleiros de cada página do livro de três (a do meio não tem nenhum).
+CAIXAS = {0: [(10, 10, 110, 110), (200, 10, 300, 110)], 2: [(10, 10, 110, 110)]}
+
+
+@pytest.fixture
+def livro_com_diagramas(tmp_path):
+    """O livro de três páginas com os diagramas lidos nas pontas, aberto na primeira; as
+    mensagens e as conferências abertas, `(página, diagrama)`, em `ouvidos`."""
+    from abbychess.controlador_de_diagramas import ControladorDeDiagramas
+    from tests.ajudantes import _lido, pdf_sintetico  # noqa: E402,F401,F811
+
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Tres", pdf_sintetico(tmp_path))
+    for indice, caixas in CAIXAS.items():
+        modelo = projeto.pagina_para_editar(indice)
+        modelo.tabuleiros = caixas
+        modelo.diagramas = [_lido(caixa=c) for c in caixas]
+        projeto.paginas_em_memoria.agendar(modelo)
+    ctl = _controlador(projeto, ExecutorManual())
+    ouvidos = []
+    ctl.eventos.ligar("conferir", lambda i: ouvidos.append((ctl.indice, i)))
+    ctl.eventos.ligar("mensagem", lambda texto, _ms: ouvidos.append(texto))
+    yield ctl, ControladorDeDiagramas(ctl), ouvidos
+    projeto.fechar()
+
+
+def test_pgdn_e_pgup_na_ponta_da_pagina_abrem_o_diagrama_vizinho_no_livro(livro_com_diagramas):
+    ctl, conferencia, ouvidos = livro_com_diagramas
+    conferencia.vizinho_do_livro(+1)                   # pula a do meio, sem diagrama
+    conferencia.vizinho_do_livro(-1)                   # o último da anterior
+    conferencia.vizinho_do_livro(-1)                   # não dá a volta no livro
+    assert ouvidos == [(2, 0), (0, 1), "Não há diagrama antes deste no livro."]
+    assert ctl.indice == 0
+
+
+def test_a_pagina_vizinha_que_nao_abre_avisa_e_fica(livro_com_diagramas, monkeypatch):
+    ctl, conferencia, ouvidos = livro_com_diagramas
+
+    def pagina(entrada, *_a, **_k):
+        raise OSError("A página 3 não renderizou.")
+
+    monkeypatch.setattr(ctl.fonte, "pagina_da_entrada", pagina)
+    conferencia.vizinho_do_livro(+1)
+    assert ouvidos == ["A página 3 não abriu."] and ctl.indice == 0
+
+
+def test_conferir_na_pagina_sem_diagrama_avisa(livro_com_diagramas):
+    ctl, conferencia, ouvidos = livro_com_diagramas
+    ctl.ir_para(1)
+    conferencia.conferir()
+    assert ouvidos == ["Não há diagrama nesta página."]
+
+
+def test_o_diagrama_por_ler_nao_se_confere(livro_com_diagramas):
+    from core.tabuleiro_edicao import TabuleiroEdicao
+    from tests.ajudantes import FEN  # noqa: E402,F401,F811
+
+    ctl, conferencia, ouvidos = livro_com_diagramas
+    modelo = ctl.projeto.pagina_para_editar(0)
+    modelo.diagramas = []                              # a página gravada antes da leitura
+    ctl.projeto.paginas_em_memoria.agendar(modelo)
+    ctl.ir_para(0)
+    assert conferencia.aplicar(CAIXAS[0][1], TabuleiroEdicao.de_fen(FEN), False) is False
+    assert ouvidos == ["O diagrama 2 não foi lido: não há posição a conferir."]
+    assert not any(d.conferido for d in ctl.diagramas)
+
+
+def test_o_projeto_so_para_leitura_nao_grava_a_conferencia(livro_com_diagramas):
+    import json
+
+    from core.tabuleiro_edicao import TabuleiroEdicao
+    from tests.ajudantes import FEN  # noqa: E402,F401,F811
+
+    ctl, _, _ = livro_com_diagramas
+    pasta = ctl.projeto.pasta
+    ctl.projeto.fechar()
+    arquivo = pasta / "projeto.json"
+    arquivo.write_text(json.dumps({**json.loads(arquivo.read_text(encoding="utf-8")),
+                                   "versao": 99}), encoding="utf-8")
+    so_leitura = ProjetoDeLivro.abrir(pasta)
+    try:
+        from abbychess.controlador_de_diagramas import ControladorDeDiagramas
+
+        outro = _controlador(so_leitura, ExecutorManual())
+        mensagens = []
+        outro.eventos.ligar("mensagem", lambda texto, _ms: mensagens.append(texto))
+        conferencia = ControladorDeDiagramas(outro)
+        assert conferencia.aplicar(CAIXAS[0][0], TabuleiroEdicao.de_fen(FEN), True) is False
+        assert mensagens == ["Projeto aberto só para leitura: a conferência não é gravada."]
+        assert not outro.diagramas[0].conferido
+        assert not (pasta / "diagramas").exists()      # nem as amostras
+    finally:
+        so_leitura.fechar()
+
+
+def test_as_amostras_que_nao_gravam_nao_desfazem_a_conferencia(livro_com_diagramas, monkeypatch):
+    from abbychess import diagramas as dg
+    from core.tabuleiro_edicao import TabuleiroEdicao
+    from tests.ajudantes import FEN  # noqa: E402,F401,F811
+
+    ctl, conferencia, ouvidos = livro_com_diagramas
+
+    def guardar(*_a, **_k):
+        raise OSError("disco cheio")
+
+    monkeypatch.setattr(dg, "guardar_amostras", guardar)
+    assert conferencia.aplicar(CAIXAS[0][0], TabuleiroEdicao.de_fen(FEN), True) is True
+    fen = ctl.diagramas[0].fen
+    assert ctl.diagramas[0].conferido
+    assert ouvidos == [f"Diagrama 1 conferido: {fen}. As amostras não foram guardadas: "
+                       "disco cheio"]
+
+
 def test_corrigir_e_ensinar_uma_palavra_e_um_passo_so_do_desfazer(dois_projetos):
     from abbychess import verificacao as vf
     from abbychess.controladores import ControladorDeVerificacao

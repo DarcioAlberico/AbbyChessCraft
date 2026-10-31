@@ -1,5 +1,6 @@
-"""As alavancas do corte 3 do Q7 (`ferramentas/mover_metodos.py`, `ferramentas/trocar_chamadas.py`)
-sobre um módulo de brinquedo, chamadas como na linha de comando (SPEC-qualidade Q-A1)."""
+"""As alavancas dos cortes 3 e 5 do Q7 (`ferramentas/mover_metodos.py`,
+`ferramentas/trocar_chamadas.py`, `ferramentas/mover_definicoes.py`) sobre módulos de
+brinquedo, chamadas como na linha de comando (SPEC-qualidade Q-A1)."""
 
 from __future__ import annotations
 
@@ -61,3 +62,52 @@ def test_trocar_chamadas_com_a_contagem_errada_nao_grava_nada(tmp_path):
     assert _rodar(FERRAMENTAS / "trocar_chamadas.py", tabela, "--aplicar",
                   cwd=tmp_path).returncode == 0
     assert alvo.read_text(encoding="utf-8") == "p.col.um()\np.col.um()\n"
+
+
+GRANDE = '''\
+"""Grande."""
+
+from abbychess import base
+
+
+#: O que o dobro dobra.
+LIMITE = 3
+
+
+def fica():
+    return dobro(LIMITE) + 1
+
+
+def dobro(x):
+    return x * 2
+'''
+
+USO = '''\
+from abbychess import grande as gr
+
+
+def usar():
+    return gr.dobro(2) + gr.fica()
+'''
+
+
+def test_mover_definicoes_leva_a_constante_e_a_funcao_e_os_chamadores_seguem(tmp_path):
+    pacote = tmp_path / "abbychess"
+    pacote.mkdir()
+    (pacote / "__init__.py").write_text("", encoding="utf-8")
+    (pacote / "base.py").write_text("", encoding="utf-8")
+    (pacote / "grande.py").write_text(GRANDE, encoding="utf-8")
+    (tmp_path / "chamador").mkdir()
+    (tmp_path / "chamador" / "uso.py").write_text(USO, encoding="utf-8")
+    cabecalho = tmp_path / "cabecalho.txt"
+    cabecalho.write_text('"""Miúdo."""\n', encoding="utf-8")
+    saida = _rodar(FERRAMENTAS / "mover_definicoes.py", pacote / "grande.py", pacote / "miudo.py",
+                   "--nomes", "LIMITE,dobro", "--cabecalho", cabecalho,
+                   "--chamadores", "chamador", "--alias", "mi", "--aplicar", cwd=tmp_path)
+    assert saida.returncode == 0, saida.stderr
+    miudo = (pacote / "miudo.py").read_text(encoding="utf-8")
+    assert "#: O que o dobro dobra.\nLIMITE = 3" in miudo     # o comentário vai junto
+    assert "def dobro" not in (pacote / "grande.py").read_text(encoding="utf-8")
+    assert "mi.dobro(2)" in (tmp_path / "chamador" / "uso.py").read_text(encoding="utf-8")
+    rodar = _rodar("-c", "from chamador.uso import usar; print(usar())", cwd=tmp_path)
+    assert rodar.stdout.strip() == "11", rodar.stderr      # 4 + (6 + 1)

@@ -212,6 +212,15 @@ def test_o_pgn_sem_diagrama_nao_troca_o_anterior(projeto, fonte, leitor, tmp_pat
     with pytest.raises(ex.NadaParaExportar, match="Nenhum diagrama"):
         ex.exportar_com_relatorio(projeto, destino)
     assert destino.read_text(encoding="utf-8") == "o PGN bom de antes\n"
+    # Com um diagrama conferido, o PGN troca o anterior.
+    modelo = projeto.carregar_modelo(1)
+    modelo.tabuleiros = [(0, 0, 400, 400)]
+    modelo.diagramas = [replace(_lido(P25, caixa=(0, 0, 400, 400)), conferido=True, lado="b",
+                                lado_origem="usuario")]
+    projeto.salvar_modelo(modelo)
+    resumo, relatorio = ex.exportar_com_relatorio(projeto, destino)
+    assert resumo == "1 diagrama(s) com a posição e os lances."
+    assert relatorio.no_pgn == 1 and '[Page "2"]' in destino.read_text(encoding="utf-8")
 
 
 def test_a_funcao_da_linha_empatada_nao_depende_do_processo():
@@ -386,6 +395,28 @@ def test_pgn_recusa_posicao_ilegal_mesmo_conferida():
     relatorio = ex.Relatorio(formato="pgn")
     assert ex.pgn_do_livro(_ProjetoFalso({0: pagina}), relatorio=relatorio) == ""
     assert relatorio.fora_do_pgn == [(0, 1, "a posição não é legal")]
+
+
+def test_o_pgn_diz_por_que_cada_diagrama_ficou_de_fora():
+    """Entra o confiável pelos lances, sem conferir; ficam de fora, com o motivo, o que os
+    lances desmentem, o não lido (com o erro da leitura, ou sem ele) e o de FEN que o
+    python-chess recusa (o lado estragado no arquivo)."""
+    caixas = [(0, 500 * k, 400, 500 * k + 400) for k in range(5)]
+    pelos_lances = _com_validacao(_lido(P25, caixa=caixas[0], lado="b"), TEXTO_P25, lado="b")
+    desmentido = _com_validacao(_lido(P25, caixa=caixas[1], lado="b"), "10...Txf8 11.Dxh7",
+                                lado="b")
+    sem_modelo = ex.DiagramaLido(caixas[2], erro="o modelo de diagramas não carregou")
+    nao_lido = ex.DiagramaLido(caixas[3])
+    lado_estragado = replace(_lido(P25, caixa=caixas[4]), conferido=True, lado="x")
+    pagina = tx.pagina_avulsa([], [pelos_lances, desmentido, sem_modelo, nao_lido,
+                                   lado_estragado])
+    pagina.tabuleiros = caixas
+    relatorio = ex.Relatorio(formato="pgn")
+    texto = ex.pgn_do_livro(_ProjetoFalso({0: pagina}), relatorio=relatorio)
+    assert texto.count("[Page ") == 1 and '[Diagram "1"]' in texto
+    assert relatorio.fora_do_pgn == [(0, 2, "10...Txf8 do texto não é legal aqui"),
+                                     (0, 3, "o modelo de diagramas não carregou"),
+                                     (0, 4, "não lido"), (0, 5, "a posição não é legal")]
 
 # ----------------------------------------------------------------------
 # A revisão de produto do fechamento (rodada 1)

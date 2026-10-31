@@ -103,13 +103,12 @@ def _chamadores(pastas: list[str], origem: str, destino: str, alias: str, nomes:
             if not trocas:
                 continue
             novo = uso.sub(lambda m: f"{alias}.{m.group(1)}", texto)
+            # Abaixo de cada import da origem (o de cada função, quando é local); o que sobrar
+            # sem uso, o ruff (F401) aponta.
             for m in reversed(list(importa.finditer(novo))):
-                recuo = m.group(1)
-                linha = f"{recuo}from abbychess import {destino} as {alias}"
-                if linha.strip() not in novo:
+                linha = f"{m.group(1)}from abbychess import {destino} as {alias}"
+                if not novo[m.end():].startswith("\n" + linha + "\n"):
                     novo = novo[:m.end()] + "\n" + linha + novo[m.end():]
-                else:
-                    break
             print(f"{arquivo}: {trocas} chamada(s)")
             if aplicar:
                 arquivo.write_text(novo, encoding="utf-8", newline="\n")

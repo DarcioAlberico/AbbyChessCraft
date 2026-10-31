@@ -90,6 +90,11 @@ from abbychess import grande as gr
 
 def usar():
     return gr.dobro(2) + gr.fica()
+
+
+def outra():
+    from abbychess import grande as gr
+    return gr.dobro(1)
 '''
 
 
@@ -113,5 +118,6 @@ def test_mover_definicoes_leva_a_constante_e_a_funcao_e_os_chamadores_seguem(tmp
     uso = (tmp_path / "chamador" / "uso.py").read_text(encoding="utf-8")
     assert "mi.dobro(2)" in uso
     assert "os\n\nfrom abbychess import grande as gr\nfrom abbychess import miudo as mi\n" in uso
-    rodar = _rodar("-c", "from chamador.uso import usar; print(usar())", cwd=tmp_path)
-    assert rodar.stdout.strip() == "11", rodar.stderr      # 4 + (6 + 1)
+    rodar = _rodar("-c", "from chamador.uso import usar, outra; print(usar(), outra())",
+                   cwd=tmp_path)
+    assert rodar.stdout.strip() == "11 2", rodar.stderr    # 4 + (6 + 1); o import local também

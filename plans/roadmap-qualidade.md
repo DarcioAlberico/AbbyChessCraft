@@ -160,6 +160,11 @@ imposta (Q-T4); o conftest central não existe de fato (Q-T5).
 **Pronto quando:** a rápida passa em < 60 s com `-n 4`, sem `from tests.test_`, e 20 vezes
 seguidas sem falha.
 
+**Feito** em 2026-10-30/31, ramo `qualidade-q4` (`docs/revisoes/qualidade-Q4.md`): o teto
+passou a 90 s (decisão §13.5) e a rápida cabe nele (77–82 s); nenhum `from tests.test_`;
+10 rodadas seguidas sem falha (e o teste da tarefa em voo, 20); as fixtures de sessão para o
+tempo ficaram de fora, por não serem mais pedidas.
+
 ## Passo Q5 — Tirar antes de pôr
 
 **Contexto.** A §11 da spec lista o código morto; a §7 os 16 pares do dryer; a Q-A3 as

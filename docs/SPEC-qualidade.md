@@ -441,6 +441,9 @@ Não medido: o `mutmut` 3 não roda no Windows sem `fork`; o `cosmic-ray` roda. 
 - **CA-Q-T1:** uma fixture autouse na suíte rápida bloqueia `com_modelos_globais` (liberada
   só em `livro_real`); o teste passa 20 vezes seguidas com `-n 4` e espera a condição dele
   (o projeto certo e a página gravada), não a fila ociosa.
+- **Feito** no Q4 (`5989fde`, `617fb3b`): sem os modelos, o aviso modal "a rede não carregou"
+  parava o teste até o timeout; a suíte ganhou também uma fixture que não deixa aviso modal
+  nenhum abrir. O teste passou 20 vezes seguidas, em 0,39 s (10,6 s sozinho antes).
 
 ### Q-T2 (Alta) — tempo de relógio e `sleep` como sincronização
 
@@ -452,6 +455,10 @@ Não medido: o `mutmut` 3 não roda no Windows sem `fork`; o `cosmic-ray` roda. 
 - **CA-Q-T2:** um teste de arquitetura reprova `time.sleep` e `perf_counter` em asserção na
   suíte rápida; a espera é uma só (`qtbot.waitUntil` ou um `esperar(cond)` do conftest), e os
   falsos sinalizam com `threading.Event`.
+- **Feito** no Q4 (`c500f8c`, `072408f`): 23 casos em 8 arquivos (os de `test_servidor` e
+  `test_gravador_processo` são da camada `processo` e ficam). A espera única é
+  `tests/ajudantes.esperar`; as afirmações de tempo viraram fatos causais (a chamada voltou
+  com o falso ainda preso) ou o relógio falso do `Gravador`.
 
 ### Q-T3 (Média) — testes de implementação
 
@@ -472,16 +479,24 @@ Não medido: o `mutmut` 3 não roda no Windows sem `fork`; o `cosmic-ray` roda. 
   `test_sessao.py:313` usa `times.ttf` sem guarda; ~40 % da suíte pula sem a Arial, sem aviso
   agregado.
 - **CA-Q-T4:** `-m noturno` seleciona as máquinas com 5 000 exemplos e a rápida roda 100; um
-  `pytest_sessionfinish` reprova a rápida acima de 60 s; o resumo da sessão conta os pulos por
-  motivo.
+  `pytest_sessionfinish` reprova a rápida acima de ~~60 s~~ 90 s (§13.5); o resumo da sessão
+  conta os pulos por motivo.
+- **Feito** no Q4 (`a1e4f76`, `4fd272b`). O `test_fen_no_livro` e o `times.ttf` sem guarda
+  ficam para o Q8 (Q-T3).
 
 ### Q-T5 (Baixa) — o conftest central não existe de fato
 
 32 `QApplication.instance() or QApplication([])` em 26 arquivos, ~180 imports
 `from tests.test_X import …`, fixtures reimportadas com `# noqa: F811`, PDFs sintéticos
 refeitos a cada teste, 25 testes de `test_janela.py` reconhecendo a mesma página.
-- **CA-Q-T5:** nenhum `from tests.test_` nos testes; as fixtures de sessão (PDF, PNG, projeto
-  já reconhecido copiado por `copytree`) baixam a suíte rápida para < 60 s com `-n 4`.
+- **CA-Q-T5:** nenhum `from tests.test_` nos testes; ~~as fixtures de sessão (PDF, PNG,
+  projeto já reconhecido copiado por `copytree`) baixam a suíte rápida para < 60 s com
+  `-n 4`~~ (o teto passou a 90 s, §13.5, e a suíte já cabe nele: 77–82 s).
+- **Feito** no Q4 (`a96bea7`, `282a389`), por uma ferramenta que move cada nome com as
+  definições de que ele depende: as 128 importações de 48 nomes vão para
+  `tests/ajudantes.py`, `tests/fixturas.py` (que o conftest dá a todos) e três
+  `tests/fixturas_<origem>.py` (as `janela` de nome repetido); a `app` é do conftest, de
+  sessão. As fixtures de sessão para o tempo não foram feitas: o teto de 90 s não as pede.
 
 ### Q-T6 (Melhoria) — onde falta propriedade
 
@@ -518,8 +533,9 @@ teste usa como o usuário; senão saem. Os 3 F401 de `camada.py` saem já (o por
 3. **Q-P5:** o segundo processo abre só para leitura ou recusa?
 4. ~~**Q-E1:** a exportação passa a usar `texto.montar` inteira (Q-E6) já no primeiro passo, ou
    primeiro só as decisões?~~ **Decidido** (2026-10-30): só as decisões no Q3; o Q-E6 no Q7.
-5. **Teto da suíte rápida:** 60 s sem cobertura (como hoje na §15.1) e a medida com cobertura
-   à parte?
+5. ~~**Teto da suíte rápida:** 60 s sem cobertura (como hoje na §15.1) e a medida com
+   cobertura à parte?~~ **Decidido** (2026-10-30): 90 s com -n 4 e sem cobertura; a medida
+   com cobertura, à parte.
 
 ## Apêndice — registro da análise
 

@@ -24,6 +24,24 @@ O passo fecha quando nenhuma linha diz "a reduzir (Q8)".
 
 | 3. A análise da página (`contexto`, `zonas`, `busca`, `ancoragem`, `layout`, `edicao`, `verificacao`) | `926949b`, `33f32e1`, `d5ac063`, `6257eb7`, `eef42f9`, `787bcf6`, `2cff6ba`, `3ddccc0`, `5bddec0`, `ef5bad5`, `3322106` por um subagente, revisado aqui; `475b380`, `13dde31` à mão | as 36 partidas, cada parte com cc ≤ 9; quatro commits só de testes antes de partir (a continuação da legenda e o ponto solto, a figurina digitada na busca, os virtuais ancorados no que se apaga, as listas extras do léxico: regras sem teste nenhum); os laços quentes medidos antes e depois (o `julgar` de 3 066 glifos, o `indexar_pagina`, as linhas das zonas: iguais); dois pares do dryer que o partir expôs, juntados (`texto.chars_dos_gids` para o contexto; `layout.partes_pelo_vao`, a mesma regra do vão no layout e nas zonas) | 215 → 179 |
 
+| 4. A exportação (`montagem`, `epub`, `exportar`, `margens`, `escritor_docx`, `pdf_pesquisavel`, `metadados`, `marcacao`, `previa`) | `e90887d` … `cfc12ea` (20 commits) por um subagente, revisado aqui; `ed33352` à mão | as 41 partidas, cada parte com cc ≤ 9; o golden da exportação (37 arquivos) igual a cada commit; os testes antes de partir: o que a conferência do EPUB recusa (17 casos) e a do DOCX (10), o PGN que sai e o que fica de fora, a palavra digitada sozinha; os tempos da camada do PDF, da `Estrutura.da_pagina` e da `pagina_extraida` iguais (7 páginas do golden, 10 308 glifos). Duas exceções com motivo: `_sem_coordenadas.fora` (roda por glifo e por tabuleiro) e `_no_calibre` (o validador externo, como o `ace`). Dois pares do dryer juntados | 179 → 140 |
+
+Na rodada 4, também:
+- `e90887d` e `29be11c`: o `epub.py` estava em `TETOS` com 1 144 linhas e não podia crescer;
+  a validação (a conferência interna, o Ace, o Calibre, o EPUBCheck) foi para
+  `validacao_do_epub.py`, e as referências internas (página, diagrama, capítulo, que o DOCX
+  também usa) para `links_internos.py`. O `epub.py` fica com 890 linhas e sai de `TETOS`
+  (CA-Q-A1: sobram `controladores.py` e `pagina.py`).
+- `508cb40` e `8239f2e` têm a lista um passo adiante do código (tiram o `trechos_marcados` e o
+  `html_do_livro` um commit antes de parti-los): o `test_complexidade` reprova neles, passa do
+  `3663751` em diante.
+- `ed33352`: a medida no `cfc12ea` reprovou por uma função fora da lista,
+  `_ComoDigitado._como_antes` (cc 8, 67 %, CRAP 10,4), da rodada 3: os dois ramos dela nunca
+  tiveram teste. O teste de comportamento os cobre.
+- A rápida no `cfc12ea` deu 104 s e 99 s (acima do teto de 90); alternando com a base
+  `b8bd62c` numa worktree temporária: HEAD 83,6 e 81,8 s, base 93,0 e 83,2 s. Era a máquina;
+  os testes novos da rodada custam ~2 s em série. O ruído chega a 10 s, perto do teto.
+
 Na rodada 3, também: `475b380` — o subagente achou e parou em `_linhas_que_atravessam`, que
 recalculava o topo e o pé da fila a cada glifo da página: numa página de duas colunas de 3 410
 glifos, 13,7 ms (quase metade da ordem de leitura); contados uma vez por fila, 1,9 ms, as
@@ -59,9 +77,14 @@ camadas passam (a rápida com cobertura em 127 s, a `processo` em 238 s); cobert
 abaixo de 10; o dryer com 3 pares fora da lista, juntados no `d8eac12` (o dryer de novo: 1
 par, o aceito). A rápida sem cobertura no `0e412bb`: 1990 passaram em 73–85 s.
 
+Medida no `cfc12ea` (`docs/medidas/qualidade/2026-10-31-qualidade-190615.json`): as duas
+camadas passam; cobertura 93,9 %; 141 funções com CRAP ≥ 10, uma fora da lista (o
+`_como_antes`, coberto no `ed33352`); o dryer com o par aceito só. Com o EPUBCheck, o Ace e o
+Calibre configurados, os 87 testes que os usam passam no `ed33352`.
+
 ## O que falta
 
-As 176 de cc ≥ 10 que ainda dizem "a reduzir (Q8)" (eram 252) ("a reduzir (Q8)"): partir, com a suíte como pino (refatoração, sem mudar
+As 135 de cc ≥ 10 que ainda dizem "a reduzir (Q8)" (eram 252) ("a reduzir (Q8)"): partir, com a suíte como pino (refatoração, sem mudar
 comportamento no mesmo commit); as de cobertura < 50 % primeiro ganham o teste. Os `match` e as
 cadeias de `if` de despacho só se partem se a tabela ficar mais clara (§8); senão ficam com
 motivo. Também Q-T3 (os testes que montam estado privado) e Q-T6 (as propriedades que faltam).
@@ -83,4 +106,7 @@ motivo. Também Q-T3 (os testes que montam estado privado) e Q-T6 (as propriedad
 | Os pares do dryer juntados, não aceitos | a repetição era de verdade (a mesma divisão, o mesmo índice); juntar seguiu o molde que o arquivo já tinha (`_levar`) |
 | Daqui em diante, o subagente roda o dryer depois de partir | a medida só o roda no fim; os três pares apareceram nela |
 | Rodada 3 com o dryer e a catraca do tamanho no protocolo | na rodada 3 ele pegou os dois pares na hora, e nenhum arquivo passou de 1 000 linhas |
+| Rodada 4 com o golden como pino a cada commit | a lição do Q3: a suíte não pega toda regressão da exportação |
+| Os validadores do EPUB num módulo próprio antes de partir | o `epub.py` estava preso no teto de 1 144 linhas; partir dentro dele reprovaria a catraca |
+| A rápida de 104 s comparada com a base antes de culpar a rodada | a regra da casa para tempo: conferir na base |
 | O `_linhas_que_atravessam` sem teste vermelho, com a medida | "se um teste honesto é impraticável, não escreva um ruim": o relógio não separa 13 de 2 ms do ruído sem um alvo, e a spec não tem alvo para a ordem de leitura |

@@ -149,6 +149,26 @@ def _ler_png(caminho: Path) -> Optional[np.ndarray]:
     return cv2.imdecode(dados, cv2.IMREAD_GRAYSCALE) if dados.size else None
 
 
+def _cinza(recorte: np.ndarray) -> np.ndarray:
+    return recorte if recorte.ndim == 2 else cv2.cvtColor(recorte, cv2.COLOR_RGB2GRAY)
+
+
+def _png(cinza: np.ndarray, char: str) -> bytes:
+    ok, png = cv2.imencode(".png", cinza)
+    if not ok:
+        raise OSError(f"O recorte de '{char}' não pôde ser codificado em PNG.")
+    return png.tobytes()
+
+
+def _meta_da_amostra(altura_relativa: Optional[float], origem: str, efeito) -> dict:
+    """Os metadados de uma amostra ensinada: a altura (arredondada), a origem e o efeito."""
+    return {
+        "altura": None if altura_relativa is None else round(float(altura_relativa), 4),
+        "origem": origem,
+        **({"efeito": _efeito_json(efeito)} if efeito is not None else {}),
+    }
+
+
 def _nome_limpo(origem: str) -> str:
     limpo = "".join(c for c in origem if c.isascii() and (c.isalnum() or c in "-_"))
     return f"{limpo[:70]}_{uuid.uuid4().hex[:8]}" if limpo else uuid.uuid4().hex
@@ -180,34 +200,40 @@ class PadroesDoLivro:
 
     # ------------------------------------------------------------------
     def _carregar(self) -> None:
-        arquivo = self.pasta / METADADOS
-        try:
-            self._meta: Dict[str, dict] = (json.loads(arquivo.read_text(encoding="utf-8"))
-                                           if arquivo.is_file() else {})
-        except ValueError:
-            self._meta = {}
-            self._guardar_os_metadados_ilegiveis(arquivo)
+        self._meta: Dict[str, dict] = self._metadados_lidos()
         vetores, chars, alturas, proporcoes, efeitos, caminhos = [], [], [], [], [], []
-        subpastas = self.pasta.iterdir() if self.pasta.is_dir() else ()
-        for pasta in sorted(p for p in subpastas if p.is_dir()):
-            char = folder_to_char(pasta.name)
-            for png in sorted(pasta.glob("*.png")):
-                imagem = _ler_png(png)
-                if imagem is None:
-                    continue
-                vetores.append(_vetor(imagem))
-                chars.append(char)
-                proporcoes.append(_proporcao(imagem))
-                meta = self._meta.get(self._chave(png), {})
-                alturas.append(meta.get("altura", np.nan))
-                efeitos.append(_efeito(meta.get("efeito")))
-                caminhos.append(png)
+        for char, png, imagem in self._amostras_em_disco():
+            vetores.append(_vetor(imagem))
+            chars.append(char)
+            proporcoes.append(_proporcao(imagem))
+            meta = self._meta.get(self._chave(png), {})
+            alturas.append(meta.get("altura", np.nan))
+            efeitos.append(_efeito(meta.get("efeito")))
+            caminhos.append(png)
         self._X = (np.stack(vetores) if vetores else np.zeros((0, LADO * LADO), np.float32))
         self._normas = (self._X * self._X).sum(axis=1)
         self._chars, self._caminhos = chars, caminhos
         self._alturas = np.array(alturas, dtype=np.float32)
         self._proporcoes = np.array(proporcoes, dtype=np.float32)
         self._efeitos = efeitos
+
+    def _metadados_lidos(self) -> Dict[str, dict]:
+        arquivo = self.pasta / METADADOS
+        try:
+            return json.loads(arquivo.read_text(encoding="utf-8")) if arquivo.is_file() else {}
+        except ValueError:
+            self._guardar_os_metadados_ilegiveis(arquivo)
+            return {}
+
+    def _amostras_em_disco(self):
+        """(caractere, caminho, imagem) de cada PNG legível, pasta por pasta, em ordem."""
+        subpastas = self.pasta.iterdir() if self.pasta.is_dir() else ()
+        for pasta in sorted(p for p in subpastas if p.is_dir()):
+            char = folder_to_char(pasta.name)
+            for png in sorted(pasta.glob("*.png")):
+                imagem = _ler_png(png)
+                if imagem is not None:
+                    yield char, png, imagem
 
     def _guardar_os_metadados_ilegiveis(self, arquivo: Path) -> None:
         """O `metadados.json` ilegível vai inteiro para `metadados.corrompido[-N].json` antes
@@ -337,19 +363,12 @@ class PadroesDoLivro:
         """Grava o recorte no tamanho original e o torna consultável na hora."""
         if not char:
             raise ValueError("O caractere ensinado não pode ser vazio.")
-        cinza = recorte if recorte.ndim == 2 else cv2.cvtColor(recorte, cv2.COLOR_RGB2GRAY)
+        cinza = _cinza(recorte)
         pasta = self.pasta / char_to_folder(char)
         caminho = pasta / f"{_nome_limpo(origem)}.png"
-        ok, png = cv2.imencode(".png", cinza)
-        if not ok:
-            raise OSError(f"O recorte de '{char}' não pôde ser codificado em PNG.")
-        gv.gravar_bytes(caminho, png.tobytes())
+        gv.gravar_bytes(caminho, _png(cinza, char))
         efeito = _efeito(efeito)
-        self._meta[self._chave(caminho)] = {
-            "altura": None if altura_relativa is None else round(float(altura_relativa), 4),
-            "origem": origem,
-            **({"efeito": _efeito_json(efeito)} if efeito is not None else {}),
-        }
+        self._meta[self._chave(caminho)] = _meta_da_amostra(altura_relativa, origem, efeito)
         self._gravar_meta()
         v = _vetor(cinza)
         # Listas novas, e não `append`: um instantâneo (a propagação lendo noutra thread)
@@ -368,55 +387,43 @@ class PadroesDoLivro:
         """Vários `ensinar` de uma vez, com os metadados gravados uma vez e a matriz crescida
         uma vez (a Galeria ensina centenas): `pedidos` é [(recorte, char, altura, origem)],
         com o efeito como quinto item opcional (sem ele, o efeito é desconhecido)."""
-        caminhos, vetores, efeitos = [], [], []
-        for pedido in pedidos:
-            recorte, char, altura_relativa, origem = pedido[:4]
-            efeito = _efeito(pedido[4] if len(pedido) > 4 else None)
-            if not char:
-                raise ValueError("O caractere ensinado não pode ser vazio.")
-            cinza = recorte if recorte.ndim == 2 else cv2.cvtColor(recorte, cv2.COLOR_RGB2GRAY)
-            caminho = self.pasta / char_to_folder(char) / f"{_nome_limpo(origem)}.png"
-            ok, png = cv2.imencode(".png", cinza)
-            if not ok:
-                raise OSError(f"O recorte de '{char}' não pôde ser codificado em PNG.")
-            gv.gravar_bytes(caminho, png.tobytes())
-            self._meta[self._chave(caminho)] = {
-                "altura": None if altura_relativa is None else round(float(altura_relativa), 4),
-                "origem": origem,
-                **({"efeito": _efeito_json(efeito)} if efeito is not None else {}),
-            }
-            caminhos.append(caminho)
-            vetores.append((_vetor(cinza), char, _proporcao(cinza), altura_relativa))
-            efeitos.append(efeito)
-        if not caminhos:
+        gravados = [self._gravar_o_pedido(pedido) for pedido in pedidos]
+        if not gravados:
             return []
         self._gravar_meta()
-        matriz = np.vstack([v for v, _c, _p, _a in vetores])
-        self._X = np.vstack([self._X, matriz])
-        self._normas = np.append(self._normas, np.einsum("ij,ij->i", matriz, matriz))
-        self._chars = self._chars + [c for _v, c, _p, _a in vetores]
-        self._caminhos = self._caminhos + caminhos
-        self._proporcoes = np.append(self._proporcoes,
-                                     np.array([p for _v, _c, p, _a in vetores], np.float32))
-        self._alturas = np.append(self._alturas, np.array(
-            [np.nan if a is None else a for _v, _c, _p, a in vetores], np.float32))
-        self._efeitos = self._efeitos + efeitos
+        caminhos, cinzas, chars, alturas, efeitos = map(list, zip(*gravados))
+        self._acrescentar(np.vstack([_vetor(cinza) for cinza in cinzas]), chars, caminhos,
+                          [_proporcao(cinza) for cinza in cinzas], alturas, efeitos)
         return caminhos
 
-    def esquecer_varios(self, caminhos) -> None:
-        """Vários `esquecer` de uma vez: os arquivos saem, os metadados são gravados uma vez
-        e as linhas deles saem da matriz (sem reler os outros padrões)."""
-        raiz = self.pasta.resolve()
-        resolvidos = [Path(c).resolve() for c in caminhos]
-        for caminho in resolvidos:
-            if raiz not in caminho.parents:
-                raise ValueError(f"{caminho} não é um padrão deste livro.")
-        for caminho in resolvidos:
-            gv.apagar(caminho)
-            self._meta.pop(caminho.relative_to(raiz).as_posix(), None)
-        self._gravar_meta()
-        saem = set(resolvidos) | {Path(c) for c in caminhos}   # sem resolver a base inteira
-        manter = [i for i, c in enumerate(self._caminhos) if Path(c) not in saem]
+    def _gravar_o_pedido(self, pedido) -> tuple:
+        """Grava o recorte de um pedido do `ensinar_varios` e os metadados dele (sem
+        gravá-los); (caminho, cinza, caractere, altura, efeito)."""
+        recorte, char, altura_relativa, origem = pedido[:4]
+        efeito = _efeito(pedido[4] if len(pedido) > 4 else None)
+        if not char:
+            raise ValueError("O caractere ensinado não pode ser vazio.")
+        cinza = _cinza(recorte)
+        caminho = self.pasta / char_to_folder(char) / f"{_nome_limpo(origem)}.png"
+        gv.gravar_bytes(caminho, _png(cinza, char))
+        self._meta[self._chave(caminho)] = _meta_da_amostra(altura_relativa, origem, efeito)
+        return caminho, cinza, char, altura_relativa, efeito
+
+    def _acrescentar(self, matriz: np.ndarray, chars, caminhos, proporcoes, alturas,
+                     efeitos) -> None:
+        """As linhas novas na matriz e nas listas, trocadas e não mudadas no lugar (o
+        instantâneo de outra thread nunca vê tamanhos diferentes), sem reler os padrões."""
+        self._X = np.vstack([self._X, matriz])
+        self._normas = np.append(self._normas, np.einsum("ij,ij->i", matriz, matriz))
+        self._chars = self._chars + chars
+        self._caminhos = self._caminhos + caminhos
+        self._proporcoes = np.append(self._proporcoes, np.array(proporcoes, np.float32))
+        self._alturas = np.append(self._alturas, np.array(
+            [np.nan if a is None else a for a in alturas], np.float32))
+        self._efeitos = self._efeitos + efeitos
+
+    def _manter(self, manter: List[int]) -> None:
+        """Só as linhas `manter` na matriz e nas listas."""
         self._X = self._X[manter] if manter else np.zeros((0, LADO * LADO), np.float32)
         self._normas = self._normas[manter]
         self._chars = [self._chars[i] for i in manter]
@@ -424,6 +431,18 @@ class PadroesDoLivro:
         self._proporcoes = self._proporcoes[manter]
         self._alturas = self._alturas[manter]
         self._efeitos = [self._efeitos[i] for i in manter]
+
+    def esquecer_varios(self, caminhos) -> None:
+        """Vários `esquecer` de uma vez: os arquivos saem, os metadados são gravados uma vez
+        e as linhas deles saem da matriz (sem reler os outros padrões)."""
+        raiz = self.pasta.resolve()
+        resolvidos = [self._do_livro(c) for c in caminhos]
+        for caminho in resolvidos:
+            gv.apagar(caminho)
+            self._meta.pop(caminho.relative_to(raiz).as_posix(), None)
+        self._gravar_meta()
+        saem = set(resolvidos) | {Path(c) for c in caminhos}   # sem resolver a base inteira
+        self._manter([i for i, c in enumerate(self._caminhos) if Path(c) not in saem])
 
     def esquecer(self, caminho: str | Path) -> None:
         caminho = self._do_livro(caminho)
@@ -462,13 +481,7 @@ class PadroesDoLivro:
         manter = [i for i, c in enumerate(self._caminhos) if Path(c) != caminho]
         if len(manter) == len(self._caminhos):
             return
-        self._X = self._X[manter] if manter else np.zeros((0, LADO * LADO), np.float32)
-        self._normas = self._normas[manter]
-        self._chars = [self._chars[i] for i in manter]
-        self._caminhos = [self._caminhos[i] for i in manter]
-        self._proporcoes = self._proporcoes[manter]
-        self._alturas = self._alturas[manter]
-        self._efeitos = [self._efeitos[i] for i in manter]
+        self._manter(manter)
 
     def altura_de(self, caminho: str | Path) -> Optional[float]:
         """A altura relativa gravada da amostra (para o delta que vai ao servidor)."""
@@ -500,32 +513,38 @@ class PadroesDoLivro:
         resolvidos = [(self._do_livro(a.caminho), a) for a in amostras]
         novos = []
         for caminho, amostra in resolvidos:
-            gv.gravar_bytes(caminho, amostra.png)
-            self._meta[caminho.relative_to(raiz).as_posix()] = dict(amostra.meta)
-            # O caminho como o `_carregar` o monta (a pasta do livro sem resolver).
-            local = self.pasta / caminho.relative_to(raiz)
-            if local not in self._caminhos:
-                cinza = cv2.imdecode(np.frombuffer(amostra.png, np.uint8), cv2.IMREAD_GRAYSCALE)
-                if cinza is not None:
-                    novos.append((local, cinza, amostra.meta))
+            novo = self._restaurar_a_amostra(raiz, caminho, amostra)
+            if novo is not None:
+                novos.append(novo)
         if not resolvidos:
             return
         self._gravar_meta()
-        if not novos:
-            return
+        if novos:
+            self._acrescentar_as_restauradas(novos)
+
+    def _restaurar_a_amostra(self, raiz: Path, caminho: Path, amostra: Amostra):
+        """Grava o arquivo e os metadados da amostra; (caminho, cinza, metadados) da que
+        ainda não é lida, ou None."""
+        gv.gravar_bytes(caminho, amostra.png)
+        self._meta[caminho.relative_to(raiz).as_posix()] = dict(amostra.meta)
+        # O caminho como o `_carregar` o monta (a pasta do livro sem resolver).
+        local = self.pasta / caminho.relative_to(raiz)
+        if local not in self._caminhos:
+            cinza = cv2.imdecode(np.frombuffer(amostra.png, np.uint8), cv2.IMREAD_GRAYSCALE)
+            if cinza is not None:
+                return local, cinza, amostra.meta
+        return None
+
+    def _acrescentar_as_restauradas(self, novos: list) -> None:
         # As linhas entram na matriz como no `ensinar_varios` (sem reler os outros padrões:
         # o Ctrl+Z de um esquecer de 40 numa base de 2.000 levava segundos).
-        matriz = np.vstack([_vetor(cinza) for _c, cinza, _m in novos])
-        alturas = [m.get("altura") for _c, _cinza, m in novos]
-        self._X = np.vstack([self._X, matriz])
-        self._normas = np.append(self._normas, np.einsum("ij,ij->i", matriz, matriz))
-        self._chars = self._chars + [folder_to_char(c.parent.name) for c, _x, _m in novos]
-        self._caminhos = self._caminhos + [c for c, _x, _m in novos]
-        self._proporcoes = np.append(self._proporcoes, np.array(
-            [_proporcao(cinza) for _c, cinza, _m in novos], np.float32))
-        self._alturas = np.append(self._alturas, np.array(
-            [np.nan if a is None else float(a) for a in alturas], np.float32))
-        self._efeitos = self._efeitos + [_efeito(m.get("efeito")) for _c, _x, m in novos]
+        locais, cinzas, metas = map(list, zip(*novos))
+        alturas = [m.get("altura") for m in metas]
+        self._acrescentar(np.vstack([_vetor(cinza) for cinza in cinzas]),
+                          [folder_to_char(c.parent.name) for c in locais], locais,
+                          [_proporcao(cinza) for cinza in cinzas],
+                          [None if a is None else float(a) for a in alturas],
+                          [_efeito(m.get("efeito")) for m in metas])
 
     def meta_de(self, caminho: str | Path) -> dict:
         """Os metadados gravados da amostra (a altura relativa, a origem; o efeito, desde o

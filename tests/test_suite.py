@@ -65,6 +65,17 @@ def test_ca_q_t2_a_suite_rapida_nao_dorme_nem_mede_o_relogio():
     assert achados == []
 
 
+def test_ca_q_t5_nenhum_teste_importa_de_outro_teste():
+    """CA-Q-T5: o que mais de um teste usa mora num módulo de apoio (`tests/ajudantes.py`,
+    `tests/fixturas*.py`) ou no conftest, e não num arquivo de teste: rodar um arquivo não
+    importa (nem coleta de novo) o outro, e mudar um teste não quebra o vizinho."""
+    achados = [f"{arquivo.relative_to(TESTES).as_posix()}:{no.lineno} ({no.module})"
+               for arquivo in sorted(TESTES.rglob("*.py"))
+               for no in ast.walk(ast.parse(arquivo.read_text(encoding="utf-8")))
+               if isinstance(no, ast.ImportFrom) and (no.module or "").startswith("tests.test_")]
+    assert achados == []
+
+
 def test_a_regra_do_relogio_pega_o_sleep_e_o_assert_e_poupa_as_camadas_lentas():
     fonte = '''
 import time

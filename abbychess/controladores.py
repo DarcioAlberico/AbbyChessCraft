@@ -1757,15 +1757,7 @@ class ControladorDaSubstituicao:
     def _paginas(self, opcoes) -> List[int]:
         from abbychess import busca as bs
 
-        lidas = sorted(self.pagina.projeto.paginas_lidas())
-        if opcoes.escopo in (bs.PAGINA, bs.SELECAO):
-            alvo = (opcoes.selecao[0] if opcoes.escopo == bs.SELECAO and opcoes.selecao
-                    else opcoes.pagina_atual)
-            return [alvo] if alvo in lidas else []
-        if opcoes.escopo == bs.INTERVALO and opcoes.intervalo is not None:
-            a, b = sorted(opcoes.intervalo)
-            return [i for i in lidas if a <= i <= b]
-        return lidas
+        return bs.paginas_do_escopo(self.pagina.projeto.paginas_lidas(), opcoes)
 
     def _casos(self, pagina, opcoes, expressao, trocar, alvo: str):
         from abbychess import busca as bs

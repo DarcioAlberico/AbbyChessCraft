@@ -301,16 +301,9 @@ class DiagramaLido:
 
 def com_ids(diagramas: Sequence[DiagramaLido]) -> List[DiagramaLido]:
     """Os diagramas com `id` cada um: os que não têm ganham o próximo `dN` livre."""
-    usados = {d.id for d in diagramas if d.id}
-    proximo, saida = 0, []
-    for d in diagramas:
-        if not d.id:
-            while f"d{proximo}" in usados:
-                proximo += 1
-            d = replace(d, id=f"d{proximo}")
-            usados.add(d.id)
-        saida.append(d)
-    return saida
+    from abbychess.zonas import ids_livres
+
+    return ids_livres(diagramas, "d")
 
 
 def afirmar_lado(tabuleiro: TabuleiroEdicao, lado: str) -> bool:

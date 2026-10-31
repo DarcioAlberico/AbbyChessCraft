@@ -179,18 +179,24 @@ class Zona:
                    diagrama_id=str(dados.get("diagrama_id") or "") or None)
 
 
+def ids_livres(itens: Sequence, prefixo: str) -> list:
+    """Os itens (dataclasses com `id`) com `id` cada um: os que não têm ganham o próximo
+    `<prefixo>N` livre. A regra das áreas (`zN`) e a dos diagramas (`dN`)."""
+    usados = {i.id for i in itens if i.id}
+    proximo, saida = 0, []
+    for item in itens:
+        if not item.id:
+            while f"{prefixo}{proximo}" in usados:
+                proximo += 1
+            item = replace(item, id=f"{prefixo}{proximo}")
+            usados.add(item.id)
+        saida.append(item)
+    return saida
+
+
 def com_ids(zonas: Sequence[Zona]) -> List[Zona]:
     """As áreas com `id` cada uma: as que não têm ganham o próximo `zN` livre."""
-    usados = {z.id for z in zonas if z.id}
-    proximo, saida = 0, []
-    for z in zonas:
-        if not z.id:
-            while f"z{proximo}" in usados:
-                proximo += 1
-            z = replace(z, id=f"z{proximo}")
-            usados.add(z.id)
-        saida.append(z)
-    return saida
+    return ids_livres(zonas, "z")
 
 
 def nova(tipo: str, caixa: Caixa, largura: int, altura: int) -> Zona:

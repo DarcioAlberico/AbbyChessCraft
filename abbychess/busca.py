@@ -501,14 +501,17 @@ def compilar(opcoes: Opcoes):
         raise PadraoInvalido(str(erro)) from erro
 
 
-def _paginas_do_escopo(paginas: Mapping[int, PaginaIndexada], opcoes: Opcoes) -> List[int]:
+def paginas_do_escopo(paginas: Iterable[int], opcoes: Opcoes) -> List[int]:
+    """Das páginas (as lidas, as do índice), as que o escopo pede, em ordem. A regra da busca
+    e a do Substituir tudo (CA-Q-D1)."""
+    lidas = sorted(paginas)
     if opcoes.escopo in (PAGINA, SELECAO):
         alvo = opcoes.selecao[0] if opcoes.escopo == SELECAO and opcoes.selecao else opcoes.pagina_atual
-        return [alvo] if alvo in paginas else []
+        return [alvo] if alvo in lidas else []
     if opcoes.escopo == INTERVALO and opcoes.intervalo is not None:
         a, b = sorted(opcoes.intervalo)
-        return [i for i in sorted(paginas) if a <= i <= b]
-    return sorted(paginas)
+        return [i for i in lidas if a <= i <= b]
+    return lidas
 
 
 def buscar(paginas: Mapping[int, PaginaIndexada], opcoes: Opcoes,
@@ -524,7 +527,7 @@ def buscar(paginas: Mapping[int, PaginaIndexada], opcoes: Opcoes,
     if expressao is None:
         expressao, _dica = compilar(opcoes)
     resultado = Resultado()
-    for indice in _paginas_do_escopo(paginas, opcoes):
+    for indice in paginas_do_escopo(paginas, opcoes):
         if cancelado():
             resultado.cancelada = True
             break

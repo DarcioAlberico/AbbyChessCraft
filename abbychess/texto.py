@@ -126,12 +126,13 @@ def linhas_dos_gids(pagina: Pagina, *, com_os_nao_lidos: bool = True) -> List[Li
     palavra em volta do buraco dele."""
     lidos, entries = _lidos(pagina, com_os_nao_lidos)
     linhas = _linhas_da_pagina(lidos, entries)[0]
-    return _aplicar_decisoes(partir_lances_colados(linhas, _chars(pagina, lidos, entries)),
+    return _aplicar_decisoes(partir_lances_colados(linhas, chars_dos_gids(pagina, lidos, entries)),
                              pagina.decisoes)
 
 
-def _chars(pagina: Pagina, lidos, entries) -> Dict[int, str]:
-    """O caractere de cada gid do documento, os virtuais também."""
+def chars_dos_gids(pagina: Pagina, lidos, entries) -> Dict[int, str]:
+    """O caractere de cada gid de `lidos` (o do `BoxEntry` de mesmo lugar em `entries`), os
+    virtuais da página também."""
     chars = {b.gid: e.char for b, e in zip(lidos, entries)}
     chars.update({v.gid: v.char for v in pagina.decisoes.virtuais})
     return chars
@@ -184,7 +185,7 @@ def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
     só têm os glifos lidos; a vista do Documento (`com_os_nao_lidos`) mostra também os que
     ninguém leu, como `NAO_LIDO`, para o realce deles (§6.1)."""
     lidos, entries = _lidos(pagina, com_os_nao_lidos)
-    chars = _chars(pagina, lidos, entries)
+    chars = chars_dos_gids(pagina, lidos, entries)
     linhas, topos, trechos, ordem = _linhas_da_pagina(lidos, entries)
     linhas = _aplicar_decisoes(partir_lances_colados(linhas, chars), pagina.decisoes)
     por_gid = {b.gid: e for b, e in zip(lidos, entries)}

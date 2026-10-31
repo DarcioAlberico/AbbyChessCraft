@@ -90,7 +90,7 @@ def _import_partido(modulo: str, nomes: list[str]) -> str:
 
 def _chamadores(pastas: list[str], origem: str, destino: str, alias: str, nomes: set[str],
                 aplicar: bool) -> None:
-    importa = re.compile(rf"^(\s*)from abbychess import {origem}(?: as (\w+))?\b.*$", re.M)
+    importa = re.compile(rf"^([ \t]*)from abbychess import {origem}(?: as (\w+))?\b.*$", re.M)
     for pasta in pastas:
         for arquivo in sorted(pathlib.Path(pasta).rglob("*.py")):
             texto = arquivo.read_text(encoding="utf-8")
@@ -133,14 +133,18 @@ def main(argv=None) -> int:
     fonte = origem.read_text(encoding="utf-8")
     linhas, blocos = _blocos(fonte, nomes)
     tirar = {k for inicio, fim, _ in blocos for k in range(inicio, fim)}
-    corpo = ["".join(linhas[inicio:fim]) for inicio, fim, _ in blocos]
-    resto = re.sub(r"\n{4,}", "\n\n\n", "".join(l for k, l in enumerate(linhas) if k not in tirar))
+    corpo, fim_de_antes = "", None
+    for inicio, fim, _ in blocos:          # os vizinhos na origem continuam colados
+        trecho = "".join(linhas[inicio:fim])
+        corpo += trecho if inicio == fim_de_antes else "\n\n" + trecho
+        fim_de_antes = fim
+    resto = re.sub(r"\n{4,}", "\n\n\n",
+                   "".join(linha for k, linha in enumerate(linhas) if k not in tirar))
     usados = _usados(resto, nomes)
     if usados:
         resto = _com_import(resto, _import_partido(destino.stem, usados))
     cabecalho = pathlib.Path(a.cabecalho).read_text(encoding="utf-8").rstrip("\n")
-    novo = cabecalho + "\n\n\n" + "\n\n".join(c.strip("\n") + "\n" for c in corpo)
-    novo = re.sub(r"\n{4,}", "\n\n\n", novo)
+    novo = re.sub(r"\n{4,}", "\n\n\n", cabecalho + "\n" + corpo)
     print(f"{len(blocos)} definições, {len(tirar)} linhas; origem {len(linhas)} -> "
           f"{resto.count(chr(10))} linhas; a origem ainda usa {len(usados)}: {usados}")
     if a.chamadores:

@@ -83,6 +83,8 @@ def dobro(x):
 '''
 
 USO = '''\
+import os
+
 from abbychess import grande as gr
 
 
@@ -108,6 +110,8 @@ def test_mover_definicoes_leva_a_constante_e_a_funcao_e_os_chamadores_seguem(tmp
     miudo = (pacote / "miudo.py").read_text(encoding="utf-8")
     assert "#: O que o dobro dobra.\nLIMITE = 3" in miudo     # o comentário vai junto
     assert "def dobro" not in (pacote / "grande.py").read_text(encoding="utf-8")
-    assert "mi.dobro(2)" in (tmp_path / "chamador" / "uso.py").read_text(encoding="utf-8")
+    uso = (tmp_path / "chamador" / "uso.py").read_text(encoding="utf-8")
+    assert "mi.dobro(2)" in uso
+    assert "os\n\nfrom abbychess import grande as gr\nfrom abbychess import miudo as mi\n" in uso
     rodar = _rodar("-c", "from chamador.uso import usar; print(usar())", cwd=tmp_path)
     assert rodar.stdout.strip() == "11", rodar.stderr      # 4 + (6 + 1)

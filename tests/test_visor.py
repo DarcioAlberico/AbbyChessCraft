@@ -27,6 +27,7 @@ from abbychess.app.janela import JanelaPrincipal  # noqa: E402
 from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL, FONTE_NENHUMA, LeitorDoLivro  # noqa: E402
 from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
+from tests.ajudantes import esperar  # noqa: E402
 from tests.janela_util import boxes, mostrar  # noqa: E402
 from tests.test_janela import _esperar  # noqa: E402
 
@@ -501,27 +502,17 @@ def test_zoom_vale_com_o_foco_no_campo_do_treino_e_o_v_nao(app, janela):
 
 
 def test_a_seguinte_e_pre_carregada_depois_da_pintura(app, janela_de_60, monkeypatch):
-    import time
-
     j = janela_de_60
     chamadas = []
     monkeypatch.setattr(j.pagina.cache, "precarregar", chamadas.append)
     j.ir_para_pagina(10)
     assert chamadas == []                                      # o ir_para não a dispara
-    fim = time.monotonic() + 2
-    while not chamadas and time.monotonic() < fim:             # o relógio da janela, sim
-        app.processEvents()
-        time.sleep(0.01)
+    esperar(lambda: chamadas, 2)                               # o relógio da janela, sim
     assert chamadas == [11]
 
 
 def _ate_a_pre_carga(app, chamadas):
-    import time
-
-    fim = time.monotonic() + 2
-    while not chamadas and time.monotonic() < fim:
-        app.processEvents()
-        time.sleep(0.005)
+    esperar(lambda: chamadas, 2)
 
 
 def test_a_pre_carga_segue_o_sentido_e_vem_ja_quem_folheia(app, janela_de_60, monkeypatch):

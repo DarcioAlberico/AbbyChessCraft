@@ -4,7 +4,6 @@ busca por glifo."""
 
 from __future__ import annotations
 
-import time
 
 import pytest
 from PySide6.QtCore import Qt
@@ -13,6 +12,7 @@ from PySide6.QtWidgets import QApplication, QDialog
 
 from abbychess.app.documento import FUNDO_DA_BUSCA, FUNDO_DA_OCORRENCIA
 
+from tests.ajudantes import esperar
 from tests.test_documento import app  # noqa: F401 (fixture)
 from tests.test_documento_edicao import _escrever, _janela_do_modulo, j  # noqa: F401 (fixtures)
 
@@ -34,11 +34,7 @@ def jb(j):  # noqa: F811
 
 
 def _ate(condicao, limite=10.0):
-    fim = time.monotonic() + limite
-    while not condicao() and time.monotonic() < fim:
-        QApplication.processEvents()
-        time.sleep(0.005)
-    assert condicao()
+    assert esperar(condicao, limite)
 
 
 def _pagina_lida(jb, *linhas):

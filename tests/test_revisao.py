@@ -12,6 +12,8 @@ from core.box_model import BoxEntry
 from abbychess import livro as lv
 from abbychess.modelo import Box, gid_de
 
+from tests import ajudantes
+
 
 def _escrever(projeto, indice, texto, confiancas):
     """A página `indice` com uma letra por box (as confianças na ordem das letras)."""
@@ -107,7 +109,6 @@ def test_o_f6_conta_pelo_resumo_sem_abrir_as_paginas(livro, monkeypatch):
 def _amostra_em_tres_paginas(livro):
     """Uma amostra "e" que leu 10 glifos em cada uma das 3 páginas (a 2 verificada), o índice
     da busca pronto e a fila da interface à mão (`esperar` a esvazia)."""
-    import time
 
     import numpy as np
 
@@ -131,13 +132,12 @@ def _amostra_em_tres_paginas(livro):
     ctl.lidos_pelas_amostras = busca.lidos_por
     busca.abrir()
 
+    def na_interface():
+        while fila_da_interface:
+            fila_da_interface.pop(0)()
+
     def esperar(condicao):
-        fim = time.monotonic() + 20
-        while not condicao() and time.monotonic() < fim:
-            while fila_da_interface:
-                fila_da_interface.pop(0)()
-            time.sleep(0.01)
-        assert condicao()
+        assert ajudantes.esperar(condicao, 20, a_cada=na_interface)
     esperar(busca.pronto.is_set)
 
     def da_amostra():

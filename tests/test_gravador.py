@@ -21,6 +21,7 @@ from abbychess.gravador import Gravador
 from abbychess.modelo import Box, RECONHECIDA, gid_de
 from abbychess.projeto import ARQUIVO_DO_LIVRO, PAGINAS_EM_MEMORIA, ProjetoDeLivro
 
+from tests.ajudantes import esperar
 from tests.test_treino_por_livro import _pagina_sintetica
 
 
@@ -30,10 +31,12 @@ class _Disco:
     def __init__(self):
         self.gravados = []
         self.falhar = 0          # quantas vezes ainda falha (-1: sempre)
+        self.tentativas = 0
         self.trava = threading.Lock()
 
     def __call__(self, instantaneo):
         with self.trava:
+            self.tentativas += 1
             if self.falhar:
                 self.falhar -= 1 if self.falhar > 0 else 0
                 raise PermissionError("disco ocupado")
@@ -41,15 +44,16 @@ class _Disco:
 
 
 def test_cem_mudancas_em_400_ms_sao_uma_gravacao():
+    """Cem entregas, uma a cada 4 ms pelo relógio do gravador (o falso: o teste o anda),
+    todas antes do prazo da primeira: uma gravação só, a da última."""
+    agora = [0.0]
     disco = _Disco()
-    gravador = Gravador(disco)
+    gravador = Gravador(disco, relogio=lambda: agora[0])
     try:
-        inicio = time.monotonic()
-        for k in range(100):                     # uma a cada 4 ms (o sleep do Windows é de
-            while time.monotonic() < inicio + k * 0.004:   # ~15 ms: espera ativa)
-                pass
+        for k in range(100):
+            agora[0] = k * 0.004
             gravador.agendar(1, k)
-        assert time.monotonic() - inicio < gravador.atraso   # tudo antes do prazo
+        assert agora[0] < gravador.atraso and disco.tentativas == 0   # nada antes do prazo
         assert gravador.descarregar(5)
         assert disco.gravados == [99] and gravador.gravacoes == 1
     finally:
@@ -74,9 +78,7 @@ def test_sem_descarregar_grava_sozinho_depois_do_atraso():
     gravador = Gravador(disco, atraso=0.05)
     try:
         gravador.agendar(1, "a")
-        fim = time.monotonic() + 3
-        while not disco.gravados and time.monotonic() < fim:
-            time.sleep(0.01)
+        assert esperar(lambda: disco.gravados, 3)
         assert disco.gravados == ["a"]
     finally:
         gravador.fechar()
@@ -90,7 +92,7 @@ def test_falha_permanente_avisa_uma_vez_e_a_pagina_continua_suja():
     try:
         gravador.agendar(7, "v1")
         assert not gravador.descarregar(5)
-        time.sleep(0.2)                          # tenta de novo, com espera crescente
+        assert esperar(lambda: disco.tentativas >= 3, 5)     # tenta de novo, sozinho
         assert gravador.sujas == {7} and gravador.falhando == {7}
         assert len(avisos) == 1 and isinstance(avisos[0][1], PermissionError)
         disco.falhar = 0                         # o disco voltou
@@ -291,14 +293,16 @@ def test_instantaneo_e_imutavel_frente_as_edicoes(projeto):
 
 def test_a_interface_nao_espera_o_disco_do_gravador(projeto, monkeypatch):
     """Com o gravador preso dentro do `fsync` do livro.json (segurando a trava do livro), as
-    chamadas da interface (entregar, ler a página do cache, o resumo) voltam na hora."""
+    chamadas da interface (entregar, ler a página do cache, o resumo) voltam com ele ainda
+    preso: se esperassem a trava, só voltariam depois de ele sair (`saiu`)."""
     original = gv.gravar_json
-    preso, solto = threading.Event(), threading.Event()
+    preso, solto, saiu = threading.Event(), threading.Event(), threading.Event()
 
     def gravar(caminho, dados):
         if caminho.name == ARQUIVO_DO_LIVRO and threading.current_thread().name == "gravador":
             preso.set()
             solto.wait(10)
+            saiu.set()
         original(caminho, dados)
 
     pagina = _pagina(projeto, 0)
@@ -309,12 +313,11 @@ def test_a_interface_nao_espera_o_disco_do_gravador(projeto, monkeypatch):
     projeto.gravador.descarregar(0)              # começa já
     assert preso.wait(5)
     try:
-        inicio = time.monotonic()
         ed.corrigir(outra, outra.boxes[0].gid, "z")
         projeto.agendar(outra)
         assert projeto.carregar_modelo(1) is outra
         assert 1 in projeto.resumo_do_livro()
-        assert time.monotonic() - inicio < 0.5
+        assert not saiu.is_set()                 # voltaram com o gravador ainda preso
     finally:
         solto.set()
     assert projeto.descarregar(5)

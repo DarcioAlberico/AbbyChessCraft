@@ -8,7 +8,6 @@ carregá-lo. O resto, inclusive as tarefas em segundo plano, é o código real.
 from __future__ import annotations
 
 import os
-import time
 
 import pytest
 
@@ -21,6 +20,7 @@ from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL, LeitorDoLivro  # noqa: E
 from abbychess import pagina as pg  # noqa: E402
 from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
+from tests.ajudantes import esperar  # noqa: E402
 from tests.test_treino_por_livro import _pagina_sintetica  # noqa: E402
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
@@ -45,12 +45,8 @@ def janela(app, tmp_path, monkeypatch):
 
 
 def _esperar(app, janela, limite=20.0):
-    fim = time.monotonic() + limite
-    while janela.executor.ocupado and time.monotonic() < fim:
-        app.processEvents()
-        time.sleep(0.01)
+    assert esperar(lambda: not janela.executor.ocupado, limite), "a tarefa não terminou no prazo"
     app.processEvents()
-    assert not janela.executor.ocupado, "a tarefa não terminou no prazo"
     if janela.relogio_do_texto.isActive():          # o texto da página, sem esperar o relógio
         janela.pintar_texto()
 
@@ -407,11 +403,7 @@ def test_falha_de_gravacao_aparece_na_barra(app, janela, monkeypatch):
         janela.treino.campo.setText("q")
         janela.treino.pedir_so_corrigir()
         janela.projeto.descarregar(5)
-        fim = time.monotonic() + 5
-        while ("não foi gravada" not in janela.statusBar().currentMessage()
-               and time.monotonic() < fim):
-            app.processEvents()
-            time.sleep(0.01)
+        esperar(lambda: "não foi gravada" in janela.statusBar().currentMessage(), 5)
         assert "A página 1 não foi gravada (disco cheio)" in janela.statusBar().currentMessage()
         assert janela.projeto.sujas
     finally:

@@ -14,6 +14,7 @@ from abbychess import busca as bs
 from abbychess import sessao as ss
 from abbychess.modelo import Box
 
+from tests.ajudantes import esperar
 from tests.test_sessao import _pagina
 
 
@@ -153,12 +154,7 @@ def test_construir_sem_processos_pelos_arquivos(tmp_path):
 # ----------------------------------------------------------------------
 
 def _esperar(condicao, limite=20.0):
-    import time
-
-    fim = time.monotonic() + limite
-    while not condicao() and time.monotonic() < fim:
-        time.sleep(0.01)
-    assert condicao()
+    assert esperar(condicao, limite)
 
 
 def test_o_controlador_monta_o_indice_busca_e_refaz_a_pagina_editada(tmp_path):

@@ -445,92 +445,142 @@ def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbo
     numerado (`"paginas"`, `"diagramas"`, `"capitulos"`: número -> href), para as
     referências do texto virarem link; `numeros`, o que o livro numera (`numerados`);
     `analise`, o site do link de análise de cada diagrama lido (`links_de_analise`)."""
-    rotulos = rotulos or {}
     alvos = alvos or {}
-    numeros = numeros or Numerados()
-    por_pagina, por_diagrama, por_capitulo = (alvos.get(k, {}) for k in
-                                              ("paginas", "diagramas", "capitulos"))
-    capitulos = [_Capitulo("capitulo-001.xhtml")]
-    numero_do_titulo = 0
-
-    def novo() -> _Capitulo:
-        capitulos.append(_Capitulo(f"capitulo-{len(capitulos) + 1:03d}.xhtml"))
-        return capitulos[-1]
-
-    atual = capitulos[0]
-    vistas: set = set()
-
-    def ancorar(numero: int) -> None:
-        """A âncora da página no capítulo em que o primeiro bloco dela cai; o rótulo é o
-        número impresso, quando se sabe."""
-        ancora = f"pg{numero}"
-        if ancora in vistas:                    # a mesma página duas vezes: uma âncora só
-            return
-        vistas.add(ancora)
-        # Com a paginação conhecida, a página sem número impresso (as de rosto) não leva o
-        # número da posição, que colidiria com um impresso: vai entre colchetes.
-        rotulo = rotulos.get(numero - 1, f"[{numero}]" if rotulos else numero)
-        atual.paginas.append((rotulo, ancora))
-        atual.partes.append(f'<span epub:type="pagebreak" role="doc-pagebreak" '
-                            f'id="{ancora}" aria-label="{rotulo}"></span>')
-
+    escrita = _EscritaDosCapitulos(
+        imagens, simbolos, msg, idioma, rotulos or {}, numeros or Numerados(),
+        por_pagina=alvos.get("paginas", {}), por_diagrama=alvos.get("diagramas", {}),
+        por_capitulo=alvos.get("capitulos", {}), quebras=quebras, analise=analise)
     for pagina in paginas:
-        if atual.tamanho > limite:
-            atual = novo()
+        if escrita.atual.tamanho > limite:
+            escrita.novo()
+        escrita.pagina(pagina)
+    return [c for c in escrita.capitulos if c.partes]
+
+
+def _abre_capitulo(bloco) -> bool:
+    """O título de capítulo (`<h1>`) com texto."""
+    return isinstance(bloco, Paragrafo) and bloco.titulo and bloco.nivel == 1 \
+        and bool(bloco.texto.strip())
+
+
+def _tem_conteudo(bloco) -> bool:
+    """A figura, ou o parágrafo com texto: o bloco que vai ao capítulo."""
+    return isinstance(bloco, Figura) or (isinstance(bloco, Paragrafo)
+                                         and bool(bloco.texto.strip()))
+
+
+@dataclass
+class _EscritaDosCapitulos:
+    """O que `_capitulos` sabe enquanto passa pelos blocos: o que entra no texto (as imagens,
+    os símbolos, as mensagens, os alvos dos links) e o que já escreveu (os capítulos, as
+    âncoras de página postas e quantos títulos vieram)."""
+
+    imagens: Dict[int, str]
+    simbolos: str
+    msg: Dict[str, str]
+    idioma: str
+    rotulos: Dict[int, int]
+    numeros: Numerados
+    por_pagina: Dict[int, str]
+    por_diagrama: Dict[int, str]
+    por_capitulo: Dict[int, str]
+    quebras: bool = False
+    analise: str = "nenhum"
+    capitulos: List[_Capitulo] = field(
+        default_factory=lambda: [_Capitulo("capitulo-001.xhtml")])
+    vistas: set = field(default_factory=set)
+    numero_do_titulo: int = 0
+
+    @property
+    def atual(self) -> _Capitulo:
+        return self.capitulos[-1]
+
+    def novo(self) -> None:
+        self.capitulos.append(_Capitulo(f"capitulo-{len(self.capitulos) + 1:03d}.xhtml"))
+
+    def pagina(self, pagina: PaginaExtraida) -> None:
         numero = pagina.numero + 1
         pendente = True
         for bloco in pagina.blocos:
-            if isinstance(bloco, Paragrafo) and bloco.titulo and bloco.nivel == 1 \
-                    and bloco.texto.strip() and atual.tamanho > 0:
-                atual = novo()
-            if pendente and (isinstance(bloco, Figura) or (isinstance(bloco, Paragrafo)
-                                                           and bloco.texto.strip())):
-                ancorar(numero)
-                pendente = False
-            if isinstance(bloco, Figura):
-                nome = imagens[id(bloco)]
-                classe = "diagrama" if bloco.fen else "diagrama recorte"
-                alt = _e(alternativo(bloco, msg, idioma), aspas=True)
-                # A ressalva do diagrama que ninguém conferiu fica à vista (PD-21), além do alt.
-                # E o link de análise, quando pedido, embaixo da ressalva.
-                na_legenda = []
-                ressalva = marcacao.ressalva_do_diagrama(bloco, idioma)
-                if ressalva:
-                    na_legenda.append(_e(ressalva))
-                endereco = links_de_analise.link_da_figura(bloco, analise)
-                if endereco:
-                    na_legenda.append(f'<a class="analise" href="{_e(endereco, aspas=True)}">'
-                                      f'{_e(links_de_analise.rotulo(analise, idioma))}</a>')
-                    atual.analises += 1
-                legenda = (f"<figcaption>{'<br/>'.join(na_legenda)}</figcaption>"
-                           if na_legenda else "")
-                ident = ""
-                if id(bloco) in numeros.figuras:
-                    ancora_do_diagrama = f"dg{numeros.figuras[id(bloco)]}"
-                    atual.diagramas.append((numeros.figuras[id(bloco)], ancora_do_diagrama))
-                    ident = f' id="{ancora_do_diagrama}"'
-                atual.partes.append(f'<figure class="{classe}"{ident}><img src="../{nome}" '
-                                    f'alt="{alt}"/>{legenda}</figure>')
-            elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
-                links = ([] if bloco.titulo else referencias_internas(
-                    bloco.texto, idioma, por_pagina,
-                    {} if id(bloco) in numeros.legendas else por_diagrama, por_capitulo))
-                atual.links += len(links)
-                corpo = xhtml_do_texto(bloco, simbolos, links, quebras=quebras)
-                if bloco.titulo:
-                    numero_do_titulo += 1
-                    nivel = 1 if bloco.nivel == 1 else 2
-                    alvo = f"t{numero_do_titulo}"
-                    atual.partes.append(f'<h{nivel} id="{alvo}">{corpo}</h{nivel}>')
-                    atual.titulos.append((nivel, alvo, aspas_curvas(bloco.texto.strip())))
-                    if id(bloco) in numeros.capitulos:
-                        atual.numerados.append((numeros.capitulos[id(bloco)], alvo))
-                else:
-                    atual.partes.append(f"<p>{corpo}</p>")
-                atual.tamanho += len(bloco.texto)
+            pendente = self.bloco(bloco, numero, pendente)
         if pendente:                            # página sem bloco: a âncora fica mesmo assim
-            ancorar(numero)
-    return [c for c in capitulos if c.partes]
+            self.ancorar(numero)
+
+    def bloco(self, bloco, numero: int, pendente: bool) -> bool:
+        """O bloco no capítulo (num novo, se ele abre um capítulo), com a âncora da página
+        antes do primeiro que tem conteúdo; devolve se ela ainda está pendente."""
+        if _abre_capitulo(bloco) and self.atual.tamanho > 0:
+            self.novo()
+        if pendente and _tem_conteudo(bloco):
+            self.ancorar(numero)
+            pendente = False
+        if isinstance(bloco, Figura):
+            self.figura(bloco)
+        elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
+            self.paragrafo(bloco)
+        return pendente
+
+    def ancorar(self, numero: int) -> None:
+        """A âncora da página no capítulo em que o primeiro bloco dela cai; o rótulo é o
+        número impresso, quando se sabe."""
+        ancora = f"pg{numero}"
+        if ancora in self.vistas:               # a mesma página duas vezes: uma âncora só
+            return
+        self.vistas.add(ancora)
+        # Com a paginação conhecida, a página sem número impresso (as de rosto) não leva o
+        # número da posição, que colidiria com um impresso: vai entre colchetes.
+        rotulo = self.rotulos.get(numero - 1, f"[{numero}]" if self.rotulos else numero)
+        self.atual.paginas.append((rotulo, ancora))
+        self.atual.partes.append(f'<span epub:type="pagebreak" role="doc-pagebreak" '
+                                 f'id="{ancora}" aria-label="{rotulo}"></span>')
+
+    def figura(self, bloco: Figura) -> None:
+        nome = self.imagens[id(bloco)]
+        classe = "diagrama" if bloco.fen else "diagrama recorte"
+        alt = _e(alternativo(bloco, self.msg, self.idioma), aspas=True)
+        legenda = self.legenda(bloco)
+        ident = ""
+        if id(bloco) in self.numeros.figuras:
+            ancora_do_diagrama = f"dg{self.numeros.figuras[id(bloco)]}"
+            self.atual.diagramas.append((self.numeros.figuras[id(bloco)], ancora_do_diagrama))
+            ident = f' id="{ancora_do_diagrama}"'
+        self.atual.partes.append(f'<figure class="{classe}"{ident}><img src="../{nome}" '
+                                 f'alt="{alt}"/>{legenda}</figure>')
+
+    def legenda(self, bloco: Figura) -> str:
+        """A ressalva do diagrama que ninguém conferiu fica à vista (PD-21), além do alt. E o
+        link de análise, quando pedido, embaixo da ressalva."""
+        na_legenda = []
+        ressalva = marcacao.ressalva_do_diagrama(bloco, self.idioma)
+        if ressalva:
+            na_legenda.append(_e(ressalva))
+        endereco = links_de_analise.link_da_figura(bloco, self.analise)
+        if endereco:
+            na_legenda.append(f'<a class="analise" href="{_e(endereco, aspas=True)}">'
+                              f'{_e(links_de_analise.rotulo(self.analise, self.idioma))}</a>')
+            self.atual.analises += 1
+        return f"<figcaption>{'<br/>'.join(na_legenda)}</figcaption>" if na_legenda else ""
+
+    def paragrafo(self, bloco: Paragrafo) -> None:
+        links = ([] if bloco.titulo else referencias_internas(
+            bloco.texto, self.idioma, self.por_pagina,
+            {} if id(bloco) in self.numeros.legendas else self.por_diagrama, self.por_capitulo))
+        self.atual.links += len(links)
+        corpo = xhtml_do_texto(bloco, self.simbolos, links, quebras=self.quebras)
+        if bloco.titulo:
+            self.titulo(bloco, corpo)
+        else:
+            self.atual.partes.append(f"<p>{corpo}</p>")
+        self.atual.tamanho += len(bloco.texto)
+
+    def titulo(self, bloco: Paragrafo, corpo: str) -> None:
+        self.numero_do_titulo += 1
+        nivel = 1 if bloco.nivel == 1 else 2
+        alvo = f"t{self.numero_do_titulo}"
+        self.atual.partes.append(f'<h{nivel} id="{alvo}">{corpo}</h{nivel}>')
+        self.atual.titulos.append((nivel, alvo, aspas_curvas(bloco.texto.strip())))
+        if id(bloco) in self.numeros.capitulos:
+            self.atual.numerados.append((self.numeros.capitulos[id(bloco)], alvo))
 
 
 def _xhtml(titulo: str, idioma: str, corpo: str, css: bool = True) -> str:

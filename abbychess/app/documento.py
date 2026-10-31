@@ -936,17 +936,6 @@ class VistaDoDocumento(QTextEdit):
         finally:
             self._movendo = anterior
 
-    def ir_ao_fim_do_gid(self, gid: Optional[int]) -> None:
-        posicao = None if gid is None else self.posicao_do_gid(gid)
-        if posicao is None:
-            return
-        fim = posicao + 1
-        while fim < posicao + 8 and self._gid_no_caractere(fim) == gid:
-            fim += 1
-        cursor = self.textCursor()
-        cursor.setPosition(fim)
-        self.setTextCursor(cursor)
-
     def inserir_figurina(self, branca: str) -> None:
         """Ctrl+Shift+K/Q/R/B/N/P: a figurina no cursor; o mesmo atalho de novo alterna a cor
         da que acabou de entrar (§6.4)."""

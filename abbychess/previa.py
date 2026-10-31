@@ -67,28 +67,37 @@ def html_do_livro(paginas: Sequence[PaginaExtraida], linhas_do_relatorio: Sequen
                       f"{pagina.numero + 1}</div>")
         for bloco in pagina.blocos:
             if isinstance(bloco, Figura):
-                tipo, _ = epub.tipo_da_imagem(bloco.png)
-                dados = base64.b64encode(bloco.png).decode("ascii")
-                alt = epub.alternativo(bloco, msg, idioma)
-                partes.append(f'<p><img src="data:{tipo};base64,{dados}" width="220" '
-                              f'alt="{html.escape(alt, quote=True)}"></p>'
-                              f'<p class="alt">{html.escape(alt)}</p>')
-                endereco = links_de_analise.link_da_figura(bloco, analise)
-                if endereco:
-                    partes.append(f'<p class="alt"><a href="{html.escape(endereco, quote=True)}">'
-                                  f"{html.escape(links_de_analise.rotulo(analise, idioma))}</a></p>")
+                partes.append(_html_da_figura(bloco, msg, idioma, analise))
             elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
-                corpo = epub.xhtml_do_texto(bloco, "", quebras=quebras, realce=realce)
-                if bloco.titulo:
-                    nivel = 1 if bloco.nivel == 1 else 2
-                    partes.append(f"<h{nivel + 1}>{corpo}</h{nivel + 1}>")
-                else:
-                    partes.append(f"<p>{corpo}</p>")
+                partes.append(_html_do_paragrafo(bloco, quebras, realce))
     if len(paginas) > limite:
         partes.append(f'<p class="resto">… e mais {len(paginas) - limite} página(s), que a '
                       "exportação inclui.</p>")
     partes.append("</body></html>")
     return "".join(partes)
+
+
+def _html_da_figura(bloco: Figura, msg, idioma: str, analise: str) -> str:
+    """A imagem dentro do HTML, o texto alternativo embaixo e o link de análise, se há."""
+    tipo, _ = epub.tipo_da_imagem(bloco.png)
+    dados = base64.b64encode(bloco.png).decode("ascii")
+    alt = epub.alternativo(bloco, msg, idioma)
+    figura = (f'<p><img src="data:{tipo};base64,{dados}" width="220" '
+              f'alt="{html.escape(alt, quote=True)}"></p>'
+              f'<p class="alt">{html.escape(alt)}</p>')
+    endereco = links_de_analise.link_da_figura(bloco, analise)
+    if endereco:
+        figura += (f'<p class="alt"><a href="{html.escape(endereco, quote=True)}">'
+                   f"{html.escape(links_de_analise.rotulo(analise, idioma))}</a></p>")
+    return figura
+
+
+def _html_do_paragrafo(bloco: Paragrafo, quebras: bool, realce: bool) -> str:
+    corpo = epub.xhtml_do_texto(bloco, "", quebras=quebras, realce=realce)
+    if bloco.titulo:
+        nivel = 1 if bloco.nivel == 1 else 2
+        return f"<h{nivel + 1}>{corpo}</h{nivel + 1}>"
+    return f"<p>{corpo}</p>"
 
 
 def html_do_texto(texto: str, linhas_do_relatorio: Sequence[str], titulo: str,

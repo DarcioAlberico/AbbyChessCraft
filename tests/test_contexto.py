@@ -116,6 +116,22 @@ def test_a_quebra_de_palavra_do_usuario_vale_e_a_mudanca_renova_o_julgamento():
     assert pagina.boxes[3].gid in contexto.improvaveis(pagina)      # "l0ca" segue
 
 
+@pytest.mark.parametrize("linha", [
+    "1.e4 e5 2.Cf3 Cc6 3.Bb5 a6 4.BxC",          # português
+    "1.e4 e5 2.Nf3 Nc6 3.Bb5 a6 4.BxN",          # inglês
+    "1.e4 e5 2.Cf3 Cc6 3.Ab5 a6 4.AxC",          # espanhol: A, o alfil
+    "1.e4 e5 2.Sf3 Sc6 3.Lb5 a6 4.LxS",          # alemão: S, o Springer; L, o Läufer
+    "1.e4 e5 2.Cf3 Cc6 3.Fb5 a6 4.FxC",          # francês: F, o fou
+])
+def test_o_lance_do_idioma_do_livro_nao_e_improvavel(linha):
+    """As letras das peças de todos os idiomas de `modelo.PECAS` fazem o lance: o "3" de
+    "Sf3" e o "5" de "Lb5" num livro alemão não são algarismos entre letras."""
+    from abbychess import texto as tx
+
+    pagina = tx.pagina_avulsa(_linha(linha))
+    assert [b.entry.char for b in pagina.boxes if b.gid in contexto.improvaveis(pagina)] == []
+
+
 def test_o_resumo_conta_o_improvavel_com_qualquer_limiar():
     boxes = _linha("c0l0ca anteS")
     resumo = resumo_das_confiancas(boxes, Limiares())

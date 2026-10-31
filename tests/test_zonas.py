@@ -368,6 +368,23 @@ def test_a_linha_de_lances_com_o_numero_mal_lido_nao_e_titulo():
     assert not zn._parece_lances("Capítulo 1: a abertura")
 
 
+@pytest.mark.parametrize("linha", [
+    "Bb5 Bc4",          # português e inglês: B, o bispo
+    "Ab5 Ac4",          # espanhol: A, o alfil
+    "Sf3 Lb5",          # alemão: S, o Springer; L, o Läufer
+    "Fb5 Fc4",          # francês: F, o fou
+])
+def test_a_linha_de_lances_de_qualquer_idioma_nao_e_titulo(linha):
+    """Uma linha curta de lances, centrada e sozinha, é texto: as letras das peças de todos
+    os idiomas de `modelo.PECAS` dizem lance, não só as do português e do inglês."""
+    largura, passo = 1000, 12
+    x = (largura - len(linha) * passo) // 2
+    boxes = _linha_de_boxes(linha, x, 300, passo=passo)
+    zona = zn.Zona(zn.TEXTO, x - 4, 296, x + len(linha) * passo + 4, 320, automatica=True)
+    [classificada] = zn.classificar_funcoes([zona], boxes, largura, 1400, 16)
+    assert classificada.funcao == "texto"
+
+
 def test_a_pagina_lida_sem_areas_ganha_as_automaticas():
     """O lote e o F5: sem área nenhuma, as automáticas pela leitura (o título chega ao
     Documento e ao sumário); sem leitura, nada; com áreas, as do usuário ficam."""

@@ -614,18 +614,26 @@ def texto_e_unidades(pagina: Pagina) -> Tuple[str, List[Unidade]]:
     normal = tx.normalizador(tx.IMPRESSO)
     virtuais = {v.gid for v in pagina.decisoes.virtuais}
     unidades: List[Unidade] = []
+
+    def da_palavra(palavra) -> None:
+        """Uma unidade por letra de cada glifo (a ligadura tem várias, o não lido é □)."""
+        for g in palavra.gids:
+            char = documento.chars.get(g, "")
+            letras = tx.NAO_LIDO if char == tx.NAO_LIDO else (normal(char) or tx.NAO_LIDO)
+            for letra in letras:
+                unidades.append(Unidade(letra, g, VIRTUAL if g in virtuais else GLIFO))
+
+    def da_linha(linha) -> None:
+        for n, palavra in enumerate(linha.palavras):
+            if n:
+                unidades.append(Unidade(" ", None, ESPACO))
+            da_palavra(palavra)
+
     for bloco in documento.blocos:
         for linha in bloco.linhas:
             if unidades:
                 unidades.append(Unidade("\n", None, LINHA))
-            for n, palavra in enumerate(linha.palavras):
-                if n:
-                    unidades.append(Unidade(" ", None, ESPACO))
-                for g in palavra.gids:
-                    char = documento.chars.get(g, "")
-                    letras = tx.NAO_LIDO if char == tx.NAO_LIDO else (normal(char) or tx.NAO_LIDO)
-                    for letra in letras:
-                        unidades.append(Unidade(letra, g, VIRTUAL if g in virtuais else GLIFO))
+            da_linha(linha)
     return "".join(u.texto for u in unidades), unidades
 
 
@@ -658,24 +666,43 @@ def _hifens_de_fim_de_linha(pagina: Pagina, saem, onde) -> List[Tuple[int, int]]
     palavra e remove `hifen_de_quebra`"; antes, a exportação saía "exem plo")."""
     if not saem or not onde:
         return []
-    por_linha: Dict[Tuple[int, int], List[int]] = {}
-    for gid, (b, n, k) in onde.items():
-        por_linha.setdefault((b, n), []).append(gid)
+    por_linha = _gids_por_linha(onde)
     ordem = {gid: i for i, gid in enumerate(onde)}
     saida = []
     for gid in saem:
-        box = pagina.box(gid) if gid in pagina.vivos else None
-        if box is None or box.entry.char not in ("-", "\u00ad") or gid not in onde:
+        if not _hifen_que_sai(pagina, gid, onde):
             continue
-        b, n, k = onde[gid]
-        linha = sorted(por_linha[(b, n)], key=ordem.__getitem__)
-        seguinte = sorted(por_linha.get((b, n + 1), []), key=ordem.__getitem__)
-        if linha[-1] != gid or len(linha) < 2 or not seguinte:
-            continue
-        if onde.get(linha[-2], (None, None, None))[2] != k:
-            continue                            # um travessão solto ("velha -") não parte palavra
-        saida.append((linha[-2], seguinte[0]))
+        juncao = _juncao_do_hifen(gid, onde, por_linha, ordem)
+        if juncao is not None:
+            saida.append(juncao)
     return saida
+
+
+def _gids_por_linha(onde) -> Dict[Tuple[int, int], List[int]]:
+    """(bloco, linha) -> os gids dela."""
+    por_linha: Dict[Tuple[int, int], List[int]] = {}
+    for gid, (b, n, _k) in onde.items():
+        por_linha.setdefault((b, n), []).append(gid)
+    return por_linha
+
+
+def _hifen_que_sai(pagina: Pagina, gid: int, onde) -> bool:
+    """O glifo que sai é um hífen (ou o hífen discricionário) da página montada."""
+    box = pagina.box(gid) if gid in pagina.vivos else None
+    return box is not None and box.entry.char in ("-", "\u00ad") and gid in onde
+
+
+def _juncao_do_hifen(gid: int, onde, por_linha, ordem) -> Optional[Tuple[int, int]]:
+    """(a letra antes do hífen, a primeira da linha seguinte), se o hífen é o último glifo da
+    linha, colado na palavra, e há uma linha depois; senão None."""
+    b, n, k = onde[gid]
+    linha = sorted(por_linha[(b, n)], key=ordem.__getitem__)
+    seguinte = sorted(por_linha.get((b, n + 1), []), key=ordem.__getitem__)
+    if linha[-1] != gid or len(linha) < 2 or not seguinte:
+        return None
+    if onde.get(linha[-2], (None, None, None))[2] != k:
+        return None                             # um travessão solto ("velha -") não parte palavra
+    return (linha[-2], seguinte[0])
 
 
 def aplicar(pagina: Pagina, plano: Plano, imagem=None, leitor=None) -> None:
@@ -687,9 +714,38 @@ def aplicar(pagina: Pagina, plano: Plano, imagem=None, leitor=None) -> None:
     from abbychess import ancoragem as ag
     from abbychess import edicao as ed
 
+    sucessores_estruturais, sucessor = _aplicar_estruturais(pagina, plano, imagem, leitor)
+
+    def primeiro(gid: int) -> int:
+        return sucessor.get(gid, (gid, gid))[0]
+
+    def ultimo_de(gid: int) -> int:
+        return sucessor.get(gid, (gid, gid))[1]
+
+    virtuais = {v.gid for v in pagina.decisoes.virtuais}
+    _corrigir(pagina, plano.corrigir, virtuais)
+    for gid in sorted(plano.quebrar):
+        ed.quebrar(pagina, primeiro(gid))
+    _juntar_as_palavras(pagina, [(ultimo_de(a), primeiro(b)) for a, b in sorted(plano.juntar)])
+    sequencia = _sequencia_digitada(pagina, plano.itens, sucessores_estruturais)
+    for gid in plano.sair & virtuais:
+        ed.apagar_virtual(pagina, gid)
+    boxes_que_saem = plano.sair - virtuais
+    plano.linha_sem_boxes = _linha_sem_boxes(pagina, sequencia, plano.linha, virtuais,
+                                             boxes_que_saem)
+    ag.ancorar(pagina, sequencia, boxes_que_saem, plano.linha)
+    _tirar_os_boxes(pagina, sequencia, boxes_que_saem, plano.linha)
+    lidos = {b.gid for b in pagina.boxes if b.entry.char}
+    ed.revisar(pagina, plano.revisar & lidos)   # o □ e o aguardando ficam na fila
+
+
+def _aplicar_estruturais(pagina: Pagina, plano: Plano, imagem, leitor):
+    """Junta e divide os boxes do plano. Devolve os gids novos de cada operação e, de cada gid
+    aposentado, (o primeiro sucessor, o último): a quebra e a junção de palavras do mesmo
+    plano citam os gids de antes ("rn b" -> "mb" junta os boxes e a palavra)."""
+    from abbychess import edicao as ed
+
     sucessores_estruturais = {}
-    # gid aposentado -> (o primeiro sucessor, o último): a quebra e a junção de palavras do
-    # mesmo plano citam os gids de antes ("rn b" -> "mb" junta os boxes e a palavra).
     sucessor: Dict[int, Tuple[int, int]] = {}
     for indice, (gids, char) in enumerate(plano.juntar_boxes):
         dif = ed.juntar_varios(pagina, gids, char)
@@ -700,24 +756,27 @@ def aplicar(pagina: Pagina, plano: Plano, imagem=None, leitor=None) -> None:
         dif = ed.dividir_em(pagina, imagem, gid, chars, leitor)
         sucessores_estruturais[("dividir", indice)] = [b.gid for b in dif.novos]
         sucessor[gid] = (dif.novos[0].gid, dif.novos[-1].gid)
+    return sucessores_estruturais, sucessor
 
-    def primeiro(gid: int) -> int:
-        return sucessor.get(gid, (gid, gid))[0]
 
-    def ultimo_de(gid: int) -> int:
-        return sucessor.get(gid, (gid, gid))[1]
+def _corrigir(pagina: Pagina, corrigir: Dict[int, str], virtuais: Set[int]) -> None:
+    from abbychess import edicao as ed
 
-    virtuais = {v.gid for v in pagina.decisoes.virtuais}
-    for gid, char in plano.corrigir.items():
+    for gid, char in corrigir.items():
         if gid in virtuais:
             ed.trocar_virtual(pagina, gid, char)
         else:
             ed.corrigir(pagina, gid, char)
-    for gid in sorted(plano.quebrar):
-        ed.quebrar(pagina, primeiro(gid))
+
+
+def _juntar_as_palavras(pagina: Pagina, juntas: List[Tuple[int, int]]) -> None:
+    """As junções (último, primeiro), já nos gids de agora. O espaço que era uma quebra só
+    tira a quebra; onde o core também separava, entra a junção."""
+    from abbychess import ancoragem as ag
+    from abbychess import edicao as ed
+
     sem_quebra = []
-    for ultimo_velho, primeiro_velho in sorted(plano.juntar):
-        ultimo, comeco = ultimo_de(ultimo_velho), primeiro(primeiro_velho)
+    for ultimo, comeco in juntas:
         if comeco in pagina.decisoes.quebras:       # o espaço era uma quebra: ela sai
             pagina.decisoes = replace(pagina.decisoes, quebras=pagina.decisoes.quebras - {comeco})
             sem_quebra.append((ultimo, comeco))
@@ -725,11 +784,19 @@ def aplicar(pagina: Pagina, plano: Plano, imagem=None, leitor=None) -> None:
             ed.juntar_palavras(pagina, ultimo, comeco)
     if sem_quebra:                              # o core também separava ali: junção
         onde, _palavras = ag.pagina_montada(pagina)
-        for ultimo, primeiro in sem_quebra:
-            if onde.get(ultimo) != onde.get(primeiro):
-                ed.juntar_palavras(pagina, ultimo, primeiro)
+        for ultimo, comeco in sem_quebra:
+            if onde.get(ultimo) != onde.get(comeco):
+                ed.juntar_palavras(pagina, ultimo, comeco)
+
+
+def _sequencia_digitada(pagina: Pagina, itens, sucessores_estruturais
+                        ) -> List[Tuple[str, Optional[int]]]:
+    """Os itens do texto novo em gids de agora: cada letra nova vira um virtual (o lugar dele
+    vem de `_ancorar`), e cada operação estrutural, os boxes que ela criou."""
+    from abbychess import edicao as ed
+
     sequencia: List[Tuple[str, Optional[int]]] = []
-    for item, valor in plano.itens:
+    for item, valor in itens:
         if item == "letra":                     # o lugar dela vem de `_ancorar`
             _d, gid = ed.virtual(pagina, str(valor), None, palavra_nova=True)
             sequencia.append(("glifo", gid))
@@ -737,27 +804,42 @@ def aplicar(pagina: Pagina, plano: Plano, imagem=None, leitor=None) -> None:
             sequencia.extend(("glifo", gid) for gid in sucessores_estruturais[(item, valor)])
         else:
             sequencia.append((item, valor))
-    for gid in plano.sair & virtuais:
-        ed.apagar_virtual(pagina, gid)
-    boxes_que_saem = plano.sair - virtuais
+    return sequencia
+
+
+def _linha_sem_boxes(pagina: Pagina, sequencia, linha, virtuais: Set[int],
+                     boxes_que_saem: Set[int]) -> bool:
+    """Alguma linha impressa do texto novo fica só com virtuais (sem box que fica)."""
+    from abbychess import ancoragem as ag
+
     vivos = pagina.vivos
-    com_box = {lp for lp, p in ag.palavras_da_sequencia(sequencia, plano.linha)
+    com_box = {lp for lp, p in ag.palavras_da_sequencia(sequencia, linha)
                if any(g not in virtuais and g in vivos and g not in boxes_que_saem
                       for g in p)}
-    plano.linha_sem_boxes = any(lp not in com_box
-                                for lp, _p in ag.palavras_da_sequencia(sequencia, plano.linha))
-    ag.ancorar(pagina, sequencia, boxes_que_saem, plano.linha)
+    return any(lp not in com_box for lp, _p in ag.palavras_da_sequencia(sequencia, linha))
+
+
+def _tirar_os_boxes(pagina: Pagina, sequencia, boxes_que_saem: Set[int], linha) -> None:
+    """Descarta os boxes que saem (já não são âncora de ninguém), junta a palavra partida pelo
+    hífen de fim de linha que saiu e fecha o vão que o box tirado deixa."""
+    from abbychess import ancoragem as ag
+    from abbychess import edicao as ed
+
     antes = ag.pagina_montada(pagina)[0] if boxes_que_saem else {}
     juntar_a_palavra = _hifens_de_fim_de_linha(pagina, boxes_que_saem, antes)
     for gid in boxes_que_saem:
         ed.descartar(pagina, gid)
+    _juntar_os_hifens(pagina, juntar_a_palavra)
+    if boxes_que_saem:                          # só o box tirado deixa um vão na página
+        ag.como_digitado(pagina, sequencia, {g for _i, g in sequencia} | set(linha), antes)
+
+
+def _juntar_os_hifens(pagina: Pagina, juntar_a_palavra: List[Tuple[int, int]]) -> None:
+    from abbychess import edicao as ed
+
     for ultimo, primeiro in juntar_a_palavra:     # §6.3: apagar o hífen junta a palavra
         if ultimo in pagina.vivos and primeiro in pagina.vivos:
             ed.juntar_palavras(pagina, ultimo, primeiro)
-    if boxes_que_saem:                          # só o box tirado deixa um vão na página
-        ag.como_digitado(pagina, sequencia, {g for _i, g in sequencia} | set(plano.linha), antes)
-    lidos = {b.gid for b in pagina.boxes if b.entry.char}
-    ed.revisar(pagina, plano.revisar & lidos)   # o □ e o aguardando ficam na fila
 
 
 # ----------------------------------------------------------------------

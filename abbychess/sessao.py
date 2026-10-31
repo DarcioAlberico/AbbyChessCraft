@@ -216,6 +216,13 @@ class Plano:
     def estrutural(self, *extras: str) -> str:
         """O aviso não modal da Linha para o que muda a estrutura (§6.3: "rn → m: 2 glifos
         juntados · Ctrl+Z desfaz"), ou "". `extras` entram antes do "Ctrl+Z desfaz"."""
+        partes = self._tirados_e_virtuais() + self._juntados_e_divididos() + self._das_linhas()
+        if not partes:
+            return ""
+        de, para = _curto(self.de), _curto(self.para)
+        return f"{de} → {para}: " + " · ".join(partes + list(extras) + ["Ctrl+Z desfaz"])
+
+    def _tirados_e_virtuais(self) -> List[str]:
         partes = []
         if self.sair:
             n = len(self.sair)
@@ -223,6 +230,10 @@ class Plano:
         letras = sum(len(t) for t, _a, _n in self.virtuais)
         if letras:
             partes.append(f"{letras} glifo virtual" if letras == 1 else f"{letras} glifos virtuais")
+        return partes
+
+    def _juntados_e_divididos(self) -> List[str]:
+        partes = []
         if self.juntar_boxes:
             n = sum(len(gids) for gids, _char in self.juntar_boxes)
             partes.append(f"{n} glifos juntados")
@@ -230,15 +241,16 @@ class Plano:
             n = sum(len(chars) for _gid, chars in self.dividir_boxes)
             partes.append(f"1 glifo dividido em {n}" if len(self.dividir_boxes) == 1
                           else f"{len(self.dividir_boxes)} glifos divididos")
+        return partes
+
+    def _das_linhas(self) -> List[str]:
+        partes = []
         if self.linha_sem_boxes:
             partes.append("a linha ficou sem glifos: o resto dela foi para a vizinha")
         if self.linha_mantida:
             partes.append("a quebra de linha fica como impressa (o Documento mostra as "
                           "linhas do livro; a exportação junta o parágrafo)")
-        if not partes:
-            return ""
-        de, para = _curto(self.de), _curto(self.para)
-        return f"{de} → {para}: " + " · ".join(partes + list(extras) + ["Ctrl+Z desfaz"])
+        return partes
 
 
 def _curto(texto: str, limite: int = 30) -> str:
@@ -254,9 +266,9 @@ def gid_no_cursor(unidades: Sequence[Unidade], novo: str, onde: int,
     """O glifo do original que ficou sob o cursor na posição `onde` do texto novo (o
     caractere antes dele; num espaço, o depois): o do Ctrl+Enter. `LETRA_NOVA` se ali há
     uma letra digitada agora; None se não há glifo."""
-    original = "".join(u.texto if u.tipo != LINHA else " " for u in unidades)
+    original = _texto_original(unidades)
     novo = _normalizar(novo)
-    por_novo = {j: i for i, j in alinhar(original, novo, fixos) if j is not None}
+    por_novo = _por_novo(original, novo, fixos)
     for j in (onde - 1, onde):
         if not 0 <= j < len(novo) or novo[j] == " ":
             continue
@@ -267,51 +279,102 @@ def gid_no_cursor(unidades: Sequence[Unidade], novo: str, onde: int,
     return None
 
 
+def _texto_original(unidades: Sequence[Unidade]) -> str:
+    """O texto das unidades com a quebra de linha impressa como espaço (como o novo,
+    normalizado)."""
+    return "".join(u.texto if u.tipo != LINHA else " " for u in unidades)
+
+
+def _por_novo(original: str, novo: str, fixos) -> Dict[int, int]:
+    """j no novo -> i no original, dos caracteres alinhados."""
+    return {j: i for i, j in alinhar(original, novo, fixos) if j is not None}
+
+
 def planejar(unidades: Sequence[Unidade], novo: str,
              fixos: Sequence[Tuple[int, int]] = ()) -> Plano:
     """O plano da sessão: o que fica, o que sai, o que entra, e as fronteiras. `fixos`, os
     pares (no original, no novo) que nenhuma edição tocou (ver `alinhar`). O hífen de fim de
     linha que sai junta a palavra na aplicação (`_hifens_de_fim_de_linha`)."""
     novo = _normalizar(novo)
-    original = "".join(u.texto if u.tipo != LINHA else " " for u in unidades)
+    original = _texto_original(unidades)
     pares = alinhar(original, novo, fixos)
     plano = Plano(linha=_linha_original(unidades), texto_mudou=original != novo,
                   de=" ".join(original.split()), para=" ".join(novo.split()))
+    letras_do_gid = _itens_do_texto_novo(plano, unidades, novo, pares)
+    _corrigir_e_tirar(plano, unidades, letras_do_gid)
+    # A linha física continua no Documento; sem o box do hífen, a exportação poderá
+    # refluir as duas metades da palavra sem reintroduzi-lo.
+    plano.linha_mantida = _linha_apagada(unidades, novo, pares)
+    _dividir_ligaduras_repetidas(plano, plano.itens, unidades, novo, pares)
+    plano.revisar = {gid for item, gid in plano.itens if item == "glifo"}
+    itens_do_original = _itens_do_original(plano)
+    _fronteiras(unidades, itens_do_original, plano)
+    _letras_novas(unidades, itens_do_original, plano)
+    return plano
+
+
+def _itens_do_texto_novo(plano: Plano, unidades, novo: str, pares) -> Dict[int, List[str]]:
+    """Os itens do texto novo em `plano.itens`, na ordem dos pares (as operações estruturais
+    no lugar do primeiro par delas); devolve as letras que cada glifo do original tem agora
+    (vazio: saiu)."""
     estruturais, cobertos_i, cobertos_j = _operacoes_estruturais(unidades, novo, pares)
-    primeiros = {min(posicoes): (tipo, dados, posicoes)
-                 for tipo, dados, posicoes in estruturais}
-    itens = plano.itens
+    primeiros = {min(posicoes): (tipo, dados) for tipo, dados, posicoes in estruturais}
+    cobertos = _posicoes_cobertas(pares, cobertos_i, cobertos_j)
     letras_do_gid: Dict[int, List[str]] = {}
     for posicao, (i, j) in enumerate(pares):
         if posicao in primeiros:
-            tipo, dados, _posicoes = primeiros[posicao]
-            if tipo == "juntar":
-                gids, char = dados
-                indice = len(plano.juntar_boxes)
-                plano.juntar_boxes.append((gids, char))
-            else:
-                gid, chars = dados
-                indice = len(plano.dividir_boxes)
-                plano.dividir_boxes.append((gid, chars))
-            itens.append((tipo, indice))
-        if ((i is not None and i in cobertos_i) or (j is not None and j in cobertos_j)):
-            continue
-        u = unidades[i] if i is not None else None
-        c = novo[j] if j is not None else None
-        if u is not None and u.glifo and c is not None and c != " ":
-            letras_do_gid.setdefault(u.gid, []).append(c)
-            if not itens or itens[-1] != ("glifo", u.gid):
-                itens.append(("glifo", u.gid))
-            continue
-        if u is not None and u.glifo:
-            letras_do_gid.setdefault(u.gid, [])     # o caractere saiu (talvez o glifo todo)
-        if c is None:
-            continue
-        if c != " ":
-            itens.append(("letra", c))
-        else:
-            itens.append(("linha", None) if u is not None and u.tipo == LINHA else ("espaco", None))
+            _item_estrutural(plano, *primeiros[posicao])
+        if posicao not in cobertos:
+            _item(plano.itens, letras_do_gid, unidades[i] if i is not None else None,
+                  novo[j] if j is not None else None)
+    return letras_do_gid
 
+
+def _posicoes_cobertas(pares, cobertos_i: Set[int], cobertos_j: Set[int]) -> Set[int]:
+    """Os pares que uma operação estrutural já cobre (de um lado ou do outro)."""
+    return {p for p, (i, j) in enumerate(pares)
+            if (i is not None and i in cobertos_i) or (j is not None and j in cobertos_j)}
+
+
+def _item_estrutural(plano: Plano, tipo: str, dados) -> None:
+    """A junção ou a divisão de boxes no plano, e o item dela no texto novo."""
+    if tipo == "juntar":
+        indice = len(plano.juntar_boxes)
+        plano.juntar_boxes.append(dados)
+    else:
+        indice = len(plano.dividir_boxes)
+        plano.dividir_boxes.append(dados)
+    plano.itens.append((tipo, indice))
+
+
+def _item(itens: list, letras_do_gid: Dict[int, List[str]], u: Optional[Unidade],
+          c: Optional[str]) -> None:
+    """O par (a unidade do original, o caractere do novo) nos itens: a letra no glifo que
+    fica, ou o glifo que perdeu o caractere; e a letra nova, o espaço ou a quebra de linha."""
+    if u is not None and u.glifo:
+        if c is not None and c != " ":
+            _letra_no_glifo(itens, letras_do_gid, u.gid, c)
+            return
+        letras_do_gid.setdefault(u.gid, [])     # o caractere saiu (talvez o glifo todo)
+    if c is not None:
+        itens.append(_item_novo(u, c))
+
+
+def _letra_no_glifo(itens: list, letras_do_gid: Dict[int, List[str]], gid: int, c: str) -> None:
+    letras_do_gid.setdefault(gid, []).append(c)
+    if not itens or itens[-1] != ("glifo", gid):
+        itens.append(("glifo", gid))
+
+
+def _item_novo(u: Optional[Unidade], c: str) -> Tuple[str, Optional[str]]:
+    """A letra sem glifo, ou o separador: a quebra de linha impressa que ficou, ou o espaço."""
+    if c != " ":
+        return ("letra", c)
+    return ("linha", None) if u is not None and u.tipo == LINHA else ("espaco", None)
+
+
+def _corrigir_e_tirar(plano: Plano, unidades, letras_do_gid: Dict[int, List[str]]) -> None:
+    """O glifo sem letras sai; o que tem outras letras é corrigido."""
     texto_do_gid: Dict[int, str] = {}           # uma passada (a página inteira, no D2)
     for u in unidades:
         if u.glifo:
@@ -323,24 +386,25 @@ def planejar(unidades: Sequence[Unidade], novo: str,
             plano.sair.add(gid)
         elif depois != antes:
             plano.corrigir[gid] = depois
-    # A linha física continua no Documento; sem o box do hífen, a exportação poderá
-    # refluir as duas metades da palavra sem reintroduzi-lo.
-    plano.linha_mantida = any(unidades[i].tipo == LINHA and (j is None or novo[j] != " ")
-                              for i, j in pares if i is not None)
-    _dividir_ligaduras_repetidas(plano, itens, unidades, novo, pares)
-    ficam = [gid for item, gid in itens if item == "glifo"]
-    plano.revisar = set(ficam)
+
+
+def _linha_apagada(unidades, novo: str, pares) -> bool:
+    """Alguma quebra de linha impressa saiu, ou virou outra coisa que não o espaço."""
+    return any(unidades[i].tipo == LINHA and (j is None or novo[j] != " ")
+               for i, j in pares if i is not None)
+
+
+def _itens_do_original(plano: Plano) -> List[Tuple[str, object]]:
+    """Os itens com cada operação estrutural no lugar do primeiro glifo do original dela."""
     itens_do_original = []
-    for item, valor in itens:
+    for item, valor in plano.itens:
         if item == "juntar":
             itens_do_original.append(("glifo", plano.juntar_boxes[valor][0][0]))
         elif item == "dividir":
             itens_do_original.append(("glifo", plano.dividir_boxes[valor][0]))
         else:
             itens_do_original.append((item, valor))
-    _fronteiras(unidades, itens_do_original, plano)
-    _letras_novas(unidades, itens_do_original, plano)
-    return plano
+    return itens_do_original
 
 
 def _dividir_ligaduras_repetidas(plano, itens, unidades, novo, pares) -> None:
@@ -367,35 +431,66 @@ def _dividir_ligaduras_repetidas(plano, itens, unidades, novo, pares) -> None:
 def _operacoes_estruturais(unidades, novo, pares):
     """Extrai os trechos desalinhados ``k -> 1`` e ``1 -> k`` entre âncoras iguais."""
     operacoes, cobertos_i, cobertos_j = [], set(), set()
-
-    def fechar(posicoes):
-        if not posicoes:
-            return
-        trecho = [pares[p] for p in posicoes]
-        indices = [i for i, _j in trecho if i is not None and unidades[i].glifo]
-        js = [j for _i, j in trecho if j is not None and novo[j] != " "]
-        gids = tuple(dict.fromkeys(unidades[i].gid for i in indices))
-        letras = "".join(novo[j] for j in js)
-        if len(gids) > 1 and len(letras) == 1 and all(unidades[i].tipo == GLIFO for i in indices):
-            operacoes.append(("juntar", (gids, letras), tuple(posicoes)))
-        elif len(gids) == 1 and len(letras) > 1 and all(unidades[i].tipo == GLIFO for i in indices):
-            operacoes.append(("dividir", (gids[0], letras), tuple(posicoes)))
-        else:
-            return
+    for posicoes in _trechos_desalinhados(unidades, novo, pares):
+        operacao = _operacao_do_trecho([pares[p] for p in posicoes], unidades, novo)
+        if operacao is None:
+            continue
+        tipo, dados, indices, js = operacao
+        operacoes.append((tipo, dados, tuple(posicoes)))
         cobertos_i.update(indices)
         cobertos_j.update(js)
+    return operacoes, cobertos_i, cobertos_j
 
+
+def _trechos_desalinhados(unidades, novo: str, pares):
+    """As posições de cada trecho de pares seguidos que não são o mesmo caractere."""
     trecho = []
     for p, (i, j) in enumerate(pares):
-        igual = (i is not None and j is not None and unidades[i].texto == novo[j]
-                 and unidades[i].tipo != LINHA)
-        if igual:
-            fechar(trecho)
+        if _mesmo_caractere(unidades, novo, i, j):
+            if trecho:
+                yield trecho
             trecho = []
         else:
             trecho.append(p)
-    fechar(trecho)
-    return operacoes, cobertos_i, cobertos_j
+    if trecho:
+        yield trecho
+
+
+def _mesmo_caractere(unidades, novo: str, i: Optional[int], j: Optional[int]) -> bool:
+    """O par é o mesmo caractere dos dois lados (a quebra de linha impressa nunca é)."""
+    return (i is not None and j is not None and unidades[i].texto == novo[j]
+            and unidades[i].tipo != LINHA)
+
+
+def _operacao_do_trecho(trecho, unidades, novo: str):
+    """(tipo, dados, índices dos glifos, posições das letras) do trecho que é ``k -> 1``
+    (juntar boxes) ou ``1 -> k`` (dividir um box); None se ele não é nenhum dos dois."""
+    indices = _glifos_do_trecho(trecho, unidades)
+    js = _letras_do_trecho(trecho, novo)
+    gids = tuple(dict.fromkeys(unidades[i].gid for i in indices))
+    letras = "".join(novo[j] for j in js)
+    tipo = _tipo_estrutural(len(gids), len(letras))
+    if tipo is None or not all(unidades[i].tipo == GLIFO for i in indices):
+        return None
+    dados = (gids, letras) if tipo == "juntar" else (gids[0], letras)
+    return tipo, dados, indices, js
+
+
+def _glifos_do_trecho(trecho, unidades) -> List[int]:
+    return [i for i, _j in trecho if i is not None and unidades[i].glifo]
+
+
+def _letras_do_trecho(trecho, novo: str) -> List[int]:
+    return [j for _i, j in trecho if j is not None and novo[j] != " "]
+
+
+def _tipo_estrutural(n_gids: int, n_letras: int) -> Optional[str]:
+    """k glifos -> 1 letra junta; 1 glifo -> k letras divide."""
+    if n_gids > 1 and n_letras == 1:
+        return "juntar"
+    if n_gids == 1 and n_letras > 1:
+        return "dividir"
+    return None
 
 
 def _palavras_originais(unidades) -> Dict[int, int]:
@@ -424,7 +519,7 @@ def _fronteiras(unidades, itens, plano: Plano) -> None:
     contam: `_ancorar` os põe): juntos numa palavra agora e separados antes (espaço apagado:
     junção), ou o contrário (espaço inserido: quebra). As linhas impressas são da página:
     apagar a quebra de linha não junta."""
-    palavra, linha = _palavras_originais(unidades), plano.linha
+    palavra = _palavras_originais(unidades)
     tipo = {u.gid: u.tipo for u in unidades if u.glifo}
     anterior: Optional[int] = None
     separado = False
@@ -434,13 +529,21 @@ def _fronteiras(unidades, itens, plano: Plano) -> None:
             continue
         if item == "letra" or tipo[gid] != GLIFO:
             continue
-        if anterior is not None:
-            antes_separado = palavra[anterior] != palavra[gid]
-            if separado and not antes_separado:
-                plano.quebrar.add(gid)
-            elif not separado and antes_separado and linha[anterior] == linha[gid]:
-                plano.juntar.add((anterior, gid))
+        _fronteira(plano, palavra, anterior, gid, separado)
         anterior, separado = gid, False
+
+
+def _fronteira(plano: Plano, palavra: Dict[int, int], anterior: Optional[int], gid: int,
+               separado: bool) -> None:
+    """A fronteira entre o box `anterior` e o `gid`, seguidos no texto novo (separados por
+    espaço ou não): a quebra ou a junção, se ela mudou."""
+    if anterior is None:
+        return
+    antes_separado = palavra[anterior] != palavra[gid]
+    if separado and not antes_separado:
+        plano.quebrar.add(gid)
+    elif not separado and antes_separado and plano.linha[anterior] == plano.linha[gid]:
+        plano.juntar.add((anterior, gid))
 
 
 def _letras_novas(unidades, itens, plano: Plano) -> None:
@@ -449,6 +552,13 @@ def _letras_novas(unidades, itens, plano: Plano) -> None:
     palavra toda nova, depois do último glifo antes dela (ou antes do primeiro depois, no
     começo de uma linha). O lugar de verdade é o de `_ancorar`."""
     linha = _linha_original(unidades)
+    for k, fim in _sequencias_de_letras(itens):
+        letras = "".join(c for _item, c in itens[k:fim])
+        plano.virtuais.append((letras, *_ancora_das_letras(itens, k, fim, linha)))
+
+
+def _sequencias_de_letras(itens):
+    """(começo, fim) de cada sequência de itens "letra" seguidos."""
     k = 0
     while k < len(itens):
         if itens[k][0] != "letra":
@@ -457,23 +567,38 @@ def _letras_novas(unidades, itens, plano: Plano) -> None:
         fim = k
         while fim < len(itens) and itens[fim][0] == "letra":
             fim += 1
-        letras = "".join(c for _item, c in itens[k:fim])
-        antes = itens[k - 1] if k else None
-        depois = itens[fim] if fim < len(itens) else None
-        if antes is not None and antes[0] == "glifo":
-            plano.virtuais.append((letras, ("depois", antes[1]), False))
-        elif depois is not None and depois[0] == "glifo":
-            plano.virtuais.append((letras, ("antes", depois[1]), False))
-        else:                                   # uma palavra nova inteira
-            anterior = next((g for item, g in reversed(itens[:k]) if item == "glifo"), None)
-            seguinte = next((g for item, g in itens[fim:] if item == "glifo"), None)
-            if anterior is not None and (seguinte is None or linha.get(anterior) == linha.get(seguinte)):
-                plano.virtuais.append((letras, ("depois", anterior), True))
-            elif seguinte is not None:
-                plano.virtuais.append((letras, ("antes", seguinte), True))
-            else:
-                plano.virtuais.append((letras, ("depois", None), True))
+        yield k, fim
         k = fim
+
+
+def _ancora_das_letras(itens, k: int, fim: int, linha: Dict[int, int]):
+    """(a âncora, a palavra é nova?) das letras `itens[k:fim]`: o glifo logo antes delas ou,
+    sem ele, o logo depois; sem os dois, a de uma palavra nova inteira."""
+    antes = itens[k - 1] if k else None
+    depois = itens[fim] if fim < len(itens) else None
+    if antes is not None and antes[0] == "glifo":
+        return ("depois", antes[1]), False
+    if depois is not None and depois[0] == "glifo":
+        return ("antes", depois[1]), False
+    return _ancora_da_palavra_nova(itens, k, fim, linha), True
+
+
+def _ancora_da_palavra_nova(itens, k: int, fim: int, linha: Dict[int, int]):
+    """Depois do último glifo antes dela, se ele está na linha do primeiro depois (ou se não
+    há glifo depois); senão, antes do primeiro depois; sem glifo nenhum, no começo."""
+    anterior, seguinte = _glifos_em_volta(itens, k, fim)
+    if anterior is not None and (seguinte is None or linha.get(anterior) == linha.get(seguinte)):
+        return ("depois", anterior)
+    if seguinte is not None:
+        return ("antes", seguinte)
+    return ("depois", None)
+
+
+def _glifos_em_volta(itens, k: int, fim: int) -> Tuple[Optional[int], Optional[int]]:
+    """O último glifo antes de `itens[k:fim]` e o primeiro depois (None: não há)."""
+    anterior = next((g for item, g in reversed(itens[:k]) if item == "glifo"), None)
+    seguinte = next((g for item, g in itens[fim:] if item == "glifo"), None)
+    return anterior, seguinte
 
 
 # ----------------------------------------------------------------------

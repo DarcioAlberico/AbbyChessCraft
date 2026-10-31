@@ -22,6 +22,13 @@ def trechos_marcados(texto: str, simbolos: str, negrito: Sequence[Tuple[int, int
                      links: Sequence[Tuple[int, int, str]]) -> List[Tuple[str, Marca]]:
     """Os pedaços seguidos de `texto` com a mesma `Marca`, em ordem. Os trechos são
     `(início, fim)` em `texto` (os de fora dele, cortados); os `links`, `(início, fim, alvo)`."""
+    return _agrupadas(texto, _marcas(texto, simbolos, negrito, italico, duvidosos, links))
+
+
+def _marcas(texto: str, simbolos: str, negrito: Sequence[Tuple[int, int]],
+            italico: Sequence[Tuple[int, int]], duvidosos: Sequence[Tuple[int, int]],
+            links: Sequence[Tuple[int, int, str]]) -> List[list]:
+    """A marca de cada caractere, como lista (os campos de `Marca`)."""
     marcas = [[False, False, c in simbolos, -1, False] for c in texto]
     for k, trechos in ((0, negrito), (1, italico), (4, duvidosos)):
         for inicio, fim in trechos or ():
@@ -30,6 +37,11 @@ def trechos_marcados(texto: str, simbolos: str, negrito: Sequence[Tuple[int, int
     for n, (inicio, fim, _alvo) in enumerate(links):
         for i in range(max(0, inicio), min(fim, len(texto))):
             marcas[i][3] = n
+    return marcas
+
+
+def _agrupadas(texto: str, marcas: List[list]) -> List[Tuple[str, Marca]]:
+    """Os pedaços seguidos de caracteres com a mesma marca."""
     saida, i = [], 0
     while i < len(texto):
         j = i

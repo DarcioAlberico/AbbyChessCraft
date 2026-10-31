@@ -298,15 +298,61 @@ def calibre(caminho: str | Path) -> Optional[List[str]]:
     tem de acabar sem erro, e cada link interno do texto (os do `nav` à parte) tem de sair como
     link para uma página do PDF. É o que dá para conferir sem olhar; o resto (a figura, a
     fonte dos símbolos) se vê no PDF."""
-    import subprocess
-
-    import fitz
-
     executavel = os.environ.get("ABBY_CALIBRE")
     if not executavel or not Path(executavel).is_file():
         return None
-    problemas: List[str] = []
-    do_texto: List[str] = []                    # o texto de cada link interno, fora do nav
+    return _no_calibre(executavel, caminho)
+
+
+def _no_calibre(executavel: str, caminho: str | Path) -> List[str]:
+    """Converte o EPUB em PDF pelo `executavel` e confere a conversão e os links."""
+    do_texto = _links_do_texto(caminho)
+    with tempfile.TemporaryDirectory(prefix="calibre-") as pasta:
+        pdf = Path(pasta) / "livro.pdf"
+        codigo, texto_da_saida = _converter(executavel, caminho, pdf)
+        if codigo is None:
+            return ["o Calibre não converteu o EPUB em 600 s"]
+        if codigo != 0 or not pdf.is_file():
+            ultimas = texto_da_saida.strip().splitlines()[-3:]
+            return [f"o Calibre não converteu o EPUB (código {codigo}): " + " | ".join(ultimas)]
+        problemas = _avisos_do_calibre(texto_da_saida)
+        no_pdf, fora = _links_do_pdf(pdf)
+    problemas += _links_que_faltam(do_texto, no_pdf)
+    if fora:
+        problemas.append(f"{fora} link(s) do PDF do Calibre levam para fora do livro")
+    return problemas
+
+
+def _converter(executavel: str, caminho: str | Path, pdf: Path) -> Tuple[Optional[int], str]:
+    """(o código de saída, o que o `ebook-convert` imprimiu); `None` no código se ele passou
+    de 600 s (e foi morto)."""
+    import subprocess
+
+    processo = subprocess.Popen([executavel, str(caminho), str(pdf)], stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                                errors="replace")
+    try:
+        texto_da_saida, _ = processo.communicate(timeout=600)
+    except subprocess.TimeoutExpired:
+        _matar_a_arvore(processo)
+        return None, ""
+    return processo.returncode, texto_da_saida
+
+
+def _matar_a_arvore(processo) -> None:
+    """O `ebook-convert` abre filhos (`calibre-parallel`): a árvore inteira sai."""
+    import subprocess
+
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(processo.pid)],
+                       capture_output=True, check=False)
+    processo.kill()
+    processo.communicate()
+
+
+def _links_do_texto(caminho: str | Path) -> List[str]:
+    """O texto visível de cada link interno dos XHTML do EPUB, fora do `nav`."""
+    do_texto: List[str] = []
     with zipfile.ZipFile(caminho) as z:
         for nome in z.namelist():
             if nome.endswith(".xhtml") and not nome.endswith("nav.xhtml"):
@@ -320,52 +366,50 @@ def calibre(caminho: str | Path) -> Optional[List[str]]:
                     visivel = " ".join(visivel.split())
                     if visivel and not re.match(r"[a-z][a-z0-9+.-]*:", href):
                         do_texto.append(visivel)
-    with tempfile.TemporaryDirectory(prefix="calibre-") as pasta:
-        pdf = Path(pasta) / "livro.pdf"
-        processo = subprocess.Popen([executavel, str(caminho), str(pdf)], stdout=subprocess.PIPE,
-                                    stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-                                    errors="replace")
-        try:
-            texto_da_saida, _ = processo.communicate(timeout=600)
-        except subprocess.TimeoutExpired:
-            # O `ebook-convert` abre filhos (`calibre-parallel`): a árvore inteira sai.
-            if os.name == "nt":
-                subprocess.run(["taskkill", "/F", "/T", "/PID", str(processo.pid)],
-                               capture_output=True, check=False)
-            processo.kill()
-            processo.communicate()
-            return ["o Calibre não converteu o EPUB em 600 s"]
-        if processo.returncode != 0 or not pdf.is_file():
-            ultimas = texto_da_saida.strip().splitlines()[-3:]
-            return [f"o Calibre não converteu o EPUB (código {processo.returncode}): "
-                    + " | ".join(ultimas)]
-        problemas += [f"o Calibre avisou: {linha.strip()}"
-                      for linha in texto_da_saida.splitlines()
-                      if re.search(r"Traceback|Failed to|Could not|not found|Unknown link",
-                                   linha)]
-        with fitz.open(pdf) as doc:
-            no_pdf, fora = [], 0
-            for pagina in doc:
-                for link in pagina.get_links():
-                    if link.get("kind") != fitz.LINK_GOTO:
-                        continue
-                    if not 0 <= link.get("page", -1) < doc.page_count:
-                        fora += 1
-                    no_pdf.append(" ".join(pagina.get_textbox(link["from"]).split()))
-    # Cada link do texto casa com um do PDF de texto igual, ou, sem ele, com o mais curto que
-    # contém o texto dele (a caixa do PDF pode levar a pontuação vizinha; "Diagrama 1" não
-    # gasta o "Diagrama 12" de outro link). Os do sumário sobram, e tudo bem.
+    return do_texto
+
+
+def _avisos_do_calibre(texto_da_saida: str) -> List[str]:
+    """As linhas da saída do `ebook-convert` que dizem que algo falhou ou não foi achado."""
+    return [f"o Calibre avisou: {linha.strip()}"
+            for linha in texto_da_saida.splitlines()
+            if re.search(r"Traceback|Failed to|Could not|not found|Unknown link", linha)]
+
+
+def _links_do_pdf(pdf: Path) -> Tuple[List[str], int]:
+    """O texto sob cada link interno do PDF e quantos deles levam para fora das páginas."""
+    import fitz
+
+    with fitz.open(pdf) as doc:
+        no_pdf, fora = [], 0
+        for pagina in doc:
+            for link in pagina.get_links():
+                if link.get("kind") != fitz.LINK_GOTO:
+                    continue
+                if not 0 <= link.get("page", -1) < doc.page_count:
+                    fora += 1
+                no_pdf.append(" ".join(pagina.get_textbox(link["from"]).split()))
+    return no_pdf, fora
+
+
+def _links_que_faltam(do_texto: List[str], no_pdf: List[str]) -> List[str]:
+    """Cada link do texto gasta um do PDF (`_o_que_casa`); os do sumário sobram, e tudo bem."""
+    problemas = []
     for texto in do_texto:
-        iguais = [k for k, t in enumerate(no_pdf) if t == texto]
-        contem = sorted((len(t), k) for k, t in enumerate(no_pdf) if texto in t)
-        achado = iguais[0] if iguais else (contem[0][1] if contem else None)
+        achado = _o_que_casa(texto, no_pdf)
         if achado is None:
             problemas.append(f"o link \"{texto}\" não saiu como link no PDF do Calibre")
         else:
             del no_pdf[achado]
-    if fora:
-        problemas.append(f"{fora} link(s) do PDF do Calibre levam para fora do livro")
     return problemas
+
+
+def _o_que_casa(texto: str, no_pdf: List[str]) -> Optional[int]:
+    """O link do PDF de texto igual, ou, sem ele, o mais curto que contém o texto (a caixa do
+    PDF pode levar a pontuação vizinha; "Diagrama 1" não gasta o "Diagrama 12" de outro link)."""
+    iguais = [k for k, t in enumerate(no_pdf) if t == texto]
+    contem = sorted((len(t), k) for k, t in enumerate(no_pdf) if texto in t)
+    return iguais[0] if iguais else (contem[0][1] if contem else None)
 
 
 def epubcheck(caminho: str | Path) -> Optional[List[str]]:

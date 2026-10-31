@@ -302,6 +302,42 @@ def test_calibre_sem_configuracao_e_none(tmp_path, monkeypatch):
     assert validacao.calibre(tmp_path / "x.epub") is None
 
 
+def test_os_links_que_o_calibre_confere_saem_do_texto_e_casam_pelo_texto(tmp_path):
+    """Sem o Calibre, as partes do `calibre` que só leem: os links do texto (fora do nav),
+    pelo EPUB escrito, e cada um gastando um link do PDF de texto igual ou que o contém."""
+    paginas, _, _ = _livro_numerado()
+    destino = tmp_path / "a.epub"
+    epub.escrever(paginas, destino, epub.Metadados("L"), limite_do_capitulo=10)
+    assert validacao._links_do_texto(destino) == ["Diagrama 1", "capítulo 1", "Capítulo 2"]
+    # A caixa do PDF leva a pontuação; o sumário sobra; um link do PDF não serve a dois.
+    assert validacao._links_que_faltam(["Diagrama 1", "capítulo 1", "Diagrama 1"],
+                                       ["Diagrama 1.", "capítulo 1", "Sumário"]) == [
+        'o link "Diagrama 1" não saiu como link no PDF do Calibre']
+    # O mais curto, não o primeiro: "Diagrama 1" não gasta o "Diagrama 12".
+    assert validacao._links_que_faltam(["Diagrama 1", "Diagrama 12"],
+                                       ["Diagrama 12", "Diagrama 1"]) == []
+
+
+def test_os_avisos_do_calibre_e_os_links_do_pdf(tmp_path):
+    saida = ("Converting input to HTML...\n"
+             "ERROR:direct_composition_support.cc(91)] GPU\n"      # ruído do Chromium
+             "  Referenced file 'OEBPS/texto/capitulo-009.xhtml' not found\n"
+             "Output saved to livro.pdf\n")
+    assert validacao._avisos_do_calibre(saida) == [
+        "o Calibre avisou: Referenced file 'OEBPS/texto/capitulo-009.xhtml' not found"]
+    pdf = tmp_path / "livro.pdf"
+    with fitz.open() as doc:
+        doc.new_page()
+        doc.new_page()
+        pagina = doc[0]
+        pagina.insert_text((72, 80), "Diagrama 1", fontsize=11)
+        pagina.insert_link({"kind": fitz.LINK_GOTO, "page": 1, "from": fitz.Rect(70, 68, 160, 84)})
+        pagina.insert_link({"kind": fitz.LINK_URI, "uri": "https://lichess.org",
+                            "from": fitz.Rect(70, 100, 160, 116)})
+        doc.save(pdf)
+    assert validacao._links_do_pdf(pdf) == (["Diagrama 1"], 0)
+
+
 def test_o_docx_liga_diagramas_e_capitulos(tmp_path):
     from docx import Document
 

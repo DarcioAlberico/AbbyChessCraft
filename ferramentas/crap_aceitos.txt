@@ -181,5 +181,5 @@ abbychess/substituir.py _juntar_em_casos  # a reduzir (Q8)
 abbychess/substituir.py aplicar_na_pagina  # a reduzir (Q8)
 abbychess/substituir.py casos_da_pagina  # a reduzir (Q8)
 abbychess/substituir.py validar  # a reduzir (Q8)
+abbychess/validacao_do_epub.py _no_calibre  # o validador externo Calibre (ABBY_CALIBRE, o ebook-convert): só roda no portão
 abbychess/validacao_do_epub.py ace  # o validador externo Ace by DAISY (ABBY_ACE, num Chrome sem janela): só roda no portão
-abbychess/validacao_do_epub.py calibre  # a reduzir (Q8)

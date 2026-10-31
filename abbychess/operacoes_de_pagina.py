@@ -255,7 +255,7 @@ class ControladorDaSequencia:
             angulo = round(float(angulo), 2)
             if abs(angulo) > self._p.ENDIREITAR_NO_MAXIMO:
                 self._p._avisar(f"Endireitar páginas: no máximo {self._p.ENDIREITAR_NO_MAXIMO:g}° "
-                             "(para mais, gire a página).", 6000)
+                                "(para mais, gire a página).", 6000)
                 return False
 
         def manter(box) -> bool:
@@ -357,7 +357,7 @@ class ControladorDaSequencia:
             return False
         except (OSError, RuntimeError) as erro:   # a fonte ilegível (o tamanho, o ângulo)
             self._p.eventos.emitir("aviso", "Páginas", f"{descricao}: a fonte não foi lida "
-                                f"({erro}); nada mudou.")
+                                   f"({erro}); nada mudou.")
             return False
         if nova == antes:
             self._p._avisar(f"{descricao}: nada muda.", 6000)
@@ -379,7 +379,7 @@ class ControladorDaSequencia:
             self.aplicar_sequencia(nova, depois_de_gravar, gravar)
         except OSError as erro:
             self._p.eventos.emitir("aviso", "Páginas", f"{descricao} não foi gravado ({erro}); "
-                                "nada mudou.")
+                                   "nada mudou.")
             return False
         self._p.historico.registrar(transacao)
         self._p.eventos.emitir("acoes_mudaram")
@@ -388,7 +388,7 @@ class ControladorDaSequencia:
         return True
 
     def aplicar_sequencia(self, nova: "sq.Sequencia", depois_de_gravar=None,
-                           gravar=None) -> None:
+                          gravar=None) -> None:
         """Grava a sequência (com `gravar(nova)`, se dado: a das páginas trocadas inteiras) e
         leva a janela junto: as visitas e a página aberta pelo `pid` (a apagada dá lugar à
         vizinha), e `sequencia_mudou` para quem guarda posições."""

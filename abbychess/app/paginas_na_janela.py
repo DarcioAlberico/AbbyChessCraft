@@ -63,10 +63,10 @@ class PaginasNaJanela:
 
     def girar_a_direita(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         """Um gesto (o menu, a gaveta): 90° à direita, sem diálogo."""
-        self.pagina.girar_paginas(self._posicoes_de_agora(selecionadas), 90)
+        self.pagina.operacoes.girar_paginas(self._posicoes_de_agora(selecionadas), 90)
 
     def girar_a_esquerda(self, selecionadas: Optional[Sequence[int]] = None) -> None:
-        self.pagina.girar_paginas(self._posicoes_de_agora(selecionadas), 270)
+        self.pagina.operacoes.girar_paginas(self._posicoes_de_agora(selecionadas), 270)
 
     def mover_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         escolha = self._perguntar_pela_selecao(
@@ -77,7 +77,7 @@ class PaginasNaJanela:
             lugar="Depois da página", lugar_padrao=self.pagina.indice, validar=_mover_vale)
         if escolha is not None:
             posicoes, depois_da = escolha
-            self.pagina.mover_paginas(posicoes, depois_da)
+            self.pagina.operacoes.mover_paginas(posicoes, depois_da)
 
     def apagar_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         escolha = self._perguntar_pela_selecao(
@@ -87,7 +87,7 @@ class PaginasNaJanela:
                       "guardadas no projeto, com os glifos e as correções: {desfazer}, ou "
                       "Página › Páginas apagadas…, as devolvem.")
         if escolha is not None:
-            self.pagina.apagar_paginas(escolha[0])
+            self.pagina.operacoes.apagar_paginas(escolha[0])
 
     def _perguntar_pela_selecao(self, titulo: str, selecionadas, efeito: Tuple[str, str],
                                 ok: str, explicacao: str, **mais):
@@ -115,7 +115,7 @@ class PaginasNaJanela:
                         "eles são copiados para o projeto (os originais podem sair do lugar). "
                         "{desfazer} desfaz."))
         if escolha is not None:
-            self.pagina.inserir_paginas(caminhos, escolha[1] + 1)
+            self.pagina.operacoes.inserir_paginas(caminhos, escolha[1] + 1)
 
     def _total(self) -> int:
         return self.pagina.fonte.total if self.pagina.fonte else 0
@@ -130,7 +130,7 @@ class PaginasNaJanela:
             explicacao="A imagem gira, e os glifos, as áreas e os diagramas lidos vão junto. "
                        "{desfazer} desfaz.")
         if escolha is not None:
-            self.pagina.girar_paginas(*escolha)
+            self.pagina.operacoes.girar_paginas(*escolha)
 
     def cortar_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         margens = [dp.campo_de_porcentagem(0.0, 0.0, 95.0) for _ in range(4)]
@@ -152,7 +152,7 @@ class PaginasNaJanela:
                        "ficam de fora são guardados: {desfazer}, ou Tirar o corte…, os "
                        "devolvem.")
         if escolha is not None:
-            self.pagina.cortar_paginas(*escolha)
+            self.pagina.operacoes.cortar_paginas(*escolha)
 
     def tirar_o_corte(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         escolha = self._perguntar_pela_selecao(
@@ -162,7 +162,7 @@ class PaginasNaJanela:
                              "guardou. A metade de uma página dividida não: o {desfazer} da "
                              "divisão junta as metades.")
         if escolha is not None:
-            self.pagina.tirar_o_corte(escolha[0])
+            self.pagina.operacoes.tirar_o_corte(escolha[0])
 
     def dividir_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         onde = dp.campo_de_porcentagem(50.0, 5.0, 95.0, " % da largura")
@@ -194,7 +194,7 @@ class PaginasNaJanela:
                        "como está. {desfazer} junta de novo.")
         if escolha is not None:
             with _ocupado(self, "Dividindo as páginas…"):
-                self.pagina.dividir_paginas(*escolha)
+                self.pagina.operacoes.dividir_paginas(*escolha)
 
     def endireitar_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         limite = self.pagina.ENDIREITAR_NO_MAXIMO
@@ -252,7 +252,7 @@ class PaginasNaJanela:
                        "áreas que você desenhou; o F5 lê de novo. {desfazer} desfaz.")
         if escolha is not None:
             with _ocupado(self, "Endireitando as páginas…"):
-                self.pagina.endireitar_paginas(*escolha)
+                self.pagina.operacoes.endireitar_paginas(*escolha)
 
     def paginas_apagadas(self) -> None:
         apagadas = self.projeto.sequencia.apagadas if self.projeto is not None else ()
@@ -261,7 +261,7 @@ class PaginasNaJanela:
             return
         pids = dp.perguntar_apagadas(self, apagadas)
         if pids:
-            self.pagina.restaurar_paginas(pids)
+            self.pagina.operacoes.restaurar_paginas(pids)
 
 
 def _mover_vale(posicoes, depois_da: int):

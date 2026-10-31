@@ -194,7 +194,7 @@ def test_a_ordem_que_muda_durante_a_procura_do_esquecer_procura_de_novo(livro):
     c.ctl.esquecer([c.caminho])
     c.ctl.executar.tudo()
     assert c.na_fila() == 10                            # só a página aberta, por enquanto
-    assert c.ctl.mover_paginas([2], -1)                 # a 3ª vai para o começo
+    assert c.ctl.operacoes.mover_paginas([2], -1)                 # a 3ª vai para o começo
     c.ctl.executar.tudo()
     c.esperar(lambda: c.na_fila() == 30)
     assert c.da_amostra() == 0

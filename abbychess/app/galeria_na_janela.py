@@ -128,13 +128,13 @@ class GaleriaNaJanela:
         quais = f"lidos como '{char}'" if char else "sem leitura"
         self.statusBar().showMessage(f"Juntando do livro os glifos {quais}…", 0)
         self._pedido_da_galeria += 1
-        pedido, versao = self._pedido_da_galeria, p.mudancas_da_sequencia
+        pedido, versao = self._pedido_da_galeria, p.operacoes.mudancas_da_sequencia
         # Com o índice ainda montando, a Galeria do livro vê só as páginas já indexadas.
         montando = "" if self.busca.pronto.is_set() else " (o índice ainda está sendo montado)"
 
         def chegou(achados):
             # Uma resposta velha (outro pedido depois, ou a ordem do livro mudou) não entra.
-            if pedido != self._pedido_da_galeria or versao != p.mudancas_da_sequencia:
+            if pedido != self._pedido_da_galeria or versao != p.operacoes.mudancas_da_sequencia:
                 return
             self.statusBar().clearMessage()
             itens = [Item(a.pagina, a.gid, a.char, a.confianca, a.fonte) for a in achados

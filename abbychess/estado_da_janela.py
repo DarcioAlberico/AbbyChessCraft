@@ -79,7 +79,7 @@ def _primeiro(*condicoes: Tuple[bool, str]) -> Optional[str]:
 
 
 def _das_paginas(p) -> Tuple[Tuple[Tuple[Optional[str], str], ...], bool]:
-    motivo = p.motivo_para_nao_mudar_as_paginas()
+    motivo = p.operacoes.motivo_para_nao_mudar_as_paginas()
     apagadas = bool(p.projeto.sequencia.apagadas) if p.projeto is not None else False
     paginas = []
     for k, dica in enumerate(DICAS_DAS_PAGINAS):

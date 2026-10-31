@@ -13,7 +13,7 @@ def _pagina(**mudar):
     base = dict(pronto=True, lote_rodando=False, projeto=projeto, fonte=Ns(total=5), boxes=[1],
                 indice=2, navegador=Ns(pode_voltar=False, pode_avancar=False),
                 historico=Ns(proximo_a_desfazer=None, proximo_a_refazer=None),
-                motivo_para_nao_mudar_as_paginas=lambda: None)
+                operacoes=Ns(motivo_para_nao_mudar_as_paginas=lambda: None))
     base.update(mudar)
     return Ns(**base)
 
@@ -40,7 +40,7 @@ def test_com_o_lote_rodando_abrir_espera_e_cancelar_vale():
 
 def test_as_operacoes_de_pagina_levam_o_motivo_na_dica():
     motivo = "O projeto está aberto só para leitura."
-    estado = ej.calcular(_pagina(motivo_para_nao_mudar_as_paginas=lambda: motivo), LIVRO, VISTA)
+    estado = ej.calcular(_pagina(operacoes=Ns(motivo_para_nao_mudar_as_paginas=lambda: motivo)), LIVRO, VISTA)
     assert all(m == motivo and dica.endswith(motivo) for m, dica in estado.paginas)
     assert not estado.paginas_mudam
     livre = ej.calcular(_pagina(), LIVRO, VISTA)

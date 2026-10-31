@@ -129,10 +129,10 @@ def main() -> int:
             [args.indice + 1]).apagadas), "dialogo-paginas-apagadas", ajustar=False)
 
         p, i = janela.pagina, args.indice
-        for nome, fazer in (("1-girada-90", lambda: p.girar_paginas([i], 90)),
-                            ("2-cortada", lambda: p.cortar_paginas([i], (0.08, 0.06, 0.08, 0.1))),
-                            ("3-dividida-esquerda", lambda: p.dividir_paginas([i], 0.5)),
-                            ("5-endireitada-3-graus", lambda: p.endireitar_paginas([i], 3.0))):
+        for nome, fazer in (("1-girada-90", lambda: p.operacoes.girar_paginas([i], 90)),
+                            ("2-cortada", lambda: p.operacoes.cortar_paginas([i], (0.08, 0.06, 0.08, 0.1))),
+                            ("3-dividida-esquerda", lambda: p.operacoes.dividir_paginas([i], 0.5)),
+                            ("5-endireitada-3-graus", lambda: p.operacoes.endireitar_paginas([i], 3.0))):
             fazer()
             _esperar(app, janela)
             janela.ir_para_pagina(i)

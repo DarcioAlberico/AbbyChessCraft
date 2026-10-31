@@ -252,7 +252,7 @@ class DesenhoDaJanela:
             functools.partial(self._restaurar_a_origem, apagada.entrada.pid, gid))
 
     def _restaurar_a_origem(self, pid: int, gid: int) -> None:
-        if self.pagina.restaurar_paginas([pid]):
+        if self.pagina.operacoes.restaurar_paginas([pid]):
             self.ir_a_origem(self.projeto.sequencia.posicao_de(pid), gid)
 
     def _layout_mudou(self) -> None:

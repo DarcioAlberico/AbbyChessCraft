@@ -112,7 +112,7 @@ def test_inserir_pelo_menu(app, janela, monkeypatch, tmp_path):  # noqa: F811
 def test_paginas_apagadas_pelo_menu_devolve(app, janela, monkeypatch):  # noqa: F811
     projeto = janela.projeto
     pids = projeto.sequencia.pids
-    janela.pagina.apagar_paginas([3])
+    janela.pagina.operacoes.apagar_paginas([3])
     monkeypatch.setattr(dp, "perguntar_apagadas", lambda _j, apagadas: [apagadas[0].entrada.pid])
     janela.acao_paginas_apagadas.trigger()
     assert projeto.sequencia.pids == pids and not janela.acao_paginas_apagadas.isEnabled()

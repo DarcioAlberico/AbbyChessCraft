@@ -59,7 +59,7 @@ def _centro_da_tinta(ctl):
 def test_ca_12_14_o_angulo_a_mao_vence_o_medido_e_o_glifo_marcado_gira(projeto, ctl):
     _gravar(projeto)
     pid = projeto.pid_da_pagina(0)
-    assert ctl.endireitar_paginas([0], 5.0)
+    assert ctl.operacoes.endireitar_paginas([0], 5.0)
     assert projeto.sequencia.entrada_de(pid).angulo == 5.0
     assert ctl.fonte.inclinacao(0) == 5.0
     modelo = projeto.carregar_modelo(0)
@@ -75,7 +75,7 @@ def test_ca_12_14_o_ctrl_z_devolve_o_angulo_e_os_boxes(projeto, ctl):
     _gravar(projeto)
     antes = [(b.gid, b.entry.char, b.entry.x1, b.entry.y1)
              for b in projeto.carregar_modelo(0).boxes]
-    ctl.endireitar_paginas([0], -3.5)
+    ctl.operacoes.endireitar_paginas([0], -3.5)
     ctl.desfazer()
     assert projeto.sequencia.entrada_em(0).angulo is None
     assert [(b.gid, b.entry.char, b.entry.x1, b.entry.y1)
@@ -86,7 +86,7 @@ def test_ca_12_14_o_ctrl_z_devolve_o_angulo_e_os_boxes(projeto, ctl):
 
 def test_o_angulo_a_mao_fica_depois_de_reabrir(projeto, ctl):
     _gravar(projeto)
-    ctl.endireitar_paginas([0], 2.0)
+    ctl.operacoes.endireitar_paginas([0], 2.0)
     projeto.fechar()
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     assert reaberto.sequencia.entrada_em(0).angulo == 2.0
@@ -94,15 +94,15 @@ def test_o_angulo_a_mao_fica_depois_de_reabrir(projeto, ctl):
 
 
 def test_voltar_ao_medido_e_o_limite(projeto, ctl):
-    ctl.endireitar_paginas([3], 1.0)
-    assert not ctl.endireitar_paginas([3], 25.0)
-    assert ctl.endireitar_paginas([3], None)
+    ctl.operacoes.endireitar_paginas([3], 1.0)
+    assert not ctl.operacoes.endireitar_paginas([3], 25.0)
+    assert ctl.operacoes.endireitar_paginas([3], None)
     assert projeto.sequencia.entrada_em(3).angulo is None
-    assert not ctl.endireitar_paginas([3], None)                # nada muda
+    assert not ctl.operacoes.endireitar_paginas([3], None)                # nada muda
 
 
 def test_a_pagina_sem_glifos_so_muda_o_angulo(projeto, ctl):
-    assert ctl.endireitar_paginas([5, 6], 1.5)
+    assert ctl.operacoes.endireitar_paginas([5, 6], 1.5)
     assert projeto.carregar_modelo(5) is None
 
 

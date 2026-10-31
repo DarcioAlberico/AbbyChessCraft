@@ -26,6 +26,10 @@ LIMITE = 500
 #: Os tipos, do mais grave ao menos.
 ERRO, AVISO = "erro", "aviso"
 
+#: O aviso da barra que pede leitura (o motivo de uma recusa, o resumo de uma operação), em
+#: ms; o comum fica no padrão de `ControladorDePagina._avisar`.
+AVISO_LONGO_MS = 8000
+
 
 @dataclass(frozen=True)
 class Aviso:

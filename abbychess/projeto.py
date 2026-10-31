@@ -271,6 +271,8 @@ class ProjetoDeLivro:
         #: ordem é sempre a do livro e depois a do cache, nunca o contrário.
         self._trava_do_cache = threading.RLock()
         self._travado = somente_leitura         # este objeto segura uma trava de só leitura
+        #: Este objeto segura a pasta contra outro processo (`gravacao.tomar_a_pasta`).
+        self._dono_da_pasta = False
         #: As páginas lidas, no modelo (as mais recentes), por `pid`, e a foto
         #: (`modelo.foto`) de cada glifo na última gravação síncrona: quem grava listas de
         #: `BoxEntry` (o lote, as ferramentas) pode tê-los mudado no lugar, e só a foto diz o
@@ -340,13 +342,20 @@ class ProjetoDeLivro:
             raise ProjetoInvalido(f"Já existe um projeto em {pasta}.")
         (pasta / PASTA_DE_PADROES).mkdir(parents=True, exist_ok=True)
         (pasta / PASTA_DE_PAGINAS).mkdir(parents=True, exist_ok=True)
-        dados = Projeto(nome=nome, fonte=_caminho_gravado(fonte, pasta),
-                        criado=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                        endireitar=True, fonte_sha256=sha_da_fonte(fonte),
-                        fonte_tamanho=fonte.stat().st_size)
-        projeto = cls(pasta, dados)
-        projeto.salvar()
-        projeto.montar_sequencia()
+        if not gv.tomar_a_pasta(pasta):
+            raise ProjetoInvalido(f"Outra janela do AbbyChessCraft está criando {pasta}.")
+        try:
+            dados = Projeto(nome=nome, fonte=_caminho_gravado(fonte, pasta),
+                            criado=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                            endireitar=True, fonte_sha256=sha_da_fonte(fonte),
+                            fonte_tamanho=fonte.stat().st_size)
+            projeto = cls(pasta, dados)
+            projeto._dono_da_pasta = True
+            projeto.salvar()
+            projeto.montar_sequencia()
+        except BaseException:
+            gv.soltar_a_pasta(pasta)
+            raise
         return projeto
 
     @classmethod
@@ -373,27 +382,56 @@ class ProjetoDeLivro:
         except (ValueError, TypeError) as erro:
             raise ProjetoInvalido(f"{arquivo} está ilegível: {erro}") from erro
         if dados.versao > VERSAO:
-            projeto = cls(pasta, dados, somente_leitura=False)
-            if projeto.fonte_ausente:
-                achada = projeto._procurar_fonte()
-                if achada is not None:          # só na memória: nada é gravado
-                    dados.fonte, projeto.fonte_relocalizada = str(achada), True
-            # A trava por último: uma falha antes dela não deixa a pasta travada sem dono.
-            projeto.somente_leitura = projeto._travado = True
-            gv.proteger(pasta)
-            projeto._guardar_a_v1_na_memoria(v1_vence=False)
-            try:
-                projeto.montar_sequencia()  # só leitura: nada é gravado
-            except ProjetoInvalido:     # a sequência de um formato que esta versão não lê
-                projeto._sequencia, projeto._proximo_pid = projeto._sequencia_da_v2()
-            return projeto
+            return cls._abrir_so_para_leitura(pasta, dados, v1_vence=False)
+        if not gv.tomar_a_pasta(pasta):
+            # Outro processo o tem aberto (Q-P5, decisão §13.3): nada aqui grava, nem limpa
+            # os temporários das gravações dele.
+            return cls._abrir_so_para_leitura(
+                pasta, dados, v1_vence=dados.versao < 2,
+                motivo="O projeto já está aberto em outra janela do AbbyChessCraft: este abre "
+                       "só para leitura, e o que você mudar aqui não é gravado.")
+        try:
+            projeto = cls._abrir_para_gravar(pasta, dados, bytes_do_projeto,
+                                             bool(desconhecidos or outros_limiares))
+        except BaseException:
+            gv.soltar_a_pasta(pasta)
+            raise
+        projeto._dono_da_pasta = True
+        return projeto
+
+    @classmethod
+    def _abrir_so_para_leitura(cls, pasta: Path, dados: Projeto, *, v1_vence: bool,
+                               motivo: str = "") -> "ProjetoDeLivro":
+        """O projeto que esta abertura não grava (o de versão mais nova, o que outro processo
+        tem aberto): a fonte achada pelo SHA-256, a v1 e a sequência só na memória."""
+        projeto = cls(pasta, dados, somente_leitura=False)
+        projeto.motivo_so_leitura = motivo
+        if projeto.fonte_ausente:
+            achada = projeto._procurar_fonte()
+            if achada is not None:              # só na memória: nada é gravado
+                dados.fonte, projeto.fonte_relocalizada = str(achada), True
+        # A trava por último: uma falha antes dela não deixa a pasta travada sem dono.
+        projeto.somente_leitura = projeto._travado = True
+        gv.proteger(pasta)
+        projeto._guardar_a_v1_na_memoria(v1_vence=v1_vence)
+        try:
+            projeto.montar_sequencia()          # só leitura: nada é gravado
+        except ProjetoInvalido:         # a sequência de um formato que esta versão não lê
+            projeto._sequencia, projeto._proximo_pid = projeto._sequencia_da_v2(gravar=False)
+        return projeto
+
+    @classmethod
+    def _abrir_para_gravar(cls, pasta: Path, dados: Projeto, bytes_do_projeto: bytes,
+                           mudou: bool) -> "ProjetoDeLivro":
+        """O projeto que este processo tem para gravar (`tomar_a_pasta`): os temporários
+        limpos, a fonte achada, a cadeia de migração e os consertos da sequência gravados.
+        `mudou`: o `projeto.json` tinha campos que esta versão regrava em `extras`."""
         (pasta / PASTA_DE_PADROES).mkdir(exist_ok=True)
         (pasta / PASTA_DE_PAGINAS).mkdir(exist_ok=True)
         gv.limpar_temporarios(pasta)
         projeto = cls(pasta, dados)
         # A fonte antes da migração: a sequência da v3 tem uma entrada por página do PDF, e
         # sem o PDF o número de páginas não se sabe.
-        mudou = bool(desconhecidos or outros_limiares)
         if projeto.fonte.is_file():
             if not dados.fonte_sha256 or not dados.fonte_tamanho:
                 dados.fonte_sha256 = sha_da_fonte(projeto.fonte)
@@ -448,8 +486,9 @@ class ProjetoDeLivro:
         return projeto
 
     def fechar(self, limite: Optional[float] = 30.0) -> bool:
-        """Espera o gravador gravar o que está pendente e solta a trava de só leitura que
-        este objeto segura (uma vez só). Devolve se ficou tudo gravado."""
+        """Espera o gravador gravar o que está pendente e solta as travas que este objeto
+        segura (a de só leitura e a entre processos, uma vez só). Devolve se ficou tudo
+        gravado."""
         gravou = True
         if self._gravador is not None:
             gravou = self._gravador.fechar(limite)
@@ -458,6 +497,9 @@ class ProjetoDeLivro:
         if self._travado:
             self._travado = False
             gv.liberar(self.pasta)
+        if self._dono_da_pasta:
+            self._dono_da_pasta = False
+            gv.soltar_a_pasta(self.pasta)
         return gravou
 
     # ------------------------------------------------------------------

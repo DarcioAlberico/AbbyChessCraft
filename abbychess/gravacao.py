@@ -76,6 +76,64 @@ def liberar(pasta: Caminho) -> None:
             _protegidas.pop(chave, None)
 
 
+#: O arquivo da trava entre processos de um projeto (SPEC-qualidade Q-P5): um byte travado
+#: pelo sistema (msvcrt no Windows, flock fora dele), solto quando o processo fecha o
+#: projeto ou morre.
+ARQUIVO_DA_TRAVA = "projeto.lock"
+#: O byte que o Windows trava, longe do conteúdo (o arquivo fica vazio): ler ou copiar a
+#: `projeto.lock` (um backup, o Explorer) não esbarra na trava.
+BYTE_DA_TRAVA = 1 << 30
+#: pasta -> [descritor da trava, quantos projetos abertos a usam] deste processo.
+_donas: dict = {}
+
+
+def _travar(fd: int) -> None:
+    if os.name == "nt":
+        import msvcrt
+
+        os.lseek(fd, BYTE_DA_TRAVA, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def tomar_a_pasta(pasta: Caminho) -> bool:
+    """A pasta do projeto para gravar, contra outro processo: falso se outro já a tem. No
+    mesmo processo, cada abertura conta (como `proteger`), e cada `soltar_a_pasta` desconta.
+    Sem como criar a trava (mídia só de leitura), verdadeiro: a gravação é que vai falhar."""
+    chave = Path(pasta).resolve()
+    with _trava:
+        dona = _donas.get(chave)
+        if dona is not None:
+            dona[1] += 1
+            return True
+        try:
+            fd = os.open(chave / ARQUIVO_DA_TRAVA, os.O_RDWR | os.O_CREAT, 0o644)
+        except OSError:
+            return True
+        try:
+            _travar(fd)
+        except OSError:
+            os.close(fd)
+            return False
+        _donas[chave] = [fd, 1]
+        return True
+
+
+def soltar_a_pasta(pasta: Caminho) -> None:
+    chave = Path(pasta).resolve()
+    with _trava:
+        dona = _donas.get(chave)
+        if dona is None:
+            return
+        dona[1] -= 1
+        if dona[1] <= 0:
+            del _donas[chave]
+            os.close(dona[0])                   # fechar o descritor solta a trava
+
+
 def _recusar_se_protegida(caminho: Path) -> None:
     if protegida(caminho):
         raise SomenteLeitura(

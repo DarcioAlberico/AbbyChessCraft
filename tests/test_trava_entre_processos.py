@@ -25,22 +25,22 @@ def _outro_dono(pasta):
     fd = os.open(pasta / "projeto.lock", os.O_RDWR | os.O_CREAT, 0o644)
     try:
         if sys.platform == "win32":
+            os.lseek(fd, gv.BYTE_DA_TRAVA, os.SEEK_SET)
             msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
         else:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         yield
         if sys.platform == "win32":
-            os.lseek(fd, 0, os.SEEK_SET)
+            os.lseek(fd, gv.BYTE_DA_TRAVA, os.SEEK_SET)
             msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
     finally:
         os.close(fd)
 
 
 def _fotografia(pasta):
-    """Os arquivos e as pastas, com os bytes; a `projeto.lock` só pelo nome (o byte travado
-    não se lê por outro descritor no Windows)."""
-    return {p.relative_to(pasta).as_posix(): (p.read_bytes() if p.is_file()
-                                              and p.name != "projeto.lock" else None)
+    """Os arquivos e as pastas, com os bytes (a `projeto.lock` travada inclusive: um backup a
+    copia)."""
+    return {p.relative_to(pasta).as_posix(): (p.read_bytes() if p.is_file() else None)
             for p in sorted(pasta.rglob("*"))}
 
 

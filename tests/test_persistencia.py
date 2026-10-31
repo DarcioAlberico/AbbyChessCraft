@@ -448,6 +448,7 @@ def test_fonte_dentro_do_projeto_fica_relativa_e_o_projeto_pode_mudar_de_pasta(t
     fonte = _pagina_sintetica(pasta / "pagina.png")
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Dentro", fonte)
     assert projeto.pasta == pasta.resolve() and projeto.dados.fonte == "pagina.png"
+    projeto.fechar()                    # aberto, ele segura a pasta (a trava entre processos)
     movida = tmp_path / "outro_lugar" / "dentro"
     shutil.move(str(pasta), str(movida))
     reaberto = ProjetoDeLivro.abrir(movida)

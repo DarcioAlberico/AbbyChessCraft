@@ -41,6 +41,7 @@ from core.pagina import Figura, PaginaExtraida, Paragrafo
 from abbychess import epub
 from abbychess import gravacao as gv
 from abbychess import links_de_analise
+from abbychess import marcacao
 
 #: A largura do diagrama sem medida de casa e a máxima de qualquer figura, em centímetros.
 LARGURA_DO_DIAGRAMA_CM = 6.5
@@ -141,23 +142,11 @@ def _texto_com_estilo(paragrafo, bloco: Paragrafo, simbolos: str, familia: str,
     texto = epub.aspas_curvas(epub.sem_proibidos(bloco.texto).replace("\r", " "))
     if not quebras:
         texto = texto.replace("\n", " ")
-    marcas = [[False, False, c in simbolos, -1, False] for c in texto]
     duvidosos = getattr(bloco, "duvidosos", ()) if realce else ()
-    for k, trechos in ((0, bloco.negrito), (1, bloco.italico), (4, duvidosos)):
-        for inicio, fim in trechos or ():
-            for i in range(max(0, inicio), min(fim, len(texto))):
-                marcas[i][k] = True
-    for n, (inicio, fim, _alvo) in enumerate(links):
-        for i in range(max(0, inicio), min(fim, len(texto))):
-            marcas[i][3] = n
     hiperlink, do_hiperlink = None, -1
-    i = 0
-    while i < len(texto):
-        j = i
-        while j < len(texto) and marcas[j] == marcas[i]:
-            j += 1
-        negrito, italico, simbolo, link, duvidoso = marcas[i]
-        run = paragrafo.add_run(texto[i:j])
+    for pedaco, (negrito, italico, simbolo, link, duvidoso) in marcacao.trechos_marcados(
+            texto, simbolos, bloco.negrito, bloco.italico, duvidosos, links):
+        run = paragrafo.add_run(pedaco)
         run.bold = negrito or None
         run.italic = italico or None
         if duvidoso:
@@ -179,7 +168,6 @@ def _texto_com_estilo(paragrafo, bloco: Paragrafo, simbolos: str, familia: str,
             hiperlink.append(run._r)
         else:
             hiperlink, do_hiperlink = None, -1
-        i = j
 
 
 def _figura(doc, figura: Figura, alt: str, numero: int) -> None:
@@ -208,12 +196,10 @@ def _figura(doc, figura: Figura, alt: str, numero: int) -> None:
 def _ressalva(doc, figura: Figura, idioma: str) -> bool:
     """A legenda visível do diagrama cuja posição ninguém conferiu (PD-21): de quem é a vez
     e "não revisado". Fica no `descr` também, mas quem vê a página precisa ver isto."""
-    if not getattr(figura, "revisao_pendente", False):
+    ressalva = marcacao.ressalva_do_diagrama(figura, idioma)
+    if not ressalva:
         return False
-    msg = epub.mensagens(idioma)
-    partes = [epub.marca_do_lado(figura, idioma)] if figura.fen else []
-    partes.append(msg["nao_revisado"])
-    paragrafo = doc.add_paragraph(epub.limpo("; ".join(partes)))
+    paragrafo = doc.add_paragraph(epub.limpo(ressalva))
     _como_legenda(doc, paragrafo)
     return True
 

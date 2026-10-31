@@ -15,7 +15,7 @@ LINHAS, METODOS = 1000, 40
 #: O que ainda passa do limite, com o teto de hoje (Q7: os cortes 4 e 5 e o resto descem).
 TETOS = {
     "abbychess/controladores.py": 2055,
-    "abbychess/epub.py": 1154,
+    "abbychess/epub.py": 1144,
     "abbychess/pagina.py": 1446,
     "abbychess/projeto.py:ProjetoDeLivro": 43,
     "abbychess/controlador.py:ControladorDePagina": 61,

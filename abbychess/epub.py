@@ -52,6 +52,8 @@ from core.pagina import Figura, PaginaExtraida, Paragrafo
 
 from abbychess import gravacao as gv
 from abbychess import links_de_analise
+from abbychess import marcacao
+from abbychess.marcacao import trechos_marcados
 
 log = logging.getLogger(__name__)
 
@@ -213,24 +215,13 @@ def xhtml_do_texto(paragrafo: Paragrafo, simbolos: str,
     # Tirar caracteres mudaria os trechos de estilo: os proibidos viram espaço. As aspas
     # retas do OCR viram as curvas do impresso (PD-07), também uma por uma.
     texto = aspas_curvas(sem_proibidos(texto))
-    marcas = [[False, False, c in simbolos, -1, False] for c in texto]
     duvidosos = getattr(paragrafo, "duvidosos", ()) if realce else ()
-    for k, trechos in ((0, paragrafo.negrito), (1, paragrafo.italico), (4, duvidosos)):
-        for inicio, fim in trechos or ():
-            for i in range(max(0, inicio), min(fim, len(texto))):
-                marcas[i][k] = True
-    for n, (inicio, fim, _href) in enumerate(links):
-        for i in range(max(0, inicio), min(fim, len(texto))):
-            marcas[i][3] = n
-    saida, i = [], 0
-    while i < len(texto):
-        j = i
-        while j < len(texto) and marcas[j] == marcas[i]:
-            j += 1
-        pedaco = html.escape(texto[i:j], quote=False)
+    saida = []
+    for cru, (negrito, italico, simbolo, link, duvidoso) in trechos_marcados(
+            texto, simbolos, paragrafo.negrito, paragrafo.italico, duvidosos, links):
+        pedaco = html.escape(cru, quote=False)
         if quebras:
             pedaco = pedaco.replace("\n", "<br/>")
-        negrito, italico, simbolo, link, duvidoso = marcas[i]
         if duvidoso:
             pedaco = f"<mark>{pedaco}</mark>"
         if simbolo:
@@ -242,7 +233,6 @@ def xhtml_do_texto(paragrafo: Paragrafo, simbolos: str,
         if link >= 0:
             pedaco = f'<a href="{html.escape(links[link][2], quote=True)}">{pedaco}</a>'
         saida.append(pedaco)
-        i = j
     return "".join(saida)
 
 
@@ -511,9 +501,9 @@ def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbo
                 # A ressalva do diagrama que ninguém conferiu fica à vista (PD-21), além do alt.
                 # E o link de análise, quando pedido, embaixo da ressalva.
                 na_legenda = []
-                if getattr(bloco, "revisao_pendente", False):
-                    ressalva = ([marca_do_lado(bloco, idioma)] if bloco.fen else []) + [msg["nao_revisado"]]
-                    na_legenda.append(_e('; '.join(ressalva)))
+                ressalva = marcacao.ressalva_do_diagrama(bloco, idioma)
+                if ressalva:
+                    na_legenda.append(_e(ressalva))
                 endereco = links_de_analise.link_da_figura(bloco, analise)
                 if endereco:
                     na_legenda.append(f'<a class="analise" href="{_e(endereco, aspas=True)}">'

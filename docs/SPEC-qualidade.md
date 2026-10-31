@@ -191,7 +191,7 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
 - `Box` é `frozen`, mas `entry` é um `BoxEntry` mutável e `carregar_pagina` entrega os objetos
   vivos do cache (`modelo.py:91-96`, `projeto.py:820-823`) → cópia na saída.
 - **CA-Q-P9:** um estado ou uma notação desconhecidos em disco dão `ProjetoInvalido`.
-- **Feito** no Q6 (`6cbbe2b`), em parte: `modelo.Estado` e `projeto.Notacao` (`StrEnum`); a notação desconhecida dá `ProjetoInvalido`, e o estado desconhecido faz a página ilegível (a regra do CA-Q-P7, não `ProjetoInvalido`: uma página não impede o livro). As duas fontes da verdade e a cópia do `Box` ficam para o Q7.
+- **Feito** no Q6 (`6cbbe2b`), em parte: `modelo.Estado` e `projeto.Notacao` (`StrEnum`); a notação desconhecida dá `ProjetoInvalido`, e o estado desconhecido faz a página ilegível (a regra do CA-Q-P7, não `ProjetoInvalido`: uma página não impede o livro). As duas fontes da verdade e a cópia do `Box` ficam para o Q7. **Feito** no Q7, corte 4: `carregar_pagina` entrega cópias (`37e97bf` o teste, `712cd9d`); a sequência e o próximo pid numa fonte só, a `SequenciaDoLivro` (`e657a72`, sem teste vermelho: nenhuma divergência visível achada).
 
 ## 4. Concorrência e falhas silenciosas
 
@@ -350,7 +350,7 @@ de entrada.
 | Classe | Tamanho | Corte proposto |
 |---|---|---|
 | `ControladorDePagina` (`controlador.py:138`) | 138 métodos, ~2 400 linhas; 9 das 15 funções mais complexas | `Navegador` (480-602), `ControladorDaSequencia` (§12.4, 604-1006), fila e margens para o `ControladorDaFila` que já existe, `PonteDeLeitura` (1533-1710), `AplicadorDoHistorico` (2177-2320), `ControladorDaSessao`. **Feito no Q7, corte 3** (`docs/revisoes/qualidade-Q7.md`): esses e o `ControladorDosPadroes`; a fila virou `FilaDaPagina` (o `ControladorDaFila` é da janela); 888 linhas e 61 métodos |
-| `ProjetoDeLivro` (`projeto.py`) | ~1 640 linhas | `CacheDePaginas` (com páginas presas, Q-P3), `ResumoDoLivro`, `Migracoes`, `Fonte` |
+| `ProjetoDeLivro` (`projeto.py`) | ~1 640 linhas | `CacheDePaginas` (com páginas presas, Q-P3), `ResumoDoLivro`, `Migracoes`, `Fonte`. **Feito no Q7, corte 4** (`docs/revisoes/qualidade-Q7.md`): `CacheDoProjeto`, `ResumoDoLivro`, `Migracoes`, `FonteDoLivro`, e também `AntesDoLote`, `SequenciaDoLivro` e a página em JSON; 950 linhas e 43 métodos |
 | `JanelaPrincipal` (`app/janela.py:72`) | 447 linhas, mas 9 mixins somam ~3 000 na MRO | composição: um objeto por painel, com só os controladores de que precisa |
 | `exportar.py` | ~2 000 linhas | Q-E6 |
 

@@ -208,7 +208,7 @@ class CondutorDoLote:
         self._avancar()
 
     def _fica_de_fora(self, indice: int) -> Optional[str]:
-        estado = self.p.projeto.estado_da_pagina(indice)
+        estado = self.p.projeto.resumo.estado_da_pagina(indice)
         if estado == VERIFICADA:
             return VERIFICADA_PULADA
         forcada = indice in self.forcar
@@ -250,7 +250,7 @@ class CondutorDoLote:
             marcados = (pg.a_manter_na_releitura(modelo.boxes, modelo.estado in LIDAS)
                         if modelo is not None else [])                     # §4.6
             imagem = fonte.pagina_da_entrada(entrada)
-            regua = projeto.regua_do_negrito(sem_o_pid=pid)
+            regua = projeto.resumo.regua_do_negrito(sem_o_pid=pid)
             if servidor is None:
                 return sl.ler_pagina(imagem, zonas, marcados, leitor, regua_do_livro=regua,
                                      cancelado=cancelado)
@@ -337,7 +337,7 @@ class CondutorDoLote:
         """A página verificada, ou mudada pelo usuário, enquanto era lida (aberta ou não).
         `indice` é a posição de agora da página pedida (ela pode ter mudado de lugar)."""
         p = self.p
-        if p.projeto.estado_da_pagina(indice) == VERIFICADA:
+        if p.projeto.resumo.estado_da_pagina(indice) == VERIFICADA:
             return VERIFICADA_PULADA
         # O pid da sequência (§12.4): a página ainda sem dados já tem o dela, e a mudança do
         # usuário no meio da leitura (a primeira, que cria a página, também) sobe a versão.

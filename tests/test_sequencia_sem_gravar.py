@@ -28,7 +28,7 @@ def test_ler_a_sequencia_nao_muda_nenhum_arquivo(projeto):
     antes = _fotografia(projeto.pasta)
 
     assert len(novo.sequencia) == len(projeto.sequencia)
-    novo.paginas_lidas()
+    novo.resumo.paginas_lidas()
 
     assert _fotografia(projeto.pasta) == antes
 

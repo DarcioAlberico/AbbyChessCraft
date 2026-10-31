@@ -72,7 +72,7 @@ def saude(projeto: ProjetoDeLivro, padroes: int = 0) -> SaudeDoLivro:
                 if projeto.posicoes_das_gravadas([g])]
     paginas = tuple(projeto.posicoes_das_gravadas(gravadas))
     iniciais = extras.get(CHAVE_DOS_PENDENTES_INICIAIS, {}) or {}
-    resumo = projeto.resumo_do_livro()
+    resumo = projeto.resumo.do_livro()
     por_pagina = tuple(
         (posicao, int(iniciais.get(str(g), iniciais.get(g, 0)) or 0),
          int(resumo.get(posicao, {}).get("pendentes", 0) or 0))
@@ -134,7 +134,7 @@ def paginas_da_amostra(indices: Iterable[int]) -> List[int]:
 
 def ja_lidas(projeto: ProjetoDeLivro, indices: Iterable[int]) -> List[int]:
     """Quais destas páginas já têm boxes gravados no projeto."""
-    lidas = set(projeto.paginas_lidas())
+    lidas = set(projeto.resumo.paginas_lidas())
     return [i for i in indices if i in lidas]
 
 
@@ -195,7 +195,7 @@ def pendentes_por_pagina(projeto: ProjetoDeLivro, limiares: Limiares) -> Dict[in
     from abbychess.projeto import pendentes_pelo_histograma
 
     contagem = {}
-    for indice, resumo in projeto.resumo_do_livro().items():
+    for indice, resumo in projeto.resumo.do_livro().items():
         try:
             n = pendentes_pelo_histograma(resumo, limiares.revisao)
         except (KeyError, TypeError, ValueError):   # um resumo antigo, sem o histograma

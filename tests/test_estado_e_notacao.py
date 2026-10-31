@@ -36,7 +36,7 @@ def test_o_estado_desconhecido_faz_a_pagina_ilegivel_e_ela_fica_guardada(projeto
     aberto = ProjetoDeLivro.abrir(projeto.pasta)
     try:
         assert aberto.carregar_modelo(0) is None
-        assert aberto.estado_da_pagina(0) == NAO_RECONHECIDA
+        assert aberto.resumo.estado_da_pagina(0) == NAO_RECONHECIDA
         [guardado] = sorted((projeto.pasta / "paginas").glob("p*.corrompido*.json"))
         assert json.loads(guardado.read_text(encoding="utf-8"))["estado"] == "reconhecido"
     finally:

@@ -127,10 +127,10 @@ def test_pagina_so_marcada_nao_conta_como_lida(tmp_path):
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Marcas",
                                    _pagina_sintetica(tmp_path / "p.png"))
     projeto.salvar_pagina(0, [BoxEntry("a", 1, 1, 5, 5)], reconhecida=False)
-    assert projeto.paginas_lidas() == [] and not projeto.pagina_reconhecida(0)
+    assert projeto.resumo.paginas_lidas() == [] and not projeto.resumo.pagina_reconhecida(0)
     assert projeto.carregar_pagina(0)[0].char == "a"
     projeto.salvar_pagina(0, [BoxEntry("a", 1, 1, 5, 5)])
-    assert projeto.paginas_lidas() == [0] and projeto.pagina_reconhecida(0)
+    assert projeto.resumo.paginas_lidas() == [0] and projeto.resumo.pagina_reconhecida(0)
 
 
 def test_manter_marcados_tira_o_box_de_baixo():
@@ -151,7 +151,7 @@ def test_lote_mantem_o_glifo_marcado(tmp_path):
 
     resultado = livro.reconhecer_paginas(projeto, fonte, leitor, [0])
 
-    assert resultado.lidas == [0] and projeto.pagina_reconhecida(0)
+    assert resultado.lidas == [0] and projeto.resumo.pagina_reconhecida(0)
     boxes = projeto.carregar_pagina(0)
     assert boxes[0].char == "α" and len(boxes) == len(pg.segmentar(fonte.pagina(0)))
 
@@ -161,7 +161,7 @@ def test_f5_numa_pagina_marcada_nao_pergunta_e_mantem_os_quadros(app, janela, mo
     janela.pagina.marcar(a.x1 - 3, a.y1 - 3, a.x2 + 3, a.y2 + 3)
     janela.treino.campo.setText("a")
     janela.treino.pedir_so_corrigir()
-    assert not janela.projeto.pagina_reconhecida(0) and janela.projeto.carregar_pagina(0)
+    assert not janela.projeto.resumo.pagina_reconhecida(0) and janela.projeto.carregar_pagina(0)
 
     def nao_pergunte(*_a, **_k):
         raise AssertionError("o F5 perguntou numa página só com quadros marcados")
@@ -170,7 +170,7 @@ def test_f5_numa_pagina_marcada_nao_pergunta_e_mantem_os_quadros(app, janela, mo
     janela.reconhecer()
     _esperar(app, janela)
 
-    assert janela.pagina.reconhecida and janela.projeto.pagina_reconhecida(0)
+    assert janela.pagina.reconhecida and janela.projeto.resumo.pagina_reconhecida(0)
     assert (boxes(janela)[0].char, boxes(janela)[0].source) == ("a", FONTE_MANUAL)
     assert sum(b.x1 == a.x1 and b.y1 == a.y1 for b in boxes(janela)) == 1
 
@@ -186,4 +186,4 @@ def test_desfazer_o_f5_devolve_a_marca_da_pagina(app, janela, reconhecida):
     _esperar(app, janela)
     janela.pagina.desfazedor.desfazer()
     assert janela.pagina.reconhecida == reconhecida
-    assert janela.projeto.pagina_reconhecida(0) == reconhecida
+    assert janela.projeto.resumo.pagina_reconhecida(0) == reconhecida

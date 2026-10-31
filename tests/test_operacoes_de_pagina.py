@@ -180,12 +180,12 @@ def test_ca_12_10_apagar_tira_do_livro_e_guarda_os_arquivos(projeto, ctl):
     assert pids[2] not in s.pids and pids[6] not in s.pids and len(s) == 58
     # A posição conta as que ficaram: a 7 tinha 5 páginas do livro antes dela.
     assert {a.entrada.pid: a.posicao for a in s.apagadas} == {pids[2]: 2, pids[6]: 5}
-    assert sorted(projeto.resumo_do_livro()) == [s.posicao_de(pids[8])]
-    assert projeto.paginas_lidas() == [s.posicao_de(pids[8])]
+    assert sorted(projeto.resumo.do_livro()) == [s.posicao_de(pids[8])]
+    assert projeto.resumo.paginas_lidas() == [s.posicao_de(pids[8])]
     assert _texto(projeto).strip() == "zz"           # a exportação também
     assert _hashes(projeto) == antes                 # os arquivos continuam no disco
     ctl.desfazedor.desfazer()
-    assert projeto.sequencia.pids == pids and sorted(projeto.resumo_do_livro()) == [2, 6, 8]
+    assert projeto.sequencia.pids == pids and sorted(projeto.resumo.do_livro()) == [2, 6, 8]
 
 
 def test_ca_12_10_restaurar_depois_de_reabrir_devolve_ao_lugar(projeto, ctl):

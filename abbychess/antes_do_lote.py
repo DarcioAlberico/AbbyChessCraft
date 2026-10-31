@@ -68,6 +68,6 @@ class AntesDoLote:
             gv.gravar_bytes(self._p._arquivo_v2(pid), dados)
             pagina = self._p._de_json(json.loads(dados.decode("utf-8")))
             self._p._guardar_no_cache(pagina, foto_nova=True)
-            self._p._atualizar_livro(pid, self._p._resumo_do_modelo(pagina))
+            self._p.resumo.atualizar(pid, self._p.resumo.do_modelo(pagina))
             gv.apagar(copia)
             return pagina

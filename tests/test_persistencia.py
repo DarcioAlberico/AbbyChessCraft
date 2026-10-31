@@ -333,14 +333,14 @@ def test_a_pagina_ilegivel_fica_guardada_e_e_nao_reconhecida_em_todo_lugar(proje
     assert aberto.ler_sem_migrar(0) is None              # a busca, numa thread
     assert aberto.ler_sem_guardar(0) is None             # a aba Diagramas
     assert aberto.carregar_modelo(0) is None             # a janela: não levanta
-    assert aberto.estado_da_pagina(0) == NAO_RECONHECIDA and aberto.paginas_lidas() == []
+    assert aberto.resumo.estado_da_pagina(0) == NAO_RECONHECIDA and aberto.resumo.paginas_lidas() == []
     [guardado] = sorted((projeto.pasta / "paginas").glob("p*.corrompido*.json"))
     assert guardado.read_bytes() == estragado and not arquivo.exists()
     assert avisos == [(0, guardado.name)]
     assert aberto.fechar()
 
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.carregar_modelo(0) is None and reaberto.paginas_lidas() == []
+    assert reaberto.carregar_modelo(0) is None and reaberto.resumo.paginas_lidas() == []
     assert len(list((projeto.pasta / "paginas").glob("p*.corrompido*.json"))) == 1
 
 
@@ -394,7 +394,7 @@ def test_versao_maior_abre_so_para_leitura_e_nada_muda(projeto, tmp_path):
     try:
         assert aberto.somente_leitura
         assert aberto.carregar_pagina(0) == [_box()]
-        assert aberto.resumo_do_livro()[0]["boxes"] == 1
+        assert aberto.resumo.do_livro()[0]["boxes"] == 1
         with pytest.raises(gv.SomenteLeitura):
             aberto.salvar_pagina(0, [_box("b")])
         with pytest.raises(gv.SomenteLeitura):
@@ -422,7 +422,7 @@ def test_livro_json_que_falta_em_projeto_so_leitura_nao_e_gravado(projeto):
     _editar_projeto_json(projeto, versao=99)
     aberto = ProjetoDeLivro.abrir(projeto.pasta)
     try:
-        assert aberto.resumo_do_livro()[0]["boxes"] == 1
+        assert aberto.resumo.do_livro()[0]["boxes"] == 1
         assert not (projeto.pasta / ARQUIVO_DO_LIVRO).exists()
     finally:
         aberto.fechar()
@@ -506,15 +506,15 @@ def test_livro_json_e_igual_ao_recalculado_depois_de_qualquer_sequencia(projeto,
         tabuleiros = [(0, 0, 100, 100)] * sorteio.randint(0, 2)
         projeto.salvar_pagina(indice, boxes, tabuleiros, reconhecida=sorteio.random() > 0.3)
     gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
-    assert gravado == projeto.recalcular_livro()
-    assert ProjetoDeLivro.abrir(projeto.pasta).resumo_do_livro() == projeto.resumo_do_livro()
+    assert gravado == projeto.resumo.recalcular()
+    assert ProjetoDeLivro.abrir(projeto.pasta).resumo.do_livro() == projeto.resumo.do_livro()
 
 
 def test_livro_json_que_falta_e_refeito(projeto):
     projeto.salvar_pagina(2, [_box(), _box(source=FONTE_MANUAL)], reconhecida=False)
     pid = projeto.pid_da_pagina(2)
     (projeto.pasta / ARQUIVO_DO_LIVRO).unlink()
-    resumo = ProjetoDeLivro.abrir(projeto.pasta).resumo_do_livro()
+    resumo = ProjetoDeLivro.abrir(projeto.pasta).resumo.do_livro()
     assert resumo == {2: {"pid": pid, "pagina_da_fonte": 2, "estado": "glifos_marcados", "boxes": 2,
                           "pendentes": 1,
                           "confirmados": 1, "sem_leitura": 0, "improvaveis": 0,
@@ -526,7 +526,7 @@ def test_livro_json_que_falta_e_refeito(projeto):
 def test_livro_json_estragado_e_refeito(projeto):
     projeto.salvar_pagina(0, [_box()])
     (projeto.pasta / ARQUIVO_DO_LIVRO).write_text("{nada", encoding="utf-8")
-    assert ProjetoDeLivro.abrir(projeto.pasta).resumo_do_livro()[0]["boxes"] == 1
+    assert ProjetoDeLivro.abrir(projeto.pasta).resumo.do_livro()[0]["boxes"] == 1
 
 
 def test_histograma_da_os_pendentes_de_outro_limiar():
@@ -649,9 +649,9 @@ def test_livro_json_igual_ao_recalculado_depois_de_mudar_o_limiar(projeto):
         projeto.salvar_pagina(indice, _pagina_aleatoria(sorteio))
     projeto.dados.limiares = Limiares(revisao=0.55)
     projeto.salvar()
-    projeto.reaplicar_limiar()
+    projeto.resumo.reaplicar_limiar()
     gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
-    assert gravado == projeto.recalcular_livro()
+    assert gravado == projeto.resumo.recalcular()
 
 
 def test_gravacoes_de_duas_threads_deixam_o_livro_coerente(projeto):
@@ -675,14 +675,14 @@ def test_gravacoes_de_duas_threads_deixam_o_livro_coerente(projeto):
         t.join()
     assert erros == []
     gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
-    assert gravado == projeto.recalcular_livro()
+    assert gravado == projeto.resumo.recalcular()
 
 
 def test_resumo_do_livro_e_copia(projeto):
     projeto.salvar_pagina(0, [_box()])
-    resumo = projeto.resumo_do_livro()
+    resumo = projeto.resumo.do_livro()
     resumo[0]["histograma"]["50"] = 999
-    assert projeto.resumo_do_livro()[0]["histograma"] == {"50": 1}
+    assert projeto.resumo.do_livro()[0]["histograma"] == {"50": 1}
 
 
 def test_temporario_de_arquivo_do_usuario_nao_e_apagado(projeto):
@@ -700,7 +700,7 @@ def test_livro_json_da_versao_1_e_refeito_com_a_faixa_100(projeto):
     velho["paginas"][str(projeto.pid_da_pagina(0))]["histograma"] = {"99": 1}  # a da versão 1
     arquivo.write_text(json.dumps(velho), encoding="utf-8")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.resumo_do_livro()[0]["histograma"] == {"100": 1}
+    assert reaberto.resumo.do_livro()[0]["histograma"] == {"100": 1}
     assert json.loads(arquivo.read_text(encoding="utf-8"))["versao"] == VERSAO_DO_LIVRO
 
 
@@ -745,12 +745,12 @@ def test_relocalizacao_automatica_grava_o_tamanho(projeto):
 
 def test_falha_ao_gravar_o_livro_nao_muda_o_cache(projeto, monkeypatch):
     projeto.salvar_pagina(0, [_box()])
-    antes = projeto.resumo_do_livro()
+    antes = projeto.resumo.do_livro()
 
     def falhar(*_args):
         raise PermissionError("disco")
 
     monkeypatch.setattr(gv, "gravar_bytes", falhar)
     with pytest.raises(PermissionError):
-        projeto._atualizar_livro(5, {"estado": "reconhecida"})
-    assert projeto.resumo_do_livro() == antes
+        projeto.resumo.atualizar(5, {"estado": "reconhecida"})
+    assert projeto.resumo.do_livro() == antes

@@ -88,7 +88,7 @@ def test_ca_12_7_os_gids_e_os_dados_ficam(projeto_v2):
     assert projeto.carregar_modelo(0).boxes[0].gid == gid_de(0, 0)
     v1 = projeto.carregar_modelo(7)
     assert v1.pid == 7 and v1.boxes[0].entry.char == "b" and v1.boxes[0].gid == gid_de(7, 0)
-    assert sorted(projeto.resumo_do_livro()) == [0, 1, 7]
+    assert sorted(projeto.resumo.do_livro()) == [0, 1, 7]
 
 
 def test_ca_12_7_inclinacoes_por_pid_sem_medir_de_novo(projeto_v2, monkeypatch):

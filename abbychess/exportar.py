@@ -1017,11 +1017,11 @@ def _alvo(projeto: ProjetoDeLivro, indices: Optional[Iterable[int]],
     Nenhuma: `NadaParaExportar`."""
     from abbychess.modelo import VERIFICADA
 
-    lidas = set(projeto.paginas_lidas())
+    lidas = set(projeto.resumo.paginas_lidas())
     alvo = sorted(lidas if indices is None else lidas.intersection(indices))
     so_verificadas = opcoes is not None and opcoes.so_verificadas
     if so_verificadas:
-        estados = {i: r.get("estado") for i, r in projeto.resumo_do_livro().items()}
+        estados = {i: r.get("estado") for i, r in projeto.resumo.do_livro().items()}
         alvo = [i for i in alvo if estados.get(i) == VERIFICADA]
     if not alvo:
         raise NadaParaExportar("Nenhuma página verificada para exportar." if so_verificadas
@@ -1053,7 +1053,7 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
     if camada not in CAMADA:
         raise ValueError(f"camada inválida: {camada!r} (use um de {CAMADA})")
     alvo = _alvo(projeto, indices, opcoes)
-    estados = {i: r.get("estado") for i, r in projeto.resumo_do_livro().items()}
+    estados = {i: r.get("estado") for i, r in projeto.resumo.do_livro().items()}
     nativas = paginas_da_camada(projeto, alvo) if camada == "auto" else {}
     pelos_boxes = [i for i in alvo if i not in nativas]
     lidos, estruturas = {}, {}
@@ -1205,7 +1205,7 @@ def _paginas_no_relatorio(relatorio: Relatorio, projeto: ProjetoDeLivro,
                           nativas: dict) -> None:
     from abbychess.modelo import VERIFICADA
 
-    resumo = projeto.resumo_do_livro()
+    resumo = projeto.resumo.do_livro()
     for pagina in paginas:
         i = pagina.numero
         relatorio.paginas.append(i)
@@ -1754,7 +1754,7 @@ def exportar_pdf_pesquisavel(projeto: ProjetoDeLivro, caminho: str | Path,
     """
     import fitz
 
-    lidas = set(projeto.paginas_lidas())
+    lidas = set(projeto.resumo.paginas_lidas())
     alvo = sorted(lidas if indices is None else lidas.intersection(indices))
     if not alvo:
         raise NadaParaExportar("Nenhuma página reconhecida para exportar.")

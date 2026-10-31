@@ -140,7 +140,7 @@ def medir_fatia(zip_: Path, folha: Path | None) -> dict:
     por_pagina, recortes = {}, []
     try:
         fonte = pg.fonte_do_projeto(projeto)
-        for indice in projeto.paginas_lidas():
+        for indice in projeto.resumo.paginas_lidas():
             modelo = projeto.carregar_modelo(indice)
             boxes = [b.entry for b in modelo.boxes]
             imagem = fonte.pagina(indice)

@@ -468,7 +468,7 @@ class ControladorDePagina:
     def _proxima_nao_verificada(self) -> Optional[int]:
         """A primeira página depois da aberta que não está verificada (a não reconhecida
         conta: está por revisar)."""
-        resumo = self.projeto.resumo_do_livro()
+        resumo = self.projeto.resumo.do_livro()
         for i in range(self.indice + 1, self.fonte.total):
             if resumo.get(i, {}).get("estado") != VERIFICADA:
                 return i

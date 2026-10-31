@@ -561,7 +561,7 @@ class EspacoDeTrabalho:
         p = self.pagina
         if not self.doca_paginas.isVisible() or p.projeto is None or p.fonte is None:
             return
-        self.paginas.mostrar(p.fonte.total, p.projeto.resumo_do_livro(),
+        self.paginas.mostrar(p.fonte.total, p.projeto.resumo.do_livro(),
                              p.indice if seguir else None)
         self.paginas.mostrar_saude(
             lv.saude(p.projeto, p.leitor.arquivos_de_padrao() if p.leitor else 0))
@@ -713,7 +713,7 @@ class EspacoDeTrabalho:
         """Ao abrir: o espaço gravado; num projeto sem ele, o padrão, com a gaveta aberta
         se a janela é larga e nada foi reconhecido ainda."""
         if not self.restaurar_espaco():
-            novo = not any(r.get("estado") in LIDAS for r in self.projeto.resumo_do_livro().values())
+            novo = not any(r.get("estado") in LIDAS for r in self.projeto.resumo.do_livro().values())
             self.doca_paginas.setVisible(novo and self.width() >= LARGURA_DA_GAVETA)
             self._espaco_padrao()
         self.atualizar_paginas(seguir=True)

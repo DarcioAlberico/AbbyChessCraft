@@ -64,7 +64,7 @@ def test_o_pdf_ganha_os_marcadores_pelos_titulos(projeto, fonte, leitor, tmp_pat
     primeira = [b for b in boxes if b.y1 < topo + 20]
     zona = Zona("texto", 0, topo - 5, 5000, max(b.y2 for b in primeira) + 5, funcao="titulo")
     projeto.salvar_zonas(1, [zona])
-    titulos = ex.titulos_das_paginas(projeto, projeto.paginas_lidas())
+    titulos = ex.titulos_das_paginas(projeto, projeto.resumo.paginas_lidas())
     assert [i for i, _t in titulos] == [1]
     destino = tmp_path / "saida.pdf"                  # o livro.pdf é a fonte da fixture
     resumo = ex.exportar_pdf_pesquisavel(projeto, destino)

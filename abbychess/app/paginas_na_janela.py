@@ -170,7 +170,7 @@ class PaginasNaJanela:
         miniatura = self._miniatura(posicoes)
         if miniatura is not None:
             miniatura = pp.PreviaDaDivisao(miniatura[0], onde, miniatura[1])
-        lidas = set(self.projeto.paginas_lidas()) if self.projeto is not None else set()
+        lidas = set(self.projeto.resumo.paginas_lidas()) if self.projeto is not None else set()
         contagem = dp.efeito("1 página dupla vira duas: {PAGINAS}.",
                              "{N} páginas duplas viram duas cada: {PAGINAS}.")
 
@@ -209,7 +209,7 @@ class PaginasNaJanela:
         medido.toggled.connect(lambda sim: angulo.setEnabled(not sim))
         medido.setChecked(True)
         nota = QLabel(f"Medido nesta página: {agora:.2f}°".replace(".", ","))
-        lidas = set(self.projeto.paginas_lidas()) if self.projeto is not None else set()
+        lidas = set(self.projeto.resumo.paginas_lidas()) if self.projeto is not None else set()
         # As com ângulo à mão: só elas mudam quando o pedido é o medido.
         a_mao = ({i for i, e in enumerate(self.projeto.sequencia.entradas)
                   if e.angulo is not None} if self.projeto is not None else set())

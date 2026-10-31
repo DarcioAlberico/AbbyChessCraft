@@ -280,7 +280,7 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
         from abbychess.leitor import rede_global
         sugeridor = LeitorDoLivro(projeto.pasta_de_padroes, rede=rede_global())
     fonte = pg.fonte_do_projeto(projeto)
-    indices = indices or projeto.paginas_lidas()
+    indices = indices or projeto.resumo.paginas_lidas()
     gabaritos = {i: json.loads((verdade / livro / f"i{i:03d}.json").read_text(encoding="utf-8"))
                  for i in indices}
 

@@ -65,7 +65,7 @@ def _conferir(projeto: ProjetoDeLivro, verdade: dict) -> None:
                                            pagina["diagramas"])]
         assert len(gravados) == len(pagina["diagramas"]), indice
         assert gravados == pagina["diagramas"], indice
-        assert projeto.pagina_reconhecida(indice) == (indice not in verdade["marcadas"])
+        assert projeto.resumo.pagina_reconhecida(indice) == (indice not in verdade["marcadas"])
         zonas = [(z.tipo, list(z.caixa)) for z in projeto.carregar_zonas(indice)]
         assert zonas == verdade["zonas"].get(indice, []), indice
     # Desde a v3 (§12.4) as medidas são por pid: os mesmos ângulos, um por página, e o arquivo
@@ -105,12 +105,12 @@ def test_abre_migra_grava_e_reabre_sem_perder_nada(projeto_v1):
         "marcadas.json", "p0.json", "p1.json", "p2.json"]
     assert not list((projeto_v1 / "zonas").glob("*.json"))
     assert [b.gid for b in projeto.carregar_modelo(0).boxes][:3] == [gid_de(0, n) for n in range(3)]
-    assert projeto.estado_da_pagina(2) == "glifos_marcados"
+    assert projeto.resumo.estado_da_pagina(2) == "glifos_marcados"
 
     for indice in verdade["paginas"]:              # gravar sem mudar nada
         projeto.salvar_pagina(indice, projeto.carregar_pagina(indice),
                               projeto.carregar_tabuleiros(indice),
-                              reconhecida=projeto.pagina_reconhecida(indice))
+                              reconhecida=projeto.resumo.pagina_reconhecida(indice))
     _conferir(ProjetoDeLivro.abrir(projeto_v1), verdade)
 
 
@@ -185,7 +185,7 @@ def test_versao_99_abre_so_para_leitura_e_nenhum_arquivo_muda(projeto_v1):
         for indice in range(3):                    # ler as páginas v1 não migra nada
             projeto.carregar_pagina(indice)
             projeto.carregar_zonas(indice)
-        assert projeto.paginas_lidas() == [0, 1]
+        assert projeto.resumo.paginas_lidas() == [0, 1]
         assert _instantaneo(projeto_v1) == antes
         assert not (projeto_v1 / PASTA_DO_BACKUP_V1).exists()
     finally:

@@ -195,7 +195,7 @@ def test_lote_le_o_diagrama_e_a_pagina_nao_fica_por_ler(app, janela, monkeypatch
     monkeypatch.setattr(QInputDialog, "getText", lambda *a, **k: ("1", True))
     janela.reconhecer_livro()
     _esperar(app, janela)
-    assert janela.projeto.paginas_lidas() == [0]
+    assert janela.projeto.resumo.paginas_lidas() == [0]
     [d] = janela.pagina.diagramas
     assert d.lido and d.fen == FEN + " w - - 0 1" and d.lado is None
     texto = _texto(janela)

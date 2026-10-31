@@ -117,7 +117,7 @@ class Migracoes:
                 self._p._v1_so_leitura[pid] = pagina_para_json(self._ler_v1(pid), pid)
             except (OSError, ValueError, TypeError, KeyError) as erro:
                 log.warning("a página v1 %d está ilegível (%s): fica de fora", pid + 1, erro)
-        self._p._livro = None                   # o resumo do livro é refeito com elas
+        self._p.resumo.esquecer()               # o resumo do livro é refeito com elas
 
     def preparar_migracao(self, bruto_do_projeto: bytes) -> None:
         """Na primeira abertura v2 de um projeto v1: `backup-v1/` com as páginas, as áreas e o

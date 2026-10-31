@@ -318,7 +318,7 @@ def intervalo_do_lote(janela, projeto, total: int) -> Optional[Tuple[List[int], 
     from abbychess.modelo import VERIFICADA
 
     lidas = livro.ja_lidas(projeto, indices)
-    verificadas = [i for i in lidas if projeto.estado_da_pagina(i) == VERIFICADA]
+    verificadas = [i for i in lidas if projeto.resumo.estado_da_pagina(i) == VERIFICADA]
     lidas = [i for i in lidas if i not in verificadas]      # essas o lote pula sempre
     if lidas:
         botoes = QMessageBox.StandardButton
@@ -384,7 +384,7 @@ def reler_depois(janela, paginas, *, faltou: bool) -> Optional[bool]:
 
 
 def destino_da_exportacao(janela, projeto) -> Optional[Path]:
-    if not projeto.paginas_lidas():
+    if not projeto.resumo.paginas_lidas():
         QMessageBox.information(janela, "Exportar", "Nenhuma página foi reconhecida ainda.")
         return None
     padrao = janela.config.value("pasta_de_exportacao", str(projeto.pasta))

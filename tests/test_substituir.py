@@ -127,7 +127,7 @@ def _previa(s, eventos, padrao, modelo, alvo=sb.PROSA, **opcoes):
 
 
 def _textos(projeto):
-    return [ss.texto_e_unidades(projeto.carregar_modelo(i))[0] for i in projeto.paginas_lidas()]
+    return [ss.texto_e_unidades(projeto.carregar_modelo(i))[0] for i in projeto.resumo.paginas_lidas()]
 
 
 def test_ca_7_5_fora_da_pagina_so_aplica_depois_da_previa(sub):

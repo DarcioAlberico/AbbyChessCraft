@@ -331,7 +331,7 @@ def test_opcoes_refazem_os_pendentes_do_livro_json(app, janela):  # noqa: F811
     for revisao in (0.5, 1.0, 0.0):
         janela.pagina.padroes_do_livro.aplicar_limiares(Limiares(revisao=revisao))
         gravado = json.loads((janela.projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
-        assert gravado == janela.projeto.recalcular_livro(), revisao
+        assert gravado == janela.projeto.resumo.recalcular(), revisao
 
 
 # ----------------------------------------------------------------------
@@ -457,10 +457,10 @@ def test_trocar_de_projeto_com_tarefa_em_voo_termina_no_projeto_dela(app, janela
     # teste já vale quando ela volta, sem esperar a fila (a abertura do segundo, CA-Q-T1).
     janela.trocar_projeto(segundo, pg.FonteDePaginas(segundo.fonte))
     assert janela.projeto is segundo
-    assert segundo.paginas_lidas() == []                 # nada do primeiro entrou aqui
+    assert segundo.resumo.paginas_lidas() == []                 # nada do primeiro entrou aqui
     reaberto = ProjetoDeLivro.abrir(primeiro.pasta)
     try:
-        assert reaberto.paginas_lidas() == [0]           # e o F5 dele foi gravado nele
+        assert reaberto.resumo.paginas_lidas() == [0]           # e o F5 dele foi gravado nele
     finally:
         reaberto.fechar()
 

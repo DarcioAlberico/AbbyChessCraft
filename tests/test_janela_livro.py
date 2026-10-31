@@ -127,7 +127,7 @@ def test_lote_reconhece_o_intervalo_e_mostra_a_pagina_atual(app, janela, respost
     janela.reconhecer_livro()
     assert janela.acao_cancelar_lote.isEnabled()
     _esperar(app, janela)
-    assert janela.projeto.paginas_lidas() == [0, 1]
+    assert janela.projeto.resumo.paginas_lidas() == [0, 1]
     assert boxes(janela), "a página aberta foi lida no lote e recarregada"
     assert "Lote concluído" in janela.statusBar().currentMessage()
     assert not janela.acao_cancelar_lote.isEnabled()
@@ -145,7 +145,7 @@ def test_lote_pergunta_e_pula_as_ja_lidas(app, janela, respostas):
     janela.reconhecer_livro()
     _esperar(app, janela)
     assert respostas["perguntas"] == 1
-    assert janela.projeto.paginas_lidas() == [0, 1, 2]
+    assert janela.projeto.resumo.paginas_lidas() == [0, 1, 2]
     assert janela.projeto.carregar_pagina(0)[0].source == FONTE_MANUAL
 
 
@@ -154,7 +154,7 @@ def test_cancelar_o_lote_guarda_o_que_ja_foi_lido(app, janela, respostas):
     janela.livro.cancelar()
     _esperar(app, janela)
     assert "Lote cancelado" in janela.statusBar().currentMessage()
-    assert len(janela.projeto.paginas_lidas()) < 3
+    assert len(janela.projeto.resumo.paginas_lidas()) < 3
 
 
 def test_f6_vai_para_a_proxima_pagina_com_pendentes(app, janela):

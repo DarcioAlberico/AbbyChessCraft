@@ -119,7 +119,7 @@ def _rodada(livro, snapshot, com_estilo, verdade, pasta) -> dict:
     projeto = ProjetoDeLivro.abrir(next(p.parent for p in pasta.rglob("projeto.json")))
     leitor = LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
     fonte = pg.fonte_do_projeto(projeto)
-    indices = projeto.paginas_lidas()
+    indices = projeto.resumo.paginas_lidas()
     gabaritos = {i: json.loads((verdade / livro / f"i{i:03d}.json").read_text(encoding="utf-8"))
                  for i in indices}
     paginas = {i: (fonte.pagina(i), projeto.carregar_pagina(i) or []) for i in indices}

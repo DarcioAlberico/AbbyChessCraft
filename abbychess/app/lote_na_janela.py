@@ -27,7 +27,7 @@ class LoteNaJanela:
         self.fila.definir("caractere")
         self.fila.definir_escopo("pagina")
         p = self.pagina
-        pendentes = p.projeto.resumo_do_livro() if p.projeto is not None else {}
+        pendentes = p.projeto.resumo.do_livro() if p.projeto is not None else {}
         com_fila = [i for i in paginas if (pendentes.get(i, {}).get("pendentes") or 0) > 0]
         alvo = (com_fila or list(paginas) or [p.indice])[0]
         if alvo != p.indice:

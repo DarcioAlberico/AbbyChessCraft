@@ -63,7 +63,7 @@ def test_reabrir_monta_a_mesma_posicao_para_cada_pagina_gravada(projeto):
     pids = {i: projeto.pid_da_pagina(i) for i in (0, 5, 59)}
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     assert {i: reaberto.pid_da_pagina(i) for i in (0, 5, 59)} == pids
-    assert sorted(reaberto.resumo_do_livro()) == [0, 5, 59]
+    assert sorted(reaberto.resumo.do_livro()) == [0, 5, 59]
 
 
 def test_o_livro_json_antigo_por_indice_e_refeito(projeto):
@@ -75,7 +75,7 @@ def test_o_livro_json_antigo_por_indice_e_refeito(projeto):
     resumo.pop("pagina_da_fonte")
     arquivo.write_text(json.dumps({"versao": 3, "paginas": {"3": resumo}}), encoding="utf-8")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.pid_da_pagina(2) == pid and list(reaberto.resumo_do_livro()) == [2]
+    assert reaberto.pid_da_pagina(2) == pid and list(reaberto.resumo.do_livro()) == [2]
     assert json.loads(arquivo.read_text(encoding="utf-8"))["versao"] == VERSAO_DO_LIVRO
 
 
@@ -88,7 +88,7 @@ def test_arquivo_que_o_livro_nao_cita_entra_na_sequencia(projeto):
     arquivo.write_text(json.dumps(livro), encoding="utf-8")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     assert reaberto.pid_da_pagina(8) == pid
-    assert reaberto.carregar_pagina(8) is not None and 8 in reaberto.resumo_do_livro()
+    assert reaberto.carregar_pagina(8) is not None and 8 in reaberto.resumo.do_livro()
     assert str(pid) in json.loads(arquivo.read_text(encoding="utf-8"))["paginas"]
 
 
@@ -105,7 +105,7 @@ def test_depois_de_reordenar_a_pagina_e_achada_na_posicao_nova(projeto):
     assert projeto.carregar_pagina(2)[0].char == "x"
     assert projeto.carregar_pagina(0)[0].char == "y"
     assert projeto.carregar_modelo(2).indice == 2  # a posição de agora, não a gravada
-    resumo = projeto.resumo_do_livro()
+    resumo = projeto.resumo.do_livro()
     assert sorted(resumo) == [0, 2] and resumo[2]["pid"] == pid0
 
 
@@ -128,7 +128,7 @@ def test_gravar_depois_de_reordenar_guarda_a_pagina_do_pdf_e_nao_a_posicao(proje
 def test_perguntar_fora_do_livro_nao_cria_paginas(projeto):
     assert projeto.pid_da_pagina(500) is None
     assert projeto.carregar_modelo(500) is None and projeto.modelo_em_memoria(500) is None
-    assert projeto.estado_da_pagina(500) == "nao_reconhecida"
+    assert projeto.resumo.estado_da_pagina(500) == "nao_reconhecida"
     assert len(projeto.sequencia) == 60
 
 
@@ -174,7 +174,7 @@ def test_pagina_pendente_no_gravador_segue_a_posicao(projeto):
     _reordenar(projeto, [4, *range(4), *range(5, 60)])
     assert projeto.agendar(pagina)
     assert projeto.paginas_sujas() == [0]
-    assert 0 in projeto.resumo_do_livro()
+    assert 0 in projeto.resumo.do_livro()
     assert projeto.fechar(10) and projeto.paginas_sujas() == []
 
 

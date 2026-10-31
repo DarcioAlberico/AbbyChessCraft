@@ -173,7 +173,7 @@ def test_o_controlador_monta_o_indice_busca_e_refaz_a_pagina_editada(tmp_path):
         busca.abrir()
         busca.buscar(bs.Opcoes("zzqq"))                  # pedida antes do índice: espera
         _ate_valer(lambda: busca.pronto.is_set() and fins)
-        assert sorted(busca.indice) == projeto.paginas_lidas() and not fins[-1].ocorrencias
+        assert sorted(busca.indice) == projeto.resumo.paginas_lidas() and not fins[-1].ocorrencias
         texto, unidades = ss.texto_e_unidades(ctl.modelo)
         inicio, fim = ss.palavras_em(unidades, 0, 0)
         ctl.sessoes.confirmar_sessao(unidades[inicio:fim], "zzqq" + texto[inicio:fim])   # uma edição
@@ -296,7 +296,7 @@ def test_a_busca_abandonada_devolve_as_relidas(livro_escrito, monkeypatch):
 def test_a_pagina_que_deixou_de_ser_reconhecida_sai_do_indice(livro_escrito, monkeypatch):
     projeto, ctl, busca, escrever, eventos = livro_escrito
     assert len(_buscar_e_esperar(busca, eventos, "casa").ocorrencias) == 2
-    monkeypatch.setattr(projeto, "paginas_lidas", lambda: [0, 2])
+    monkeypatch.setattr(projeto.resumo, "paginas_lidas", lambda: [0, 2])
     assert [o.pagina for o in _buscar_e_esperar(busca, eventos, "casa").ocorrencias] == [0]
     assert 1 not in busca.indice and busca.nao_reconhecidas() >= 1
 
@@ -398,7 +398,8 @@ def test_trocar_de_projeto_com_o_pool_nao_esvazia_o_indice_novo(tmp_path):
         # A sequência, desde o passo L: o índice lê dela a geometria de cada página.
         from abbychess.sequencia import Sequencia
 
-        return SimpleNamespace(dados=SimpleNamespace(idioma="pt"), paginas_lidas=lambda: range(120),
+        return SimpleNamespace(dados=SimpleNamespace(idioma="pt"),
+                               resumo=SimpleNamespace(paginas_lidas=lambda: range(120)),
                                pid_da_pagina=lambda i: i, modelo_em_memoria=lambda i: None,
                                arquivo_da_pagina=lambda i: pasta / f"p{i}.json",
                                sequencia=Sequencia.do_livro(range(120)))

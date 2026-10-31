@@ -255,9 +255,9 @@ def test_areas_gravadas_voltam_iguais_e_nao_contam_como_pagina_lida(projeto):
     assert [(z.tipo, z.caixa) for z in gravadas] == [(z.tipo, z.caixa) for z in zonas]
     assert [z.id for z in gravadas] == ["z0", "z1"]           # cada área ganha um id (v2)
     assert projeto.carregar_zonas(1) == []
-    assert projeto.paginas_lidas() == []
+    assert projeto.resumo.paginas_lidas() == []
     assert projeto.carregar_pagina(0) is None
-    assert projeto.estado_da_pagina(0) == "nao_reconhecida"
+    assert projeto.resumo.estado_da_pagina(0) == "nao_reconhecida"
     projeto.salvar_zonas(0, [])
     assert projeto.carregar_zonas(0) == []
 

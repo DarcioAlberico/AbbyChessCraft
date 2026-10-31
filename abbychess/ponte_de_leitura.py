@@ -97,7 +97,7 @@ class PonteDeLeitura:
         if zona is not None:
             marcados = [b for b in marcados if zona.contem_o_centro(b)]
         servidor = self.servidor_para_pedir()
-        regua = self._p.projeto.regua_do_negrito(sem_o_pid=pagina.pid)
+        regua = self._p.projeto.resumo.regua_do_negrito(sem_o_pid=pagina.pid)
 
         def trabalho(progresso):
             if servidor is None:

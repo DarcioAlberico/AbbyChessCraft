@@ -220,7 +220,7 @@ class ControladorDaSessao:
         antes do D1 não tem o campo e conta quando for gravada de novo)."""
         if self._p.projeto is None:
             return False
-        return any(r.get("figurinas") for r in self._p.projeto.resumo_do_livro().values())
+        return any(r.get("figurinas") for r in self._p.projeto.resumo.do_livro().values())
 
     def _tinta_sem_box(self, pagina: Pagina, plano) -> bool:
         """Há tinta sem box onde uma letra que faltou entrou (a letra que a segmentação não

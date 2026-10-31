@@ -113,7 +113,7 @@ def test_amostra_guiada_usa_apenas_as_paginas_que_ficaram_para_ocr(ctl, projeto)
     ctl.executor.tudo()
 
     assert terminou == [(1, 2)]
-    assert projeto.paginas_lidas() == [1, 2]
+    assert projeto.resumo.paginas_lidas() == [1, 2]
 
 
 def test_o_lote_le_e_grava_as_paginas_e_a_aberta_aparece(ctl, projeto):
@@ -122,7 +122,7 @@ def test_o_lote_le_e_grava_as_paginas_e_a_aberta_aparece(ctl, projeto):
     ctl.executor.tudo()
     [resultado] = ctl.fins
     assert resultado.lidas == [0, 1, 2] and not ctl.lote_rodando
-    assert projeto.paginas_lidas() == [0, 1, 2]
+    assert projeto.resumo.paginas_lidas() == [0, 1, 2]
     assert ctl.pagina.boxes                               # a página aberta, já com os glifos
 
 
@@ -329,11 +329,11 @@ def test_g2_a_pagina_verificada_durante_a_leitura_continua_verificada(ctl, proje
     servidor.segurar.clear()
     ctl.reconhecer([0], refazer=True)
     p.verificar()                                         # Ctrl+T: verifica a 0 e abre a 1
-    assert p.indice == 1 and projeto.estado_da_pagina(0) == VERIFICADA
+    assert p.indice == 1 and projeto.resumo.estado_da_pagina(0) == VERIFICADA
     servidor.segurar.set()
     entregar(fila, esperar_por=1)
     assert ctl.fins[-1].verificadas == [0] and ctl.fins[-1].lidas == []
-    assert projeto.estado_da_pagina(0) == VERIFICADA
+    assert projeto.resumo.estado_da_pagina(0) == VERIFICADA
 
 
 def test_g2_a_correcao_feita_durante_a_leitura_numa_pagina_deixada_fica(ctl, projeto,

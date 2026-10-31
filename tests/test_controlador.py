@@ -119,7 +119,7 @@ def test_resultado_de_tarefa_do_projeto_anterior_nao_entra_no_novo(dois_projetos
     ctl.ir_para(0)
     fim()
     assert ctl.boxes == [] and b.carregar_modelo(0) is None
-    assert not b.sujas and b.paginas_lidas() == []
+    assert not b.sujas and b.resumo.paginas_lidas() == []
 
 
 def test_tarefa_na_fila_do_projeto_anterior_nao_roda(dois_projetos):
@@ -150,7 +150,7 @@ def test_reconhecer_entra_na_pagina_que_pediu_mesmo_depois_de_trocar(tmp_path):
         fim()
         assert ctl.indice == 1 and ctl.boxes == []    # a página aberta não mudou
         assert projeto.carregar_modelo(0).boxes        # a pedida ficou reconhecida
-        assert projeto.paginas_lidas() == [0]
+        assert projeto.resumo.paginas_lidas() == [0]
     finally:
         projeto.fechar()
 

@@ -36,7 +36,7 @@ def test_pagina_nova_ganha_pid_estavel_e_gids_dela(lido):
     assert modelo.pid == 0 and projeto.dados.proximo_pid == 1
     assert {pid_de(b.gid) for b in modelo.boxes} == {0}
     assert projeto.arquivo_da_pagina(0).name == "p0.json"
-    assert projeto.resumo_do_livro()[0]["pid"] == 0
+    assert projeto.resumo.do_livro()[0]["pid"] == 0
     gids = [b.gid for b in modelo.boxes]
     projeto.salvar_pagina(0, projeto.carregar_pagina(0))
     assert [b.gid for b in ProjetoDeLivro.abrir(projeto.pasta).carregar_modelo(0).boxes] == gids
@@ -56,18 +56,18 @@ def test_dividir_pela_janela_aposenta_o_gid_e_da_gids_novos(lido):
 
 def test_estados_pela_gravacao(lido, tmp_path):
     projeto, leitor, imagem = lido
-    assert projeto.estado_da_pagina(0) == RECONHECIDA
+    assert projeto.resumo.estado_da_pagina(0) == RECONHECIDA
     projeto.salvar_pagina(0, projeto.carregar_pagina(0))               # nada mudou
-    assert projeto.estado_da_pagina(0) == RECONHECIDA
+    assert projeto.resumo.estado_da_pagina(0) == RECONHECIDA
     boxes = projeto.carregar_pagina(0)
     pg.confirmar(boxes, 0, "z")
     projeto.salvar_pagina(0, boxes)                                    # primeira edição
-    assert projeto.estado_da_pagina(0) == EM_REVISAO
+    assert projeto.resumo.estado_da_pagina(0) == EM_REVISAO
     livro.reconhecer_paginas(projeto, pg.fonte_do_projeto(projeto), leitor, [0], refazer=True)
-    assert projeto.estado_da_pagina(0) == EM_REVISAO                  # F5 não volta atrás
+    assert projeto.resumo.estado_da_pagina(0) == EM_REVISAO                  # F5 não volta atrás
     marcados = pg.segmentar(imagem)[:2]
     projeto.salvar_pagina(1, marcados, reconhecida=False)
-    assert projeto.estado_da_pagina(1) == GLIFOS_MARCADOS and projeto.paginas_lidas() == [0]
+    assert projeto.resumo.estado_da_pagina(1) == GLIFOS_MARCADOS and projeto.resumo.paginas_lidas() == [0]
 
 
 def test_procedencia_e_gid_no_padrao(lido):
@@ -92,13 +92,13 @@ def test_procedencia_e_gid_no_padrao(lido):
 def test_livro_json_tem_o_pid_e_e_igual_ao_recalculado(lido):
     projeto, leitor, imagem = lido
     projeto.salvar_zonas(4, [])                                          # nada a gravar
-    assert 4 not in projeto.resumo_do_livro()
+    assert 4 not in projeto.resumo.do_livro()
     projeto.salvar_pagina(2, pg.segmentar(imagem)[:1], reconhecida=False)
     gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
-    assert gravado == projeto.recalcular_livro()
+    assert gravado == projeto.resumo.recalcular()
     # Desde o passo L, o livro é chaveado por pid e cada página tem o pid da sequência.
     assert set(gravado["paginas"]) == {"0", str(projeto.pid_da_pagina(2))}
-    assert {i: r["pid"] for i, r in projeto.resumo_do_livro().items()} == {
+    assert {i: r["pid"] for i, r in projeto.resumo.do_livro().items()} == {
         0: 0, 2: projeto.pid_da_pagina(2)}
 
 
@@ -112,7 +112,7 @@ def test_livro_sem_a_pagina_acha_o_arquivo_e_nao_duplica(lido):
     assert reaberto.carregar_pagina(0) is not None
     reaberto.salvar_pagina(0, reaberto.carregar_pagina(0))
     assert sorted(p.name for p in (projeto.pasta / "paginas").glob("p*.json")) == ["p0.json"]
-    assert reaberto.resumo_do_livro()[0]["pid"] == 0
+    assert reaberto.resumo.do_livro()[0]["pid"] == 0
 
 
 def test_dois_arquivos_do_mesmo_indice_vale_o_gravado_por_ultimo(lido):
@@ -122,7 +122,7 @@ def test_dois_arquivos_do_mesmo_indice_vale_o_gravado_por_ultimo(lido):
     bruto.update(pid=9, gravado_em="2000-01-01T00:00:00+00:00", boxes=[])
     (projeto.pasta / "paginas" / "p9.json").write_text(json.dumps(bruto), encoding="utf-8")
     (projeto.pasta / ARQUIVO_DO_LIVRO).unlink()
-    assert ProjetoDeLivro.abrir(projeto.pasta).resumo_do_livro()[0]["pid"] == 0
+    assert ProjetoDeLivro.abrir(projeto.pasta).resumo.do_livro()[0]["pid"] == 0
 
 
 def test_gid_que_a_janela_pede_ja_esta_gravado(lido):
@@ -164,14 +164,14 @@ def test_pagina_que_sai_da_memoria_volta_com_os_mesmos_gids(lido, monkeypatch):
     boxes = projeto.carregar_pagina(0)
     projeto.salvar_pagina(0, boxes)
     assert [b.gid for b in projeto.carregar_modelo(0).boxes] == gids
-    assert projeto.estado_da_pagina(0) == RECONHECIDA                       # nada mudou
+    assert projeto.resumo.estado_da_pagina(0) == RECONHECIDA                       # nada mudou
 
 
 def test_gid_de_glifo_marcado_grava_a_pagina_como_glifos_marcados(lido):
     projeto, _, imagem = lido
     marcados = pg.segmentar(imagem)[:2]
     projeto.gid_do_box(7, marcados, 0)                       # página que nunca foi gravada
-    assert ProjetoDeLivro.abrir(projeto.pasta).estado_da_pagina(7) == GLIFOS_MARCADOS
+    assert ProjetoDeLivro.abrir(projeto.pasta).resumo.estado_da_pagina(7) == GLIFOS_MARCADOS
 
 
 def test_lote_gravando_enquanto_a_janela_pede_gids(lido):
@@ -194,4 +194,4 @@ def test_lote_gravando_enquanto_a_janela_pede_gids(lido):
     linha.join()
     assert erros == [] and len(set(gids)) == 5
     gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
-    assert gravado == projeto.recalcular_livro()
+    assert gravado == projeto.resumo.recalcular()

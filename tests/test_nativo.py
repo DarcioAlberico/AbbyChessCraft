@@ -20,7 +20,7 @@ def test_pdf_nativo_e_oferecido_e_cria_paginas_sem_ocr(tmp_path):
     projeto = ProjetoDeLivro.criar(tmp_path / "projetos", "Digital", pdf)
     resultado = nativo.importar(projeto)
     assert resultado.importadas == (0, 1) and resultado.recusadas == ()
-    assert projeto.paginas_lidas() == [0, 1]
+    assert projeto.resumo.paginas_lidas() == [0, 1]
     pagina = projeto.carregar_modelo(0)
     assert "The knight on d5 is strong" in tx.texto(tx.montar(pagina))
     assert all(b.entry.source == nativo.FONTE_NATIVA and b.revisado for b in pagina.boxes)

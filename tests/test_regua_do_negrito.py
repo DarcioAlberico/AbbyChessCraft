@@ -117,9 +117,9 @@ def test_a_regua_da_pagina_vai_ao_arquivo_e_ao_resumo_do_livro(projeto):  # noqa
     projeto.descarregar(30)
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     assert reaberto.carregar_modelo(1).regua_do_negrito == {"a": [3, 0.1, 0.11]}
-    assert reaberto.resumo_do_livro()[1]["regua_do_negrito"] == {"a": [3, 0.1, 0.11]}
-    assert reaberto.regua_do_negrito() == {"a": [3, 0.1, 0.11]}
-    assert reaberto.regua_do_negrito(sem_o_pid=reaberto.pid_da_pagina(1)) == {}
+    assert reaberto.resumo.do_livro()[1]["regua_do_negrito"] == {"a": [3, 0.1, 0.11]}
+    assert reaberto.resumo.regua_do_negrito() == {"a": [3, 0.1, 0.11]}
+    assert reaberto.resumo.regua_do_negrito(sem_o_pid=reaberto.pid_da_pagina(1)) == {}
 
 
 def test_o_lote_grava_a_regua_de_cada_pagina_e_manda_a_do_livro(projeto, fonte, leitor,  # noqa: F811
@@ -138,7 +138,7 @@ def test_o_lote_grava_a_regua_de_cada_pagina_e_manda_a_do_livro(projeto, fonte, 
     assert pedidas[1] == {"a": [2000, 0.1, 0.11]}
     assert pedidas[2] == {"a": [4000, 0.1, 0.11]}
     assert projeto.carregar_modelo(2).regua_do_negrito == {"a": [2000, 0.1, 0.11]}
-    assert projeto.regua_do_negrito()["a"][0] == 6000
+    assert projeto.resumo.regua_do_negrito()["a"][0] == 6000
     # A página apagada sai da régua do livro com o resumo dela.
     projeto.gravar_sequencia(projeto.sequencia.apagar([projeto.pid_da_pagina(0)]))
-    assert projeto.regua_do_negrito()["a"][0] == 4000
+    assert projeto.resumo.regua_do_negrito()["a"][0] == 4000

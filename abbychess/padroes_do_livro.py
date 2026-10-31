@@ -217,7 +217,7 @@ class ControladorDosPadroes:
             else:
                 gravou = True
                 try:
-                    projeto.reaplicar_limiar()
+                    projeto.resumo.reaplicar_limiar()
                 except OSError as erro:
                     self._p.eventos.emitir("aviso", "Opções", "Os limiares foram gravados, mas o "
                                            "resumo do livro (livro.json) não; ele é refeito na "

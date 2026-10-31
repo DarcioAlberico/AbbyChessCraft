@@ -148,7 +148,7 @@ class ControladorDeLayout:
         if p.projeto is None or p.imagem is None:
             return zonas
         paginas = {}
-        for indice in p.projeto.paginas_lidas():
+        for indice in p.projeto.resumo.paginas_lidas():
             modelo = p.modelo if indice == p.indice else p.projeto.carregar_modelo(indice)
             if modelo is None:
                 continue
@@ -555,7 +555,7 @@ class ControladorDeDiagramas:
         if any(not d.conferido for d in p.diagramas):
             self.conferir()
             return
-        resumo = p.projeto.resumo_do_livro()
+        resumo = p.projeto.resumo.do_livro()
         com = sorted(i for i, r in resumo.items() if r.get("diagramas_por_conferir", 0) > 0)
         proxima = next((i for i in com if i > p.indice), com[0] if com else None)
         if proxima is None or proxima == p.indice:
@@ -570,7 +570,7 @@ class ControladorDeDiagramas:
         p = self.pagina
         if not p.pronto:
             return
-        resumo = p.projeto.resumo_do_livro()
+        resumo = p.projeto.resumo.do_livro()
         com = sorted(i for i, r in resumo.items() if r.get("diagramas", 0) > 0)
         if passo > 0:
             alvo = next((i for i in com if i > p.indice), None)
@@ -596,7 +596,7 @@ class ControladorDeDiagramas:
         projeto = p.projeto
 
         def preparar():
-            com = sorted(i for i, r in projeto.resumo_do_livro().items()
+            com = sorted(i for i, r in projeto.resumo.do_livro().items()
                          if r.get("diagramas", 0) > 0)
 
             def trabalho(_progresso):
@@ -883,7 +883,7 @@ class ControladorDoLivro:
         self._largar_lote()
         p.ligar(projeto, fonte, leitor, servidor)
         self._ler_restante()
-        lidas = projeto.paginas_lidas()
+        lidas = projeto.resumo.paginas_lidas()
         p.ir_para(lidas[-1] if lidas else 0)
 
     def reconhecer(self, indices: Sequence[int], refazer: bool,
@@ -974,7 +974,7 @@ class ControladorDoLivro:
             extras["amostra_guiada_pendente"] = not completa
             if completa:
                 projeto = self.pagina.projeto
-                resumo = projeto.resumo_do_livro()
+                resumo = projeto.resumo.do_livro()
                 # Pelo valor gravado da página (o `pid`, §12.4), como a lista da amostra.
                 extras[lv.CHAVE_DOS_PENDENTES_INICIAIS] = {
                     str(g): int(resumo.get(i, {}).get("pendentes", 0) or 0)
@@ -1303,7 +1303,7 @@ class ControladorDaFila:
         p = self.pagina
         if p.projeto is None or p.fonte is None:
             return
-        lidas = sorted(p.projeto.paginas_lidas())
+        lidas = sorted(p.projeto.resumo.paginas_lidas())
         if not lidas:
             return
         depois = [i for i in lidas if (i > p.indice if passo > 0 else i < p.indice)]
@@ -1331,7 +1331,7 @@ class ControladorDaFila:
             return f"{self.verificador.posicao + 1 if total else 0}/{total}"
         if p.projeto is None:
             return "0"
-        resumo = p.projeto.resumo_do_livro()
+        resumo = p.projeto.resumo.do_livro()
         return str(sum(r.get("diagramas_por_conferir", 0) for r in resumo.values()))
 
 
@@ -1420,7 +1420,7 @@ class ControladorDaBusca:
             return
         historico, idioma = self.pagina.historico, self.idioma
         fontes, a_ler = {}, {}
-        for indice in projeto.paginas_lidas():
+        for indice in projeto.resumo.paginas_lidas():
             versao = historico.versao(projeto.pid_da_pagina(indice))
             modelo = projeto.modelo_em_memoria(indice)
             caminho = None if modelo is not None else projeto.arquivo_da_pagina(indice)
@@ -1557,7 +1557,7 @@ class ControladorDaBusca:
         velhas se ele não terminar)."""
         projeto, historico = self.pagina.projeto, self.pagina.historico
         refazer, carregar = {}, {}
-        lidas = set(projeto.paginas_lidas())
+        lidas = set(projeto.resumo.paginas_lidas())
         for i in sorted(lidas):
             versao = historico.versao(projeto.pid_da_pagina(i))
             indexada = self.indice.get(i)
@@ -1586,7 +1586,7 @@ class ControladorDaBusca:
     def _guardar(self, leitura: int, refeitas: dict) -> None:
         """As páginas refeitas entram no índice, se ainda são lidas e se nenhuma leitura mais
         nova (que viu o disco depois) já as pôs lá."""
-        lidas = set(self.pagina.projeto.paginas_lidas()) if self.pagina.projeto else set()
+        lidas = set(self.pagina.projeto.resumo.paginas_lidas()) if self.pagina.projeto else set()
         for i, indexada in refeitas.items():
             atual = self.indice.get(i)
             if (i in lidas and self._lida_em.get(i, 0) < leitura
@@ -1650,7 +1650,7 @@ class ControladorDaBusca:
             historico = self.pagina.historico
             leitura, refazer, indice = 0, {}, {}
             carregar = {i: historico.versao(projeto.pid_da_pagina(i))
-                        for i in projeto.paginas_lidas()}
+                        for i in projeto.resumo.paginas_lidas()}
 
         def rodar():
             refeitas = {}
@@ -1764,7 +1764,7 @@ class ControladorDaSubstituicao:
     def _paginas(self, opcoes) -> List[int]:
         from abbychess import busca as bs
 
-        return bs.paginas_do_escopo(self.pagina.projeto.paginas_lidas(), opcoes)
+        return bs.paginas_do_escopo(self.pagina.projeto.resumo.paginas_lidas(), opcoes)
 
     def _casos(self, pagina, opcoes, expressao, trocar, alvo: str):
         from abbychess import busca as bs
@@ -1955,7 +1955,7 @@ class ControladorDaSubstituicao:
                         sb.aplicar_na_pagina(copia, casos)
                         depois_de_editar(copia, fontes[i], idioma)
                         feitas[i] = (copia, hs.mudanca(fontes[i], copia.instantaneo()),
-                                     projeto.resumo_do_modelo(copia))
+                                     projeto.resumo.do_modelo(copia))
                     except ss.Recusa as recusa:
                         falhas[i] = str(recusa)
                     except Exception as erro:   # a página fica de fora; o resto vale

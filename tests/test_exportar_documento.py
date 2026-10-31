@@ -247,12 +247,14 @@ class _Dados:
 
 
 class _ProjetoFalso:
-    """O que `pgn_do_livro` lê do projeto: as páginas lidas e o modelo de cada uma."""
+    """O que `pgn_do_livro` lê do projeto: as páginas lidas e o modelo de cada uma (o
+    resumo do livro é o próprio falso)."""
 
     dados = _Dados()
 
     def __init__(self, modelos):
         self.modelos = modelos
+        self.resumo = self
 
     def paginas_lidas(self):
         return sorted(self.modelos)
@@ -294,7 +296,7 @@ class _ProjetoComEstados(_ProjetoFalso):
         super().__init__(modelos)
         self.verificadas = verificadas
 
-    def resumo_do_livro(self):
+    def do_livro(self):
         return {i: {"estado": VERIFICADA if i in self.verificadas else "reconhecida"}
                 for i in self.modelos}
 

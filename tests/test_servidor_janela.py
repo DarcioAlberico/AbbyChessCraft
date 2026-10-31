@@ -162,13 +162,13 @@ def test_ca_11_1_e_11_2_durante_o_lote_navegar_e_ensinar_valem_na_hora(app, jane
     j.reconhecer()                                       # a página 1, pelo servidor
     _esperar(app, j)
     j.livro.reconhecer(list(range(1, 51)), refazer=False)
-    _ate(app, lambda: len(p.projeto.paginas_lidas()) >= 3)
+    _ate(app, lambda: len(p.projeto.resumo.paginas_lidas()) >= 3)
     assert j.livro.lote_rodando and not j.executor.ocupado    # o lote não prende a fila
     p.escolher(p.gids[0])
     p.leitura.ensinar("a")                                       # o primeiro glifo é um "a"
     assert p.box(p.gids[0]).char == "a"                  # na hora, sem esperar o lote
     assert j.pagina.ir_para(1) and p.indice == 1         # navegar também
-    feitas_ao_ensinar = len(p.projeto.paginas_lidas())
+    feitas_ao_ensinar = len(p.projeto.resumo.paginas_lidas())
     # A busca também (passo B): as páginas que o lote já leu entram nela.
     j.localizar()
     j.barra_de_busca.campo.setText("x")
@@ -186,7 +186,7 @@ def test_ca_11_1_e_11_2_durante_o_lote_navegar_e_ensinar_valem_na_hora(app, jane
     # CA-4.4: o livro.json é o recalculado, com as páginas que vieram do servidor.
     assert p.projeto.descarregar(10)
     gravado = json.loads((p.projeto.pasta / "livro.json").read_text(encoding="utf-8"))
-    assert gravado == p.projeto.recalcular_livro()
+    assert gravado == p.projeto.resumo.recalcular()
 
 
 def test_ca_11_4_a_aberta_editada_durante_a_leitura_fica_para_reler_depois(
@@ -217,7 +217,7 @@ def test_ca_11_3_fechar_com_o_lote_ativo_termina_o_filho_e_as_paginas_carregam(a
     p = j.pagina
     pasta, pid = p.projeto.pasta, p.servidor.pid
     j.livro.reconhecer(list(range(51)), refazer=False)
-    _ate(app, lambda: len(p.projeto.paginas_lidas()) >= 2)
+    _ate(app, lambda: len(p.projeto.resumo.paginas_lidas()) >= 2)
     inicio = time.perf_counter()
     j.close()
     assert time.perf_counter() - inicio <= 6
@@ -226,7 +226,7 @@ def test_ca_11_3_fechar_com_o_lote_ativo_termina_o_filho_e_as_paginas_carregam(a
         json.loads(arquivo.read_text(encoding="utf-8"))  # toda página gravada carrega
     reaberto = ProjetoDeLivro.abrir(pasta)
     try:
-        assert len(reaberto.paginas_lidas()) >= 2
+        assert len(reaberto.resumo.paginas_lidas()) >= 2
     finally:
         reaberto.fechar()
 
@@ -241,10 +241,10 @@ def test_o_lote_para_quando_o_servidor_desiste(app, janela_do_livro, monkeypatch
     p = j.pagina
     servidor = p.servidor
     j.livro.reconhecer(list(range(51)), refazer=False)
-    _ate(app, lambda: len(p.projeto.paginas_lidas()) >= 1)
+    _ate(app, lambda: len(p.projeto.resumo.paginas_lidas()) >= 1)
     servidor.processo.kill()
     _ate(app, lambda: servidor.reinicios == 1 and servidor.pronto.is_set())
-    _ate(app, lambda: len(p.projeto.paginas_lidas()) >= 3)        # o lote seguiu no reaberto
+    _ate(app, lambda: len(p.projeto.resumo.paginas_lidas()) >= 3)        # o lote seguiu no reaberto
     servidor.processo.kill()
     _ate(app, lambda: not j.livro.lote_rodando, 60)
     resultado = j.fins[-1]

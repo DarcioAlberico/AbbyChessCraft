@@ -82,7 +82,7 @@ def test_lote_grava_cada_pagina_com_progresso(projeto, fonte, leitor):
         projeto, fonte, leitor, range(3), progresso=lambda f, t: progresso.append((f, t)),
         ao_gravar=lambda i, _r: gravadas.append(i))
     assert resultado.lidas == gravadas == [0, 1, 2]
-    assert projeto.paginas_lidas() == [0, 1, 2]
+    assert projeto.resumo.paginas_lidas() == [0, 1, 2]
     assert progresso == [(0, 3), (1, 3), (2, 3), (3, 3)]
     # Sem rede nem padrão, todo glifo fica para a revisão.
     assert resultado.pendentes[0] == len(projeto.carregar_pagina(0)) > 10
@@ -120,7 +120,7 @@ def test_cancelar_para_entre_paginas_e_guarda_as_feitas(projeto, fonte, leitor):
                                          cancelado=lambda: len(gravadas) >= 1,
                                          ao_gravar=lambda i, _r: gravadas.append(i))
     assert resultado.cancelado
-    assert projeto.paginas_lidas() == [0]
+    assert projeto.resumo.paginas_lidas() == [0]
 
 
 def test_cancelar_no_meio_da_pagina_nao_grava_ela_pela_metade(projeto, fonte, leitor):
@@ -132,7 +132,7 @@ def test_cancelar_no_meio_da_pagina_nao_grava_ela_pela_metade(projeto, fonte, le
 
     resultado = livro.reconhecer_paginas(projeto, fonte, leitor, [0], cancelado=cancelado)
     assert resultado.cancelado and resultado.lidas == []
-    assert projeto.paginas_lidas() == []
+    assert projeto.resumo.paginas_lidas() == []
 
 
 def test_pagina_que_falha_nao_derruba_o_lote(projeto, fonte, leitor, monkeypatch):

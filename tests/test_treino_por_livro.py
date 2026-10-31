@@ -66,7 +66,7 @@ def test_pagina_gravada_volta_igual(projeto):
     projeto.salvar_pagina(0, boxes)
     assert projeto.carregar_pagina(0) == boxes
     assert projeto.carregar_pagina(1) is None
-    assert projeto.paginas_lidas() == [0]
+    assert projeto.resumo.paginas_lidas() == [0]
 
 
 def test_sem_padroes_nem_rede_tudo_vai_para_a_revisao(projeto, leitor):

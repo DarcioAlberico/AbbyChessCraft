@@ -103,7 +103,7 @@ class PaginaLida:
 def ler_pagina(imagem, zonas, marcados, leitor, *, regua_do_livro: Optional[dict] = None,
                progresso=None, cancelado: Callable[[], bool] = lambda: False) -> PaginaLida:
     """Segmenta pelas áreas, põe no lugar os glifos que ficam (§4.6), lê e acha os diagramas.
-    O negrito é decidido com a régua do livro (`projeto.regua_do_negrito`), quando dada."""
+    O negrito é decidido com a régua do livro (`projeto.resumo.regua_do_negrito`), quando dada."""
     from abbychess import diagramas as dg
     from abbychess import pagina as pg
     from abbychess import procedencia

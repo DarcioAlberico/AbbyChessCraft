@@ -151,11 +151,11 @@ def test_agendar_nao_grava_na_hora_e_o_resumo_ja_ve(projeto):
     pagina = _pagina(projeto, 0)
     assert projeto.agendar(pagina)
     assert not (projeto.pasta / "paginas" / f"p{pagina.pid}.json").exists()
-    assert projeto.paginas_lidas() == [0]        # o resumo não espera o disco
+    assert projeto.resumo.paginas_lidas() == [0]        # o resumo não espera o disco
     assert projeto.descarregar(5)
     gravado = json.loads((projeto.pasta / "paginas" / f"p{pagina.pid}.json").read_text("utf-8"))
     assert len(gravado["boxes"]) == 5
-    assert projeto.paginas_lidas() == [0]
+    assert projeto.resumo.paginas_lidas() == [0]
 
 
 def test_fechar_com_a_pagina_suja_grava_antes_de_voltar(projeto):
@@ -256,7 +256,7 @@ def test_a_gravacao_sincrona_nao_perde_para_o_instantaneo_velho_do_gravador(proj
     try:
         assert reaberto.carregar_pagina(0)[0].char == "z"
         gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
-        assert gravado == reaberto.recalcular_livro()
+        assert gravado == reaberto.resumo.recalcular()
     finally:
         reaberto.fechar()
 
@@ -279,7 +279,7 @@ def test_livro_json_igual_ao_recalculado_depois_de_gravacoes_assincronas(projeto
             projeto.descarregar(5)
     assert projeto.descarregar(5)
     gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
-    assert gravado == projeto.recalcular_livro()
+    assert gravado == projeto.resumo.recalcular()
 
 
 def test_instantaneo_e_imutavel_frente_as_edicoes(projeto):
@@ -316,7 +316,7 @@ def test_a_interface_nao_espera_o_disco_do_gravador(projeto, monkeypatch):
         ed.corrigir(outra, outra.boxes[0].gid, "z")
         projeto.agendar(outra)
         assert projeto.carregar_modelo(1) is outra
-        assert 1 in projeto.resumo_do_livro()
+        assert 1 in projeto.resumo.do_livro()
         assert not saiu.is_set()                 # voltaram com o gravador ainda preso
     finally:
         solto.set()

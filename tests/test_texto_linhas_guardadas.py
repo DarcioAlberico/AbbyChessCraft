@@ -31,7 +31,7 @@ def paginas(tmp_path_factory):
         z.extractall(pasta)
     projeto = ProjetoDeLivro.abrir(next(p.parent for p in pasta.rglob("projeto.json")))
     try:
-        yield [projeto.carregar_modelo(i) for i in projeto.paginas_lidas()]
+        yield [projeto.carregar_modelo(i) for i in projeto.resumo.paginas_lidas()]
     finally:
         projeto.fechar()
 

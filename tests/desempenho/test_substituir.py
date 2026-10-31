@@ -39,7 +39,7 @@ def _livro_de_230(pasta, pdf_do_tamanho_da_fatia: bool = False):
         z.extractall(pasta / "fatia")
     fatia = ProjetoDeLivro.abrir(next(p.parent for p in (pasta / "fatia").rglob("projeto.json")))
     try:
-        modelos = [fatia.carregar_modelo(i) for i in fatia.paginas_lidas()]
+        modelos = [fatia.carregar_modelo(i) for i in fatia.resumo.paginas_lidas()]
     finally:
         fatia.fechar()
     if pdf_do_tamanho_da_fatia:

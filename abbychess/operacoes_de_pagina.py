@@ -112,7 +112,7 @@ class ControladorDaSequencia:
                 e = nova.entrada_de(pid)
                 nova = nova.com_entrada(replace(e, giro=(e.giro + graus) % 360,
                                                 tamanho=e.tamanho or self._tamanho(e)))
-            lidas = {self._p.projeto.pid_da_pagina(i) for i in self._p.projeto.paginas_lidas()}
+            lidas = {self._p.projeto.pid_da_pagina(i) for i in self._p.projeto.resumo.paginas_lidas()}
             if lidas.intersection(pids):
                 # Os glifos vão junto, mas a leitura (a ordem das linhas, o texto deitado) é a
                 # da posição de antes.
@@ -307,7 +307,7 @@ class ControladorDaSequencia:
             return []
         # O guardado, sem medir (um render por página, na thread da interface): a página lida
         # foi aberta e medida; a que ganhou boxes sem abrir não tem ângulo a guardar.
-        com_dados = {self._p.projeto.pid_da_pagina(i) for i in self._p.projeto.resumo_do_livro()}
+        com_dados = {self._p.projeto.pid_da_pagina(i) for i in self._p.projeto.resumo.do_livro()}
         angulos = []
         for e in mudam:
             if e.pid in com_dados:

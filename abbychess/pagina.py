@@ -238,10 +238,14 @@ class FonteDePaginas:
             return
         with self._trava_das_inclinacoes:
             self._inclinacoes.update(novas)
-            if self._arquivo_das_inclinacoes is not None and not self.somente_leitura:
-                gv.gravar_json(self._arquivo_das_inclinacoes, {
-                    str(k): v for k, v in sorted(self._inclinacoes.items(),
-                                                 key=_ordem_da_chave)})
+            self._gravar_as_inclinacoes()
+
+    def _gravar_as_inclinacoes(self) -> None:
+        """Grava o `inclinacoes.json` (com a trava das inclinações tomada), se há onde e o
+        projeto não é só leitura."""
+        if self._arquivo_das_inclinacoes is not None and not self.somente_leitura:
+            gv.gravar_json(self._arquivo_das_inclinacoes, {
+                str(k): v for k, v in sorted(self._inclinacoes.items(), key=_ordem_da_chave)})
 
     def inclinacao_guardada(self, entrada: "sq.Entrada") -> Optional[float]:
         """O ângulo medido e guardado da entrada, sem medir (None: ainda não foi medido)."""
@@ -250,6 +254,8 @@ class FonteDePaginas:
         with self._trava_das_inclinacoes:
             angulo = self._inclinacoes.get(_chave_da_inclinacao(entrada, self.por_pid))
             if angulo is None and self.por_pid and entrada.do_livro_sem_geometria:
+                # A medida da v2, pelo índice do PDF: a migração a passa a `pid`, e uma queda
+                # no meio dela não faz medir de novo (os boxes estão no ângulo medido).
                 angulo = self._inclinacoes.get(entrada.pagina)
         return angulo
 
@@ -263,30 +269,28 @@ class FonteDePaginas:
             return entrada.angulo if abs(entrada.angulo) >= INCLINACAO_MINIMA else 0.0
         if not self.endireitar:
             return 0.0
+        angulo = self.inclinacao_guardada(entrada)
+        if angulo is None:
+            angulo = self._medir_e_guardar(entrada, imagem)
+        return angulo if abs(angulo) >= INCLINACAO_MINIMA else 0.0
+
+    def _medir_e_guardar(self, entrada: "sq.Entrada", imagem: Optional[Image.Image]) -> float:
+        """Mede a inclinação da entrada (fora das travas) e a grava; se outra thread gravou a
+        dela antes, vale a primeira.
+
+        Medida na página inteira da fonte, já girada (o texto deitado de uma página escaneada
+        de lado mede em pé); como girar de 90 e endireitar comutam em volta do centro (a menos
+        de um pixel na página não quadrada), o ângulo vale aplicado à página da fonte."""
         chave = _chave_da_inclinacao(entrada, self.por_pid)
+        imagem = imagem if imagem is not None else self._da_fonte(entrada)
+        medido = medir_inclinacao(np.asarray(
+            com_geometria(imagem, None, entrada.giro).convert("L")))   # fora das travas
         with self._trava_das_inclinacoes:
             angulo = self._inclinacoes.get(chave)
-            if angulo is None and self.por_pid and entrada.do_livro_sem_geometria:
-                # A medida da v2, pelo índice do PDF: a migração a passa a `pid`, e uma queda
-                # no meio dela não faz medir de novo (os boxes estão no ângulo medido).
-                angulo = self._inclinacoes.get(entrada.pagina)
-        if angulo is None:
-            # Medida na página inteira da fonte, já girada (o texto deitado de uma página
-            # escaneada de lado mede em pé); como girar de 90 e endireitar comutam em volta
-            # do centro (a menos de um pixel na página não quadrada), o ângulo vale aplicado
-            # à página da fonte.
-            imagem = imagem if imagem is not None else self._da_fonte(entrada)
-            medido = medir_inclinacao(np.asarray(
-                com_geometria(imagem, None, entrada.giro).convert("L")))   # fora das travas
-            with self._trava_das_inclinacoes:
-                angulo = self._inclinacoes.get(chave)
-                if angulo is None:
-                    angulo = self._inclinacoes[chave] = medido
-                    if self._arquivo_das_inclinacoes is not None and not self.somente_leitura:
-                        gv.gravar_json(self._arquivo_das_inclinacoes, {
-                            str(k): v for k, v in sorted(self._inclinacoes.items(),
-                                                         key=_ordem_da_chave)})
-        return angulo if abs(angulo) >= INCLINACAO_MINIMA else 0.0
+            if angulo is None:
+                angulo = self._inclinacoes[chave] = medido
+                self._gravar_as_inclinacoes()
+        return angulo
 
 
 def _ordem_da_chave(item) -> tuple:
@@ -708,13 +712,36 @@ def devolver_pingos(boxes: List[BoxEntry], binaria: np.ndarray, escala: float
 
     # A tinta sem box (quase nada numa página): a binária com os boxes apagados. O componente
     # dela que encosta em tinta coberta é pedaço de um glifo que tem box.
+    orfa = _sem_os_boxes(binaria, boxes)
+    total, rotulos, medidas, _c = cv2.connectedComponentsWithStats(orfa, connectivity=8)
+    saida = list(boxes)
+    crescidos = set()
+    for rotulo, x, y, w, h in _orfaos_pequenos(medidas, escala):
+        if _encosta_em_tinta_coberta(rotulos, rotulo, binaria, orfa, x, y, w, h):
+            continue
+        k = _glifo_de_baixo(saida, crescidos, x, y, w, h)
+        if k is None:
+            continue
+        b = saida[k]
+        saida[k] = replace(b, x1=min(b.x1, x), y1=y, x2=max(b.x2, x + w))
+        crescidos.add(k)
+    return saida
+
+
+def _sem_os_boxes(binaria: np.ndarray, boxes: List[BoxEntry]) -> np.ndarray:
+    """A binária com a tinta dos boxes apagada: a tinta sem box."""
     orfa = binaria.copy()
     for b in boxes:
         orfa[b.y1:b.y2, b.x1:b.x2] = 0
-    total, rotulos, medidas, _c = cv2.connectedComponentsWithStats(orfa, connectivity=8)
+    return orfa
+
+
+def _orfaos_pequenos(medidas: np.ndarray, escala: float):
+    """`(rótulo, x, y, w, h)` de cada componente da tinta sem box com tamanho de pingo: até
+    `PINGO_PERDIDO_MAXIMO` escalas nos dois eixos e com a área mínima (abaixo é poeira)."""
+    import cv2
+
     maximo, area_minima = PINGO_PERDIDO_MAXIMO * escala, PINGO_PERDIDO_AREA_MINIMA * escala ** 2
-    saida = list(boxes)
-    crescidos = set()
     larguras, alturas, areas = (medidas[:, k] for k in (cv2.CC_STAT_WIDTH, cv2.CC_STAT_HEIGHT,
                                                          cv2.CC_STAT_AREA))
     pequenos = (larguras <= maximo) & (alturas <= maximo) & (areas >= area_minima)
@@ -722,24 +749,34 @@ def devolver_pingos(boxes: List[BoxEntry], binaria: np.ndarray, escala: float
         if rotulo == 0:                                  # o fundo
             continue
         x, y, w, h = (int(v) for v in medidas[rotulo][:4])
-        y0, x0 = max(0, y - 1), max(0, x - 1)
-        janela = np.s_[y0:y + h + 1, x0:x + w + 1]
-        vizinhanca = cv2.dilate((rotulos[janela] == rotulo).astype(np.uint8),
-                                np.ones((3, 3), np.uint8)) > 0
-        if (vizinhanca & (binaria[janela] > 0) & (orfa[janela] == 0)).any():
-            continue
-        centro = x + w / 2
-        candidatos = [k for k, b in enumerate(saida)
-                      if k not in crescidos and not (b.angulo or 0) % 180
-                      and b.x1 <= centro <= b.x2 and w <= b.width + 1
-                      and 0 <= b.y1 - (y + h) <= BoxService.FOLGA_DE_DIACRITICO * b.height]
-        if not candidatos:
-            continue
-        k = min(candidatos, key=lambda k: saida[k].y1 - (y + h))
-        b = saida[k]
-        saida[k] = replace(b, x1=min(b.x1, x), y1=y, x2=max(b.x2, x + w))
-        crescidos.add(k)
-    return saida
+        yield rotulo, x, y, w, h
+
+
+def _encosta_em_tinta_coberta(rotulos: np.ndarray, rotulo, binaria: np.ndarray,
+                              orfa: np.ndarray, x: int, y: int, w: int, h: int) -> bool:
+    """O componente encosta em tinta que tem box: é pedaço de um glifo (a cauda de um "p"
+    cortada), e não um pingo inteiro."""
+    import cv2
+
+    y0, x0 = max(0, y - 1), max(0, x - 1)
+    janela = np.s_[y0:y + h + 1, x0:x + w + 1]
+    vizinhanca = cv2.dilate((rotulos[janela] == rotulo).astype(np.uint8),
+                            np.ones((3, 3), np.uint8)) > 0
+    return bool((vizinhanca & (binaria[janela] > 0) & (orfa[janela] == 0)).any())
+
+
+def _glifo_de_baixo(saida: List[BoxEntry], crescidos: set, x: int, y: int, w: int, h: int
+                    ) -> Optional[int]:
+    """O box em pé, ainda sem pingo devolvido, com o centro do pingo sobre ele e logo abaixo
+    (até `FOLGA_DE_DIACRITICO` da altura dele); o mais perto, ou None."""
+    centro = x + w / 2
+    candidatos = [k for k, b in enumerate(saida)
+                  if k not in crescidos and not (b.angulo or 0) % 180
+                  and b.x1 <= centro <= b.x2 and w <= b.width + 1
+                  and 0 <= b.y1 - (y + h) <= BoxService.FOLGA_DE_DIACRITICO * b.height]
+    if not candidatos:
+        return None
+    return min(candidatos, key=lambda k: saida[k].y1 - (y + h))
 
 
 def segmentar(imagem: Image.Image, leitor: Optional[LeitorDoLivro] = None) -> List[BoxEntry]:
@@ -784,15 +821,28 @@ def ler_boxes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorDoLivro,
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
     if so_pendentes and pendentes is None:
         pendentes = contexto.pendentes(boxes, leitor.limiares)
-    alvos = [b for i, b in enumerate(boxes) if b.source != FONTE_MANUAL and (
+    _ler_os_alvos(pagina, _alvos_da_leitura(boxes, so_pendentes, pendentes), leitor, referencia,
+                  progresso, cancelado)
+    return resumir(boxes, leitor)
+
+
+def _alvos_da_leitura(boxes: List[BoxEntry], so_pendentes: bool,
+                      pendentes: Optional[Sequence[bool]]) -> List[BoxEntry]:
+    """Os boxes a ler: nunca os manuais; com `so_pendentes`, só os pendentes."""
+    return [b for i, b in enumerate(boxes) if b.source != FONTE_MANUAL and (
         not so_pendentes or pendentes[i])]
+
+
+def _ler_os_alvos(pagina: np.ndarray, alvos: List[BoxEntry], leitor: LeitorDoLivro,
+                  referencia: Optional[float], progresso: Optional[Progresso],
+                  cancelado: Callable[[], bool]) -> None:
+    """Lê os boxes no lugar, um por um, até o `cancelado`; o `progresso` a cada 10 e no fim."""
     for i, box in enumerate(alvos):
         if cancelado():
             break
         _ler_um(pagina, box, leitor, referencia)
         if progresso and (i % 10 == 0 or i == len(alvos) - 1):
             progresso(i + 1, len(alvos))
-    return resumir(boxes, leitor)
 
 
 def _ler_um(pagina: np.ndarray, box: BoxEntry, leitor: LeitorDoLivro,

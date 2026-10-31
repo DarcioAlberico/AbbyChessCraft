@@ -456,35 +456,32 @@ class VisorDePagina(QGraphicsView):
 
     def marcar_palavra(self, caixa) -> None:
         """Contorna a palavra em verificação e a traz para a vista, ou apaga o contorno."""
+        self._palavra = self._contornar(self._palavra, caixa, QPen(estilo.PALAVRA), 3, 6, 13)
         if self._palavra is not None:
-            self.scene().removeItem(self._palavra)
-            self._palavra = None
-        if caixa is None:
-            return
-        x1, y1, x2, y2 = caixa
-        caneta = QPen(estilo.PALAVRA)
-        caneta.setCosmetic(True)
-        caneta.setWidthF(3)
-        self._palavra = self.scene().addRect(x1 - 6, y1 - 6, x2 - x1 + 12, y2 - y1 + 12, caneta)
-        self._palavra.setZValue(13)
-        self.ensureVisible(self._palavra, 150, 150)
+            self.ensureVisible(self._palavra, 150, 150)
 
     def marcar_palavra_do_documento(self, caixa) -> None:
         """Contorna (tracejado) a palavra sob o cursor do Documento, sem rolar: quem rola é o
         Seguir (`mostrar_caixa`)."""
-        if self._palavra_do_documento is not None:
-            self.scene().removeItem(self._palavra_do_documento)
-            self._palavra_do_documento = None
-        if caixa is None:
-            return
-        x1, y1, x2, y2 = caixa
         caneta = QPen(estilo.AZUL)
-        caneta.setCosmetic(True)
-        caneta.setWidthF(2)
         caneta.setStyle(Qt.PenStyle.DashLine)
-        self._palavra_do_documento = self.scene().addRect(x1 - 4, y1 - 4, x2 - x1 + 8,
-                                                          y2 - y1 + 8, caneta)
-        self._palavra_do_documento.setZValue(12)
+        self._palavra_do_documento = self._contornar(self._palavra_do_documento, caixa, caneta,
+                                                     2, 4, 12)
+
+    def _contornar(self, atual, caixa, caneta: QPen, largura: float, folga: int, z: int):
+        """Apaga o contorno `atual` e, se há `caixa`, desenha o novo (`folga` pixels em volta);
+        devolve o novo, ou None."""
+        if atual is not None:
+            self.scene().removeItem(atual)
+        if caixa is None:
+            return None
+        x1, y1, x2, y2 = caixa
+        caneta.setCosmetic(True)
+        caneta.setWidthF(largura)
+        novo = self.scene().addRect(x1 - folga, y1 - folga, x2 - x1 + 2 * folga,
+                                    y2 - y1 + 2 * folga, caneta)
+        novo.setZValue(z)
+        return novo
 
     def menu_do_box(self, indice: int, coluna: int) -> QMenu:
         """O menu de edição do box, com a coluna onde o botão direito caiu."""

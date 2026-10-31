@@ -7,7 +7,7 @@ como `EspacoDeTrabalho`.
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Tuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QCheckBox, QFileDialog, QLabel
@@ -69,30 +69,33 @@ class PaginasNaJanela:
         self.pagina.girar_paginas(self._posicoes_de_agora(selecionadas), 270)
 
     def mover_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
-        total = self.pagina.fonte.total if self.pagina.fonte else 0
-        escolha = dp.perguntar_paginas(
-            self, "Mover páginas", total, selecao=self._selecao_de_agora(selecionadas),
-            lugar="Depois da página", lugar_padrao=self.pagina.indice,
-            efeito=dp.efeito("1 página muda de lugar: {PAGINAS}.",
-                             "{N} páginas mudam de lugar: {PAGINAS}."),
-            validar=_mover_vale, ok="Mover",
-            explicacao="As páginas saem de onde estão e entram, na mesma ordem, depois da "
-                       "página escolhida (contada como está agora). {desfazer} desfaz.")
+        escolha = self._perguntar_pela_selecao(
+            "Mover páginas", selecionadas, ("1 página muda de lugar: {PAGINAS}.",
+                                            "{N} páginas mudam de lugar: {PAGINAS}."),
+            "Mover", "As páginas saem de onde estão e entram, na mesma ordem, depois da "
+                     "página escolhida (contada como está agora). {desfazer} desfaz.",
+            lugar="Depois da página", lugar_padrao=self.pagina.indice, validar=_mover_vale)
         if escolha is not None:
             posicoes, depois_da = escolha
             self.pagina.mover_paginas(posicoes, depois_da)
 
     def apagar_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
-        total = self.pagina.fonte.total if self.pagina.fonte else 0
-        escolha = dp.perguntar_paginas(
-            self, "Apagar páginas", total, selecao=self._selecao_de_agora(selecionadas),
-            efeito=dp.efeito("1 página sai do livro: {PAGINAS}.",
-                             "{N} páginas saem do livro: {PAGINAS}."), ok="Apagar",
-            explicacao="As páginas saem do livro, da busca e das exportações, mas ficam "
-                       "guardadas no projeto, com os glifos e as correções: {desfazer}, ou "
-                       "Página › Páginas apagadas…, as devolvem.")
+        escolha = self._perguntar_pela_selecao(
+            "Apagar páginas", selecionadas, ("1 página sai do livro: {PAGINAS}.",
+                                             "{N} páginas saem do livro: {PAGINAS}."),
+            "Apagar", "As páginas saem do livro, da busca e das exportações, mas ficam "
+                      "guardadas no projeto, com os glifos e as correções: {desfazer}, ou "
+                      "Página › Páginas apagadas…, as devolvem.")
         if escolha is not None:
             self.pagina.apagar_paginas(escolha[0])
+
+    def _perguntar_pela_selecao(self, titulo: str, selecionadas, efeito: Tuple[str, str],
+                                ok: str, explicacao: str, **mais):
+        """O diálogo das páginas a partir da seleção de agora; `efeito` é a frase de uma
+        página e a de várias. A escolha, ou None se cancelou."""
+        return dp.perguntar_paginas(
+            self, titulo, self._total(), selecao=self._selecao_de_agora(selecionadas),
+            efeito=dp.efeito(*efeito), ok=ok, explicacao=explicacao, **mais)
 
     def inserir_paginas(self) -> None:
         caminhos, _ = QFileDialog.getOpenFileNames(
@@ -152,13 +155,12 @@ class PaginasNaJanela:
             self.pagina.cortar_paginas(*escolha)
 
     def tirar_o_corte(self, selecionadas: Optional[Sequence[int]] = None) -> None:
-        escolha = dp.perguntar_paginas(
-            self, "Tirar o corte", self._total(), selecao=self._selecao_de_agora(selecionadas),
-            efeito=dp.efeito("1 página volta inteira: {PAGINAS}.",
-                             "{N} páginas voltam inteiras: {PAGINAS}."), ok="Tirar o corte",
-            explicacao="A página volta inteira (o giro fica), com os glifos que o corte "
-                       "guardou. A metade de uma página dividida não: o {desfazer} da divisão "
-                       "junta as metades.")
+        escolha = self._perguntar_pela_selecao(
+            "Tirar o corte", selecionadas, ("1 página volta inteira: {PAGINAS}.",
+                                            "{N} páginas voltam inteiras: {PAGINAS}."),
+            "Tirar o corte", "A página volta inteira (o giro fica), com os glifos que o corte "
+                             "guardou. A metade de uma página dividida não: o {desfazer} da "
+                             "divisão junta as metades.")
         if escolha is not None:
             self.pagina.tirar_o_corte(escolha[0])
 

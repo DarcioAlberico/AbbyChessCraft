@@ -62,6 +62,17 @@ NOMES_DOS_SIMBOLOS = {
 
 FONTE_DE_SIMBOLOS = "Segoe UI Symbol"
 
+
+def menu_da_paleta(pai, inserir) -> QMenu:
+    """A paleta (F2) como menu: o símbolo escolhido vai a `inserir` (o campo do treino, o
+    cursor do Documento)."""
+    menu = QMenu(pai)
+    menu.setFont(QFont(FONTE_DE_SIMBOLOS, 12))
+    for simbolo in PALETA:
+        menu.addAction(f"{simbolo}   {NOMES_DOS_SIMBOLOS.get(simbolo, '')}",
+                       lambda s=simbolo: inserir(s))
+    return menu
+
 NOMES_DAS_FONTES = {
     "manual": "confirmado por você",
     "livro": "padrão deste livro",
@@ -455,13 +466,8 @@ class PainelDeTreino(QWidget):
         """F2: a paleta como menu, no campo; o símbolo escolhido entra no cursor."""
         if not self._ativo:
             return
-        menu = QMenu(self)
-        menu.setFont(QFont(FONTE_DE_SIMBOLOS, 12))
-        for simbolo in PALETA:
-            menu.addAction(f"{simbolo}   {NOMES_DOS_SIMBOLOS.get(simbolo, '')}",
-                           lambda s=simbolo: self._inserir(s))
-        self.menu_da_paleta = menu              # os testes escolhem sem abrir
-        menu.popup(self.campo.mapToGlobal(self.campo.rect().bottomLeft()))
+        self.menu_da_paleta = menu_da_paleta(self, self._inserir)  # os testes escolhem sem abrir
+        self.menu_da_paleta.popup(self.campo.mapToGlobal(self.campo.rect().bottomLeft()))
 
     def inserir_figurina(self, branca: str) -> None:
         """Ctrl+Shift+peça no campo: a figurina; o mesmo atalho de novo alterna a cor."""

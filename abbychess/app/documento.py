@@ -43,7 +43,7 @@ from PySide6.QtCore import QRectF, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import (QFont, QFontMetrics, QGuiApplication, QImage, QPainter, QPen,
                            QTextBlockFormat, QTextBlockUserData, QTextCharFormat, QTextCursor,
                            QTextDocument, QTextImageFormat)
-from PySide6.QtWidgets import QMenu, QTextEdit
+from PySide6.QtWidgets import QTextEdit
 
 from abbychess import grade as gd
 from abbychess import sessao as ss
@@ -957,15 +957,11 @@ class VistaDoDocumento(QTextEdit):
         """F2 no Documento: a paleta no cursor; o símbolo escolhido entra nele."""
         if self.isReadOnly():
             return
-        from abbychess.app.painel_treino import FONTE_DE_SIMBOLOS, NOMES_DOS_SIMBOLOS, PALETA
+        from abbychess.app.painel_treino import menu_da_paleta
 
-        menu = QMenu(self)
-        menu.setFont(QFont(FONTE_DE_SIMBOLOS, 12))
-        for simbolo in PALETA:
-            menu.addAction(f"{simbolo}   {NOMES_DOS_SIMBOLOS.get(simbolo, '')}",
-                           lambda s=simbolo: self.textCursor().insertText(s))
-        self.menu_da_paleta = menu              # os testes escolhem sem abrir
-        menu.popup(self.viewport().mapToGlobal(self.cursorRect().bottomLeft()))
+        # os testes escolhem sem abrir
+        self.menu_da_paleta = menu_da_paleta(self, lambda s: self.textCursor().insertText(s))
+        self.menu_da_paleta.popup(self.viewport().mapToGlobal(self.cursorRect().bottomLeft()))
 
     def event(self, evento):
         teclas = self.__dict__.get('teclas')     # o Qt chama event() já no __init__

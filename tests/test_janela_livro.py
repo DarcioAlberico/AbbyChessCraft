@@ -254,3 +254,219 @@ def test_previa_pelo_controlador_chega_ao_dialogo(app, janela, tmp_path):
     assert dialogo.btn_exportar.isEnabled()
     dialogo.reject()
     assert not dialogo.janela_da_previa.isVisible()   # fechar o diálogo fecha a prévia
+
+
+# ----------------------------------------------------------------------
+# As opções do livro e o modelo de áreas, pelos menus
+# ----------------------------------------------------------------------
+
+def _no_dialogo(preencher, aceitar=True):
+    """O diálogo modal, quando abrir: `preencher(dialogo)` e o OK (ou o Cancelar)."""
+    from PySide6.QtCore import QTimer
+
+    def agir():
+        dialogo = QApplication.activeModalWidget()
+        preencher(dialogo)
+        dialogo.accept() if aceitar else dialogo.reject()
+    QTimer.singleShot(0, agir)
+
+
+def test_as_opcoes_do_livro_mudam_os_limiares_a_notacao_e_o_idioma(app, janela):
+    import json
+
+    def mudar(dialogo):
+        dialogo.campos["revisao"].setValue(0.35)
+        dialogo.campo_notacao.setCurrentIndex(dialogo.campo_notacao.findData("letras"))
+        dialogo.campo_idioma.setCurrentIndex(dialogo.campo_idioma.findData("en"))
+    dados = janela.projeto.dados
+    antes = (dados.limiares.revisao, dados.notacao, dados.idioma)
+    assert all(a != b for a, b in zip(antes, (0.35, "letras", "en")))
+    _no_dialogo(mudar, aceitar=False)                    # Cancelar: nada muda
+    janela.acao_opcoes.trigger()
+    assert (dados.limiares.revisao, dados.notacao, dados.idioma) == antes
+
+    _no_dialogo(mudar)
+    janela.acao_opcoes.trigger()
+    assert (dados.limiares.revisao, dados.notacao, dados.idioma) == (0.35, "letras", "en")
+    gravado = json.loads((janela.projeto.pasta / "projeto.json").read_text(encoding="utf-8"))
+    assert gravado["notacao"] == "letras" and gravado["idioma"] == "en"
+
+
+def test_as_opcoes_sem_livro_aberto_nao_abrem(app, respostas):
+    janela = JanelaPrincipal()
+    try:
+        janela.opcoes()                                   # sem projeto: nenhum diálogo modal
+        assert QApplication.activeModalWidget() is None
+    finally:
+        janela.close()
+
+
+def test_o_modelo_de_areas_vai_as_paginas_impares_do_intervalo(app, janela, respostas,
+                                                               monkeypatch):
+    escolhas = []
+
+    def paridade(*_a, **_k):
+        return escolhas.pop(0)
+    monkeypatch.setattr(QInputDialog, "getItem", paridade)
+    janela.acao_aplicar_modelo_areas.trigger()           # sem modelo salvo: nada a aplicar
+    assert not any(janela.projeto.carregar_zonas(i) for i in range(3))
+
+    janela.acao_areas.setChecked(True)
+    janela.modo_areas(True)
+    _esperar(app, janela)
+    zonas = list(janela.areas.zonas)
+    assert zonas
+    janela.acao_salvar_modelo_areas.trigger()
+    janela.pagina.ir_para(1)
+    _esperar(app, janela)
+    for _ in list(janela.areas.zonas):                   # a 2ª sem áreas, para ver o modelo
+        janela.areas.apagar(0)
+
+    escolhas.append(("Páginas ímpares", False))          # Cancelar na paridade
+    janela.acao_aplicar_modelo_areas.trigger()
+    assert not janela.projeto.carregar_zonas(2)
+
+    respostas["intervalo"] = "2-3"
+    escolhas.append(("Páginas ímpares", True))
+    janela.acao_aplicar_modelo_areas.trigger()
+    assert [z.caixa for z in janela.projeto.carregar_zonas(2)] == [z.caixa for z in zonas]
+    assert not janela.projeto.carregar_zonas(1)          # a 2ª é par: fica sem
+
+
+# ----------------------------------------------------------------------
+# Retomar o lote, voltar ao antes dele e o cartão Saúde no Documento
+# ----------------------------------------------------------------------
+
+CANCELAR = QMessageBox.StandardButton.Cancel
+
+
+def _livro_sem_janela(tmp_path):
+    """O projeto de 3 páginas com o controlador do livro sem janela (as tarefas quando o
+    teste quiser), para deixar o projeto como uma sessão de antes o deixou."""
+    from abbychess.controladores import ControladorDoLivro
+    from tests.ajudantes import ExecutorManual, _controlador
+
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Livro", pdf_sintetico(tmp_path))
+    executor = ExecutorManual()
+    pagina = _controlador(projeto, executor)
+    livro = ControladorDoLivro(pagina)
+    livro.executor = executor
+    return projeto, pagina, livro, executor
+
+
+def _reaberto(projeto):
+    """O projeto fechado e aberto de novo numa janela, como no dia seguinte."""
+    projeto.paginas_em_memoria.descarregar(10)
+    pasta = projeto.pasta
+    projeto.fechar()
+    reaberto = ProjetoDeLivro.abrir(pasta)
+    j = JanelaPrincipal()
+    j.usar(reaberto, pg.FonteDePaginas(reaberto.fonte),
+           LeitorDoLivro(reaberto.pasta_de_padroes, limiares=reaberto.dados.limiares))
+    return j
+
+
+@pytest.fixture
+def lote_parado(app, tmp_path, respostas):
+    """A janela de um projeto fechado com o lote no meio: a 1ª página, aberta e corrigida à
+    mão (um "R"), ficou para reler depois; a 2ª foi relida, a 3ª falta."""
+    projeto, pagina, livro, executor = _livro_sem_janela(tmp_path)
+    livro.reconhecer([0, 1, 2], refazer=False)
+    executor.tudo()
+    pagina.escolher(pagina.gids[0])
+    pagina.corrigir("R")
+    livro.reconhecer([0, 1, 2], refazer=True)            # a 1ª, aberta e mudada, fica
+    executor.comecar()()                                 # a 2ª é lida
+    livro.cancelar()
+    executor.tudo()
+    assert livro.reler_depois == [0] and livro.restante == ([2], True)
+    j = _reaberto(projeto)
+    yield j
+    j.close()
+
+
+def _o_r_manual(projeto) -> bool:
+    return any((b.entry.char, b.entry.source) == ("R", FONTE_MANUAL)
+               for b in projeto.carregar_modelo(0).boxes)
+
+
+def test_retomar_o_lote_pergunta_se_le_tambem_as_paginas_mudadas(app, lote_parado, respostas):
+    j = lote_parado
+    assert j.livro.pode_retomar and j.livro.restante == ([2], True)
+    respostas["pergunta"] = CANCELAR
+    j.retomar_lote()
+    _esperar(app, j)
+    texto = respostas["texto"]
+    assert "O lote não sobrescreveu as páginas 1, porque você as mudou" in texto
+    assert "Não lê só o que faltou do lote" in texto
+    assert j.livro.restante == ([2], True) and j.livro.reler_depois == [0]      # nada
+
+    respostas["pergunta"] = NAO                          # só o que faltou
+    j.retomar_lote()
+    _esperar(app, j)
+    assert j.livro.restante is None and j.livro.reler_depois == [0] and j.livro.pode_retomar
+
+    respostas["pergunta"] = SIM                          # sem o que faltou: "ler essas agora?"
+    j.retomar_lote()
+    _esperar(app, j)
+    assert "Ler essas agora?" in respostas["texto"] and "Não lê" not in respostas["texto"]
+    assert j.livro.reler_depois == [] and not j.livro.pode_retomar
+    assert _o_r_manual(j.projeto)                        # a correção à mão ficou (§4.6)
+    assert j.projeto.antes_do_lote.tem(0)                # e a página de antes, guardada
+
+
+def test_voltar_ao_antes_do_lote_pergunta_com_a_data_da_copia_e_desfaz_o_que_veio_depois(
+        app, lote_parado, respostas):
+    j = lote_parado
+    respostas["pergunta"] = SIM                          # retoma lendo também a 1ª
+    j.retomar_lote()
+    _esperar(app, j)
+    assert not j.livro.pode_retomar and j.projeto.antes_do_lote.tem(0)
+    j.ir_para_pagina(0)
+    p = j.pagina
+    gid = next(b.gid for b in p.modelo.boxes if b.entry.char != "R")
+    p.escolher(gid)
+    p.corrigir("Z")                                      # mudada depois do lote
+
+    respostas["pergunta"] = NAO
+    j.voltar_ao_antes_do_lote()
+    copia = j.projeto.antes_do_lote.data(0)
+    assert f"(a cópia de {copia:%d/%m/%Y às %H:%M})" in respostas["texto"]
+    assert p.box(gid).char == "Z" and j.projeto.antes_do_lote.tem(0)
+
+    respostas["pergunta"] = SIM
+    j.voltar_ao_antes_do_lote()
+    assert p.box(gid).char != "Z" and not j.projeto.antes_do_lote.tem(0)
+    assert _o_r_manual(j.projeto)                        # a de antes do lote tinha o "R"
+
+
+def test_a_pagina_nao_lida_mostra_a_saude_da_amostra_no_documento(app, tmp_path, respostas):
+    """§9.1: com a amostra guiada lida, a página ainda não reconhecida mostra no Documento os
+    pendentes de cada página da amostra, antes e agora, e o que fazer; com o limiar
+    escolhido na gaveta acima dos pendentes, a amostra está pronta."""
+    projeto, pagina, livro, executor = _livro_sem_janela(tmp_path)
+    projeto.dados.extras.update(amostra_guiada_pendente=True, intervalo_do_corpo=[0, 2],
+                                candidatos_da_amostra_guiada=[0, 1])
+    projeto.salvar()
+    assert livro.iniciar_amostra_guiada()
+    executor.tudo()
+    saude = lv.saude(projeto)
+    assert saude.paginas == (0, 1) and saude.pendentes_agora > saude.limiar
+    j = _reaberto(projeto)
+    try:
+        j.ir_para_pagina(2)
+        j.pintar_texto()
+        texto = j.texto.toPlainText()
+        (_p0, antes0, agora0), (_p1, antes1, agora1) = saude.por_pagina
+        assert texto.startswith("Saúde do livro: a amostra, pendentes antes → agora\n"
+                                f"  p. 1: {antes0} → {agora0}\n  p. 2: {antes1} → {agora1}\n"
+                                f"  total: {saude.pendentes_antes} → {saude.pendentes_agora} · "
+                                "0 amostras ensinadas\n"
+                                f"Revise a amostra até restarem {saude.limiar} pendentes ou menos")
+        assert "Página não reconhecida" in texto
+        j.paginas.limiar_da_saude.setValue(saude.pendentes_agora)      # na gaveta
+        j.pintar_texto()
+        assert "A amostra está pronta:" in j.texto.toPlainText()
+        assert "reconhece o livro inteiro" in j.texto.toPlainText()
+    finally:
+        j.close()

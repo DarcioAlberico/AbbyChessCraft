@@ -216,18 +216,25 @@ def xhtml_do_texto(paragrafo: Paragrafo, simbolos: str,
         pedaco = html.escape(cru, quote=False)
         if quebras:
             pedaco = pedaco.replace("\n", "<br/>")
-        if duvidoso:
-            pedaco = f"<mark>{pedaco}</mark>"
-        if simbolo:
-            pedaco = f'<span class="s">{pedaco}</span>'
-        if italico:
-            pedaco = f"<em>{pedaco}</em>"
-        if negrito:
-            pedaco = f"<strong>{pedaco}</strong>"
+        pedaco = _com_estilo(pedaco, negrito, italico, simbolo, duvidoso)
         if link >= 0:
             pedaco = f'<a href="{html.escape(links[link][2], quote=True)}">{pedaco}</a>'
         saida.append(pedaco)
     return "".join(saida)
+
+
+def _com_estilo(pedaco: str, negrito: bool, italico: bool, simbolo: bool, duvidoso: bool) -> str:
+    """O trecho dentro da marcação do estilo dele, de dentro para fora: o realce, os
+    símbolos, o itálico e o negrito."""
+    if duvidoso:
+        pedaco = f"<mark>{pedaco}</mark>"
+    if simbolo:
+        pedaco = f'<span class="s">{pedaco}</span>'
+    if italico:
+        pedaco = f"<em>{pedaco}</em>"
+    if negrito:
+        pedaco = f"<strong>{pedaco}</strong>"
+    return pedaco
 
 
 #: A procedência do lado a jogar nos idiomas sem a frase do core (`lado_a_jogar.marca`, que
@@ -461,24 +468,10 @@ def _xhtml(titulo: str, idioma: str, corpo: str, css: bool = True) -> str:
 def _nav(capitulos: Sequence[_Capitulo], msg: Dict[str, str], idioma: str,
          tem_capa: bool) -> str:
     titulos = [(c.nome, n, a, t) for c in capitulos for n, a, t in c.titulos]
-    if titulos:
-        lista = lista_do_sumario(titulos)
-    else:
-        itens = []
-        for c in capitulos:
-            primeira, ultima = c.paginas[0][0], c.paginas[-1][0]
-            faixa = f"{primeira}" if primeira == ultima else f"{primeira}–{ultima}"
-            itens.append(f'<li><a href="texto/{c.nome}">{msg["paginas"]} {faixa}</a></li>')
-        lista = "".join(itens)
+    lista = lista_do_sumario(titulos) if titulos else _sumario_pelas_paginas(capitulos, msg)
     paginas = "".join(f'<li><a href="texto/{c.nome}#{a}">{n}</a></li>'
                       for c in capitulos for n, a in c.paginas)
-    marcos = []
-    if tem_capa:
-        marcos.append(f'<li><a epub:type="cover" href="texto/capa.xhtml">{msg["capa"]}</a></li>')
-    marcos.append(f'<li><a epub:type="toc" href="nav.xhtml#toc">{msg["sumario"]}</a></li>')
-    if capitulos:
-        marcos.append(f'<li><a epub:type="bodymatter" href="texto/{capitulos[0].nome}">'
-                      f'{msg["inicio"]}</a></li>')
+    marcos = _marcos(capitulos, msg, tem_capa)
     lang = html.escape(idioma, quote=True)
     return ('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n'
             '<html xmlns="http://www.w3.org/1999/xhtml" '
@@ -491,6 +484,28 @@ def _nav(capitulos: Sequence[_Capitulo], msg: Dict[str, str], idioma: str,
             f'<nav epub:type="landmarks" id="marcos" hidden="hidden"><h1>'
             f'{html.escape(msg["marcos"])}</h1><ol>{"".join(marcos)}</ol></nav>'
             "</body></html>\n")
+
+
+def _sumario_pelas_paginas(capitulos: Sequence[_Capitulo], msg: Dict[str, str]) -> str:
+    """Sem título nenhum, o sumário lista os capítulos pelas páginas que cobrem."""
+    itens = []
+    for c in capitulos:
+        primeira, ultima = c.paginas[0][0], c.paginas[-1][0]
+        faixa = f"{primeira}" if primeira == ultima else f"{primeira}–{ultima}"
+        itens.append(f'<li><a href="texto/{c.nome}">{msg["paginas"]} {faixa}</a></li>')
+    return "".join(itens)
+
+
+def _marcos(capitulos: Sequence[_Capitulo], msg: Dict[str, str], tem_capa: bool) -> List[str]:
+    """Os `landmarks`: a capa, se há, o sumário e o começo do texto."""
+    marcos = []
+    if tem_capa:
+        marcos.append(f'<li><a epub:type="cover" href="texto/capa.xhtml">{msg["capa"]}</a></li>')
+    marcos.append(f'<li><a epub:type="toc" href="nav.xhtml#toc">{msg["sumario"]}</a></li>')
+    if capitulos:
+        marcos.append(f'<li><a epub:type="bodymatter" href="texto/{capitulos[0].nome}">'
+                      f'{msg["inicio"]}</a></li>')
+    return marcos
 
 
 def lista_do_sumario(titulos: Sequence[Tuple[str, int, str, str]]) -> str:
@@ -539,10 +554,20 @@ def png_otimizado(dados: bytes) -> bytes:
     fica o menor; o que não é PNG, não abre ou traz gestão de cor (perfil ICC, gama,
     cromaticidade, sRGB: o Pillow não a regrava inteira) volta como veio. Os mesmos bytes
     de entrada dão os mesmos de saída (CA-12.6)."""
-    from PIL import Image
-
     if not dados.startswith(b"\x89PNG"):
         return dados
+    original, info = _png_aberto(dados)
+    if original is None:
+        return dados
+    referencia = original.convert("RGBA").tobytes()
+    return _o_menor_sem_perda(dados, _candidatos(original), info, referencia)
+
+
+def _png_aberto(dados: bytes):
+    """(a imagem, o dpi para regravar), ou (None, {}) se o PNG não abre, traz gestão de cor
+    ou tem um modo que o Pillow não regrava sem perda."""
+    from PIL import Image
+
     try:
         with Image.open(io.BytesIO(dados)) as aberta:
             aberta.load()
@@ -551,16 +576,30 @@ def png_otimizado(dados: bytes) -> bytes:
             de_cor = {"icc_profile", "gamma", "chromaticity", "srgb"} & set(aberta.info)
     except Exception:                          # PNG estragado: o escritor decide
         log.warning("o PNG não foi otimizado; vai como estava", exc_info=True)
-        return dados
+        return None, {}
     if de_cor or original.mode not in ("1", "L", "LA", "P", "RGB", "RGBA"):
-        return dados
-    referencia = original.convert("RGBA").tobytes()
+        return None, {}
+    return original, info
+
+
+def _candidatos(original) -> list:
+    """O original e, se colorido, em tons de cinza e em paleta (com até 256 cores)."""
+    from PIL import Image
+
     candidatos = [original]
     if original.mode in ("RGB", "RGBA"):
         sem_alfa = original.mode == "RGB" or original.getextrema()[3] == (255, 255)
         candidatos.append(original.convert("L" if sem_alfa else "LA"))
         if original.getcolors(256) is not None:
             candidatos.append(original.convert("RGBA").quantize(colors=256, method=Image.Quantize.FASTOCTREE))
+    return candidatos
+
+
+def _o_menor_sem_perda(dados: bytes, candidatos: list, info: dict, referencia: bytes) -> bytes:
+    """O menor dos candidatos gravados com a compressão máxima que, lido de volta, dá os
+    mesmos pixels; nenhum menor que `dados`, `dados`."""
+    from PIL import Image
+
     melhor = dados
     for candidato in candidatos:
         saida = io.BytesIO()

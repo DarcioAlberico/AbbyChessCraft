@@ -102,31 +102,50 @@ def numerados(paginas: Sequence[PaginaExtraida]) -> Numerados:
     A legenda do diagrama é o parágrafo logo depois dele, ou logo antes: vale o lado que o
     livro mais usa, contado em todos os diagramas, porque o parágrafo de depois de um
     diagrama pode ser a legenda impressa acima do seguinte."""
-    from collections import Counter
-
     lados: Dict[str, Dict[int, Tuple[int, int]]] = {"depois": {}, "antes": {}}
     titulos: Dict[int, int] = {}
     for pagina in paginas:
-        blocos = pagina.blocos
-        for k, bloco in enumerate(blocos):
-            if isinstance(bloco, Paragrafo) and bloco.titulo and bloco.nivel == 1:
-                achado = CAPITULO.match(bloco.texto.strip())
-                numero = _numero_do_capitulo(achado.group(1)) if achado else None
-                if numero is not None:
-                    titulos[id(bloco)] = numero
-            if not isinstance(bloco, Figura):
-                continue
-            for lado, j in (("depois", k + 1), ("antes", k - 1)):
-                if 0 <= j < len(blocos) and isinstance(blocos[j], Paragrafo):
-                    achado = LEGENDA.match(blocos[j].texto)
-                    if achado:
-                        lados[lado][id(bloco)] = (int(achado.group(1)), id(blocos[j]))
-    escolhido = lados["depois"] if len(lados["depois"]) >= len(lados["antes"]) else lados["antes"]
-    vezes = Counter(n for n, _ in escolhido.values())
-    capitulos = Counter(titulos.values())
-    return Numerados(figuras={f: n for f, (n, _) in escolhido.items() if vezes[n] == 1},
+        for k, bloco in enumerate(pagina.blocos):
+            numero = _numero_do_titulo(bloco)
+            if numero is not None:
+                titulos[id(bloco)] = numero
+            if isinstance(bloco, Figura):
+                _legendas_vizinhas(pagina.blocos, k, lados)
+    escolhido = _o_lado_mais_usado(lados)
+    return Numerados(figuras=_unicos({f: n for f, (n, _) in escolhido.items()}),
                      legendas={p for _, p in escolhido.values()},
-                     capitulos={t: n for t, n in titulos.items() if capitulos[n] == 1})
+                     capitulos=_unicos(titulos))
+
+
+def _numero_do_titulo(bloco) -> Optional[int]:
+    """O número do título de capítulo (`<h1>`) que começa por "Capítulo 3", "Chapter III"."""
+    if not (isinstance(bloco, Paragrafo) and bloco.titulo and bloco.nivel == 1):
+        return None
+    achado = CAPITULO.match(bloco.texto.strip())
+    return _numero_do_capitulo(achado.group(1)) if achado else None
+
+
+def _legendas_vizinhas(blocos: Sequence, k: int, lados: Dict[str, Dict[int, Tuple[int, int]]]
+                       ) -> None:
+    """A legenda que numera a figura `blocos[k]` no parágrafo logo depois e no logo antes:
+    (número, id do parágrafo) em cada lado."""
+    for lado, j in (("depois", k + 1), ("antes", k - 1)):
+        if 0 <= j < len(blocos) and isinstance(blocos[j], Paragrafo):
+            achado = LEGENDA.match(blocos[j].texto)
+            if achado:
+                lados[lado][id(blocos[k])] = (int(achado.group(1)), id(blocos[j]))
+
+
+def _o_lado_mais_usado(lados: Dict[str, Dict[int, Tuple[int, int]]]) -> Dict[int, Tuple[int, int]]:
+    return lados["depois"] if len(lados["depois"]) >= len(lados["antes"]) else lados["antes"]
+
+
+def _unicos(numeros: Dict[int, int]) -> Dict[int, int]:
+    """Só os de número que não se repete no livro."""
+    from collections import Counter
+
+    vezes = Counter(numeros.values())
+    return {k: n for k, n in numeros.items() if vezes[n] == 1}
 
 
 def referencias_internas(texto: str, idioma: str, paginas: Dict[int, str],

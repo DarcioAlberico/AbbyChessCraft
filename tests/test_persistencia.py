@@ -344,6 +344,66 @@ def test_a_pagina_ilegivel_fica_guardada_e_e_nao_reconhecida_em_todo_lugar(proje
     assert len(list((projeto.pasta / "paginas").glob("p*.corrompido*.json"))) == 1
 
 
+def _truncar_a_pagina_0(projeto) -> tuple:
+    projeto.salvar_pagina(0, [_box()], reconhecida=True)
+    assert projeto.fechar()
+    arquivo = projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(0)}.json"
+    estragado = arquivo.read_bytes()[:-9]
+    arquivo.write_bytes(estragado)
+    return arquivo, estragado
+
+
+def test_a_pagina_ilegivel_de_novo_guarda_outra_copia(projeto):
+    arquivo, _ = _truncar_a_pagina_0(projeto)
+    primeiro = ProjetoDeLivro.abrir(projeto.pasta)
+    assert primeiro.carregar_modelo(0) is None
+    primeiro.salvar_pagina(0, [_box("b")], reconhecida=True)
+    assert primeiro.fechar()
+    segunda = arquivo.read_bytes()[:-9]
+    arquivo.write_bytes(segunda)
+    aberto = ProjetoDeLivro.abrir(projeto.pasta)
+    avisos = []
+    aberto.ao_achar_ilegivel = lambda posicao, guardado: avisos.append((posicao, guardado))
+    assert aberto.carregar_modelo(0) is None
+    copia = arquivo.with_name(f"{arquivo.stem}.corrompido-2.json")
+    assert avisos == [(0, copia.name)] and copia.read_bytes() == segunda
+    assert aberto.fechar()
+
+
+def test_a_pagina_ilegivel_que_nao_se_guarda_fica_e_avisa_uma_vez(projeto, monkeypatch):
+    arquivo, estragado = _truncar_a_pagina_0(projeto)
+    aberto = ProjetoDeLivro.abrir(projeto.pasta)
+    real = gv._replace
+
+    def disco_cheio(temporario, caminho):
+        if "corrompido" in Path(caminho).name:
+            raise OSError(28, "sem espaço")
+        return real(temporario, caminho)
+
+    monkeypatch.setattr(gv, "_replace", disco_cheio)
+    avisos = []
+    aberto.ao_achar_ilegivel = lambda posicao, guardado: avisos.append((posicao, guardado))
+    assert aberto.carregar_modelo(0) is None and aberto.ler_sem_migrar(0) is None
+    assert avisos == [(0, None)] and arquivo.read_bytes() == estragado
+    assert not list(arquivo.parent.glob("p*.corrompido*.json"))
+    monkeypatch.undo()
+    assert aberto.fechar()
+
+
+def test_a_pagina_ilegivel_so_para_leitura_nao_muda_o_disco(projeto):
+    arquivo, estragado = _truncar_a_pagina_0(projeto)
+    _versao_99(projeto)
+    livro_antes = (projeto.pasta / ARQUIVO_DO_LIVRO).read_bytes()
+    aberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert aberto.somente_leitura and aberto.resumo.paginas_lidas() == [0]
+    assert aberto.carregar_modelo(0) is None
+    assert aberto.resumo.estado_da_pagina(0) == NAO_RECONHECIDA and aberto.resumo.paginas_lidas() == []
+    assert arquivo.read_bytes() == estragado
+    assert (projeto.pasta / ARQUIVO_DO_LIVRO).read_bytes() == livro_antes
+    assert not list(arquivo.parent.glob("p*.corrompido*.json"))
+    aberto.fechar()
+
+
 def test_temporarios_sobrando_sao_apagados_ao_abrir(projeto):
     sobras = [projeto.pasta / "projeto.json.tmp", projeto.pasta / "paginas" / "0001.json.tmp",
               projeto.pasta_de_padroes / "metadados.json.tmp"]

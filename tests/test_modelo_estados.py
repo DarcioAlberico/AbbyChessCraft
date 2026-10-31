@@ -11,12 +11,11 @@ ela não tocou, e uma quebra e uma junção nunca valem na mesma fronteira. Do D
 confirmada (sem recusa) deixa na página o texto digitado, e a âncora de todo virtual é um box
 vivo ou outro virtual.
 
-Suíte rápida: `derandomize=True`, `max_examples=100`. A camada noturna roda 5.000.
+Suíte rápida: `derandomize=True`, `max_examples=100`. A camada noturna (`-m noturno`) roda
+as mesmas máquinas com 5.000 (SPEC-qualidade CA-Q-T4).
 """
 
 from __future__ import annotations
-
-import os
 
 import pytest
 from hypothesis import HealthCheck, Phase, settings
@@ -33,7 +32,23 @@ from abbychess import texto as tx
 from abbychess.modelo import Box, Pagina, foto, gid_de, reconciliar
 
 LARGURA, ALTURA = 900, 400
-EXEMPLOS = 5000 if os.environ.get("ABBY_NOTURNO") == "1" else 100
+#: Os exemplos de cada máquina: na suíte rápida e na camada noturna (§15.1).
+EXEMPLOS, EXEMPLOS_DA_NOITE = 100, 5000
+
+
+def _casos(maquina, nome: str):
+    """A máquina nas duas camadas: (a da suíte rápida, a noturna, marcada)."""
+    def ajustes(exemplos):
+        return settings(
+            max_examples=exemplos, derandomize=True, stateful_step_count=25, deadline=None,
+            # Sem a fase "explain": ela roda com rastreio linha a linha e leva minutos.
+            phases=[Phase.explicit, Phase.reuse, Phase.generate, Phase.target, Phase.shrink],
+            suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+
+    rapida = type(f"{nome}Rapida", (maquina.TestCase,), {"settings": ajustes(EXEMPLOS)})
+    noturna = type(f"{nome}Noturna", (maquina.TestCase,),
+                   {"settings": ajustes(EXEMPLOS_DA_NOITE)})
+    return rapida, pytest.mark.noturno(pytest.mark.timeout(1800)(noturna))
 
 
 def _pagina_sintetica(n: int):
@@ -318,12 +333,7 @@ class MaquinaDaPagina(RuleBasedStateMachine):
         assert sorted(doc.gids()) == sorted(esperados)
 
 
-MaquinaDaPagina.TestCase.settings = settings(
-    max_examples=EXEMPLOS, derandomize=True, stateful_step_count=25, deadline=None,
-    # Sem a fase "explain": ela roda com rastreio linha a linha e leva minutos.
-    phases=[Phase.explicit, Phase.reuse, Phase.generate, Phase.target, Phase.shrink],
-    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
-test_maquina_da_pagina = pytest.mark.timeout(600)(MaquinaDaPagina.TestCase)
+test_maquina_da_pagina, test_maquina_da_pagina_noturna = _casos(MaquinaDaPagina, "Pagina")
 
 
 # ----------------------------------------------------------------------
@@ -557,9 +567,5 @@ class MaquinaDoControlador(RuleBasedStateMachine):
         assert modelo.decisoes.gids() <= modelo.vivos
 
 
-MaquinaDoControlador.TestCase.settings = settings(
-    max_examples=EXEMPLOS, derandomize=True, stateful_step_count=25, deadline=None,
-    # Sem a fase "explain": ela roda com rastreio linha a linha e leva minutos.
-    phases=[Phase.explicit, Phase.reuse, Phase.generate, Phase.target, Phase.shrink],
-    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
-test_maquina_do_controlador = pytest.mark.timeout(600)(MaquinaDoControlador.TestCase)
+test_maquina_do_controlador, test_maquina_do_controlador_noturna = _casos(MaquinaDoControlador,
+                                                                           "Controlador")

@@ -188,6 +188,62 @@ def pytest_xdist_auto_num_workers(config):
     return max(1, min(MAX_WORKERS, nucleos, int(livre_gb / GB_POR_WORKER)))
 
 
+#: O teto da suíte rápida com -n 4, sem cobertura (SPEC §15.1, decisão §13.5 da
+#: SPEC-qualidade): passar dele reprova a rodada. `ABBY_TETO_DA_RAPIDA_S` o troca.
+TETO_DA_RAPIDA_S = 90.0
+_CAMADAS_LENTAS = ("livro_real", "desempenho", "processo", "noturno")
+
+
+def _teto_da_rodada(config):
+    """O teto desta rodada, ou None: só a suíte rápida (sem `-m` que peça uma camada lenta)
+    e sem a cobertura, que a deixa mais lenta e tem a medida dela (`ferramentas/qualidade.py`)."""
+    marcas = config.getoption("markexpr", "") or ""
+    pede_lenta = any(c in marcas and f"not {c}" not in marcas for c in _CAMADAS_LENTAS)
+    if pede_lenta or config.getoption("cov_source", None):
+        return None
+    return float(os.environ.get("ABBY_TETO_DA_RAPIDA_S", TETO_DA_RAPIDA_S))
+
+
+def pytest_sessionstart(session):
+    import time
+
+    session.config._abby_inicio = time.perf_counter()
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """CA-Q-T4: a suíte rápida que passa do teto reprova, mesmo com todos os testes verdes."""
+    import time
+
+    teto = _teto_da_rodada(session.config)
+    inicio = getattr(session.config, "_abby_inicio", None)
+    if teto is None or inicio is None or hasattr(session.config, "workerinput"):
+        return                                  # o worker do xdist não conta: o controlador sim
+    duracao = time.perf_counter() - inicio
+    if duracao > teto and exitstatus == 0:
+        session.config._abby_estourou = (duracao, teto)
+        session.exitstatus = 1
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """Os pulos por motivo, e o teto estourado (CA-Q-T4)."""
+    from collections import Counter
+
+    motivos = Counter()
+    for relatorio in terminalreporter.stats.get("skipped", []):
+        longrepr = getattr(relatorio, "longrepr", None)
+        motivo = longrepr[2] if isinstance(longrepr, tuple) and len(longrepr) == 3 else str(longrepr)
+        motivos[motivo.removeprefix("Skipped: ")] += 1
+    if motivos:
+        terminalreporter.write_sep("-", "pulados por motivo")
+        for motivo, quantos in motivos.most_common():
+            terminalreporter.write_line(f"{quantos} × {motivo}")
+    estourou = getattr(config, "_abby_estourou", None)
+    if estourou is not None:
+        duracao, teto = estourou
+        terminalreporter.write_sep("!", f"a rodada levou {duracao:.0f} s: passou do teto da suíte "
+                                        f"rápida ({teto:.0f} s, SPEC §15.1)")
+
+
 def pytest_addoption(parser):
     parser.addoption("--atualizar-golden", action="store_true", default=False,
                      help="regrava os arquivos de referência (golden) em vez de comparar")

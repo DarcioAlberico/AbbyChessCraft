@@ -1,12 +1,30 @@
 """Pares de funções quase iguais pela forma (nomes e literais normalizados).
 
-Uso: python dryer.py <raiz> [rank-minimo] [min-nos]
+Uso: python dryer.py <raiz> [rank-minimo] [min-nos] [--aceitos <arquivo>]
 O rank é o ratio do difflib sobre a sequência de nós do AST de cada função.
+
+Com `--aceitos`, os pares da lista (uma linha `arq.py funcao <-> arq.py funcao  # motivo`,
+os arquivos a partir da pasta que contém a raiz) não contam; sai 1 se há par fora da lista
+ou par da lista que não existe mais (a lista fica do tamanho do que se aceitou de fato).
 """
 import ast
+import re
 import sys
 from difflib import SequenceMatcher
 from pathlib import Path
+
+_ACEITO = re.compile(r"^\s*(\S+)\s+(\S+)\s+<->\s+(\S+)\s+(\S+)")
+
+
+def aceitos(caminho):
+    """Os pares aceitos do arquivo, cada um como o conjunto das duas (arquivo, função)."""
+    pares = set()
+    for linha in Path(caminho).read_text(encoding="utf-8").splitlines():
+        achado = _ACEITO.match(linha.split("#", 1)[0])
+        if achado:
+            a, na, b, nb = achado.groups()
+            pares.add(frozenset({(a, na), (b, nb)}))
+    return pares
 
 
 def forma(func):
@@ -24,16 +42,24 @@ def forma(func):
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8", newline="\n")
-    raiz = Path(sys.argv[1])
-    minimo = float(sys.argv[2]) if len(sys.argv) > 2 else 0.8
-    min_nos = int(sys.argv[3]) if len(sys.argv) > 3 else 60
+    argumentos = sys.argv[1:]
+    lista = None
+    if "--aceitos" in argumentos:
+        i = argumentos.index("--aceitos")
+        lista = aceitos(argumentos[i + 1])
+        del argumentos[i:i + 2]
+    raiz = Path(argumentos[0])
+    minimo = float(argumentos[1]) if len(argumentos) > 1 else 0.8
+    min_nos = int(argumentos[2]) if len(argumentos) > 2 else 60
+    base = raiz.resolve().parent
     fs = []
     for arq in sorted(raiz.rglob("*.py")):
+        nome = arq.resolve().relative_to(base).as_posix()
         for no in ast.walk(ast.parse(arq.read_text(encoding="utf-8"))):
             if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 s = forma(no)
                 if len(s) >= min_nos:
-                    fs.append((f"{arq.as_posix()}:{no.lineno}", no.name, s,
+                    fs.append((f"{nome}:{no.lineno}", no.name, s,
                                no.end_lineno - no.lineno + 1, (arq, no.lineno, no.end_lineno)))
     fs.sort(key=lambda f: len(f[2]))
     pares = []
@@ -53,7 +79,17 @@ def main():
     print(f"funções com >= {min_nos} nós: {len(fs)}; pares com rank >= {minimo}: {len(pares)}")
     for r, linhas, a, na, b, nb in pares:
         print(f"{r:.2f}  {linhas:4d} linhas  {a} {na}  <->  {b} {nb}")
+    if lista is None:
+        return 0
+    achados = {frozenset({(a.rsplit(":", 1)[0], na), (b.rsplit(":", 1)[0], nb)})
+               for _r, _l, a, na, b, nb in pares}
+    novos, sumidos = achados - lista, lista - achados
+    print(f"fora da lista de aceitos: {len(novos)}; aceitos que não existem mais: {len(sumidos)}")
+    for par in sorted(map(sorted, novos | sumidos)):
+        print(("novo     " if frozenset(par) in novos else "sumiu    ")
+              + "  <->  ".join(f"{arq} {func}" for arq, func in par))
+    return 1 if novos or sumidos else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -1,0 +1,5 @@
+# Os pares do dryer (rank >= 0,8) aceitos com motivo (SPEC-qualidade CA-Q-D1). A medida
+# (qualidade.py) falha com um par fora daqui, e com um daqui que não existe mais.
+# Uma linha por par: arquivo função <-> arquivo função  # o motivo
+
+abbychess/app/barra_de_busca.py _botao <-> abbychess/app/barra_de_busca.py _acao_simples  # dois botões de natureza diferente (alternar a opção, agir uma vez): juntar esconde a diferença atrás de um parâmetro

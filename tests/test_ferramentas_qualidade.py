@@ -128,6 +128,19 @@ def test_o_resumo_da_qualidade_le_a_primeira_linha_de_cada_relatorio(tmp_path):
     assert dados["camadas"] == {"rapida": 0, "processo": 0}
 
 
+def test_o_resumo_da_qualidade_conta_os_pares_fora_da_lista_de_aceitos():
+    sys.path.insert(0, str(FERRAMENTAS))
+    import qualidade
+
+    cobertura = {"totals": {"num_statements": 1, "missing_lines": 0, "percent_covered": 100.0}}
+    duplicacao = ("funções com >= 60 nós: 9; pares com rank >= 0.8: 2\n"
+                  "0.90    30 linhas  a.py:1 f  <->  b.py:1 g\n"
+                  "fora da lista de aceitos: 1; aceitos que não existem mais: 0\n")
+    dados = qualidade.resumo(cobertura, "funções: 1; CRAP >= 10: 0\n", duplicacao, {}, {})
+    assert dados["duplicacao"] == {"pares_acima_de_0_8": 2, "fora_da_lista": 1,
+                                   "aceitos_sumidos": 0}
+
+
 def _pares_do_dryer(pacote):
     texto = _rodar("dryer.py", pacote, 0.8, 20)
     return [linha for linha in texto.splitlines()[1:] if linha.strip()]

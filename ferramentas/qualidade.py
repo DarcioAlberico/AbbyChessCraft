@@ -27,6 +27,7 @@ import comum  # noqa: E402
 
 PASTA = comum.MEDIDAS / "qualidade"
 FERRAMENTAS = Path(__file__).resolve().parent
+ACEITOS = FERRAMENTAS / "pares_aceitos.txt"     # os pares do dryer aceitos com motivo
 # As duas camadas que entram na cobertura: a rápida em paralelo (no máximo 4 workers) e a
 # `processo` em série, que abre o servidor de leitura e o render (os filhos são medidos pelo
 # `pytest-cov.pth` de quem os abre). Com a cobertura em cada filho, a matança do gravador (50
@@ -53,9 +54,11 @@ def rodar_as_camadas(cobertura: Path) -> dict:
     return codigos
 
 
-def _ferramenta(nome: str, *args) -> str:
+def _ferramenta(nome: str, *args, codigos=(0,)) -> str:
     saida = subprocess.run([sys.executable, "-I", str(FERRAMENTAS / nome), *map(str, args)],
-                           cwd=comum.RAIZ, capture_output=True, check=True)
+                           cwd=comum.RAIZ, capture_output=True)
+    if saida.returncode not in codigos:
+        raise subprocess.CalledProcessError(saida.returncode, nome, saida.stdout, saida.stderr)
     return saida.stdout.decode("utf-8")
 
 
@@ -65,13 +68,17 @@ def resumo(cobertura: dict, crap: str, duplicacao: str, git: dict, codigos: dict
     funcoes, acima = map(int, re.match(r"funções: (\d+); CRAP >= \S+: (\d+)", crap).groups())
     pares = int(re.match(r"funções com >= \d+ nós: \d+; pares com rank >= \S+: (\d+)",
                          duplicacao).group(1))
+    fora = re.search(r"^fora da lista de aceitos: (\d+); aceitos que não existem mais: (\d+)",
+                     duplicacao, re.MULTILINE)
     return {
         "ambiente": {**git, "data": time.strftime("%Y-%m-%d")},
         "camadas": codigos,
         "cobertura": {"linhas": totais["num_statements"], "faltando": totais["missing_lines"],
                       "percentual": round(totais["percent_covered"], 1)},
         "crap": {"funcoes": funcoes, "acima_de_10": acima},
-        "duplicacao": {"pares_acima_de_0_8": pares},
+        "duplicacao": {"pares_acima_de_0_8": pares,
+                       **({"fora_da_lista": int(fora.group(1)), "aceitos_sumidos": int(fora.group(2))}
+                          if fora else {})},
     }
 
 
@@ -88,7 +95,8 @@ def main() -> int:
             print(f"uma camada falhou ({codigos}): a medida não vale sobre uma suíte vermelha")
             return 1
         crap = _ferramenta("crapper.py", "abbychess", cobertura, 10)
-        duplicacao = _ferramenta("dryer.py", "abbychess", 0.8, 60)
+        duplicacao = _ferramenta("dryer.py", "abbychess", 0.8, 60, "--aceitos", ACEITOS,
+                                 codigos=(0, 1))
         dados = resumo(json.loads(cobertura.read_text(encoding="utf-8")), crap, duplicacao, git,
                        codigos)
     PASTA.mkdir(parents=True, exist_ok=True)
@@ -100,6 +108,10 @@ def main() -> int:
                        newline="\n")
     print(json.dumps(dados, ensure_ascii=False, indent=2))
     print(f"gravado: {destino.relative_to(comum.RAIZ)}")
+    if dados["duplicacao"].get("fora_da_lista") or dados["duplicacao"].get("aceitos_sumidos"):
+        print(f"a duplicação mudou fora de {ACEITOS.relative_to(comum.RAIZ)} (CA-Q-D1): veja "
+              f"duplicacao-{commit}.txt")
+        return 1
     return 0
 
 

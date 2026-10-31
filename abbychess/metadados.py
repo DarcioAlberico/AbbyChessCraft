@@ -51,24 +51,32 @@ def normalizar_metadados(dados: dict) -> dict:
     `;` vira lista) e sem os vazios. Levanta `ValueError` com a data fora de AAAA-MM-DD."""
     saida: dict = {}
     for campo in CAMPOS_DE_METADADOS:
-        valor = dados.get(campo)
-        if valor is None:
-            continue
-        if campo in LISTAS_DE_METADADOS:
-            if isinstance(valor, str):
-                itens = valor.split(";")
-            elif isinstance(valor, (list, tuple)):
-                itens = list(valor)
-            else:                               # um número, um objeto: vira um item
-                itens = [valor]
-            lista = [str(v).strip() for v in itens if v is not None and str(v).strip()]
-            if lista:
-                saida[campo] = lista
-        elif str(valor).strip():
-            saida[campo] = str(valor).strip()
+        valor = _normalizado(campo, dados.get(campo))
+        if valor:
+            saida[campo] = valor
     if "data" in saida and not DATA_DOS_METADADOS.fullmatch(saida["data"]):
         raise ValueError(f"A data {saida['data']!r} deve ser AAAA, AAAA-MM ou AAAA-MM-DD.")
     return saida
+
+
+def _normalizado(campo: str, valor):
+    """O valor do campo sem espaços nas pontas (a lista, item a item); vazio se não sobra
+    nada."""
+    if valor is None:
+        return None
+    if campo in LISTAS_DE_METADADOS:
+        return _itens(valor)
+    return str(valor).strip()
+
+
+def _itens(valor) -> list:
+    if isinstance(valor, str):
+        itens = valor.split(";")
+    elif isinstance(valor, (list, tuple)):
+        itens = list(valor)
+    else:                                       # um número, um objeto: vira um item
+        itens = [valor]
+    return [str(v).strip() for v in itens if v is not None and str(v).strip()]
 
 
 def gravar_metadados(projeto: ProjetoDeLivro, dados: dict,
@@ -85,23 +93,31 @@ def gravar_metadados(projeto: ProjetoDeLivro, dados: dict,
                if k not in CAMPOS_DE_METADADOS and k != "autor"}
     gravado.update(novos)
     if capa is not None:
-        capa = Path(capa)
-        conteudo = capa.read_bytes()
-        _conferir_capa(conteudo)
-        extensao = capa.suffix.lower() if capa.suffix.lower() in EXTENSOES_DA_CAPA else ".png"
-        nome = f"{NOME_DA_CAPA}{extensao}"
-        destino = pasta / nome
-        if not destino.exists() or destino.resolve() != capa.resolve():
-            gv.gravar_bytes(destino, conteudo)
-        gravado["capa"] = nome
+        extensao = _copiar_a_capa(Path(capa), pasta)
+        gravado["capa"] = f"{NOME_DA_CAPA}{extensao}"
     gv.gravar_json(pasta / ARQUIVO_DE_METADADOS, gravado)
     if capa is not None:
-        # A capa de outra extensão não fica órfã; sai só depois do JSON, que se falhar
-        # deixa valendo a de antes.
-        for velha in EXTENSOES_DA_CAPA:
-            if velha != extensao and (pasta / f"{NOME_DA_CAPA}{velha}").is_file():
-                gv.apagar(pasta / f"{NOME_DA_CAPA}{velha}")
+        _apagar_as_outras_capas(pasta, extensao)
     return gravado
+
+
+def _copiar_a_capa(capa: Path, pasta: Path) -> str:
+    """A capa conferida e copiada para a pasta do projeto (`capa.<ext>`); devolve a extensão."""
+    conteudo = capa.read_bytes()
+    _conferir_capa(conteudo)
+    extensao = capa.suffix.lower() if capa.suffix.lower() in EXTENSOES_DA_CAPA else ".png"
+    destino = pasta / f"{NOME_DA_CAPA}{extensao}"
+    if not destino.exists() or destino.resolve() != capa.resolve():
+        gv.gravar_bytes(destino, conteudo)
+    return extensao
+
+
+def _apagar_as_outras_capas(pasta: Path, extensao: str) -> None:
+    """A capa de outra extensão não fica órfã; sai só depois do JSON, que se falhar deixa
+    valendo a de antes."""
+    for velha in EXTENSOES_DA_CAPA:
+        if velha != extensao and (pasta / f"{NOME_DA_CAPA}{velha}").is_file():
+            gv.apagar(pasta / f"{NOME_DA_CAPA}{velha}")
 
 
 #: As extensões de capa que o EPUB leva, e o tamanho máximo (a cópia é na hora de exportar).

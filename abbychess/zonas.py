@@ -362,44 +362,76 @@ def classificar_funcoes(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
     do livro. Quando os boxes ainda não foram lidos, as regras que dependem de texto apenas
     não disparam.
     """
-    diagramas = [z for z in zonas if z.funcao == "diagrama"]
-    alturas = [b.y2 - b.y1 for b in boxes if b.char]
-    corpo = median(alturas) if alturas else float(escala)
-    # O corpo das maiúsculas e dos algarismos (o percentil 90): uma linha de lances, cheia
-    # deles, tem a mediana alta sem ser de letra maior; o título tem as maiúsculas maiores.
-    maiusculas = _percentil(alturas, 0.9) if alturas else float(escala)
-    saida: List[Zona] = []
-    for zona in zonas:
-        if not zona.automatica or zona.tipo != TEXTO:
-            saida.append(zona)
-            continue
-        dentro = [b for b in boxes if zona.contem_o_centro(b)]
-        texto = _texto_dos_boxes(dentro)
-        funcao = "texto"
-        if texto and len(texto) <= 2 and not any(c.isalnum() for c in texto):
-            # Poeira da digitalização (um ponto, um traço soltos): fica fora do texto.
-            saida.append(replace(zona, tipo=IGNORAR, funcao="ignorar"))
-            continue
-        if texto and _NUMERO_DE_PAGINA.fullmatch(texto) and (
-                zona.y1 < 0.15 * altura or zona.y2 > 0.85 * altura):
-            funcao = "numero_de_pagina"
-        elif texto and _parece_legenda(texto) and any(
-                _vizinha_do_diagrama(zona, diagrama, escala) for diagrama in diagramas):
-            funcao = "legenda"
-        elif (texto and not _parece_lances(texto)
-              and _percentil([b.y2 - b.y1 for b in dentro], 0.9) >= RAZAO_DO_TITULO * maiusculas):
-            funcao = "titulo"
-        elif (texto and len(texto) <= 80 and not _parece_lances(texto)
-              and abs((zona.x1 + zona.x2) / 2 - largura / 2) <= 0.1 * largura
-              and zona.y2 - zona.y1 <= 2.2 * maiusculas       # uma linha só
-              and _isolada(zona, zonas, escala)):
-            funcao = "titulo"
-        elif (texto and zona.y1 >= 0.7 * altura
-              and median(b.y2 - b.y1 for b in dentro) <= RAZAO_DA_NOTA * corpo
-              and _isolada(zona, zonas, escala)):
-            funcao = "nota"
-        saida.append(replace(zona, funcao=funcao))
+    classificacao = _Classificacao(zonas, boxes, largura, altura, escala)
+    saida = [classificacao.zona(zona) if zona.automatica and zona.tipo == TEXTO else zona
+             for zona in zonas]
     return _continuacoes_da_legenda(saida, boxes, escala)
+
+
+class _Classificacao:
+    """O que a página diz a `classificar_funcoes`: as zonas e os diagramas dela, o tamanho,
+    a escala, o corpo do texto e o das maiúsculas."""
+
+    def __init__(self, zonas: Sequence[Zona], boxes: Sequence[BoxEntry], largura: int,
+                 altura: int, escala: float):
+        self.zonas, self.boxes = zonas, boxes
+        self.largura, self.altura, self.escala = largura, altura, escala
+        self.diagramas = [z for z in zonas if z.funcao == "diagrama"]
+        alturas = [b.y2 - b.y1 for b in boxes if b.char]
+        self.corpo = median(alturas) if alturas else float(escala)
+        # O corpo das maiúsculas e dos algarismos (o percentil 90): uma linha de lances, cheia
+        # deles, tem a mediana alta sem ser de letra maior; o título tem as maiúsculas maiores.
+        self.maiusculas = _percentil(alturas, 0.9) if alturas else float(escala)
+
+    def zona(self, zona: Zona) -> Zona:
+        """A zona automática de texto com a função que o texto dela diz."""
+        dentro = [b for b in self.boxes if zona.contem_o_centro(b)]
+        texto = _texto_dos_boxes(dentro)
+        if not texto:
+            return replace(zona, funcao="texto")
+        if len(texto) <= 2 and not any(c.isalnum() for c in texto):
+            # Poeira da digitalização (um ponto, um traço soltos): fica fora do texto.
+            return replace(zona, tipo=IGNORAR, funcao="ignorar")
+        return replace(zona, funcao=self.funcao(zona, dentro, texto))
+
+    def funcao(self, zona: Zona, dentro: Sequence[BoxEntry], texto: str) -> str:
+        """Número de página, legenda, título ou nota, nessa ordem; senão, texto."""
+        if self._numero_de_pagina(zona, texto):
+            return "numero_de_pagina"
+        if self._legenda(zona, texto):
+            return "legenda"
+        if self._titulo(zona, dentro, texto):
+            return "titulo"
+        if self._nota(zona, dentro):
+            return "nota"
+        return "texto"
+
+    def _numero_de_pagina(self, zona: Zona, texto: str) -> bool:
+        """Só o número (ou "pág. N"), no alto ou no pé da página."""
+        return bool(_NUMERO_DE_PAGINA.fullmatch(texto)) and (
+            zona.y1 < 0.15 * self.altura or zona.y2 > 0.85 * self.altura)
+
+    def _legenda(self, zona: Zona, texto: str) -> bool:
+        return _parece_legenda(texto) and any(
+            _vizinha_do_diagrama(zona, diagrama, self.escala) for diagrama in self.diagramas)
+
+    def _titulo(self, zona: Zona, dentro: Sequence[BoxEntry], texto: str) -> bool:
+        """Sem lances, com as maiúsculas maiores que as da página, ou curto, centrado, de
+        uma linha só e sozinho."""
+        if _parece_lances(texto):
+            return False
+        if _percentil([b.y2 - b.y1 for b in dentro], 0.9) >= RAZAO_DO_TITULO * self.maiusculas:
+            return True
+        return (len(texto) <= 80
+                and abs((zona.x1 + zona.x2) / 2 - self.largura / 2) <= 0.1 * self.largura
+                and zona.y2 - zona.y1 <= 2.2 * self.maiusculas       # uma linha só
+                and _isolada(zona, self.zonas, self.escala))
+
+    def _nota(self, zona: Zona, dentro: Sequence[BoxEntry]) -> bool:
+        """No pé da página, com a letra menor que a do corpo, e sozinha."""
+        return (zona.y1 >= 0.7 * self.altura
+                and median(b.y2 - b.y1 for b in dentro) <= RAZAO_DA_NOTA * self.corpo
+                and _isolada(zona, self.zonas, self.escala))
 
 
 #: As funções que a classificação local dá (as da margem vêm das páginas lidas do livro).
@@ -413,12 +445,19 @@ def reclassificar_automaticas(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
     tinham texto, e sem ele a função era só um palpite; a do usuário e a da margem
     aprendida pelo livro ficam como estão."""
     lidos = [b for b in boxes if b.char]
-    if not lidos or not any(z.automatica and z.funcao in FUNCOES_LOCAIS for z in zonas):
-        return list(zonas)
-    escala = median(b.y2 - b.y1 for b in lidos)
-    candidatas = [replace(z, tipo=TEXTO, funcao="texto")
-                  if z.automatica and z.funcao in FUNCOES_LOCAIS else z for z in zonas]
     marcadas = [z.automatica and z.funcao in FUNCOES_LOCAIS for z in zonas]
+    if not lidos or not any(marcadas):
+        return list(zonas)
+    return _reclassificadas(zonas, marcadas, lidos, largura, altura)
+
+
+def _reclassificadas(zonas: Sequence[Zona], marcadas: Sequence[bool], lidos: Sequence[BoxEntry],
+                     largura: int, altura: int) -> List[Zona]:
+    """As zonas `marcadas` de volta a texto e classificadas pelos glifos lidos; as outras
+    como estão."""
+    escala = median(b.y2 - b.y1 for b in lidos)
+    candidatas = [replace(z, tipo=TEXTO, funcao="texto") if marcada else z
+                  for z, marcada in zip(zonas, marcadas)]
     classificadas = classificar_funcoes(candidatas, lidos, largura, altura, escala)
     return [nova if marcada else velha
             for velha, nova, marcada in zip(zonas, classificadas, marcadas)]
@@ -449,19 +488,26 @@ def _continuacoes_da_legenda(zonas: List[Zona], boxes: Sequence[BoxEntry],
     while mudou:
         mudou = False
         for k, zona in enumerate(saida):
-            if not zona.automatica or zona.tipo != TEXTO or zona.funcao != "texto":
-                continue
-            dentro = [b for b in boxes if zona.contem_o_centro(b)]
-            if len(_texto_dos_boxes(dentro)) > TAMANHO_DA_CONTINUACAO:
-                continue
-            for legenda in saida:
-                if (legenda.funcao == "legenda"
-                        and min(zona.x2, legenda.x2) - max(zona.x1, legenda.x1) > 0
-                        and -escala <= zona.y1 - legenda.y2 <= 1.5 * escala):
-                    saida[k] = replace(zona, funcao="legenda")
-                    mudou = True
-                    break
+            if _pode_continuar(zona, boxes) and any(
+                    _embaixo_da_legenda(zona, legenda, escala) for legenda in saida):
+                saida[k] = replace(zona, funcao="legenda")
+                mudou = True
     return saida
+
+
+def _pode_continuar(zona: Zona, boxes: Sequence[BoxEntry]) -> bool:
+    """A zona automática de texto, ainda sem outra função, com `TAMANHO_DA_CONTINUACAO`
+    caracteres ou menos."""
+    return (zona.automatica and zona.tipo == TEXTO and zona.funcao == "texto"
+            and len(_texto_dos_boxes([b for b in boxes if zona.contem_o_centro(b)]))
+            <= TAMANHO_DA_CONTINUACAO)
+
+
+def _embaixo_da_legenda(zona: Zona, legenda: Zona, escala: float) -> bool:
+    """Se `legenda` é uma legenda logo acima da zona, sobrepondo-a na horizontal."""
+    return (legenda.funcao == "legenda"
+            and min(zona.x2, legenda.x2) - max(zona.x1, legenda.x1) > 0
+            and -escala <= zona.y1 - legenda.y2 <= 1.5 * escala)
 
 
 def _texto_dos_boxes(boxes: Sequence[BoxEntry]) -> str:
@@ -470,6 +516,13 @@ def _texto_dos_boxes(boxes: Sequence[BoxEntry]) -> str:
     if not lidos:
         return ""
     altura = median(b.y2 - b.y1 for b in lidos)
+    linhas = sorted(_linhas_dos_lidos(lidos), key=lambda itens: min(b.y1 for b in itens))
+    return " ".join(_texto_da_linha(linha, altura) for linha in linhas).strip()
+
+
+def _linhas_dos_lidos(lidos: Sequence[BoxEntry]) -> List[List[BoxEntry]]:
+    """Os glifos em linhas: cada um entra na linha cuja altura cobre o meio dele, ou cujo
+    meio ele cobre, entre as três últimas."""
     linhas: List[List[BoxEntry]] = []
     for box in sorted(lidos, key=lambda b: (b.y1 + b.y2) / 2):
         meio = (box.y1 + box.y2) / 2
@@ -480,17 +533,20 @@ def _texto_dos_boxes(boxes: Sequence[BoxEntry]) -> str:
                 break
         else:
             linhas.append([box])
-    textos = []
-    for linha in sorted(linhas, key=lambda itens: min(b.y1 for b in itens)):
-        partes = []
-        anterior = None
-        for box in sorted(linha, key=lambda b: b.x1):
-            if anterior is not None and box.x1 - anterior.x2 > 0.6 * altura:
-                partes.append(" ")
-            partes.append(box.char)
-            anterior = box
-        textos.append("".join(partes))
-    return " ".join(textos).strip()
+    return linhas
+
+
+def _texto_da_linha(linha: Sequence[BoxEntry], altura: float) -> str:
+    """Os caracteres da linha da esquerda para a direita, com um espaço onde o vão passa de
+    0,6 altura."""
+    partes = []
+    anterior = None
+    for box in sorted(linha, key=lambda b: b.x1):
+        if anterior is not None and box.x1 - anterior.x2 > 0.6 * altura:
+            partes.append(" ")
+        partes.append(box.char)
+        anterior = box
+    return "".join(partes)
 
 
 def _percentil(valores, q: float) -> float:
@@ -574,39 +630,51 @@ def vincular_legendas(zonas: Sequence[Zona], diagramas: Sequence) -> List[Zona]:
     for zona in zonas:
         if zona.funcao != "legenda":
             saida.append(replace(zona, diagrama_id=None) if zona.diagrama_id else zona)
-            continue
-        if zona.diagrama_id in ids:
+        elif zona.diagrama_id in ids:
             saida.append(zona)
-            continue
-        candidatos = []
-        for diagrama in diagramas:
-            if not getattr(diagrama, "id", ""):
-                continue
-            distancia = _distancia_ao_diagrama(zona, tuple(diagrama.caixa))
-            if distancia == float("inf"):
-                continue
-            x1, y1, x2, y2 = diagrama.caixa
-            embaixo = min(zona.x2, x2) - max(zona.x1, x1) > 0   # a de baixo vence a do lado
-            candidatos.append((distancia, not embaixo, diagrama.id))
-        diagrama_id = min(candidatos)[2] if candidatos else None
-        saida.append(replace(zona, diagrama_id=diagrama_id))
+        else:
+            saida.append(replace(zona, diagrama_id=_diagrama_mais_perto(zona, diagramas)))
     return saida
+
+
+def _diagrama_mais_perto(zona: Zona, diagramas: Sequence) -> Optional[str]:
+    """O id do diagrama com id que encara a legenda mais de perto; na mesma distância, o de
+    cima ou de baixo vence o do lado. None se nenhum a encara."""
+    candidatos = []
+    for diagrama in diagramas:
+        if not getattr(diagrama, "id", ""):
+            continue
+        distancia = _distancia_ao_diagrama(zona, tuple(diagrama.caixa))
+        if distancia == float("inf"):
+            continue
+        x1, y1, x2, y2 = diagrama.caixa
+        embaixo = min(zona.x2, x2) - max(zona.x1, x1) > 0   # a de baixo vence a do lado
+        candidatos.append((distancia, not embaixo, diagrama.id))
+    return min(candidatos)[2] if candidatos else None
 
 
 def aplicar_funcoes_de_margem(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
                               funcoes: dict) -> List[Zona]:
     """Aplica cabeçalho/rodapé/número aprendidos pelo livro às zonas automáticas."""
-    saida = []
-    for zona in zonas:
-        if not zona.automatica or zona.tipo != TEXTO or zona.funcao not in (
-                "texto", "titulo", "cabecalho", "rodape", "numero_de_pagina"):
-            saida.append(zona)
-            continue
-        indices = [i for i, box in enumerate(boxes) if zona.contem_o_centro(box)]
-        votos = [funcoes[i] for i in indices if i in funcoes]
-        funcao = votos[0] if indices and len(votos) == len(indices) and len(set(votos)) == 1 else None
-        saida.append(replace(zona, funcao=funcao) if funcao else zona)
-    return saida
+    return [_com_a_funcao_da_margem(zona, boxes, funcoes) for zona in zonas]
+
+
+def _com_a_funcao_da_margem(zona: Zona, boxes: Sequence[BoxEntry], funcoes: dict) -> Zona:
+    """A zona automática de texto (ou de uma função da margem) com a função que todos os
+    glifos dela têm em `funcoes`; as outras como estão."""
+    if not zona.automatica or zona.tipo != TEXTO or zona.funcao not in (
+            "texto", "titulo", "cabecalho", "rodape", "numero_de_pagina"):
+        return zona
+    funcao = _funcao_de_todos([i for i, box in enumerate(boxes) if zona.contem_o_centro(box)],
+                              funcoes)
+    return replace(zona, funcao=funcao) if funcao else zona
+
+
+def _funcao_de_todos(indices: Sequence[int], funcoes: dict) -> Optional[str]:
+    """A função que todos os glifos de `indices` têm em `funcoes`; None se não há glifo, se
+    algum não tem função ou se elas diferem."""
+    votos = [funcoes[i] for i in indices if i in funcoes]
+    return votos[0] if indices and len(votos) == len(indices) and len(set(votos)) == 1 else None
 
 
 def _linhas(boxes: Sequence[BoxEntry]) -> List[List[int]]:
@@ -641,6 +709,13 @@ def _partir_no_vao(boxes: Sequence[BoxEntry]) -> List[List[int]]:
     zona só ligada a um diagrama só (a mesma regra da `layout.partir_nos_vaos`)."""
     ordem = sorted(boxes, key=lambda b: b.x1)
     altura = max(1, median(b.y2 - b.y1 for b in ordem))
+    return [[min(x.x1 for x in p), min(x.y1 for x in p), max(x.x2 for x in p), max(x.y2 for x in p)]
+            for p in _partes_no_vao(ordem, altura)]
+
+
+def _partes_no_vao(ordem: Sequence[BoxEntry], altura: float) -> List[List[BoxEntry]]:
+    """Os glifos da linha (da esquerda para a direita) partidos em cada vão de mais de
+    `VAO_QUE_PARTE` alturas com `GLIFOS_DE_CADA_LADO` glifos ou mais de cada lado."""
     partes, atual = [], [ordem[0]]
     for k, (a, b) in enumerate(zip(ordem, ordem[1:]), start=1):
         if (b.x1 - max(x.x2 for x in atual) > VAO_QUE_PARTE * altura
@@ -649,8 +724,7 @@ def _partir_no_vao(boxes: Sequence[BoxEntry]) -> List[List[int]]:
             atual = []
         atual.append(b)
     partes.append(atual)
-    return [[min(x.x1 for x in p), min(x.y1 for x in p), max(x.x2 for x in p), max(x.y2 for x in p)]
-            for p in partes]
+    return partes
 
 
 def _blocos(linhas: List[List[int]], escala: float) -> List[Caixa]:
@@ -693,16 +767,27 @@ def filtrar(boxes: Sequence[BoxEntry], tabuleiros: Sequence[Caixa],
     """
     texto = [b for b in boxes
              if tipo_no_ponto(zonas, (b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2) == TEXTO]
+    return texto, _tabuleiros_das_areas(tabuleiros, zonas)
+
+
+def _tabuleiros_das_areas(tabuleiros: Sequence[Caixa], zonas: Sequence[Zona]) -> List[Caixa]:
+    """Cada área de diagrama dá os tabuleiros achados dentro dela, onde o diagrama vence, ou
+    a própria área, se não achou nenhum e o diagrama vence no centro dela; sem repetir."""
     saida: List[Caixa] = []
     for z in zonas:
         if z.tipo != DIAGRAMA:
             continue
-        dentro = [t for t in tabuleiros if z.contem((t[0] + t[2]) / 2, (t[1] + t[3]) / 2)
-                  and tipo_no_ponto(zonas, (t[0] + t[2]) / 2, (t[1] + t[3]) / 2) == DIAGRAMA]
+        dentro = _tabuleiros_dentro(z, tabuleiros, zonas)
         saida.extend(tuple(t) for t in dentro if tuple(t) not in saida)
         if not dentro and tipo_no_ponto(zonas, (z.x1 + z.x2) / 2, (z.y1 + z.y2) / 2) == DIAGRAMA:
             saida.append(z.caixa)
-    return texto, saida
+    return saida
+
+
+def _tabuleiros_dentro(zona: Zona, tabuleiros: Sequence[Caixa], zonas: Sequence[Zona]) -> list:
+    """Os tabuleiros com o centro na área e onde o diagrama vence."""
+    return [t for t in tabuleiros if zona.contem((t[0] + t[2]) / 2, (t[1] + t[3]) / 2)
+            and tipo_no_ponto(zonas, (t[0] + t[2]) / 2, (t[1] + t[3]) / 2) == DIAGRAMA]
 
 
 def segmentar(imagem, zonas: Sequence[Zona], leitor=None):

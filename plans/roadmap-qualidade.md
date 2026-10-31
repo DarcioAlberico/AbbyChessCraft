@@ -180,6 +180,12 @@ decisões em dois lugares do controlador.
 **Pronto quando:** `dryer.py abbychess 0.8` só lista as exceções aceitas; o teste de
 arquitetura de CA-Q-D1 está na rápida.
 
+**Feito** em 2026-10-31, ramo `qualidade-q5` (`docs/revisoes/qualidade-Q5.md`): 6 itens
+mortos fora, um commit cada; de 16 pares do dryer a 1, aceito com motivo em
+`ferramentas/pares_aceitos.txt`; a Q-A3, menos o modo da fila, que não é espelho. Desvio: a
+regra do CA-Q-D1 está na medida (`qualidade.py` falha com par fora da lista), não na rápida,
+porque o dryer leva 18 s; a rápida testa o mecanismo num pacote de brinquedo.
+
 ## Passo Q6 — Fronteira e tipos
 
 **Contexto.** O `projeto.json` é validado pela metade (Q-P6); a sequência grava ao ser lida

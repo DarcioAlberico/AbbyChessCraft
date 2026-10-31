@@ -374,6 +374,11 @@ em dois lugares espelhados à mão (`controlador.py:193`, `controladores.py:1212
 duração 8000 ms em ~30 lugares; "centro dentro da zona" três vezes
 (`controlador.py:1237, 1266, 1281`); `TEMPO_DO_PEDIDO` no controlador, importado pelo lote.
 
+**Feito** no Q5 (2026-10-31): `_trocar_condutor` muda o condutor e o flag juntos;
+`AVISO_LONGO_MS`; `TEMPO_DO_PEDIDO` no `servidor_de_leitura`; `Zona.contem_o_centro` (eram
+seis contas, três em `zonas.py`). O modo da fila fica: `ordem_da_fila` guarda o último modo de
+glifos enquanto a fila mostra palavras ou diagramas, e só `ControladorDaFila.definir` a escreve.
+
 ## 7. Duplicação (dryer, rank ≥ 0,8)
 
 `ferramentas/dryer.py` compara a forma do AST de cada par de funções com ≥ 60 nós. Os 16
@@ -398,7 +403,9 @@ pares de `docs/medidas/qualidade/duplicacao-4accb7f.txt`, com o destino:
 
 - **CA-Q-D1:** `dryer.py abbychess 0.8` lista só os pares marcados "rever" que forem
   aceitos, registrados numa lista de exceções com o motivo; o teste de arquitetura reprova
-  par novo.
+  par novo. **Feito** no Q5 (2026-10-31): 1 par, aceito em `ferramentas/pares_aceitos.txt`;
+  quem reprova o par novo é a medida (`dryer.py --aceitos`, chamado por `qualidade.py`), não
+  a rápida: o dryer leva 18 s. A rápida testa o mecanismo num pacote de brinquedo.
 
 ## 8. Complexidade (crapper, CRAP < 10)
 
@@ -515,7 +522,12 @@ o parâmetro `indices_v1` de `sq.da_v2` (sempre `()`), `app/documento.ir_ao_fim_
 `migrar_tudo`, `grade.ACEITOS`, `diagramas.amostras_guardadas`) ficam se forem a porta que o
 teste usa como o usuário; senão saem. Os 3 F401 de `camada.py` saem já (o portão).
 - **CA-Q-Z1:** cada item é confirmado sem chamador por `git grep` (e pelo mutador, quando
-  houver) e apagado num commit próprio; a suíte passa igual.
+  houver) e apagado num commit próprio; a suíte passa igual. **Feito** no Q5 (2026-10-31):
+  saíram `FONTE_LIVRO_FRACO`, `ir_ao_fim_do_gid`, `mostrar_glifos`, `efeitos_de_impressao`,
+  o `indices_v1` e o `avisar` de `_pode_ler`; `_arquivo_da_pagina`, `n_de`,
+  `descartar_desfazer`/`descartar_refazer` e `emendou` têm chamador e ficam; `salvar_zonas`,
+  `exportar`, `paragrafos`, `grade.ACEITOS` e `amostras_guardadas` ficam como a porta do
+  teste; o alias `editar = tem` sai no Q-A2.
 
 ## 12. Fora do escopo
 
@@ -528,8 +540,9 @@ teste usa como o usuário; senão saem. Os 3 F401 de `camada.py` saem já (o por
 
 1. ~~**Q-P1:** migrar toda a v1 na abertura ou só passar a busca a pid?~~ **Decidido**
    (2026-10-30): migrar toda a v1 na abertura.
-2. **Faixas de páginas:** o "–" do lote e o "-" do diálogo são de propósito (mostrar contra
-   digitar)?
+2. ~~**Faixas de páginas:** o "–" do lote e o "-" do diálogo são de propósito (mostrar contra
+   digitar)?~~ **Decidido** (2026-10-31): sim; uma função só, `sequencia.faixas_de_paginas`,
+   com o separador por parâmetro.
 3. **Q-P5:** o segundo processo abre só para leitura ou recusa?
 4. ~~**Q-E1:** a exportação passa a usar `texto.montar` inteira (Q-E6) já no primeiro passo, ou
    primeiro só as decisões?~~ **Decidido** (2026-10-30): só as decisões no Q3; o Q-E6 no Q7.

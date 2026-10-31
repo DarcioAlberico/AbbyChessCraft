@@ -12,6 +12,7 @@ from core.box_model import BoxEntry
 from core.pagina import PaginaExtraida, Paragrafo
 
 from abbychess import epub
+from abbychess import validacao_do_epub as validacao
 from abbychess import exportar as ex
 from abbychess import pdf_pesquisavel as pdfp
 from abbychess import margens as mg
@@ -108,7 +109,7 @@ def test_referencia_a_pagina_impressa_vira_link_e_o_rotulo_e_o_impresso(tmp_path
     escrito = epub.escrever(paginas, destino, epub.Metadados("L"),
                             numeros={0: 10, 1: 11, 2: 12})
     assert escrito.links == 1
-    assert epub.conferir(destino) == []
+    assert validacao.conferir(destino) == []
     with zipfile.ZipFile(destino) as z:
         primeiro = z.read("OEBPS/texto/capitulo-001.xhtml").decode("utf-8")
         nav = z.read("OEBPS/nav.xhtml").decode("utf-8")
@@ -182,7 +183,7 @@ def test_pagina_sem_numero_impresso_nao_colide_com_um_impresso(tmp_path):
     with zipfile.ZipFile(destino) as z:
         nav = z.read("OEBPS/nav.xhtml").decode("utf-8")
     assert ">[1]</a>" in nav and ">[2]</a>" in nav and ">1</a>" in nav and ">2</a>" in nav
-    assert epub.conferir(destino) == []
+    assert validacao.conferir(destino) == []
 
 # ----------------------------------------------------------------------
 # Os links para "Diagrama N" e para os capítulos
@@ -257,7 +258,7 @@ def test_o_epub_liga_diagramas_e_capitulos_e_a_legenda_nao_se_cita(tmp_path):
     paginas, _, _ = _livro_numerado()
     destino = tmp_path / "a.epub"
     escrito = epub.escrever(paginas, destino, epub.Metadados("L"), limite_do_capitulo=10)
-    assert epub.conferir(destino) == []
+    assert validacao.conferir(destino) == []
     with zipfile.ZipFile(destino) as z:
         primeiro = z.read("OEBPS/texto/capitulo-001.xhtml").decode("utf-8")
         segundo = z.read("OEBPS/texto/capitulo-002.xhtml").decode("utf-8")
@@ -269,9 +270,9 @@ def test_o_epub_liga_diagramas_e_capitulos_e_a_legenda_nao_se_cita(tmp_path):
     assert "<p>Diagrama 2. Jogam as pretas</p>" in segundo     # a legenda não se cita
     assert escrito.links == 3
     if os.environ.get("ABBY_EPUBCHECK"):
-        assert epub.epubcheck(destino) == []
+        assert validacao.epubcheck(destino) == []
     if os.environ.get("ABBY_ACE"):
-        assert epub.ace(destino) == []
+        assert validacao.ace(destino) == []
 
 
 @pytest.mark.skipif(not os.environ.get("ABBY_CALIBRE"),
@@ -281,7 +282,7 @@ def test_no_calibre_os_links_do_texto_levam_ao_diagrama_e_ao_capitulo(tmp_path):
     paginas, _, _ = _livro_numerado()
     destino = tmp_path / "a.epub"
     epub.escrever(paginas, destino, epub.Metadados("L"), limite_do_capitulo=10)
-    assert epub.calibre(destino) == []
+    assert validacao.calibre(destino) == []
     # O link que some do texto é acusado.
     with zipfile.ZipFile(destino) as z:
         partes = {n: z.read(n) for n in z.namelist()}
@@ -291,14 +292,14 @@ def test_no_calibre_os_links_do_texto_levam_ao_diagrama_e_ao_capitulo(tmp_path):
     with zipfile.ZipFile(quebrado, "w") as z:
         for nome, dados in partes.items():
             z.writestr(nome, dados, zipfile.ZIP_STORED if nome == "mimetype" else zipfile.ZIP_DEFLATED)
-    assert epub.calibre(quebrado) == [
+    assert validacao.calibre(quebrado) == [
         "o Calibre avisou: Referenced file 'OEBPS/texto/capitulo-009.xhtml' not found",
         'o link "Diagrama 1" não saiu como link no PDF do Calibre']
 
 
 def test_calibre_sem_configuracao_e_none(tmp_path, monkeypatch):
     monkeypatch.delenv("ABBY_CALIBRE", raising=False)
-    assert epub.calibre(tmp_path / "x.epub") is None
+    assert validacao.calibre(tmp_path / "x.epub") is None
 
 
 def test_o_docx_liga_diagramas_e_capitulos(tmp_path):

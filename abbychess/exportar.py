@@ -89,7 +89,7 @@ class Relatorio:
     #: No PDF pesquisável, o resumo dele (o relatório por item é dos outros formatos).
     resumo_do_pdf: str = ""
     #: No EPUB: os capítulos, as figuras que reaproveitaram uma imagem igual e o que a
-    #: conferência do arquivo escrito acusou (`epub.conferir`).
+    #: conferência do arquivo escrito acusou (`validacao_do_epub.conferir`).
     capitulos: int = 0
     imagens_reutilizadas: int = 0
     #: No EPUB: os bytes que o PNG otimizado sem perda tirou das imagens.
@@ -441,8 +441,8 @@ def exportar_epub(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
     """O EPUB pelo escritor próprio (`abbychess.epub`): capítulos, sumário pelos títulos,
     lista de páginas, marcos, metadados e a acessibilidade do que foi escrito; com
     `analise`, o link de análise de cada diagrama lido (`Opcoes.links_de_analise`). O
-    escritor confere o arquivo (`epub.conferir`) antes de trocar o anterior, e recusa o que
-    não passa (SPEC-qualidade Q-E3), como o DOCX."""
+    escritor confere o arquivo (`validacao_do_epub.conferir`) antes de trocar o anterior, e
+    recusa o que não passa (SPEC-qualidade Q-E3), como o DOCX."""
     from abbychess import epub
 
     escrito = _escrever_formatado(epub.escrever, paginas, caminho, titulo, autor, idioma,

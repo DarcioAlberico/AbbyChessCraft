@@ -63,7 +63,7 @@ def _sha(caminho: Path) -> str:
 
 def medir(livro: str) -> dict:
     from abbychess import exportar as ex
-    from abbychess import epub
+    from abbychess import validacao_do_epub as validacao
     from abbychess import livro as lv
     from abbychess import pagina as pg
     from abbychess.leitor import LeitorDoLivro
@@ -106,12 +106,12 @@ def medir(livro: str) -> dict:
                 "no_pgn": relatorio.no_pgn,
                 "palavras_sinalizadas": sum(relatorio.sinalizadas.values()),
                 # O EPUB que não passa nela nem é gravado (SPEC-qualidade Q-E3): aqui, [].
-                "problemas_do_arquivo": epub.conferir(destino) if formato == "epub" else [],
+                "problemas_do_arquivo": validacao.conferir(destino) if formato == "epub" else [],
             }
             if formato == "epub":
-                dados["epubcheck"] = epub.epubcheck(destino)
-                dados["ace"] = epub.ace(destino)
-                dados["calibre"] = epub.calibre(destino)
+                dados["epubcheck"] = validacao.epubcheck(destino)
+                dados["ace"] = validacao.ace(destino)
+                dados["calibre"] = validacao.calibre(destino)
             formatos[formato] = dados
             print(formato, dados["tempo"], "mesmos bytes:", dados["mesmos_bytes"], flush=True)
         projeto.paginas_em_memoria.descarregar(30)

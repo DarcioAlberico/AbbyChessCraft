@@ -29,6 +29,7 @@ from PIL import Image
 from core.box_model import BoxEntry
 
 from abbychess import epub
+from abbychess import validacao_do_epub as validacao
 from abbychess import escritor_docx as ed
 from abbychess import exportar as ex
 from abbychess import montagem as mo
@@ -167,9 +168,9 @@ def _formas(tmp_path: Path, opcoes: ex.Opcoes) -> dict:
                   analise=opcoes.links_de_analise)
     txt.write_text(ex.texto_do_livro(paginas, marcas_de_pagina=opcoes.marcas_de_pagina),
                    encoding="utf-8")
-    assert ed.conferir(docx) == [] and epub.conferir(livro) == []
+    assert ed.conferir(docx) == [] and validacao.conferir(livro) == []
     if os.environ.get("ABBY_EPUBCHECK"):
-        assert epub.epubcheck(livro) == []
+        assert validacao.epubcheck(livro) == []
     return {"docx": forma_do_docx(docx), "epub": forma_do_epub(livro), "txt": forma_do_txt(txt)}
 
 

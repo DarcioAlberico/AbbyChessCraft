@@ -13,6 +13,7 @@ from PIL import Image
 from core.pagina import Figura, PaginaExtraida, Paragrafo
 
 from abbychess import epub
+from abbychess import validacao_do_epub as validacao
 from abbychess import escritor_docx as ed
 
 FEN = "r3k2r/pp3ppp/2n5/3q4/3P4/2N2N2/PP3PPP/R3K2R w - - 0 1"
@@ -194,4 +195,4 @@ def test_no_epub_a_ressalva_fica_a_vista(tmp_path):
     with zipfile.ZipFile(destino) as z:
         texto = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".xhtml"))
     assert "<figcaption>pretas a jogar (informado na revisão); não revisado</figcaption>" in texto
-    assert epub.conferir(destino) == []
+    assert validacao.conferir(destino) == []

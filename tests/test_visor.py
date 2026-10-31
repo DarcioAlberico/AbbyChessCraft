@@ -431,6 +431,137 @@ def test_ligar_outro_projeto_troca_o_cache(app, janela_de_60, tmp_path):
     assert janela_de_60.pagina.cache.fonte is janela_de_60.pagina.fonte
 
 
+# ----------------------------------------------------------------------
+# O cursor sobre as áreas e os menus do botão direito
+# ----------------------------------------------------------------------
+
+def _no_editor_de_areas_com_uma_area(app, janela, caixa=(100, 50, 500, 200)):
+    """O editor de áreas ligado, com uma área só (a desenhada, que fica escolhida), a página a
+    100% no canto da vista."""
+    from PySide6.QtCore import QPointF
+
+    janela.show()
+    janela.acao_areas.setChecked(True)
+    janela.modo_areas(True)
+    _esperar(app, janela)
+    for _ in list(janela.areas.zonas):
+        janela.areas.apagar(0)
+    janela.visor.resetTransform()
+    janela.visor.horizontalScrollBar().setValue(0)
+    janela.visor.verticalScrollBar().setValue(0)
+    x1, y1, x2, y2 = caixa
+    janela.visor.soltar_area(QPointF(x1, y1), QPointF(x2 - 1, y2 - 1))
+    app.processEvents()
+    assert [z.caixa for z in janela.areas.zonas] == [caixa] and janela.areas.atual == 0
+
+
+def _cursor_em(visor, x, y):
+    """A forma do cursor com o mouse parado no ponto (x, y) da página."""
+    QTest.mouseMove(visor.viewport(), visor.mapFromScene(x, y))
+    return visor.viewport().cursor().shape()
+
+
+def test_o_cursor_sobre_a_area_diz_o_que_o_arraste_vai_fazer(app, janela):
+    """No editor de áreas, o cursor sobre a área escolhida: nos cantos, a seta diagonal; nas
+    bordas, a horizontal ou a vertical; no miolo, a de mover; fora, a cruz de desenhar."""
+    _no_editor_de_areas_com_uma_area(app, janela)
+    visor = janela.visor
+    forma = Qt.CursorShape
+    assert _cursor_em(visor, 100, 50) == forma.SizeFDiagCursor        # esquerda e cima
+    assert _cursor_em(visor, 500, 200) == forma.SizeFDiagCursor       # direita e baixo
+    assert _cursor_em(visor, 500, 50) == forma.SizeBDiagCursor        # direita e cima
+    assert _cursor_em(visor, 100, 200) == forma.SizeBDiagCursor       # esquerda e baixo
+    assert _cursor_em(visor, 100, 120) == forma.SizeHorCursor
+    assert _cursor_em(visor, 500, 120) == forma.SizeHorCursor
+    assert _cursor_em(visor, 300, 50) == forma.SizeVerCursor
+    assert _cursor_em(visor, 300, 200) == forma.SizeVerCursor
+    assert _cursor_em(visor, 300, 120) == forma.SizeAllCursor         # o miolo move
+    assert _cursor_em(visor, 800, 240) == forma.CrossCursor           # fora: área nova
+    janela.areas.escolher(-1)                     # sem área escolhida, a borda não estica
+    app.processEvents()
+    assert _cursor_em(visor, 100, 120) == forma.SizeAllCursor
+    assert _cursor_em(visor, 800, 240) == forma.CrossCursor
+
+
+def _botao_direito(app, visor, x, y, *, escolher=None, razao=None):
+    """O botão direito no ponto (x, y) da página: devolve os textos do menu que abriu (None
+    se nenhum abriu) e, com `escolher`, aciona a opção que começa com esse texto."""
+    from PySide6.QtCore import QTimer
+    from PySide6.QtGui import QContextMenuEvent
+
+    vistos = []
+
+    def ler_e_fechar():
+        menu = QApplication.activePopupWidget()
+        if menu is None:
+            return
+        vistos.append([a.text() for a in menu.actions() if not a.isSeparator()])
+        if escolher is not None:
+            next(a for a in menu.actions() if a.text().startswith(escolher)).trigger()
+        menu.close()
+
+    QTimer.singleShot(0, ler_e_fechar)
+    ponto = visor.mapFromScene(x, y)
+    razao = QContextMenuEvent.Reason.Mouse if razao is None else razao
+    QApplication.sendEvent(visor.viewport(), QContextMenuEvent(
+        razao, ponto, visor.viewport().mapToGlobal(ponto)))
+    app.processEvents()
+    return vistos[0] if vistos else None
+
+
+def test_o_botao_direito_num_box_o_escolhe_e_junta_com_o_seguinte(app, janela):
+    janela.show()
+    janela.visor.resetTransform()
+    app.processEvents()
+    primeiro, segundo = boxes(janela)[3], boxes(janela)[4]
+    total = len(boxes(janela))
+    textos = _botao_direito(app, janela.visor, (primeiro.x1 + primeiro.x2) / 2,
+                            (primeiro.y1 + primeiro.y2) / 2, escolher="Juntar com o seguinte")
+    assert textos == ["Dividir aqui", "Juntar com o anterior", "Juntar com o seguinte"]
+    assert len(boxes(janela)) == total - 1
+    junto = boxes(janela)[3]
+    assert (junto.x1, junto.x2) == (primeiro.x1, segundo.x2)
+    assert janela.pagina.indice_de(janela.pagina.atual) == 3          # o clicado é o atual
+
+
+def test_o_botao_direito_fora_dos_boxes_abre_o_zoom_e_a_origem(app, janela):
+    janela.show()
+    janela.visor.definir_zoom(2.0)
+    app.processEvents()
+    textos = _botao_direito(app, janela.visor, 5, 5, escolher="100%")
+    assert textos == ["Página inteira", "Largura da página", "100%", "Zoom no item atual",
+                      "Aproximar", "Afastar", "Mostrar a origem das leituras"]
+    assert janela.visor.escala() == pytest.approx(1.0)
+    assert len(boxes(janela)) == 15                                    # nada da página mudou
+
+
+def test_o_botao_direito_no_editor_de_areas_escolhe_a_area_e_muda_a_funcao(app, janela):
+    _no_editor_de_areas_com_uma_area(app, janela)
+    from PySide6.QtCore import QPointF
+
+    janela.visor.soltar_area(QPointF(100, 220), QPointF(499, 254))       # uma segunda área
+    app.processEvents()
+    assert janela.areas.atual == 1
+    textos = _botao_direito(app, janela.visor, 300, 120, escolher="Título")
+    assert textos[0].startswith("Texto") and textos[-1] == "Apagar área\tDel"
+    assert janela.areas.atual == 0
+    assert janela.projeto.carregar_zonas(0)[0].funcao == "titulo"
+    assert _botao_direito(app, janela.visor, 800, 240) is None         # fora das áreas: nada
+
+
+def test_o_menu_pelo_teclado_no_visor_e_o_do_box_atual(app, janela):
+    """Shift+F10 e a tecla Menu (o `QContextMenuEvent` de teclado): o menu do box em revisão,
+    e não o do ponto do mouse."""
+    from PySide6.QtGui import QContextMenuEvent
+
+    janela.show()
+    janela.visor.resetTransform()
+    app.processEvents()
+    mostrar(janela, 2)
+    textos = _botao_direito(app, janela.visor, 5, 5, razao=QContextMenuEvent.Reason.Keyboard)
+    assert textos == ["Dividir aqui", "Juntar com o anterior", "Juntar com o seguinte"]
+
+
 def test_paint_desenha_o_traco_do_box_logo_fora_do_retangulo_exposto(app):
     from PySide6.QtCore import QRectF
     from PySide6.QtGui import QImage, QPainter, QTransform

@@ -117,6 +117,37 @@ def test_arrastar_dentro_move_o_retangulo_sem_sair_da_pagina(corte):
     assert margens[2].value() == pytest.approx(0.0, abs=0.1)
 
 
+def _cursor_em(widget, x, y):
+    """A forma do cursor com o mouse passando, sem botão, no ponto (x, y) da miniatura."""
+    p = QPointF(x, y)
+    nenhum = Qt.MouseButton.NoButton
+    QApplication.sendEvent(widget, QMouseEvent(QEvent.Type.MouseMove, p, widget.mapToGlobal(p),
+                                               nenhum, nenhum, Qt.KeyboardModifier.NoModifier))
+    return widget.cursor().shape()
+
+
+def test_o_cursor_sobre_o_corte_diz_o_que_o_arraste_vai_fazer(corte):
+    """Nos cantos, a seta diagonal; nas bordas, a horizontal ou a vertical; dentro, a de
+    mover; fora, a cruz do retângulo novo."""
+    previa, margens = corte
+    for m in margens:
+        m.setValue(20.0)
+    r = previa.retangulo()
+    meio_x, meio_y = r.center().x(), r.center().y()
+    forma = Qt.CursorShape
+    assert _cursor_em(previa, r.left(), r.top()) == forma.SizeFDiagCursor
+    assert _cursor_em(previa, r.right(), r.bottom()) == forma.SizeFDiagCursor
+    assert _cursor_em(previa, r.right(), r.top()) == forma.SizeBDiagCursor
+    assert _cursor_em(previa, r.left(), r.bottom()) == forma.SizeBDiagCursor
+    assert _cursor_em(previa, r.left(), meio_y) == forma.SizeHorCursor
+    assert _cursor_em(previa, r.right(), meio_y) == forma.SizeHorCursor
+    assert _cursor_em(previa, meio_x, r.top()) == forma.SizeVerCursor
+    assert _cursor_em(previa, meio_x, r.bottom()) == forma.SizeVerCursor
+    assert _cursor_em(previa, meio_x, meio_y) == forma.SizeAllCursor
+    assert _cursor_em(previa, 2, 2) == forma.CrossCursor
+    assert [m.value() for m in margens] == [20.0] * 4               # passar não muda o corte
+
+
 def test_o_arraste_avisa_a_previa_do_dialogo_uma_vez(corte):
     """As quatro margens mudam juntas, e a prévia ("1 página é cortada…") é refeita uma vez."""
     previa, margens = corte

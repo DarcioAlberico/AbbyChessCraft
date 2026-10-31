@@ -167,78 +167,35 @@ class Decisoes:
         """Todo gid de box que alguma decisão referencia (os dos virtuais não são boxes)."""
         usados = set(self.quebras) | set(self.paragrafo_antes) | set(self.hifen_de_quebra)
         usados |= {g for par in self.juncoes for g in par}
+        return usados | self._ancoras_dos_virtuais()
+
+    def _ancoras_dos_virtuais(self) -> Set[int]:
+        """Os boxes a que os virtuais se prendem (a âncora que é outro virtual não conta)."""
         virtuais = {v.gid for v in self.virtuais}
-        usados |= {v.depois_de for v in self.virtuais
-                   if v.depois_de is not None and v.depois_de not in virtuais}
-        usados |= {v.antes_de for v in self.virtuais
-                   if v.antes_de is not None and v.antes_de not in virtuais}
-        return usados
+        return {g for v in self.virtuais for g in (v.depois_de, v.antes_de)
+                if g is not None and g not in virtuais}
 
     def reescrever(self, sucessores: Dict[int, List[int]]) -> Tuple["Decisoes", List[str]]:
         """As decisões com os gids aposentados trocados pelos sucessores. Devolve também o
         que caiu (gid aposentado sem sucessor), em frases, para a interface avisar."""
-        caidas: List[str] = []
-
-        def primeiro(g: int) -> Optional[int]:
-            if g not in sucessores:
-                return g
-            novos = sucessores[g]
-            return novos[0] if novos else None
-
-        def ultimo(g: int) -> Optional[int]:
-            if g not in sucessores:
-                return g
-            novos = sucessores[g]
-            return novos[-1] if novos else None
-
-        def mapear(conjunto, onde, rotulo):
-            saida = set()
-            for g in conjunto:
-                novo = onde(g)
-                if novo is None:
-                    caidas.append(f"{rotulo} do glifo {g} (o glifo saiu)")
-                else:
-                    saida.add(novo)
-            return frozenset(saida)
-
-        juncoes = set()
-        for a, b in self.juncoes:
-            na, nb = ultimo(a), primeiro(b)
-            if na is None or nb is None:
-                caidas.append(f"junção de palavras {a}+{b} (um dos glifos saiu)")
-            elif na != nb:
-                juncoes.add((na, nb))
-        virtuais = []
-        for v in self.virtuais:
-            if v.antes_de is not None and v.antes_de in sucessores:
-                novo = primeiro(v.antes_de)
-                if novo is None:
-                    caidas.append(f"glifo virtual '{v.char}' antes do glifo {v.antes_de} "
-                                  "(o glifo saiu; o virtual foi para o começo da página)")
-                v = replace(v, antes_de=novo)
-            if v.depois_de is None or v.depois_de not in sucessores:
-                virtuais.append(v)
-                continue
-            novo = ultimo(v.depois_de)
-            if novo is None:
-                caidas.append(f"glifo virtual '{v.char}' depois do glifo {v.depois_de} "
-                              "(o glifo saiu; o virtual foi para o começo da página)")
-            virtuais.append(replace(v, depois_de=novo))
-        quebras = mapear(self.quebras, primeiro, "palavra nova antes")
+        r = _Reescrita(sucessores)
+        juncoes = r.juncoes(self.juncoes)
+        virtuais = [r.virtual(v) for v in self.virtuais]
+        quebras = r.conjunto(self.quebras, r.primeiro, "palavra nova antes")
         # Dois glifos fundidos podem levar uma quebra e uma junção à mesma fronteira (a
         # junção que terminava num e a quebra antes do outro). As duas não valem juntas:
         # fica a junção, que é sobre o glifo que já começava a fronteira, e a quebra cai.
         conflito = quebras & {b for _, b in juncoes}
         for g in sorted(conflito):
-            caidas.append(f"palavra nova antes do glifo {g} (o glifo foi fundido no fim de "
-                          "uma palavra juntada)")
+            r.caidas.append(f"palavra nova antes do glifo {g} (o glifo foi fundido no fim de "
+                            "uma palavra juntada)")
         return Decisoes(
             quebras=quebras - conflito,
             juncoes=frozenset(juncoes),
-            paragrafo_antes=mapear(self.paragrafo_antes, primeiro, "parágrafo antes"),
+            paragrafo_antes=r.conjunto(self.paragrafo_antes, r.primeiro, "parágrafo antes"),
             virtuais=tuple(virtuais),
-            hifen_de_quebra=mapear(self.hifen_de_quebra, ultimo, "hífen de quebra"),
-        ), caidas
+            hifen_de_quebra=r.conjunto(self.hifen_de_quebra, r.ultimo, "hífen de quebra"),
+        ), r.caidas
 
     def para_json(self) -> dict:
         return {"quebras": sorted(self.quebras), "juncoes": sorted([a, b] for a, b in self.juncoes),
@@ -254,6 +211,66 @@ class Decisoes:
                    paragrafo_antes=frozenset(map(int, bruto.get("paragrafo_antes", []))),
                    virtuais=tuple(GlifoVirtual.de_json(v) for v in bruto.get("virtuais", [])),
                    hifen_de_quebra=frozenset(map(int, bruto.get("hifen_de_quebra", []))))
+
+
+class _Reescrita:
+    """Os gids aposentados levados aos sucessores (`Decisoes.reescrever`), com as frases do
+    que caiu, na ordem em que caiu."""
+
+    def __init__(self, sucessores: Dict[int, List[int]]):
+        self.sucessores = sucessores
+        self.caidas: List[str] = []
+
+    def primeiro(self, g: int) -> Optional[int]:
+        if g not in self.sucessores:
+            return g
+        novos = self.sucessores[g]
+        return novos[0] if novos else None
+
+    def ultimo(self, g: int) -> Optional[int]:
+        if g not in self.sucessores:
+            return g
+        novos = self.sucessores[g]
+        return novos[-1] if novos else None
+
+    def conjunto(self, conjunto, onde, rotulo: str) -> FrozenSet[int]:
+        saida = set()
+        for g in conjunto:
+            novo = onde(g)
+            if novo is None:
+                self.caidas.append(f"{rotulo} do glifo {g} (o glifo saiu)")
+            else:
+                saida.add(novo)
+        return frozenset(saida)
+
+    def juncoes(self, juncoes) -> Set[Tuple[int, int]]:
+        """A junção vai do último sucessor de um ao primeiro do outro; a dos dois glifos
+        fundidos num só some."""
+        saida = set()
+        for a, b in juncoes:
+            na, nb = self.ultimo(a), self.primeiro(b)
+            if na is None or nb is None:
+                self.caidas.append(f"junção de palavras {a}+{b} (um dos glifos saiu)")
+            elif na != nb:
+                saida.add((na, nb))
+        return saida
+
+    def virtual(self, v: GlifoVirtual) -> GlifoVirtual:
+        """O virtual antes do primeiro sucessor do `antes_de` e depois do último do
+        `depois_de`; a âncora que saiu vira None (o começo da página)."""
+        if v.antes_de is not None and v.antes_de in self.sucessores:
+            novo = self.primeiro(v.antes_de)
+            if novo is None:
+                self.caidas.append(f"glifo virtual '{v.char}' antes do glifo {v.antes_de} "
+                                   "(o glifo saiu; o virtual foi para o começo da página)")
+            v = replace(v, antes_de=novo)
+        if v.depois_de is None or v.depois_de not in self.sucessores:
+            return v
+        novo = self.ultimo(v.depois_de)
+        if novo is None:
+            self.caidas.append(f"glifo virtual '{v.char}' depois do glifo {v.depois_de} "
+                               "(o glifo saiu; o virtual foi para o começo da página)")
+        return replace(v, depois_de=novo)
 
 
 # ----------------------------------------------------------------------
@@ -857,16 +874,7 @@ def _dividir_decisoes(d: Decisoes, gids: Set[int], movidos: Dict[int, int],
         def um(conjunto):
             return frozenset(f(g) for g in conjunto if no_lado(g))
 
-        virtuais = []
-        for v in d.virtuais:
-            if not no_lado(v.gid):
-                continue
-            virtuais.append(replace(
-                v, gid=f(v.gid),
-                depois_de=f(v.depois_de) if v.depois_de is not None and no_lado(v.depois_de)
-                else None,
-                antes_de=f(v.antes_de) if v.antes_de is not None and no_lado(v.antes_de)
-                else None))
+        virtuais = [_virtual_na_metade(v, no_lado, f) for v in d.virtuais if no_lado(v.gid)]
         return Decisoes(quebras=um(d.quebras), paragrafo_antes=um(d.paragrafo_antes),
                         hifen_de_quebra=um(d.hifen_de_quebra),
                         juncoes=frozenset((f(a), f(b)) for a, b in d.juncoes
@@ -882,21 +890,39 @@ def _dividir_decisoes(d: Decisoes, gids: Set[int], movidos: Dict[int, int],
     return metade(na_esquerda, lambda g: g), metade(na_direita, mapa.__getitem__)
 
 
+def _virtual_na_metade(v: GlifoVirtual, no_lado, f) -> GlifoVirtual:
+    """O virtual com os gids da metade (`f`); a âncora que ficou na outra vira None."""
+    return replace(
+        v, gid=f(v.gid),
+        depois_de=f(v.depois_de) if v.depois_de is not None and no_lado(v.depois_de) else None,
+        antes_de=f(v.antes_de) if v.antes_de is not None and no_lado(v.antes_de) else None)
+
+
 def decisoes_dos_vivos(d: Decisoes, vivos: Set[int]) -> Decisoes:
     """As decisões sem as que citam um glifo que saiu (o virtual cuja âncora saiu também)."""
     if d.gids() <= vivos:
         return d
-    ficam = tuple(d.virtuais)
-    while True:
-        gids = vivos | {v.gid for v in ficam}
-        filtrados = tuple(v for v in ficam if (v.depois_de is None or v.depois_de in gids)
-                          and (v.antes_de is None or v.antes_de in gids))
-        if len(filtrados) == len(ficam):
-            break
-        ficam = filtrados
+    ficam = _virtuais_ancorados(d.virtuais, vivos)
     return replace(d, quebras=d.quebras & vivos, paragrafo_antes=d.paragrafo_antes & vivos,
                    hifen_de_quebra=d.hifen_de_quebra & vivos,
                    juncoes=frozenset(j for j in d.juncoes if set(j) <= vivos), virtuais=ficam)
+
+
+def _virtuais_ancorados(virtuais, vivos: Set[int]) -> Tuple[GlifoVirtual, ...]:
+    """Os virtuais cujas âncoras estão vivas ou são virtuais que ficam, até nada mais cair
+    (o que se prendia a um virtual que caiu cai também)."""
+    ficam = tuple(virtuais)
+    while True:
+        gids = vivos | {v.gid for v in ficam}
+        filtrados = tuple(v for v in ficam if _ancorado(v, gids))
+        if len(filtrados) == len(ficam):
+            return ficam
+        ficam = filtrados
+
+
+def _ancorado(v: GlifoVirtual, gids: Set[int]) -> bool:
+    return ((v.depois_de is None or v.depois_de in gids)
+            and (v.antes_de is None or v.antes_de in gids))
 
 
 def _girada_no_centro(caixa, delta: float, tamanho: Tuple[int, int]):

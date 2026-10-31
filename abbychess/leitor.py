@@ -30,7 +30,6 @@ from abbychess.padroes import ESCALA_DA_CONFIANCA, PadroesDoLivro
 from abbychess.projeto import Limiares, nome_de_pasta
 
 FONTE_LIVRO = "livro"
-FONTE_LIVRO_FRACO = "livro?"
 FONTE_MANUAL = "manual"
 FONTE_NATIVA = "nativa"
 FONTE_NENHUMA = "none"

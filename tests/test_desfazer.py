@@ -148,11 +148,11 @@ def test_padrao_guardado_volta_inteiro(tmp_path):
     padroes.esquecer(caminho)
     assert padroes.total == 0
 
-    padroes.restaurar(amostra)
+    padroes.restaurar_varios([amostra])
     assert padroes.total == 1
     assert padroes.amostras_de("a") == [(caminho.resolve(), pytest.approx(0.8))]
     with pytest.raises(ValueError):
-        padroes.restaurar(type(amostra)(tmp_path / "fora.png", amostra.png, {}))
+        padroes.restaurar_varios([type(amostra)(tmp_path / "fora.png", amostra.png, {})])
 
 
 # ----------------------------------------------------------------------
@@ -468,8 +468,8 @@ def test_reler_pendentes_entra_no_desfazer(app, janela):
     janela.treino.pedir_ensinar()
     _esperar(app, janela)
     janela.pagina.desfazer()                            # o Enter e a propagação saem
-    janela.leitor.padroes.restaurar(janela.pagina.historico.proxima_a_refazer()
-                                    .amostras_criadas[0])      # o padrão volta por fora
+    janela.leitor.padroes.restaurar_varios(janela.pagina.historico.proxima_a_refazer()
+                                           .amostras_criadas[:1])  # o padrão volta por fora
     janela.pagina.reler_pendentes()
     _esperar(app, janela)
     assert janela.acao_desfazer.text() == "Desfazer: Reler pendentes"

@@ -467,12 +467,16 @@ def mesclar(novos: Sequence[DiagramaLido], antigos: Sequence[DiagramaLido]) -> L
     Reconhecer a página de novo não pode desfazer uma conferência: o FEN
     corrigido à mão vale mais que a releitura do mesmo tabuleiro.
     """
-    saida = []
-    for novo in novos:
-        igual = next((a for a in antigos if a.conferido
-                      and _sobreposicao(a.caixa, novo.caixa) >= SOBREPOSICAO_DO_MESMO), None)
-        saida.append(replace(igual, caixa=novo.caixa) if igual is not None else novo)
-    return saida
+    conferidos = [a for a in antigos if a.conferido]
+    return [_o_de_antes(conferidos, novo.caixa, novo) for novo in novos]
+
+
+def _o_de_antes(antigos: Sequence[DiagramaLido], caixa: Caixa,
+                senao: DiagramaLido) -> DiagramaLido:
+    """O antigo que ocupa o mesmo lugar que `caixa`, com a caixa nova; `senao` se nenhum."""
+    igual = next((a for a in antigos if _sobreposicao(a.caixa, caixa) >= SOBREPOSICAO_DO_MESMO),
+                 None)
+    return replace(igual, caixa=caixa) if igual is not None else senao
 
 
 def diagrama_em(diagramas: Sequence[DiagramaLido], x: float, y: float) -> Optional[int]:
@@ -491,12 +495,7 @@ def para_caixas(tabuleiros: Sequence[Caixa], diagramas: Sequence[DiagramaLido]
     Uma página gravada antes da leitura dos diagramas só tem as caixas; elas
     entram aqui como diagramas por ler, e a leitura vem no primeiro clique.
     """
-    saida = []
-    for caixa in em_ordem(tabuleiros):
-        lido = next((d for d in diagramas
-                     if _sobreposicao(d.caixa, caixa) >= SOBREPOSICAO_DO_MESMO), None)
-        saida.append(replace(lido, caixa=caixa) if lido is not None else DiagramaLido(caixa))
-    return saida
+    return [_o_de_antes(diagramas, caixa, DiagramaLido(caixa)) for caixa in em_ordem(tabuleiros)]
 
 
 # ----------------------------------------------------------------------

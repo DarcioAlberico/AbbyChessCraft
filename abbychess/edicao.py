@@ -145,12 +145,9 @@ def descartar(pagina: Pagina, gid: int) -> Diferenca:
 
 def corrigir(pagina: Pagina, gid: int, char: str) -> Diferenca:
     """Aceita o caractere do glifo sem ensinar (ver `pagina.confirmar`)."""
-    i = pagina.indice_de(gid)
-    entries = [copia(pagina.boxes[i].entry)]
+    entries = [copia(pagina.boxes[pagina.indice_de(gid)].entry)]
     pg.confirmar(entries, 0, char)
-    boxes = list(pagina.boxes)
-    boxes[i] = replace(boxes[i], entry=entries[0], amostra=None)
-    return pagina.aplicar(Diferenca(mudados={gid}), boxes)
+    return trocar(pagina, gid, entries[0])
 
 
 def ajustar(pagina: Pagina, imagem, gid: int, leitor=None, **bordas) -> Diferenca:

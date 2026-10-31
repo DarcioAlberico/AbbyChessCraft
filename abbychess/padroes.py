@@ -226,6 +226,14 @@ class PadroesDoLivro:
         log.warning("o %s dos padrões está ilegível: a altura e o efeito deles recomeçam, e o "
                     "arquivo foi guardado em %s", arquivo, destino.name)
 
+    def _do_livro(self, caminho: str | Path) -> Path:
+        """O caminho resolvido de um padrão; erro se ele não está na pasta deste livro (nem
+        esquecer nem restaurar escrevem fora dela)."""
+        caminho = Path(caminho).resolve()
+        if self.pasta.resolve() not in caminho.parents:
+            raise ValueError(f"{caminho} não é um padrão deste livro.")
+        return caminho
+
     def _chave(self, caminho: Path) -> str:
         """A chave do `metadados.json`: o caminho relativo à pasta dos padrões. Aceita também
         o caminho já relativo, que é a procedência gravada no `Box` (`relativo`)."""
@@ -418,9 +426,7 @@ class PadroesDoLivro:
         self._efeitos = [self._efeitos[i] for i in manter]
 
     def esquecer(self, caminho: str | Path) -> None:
-        caminho = Path(caminho).resolve()
-        if self.pasta.resolve() not in caminho.parents:
-            raise ValueError(f"{caminho} não é um padrão deste livro.")
+        caminho = self._do_livro(caminho)
         gv.apagar(caminho)
         self._meta.pop(caminho.relative_to(self.pasta.resolve()).as_posix(), None)
         self._gravar_meta()
@@ -486,24 +492,12 @@ class PadroesDoLivro:
         chave = caminho.relative_to(self.pasta.resolve()).as_posix()
         return Amostra(caminho, caminho.read_bytes(), dict(self._meta.get(chave, {})))
 
-    def restaurar(self, amostra: Amostra) -> None:
-        """Devolve um padrão apagado, com a altura gravada, e o torna consultável."""
-        caminho = Path(amostra.caminho).resolve()
-        if self.pasta.resolve() not in caminho.parents:
-            raise ValueError(f"{caminho} não é um padrão deste livro.")
-        gv.gravar_bytes(caminho, amostra.png)
-        self._meta[caminho.relative_to(self.pasta.resolve()).as_posix()] = dict(amostra.meta)
-        self._gravar_meta()
-        self._carregar()
-
     def restaurar_varios(self, amostras) -> None:
-        """Vários `restaurar` de uma vez (o desfazer de um esquecer, o refazer de um ensinar
-        da Galeria): os metadados gravados e os padrões relidos uma vez só."""
+        """Devolve os padrões apagados, com a altura gravada, e os torna consultáveis (o
+        desfazer de um esquecer, o refazer de um ensinar da Galeria): os metadados gravados
+        e os padrões relidos uma vez só."""
         raiz = self.pasta.resolve()
-        resolvidos = [(Path(a.caminho).resolve(), a) for a in amostras]
-        for caminho, _amostra in resolvidos:
-            if raiz not in caminho.parents:
-                raise ValueError(f"{caminho} não é um padrão deste livro.")
+        resolvidos = [(self._do_livro(a.caminho), a) for a in amostras]
         novos = []
         for caminho, amostra in resolvidos:
             gv.gravar_bytes(caminho, amostra.png)

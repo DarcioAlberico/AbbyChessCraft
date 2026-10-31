@@ -290,7 +290,7 @@ def test_padrao_ensinado_esquecido_e_restaurado_passam_pela_gravacao(projeto, mo
     padroes.esquecer(png)
     assert png.resolve() in [a.resolve() for a in apagados] and not png.exists()
     gravados.clear()
-    padroes.restaurar(amostra)
+    padroes.restaurar_varios([amostra])
     assert png.resolve() in [g.resolve() for g in gravados] and png.exists()
 
 

@@ -346,7 +346,7 @@ class ProjetoDeLivro:
                         fonte_tamanho=fonte.stat().st_size)
         projeto = cls(pasta, dados)
         projeto.salvar()
-        projeto.sequencia               # agora, antes de qualquer render (o fitz e as threads)
+        projeto.montar_sequencia()
         return projeto
 
     @classmethod
@@ -383,7 +383,7 @@ class ProjetoDeLivro:
             gv.proteger(pasta)
             projeto._guardar_a_v1_na_memoria(v1_vence=False)
             try:
-                projeto.sequencia       # só na memória: nada é gravado
+                projeto.montar_sequencia()  # só leitura: nada é gravado
             except ProjetoInvalido:     # a sequência de um formato que esta versão não lê
                 projeto._sequencia, projeto._proximo_pid = projeto._sequencia_da_v2()
             return projeto
@@ -435,14 +435,14 @@ class ProjetoDeLivro:
                 projeto.somente_leitura = projeto._travado = True
                 gv.proteger(pasta)
                 projeto._guardar_a_v1_na_memoria(v1_vence=versao_de_antes < 2)
-                projeto.sequencia
+                projeto.montar_sequencia()
                 return projeto
         if mudou:
             try:
                 projeto.salvar()
             except OSError as erro:     # mídia só de leitura: abre igual, sem gravar o ajuste
                 log.warning("não deu para gravar %s ao abrir: %s", ARQUIVO_DO_PROJETO, erro)
-        projeto.sequencia               # agora, antes de qualquer render (o fitz e as threads)
+        projeto.montar_sequencia()
         if projeto.sequencia_gravada:
             projeto._completar_v3()     # o que uma queda no meio da migração deixou
         return projeto
@@ -1367,14 +1367,28 @@ class ProjetoDeLivro:
     # ------------------------------------------------------------------
     @property
     def sequencia(self) -> sq.Sequencia:
-        """A ordem das páginas e o `pid` de cada uma (montada na primeira pergunta)."""
+        """A ordem das páginas e o `pid` de cada uma. Ler não grava (SPEC-qualidade Q-P8):
+        antes de `montar_sequencia`, a pergunta a monta só na memória."""
         sequencia = self._sequencia
         if sequencia is None:
             with self._trava_do_livro:
                 if self._sequencia is None:
-                    self._sequencia, self._proximo_pid = self._montar_sequencia()
+                    self._sequencia, self._proximo_pid = self._montar_sequencia(gravar=False)
                 sequencia = self._sequencia
         return sequencia
+
+    def montar_sequencia(self) -> sq.Sequencia:
+        """Monta a sequência e grava o que a montagem conserta (o `livro.json` que falta, a
+        página em disco que ele não cita, a sequência que o `projeto.json` da v3 não tem, as
+        páginas fora dela): ao criar e ao abrir, na thread de quem abre e antes de qualquer
+        render (o fitz que conta as páginas não roda junto com um render da pré-carga)."""
+        with self._trava_do_livro:
+            if not self.somente_leitura:
+                self._livro = None              # o do disco: o conserto da memória vai a ele
+                self._carregar_livro(gravar=True)
+            self._sequencia, proximo = self._montar_sequencia(gravar=True)
+            self._proximo_pid = max(self._proximo_pid, proximo)
+            return self._sequencia
 
     def _pid_em(self, indice: int, criar: bool = False) -> Optional[int]:
         """O `pid` da página na posição `indice`, ou None fora do livro. Só `criar` (a
@@ -1483,7 +1497,6 @@ class ProjetoDeLivro:
         if not destino.is_file():
             gv.gravar_bytes(destino, dados)
         with self._trava_do_livro:
-            self.sequencia                      # o próximo pid vem dela
             pids = list(range(self._proximo_pid, self._proximo_pid + paginas))
             self._proximo_pid += paginas
         return [sq.Entrada(pid, nome, k) for k, pid in enumerate(pids)]
@@ -1545,7 +1558,6 @@ class ProjetoDeLivro:
         """Um `pid` que nenhuma página teve (a metade direita de uma divisão). Gravado com a
         sequência que o usa; perdido (nunca reaproveitado) se a operação não acontece."""
         with self._trava_do_livro:
-            self.sequencia                      # o próximo pid vem dela
             pid = self._proximo_pid
             self._proximo_pid += 1
             return pid
@@ -1709,20 +1721,21 @@ class ProjetoDeLivro:
         except (RuntimeError, ValueError, OSError):
             return 0
 
-    def _montar_sequencia(self) -> Tuple[sq.Sequencia, int]:
+    def _montar_sequencia(self, gravar: bool) -> Tuple[sq.Sequencia, int]:
         """A sequência gravada (v3), ou a montada dos dados da v2. O projeto da v3 sem ela
-        (o projeto novo, ou um `projeto.json` que a perdeu) a monta pela ordem do PDF e a grava
-        já; o da v2 só para leitura a tem só na memória."""
+        (o projeto novo, ou um `projeto.json` que a perdeu) a monta pela ordem do PDF e, com
+        `gravar`, a grava já; o da v2 só para leitura a tem só na memória."""
         if self.dados.sequencia is not None:
-            return self._sequencia_lida()
-        sequencia, proximo = self._sequencia_da_v2()
-        if self.dados.versao >= VERSAO and not self.somente_leitura and self.fonte.is_file():
+            return self._sequencia_lida(gravar)
+        sequencia, proximo = self._sequencia_da_v2(gravar)
+        if (gravar and self.dados.versao >= VERSAO and not self.somente_leitura
+                and self.fonte.is_file()):
             self.dados.sequencia = sequencia.para_json()
             self.dados.proximo_pid = max(self.dados.proximo_pid, proximo)
             self.salvar()
         return sequencia, proximo
 
-    def _sequencia_lida(self) -> Tuple[sq.Sequencia, int]:
+    def _sequencia_lida(self, gravar: bool) -> Tuple[sq.Sequencia, int]:
         """A sequência do `projeto.json`. Um `p<pid>.json` que não está nela nem nas apagadas
         (uma queda entre gravações, §12.4) entra nas apagadas, no fim; todo arquivo em disco
         fica abaixo do próximo `pid`."""
@@ -1744,13 +1757,7 @@ class ProjetoDeLivro:
                         self._arquivo_v2(pid).read_text(encoding="utf-8")))
                 except (OSError, ValueError, TypeError, KeyError):
                     continue
-                resumo = self._resumo_do_modelo(pagina)
-                if self.somente_leitura:
-                    self._livro = livro = {**livro, "paginas": {**livro["paginas"],
-                                                                str(pid): resumo}}
-                else:
-                    self._atualizar_livro(pid, resumo)
-                    livro = self._carregar_livro()
+                livro = self._citar_no_livro(pid, self._resumo_do_modelo(pagina), gravar)
         todas = list(sequencia.entradas) + [a.entrada for a in sequencia.apagadas]
         # Página do PDF -> o pid que a tem (as do livro, na sequência ou apagadas).
         do_pdf = {e.pagina: e.pid for e in todas if e.fonte == sq.FONTE_DO_LIVRO}
@@ -1792,13 +1799,13 @@ class ProjetoDeLivro:
                             len(novas))
             sequencia = sq.Sequencia(sequencia.entradas + novas,
                                      sequencia.apagadas + tuple(orfaos))
-            if not self.somente_leitura:
+            if gravar and not self.somente_leitura:
                 self.dados.sequencia = sequencia.para_json()
                 self.dados.proximo_pid = max(self.dados.proximo_pid, proximo)
                 self.salvar()
         return sequencia, proximo
 
-    def _sequencia_da_v2(self) -> Tuple[sq.Sequencia, int]:
+    def _sequencia_da_v2(self, gravar: bool = True) -> Tuple[sq.Sequencia, int]:
         """A sequência de um projeto da v2 (`sequencia.da_v2`): a ordem do PDF, os `pid`
         das páginas gravadas pelo `livro.json`, e os `p<pid>.json` que ele não cita (uma
         queda entre a página e o livro: o mais recente de cada índice entra, e o livro é
@@ -1823,12 +1830,7 @@ class ProjetoDeLivro:
         total = max([self.total_de_paginas(), *(i + 1 for i in gravados)], default=0)
         sequencia, proximo = sq.da_v2(total, gravados, piso)
         for indice, (pid, pagina) in orfaos.items():
-            resumo = self._resumo_do_modelo(pagina)
-            if self.somente_leitura:            # só na memória; troca, não muda no lugar
-                livro = self._carregar_livro()
-                self._livro = {**livro, "paginas": {**livro["paginas"], str(pid): resumo}}
-            else:
-                self._atualizar_livro(pid, resumo)
+            self._citar_no_livro(pid, self._resumo_do_modelo(pagina), gravar)
         return sequencia, proximo
 
     def _orfaos(self, livro: dict, gravados: Dict[int, int]) -> Dict[int, Tuple[int, Pagina]]:
@@ -1900,7 +1902,10 @@ class ProjetoDeLivro:
         return {"versao": VERSAO_DO_LIVRO,
                 "paginas": dict(sorted(paginas.items(), key=lambda kv: int(kv[0])))}
 
-    def _carregar_livro(self) -> dict:
+    def _carregar_livro(self, gravar: bool = False) -> dict:
+        """O `livro.json`, ou o recalculado das páginas se ele falta ou está ilegível. Só
+        `gravar` (a montagem da abertura, `montar_sequencia`) grava o recalculado; ler não
+        grava (SPEC-qualidade Q-P8), e a gravação seguinte do livro o leva ao disco."""
         if self._livro is None:
             arquivo = self.pasta / ARQUIVO_DO_LIVRO
             try:
@@ -1910,10 +1915,21 @@ class ProjetoDeLivro:
                     raise ValueError("versão ou forma inesperada")
             except (OSError, ValueError, AttributeError):
                 bruto = self.recalcular_livro()
-                if not self.somente_leitura:
+                if gravar and not self.somente_leitura:
                     gv.gravar_json(arquivo, bruto)
             self._livro = bruto
         return self._livro
+
+    def _citar_no_livro(self, pid: int, resumo: dict, gravar: bool) -> dict:
+        """A página em disco que o `livro.json` não cita entra nele: gravada (`gravar`, a
+        montagem da abertura) ou só na memória (a leitura, o projeto só para leitura), por
+        troca e não no lugar. Devolve o livro de agora."""
+        if gravar and not self.somente_leitura:
+            self._atualizar_livro(pid, resumo)
+        else:
+            livro = self._carregar_livro()
+            self._livro = {**livro, "paginas": {**livro["paginas"], str(pid): resumo}}
+        return self._carregar_livro()
 
     def _atualizar_livro(self, pid: int, resumo: Optional[dict]) -> None:
         """O resumo da página no `livro.json` (None: ela sai dele)."""

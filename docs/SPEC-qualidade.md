@@ -325,6 +325,16 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
 - `Estrutura` chaveada por `id(BoxEntry)` (`exportar.py:304-363`): uma cópia perde o estilo.
 - **CA-Q-E5:** um teste de arquitetura conta uma definição por regra (regex de lance, `PECAS`,
   idioma); os trechos marcados têm uma função comum ao EPUB, ao DOCX e à prévia.
+- **Feito em parte** no Q7, corte 5 (`docs/revisoes/qualidade-Q7.md`): o idioma pedido uma vez
+  por exportação (o `Pedido`, em TDD); o `PECAS` só em `modelo.py`, e as letras de lance do
+  `contexto` e do `zonas` derivadas dele (em TDD: o lance alemão e o espanhol eram
+  improváveis); `marcacao.trechos_marcados` e `ressalva_do_diagrama`, comuns ao EPUB e ao
+  DOCX (a prévia usa a do EPUB); `tests/test_regras_unicas.py` é o teste de arquitetura. As
+  quatro regex de lance ficam: cada uma é uma regra diferente (o SAN do PGN, a palavra que
+  parece lance, a linha de lances sem espaços, o lance colado), e só as letras eram a mesma.
+  Ficam: os dois detectores de idioma (o do core na exportação, o de `idioma.py` no projeto
+  novo), que é decisão do usuário; o lado do PGN (suspeita, não investigada); a `Estrutura`
+  por `id()`, sem caminho de hoje que a quebre.
 
 ### Q-E6 (Melhoria) — um adaptador do Documento para a exportação
 
@@ -332,6 +342,13 @@ O que se construiria do zero: um `Pedido(projeto, opcoes)` resolvido uma vez (p�
 idioma, metadados, números impressos) e a exportação consumindo `texto.montar`. `exportar.py`
 (2 000+ linhas) se parte em montagem/margens (puras), PDF pesquisável, metadados e a porta
 de entrada.
+
+**Feito em parte** no Q7, corte 5: o `exportar.py` partido como acima (674 linhas), e o
+`Pedido` (as opções, os índices cortados pelo intervalo, o alvo e o idioma, resolvidos uma
+vez). Os metadados continuam montados pela porta de entrada, e os números impressos pelas
+margens, no caminho das páginas: o `Pedido` os levaria sem mudar nada que se veja. A
+exportação consumindo `texto.montar` inteira fica: muda o texto exportado (não é estrutura) e
+pede o seu passo, com o golden de cada formato.
 
 ### Q-E7 (Média) — privados do core
 
@@ -352,7 +369,7 @@ de entrada.
 | `ControladorDePagina` (`controlador.py:138`) | 138 métodos, ~2 400 linhas; 9 das 15 funções mais complexas | `Navegador` (480-602), `ControladorDaSequencia` (§12.4, 604-1006), fila e margens para o `ControladorDaFila` que já existe, `PonteDeLeitura` (1533-1710), `AplicadorDoHistorico` (2177-2320), `ControladorDaSessao`. **Feito no Q7, corte 3** (`docs/revisoes/qualidade-Q7.md`): esses e o `ControladorDosPadroes`; a fila virou `FilaDaPagina` (o `ControladorDaFila` é da janela); 888 linhas e 61 métodos |
 | `ProjetoDeLivro` (`projeto.py`) | ~1 640 linhas | `CacheDePaginas` (com páginas presas, Q-P3), `ResumoDoLivro`, `Migracoes`, `Fonte`. **Feito no Q7, corte 4** (`docs/revisoes/qualidade-Q7.md`): `CacheDoProjeto`, `ResumoDoLivro`, `Migracoes`, `FonteDoLivro`, e também `AntesDoLote`, `SequenciaDoLivro` e a página em JSON; 950 linhas e 43 métodos |
 | `JanelaPrincipal` (`app/janela.py:72`) | 447 linhas, mas 9 mixins somam ~3 000 na MRO | composição: um objeto por painel, com só os controladores de que precisa |
-| `exportar.py` | ~2 000 linhas | Q-E6 |
+| `exportar.py` | ~2 000 linhas | Q-E6. **Feito no Q7, corte 5** (`docs/revisoes/qualidade-Q7.md`): `montagem`, `margens`, `metadados`, `pedido`, `pdf_pesquisavel`; 674 linhas |
 
 - **CA-Q-A1:** nenhum arquivo de `abbychess/` com mais de 1 000 linhas, nenhuma classe com
   mais de 40 métodos (teste de arquitetura, com o teto descendo a cada passo).

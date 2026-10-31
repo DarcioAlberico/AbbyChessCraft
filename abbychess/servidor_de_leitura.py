@@ -233,7 +233,8 @@ class _Laco:
         #: CA-11.8 e a vez entre glifos).
         self.ordem: List[int] = []
         self.fins: List[int] = []
-        self._trava = threading.Lock()             # o leitor: um glifo por vez
+        #: O leitor: um glifo por vez. Reentrante: o `ler` chama o `ler_pelo_livro`.
+        self._trava = threading.RLock()
         self._livre = threading.Event()            # nenhum interativo rodando
         self._livre.set()
         self._acordar = threading.Event()          # a página do lote terminou
@@ -297,9 +298,19 @@ class _Laco:
                 return
 
     def dar_a_vez(self) -> None:
-        """Os métodos do leitor que as duas threads chamam passam pela vez (`_ler_com_vez`)."""
+        """Os métodos do leitor que as duas threads chamam passam pela trava (SPEC-qualidade
+        Q-C3): o `ler` pela vez inteira (`_ler_com_vez`), o `ler_pelo_livro` (os padrões que
+        os deltas mudam) e o `sugerir` (a rede) só pela trava. O `arbitro` lê pelo `ler`."""
         ler_original = self.leitor.ler
         self.leitor.ler = lambda recorte, **k: self._ler_com_vez(ler_original, recorte, **k)
+        for nome in ("ler_pelo_livro", "sugerir"):
+            setattr(self.leitor, nome, self._com_a_trava(getattr(self.leitor, nome)))
+
+    def _com_a_trava(self, metodo):
+        def com_a_trava(*args, **k):
+            with self._trava:
+                return metodo(*args, **k)
+        return com_a_trava
 
     def _ler_com_vez(self, ler, recorte, **k):
         """Um glifo. O do lote espera os interativos em curso e para se foi cancelado (ou se

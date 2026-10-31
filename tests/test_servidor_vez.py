@@ -46,7 +46,7 @@ class _LeitorQueConta:
         return self._rodar()
 
     def arbitro(self, recorte):
-        return self._rodar()
+        return self.ler(recorte)                # como o de verdade: o árbitro lê
 
 
 @pytest.mark.parametrize("segundo", METODOS)

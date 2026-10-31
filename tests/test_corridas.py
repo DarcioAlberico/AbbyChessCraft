@@ -71,6 +71,38 @@ def test_a_busca_le_as_paginas_do_projeto_de_quando_foi_pedida(livro_escrito, mo
     assert outro.lidas == []
 
 
+def test_os_recortes_da_galeria_de_outro_projeto_nao_entram(monkeypatch):
+    from types import SimpleNamespace as Ns
+
+    from core.box_model import BoxEntry
+    from PIL import Image
+
+    from abbychess.app.galeria_na_janela import GaleriaNaJanela
+
+    na_interface, mostrados = [], []
+    caixa = Ns(gid=7, entry=BoxEntry(char="a", x1=2, y1=2, x2=8, y2=8))
+    projeto = Ns(ler_sem_migrar=lambda i: Ns(boxes=[caixa]))
+    pagina = Ns(projeto=projeto, fonte=Ns(pagina=lambda i: Image.new("L", (20, 20), 255)),
+                indice=0, imagem=None, modelo=None, geracao=1,
+                executar=Ns(na_interface=na_interface.append))
+    janela = Ns(pagina=pagina, _carga_da_galeria=0,
+                galeria=Ns(modelo=Ns(mostrar_recorte=lambda *a: mostrados.append(a))))
+    janela._recortes_chegaram = lambda *a: GaleriaNaJanela._recortes_chegaram(janela, *a)
+    adiadas, Thread = [], threading.Thread
+    monkeypatch.setattr(threading, "Thread", lambda *a, target=None, **k: Ns(
+        start=lambda: adiadas.append(target)))
+
+    GaleriaNaJanela._carregar_recortes(janela, [Ns(pagina=3, gid=7)])
+    monkeypatch.setattr(threading, "Thread", Thread)
+    pagina.geracao += 1                                   # outro projeto abriu
+    [rodar] = adiadas
+    rodar()
+    for chegar in na_interface:
+        chegar()
+
+    assert mostrados == []
+
+
 def test_fechar_o_pool_ocioso_nao_fecha_o_que_um_obter_acabou_de_pegar():
     pool = bs.PoolDoIndice()
     aberto = pool._pool = _PoolFalso()

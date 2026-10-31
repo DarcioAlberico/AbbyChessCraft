@@ -1014,6 +1014,25 @@ def pagina_extraida(indice: int, boxes: Sequence[BoxEntry],
                           dpi=DPI_DA_LEITURA)
 
 
+def _alvo(projeto: ProjetoDeLivro, indices: Optional[Iterable[int]],
+          opcoes: Optional[Opcoes]) -> List[int]:
+    """As páginas que a exportação leva, em todo formato (SPEC-qualidade Q-E2): as
+    reconhecidas de `indices` (ou todas) e, com `so_verificadas`, só as verificadas.
+    Nenhuma: `NadaParaExportar`."""
+    from abbychess.modelo import VERIFICADA
+
+    lidas = set(projeto.paginas_lidas())
+    alvo = sorted(lidas if indices is None else lidas.intersection(indices))
+    so_verificadas = opcoes is not None and opcoes.so_verificadas
+    if so_verificadas:
+        estados = {i: r.get("estado") for i, r in projeto.resumo_do_livro().items()}
+        alvo = [i for i in alvo if estados.get(i) == VERIFICADA]
+    if not alvo:
+        raise NadaParaExportar("Nenhuma página verificada para exportar." if so_verificadas
+                               else "Nenhuma página reconhecida para exportar.")
+    return alvo
+
+
 def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePaginas],
                        indices: Optional[Iterable[int]] = None, *,
                        progresso: Optional[Progresso] = None,
@@ -1033,21 +1052,12 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
     """
     from core import pdf_nativo
 
-    from abbychess.modelo import VERIFICADA
-
     opcoes = opcoes or Opcoes()
     relatorio = relatorio if relatorio is not None else Relatorio()
     if camada not in CAMADA:
         raise ValueError(f"camada inválida: {camada!r} (use um de {CAMADA})")
-    lidas = set(projeto.paginas_lidas())
-    alvo = sorted(lidas if indices is None else lidas.intersection(indices))
+    alvo = _alvo(projeto, indices, opcoes)
     estados = {i: r.get("estado") for i, r in projeto.resumo_do_livro().items()}
-    if opcoes.so_verificadas:
-        alvo = [i for i in alvo if estados.get(i) == VERIFICADA]
-    if not alvo:
-        raise NadaParaExportar("Nenhuma página reconhecida para exportar."
-                               if not opcoes.so_verificadas else
-                               "Nenhuma página verificada para exportar.")
     nativas = paginas_da_camada(projeto, alvo) if camada == "auto" else {}
     pelos_boxes = [i for i in alvo if i not in nativas]
     lidos, estruturas = {}, {}
@@ -1976,16 +1986,9 @@ def pgn_do_livro(projeto: ProjetoDeLivro, indices: Optional[Iterable[int]] = Non
     `relatorio` com o motivo, para serem conferidos e exportados de novo."""
     from abbychess import lances as lc
     from abbychess.diagramas import em_ordem
-    from abbychess.modelo import VERIFICADA
 
     relatorio = relatorio if relatorio is not None else Relatorio()
-    lidas = set(projeto.paginas_lidas())
-    alvo = sorted(lidas if indices is None else lidas.intersection(indices))
-    if opcoes is not None and opcoes.so_verificadas:
-        estados = {i: r.get("estado") for i, r in projeto.resumo_do_livro().items()}
-        alvo = [i for i in alvo if estados.get(i) == VERIFICADA]
-    if not alvo:
-        raise NadaParaExportar("Nenhuma página reconhecida para exportar.")
+    alvo = _alvo(projeto, indices, opcoes)
     partidas = []
     for i in alvo:
         modelo = projeto.carregar_modelo(i)
@@ -2103,7 +2106,8 @@ def exportar_com_relatorio(projeto: ProjetoDeLivro, caminho: str | Path,
     indices = opcoes.indices(indices)
     relatorio = Relatorio(formato=formato)
     if formato == "pdf":
-        resumo = exportar_pdf_pesquisavel(projeto, caminho, indices, progresso=progresso)
+        resumo = exportar_pdf_pesquisavel(projeto, caminho, _alvo(projeto, indices, opcoes),
+                                          progresso=progresso)
         partes = [f"{resumo.paginas} página(s), {resumo.caracteres} caracteres na camada"]
         if resumo.camadas_trocadas:
             partes.append(f"camada antiga trocada em {resumo.camadas_trocadas}")

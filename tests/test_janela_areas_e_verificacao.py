@@ -279,6 +279,32 @@ def test_clique_no_glifo_abre_o_treino(app, janela):  # noqa: F811
     assert atual(janela) == palavra.indices[1]
 
 
+def test_o_clique_no_recorte_da_palavra_abre_o_glifo_no_treino(app, janela):  # noqa: F811
+    """O clique de verdade no recorte ampliado (centrado no painel): o botão esquerdo no
+    glifo do meio o abre no Glifo; o direito não."""
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+
+    _ler_a_mao(app, janela)
+    janela.resize(1366, 768)
+    janela.show()
+    janela.verificador.lexico = lexico.Lexico(palavras={"abc", "cab"})
+    janela.verificar_texto()
+    app.processEvents()
+    painel = janela.verificacao
+    recorte, palavra = painel.recorte, janela.verificador.desconhecidas[0]
+    imagem = recorte.pixmap()
+    colunas = [x for x in range(imagem.width()) if painel.glifo_em(x) == palavra.indices[1]]
+    assert 0 < colunas[0] and colunas[-1] < imagem.width() - 1      # o do meio, entre dois
+    ponto = QPoint(int((recorte.width() - imagem.width()) / 2 + (colunas[0] + colunas[-1]) / 2),
+                   recorte.height() // 2)
+    QTest.mouseClick(recorte, Qt.MouseButton.RightButton, pos=ponto)
+    assert janela.inspetor.atual() == "palavra"
+    QTest.mouseClick(recorte, Qt.MouseButton.LeftButton, pos=ponto)
+    assert janela.inspetor.atual() == "glifo"
+    assert atual(janela) == palavra.indices[1]
+
+
 def test_o_texto_noutro_idioma_avisa_uma_vez(app, janela, monkeypatch):  # noqa: F811
     """Mirkovic, em inglês num projeto em português: a verificação diz que o dicionário é o
     errado, e onde trocar; só uma vez por página."""

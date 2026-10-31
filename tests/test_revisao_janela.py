@@ -145,6 +145,37 @@ def test_ca_8_2_shift_f7_alterna_o_escopo_da_fila(jb):  # noqa: F811
     assert jb.fila.escopo == "pagina" and "livro" not in jb.inspetor.seletor.text()
 
 
+def test_no_escopo_do_livro_o_aviso_de_ensino_conta_a_leitura_no_livro(jb):  # noqa: F811
+    """§8.3: digitar o caractere no Glifo diz quantos a página tem com a mesma leitura; com a
+    fila no escopo do livro (Shift+F7), também quantos o livro tem, pelo índice da busca."""
+    from PySide6.QtGui import QTextDocument
+
+    def aviso():                                          # o rótulo é rich text: o que se lê
+        documento = QTextDocument()
+        documento.setHtml(jb.treino.aviso_de_ensino.text())
+        return documento.toPlainText()
+
+    _uns(jb, 5)                                           # um "a" e cinco "1"
+    p = jb.pagina
+    um = next(b.gid for b in p.modelo.boxes if b.entry.char == "1")
+    p.escolher(um)
+    jb.treino.campo.setText("l")
+    assert "Enter ensina 'l' · 4 iguais nesta página" in aviso() and "no livro" not in aviso()
+    QTest.keyClick(jb.visor, Qt.Key.Key_F7, Qt.KeyboardModifier.ShiftModifier)
+    try:
+        assert jb.fila.escopo == "livro"
+        p.escolher(um)
+        jb.treino.campo.setText("l")
+        assert "4 iguais nesta página · 5 no livro" in aviso()
+        a = next(b.gid for b in p.modelo.boxes if b.entry.char == "a")
+        p.escolher(a)                                     # o único "a" do livro: ele mesmo
+        jb.treino.campo.setText("e")
+        assert aviso().startswith("Enter ensina 'e' · 1 no livro")
+    finally:
+        QTest.keyClick(jb.visor, Qt.Key.Key_F7, Qt.KeyboardModifier.ShiftModifier)
+    assert jb.fila.escopo == "pagina"
+
+
 def test_a_galeria_com_leituras_misturadas_e_um_passo_so(jb):  # noqa: F811
     _uns(jb, 3)
     from abbychess import busca as bs

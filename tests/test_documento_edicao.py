@@ -72,6 +72,19 @@ def test_ca_6_9_esc_restaura_e_ctrl_y_reaplica(j):
     assert _texto(j) == "casas velha" and len(pagina.decisoes.virtuais) == 1
 
 
+def test_o_ctrl_y_da_palavra_do_esc_vale_ate_o_cursor_sair_dela(j):
+    pagina = _escrever(j, "casa velha")
+    _por_o_cursor(j, 4)
+    QTest.keyClicks(j.texto, "s")
+    j.fechar_sobreposicao()                               # Esc: "casa" volta
+    _por_o_cursor(j, 1)                                   # andando dentro dela, o Ctrl+Y vale
+    assert j.acao_refazer.isEnabled()
+    _por_o_cursor(j, 7)                                   # em "velha": não vale mais
+    assert not j.acao_refazer.isEnabled()
+    _tecla(j, Qt.Key.Key_Y, Qt.KeyboardModifier.ControlModifier)
+    assert _texto(j) == "casa velha" and not pagina.decisoes.virtuais
+
+
 def test_ca_6_9_enter_numa_palavra_sem_mudanca_a_tira_da_fila(j):
     pagina = _escrever(j, "casa velha")
     for b in pagina.boxes:

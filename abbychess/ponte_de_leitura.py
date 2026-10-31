@@ -128,16 +128,22 @@ class PonteDeLeitura:
             # O estado já é o do reconhecer (`aplicar_lida`).
             self._p._mudou(pagina, indice, descricao, antes, evento=None)
             self._p.eventos.emitir("pagina_reconhecida", indice)
-            if pagina is self._p.modelo and pagina.zonas:
-                self._p.eventos.emitir("layout_mudou")   # os rótulos das áreas reclassificadas
-            if pagina is self._p.modelo:
-                self._p.fila_da_pagina.ir_ao_primeiro_pendente()
-                resumo = pg.resumir(pagina.entries(), leitor)
-                areas = f", pelas {len(zonas)} área(s) da página" if zonas else ""
-                self._p._avisar(f"{resumo.boxes} boxes, {resumo.pendentes} a revisar, "
-                                f"{len(pagina.tabuleiros)} diagrama(s){areas}.", AVISO_LONGO_MS)
+            self._mostrar_o_reconhecido(pagina, leitor, zonas)
 
         return trabalho, pronto
+
+    def _mostrar_o_reconhecido(self, pagina: Pagina, leitor, zonas) -> None:
+        """A página reconhecida, se é a aberta: os rótulos das áreas reclassificadas, a fila no
+        primeiro pendente e o resumo da leitura."""
+        if pagina is not self._p.modelo:
+            return
+        if pagina.zonas:
+            self._p.eventos.emitir("layout_mudou")
+        self._p.fila_da_pagina.ir_ao_primeiro_pendente()
+        resumo = pg.resumir(pagina.entries(), leitor)
+        areas = f", pelas {len(zonas)} área(s) da página" if zonas else ""
+        self._p._avisar(f"{resumo.boxes} boxes, {resumo.pendentes} a revisar, "
+                        f"{len(pagina.tabuleiros)} diagrama(s){areas}.", AVISO_LONGO_MS)
 
     def reler_pendentes(self, tudo: bool = False) -> None:
         """Lê de novo os pendentes (ou todos os não manuais), com os padrões de agora."""
@@ -265,16 +271,42 @@ class PonteDeLeitura:
         pagina = self._p.modelo
         if indice != self._p.indice or pagina is None or self._p.leitor is None:
             return
-        vivos = pagina.vivos
-        por_char = {c: [g for g in gids if g in vivos] for c, gids in por_char.items()}
-        por_char = {c: gids for c, gids in por_char.items() if gids}
+        por_char = _os_vivos(por_char, pagina.vivos)
         if not por_char:
             self._p._avisar("O glifo a ensinar saiu da página antes da vez dele.", 6000)
             return
-        imagem, leitor, projeto = self._p._cinza(), self._p.leitor, self._p.projeto
+        feito = self._ensinar_e_corrigir(pagina, indice, por_char, lote)
+        if feito is None:
+            return
+        antes_inst, corrigidos = feito
+        transacao = self._p._mudou(pagina, indice, descricao, antes_inst, juntar=juntar)
+        self._p.eventos.emitir("padroes_mudaram")
+        propagou = self._depois_do_enter(pagina, depois, lote, corrigidos)
+        self.propagar(pagina, indice, transacao, propagou)
+
+    def _ensinar_e_corrigir(self, pagina: Pagina, indice: int, por_char, lote):
+        """A parte síncrona do Enter na página: as amostras ensinadas (`_ensinar_as_amostras`),
+        os glifos do lote corrigidos sem ensinar e as leituras na página. Devolve `(o
+        instantâneo de antes, os gids corrigidos em lote)`, ou None se o ensino falhou."""
+        imagem = self._p._cinza()
         antes_inst = self._p._instantaneo()
         antes = tuple(pagina.boxes)
         onde = {b.gid: i for i, b in enumerate(antes)}
+        lidos = self._ensinar_as_amostras(imagem, indice, por_char, antes, onde, antes_inst)
+        if lidos is None:
+            return None
+        corrigidos = (_corrigir_em_lote(pagina, lote, por_char, antes, onde, lidos)
+                      if lote is not None else [])
+        ed.aplicar_leituras(pagina, antes, lidos)
+        for char, gids in por_char.items():
+            self._p._tirar_a_letra_que_faltava(pagina, gids, char)
+        return antes_inst, corrigidos
+
+    def _ensinar_as_amostras(self, imagem, indice: int, por_char, antes, onde, antes_inst):
+        """Ensina cada glifo como o caractere dele (uma amostra por glifo, nas cópias que
+        devolve). Se uma falha (disco cheio, antivírus), nada do Enter fica: as amostras dele
+        são esquecidas, o erro vai ao usuário e devolve None."""
+        leitor, projeto = self._p.leitor, self._p.projeto
         lidos = [b.entry for b in antes]
         try:
             for char, gids in por_char.items():
@@ -291,21 +323,11 @@ class PonteDeLeitura:
                     log.exception("a amostra %s ficou sem o Enter dela", caminho)
             log.exception("o Enter falhou")
             self._p._falhou("Ensinar")(f"O padrão não foi ensinado: {erro}")
-            return
-        corrigidos = []
-        if lote is not None:
-            lidas, novo = lote
-            ensinados = {g for gids in por_char.values() for g in gids}
-            for gid in contexto.lote(pagina, lidas, novo, ensinados):
-                i = onde[gid]
-                lidos[i] = ed.copia(antes[i].entry)
-                pg.confirmar(lidos, i, novo)
-                corrigidos.append(gid)
-        ed.aplicar_leituras(pagina, antes, lidos)
-        for char, gids in por_char.items():
-            self._p._tirar_a_letra_que_faltava(pagina, gids, char)
-        transacao = self._p._mudou(pagina, indice, descricao, antes_inst, juntar=juntar)
-        self._p.eventos.emitir("padroes_mudaram")
+            return None
+        return lidos
+
+    def _depois_do_enter(self, pagina: Pagina, depois, lote, corrigidos):
+        """Na página aberta: o `ensinou` de `depois` e o aviso do lote. Devolve o `propagou`."""
         ensinou, propagou = depois if isinstance(depois, tuple) else (None, depois)
         if ensinou is not None and pagina is self._p.modelo:
             ensinou()
@@ -315,7 +337,7 @@ class PonteDeLeitura:
                             "em lote na página; propagando…" if corrigidos else
                             "Nenhum outro glifo da página tem essa leitura numa palavra que a "
                             "desminta: só este foi ensinado.", 6000)
-        self.propagar(pagina, indice, transacao, propagou)
+        return propagou
 
     def propagar(self, pagina: Pagina, indice: int, transacao: hs.Transacao,
                  ao_fim: Optional[Callable[[int], None]]) -> None:
@@ -376,12 +398,10 @@ class PonteDeLeitura:
         depois de uma queda), o pedido espera na fila do filho; parado, os glifos ficam
         aguardando."""
         servidor = self._p.servidor
-        if servidor is None or servidor.parado \
-                or pagina is not self._p.modelo or indice != self._p.indice:
+        if not _pode_pedir_a_leitura(servidor, self._p, pagina, indice):
             return
         antes = tuple(pagina.boxes)
-        indices = [i for i, b in enumerate(antes)
-                   if pg.aguardando(b.entry) and b.gid not in self._em_leitura]
+        indices = _aguardando_sem_pedido(antes, self._em_leitura)
         if not indices:
             return
         entradas = [b.entry for b in antes]
@@ -399,10 +419,7 @@ class PonteDeLeitura:
                 if not pedido.cancelado:
                     log.warning("a leitura dos glifos aguardando falhou: %s", pedido.resultado)
                 return
-            lidos = list(entradas)
-            for i, leitura in zip(indices, pedido.resultado):
-                lidos[i] = ed.copia(entradas[i])
-                pg.por_leitura(lidos[i], leitura)
+            lidos = _com_as_leituras(entradas, indices, pedido.resultado)
             foto = pagina.instantaneo()
             dif = ed.aplicar_leituras(pagina, antes, lidos)
             if dif.vazia:
@@ -410,15 +427,20 @@ class PonteDeLeitura:
             if transacao is not None and not transacao.invalidada:
                 self.emendar(transacao, foto, pagina)
             self._p._gravar(pagina)
-            if pagina is self._p.modelo:
-                self._p.eventos.emitir("glifos_mudaram", dif.mudados)
-                if self._p.atual is None:
-                    self._p.fila_da_pagina.ir_ao_primeiro_pendente()
+            self._mostrar_os_lidos(pagina, dif)
             self._p.eventos.emitir("acoes_mudaram")
 
         servidor.pedir("ler_recortes", recortes,
                        ao_terminar=lambda pedido: self._p.executar.na_interface(
                            lambda: chegou(pedido)))
+
+    def _mostrar_os_lidos(self, pagina: Pagina, dif) -> None:
+        """Os glifos lidos, se a página é a aberta; sem glifo em revisão, a fila vai ao
+        primeiro pendente."""
+        if pagina is self._p.modelo:
+            self._p.eventos.emitir("glifos_mudaram", dif.mudados)
+            if self._p.atual is None:
+                self._p.fila_da_pagina.ir_ao_primeiro_pendente()
 
     # ------------------------------------------------------------------
     # O palpite da rede para o glifo que ninguém leu (§9.2)
@@ -462,22 +484,16 @@ class PonteDeLeitura:
 
     def _pedir_palpite(self) -> None:
         i = self._p.indice_de(self._p.atual)
-        if (i is None or self._p.imagem is None or not pg.sem_leitura(self._p.modelo.boxes[i].entry)
-                or self._sugestao_guardada(i) is not None or self._p.atual in self._sugerindo):
+        if not self._precisa_de_palpite(i):
             return
         servidor, geracao = self._p.servidor, self._p.geracao
-        if servidor is None and getattr(self._p.leitor, "rede", None) is None:
-            return
-        if servidor is not None and servidor.parado:
+        if not _ha_quem_sugira(servidor, self._p.leitor):
             return
         antes = tuple(self._p.modelo.boxes)
         # Guarda-se só o da página aberta (os gids levam a página, e os outros não voltam a
         # valer sem um novo pedido).
-        pid = pid_de(antes[i].gid)
-        self._sugestoes = {g: v for g, v in self._sugestoes.items() if pid_de(g) == pid}
-        indices = [i] if servidor is None else [
-            k for k, b in enumerate(antes) if pg.sem_leitura(b.entry)
-            and b.gid not in self._sugerindo and self._sugestao_guardada(k) is None]
+        self._sugestoes = _so_os_da_pagina(self._sugestoes, pid_de(antes[i].gid))
+        indices = self._a_sugerir(antes, i, servidor)
         recortes = pg.recortes_para_ler(self._p._cinza(), [b.entry for b in antes], indices)
         gids = {antes[k].gid for k in indices}
 
@@ -505,6 +521,20 @@ class PonteDeLeitura:
         servidor.pedir("sugerir_recortes", recortes,
                        ao_terminar=lambda pedido: self._p.executar.na_interface(
                            lambda: terminou(pedido)))
+
+    def _precisa_de_palpite(self, i: Optional[int]) -> bool:
+        """O glifo `i` da página aberta não tem leitura, nem palpite guardado ou pedido."""
+        return not (i is None or self._p.imagem is None
+                    or not pg.sem_leitura(self._p.modelo.boxes[i].entry)
+                    or self._sugestao_guardada(i) is not None or self._p.atual in self._sugerindo)
+
+    def _a_sugerir(self, antes, i: int, servidor) -> list:
+        """Os glifos do pedido: sem o servidor, só o atual; com ele, os da página toda sem
+        leitura, sem palpite guardado nem pedido."""
+        if servidor is None:
+            return [i]
+        return [k for k, b in enumerate(antes) if pg.sem_leitura(b.entry)
+                and b.gid not in self._sugerindo and self._sugestao_guardada(k) is None]
 
     def servidor_parado(self) -> bool:
         """O servidor desistiu (caiu duas vezes): o comando que lê avisa e não roda."""
@@ -540,3 +570,57 @@ class PonteDeLeitura:
         else:
             transacao.paginas[pagina.pid] = mais
         self._p.historico.emendou(transacao)
+
+
+def _os_vivos(por_char: Dict[str, Sequence[int]], vivos) -> Dict[str, list]:
+    """Os gids de cada caractere que ainda estão na página; sem os caracteres que ficaram sem
+    nenhum."""
+    por_char = {c: [g for g in gids if g in vivos] for c, gids in por_char.items()}
+    return {c: gids for c, gids in por_char.items() if gids}
+
+
+def _corrigir_em_lote(pagina: Pagina, lote, por_char, antes, onde, lidos) -> list:
+    """O Ctrl+Enter: os glifos da página com as leituras do `lote` que a palavra desmente
+    (`contexto.lote`) viram o caractere dele nas cópias `lidos`, sem ensinar; devolve os gids."""
+    lidas, novo = lote
+    ensinados = {g for gids in por_char.values() for g in gids}
+    corrigidos = []
+    for gid in contexto.lote(pagina, lidas, novo, ensinados):
+        i = onde[gid]
+        lidos[i] = ed.copia(antes[i].entry)
+        pg.confirmar(lidos, i, novo)
+        corrigidos.append(gid)
+    return corrigidos
+
+
+def _ha_quem_sugira(servidor, leitor) -> bool:
+    """O palpite tem quem o dê: o servidor de pé, ou, sem ele, a rede do leitor."""
+    if servidor is None:
+        return getattr(leitor, "rede", None) is not None
+    return not servidor.parado
+
+
+def _so_os_da_pagina(sugestoes: dict, pid: int) -> dict:
+    """Os palpites guardados dos glifos da página `pid`."""
+    return {g: v for g, v in sugestoes.items() if pid_de(g) == pid}
+
+
+def _pode_pedir_a_leitura(servidor, p, pagina: Pagina, indice: int) -> bool:
+    """O servidor de pé e a página ainda aberta: os aguardando podem ir a ele."""
+    return not (servidor is None or servidor.parado
+                or pagina is not p.modelo or indice != p.indice)
+
+
+def _aguardando_sem_pedido(antes, em_leitura: set) -> list:
+    """Os glifos aguardando leitura cujo pedido ainda não foi feito."""
+    return [i for i, b in enumerate(antes)
+            if pg.aguardando(b.entry) and b.gid not in em_leitura]
+
+
+def _com_as_leituras(entradas, indices, leituras) -> list:
+    """As entradas com cópias lidas nos `indices` (as outras, as mesmas)."""
+    lidos = list(entradas)
+    for i, leitura in zip(indices, leituras):
+        lidos[i] = ed.copia(entradas[i])
+        pg.por_leitura(lidos[i], leitura)
+    return lidos

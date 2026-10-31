@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import difflib
 import re
+from collections import Counter
 from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
@@ -409,8 +410,8 @@ def _itens_do_original(plano: Plano) -> List[Tuple[str, object]]:
 
 def _dividir_ligaduras_repetidas(plano, itens, unidades, novo, pares) -> None:
     """Uma inserção no meio de um box multicaractere transforma-o em ``1 -> k``."""
-    repetidos = [gid for gid in dict.fromkeys(v for t, v in itens if t == "glifo")
-                 if sum(t == "glifo" and v == gid for t, v in itens) > 1]
+    vezes = Counter(v for t, v in itens if t == "glifo")      # uma passada: a página inteira
+    repetidos = [gid for gid, n in vezes.items() if n > 1]
     for gid in repetidos:
         posicoes = [p for p, (i, _j) in enumerate(pares)
                     if i is not None and unidades[i].glifo and unidades[i].gid == gid]

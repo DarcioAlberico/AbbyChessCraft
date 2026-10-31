@@ -356,20 +356,23 @@ class ControladorDePagina:
 
     def texto(self) -> str:
         """O texto da página (com as decisões e os diagramas), como no painel de baixo."""
-        if self.modelo is None or not (self.modelo.boxes or self.modelo.tabuleiros):
-            return ""
-        pagina = self.modelo.instantaneo()
-        pagina.diagramas = self.diagramas
-        return tx.texto(tx.montar(pagina), pagina.diagramas, modo=tx.SAN)
+        pagina = self._pagina_do_documento()
+        return "" if pagina is None else tx.texto(tx.montar(pagina), pagina.diagramas,
+                                                   modo=tx.SAN)
 
     def documento(self):
         """O documento derivado da página (§4.2), para o painel Documento, com os glifos que
         ninguém leu (o realce os mostra); None sem página reconhecida."""
+        pagina = self._pagina_do_documento()
+        return None if pagina is None else tx.montar(pagina, com_os_nao_lidos=True)
+
+    def _pagina_do_documento(self):
+        """O instantâneo da página com os diagramas de agora; None sem nada reconhecido."""
         if self.modelo is None or not (self.modelo.boxes or self.modelo.tabuleiros):
             return None
         pagina = self.modelo.instantaneo()
         pagina.diagramas = self.diagramas
-        return tx.montar(pagina, com_os_nao_lidos=True)
+        return pagina
 
     def linhas_dos_diagramas(self) -> List[List[lc.Lance]]:
         """A primeira linha de lances do texto que segue cada diagrama (§10), na ordem de
@@ -592,21 +595,19 @@ class ControladorDePagina:
 
     def voltar_visita(self) -> bool:
         """Alt+←: a página visitada antes desta."""
-        if self._visita <= 0:
-            return False
-        if not self.ir_para(self.visitas[self._visita - 1], visita=False):
-            return False
-        self._visita -= 1
-        self.eventos.emitir("acoes_mudaram")    # Alt+←/→ ligam e desligam pelo lugar novo
-        return True
+        return self._andar_na_visita(-1)
 
     def avancar_visita(self) -> bool:
         """Alt+→: a página visitada depois (depois de um Alt+←)."""
-        if self._visita >= len(self.visitas) - 1:
+        return self._andar_na_visita(+1)
+
+    def _andar_na_visita(self, passo: int) -> bool:
+        alvo = self._visita + passo
+        if not 0 <= alvo < len(self.visitas):
             return False
-        if not self.ir_para(self.visitas[self._visita + 1], visita=False):
+        if not self.ir_para(self.visitas[alvo], visita=False):
             return False
-        self._visita += 1
+        self._visita = alvo
         self.eventos.emitir("acoes_mudaram")    # Alt+←/→ ligam e desligam pelo lugar novo
         return True
 

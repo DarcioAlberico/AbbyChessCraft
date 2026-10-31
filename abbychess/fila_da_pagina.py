@@ -63,19 +63,11 @@ class FilaDaPagina:
         if self._p.leitor is None or self._p.modelo is None:
             return []
         boxes = self._p.modelo.boxes
-        indices = self._pendentes()
-        if self.ordem_da_fila == "caractere":
-            indices = sorted(indices, key=lambda i: (boxes[i].entry.char or "\uffff",
-                                                     round(boxes[i].entry.confidence, 2), i))
-        elif self.ordem_da_fila != "leitura":
-            indices = sorted(indices, key=lambda i: (round(boxes[i].entry.confidence, 2), i))
-        fila = [boxes[i].gid for i in indices]
+        fila = [boxes[i].gid for i in _na_ordem(boxes, self._pendentes(), self.ordem_da_fila)]
         if self.ordem_da_fila == "leitura":
             return fila
         fora = self.gids_fora_do_texto(self.margens_da_fila()) if fila else frozenset()
-        return ([g for g in fila if g not in self._p.pulados and g not in fora]
-                + [g for g in fila if g not in self._p.pulados and g in fora]
-                + [g for g in fila if g in self._p.pulados])
+        return _fora_e_pulados_no_fim(fila, fora, self._p.pulados)
 
     def _pendentes(self) -> List[int]:
         """Os índices dos glifos que vão para a fila, na ordem da página. Só os glifos que
@@ -115,8 +107,6 @@ class FilaDaPagina:
         o □ do título corrido é título corrido."""
         if self._p.modelo is None or self._p.imagem is None:
             return frozenset()
-        from abbychess import margens as mg
-
         boxes = self._p.modelo.boxes
         # A regra olha as linhas inteiras da página (~25 ms numa página cheia): o resultado
         # fica, por página, enquanto o que ela lê não muda (o texto, a posição de cada glifo e
@@ -127,11 +117,8 @@ class FilaDaPagina:
                        for b in boxes))
         guardada = self._margens.pop(self._p.modelo.pid, None)
         if guardada is None or guardada[0] != chave:
-            indices = mg.margens_da_pagina([b.entry for b in boxes], self._p.imagem.height)
-            guardada = (chave, frozenset(boxes[i].gid for i in indices if i < len(boxes)))
-        self._margens[self._p.modelo.pid] = guardada       # a vista por último, no fim
-        while len(self._margens) > MARGENS_GUARDADAS:
-            del self._margens[next(iter(self._margens))]
+            guardada = (chave, _margens_corridas(boxes, self._p.imagem.height))
+        _guardar_por_ultimo(self._margens, self._p.modelo.pid, guardada)
         return guardada[1]
 
     def margens_da_fila(self) -> frozenset:
@@ -187,14 +174,7 @@ class FilaDaPagina:
             self.ir_ao_primeiro_pendente()
             return
         if self.ordem_da_fila == "leitura":
-            ordem = {g: n for n, g in enumerate(self._p.gids)}
-            aqui = ordem.get(self._p.atual, -1)
-            if passo > 0:
-                seguintes = [g for g in fila if ordem[g] > aqui]
-                self._p.escolher(seguintes[0] if seguintes else fila[0])
-            else:
-                anteriores = [g for g in fila if ordem[g] < aqui]
-                self._p.escolher(anteriores[-1] if anteriores else fila[-1])
+            self._p.escolher(_vizinho_na_leitura(fila, self._p.gids, self._p.atual, passo))
             return
         if passo > 0 and self._p.atual in fila:
             self._p.pulados.add(self._p.atual)
@@ -204,3 +184,54 @@ class FilaDaPagina:
             self._p.escolher(fila[0] if passo > 0 else fila[-1])
             return
         self._p.escolher(fila[(fila.index(self._p.atual) + passo) % len(fila)])
+
+
+def _na_ordem(boxes, indices: List[int], ordem: str) -> List[int]:
+    """Os índices dos pendentes na ordem da fila: por caractere (os sem leitura no fim) e, em
+    cada um, do menos confiável ao mais; na ordem da página; ou do menos confiável ao mais."""
+    if ordem == "caractere":
+        return sorted(indices, key=lambda i: (boxes[i].entry.char or "￿",
+                                              round(boxes[i].entry.confidence, 2), i))
+    if ordem != "leitura":
+        return sorted(indices, key=lambda i: (round(boxes[i].entry.confidence, 2), i))
+    return indices
+
+
+def _fora_e_pulados_no_fim(fila: List[int], fora, pulados) -> List[int]:
+    """A fila com o que a exportação tira depois do resto, e os pulados no fim de tudo; cada
+    parte na ordem em que estava."""
+    resto, de_fora, no_fim = [], [], []
+    for g in fila:
+        if g in pulados:
+            no_fim.append(g)
+        elif g in fora:
+            de_fora.append(g)
+        else:
+            resto.append(g)
+    return resto + de_fora + no_fim
+
+
+def _vizinho_na_leitura(fila: List[int], gids: List[int], atual, passo: int) -> int:
+    """Na ordem de leitura: o pendente seguinte ao atual (`passo` > 0) ou o anterior, na
+    página; na ponta, o primeiro (ou o último) da fila."""
+    ordem = {g: n for n, g in enumerate(gids)}
+    aqui = ordem.get(atual, -1)
+    if passo > 0:
+        return next((g for g in fila if ordem[g] > aqui), fila[0])
+    return next((g for g in reversed(fila) if ordem[g] < aqui), fila[-1])
+
+
+def _margens_corridas(boxes, altura: int) -> frozenset:
+    """Os gids do cabeçalho e do rodapé corridos (`margens.margens_da_pagina`)."""
+    from abbychess import margens as mg
+
+    indices = mg.margens_da_pagina([b.entry for b in boxes], altura)
+    return frozenset(boxes[i].gid for i in indices if i < len(boxes))
+
+
+def _guardar_por_ultimo(margens: dict, pid: int, guardada) -> None:
+    """Guarda a conta da página como a vista por último, com só as `MARGENS_GUARDADAS`
+    últimas."""
+    margens[pid] = guardada
+    while len(margens) > MARGENS_GUARDADAS:
+        del margens[next(iter(margens))]

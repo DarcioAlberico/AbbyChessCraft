@@ -55,6 +55,32 @@ def test_vizinhos_de_fora(linhas, sessao, dependentes, esperado):
     assert (antes, depois) == tuple(None if k is None else g[k] for k in esperado)
 
 
+def _palavras(p):
+    chars = {b.gid: b.entry.char for b in p.boxes}
+    _onde, montadas = ag.pagina_montada(p)
+    return ["".join(chars[g] for g in gids) for _k, gids in sorted(montadas.items())]
+
+
+@pytest.mark.parametrize("texto, palavra_antes, esperado", [
+    # a montagem de agora parte "ab|cd", que antes era uma palavra só: junta de novo
+    ("ab cd ef", {2: 0, 3: 0}, ["abcd", "ef"]),
+    # a montagem de agora junta "abcd", que antes eram duas: parte de novo
+    ("abcd", {2: 1, 3: 1}, ["ab", "cd"]),
+])
+def test_as_palavras_de_fora_da_sessao_voltam_as_de_antes(texto, palavra_antes, esperado):
+    """Os boxes de fora da sessão, na linha dela, voltam às palavras de antes de o box sair
+    (`como_digitado`): o vão que a saída abriu ou fechou não as parte nem as junta. A sessão
+    é o primeiro glifo; `palavra_antes` diz em que palavra da linha cada outro estava."""
+    p = _pagina(texto)
+    g = _gids(p)
+    antes, _montadas = ag.pagina_montada(p)
+    linha = antes[g[0]][:2]
+    for k, palavra in palavra_antes.items():
+        antes[g[k]] = linha + (palavra,)
+    ag.como_digitado(p, [], {g[0]}, antes)
+    assert _palavras(p) == esperado
+
+
 def test_o_virtual_vizinho_do_box_marcado():
     """A revisão do D1: o box marcado sobre a tinta sem box acha a letra virtual ao lado
     dele (quem decide se é ela é o usuário, no Glifo)."""

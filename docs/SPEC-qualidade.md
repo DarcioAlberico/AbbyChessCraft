@@ -372,7 +372,11 @@ pede o seu passo, com o golden de cada formato.
 | `exportar.py` | ~2 000 linhas | Q-E6. **Feito no Q7, corte 5** (`docs/revisoes/qualidade-Q7.md`): `montagem`, `margens`, `metadados`, `pedido`, `pdf_pesquisavel`; 674 linhas |
 
 - **CA-Q-A1:** nenhum arquivo de `abbychess/` com mais de 1 000 linhas, nenhuma classe com
-  mais de 40 métodos (teste de arquitetura, com o teto descendo a cada passo).
+  mais de 40 métodos (teste de arquitetura, com o teto descendo a cada passo). **No fim do
+  Q7** (decisão §13.6): `controladores.py` (2 055), `pagina.py` (1 446), `epub.py` (1 144) e
+  cinco classes (`ControladorDePagina` 61, `VistaDoDocumento` 58, `VisorDePagina` 55,
+  `EspacoDeTrabalho` 53, `ProjetoDeLivro` 43) ficam presos em `TETOS` de
+  `tests/test_tamanho_dos_modulos.py`.
 
 ### Q-A2 (Média) — o app decide regra de negócio (CA-14.1)
 
@@ -572,6 +576,11 @@ teste usa como o usuário; senão saem. Os 3 F401 de `camada.py` saem já (o por
 5. ~~**Teto da suíte rápida:** 60 s sem cobertura (como hoje na §15.1) e a medida com
    cobertura à parte?~~ **Decidido** (2026-10-30): 90 s com -n 4 e sem cobertura; a medida
    com cobertura, à parte.
+6. ~~**CA-Q-A1 no fim do Q7:** fechar com o que sobra preso na catraca ou seguir cortando?~~
+   **Decidido** (2026-10-31): fechar; os tetos de `tests/test_tamanho_dos_modulos.py` só
+   descem.
+7. **Idioma do livro:** a exportação usa o detector do core (pt e en) e o projeto novo o de
+   `idioma.py` (cinco idiomas); escolher um só muda o `dc:language` do EPUB. Qual vale?
 
 ## Apêndice — registro da análise
 

@@ -228,6 +228,14 @@ mesma medida da fatia).
 **Pronto quando:** CA-Q-A1 (nenhum arquivo > 1 000 linhas, nenhuma classe > 40 métodos) e
 CA-14.1 da spec principal passam.
 
+**Feito** em 2026-10-31, ramo `qualidade-q7` (`docs/revisoes/qualidade-Q7.md`): os cinco
+cortes, cada um provado pela mesma suíte (e, no corte 5, pelo golden da exportação e pela
+medida). `controlador.py`, `projeto.py` e `exportar.py` abaixo de 1 000 linhas. Desvio
+(decisão §13.6): o CA-Q-A1 não passa inteiro; `controladores.py`, `pagina.py`, `epub.py` e
+cinco classes acima de 40 métodos ficam presos nos tetos que só descem. O CA-14.1 passa. O
+fim do Q-E6 (a exportação lendo `texto.montar` inteira) muda o texto exportado e fica fora;
+o detector de idioma único espera a §13.7.
+
 ## Passo Q8 — CRAP abaixo de 10
 
 **Contexto.** Depois do Q7, o que sobrar acima de 10 no crapper com a cobertura combinada.

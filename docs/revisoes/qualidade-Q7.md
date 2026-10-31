@@ -1,4 +1,4 @@
-# Passo Q7 — cortar os objetos-deus (em andamento, ramo `qualidade-q7`)
+# Passo Q7 — cortar os objetos-deus (2026-10-31, ramo `qualidade-q7`)
 
 Oitavo passo de `plans/roadmap-qualidade.md`, a partir do `08a0080` (o Q6 mesclado no
 `passo-i-treino`), na worktree irmã `C:\Python-Chess2\AbbyChessCraft-qualidade`. O roadmap
@@ -29,7 +29,34 @@ seguida numa worktree temporária: os mesmos bytes e o mesmo resumo nos cinco fo
 aprovado no EPUBCheck, no Ace e no Calibre, e o p50 dentro do ruído (EPUB 1 469 → 1 450 ms,
 DOCX 1 565 → 1 534, TXT 1 101 → 1 090, PGN 7,5 → 7,4, PDF 2 962 → 2 982).
 
-## O que falta
+## Fechamento
+
+O usuário decidiu (2026-10-31) fechar o Q7 com o que sobra do CA-Q-A1 preso na catraca: os
+arquivos e as classes abaixo continuam em `TETOS` de `tests/test_tamanho_dos_modulos.py`, que
+reprova se qualquer um crescer e obriga a baixar o teto quando encolher. O CA-14.1 da spec
+principal passa (`tests/test_arquitetura.py`, na rápida).
+
+- A rápida inteira no `9bb04dd`: 1942 passaram e 3 pularam em 75 s (-n 4); a camada
+  `processo`, 36 passaram; ruff E,F limpo.
+- `ferramentas/qualidade.py` no `9bb04dd` (árvore limpa,
+  `docs/medidas/qualidade/2026-10-31-qualidade-142355.json`): a rápida com cobertura (147 s;
+  110 s no Q6, com um processo Python órfão de outra sessão ocupando um núcleo desde 30/10) e
+  a `processo` (222 s) passam; cobertura 92,2 % (92,0 % no Q6); 281 funções com CRAP ≥ 10
+  (282 no Q6); 1 par do dryer, 0 fora da lista.
+- Portão `ABBY_PORTAO=1 pytest -m livro_real` no `9bb04dd`, com o EPUBCheck, o Ace e o
+  Calibre, sozinho na máquina (fora o órfão): 21 passaram, 1 reprovou
+  (`docs/medidas/2026-10-31-medida-falhou-143338.json`), o mesmo índice da busca pela janela
+  (CA-7.1) que reprova na base, mediana 3003 ms. Para saber se era do Q7, o teste sozinho,
+  alternando com a base `08a0080` numa worktree temporária (já removida): a base deu 2486 e
+  2479 ms, o Q7 2487 e 2436. Não é regressão: os 3003 ms vêm da máquina no fim de uma rodada
+  de 9 minutos. As outras medidas do portão ficaram nas metas; duas sem meta própria subiram em
+  relação ao Q6 (a abertura dos modelos, 9,9 → 38,9 ms; o p95 de folhear páginas nunca
+  vistas, 319 → 401 ms), e nenhum dos dois caminhos foi tocado pelos cortes.
+
+## O que fica para depois
+
+Preso na catraca, para um passo próprio (ou o Q8, quando a função a reduzir estiver numa
+dessas classes):
 
 3. O resto do `ControladorDePagina`: 61 métodos para o teto de 40 (as edições: corrigir,
    dividir, juntar, marcar, ajustar; a seleção; o que a janela lê).
@@ -83,3 +110,7 @@ tamanho de hoje: o teto só desce.
 | A `Estrutura` continua chaveada pelo `id()` do `BoxEntry` | a exportação lê `carregar_modelo` (os objetos vivos; a cópia do corte 4 é só do `carregar_pagina`) e a montagem não copia caixas: nenhum caminho de hoje perde o estilo, e um teste honesto não acha o defeito |
 | As letras de lance do `contexto` e do `zonas` por um subagente, revisado aqui | TDD em dois commits (5 falhas: o espanhol, o alemão e o francês); o golden em português ficou igual |
 | O lado do PGN com o diagrama conferido (`lances.py:504`, "suspeita" na spec) não foi investigado | fora da estrutura da exportação; fica a suspeita, para o Q8 ou um passo próprio |
+| Perguntei ao usuário como fechar o Q7 com o CA-Q-A1 ainda reprovando | o "pronto quando" do roadmap não se cumpre inteiro: fechar com a catraca ou seguir cortando é escolha dele; ele escolheu fechar |
+| Medi e rodei o portão com a worktree parada | a regra da casa |
+| O CA-7.1 sozinho, alternando com a base, antes de culpar o Q7 | a mediana do portão (3003 ms) passou da do Q6 (2541); alternando, base e Q7 deram o mesmo |
+| O processo Python órfão (PID 1536, desde 30/10 18:49) não foi encerrado | é de outra sessão, cujo pai já terminou; anotado e avisado ao usuário |

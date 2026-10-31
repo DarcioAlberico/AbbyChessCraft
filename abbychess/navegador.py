@@ -79,7 +79,7 @@ class Navegador:
 
     def pids_das_visitas(self, projeto) -> List[Optional[int]]:
         """As visitas pelo pid, antes de a ordem do livro mudar (`seguir_a_sequencia`)."""
-        return [projeto.pid_da_pagina(i) for i in self.visitas]
+        return [projeto.ordem.pid_em(i) for i in self.visitas]
 
     def seguir_a_sequencia(self, pids: List[Optional[int]], nova) -> None:
         """As visitas na ordem `nova`, pelos `pids` de antes: a de agora é a que sobra até ela

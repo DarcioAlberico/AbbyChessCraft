@@ -132,7 +132,7 @@ class ResumoDoLivro:
 
     def carregar(self, gravar: bool = False) -> dict:
         """O `livro.json`, ou o recalculado das páginas se ele falta ou está ilegível. Só
-        `gravar` (a montagem da abertura, `montar_sequencia`) grava o recalculado; ler não
+        `gravar` (a montagem da abertura, `ordem.montar`) grava o recalculado; ler não
         grava (SPEC-qualidade Q-P8), e a gravação seguinte do livro o leva ao disco."""
         if self._livro is None:
             arquivo = self._p.pasta / ARQUIVO_DO_LIVRO
@@ -197,7 +197,7 @@ class ResumoDoLivro:
         conferidos = sum(1 for d in pagina.diagramas if d.conferido)
         # A régua do negrito dela, para a do livro (`regua_do_negrito`), quando foi medida.
         regua = {"regua_do_negrito": pagina.regua_do_negrito} if pagina.regua_do_negrito else {}
-        return {"pid": pagina.pid, "pagina_da_fonte": self._p._pagina_da_fonte(pagina),
+        return {"pid": pagina.pid, "pagina_da_fonte": self._p.ordem.pagina_da_fonte(pagina),
                 "estado": pagina.estado,
                 **resumo_das_confiancas(pagina.entries(), self._p.dados.limiares,
                                         [b.revisado for b in pagina.boxes]),

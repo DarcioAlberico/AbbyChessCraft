@@ -556,12 +556,12 @@ class CacheDePaginas:
 
 def fonte_do_projeto(projeto: ProjetoDeLivro) -> FonteDePaginas:
     """As páginas do livro como o projeto as lê: pela sequência dele, endireitadas se ele
-    nasceu assim. A sequência já foi montada ao abrir (`montar_sequencia`), na thread de quem
+    nasceu assim. A sequência já foi montada ao abrir (`ordem.montar`), na thread de quem
     abre (o fitz que conta as páginas não roda junto com um render da pré-carga)."""
     return FonteDePaginas(projeto.fonte, endireitar=projeto.dados.endireitar,
                           pasta=projeto.pasta, somente_leitura=projeto.somente_leitura,
                           sequencia=lambda: projeto.sequencia,
-                          por_pid=projeto.sequencia_gravada)
+                          por_pid=projeto.ordem.gravada)
 
 
 @dataclass

@@ -72,7 +72,7 @@ class PonteDeLeitura:
         if not self._p._pode_ler() or self.servidor_parado():
             return
         indice = self._p.indice
-        pid = self._p.projeto.pid_da_pagina(indice)
+        pid = self._p.projeto.ordem.pid_em(indice)
         titulo, falha = (("Reconhecendo a página", "Reconhecer página") if zona is None
                          else ("Reconhecendo a área", "Reconhecer área"))
         avisar = self._p._falhou(falha)

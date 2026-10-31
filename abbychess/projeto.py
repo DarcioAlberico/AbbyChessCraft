@@ -19,7 +19,9 @@ Um projeto é uma pasta com esta forma (formato 2, desde o passo 1b)::
 
 **O `pid`** é da página, não da posição dela no PDF: reordenar ou inserir páginas (passo
 L) não o muda, e os gids dos glifos (`pid << 20 | n`) continuam únicos no projeto. A página
-grava o próprio índice, e `livro.json` mapeia índice → pid.
+grava o próprio índice, e `livro.json` mapeia índice → pid. A sequência do livro (a ordem
+das páginas e o `pid` de cada uma, §12.4) é da `SequenciaDoLivro`
+(`abbychess.sequencia_do_livro`, `self.ordem`).
 
 **Migração do v1** (`paginas/0001.json`, `zonas/0001.json`, `paginas/marcadas.json`): na
 primeira abertura, o v1 vai para `backup-v1/` e o projeto passa ao formato 2; todas as
@@ -60,7 +62,6 @@ pode ter acento: os padrões são lidos e gravados por `np.fromfile` e
 from __future__ import annotations
 
 import copy
-import hashlib
 import itertools
 import json
 import logging
@@ -71,7 +72,7 @@ from dataclasses import asdict, dataclass, field, fields
 from enum import StrEnum
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
 
 from core.box_model import BoxEntry
 
@@ -85,6 +86,7 @@ from abbychess.fonte_do_livro import FonteDoLivro, caminho_gravado, sha_da_fonte
 from abbychess import sequencia as sq
 from abbychess.migracoes import Migracoes
 from abbychess.resumo_do_livro import ResumoDoLivro
+from abbychess.sequencia_do_livro import SequenciaDoLivro
 from abbychess import zonas as zn
 from abbychess.modelo import (GLIFOS_MARCADOS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
                               Pagina, proximo_estado, reconciliar, reenquadrar)
@@ -97,6 +99,8 @@ from abbychess.pasta_do_projeto import (ARQUIVO_DO_LEXICO, ARQUIVO_DO_PROJETO, P
 from abbychess.pasta_do_projeto import (ARQUIVO_DA_JANELA, ARQUIVO_DE_INCLINACOES,  # noqa: F401
                                         ARQUIVO_DO_LIVRO, ARQUIVO_DO_LOTE,  # noqa: F401
                                         LISTAS_DE_PAGINAS, MAPAS_DE_PAGINAS)  # noqa: F401
+# Reexportado: o teste do fechamento da rodada L o importa daqui.
+from abbychess.sequencia_do_livro import FORA_DO_PDF  # noqa: F401
 # Reexportados: o livro e os testes do resumo os importam daqui.
 from abbychess.resumo_do_livro import (VERSAO_DO_LIVRO, pendentes_pelo_histograma,  # noqa: F401
                                        resumo_das_confiancas)  # noqa: F401
@@ -106,9 +110,6 @@ if TYPE_CHECKING:
     from abbychess.diagramas import DiagramaLido
 
 log = logging.getLogger(__name__)
-
-#: O `indice` gravado da página que não é uma do PDF do livro (`_pagina_da_fonte`).
-FORA_DO_PDF = -1
 
 #: Os erros de um JSON de página que não se lê, no texto ou na forma (SPEC-qualidade Q-P7).
 ERROS_DE_PAGINA_ILEGIVEL = (ValueError, TypeError, KeyError, AttributeError)
@@ -266,13 +267,6 @@ class ProjetoDeLivro:
         #: migração gravaria de cada página v1, lido uma vez na abertura. Aberto para gravar,
         #: a v1 migra inteira na abertura, e a leitura das páginas não a conhece.
         self._v1_so_leitura: Dict[int, dict] = {}
-        #: A sequência do livro (§12.4): a posição de cada `pid`. Montada na primeira vez que
-        #: alguém pergunta (`sequencia`), dos dados da v2; `_proximo_pid` é o primeiro `pid`
-        #: acima dela, para as páginas que ela ainda não tem.
-        self._sequencia: Optional[sq.Sequencia] = None
-        self._proximo_pid = 0
-        #: (sequência, página do PDF -> primeira posição dela): a origem das amostras antigas.
-        self._posicoes_do_pdf: Optional[tuple] = None
         #: A abertura achou a fonte noutro lugar, pelo SHA-256 (a janela avisa).
         self.fonte_relocalizada = False
         #: Esta abertura passou o projeto a um formato novo (a janela avisa onde ficou a cópia).
@@ -299,6 +293,8 @@ class ProjetoDeLivro:
         self.nao_gravadas: List[int] = []
         #: As páginas na memória (§4.3): as lidas, a aberta e as entregues ao gravador.
         self.paginas_em_memoria = CacheDoProjeto(self)
+        #: A sequência do livro (§12.4): a posição e o `pid` de cada página.
+        self.ordem = SequenciaDoLivro(self)
         #: A migração dos formatos antigos, que a abertura chama (`abrir`).
         self.migracoes = Migracoes(self)
         #: A cópia de cada página de antes de o lote a reler (§4.6).
@@ -334,7 +330,7 @@ class ProjetoDeLivro:
             projeto = cls(pasta, dados)
             projeto._dono_da_pasta = True
             projeto.salvar()
-            projeto.montar_sequencia()
+            projeto.ordem.montar()
         except BaseException:
             gv.soltar_a_pasta(pasta)
             raise
@@ -398,9 +394,9 @@ class ProjetoDeLivro:
         gv.proteger(pasta)
         projeto.migracoes.guardar_a_v1_na_memoria(v1_vence=v1_vence)
         try:
-            projeto.montar_sequencia()          # só leitura: nada é gravado
+            projeto.ordem.montar()              # só leitura: nada é gravado
         except ProjetoInvalido:         # a sequência de um formato que esta versão não lê
-            projeto._sequencia, projeto._proximo_pid = projeto._sequencia_da_v2(gravar=False)
+            projeto.ordem.adotar(*projeto.ordem.da_v2(gravar=False))
         return projeto
 
     @classmethod
@@ -456,15 +452,15 @@ class ProjetoDeLivro:
                 projeto.somente_leitura = projeto._travado = True
                 gv.proteger(pasta)
                 projeto.migracoes.guardar_a_v1_na_memoria(v1_vence=versao_de_antes < 2)
-                projeto.montar_sequencia()
+                projeto.ordem.montar()
                 return projeto
         if mudou:
             try:
                 projeto.salvar()
             except OSError as erro:     # mídia só de leitura: abre igual, sem gravar o ajuste
                 log.warning("não deu para gravar %s ao abrir: %s", ARQUIVO_DO_PROJETO, erro)
-        projeto.montar_sequencia()
-        if projeto.sequencia_gravada:
+        projeto.ordem.montar()
+        if projeto.ordem.gravada:
             projeto.migracoes.completar_v3()    # o que uma queda no meio da migração deixou
         return projeto
 
@@ -488,7 +484,7 @@ class ProjetoDeLivro:
         página veio antes."""
         bilhete, pagina = entregue
         self._gravar_arquivo_da_pagina(pagina.pid, bilhete,
-                                       pagina_para_json(pagina, self._pagina_da_fonte(pagina)))
+                                       pagina_para_json(pagina, self.ordem.pagina_da_fonte(pagina)))
         with self._trava_do_livro:
             with self._trava_das_paginas:
                 vale = self._ultimo_bilhete.get(pagina.pid) == bilhete
@@ -516,6 +512,11 @@ class ProjetoDeLivro:
     def fonte(self) -> Path:
         """O caminho da fonte do livro (`origem.caminho`)."""
         return self.origem.caminho
+
+    @property
+    def sequencia(self) -> sq.Sequencia:
+        """A ordem das páginas e o `pid` de cada uma (`ordem.sequencia`)."""
+        return self.ordem.sequencia
 
     def _arquivo_v2(self, pid: int) -> Path:
         return self.pasta / PASTA_DE_PAGINAS / f"p{pid}.json"
@@ -545,7 +546,7 @@ class ProjetoDeLivro:
         """A página da posição `indice` como está gravada, lida de novo (fora do cache): o
         `p<pid>.json`, ou a v1 de um projeto só para leitura; None se nada foi gravado dela,
         ou se o arquivo é ilegível (`_isolar_a_ilegivel`). O `OSError` sobe: quem lê decide."""
-        pid = self._pid_em(indice)
+        pid = self.ordem.pid_em(indice)
         if pid is None:
             return None
         bruto = self._v1_so_leitura.get(pid)
@@ -626,7 +627,7 @@ class ProjetoDeLivro:
             em_cache = self.paginas_em_memoria.pagina(pagina.indice)
             if em_cache is not None:
                 return em_cache
-            if (carimbo is None or self._pid_em(pagina.indice) != pagina.pid
+            if (carimbo is None or self.ordem.pid_em(pagina.indice) != pagina.pid
                     or self.carimbo(pagina.indice) != carimbo):
                 return None
             # Girar e cortar não gravam a página (o carimbo é o mesmo): a lida na geometria
@@ -637,7 +638,7 @@ class ProjetoDeLivro:
 
     def carregar_modelo(self, indice: int) -> Optional[Pagina]:
         """A página no modelo v2, ou `None` se nada foi gravado dela."""
-        pid = self._pid_em(indice)              # antes das travas (a do livro, se montar)
+        pid = self.ordem.pid_em(indice)              # antes das travas (a do livro, se montar)
         if pid is None:
             return None                         # fora do livro: nada gravado
         em_cache = self.paginas_em_memoria.usar(pid)               # o caminho comum, sem esperar o disco
@@ -667,7 +668,7 @@ class ProjetoDeLivro:
         """Os boxes na geometria da entrada de agora (§12.4): a página gravada noutra (uma
         operação de página que só gravou a sequência, ou uma queda antes do arquivo da
         página) é levada na leitura."""
-        sequencia = self._sequencia
+        sequencia = self.ordem.ja_montada
         if sequencia is None:
             return
         entrada = sequencia.entrada_de(pagina.pid)
@@ -684,8 +685,8 @@ class ProjetoDeLivro:
     def _arquivo_v2_de(self, indice: int) -> Optional[Path]:
         """O `p<pid>.json` da página na posição `indice`, ou None se nada foi gravado dela.
         Os arquivos que o `livro.json` não cita (uma queda entre a página e o livro) entram
-        na sequência quando ela é montada (`_montar_sequencia`)."""
-        pid = self._pid_em(indice)
+        na sequência quando ela é montada (`ordem.montar`)."""
+        pid = self.ordem.pid_em(indice)
         if pid is None:
             return None
         arquivo = self._arquivo_v2(pid)
@@ -703,7 +704,7 @@ class ProjetoDeLivro:
         """A página e o resumo dela em `livro.json` (com a trava do livro); `livro=False`
         deixa o resumo para quem grava várias de uma vez (`trocar_paginas`)."""
         bilhete = next(self._bilhetes)
-        dados = pagina_para_json(pagina, self._pagina_da_fonte(pagina))
+        dados = pagina_para_json(pagina, self.ordem.pagina_da_fonte(pagina))
         self._gravar_arquivo_da_pagina(pagina.pid, bilhete, dados)
         # A foto da gravação, do mesmo `as_state()` que foi para o JSON.
         self.paginas_em_memoria.fotografar(pagina.pid, {b[0]: hash(tuple(b[1])) for b in dados["boxes"]})
@@ -729,7 +730,7 @@ class ProjetoDeLivro:
     def _modelo_ou_novo(self, indice: int) -> Pagina:
         pagina = self.carregar_modelo(indice)
         if pagina is None:
-            pid = self._pid_em(indice, criar=True)
+            pid = self.ordem.pid_em(indice, criar=True)
             if pid >= self.dados.proximo_pid:
                 # O contador gravado passa do pid da página que nasce, antes do arquivo dela.
                 # Ele não é o teto dos pids em disco (uma página de pid menor nasce sem
@@ -816,11 +817,6 @@ class ProjetoDeLivro:
                 pagina.estado = proximo_estado(pagina.estado, "editar")
             self.salvar_modelo(pagina)
 
-    def pid_da_pagina(self, indice: int) -> Optional[int]:
-        """O pid da página na posição `indice`, sem ler o JSON dela (o da sequência), ou
-        None fora do livro."""
-        return self._pid_em(indice)
-
     def carregar_pagina(self, indice: int) -> Optional[List[BoxEntry]]:
         """Os boxes gravados da página (None se ela não foi lida nem marcada), em cópias
         (Q-P9): mudá-los não muda o projeto; a janela edita o modelo (`pagina_para_editar`)."""
@@ -838,7 +834,7 @@ class ProjetoDeLivro:
         """A página para só ler (a aba Diagramas percorre o livro): a do cache, se estiver
         lá (pode ter o que ainda não foi gravado), ou a do JSON, **sem entrar no cache** (a
         leitura do livro não despeja as páginas abertas)."""
-        pid = self._pid_em(indice)
+        pid = self.ordem.pid_em(indice)
         if pid is None:
             return None
         em_cache = self.paginas_em_memoria.do_pid(pid)
@@ -878,210 +874,8 @@ class ProjetoDeLivro:
         return self.pasta / ARQUIVO_DO_LEXICO
 
     # ------------------------------------------------------------------
-    # As páginas nas listas gravadas (posição na interface, `pid` no disco)
+    # Os gids movidos e as páginas trocadas inteiras (dividir e o desfazer, §12.4)
     # ------------------------------------------------------------------
-    @property
-    def sequencia_gravada(self) -> bool:
-        """O projeto tem a sequência no disco (v3): as listas de páginas gravadas são de
-        `pid`. Num projeto da v2 aberto só para leitura, de posições."""
-        return self.dados.sequencia is not None
-
-    def paginas_para_gravar(self, posicoes: Iterable[int]) -> List[int]:
-        """As posições como o projeto as grava: os `pid` (v3), ou as próprias posições."""
-        posicoes = [int(p) for p in posicoes]
-        if not self.sequencia_gravada:
-            return posicoes
-        return [p for p in map(self._pid_em, posicoes) if p is not None]
-
-    def posicoes_das_gravadas(self, gravadas: Iterable) -> List[int]:
-        """As posições de agora das páginas de uma lista gravada (`paginas_para_gravar`): a
-        página que saiu do livro, ou o valor ilegível, sai."""
-        saida = []
-        for valor in gravadas or ():
-            valor = inteiro(valor)
-            if valor is None:
-                continue
-            posicao = self.posicao_do_pid(valor) if self.sequencia_gravada else valor
-            if posicao is not None and 0 <= posicao < len(self.sequencia):
-                saida.append(posicao)
-        return saida
-
-    # ------------------------------------------------------------------
-    # A sequência do livro (§12.4)
-    # ------------------------------------------------------------------
-    @property
-    def sequencia(self) -> sq.Sequencia:
-        """A ordem das páginas e o `pid` de cada uma. Ler não grava (SPEC-qualidade Q-P8):
-        antes de `montar_sequencia`, a pergunta a monta só na memória."""
-        sequencia = self._sequencia
-        if sequencia is None:
-            with self._trava_do_livro:
-                if self._sequencia is None:
-                    self._sequencia, self._proximo_pid = self._montar_sequencia(gravar=False)
-                sequencia = self._sequencia
-        return sequencia
-
-    def montar_sequencia(self) -> sq.Sequencia:
-        """Monta a sequência e grava o que a montagem conserta (o `livro.json` que falta, a
-        página em disco que ele não cita, a sequência que o `projeto.json` da v3 não tem, as
-        páginas fora dela): ao criar e ao abrir, na thread de quem abre e antes de qualquer
-        render (o fitz que conta as páginas não roda junto com um render da pré-carga)."""
-        with self._trava_do_livro:
-            if not self.somente_leitura:
-                self.resumo.esquecer()          # o do disco: o conserto da memória vai a ele
-                self.resumo.carregar(gravar=True)
-            self._sequencia, proximo = self._montar_sequencia(gravar=True)
-            self._proximo_pid = max(self._proximo_pid, proximo)
-            return self._sequencia
-
-    def _pid_em(self, indice: int, criar: bool = False) -> Optional[int]:
-        """O `pid` da página na posição `indice`, ou None fora do livro. Só `criar` (a
-        página que nasce numa gravação: a fonte sumida não diz quantas páginas tem) estende a
-        sequência com `pid` novos; uma pergunta não deixa entradas fantasmas."""
-        sequencia = self.sequencia
-        if 0 <= indice < len(sequencia):
-            return sequencia.pid_em(indice)
-        if indice < 0:
-            raise IndexError(f"Página {indice + 1} fora do livro")
-        if not criar:
-            return None
-        with self._trava_do_livro:
-            sequencia = self._sequencia
-            if indice >= len(sequencia):
-                faltam = indice + 1 - len(sequencia)
-                pids = list(range(self._proximo_pid, self._proximo_pid + faltam))
-                self._proximo_pid += faltam
-                novas = tuple(sq.Entrada(p, sq.FONTE_DO_LIVRO, len(sequencia) + k)
-                              for k, p in enumerate(pids))
-                self._sequencia = sequencia = sq.Sequencia(sequencia.entradas + novas,
-                                                           sequencia.apagadas)
-                if self.sequencia_gravada and not self.somente_leitura:
-                    self.dados.sequencia = sequencia.para_json()     # antes da página
-                    self.dados.proximo_pid = max(self.dados.proximo_pid, self._proximo_pid)
-                    self.salvar()
-            return sequencia.pid_em(indice)
-
-    def gravar_sequencia(self, nova: sq.Sequencia) -> None:
-        """A sequência nova (uma operação de página, §12.4): o `projeto.json` primeiro, e só
-        depois a memória; uma falha de gravação (`OSError`) não muda nada. Recusa o projeto
-        só para leitura e o da v2 (sem a sequência gravada: a fonte sumida)."""
-        if self.somente_leitura:
-            raise OSError("o projeto está aberto só para leitura")
-        if not self.sequencia_gravada:
-            raise OSError("o projeto ainda está no formato antigo: abra-o com a fonte do livro "
-                          "no lugar para passar ao novo")
-        with self._trava_do_livro:
-            antes = (self.dados.sequencia, self.dados.proximo_pid)
-            velha = self.sequencia
-            self.dados.sequencia = nova.para_json()
-            self.dados.proximo_pid = max([self.dados.proximo_pid, self._proximo_pid,
-                                          *(p + 1 for p in nova.todos_os_pids)])
-            try:
-                self.salvar()
-            except BaseException:
-                self.dados.sequencia, self.dados.proximo_pid = antes
-                raise
-            self._trocar_sequencia(nova)
-            self._regravar_as_reenquadradas(velha, nova)
-
-    def _regravar_as_reenquadradas(self, velha: sq.Sequencia, nova: sq.Sequencia) -> None:
-        """As páginas gravadas cujo quadro mudou (cortar, tirar o corte e o desfazer deles) vão
-        ao gravador já levadas à geometria nova: o arquivo, o `livro.json` (as contagens sem
-        os glifos guardados fora do quadro) e a busca (que lê a da memória) seguem a imagem.
-        Girar não tira glifo nenhum: as contagens e o texto ficam, e a página é levada ao giro
-        quando é lida (o livro inteiro girado não relê as 230 páginas). A sequência já está
-        gravada antes: uma queda antes delas é a leitura preguiçosa que resolve
-        (`_na_geometria_da_entrada`)."""
-        for posicao, entrada in enumerate(nova.entradas):
-            antes = velha.entrada_de(entrada.pid)
-            if antes is None or antes.quadro == entrada.quadro:
-                continue
-            if self.paginas_em_memoria.pagina(posicao) is None and self._arquivo_v2_de(posicao) is None:
-                continue                            # nada gravado: nada a levar
-            try:
-                pagina = self.carregar_modelo(posicao)
-            except (OSError, ValueError, KeyError, TypeError) as erro:
-                log.warning("a página %d não foi levada à geometria nova: %s", posicao + 1,
-                            erro)
-                continue
-            if pagina is not None:
-                self.paginas_em_memoria.agendar(pagina)
-
-    def inserir_arquivo(self, caminho: str | Path) -> List[sq.Entrada]:
-        """Copia o PDF ou a imagem para `inseridas/` (o nome pelo SHA-256: o mesmo arquivo
-        inserido duas vezes é uma cópia só) e devolve uma entrada com `pid` novo para cada
-        página dele, para `Sequencia.inserir`. O PDF cifrado ou que não abre levanta
-        `ProjetoInvalido`, e nada é copiado. A imagem é uma página (de um TIFF de várias, a
-        primeira)."""
-        caminho = Path(caminho)
-        sufixo = caminho.suffix.lower()
-        if sufixo != ".pdf" and sufixo not in EXTENSOES_DE_IMAGEM:
-            raise ProjetoInvalido(f"Formato não suportado: {sufixo}. Use PDF ou imagem.")
-        try:
-            dados = caminho.read_bytes()
-        except OSError as erro:
-            raise ProjetoInvalido(f"{caminho.name} não abriu: {erro}") from erro
-        paginas = 1
-        if sufixo == ".pdf":
-            import fitz
-
-            try:
-                with fitz.open(stream=dados, filetype="pdf") as documento:
-                    cifrado = documento.needs_pass or documento.is_encrypted
-                    paginas = documento.page_count
-            except (RuntimeError, ValueError) as erro:
-                raise ProjetoInvalido(f"{caminho.name} não é um PDF legível: {erro}") from erro
-            if cifrado:
-                raise ProjetoInvalido(f"{caminho.name} é um PDF cifrado: tire a senha antes de "
-                                      "inserir.")
-            if paginas == 0:
-                raise ProjetoInvalido(f"{caminho.name} não tem páginas.")
-        nome = f"{sq.PASTA_DAS_INSERIDAS}/{hashlib.sha256(dados).hexdigest()}{sufixo}"
-        destino = self.pasta / nome
-        if not destino.is_file():
-            gv.gravar_bytes(destino, dados)
-        with self._trava_do_livro:
-            pids = list(range(self._proximo_pid, self._proximo_pid + paginas))
-            self._proximo_pid += paginas
-        return [sq.Entrada(pid, nome, k) for k, pid in enumerate(pids)]
-
-    def _trocar_sequencia(self, nova: sq.Sequencia) -> None:
-        """A sequência nova (as operações de página, rodada 2): as páginas da memória passam a
-        ter a posição dela no `indice`. Não grava nada."""
-        with self._trava_do_livro:
-            self._sequencia = nova
-            self._proximo_pid = max([self._proximo_pid, *(p + 1 for p in nova.todos_os_pids)])
-            self.paginas_em_memoria.reposicionar(nova, self._na_geometria_da_entrada)
-
-    def origem_da_amostra(self, origem: str) -> Optional[Tuple[Optional[int], Optional[int]]]:
-        """(posição de agora, gid) do glifo de onde a amostra veio, pelo nome de origem dela
-        (`leitor.nome_de_origem`); None se o nome não diz. A posição vem do `gid` (`pid =
-        gid >> 20`, §12.4), e não do número da página no nome, que é o de quando ela foi
-        ensinada; None na posição: a página saiu do livro. A amostra antiga, sem o `gid` no
-        nome, vai à primeira entrada da página do PDF do nome (a metade esquerda, se ela foi
-        dividida)."""
-        from abbychess.leitor import origem_de
-        from abbychess.modelo import pid_de
-
-        lido = origem_de(origem)
-        if lido is None:
-            return None
-        pagina_do_nome, gid = lido
-        sequencia = self.sequencia
-        if gid is not None:
-            gid = self.gid_de_agora(gid)
-            return sequencia.posicao_de(pid_de(gid)), gid
-        guardado = self._posicoes_do_pdf
-        if guardado is None or guardado[0] is not sequencia:   # uma vez por sequência
-            posicoes: Dict[int, int] = {}
-            for direita in (False, True):       # a metade esquerda, onde quer que esteja
-                for posicao, entrada in enumerate(sequencia.entradas):
-                    if entrada.fonte == sq.FONTE_DO_LIVRO and \
-                            (entrada.metade == "direita") == direita:
-                        posicoes.setdefault(entrada.pagina, posicao)
-            guardado = self._posicoes_do_pdf = (sequencia, posicoes)
-        return guardado[1].get(pagina_do_nome), None
-
     def gid_de_agora(self, gid: int) -> int:
         """O gid de hoje do glifo `gid` (o mesmo, ou o que ele ganhou ao mudar de página numa
         divisão, pelos `gids_movidos`)."""
@@ -1092,14 +886,6 @@ class ProjetoDeLivro:
                 break
             gid = novo
         return gid
-
-    def novo_pid(self) -> int:
-        """Um `pid` que nenhuma página teve (a metade direita de uma divisão). Gravado com a
-        sequência que o usa; perdido (nunca reaproveitado) se a operação não acontece."""
-        with self._trava_do_livro:
-            pid = self._proximo_pid
-            self._proximo_pid += 1
-            return pid
 
     def pagina_do_pid(self, pid: int) -> Optional[Pagina]:
         """A página `pid` como está (a do cache, ou a do arquivo, sem pô-la no cache); None
@@ -1157,248 +943,3 @@ class ProjetoDeLivro:
         if atual is None:
             return False
         return comparavel(atual) == comparavel(esperada)
-
-    def trocar_paginas(self, nova: sq.Sequencia, paginas: Dict[int, Optional[Pagina]],
-                       gids_movidos: Dict[str, int]) -> None:
-        """A sequência nova com páginas trocadas inteiras (dividir e o desfazer dela, §12.4):
-        `paginas` é pid -> a página nova (None: o arquivo sai). A ordem das gravações: os
-        arquivos das páginas que entram na sequência, o `projeto.json` (a sequência, o
-        contador de `pid` e os `gids_movidos`), as outras páginas, e por último os arquivos que
-        saem. `OSError` até o `projeto.json`: nada mudou (os arquivos que entraram saem).
-        Depois dele a operação vale: a página que não grava fica com o gravador, que tenta de
-        novo e avisa, e o arquivo que não sai é avisado no log. Uma queda depois do
-        `projeto.json` e antes das páginas deixa a página de antes no disco, que a leitura leva
-        à geometria nova: nada se perde (o que passou à página nova fica também guardado fora
-        do quadro da outra)."""
-        if self.somente_leitura:
-            raise OSError("o projeto está aberto só para leitura")
-        if not self.sequencia_gravada:
-            raise OSError("o projeto ainda está no formato antigo")
-        pendentes = set(paginas) & self.paginas_em_memoria.sujas
-        if pendentes:
-            raise OSError("há página com gravação pendente: tente de novo")
-        with self._trava_do_livro:
-            atual = self.sequencia
-            entram = {pid for pid, pagina in paginas.items() if pagina is not None
-                      and atual.entrada_de(pid) is None and atual.apagada(pid) is None}
-            for pid, pagina in paginas.items():
-                if pagina is not None and nova.posicao_de(pid) is not None:
-                    pagina.indice = nova.posicao_de(pid)
-            antes = (self.dados.sequencia, self.dados.proximo_pid, self.dados.gids_movidos)
-            gravados = []
-            try:
-                for pid in entram:
-                    entrada = nova.entrada_de(pid)
-                    do_pdf = (entrada is not None and entrada.fonte == sq.FONTE_DO_LIVRO
-                              and entrada.metade != "direita")
-                    gv.gravar_json(self._arquivo_v2(pid), pagina_para_json(
-                        paginas[pid], entrada.pagina if do_pdf else FORA_DO_PDF))
-                    gravados.append(pid)
-                self.dados.sequencia = nova.para_json()
-                self.dados.proximo_pid = max([self.dados.proximo_pid, self._proximo_pid,
-                                              *(p + 1 for p in nova.todos_os_pids)])
-                self.dados.gids_movidos = dict(gids_movidos)
-                self.salvar()
-            except BaseException:
-                self.dados.sequencia, self.dados.proximo_pid, self.dados.gids_movidos = antes
-                for pid in gravados:
-                    try:
-                        self._arquivo_v2(pid).unlink(missing_ok=True)
-                    except OSError:
-                        log.warning("p%d.json ficou (vai para as apagadas)", pid,
-                                    exc_info=True)
-                raise
-            self.paginas_em_memoria.tirar(paginas)        # a velha não é levada à geometria nova
-            self._trocar_sequencia(nova)
-            resumos: Dict[int, Optional[dict]] = {}
-            for pid, pagina in paginas.items():
-                if pagina is None:
-                    continue
-                try:
-                    self._gravar(pagina, livro=False)
-                except OSError:
-                    log.warning("a página p%d fica com o gravador", pid, exc_info=True)
-                    self.paginas_em_memoria.agendar(pagina)
-                else:
-                    resumos[pid] = self.resumo.do_modelo(pagina)
-                    self._trocadas[pid] = (self._carimbo_do_pid(pid), pagina.proximo_n)
-                    self.paginas_em_memoria.guardar(pagina, foto_nova=True)
-            for pid, pagina in paginas.items():
-                if pagina is None:
-                    try:
-                        self._arquivo_v2(pid).unlink(missing_ok=True)
-                        resumos[pid] = None
-                    except OSError:
-                        log.warning("p%d.json não saiu (vai para as apagadas)", pid,
-                                    exc_info=True)
-            try:
-                self.resumo.atualizar_varias(resumos)
-            except OSError:
-                # As páginas estão gravadas; o livro.json se refaz delas ao abrir.
-                log.warning("o livro.json não foi atualizado", exc_info=True)
-
-    def posicao_do_pid(self, pid: int) -> Optional[int]:
-        """A posição no livro da página `pid`, ou None (fora da sequência)."""
-        return self.sequencia.posicao_de(pid)
-
-    def _montar_sequencia(self, gravar: bool) -> Tuple[sq.Sequencia, int]:
-        """A sequência gravada (v3), ou a montada dos dados da v2. O projeto da v3 sem ela
-        (o projeto novo, ou um `projeto.json` que a perdeu) a monta pela ordem do PDF e, com
-        `gravar`, a grava já; o da v2 só para leitura a tem só na memória."""
-        if self.dados.sequencia is not None:
-            return self._sequencia_lida(gravar)
-        sequencia, proximo = self._sequencia_da_v2(gravar)
-        if (gravar and self.dados.versao >= VERSAO and not self.somente_leitura
-                and self.fonte.is_file()):
-            self.dados.sequencia = sequencia.para_json()
-            self.dados.proximo_pid = max(self.dados.proximo_pid, proximo)
-            self.salvar()
-        return sequencia, proximo
-
-    def _sequencia_lida(self, gravar: bool) -> Tuple[sq.Sequencia, int]:
-        """A sequência do `projeto.json`. Um `p<pid>.json` que não está nela nem nas apagadas
-        (uma queda entre gravações, §12.4) entra nas apagadas, no fim; todo arquivo em disco
-        fica abaixo do próximo `pid`."""
-        try:
-            sequencia = sq.Sequencia.de_json(self.dados.sequencia)
-        except (KeyError, TypeError, ValueError) as erro:
-            raise ProjetoInvalido(f"A sequência do livro em {ARQUIVO_DO_PROJETO} está "
-                                  f"ilegível: {erro}") from erro
-        conhecidos = set(sequencia.todos_os_pids)
-        em_disco = sorted(int(a.stem[1:]) for a in (self.pasta / PASTA_DE_PAGINAS).glob("p*.json")
-                          if a.stem[1:].isdigit())
-        # A página da sequência que o `livro.json` não cita (uma queda entre a página e o
-        # livro) entra nele agora: o resumo, a gaveta e a fila do livro a mostram.
-        livro = self.resumo.carregar()
-        for pid in em_disco:
-            if pid in conhecidos and str(pid) not in livro["paginas"]:
-                try:
-                    pagina = pagina_de_json(json.loads(
-                        self._arquivo_v2(pid).read_text(encoding="utf-8")))
-                except (OSError, ValueError, TypeError, KeyError):
-                    continue
-                livro = self.resumo.citar(pid, self.resumo.do_modelo(pagina), gravar)
-        todas = list(sequencia.entradas) + [a.entrada for a in sequencia.apagadas]
-        # Página do PDF -> o pid que a tem (as do livro, na sequência ou apagadas).
-        do_pdf = {e.pagina: e.pid for e in todas if e.fonte == sq.FONTE_DO_LIVRO}
-        orfaos = []
-        for pid in em_disco:
-            if pid in conhecidos:
-                continue
-            try:
-                pagina = pagina_de_json(json.loads(
-                    self._arquivo_v2(pid).read_text(encoding="utf-8")))
-            except (OSError, ValueError, TypeError, KeyError):
-                continue
-            dono = do_pdf.get(pagina.indice)
-            if dono is not None and self._arquivo_v2(dono).is_file():
-                # O perdedor de dois arquivos da mesma página (uma queda): o dono vale.
-                log.warning("p%d.json repete a página %d do PDF, que é da p%d: fica fora do "
-                            "livro", pid, pagina.indice + 1, dono)
-                continue
-            if pagina.indice < 0:
-                # Uma inserida ou uma metade direita sem entrada: não se sabe a imagem dela, e
-                # apontá-la para uma página do PDF mostraria os glifos noutra imagem.
-                log.warning("p%d.json não é de uma página do PDF e saiu da sequência: fica "
-                            "fora do livro, no disco", pid)
-                continue
-            orfaos.append(sq.Apagada(sq.Entrada(pid, sq.FONTE_DO_LIVRO, max(0, pagina.indice)),
-                                     len(sequencia)))
-        proximo = max([self.dados.proximo_pid, *(p + 1 for p in em_disco),
-                       *(p + 1 for p in sequencia.todos_os_pids)])
-        # As páginas do PDF que não estão em entrada nenhuma (uma sequência gravada curta, de
-        # antes de a fonte voltar): no fim do livro, com pid novo.
-        faltam = [k for k in range(self.origem.total_de_paginas()) if k not in do_pdf]
-        novas = tuple(sq.Entrada(proximo + n, sq.FONTE_DO_LIVRO, k) for n, k in enumerate(faltam))
-        proximo += len(novas)
-        if orfaos or novas:
-            if orfaos:
-                log.warning("%d página(s) fora da sequência foram para as apagadas", len(orfaos))
-            if novas:
-                log.warning("%d página(s) do PDF fora da sequência entraram no fim do livro",
-                            len(novas))
-            sequencia = sq.Sequencia(sequencia.entradas + novas,
-                                     sequencia.apagadas + tuple(orfaos))
-            if gravar and not self.somente_leitura:
-                self.dados.sequencia = sequencia.para_json()
-                self.dados.proximo_pid = max(self.dados.proximo_pid, proximo)
-                self.salvar()
-        return sequencia, proximo
-
-    def _sequencia_da_v2(self, gravar: bool = True) -> Tuple[sq.Sequencia, int]:
-        """A sequência de um projeto da v2 (`sequencia.da_v2`): a ordem do PDF, os `pid`
-        das páginas gravadas pelo `livro.json`, e os `p<pid>.json` que ele não cita (uma
-        queda entre a página e o livro: o mais recente de cada índice entra, e o livro é
-        atualizado), a v1 não migrada com `pid` = índice. Um arquivo v1 presente vence a
-        página v2 do mesmo índice (o `backup-v1/` copiado de volta, CA-4.5): os `gid` e as
-        amostras dele usam o `pid` = índice. Todo `p<pid>.json` em disco fica abaixo do
-        próximo `pid`, mesmo o que não entra na sequência."""
-        livro = self.resumo.carregar()
-        gravados: Dict[int, int] = {}
-        for chave, resumo in livro["paginas"].items():
-            indice = resumo.get("pagina_da_fonte")
-            if isinstance(indice, int) and indice >= 0:     # a inserida e a direita, não
-                gravados[indice] = int(chave)
-        orfaos = self._orfaos(livro, gravados)
-        for indice, (pid, pagina) in orfaos.items():
-            gravados[indice] = pid
-        for indice in self._v1_so_leitura:      # aberto para gravar, a v1 já migrou
-            gravados[indice] = indice
-        em_disco = [int(a.stem[1:]) for a in (self.pasta / PASTA_DE_PAGINAS).glob("p*.json")
-                    if a.stem[1:].isdigit()]
-        piso = max([self.dados.proximo_pid, *(p + 1 for p in em_disco)])
-        total = max([self.origem.total_de_paginas(), *(i + 1 for i in gravados)], default=0)
-        sequencia, proximo = sq.da_v2(total, gravados, piso)
-        for indice, (pid, pagina) in orfaos.items():
-            self.resumo.citar(pid, self.resumo.do_modelo(pagina), gravar)
-        return sequencia, proximo
-
-    def _orfaos(self, livro: dict, gravados: Dict[int, int]) -> Dict[int, Tuple[int, Pagina]]:
-        """índice -> (pid, página) dos `p<pid>.json` que o livro não cita, para os índices
-        que ele não tem (ou cujo arquivo sumiu): o mais recente pelo `gravado_em` e, no
-        empate, o `pid` maior."""
-        citados = {int(k) for k in livro["paginas"]}
-        achados: Dict[int, list] = {}
-        for arquivo in (self.pasta / PASTA_DE_PAGINAS).glob("p*.json"):
-            if not arquivo.stem[1:].isdigit() or int(arquivo.stem[1:]) in citados:
-                continue
-            try:
-                bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-                pagina = pagina_de_json(bruto)
-            except (OSError, ValueError, TypeError, KeyError):
-                continue
-            indice = pagina.indice
-            if indice < 0:
-                continue                    # não é uma página do PDF (a v2 não a conhece)
-            if indice in gravados and self._arquivo_v2(gravados[indice]).is_file():
-                continue                    # o livro já tem esta página, e o arquivo dela
-            achados.setdefault(indice, []).append(
-                (bruto.get("gravado_em", ""), pagina.pid, pagina))
-        orfaos = {}
-        for indice, lista in achados.items():
-            _, pid, pagina = max(lista, key=lambda t: (t[0], t[1]))
-            if len(lista) > 1:
-                log.warning("a página %d tem %d arquivos sem o livro; vale o mais recente, p%d",
-                            indice + 1, len(lista), pid)
-            orfaos[indice] = (pid, pagina)
-        return orfaos
-
-    def _pagina_da_fonte(self, pagina: Pagina) -> int:
-        """O índice da página no PDF do livro (na v2, o que dá a ordem do livro, §12.4): o da
-        entrada dela na sequência, e não a posição (`pagina.indice`), que muda ao reordenar.
-        A página que não é uma do PDF (a inserida) e a metade direita de uma divisão (a
-        esquerda fica com o índice) gravam `FORA_DO_PDF`: o `backup-v2/` copiado de volta não
-        as toma pela página do livro de mesmo número. Antes de a sequência existir (montando-a,
-        ou refazendo o livro), a página veio do JSON, e o `indice` dela é o gravado."""
-        sequencia = self._sequencia         # sem montar: quem monta chama daqui
-        if sequencia is None:
-            return pagina.indice
-        entrada = sequencia.entrada_de(pagina.pid)
-        if entrada is None:
-            apagada = sequencia.apagada(pagina.pid)
-            entrada = None if apagada is None else apagada.entrada
-        if entrada is None:
-            return pagina.indice
-        if entrada.fonte == sq.FONTE_DO_LIVRO and entrada.metade != "direita":
-            return entrada.pagina
-        return FORA_DO_PDF

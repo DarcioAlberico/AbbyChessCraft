@@ -30,7 +30,7 @@ class AntesDoLote:
         no desfazer, e "Voltar ao estado antes do lote" a restaura."""
         gv.gravar_json(self._arquivo(pagina.pid),
                        pagina_para_json(pagina.instantaneo(),
-                                        self._p._pagina_da_fonte(pagina)))
+                                        self._p.ordem.pagina_da_fonte(pagina)))
 
     def tem(self, indice: int) -> bool:
         # O pid do modelo (em memória), e não o do `livro.json`: logo depois do lote, a
@@ -59,7 +59,7 @@ class AntesDoLote:
         if not self._p.paginas_em_memoria.descarregar(10):
             raise OSError("há páginas que não puderam ser gravadas (veja a barra de status); "
                           "nada foi mudado")
-        pid = self._p._pid_em(indice)
+        pid = self._p.ordem.pid_em(indice)
         with self._p._trava_do_livro:
             copia = None if pid is None else self._arquivo(pid)
             if copia is None or not copia.is_file():

@@ -9,7 +9,7 @@ gravaria. Da 2 à 3: `migrar_para_v3` guarda o `backup-v2/`, grava a sequência 
 de páginas a `pid`, e `completar_v3` passa as inclinações, `janela.json` e `lote.json`, também
 o que uma queda no meio deixou na forma da v2. Abrir, e decidir o que migra, é do projeto
 (`abrir`, `_abrir_para_gravar`, `_abrir_so_para_leitura`, `self._p`), e a sequência montada
-dos dados da v2 também (`_sequencia_da_v2`): o projeto da v2 aberto só para leitura a usa sem
+dos dados da v2 também (`ordem.da_v2`): o projeto da v2 aberto só para leitura a usa sem
 migrar."""
 
 from __future__ import annotations
@@ -155,13 +155,13 @@ class Migracoes:
                 arquivo = self._p.pasta / nome
                 if arquivo.is_file():
                     gv.gravar_bytes(backup / nome, arquivo.read_bytes())
-        sequencia, proximo = self._p._sequencia_da_v2()
+        sequencia, proximo = self._p.ordem.da_v2()
         self._listas_para_pids(sequencia)
         self._p.dados.sequencia = sequencia.para_json()
         self._p.dados.proximo_pid = max(self._p.dados.proximo_pid, proximo)
         self._p.dados.versao = VERSAO
         self._p.salvar()
-        self._p._sequencia, self._p._proximo_pid = sequencia, max(self._p._proximo_pid, proximo)
+        self._p.ordem.adotar(sequencia, proximo)
 
     def completar_v3(self) -> None:
         """Os arquivos que a migração passa a `pid` depois do `projeto.json` (as inclinações,

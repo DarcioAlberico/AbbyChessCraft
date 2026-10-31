@@ -28,7 +28,7 @@ def test_o_estado_desconhecido_faz_a_pagina_ilegivel_e_ela_fica_guardada(projeto
     projeto.salvar_pagina(0, [BoxEntry(char="a", x1=10, y1=10, x2=30, y2=40, source="net",
                                        confidence=0.5)], reconhecida=True)
     assert projeto.fechar()
-    arquivo = projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(0)}.json"
+    arquivo = projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(0)}.json"
     bruto = json.loads(arquivo.read_text(encoding="utf-8"))
     bruto["estado"] = "reconhecido"                     # não é estado nenhum
     arquivo.write_text(json.dumps(bruto), encoding="utf-8")

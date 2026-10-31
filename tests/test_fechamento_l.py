@@ -97,17 +97,17 @@ def test_dividir_pula_as_metades_e_avisa(projeto, ctl):
 def test_a_inserida_e_a_metade_direita_nao_gravam_o_indice_do_pdf(projeto, ctl, tmp_path):
     imagem = tmp_path / "solta.png"
     Image.fromarray(np.full((300, 200), 255, np.uint8)).save(imagem)
-    projeto.gravar_sequencia(projeto.sequencia.inserir(projeto.inserir_arquivo(imagem), 5))
+    projeto.ordem.gravar(projeto.sequencia.inserir(projeto.ordem.inserir_arquivo(imagem), 5))
     _ler(projeto, 5)
     _ler(projeto, 8)
     ctl.operacoes.dividir_paginas([8])
     projeto.paginas_em_memoria.descarregar()
     livro = json.loads((projeto.pasta / "livro.json").read_text(encoding="utf-8"))
     por_pid = {int(k): v["pagina_da_fonte"] for k, v in livro["paginas"].items()}
-    assert por_pid[projeto.pid_da_pagina(5)] == FORA_DO_PDF          # a inserida
-    assert por_pid[projeto.pid_da_pagina(8)] == 7                    # a esquerda: a p. 8
-    assert por_pid[projeto.pid_da_pagina(9)] == FORA_DO_PDF          # a direita
-    bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(5)}.json")
+    assert por_pid[projeto.ordem.pid_em(5)] == FORA_DO_PDF          # a inserida
+    assert por_pid[projeto.ordem.pid_em(8)] == 7                    # a esquerda: a p. 8
+    assert por_pid[projeto.ordem.pid_em(9)] == FORA_DO_PDF          # a direita
+    bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(5)}.json")
                        .read_text(encoding="utf-8"))
     assert bruto["indice"] == FORA_DO_PDF
 
@@ -290,7 +290,7 @@ def test_a_busca_le_a_pagina_girada_fora_da_memoria_na_geometria_da_entrada(proj
     projeto.salvar_pagina(3, caixas)
     ctl.operacoes.girar_paginas([3], 90)
     ctl.operacoes.mover_paginas([3], 9)                                  # e muda de lugar
-    posicao = projeto.posicao_do_pid(projeto.sequencia.entradas[9].pid)
+    posicao = projeto.ordem.posicao_de(projeto.sequencia.entradas[9].pid)
     na_memoria = bs._indexar_tarefa((projeto.carregar_modelo(posicao).instantaneo(), "pt", 0))
     entrada = projeto.sequencia.entrada_em(posicao)
     do_arquivo = bs._indexar_tarefa(((str(projeto.arquivo_da_pagina(posicao)), posicao,
@@ -309,7 +309,7 @@ def test_o_ctrl_z_da_divisao_pelo_carimbo_com_o_cache_vazio(projeto, ctl):
     ctl.desfazedor.refazer()
     with projeto.paginas_em_memoria._trava_do_cache:
         projeto.paginas_em_memoria._modelos.clear()
-    arquivo = projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(3)}.json"
+    arquivo = projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(3)}.json"
     bruto = json.loads(arquivo.read_text(encoding="utf-8"))
     bruto["estado"] = "verificada"                                  # mudou por fora
     arquivo.write_text(json.dumps(bruto), encoding="utf-8")

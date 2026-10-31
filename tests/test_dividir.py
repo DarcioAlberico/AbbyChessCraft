@@ -68,7 +68,7 @@ def test_ca_12_13_dividir_da_duas_paginas_com_metade_dos_pixels(projeto, ctl):
     imagem = _imagem(ctl, 2)
     recortes = _recortes(ctl, projeto, 2)
     gids = [b.gid for b in projeto.carregar_modelo(2).boxes]
-    pid = projeto.pid_da_pagina(2)
+    pid = projeto.ordem.pid_em(2)
     assert ctl.operacoes.dividir_paginas([2])
     assert len(projeto.sequencia) == 61
     esquerda, direita = projeto.sequencia.entrada_em(2), projeto.sequencia.entrada_em(3)
@@ -91,10 +91,10 @@ def test_ca_12_13_a_amostra_de_um_glifo_da_direita_acha_a_origem(projeto, ctl):
     origem = nome_de_origem("Dividir", 5, 4, gid)
     ctl.operacoes.dividir_paginas([5])
     novo = projeto.dados.gids_movidos[str(gid)]
-    assert projeto.origem_da_amostra(origem) == (6, novo)
+    assert projeto.ordem.origem_da_amostra(origem) == (6, novo)
     assert projeto.carregar_modelo(6).boxes[1].gid == novo
     # a amostra antiga, sem gid, vai à metade esquerda
-    assert projeto.origem_da_amostra(nome_de_origem("Dividir", 5, 4)) == (5, None)
+    assert projeto.ordem.origem_da_amostra(nome_de_origem("Dividir", 5, 4)) == (5, None)
 
 
 def test_ca_12_13_dividir_uma_metade_e_recusado(projeto, ctl):
@@ -120,7 +120,7 @@ def test_ca_12_13_o_ctrl_z_junta_e_aposenta_o_pid_novo(projeto, ctl):
     assert not (projeto.pasta / "paginas" / f"p{pid_novo}.json").exists()
     assert [b.gid for b in projeto.carregar_modelo(2).boxes] == gids
     assert _recortes(ctl, projeto, 2) == recortes
-    assert projeto.novo_pid() > pid_novo                         # aposentado
+    assert projeto.ordem.novo_pid() > pid_novo                         # aposentado
     livro = json.loads((projeto.pasta / "livro.json").read_text(encoding="utf-8"))
     assert str(pid_novo) not in livro["paginas"]
     ctl.desfazedor.refazer()
@@ -280,7 +280,7 @@ def test_falhar_ao_gravar_o_projeto_nao_deixa_o_arquivo_da_direita(projeto, ctl,
     assert not ctl.operacoes.dividir_paginas([2])
     assert projeto.sequencia == antes and projeto.dados.gids_movidos == {}
     assert [p.name for p in (projeto.pasta / "paginas").glob("p*.json")] == \
-        [f"p{projeto.pid_da_pagina(2)}.json"]
+        [f"p{projeto.ordem.pid_em(2)}.json"]
 
 
 def test_com_leitura_do_servidor_pendente_as_operacoes_esperam(projeto, ctl):
@@ -300,4 +300,4 @@ def test_a_amostra_antiga_vai_a_esquerda_mesmo_com_a_direita_antes(projeto, ctl)
     ctl.operacoes.dividir_paginas([5])
     ctl.operacoes.mover_paginas([6], -1)                       # a direita vai para o começo
     assert projeto.sequencia.entrada_em(0).metade == "direita"
-    assert projeto.origem_da_amostra(nome_de_origem("Dividir", 5, 0)) == (6, None)
+    assert projeto.ordem.origem_da_amostra(nome_de_origem("Dividir", 5, 0)) == (6, None)

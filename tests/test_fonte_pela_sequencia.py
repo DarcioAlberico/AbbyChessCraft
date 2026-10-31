@@ -63,7 +63,7 @@ def test_abrir_a_pagina_de_quadro_ruim_avisa_e_nao_derruba(tmp_path, pdf_de_60_p
     controlador.ligar(projeto, pg.fonte_do_projeto(projeto),
                       LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
     entrada = projeto.sequencia.entrada_em(3)
-    projeto._trocar_sequencia(projeto.sequencia.com_entrada(
+    projeto.ordem.trocar(projeto.sequencia.com_entrada(
         Entrada(entrada.pid, "livro", 3, quadro=(0, 0, 99999, 50))))
     assert controlador.ir_para(3) is False and avisos and "não cabe" in avisos[0]
 
@@ -160,7 +160,7 @@ def test_o_lote_pula_a_pagina_que_saiu_do_livro_e_segue_a_que_mudou_de_lugar(
                               ao_gravar=gravadas.append)
     entradas = projeto.sequencia.entradas
     # Antes de começar: a página 2 sai do livro e a 3 vai para a frente.
-    projeto._trocar_sequencia(Sequencia((entradas[2], entradas[0]),
+    projeto.ordem.trocar(Sequencia((entradas[2], entradas[0]),
                                         (Apagada(entradas[1], 1),)))
     assert condutor.posicoes_restantes() == [1, 0]
     condutor.comecar()
@@ -206,7 +206,7 @@ def test_a_pagina_que_muda_de_lugar_durante_a_leitura_e_gravada_no_lugar_novo(
         vistos.append(entrada.pid)
         if entrada.pid == pids[0]:              # a primeira vai para o fim enquanto é lida
             e = projeto.sequencia.entradas
-            projeto._trocar_sequencia(Sequencia((e[1], e[2], e[0])))
+            projeto.ordem.trocar(Sequencia((e[1], e[2], e[0])))
         return renderizar(entrada)
 
     controlador.fonte.pagina_da_entrada = no_meio_da_leitura

@@ -123,7 +123,7 @@ class CacheDoProjeto:
     # ------------------------------------------------------------------
     def pagina(self, indice: int) -> Optional[Pagina]:
         """A página do cache, sem ler o disco (None se ela não está na memória)."""
-        pid = self._p._pid_em(indice)
+        pid = self._p.ordem.pid_em(indice)
         if pid is None:
             return None
         with self._trava_do_cache:

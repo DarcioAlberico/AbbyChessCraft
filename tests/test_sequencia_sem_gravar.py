@@ -1,5 +1,5 @@
 """Ler a sequência não grava (SPEC-qualidade Q-P8): quem monta e conserta a sequência é
-`montar_sequencia`, chamada ao criar e ao abrir; a propriedade só lê."""
+`ordem.montar`, chamada ao criar e ao abrir; a propriedade só lê."""
 from __future__ import annotations
 
 import json

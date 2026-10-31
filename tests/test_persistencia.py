@@ -220,7 +220,7 @@ def _cada_arquivo_do_projeto(projeto: ProjetoDeLivro, tmp_path: Path):
 
     # No v2, a página, a marca dela (o estado) e as áreas ficam no arquivo da página; desde a
     # v3 (§12.4), o pid dela é o da sequência.
-    arquivo_da_pagina = projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(0)}.json"
+    arquivo_da_pagina = projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(0)}.json"
     return [("pagina", arquivo_da_pagina, pagina),
             ("marcadas", arquivo_da_pagina, marcadas),
             ("projeto.json", projeto.pasta / "projeto.json", projeto_json),
@@ -323,7 +323,7 @@ def test_a_pagina_ilegivel_fica_guardada_e_e_nao_reconhecida_em_todo_lugar(proje
     todos (a busca, a aba Diagramas, a janela, a exportação); o aviso sai uma vez."""
     projeto.salvar_pagina(0, [_box()], reconhecida=True)
     assert projeto.fechar()
-    arquivo = projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(0)}.json"
+    arquivo = projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(0)}.json"
     estragado = arquivo.read_bytes()[:-9]
     arquivo.write_bytes(estragado)
 
@@ -512,7 +512,7 @@ def test_livro_json_e_igual_ao_recalculado_depois_de_qualquer_sequencia(projeto,
 
 def test_livro_json_que_falta_e_refeito(projeto):
     projeto.salvar_pagina(2, [_box(), _box(source=FONTE_MANUAL)], reconhecida=False)
-    pid = projeto.pid_da_pagina(2)
+    pid = projeto.ordem.pid_em(2)
     (projeto.pasta / ARQUIVO_DO_LIVRO).unlink()
     resumo = ProjetoDeLivro.abrir(projeto.pasta).resumo.do_livro()
     assert resumo == {2: {"pid": pid, "pagina_da_fonte": 2, "estado": "glifos_marcados", "boxes": 2,
@@ -697,7 +697,7 @@ def test_livro_json_da_versao_1_e_refeito_com_a_faixa_100(projeto):
     arquivo = projeto.pasta / ARQUIVO_DO_LIVRO
     velho = json.loads(arquivo.read_text(encoding="utf-8"))
     velho["versao"] = 1
-    velho["paginas"][str(projeto.pid_da_pagina(0))]["histograma"] = {"99": 1}  # a da versão 1
+    velho["paginas"][str(projeto.ordem.pid_em(0))]["histograma"] = {"99": 1}  # a da versão 1
     arquivo.write_text(json.dumps(velho), encoding="utf-8")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     assert reaberto.resumo.do_livro()[0]["histograma"] == {"100": 1}

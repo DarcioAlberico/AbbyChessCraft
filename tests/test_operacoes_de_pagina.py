@@ -96,7 +96,7 @@ def test_ca_12_8_desfazer_devolve_a_ordem_e_o_seguinte_desfaz_a_edicao_de_antes(
 def test_desfazer_a_reordenacao_e_recusado_se_a_ordem_mudou_por_fora(projeto, ctl):
     ctl.operacoes.mover_paginas([0], 4)
     s = projeto.sequencia
-    projeto.gravar_sequencia(s.mover([s.pid_em(10)], -1))    # outra mudança, sem o desfazer
+    projeto.ordem.gravar(s.mover([s.pid_em(10)], -1))    # outra mudança, sem o desfazer
     ctl.desfazedor.desfazer()
     assert any("mudou depois" in a for a in ctl.avisos)
     assert projeto.sequencia.pid_em(0) == s.pid_em(10)       # nada foi mudado
@@ -148,7 +148,7 @@ def test_ca_12_9_inserir_antes_da_primeira_e_ler_e_exportar_a_inserida(projeto, 
     assert ctl.operacoes.inserir_paginas([pdf], 0)
     assert projeto.sequencia.entrada_em(0).fonte.startswith("inseridas/")
     projeto.salvar_pagina(0, [_box("q"), _box("q", x=20)])     # lida (os boxes de um F5)
-    assert projeto.carregar_modelo(0).pid == projeto.pid_da_pagina(0)
+    assert projeto.carregar_modelo(0).pid == projeto.ordem.pid_em(0)
     assert _texto(projeto).startswith("qq")
 
 
@@ -204,7 +204,7 @@ def test_a_pagina_aberta_que_e_apagada_da_lugar_a_vizinha(projeto, ctl):
     ctl.ir_para(59)
     pids = projeto.sequencia.pids
     ctl.operacoes.apagar_paginas([59])
-    assert ctl.indice == 58 and projeto.pid_da_pagina(ctl.indice) == pids[58]
+    assert ctl.indice == 58 and projeto.ordem.pid_em(ctl.indice) == pids[58]
     assert ctl.fonte.total == 59
 
 
@@ -278,7 +278,7 @@ def test_falha_ao_gravar_a_ordem_nao_muda_nada(projeto, ctl, monkeypatch):
 
 def test_desfazer_o_inserir_poe_as_inseridas_nas_apagadas(projeto, ctl, tmp_path):
     ctl.operacoes.inserir_paginas([_png(tmp_path / "x.png")], 3)
-    pid = projeto.pid_da_pagina(3)
+    pid = projeto.ordem.pid_em(3)
     projeto.salvar_pagina(3, [_box("w")])                     # lida, fora do desfazer
     ctl.desfazedor.desfazer()
     assert pid not in projeto.sequencia.pids
@@ -297,7 +297,7 @@ def test_as_visitas_seguem_as_paginas_pelo_pid(projeto, ctl):
     ctl.operacoes.mover_paginas([5], 20)                               # a 6 vai para depois da 21
     assert ctl.navegador.visitas == [0, 20, 8, 20] and ctl.navegador._visita == 3
     ctl.navegador.voltar_visita()
-    assert projeto.pid_da_pagina(ctl.indice) == pids[9]
+    assert projeto.ordem.pid_em(ctl.indice) == pids[9]
 
 
 def test_pdf_cifrado_diz_que_e_cifrado(projeto, tmp_path):
@@ -310,7 +310,7 @@ def test_pdf_cifrado_diz_que_e_cifrado(projeto, tmp_path):
         doc.new_page()
         doc.save(str(cifrado), encryption=fitz.PDF_ENCRYPT_AES_256, user_pw="x", owner_pw="y")
     with pytest.raises(ProjetoInvalido, match="é um PDF cifrado"):
-        projeto.inserir_arquivo(cifrado)
+        projeto.ordem.inserir_arquivo(cifrado)
 
 
 # ----------------------------------------------------------------------
@@ -329,6 +329,6 @@ def test_ca_4_6_nenhum_gid_se_repete_e_a_amostra_acha_a_origem(projeto, ctl, tmp
     for arquivo in (projeto.pasta / "paginas").glob("p*.json"):
         todos += [b[0] for b in json.loads(arquivo.read_text(encoding="utf-8"))["boxes"]]
     assert len(todos) == len(set(todos)) == 8
-    posicao, achado = projeto.origem_da_amostra(origem)
-    assert achado == gid and projeto.pid_da_pagina(posicao) == pid_de(gid)
+    posicao, achado = projeto.ordem.origem_da_amostra(origem)
+    assert achado == gid and projeto.ordem.pid_em(posicao) == pid_de(gid)
     assert gid in {b.gid for b in projeto.carregar_modelo(posicao).boxes}

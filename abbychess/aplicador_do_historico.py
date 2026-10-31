@@ -63,12 +63,12 @@ class AplicadorDoHistorico:
                             # leva o contador dela para quando voltar.
                             guardada.proximo_n = max(guardada.proximo_n, contador)
                     if not self._p.projeto.pagina_igual(pid, velha if refazer else nova):
-                        posicao = self._p.projeto.posicao_do_pid(pid)
+                        posicao = self._p.projeto.ordem.posicao_de(pid)
                         onde = "" if posicao is None else f" {posicao + 1}"
                         raise hs.Recusa(f"a página{onde} mudou depois (por outra ação)")
             for pid, m in transacao.paginas.items():
                 # Pelo pid (§12.4): a página pode ter mudado de posição desde a transação.
-                posicao = self._p.projeto.posicao_do_pid(pid)
+                posicao = self._p.projeto.ordem.posicao_de(pid)
                 if posicao is None:
                     raise hs.Recusa(f"a página {m.indice + 1} saiu do livro")
                 pagina = (self._p.modelo if self._p.modelo is not None and self._p.modelo.pid == pid
@@ -93,7 +93,7 @@ class AplicadorDoHistorico:
                         for pid, par in transacao.inteiras.items()}
 
                 def gravar(s):
-                    self._p.projeto.trocar_paginas(s, alvo, transacao.movidos[lado])
+                    self._p.projeto.ordem.trocar_paginas(s, alvo, transacao.movidos[lado])
             try:
                 self._p.operacoes.aplicar_sequencia(depois if refazer else antes, gravar=gravar)
             except OSError as erro:
@@ -130,7 +130,7 @@ class AplicadorDoHistorico:
                                    f"“{transacao.descricao}” voltou nas páginas, mas os "
                                    f"padrões do livro não ({erro}).")
         aberta = self._p.modelo is not None and self._p.modelo.pid in transacao.paginas
-        posicoes = sorted(p for p in map(self._p.projeto.posicao_do_pid, transacao.paginas)
+        posicoes = sorted(p for p in map(self._p.projeto.ordem.posicao_de, transacao.paginas)
                           if p is not None)
         if aberta or not posicoes or not self._p.ir_para(posicoes[0]):
             # A página aberta mudou (ou a da transação não abre): o glifo em revisão, os

@@ -69,8 +69,8 @@ def saude(projeto: ProjetoDeLivro, padroes: int = 0) -> SaudeDoLivro:
     # Gravadas por `pid` (§12.4): `paginas` é a posição de agora de cada uma; os pendentes
     # iniciais são chaveados pelo valor gravado.
     gravadas = [g for g in extras.get(CHAVE_DA_AMOSTRA, ())
-                if projeto.posicoes_das_gravadas([g])]
-    paginas = tuple(projeto.posicoes_das_gravadas(gravadas))
+                if projeto.ordem.posicoes_das_gravadas([g])]
+    paginas = tuple(projeto.ordem.posicoes_das_gravadas(gravadas))
     iniciais = extras.get(CHAVE_DOS_PENDENTES_INICIAIS, {}) or {}
     resumo = projeto.resumo.do_livro()
     por_pagina = tuple(

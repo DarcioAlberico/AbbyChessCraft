@@ -354,6 +354,7 @@ class _ProjetoNaMemoria:
         self.pagina = pagina
         self.agendadas = 0
         self.paginas_em_memoria = self             # prender e agendar, como o cache
+        self.ordem = self                          # e a posição do pid, como a sequência
 
     def carregar_modelo(self, indice):
         return self.pagina
@@ -361,7 +362,7 @@ class _ProjetoNaMemoria:
     def pagina_para_editar(self, indice):
         return self.pagina
 
-    def posicao_do_pid(self, pid):                  # a página única, na posição 0
+    def posicao_de(self, pid):                      # a página única, na posição 0
         return 0 if pid == self.pagina.pid else None
 
     def prender(self, pid):                         # sem cache, nada a despejar

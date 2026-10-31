@@ -64,7 +64,7 @@ def _sem_hora(dados: bytes) -> dict:
 
 
 def _hash(projeto, indice) -> str:
-    pid = projeto.pid_da_pagina(indice)
+    pid = projeto.ordem.pid_em(indice)
     return hashlib.sha256(projeto._arquivo_v2(pid).read_bytes()).hexdigest()
 
 
@@ -254,13 +254,13 @@ def test_ca_4_8_voltar_ao_estado_antes_do_lote_devolve_o_json_copiado(ctl, proje
     p.leitura.ensinar("a")                                        # o lote lê os "a" da 1 pelo padrão
     ctl.executor.tudo()
     projeto.paginas_em_memoria.descarregar(10)
-    copia_esperada = (projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(1)}.json").read_bytes()
+    copia_esperada = (projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(1)}.json").read_bytes()
     assert not any(b.entry.source == "livro" for b in projeto.carregar_modelo(1).boxes)
     ctl.reconhecer([1], refazer=True)
     ctl.executor.tudo()
     assert ctl.fins[-1].lidas == [1]
     projeto.paginas_em_memoria.descarregar(10)
-    pid = projeto.pid_da_pagina(1)
+    pid = projeto.ordem.pid_em(1)
     copia = projeto.pasta / "paginas" / ".antes-do-lote" / f"p{pid}.json"
     relida = projeto.carregar_modelo(1)
     assert any(b.entry.char == "W" and b.entry.source == FONTE_MANUAL for b in relida.boxes)
@@ -513,7 +513,7 @@ def test_o_que_falta_retomar_fica_no_projeto_e_volta_ao_reabrir(ctl, projeto):
     arquivo = projeto.pasta / ARQUIVO_DO_LOTE
     # Por pid desde a v3 (§12.4): no projeto novo, o pid da página é a posição dela.
     assert json.loads(arquivo.read_text(encoding="utf-8")) == {
-        "paginas": [projeto.pid_da_pagina(1), projeto.pid_da_pagina(2)], "refazer": True,
+        "paginas": [projeto.ordem.pid_em(1), projeto.ordem.pid_em(2)], "refazer": True,
         "reler_depois": [], "pids": True}
     p = ctl.pagina                                        # reabre o projeto
     ctl.usar(projeto, p.fonte, p.leitor)

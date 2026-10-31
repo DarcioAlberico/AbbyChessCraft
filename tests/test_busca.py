@@ -400,7 +400,7 @@ def test_trocar_de_projeto_com_o_pool_nao_esvazia_o_indice_novo(tmp_path):
 
         return SimpleNamespace(dados=SimpleNamespace(idioma="pt"),
                                resumo=SimpleNamespace(paginas_lidas=lambda: range(120)),
-                               pid_da_pagina=lambda i: i,
+                               ordem=SimpleNamespace(pid_em=lambda i: i),
                                paginas_em_memoria=SimpleNamespace(pagina=lambda i: None),
                                arquivo_da_pagina=lambda i: pasta / f"p{i}.json",
                                sequencia=Sequencia.do_livro(range(120)))

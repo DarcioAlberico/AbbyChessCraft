@@ -78,10 +78,10 @@ def test_mover_pelo_menu_e_a_busca_acha_na_posicao_nova(app, janela, monkeypatch
     _palavra(projeto, 1, "cavalo")
     janela.busca.abrir()
     _ate(janela.busca.pronto.is_set)
-    pid = projeto.pid_da_pagina(1)
+    pid = projeto.ordem.pid_em(1)
     monkeypatch.setattr(dp, "perguntar_paginas", lambda *_a, **_k: ([1], 9))
     janela.acao_mover_paginas.trigger()              # a página 2 depois da 10
-    assert projeto.pid_da_pagina(9) == pid
+    assert projeto.ordem.pid_em(9) == pid
     assert "Ctrl+Z" in janela.statusBar().currentMessage()
     _ate(janela.busca.pronto.is_set)
     _buscar(janela, "cavalo")

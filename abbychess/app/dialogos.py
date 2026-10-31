@@ -172,7 +172,7 @@ def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
         return None
     projeto.dados.idioma = opcoes.idioma
     # As listas de páginas vão por `pid` (§12.4): seguem a página que mudar de lugar.
-    projeto.dados.extras["intervalo_do_corpo"] = projeto.paginas_para_gravar(opcoes.intervalo)
+    projeto.dados.extras["intervalo_do_corpo"] = projeto.ordem.paginas_para_gravar(opcoes.intervalo)
     projeto.salvar()
     inicio, fim = opcoes.intervalo
     try:
@@ -203,7 +203,7 @@ def novo_projeto(janela) -> Optional[ProjetoDeLivro]:
     candidatos = [i for i in range(inicio, fim + 1) if i not in set(importadas)]
     projeto.dados.extras["amostra_guiada_pendente"] = bool(candidatos)
     projeto.dados.extras[livro.CHAVE_DOS_CANDIDATOS_DA_AMOSTRA] = \
-        projeto.paginas_para_gravar(candidatos)
+        projeto.ordem.paginas_para_gravar(candidatos)
     projeto.salvar()
     config.setValue("pasta_dos_projetos", pasta_mae)
     return projeto

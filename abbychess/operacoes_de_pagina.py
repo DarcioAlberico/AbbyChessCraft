@@ -33,7 +33,7 @@ class ControladorDaSequencia:
             return "Nenhum projeto aberto."
         if self._p.projeto.somente_leitura:
             return "O projeto está aberto só para leitura."
-        if not self._p.projeto.sequencia_gravada:
+        if not self._p.projeto.ordem.gravada:
             return ("O projeto ainda está no formato antigo: abra-o com a fonte do livro no "
                     "lugar para passar ao novo.")
         if self._p.lote_rodando:
@@ -78,7 +78,7 @@ class ControladorDaSequencia:
         novas = []
         try:
             for caminho in caminhos:
-                novas += self._p.projeto.inserir_arquivo(caminho)
+                novas += self._p.projeto.ordem.inserir_arquivo(caminho)
         except (ProjetoInvalido, OSError) as erro:
             self._p.eventos.emitir("aviso", "Inserir páginas", f"{erro} Nada foi inserido.")
             return False
@@ -112,7 +112,7 @@ class ControladorDaSequencia:
                 e = nova.entrada_de(pid)
                 nova = nova.com_entrada(replace(e, giro=(e.giro + graus) % 360,
                                                 tamanho=e.tamanho or self._tamanho(e)))
-            lidas = {self._p.projeto.pid_da_pagina(i) for i in self._p.projeto.resumo.paginas_lidas()}
+            lidas = {self._p.projeto.ordem.pid_em(i) for i in self._p.projeto.resumo.paginas_lidas()}
             if lidas.intersection(pids):
                 # Os glifos vão junto, mas a leitura (a ordem das linhas, o texto deitado) é a
                 # da posição de antes.
@@ -201,7 +201,7 @@ class ControladorDaSequencia:
                 corte = round(fracao * largura)
                 if not 0 < corte < largura:
                     raise ValueError(f"a página {s.posicao_de(pid) + 1} é estreita demais")
-                pid_novo = projeto.novo_pid()
+                pid_novo = projeto.ordem.novo_pid()
                 esquerda = replace(e, metade="esquerda", tamanho=tamanho,
                                    quadro=geo.quadro_da_vista((0, 0, corte, altura),
                                                               e.geometria, tamanho))
@@ -307,7 +307,7 @@ class ControladorDaSequencia:
             return []
         # O guardado, sem medir (um render por página, na thread da interface): a página lida
         # foi aberta e medida; a que ganhou boxes sem abrir não tem ângulo a guardar.
-        com_dados = {self._p.projeto.pid_da_pagina(i) for i in self._p.projeto.resumo.do_livro()}
+        com_dados = {self._p.projeto.ordem.pid_em(i) for i in self._p.projeto.resumo.do_livro()}
         angulos = []
         for e in mudam:
             if e.pid in com_dados:
@@ -374,7 +374,7 @@ class ControladorDaSequencia:
             transacao.movidos = troca["movidos"]
 
             def gravar(s):
-                self._p.projeto.trocar_paginas(s, novas, troca["movidos"][1])
+                self._p.projeto.ordem.trocar_paginas(s, novas, troca["movidos"][1])
         try:
             self.aplicar_sequencia(nova, depois_de_gravar, gravar)
         except OSError as erro:
@@ -396,7 +396,7 @@ class ControladorDaSequencia:
         aberta = projeto.sequencia.entrada_em(self._p.indice) if self._p.imagem is not None else None
         visitas = self._p.navegador.pids_das_visitas(projeto)
         angulos = self._angulos_a_guardar(projeto.sequencia, nova)
-        (gravar or projeto.gravar_sequencia)(nova)      # OSError: nada mudou
+        (gravar or projeto.ordem.gravar)(nova)      # OSError: nada mudou
         self._guardar_os_angulos(angulos)
         if depois_de_gravar is not None:
             depois_de_gravar()

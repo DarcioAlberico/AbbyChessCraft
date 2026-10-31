@@ -206,7 +206,7 @@ class DesenhoDaJanela:
                 except ValueError:
                     nome = ""
                 # (posição de agora, gid): pelo gid da amostra, que segue a página (§12.4).
-                origem = self.projeto.origem_da_amostra(meta.get("origem", ""))
+                origem = self.projeto.ordem.origem_da_amostra(meta.get("origem", ""))
                 detalhes[str(arquivo)] = {"origem": origem,
                                           "altura": meta.get("altura"),
                                           "efeito": meta.get("efeito"),
@@ -215,7 +215,7 @@ class DesenhoDaJanela:
 
     def ir_a_origem(self, pagina: int, gid) -> None:
         """A página e o glifo de onde a amostra veio (a aba Padrões, "ir para"); `pagina` é a
-        posição de agora (`projeto.origem_da_amostra`), ou None se ela saiu do livro."""
+        posição de agora (`projeto.ordem.origem_da_amostra`), ou None se ela saiu do livro."""
         if self.fonte is None or pagina is None or not 0 <= pagina < self.fonte.total:
             if pagina is None:
                 self._origem_fora_do_livro(gid)

@@ -64,7 +64,7 @@ class GaleriaNaJanela:
         p = self.pagina
         if not self.galeria.modelo.itens or p.projeto is None:
             return
-        posicoes = {p.projeto.posicao_do_pid(pid) for pid in pids} - {None}
+        posicoes = {p.projeto.ordem.posicao_de(pid) for pid in pids} - {None}
         afetadas = {i.pagina for i in self.galeria.modelo.itens} & posicoes
         leituras = {}
         for posicao in afetadas:

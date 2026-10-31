@@ -30,7 +30,7 @@ def projeto(tmp_path, pdf_de_60_paginas, monkeypatch):  # noqa: F811
     matriz[y1:y2, x1:x2] = 0
     imagem = tmp_path / "quadrado.png"
     Image.fromarray(matriz).save(imagem)
-    projeto.gravar_sequencia(projeto.sequencia.inserir(projeto.inserir_arquivo(imagem), 0))
+    projeto.ordem.gravar(projeto.sequencia.inserir(projeto.ordem.inserir_arquivo(imagem), 0))
     return projeto
 
 
@@ -58,7 +58,7 @@ def _centro_da_tinta(ctl):
 
 def test_ca_12_14_o_angulo_a_mao_vence_o_medido_e_o_glifo_marcado_gira(projeto, ctl):
     _gravar(projeto)
-    pid = projeto.pid_da_pagina(0)
+    pid = projeto.ordem.pid_em(0)
     assert ctl.operacoes.endireitar_paginas([0], 5.0)
     assert projeto.sequencia.entrada_de(pid).angulo == 5.0
     assert ctl.fonte.inclinacao(0) == 5.0

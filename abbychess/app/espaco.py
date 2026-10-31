@@ -627,9 +627,9 @@ class EspacoDeTrabalho:
     def _pid_aberto(self) -> Optional[int]:
         """O `pid` da página aberta (v3): reabrir volta a ela mesmo se ela mudou de lugar."""
         projeto = self.projeto
-        if projeto is None or not projeto.sequencia_gravada or self.pagina.fonte is None:
+        if projeto is None or not projeto.ordem.gravada or self.pagina.fonte is None:
             return None
-        return projeto.pid_da_pagina(self.pagina.indice)
+        return projeto.ordem.pid_em(self.pagina.indice)
 
     def gravar_espaco(self) -> None:
         """Grava o espaço do projeto aberto (atômico, como as páginas)."""
@@ -670,8 +670,8 @@ class EspacoDeTrabalho:
                 doca.setVisible(visivel)
         total = self.pagina.fonte.total if self.pagina.fonte else 0
         pagina = dados["pagina"]
-        if dados["pid"] is not None and self.projeto.sequencia_gravada:
-            pela_sequencia = self.projeto.posicao_do_pid(dados["pid"])
+        if dados["pid"] is not None and self.projeto.ordem.gravada:
+            pela_sequencia = self.projeto.ordem.posicao_de(dados["pid"])
             if pela_sequencia is not None:      # a página aberta, onde ela estiver agora
                 pagina = pela_sequencia
         if 0 <= pagina < total and pagina != self.pagina.indice:

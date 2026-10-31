@@ -97,9 +97,9 @@ def test_livro_json_tem_o_pid_e_e_igual_ao_recalculado(lido):
     gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
     assert gravado == projeto.resumo.recalcular()
     # Desde o passo L, o livro é chaveado por pid e cada página tem o pid da sequência.
-    assert set(gravado["paginas"]) == {"0", str(projeto.pid_da_pagina(2))}
+    assert set(gravado["paginas"]) == {"0", str(projeto.ordem.pid_em(2))}
     assert {i: r["pid"] for i, r in projeto.resumo.do_livro().items()} == {
-        0: 0, 2: projeto.pid_da_pagina(2)}
+        0: 0, 2: projeto.ordem.pid_em(2)}
 
 
 def test_livro_sem_a_pagina_acha_o_arquivo_e_nao_duplica(lido):

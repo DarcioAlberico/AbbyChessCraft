@@ -81,7 +81,7 @@ def test_ca_12_11_girar_as_impares_leva_imagem_e_boxes(projeto, ctl):
     # e cada página é levada ao giro quando é lida
     projeto.paginas_em_memoria.descarregar()
     for i in range(10):
-        bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(i)}.json")
+        bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(i)}.json")
                            .read_text(encoding="utf-8"))
         assert bruto["geometria"] == [None, 0]
 
@@ -115,7 +115,7 @@ def test_ca_12_11_reabrir_sem_gravar_as_paginas_os_boxes_estao_no_lugar(projeto,
     depois = _recortes(outro, reaberto, 1)
     assert {g: np.rot90(r, k=1).tobytes() for g, r in recortes.items()} == \
         {g: r.tobytes() for g, r in depois.items()}
-    bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(1)}.json")
+    bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(1)}.json")
                        .read_text(encoding="utf-8"))
     assert bruto["geometria"] == [None, 0]               # o arquivo ainda na de antes
 
@@ -130,7 +130,7 @@ def test_a_pagina_com_boxes_guarda_o_angulo_em_que_foi_lida(tmp_path, pdf_de_60_
     ctl.operacoes.girar_paginas([0], 90)
     assert ctl.fonte.inclinacao(0) == 0.6
     gravado = json.loads((projeto.pasta / "inclinacoes.json").read_text(encoding="utf-8"))
-    assert gravado[f"p{projeto.pid_da_pagina(0)}:inteira:90"] == 0.6
+    assert gravado[f"p{projeto.ordem.pid_em(0)}:inteira:90"] == 0.6
 
 
 # ----------------------------------------------------------------------
@@ -162,7 +162,7 @@ def test_o_glifo_de_fora_volta_ao_tirar_o_corte_depois_de_gravar_e_reabrir(proje
     gids = [b.gid for b in projeto.carregar_modelo(4).boxes]
     ctl.operacoes.cortar_paginas([4], (0, 0, 0.5, 0.5))
     projeto.salvar_pagina(4, projeto.carregar_pagina(4))   # gravada no quadro (o 3º fora)
-    bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(4)}.json")
+    bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(4)}.json")
                        .read_text(encoding="utf-8"))
     assert len(bruto["boxes"]) == 2 and len(bruto["fora"]) == 1
     projeto.fechar()

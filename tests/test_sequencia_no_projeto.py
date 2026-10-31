@@ -29,18 +29,18 @@ def projeto(tmp_path, pdf_de_60_paginas):  # noqa: F811
 def _reordenar(projeto, ordem):
     """Troca a sequência na memória (o que a operação de reordenar fará, na rodada 2)."""
     s = projeto.sequencia
-    projeto._trocar_sequencia(sq.Sequencia(tuple(s.entradas[i] for i in ordem), s.apagadas))
+    projeto.ordem.trocar(sq.Sequencia(tuple(s.entradas[i] for i in ordem), s.apagadas))
 
 
 def test_o_projeto_novo_tem_uma_entrada_por_pagina_do_pdf(projeto):
     s = projeto.sequencia
     assert len(s) == 60 and [e.pagina for e in s.entradas] == list(range(60))
     assert len(set(s.pids)) == 60
-    assert projeto.pid_da_pagina(7) == s.pid_em(7)
+    assert projeto.ordem.pid_em(7) == s.pid_em(7)
 
 
 def test_a_primeira_edicao_usa_o_pid_da_sequencia_e_o_contador_passa_dele(projeto):
-    pid = projeto.pid_da_pagina(41)
+    pid = projeto.ordem.pid_em(41)
     projeto.salvar_pagina(41, [_box()])
     assert projeto.carregar_modelo(41).pid == pid
     assert projeto.dados.proximo_pid > pid
@@ -52,7 +52,7 @@ def test_a_primeira_edicao_usa_o_pid_da_sequencia_e_o_contador_passa_dele(projet
 def test_livro_json_e_chaveado_por_pid_com_o_indice(projeto):
     projeto.salvar_pagina(3, [_box()])
     livro = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
-    pid = projeto.pid_da_pagina(3)
+    pid = projeto.ordem.pid_em(3)
     assert livro["versao"] == VERSAO_DO_LIVRO and list(livro["paginas"]) == [str(pid)]
     assert livro["paginas"][str(pid)]["pagina_da_fonte"] == 3
 
@@ -60,34 +60,34 @@ def test_livro_json_e_chaveado_por_pid_com_o_indice(projeto):
 def test_reabrir_monta_a_mesma_posicao_para_cada_pagina_gravada(projeto):
     for i in (0, 5, 59):
         projeto.salvar_pagina(i, [_box()])
-    pids = {i: projeto.pid_da_pagina(i) for i in (0, 5, 59)}
+    pids = {i: projeto.ordem.pid_em(i) for i in (0, 5, 59)}
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert {i: reaberto.pid_da_pagina(i) for i in (0, 5, 59)} == pids
+    assert {i: reaberto.ordem.pid_em(i) for i in (0, 5, 59)} == pids
     assert sorted(reaberto.resumo.do_livro()) == [0, 5, 59]
 
 
 def test_o_livro_json_antigo_por_indice_e_refeito(projeto):
     projeto.salvar_pagina(2, [_box()])
-    pid = projeto.pid_da_pagina(2)
+    pid = projeto.ordem.pid_em(2)
     arquivo = projeto.pasta / ARQUIVO_DO_LIVRO
     velho = json.loads(arquivo.read_text(encoding="utf-8"))
     resumo = velho["paginas"][str(pid)]
     resumo.pop("pagina_da_fonte")
     arquivo.write_text(json.dumps({"versao": 3, "paginas": {"3": resumo}}), encoding="utf-8")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.pid_da_pagina(2) == pid and list(reaberto.resumo.do_livro()) == [2]
+    assert reaberto.ordem.pid_em(2) == pid and list(reaberto.resumo.do_livro()) == [2]
     assert json.loads(arquivo.read_text(encoding="utf-8"))["versao"] == VERSAO_DO_LIVRO
 
 
 def test_arquivo_que_o_livro_nao_cita_entra_na_sequencia(projeto):
     projeto.salvar_pagina(8, [_box()])
-    pid = projeto.pid_da_pagina(8)
+    pid = projeto.ordem.pid_em(8)
     arquivo = projeto.pasta / ARQUIVO_DO_LIVRO
     livro = json.loads(arquivo.read_text(encoding="utf-8"))
     del livro["paginas"][str(pid)]                 # a queda entre a página e o livro
     arquivo.write_text(json.dumps(livro), encoding="utf-8")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.pid_da_pagina(8) == pid
+    assert reaberto.ordem.pid_em(8) == pid
     assert reaberto.carregar_pagina(8) is not None and 8 in reaberto.resumo.do_livro()
     assert str(pid) in json.loads(arquivo.read_text(encoding="utf-8"))["paginas"]
 
@@ -99,9 +99,9 @@ def test_arquivo_que_o_livro_nao_cita_entra_na_sequencia(projeto):
 def test_depois_de_reordenar_a_pagina_e_achada_na_posicao_nova(projeto):
     projeto.salvar_pagina(0, [_box(char="x")])
     projeto.salvar_pagina(1, [_box(char="y")])
-    pid0 = projeto.pid_da_pagina(0)
+    pid0 = projeto.ordem.pid_em(0)
     _reordenar(projeto, [1, 2, 0, *range(3, 60)])  # a página 1 vai à posição 3
-    assert projeto.pid_da_pagina(2) == pid0
+    assert projeto.ordem.pid_em(2) == pid0
     assert projeto.carregar_pagina(2)[0].char == "x"
     assert projeto.carregar_pagina(0)[0].char == "y"
     assert projeto.carregar_modelo(2).indice == 2  # a posição de agora, não a gravada
@@ -113,7 +113,7 @@ def test_gravar_depois_de_reordenar_guarda_a_pagina_do_pdf_e_nao_a_posicao(proje
     """Até a v3 gravar a sequência (rodada 1e), o PDF dá a ordem: a página movida e gravada
     tem de voltar à página dela no PDF, e não ir para a posição em que estava ao gravar."""
     projeto.salvar_pagina(0, [_box(char="x")])
-    pid = projeto.pid_da_pagina(0)
+    pid = projeto.ordem.pid_em(0)
     _reordenar(projeto, [1, 2, 0, *range(3, 60)])
     projeto.salvar_pagina(2, [_box(char="z")])         # a mesma página, na posição 3
     assert projeto.fechar(10)
@@ -122,11 +122,11 @@ def test_gravar_depois_de_reordenar_guarda_a_pagina_do_pdf_e_nao_a_posicao(proje
     bruto = json.loads((projeto.pasta / "paginas" / f"p{pid}.json").read_text(encoding="utf-8"))
     assert bruto["indice"] == 0
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.pid_da_pagina(0) == pid and reaberto.carregar_pagina(0)[0].char == "z"
+    assert reaberto.ordem.pid_em(0) == pid and reaberto.carregar_pagina(0)[0].char == "z"
 
 
 def test_perguntar_fora_do_livro_nao_cria_paginas(projeto):
-    assert projeto.pid_da_pagina(500) is None
+    assert projeto.ordem.pid_em(500) is None
     assert projeto.carregar_modelo(500) is None and projeto.paginas_em_memoria.pagina(500) is None
     assert projeto.resumo.estado_da_pagina(500) == "nao_reconhecida"
     assert len(projeto.sequencia) == 60
@@ -136,15 +136,15 @@ def test_arquivo_em_disco_fora_da_sequencia_vai_as_apagadas_e_reserva_o_pid(proj
     """Desde a v3 (§12.4): um `p<pid>.json` que não está na sequência nem nas apagadas (uma
     queda entre gravações) entra nas apagadas, e o pid dele não é dado a outra página."""
     projeto.salvar_pagina(0, [_box()])
-    bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(0)}.json")
+    bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(0)}.json")
                        .read_text(encoding="utf-8"))
     bruto.update(pid=500, indice=30)             # a página 31, que não tem arquivo dela
     (projeto.pasta / "paginas" / "p500.json").write_text(json.dumps(bruto), encoding="utf-8")
     (projeto.pasta / ARQUIVO_DO_LIVRO).unlink()
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.pid_da_pagina(0) == projeto.pid_da_pagina(0)
+    assert reaberto.ordem.pid_em(0) == projeto.ordem.pid_em(0)
     assert 500 not in reaberto.sequencia.pids and reaberto.sequencia.apagada(500) is not None
-    assert reaberto._proximo_pid > 500
+    assert reaberto.ordem._proximo_pid > 500
     assert ProjetoDeLivro.abrir(projeto.pasta).sequencia.apagada(500) is not None   # gravada
 
 
@@ -152,21 +152,21 @@ def test_o_perdedor_de_dois_arquivos_da_mesma_pagina_nao_vira_apagada(projeto):
     """O duplicado (a página tem o arquivo dela) fica de fora, para não ser "restaurado"
     depois; o pid dele continua reservado."""
     projeto.salvar_pagina(0, [_box()])
-    bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(0)}.json")
+    bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(0)}.json")
                        .read_text(encoding="utf-8"))
     bruto.update(pid=500, gravado_em="2000-01-01T00:00:00+00:00")
     (projeto.pasta / "paginas" / "p500.json").write_text(json.dumps(bruto), encoding="utf-8")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     assert reaberto.sequencia.apagada(500) is None and 500 not in reaberto.sequencia.pids
-    assert reaberto._proximo_pid > 500
+    assert reaberto.ordem._proximo_pid > 500
 
 
 def test_sem_a_fonte_a_pagina_gravada_continua_no_lugar(projeto):
     projeto.salvar_pagina(7, [_box()])
-    pid = projeto.pid_da_pagina(7)
+    pid = projeto.ordem.pid_em(7)
     projeto.fonte.rename(projeto.fonte.with_suffix(".sumido"))
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.pid_da_pagina(7) == pid and reaberto.carregar_pagina(7) is not None
+    assert reaberto.ordem.pid_em(7) == pid and reaberto.carregar_pagina(7) is not None
 
 
 def test_pagina_pendente_no_gravador_segue_a_posicao(projeto):
@@ -190,7 +190,7 @@ def test_o_desfazer_acha_a_pagina_pelo_pid_depois_de_reordenar(tmp_path, pdf_de_
     controlador.ir_para(6)
     largura, altura = controlador.imagem.size
     controlador.marcar(0, 0, largura - 1, altura // 4)  # o "Pagina 7" vira um glifo
-    pid = projeto.pid_da_pagina(6)
+    pid = projeto.ordem.pid_em(6)
     assert projeto.carregar_modelo(6).boxes
     controlador.ir_para(0)
     _reordenar(projeto, [6, *range(6), *range(7, 60)])

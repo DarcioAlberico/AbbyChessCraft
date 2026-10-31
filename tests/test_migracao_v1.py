@@ -72,7 +72,7 @@ def _conferir(projeto: ProjetoDeLivro, verdade: dict) -> None:
     # de antes em `backup-v2/`.
     antigos = json.loads(verdade["inclinacoes"])
     novos = json.loads((projeto.pasta / "inclinacoes.json").read_text(encoding="utf-8"))
-    assert novos == {f"p{projeto.pid_da_pagina(int(k))}:inteira:0": v for k, v in antigos.items()}
+    assert novos == {f"p{projeto.ordem.pid_em(int(k))}:inteira:0": v for k, v in antigos.items()}
     assert (projeto.pasta / "backup-v2" / "inclinacoes.json").read_bytes() == \
         verdade["inclinacoes"]
     padroes = {p.relative_to(projeto.pasta).as_posix(): p.read_bytes()
@@ -129,12 +129,12 @@ def test_reordenar_antes_de_ler_a_v1_mostra_cada_pagina_com_os_glifos_dela(proje
     verdade = _verdade_v1(projeto_v1)
     projeto = ProjetoDeLivro.abrir(projeto_v1)
     sequencia = projeto.sequencia
-    projeto.gravar_sequencia(sequencia.mover([sequencia.pid_em(0)], 1))     # a 1ª depois da 2ª
+    projeto.ordem.gravar(sequencia.mover([sequencia.pid_em(0)], 1))     # a 1ª depois da 2ª
 
     def conferir(aberto: ProjetoDeLivro) -> None:
-        assert [aberto.pid_da_pagina(i) for i in range(3)] == [1, 0, 2]
+        assert [aberto.ordem.pid_em(i) for i in range(3)] == [1, 0, 2]
         for posicao in range(3):
-            pid = aberto.pid_da_pagina(posicao)
+            pid = aberto.ordem.pid_em(posicao)
             boxes = [list(b.as_state()) for b in aberto.carregar_pagina(posicao)]
             assert boxes == verdade["paginas"][pid]["boxes"], (posicao, pid)
 

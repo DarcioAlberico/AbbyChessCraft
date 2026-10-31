@@ -300,7 +300,7 @@ class ControladorDeLayout:
         if mudancas:
             p.historico.registrar(hs.Transacao("Aplicar modelo de áreas", mudancas))
             p.eventos.emitir("acoes_mudaram")
-            aberta = p.projeto.pid_da_pagina(p.indice) if p.indice is not None else None
+            aberta = p.projeto.ordem.pid_em(p.indice) if p.indice is not None else None
             if aberta in mudancas:
                 # A página aberta (lida ou não) mostra as zonas novas já.
                 self.atual = None
@@ -920,9 +920,9 @@ class ControladorDoLivro:
         extras = p.projeto.dados.extras
         candidatos = extras.get(lv.CHAVE_DOS_CANDIDATOS_DA_AMOSTRA)
         if candidatos is not None:               # gravados por pid (§12.4)
-            candidatos = p.projeto.posicoes_das_gravadas(candidatos)
+            candidatos = p.projeto.ordem.posicoes_das_gravadas(candidatos)
         else:                                    # projeto criado antes desta chave
-            ponta = p.projeto.posicoes_das_gravadas(extras.get("intervalo_do_corpo") or ())
+            ponta = p.projeto.ordem.posicoes_das_gravadas(extras.get("intervalo_do_corpo") or ())
             inicio, fim = (ponta[0], ponta[-1]) if len(ponta) == 2 else (0, p.fonte.total - 1)
             candidatos = range(max(0, int(inicio)), min(p.fonte.total - 1, int(fim)) + 1)
         candidatos = [int(i) for i in candidatos if 0 <= int(i) < p.fonte.total]
@@ -932,7 +932,7 @@ class ControladorDoLivro:
             p.projeto.salvar()
             return False
         p.projeto.dados.extras["amostra_guiada_pendente"] = False
-        p.projeto.dados.extras[lv.CHAVE_DA_AMOSTRA] = p.projeto.paginas_para_gravar(indices)
+        p.projeto.dados.extras[lv.CHAVE_DA_AMOSTRA] = p.projeto.ordem.paginas_para_gravar(indices)
         p.projeto.salvar()
         self._amostra_guiada = indices
         self.reconhecer(indices, refazer=False)
@@ -979,7 +979,7 @@ class ControladorDoLivro:
                 extras[lv.CHAVE_DOS_PENDENTES_INICIAIS] = {
                     str(g): int(resumo.get(i, {}).get("pendentes", 0) or 0)
                     for i in paginas_da_amostra
-                    for g in projeto.paginas_para_gravar([i])
+                    for g in projeto.ordem.paginas_para_gravar([i])
                 }
             self.pagina.projeto.salvar()
             if completa:
@@ -1014,9 +1014,9 @@ class ControladorDoLivro:
             return
         # Por `pid` (§12.4, `pids`): a página que mudar de lugar continua no lote a retomar.
         dados = None if not faltam and not reler_depois else {
-            "paginas": projeto.paginas_para_gravar(faltam), "refazer": bool(refazer),
-            "reler_depois": projeto.paginas_para_gravar(reler_depois),
-            "pids": projeto.sequencia_gravada}
+            "paginas": projeto.ordem.paginas_para_gravar(faltam), "refazer": bool(refazer),
+            "reler_depois": projeto.ordem.paginas_para_gravar(reler_depois),
+            "pids": projeto.ordem.gravada}
         self._gravador_do_lote.gravar(arquivo, dados)
         if agora:
             self._gravador_do_lote.esperar()
@@ -1033,8 +1033,8 @@ class ControladorDoLivro:
             bruto = json.loads(arquivo.read_text(encoding="utf-8"))
             projeto, total = self.pagina.projeto, self.pagina.fonte.total
             if bruto.get("pids"):               # v3: por pid
-                paginas = projeto.posicoes_das_gravadas(bruto["paginas"])
-                reler = projeto.posicoes_das_gravadas(bruto.get("reler_depois", []))
+                paginas = projeto.ordem.posicoes_das_gravadas(bruto["paginas"])
+                reler = projeto.ordem.posicoes_das_gravadas(bruto.get("reler_depois", []))
             else:                               # o da v2, por posição (a migração o passa)
                 paginas = [int(i) for i in bruto["paginas"] if 0 <= int(i) < total]
                 reler = [int(i) for i in bruto.get("reler_depois", []) if 0 <= int(i) < total]
@@ -1421,7 +1421,7 @@ class ControladorDaBusca:
         historico, idioma = self.pagina.historico, self.idioma
         fontes, a_ler = {}, {}
         for indice in projeto.resumo.paginas_lidas():
-            versao = historico.versao(projeto.pid_da_pagina(indice))
+            versao = historico.versao(projeto.ordem.pid_em(indice))
             modelo = projeto.paginas_em_memoria.pagina(indice)
             caminho = None if modelo is not None else projeto.arquivo_da_pagina(indice)
             if modelo is not None:              # na memória (talvez sem gravar): o instantâneo
@@ -1559,7 +1559,7 @@ class ControladorDaBusca:
         refazer, carregar = {}, {}
         lidas = set(projeto.resumo.paginas_lidas())
         for i in sorted(lidas):
-            versao = historico.versao(projeto.pid_da_pagina(i))
+            versao = historico.versao(projeto.ordem.pid_em(i))
             indexada = self.indice.get(i)
             if indexada is not None and indexada.versao == versao and i not in self._velhas:
                 continue
@@ -1649,7 +1649,7 @@ class ControladorDaBusca:
         else:
             historico = self.pagina.historico
             leitura, refazer, indice = 0, {}, {}
-            carregar = {i: historico.versao(projeto.pid_da_pagina(i))
+            carregar = {i: historico.versao(projeto.ordem.pid_em(i))
                         for i in projeto.resumo.paginas_lidas()}
 
         def rodar():
@@ -1793,7 +1793,7 @@ class ControladorDaSubstituicao:
         fora, em_dia = busca.fora_de_dia(), {}
         for i in indices:
             indexada = busca.indice.get(i)
-            versao = historico.versao(projeto.pid_da_pagina(i))
+            versao = historico.versao(projeto.ordem.pid_em(i))
             em_dia[i] = (indexada if indexada is not None and indexada.versao == versao
                          and i not in fora else None)
         return em_dia

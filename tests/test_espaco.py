@@ -488,18 +488,18 @@ def test_reabrir_volta_a_pagina_aberta_pelo_pid_mesmo_se_ela_mudou_de_lugar(
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Pid", pdf_de_60_paginas)
     j = _abrir(projeto)
     j.ir_para_pagina(12)
-    pid = projeto.pid_da_pagina(12)
+    pid = projeto.ordem.pid_em(12)
     j.close()
     outro = ProjetoDeLivro.abrir(projeto.pasta)
     s = outro.sequencia                              # o que a reordenação (rodada 2) grava
     nova = Sequencia((s.entradas[12], *s.entradas[:12], *s.entradas[13:]))
-    outro._trocar_sequencia(nova)
+    outro.ordem.trocar(nova)
     outro.dados.sequencia = nova.para_json()
     outro.salvar()
     k = _abrir(ProjetoDeLivro.abrir(projeto.pasta))
     try:
         app.processEvents()
-        assert k.pagina.indice == 0 and k.pagina.projeto.pid_da_pagina(0) == pid
+        assert k.pagina.indice == 0 and k.pagina.projeto.ordem.pid_em(0) == pid
     finally:
         k.close()
 

@@ -111,7 +111,7 @@ class CondutorDoLote:
         self.restante: Deque[int] = deque()
         self.resultado = ResultadoDoLote()
         for indice in self.indices:
-            pid = pagina.projeto.pid_da_pagina(indice)
+            pid = pagina.projeto.ordem.pid_em(indice)
             if pid is None:
                 self.resultado.falhas[indice] = "a página não está no livro"
             else:
@@ -144,7 +144,7 @@ class CondutorDoLote:
     def posicoes_restantes(self) -> List[int]:
         """As posições de agora das páginas que faltam (as que saíram do livro, não)."""
         projeto = self.p.projeto
-        return [p for p in map(projeto.posicao_do_pid, self.restante) if p is not None]
+        return [p for p in map(projeto.ordem.posicao_de, self.restante) if p is not None]
 
     def comecar(self) -> None:
         self.ao_progresso(0, self.total, None)
@@ -190,7 +190,7 @@ class CondutorDoLote:
             if not self.restante:
                 self._terminar()
                 return
-            indice = self.p.projeto.posicao_do_pid(self.restante[0])
+            indice = self.p.projeto.ordem.posicao_de(self.restante[0])
             if indice is None:                  # apagada antes da vez dela
                 self.resultado.fora_do_livro.append(self.restante.popleft())
                 self._avancar()
@@ -234,7 +234,7 @@ class CondutorDoLote:
         # Na janela, só o pid e a versão (sem ler o JSON da página: isso, e o que o §4.6
         # mantém, vão para a thread da leitura). Uma mudança do usuário depois daqui sobe a
         # versão, e `_mudou_durante` a pega.
-        pid = projeto.pid_da_pagina(indice)
+        pid = projeto.ordem.pid_em(indice)
         # A entrada e o pid são tomados aqui, na interface: a thread da leitura não resolve a
         # posição de novo (uma reordenação no meio daria a imagem de outra página).
         entrada = fonte.entrada(indice)
@@ -242,7 +242,7 @@ class CondutorDoLote:
         self.em_leitura = indice
 
         def ler(cancelado) -> sl.PaginaLida:
-            agora = projeto.posicao_do_pid(pid)
+            agora = projeto.ordem.posicao_de(pid)
             if agora is None:
                 raise OSError("a página saiu do livro")    # `_voltou` a conta como fora
             modelo = projeto.carregar_modelo(agora)
@@ -298,7 +298,7 @@ class CondutorDoLote:
 
     def _voltou(self, pedida: _Pedida, resultado) -> None:
         # A posição de agora: a página pode ter mudado de lugar enquanto era lida.
-        indice = self.p.projeto.posicao_do_pid(pedida.pid)
+        indice = self.p.projeto.ordem.posicao_de(pedida.pid)
         self._tempos.append(time.perf_counter() - pedida.inicio)
         self.em_leitura = None
         p = self.p
@@ -341,7 +341,7 @@ class CondutorDoLote:
             return VERIFICADA_PULADA
         # O pid da sequência (§12.4): a página ainda sem dados já tem o dela, e a mudança do
         # usuário no meio da leitura (a primeira, que cria a página, também) sobe a versão.
-        pid = p.projeto.pid_da_pagina(indice)
+        pid = p.projeto.ordem.pid_em(indice)
         if pid != pedida.pid or p.historico.versao(pid) != pedida.versao:
             return RELER_DEPOIS
         if pid in p.leitura.lendo_no_f5:        # o pronto do F5 viria por cima (CA-Q-C2)

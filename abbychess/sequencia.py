@@ -53,22 +53,33 @@ class Entrada:
     tamanho: Optional[Tuple[int, int]] = None
 
     def __post_init__(self):
-        if self.quadro is not None and not isinstance(self.quadro, tuple):
-            object.__setattr__(self, "quadro", tuple(self.quadro))     # chave de cache: hashável
-        if self.tamanho is not None and not isinstance(self.tamanho, tuple):
-            object.__setattr__(self, "tamanho", tuple(self.tamanho))
+        for campo in ("quadro", "tamanho"):                             # chave de cache: hashável
+            valor = getattr(self, campo)
+            if valor is not None and not isinstance(valor, tuple):
+                object.__setattr__(self, campo, tuple(valor))
+        motivo = self._rotulos_invalidos() or self._origem_invalida()
+        if motivo:
+            raise ValueError(motivo)
+
+    def _rotulos_invalidos(self) -> Optional[str]:
+        """Por que o pid, a página, o giro ou a metade não valem (None: valem)."""
         if self.pid < 0 or self.pagina < 0:
-            raise ValueError(f"pid e página não negativos: {self.pid}, {self.pagina}")
+            return f"pid e página não negativos: {self.pid}, {self.pagina}"
         if self.giro not in GIROS:
-            raise ValueError(f"giro de {self.giro}° (só {GIROS})")
+            return f"giro de {self.giro}° (só {GIROS})"
         if self.metade is not None and self.metade not in METADES:
-            raise ValueError(f"metade desconhecida: {self.metade!r}")
+            return f"metade desconhecida: {self.metade!r}"
+        return None
+
+    def _origem_invalida(self) -> Optional[str]:
+        """Por que o quadro ou a fonte não valem (None: valem)."""
         if self.quadro is not None:
             x0, y0, x1, y1 = self.quadro
             if not (0 <= x0 < x1 and 0 <= y0 < y1):
-                raise ValueError(f"quadro vazio ou invertido: {self.quadro}")
+                return f"quadro vazio ou invertido: {self.quadro}"
         if self.fonte != FONTE_DO_LIVRO and not _dentro_das_inseridas(self.fonte):
-            raise ValueError(f"fonte desconhecida: {self.fonte!r}")
+            return f"fonte desconhecida: {self.fonte!r}"
+        return None
 
     @property
     def do_livro_sem_geometria(self) -> bool:

@@ -249,24 +249,6 @@ class PainelDeResultados(QTabWidget):
         if lugar is not None:
             self.aviso_escolhido.emit(*lugar)
 
-    def mostrar_glifos(self, glifos: Sequence, cabecalho: str, nomes=None) -> None:
-        """Os glifos da busca por glifo (até a Galeria do passo C); `nomes`, o nome de cada
-        grupo de fonte."""
-        from abbychess import busca as bs
-
-        self._limpar()
-        self.resultados.addItem(cabecalho)
-        for g in glifos[:LIMITE_DE_LINHAS]:
-            grupo = bs.grupo_da_fonte(g.fonte)
-            fonte = (nomes or {}).get(grupo, grupo)
-            item = QListWidgetItem(f"p. {g.pagina + 1}: '{g.char or '□'}', {fonte.lower()}, "
-                                   f"confiança {g.confianca:.2f}")
-            item.setData(PAPEL_DO_ALVO, g)
-            self.resultados.addItem(item)
-        if len(glifos) > LIMITE_DE_LINHAS:
-            self.resultados.addItem(f"… e mais {len(glifos) - LIMITE_DE_LINHAS}")
-        self.setCurrentWidget(self.aba_de_resultados)
-
     def ir_aos_avisos(self) -> None:
         self.setCurrentWidget(self.avisos)
 

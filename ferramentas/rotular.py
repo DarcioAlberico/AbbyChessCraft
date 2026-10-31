@@ -136,6 +136,7 @@ def _rascunho(livro: str, pdf: Path, indices, pasta: Path, com_modelos: bool) ->
 
     from abbychess import diagramas as dg
     from abbychess import exportar as ex
+    from abbychess import montagem as mo
     from abbychess import pagina as pg
     from abbychess.leitor import LeitorDoLivro
 
@@ -163,7 +164,7 @@ def _rascunho(livro: str, pdf: Path, indices, pasta: Path, com_modelos: bool) ->
         altura, largura = original.shape
         angulo = fonte.inclinacao(indice)
         boxes = segmentada.boxes
-        linhas = ex._linhas(boxes)
+        linhas = mo._linhas(boxes)
         de_margem = margens[indice]
         tabuleiros = dg.em_ordem(segmentada.tabuleiros)
         diagramas = dg.ler_diagramas(imagem, tabuleiros, escala=None,

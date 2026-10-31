@@ -402,6 +402,7 @@ def medir(livro: str, pdf: Path, indices) -> dict:
 
 def _medir(livro: str, pdf: Path, indices, pasta: Path) -> dict:
     from abbychess import exportar as ex
+    from abbychess import montagem as mo
     from abbychess import livro as lv
     from abbychess import pagina as pg
     from abbychess.leitor import LeitorDoLivro
@@ -434,7 +435,7 @@ def _medir(livro: str, pdf: Path, indices, pasta: Path) -> dict:
     for i in indices:
         angulo = fonte.inclinacao(i)
         rel = lambda caixa: _caixa_relativa(caixa, angulo, larguras[i], alturas[i])  # noqa: E731
-        linhas = ex._linhas(boxes[i])
+        linhas = mo._linhas(boxes[i])
         caixas = [rel((min(boxes[i][k].x1 for k in ln.indices), ln.topo,
                        max(boxes[i][k].x2 for k in ln.indices), ln.pe)) for ln in linhas]
         # A poeira da borda, que a mesma regra tira, não conta: ela é `ignorar` no

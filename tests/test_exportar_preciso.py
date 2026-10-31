@@ -22,6 +22,7 @@ from PIL import Image
 from core.box_model import BoxEntry
 
 from abbychess import exportar as ex
+from abbychess import montagem as mo
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.modelo import Box, Pagina
@@ -42,7 +43,7 @@ def _linha(texto, y, x=300, altura=50, largura=30, alturas=None):
 
 
 def _texto(boxes):
-    return " ".join(t for linha in ex.palavras(boxes) for t, _ in linha)
+    return " ".join(t for linha in mo.palavras(boxes) for t, _ in linha)
 
 
 # ----------------------------------------------------------------------
@@ -81,11 +82,11 @@ def test_as_coordenadas_do_tabuleiro_saem_do_texto():
     letras = [BoxEntry("abcdefgh"[k], 1015 + 50 * k, 1410, 1035, 1440, 1.0, FONTE_MANUAL)
               for k in range(8)]
     acima = _linha("9.e4 Qh5", 940, x=1000, altura=40)
-    assert ex._sem_coordenadas(numeros + letras + acima, [TABULEIRO]) == acima
+    assert mo._sem_coordenadas(numeros + letras + acima, [TABULEIRO]) == acima
     # Sem coordenadas impressas, a legenda colada embaixo do tabuleiro, com
     # letras de `a` a `h` e números, fica inteira.
     legenda = _linha("1-40 Branco joga", 1405, x=1000, altura=30, largura=22)
-    assert ex._sem_coordenadas(legenda, [TABULEIRO]) == legenda
+    assert mo._sem_coordenadas(legenda, [TABULEIRO]) == legenda
 
 
 def test_linha_de_lances_no_pe_da_pagina_nao_e_rodape():
@@ -125,7 +126,7 @@ def _lado_a_lado(esquerda, direita, vao_em_alturas, y=3300):
 def test_as_legendas_lado_a_lado_sao_duas_linhas():
     """Xadrez Vitorioso p. 25: as legendas dos dois diagramas saíam numa frase só."""
     boxes = _lado_a_lado("Diagrama 6. Jogam as brancas.", "Diagrama 7. Jogam as brancas.", 10.5)
-    assert [" ".join(t for t, _ in linha) for linha in ex.palavras(boxes)] == [
+    assert [" ".join(t for t, _ in linha) for linha in mo.palavras(boxes)] == [
         "Diagrama 6. Jogam as brancas.", "Diagrama 7. Jogam as brancas."]
 
     pagina = Pagina(1, 0, boxes=[Box(i, e) for i, e in enumerate(boxes)], proximo_n=len(boxes))
@@ -138,18 +139,18 @@ def test_as_legendas_lado_a_lado_sao_duas_linhas():
     ("Capitulo um", "Diagrama 7. Jogam as brancas.", 12),  # só duas palavras de um lado
 ])
 def test_o_vao_que_nao_parte_a_linha(esquerda, direita, vao):
-    assert len(ex.palavras(_lado_a_lado(esquerda, direita, vao))) == 1
+    assert len(mo.palavras(_lado_a_lado(esquerda, direita, vao))) == 1
 
 
 def test_as_colunas_nao_se_misturam_na_linha():
-    textos = [b.texto for b in ex.paragrafos(_duas_colunas())]
+    textos = [b.texto for b in mo.paragrafos(_duas_colunas())]
     juntos = " ".join(textos)
     assert not any(t != t.upper() and t != t.lower() for t in textos)
     assert juntos.index(f"{FRASES[5]} 11") < juntos.index(f"{FRASES[3].upper()} 00")
 
 
 def test_o_titulo_que_atravessa_a_calha_vem_primeiro():
-    textos = [b.texto for b in ex.paragrafos(_duas_colunas(titulo="Games"))]
+    textos = [b.texto for b in mo.paragrafos(_duas_colunas(titulo="Games"))]
     assert textos[0] == "Games"
 
 
@@ -197,7 +198,7 @@ def test_a_pagina_de_uma_coluna_detecta_as_colunas_uma_vez(monkeypatch, saida):
         if saida == "documento":
             tx._LINHAS_VISTAS.clear()              # as linhas guardadas pulariam a detecção
             return tx.texto(tx.montar(tx.pagina_avulsa(entries)))
-        return [p.texto for p in ex.paragrafos(entries)]
+        return [p.texto for p in mo.paragrafos(entries)]
 
     with monkeypatch.context() as m:
         refeitas = _contar_deteccoes(m, refazer=True)
@@ -261,9 +262,9 @@ def test_o_idioma_do_arquivo():
 
 
 def test_a_captura_sai_em_minuscula():
-    assert ex._captura_minuscula("♖Xf2!") == "♖xf2!"
-    assert ex._captura_minuscula("eXd5") == "exd5"
-    assert ex._captura_minuscula("XIIIIIY") == "XIIIIIY"
+    assert mo._captura_minuscula("♖Xf2!") == "♖xf2!"
+    assert mo._captura_minuscula("eXd5") == "exd5"
+    assert mo._captura_minuscula("XIIIIIY") == "XIIIIIY"
 
 
 def _com_lacunas(*partes, y=3300):

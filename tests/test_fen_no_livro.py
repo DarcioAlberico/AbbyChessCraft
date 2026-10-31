@@ -14,6 +14,7 @@ import fitz
 import pytest
 
 from abbychess import exportar as ex
+from abbychess import montagem as mo
 from abbychess import livro
 from abbychess import pagina as pg
 from abbychess.leitor import LeitorDoLivro
@@ -81,7 +82,7 @@ def test_lote_refeito_nao_desfaz_a_conferencia(projeto, fonte, leitor):
 def test_diagrama_conferido_sai_desenhado_do_fen(fonte):
     imagem = fonte.pagina(0)
     diagrama = _lido(conferido=True, lado="b", lado_origem="usuario")
-    pagina = ex.pagina_extraida(0, [], [diagrama.caixa], imagem, [diagrama])
+    pagina = mo.pagina_extraida(0, [], [diagrama.caixa], imagem, [diagrama])
     [figura] = [b for b in pagina.blocos if isinstance(b, ex.Figura)]
     assert figura.origem == "render"
     assert figura.fen == diagrama.fen and figura.fen.split()[1] == "b"
@@ -94,7 +95,7 @@ def test_diagrama_sem_confianca_sai_como_recorte_com_o_motivo(fonte):
     duvidoso = _lido(motivo="duas damas brancas a mais")
     por_ler = _lido(caixa=(10, 10, 60, 60))
     por_ler.casas = []
-    pagina = ex.pagina_extraida(0, [], [duvidoso.caixa, por_ler.caixa], imagem,
+    pagina = mo.pagina_extraida(0, [], [duvidoso.caixa, por_ler.caixa], imagem,
                                 [duvidoso, por_ler])
     figuras = [b for b in pagina.blocos if isinstance(b, ex.Figura)]
     assert [f.origem for f in figuras] == ["recorte", "recorte"]

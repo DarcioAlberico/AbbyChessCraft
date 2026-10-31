@@ -154,9 +154,9 @@ def test_roque_conferido_vai_ao_fen():
 def test_exportar_o_fen_do_diagrama_sem_conferir_nao_tem_roque():
     from PIL import Image
 
-    from abbychess import exportar as ex
+    from abbychess import montagem as mo
 
-    figura = ex.figura_do_diagrama(Image.new("L", (800, 600), 255), _lido())
+    figura = mo.figura_do_diagrama(Image.new("L", (800, 600), 255), _lido())
     assert figura.fen and figura.fen.split()[2] == "-"
 
 

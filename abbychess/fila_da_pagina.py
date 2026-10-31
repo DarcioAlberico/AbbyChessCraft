@@ -148,9 +148,9 @@ class FilaDaPagina:
         áreas de cabeçalho, rodapé, número de página e ignorar (`exportar.FORA_DA_EXPORTACAO`)."""
         if self._p.modelo is None:
             return frozenset()
-        from abbychess import exportar as ex
+        from abbychess import montagem as mo
 
-        areas = [z for z in self._p.modelo.zonas if z.funcao in ex.FORA_DA_EXPORTACAO]
+        areas = [z for z in self._p.modelo.zonas if z.funcao in mo.FORA_DA_EXPORTACAO]
         nas_areas = {b.gid for b in self._p.modelo.boxes
                      if any(z.contem_o_centro(b.entry) for z in areas)} if areas else set()
         return (self.gids_de_margem() if margens is None else margens) | nas_areas

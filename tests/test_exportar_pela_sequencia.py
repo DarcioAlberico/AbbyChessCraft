@@ -8,6 +8,7 @@ import pytest
 from core.box_model import BoxEntry
 
 from abbychess import exportar as ex
+from abbychess import montagem as mo
 from abbychess import pagina as pg
 from abbychess.leitor import nome_de_origem
 from abbychess.modelo import gid_de
@@ -163,7 +164,7 @@ def test_ca_12_16_o_pdf_pesquisavel_usa_as_imagens_transformadas(projeto, tmp_pa
     projeto.salvar_pagina(2, [_box("c"), _box("c", x=20)])
     saida = tmp_path / "pesquisavel.pdf"
     ex.exportar_pdf_pesquisavel(projeto, saida)
-    escala = 72.0 / ex.DPI_DA_LEITURA
+    escala = 72.0 / mo.DPI_DA_LEITURA
     with fitz.open(str(saida)) as doc:
         assert len(doc) == 3
         girada, original, inserida = doc[0], doc[1], doc[2]
@@ -189,7 +190,7 @@ def test_a_altura_vem_da_pagina_do_pdf_da_entrada(tmp_path):
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Alturas", pdf)
     _reordenar(projeto, [2, 0, 1])
     assert [ex._altura_da_pagina(projeto, i) for i in range(3)] == [
-        round(a * ex.DPI_DA_LEITURA / 72) for a in (500, 300, 400)]
+        round(a * mo.DPI_DA_LEITURA / 72) for a in (500, 300, 400)]
     e = projeto.sequencia.entrada_em(0)                          # girada: renderiza
     projeto.ordem.trocar(projeto.sequencia.com_entrada(
         Entrada(e.pid, "livro", e.pagina, giro=90,

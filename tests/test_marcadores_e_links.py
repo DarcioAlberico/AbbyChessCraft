@@ -13,6 +13,7 @@ from core.pagina import PaginaExtraida, Paragrafo
 
 from abbychess import epub
 from abbychess import exportar as ex
+from abbychess import montagem as mo
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.zonas import Zona
@@ -33,7 +34,7 @@ def _pagina_com_rodape(numero_impresso: str):
     entries = _linha("Texto da pagina corrida.", 100) + _linha(numero_impresso, 3000)
     pagina = tx.pagina_avulsa(entries, zonas=[Zona("texto", 0, 2990, 2000, 3040,
                                                    funcao="numero_de_pagina")])
-    return ex.Estrutura.da_pagina(pagina)
+    return mo.Estrutura.da_pagina(pagina)
 
 
 # ----------------------------------------------------------------------
@@ -64,7 +65,7 @@ def test_o_pdf_ganha_os_marcadores_pelos_titulos(projeto, fonte, leitor, tmp_pat
     primeira = [b for b in boxes if b.y1 < topo + 20]
     zona = Zona("texto", 0, topo - 5, 5000, max(b.y2 for b in primeira) + 5, funcao="titulo")
     projeto.salvar_zonas(1, [zona])
-    titulos = ex.titulos_das_paginas(projeto, projeto.resumo.paginas_lidas())
+    titulos = mo.titulos_das_paginas(projeto, projeto.resumo.paginas_lidas())
     assert [i for i, _t in titulos] == [1]
     destino = tmp_path / "saida.pdf"                  # o livro.pdf é a fonte da fixture
     resumo = ex.exportar_pdf_pesquisavel(projeto, destino)
@@ -149,7 +150,7 @@ def test_paginas_de_rosto_ganham_romanos_e_o_rotulo_do_pdf_fica_valido(tmp_path,
     doc = fitz.open()
     for _ in range(4):
         doc.new_page()
-    estruturas = {i: _pagina_com_rodape(str(i - 1)) if i >= 2 else ex.Estrutura.da_pagina(None)
+    estruturas = {i: _pagina_com_rodape(str(i - 1)) if i >= 2 else mo.Estrutura.da_pagina(None)
                   for i in range(4)}
 
     class _Projeto:
@@ -158,7 +159,7 @@ def test_paginas_de_rosto_ganham_romanos_e_o_rotulo_do_pdf_fica_valido(tmp_path,
 
     # As estruturas entram pelo `Estrutura.da_pagina` do projeto falso.
     fila = iter(estruturas[i] for i in range(4))
-    monkeypatch.setattr(ex.Estrutura, "da_pagina", classmethod(lambda cls, _p: next(fila)))
+    monkeypatch.setattr(mo.Estrutura, "da_pagina", classmethod(lambda cls, _p: next(fila)))
     resumo = ex.ResumoDoPdf()
     ex._marcar_o_pdf(doc, _Projeto(), [0, 1, 2, 3], resumo)
     assert resumo.rotulos

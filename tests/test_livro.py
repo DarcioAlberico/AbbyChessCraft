@@ -18,6 +18,7 @@ from PIL import Image
 from core.box_model import BoxEntry
 
 from abbychess import exportar as ex
+from abbychess import montagem as mo
 from abbychess import livro
 from abbychess import pagina as pg
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro
@@ -186,13 +187,13 @@ def test_paragrafos_cortam_no_vao_e_juntam_hifen():
                 for i, c in enumerate(texto) if c != " "]
 
     boxes = linha("abc-", 0) + linha("de fg", 40) + linha("jk", 80) + linha("hi", 200)
-    blocos = ex.paragrafos(boxes)
+    blocos = mo.paragrafos(boxes)
     assert [p.texto for p in blocos] == ["abcde fg jk", "hi"]
 
 
 def test_figurina_sai_como_impressa_e_nao_como_letra_do_san():
     boxes = [pg.BoxEntry(c, 10 + 20 * i, 0, 25 + 20 * i, 20) for i, c in enumerate("1.♘f3")]
-    assert [p.texto for p in ex.paragrafos(boxes)] == ["1.♘f3"]
+    assert [p.texto for p in mo.paragrafos(boxes)] == ["1.♘f3"]
 
 
 def test_docx_e_epub_tem_o_texto_das_paginas(projeto, fonte, leitor, tmp_path):
@@ -218,7 +219,7 @@ def test_diagrama_entra_como_recorte_na_altura_dele(projeto, fonte):
     for b in boxes:
         b.char = "a"
     meio = (boxes[0].y2 + max(b.y1 for b in boxes)) // 2
-    pagina = ex.pagina_extraida(0, boxes, [(10, meio, 60, meio + 5)], imagem)
+    pagina = mo.pagina_extraida(0, boxes, [(10, meio, 60, meio + 5)], imagem)
     tipos = ["Figura" if isinstance(b, ex.Figura) else "Paragrafo" if isinstance(b, ex.Paragrafo)
              else type(b).__name__ for b in pagina.blocos]
     assert tipos == ["Paragrafo", "Figura", "Paragrafo"]

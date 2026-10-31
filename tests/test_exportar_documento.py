@@ -13,6 +13,7 @@ import pytest
 from core.box_model import BoxEntry
 
 from abbychess import exportar as ex
+from abbychess import montagem as mo
 from abbychess import lances as lc
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
@@ -62,9 +63,9 @@ def _paragrafos(pagina_extraida):
 
 def test_a_exportacao_segue_as_areas_os_estilos_e_as_decisoes():
     pagina, inicio = _pagina()
-    entries, estrutura = ex.Estrutura.da_pagina(pagina)
+    entries, estrutura = mo.Estrutura.da_pagina(pagina)
     assert estrutura.funcao(entries[0]) == "cabecalho"
-    paragrafos = _paragrafos(ex.pagina_extraida(0, entries, estrutura=estrutura))
+    paragrafos = _paragrafos(mo.pagina_extraida(0, entries, estrutura=estrutura))
     assert [p.texto for p in paragrafos] == [
         "Capitulo um", "O texto vai em negrito e o hiFen termina aqui.",
         "Outro paragrafo comeca."]
@@ -91,8 +92,8 @@ def test_ca_q_e1_a_exportacao_leva_as_decisoes_de_palavra_do_documento():
     documento = tx.texto(tx.montar(pagina))
     assert documento == "o cavalo vai a f6 mais um ♘f6 2.c4 fim"
 
-    entries, estrutura = ex.Estrutura.da_pagina(pagina)
-    extraida = ex.pagina_extraida(0, entries, estrutura=estrutura)
+    entries, estrutura = mo.Estrutura.da_pagina(pagina)
+    extraida = mo.pagina_extraida(0, entries, estrutura=estrutura)
     assert [p.texto for p in _paragrafos(extraida)] == [documento]
     assert ex.texto_do_livro([extraida]) == documento + "\n"
 
@@ -109,15 +110,15 @@ def test_ca_q_e1_o_glifo_nao_lido_no_meio_da_palavra_fica_como_no_texto_do_docum
             b.char = ""                                  # o "s" que ninguém leu
     pagina = tx.pagina_avulsa(entries)
     documento = tx.texto(tx.montar(pagina))
-    entries, estrutura = ex.Estrutura.da_pagina(pagina)
-    assert [p.texto for p in _paragrafos(ex.pagina_extraida(0, entries, estrutura=estrutura))] \
+    entries, estrutura = mo.Estrutura.da_pagina(pagina)
+    assert [p.texto for p in _paragrafos(mo.pagina_extraida(0, entries, estrutura=estrutura))] \
         == [documento]
 
 
 def test_manter_margens_deixa_o_cabecalho_da_area():
     pagina, _ = _pagina()
-    entries, estrutura = ex.Estrutura.da_pagina(pagina)
-    textos = [p.texto for p in _paragrafos(ex.pagina_extraida(0, entries, estrutura=estrutura,
+    entries, estrutura = mo.Estrutura.da_pagina(pagina)
+    textos = [p.texto for p in _paragrafos(mo.pagina_extraida(0, entries, estrutura=estrutura,
                                                               manter_margens=True))]
     assert textos[0] == "XADREZ VITORIOSO 23"
 
@@ -125,17 +126,17 @@ def test_manter_margens_deixa_o_cabecalho_da_area():
 def test_sem_estrutura_a_pagina_sai_como_antes():
     pagina, _ = _pagina()
     entries = [b.entry for b in pagina.boxes]
-    textos = [p.texto for p in _paragrafos(ex.pagina_extraida(0, entries))]
+    textos = [p.texto for p in _paragrafos(mo.pagina_extraida(0, entries))]
     assert "XADREZ VITORIOSO 23" in textos[0]
-    assert not any(p.titulo for p in _paragrafos(ex.pagina_extraida(0, entries)))
+    assert not any(p.titulo for p in _paragrafos(mo.pagina_extraida(0, entries)))
 
 
 def test_area_ignorar_sai_sempre():
     entries = _linha("Texto que fica.", 10) + _linha("respingo", 300)
     pagina = tx.pagina_avulsa(entries, zonas=[Zona("ignorar", 0, 290, 1000, 330)])
-    entries, estrutura = ex.Estrutura.da_pagina(pagina)
+    entries, estrutura = mo.Estrutura.da_pagina(pagina)
     for manter in (False, True):
-        textos = [p.texto for p in _paragrafos(ex.pagina_extraida(
+        textos = [p.texto for p in _paragrafos(mo.pagina_extraida(
             0, entries, estrutura=estrutura, manter_margens=manter))]
         assert textos == ["Texto que fica."]
 
@@ -146,8 +147,8 @@ def test_area_ignorar_sai_sempre():
 
 def test_txt_tem_um_paragrafo_por_bloco_e_as_marcas_de_pagina():
     pagina, _ = _pagina()
-    entries, estrutura = ex.Estrutura.da_pagina(pagina)
-    extraida = ex.pagina_extraida(4, entries, estrutura=estrutura)
+    entries, estrutura = mo.Estrutura.da_pagina(pagina)
+    extraida = mo.pagina_extraida(4, entries, estrutura=estrutura)
     assert ex.texto_do_livro([extraida]) == (
         "Capitulo um\n\nO texto vai em negrito e o hiFen termina aqui.\n\n"
         "Outro paragrafo comeca.\n")
@@ -234,8 +235,8 @@ def _funcao_empatada() -> str:
     zonas = [Zona("texto", 0, 90, 90, 130, funcao="titulo"),
              Zona("texto", 90, 90, 1000, 130)]
     pagina = tx.pagina_avulsa(entries, zonas=zonas)
-    lidos, estrutura = ex.Estrutura.da_pagina(pagina)
-    return ex._linhas(lidos, ex.OrdemDeLeitura(), estrutura)[0].funcao
+    lidos, estrutura = mo.Estrutura.da_pagina(pagina)
+    return mo._linhas(lidos, ex.OrdemDeLeitura(), estrutura)[0].funcao
 
 
 # ----------------------------------------------------------------------
@@ -326,8 +327,8 @@ def test_so_verificadas_no_pgn_leva_so_o_diagrama_da_verificada():
 def test_ca_12_6_duas_exportacoes_iguais_byte_a_byte(tmp_path, monkeypatch):
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "1700000000")
     pagina, _ = _pagina()
-    entries, estrutura = ex.Estrutura.da_pagina(pagina)
-    paginas = [ex.pagina_extraida(0, entries, estrutura=estrutura)]
+    entries, estrutura = mo.Estrutura.da_pagina(pagina)
+    paginas = [mo.pagina_extraida(0, entries, estrutura=estrutura)]
     a, b = tmp_path / "a.epub", tmp_path / "b.epub"
     ex.exportar_epub(paginas, a, titulo="T")
     ex.exportar_epub(paginas, b, titulo="T")
@@ -347,29 +348,29 @@ def test_ca_12_6_duas_exportacoes_iguais_byte_a_byte(tmp_path, monkeypatch):
 # ----------------------------------------------------------------------
 
 def test_o_negrito_que_acaba_no_hifen_nao_cobre_a_linha_seguinte():
-    a = ex._Linha("inter-", 0, 10, hifen=True, negrito=[(0, 6)])
-    b = ex._Linha("essante fim", 20, 30)
-    assert ex._juntar([a, b]) == ("interessante fim", [(0, 5)], [], [])
+    a = mo._Linha("inter-", 0, 10, hifen=True, negrito=[(0, 6)])
+    b = mo._Linha("essante fim", 20, 30)
+    assert mo._juntar([a, b]) == ("interessante fim", [(0, 5)], [], [])
 
 
 def test_a_juncao_dos_trechos_so_atravessa_espaco():
-    assert ex._unir_trechos([(0, 1), (2, 3)], "abc") == [(0, 1), (2, 3)]
-    assert ex._unir_trechos([(0, 2), (3, 5)], "ab cd") == [(0, 5)]
+    assert mo._unir_trechos([(0, 1), (2, 3)], "abc") == [(0, 1), (2, 3)]
+    assert mo._unir_trechos([(0, 2), (3, 5)], "ab cd") == [(0, 5)]
 
 
 def test_pagina_sem_modelo_nao_derruba():
-    entries, estrutura = ex.Estrutura.da_pagina(None)
+    entries, estrutura = mo.Estrutura.da_pagina(None)
     assert entries == [] and estrutura.funcoes == {}
 
 
 def test_area_de_texto_do_usuario_protege_da_regra_das_margens():
     entries = _linha("Linha marcada pelo usuario", 10)
     pagina = tx.pagina_avulsa(entries, zonas=[Zona("texto", 0, 0, 1000, 40)])
-    lidos, estrutura = ex.Estrutura.da_pagina(pagina)
+    lidos, estrutura = mo.Estrutura.da_pagina(pagina)
     assert all(id(b) in estrutura.protegidos for b in lidos)
     automatica = tx.pagina_avulsa(entries, zonas=[Zona("texto", 0, 0, 1000, 40,
                                                        automatica=True)])
-    lidos, estrutura = ex.Estrutura.da_pagina(automatica)
+    lidos, estrutura = mo.Estrutura.da_pagina(automatica)
     assert not estrutura.protegidos
 
 

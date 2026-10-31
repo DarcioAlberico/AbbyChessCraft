@@ -180,7 +180,7 @@ def _palavras_por_glifo(texto: str):
     return saida
 
 
-def _linhas_da_pagina(boxes, fonte, indice, ex):
+def _linhas_da_pagina(boxes, fonte, indice, mo):
     """As linhas lidas (com os boxes sem leitura dentro), as caixas relativas e a palavra
     de cada box, pelo mesmo corte em palavras que a exportação usa."""
     imagem = fonte.pagina(indice)
@@ -190,9 +190,9 @@ def _linhas_da_pagina(boxes, fonte, indice, ex):
     try:
         for b in sem_leitura:
             b.char = SEM_LEITURA          # sem leitura também é glifo a corrigir
-        linhas = ex._linhas(boxes)
+        linhas = mo._linhas(boxes)
         palavra_do_box = {}
-        for n, (_, grupo) in enumerate(p for linha in ex.palavras(boxes) for p in linha):
+        for n, (_, grupo) in enumerate(p for linha in mo.palavras(boxes) for p in linha):
             palavra_do_box.update({i: n for i in grupo})
     finally:
         for b in sem_leitura:
@@ -257,7 +257,7 @@ def replay(livro: str, snapshot: Path, passo: str, indices=None, verdade: Path =
 
 
 def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
-    from abbychess import exportar as ex
+    from abbychess import montagem as mo
     from abbychess import pagina as pg
     from abbychess.atalhos import carregar as carregar_atalhos
     from abbychess.leitor import LeitorDoLivro
@@ -306,7 +306,7 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
             navegacao.usar("trocar_pagina")
         # Os erros da página são os do snapshot, antes de qualquer correção (o reler
         # inclusive): o N da CA-F.2 não pode depender do passo nem da ordem das páginas.
-        linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
+        linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, mo)
         inicial = diferencas(boxes, linhas, caixas, palavra, gabarito)
         erros_iniciais = (len(inicial.acoes) + inicial.faltas + inicial.espacos
                           + inicial.caracteres_sem_par)
@@ -328,13 +328,13 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
                 # Com um padrão novo, a parte de um box colado pode sair certa ao dividir.
                 sem_colado.clear()
                 padroes_vistos = len(ensinados)
-            linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
+            linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, mo)
             dif = diferencas(boxes, linhas, caixas, palavra, gabarito)
             acao, da_fila = _proxima_acao(dif, boxes, leitor, disponiveis, imagem.height,
                                           mostrado)
             if acao is None:
                 colado = _colado(dif, boxes, sem_colado, disponiveis, imagem, leitor,
-                                 fonte, indice, ex, gabarito, mostrado)
+                                 fonte, indice, mo, gabarito, mostrado)
                 if colado is None:
                     break
                 acao, da_fila = ("divisao", colado), colado == mostrado
@@ -386,7 +386,7 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
         else:
             raise RuntimeError(f"i{indice:03d}: o replay não convergiu")
 
-        linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
+        linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, mo)
         dif = diferencas(boxes, linhas, caixas, palavra, gabarito)
         if dif.faltas:
             _faltas_pelo_mais_barato(texto_conta, dif, disponiveis)
@@ -462,7 +462,7 @@ def _proxima_acao(dif: Diferencas, boxes, leitor, disponiveis: dict, altura=None
 
 
 def _colado(dif: Diferencas, boxes, sem_colado: set, disponiveis: dict, imagem, leitor,
-            fonte, indice, ex, gabarito, mostrado=None):
+            fonte, indice, mo, gabarito, mostrado=None):
     """O box colado a dividir com o Ctrl+D, ou `None` (desde o catálogo 9).
 
     Um trecho que falta ao lado de um box pode ser o box que juntou dois glifos e foi lido
@@ -496,7 +496,7 @@ def _colado(dif: Diferencas, boxes, sem_colado: set, disponiveis: dict, imagem, 
                 pg.dividir(imagem, copia, candidato, leitor)
             except ValueError:
                 continue
-            linhas, caixas, palavra = _linhas_da_pagina(copia, fonte, indice, ex)
+            linhas, caixas, palavra = _linhas_da_pagina(copia, fonte, indice, mo)
             depois_de_dividir = diferencas(copia, linhas, caixas, palavra, gabarito)
             deixam = dif.faltas - depois_de_dividir.faltas
             if deixam <= 0:

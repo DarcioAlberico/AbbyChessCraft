@@ -31,6 +31,7 @@ from core.box_model import BoxEntry
 from abbychess import epub
 from abbychess import escritor_docx as ed
 from abbychess import exportar as ex
+from abbychess import montagem as mo
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL, Limiares
 from abbychess.modelo import Decisoes, Estilo
@@ -80,8 +81,8 @@ def _pagina():
 def _extraida(opcoes: ex.Opcoes):
     pagina = _pagina()
     limiares = Limiares() if opcoes.realcar_duvidosos else None
-    entries, estrutura = ex.Estrutura.da_pagina(pagina, limiares)
-    return [ex.pagina_extraida(0, entries, pagina.tabuleiros, Image.new("L", (1000, 1400), 255),
+    entries, estrutura = mo.Estrutura.da_pagina(pagina, limiares)
+    return [mo.pagina_extraida(0, entries, pagina.tabuleiros, Image.new("L", (1000, 1400), 255),
                                pagina.diagramas, estrutura=estrutura,
                                manter_margens=opcoes.manter_margens,
                                desenhar_diagramas=opcoes.desenhar_diagramas,
@@ -264,12 +265,12 @@ def test_manter_quebras_fica_com_as_linhas_e_o_hifen():
 def test_manter_quebras_na_camada_nativa_volta_pelos_inicios():
     paragrafo = ex.Paragrafo("uma linha outra linha", inicios=[0, 10])
     pagina = ex.PaginaExtraida(numero=0, blocos=[paragrafo])
-    ex._quebras_da_camada(pagina)
+    mo._quebras_da_camada(pagina)
     assert paragrafo.texto == "uma linha\noutra linha"
     # A camada guarda o hífen colado (`inter-essante`): o `\n` entra depois dele, e o
     # negrito de "essante" e o da linha de antes seguem nas letras deles.
     partida = ex.Paragrafo("o inter-essante fim", inicios=[0, 8], negrito=[(2, 8), (8, 15)])
-    ex._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[partida]))
+    mo._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[partida]))
     assert partida.texto == "o inter-\nessante fim"
     assert [partida.texto[a:z] for a, z in partida.negrito] == ["inter-", "essante"]
     assert partida.inicios == [0, 9] and partida.pesos is None
@@ -281,14 +282,14 @@ def test_manter_quebras_na_camada_nativa_devolve_o_hifen_que_o_core_tirou():
     impressa, e o hífen fica no negrito da sílaba de antes."""
     partida = ex.Paragrafo("o interessante fim e mais", inicios=[0, 7, 19],
                            negrito=[(2, 14)], italico=[(15, 18)])
-    ex._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[partida]))
+    mo._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[partida]))
     assert partida.texto == "o inter-\nessante fim\ne mais"
     assert [partida.texto[a:z] for a, z in partida.negrito] == ["inter-\nessante"]
     assert [partida.texto[a:z] for a, z in partida.italico] == ["fim"]
     assert partida.inicios == [0, 9, 21]
     # Sem letra dos dois lados, não é palavra partida: nada entra.
     numero = ex.Paragrafo("lance 12.e4", inicios=[0, 8])
-    ex._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[numero]))
+    mo._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[numero]))
     assert numero.texto == "lance 12.e4"
 
 
@@ -313,7 +314,7 @@ def test_manter_quebras_com_a_camada_de_um_pdf_que_parte_palavras(tmp_path, com_
     extraida = pdf_nativo.extrair(str(caminho), [0], idioma="en", lex=lex).paginas[0]
     textos = [b.texto for b in extraida.blocos if isinstance(b, ex.Paragrafo)]
     assert any(("beautiful" if com_dicionario else "beauti-ful") in t for t in textos), textos
-    ex._quebras_da_camada(extraida)
+    mo._quebras_da_camada(extraida)
     textos = [b.texto for b in extraida.blocos if isinstance(b, ex.Paragrafo)]
     assert "Then came a very beauti-\nful combination in the game and\nit ends here." in textos
 
@@ -323,11 +324,11 @@ def test_o_realce_marca_so_a_palavra_duvidosa_e_atravessa_a_pagina():
                  if isinstance(b, ex.Paragrafo) and "duvida" in b.texto)
     assert [corpo.texto[a:z] for a, z in corpo.duvidosos] == ["duvida"]
     # O parágrafo que a paginação partiu volta com os duvidosos dele no lugar certo.
-    antes = ex.ParagrafoExportado("fim da pagina sem ponto")
-    depois = ex.ParagrafoExportado("e segue duvida", duvidosos=[(8, 14)])
+    antes = mo.ParagrafoExportado("fim da pagina sem ponto")
+    depois = mo.ParagrafoExportado("e segue duvida", duvidosos=[(8, 14)])
     paginas = [ex.PaginaExtraida(numero=0, blocos=[antes]),
                ex.PaginaExtraida(numero=1, blocos=[depois])]
-    ex._juntar_entre_paginas(paginas)
+    mo._juntar_entre_paginas(paginas)
     assert [antes.texto[a:z] for a, z in antes.duvidosos] == ["duvida"]
 
 

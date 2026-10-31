@@ -47,9 +47,9 @@ def test_efeitos_diferentes_nunca_sao_vizinhos_quando_conhecidos(tmp_path):
 
 def test_a_ligadura_sai_como_as_letras_dela_na_exportacao():
     """O mesmo texto do Documento: a ligadura de um box sai "fi" no TXT, no DOCX e no EPUB
-    (que leem `exportar.palavras`), e a busca por "fim" acha."""
-    from abbychess import exportar
+    (que leem `mo.palavras`), e a busca por "fim" acha."""
+    from abbychess import montagem as mo
 
     boxes = [BoxEntry("ﬁ", 0, 0, 20, 30), BoxEntry("m", 22, 0, 40, 30)]
-    linhas = exportar.palavras(boxes)
+    linhas = mo.palavras(boxes)
     assert [texto for linha in linhas for texto, _indices in linha] == ["fim"]

@@ -22,6 +22,7 @@ from core.box_model import BoxEntry
 
 from abbychess import diagramas as dg
 from abbychess import exportar as ex
+from abbychess import montagem as mo
 from abbychess import pagina as pg
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro
@@ -132,8 +133,8 @@ def test_tres_montagens_do_texto(request):
     montagens = {
         "pagina.texto": pg.texto(boxes),
         "diagramas.texto_da_pagina": dg.texto_da_pagina(boxes, [diagrama]),
-        "exportar.paragrafos": [p.texto for p in ex.paragrafos(boxes)],
-        "exportar.paragrafos_com_corte": [p.texto for p in ex.paragrafos(boxes, [200])],
+        "exportar.paragrafos": [p.texto for p in mo.paragrafos(boxes)],
+        "exportar.paragrafos_com_corte": [p.texto for p in mo.paragrafos(boxes, [200])],
     }
     _conferir(request, "tres_montagens.json", montagens)
 

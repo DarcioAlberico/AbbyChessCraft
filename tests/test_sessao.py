@@ -331,14 +331,14 @@ def test_m_impresso_vira_rn_com_tinta_pela_sessao():
 def test_apagar_o_hifen_de_fim_de_linha_junta_a_palavra_na_exportacao():
     """§6.3: apagar o hífen de quebra junta a palavra. O Documento mostra as linhas como
     impressas, e a exportação sai "exemplo" (antes, "exem plo": pior que sem tocar)."""
-    from abbychess import exportar as ex
+    from abbychess import montagem as mo
     from abbychess.modelo import Decisoes
 
     p = _pagina("exem-", "plo")
     p.decisoes = Decisoes(hifen_de_quebra=frozenset({p.boxes[4].gid}))
     _editar(p, "exem-\nplo", "exemplo")
-    entries, estrutura = ex.Estrutura.da_pagina(p)
-    blocos = ex.pagina_extraida(0, entries, estrutura=estrutura).blocos
+    entries, estrutura = mo.Estrutura.da_pagina(p)
+    blocos = mo.pagina_extraida(0, entries, estrutura=estrutura).blocos
     assert [b.texto for b in blocos if hasattr(b, "texto")] == ["exemplo"]
 
 

@@ -276,7 +276,7 @@ def test_ca_4_8_voltar_ao_estado_antes_do_lote_devolve_o_json_copiado(ctl, proje
     ctl.voltar_ao_antes_do_lote()
     projeto.descarregar(10)
     assert (projeto.pasta / "paginas" / f"p{pid}.json").read_bytes() == guardado
-    assert not copia.exists() and not projeto.tem_antes_do_lote(1)
+    assert not copia.exists() and not projeto.antes_do_lote.tem(1)
     assert not any(b.source == "livro" for b in p.boxes)       # a aberta mostra a de antes
     assert any(b.char == "W" for b in p.boxes) and not any(b.char == "Z" for b in p.boxes)
     p.desfazedor.desfazer()                                          # o "Z" não está mais lá: recusa
@@ -298,7 +298,7 @@ def test_voltar_ao_antes_do_lote_nao_grava_no_projeto_so_de_leitura(ctl, projeto
     projeto.somente_leitura = True
     ctl.voltar_ao_antes_do_lote()
     assert avisos and "só para leitura" in avisos[0]
-    assert _hash(projeto, 0) == antes and projeto.tem_antes_do_lote(0)
+    assert _hash(projeto, 0) == antes and projeto.antes_do_lote.tem(0)
 
 
 # ----------------------------------------------------------------------
@@ -476,7 +476,7 @@ def test_o_lote_sincrono_de_centenas_de_paginas_nao_aninha_a_pilha(projeto, monk
     from abbychess import servidor_de_leitura as sl
 
     monkeypatch.setattr(lote.sl, "ler_pagina", lambda *a, **k: sl.PaginaLida([], [], [], None))
-    monkeypatch.setattr(projeto, "guardar_antes_do_lote", lambda pagina: None)   # o disco, não
+    monkeypatch.setattr(projeto.antes_do_lote, "guardar", lambda pagina: None)   # o disco, não
     pagina = ControladorDePagina(Eventos())
     pagina.ligar(projeto, pg.FonteDePaginas(projeto.fonte),
                  LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))

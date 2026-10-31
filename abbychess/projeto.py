@@ -76,6 +76,7 @@ from core.box_model import BoxEntry
 
 from abbychess import gravacao as gv
 from abbychess import procedencia
+from abbychess.antes_do_lote import AntesDoLote
 from abbychess import sequencia as sq
 from abbychess.gravador import Gravador
 from abbychess.migracoes import Migracoes
@@ -85,8 +86,8 @@ from abbychess.modelo import (FIGURINAS, GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA
 from abbychess.pagina_em_json import (com_ids_de_diagramas, comparavel, inteiro, pagina_de_json,
                                       pagina_para_json, vazia)
 from abbychess.pasta_do_projeto import (ARQUIVO_DO_LEXICO, ARQUIVO_DO_LIVRO, ARQUIVO_DO_PROJETO,
-                                        PASTA_ANTES_DO_LOTE, PASTA_DE_PADROES, PASTA_DE_PAGINAS,
-                                        PASTA_DO_BACKUP_V1, PASTA_DO_BACKUP_V2, VERSAO)
+                                        PASTA_DE_PADROES, PASTA_DE_PAGINAS, PASTA_DO_BACKUP_V1,
+                                        PASTA_DO_BACKUP_V2, VERSAO)
 # Reexportados: o espaço, a fonte, o lote e os testes da migração os importam daqui.
 from abbychess.pasta_do_projeto import (ARQUIVO_DA_JANELA, ARQUIVO_DE_INCLINACOES,  # noqa: F401
                                         ARQUIVO_DO_LOTE, LISTAS_DE_PAGINAS, MAPAS_DE_PAGINAS)  # noqa: F401
@@ -324,6 +325,8 @@ class ProjetoDeLivro:
         self.nao_gravadas: List[int] = []
         #: A migração dos formatos antigos, que a abertura chama (`abrir`).
         self.migracoes = Migracoes(self)
+        #: A cópia de cada página de antes de o lote a reler (§4.6).
+        self.antes_do_lote = AntesDoLote(self)
 
     # ------------------------------------------------------------------
     # Criar e abrir
@@ -999,63 +1002,10 @@ class ProjetoDeLivro:
                 pagina.estado = proximo_estado(pagina.estado, "editar")
             self.salvar_modelo(pagina)
 
-    # ------------------------------------------------------------------
-    # Antes do lote (§4.6)
-    # ------------------------------------------------------------------
-    def _arquivo_antes_do_lote(self, pid: int) -> Path:
-        return self.pasta / PASTA_DE_PAGINAS / PASTA_ANTES_DO_LOTE / f"p{pid}.json"
-
-    def guardar_antes_do_lote(self, pagina: Pagina) -> None:
-        """A página como está agora, antes de o lote com "refazer" a reler: o lote não entra
-        no desfazer, e "Voltar ao estado antes do lote" a restaura."""
-        gv.gravar_json(self._arquivo_antes_do_lote(pagina.pid),
-                       pagina_para_json(pagina.instantaneo(),
-                                        self._pagina_da_fonte(pagina)))
-
-    def tem_antes_do_lote(self, indice: int) -> bool:
-        # O pid do modelo (em memória), e não o do `livro.json`: logo depois do lote, a
-        # página ainda está com o gravador, e o livro não a tem.
-        pagina = self.carregar_modelo(indice)
-        return pagina is not None and self._arquivo_antes_do_lote(pagina.pid).is_file()
-
     def pid_da_pagina(self, indice: int) -> Optional[int]:
         """O pid da página na posição `indice`, sem ler o JSON dela (o da sequência), ou
         None fora do livro."""
         return self._pid_em(indice)
-
-    def data_antes_do_lote(self, indice: int) -> Optional[datetime]:
-        """Quando a cópia de antes do lote foi feita (a hora do arquivo), ou None."""
-        pagina = self.carregar_modelo(indice)
-        if pagina is None:
-            return None
-        arquivo = self._arquivo_antes_do_lote(pagina.pid)
-        try:
-            return datetime.fromtimestamp(arquivo.stat().st_mtime)
-        except OSError:
-            return None
-
-    def voltar_ao_antes_do_lote(self, indice: int) -> Pagina:
-        """Põe de volta a página copiada antes do lote (o JSON idêntico ao copiado), e a
-        cópia sai. O gravador grava antes o que tem pendente: senão, a gravação dele passaria
-        por cima da página restaurada; se ele não grava, nada muda (`OSError`). No projeto
-        só para leitura, também não."""
-        if self.somente_leitura:
-            raise OSError("o projeto está aberto só para leitura")
-        if not self.descarregar(10):
-            raise OSError("há páginas que não puderam ser gravadas (veja a barra de status); "
-                          "nada foi mudado")
-        pid = self._pid_em(indice)
-        with self._trava_do_livro:
-            copia = None if pid is None else self._arquivo_antes_do_lote(pid)
-            if copia is None or not copia.is_file():
-                raise OSError(f"a página {indice + 1} não tem cópia de antes do lote")
-            dados = copia.read_bytes()
-            gv.gravar_bytes(self._arquivo_v2(pid), dados)
-            pagina = self._de_json(json.loads(dados.decode("utf-8")))
-            self._guardar_no_cache(pagina, foto_nova=True)
-            self._atualizar_livro(pid, self._resumo_do_modelo(pagina))
-            gv.apagar(copia)
-            return pagina
 
     def carregar_pagina(self, indice: int) -> Optional[List[BoxEntry]]:
         """Os boxes gravados da página, ou `None` se ela ainda não foi lida nem marcada.

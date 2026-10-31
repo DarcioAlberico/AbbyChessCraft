@@ -1099,11 +1099,11 @@ class ControladorDoLivro:
         """Página › Voltar ao estado antes do lote (§4.6): a página aberta volta a ser a que
         o lote com "refazer" copiou antes de relê-la."""
         p = self.pagina
-        if not p.pronto or not p.projeto.tem_antes_do_lote(p.indice):
+        if not p.pronto or not p.projeto.antes_do_lote.tem(p.indice):
             p._avisar("Esta página não tem cópia de antes do lote.", 6000)
             return
         try:
-            pagina = p.projeto.voltar_ao_antes_do_lote(p.indice)
+            pagina = p.projeto.antes_do_lote.voltar(p.indice)
         except OSError as erro:
             p.eventos.emitir("aviso", "Voltar ao estado antes do lote", str(erro))
             return

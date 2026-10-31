@@ -96,7 +96,7 @@ def calcular(p, livro, vista: Vista) -> EstadoDaJanela:
     sem_lote = (not p.lote_rodando, LOTE_RODANDO)
     boxes = (pronto and bool(p.boxes), SEM_BOXES)
     total = p.fonte.total if p.fonte else 0
-    antes = (pronto and not p.projeto.somente_leitura and p.projeto.tem_antes_do_lote(p.indice),
+    antes = (pronto and not p.projeto.somente_leitura and p.projeto.antes_do_lote.tem(p.indice),
              SEM_ANTES)
     primeira = (pronto and p.indice > 0, NA_PRIMEIRA)
     ultima = (pronto and p.indice < total - 1, NA_ULTIMA)

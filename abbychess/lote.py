@@ -382,7 +382,7 @@ class CondutorDoLote:
         pagina = projeto.pagina_para_editar(indice)
         if (self.refazer or indice in self.forcar) and pagina.estado in LIDAS \
                 and not projeto.somente_leitura:
-            projeto.guardar_antes_do_lote(pagina)                         # §4.6
+            projeto.antes_do_lote.guardar(pagina)                         # §4.6
         tamanho = None
         if p.fonte is not None:
             from abbychess import geometria as geo

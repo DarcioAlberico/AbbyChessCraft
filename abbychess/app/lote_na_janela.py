@@ -63,7 +63,7 @@ class LoteNaJanela:
                 self.abrir_caminho(str(pasta))
 
     def voltar_ao_antes_do_lote(self) -> None:
-        quando = self.projeto.data_antes_do_lote(self.pagina.indice) if self.projeto else None
+        quando = self.projeto.antes_do_lote.data(self.pagina.indice) if self.projeto else None
         de = f" (a cópia de {quando:%d/%m/%Y às %H:%M})" if quando else ""
         if dialogos.confirmar(self, "Voltar ao estado antes do lote", "A página volta a ser a "
                               f"de antes do último lote com \u201crefazer\u201d{de}; tudo o que "

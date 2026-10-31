@@ -9,7 +9,7 @@ from abbychess import estado_da_janela as ej
 
 def _pagina(**mudar):
     projeto = Ns(sequencia=Ns(apagadas=()), somente_leitura=False,
-                 tem_antes_do_lote=lambda indice: False)
+                 antes_do_lote=Ns(tem=lambda indice: False))
     base = dict(pronto=True, lote_rodando=False, projeto=projeto, fonte=Ns(total=5), boxes=[1],
                 indice=2, navegador=Ns(pode_voltar=False, pode_avancar=False),
                 historico=Ns(proximo_a_desfazer=None, proximo_a_refazer=None),

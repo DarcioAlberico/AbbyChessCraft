@@ -257,6 +257,25 @@ def test_o_virtual_entra_logo_depois_da_ancora_dele():
     assert tx.texto(tx.montar(p)) == "1aYXZbc"
 
 
+def test_apagar_o_virtual_passa_os_ancorados_nele_ao_lugar_dele():
+    """Os virtuais ancorados no que sai (depois dele, ou antes dele e sem outra âncora)
+    ficam no lugar dele, com a palavra nova dele; apagar um box como virtual é recusado."""
+    from abbychess import edicao as ed
+
+    p = _pagina(*_linha("abc"))
+    a, b = p.boxes[0].gid, p.boxes[1].gid
+    _, x = ed.virtual(p, "X", a, palavra_nova=True)
+    _, y = ed.virtual(p, "Y", x)
+    _, z = ed.virtual(p, "Z", None, antes_de=x)
+    assert tx.texto(tx.montar(p)) == "abc ZXY"
+    ed.apagar_virtual(p, x)
+    assert tx.texto(tx.montar(p)) == "abc Z Y"
+    assert {v.gid: (v.depois_de, v.antes_de, v.palavra_nova) for v in p.decisoes.virtuais} == {
+        y: (a, None, True), z: (a, None, True)}
+    with pytest.raises(ValueError, match="não é virtual"):
+        ed.apagar_virtual(p, b)
+
+
 def test_quebrar_desfaz_a_juncao_que_termina_no_glifo():
     from abbychess import edicao as ed
 

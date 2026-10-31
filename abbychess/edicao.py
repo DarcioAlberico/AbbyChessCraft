@@ -57,24 +57,40 @@ def juntar(pagina: Pagina, imagem, gid_a: int, gid_b: int, leitor=None) -> Difer
 
 def juntar_varios(pagina: Pagina, gids: Sequence[int], char: str) -> Diferenca:
     """Junta boxes contíguos numa caixa manual, para a edição ``k -> 1`` do Documento."""
-    if len(gids) < 2 or not char:
-        raise ValueError("A junção estrutural exige dois boxes e um caractere.")
-    indices = [pagina.indice_de(g) for g in gids]
-    if indices != list(range(min(indices), max(indices) + 1)):
-        raise ValueError("Só é possível juntar boxes contíguos.")
+    indices = _contiguos(pagina, gids, char)
     antigos = [pagina.boxes[i] for i in indices]
-    entries = [copia(b.entry) for b in antigos]
-    while len(entries) > 1:
-        pg.juntar(None, entries, 0, 1)  # sem leitor: a correção manual vem logo abaixo
-    pg.confirmar(entries, 0, char)
-    estilos = [b.estilo for b in antigos]
-    estilo = estilos[0] if all(e == estilos[0] for e in estilos) else Estilo()
-    novo = Box(pagina.alocar(), entries[0], estilo=estilo, revisado=True)
+    entry = _juntados(antigos, char)
+    novo = Box(pagina.alocar(), entry, estilo=_estilo_comum(antigos), revisado=True)
     inicio, fim = indices[0], indices[-1] + 1
     boxes = pagina.boxes[:inicio] + [novo] + pagina.boxes[fim:]
     dif = Diferenca(removidos=set(gids), novos=[novo],
                     sucessores={g: [novo.gid] for g in gids})
     return pagina.aplicar(dif, boxes)
+
+
+def _contiguos(pagina: Pagina, gids: Sequence[int], char: str) -> List[int]:
+    """Os índices dos glifos a juntar: dois ou mais, contíguos, com um caractere."""
+    if len(gids) < 2 or not char:
+        raise ValueError("A junção estrutural exige dois boxes e um caractere.")
+    indices = [pagina.indice_de(g) for g in gids]
+    if indices != list(range(min(indices), max(indices) + 1)):
+        raise ValueError("Só é possível juntar boxes contíguos.")
+    return indices
+
+
+def _juntados(antigos: Sequence[Box], char: str) -> BoxEntry:
+    """Uma cópia dos glifos numa caixa só, com o caractere confirmado."""
+    entries = [copia(b.entry) for b in antigos]
+    while len(entries) > 1:
+        pg.juntar(None, entries, 0, 1)  # sem leitor: a correção manual vem logo abaixo
+    pg.confirmar(entries, 0, char)
+    return entries[0]
+
+
+def _estilo_comum(antigos: Sequence[Box]) -> Estilo:
+    """O estilo dos glifos, se todos têm o mesmo; senão, o sem estilo."""
+    estilos = [b.estilo for b in antigos]
+    return estilos[0] if all(e == estilos[0] for e in estilos) else Estilo()
 
 
 def dividir_em(pagina: Pagina, imagem, gid: int, chars: str, leitor=None) -> Diferenca:
@@ -200,13 +216,19 @@ def aplicar_leituras(pagina: Pagina, antes: Sequence[Box], lidos: Sequence[BoxEn
         i = onde.get(velho.gid)
         if i is None or boxes[i] is not velho or lido.as_state() == velho.entry.as_state():
             continue
-        registrada = procedencia.amostra_de(lido)
-        amostra = velho.amostra if registrada is None else (registrada or None)
-        boxes[i] = replace(velho, entry=lido, amostra=amostra)
+        boxes[i] = _com_a_leitura(velho, lido)
         mudados.add(velho.gid)
     if not mudados:
         return Diferenca()
     return pagina.aplicar(Diferenca(mudados=mudados), boxes)
+
+
+def _com_a_leitura(velho: Box, lido: BoxEntry) -> Box:
+    """O glifo com o `BoxEntry` lido e a amostra que a leitura registrou (sem registro, a
+    de antes; "" é lido, mas não por um padrão do livro)."""
+    registrada = procedencia.amostra_de(lido)
+    amostra = velho.amostra if registrada is None else (registrada or None)
+    return replace(velho, entry=lido, amostra=amostra)
 
 
 # ----------------------------------------------------------------------
@@ -277,15 +299,17 @@ def apagar_virtual(pagina: Pagina, gid: int) -> Diferenca:
     saiu = next((v for v in d.virtuais if v.gid == gid), None)
     if saiu is None:
         raise ValueError(f"O glifo {gid} não é virtual.")
-    virtuais = []
-    for v in d.virtuais:
-        if v.gid == gid:
-            continue
-        if v.depois_de == gid or (v.antes_de == gid and v.depois_de is None):
-            v = replace(v, depois_de=saiu.depois_de, antes_de=saiu.antes_de,
-                        palavra_nova=v.palavra_nova or saiu.palavra_nova)
-        virtuais.append(v)
-    return _decidir(pagina, replace(d, virtuais=tuple(virtuais)))
+    virtuais = tuple(_no_lugar_do_que_sai(v, saiu) for v in d.virtuais if v.gid != gid)
+    return _decidir(pagina, replace(d, virtuais=virtuais))
+
+
+def _no_lugar_do_que_sai(v: GlifoVirtual, saiu: GlifoVirtual) -> GlifoVirtual:
+    """O virtual ancorado no que sai (depois dele, ou antes dele e sem outra âncora) no
+    lugar dele, com a palavra nova dele; os outros como estão."""
+    if v.depois_de == saiu.gid or (v.antes_de == saiu.gid and v.depois_de is None):
+        return replace(v, depois_de=saiu.depois_de, antes_de=saiu.antes_de,
+                       palavra_nova=v.palavra_nova or saiu.palavra_nova)
+    return v
 
 
 def ancorar(pagina: Pagina, ancoras) -> Diferenca:

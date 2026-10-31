@@ -351,90 +351,22 @@ def _menus(j) -> None:
 
 
 def atualizar(janela) -> None:
-    """Liga e desliga as ações pelo estado: projeto aberto, lote rodando, o que a página tem.
+    """Aplica nas ações o estado da janela (`estado_da_janela.calcular`): quem decide é ele."""
+    from abbychess import estado_da_janela as ej
 
-    Uma tarefa rodando não desliga quase nada: o comando pedido entra na fila do
-    executor, que a barra de status mostra. O lote (passo E) também não: ele grava entre um
-    comando e outro; só abrir outro projeto e começar outro lote esperam o fim dele."""
-    j, p = janela, janela.pagina
-    tem = p.pronto
-    sem_lote = not p.lote_rodando
-    # As operações de página: desligadas, com o motivo na dica (só para leitura, o lote, uma
-    # tarefa em curso, o projeto ainda na v2).
-    motivo = p.motivo_para_nao_mudar_as_paginas()
-    apagadas = bool(p.projeto.sequencia.apagadas) if p.projeto is not None else False
-    dicas = ("Muda páginas de lugar (as escolhidas, depois de outra)",
-             "Tira páginas do livro; elas ficam guardadas no projeto",
-             "Põe páginas de um PDF ou de imagens no livro",
-             "Devolve ao livro as páginas apagadas",
-             "Gira 90° no sentido horário a página aberta (ou as escolhidas na gaveta)",
-             "Gira 90° no sentido anti-horário a página aberta (ou as escolhidas na gaveta)",
-             "Gira as páginas de 90 em 90 graus, com os glifos",
-             "Corta as margens das páginas; os glifos de fora ficam guardados",
-             "Devolve as páginas cortadas inteiras",
-             "Divide a página espelhada em duas",
-             "Endireita as páginas por um ângulo à mão; a leitura delas se desfaz")
-    valem = (True, True, True, apagadas, True, True, True, True, True, True, True)
-    for q, dica, vale in zip(j.acoes_de_paginas, dicas, valem):
-        q.setEnabled(motivo is None and vale)
-        q.setToolTip(dica if motivo is None else f"{dica}. {motivo}")
-    j.paginas.paginas_mudam = motivo is None
-    total = p.fonte.total if p.fonte else 0
-    editar = tem
-    j.acao_novo.setEnabled(sem_lote)
-    j.acao_abrir.setEnabled(sem_lote)
-    j.acao_reconhecer.setEnabled(editar)
-    j.acao_reler.setEnabled(editar and bool(p.boxes))
-    j.acao_verificada.setEnabled(editar)
-    j.acao_anterior.setEnabled(tem and p.indice > 0)
-    j.acao_seguinte.setEnabled(tem and p.indice < total - 1)
-    j.acao_primeira.setEnabled(tem and p.indice > 0)
-    j.acao_ultima.setEnabled(tem and p.indice < total - 1)
-    j.acao_ir_para.setEnabled(tem)
-    j.acao_voltar_visita.setEnabled(tem and p.pode_voltar)
-    j.acao_avancar_visita.setEnabled(tem and p.pode_avancar)
-    j.seletor.setEnabled(tem)
-    j.acao_modo_treino.setEnabled(tem)
-    j.acao_opcoes.setEnabled(editar)
-    j.acao_lote.setEnabled(tem and sem_lote)
-    j.acao_cancelar_lote.setEnabled(j.livro.lote_rodando)
-    j.acao_retomar_lote.setEnabled(tem and j.livro.pode_retomar)
-    j.acao_antes_do_lote.setEnabled(tem and not p.projeto.somente_leitura
-                                    and p.projeto.tem_antes_do_lote(p.indice))
-    j.acao_proximo_do_livro.setEnabled(tem)
-    j.acao_exportar.setEnabled(tem)
-    for q in (j.acao_localizar, j.acao_proxima_ocorrencia, j.acao_ocorrencia_anterior,
-              j.acao_todas_em_resultados, j.acao_buscar_glifo):
-        q.setEnabled(tem)
-    j.acao_substituir.setEnabled(editar)
-    j.acao_galeria.setEnabled(tem and bool(p.boxes))
-    j.acao_areas.setEnabled(tem)
-    j.acao_areas_auto.setEnabled(editar and j.acao_areas.isChecked())
-    area_atual = editar and j.acao_areas.isChecked() and j.areas.atual is not None
-    j.acao_reconhecer_zona.setEnabled(area_atual)
-    j.acao_ordenar_areas.setEnabled(editar and j.acao_areas.isChecked() and bool(j.areas.zonas))
-    j.acao_salvar_modelo_areas.setEnabled(editar and j.acao_areas.isChecked()
-                                          and bool(j.areas.zonas))
-    j.acao_aplicar_modelo_areas.setEnabled(editar and j.acao_areas.isChecked()
-                                           and j.areas.modelo is not None)
-    for q in (*j.acoes_das_funcoes, *j.acoes_dos_tipos):
-        q.setEnabled(area_atual)
-    j.acao_verificar.setEnabled(tem and bool(p.boxes))
-    j.acao_diagramas.setEnabled(tem)
-    for q in (j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
-              j.acao_escopo_da_fila):
-        q.setEnabled(tem)
-    for q in (j.acao_realce, j.acao_margens):     # sem página reconhecida, nada a realçar
-        q.setEnabled(tem and bool(p.boxes))
-    desfazer = p.historico.proximo_a_desfazer
-    refazer = p.historico.proximo_a_refazer
-    if j.texto.tem_sessao:                      # na sessão, o Ctrl+Z é dela (§6.3)
-        desfazer = "a palavra"
-    if j.texto.pode_reaplicar:                  # depois do Esc, o Ctrl+Y a reaplica
-        refazer = "a palavra"
-    # Com o editor Diagrama aberto, o Ctrl+Z dele (o do tabuleiro) vale sem histórico.
-    no_diagrama = j.editor_diagrama.aberto and j.editor_diagrama.isVisible()
-    j.acao_desfazer.setEnabled(editar and (desfazer is not None or no_diagrama))
-    j.acao_refazer.setEnabled(editar and (refazer is not None or no_diagrama))
-    j.acao_desfazer.setText(f"Desfazer: {desfazer}" if desfazer else "Desfazer")
-    j.acao_refazer.setText(f"Refazer: {refazer}" if refazer else "Refazer")
+    j = janela
+    vista = ej.Vista(areas_ligadas=j.acao_areas.isChecked(), area_atual=j.areas.atual is not None,
+                     tem_zonas=bool(j.areas.zonas), tem_modelo=j.areas.modelo is not None,
+                     sessao=j.texto.tem_sessao, pode_reaplicar=j.texto.pode_reaplicar,
+                     no_diagrama=j.editor_diagrama.aberto and j.editor_diagrama.isVisible())
+    estado = ej.calcular(j.pagina, j.livro, vista)
+    for nome, motivo in estado.habilitadas.items():
+        alvo = getattr(j, nome)
+        for q in alvo if isinstance(alvo, (list, tuple)) else (alvo,):
+            q.setEnabled(motivo is None)
+    for q, (motivo, dica) in zip(j.acoes_de_paginas, estado.paginas):
+        q.setEnabled(motivo is None)
+        q.setToolTip(dica)
+    j.paginas.paginas_mudam = estado.paginas_mudam
+    j.acao_desfazer.setText(estado.texto_do_desfazer)
+    j.acao_refazer.setText(estado.texto_do_refazer)

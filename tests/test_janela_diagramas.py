@@ -244,11 +244,11 @@ def test_corrigir_a_legenda_muda_o_lado_sem_f5_e_desfaz_junto(app, janela_com_le
     assert d.casas == casas and d.fen == FEN + " b - - 0 1"
     assert "pretas a jogar (da legenda)" in _texto(janela)
 
-    p.desfazer()
+    p.desfazedor.desfazer()
     _esperar(app, janela)
     assert p.diagramas[0].lado is None
     assert "(assumido: a página não diz)" in _texto(janela)
-    p.refazer()
+    p.desfazedor.refazer()
     _esperar(app, janela)
     assert p.diagramas[0].lado == "b"
 

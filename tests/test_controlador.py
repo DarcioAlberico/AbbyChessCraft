@@ -238,7 +238,7 @@ def test_corrigir_e_ensinar_uma_palavra_e_um_passo_so_do_desfazer(dois_projetos)
     executor.tudo()                                     # a correção e, depois, o ensino
     assert [ctl.box(g).char for g in ctl.gids[:2]] == ["x", "y"]
     assert ctl.leitor.total_de_padroes == 2
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     executor.tudo()
     assert ctl.modelo.boxes == antes                    # um Ctrl+Z volta as duas coisas
     assert ctl.leitor.total_de_padroes == 0
@@ -267,7 +267,7 @@ def test_espaco_na_correcao_separa_a_palavra_e_desfaz_junto(dois_projetos):
     executor.tudo()
     assert [ctl.box(g).char for g in (primeiro, segundo)] == ["x", "y"]
     assert ctl.modelo.decisoes.quebras == {segundo}
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     executor.tudo()
     assert ctl.modelo.decisoes.quebras == frozenset()   # a letra e o espaço, um Ctrl+Z
 

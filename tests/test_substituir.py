@@ -150,10 +150,10 @@ def test_ca_7_2_um_ctrl_z_volta_todas_as_paginas(sub):
     _aplicar(s, eventos["previas"][-1])
     ctl.executar.tudo()
     assert _textos(projeto) == ["coso velho", "outro coso", "fim"]
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     ctl.executar.tudo()
     assert _textos(projeto) == ["casa velha", "outra casa", "fim"]
-    ctl.refazer()
+    ctl.desfazedor.refazer()
     ctl.executar.tudo()
     assert _textos(projeto) == ["coso velho", "outro coso", "fim"]
 
@@ -225,7 +225,7 @@ def test_areas_e_estado_mudados_depois_da_previa_ficam(sub):
     ctl.executar.tudo()
     assert _textos(projeto) == ["lata velha", "outra lata", "fim"]
     assert len(projeto.carregar_modelo(1).zonas) == 1
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     ctl.executar.tudo()
     assert _textos(projeto)[1] == "outra casa" and len(projeto.carregar_modelo(1).zonas) == 1
 

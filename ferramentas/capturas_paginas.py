@@ -142,7 +142,7 @@ def main() -> int:
                 janela.ir_para_pagina(i + 1)
                 janela.visor.zoom_largura()
                 gravar(janela, "4-dividida-direita")
-            p.desfazer()
+            p.desfazedor.desfazer()
             _esperar(app, janela)
         janela.pagina.projeto.descarregar(10)
         janela.close()

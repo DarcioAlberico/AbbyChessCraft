@@ -487,7 +487,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.registrar_aviso(av.AVISO, "Desfazer" if not refazer else "Refazer", texto)
         if dialogos.confirmar(self, "Desfazer", texto + f"\n\nTirar esta ação do {pilha} e "
                               "continuar com as outras?"):
-            self.pagina.tirar_do_desfazer(refazer)
+            self.pagina.desfazedor.tirar_do_desfazer(refazer)
 
     def closeEvent(self, evento):
         self.config.setValue("geometria", self.saveGeometry())

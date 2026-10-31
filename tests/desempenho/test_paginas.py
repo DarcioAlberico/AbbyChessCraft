@@ -44,10 +44,10 @@ def test_dividir_e_girar_o_livro_inteiro(tmp_path, medidas):
         todas, total = list(range(PAGINAS)), len(projeto.sequencia)   # o PDF tem uma a mais
         dividir = _segundos(lambda: ctl.operacoes.dividir_paginas(todas))
         assert len(projeto.sequencia) == total + PAGINAS
-        desfazer_dividir = _segundos(ctl.desfazer)
+        desfazer_dividir = _segundos(ctl.desfazedor.desfazer)
         assert len(projeto.sequencia) == total
         girar = _segundos(lambda: ctl.operacoes.girar_paginas(todas, 90))
-        desfazer_girar = _segundos(ctl.desfazer)
+        desfazer_girar = _segundos(ctl.desfazedor.desfazer)
         assert projeto.sequencia.entrada_em(0).giro == 0
         assert projeto.descarregar(120)
 

@@ -194,6 +194,6 @@ def test_o_desfazer_acha_a_pagina_pelo_pid_depois_de_reordenar(tmp_path, pdf_de_
     assert projeto.carregar_modelo(6).boxes
     controlador.ir_para(0)
     _reordenar(projeto, [6, *range(6), *range(7, 60)])
-    controlador.desfazer()
+    controlador.desfazedor.desfazer()
     assert controlador.indice == 0 and controlador.modelo.pid == pid
     assert not controlador.modelo.boxes

@@ -84,12 +84,12 @@ def test_ca_12_8_desfazer_devolve_a_ordem_e_o_seguinte_desfaz_a_edicao_de_antes(
     pids = projeto.sequencia.pids
     ctl.operacoes.mover_paginas([0], 4)
     assert projeto.sequencia.pids[4] == pids[0]
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia.pids == pids
-    ctl.desfazer()                                   # a edição de antes da reordenação
+    ctl.desfazedor.desfazer()                                   # a edição de antes da reordenação
     assert not projeto.carregar_modelo(0).boxes
-    ctl.refazer()
-    ctl.refazer()
+    ctl.desfazedor.refazer()
+    ctl.desfazedor.refazer()
     assert projeto.sequencia.pids[4] == pids[0] and projeto.carregar_modelo(4).boxes
 
 
@@ -97,7 +97,7 @@ def test_desfazer_a_reordenacao_e_recusado_se_a_ordem_mudou_por_fora(projeto, ct
     ctl.operacoes.mover_paginas([0], 4)
     s = projeto.sequencia
     projeto.gravar_sequencia(s.mover([s.pid_em(10)], -1))    # outra mudança, sem o desfazer
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert any("mudou depois" in a for a in ctl.avisos)
     assert projeto.sequencia.pid_em(0) == s.pid_em(10)       # nada foi mudado
 
@@ -184,7 +184,7 @@ def test_ca_12_10_apagar_tira_do_livro_e_guarda_os_arquivos(projeto, ctl):
     assert projeto.paginas_lidas() == [s.posicao_de(pids[8])]
     assert _texto(projeto).strip() == "zz"           # a exportação também
     assert _hashes(projeto) == antes                 # os arquivos continuam no disco
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia.pids == pids and sorted(projeto.resumo_do_livro()) == [2, 6, 8]
 
 
@@ -248,11 +248,11 @@ def test_com_uma_tarefa_em_curso_as_operacoes_e_o_desfazer_delas_esperam(projeto
     pids = projeto.sequencia.pids
     monkeypatch.setattr(ctl, "_agora", lambda: False)        # o F5 rodando, por exemplo
     assert not ctl.operacoes.apagar_paginas([1])
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia.pids == pids and any("não pode voltar" in a for a in ctl.avisos)
     monkeypatch.undo()
     ctl.lote_rodando = True
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia.pids == pids                    # nem com o lote rodando
 
 
@@ -280,13 +280,13 @@ def test_desfazer_o_inserir_poe_as_inseridas_nas_apagadas(projeto, ctl, tmp_path
     ctl.operacoes.inserir_paginas([_png(tmp_path / "x.png")], 3)
     pid = projeto.pid_da_pagina(3)
     projeto.salvar_pagina(3, [_box("w")])                     # lida, fora do desfazer
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert pid not in projeto.sequencia.pids
     apagada = projeto.sequencia.apagada(pid)
     assert apagada is not None and apagada.entrada.fonte.startswith("inseridas/")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)           # e não vira página do livro
     assert reaberto.sequencia.apagada(pid).entrada.fonte.startswith("inseridas/")
-    ctl.refazer()
+    ctl.desfazedor.refazer()
     assert projeto.sequencia.pid_em(3) == pid and not projeto.sequencia.apagadas
 
 

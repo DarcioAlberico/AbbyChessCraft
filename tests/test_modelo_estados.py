@@ -507,7 +507,7 @@ class MaquinaDoControlador(RuleBasedStateMachine):
         historico = self.ctl.historico
         while historico.proxima_a_desfazer() is not None:
             antes = historico.proxima_a_desfazer()
-            self.ctl.desfazer()
+            self.ctl.desfazedor.desfazer()
             if historico.proxima_a_desfazer() is antes:
                 assert self.mudou_por_fora, "desfazer recusado sem mudança por fora"
                 return
@@ -525,11 +525,11 @@ class MaquinaDoControlador(RuleBasedStateMachine):
 
     @rule()
     def desfazer(self):
-        self.ctl.desfazer()
+        self.ctl.desfazedor.desfazer()
 
     @rule()
     def refazer(self):
-        self.ctl.refazer()
+        self.ctl.desfazedor.refazer()
 
     @rule(c=st.sampled_from("ab"), qual=st.sampled_from(["corrigir", "descartar", "juntar"]))
     def editar_e_desfazer(self, c, qual):
@@ -542,7 +542,7 @@ class MaquinaDoControlador(RuleBasedStateMachine):
          "juntar": lambda: self.ctl.juntar(+1)}[qual]()
         if self.ctl.modelo.boxes == antes:
             return                                   # a edição não se aplicou (sem vizinho)
-        self.ctl.desfazer()
+        self.ctl.desfazedor.desfazer()
         assert self.ctl.modelo.boxes == antes and self.ctl.modelo.estado == estado
         assert self.ctl.modelo.decisoes == decisoes
 

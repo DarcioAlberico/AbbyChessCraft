@@ -112,7 +112,7 @@ def test_ca_7_2_substituir_todas_no_livro_e_um_ctrl_z(tmp_path, medidas):
         desfazer_mb = ctl.historico.bytes / 2**20
 
         inicio = time.perf_counter()
-        ctl.desfazer()                                    # um Ctrl+Z
+        ctl.desfazedor.desfazer()                                    # um Ctrl+Z
         executor.tudo()
         t_desfazer = time.perf_counter() - inicio
         for i in range(PAGINAS):                          # todas voltaram
@@ -122,7 +122,7 @@ def test_ca_7_2_substituir_todas_no_livro_e_um_ctrl_z(tmp_path, medidas):
             assert agora.decisoes == antes.decisoes and agora.estado == antes.estado
             assert list(agora.zonas) == list(antes.zonas)
             assert [d.lado for d in agora.diagramas] == [d.lado for d in antes.diagramas]
-        ctl.refazer()
+        ctl.desfazedor.refazer()
         executor.tudo()
         assert sum(1 for i in range(PAGINAS)
                    if any(b.entry.char == "E" for b in projeto.carregar_modelo(i).boxes)) == PAGINAS

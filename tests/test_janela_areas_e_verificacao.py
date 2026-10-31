@@ -117,7 +117,7 @@ def test_funcao_e_ordem_das_areas_atualizam_o_documento_e_desfazem(app, janela):
     janela.areas.escolher(0)
     janela.areas.trocar_funcao_atual("titulo")
     assert janela.pagina.documento().blocos[0].funcao == "titulo"
-    janela.pagina.desfazer()
+    janela.pagina.desfazedor.desfazer()
     assert janela.areas.zonas[0].funcao == "texto"
 
     janela.areas.iniciar_ordenacao()
@@ -160,7 +160,7 @@ def test_ca_5_5_ordenar_quatro_areas_na_ordem_inversa(app, janela):  # noqa: F81
     assert [z.ordem for z in janela.areas.zonas] == [3, 2, 1, 0]
     ids = [b.zona_id for b in janela.pagina.documento().blocos if b.zona_id]
     assert ids == sorted(ids, reverse=True)
-    janela.pagina.desfazer()
+    janela.pagina.desfazedor.desfazer()
     assert all(z.ordem is None for z in janela.areas.zonas)
 
 
@@ -193,7 +193,7 @@ def test_ca_5_4_o_modelo_vai_so_as_impares_e_aparece_na_pagina_aberta(app, janel
         tem = bool(janela.projeto.carregar_zonas(i))
         assert tem == (i in impares), i
     assert janela.pagina.indice in impares and janela.areas.zonas
-    janela.pagina.desfazer()
+    janela.pagina.desfazedor.desfazer()
     assert not any(janela.projeto.carregar_zonas(i) for i in range(total))
 
 

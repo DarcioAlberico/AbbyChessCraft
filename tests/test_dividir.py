@@ -114,7 +114,7 @@ def test_ca_12_13_o_ctrl_z_junta_e_aposenta_o_pid_novo(projeto, ctl):
     ctl.operacoes.dividir_paginas([2])
     pid_novo = projeto.sequencia.entrada_em(3).pid
     assert (projeto.pasta / "paginas" / f"p{pid_novo}.json").is_file()
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia == antes
     assert projeto.dados.gids_movidos == {}
     assert not (projeto.pasta / "paginas" / f"p{pid_novo}.json").exists()
@@ -123,7 +123,7 @@ def test_ca_12_13_o_ctrl_z_junta_e_aposenta_o_pid_novo(projeto, ctl):
     assert projeto.novo_pid() > pid_novo                         # aposentado
     livro = json.loads((projeto.pasta / "livro.json").read_text(encoding="utf-8"))
     assert str(pid_novo) not in livro["paginas"]
-    ctl.refazer()
+    ctl.desfazedor.refazer()
     assert projeto.sequencia.entrada_em(3).pid == pid_novo
     assert len(projeto.carregar_modelo(3).boxes) == 2
 
@@ -134,7 +134,7 @@ def test_o_ctrl_z_recusa_se_a_metade_mudou_depois(projeto, ctl):
     pagina = projeto.carregar_modelo(3)
     projeto.salvar_pagina(3, [b.entry for b in pagina.boxes[:1]])   # por fora do desfazer
     sequencia = projeto.sequencia
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia == sequencia
 
 
@@ -143,7 +143,7 @@ def test_dividir_pagina_sem_glifos_so_muda_a_sequencia(projeto, ctl):
     assert [projeto.sequencia.entrada_em(i).metade for i in (7, 8, 10, 11)] == \
         ["esquerda", "direita", "esquerda", "direita"]
     assert not list((projeto.pasta / "paginas").glob("p*.json"))
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert len(projeto.sequencia) == 60
 
 
@@ -251,8 +251,8 @@ def test_refazer_a_divisao_nao_reaproveita_um_gid_da_direita(projeto, ctl):
     direita = projeto.carregar_modelo(3)
     direita.alocar()                                 # uma edição na direita, desfeita
     contador = direita.proximo_n
-    ctl.desfazer()
-    ctl.refazer()
+    ctl.desfazedor.desfazer()
+    ctl.desfazedor.refazer()
     assert projeto.carregar_modelo(3).proximo_n >= contador
 
 
@@ -292,7 +292,7 @@ def test_com_leitura_do_servidor_pendente_as_operacoes_esperam(projeto, ctl):
 def test_a_pagina_vazia_na_memoria_nao_impede_o_desfazer(projeto, ctl):
     ctl.operacoes.dividir_paginas([7])
     projeto.pagina_para_editar(8)                    # nasce vazia na memória, sem arquivo
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert len(projeto.sequencia) == 60
 
 

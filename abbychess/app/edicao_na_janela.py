@@ -77,7 +77,7 @@ class EdicaoNoDocumento:
             self.texto.restaurar()
         else:
             self.texto.esquecer_a_restaurada()
-            self.pagina.desfazer()
+            self.pagina.desfazedor.desfazer()
 
     def refazer(self) -> None:
         if self._no_editor_de_diagrama() and self.editor_diagrama.pode_refazer:
@@ -85,7 +85,7 @@ class EdicaoNoDocumento:
         elif self.texto.pode_reaplicar:
             self.texto.reaplicar()
         else:
-            self.pagina.refazer()
+            self.pagina.desfazedor.refazer()
 
     def abrir_paleta(self) -> None:
         """F2: a paleta no Documento (o cursor de texto) ou no campo do Glifo."""

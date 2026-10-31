@@ -184,6 +184,6 @@ def test_desfazer_o_f5_devolve_a_marca_da_pagina(app, janela, reconhecida):
     janela.pagina.marcar(a.x1 - 3, a.y1 - 3, a.x2 + 3, a.y2 + 3)
     janela.reconhecer()
     _esperar(app, janela)
-    janela.pagina.desfazer()
+    janela.pagina.desfazedor.desfazer()
     assert janela.pagina.reconhecida == reconhecida
     assert janela.projeto.pagina_reconhecida(0) == reconhecida

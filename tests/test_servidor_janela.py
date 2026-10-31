@@ -74,7 +74,7 @@ def test_o_glifo_marcado_fica_aguardando_e_recebe_a_leitura_do_servidor(app, jan
     marcado = p.box(gid)
     assert (marcado.char, marcado.source) == (leitor_falso.LETRA, leitor_falso.FONTE)
     assert not any(pg.aguardando(x) for x in p.boxes)
-    p.desfazer()                                               # o quadro e a leitura: um passo
+    p.desfazedor.desfazer()                                               # o quadro e a leitura: um passo
     assert len(boxes(janela)) == antes and p.historico.proxima_a_desfazer().descricao \
         == "Reconhecer a página"
 
@@ -88,7 +88,7 @@ def test_o_padrao_ensinado_vai_ao_servidor_antes_do_pedido_seguinte(app, janela)
     _esperar(app, janela)
     assert len(p.padroes()) == 1
     assert p.servidor.chamar("padroes", timeout=10) == 1        # CA-11.2: o delta chegou
-    p.desfazer()                                               # o desfazer apaga a amostra
+    p.desfazedor.desfazer()                                               # o desfazer apaga a amostra
     _esperar(app, janela)
     assert p.servidor.chamar("padroes", timeout=10) == 0
 

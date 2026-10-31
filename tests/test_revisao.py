@@ -163,7 +163,7 @@ def test_ca_8_4_esquecer_devolve_a_fila_os_lidos_no_livro_e_desfazer_os_tira(liv
     c.esperar(lambda: c.na_fila() == 30)
     assert c.da_amostra() == 0 and c.projeto.carregar_modelo(1).estado == EM_REVISAO
     assert len(c.ctl.historico.proxima_a_desfazer().paginas) == 3     # uma transação só
-    c.ctl.desfazer()
+    c.ctl.desfazedor.desfazer()
     c.ctl.executar.tudo()
     assert c.na_fila() == 0 and c.da_amostra() == 30
     assert c.projeto.carregar_modelo(1).estado == VERIFICADA
@@ -177,11 +177,11 @@ def test_refazer_o_esquecer_desfeito_antes_da_procura_devolve_os_30(livro):
     c.ctl.esquecer([c.caminho])
     c.ctl.executar.tudo()
     assert c.na_fila() == 10                            # só a página aberta, por enquanto
-    c.ctl.desfazer()                                    # a procura ainda não voltou
+    c.ctl.desfazedor.desfazer()                                    # a procura ainda não voltou
     c.ctl.executar.tudo()
     c.esperar(lambda: not c.fila and c.na_fila() == 0)  # a volta dela é descartada
     assert c.da_amostra() == 30
-    c.ctl.refazer()
+    c.ctl.desfazedor.refazer()
     c.ctl.executar.tudo()
     c.esperar(lambda: c.na_fila() == 30)
     assert c.da_amostra() == 0 and not Path(c.caminho).exists()
@@ -212,7 +212,7 @@ def test_a_galeria_em_duas_paginas_com_leituras_diferentes_e_um_passo(livro):
     assert leituras(0, g0) == ["x", "y"] and leituras(2, g2) == ["z"]
     transacao = ctl.historico.proxima_a_desfazer()
     assert len(transacao.paginas) == 2                  # as duas páginas, num passo só
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     ctl.executar.tudo()
     assert leituras(0, g0) == ["c", "a"] and leituras(2, g2) == ["b"]
 

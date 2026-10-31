@@ -300,9 +300,9 @@ def test_ctrl_t_verifica_a_pagina_e_editar_a_devolve_a_revisao(app, lida):
         QTest.keyClick(j.confirmacao.aceitar, Qt.Key.Key_Return)
     assert j.pagina.modelo.estado == md.VERIFICADA
     assert "verificada" in j.rotulo_da_pagina.text()
-    j.pagina.desfazer()
+    j.pagina.desfazedor.desfazer()
     assert j.pagina.modelo.estado != md.VERIFICADA
-    j.pagina.refazer()
+    j.pagina.desfazedor.refazer()
     assert j.pagina.modelo.estado == md.VERIFICADA
     j.treino.campo.setText("x")
     j.treino.pedir_so_corrigir()

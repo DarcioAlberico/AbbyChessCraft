@@ -173,7 +173,7 @@ def test_girar_cortar_e_dividir_pelo_menu(app, janela, monkeypatch):  # noqa: F8
     janela.acao_dividir_paginas.trigger()
     assert janela.fonte.total == 61 and janela.seletor.maximum() == 61
     assert projeto.sequencia.entrada_em(5).metade == "direita"
-    janela.pagina.desfazer()
+    janela.pagina.desfazedor.desfazer()
     assert janela.fonte.total == 60
     monkeypatch.setattr(dp, "perguntar_com", lambda *_a, **_k: ([6], 1.25))
     janela.acao_endireitar_paginas.trigger()

@@ -279,7 +279,7 @@ def test_ca_4_8_voltar_ao_estado_antes_do_lote_devolve_o_json_copiado(ctl, proje
     assert not copia.exists() and not projeto.tem_antes_do_lote(1)
     assert not any(b.source == "livro" for b in p.boxes)       # a aberta mostra a de antes
     assert any(b.char == "W" for b in p.boxes) and not any(b.char == "Z" for b in p.boxes)
-    p.desfazer()                                          # o "Z" não está mais lá: recusa
+    p.desfazedor.desfazer()                                          # o "Z" não está mais lá: recusa
     assert recusas and "Corrigir para 'Z'" in recusas[0]
 
 
@@ -354,7 +354,7 @@ def test_g2_a_correcao_feita_durante_a_leitura_numa_pagina_deixada_fica(ctl, pro
     corrigido = projeto.carregar_modelo(0).box(gid).entry
     assert (corrigido.char, corrigido.source) == ("Q", FONTE_MANUAL)
     p.ir_para(0)
-    p.desfazer()                                          # o Ctrl+Z dela continua valendo
+    p.desfazedor.desfazer()                                          # o Ctrl+Z dela continua valendo
     assert projeto.carregar_modelo(0).box(gid).entry.char != "Q"
 
 
@@ -387,7 +387,7 @@ def test_o_lote_deixa_para_depois_a_pagina_com_um_f5_em_voo(ctl, projeto, com_se
     ctl.executor.tudo()
     assert ctl.fins[-1].reler_depois == [0] and ctl.fins[-1].lidas == []
     assert p.box(gid).char != "W"
-    p.desfazer()
+    p.desfazedor.desfazer()
     assert p.box(gid).char == antes
     projeto.descarregar(10)
     assert ProjetoDeLivro.abrir(projeto.pasta).carregar_modelo(0).box(gid).entry.char == antes
@@ -421,17 +421,17 @@ def test_o_glifo_aguardando_que_volta_no_refazer_e_lido_e_o_desfazer_vale(ctl, p
     p.marcar(b.x1 - 1, b.y1 - 1, b.x2 + 1, b.y2 + 1)
     gid = p.atual
     assert pg.aguardando(p.box(gid))
-    p.desfazer()                                          # antes de a leitura chegar
-    p.refazer()
+    p.desfazedor.desfazer()                                          # antes de a leitura chegar
+    p.desfazedor.refazer()
     assert pg.aguardando(p.box(gid))
     entregar(fila, esperar_por=1)                         # a leitura do primeiro pedido
     assert p.box(gid).char == "x"
     assert p.historico.proximo_a_desfazer == "Marcar glifo"
     recusas = []
     p.eventos.ligar("recusa", lambda refazer, texto: recusas.append(texto))
-    p.desfazer()                                          # a leitura não impede o desfazer
+    p.desfazedor.desfazer()                                          # a leitura não impede o desfazer
     assert not recusas and gid not in p.gids and len(p.gids) == antes
-    p.refazer()
+    p.desfazedor.refazer()
     entregar(fila, esperar_por=1)
     assert p.box(gid).char == "x"
 
@@ -445,7 +445,7 @@ def test_abrir_a_pagina_com_aguardando_le_fora_do_desfazer(ctl, projeto, com_ser
     p = ctl.pagina
     p.escolher(p.gids[0])
     p.corrigir("k")
-    p.desfazer()                                          # algo para refazer
+    p.desfazedor.desfazer()                                          # algo para refazer
     pagina = projeto.carregar_modelo(1)
     pagina.boxes = [replace(b, entry=replace(b.entry, char="", source="", confidence=0.0))
                     if k == 0 else b for k, b in enumerate(pagina.boxes)]

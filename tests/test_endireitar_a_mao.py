@@ -76,11 +76,11 @@ def test_ca_12_14_o_ctrl_z_devolve_o_angulo_e_os_boxes(projeto, ctl):
     antes = [(b.gid, b.entry.char, b.entry.x1, b.entry.y1)
              for b in projeto.carregar_modelo(0).boxes]
     ctl.operacoes.endireitar_paginas([0], -3.5)
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia.entrada_em(0).angulo is None
     assert [(b.gid, b.entry.char, b.entry.x1, b.entry.y1)
             for b in projeto.carregar_modelo(0).boxes] == antes
-    ctl.refazer()
+    ctl.desfazedor.refazer()
     assert projeto.sequencia.entrada_em(0).angulo == -3.5
 
 

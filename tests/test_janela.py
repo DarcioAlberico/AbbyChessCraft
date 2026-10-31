@@ -529,7 +529,7 @@ def test_durante_o_lote_editar_vale_na_hora(app, janela):  # noqa: F811
         janela.pagina.corrigir("z")
         assert janela.pagina.box(janela.pagina.gids[0]).char == "z"
         assert janela.acao_reconhecer.isEnabled() and janela.acao_reler.isEnabled()
-        janela.pagina.desfazer()
+        janela.pagina.desfazedor.desfazer()
         assert janela.pagina.box(janela.pagina.gids[0]).char != "z"
     finally:
         janela.pagina.lote_rodando = False

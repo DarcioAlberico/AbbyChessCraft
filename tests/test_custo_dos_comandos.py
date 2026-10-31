@@ -409,7 +409,7 @@ def test_ensinar_em_lote_da_fila(app, janela, contador):
     _esperar(app, janela)
     assert contador.gestos == CUSTO_L["ensinar_em_lote_da_fila"]
     _so_um_padrao_e_o_resto_corrigido(janela, lida, seis, lance)
-    janela.pagina.desfazer()                         # um Ctrl+Z desfaz o lote inteiro
+    janela.pagina.desfazedor.desfazer()                         # um Ctrl+Z desfaz o lote inteiro
     _esperar(app, janela)
     assert all(boxes(janela)[i].char == "6" for i in seis)
 

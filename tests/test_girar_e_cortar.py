@@ -93,8 +93,8 @@ def test_ca_12_11_noventa_duas_vezes_e_cento_e_oitenta_e_o_ctrl_z_volta(projeto,
     ctl.operacoes.girar_paginas([3], 90)
     assert projeto.sequencia.entrada_em(3).giro == 180
     assert np.array_equal(_imagem(ctl, 3), np.rot90(imagem, k=2))
-    ctl.desfazer()
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia.entrada_em(3).giro == 0
     assert np.array_equal(_imagem(ctl, 3), imagem)
     assert {g: r.tobytes() for g, r in _recortes(ctl, projeto, 3).items()} == \
@@ -153,7 +153,7 @@ def test_ca_12_12_cortar_e_o_recorte_exato_e_o_glifo_de_fora_fica_guardado(proje
     depois = _recortes(ctl, projeto, 2)
     for gid in dentro:
         assert np.array_equal(depois[gid], recortes[gid])  # os mesmos pixels
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert [b.gid for b in projeto.carregar_modelo(2).boxes] == gids   # na ordem de antes
 
 

@@ -71,10 +71,10 @@ def test_o_ctrl_z_do_giro_guarda_o_angulo_em_que_a_pagina_foi_lida(projeto, ctl)
     ctl.operacoes.girar_paginas([2], 90)
     assert ctl.fonte.inclinacao(2) == 0.6
     _ler(projeto, 2)
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia.entrada_em(2).giro == 0
     assert ctl.fonte.inclinacao(2) == 0.6
-    ctl.refazer()
+    ctl.desfazedor.refazer()
     assert ctl.fonte.inclinacao(2) == 0.6
 
 
@@ -268,7 +268,7 @@ def test_a_origem_numa_pagina_apagada_oferece_restaura_la(app, janela):
     janela.confirmacao.aceitar.click()
     assert projeto.sequencia.posicao_de(gid >> 20) == 3
     assert janela.pagina.indice == 3 and janela.pagina.atual == gid
-    janela.pagina.desfazer()                      # o Ctrl+Z apaga de novo
+    janela.pagina.desfazedor.desfazer()                      # o Ctrl+Z apaga de novo
     assert projeto.sequencia.posicao_de(gid >> 20) is None
 
 
@@ -305,13 +305,13 @@ def test_o_ctrl_z_da_divisao_pelo_carimbo_com_o_cache_vazio(projeto, ctl):
     ctl.operacoes.dividir_paginas([2])
     with projeto._trava_do_cache:
         projeto._modelos.clear()
-    assert ctl.desfazer() is None and len(projeto.sequencia) == 60   # intocada: desfaz
-    ctl.refazer()
+    assert ctl.desfazedor.desfazer() is None and len(projeto.sequencia) == 60   # intocada: desfaz
+    ctl.desfazedor.refazer()
     with projeto._trava_do_cache:
         projeto._modelos.clear()
     arquivo = projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(3)}.json"
     bruto = json.loads(arquivo.read_text(encoding="utf-8"))
     bruto["estado"] = "verificada"                                  # mudou por fora
     arquivo.write_text(json.dumps(bruto), encoding="utf-8")
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert len(projeto.sequencia) == 61                             # recusado

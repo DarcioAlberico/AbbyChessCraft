@@ -109,6 +109,32 @@ def test_a_aba_padroes_filtra_vai_a_origem_e_esquece_com_delete(app, tmp_path): 
     assert esquecidas == [[str(arquivos[0])]]
 
 
+def test_a_aba_padroes_diz_o_efeito_de_cada_amostra_por_extenso(app, tmp_path):  # noqa: F811
+    """O efeito gravado na amostra ([negrito, itálico], None no eixo não medido) na dica e no
+    detalhe da amostra escolhida."""
+    from PySide6.QtGui import QPixmap
+
+    from abbychess.app.painel_padroes import PainelDePadroes
+
+    efeitos = (([True, None], "negrito"), ([None, True], "itálico"),
+               ([True, True], "negrito e itálico"), ([False, False], "reto"),
+               ([None, None], "não medido"), ([False], "reto"),        # só o negrito gravado
+               (None, "não medido"))                                   # a amostra de antes do I
+    arquivos, detalhes = [], {}
+    for k, (efeito, _nome) in enumerate(efeitos):
+        caminho = tmp_path / f"a{k}.png"
+        QPixmap(8, 8).save(str(caminho))
+        arquivos.append(caminho)
+        detalhes[str(caminho)] = {"origem": (0, k), "altura": 1.0, "efeito": efeito, "lidos": 1}
+    painel = PainelDePadroes()
+    painel.atualizar({"e": arquivos}, detalhes)
+    painel.caracteres.setCurrentRow(0)                      # o "e" escolhido na lista
+    dicas =[painel.amostras.item(k).toolTip().splitlines()[2] for k in range(len(arquivos))]
+    assert dicas == [f"Efeito: {nome}" for _efeito, nome in efeitos]
+    painel.amostras.item(2).setSelected(True)
+    assert "Efeito: negrito e itálico" in painel.detalhe.text()
+
+
 def test_ca_8_2_shift_f7_alterna_o_escopo_da_fila(jb):  # noqa: F811
     _uns(jb, 3)
     assert jb.fila.escopo == "pagina"

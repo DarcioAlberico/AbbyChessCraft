@@ -33,6 +33,44 @@ class _TravaComIntervalo:
             intervalo()
 
 
+class _ProjetoQueNaoEDaBusca:
+    """O projeto que a janela abriu depois do pedido da busca: ninguém deve lê-lo por ela."""
+
+    def __init__(self, resto):
+        self.lidas, self._resto = [], resto
+
+    def ler_sem_migrar(self, indice):
+        self.lidas.append(indice)
+        return None
+
+    def __getattr__(self, nome):                # o resto, que o fim da busca consulta
+        return getattr(self._resto, nome)
+
+
+def test_a_busca_le_as_paginas_do_projeto_de_quando_foi_pedida(livro_escrito, monkeypatch):
+    projeto, ctl, busca, escrever, eventos = livro_escrito
+    escrever(2, "fim novo")
+    busca.marcar_velha(2)                                 # para ler do disco, na thread
+    monkeypatch.setattr(projeto, "modelo_em_memoria", lambda i: None)
+    adiadas, Thread = [], threading.Thread
+
+    def thread_adiada(*args, name=None, target=None, **k):   # a da busca não começa já
+        if name == "busca":
+            adiadas.append(target)
+            return type("Parada", (), {"start": lambda self: None})()
+        return Thread(*args, name=name, target=target, **k)
+
+    monkeypatch.setattr(threading, "Thread", thread_adiada)
+    busca.buscar(bs.Opcoes("novo"))
+    outro = _ProjetoQueNaoEDaBusca(projeto)
+    monkeypatch.setattr(ctl, "projeto", outro)            # a janela troca de projeto
+    monkeypatch.setattr(threading, "Thread", Thread)
+    [rodar] = adiadas
+    rodar()                                               # e só então a thread lê
+
+    assert outro.lidas == []
+
+
 def test_fechar_o_pool_ocioso_nao_fecha_o_que_um_obter_acabou_de_pegar():
     pool = bs.PoolDoIndice()
     aberto = pool._pool = _PoolFalso()

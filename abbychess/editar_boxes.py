@@ -90,18 +90,30 @@ def _corte_sob_o_pingo(partes: List[BoxEntry], box: BoxEntry, tinta) -> Optional
 
     O vão vertical é medido só na tinta de baixo do corte do core, sem o pingo, pela
     mesma régua do core (`_vale_mais_fundo`, com a margem dele)."""
-    if tinta is None or len(partes) != 2 or (box.angulo or 0) % 180:
-        return None                                  # girado, o corte em y é o certo
+    if tinta is None or not _cortou_em_y(partes, box):
+        return None
     de_cima = partes[0]
-    if (de_cima.x1, de_cima.x2) != (box.x1, box.x2) or de_cima.y2 >= box.y2:
-        return None                                  # o core cortou na coluna
-    pingo = _aparar(de_cima, box, tinta)
-    if pingo is None or (pingo.y2 - pingo.y1 > PINGO_ALTURA * box.height
-                         or pingo.x2 - pingo.x1 > PINGO_LARGURA * box.width):
+    if not _so_um_pingo(_aparar(de_cima, box, tinta), box):
         return None
     vale = BoxService._vale_mais_fundo(tinta[de_cima.y2 - box.y1:].sum(axis=0),
                                        BoxService.MARGEM_DO_CORTE)
     return box.x1 + vale[0] if vale else None
+
+
+def _cortou_em_y(partes: List[BoxEntry], box: BoxEntry) -> bool:
+    """O core partiu o box em pé em dois, um em cima do outro, a de cima com a largura toda."""
+    if len(partes) != 2 or (box.angulo or 0) % 180:
+        return False                                 # girado, o corte em y é o certo
+    de_cima = partes[0]
+    # Senão, o core cortou na coluna.
+    return (de_cima.x1, de_cima.x2) == (box.x1, box.x2) and de_cima.y2 < box.y2
+
+
+def _so_um_pingo(parte: Optional[BoxEntry], box: BoxEntry) -> bool:
+    """A parte de cima, aparada à tinta, é só um pingo: até `PINGO_ALTURA` da altura e
+    `PINGO_LARGURA` da largura do box."""
+    return (parte is not None and parte.y2 - parte.y1 <= PINGO_ALTURA * box.height
+            and parte.x2 - parte.x1 <= PINGO_LARGURA * box.width)
 
 
 def _aparar(parte: BoxEntry, inteiro: BoxEntry, tinta) -> Optional[BoxEntry]:
@@ -129,24 +141,42 @@ def criar_box(imagem: Image.Image, boxes: List[BoxEntry], area: Caixa,
     Devolve o índice dele; os outros índices mudam, e quem guarda índices os
     remapeia pela identidade dos boxes.
     """
-    largura, altura = imagem.size
+    quadro = _quadro_na_pagina(area, *imagem.size)
+    novo = _aparado_a_tinta(quadro, imagem)
+    boxes[:] = _no_lugar_dos_de_dentro(boxes, novo)
+    indice = next(i for i, b in enumerate(boxes) if b is novo)
+    _reler(imagem, boxes, [indice], leitor)
+    return indice
+
+
+def _quadro_na_pagina(area: Caixa, largura: int, altura: int) -> BoxEntry:
+    """O quadro da área desenhada (em qualquer sentido), cortado à página; `ValueError` se ele
+    fica fora dela."""
     x1, y1, x2, y2 = area
     x1, x2 = sorted((x1, x2))
     y1, y2 = sorted((y1, y2))
     quadro = BoxService.clamp_box(BoxEntry("", x1, y1, x2, y2), largura, altura)
     if quadro.x2 - quadro.x1 < 1 or quadro.y2 - quadro.y1 < 1:
         raise ValueError("A área está fora da página.")
+    return quadro
+
+
+def _aparado_a_tinta(quadro: BoxEntry, imagem: Image.Image) -> BoxEntry:
+    """O quadro encolhido até a tinta dele; `ValueError` se não há tinta."""
     tinta = BoxService._tinta_do_box(quadro, np.asarray(imagem.convert("L")))
     novo = _aparar(quadro, quadro, tinta) if tinta is not None and tinta.any() else None
     if novo is None:
         raise ValueError("Não há tinta na área marcada.")
+    return novo
+
+
+def _no_lugar_dos_de_dentro(boxes: List[BoxEntry], novo: BoxEntry) -> List[BoxEntry]:
+    """Os boxes com o novo no lugar dos que ficam dentro dele (ou com o centro dentro), em
+    ordem de leitura."""
     dentro = [b for b in boxes if _contido(b, (novo.x1, novo.y1, novo.x2, novo.y2))
               or _centro_dentro(b, novo)]
     restantes = [b for b in boxes if not any(b is d for d in dentro)]
-    boxes[:] = BoxService.sort_boxes_reading_order(restantes + [novo])
-    indice = next(i for i, b in enumerate(boxes) if b is novo)
-    _reler(imagem, boxes, [indice], leitor)
-    return indice
+    return BoxService.sort_boxes_reading_order(restantes + [novo])
 
 
 def a_manter_na_releitura(boxes, lida: bool) -> List[BoxEntry]:

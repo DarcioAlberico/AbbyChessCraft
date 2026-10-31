@@ -67,8 +67,6 @@ abbychess/controlador.py ControladorDePagina.alternar_na_selecao  # a reduzir (Q
 abbychess/controlador.py ControladorDePagina.corrigir_no_livro.corpo  # a reduzir (Q8)
 abbychess/diagramas.py legendas_dos_boxes  # a reduzir (Q8)
 abbychess/diagramas.py ler_diagrama  # a reduzir (Q8)
-abbychess/editar_boxes.py _corte_sob_o_pingo  # a reduzir (Q8)
-abbychess/editar_boxes.py criar_box  # a reduzir (Q8)
 abbychess/estado_da_janela.py calcular  # a reduzir (Q8)
 abbychess/fila_da_pagina.py FilaDaPagina.andar  # a reduzir (Q8)
 abbychess/fila_da_pagina.py FilaDaPagina.fila  # a reduzir (Q8)

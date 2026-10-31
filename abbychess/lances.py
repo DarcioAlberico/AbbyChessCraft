@@ -215,56 +215,82 @@ def _tokens(texto: str, idioma: str):
         if numero:
             yield "numero", (int(numero.group(1)), numero.group(2) != ".")
             nucleo = numero.group(3)
-        nucleo = nucleo.rstrip(_BORDA + ")]}")
-        if nucleo:
-            achado = _em_san(nucleo, tabela)
-            if achado:
-                san = achado.group("lance").replace(":", "x").replace("×", "x")
-                impresso = nucleo.rstrip("!?‼⁇⁈⁉")
-                yield "lance", Lance(impresso, san, marca=achado.group("marca"),
-                                     juizo=achado.group("juizo"))
-            elif _SINAL.match(nucleo):
-                yield "sinal", nucleo
-            else:
-                yield "prosa", nucleo
+        yield from _token_do_nucleo(nucleo.rstrip(_BORDA + ")]}"), tabela)
         if fecha:
             yield "variante", None
         if fim:
             yield "fim", None
 
 
+def _token_do_nucleo(nucleo: str, tabela: Dict[str, str]):
+    """O token do que sobra da palavra sem o número e a pontuação: "lance", "sinal" ou
+    "prosa"; nada, se não sobrou nada."""
+    if not nucleo:
+        return
+    achado = _em_san(nucleo, tabela)
+    if achado:
+        san = achado.group("lance").replace(":", "x").replace("×", "x")
+        impresso = nucleo.rstrip("!?‼⁇⁈⁉")
+        yield "lance", Lance(impresso, san, marca=achado.group("marca"),
+                             juizo=achado.group("juizo"))
+    elif _SINAL.match(nucleo):
+        yield "sinal", nucleo
+    else:
+        yield "prosa", nucleo
+
+
 def primeira_linha(texto: str, idioma: str = "pt") -> List[Lance]:
     """Os lances da primeira linha do texto (ver o docstring do módulo)."""
-    linha: List[Lance] = []
-    esperado: Optional[Tuple[int, bool]] = None
-    numero: Optional[Tuple[int, bool]] = None
-    colado = False                   # o token anterior foi um lance aceito
+    linha = _Linha()
     for tipo, valor in _tokens(texto, idioma):
-        if tipo in ("variante", "fim"):
-            if linha:
-                break
-            numero, colado = None, False
-        elif tipo == "sinal":
-            continue
-        elif tipo == "prosa":
-            numero, colado = None, False
-        elif tipo == "numero":
-            if linha and valor != esperado:
-                break
-            numero, colado = valor, False
-        else:                                   # lance
-            if numero is not None:
-                n, pretas = numero
-            elif linha and colado and esperado is not None and esperado[1]:
-                n, pretas = esperado
-            elif linha and colado:
-                break                           # lance das brancas sem número: outra coisa
-            else:
-                continue                        # lance solto na prosa
-            linha.append(Lance(valor.impresso, valor.san, n, pretas, valor.marca, valor.juizo))
-            esperado = (n, True) if not pretas else (n + 1, False)
-            numero, colado = None, True
-    return linha
+        if linha.lance(valor) if tipo == "lance" else linha.outro(tipo, valor):
+            break
+    return linha.lances
+
+
+class _Linha:
+    """A primeira linha enquanto os tokens chegam: os lances aceitos, o número que o próximo
+    lance teria e o que o livro imprimiu logo antes dele."""
+
+    def __init__(self):
+        self.lances: List[Lance] = []
+        self.esperado: Optional[Tuple[int, bool]] = None
+        self.numero: Optional[Tuple[int, bool]] = None
+        self.colado = False              # o token anterior foi um lance aceito
+
+    def outro(self, tipo: str, valor) -> bool:
+        """O token que não é lance; True: ele acaba a linha."""
+        if tipo == "sinal":
+            return False
+        if self._corta(tipo, valor):
+            return True
+        self.numero, self.colado = (valor if tipo == "numero" else None), False
+        return False
+
+    def _corta(self, tipo: str, valor) -> bool:
+        """A variante, o ponto e vírgula e o número que não é o esperado acabam a linha
+        começada (o livro volta a um lance que já passou)."""
+        if not self.lances:
+            return False
+        if tipo == "numero":
+            return valor != self.esperado
+        return tipo in ("variante", "fim")
+
+    def lance(self, valor: Lance) -> bool:
+        """Põe o lance na linha, se ele tem número ou é a resposta das pretas logo depois do
+        lance das brancas; True: ele acaba a linha."""
+        if self.numero is not None:
+            n, pretas = self.numero
+        elif not (self.lances and self.colado):
+            return False                        # lance solto na prosa
+        elif self.esperado is not None and self.esperado[1]:
+            n, pretas = self.esperado
+        else:
+            return True                         # lance das brancas sem número: outra coisa
+        self.lances.append(Lance(valor.impresso, valor.san, n, pretas, valor.marca, valor.juizo))
+        self.esperado = (n, True) if not pretas else (n + 1, False)
+        self.numero, self.colado = None, True
+        return False
 
 
 # ----------------------------------------------------------------------
@@ -314,17 +340,41 @@ def validar(fen: str, linha: Sequence[Lance], *, lado: Optional[str] = None,
     """A validação de `linha` a partir do FEN (só as peças contam). `lado` é o que o
     diagrama diz ("w"/"b") ou `None`; `roque`, o conferido, e `roque_informado`, se quem
     conferiu o disse (vazio dito é "sem roque", não "o inferido"). Sem lances, `None`."""
-    pecas = (fen or "").split()[0] if (fen or "").strip() else ""
+    pecas = _pecas(fen)
     if not linha or not pecas:
         return None
     primeiro = linha[0]
     vez = "b" if primeiro.pretas else "w"
     numero = primeiro.numero or 1
     total = len(linha)
-    if lado in ("w", "b") and lado != vez:
-        quem = {"w": "as brancas", "b": "as pretas"}
+    if _lado_contrario(lado, vez):
         return Validacao(ILEGAL, total, 0, f"{primeiro.rotulo()} do texto diz que jogam "
-                         f"{quem[vez]}, mas o diagrama diz {quem[lado]}", vez, numero)
+                         f"{_QUEM[vez]}, mas o diagrama diz {_QUEM[lado]}", vez, numero)
+    board = _tabuleiro_valido(pecas, vez, roque, roque_informado, numero)
+    if board is None:
+        return Validacao(ILEGAL, total, 0, "a posição lida não é legal com "
+                         f"{_QUEM[vez]} a jogar", vez, numero)
+    return _validar_os_lances(board, linha, vez, numero)
+
+
+#: Quem joga, pelo lado ("w"/"b"), como os avisos o dizem.
+_QUEM = {"w": "as brancas", "b": "as pretas"}
+
+
+def _pecas(fen: Optional[str]) -> str:
+    """O campo das peças do FEN (vazio sem FEN)."""
+    return (fen or "").split()[0] if (fen or "").strip() else ""
+
+
+def _lado_contrario(lado: Optional[str], vez: str) -> bool:
+    """O diagrama diz um lado ("w"/"b") e o número do primeiro lance, o outro."""
+    return lado in ("w", "b") and lado != vez
+
+
+def _tabuleiro_valido(pecas: str, vez: str, roque: str, roque_informado: bool,
+                      numero: int) -> Optional[chess.Board]:
+    """O tabuleiro da posição lida, com o roque que vale; None se o FEN é malformado ou a
+    posição não é legal."""
     # O roque marcado só vale onde rei e torre ainda estão (o editor pode guardar um que a
     # correção de uma casa desfez); sem ninguém dizer, vale o inferido.
     try:
@@ -333,10 +383,14 @@ def validar(fen: str, linha: Sequence[Lance], *, lado: Optional[str] = None,
         roque = "".join(letra for letra in dito if letra in possiveis)
         board = _tabuleiro(pecas, vez, roque, numero)
     except ValueError:                          # FEN malformado
-        board = None
-    if board is None or not board.is_valid():
-        return Validacao(ILEGAL, total, 0, "a posição lida não é legal com "
-                         f"{'as pretas' if vez == 'b' else 'as brancas'} a jogar", vez, numero)
+        return None
+    return board if board.is_valid() else None
+
+
+def _validar_os_lances(board: chess.Board, linha: Sequence[Lance], vez: str,
+                       numero: int) -> Validacao:
+    """Joga a linha no tabuleiro até o primeiro lance que não é legal ou diz o que não faz."""
+    total = len(linha)
     sans, juizos = [], []
     for lance in linha:
         try:
@@ -432,36 +486,49 @@ def validar_pagina(pagina, idioma: str = "pt") -> list:
     É derivada, como o lado pela legenda: refeita depois de cada edição (`_mudou`) e
     gravada no diagrama para a fila, a aba Diagramas e o resumo do livro."""
     import copy
-    from dataclasses import replace
 
     from abbychess import diagramas as dg
 
     if not any(d.lido and d.id for d in pagina.diagramas):
-        return [d if d.validacao is None and d.lado_origem != LADO_DOS_LANCES
-                else _sem_lado_dos_lances(replace(d, validacao=None)) for d in pagina.diagramas]
+        return _sem_validacao(pagina.diagramas)
     # O documento com todos os tabuleiros, os por ler também: o texto que segue um
     # diagrama ainda não lido não pode cair no anterior.
     copia = copy.copy(pagina)
     if pagina.tabuleiros:
         copia.diagramas = dg.com_ids(dg.para_caixas(pagina.tabuleiros, pagina.diagramas))
     textos = _textos_da_pagina(copia)
-    saida = []
-    for d in pagina.diagramas:
-        linha = primeira_linha(textos.get(d.id, ""), idioma) if d.lido and d.id else []
-        dito = d.lado if d.lado_origem != LADO_DOS_LANCES else None
-        validacao = (validar(d.fen, linha, lado=dito, roque=d.roque,
-                             roque_informado=d.roque_informado) if linha else None)
-        novo = d if d.validacao == validacao else replace(d, validacao=validacao)
-        if dito is None:
-            # O número do primeiro lance (`1...`) diz de quem é a vez quando ninguém disse:
-            # nem a legenda nem quem conferiu (conferir sem tocar no lado não o apaga).
-            if validacao is not None and validacao.vez:
-                novo = replace(novo, lado=validacao.vez, lado_origem=LADO_DOS_LANCES,
-                               lado_trecho=linha[0].rotulo())
-            else:
-                novo = _sem_lado_dos_lances(novo)
-        saida.append(novo)
-    return saida
+    return [_validado(d, textos, idioma) for d in pagina.diagramas]
+
+
+def _sem_validacao(diagramas) -> list:
+    """Os diagramas sem a validação nem o lado dos lances (a página não tem diagrama lido)."""
+    from dataclasses import replace
+
+    return [d if d.validacao is None and d.lado_origem != LADO_DOS_LANCES
+            else _sem_lado_dos_lances(replace(d, validacao=None)) for d in diagramas]
+
+
+def _validado(d, textos: Dict[str, str], idioma: str):
+    """O diagrama com a validação pelos lances do texto que o segue."""
+    from dataclasses import replace
+
+    linha = primeira_linha(textos.get(d.id, ""), idioma) if d.lido and d.id else []
+    dito = d.lado if d.lado_origem != LADO_DOS_LANCES else None
+    validacao = (validar(d.fen, linha, lado=dito, roque=d.roque,
+                         roque_informado=d.roque_informado) if linha else None)
+    novo = d if d.validacao == validacao else replace(d, validacao=validacao)
+    return novo if dito is not None else _lado_pelos_lances(novo, validacao, linha)
+
+
+def _lado_pelos_lances(d, validacao: Optional[Validacao], linha: Sequence[Lance]):
+    """O número do primeiro lance (`1...`) diz de quem é a vez quando ninguém disse: nem a
+    legenda nem quem conferiu (conferir sem tocar no lado não o apaga)."""
+    from dataclasses import replace
+
+    if validacao is not None and validacao.vez:
+        return replace(d, lado=validacao.vez, lado_origem=LADO_DOS_LANCES,
+                       lado_trecho=linha[0].rotulo())
+    return _sem_lado_dos_lances(d)
 
 
 def _sem_lado_dos_lances(d):
@@ -502,31 +569,55 @@ def pgn_do_diagrama(diagrama, cabecalhos: Optional[Dict[str, str]] = None) -> st
         return ""
     validacao = diagrama.validacao
     pecas = diagrama.fen.split()[0]
-    vez = (validacao.vez if validacao else "") or diagrama.lado or "w"
-    numero = validacao.numero if validacao else 1
-    sans = list(validacao.lances) if validacao else []
+    vez_dos_lances, numero, sans, juizos = _do_texto(validacao)
+    vez = vez_dos_lances or diagrama.lado or "w"
     conferido = set(diagrama.roque) & set(roque_inferido(pecas))
     roque = "".join(sorted(conferido | set(_roque_usado(pecas, vez, numero, sans)),
                            key="KQkq".index))
     board = _tabuleiro(pecas, vez, roque, numero)
+    jogo = _jogo_vazio(cabecalhos)
+    jogo.setup(board)
+    no = _com_os_lances(jogo, sans, juizos)
+    _comentar(jogo, no, validacao, diagrama.conferido)
+    return str(jogo)
+
+
+def _do_texto(validacao: Optional[Validacao]) -> Tuple[str, int, List[str], Sequence[str]]:
+    """O lado, o número do primeiro lance, os lances e os juízos validados (sem validação: os
+    de uma posição sem lances)."""
+    if validacao is None:
+        return "", 1, [], ()
+    return validacao.vez, validacao.numero, list(validacao.lances), validacao.juizos
+
+
+def _jogo_vazio(cabecalhos: Optional[Dict[str, str]]) -> chess.pgn.Game:
+    """O jogo com os cabeçalhos obrigatórios do PGN e os dados que não são vazios."""
     jogo = chess.pgn.Game()
     for chave in ("Event", "Site", "Round", "White", "Black"):
         jogo.headers[chave] = "?"
     jogo.headers["Date"] = "????.??.??"
     jogo.headers["Result"] = "*"
     jogo.headers.update({k: v for k, v in (cabecalhos or {}).items() if v})
-    jogo.setup(board)
+    return jogo
+
+
+def _com_os_lances(jogo: chess.pgn.Game, sans: Sequence[str], juizos: Sequence[str]):
+    """Os lances na linha principal do jogo, com o juízo em NAG; devolve o último nó."""
     no = jogo
-    for san, juizo in zip(sans, validacao.juizos if validacao else ()):
+    for san, juizo in zip(sans, juizos):
         try:
             no = no.add_variation(no.board().parse_san(san))
         except ValueError:                      # validação de outra posição: pára aqui
             break
         if juizo in _NAGS:
             no.nags.add(_NAGS[juizo])
+    return no
+
+
+def _comentar(jogo: chess.pgn.Game, no, validacao: Optional[Validacao], conferido: bool):
+    """O aviso do lance que não passou, no último nó, e a posição não conferida, no jogo."""
     if validacao is not None and not validacao.confiavel:
         no.comment = f"[{validacao.aviso}]"
-    if not diagrama.conferido:
+    if not conferido:
         jogo.comment = ("posição lida, não conferida; " + NOMES[CONFIAVEL]
                         if validacao and validacao.confiavel else "posição lida, não conferida")
-    return str(jogo)

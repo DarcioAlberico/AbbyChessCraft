@@ -112,23 +112,14 @@ class ControladorDaSubstituicao:
                 for n, i in enumerate(indices):
                     if numero != self._numero:
                         return
-                    if n % 10 == 9:
-                        self._na_interface(lambda f=n + 1: self._progresso(numero, f,
-                                                                           len(indices)))
-                    indexada = em_dia[i]
-                    if indexada is not None and expressao.search(
-                            indexada.texto, concurrent=True, timeout=bs.TEMPO_LIMITE) is None:
-                        continue                # o índice em dia: sem casamento, sem ler
-                    # O carimbo antes de ler: se o arquivo mudar depois, aplicar o vê.
-                    carimbo = (projeto.carimbo(i) if projeto.paginas_em_memoria.pagina(i) is None
-                               else None)
-                    pagina = projeto.ler_sem_migrar(i)
-                    if pagina is None:
+                    self._progresso_a_cada_10(numero, n, len(indices))
+                    previa = self._previa_lida(projeto, i, em_dia[i], opcoes, expressao,
+                                               trocar, alvo)
+                    if previa is None:
                         continue
-                    previa = self._casos(pagina, opcoes, expressao, trocar, alvo)
                     fora += previa.fora
                     if previa.casos:
-                        previa.carimbo, previa.geracao = carimbo, geracao
+                        previa.geracao = geracao
                         previas.append(previa)
             except (bs.PadraoLento, TimeoutError) as lento:
                 erro = f"Substituição abortada: {lento or 'padrão lento demais'}."
@@ -140,6 +131,30 @@ class ControladorDaSubstituicao:
 
         threading.Thread(target=rodar, name="previa-da-substituicao", daemon=True).start()
         return True
+
+    def _progresso_a_cada_10(self, numero: int, n: int, total: int) -> None:
+        """Da thread da prévia: o progresso a cada 10 páginas, na interface."""
+        if n % 10 == 9:
+            self._na_interface(lambda f=n + 1: self._progresso(numero, f, total))
+
+    def _previa_lida(self, projeto, i: int, indexada, opcoes, expressao, trocar, alvo: str):
+        """Da thread da prévia: a `Previa` da página `i` lida do disco, com o carimbo de antes
+        da leitura quando tem casos; None se o índice em dia diz que ela não casa (sem ler),
+        ou se ela sumiu."""
+        from abbychess import busca as bs
+
+        if indexada is not None and expressao.search(
+                indexada.texto, concurrent=True, timeout=bs.TEMPO_LIMITE) is None:
+            return None                         # o índice em dia: sem casamento, sem ler
+        # O carimbo antes de ler: se o arquivo mudar depois, aplicar o vê.
+        carimbo = projeto.carimbo(i) if projeto.paginas_em_memoria.pagina(i) is None else None
+        pagina = projeto.ler_sem_migrar(i)
+        if pagina is None:
+            return None
+        previa = self._casos(pagina, opcoes, expressao, trocar, alvo)
+        if previa.casos:
+            previa.carimbo = carimbo
+        return previa
 
     def _progresso(self, numero: int, feitas: int, total: int) -> None:
         if numero == self._numero:
@@ -163,6 +178,29 @@ class ControladorDaSubstituicao:
         o aviso. Devolve os casos pedidos (aplicados na vez deles na fila); [] se em
         `posicao` não há o que trocar (o casamento já está como o substituto: quem chama
         segue para o próximo); None se nada foi feito (o aviso já saiu)."""
+        pc = self.pagina
+        preparada = self._previa_da_aberta(opcoes, modelo, alvo)
+        if preparada is None:
+            return None
+        previa, expressao, trocar = preparada
+        casos = previa.casos
+        if posicao is not None:
+            casos = self._caso_em(previa, expressao, trocar, posicao, alvo)
+            if not casos:
+                return casos                    # []: já trocado; None: o aviso já saiu
+        bons = [c for c in casos if c.aplicavel]
+        if not bons:
+            motivo = casos[0].motivo if casos else self._por_que_fora(previa, alvo)
+            self.eventos.emitir("substituicao_falhou", f"Não substituído: {motivo}.")
+            return None
+        previa.geracao = pc.geracao
+        self.aplicar({pc.indice: bons}, _descricao(bons), {pc.indice: previa},
+                     sem_traducao=len(casos) - len(bons))
+        return bons
+
+    def _previa_da_aberta(self, opcoes, modelo: str, alvo: str):
+        """`(prévia, expressão, trocar)` da página aberta; None, com o aviso, sem página
+        aberta ou com o padrão inválido ou lento."""
         from abbychess import busca as bs
 
         pc = self.pagina
@@ -175,24 +213,17 @@ class ControladorDaSubstituicao:
         except (bs.PadraoInvalido, bs.PadraoLento) as erro:
             self.eventos.emitir("substituicao_falhou", str(erro))
             return None
-        casos = previa.casos
-        if posicao is not None:
-            casos = [c for c in casos if c.inicio <= posicao < c.fim][:1]
-            if not casos and self._ja_trocado(previa.texto, expressao, trocar, posicao):
-                return []
-            if not casos:
-                self.eventos.emitir("substituicao_falhou", "Não substituído: "
-                                    + self._por_que_fora(previa, alvo) + ".")
-                return None
-        bons = [c for c in casos if c.aplicavel]
-        if not bons:
-            motivo = casos[0].motivo if casos else self._por_que_fora(previa, alvo)
-            self.eventos.emitir("substituicao_falhou", f"Não substituído: {motivo}.")
-            return None
-        previa.geracao = pc.geracao
-        self.aplicar({pc.indice: bons}, _descricao(bons), {pc.indice: previa},
-                     sem_traducao=len(casos) - len(bons))
-        return bons
+        return previa, expressao, trocar
+
+    def _caso_em(self, previa, expressao, trocar, posicao: int, alvo: str):
+        """O caso que contém `posicao` (numa lista); [] se o casamento dali já está como o
+        substituto; None, com o aviso, se ali não há o que trocar."""
+        casos = [c for c in previa.casos if c.inicio <= posicao < c.fim][:1]
+        if casos or self._ja_trocado(previa.texto, expressao, trocar, posicao):
+            return casos
+        self.eventos.emitir("substituicao_falhou", "Não substituído: "
+                            + self._por_que_fora(previa, alvo) + ".")
+        return None
 
     @staticmethod
     def _ja_trocado(texto: str, expressao, trocar, posicao: int) -> bool:
@@ -267,8 +298,6 @@ class ControladorDaSubstituicao:
         a prévia leu do disco, e que ninguém abriu desde então, é adotada como a viva
         (`projeto.adotar`: sem ler o JSON de novo)."""
         from abbychess import historico as hs
-        from abbychess import sessao as ss
-        from abbychess import substituir as sb
 
         pc = self.pagina
         projeto = pc.projeto
@@ -276,47 +305,50 @@ class ControladorDaSubstituicao:
         mudadas = []
         for i, (copia, mudanca, resumo) in sorted(feitas.items()):
             fonte = fontes[i]
-            if pc.modelo is not None and pc.modelo.indice == i:
-                viva = pc.modelo
-            else:
-                viva = projeto.adotar(fonte, carimbos.get(i)) or projeto.pagina_para_editar(i)
+            viva = self._viva(i, fonte, carimbos.get(i))
             if viva is fonte or _mesma_pagina(viva, fonte):
-                viva.boxes, viva.decisoes = list(copia.boxes), copia.decisoes
-                viva.proximo_n = max(viva.proximo_n, copia.proximo_n)
-                viva.estado = copia.estado
-                viva.diagramas, viva.zonas = list(copia.diagramas), list(copia.zonas)
+                _com_a_copia(viva, copia)
             else:                               # mudou desde a leitura: na de agora
-                antes = viva.instantaneo()
-                try:
-                    sb.aplicar_na_pagina(viva, aceitos[i])
-                except Exception as erro:
-                    viva.boxes, viva.decisoes = list(antes.boxes), antes.decisoes
-                    falhas[i] = (str(erro) if isinstance(erro, ss.Recusa)
-                                 else f"a substituição falhou: {erro}")
+                mudanca, falha = _na_de_agora(viva, aceitos[i], projeto)
+                if falha is not None:
+                    falhas[i] = falha
                     continue
-                depois_de_editar(viva, antes, self.pagina.projeto.dados.idioma)
-                mudanca, resumo = hs.mudanca(antes, viva.instantaneo()), None
+                resumo = None
             transacao.paginas[viva.pid] = mudanca
             mudadas.append((viva, resumo))
         casos = sum(len(aceitos[p.indice]) for p, _r in mudadas)
-        saidos = 0
-        if mudadas:
-            passos = pc.historico.passos
-            pc.historico.registrar(transacao)
-            saidos = max(0, passos + 1 - pc.historico.passos)
-            gravou = all([projeto.paginas_em_memoria.agendar(p, resumo) for p, resumo in mudadas])
-            if not gravou:
-                pc._avisar("Projeto aberto só para leitura: nada é gravado.", 6000)
-            if any(p is pc.modelo for p, _r in mudadas):
-                vivos = pc.modelo.vivos
-                pc.pulados &= vivos
-                pc.selecao &= vivos
-                if pc.atual not in vivos:
-                    pc.atual = None
-                self.eventos.emitir("glifos_mudaram", None)
-            self.eventos.emitir("acoes_mudaram")
+        saidos = self._registrar_a_troca(transacao, mudadas) if mudadas else 0
         self.eventos.emitir("substituicao_feita", casos, len(mudadas), dict(falhas),
                             sem_traducao, saidos)
+
+    def _viva(self, i: int, fonte, carimbo):
+        """A página `i` a mudar: a aberta; senão, a que a prévia leu, adotada se ninguém a
+        abriu desde então, ou a do projeto."""
+        pc = self.pagina
+        if pc.modelo is not None and pc.modelo.indice == i:
+            return pc.modelo
+        return pc.projeto.adotar(fonte, carimbo) or pc.projeto.pagina_para_editar(i)
+
+    def _registrar_a_troca(self, transacao, mudadas) -> int:
+        """A transação no desfazer e as páginas mudadas para gravar; a aberta, se mudou, perde
+        os pulados, a seleção e o atual que saíram. Devolve quantos passos antigos do desfazer
+        saíram para a transação caber."""
+        pc = self.pagina
+        passos = pc.historico.passos
+        pc.historico.registrar(transacao)
+        saidos = max(0, passos + 1 - pc.historico.passos)
+        gravou = all([pc.projeto.paginas_em_memoria.agendar(p, resumo) for p, resumo in mudadas])
+        if not gravou:
+            pc._avisar("Projeto aberto só para leitura: nada é gravado.", 6000)
+        if any(p is pc.modelo for p, _r in mudadas):
+            vivos = pc.modelo.vivos
+            pc.pulados &= vivos
+            pc.selecao &= vivos
+            if pc.atual not in vivos:
+                pc.atual = None
+            self.eventos.emitir("glifos_mudaram", None)
+        self.eventos.emitir("acoes_mudaram")
+        return saidos
 
 
 def _outro_onde(alvo: str) -> str:
@@ -325,18 +357,50 @@ def _outro_onde(alvo: str) -> str:
     return "notação" if alvo == sb.PROSA else "prosa"
 
 
+def _com_a_copia(viva, copia) -> None:
+    """A página de agora (a mesma que foi lida) recebe a cópia editada na thread."""
+    viva.boxes, viva.decisoes = list(copia.boxes), copia.decisoes
+    viva.proximo_n = max(viva.proximo_n, copia.proximo_n)
+    viva.estado = copia.estado
+    viva.diagramas, viva.zonas = list(copia.diagramas), list(copia.zonas)
+
+
+def _na_de_agora(viva, casos, projeto):
+    """Os casos aplicados na página de agora, que mudou desde a leitura: `(mudança, None)`,
+    ou `(None, motivo)` com os glifos e as decisões como estavam (o motivo vai à lista de
+    falhas)."""
+    from abbychess import historico as hs
+    from abbychess import sessao as ss
+    from abbychess import substituir as sb
+
+    antes = viva.instantaneo()
+    try:
+        sb.aplicar_na_pagina(viva, casos)
+    except Exception as erro:
+        viva.boxes, viva.decisoes = list(antes.boxes), antes.decisoes
+        return None, (str(erro) if isinstance(erro, ss.Recusa)
+                      else f"a substituição falhou: {erro}")
+    depois_de_editar(viva, antes, projeto.dados.idioma)
+    return hs.mudanca(antes, viva.instantaneo()), None
+
+
 def _mesma_pagina(viva, lida) -> bool:
     """A página de agora é a que foi lida: os mesmos glifos, decisões, áreas, diagramas e
     estado (a cópia editada leva tudo isso da lida)."""
     from abbychess import historico as hs
 
-    if (viva.pid != lida.pid or viva.decisoes != lida.decisoes or viva.estado != lida.estado
-            or len(viva.boxes) != len(lida.boxes)
-            or list(viva.zonas) != list(lida.zonas)
-            or list(viva.diagramas) != list(lida.diagramas)
-            or list(viva.tabuleiros) != list(lida.tabuleiros)):
+    if not _mesmos_campos(viva, lida):
         return False
     return all(a is b or hs.igual(a, b) for a, b in zip(viva.boxes, lida.boxes))
+
+
+def _mesmos_campos(viva, lida) -> bool:
+    """O mesmo pid, decisões, estado, número de glifos, áreas, diagramas e tabuleiros."""
+    return (viva.pid == lida.pid and viva.decisoes == lida.decisoes and viva.estado == lida.estado
+            and len(viva.boxes) == len(lida.boxes)
+            and list(viva.zonas) == list(lida.zonas)
+            and list(viva.diagramas) == list(lida.diagramas)
+            and list(viva.tabuleiros) == list(lida.tabuleiros))
 
 
 def _descricao(casos) -> str:

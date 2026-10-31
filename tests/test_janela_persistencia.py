@@ -33,9 +33,7 @@ def sem_dialogos(monkeypatch):
                             lambda _pai, titulo, texto, *a, **k: avisos.append(texto))
     monkeypatch.setattr(QMessageBox, "question",
                         lambda *a, **k: QMessageBox.StandardButton.Yes)
-    monkeypatch.setattr(LeitorDoLivro, "com_modelos_globais",
-                        classmethod(lambda cls, pasta, limiares=None: cls(pasta, limiares=limiares)))
-    return avisos
+    return avisos                   # sem os modelos globais: o conftest (CA-Q-T1)
 
 
 @pytest.fixture

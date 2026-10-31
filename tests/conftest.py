@@ -85,6 +85,34 @@ def gravadores_descarregados():
                 pass
 
 
+@pytest.fixture(autouse=True)
+def avisos_que_nao_param(monkeypatch):
+    """Na suíte, o aviso estático do Qt (`warning`, `information`, `critical`) não abre a
+    caixa modal, que no offscreen esperaria um clique até o timeout (o da rede que não
+    carregou, sem os modelos globais, parava o teste da tarefa em voo). O teste que confere
+    um aviso os troca por um que anota, por cima deste."""
+    from PySide6.QtWidgets import QMessageBox
+
+    for nome in ("warning", "information", "critical"):
+        monkeypatch.setattr(QMessageBox, nome,
+                            staticmethod(lambda *a, **k: QMessageBox.StandardButton.Ok))
+
+
+@pytest.fixture(autouse=True)
+def sem_os_modelos_globais(request, monkeypatch):
+    """Fora das camadas `livro_real` e `desempenho`, `com_modelos_globais` devolve o leitor só
+    com os padrões do livro (SPEC-qualidade CA-Q-T1): a rede e a base global do PyBoxEditor
+    custam segundos e gigabytes por worker, e a janela que abre um projeto (`livro.abrir`)
+    as carregava em toda a suíte rápida."""
+    if any(request.node.get_closest_marker(nome) for nome in ("livro_real", "desempenho")):
+        return
+    from abbychess.leitor import LeitorDoLivro
+
+    monkeypatch.setattr(LeitorDoLivro, "com_modelos_globais", classmethod(
+        lambda cls, pasta, *, limiares=None, easyocr=False: cls(pasta, limiares=limiares,
+                                                                 easyocr=easyocr)))
+
+
 @pytest.fixture(autouse=True, scope="module")
 def janelas_apagadas_no_fim_do_modulo():
     """As janelas e os diálogos que os testes do módulo deixaram vivos (fechados, mas ainda

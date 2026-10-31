@@ -482,8 +482,9 @@ def test_trocar_de_projeto_com_tarefa_em_voo_termina_no_projeto_dela(app, janela
     threading.Timer(0.3, solto.set).start()
     segundo = ProjetoDeLivro.criar(tmp_path / "outros", "Segundo",
                                    _pagina_sintetica(tmp_path / "segunda.png"))
+    # A troca espera a tarefa em voo terminar no primeiro projeto e o fecha: a condição do
+    # teste já vale quando ela volta, sem esperar a fila (a abertura do segundo, CA-Q-T1).
     janela.trocar_projeto(segundo, pg.FonteDePaginas(segundo.fonte))
-    _esperar(app, janela)
     assert janela.projeto is segundo
     assert segundo.paginas_lidas() == []                 # nada do primeiro entrou aqui
     reaberto = ProjetoDeLivro.abrir(primeiro.pasta)

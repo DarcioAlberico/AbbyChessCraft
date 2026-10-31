@@ -7,7 +7,7 @@ acrescenta `conferir(indice)` (a janela abre a conferência). Sem Qt.
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import List, Optional
 
 from abbychess import diagramas as dg
 from abbychess import lances as lc
@@ -33,9 +33,8 @@ class ControladorDeDiagramas:
         if any(not d.conferido for d in p.diagramas):
             self.conferir()
             return
-        resumo = p.projeto.resumo.do_livro()
-        com = sorted(i for i, r in resumo.items() if r.get("diagramas_por_conferir", 0) > 0)
-        proxima = next((i for i in com if i > p.indice), com[0] if com else None)
+        com = _paginas_com(p.projeto.resumo.do_livro(), "diagramas_por_conferir")
+        proxima = _seguinte_dando_a_volta(com, p.indice)
         if proxima is None or proxima == p.indice:
             p._avisar("Não há diagrama por conferir no livro.", 6000)
             return
@@ -48,12 +47,7 @@ class ControladorDeDiagramas:
         p = self.pagina
         if not p.pronto:
             return
-        resumo = p.projeto.resumo.do_livro()
-        com = sorted(i for i, r in resumo.items() if r.get("diagramas", 0) > 0)
-        if passo > 0:
-            alvo = next((i for i in com if i > p.indice), None)
-        else:
-            alvo = next((i for i in reversed(com) if i < p.indice), None)
+        alvo = _vizinha(_paginas_com(p.projeto.resumo.do_livro(), "diagramas"), p.indice, passo)
         if alvo is None:
             p._avisar(f"Não há diagrama {'depois' if passo > 0 else 'antes'} deste no livro.",
                       5000)
@@ -74,8 +68,7 @@ class ControladorDeDiagramas:
         projeto = p.projeto
 
         def preparar():
-            com = sorted(i for i, r in projeto.resumo.do_livro().items()
-                         if r.get("diagramas", 0) > 0)
+            com = _paginas_com(projeto.resumo.do_livro(), "diagramas")
 
             def trabalho(_progresso):
                 saida = []
@@ -110,9 +103,8 @@ class ControladorDeDiagramas:
             p._avisar("Não há diagrama nesta página.", 5000)
             return
         if indice is None:
-            indice = next((i for i, d in enumerate(diagramas) if d.lido and not d.conferido),
-                          0)
-        if not any(not d.lido and not d.erro for d in diagramas):
+            indice = _primeiro_por_conferir(diagramas)
+        if not _por_ler(diagramas):
             self._abrir(indice)
             return
         if p.leitura.servidor_parado():
@@ -124,7 +116,7 @@ class ControladorDeDiagramas:
             if p.indice != pagina_indice or pagina is None:
                 return None
             atuais = dg.para_caixas(pagina.tabuleiros, pagina.diagramas)
-            por_ler = [i for i, d in enumerate(atuais) if not d.lido and not d.erro]
+            por_ler = _por_ler(atuais)
             imagem, leitor, boxes = p.imagem, p.leitor, pagina.entries()
             caixas = [atuais[i].caixa for i in por_ler]
 
@@ -182,8 +174,7 @@ class ControladorDeDiagramas:
             p._avisar("Projeto aberto só para leitura: a conferência não é gravada.", 6000)
             return False
         diagramas = p.diagramas
-        indice = next((i for i, d in enumerate(diagramas)
-                       if tuple(d.caixa) == tuple(caixa)), None)
+        indice = _indice_da_caixa(diagramas, caixa)
         if indice is None:
             p._avisar("O diagrama mudou na página ({reconhecer_pagina}, desfazer ou áreas): reabra a "
                       "conferência.", AVISO_LONGO_MS)
@@ -196,15 +187,56 @@ class ControladorDeDiagramas:
         p.modelo.diagramas = diagramas
         p._mudou(p.modelo, p.indice, f"Conferir o diagrama {indice + 1}", antes)
         mensagem = f"Diagrama {indice + 1} conferido: {diagramas[indice].fen}"
-        if tudo or tabuleiro.corrigidas:
-            origem = f"p{p.indice + 1:04d}"
-            try:
-                caminhos = dg.guardar_amostras(p.imagem, diagramas[indice], tabuleiro,
-                                               p.projeto.pasta, origem, tudo=tudo)
-            except Exception as erro:  # disco cheio, pasta sem permissão, modelo ausente
-                log.exception("as amostras do diagrama não foram guardadas")
-                mensagem += f". As amostras não foram guardadas: {erro}"
-            else:
-                mensagem += f"; {len(caminhos)} amostra(s) guardadas no projeto"
+        mensagem += _guardar_as_amostras(p, diagramas[indice], tabuleiro, tudo)
         p._avisar(mensagem, AVISO_LONGO_MS)
         return True
+
+
+def _paginas_com(resumo: dict, chave: str) -> List[int]:
+    """As páginas do resumo do livro com algum `chave` ("diagramas", "diagramas_por_conferir"),
+    em ordem."""
+    return sorted(i for i, r in resumo.items() if r.get(chave, 0) > 0)
+
+
+def _seguinte_dando_a_volta(paginas: List[int], indice: int) -> Optional[int]:
+    """A primeira de `paginas` depois de `indice`; na ponta, a primeira do livro (None sem
+    nenhuma)."""
+    return next((i for i in paginas if i > indice), paginas[0] if paginas else None)
+
+
+def _vizinha(paginas: List[int], indice: int, passo: int) -> Optional[int]:
+    """A primeira de `paginas` depois de `indice` (`passo` > 0) ou a última antes dela; None na
+    ponta do livro."""
+    if passo > 0:
+        return next((i for i in paginas if i > indice), None)
+    return next((i for i in reversed(paginas) if i < indice), None)
+
+
+def _primeiro_por_conferir(diagramas) -> int:
+    """O primeiro diagrama lido e ainda não conferido, ou o primeiro de todos."""
+    return next((i for i, d in enumerate(diagramas) if d.lido and not d.conferido), 0)
+
+
+def _por_ler(diagramas) -> List[int]:
+    """Os diagramas ainda não lidos (a página gravada antes da leitura), fora os que falharam."""
+    return [i for i, d in enumerate(diagramas) if not d.lido and not d.erro]
+
+
+def _indice_da_caixa(diagramas, caixa) -> Optional[int]:
+    """O diagrama da página que está na `caixa`, ou None se ele sumiu."""
+    return next((i for i, d in enumerate(diagramas) if tuple(d.caixa) == tuple(caixa)), None)
+
+
+def _guardar_as_amostras(p: ControladorDePagina, diagrama, tabuleiro, tudo: bool) -> str:
+    """Guarda no projeto as casas do diagrama conferido como amostras (todas com `tudo`; senão,
+    as corrigidas, se houver) e devolve o que a mensagem da conferência diz delas."""
+    if not (tudo or tabuleiro.corrigidas):
+        return ""
+    origem = f"p{p.indice + 1:04d}"
+    try:
+        caminhos = dg.guardar_amostras(p.imagem, diagrama, tabuleiro, p.projeto.pasta, origem,
+                                       tudo=tudo)
+    except Exception as erro:  # disco cheio, pasta sem permissão, modelo ausente
+        log.exception("as amostras do diagrama não foram guardadas")
+        return f". As amostras não foram guardadas: {erro}"
+    return f"; {len(caminhos)} amostra(s) guardadas no projeto"

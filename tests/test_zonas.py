@@ -397,3 +397,24 @@ def test_a_pagina_lida_sem_areas_ganha_as_automaticas():
     assert zn.depois_de_ler([], sem_leitura, [], [], 1000, 1400) == []
     do_usuario = [zn.Zona("texto", 0, 0, 1000, 1400)]
     assert zn.depois_de_ler(do_usuario, titulo + corpo, [], [], 1000, 1400) == do_usuario
+
+
+def test_as_linhas_curtas_embaixo_da_legenda_a_continuam_e_a_prosa_nao():
+    """"Gormon-Silman / Memorial Ervin, 1987" embaixo de "Diagrama 5…", cada uma na sua
+    zona: as duas continuam a legenda; a linha longa de prosa logo depois, não."""
+    tabuleiro = [(50, 50, 330, 330)]
+    boxes = (_linha_de_boxes("Diagrama 5. Jogam as pretas.", 60, 345)
+             + _linha_de_boxes("Gormon-Silman", 60, 381)
+             + _linha_de_boxes("Memorial Ervin, 1987", 60, 417)
+             + _linha_de_boxes("O corpo do texto segue aqui, com as letras de sempre.", 60, 453,
+                               passo=10))
+    zonas = zn.automaticas(boxes, tabuleiro, 760, 1000, escala=16)
+    textos = sorted((z for z in zonas if z.tipo == zn.TEXTO), key=lambda z: z.y1)
+    assert [z.funcao for z in textos] == ["legenda", "legenda", "legenda", "texto"]
+
+
+def test_o_ponto_solto_da_digitalizacao_fica_fora_do_texto():
+    boxes = _boxes_de("texto normal bastante longo", 100, 250) + _boxes_de(".", 400, 600)
+    zonas = zn.automaticas(boxes, [], 800, 1000, escala=10)
+    assert [(z.tipo, z.funcao) for z in sorted(zonas, key=lambda z: z.y1)] == [
+        (zn.TEXTO, "texto"), (zn.IGNORAR, "ignorar")]

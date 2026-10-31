@@ -48,6 +48,7 @@ from PIL import Image
 from core.box_model import BoxEntry
 from core.pagina import Figura, PaginaExtraida, Paragrafo
 
+from abbychess import gravacao as gv
 from abbychess import links_de_analise
 from abbychess import pagina as pg
 from abbychess import sequencia as sq
@@ -188,7 +189,6 @@ class Relatorio:
     imagens_reutilizadas: int = 0
     #: No EPUB: os bytes que o PNG otimizado sem perda tirou das imagens.
     bytes_poupados: int = 0
-    problemas_do_arquivo: List[str] = field(default_factory=list)
     #: Índice da página -> o número impresso nela (`numeros_impressos`), quando se sabe.
     numeros_impressos: Dict[int, int] = field(default_factory=dict)
     #: No EPUB, as referências a página que viraram link; no PDF, os marcadores.
@@ -235,9 +235,6 @@ class Relatorio:
             partes.append(f"{self.imagens_reutilizadas} imagem(ns) reaproveitada(s)")
         if self.bytes_poupados >= 1024:
             partes.append(f"imagens {self.bytes_poupados // 1024} KB menores, sem perda")
-        if self.problemas_do_arquivo:
-            partes.append(f"{len(self.problemas_do_arquivo)} problema(s) no arquivo "
-                          "(ver Resultados)")
         return "; ".join(partes) + "."
 
     def pagina(self, indice: int) -> str:
@@ -272,8 +269,6 @@ class Relatorio:
         if self.nao_verificadas:
             linhas.append("Páginas não verificadas: "
                           + ", ".join(str(i + 1) for i in self.nao_verificadas))
-        for problema in self.problemas_do_arquivo:
-            linhas.append(f"arquivo: {problema}")
         return linhas
 
     def texto(self) -> str:
@@ -1393,15 +1388,11 @@ def exportar_epub(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
                                             autores=(autor,) if autor else ())
     numeros = relatorio.numeros_impressos if relatorio is not None else None
     escrito = epub.escrever(paginas, caminho, metadados, numeros=numeros, quebras=quebras,
-                            analise=analise)
-    problemas = epub.conferir(caminho)
-    for problema in problemas:
-        log.warning("EPUB %s: %s", caminho, problema)
+                            analise=analise)        # conferido antes de trocar (Q-E3)
     if relatorio is not None:
         relatorio.capitulos = escrito.capitulos
         relatorio.imagens_reutilizadas = escrito.reutilizadas
         relatorio.bytes_poupados = escrito.poupados
-        relatorio.problemas_do_arquivo = problemas
         relatorio.links = escrito.links
         _analises_no_relatorio(relatorio, escrito.analises, analise)
     return Path(caminho)
@@ -1469,8 +1460,6 @@ def gravar_metadados(projeto: ProjetoDeLivro, dados: dict,
     gravado. `capa` é uma imagem escolhida fora do projeto: é copiada para a pasta dele
     (`capa.<ext>`) e o campo passa a apontá-la. Recusa (`SomenteLeitura`) em projeto só
     de leitura."""
-    from abbychess import gravacao as gv
-
     novos = normalizar_metadados(dados)
     pasta = Path(projeto.pasta)
     # As chaves que o formulário não conhece (escritas à mão) ficam; as dele valem o que ele
@@ -1908,15 +1897,18 @@ def _gravar_pdf(doc, caminho: Path) -> None:
     """Grava ao lado e troca no fim. Com `SOURCE_DATE_EPOCH`, os mesmos bytes (CA-12.6): as
     datas do arquivo são a dela, e o identificador do original fica (o PyMuPDF sorteia a
     segunda metade do `/ID` a cada gravação)."""
-    temporario = caminho.with_name(caminho.name + ".tmp")
     epoca = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
     if epoca.isdigit():
         quando = datetime.fromtimestamp(int(epoca), timezone.utc).strftime("D:%Y%m%d%H%M%S+00'00'")
         doc.set_metadata({**(doc.metadata or {}), "creationDate": quando, "modDate": quando})
-        doc.save(str(temporario), garbage=3, deflate=True, no_new_id=True)
-    else:
-        doc.save(str(temporario), garbage=3, deflate=True)
-    temporario.replace(caminho)
+
+    def escrever(temporario: Path) -> None:
+        if epoca.isdigit():
+            doc.save(str(temporario), garbage=3, deflate=True, no_new_id=True)
+        else:
+            doc.save(str(temporario), garbage=3, deflate=True)
+
+    gv.gravar_por(caminho, escrever)
 
 
 # ----------------------------------------------------------------------
@@ -1925,26 +1917,9 @@ def _gravar_pdf(doc, caminho: Path) -> None:
 
 def _gravar_texto(caminho: Path, texto: str) -> Path:
     """Grava ao lado e troca no fim: uma exportação que falha não estraga a anterior."""
-    import tempfile
-
     caminho = Path(caminho)
-    caminho.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporario = tempfile.mkstemp(prefix=f".{caminho.stem}-", suffix=".tmp",
-                                      dir=caminho.parent)
-    try:
-        arquivo = os.fdopen(fd, "w", encoding="utf-8", newline="\n")
-    except BaseException:
-        os.close(fd)
-        Path(temporario).unlink(missing_ok=True)
-        raise
-    try:
-        with arquivo:
-            arquivo.write(texto)
-        os.chmod(temporario, 0o644)             # o mkstemp nasce 0600
-        os.replace(temporario, caminho)
-    except BaseException:
-        Path(temporario).unlink(missing_ok=True)
-        raise
+    gv.gravar_por(caminho, lambda temporario: temporario.write_text(
+        texto, encoding="utf-8", newline="\n"))
     return caminho
 
 

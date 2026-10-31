@@ -50,6 +50,7 @@ from xml.etree import ElementTree
 
 from core.pagina import Figura, PaginaExtraida, Paragrafo
 
+from abbychess import gravacao as gv
 from abbychess import links_de_analise
 
 log = logging.getLogger(__name__)
@@ -859,10 +860,9 @@ def _opf(m: Metadados, idioma: str, msg: Dict[str, str], manifesto: List[str],
 
 
 def _gravar_zip(caminho: Path, data_hora, entradas: List[Tuple[str, bytes]]) -> None:
-    caminho.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporario = tempfile.mkstemp(prefix=".epub-", suffix=".tmp", dir=caminho.parent)
-    os.close(fd)
-    try:
+    """O EPUB ao lado, conferido (`conferir`) antes de trocar com o anterior
+    (SPEC-qualidade Q-E3): o que não passa não é publicado, como no DOCX."""
+    def escrever(temporario: Path) -> None:
         with zipfile.ZipFile(temporario, "w", zipfile.ZIP_DEFLATED) as z:
             _entrada(z, "mimetype", b"application/epub+zip", data_hora, zipfile.ZIP_STORED)
             for nome, dados in entradas:
@@ -870,11 +870,13 @@ def _gravar_zip(caminho: Path, data_hora, entradas: List[Tuple[str, bytes]]) -> 
         with zipfile.ZipFile(temporario) as z:
             if z.testzip() is not None:
                 raise zipfile.BadZipFile("EPUB temporário com entrada inválida")
-        os.chmod(temporario, 0o644)             # o mkstemp nasce 0600
-        os.replace(temporario, caminho)
-    except BaseException:
-        Path(temporario).unlink(missing_ok=True)
-        raise
+
+    def recusar_o_estragado(temporario: Path) -> None:
+        problemas = conferir(temporario)
+        if problemas:
+            raise ValueError("O EPUB não passou na conferência: " + "; ".join(problemas))
+
+    gv.gravar_por(caminho, escrever, recusar_o_estragado)
 
 
 def _entrada(z: zipfile.ZipFile, nome: str, dados: bytes, data_hora, compressao: int) -> None:

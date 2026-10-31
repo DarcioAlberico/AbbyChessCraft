@@ -30,8 +30,6 @@ from __future__ import annotations
 
 import datetime
 import io
-import os
-import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,6 +39,7 @@ from xml.etree import ElementTree
 from core.pagina import Figura, PaginaExtraida, Paragrafo
 
 from abbychess import epub
+from abbychess import gravacao as gv
 from abbychess import links_de_analise
 
 #: A largura do diagrama sem medida de casa e a máxima de qualquer figura, em centímetros.
@@ -435,10 +434,7 @@ def _gravar_reprodutivel(caminho: Path, partes: Dict[str, bytes], data_hora) -> 
     """As partes num zip com a mesma data e os mesmos atributos em toda entrada (o
     python-docx carimba a hora de agora), ao lado; conferido antes de trocar com o
     anterior: um DOCX que não passa em `conferir` não é publicado."""
-    caminho.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporario = tempfile.mkstemp(prefix=".docx-", suffix=".tmp", dir=caminho.parent)
-    os.close(fd)
-    try:
+    def escrever(temporario: Path) -> None:
         with zipfile.ZipFile(temporario, "w", zipfile.ZIP_DEFLATED) as destino:
             for nome, dados in partes.items():
                 info = zipfile.ZipInfo(nome, date_time=data_hora)
@@ -446,14 +442,13 @@ def _gravar_reprodutivel(caminho: Path, partes: Dict[str, bytes], data_hora) -> 
                 info.create_system = 0
                 info.external_attr = 0o644 << 16
                 destino.writestr(info, dados)
+
+    def recusar_o_estragado(temporario: Path) -> None:
         problemas = conferir(temporario)
         if problemas:
             raise ValueError("O DOCX não passou na conferência: " + "; ".join(problemas))
-        os.chmod(temporario, 0o644)
-        os.replace(temporario, caminho)
-    except BaseException:
-        Path(temporario).unlink(missing_ok=True)
-        raise
+
+    gv.gravar_por(caminho, escrever, recusar_o_estragado)
 
 
 # ----------------------------------------------------------------------

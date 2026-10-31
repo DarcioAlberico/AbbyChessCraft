@@ -27,11 +27,12 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import threading
 import time
 from collections import Counter
 from pathlib import Path
-from typing import List, Union
+from typing import Callable, List, Optional, Union
 
 TENTATIVAS = 5
 ESPERA = 0.05
@@ -130,6 +131,37 @@ def gravar_bytes(caminho: Caminho, dados: bytes) -> None:
     finally:
         if not gravado:
             temporario.unlink(missing_ok=True)
+
+
+def gravar_por(caminho: Caminho, escrever: Callable[[Path], None],
+               conferir: Optional[Callable[[Path], None]] = None) -> None:
+    """O arquivo que outro escreve (o que se exporta: o zip do EPUB e do DOCX, o PDF do
+    PyMuPDF, o texto), por um caminho só (SPEC-qualidade Q-E4): `escrever(temporario)` grava
+    num temporário de nome único ao lado (duas exportações seguidas não se pisam);
+    `conferir(temporario)`, se vier, levanta para recusá-lo (Q-E3); só então ele troca com o
+    arquivo, com as novas tentativas de `gravar_bytes` (o Word ou o leitor com o anterior
+    aberto). O temporário nunca fica, e uma falha deixa o anterior como estava."""
+    caminho = Path(caminho)
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    fd, nome = tempfile.mkstemp(prefix=f".{caminho.stem}-", suffix=SUFIXO_TEMPORARIO,
+                                dir=caminho.parent)
+    os.close(fd)
+    temporario = Path(nome)
+    try:
+        escrever(temporario)
+        if conferir is not None:
+            conferir(temporario)
+        os.chmod(temporario, 0o644)             # o mkstemp nasce 0600
+        for tentativa in range(TENTATIVAS):
+            try:
+                _trocar(temporario, caminho)
+                return
+            except PermissionError:
+                if tentativa == TENTATIVAS - 1:
+                    raise
+                time.sleep(ESPERA)
+    finally:
+        temporario.unlink(missing_ok=True)
 
 
 def gravar_texto(caminho: Caminho, texto: str) -> None:

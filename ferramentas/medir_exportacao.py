@@ -105,7 +105,8 @@ def medir(livro: str) -> dict:
                 "recortados": len(relatorio.recortados),
                 "no_pgn": relatorio.no_pgn,
                 "palavras_sinalizadas": sum(relatorio.sinalizadas.values()),
-                "problemas_do_arquivo": relatorio.problemas_do_arquivo,
+                # O EPUB que não passa nela nem é gravado (SPEC-qualidade Q-E3): aqui, [].
+                "problemas_do_arquivo": epub.conferir(destino) if formato == "epub" else [],
             }
             if formato == "epub":
                 dados["epubcheck"] = epub.epubcheck(destino)

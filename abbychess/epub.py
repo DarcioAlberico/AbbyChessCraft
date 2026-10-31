@@ -731,14 +731,66 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
     `analise` põe na legenda de cada diagrama lido o link que abre a posição no Lichess ou
     no Chess.com (`Opcoes.links_de_analise`); `nenhum`, nenhum link."""
     links_de_analise.validar(analise)
-    from core.exportar import agora, data_no_zip, fonte_dos_simbolos, instante
+    from core.exportar import agora, data_no_zip, instante
 
     idioma = metadados.idioma or "pt-BR"
     msg = mensagens(idioma)
     escrito = Escrito(paginas=len(paginas))
+    pacote = _Pacote()
+    imagens = _imagens(paginas, escrito, pacote)
+    css, simbolos = _css_e_simbolos(paginas, pacote)
+    pacote.manifesto.append('<item id="css" href="estilo.css" media-type="text/css"/>')
+    pacote.manifesto.append('<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" '
+                            'properties="nav"/>')
+    tem_capa = metadados.capa is not None
+    if tem_capa:
+        _capa(metadados.capa, msg, idioma, pacote)
 
-    arquivos: List[Tuple[str, bytes]] = []
-    manifesto: List[str] = []
+    # Duas passadas: a primeira diz em que capítulo cai cada página, diagrama e capítulo
+    # numerado, e a segunda escreve as referências já com o arquivo certo.
+    numeros = numeros or {}
+    contados = numerados(paginas)
+    capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
+                           numeros, numeros=contados, quebras=quebras, analise=analise)
+    alvos = _alvos(capitulos, numeros)
+    if any(alvos.values()):
+        capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
+                               numeros, alvos, contados, quebras, analise)
+    if not capitulos:
+        raise ValueError("Nada para escrever no EPUB: as páginas não têm texto nem diagrama.")
+    _contar_os_capitulos(escrito, capitulos)
+    _textos_dos_capitulos(capitulos, metadados.titulo, idioma, pacote)
+    # O marco do sumário aponta o nav: fora da espinha, é RSC-011 no EPUBCheck. Fora da
+    # leitura corrida (`linear="no"`), o leitor não o mostra entre a capa e o texto.
+    pacote.espinha.append('<itemref idref="nav" linear="no"/>')
+
+    momento = instante()
+    opf = _opf(metadados, idioma, msg, pacote.manifesto, pacote.espinha, agora(momento),
+               tem_figura=bool(imagens), todos_com_fen=escrito.sem_fen == 0,
+               tem_titulos=escrito.titulos > 0, tem_capa=tem_capa)
+    nav = _nav(capitulos, msg, idioma, tem_capa)
+    _gravar_zip(Path(caminho), data_no_zip(momento),
+                [("META-INF/container.xml", _CONTAINER.encode("utf-8")),
+                 ("OEBPS/content.opf", opf.encode("utf-8")),
+                 ("OEBPS/nav.xhtml", nav.encode("utf-8")),
+                 ("OEBPS/estilo.css", css.encode("utf-8"))] + pacote.arquivos)
+    return escrito
+
+
+@dataclass
+class _Pacote:
+    """O que o EPUB leva além do OPF, do nav e do CSS (`arquivos`: entrada do zip, bytes),
+    e as linhas do manifesto e da espinha, na ordem em que entram."""
+
+    arquivos: List[Tuple[str, bytes]] = field(default_factory=list)
+    manifesto: List[str] = field(default_factory=list)
+    espinha: List[str] = field(default_factory=list)
+
+
+def _imagens(paginas: Sequence[PaginaExtraida], escrito: Escrito, pacote: _Pacote
+             ) -> Dict[int, str]:
+    """A entrada do zip da imagem de cada figura (id da `Figura` -> nome), com o PNG
+    otimizado; as iguais byte a byte são um recurso só."""
     por_hash: Dict[str, str] = {}
     imagens: Dict[int, str] = {}
     for pagina in paginas:
@@ -755,12 +807,19 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
                 tipo, extensao = tipo_da_imagem(png)
                 nome = f"imagens/{soma[:20]}{extensao}"
                 por_hash[soma] = nome
-                arquivos.append((f"OEBPS/{nome}", png))
+                pacote.arquivos.append((f"OEBPS/{nome}", png))
                 escrito.poupados += len(bloco.png) - len(png)
-                manifesto.append(f'<item id="i{len(por_hash)}" href="{nome}" '
-                                 f'media-type="{tipo}"/>')
+                pacote.manifesto.append(f'<item id="i{len(por_hash)}" href="{nome}" '
+                                        f'media-type="{tipo}"/>')
             imagens[id(bloco)] = por_hash[soma]
     escrito.imagens = len(por_hash)
+    return imagens
+
+
+def _css_e_simbolos(paginas: Sequence[PaginaExtraida], pacote: _Pacote) -> Tuple[str, str]:
+    """(o CSS, os símbolos que a fonte cobre): com uma fonte de símbolos para o texto do
+    livro, o CSS a declara e ela vai no pacote."""
+    from core.exportar import fonte_dos_simbolos
 
     css = CSS
     recurso = fonte_dos_simbolos("".join(b.texto for p in paginas for b in p.blocos
@@ -772,72 +831,57 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
         css += CSS_DOS_SIMBOLOS % {"familia": familia.replace('"', ""),
                                    "arquivo": arquivo.replace('"', "%22")}
         with open(origem, "rb") as f:
-            arquivos.append((f"OEBPS/fontes/{arquivo}", f.read()))
+            pacote.arquivos.append((f"OEBPS/fontes/{arquivo}", f.read()))
         tipo = TIPOS_DE_FONTE.get(os.path.splitext(arquivo)[1].lower(), "font/otf")
-        manifesto.append(f'<item id="fonte" href="fontes/{_e(arquivo, aspas=True)}" '
-                         f'media-type="{tipo}"/>')
-    manifesto.append('<item id="css" href="estilo.css" media-type="text/css"/>')
-    manifesto.append('<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" '
-                     'properties="nav"/>')
+        pacote.manifesto.append(f'<item id="fonte" href="fontes/{_e(arquivo, aspas=True)}" '
+                                f'media-type="{tipo}"/>')
+    return css, simbolos
 
-    espinha = []
-    tem_capa = metadados.capa is not None
-    if tem_capa:
-        tipo, extensao = tipo_da_imagem(metadados.capa)
-        arquivos.append((f"OEBPS/imagens/capa{extensao}", metadados.capa))
-        manifesto.append(f'<item id="capa-imagem" href="imagens/capa{extensao}" '
-                         f'media-type="{tipo}" properties="cover-image"/>')
-        corpo = (f'<section epub:type="cover"><img class="capa" src="../imagens/capa{extensao}" '
-                 f'alt="{html.escape(msg["capa"], quote=True)}"/></section>')
-        arquivos.append(("OEBPS/texto/capa.xhtml",
-                         _xhtml(msg["capa"], idioma, corpo).encode("utf-8")))
-        manifesto.append('<item id="capa" href="texto/capa.xhtml" '
-                         'media-type="application/xhtml+xml"/>')
-        espinha.append('<itemref idref="capa"/>')
 
-    # Duas passadas: a primeira diz em que capítulo cai cada página, diagrama e capítulo
-    # numerado, e a segunda escreve as referências já com o arquivo certo.
-    numeros = numeros or {}
-    contados = numerados(paginas)
-    capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
-                           numeros, numeros=contados, quebras=quebras, analise=analise)
-    alvos = {
+def _capa(capa: bytes, msg: Dict[str, str], idioma: str, pacote: _Pacote) -> None:
+    """A imagem da capa e a página dela, primeira na espinha."""
+    tipo, extensao = tipo_da_imagem(capa)
+    pacote.arquivos.append((f"OEBPS/imagens/capa{extensao}", capa))
+    pacote.manifesto.append(f'<item id="capa-imagem" href="imagens/capa{extensao}" '
+                            f'media-type="{tipo}" properties="cover-image"/>')
+    corpo = (f'<section epub:type="cover"><img class="capa" src="../imagens/capa{extensao}" '
+             f'alt="{html.escape(msg["capa"], quote=True)}"/></section>')
+    pacote.arquivos.append(("OEBPS/texto/capa.xhtml",
+                            _xhtml(msg["capa"], idioma, corpo).encode("utf-8")))
+    pacote.manifesto.append('<item id="capa" href="texto/capa.xhtml" '
+                            'media-type="application/xhtml+xml"/>')
+    pacote.espinha.append('<itemref idref="capa"/>')
+
+
+def _alvos(capitulos: Sequence[_Capitulo], numeros: Dict[int, int]) -> Dict[str, Dict[int, str]]:
+    """O href de cada página impressa (só com a paginação conhecida), diagrama e capítulo
+    numerado, pelo capítulo em que caíram."""
+    return {
         "paginas": ({rotulo: f"{c.nome}#{ancora}" for c in capitulos
                      for rotulo, ancora in c.paginas} if numeros else {}),
         "diagramas": {n: f"{c.nome}#{ancora}" for c in capitulos for n, ancora in c.diagramas},
         "capitulos": {n: f"{c.nome}#{ancora}" for c in capitulos for n, ancora in c.numerados},
     }
-    if any(alvos.values()):
-        capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
-                               numeros, alvos, contados, quebras, analise)
+
+
+def _contar_os_capitulos(escrito: Escrito, capitulos: Sequence[_Capitulo]) -> None:
     escrito.links = sum(c.links for c in capitulos)
     escrito.analises = sum(c.analises for c in capitulos)
-    if not capitulos:
-        raise ValueError("Nada para escrever no EPUB: as páginas não têm texto nem diagrama.")
     escrito.capitulos = len(capitulos)
     escrito.titulos = sum(len(c.titulos) for c in capitulos)
-    for n, c in enumerate(capitulos, start=1):
-        titulo = c.titulos[0][2] if c.titulos else metadados.titulo
-        arquivos.append((f"OEBPS/texto/{c.nome}",
-                         _xhtml(titulo, idioma, "".join(c.partes)).encode("utf-8")))
-        manifesto.append(f'<item id="c{n}" href="texto/{c.nome}" '
-                         'media-type="application/xhtml+xml"/>')
-        espinha.append(f'<itemref idref="c{n}"/>')
-    # O marco do sumário aponta o nav: fora da espinha, é RSC-011 no EPUBCheck. Fora da
-    # leitura corrida (`linear="no"`), o leitor não o mostra entre a capa e o texto.
-    espinha.append('<itemref idref="nav" linear="no"/>')
 
-    momento = instante()
-    opf = _opf(metadados, idioma, msg, manifesto, espinha, agora(momento),
-               tem_figura=bool(imagens), todos_com_fen=escrito.sem_fen == 0,
-               tem_titulos=escrito.titulos > 0, tem_capa=tem_capa)
-    nav = _nav(capitulos, msg, idioma, tem_capa)
-    _gravar_zip(Path(caminho), data_no_zip(momento),
-                [("META-INF/container.xml", _CONTAINER.encode("utf-8")),
-                 ("OEBPS/content.opf", opf.encode("utf-8")),
-                 ("OEBPS/nav.xhtml", nav.encode("utf-8")),
-                 ("OEBPS/estilo.css", css.encode("utf-8"))] + arquivos)
-    return escrito
+
+def _textos_dos_capitulos(capitulos: Sequence[_Capitulo], titulo_do_livro: str, idioma: str,
+                          pacote: _Pacote) -> None:
+    """O XHTML de cada capítulo, com o título dele (ou o do livro), no manifesto e na
+    espinha."""
+    for n, c in enumerate(capitulos, start=1):
+        titulo = c.titulos[0][2] if c.titulos else titulo_do_livro
+        pacote.arquivos.append((f"OEBPS/texto/{c.nome}",
+                                _xhtml(titulo, idioma, "".join(c.partes)).encode("utf-8")))
+        pacote.manifesto.append(f'<item id="c{n}" href="texto/{c.nome}" '
+                                'media-type="application/xhtml+xml"/>')
+        pacote.espinha.append(f'<itemref idref="c{n}"/>')
 
 
 def _opf(m: Metadados, idioma: str, msg: Dict[str, str], manifesto: List[str],
@@ -853,17 +897,48 @@ def _opf(m: Metadados, idioma: str, msg: Dict[str, str], manifesto: List[str],
           # EPUBCheck 5.4 o recusa (OPF-027): fica de fora.
           f'<dc:source id="pub-fonte">{e(m.fonte or titulo)}</dc:source>',
           '<meta refines="#pub-fonte" property="source-of">pagination</meta>']
-    dc += [f"<dc:creator>{e(a)}</dc:creator>" for a in m.autores if a]
+    dc += _dc_do_livro(m)
+    a11y = _acessibilidade(msg, tem_figura=tem_figura, todos_com_fen=todos_com_fen,
+                           tem_titulos=tem_titulos, tem_capa=tem_capa)
+    capa = '<meta name="cover" content="capa-imagem"/>' if tem_capa else ""
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            # O idioma também no `<package>` (o Ace: epub-lang), além do `dc:language`.
+            '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" '
+            f'unique-identifier="pub-id" xml:lang="{e(idioma, aspas=True)}" '
+            'prefix="schema: http://schema.org/">\n'
+            '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">\n'
+            + "\n".join(dc) + "\n"
+            f'<meta property="dcterms:modified">{modificado}</meta>\n'
+            + "\n".join(a11y) + "\n" + capa
+            + "</metadata>\n<manifest>\n" + "\n".join(manifesto) + "\n</manifest>\n"
+            f'<spine>{"".join(espinha)}</spine>\n</package>\n')
+
+
+def _dc_do_livro(m: Metadados) -> List[str]:
+    """Os autores, a editora, a data, os assuntos e os direitos que os metadados trazem."""
+    e = _e
+    dc = [f"<dc:creator>{e(a)}</dc:creator>" for a in m.autores if a]
     if m.editora:
         dc.append(f"<dc:publisher>{e(m.editora)}</dc:publisher>")
-    if m.data and re.fullmatch(r"\d{4}(-\d{2}(-\d{2})?)?", m.data.strip()):
-        dc.append(f"<dc:date>{e(m.data.strip())}</dc:date>")
-    elif m.data:
-        log.warning("A data %r não é AAAA, AAAA-MM nem AAAA-MM-DD: fica fora do EPUB.", m.data)
+    dc += _data(m)
     dc += [f"<dc:subject>{e(s)}</dc:subject>" for s in m.assuntos if s]
     if m.direitos:
         dc.append(f"<dc:rights>{e(m.direitos)}</dc:rights>")
-    # A acessibilidade do que foi escrito, e só dele (EPUB Accessibility 1.1).
+    return dc
+
+
+def _data(m: Metadados) -> List[str]:
+    """O `dc:date`, se a data é AAAA, AAAA-MM ou AAAA-MM-DD; fora disso, fica de fora."""
+    if m.data and re.fullmatch(r"\d{4}(-\d{2}(-\d{2})?)?", m.data.strip()):
+        return [f"<dc:date>{_e(m.data.strip())}</dc:date>"]
+    if m.data:
+        log.warning("A data %r não é AAAA, AAAA-MM nem AAAA-MM-DD: fica fora do EPUB.", m.data)
+    return []
+
+
+def _acessibilidade(msg: Dict[str, str], *, tem_figura: bool, todos_com_fen: bool,
+                    tem_titulos: bool, tem_capa: bool) -> List[str]:
+    """A acessibilidade do que foi escrito, e só dele (EPUB Accessibility 1.1)."""
     a11y = ['<meta property="schema:accessMode">textual</meta>']
     if tem_figura or tem_capa:
         a11y.append('<meta property="schema:accessMode">visual</meta>')
@@ -877,19 +952,8 @@ def _opf(m: Metadados, idioma: str, msg: Dict[str, str], manifesto: List[str],
     a11y += ['<meta property="schema:accessibilityFeature">pageNavigation</meta>',
              '<meta property="schema:accessibilityFeature">readingOrder</meta>',
              '<meta property="schema:accessibilityHazard">unknown</meta>',
-             f'<meta property="schema:accessibilitySummary">{e(msg["resumo"])}</meta>']
-    capa = '<meta name="cover" content="capa-imagem"/>' if tem_capa else ""
-    return ('<?xml version="1.0" encoding="UTF-8"?>\n'
-            # O idioma também no `<package>` (o Ace: epub-lang), além do `dc:language`.
-            '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" '
-            f'unique-identifier="pub-id" xml:lang="{e(idioma, aspas=True)}" '
-            'prefix="schema: http://schema.org/">\n'
-            '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">\n'
-            + "\n".join(dc) + "\n"
-            f'<meta property="dcterms:modified">{modificado}</meta>\n'
-            + "\n".join(a11y) + "\n" + capa
-            + "</metadata>\n<manifest>\n" + "\n".join(manifesto) + "\n</manifest>\n"
-            f'<spine>{"".join(espinha)}</spine>\n</package>\n')
+             f'<meta property="schema:accessibilitySummary">{_e(msg["resumo"])}</meta>']
+    return a11y
 
 
 def _gravar_zip(caminho: Path, data_hora, entradas: List[Tuple[str, bytes]]) -> None:

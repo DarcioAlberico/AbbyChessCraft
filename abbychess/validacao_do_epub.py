@@ -48,120 +48,212 @@ def conferir(caminho: str | Path) -> List[str]:
     legível, ids sem repetição, cada `href` e `src` — decodificados — apontando um item do
     manifesto e, com `#`, um id dele), o `url()` do CSS e o `nav` (`toc` e `page-list` com
     itens). Não substitui o EPUBCheck (`epubcheck`), que confere o esquema inteiro."""
-    problemas: List[str] = []
     with zipfile.ZipFile(caminho) as z:
         nomes = set(z.namelist())
-        infos = z.infolist()
-        if not infos or infos[0].filename != "mimetype":
-            problemas.append("o mimetype não é a primeira entrada")
-        elif infos[0].compress_type != zipfile.ZIP_STORED:
-            problemas.append("o mimetype está comprimido")
-        elif z.read("mimetype") != b"application/epub+zip":
-            problemas.append("o mimetype não é application/epub+zip")
-        try:
-            container = ElementTree.fromstring(z.read("META-INF/container.xml"))
-            opf_nome = container.find(".//c:rootfile", _NS).get("full-path")
-        except (KeyError, ElementTree.ParseError, AttributeError):
-            return problemas + ["o META-INF/container.xml falta ou não aponta o OPF"]
-        if opf_nome not in nomes:
-            return problemas + [f"o OPF {opf_nome} não está no pacote"]
-        try:
-            opf = ElementTree.fromstring(z.read(opf_nome))
-        except ElementTree.ParseError as erro:
-            return problemas + [f"o OPF não é XML legível ({erro})"]
+        problemas = _problemas_do_mimetype(z)
+        opf_nome, opf, recusa = _opf_do_pacote(z, nomes)
+        if opf is None:
+            return problemas + [recusa]
         base = posixpath.dirname(opf_nome)
-        metadados = opf.find("opf:metadata", _NS)
-        dc = "{http://purl.org/dc/elements/1.1/}"
-        for campo in ("title", "language", "identifier"):
-            achado = metadados.find(dc + campo) if metadados is not None else None
-            if achado is None or not (achado.text or "").strip():
-                problemas.append(f"o OPF não tem dc:{campo}")
-        if metadados is None or not any(m.get("property") == "dcterms:modified"
-                                        for m in metadados.findall("opf:meta", _NS)):
-            problemas.append("o OPF não tem dcterms:modified")
-        itens: Dict[str, ElementTree.Element] = {}
-        no_manifesto: Dict[str, str] = {}         # entrada do zip -> media-type
-        for item in opf.findall(".//opf:manifest/opf:item", _NS):
-            ident, href = item.get("id"), item.get("href")
-            if ident in itens:
-                problemas.append(f"o id {ident} se repete no manifesto")
-            itens[ident] = item
-            if not href:
-                problemas.append(f"o item {ident} não tem href")
-                continue
-            alvo, _ = _resolver(base, href)
-            no_manifesto[alvo] = item.get("media-type") or ""
-            if alvo not in nomes:
-                problemas.append(f"o item {href} do manifesto não está no pacote")
-        refs = opf.findall(".//opf:spine/opf:itemref", _NS)
-        if not refs:
-            problemas.append("a espinha está vazia")
-        na_espinha = set()
-        for ref in refs:
-            if ref.get("idref") not in itens:
-                problemas.append(f"o itemref {ref.get('idref')} não está no manifesto")
-            else:
-                na_espinha.add(_resolver(base, itens[ref.get("idref")].get("href") or "")[0])
-        navs = [i for i in itens.values() if "nav" in (i.get("properties") or "").split()]
-        if len(navs) != 1:
-            problemas.append(f"o manifesto tem {len(navs)} nav (precisa de um)")
-
-        arvores: Dict[str, ElementTree.Element] = {}
-        ids: Dict[str, set] = {}
-        for nome, tipo in sorted(no_manifesto.items()):
-            if tipo != "application/xhtml+xml" or nome not in nomes:
-                continue
-            try:
-                arvore = ElementTree.fromstring(z.read(nome))
-            except ElementTree.ParseError as erro:
-                problemas.append(f"{nome}: XML inválido ({erro})")
-                continue
-            arvores[nome] = arvore
-            vistos: set = set()
-            for el in arvore.iter():
-                ident = el.get("id")
-                if ident is None:
-                    continue
-                if ident in vistos:
-                    problemas.append(f"{nome}: o id {ident} se repete")
-                vistos.add(ident)
-            ids[nome] = vistos
+        problemas += _problemas_dos_metadados(opf.find("opf:metadata", _NS))
+        itens, no_manifesto = _manifesto(opf, base, nomes, problemas)
+        na_espinha = _espinha(opf, base, itens, problemas)
+        navs = _navs(itens, problemas)
+        arvores, ids = _xhtml_do_manifesto(z, nomes, no_manifesto, problemas)
         for nome, arvore in arvores.items():
-            pasta = posixpath.dirname(nome)
-            for el in arvore.iter():
-                for atributo in ("href", "src"):
-                    link = el.get(atributo)
-                    if not link or re.match(r"^[a-z][a-z0-9+.-]*:", link, re.I):
-                        continue                # http:, mailto:, data:
-                    alvo, fragmento = _resolver(pasta, link)
-                    alvo = alvo or nome
-                    if alvo not in no_manifesto:
-                        problemas.append(f"{nome}: link quebrado {link}")
-                    elif fragmento and alvo in ids and fragmento not in ids[alvo]:
-                        problemas.append(f"{nome}: âncora inexistente {link}")
-                    elif (el.tag == "{http://www.w3.org/1999/xhtml}a"
-                          and no_manifesto[alvo] == "application/xhtml+xml"
-                          and alvo not in na_espinha):
-                        # O que o EPUBCheck chama RSC-011.
-                        problemas.append(f"{nome}: link para fora da espinha {link}")
-        for nome, tipo in sorted(no_manifesto.items()):
-            if tipo == "text/css" and nome in nomes:
-                for link in _URL_DO_CSS.findall(z.read(nome).decode("utf-8", "replace")):
-                    alvo, _ = _resolver(posixpath.dirname(nome), link)
-                    if alvo not in no_manifesto:
-                        problemas.append(f"{nome}: url() quebrada {link}")
-        if navs:
-            nav_nome, _ = _resolver(base, navs[0].get("href") or "")
-            nav = arvores.get(nav_nome)
-            for tipo in ("toc", "page-list"):
-                el = None if nav is None else next(
-                    (n for n in nav.iter("{http://www.w3.org/1999/xhtml}nav")
-                     if n.get(_EPUB_TYPE) == tipo), None)
-                if el is None:
-                    problemas.append(f"o nav não tem {tipo}")
-                elif el.find(".//x:li", _NS) is None:
-                    problemas.append(f"o {tipo} do nav está vazio")
+            problemas += _problemas_dos_links(nome, arvore, no_manifesto, ids, na_espinha)
+        problemas += _problemas_do_css(z, nomes, no_manifesto)
+        problemas += _problemas_do_nav(navs, base, arvores)
     return problemas
+
+
+def _problemas_do_mimetype(z: zipfile.ZipFile) -> List[str]:
+    """O `mimetype` é a primeira entrada, sem compressão, e diz que o pacote é um EPUB."""
+    infos = z.infolist()
+    if not infos or infos[0].filename != "mimetype":
+        return ["o mimetype não é a primeira entrada"]
+    if infos[0].compress_type != zipfile.ZIP_STORED:
+        return ["o mimetype está comprimido"]
+    if z.read("mimetype") != b"application/epub+zip":
+        return ["o mimetype não é application/epub+zip"]
+    return []
+
+
+def _opf_do_pacote(z: zipfile.ZipFile, nomes: set
+                   ) -> Tuple[str, Optional[ElementTree.Element], str]:
+    """(o nome do OPF, a árvore dele, ""), pelo `container.xml`; sem ela, o problema que
+    impede de conferir o resto."""
+    try:
+        container = ElementTree.fromstring(z.read("META-INF/container.xml"))
+        opf_nome = container.find(".//c:rootfile", _NS).get("full-path")
+    except (KeyError, ElementTree.ParseError, AttributeError):
+        return "", None, "o META-INF/container.xml falta ou não aponta o OPF"
+    if opf_nome not in nomes:
+        return opf_nome, None, f"o OPF {opf_nome} não está no pacote"
+    try:
+        return opf_nome, ElementTree.fromstring(z.read(opf_nome)), ""
+    except ElementTree.ParseError as erro:
+        return opf_nome, None, f"o OPF não é XML legível ({erro})"
+
+
+def _problemas_dos_metadados(metadados: Optional[ElementTree.Element]) -> List[str]:
+    """O `dc:title`, o `dc:language` e o `dc:identifier` com texto, e o `dcterms:modified`."""
+    problemas = []
+    dc = "{http://purl.org/dc/elements/1.1/}"
+    for campo in ("title", "language", "identifier"):
+        achado = metadados.find(dc + campo) if metadados is not None else None
+        if achado is None or not (achado.text or "").strip():
+            problemas.append(f"o OPF não tem dc:{campo}")
+    if not _tem_a_data_da_mudanca(metadados):
+        problemas.append("o OPF não tem dcterms:modified")
+    return problemas
+
+
+def _tem_a_data_da_mudanca(metadados: Optional[ElementTree.Element]) -> bool:
+    return metadados is not None and any(m.get("property") == "dcterms:modified"
+                                         for m in metadados.findall("opf:meta", _NS))
+
+
+def _manifesto(opf: ElementTree.Element, base: str, nomes: set, problemas: List[str]
+               ) -> Tuple[Dict[str, ElementTree.Element], Dict[str, str]]:
+    """Os itens do manifesto por id e o media-type de cada entrada do zip que ele cita;
+    acusa o id repetido, o item sem `href` e o que não está no pacote."""
+    itens: Dict[str, ElementTree.Element] = {}
+    no_manifesto: Dict[str, str] = {}         # entrada do zip -> media-type
+    for item in opf.findall(".//opf:manifest/opf:item", _NS):
+        ident, href = item.get("id"), item.get("href")
+        if ident in itens:
+            problemas.append(f"o id {ident} se repete no manifesto")
+        itens[ident] = item
+        if not href:
+            problemas.append(f"o item {ident} não tem href")
+            continue
+        alvo, _ = _resolver(base, href)
+        no_manifesto[alvo] = item.get("media-type") or ""
+        if alvo not in nomes:
+            problemas.append(f"o item {href} do manifesto não está no pacote")
+    return itens, no_manifesto
+
+
+def _espinha(opf: ElementTree.Element, base: str, itens: Dict[str, ElementTree.Element],
+             problemas: List[str]) -> set:
+    """As entradas do zip na espinha; acusa a espinha vazia e o `itemref` fora do manifesto."""
+    refs = opf.findall(".//opf:spine/opf:itemref", _NS)
+    if not refs:
+        problemas.append("a espinha está vazia")
+    na_espinha = set()
+    for ref in refs:
+        if ref.get("idref") not in itens:
+            problemas.append(f"o itemref {ref.get('idref')} não está no manifesto")
+        else:
+            na_espinha.add(_resolver(base, itens[ref.get("idref")].get("href") or "")[0])
+    return na_espinha
+
+
+def _navs(itens: Dict[str, ElementTree.Element], problemas: List[str]
+          ) -> List[ElementTree.Element]:
+    """Os itens do manifesto com `properties="nav"`; acusa se não for um só."""
+    navs = [i for i in itens.values() if "nav" in (i.get("properties") or "").split()]
+    if len(navs) != 1:
+        problemas.append(f"o manifesto tem {len(navs)} nav (precisa de um)")
+    return navs
+
+
+def _xhtml_do_manifesto(z: zipfile.ZipFile, nomes: set, no_manifesto: Dict[str, str],
+                        problemas: List[str]
+                        ) -> Tuple[Dict[str, ElementTree.Element], Dict[str, set]]:
+    """A árvore e os ids de cada XHTML do manifesto que está no pacote; acusa o que não é XML
+    legível e o id repetido."""
+    arvores: Dict[str, ElementTree.Element] = {}
+    ids: Dict[str, set] = {}
+    for nome, tipo in sorted(no_manifesto.items()):
+        if tipo != "application/xhtml+xml" or nome not in nomes:
+            continue
+        try:
+            arvore = ElementTree.fromstring(z.read(nome))
+        except ElementTree.ParseError as erro:
+            problemas.append(f"{nome}: XML inválido ({erro})")
+            continue
+        arvores[nome] = arvore
+        ids[nome] = _ids_do_xhtml(nome, arvore, problemas)
+    return arvores, ids
+
+
+def _ids_do_xhtml(nome: str, arvore: ElementTree.Element, problemas: List[str]) -> set:
+    vistos: set = set()
+    for el in arvore.iter():
+        ident = el.get("id")
+        if ident is None:
+            continue
+        if ident in vistos:
+            problemas.append(f"{nome}: o id {ident} se repete")
+        vistos.add(ident)
+    return vistos
+
+
+def _problemas_dos_links(nome: str, arvore: ElementTree.Element, no_manifesto: Dict[str, str],
+                         ids: Dict[str, set], na_espinha: set) -> List[str]:
+    """Cada `href` e `src` relativo do XHTML aponta um item do manifesto (e, com `#`, um id
+    dele); o `<a>` para um XHTML, um da espinha."""
+    problemas = []
+    pasta = posixpath.dirname(nome)
+    for el in arvore.iter():
+        for atributo in ("href", "src"):
+            link = el.get(atributo)
+            if not link or re.match(r"^[a-z][a-z0-9+.-]*:", link, re.I):
+                continue                # http:, mailto:, data:
+            alvo, fragmento = _resolver(pasta, link)
+            problema = _problema_do_link(el.tag, alvo or nome, fragmento, no_manifesto, ids,
+                                         na_espinha)
+            if problema:
+                problemas.append(f"{nome}: {problema} {link}")
+    return problemas
+
+
+def _problema_do_link(tag: str, alvo: str, fragmento: str, no_manifesto: Dict[str, str],
+                      ids: Dict[str, set], na_espinha: set) -> str:
+    if alvo not in no_manifesto:
+        return "link quebrado"
+    if fragmento and alvo in ids and fragmento not in ids[alvo]:
+        return "âncora inexistente"
+    if (tag == "{http://www.w3.org/1999/xhtml}a" and no_manifesto[alvo] == "application/xhtml+xml"
+            and alvo not in na_espinha):
+        return "link para fora da espinha"          # o que o EPUBCheck chama RSC-011
+    return ""
+
+
+def _problemas_do_css(z: zipfile.ZipFile, nomes: set, no_manifesto: Dict[str, str]) -> List[str]:
+    """Cada `url()` dos CSS do manifesto aponta um item dele."""
+    problemas = []
+    for nome, tipo in sorted(no_manifesto.items()):
+        if tipo == "text/css" and nome in nomes:
+            for link in _URL_DO_CSS.findall(z.read(nome).decode("utf-8", "replace")):
+                alvo, _ = _resolver(posixpath.dirname(nome), link)
+                if alvo not in no_manifesto:
+                    problemas.append(f"{nome}: url() quebrada {link}")
+    return problemas
+
+
+def _problemas_do_nav(navs: List[ElementTree.Element], base: str,
+                      arvores: Dict[str, ElementTree.Element]) -> List[str]:
+    """O `nav` (o primeiro, se há mais de um) tem `toc` e `page-list`, cada um com itens."""
+    if not navs:
+        return []
+    nav = arvores.get(_resolver(base, navs[0].get("href") or "")[0])
+    problemas = []
+    for tipo in ("toc", "page-list"):
+        el = _nav_do_tipo(nav, tipo)
+        if el is None:
+            problemas.append(f"o nav não tem {tipo}")
+        elif el.find(".//x:li", _NS) is None:
+            problemas.append(f"o {tipo} do nav está vazio")
+    return problemas
+
+
+def _nav_do_tipo(nav: Optional[ElementTree.Element], tipo: str) -> Optional[ElementTree.Element]:
+    return None if nav is None else next(
+        (n for n in nav.iter("{http://www.w3.org/1999/xhtml}nav") if n.get(_EPUB_TYPE) == tipo),
+        None)
 
 
 def ace(caminho: str | Path) -> Optional[List[str]]:

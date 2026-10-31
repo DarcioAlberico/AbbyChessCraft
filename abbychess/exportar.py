@@ -312,9 +312,10 @@ class Estrutura:
     protegidos: set = field(default_factory=set)
     #: Os `BoxEntry` da estrutura, vivos enquanto ela viver: as chaves são `id()`.
     vivos: list = field(default_factory=list)
-    #: As palavras do Documento em ordem de leitura (`texto.linhas_dos_gids`: as quebras, as
-    #: junções, os lances colados partidos e os virtuais), cada uma como os `id()` dos
-    #: glifos dela e, no lugar dos virtuais (sem box), o caractere (SPEC-qualidade Q-E1).
+    #: As palavras do texto do Documento em ordem de leitura (`texto.linhas_dos_gids` sem
+    #: os não lidos, como `texto.montar`: as quebras, as junções, os lances colados partidos
+    #: e os virtuais), cada uma como os `id()` dos glifos dela e, no lugar dos virtuais (sem
+    #: box), o caractere (SPEC-qualidade Q-E1).
     palavras_do_documento: list = field(default_factory=list)
     #: O `id()` de cada glifo -> a posição da palavra dele em `palavras_do_documento`.
     palavra_de: Dict[int, int] = field(default_factory=dict)
@@ -365,8 +366,8 @@ class Estrutura:
         from abbychess import texto as tx
 
         virtuais = {v.gid: v.char for v in decisoes.virtuais}
-        for linha in tx.linhas_dos_gids(pagina):
-            for p in linha:                     # o não lido (sem char) não entra
+        for linha in tx.linhas_dos_gids(pagina, com_os_nao_lidos=False):
+            for p in linha:
                 itens = tuple(id(entrada_do[g]) if g in entrada_do else virtuais[g]
                               for g in p if g in entrada_do or g in virtuais)
                 if itens:

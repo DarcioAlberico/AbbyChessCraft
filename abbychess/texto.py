@@ -120,9 +120,11 @@ def palavras_dos_gids(pagina: Pagina) -> List[List[int]]:
     return [p for ln in linhas_dos_gids(pagina) for p in ln]
 
 
-def linhas_dos_gids(pagina: Pagina) -> List[List[List[int]]]:
-    """As linhas de `palavras_dos_gids`, cada uma com as palavras dela (gids)."""
-    lidos, entries = _lidos(pagina, True)
+def linhas_dos_gids(pagina: Pagina, *, com_os_nao_lidos: bool = True) -> List[List[List[int]]]:
+    """As linhas de `palavras_dos_gids`, cada uma com as palavras dela (gids). Sem os não
+    lidos, as do texto e da exportação (`montar`): o glifo que ninguém leu não junta a
+    palavra em volta do buraco dele."""
+    lidos, entries = _lidos(pagina, com_os_nao_lidos)
     linhas = _linhas_da_pagina(lidos, entries)[0]
     return _aplicar_decisoes(partir_lances_colados(linhas, _chars(pagina, lidos, entries)),
                              pagina.decisoes)

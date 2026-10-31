@@ -257,6 +257,58 @@ def test_o_epub_leva_o_idioma_do_livro(tmp_path):
     assert "1 página(s) lida(s) da camada de texto do PDF" in resumo
 
 
+#: O diagrama 1-7 do Dvoretsky, e onde ele fica na página do PDF (em pontos).
+FEN_DO_DIAGRAMA = "8/1k6/1p6/1K6/P1P5/8/8/8"
+X_DO_DIAGRAMA, Y_DO_DIAGRAMA, CASA = 220, 200, 20
+
+
+def _pdf_com_diagrama(caminho):
+    """Uma página nascida digital: prosa em Helvetica e o diagrama composto na ChessMerida do
+    PyBoxEditor, uma casa por glifo (como o `core.pdf_nativo` o lê)."""
+    import fitz
+
+    from core import render_diagrama
+
+    fonte = render_diagrama.carregar("ChessMerida-Diagram")
+    doc = fitz.open()
+    p = doc.new_page(width=600, height=800)
+    p.insert_text((200, 60), "Chapter 1 Pawn Endgames", fontname="hebo", fontsize=16)
+    for k, linha in enumerate(["White has the opposition, but it is not enough",
+                               "to win, and the whole ending turns on that."]):
+        p.insert_text((60, 100 + 12 * k), linha, fontname="helv", fontsize=10)
+    for k, linha in enumerate(render_diagrama.linhas(FEN_DO_DIAGRAMA, fonte, "branca")):
+        p.insert_text((X_DO_DIAGRAMA, Y_DO_DIAGRAMA + (k + 1) * CASA), linha,
+                      fontfile=fonte.arquivo, fontname="merida", fontsize=CASA)
+    for k, linha in enumerate(["Since 2.c5 would be useless, the king starts an",
+                               "outflanking maneuver."]):
+        p.insert_text((60, 500 + 12 * k), linha, fontname="helv", fontsize=10)
+    doc.save(caminho)
+    doc.close()
+    return caminho
+
+
+@pytest.mark.parametrize("conferido, lado, esperado", [
+    (True, "b", "b"),                    # o lado conferido na revisão vale sobre o da camada
+    (False, "b", "w"),                   # o lido e não conferido, não
+    (True, None, "w"),                   # conferido sem lado escolhido: fica o da camada
+])
+def test_o_lado_conferido_na_revisao_vai_ao_diagrama_da_camada(tmp_path, conferido, lado,
+                                                               esperado):
+    from tests.ajudantes import _lido
+
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Digital",
+                                   _pdf_com_diagrama(tmp_path / "livro.pdf"))
+    escala = 300 / 72                                     # a página lida, a 300 dpi
+    caixa = tuple(round(v * escala) for v in (X_DO_DIAGRAMA, Y_DO_DIAGRAMA,
+                                              X_DO_DIAGRAMA + 8 * CASA, Y_DO_DIAGRAMA + 8 * CASA))
+    pagina = projeto.pagina_para_editar(0)
+    pagina.diagramas = [_lido(FEN_DO_DIAGRAMA, caixa=caixa, conferido=conferido, lado=lado)]
+    projeto.salvar_modelo(pagina)
+    [figura] = [b for b in ex.paginas_da_camada(projeto, [0])[0].blocos
+                if isinstance(b, ex.Figura)]
+    assert figura.fen.split()[:2] == [FEN_DO_DIAGRAMA, esperado]
+
+
 def test_o_idioma_do_livro_e_lido_uma_vez_por_exportacao(tmp_path, monkeypatch):
     """O idioma pela camada do PDF abre o livro: a exportação e a prévia o pedem uma vez, e a
     camada de texto e os metadados levam o mesmo (SPEC-qualidade Q-E5, Q-E6)."""

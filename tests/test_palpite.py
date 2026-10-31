@@ -144,6 +144,43 @@ def test_a_rede_que_falha_nao_prende_o_painel(app, janela, caplog):
     assert "rede quebrada" in caplog.text
 
 
+class _RedeDoTraco:
+    """Uma rede que lê traço nos glifos de letra: o veto de proporção do core (o traço é
+    deitado) a faz pular para a próxima candidata dela que caiba."""
+
+    def __init__(self, candidatas, carregada=True):
+        self.candidatas, self.loaded = candidatas, carregada
+
+    def predict(self, _recorte):
+        return self.candidatas[0]
+
+    def predict_topk(self, _recorte, k=5):
+        return self.candidatas[:k]
+
+
+def test_o_palpite_que_nao_cabe_no_glifo_cede_a_proxima_candidata_da_rede(app, janela):
+    """§9.2: o palpite passa pelo veto de proporção, como a cadeia global: o traço num glifo
+    de letra cede à primeira candidata que cabe; sem nenhuma que caiba, ou com a rede que não
+    carregou, o campo fica vazio."""
+    _pronta(app, janela)
+    campo = janela.treino.campo
+    primeiro, segundo, terceiro = fila(janela)[:3]
+    janela.leitor.rede = _RedeDoTraco([("-", 0.35), ("—", 0.2), ("c", 0.1)])
+    mostrar(janela, primeiro)
+    app.processEvents()
+    assert campo.text() == "c" and janela.pagina.leitura.sugestao_do_atual() == ("c", 0.1)
+
+    janela.leitor.rede = _RedeDoTraco([("-", 0.35), ("_", 0.2)])
+    mostrar(janela, segundo)
+    app.processEvents()
+    assert campo.text() == "" and janela.pagina.leitura.sugestao_do_atual() is None
+
+    janela.leitor.rede = _RedeDoTraco([("c", 0.3)], carregada=False)
+    mostrar(janela, terceiro)
+    app.processEvents()
+    assert campo.text() == "" and janela.pagina.leitura.sugestao_do_atual() is None
+
+
 def test_a_troca_pelo_contexto_vai_ao_campo(app, janela, monkeypatch):
     """O glifo que a palavra ou a linha desmente (`contexto.sugestoes`) chega com a troca no
     campo; vírgula e apóstrofo têm o mesmo desenho, e a leitura pede "só esta"."""

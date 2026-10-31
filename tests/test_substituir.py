@@ -104,7 +104,7 @@ def test_aplicar_recusa_se_a_pagina_mudou_desde_a_previa():
 
 @pytest.fixture
 def sub(livro_escrito):  # noqa: F811
-    from abbychess.controladores import ControladorDaSubstituicao
+    from abbychess.controlador_da_substituicao import ControladorDaSubstituicao
 
     projeto, ctl, busca, escrever, eventos = livro_escrito
     s = ControladorDaSubstituicao(ctl, busca)

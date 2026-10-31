@@ -21,7 +21,7 @@ import pytest
 from abbychess import livro as lv
 from abbychess import pagina as pg
 from abbychess.controlador import ControladorDePagina, Eventos
-from abbychess.controladores import ControladorDoLivro
+from abbychess.controlador_do_livro import ControladorDoLivro
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro
 from abbychess.modelo import VERIFICADA
 from abbychess.projeto import ProjetoDeLivro
@@ -503,7 +503,7 @@ def test_voltar_ao_antes_do_lote_durante_a_releitura_nao_e_sobrescrito(ctl, proj
 
 
 def test_o_que_falta_retomar_fica_no_projeto_e_volta_ao_reabrir(ctl, projeto):
-    from abbychess.controladores import ARQUIVO_DO_LOTE
+    from abbychess.controlador_do_livro import ARQUIVO_DO_LOTE
 
     ctl.reconhecer([0, 1, 2], refazer=True)
     fim = ctl.executor.comecar()
@@ -554,7 +554,7 @@ def test_g1_fechar_com_o_lote_ativo_guarda_o_ponto_e_nao_rele_nada(ctl, projeto,
                                                                   com_servidor):
     """Rodada 3: fechar no meio do lote (a resposta da página em curso nunca chega à janela)
     deixa em `lote.json` só o que falta; um arquivo de um lote anterior não volta."""
-    from abbychess.controladores import ARQUIVO_DO_LOTE
+    from abbychess.controlador_do_livro import ARQUIVO_DO_LOTE
     from tests import servidor_falso
 
     servidor, fila = com_servidor
@@ -642,7 +642,7 @@ def test_retomar_com_reler_depois_nao_rele_o_que_o_lote_mandou_pular(ctl, projet
 
 
 def test_o_f5_tira_a_pagina_de_reler_depois(ctl, projeto):
-    from abbychess.controladores import ARQUIVO_DO_LOTE
+    from abbychess.controlador_do_livro import ARQUIVO_DO_LOTE
 
     p = ctl.pagina
     ctl.reconhecer([0], refazer=False)
@@ -690,7 +690,7 @@ def test_o_gravador_do_lote_fica_com_o_mais_novo_e_apaga(tmp_path, monkeypatch):
     import threading
 
     from abbychess import gravacao as gv
-    from abbychess.controladores import _GravadorDoLote
+    from abbychess.controlador_do_livro import _GravadorDoLote
 
     arquivo = tmp_path / "lote.json"
     liberar = threading.Event()

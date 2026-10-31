@@ -77,7 +77,8 @@ def _esperar(condicao, limite=120.0):
 
 
 def test_ca_7_2_substituir_todas_no_livro_e_um_ctrl_z(tmp_path, medidas):
-    from abbychess.controladores import ControladorDaBusca, ControladorDaSubstituicao
+    from abbychess.controlador_da_substituicao import ControladorDaSubstituicao
+    from abbychess.controladores import ControladorDaBusca
     from tests.ajudantes import ExecutorManual, _controlador  # noqa: E402,F401,F811
 
     projeto = _livro_de_230(tmp_path)

@@ -54,8 +54,8 @@ from abbychess.app.painel_verificacao import PainelDeVerificacao
 from abbychess.app.trabalho import Executor
 from abbychess.app.visor import VisorDePagina
 from abbychess.controlador import AVISO_LONGO_MS, ControladorDePagina, Eventos
-from abbychess.controladores import (ControladorDeDiagramas, ControladorDeLayout,
-                                     ControladorDeVerificacao, ControladorDoLivro)
+from abbychess import controlador_de_diagramas, controlador_de_layout, controlador_do_livro
+from abbychess.controladores import ControladorDeVerificacao
 
 log = logging.getLogger(__name__)
 
@@ -86,10 +86,10 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.executor = Executor(self)
         self.eventos = Eventos()
         self.pagina = ControladorDePagina(self.eventos, self.executor)
-        self.areas = ControladorDeLayout(self.pagina)
+        self.areas = controlador_de_layout.ControladorDeLayout(self.pagina)
         self.verificador = ControladorDeVerificacao(self.pagina)
-        self.conferencia = ControladorDeDiagramas(self.pagina)
-        self.livro = ControladorDoLivro(self.pagina)
+        self.conferencia = controlador_de_diagramas.ControladorDeDiagramas(self.pagina)
+        self.livro = controlador_do_livro.ControladorDoLivro(self.pagina)
         self._montar_paineis()
         self._montar_espaco()
         self._montar_busca()

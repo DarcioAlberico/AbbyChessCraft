@@ -343,7 +343,7 @@ CANCELAR = QMessageBox.StandardButton.Cancel
 def _livro_sem_janela(tmp_path):
     """O projeto de 3 páginas com o controlador do livro sem janela (as tarefas quando o
     teste quiser), para deixar o projeto como uma sessão de antes o deixou."""
-    from abbychess.controladores import ControladorDoLivro
+    from abbychess.controlador_do_livro import ControladorDoLivro
     from tests.ajudantes import ExecutorManual, _controlador
 
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Livro", pdf_sintetico(tmp_path))

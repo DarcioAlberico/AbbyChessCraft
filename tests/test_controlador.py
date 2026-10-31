@@ -192,7 +192,7 @@ def test_comando_guarda_o_glifo_da_hora_em_que_foi_pedido(dois_projetos):
 
 def test_diagramas_lidos_entram_na_pagina_que_pediu(tmp_path, monkeypatch):
     from abbychess import diagramas as dg
-    from abbychess.controladores import ControladorDeDiagramas
+    from abbychess.controlador_de_diagramas import ControladorDeDiagramas
     from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))

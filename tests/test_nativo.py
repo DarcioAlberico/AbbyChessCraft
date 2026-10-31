@@ -4,7 +4,7 @@ from abbychess import nativo
 from abbychess import pagina as pg
 from abbychess import texto as tx
 from abbychess.controlador import ControladorDePagina
-from abbychess.controladores import ControladorDoLivro
+from abbychess.controlador_do_livro import ControladorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
 from tests import leitor_falso, servidor_falso

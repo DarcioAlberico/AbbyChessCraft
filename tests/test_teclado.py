@@ -349,8 +349,7 @@ def test_todo_modelo_de_texto_cita_acao_do_yaml():
 
     raiz = Path(abbychess.__file__).parent
     ids = {a.id for a in teclado.tabela().acoes}
-    arquivos = [*raiz.joinpath("app").glob("*.py"), raiz / "controlador.py",
-                raiz / "controladores.py"]
+    arquivos = [*raiz.joinpath("app").glob("*.py"), *raiz.glob("controlador*.py")]
     citados = {}
     for arquivo in arquivos:
         arvore = ast.parse(arquivo.read_text(encoding="utf-8"))

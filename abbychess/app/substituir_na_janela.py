@@ -15,7 +15,7 @@ from dataclasses import replace
 from abbychess import busca as bs
 from abbychess import substituir as sb
 from abbychess.controlador import AVISO_LONGO_MS
-from abbychess.controladores import ControladorDaSubstituicao, _descricao
+from abbychess.controlador_da_substituicao import ControladorDaSubstituicao, _descricao
 
 
 class SubstituirNaJanela:

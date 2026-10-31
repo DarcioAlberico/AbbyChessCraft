@@ -112,7 +112,8 @@ def test_closures_da_janela_nao_tem_atribuicao_nem_controle_de_fluxo():
 #: (arquivo, função) -> por que o `except` amplo dela não engole o erro: ele o leva adiante.
 LEVAM_O_ERRO = {
     ("app/dialogos.py", "rodar"): "a thread guarda o erro, levantado de novo na interface",
-    ("controladores.py", "_trocar"): "a substituição que falha vai à lista de falhas, ao usuário",
+    ("controlador_da_substituicao.py", "_trocar"):
+        "a substituição que falha vai à lista de falhas, ao usuário",
     ("escritor_docx.py", "conferir"): "o que o python-docx não abre vira problema do relatório",
     ("lote.py", "rodar"): "a leitura que falhou volta ao lote como resultado, com o rastro",
     ("servidor_de_leitura.py", "_atender"): "a resposta leva o erro e o rastro à interface",

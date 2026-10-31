@@ -1,0 +1,3 @@
+funções com >= 60 nós: 1595; pares com rank >= 0.8: 1
+0.84    17 linhas  abbychess/app/barra_de_busca.py:144 _botao  <->  abbychess/app/barra_de_busca.py:153 _acao_simples
+fora da lista de aceitos: 0; aceitos que não existem mais: 0

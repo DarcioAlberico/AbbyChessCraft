@@ -376,7 +376,9 @@ pede o seu passo, com o golden de cada formato.
   Q7** (decisão §13.6): `controladores.py` (2 055), `pagina.py` (1 446), `epub.py` (1 144) e
   cinco classes (`ControladorDePagina` 61, `VistaDoDocumento` 58, `VisorDePagina` 55,
   `EspacoDeTrabalho` 53, `ProjetoDeLivro` 43) ficam presos em `TETOS` de
-  `tests/test_tamanho_dos_modulos.py`.
+  `tests/test_tamanho_dos_modulos.py`. **No Q8** (`docs/revisoes/qualidade-Q8.md`, rodadas 4
+  e 5), partir as funções obrigou a tirar seções dos três arquivos: nenhum arquivo passa mais de
+  1 000 linhas; as cinco classes continuam presas.
 
 ### Q-A2 (Média) — o app decide regra de negócio (CA-14.1)
 

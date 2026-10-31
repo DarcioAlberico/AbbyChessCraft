@@ -26,6 +26,18 @@ O passo fecha quando nenhuma linha diz "a reduzir (Q8)".
 
 | 4. A exportação (`montagem`, `epub`, `exportar`, `margens`, `escritor_docx`, `pdf_pesquisavel`, `metadados`, `marcacao`, `previa`) | `e90887d` … `cfc12ea` (20 commits) por um subagente, revisado aqui; `ed33352` à mão | as 41 partidas, cada parte com cc ≤ 9; o golden da exportação (37 arquivos) igual a cada commit; os testes antes de partir: o que a conferência do EPUB recusa (17 casos) e a do DOCX (10), o PGN que sai e o que fica de fora, a palavra digitada sozinha; os tempos da camada do PDF, da `Estrutura.da_pagina` e da `pagina_extraida` iguais (7 páginas do golden, 10 308 glifos). Duas exceções com motivo: `_sem_coordenadas.fora` (roda por glifo e por tabuleiro) e `_no_calibre` (o validador externo, como o `ace`). Dois pares do dryer juntados | 179 → 140 |
 
+| 5. Os controladores e a página (`controladores`, `pagina`, `ponte_de_leitura`, `controlador`, `fila_da_pagina`) | `deec535` … `ea1c83f` (18 commits) por um subagente, revisado aqui | as 34 partidas, nenhuma exceção, cada parte com cc ≤ 9; as partes do `ControladorDePagina` são funções do módulo (ele está preso em 61 métodos); cinco commits de testes antes de partir (PgDn e PgUp entre diagramas, a conferência que não grava, as palavras desconhecidas pelo livro — de 8 % a 83 % —, o lote a retomar da v2 e o ilegível, a prévia do Substituir que falha e a cancelada, os glifos aguardando a leitura); os laços quentes medidos (`_italicos`, `decidir_negritos`, `devolver_pingos`: iguais; a `fila` de 5 000, de 0,78 para 0,38 ms, as três listas num laço só) | 140 → 106 |
+
+Na rodada 5, também: `deec535` e `22b025a` — os dois arquivos presos em `TETOS` não podiam
+crescer. Do `controladores.py` saíram quatro controladores, cada um no seu módulo
+(`controlador_de_layout`, `controlador_de_diagramas`, `controlador_do_livro`,
+`controlador_da_substituicao`): de 2 055 para 813 linhas no fim. Do `pagina.py` saíram o
+negrito e o itálico (`efeitos.py`) e a edição dos boxes (`editar_boxes.py`): de 1 446 para 998.
+Os dois saem de `TETOS`: **nenhum arquivo de `abbychess/` passa de 1 000 linhas** (a parte dos
+arquivos do CA-Q-A1; as cinco classes acima de 40 métodos continuam presas). Anotado, não
+mudado: a anotação `hs.Instantaneo` em `ControladorDePagina._depois_de_editar` cita um nome que
+o `historico` não tem (nunca avaliada, pelo `from __future__ import annotations`).
+
 Na rodada 4, também:
 - `e90887d` e `29be11c`: o `epub.py` estava em `TETOS` com 1 144 linhas e não podia crescer;
   a validação (a conferência interna, o Ace, o Calibre, o EPUBCheck) foi para
@@ -82,9 +94,15 @@ camadas passam; cobertura 93,9 %; 141 funções com CRAP ≥ 10, uma fora da lis
 `_como_antes`, coberto no `ed33352`); o dryer com o par aceito só. Com o EPUBCheck, o Ace e o
 Calibre configurados, os 87 testes que os usam passam no `ed33352`.
 
+Medida no `ea1c83f` (`docs/medidas/qualidade/2026-10-31-qualidade-202733.json`): as duas
+camadas passam; cobertura 94,1 %; 106 funções com CRAP ≥ 10, todas na lista; o dryer só com o
+par aceito. O golden da exportação: 37 arquivos, 0 diferentes. A rápida sem cobertura: 91,3 s
+e 85,3 s, com o AbbyChessCraft aberto na máquina (o usuário, desde as 17h32, com o servidor de
+leitura): a folga do teto de 90 s é de poucos segundos.
+
 ## O que falta
 
-As 135 de cc ≥ 10 que ainda dizem "a reduzir (Q8)" (eram 252) ("a reduzir (Q8)"): partir, com a suíte como pino (refatoração, sem mudar
+As 101 de cc ≥ 10 que ainda dizem "a reduzir (Q8)" (eram 252) ("a reduzir (Q8)"): partir, com a suíte como pino (refatoração, sem mudar
 comportamento no mesmo commit); as de cobertura < 50 % primeiro ganham o teste. Os `match` e as
 cadeias de `if` de despacho só se partem se a tabela ficar mais clara (§8); senão ficam com
 motivo. Também Q-T3 (os testes que montam estado privado) e Q-T6 (as propriedades que faltam).

@@ -316,6 +316,40 @@ def test_a_previa_so_le_as_paginas_que_o_indice_diz(sub, monkeypatch):
     assert lidas == [1]
 
 
+def test_a_previa_que_falha_ao_ler_uma_pagina_avisa_o_erro(sub, monkeypatch):
+    projeto, ctl, s, escrever, eventos = sub
+    ler = projeto.ler_sem_migrar
+
+    def ler_ou_falhar(i):
+        if i == 1:
+            raise OSError("disco ilegível")
+        return ler(i)
+
+    monkeypatch.setattr(projeto, "ler_sem_migrar", ler_ou_falhar)
+    assert s.previa(bs.Opcoes("casa", escopo=bs.LIVRO), "lata", sb.PROSA)
+    _ate_valer(lambda: eventos["erros"])
+    assert eventos["erros"] == ["A prévia falhou: disco ilegível"] and eventos["previas"] == []
+
+
+def test_cancelar_no_meio_da_previa_para_de_ler_e_nada_chega(sub, monkeypatch):
+    import threading
+
+    projeto, ctl, s, escrever, eventos = sub
+    lidas, ler = [], projeto.ler_sem_migrar
+
+    def ler_e_cancelar(i):
+        lidas.append(i)
+        s.cancelar()                                     # o Esc durante a leitura da 1ª
+        return ler(i)
+
+    monkeypatch.setattr(projeto, "ler_sem_migrar", ler_e_cancelar)
+    assert s.previa(bs.Opcoes("casa", escopo=bs.LIVRO), "lata", sb.PROSA)
+    _ate_valer(lambda: not any(t.name == "previa-da-substituicao"
+                               for t in threading.enumerate()))
+    ctl.executar.tudo()
+    assert lidas == [0] and eventos["previas"] == [] and eventos["erros"] == []
+
+
 def test_a_juncao_estrutural_tambem_entra_na_previa():
     p = _pagina("uma casa")
     [caso] = _casos(p, "casa", "lar")

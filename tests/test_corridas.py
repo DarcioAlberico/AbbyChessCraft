@@ -103,6 +103,34 @@ def test_os_recortes_da_galeria_de_outro_projeto_nao_entram(monkeypatch):
     assert mostrados == []
 
 
+def test_o_filho_reaberto_recebe_o_pedido_e_o_cancelamento_dele():
+    from types import SimpleNamespace as Ns
+
+    from abbychess import servidor_de_leitura as sl
+
+    filas = [[]]
+    servidor = sl.ServidorDeLeitura.__new__(sl.ServidorDeLeitura)   # sem abrir o filho
+    servidor._trava = threading.RLock()
+    servidor._fechando = servidor.desistiu = False
+    servidor.reinicios = 0
+    servidor.processo = Ns(join=lambda t=None: None)
+    servidor._entrada = Ns(put=filas[-1].append)
+    servidor._avisar = lambda texto, desistiu: None
+
+    def reabrir():                              # o filho novo, com a fila de entrada dele
+        filas.append([])
+        servidor._entrada = Ns(put=filas[-1].append)
+
+    servidor._abrir = reabrir
+    pedido = sl.Pedido(1, "ler_pagina", sl.LOTE, ("pedido", 1, sl.LOTE, "ler_pagina", ()))
+    servidor._pendentes = {1: pedido}
+
+    servidor.cancelar(pedido)                   # chega ao filho que vai cair
+    servidor._caiu("o processo terminou")
+
+    assert filas[-1] == [pedido.mensagem, ("cancelar", 1)]
+
+
 def test_fechar_o_pool_ocioso_nao_fecha_o_que_um_obter_acabou_de_pegar():
     pool = bs.PoolDoIndice()
     aberto = pool._pool = _PoolFalso()

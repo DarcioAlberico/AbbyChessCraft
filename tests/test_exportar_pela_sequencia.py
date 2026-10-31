@@ -8,6 +8,7 @@ import pytest
 from core.box_model import BoxEntry
 
 from abbychess import exportar as ex
+from abbychess import pdf_pesquisavel as pdfp
 from abbychess import montagem as mo
 from abbychess import pagina as pg
 from abbychess.leitor import nome_de_origem
@@ -137,7 +138,7 @@ def test_o_pdf_pesquisavel_sai_na_ordem_do_livro(projeto, tmp_path):
     _ler(projeto, [(0, "a"), (1, "b"), (2, "c")])
     _reordenar(projeto, [2, 0, 1, *range(3, 60)])
     saida = tmp_path / "pesquisavel.pdf"
-    ex.exportar_pdf_pesquisavel(projeto, saida)
+    pdfp.exportar_pdf_pesquisavel(projeto, saida)
     with fitz.open(str(saida)) as doc:
         impressas = [doc[k].get_text().split("Pagina")[1].split()[0] for k in range(3)]
     assert impressas == ["3", "1", "2"]                  # o texto impresso do PDF de cada uma
@@ -163,7 +164,7 @@ def test_ca_12_16_o_pdf_pesquisavel_usa_as_imagens_transformadas(projeto, tmp_pa
     projeto.ordem.gravar(projeto.sequencia.inserir(inseridas, 2))
     projeto.salvar_pagina(2, [_box("c"), _box("c", x=20)])
     saida = tmp_path / "pesquisavel.pdf"
-    ex.exportar_pdf_pesquisavel(projeto, saida)
+    pdfp.exportar_pdf_pesquisavel(projeto, saida)
     escala = 72.0 / mo.DPI_DA_LEITURA
     with fitz.open(str(saida)) as doc:
         assert len(doc) == 3
@@ -208,7 +209,7 @@ def test_o_sumario_do_original_fora_de_ordem_nao_vai_para_o_pdf(projeto, tmp_pat
     projeto.fonte.write_bytes((tmp_path / "com_sumario.pdf").read_bytes())
     _reordenar(projeto, [2, 0, 1, *range(3, 60)])
     saida = tmp_path / "pesquisavel.pdf"
-    ex.exportar_pdf_pesquisavel(projeto, saida)
+    pdfp.exportar_pdf_pesquisavel(projeto, saida)
     with fitz.open(str(saida)) as doc:
         paginas = [m[2] for m in doc.get_toc()]
     assert paginas == sorted(paginas)                            # nenhum destino para trás

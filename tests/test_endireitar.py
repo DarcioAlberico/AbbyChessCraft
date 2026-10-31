@@ -15,6 +15,7 @@ import pytest
 from PIL import Image
 
 from abbychess import exportar as ex
+from abbychess import pdf_pesquisavel as pdfp
 from abbychess import livro
 from abbychess import pagina as pg
 from abbychess.leitor import LeitorDoLivro
@@ -141,8 +142,8 @@ def test_box_endireitado_volta_para_cima_da_tinta_original():
     girada = pg.girar(original, 2.0)
     ys, xs = np.nonzero(girada < 128)
     box = pg.BoxEntry("x", int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
-    movido = ex._na_original(box, 2.0, 600, 400)
+    movido = pdfp._na_original(box, 2.0, 600, 400)
     assert abs(movido.x1 - 500) <= 1 and abs(movido.y1 - 100) <= 1
     assert movido.x2 - movido.x1 == box.x2 - box.x1   # translada, sem deformar
-    assert ex._na_original((box.x1, box.y1, box.x2, box.y2), 2.0, 600, 400) == (
+    assert pdfp._na_original((box.x1, box.y1, box.x2, box.y2), 2.0, 600, 400) == (
         movido.x1, movido.y1, movido.x2, movido.y2)

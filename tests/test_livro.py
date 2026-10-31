@@ -18,6 +18,7 @@ from PIL import Image
 from core.box_model import BoxEntry
 
 from abbychess import exportar as ex
+from abbychess import pdf_pesquisavel as pdfp
 from abbychess import montagem as mo
 from abbychess import livro
 from abbychess import pagina as pg
@@ -236,7 +237,7 @@ def test_pdf_pesquisavel_troca_a_camada_antiga(tmp_path):
     _ensinar_e_ler(projeto, fonte, leitor)
 
     destino = tmp_path / "saida.pdf"
-    resumo = ex.exportar_pdf_pesquisavel(projeto, destino, [0, 2])
+    resumo = pdfp.exportar_pdf_pesquisavel(projeto, destino, [0, 2])
     assert resumo.paginas == 2 and resumo.camadas_trocadas == 2 and resumo.caracteres > 20
     doc = fitz.open(destino)
     assert len(doc) == 2

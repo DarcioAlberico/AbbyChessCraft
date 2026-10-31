@@ -13,6 +13,7 @@ from core.pagina import PaginaExtraida, Paragrafo
 
 from abbychess import epub
 from abbychess import exportar as ex
+from abbychess import pdf_pesquisavel as pdfp
 from abbychess import margens as mg
 from abbychess import montagem as mo
 from abbychess import texto as tx
@@ -69,7 +70,7 @@ def test_o_pdf_ganha_os_marcadores_pelos_titulos(projeto, fonte, leitor, tmp_pat
     titulos = mo.titulos_das_paginas(projeto, projeto.resumo.paginas_lidas())
     assert [i for i, _t in titulos] == [1]
     destino = tmp_path / "saida.pdf"                  # o livro.pdf é a fonte da fixture
-    resumo = ex.exportar_pdf_pesquisavel(projeto, destino)
+    resumo = pdfp.exportar_pdf_pesquisavel(projeto, destino)
     assert resumo.marcadores == 1
     with fitz.open(destino) as doc:
         assert doc.get_toc() == [[1, titulos[0][1], 2]]
@@ -80,13 +81,13 @@ def test_o_sumario_do_pdf_original_fica(tmp_path):
     for _ in range(2):
         doc.new_page()
     doc.set_toc([[1, "Do editor", 2]])
-    resumo = ex.ResumoDoPdf()
+    resumo = pdfp.ResumoDoPdf()
 
     class _Projeto:
         def carregar_modelo(self, _i):
             return None
 
-    ex._marcar_o_pdf(doc, _Projeto(), [0, 1], resumo)
+    pdfp._marcar_o_pdf(doc, _Projeto(), [0, 1], resumo)
     assert doc.get_toc() == [[1, "Do editor", 2]]
     assert resumo.marcadores_do_original == 1 and resumo.marcadores == 0
 
@@ -161,8 +162,8 @@ def test_paginas_de_rosto_ganham_romanos_e_o_rotulo_do_pdf_fica_valido(tmp_path,
     # As estruturas entram pelo `Estrutura.da_pagina` do projeto falso.
     fila = iter(estruturas[i] for i in range(4))
     monkeypatch.setattr(mo.Estrutura, "da_pagina", classmethod(lambda cls, _p: next(fila)))
-    resumo = ex.ResumoDoPdf()
-    ex._marcar_o_pdf(doc, _Projeto(), [0, 1, 2, 3], resumo)
+    resumo = pdfp.ResumoDoPdf()
+    pdfp._marcar_o_pdf(doc, _Projeto(), [0, 1, 2, 3], resumo)
     assert resumo.rotulos
     assert [p.get_label() for p in doc] == ["i", "ii", "1", "2"]
 

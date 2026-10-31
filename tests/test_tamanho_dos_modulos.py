@@ -16,7 +16,6 @@ LINHAS, METODOS = 1000, 40
 TETOS = {
     "abbychess/controladores.py": 2055,
     "abbychess/epub.py": 1154,
-    "abbychess/exportar.py": 2130,
     "abbychess/pagina.py": 1446,
     "abbychess/projeto.py:ProjetoDeLivro": 43,
     "abbychess/controlador.py:ControladorDePagina": 61,

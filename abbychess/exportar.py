@@ -1356,23 +1356,29 @@ def exportar_docx(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
     internos, metadados; com `analise`, o link de análise de cada diagrama lido
     (`Opcoes.links_de_analise`). O escritor confere o arquivo (`escritor_docx.conferir`)
     antes de trocar o anterior, e recusa o que não passa."""
-    from abbychess import epub
     from abbychess import escritor_docx
+
+    _escrever_formatado(escritor_docx.escrever, paginas, caminho, titulo, autor, idioma,
+                        metadados, relatorio, analise, quebras=quebras, realce=realce)
+    return Path(caminho)
+
+
+def _escrever_formatado(escrever, paginas, caminho, titulo: str, autor: str, idioma: str,
+                        metadados, relatorio: Optional["Relatorio"], analise: str, **opcoes):
+    """Os dois escritores formatados (o DOCX e o EPUB) por um caminho só: os metadados
+    (os dados, ou os de padrão pelo título), os números impressos e, no relatório, os links
+    e as análises. Devolve o que o escritor contou."""
+    from abbychess import epub
 
     metadados = metadados or epub.Metadados(titulo=titulo, idioma=idioma,
                                             autores=(autor,) if autor else ())
     numeros = relatorio.numeros_impressos if relatorio is not None else None
-    escrito = escritor_docx.escrever(paginas, caminho, metadados, numeros=numeros,
-                                     quebras=quebras, realce=realce, analise=analise)
-    if relatorio is not None:                   # o escritor recusa o que não passa em `conferir`
+    escrito = escrever(paginas, caminho, metadados, numeros=numeros, analise=analise, **opcoes)
+    if relatorio is not None:
         relatorio.links = escrito.links
-        _analises_no_relatorio(relatorio, escrito.analises, analise)
-    return Path(caminho)
-
-
-def _analises_no_relatorio(relatorio: "Relatorio", analises: int, site: str) -> None:
-    relatorio.analises = analises
-    relatorio.site_de_analise = links_de_analise.NOMES[site] if analises else ""
+        relatorio.analises = escrito.analises
+        relatorio.site_de_analise = links_de_analise.NOMES[analise] if escrito.analises else ""
+    return escrito
 
 
 def exportar_epub(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
@@ -1381,21 +1387,17 @@ def exportar_epub(paginas: Sequence[PaginaExtraida], caminho: str | Path, *,
                   quebras: bool = False, analise: str = "nenhum") -> Path:
     """O EPUB pelo escritor próprio (`abbychess.epub`): capítulos, sumário pelos títulos,
     lista de páginas, marcos, metadados e a acessibilidade do que foi escrito; com
-    `analise`, o link de análise de cada diagrama lido (`Opcoes.links_de_analise`). Depois
-    de gravar, `epub.conferir` lê o arquivo; o que ele acusar vai ao `relatorio`."""
+    `analise`, o link de análise de cada diagrama lido (`Opcoes.links_de_analise`). O
+    escritor confere o arquivo (`epub.conferir`) antes de trocar o anterior, e recusa o que
+    não passa (SPEC-qualidade Q-E3), como o DOCX."""
     from abbychess import epub
 
-    metadados = metadados or epub.Metadados(titulo=titulo, idioma=idioma,
-                                            autores=(autor,) if autor else ())
-    numeros = relatorio.numeros_impressos if relatorio is not None else None
-    escrito = epub.escrever(paginas, caminho, metadados, numeros=numeros, quebras=quebras,
-                            analise=analise)        # conferido antes de trocar (Q-E3)
+    escrito = _escrever_formatado(epub.escrever, paginas, caminho, titulo, autor, idioma,
+                                  metadados, relatorio, analise, quebras=quebras)
     if relatorio is not None:
         relatorio.capitulos = escrito.capitulos
         relatorio.imagens_reutilizadas = escrito.reutilizadas
         relatorio.bytes_poupados = escrito.poupados
-        relatorio.links = escrito.links
-        _analises_no_relatorio(relatorio, escrito.analises, analise)
     return Path(caminho)
 
 

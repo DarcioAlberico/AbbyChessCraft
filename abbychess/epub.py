@@ -19,7 +19,7 @@ exportação) e escreve um EPUB 3 que a auditoria do EPUB do Aagaard pediu (road
 - **Diagramas**: o texto alternativo diz o FEN e o lado a jogar (e se foi assumido); o
   recorte diz que o diagrama não foi lido. Imagens iguais byte a byte são um recurso só.
 - **Links internos**: "página 23", "Diagrama 6" (pelo número da legenda) e "capítulo 3"
-  (pelo número do título) viram link quando o alvo está no livro (`referencias_internas`).
+  (pelo número do título) viram link quando o alvo está no livro (`links_internos`).
 - **Links de análise**, se pedidos: na legenda de cada diagrama lido, o link que abre a
   posição no Lichess ou no Chess.com (`links_de_analise`).
 - **Os mesmos bytes**: com o mesmo `SOURCE_DATE_EPOCH`, o mesmo arquivo (CA-12.6): a data
@@ -51,6 +51,7 @@ from abbychess import links_de_analise
 from abbychess import marcacao
 from abbychess.marcacao import trechos_marcados
 from abbychess.validacao_do_epub import conferir
+from abbychess.links_internos import Numerados, numerados, referencias_internas
 
 log = logging.getLogger(__name__)
 
@@ -227,142 +228,6 @@ def xhtml_do_texto(paragrafo: Paragrafo, simbolos: str,
             pedaco = f'<a href="{html.escape(links[link][2], quote=True)}">{pedaco}</a>'
         saida.append(pedaco)
     return "".join(saida)
-
-
-#: As referências a uma página impressa, por idioma: "página 23", "on page 23", "p. 23".
-#: O número é o grupo 1. Só viram link quando a página existe no livro exportado.
-REFERENCIAS = {
-    "pt": re.compile(r"\b(?:p[áa]gina|p[áa]g\.|p\.)\s*(\d{1,4})\b", re.IGNORECASE),
-    "en": re.compile(r"\b(?:page|p\.)\s*(\d{1,4})\b", re.IGNORECASE),
-    "es": re.compile(r"\b(?:p[áa]gina|p[áa]g\.|p\.)\s*(\d{1,4})\b", re.IGNORECASE),
-    "de": re.compile(r"\b(?:Seite|S\.)\s*(\d{1,4})\b"),
-    "fr": re.compile(r"\b(?:page|p\.)\s*(\d{1,4})\b", re.IGNORECASE),
-}
-
-
-def referencias(texto: str, idioma: str, alvos: Dict[int, str]) -> List[Tuple[int, int, str]]:
-    """`(início, fim, href)` das referências do texto a páginas impressas que estão em
-    `alvos` (número impresso -> href da âncora); as outras ficam como texto."""
-    padrao = REFERENCIAS.get((idioma or "pt").split("-")[0].lower(), REFERENCIAS["en"])
-    saida = []
-    for achado in padrao.finditer(texto):
-        if _citacao(texto, achado.start()):
-            continue
-        href = alvos.get(int(achado.group(1)))
-        if href:
-            saida.append((achado.start(), achado.end(), href))
-    return saida
-
-
-def _citacao(texto: str, inicio: int) -> bool:
-    """A referência é a página de outra obra: "(Informator 45, p. 12)", "Fine, p. 3" —
-    vem depois de uma vírgula, dentro de parênteses ainda abertos, ou logo depois de um
-    nome com vírgula."""
-    antes = texto[:inicio].rstrip()
-    if not antes.endswith(","):
-        return False
-    return antes.count("(") > antes.count(")") or bool(re.search(r"[A-ZÀ-Ý][\w.'-]*,$", antes))
-
-
-#: "Diagrama 6", "Diagram 6", "Diagramm 6", "diagramme 6", "diag. 6": a referência a um
-#: diagrama numerado, em qualquer idioma (grupo 1). No começo de um parágrafo vizinho do
-#: diagrama, é a legenda que o numera (`LEGENDA`).
-#: "Diagrama 6.1" e "Diagrama 6,2" são outra numeração (por capítulo): não são o 6.
-DIAGRAMA = re.compile(r"\b(?:diagram(?:a|me|m)?|diag\.)\s*(\d{1,4})\b(?![.,]\d)", re.IGNORECASE)
-LEGENDA = re.compile(r"\s*(?:diagram(?:a|me|m)?|diag\.)\s*(\d{1,4})\b(?![.,]\d)", re.IGNORECASE)
-#: "Capítulo 3", "Chapter III", "Kapitel 3", "chapitre 3": a referência a um capítulo
-#: (grupo 1, arábico ou romano). No começo de um título de capítulo, é o número dele. O
-#: romano só em maiúsculas ("in chapter i" não é o capítulo 1). O "I" pronome depois de
-#: "chapter" ("the chapter I wrote") continua ambíguo: só vira link se houver capítulo I.
-CAPITULO = re.compile(r"\b(?i:cap[íi]tulo|chapter|kapitel|chapitre)\s+(\d{1,3}|[IVXLC]{1,7})\b")
-_ROMANOS = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100}
-
-
-def _numero_do_capitulo(texto: str) -> Optional[int]:
-    """`3`, `III` -> 3; `None` para o romano malformado ("IIII", "VX")."""
-    if texto.isdigit():
-        return int(texto)
-    letras = texto.upper()
-    total = 0
-    for i, letra in enumerate(letras):
-        valor = _ROMANOS[letra]
-        seguinte = _ROMANOS[letras[i + 1]] if i + 1 < len(letras) else 0
-        total += -valor if valor < seguinte else valor
-    canonico = ""
-    resto = total
-    for valor, simbolo in ((100, "C"), (90, "XC"), (50, "L"), (40, "XL"), (10, "X"), (9, "IX"),
-                           (5, "V"), (4, "IV"), (1, "I")):
-        while resto >= valor:
-            canonico, resto = canonico + simbolo, resto - valor
-    return total if total and canonico == letras else None
-
-
-@dataclass
-class Numerados:
-    """O que o livro numera e o texto pode citar: `figuras` (id da `Figura` -> o número que a
-    legenda dela imprime), `legendas` (id dos parágrafos que são essas legendas, onde a
-    referência não vira link para si mesma) e `capitulos` (id do título -> o número dele).
-
-    Número que se repete no livro (a numeração que recomeça a cada capítulo) não é alvo: o
-    link iria para o diagrama errado."""
-    figuras: Dict[int, int] = field(default_factory=dict)
-    legendas: set = field(default_factory=set)
-    capitulos: Dict[int, int] = field(default_factory=dict)
-
-
-def numerados(paginas: Sequence[PaginaExtraida]) -> Numerados:
-    """Os diagramas e os capítulos que o livro numera (`Numerados`).
-
-    A legenda do diagrama é o parágrafo logo depois dele, ou logo antes: vale o lado que o
-    livro mais usa, contado em todos os diagramas, porque o parágrafo de depois de um
-    diagrama pode ser a legenda impressa acima do seguinte."""
-    from collections import Counter
-
-    lados: Dict[str, Dict[int, Tuple[int, int]]] = {"depois": {}, "antes": {}}
-    titulos: Dict[int, int] = {}
-    for pagina in paginas:
-        blocos = pagina.blocos
-        for k, bloco in enumerate(blocos):
-            if isinstance(bloco, Paragrafo) and bloco.titulo and bloco.nivel == 1:
-                achado = CAPITULO.match(bloco.texto.strip())
-                numero = _numero_do_capitulo(achado.group(1)) if achado else None
-                if numero is not None:
-                    titulos[id(bloco)] = numero
-            if not isinstance(bloco, Figura):
-                continue
-            for lado, j in (("depois", k + 1), ("antes", k - 1)):
-                if 0 <= j < len(blocos) and isinstance(blocos[j], Paragrafo):
-                    achado = LEGENDA.match(blocos[j].texto)
-                    if achado:
-                        lados[lado][id(bloco)] = (int(achado.group(1)), id(blocos[j]))
-    escolhido = lados["depois"] if len(lados["depois"]) >= len(lados["antes"]) else lados["antes"]
-    vezes = Counter(n for n, _ in escolhido.values())
-    capitulos = Counter(titulos.values())
-    return Numerados(figuras={f: n for f, (n, _) in escolhido.items() if vezes[n] == 1},
-                     legendas={p for _, p in escolhido.values()},
-                     capitulos={t: n for t, n in titulos.items() if capitulos[n] == 1})
-
-
-def referencias_internas(texto: str, idioma: str, paginas: Dict[int, str],
-                         diagramas: Dict[int, str], capitulos: Dict[int, str]
-                         ) -> List[Tuple[int, int, str]]:
-    """As referências do texto que viram link: às páginas impressas (`referencias`), aos
-    diagramas ("ver o Diagrama 6") e aos capítulos ("no capítulo 3") que estão nos alvos
-    (número -> href). Sem sobrepor: "Diagrama 6, p. 23" são dois links."""
-    achados = list(referencias(texto, idioma, paginas))
-    for padrao, alvos, numero in ((DIAGRAMA, diagramas, int), (CAPITULO, capitulos,
-                                                               _numero_do_capitulo)):
-        if not alvos:
-            continue
-        for achado in padrao.finditer(texto):
-            href = alvos.get(numero(achado.group(1)))
-            if href:
-                achados.append((achado.start(), achado.end(), href))
-    saida: List[Tuple[int, int, str]] = []
-    for inicio, fim, href in sorted(achados):
-        if not saida or inicio >= saida[-1][1]:
-            saida.append((inicio, fim, href))
-    return saida
 
 
 #: A procedência do lado a jogar nos idiomas sem a frase do core (`lado_a_jogar.marca`, que

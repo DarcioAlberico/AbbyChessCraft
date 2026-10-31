@@ -9,9 +9,9 @@ Lê as mesmas `core.pagina.PaginaExtraida` que o EPUB e escreve pelo python-docx
   procedência, ou que o diagrama não foi lido) no `descr` da figura; imagens iguais são uma
   parte só (o python-docx já guarda pela soma).
 - **Páginas impressas**: cada página começa com um marcador (`pg23`), e as referências do
-  texto ("página 23", `epub.referencias`) viram hiperlink interno para ele, quando a página
+  texto ("página 23", `links_internos.referencias`) viram hiperlink interno para ele, quando a página
   está no arquivo. Os diagramas numerados pela legenda e os capítulos numerados pelo título
-  (`epub.numerados`) têm marcador (`dg6`, `cap3`), e "ver o Diagrama 6" e "no capítulo 3"
+  (`links_internos.numerados`) têm marcador (`dg6`, `cap3`), e "ver o Diagrama 6" e "no capítulo 3"
   viram hiperlink para eles.
 - **Links de análise**, se pedidos: embaixo de cada diagrama lido, o hiperlink externo que
   abre a posição no Lichess ou no Chess.com (`links_de_analise`).
@@ -39,6 +39,7 @@ from xml.etree import ElementTree
 from core.pagina import Figura, PaginaExtraida, Paragrafo
 
 from abbychess import epub
+from abbychess import links_internos
 from abbychess import gravacao as gv
 from abbychess import links_de_analise
 from abbychess import marcacao
@@ -281,7 +282,7 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
             alvos[numeros[pagina.numero]] = f"pg{pagina.numero + 1}"
     # Os diagramas e os capítulos numerados ganham marcador (`dg6`, `cap3`) e são alvo de
     # "ver o Diagrama 6" e "no capítulo 3", como no EPUB.
-    contados = epub.numerados(com_conteudo)
+    contados = links_internos.numerados(com_conteudo)
     por_diagrama = {n: f"dg{n}" for n in contados.figuras.values()}
     por_capitulo = {n: f"cap{n}" for n in contados.capitulos.values()}
 
@@ -313,7 +314,7 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
                     links: list = []
                 else:
                     estilo = None
-                    links = epub.referencias_internas(
+                    links = links_internos.referencias_internas(
                         bloco.texto, idioma, alvos,
                         {} if id(bloco) in contados.legendas else por_diagrama, por_capitulo)
                     escrito.links += len(links)

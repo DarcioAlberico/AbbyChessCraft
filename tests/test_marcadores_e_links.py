@@ -12,6 +12,7 @@ from core.box_model import BoxEntry
 from core.pagina import PaginaExtraida, Paragrafo
 
 from abbychess import epub
+from abbychess import links_internos as li
 from abbychess import validacao_do_epub as validacao
 from abbychess import exportar as ex
 from abbychess import pdf_pesquisavel as pdfp
@@ -122,10 +123,10 @@ def test_referencia_a_pagina_impressa_vira_link_e_o_rotulo_e_o_impresso(tmp_path
 
 def test_sem_numero_impresso_nao_ha_link():
     alvos = {}
-    assert epub.referencias("ver a página 12", "pt", alvos) == []
-    assert epub.referencias("see page 12 and p. 13", "en", {12: "x#a", 13: "x#b"}) == [
+    assert li.referencias("ver a página 12", "pt", alvos) == []
+    assert li.referencias("see page 12 and p. 13", "en", {12: "x#a", 13: "x#b"}) == [
         (4, 11, "x#a"), (16, 21, "x#b")]
-    assert epub.referencias("siehe Seite 5", "de", {5: "y#c"}) == [(6, 13, "y#c")]
+    assert li.referencias("siehe Seite 5", "de", {5: "y#c"}) == [(6, 13, "y#c")]
 
 
 def test_exportar_sobre_a_propria_fonte_e_recusado(projeto, fonte, leitor):  # noqa: F811
@@ -171,9 +172,9 @@ def test_paginas_de_rosto_ganham_romanos_e_o_rotulo_do_pdf_fica_valido(tmp_path,
 
 def test_citacao_de_outra_obra_nao_vira_link():
     alvos = {3: "c#a", 12: "c#b"}
-    assert epub.referencias("(Informator 45, p. 12)", "en", alvos) == []
-    assert epub.referencias("Fine, p. 3", "en", alvos) == []
-    assert epub.referencias("Ver a solução, p. 12", "pt", alvos) == [(15, 20, "c#b")]
+    assert li.referencias("(Informator 45, p. 12)", "en", alvos) == []
+    assert li.referencias("Fine, p. 3", "en", alvos) == []
+    assert li.referencias("Ver a solução, p. 12", "pt", alvos) == [(15, 20, "c#b")]
 
 
 def test_pagina_sem_numero_impresso_nao_colide_com_um_impresso(tmp_path):
@@ -222,7 +223,7 @@ def _livro_numerado():
 
 def test_as_legendas_numeram_os_diagramas_e_os_titulos_os_capitulos():
     paginas, um, dois = _livro_numerado()
-    numeros = epub.numerados(paginas)
+    numeros = li.numerados(paginas)
     assert numeros.figuras == {id(um): 1, id(dois): 2}
     assert numeros.capitulos == {id(paginas[0].blocos[0]): 1, id(paginas[1].blocos[0]): 2}
     assert numeros.legendas == {id(paginas[0].blocos[2]), id(paginas[1].blocos[2])}
@@ -234,23 +235,23 @@ def test_a_legenda_acima_vale_quando_o_livro_a_usa_e_o_numero_repetido_nao_e_alv
     paginas = [PaginaExtraida(numero=0, blocos=[
         Paragrafo("Diagrama 1"), a, Paragrafo("Diagrama 2"), b,
         Paragrafo("Diagrama 2"), c])]
-    assert epub.numerados(paginas).figuras == {id(a): 1}
+    assert li.numerados(paginas).figuras == {id(a): 1}
     # Romano malformado e título que não é de capítulo não numeram.
     titulos = [PaginaExtraida(numero=0, blocos=[Paragrafo("Capítulo IIII", titulo=True, nivel=1),
                                                 Paragrafo("Capítulo 3", titulo=True, nivel=2)])]
-    assert epub.numerados(titulos).capitulos == {}
+    assert li.numerados(titulos).capitulos == {}
 
 
 def test_numeracao_por_capitulo_e_romano_minusculo_nao_viram_link():
     alvos = {6: "c#dg6"}
-    assert epub.referencias_internas("o Diagrama 6.1 e o 6,2", "pt", {}, alvos, {}) == []
-    assert epub.referencias_internas("in chapter i", "en", {}, {}, {1: "c#t1"}) == []
-    assert epub.LEGENDA.match("Diagrama 6.1. Jogam as brancas") is None
+    assert li.referencias_internas("o Diagrama 6.1 e o 6,2", "pt", {}, alvos, {}) == []
+    assert li.referencias_internas("in chapter i", "en", {}, {}, {1: "c#t1"}) == []
+    assert li.LEGENDA.match("Diagrama 6.1. Jogam as brancas") is None
 
 
 def test_referencias_internas_nao_se_sobrepoem():
     texto = "Ver o Diagrama 6, p. 23, e o Chapter IV."
-    assert epub.referencias_internas(texto, "pt", {23: "c#pg"}, {6: "c#dg6"}, {4: "c#t4"}) == [
+    assert li.referencias_internas(texto, "pt", {23: "c#pg"}, {6: "c#dg6"}, {4: "c#t4"}) == [
         (6, 16, "c#dg6"), (18, 23, "c#pg"), (29, 39, "c#t4")]
 
 

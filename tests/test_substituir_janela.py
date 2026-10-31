@@ -75,6 +75,48 @@ def test_todas_na_pagina_aplica_direto(jb):  # noqa: F811
     assert not jb.resultados.na_previa
 
 
+def test_enter_no_substituto_substitui_e_ctrl_enter_substitui_todas(jb):  # noqa: F811
+    _pagina_lida(jb, "casa velha casa casa")
+    _buscar(jb, "casa")
+    jb.barra_de_busca.escolher_escopo(bs.PAGINA)
+    _substituir_por(jb, "lata")
+    b = jb.barra_de_busca
+    b.substituto.setFocus()
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return)      # o Ctrl+H buscou de novo: vai à 1ª
+    _ate(lambda: b.contador.text() == "1 de 3")
+    QTest.keyClick(b.substituto, Qt.Key.Key_Enter, Qt.KeyboardModifier.KeypadModifier)
+    _ate(lambda: _texto(jb) == "lata velha casa casa")   # troca ela e vai à próxima
+    _ate(lambda: b.contador.text() == "1 de 2")
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+    _ate(lambda: _texto(jb) == "lata velha lata lata")   # Todas, na página: direto
+    jb.desfazer()
+    _ate(lambda: _texto(jb) == "lata velha casa casa")
+
+
+def test_todas_sem_o_texto_sem_selecao_ou_com_o_intervalo_errado_nao_substitui(jb):  # noqa: F811
+    from PySide6.QtWidgets import QApplication
+
+    _pagina_lida(jb, "casa velha casa")
+    _buscar(jb, "casa")
+    _substituir_por(jb, "lata")
+    b = jb.barra_de_busca
+    b.escolher_escopo(bs.SELECAO)                         # sem trecho escolhido no Documento
+    b.substituto.setFocus()
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+    assert b.contador.text() == "erro" and "Sem seleção" in b.contador.toolTip()
+    b.escolher_escopo(bs.INTERVALO)
+    b.intervalo.setText("abc")
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+    assert b.contador.text() == "erro" and "Intervalo inválido" in b.contador.toolTip()
+    b.escolher_escopo(bs.PAGINA)
+    b.campo.clear()
+    b.substituto.setFocus()
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+    assert QApplication.focusWidget() is b.campo          # falta o que localizar: o campo
+    _ate(lambda: not jb.busca.buscando and not b.relogio.isActive())
+    assert _texto(jb) == "casa velha casa" and not jb.resultados.na_previa
+
+
 def test_o_caso_estrutural_vem_habilitado_na_previa(jb):  # noqa: F811
     _pagina_lida(jb, "uma casa")
     _buscar(jb, "m")

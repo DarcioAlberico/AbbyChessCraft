@@ -115,6 +115,93 @@ def test_a_busca_por_glifo_vai_para_resultados(jb, monkeypatch):
     assert jb.pagina.atual == pagina.boxes[3].gid
 
 
+def _no_dialogo_do_glifo(preencher):
+    """O diálogo da busca por glifo, quando abrir: `preencher(dialogo)` e o OK."""
+    from PySide6.QtCore import QTimer
+
+    def agir():
+        dialogo = QApplication.activeModalWidget()
+        preencher(dialogo)
+        dialogo.accept()
+    QTimer.singleShot(0, agir)
+
+
+def test_a_busca_por_glifo_pede_o_caractere_a_fonte_e_a_faixa_de_confianca(jb):
+    """O que se marca no diálogo é o que a Galeria mostra: o caractere, a faixa (as pontas
+    trocadas valem do menor ao maior) e as fontes da leitura."""
+    from abbychess import busca as bs
+
+    pagina = _pagina_lida(jb, "casa")                    # cada letra lida pela rede, a 0,90
+
+    def o_a_com_a_faixa_trocada(dialogo):
+        dialogo.caractere.setText("a")
+        dialogo.minima.setValue(0.95)
+        dialogo.maxima.setValue(0.85)
+    _no_dialogo_do_glifo(o_a_com_a_faixa_trocada)
+    jb.buscar_glifo()
+    modelo = jb.galeria.modelo
+    _ate(lambda: "Glifos 'a', confiança de 0.85 a 0.95" in jb.galeria.titulo.text())
+    assert {i.gid for i in modelo.itens} == {pagina.boxes[1].gid, pagina.boxes[3].gid}
+
+    def qualquer_um_sem_a_rede(dialogo):
+        dialogo.caractere.clear()
+        dialogo.fontes[bs.REDE].setChecked(False)
+    _no_dialogo_do_glifo(qualquer_um_sem_a_rede)
+    jb.buscar_glifo()
+    _ate(lambda: "Glifos qualquer caractere, confiança de 0.00 a 1.00" in jb.galeria.titulo.text())
+    assert modelo.rowCount() == 0                        # todos foram lidos pela rede
+
+    _no_dialogo_do_glifo(lambda dialogo: dialogo.caractere.clear())
+    jb.buscar_glifo()
+    _ate(lambda: modelo.rowCount() == 4)                 # todas as fontes: as quatro letras
+
+
+def test_as_teclas_da_barra_andam_mandam_para_resultados_e_fecham(jb):
+    """Na barra: Shift+Enter a anterior, Enter (também o do teclado numérico) a próxima,
+    Alt+Enter todas em Resultados, Esc fecha."""
+    _pagina_lida(jb, "casa velha casa")
+    _buscar(jb, "casa")
+    jb.doca_resultados.hide()
+    b = jb.barra_de_busca
+    b.campo.setFocus()
+    QTest.keyClick(b.campo, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    assert b.contador.text() == "2 de 2"                 # da página aberta para trás: a última
+    QTest.keyClick(b.campo, Qt.Key.Key_Enter, Qt.KeyboardModifier.KeypadModifier)
+    assert b.contador.text() == "1 de 2"
+    QTest.keyClick(b.campo, Qt.Key.Key_Return, Qt.KeyboardModifier.AltModifier)
+    assert jb.doca_resultados.isVisible()
+    assert "“casa”: 2 ocorrência" in jb.resultados.resultados.item(0).text()
+    b.campo.setFocus()
+    QTest.keyClick(b.campo, Qt.Key.Key_Escape)
+    assert not b.isVisible()
+
+
+def test_alt_enter_logo_depois_de_digitar_manda_esta_busca_para_resultados(jb):
+    _pagina_lida(jb, "casa velha casa")
+    _buscar(jb, "casa")
+    jb.doca_resultados.hide()
+    b = jb.barra_de_busca
+    b.campo.setFocus()
+    QTest.keyClicks(b.campo, "s")                        # "casas", e o Alt+Enter antes da espera
+    assert b.relogio.isActive()
+    QTest.keyClick(b.campo, Qt.Key.Key_Return, Qt.KeyboardModifier.AltModifier)
+    _ate(jb.doca_resultados.isVisible)
+    assert "“casas”: 0 ocorrência" in jb.resultados.resultados.item(0).text()
+
+
+def test_alt_enter_sem_nada_digitado_abre_a_barra(jb):
+    _pagina_lida(jb, "casa")
+    b = jb.barra_de_busca
+    b.campo.clear()
+    jb.fechar_busca()
+    jb.doca_resultados.hide()
+    jb.activateWindow()                                  # a doca de Resultados pode ter ficado
+    jb.visor.setFocus()                                  # com a janela ativa
+    QApplication.processEvents()
+    QTest.keyClick(jb.visor, Qt.Key.Key_Return, Qt.KeyboardModifier.AltModifier)
+    assert b.isVisible() and not jb.doca_resultados.isVisible()
+
+
 # ----------------------------------------------------------------------
 # As revisões do passo B
 # ----------------------------------------------------------------------

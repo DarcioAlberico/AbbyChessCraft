@@ -253,6 +253,38 @@ def test_o_arquivo_mudado_fora_do_cache_nao_e_adotado(sub):
     assert 1 in eventos["feitas"][-1][2]
 
 
+def test_a_previa_de_um_projeto_nao_se_aplica_no_outro(sub, tmp_path):
+    """O Aplicar de uma prévia montada antes de abrir outro projeto avisa e não troca nada,
+    nem no outro nem no de antes."""
+    from abbychess import pagina as pg
+    from abbychess.leitor import LeitorDoLivro
+    from abbychess.modelo import Box, gid_de
+    from abbychess.projeto import ProjetoDeLivro
+    from tests.ajudantes import pdf_sintetico
+
+    projeto, ctl, s, escrever, eventos = sub
+    previas = _previa(s, eventos, "casa", "lata")
+    pasta = tmp_path / "outro"
+    pasta.mkdir()
+    outro = ProjetoDeLivro.criar(tmp_path / "outros", "Outro", pdf_sintetico(pasta))
+    for i, texto in enumerate(("casa nova", "casa", "casa")):
+        pagina = outro.pagina_para_editar(i)
+        pagina.boxes = [Box(gid_de(pagina.pid, n), b.entry)
+                        for n, b in enumerate(_pagina(texto).boxes)]
+        pagina.proximo_n, pagina.estado = len(pagina.boxes), "reconhecida"
+        outro.salvar_modelo(pagina)
+    ctl.ligar(outro, pg.FonteDePaginas(outro.fonte), LeitorDoLivro(outro.pasta_de_padroes))
+    try:
+        _aplicar(s, previas)
+        ctl.executar.tudo()
+        assert eventos["erros"][-1] == "A prévia é de outro projeto: refaça."
+        assert eventos["feitas"] == []
+        assert _textos(outro) == ["casa nova", "casa", "casa"]
+        assert _textos(projeto) == ["casa velha", "outra casa", "fim"]
+    finally:
+        outro.fechar()
+
+
 def test_o_padrao_lento_aborta_a_previa(sub, monkeypatch):
     projeto, ctl, s, escrever, eventos = sub
     escrever(2, "a" * 300 + "!")

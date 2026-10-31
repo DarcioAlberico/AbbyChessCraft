@@ -59,26 +59,49 @@ def _margem_da_pagina(boxes: Sequence[BoxEntry], altura: int) -> _Margem:
     linhas = _linhas(boxes, OrdemDeLeitura())
     if not linhas or not altura:
         return margem
-    poeira = [linha for linha in linhas if len(linha.texto.replace(" ", "")) <= 2 and (
-        linha.pe < FAIXA_DA_POEIRA * altura or linha.topo > (1 - FAIXA_DA_POEIRA) * altura)]
-    for linha in poeira:
-        margem.poeira.extend(linha.indices)
-    linhas = [linha for linha in linhas if linha not in poeira]
+    linhas = _sem_a_poeira(linhas, altura, margem)
     if len(linhas) < 3:
         return margem
-    passos = [b.topo - a.topo for a, b in zip(linhas, linhas[1:]) if b.topo > a.topo]
-    passo = statistics.median(passos) if passos else 0
+    passo = _passo_mediano(linhas)
     if not passo:
         return margem
+    margem.candidatos += _candidatos_da_margem(linhas, altura, passo)
+    return margem
+
+
+def _sem_a_poeira(linhas: List[_Linha], altura: int, margem: _Margem) -> List[_Linha]:
+    """As linhas sem a poeira da borda, que vai à `margem`."""
+    poeira = [linha for linha in linhas if _e_poeira(linha, altura)]
+    for linha in poeira:
+        margem.poeira.extend(linha.indices)
+    return [linha for linha in linhas if linha not in poeira]
+
+
+def _e_poeira(linha: _Linha, altura: int) -> bool:
+    """Um ou dois caracteres na borda extrema da página (`FAIXA_DA_POEIRA`)."""
+    return len(linha.texto.replace(" ", "")) <= 2 and (
+        linha.pe < FAIXA_DA_POEIRA * altura or linha.topo > (1 - FAIXA_DA_POEIRA) * altura)
+
+
+def _passo_mediano(linhas: List[_Linha]) -> float:
+    passos = [b.topo - a.topo for a, b in zip(linhas, linhas[1:]) if b.topo > a.topo]
+    return statistics.median(passos) if passos else 0
+
+
+def _candidatos_da_margem(linhas: List[_Linha], altura: int, passo: float
+                          ) -> List[Tuple[_Linha, str]]:
+    """A primeira linha na faixa de cima e a última na de baixo, curtas e separadas do texto
+    por um vão maior que o das linhas."""
+    candidatos = []
     primeira, segunda = linhas[0], linhas[1]
     if (primeira.pe < FAIXA_DA_MARGEM * altura and len(primeira.texto) <= TAMANHO_DA_MARGEM
             and segunda.topo - primeira.topo > VAO_DA_MARGEM * passo):
-        margem.candidatos.append((primeira, "cabecalho"))
+        candidatos.append((primeira, "cabecalho"))
     penultima, ultima = linhas[-2], linhas[-1]
     if (ultima.topo > (1 - FAIXA_DA_MARGEM) * altura and len(ultima.texto) <= TAMANHO_DA_MARGEM
             and ultima.topo - penultima.topo > VAO_DA_MARGEM * passo):
-        margem.candidatos.append((ultima, "rodape"))
-    return margem
+        candidatos.append((ultima, "rodape"))
+    return candidatos
 
 
 def margens_corridas(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]) -> Dict[int, set]:
@@ -111,16 +134,25 @@ def margens_da_pagina(boxes: Sequence[BoxEntry], altura: int) -> set:
     for k, b in enumerate(boxes):
         if b.char:
             continue
-        if b.y2 < FAIXA_DA_POEIRA * altura or b.y1 > (1 - FAIXA_DA_POEIRA) * altura:
+        if _na_poeira(b, altura) or _na_faixa_da_margem(b, boxes, de_margem):
             margem.add(k)
-            continue
-        x, y = (b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2
-        na_altura = [boxes[m] for m in de_margem if boxes[m].y1 <= y <= boxes[m].y2]
-        if na_altura:
-            folga = max(m.y2 - m.y1 for m in na_altura)
-            if min(m.x1 for m in na_altura) - folga <= x <= max(m.x2 for m in na_altura) + folga:
-                margem.add(k)
     return margem
+
+
+def _na_poeira(b: BoxEntry, altura: int) -> bool:
+    """O box todo dentro da faixa da poeira, em cima ou embaixo."""
+    return b.y2 < FAIXA_DA_POEIRA * altura or b.y1 > (1 - FAIXA_DA_POEIRA) * altura
+
+
+def _na_faixa_da_margem(b: BoxEntry, boxes: Sequence[BoxEntry], de_margem: List[int]) -> bool:
+    """O centro do box na altura de um glifo de margem e na faixa dos glifos de margem dessa
+    altura, com a folga de uma altura de cada lado."""
+    x, y = (b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2
+    na_altura = [boxes[m] for m in de_margem if boxes[m].y1 <= y <= boxes[m].y2]
+    if not na_altura:
+        return False
+    folga = max(m.y2 - m.y1 for m in na_altura)
+    return min(m.x1 for m in na_altura) - folga <= x <= max(m.x2 for m in na_altura) + folga
 
 
 def funcoes_das_margens(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]) -> Dict[int, dict]:
@@ -137,27 +169,39 @@ def _funcoes_das_margens(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]
                           ) -> Tuple[Dict[int, dict], Dict[int, _Margem]]:
     margens = {i: _margem_da_pagina(boxes, altura) for i, (boxes, altura) in paginas.items()}
     saida = {i: {} for i in paginas}
-    from core import lado_a_jogar
-
     for i, margem in margens.items():
         for linha, lugar in margem.candidatos:
-            # "13.♕b3 0–0–0" no pé da coluna tem o "13" de um número de página,
-            # e saía do livro como rodapé.
-            if lado_a_jogar.tem_lance(linha.texto):
-                continue
-            letras = _so_letras(linha.texto)
-            numero = bool(_NUMERO_DE_PAGINA.search(linha.texto))
-            repete = any(
-                lugar == outro_lugar and difflib.SequenceMatcher(
-                    None, letras, _so_letras(outra.texto)).ratio() >= SEMELHANCA_DA_MARGEM
-                for j, outra_margem in margens.items() if j != i
-                for outra, outro_lugar in outra_margem.candidatos)
-            if numero or (repete and letras):
-                texto = linha.texto.strip()
-                funcao = ("numero_de_pagina" if re.fullmatch(r"\D*\d{1,4}\D*", texto)
-                          and not letras else lugar)
+            funcao = _funcao_da_margem(i, linha, lugar, margens)
+            if funcao:
                 saida[i].update({indice: funcao for indice in linha.indices})
     return saida, margens
+
+
+def _funcao_da_margem(i: int, linha: _Linha, lugar: str, margens: Dict[int, _Margem]) -> str:
+    """A função da linha candidata da página `i`: o número de página, o cabeçalho ou o rodapé
+    (o `lugar`), se ela tem o número da página ou se repete noutra; vazia se fica no texto."""
+    from core import lado_a_jogar
+
+    # "13.♕b3 0–0–0" no pé da coluna tem o "13" de um número de página,
+    # e saía do livro como rodapé.
+    if lado_a_jogar.tem_lance(linha.texto):
+        return ""
+    letras = _so_letras(linha.texto)
+    numero = bool(_NUMERO_DE_PAGINA.search(linha.texto))
+    repete = _repete(i, letras, lugar, margens)
+    if not (numero or (repete and letras)):
+        return ""
+    texto = linha.texto.strip()
+    return "numero_de_pagina" if re.fullmatch(r"\D*\d{1,4}\D*", texto) and not letras else lugar
+
+
+def _repete(i: int, letras: str, lugar: str, margens: Dict[int, _Margem]) -> bool:
+    """As letras se parecem com as de uma candidata do mesmo lugar noutra página."""
+    return any(
+        lugar == outro_lugar and difflib.SequenceMatcher(
+            None, letras, _so_letras(outra.texto)).ratio() >= SEMELHANCA_DA_MARGEM
+        for j, outra_margem in margens.items() if j != i
+        for outra, outro_lugar in outra_margem.candidatos)
 
 
 #: Quantas páginas precisam concordar no deslocamento para o número impresso valer.
@@ -178,22 +222,41 @@ def numeros_impressos(paginas: Dict[int, Tuple[Sequence[BoxEntry], "Estrutura"]]
     trecho, e cada página das pedidas (`todas`, ou as de `paginas`) recebe o do último
     trecho que começa nela ou antes (o encarte de fotos que o livro não numera muda o
     deslocamento dali em diante). Número ≤ 0 não sai. Sem trecho, `{}`."""
-    from collections import Counter
-
     por_pagina: Dict[int, set] = {}
     for indice, (boxes, estrutura) in paginas.items():
-        das_margens = funcoes.get(indice, {})
-        margem = [b for k, b in enumerate(boxes) if k in das_margens
-                  or estrutura.funcao(b) in FUNCOES_DE_MARGEM]
-        vistos = set()
-        for linha in _linhas(margem, OrdemDeLeitura()) if margem else []:
-            for numero in _NUMERO_DE_PAGINA.findall(linha.texto):
-                vistos.add(int(numero) - indice)
+        vistos = _deslocamentos(indice, boxes, estrutura, funcoes.get(indice, {}))
         if vistos:
             por_pagina[indice] = vistos
+    trechos = _trechos(_mais_votados(por_pagina))
+    if not trechos:
+        return {}
+    return _numeros_pelos_trechos(trechos, sorted(todas if todas is not None else paginas))
+
+
+def _deslocamentos(indice: int, boxes: Sequence[BoxEntry], estrutura: "Estrutura",
+                   das_margens: dict) -> set:
+    """Os deslocamentos (número − índice) dos números nas linhas de margem da página."""
+    margem = [b for k, b in enumerate(boxes) if k in das_margens
+              or estrutura.funcao(b) in FUNCOES_DE_MARGEM]
+    vistos = set()
+    for linha in _linhas(margem, OrdemDeLeitura()) if margem else []:
+        for numero in _NUMERO_DE_PAGINA.findall(linha.texto):
+            vistos.add(int(numero) - indice)
+    return vistos
+
+
+def _mais_votados(por_pagina: Dict[int, set]) -> Dict[int, int]:
+    """O deslocamento de cada página: o dela mais votado no livro (no empate, o menor)."""
+    from collections import Counter
+
     votos: Counter = Counter(d for vistos in por_pagina.values() for d in vistos)
-    escolhido = {i: max(sorted(v), key=lambda d: votos[d]) for i, v in por_pagina.items()}
-    trechos: List[Tuple[int, int]] = []           # (primeira página, deslocamento)
+    return {i: max(sorted(v), key=lambda d: votos[d]) for i, v in por_pagina.items()}
+
+
+def _trechos(escolhido: Dict[int, int]) -> List[Tuple[int, int]]:
+    """(primeira página, deslocamento) de cada corrida de páginas seguidas com o mesmo
+    deslocamento, de ao menos `CONCORDANCIA_DOS_NUMEROS` páginas."""
+    trechos: List[Tuple[int, int]] = []
     corrida: List[int] = []
 
     def fechar() -> None:
@@ -206,10 +269,14 @@ def numeros_impressos(paginas: Dict[int, Tuple[Sequence[BoxEntry], "Estrutura"]]
             corrida = []
         corrida.append(i)
     fechar()
-    if not trechos:
-        return {}
+    return trechos
+
+
+def _numeros_pelos_trechos(trechos: List[Tuple[int, int]], indices: Iterable[int]
+                           ) -> Dict[int, int]:
+    """O número de cada página pelo último trecho que começa nela ou antes; ≤ 0 não sai."""
     saida = {}
-    for i in sorted(todas if todas is not None else paginas):
+    for i in indices:
         deslocamento = trechos[0][1]
         for comeco, d in trechos:
             if comeco <= i:

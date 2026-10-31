@@ -470,59 +470,101 @@ def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
     foto da última gravação, `foto(entry)` de cada gid: a janela muda o `BoxEntry` no
     lugar, e só a foto de antes diz se ele mudou (sem ela, vale o estado atual de `antes`).
     """
-    por_objeto = {id(b.entry): b for b in antes}
-    usados: Set[int] = set()
-    saida: List[Optional[Box]] = [None] * len(depois)
-    dif = Diferenca()
-    estados = estados or {}
-    agora = [foto(e) for e in depois]                       # uma vez por glifo
+    r = _Reconciliacao(antes, depois, amostra_de, estados or {}, estilo_de)
+    r.pelo_objeto()                                          # 1. o mesmo objeto
+    if r.faltam():                                           # 2. a mesma caixa
+        r.pela_caixa()
+    if iou_minimo is not None and r.faltam():                # 2½. pela sobreposição
+        r.pela_sobreposicao(iou_minimo)
+    saidos = [b for b in antes if b.gid not in r.usados]
+    r.nascidos(alocar)                                       # 3. nascidos
+    r.sucessores(saidos)
+    return list(r.saida), r.dif
 
-    def manter(i: int, velho: Box, entry: BoxEntry, estado_antes) -> None:
-        usados.add(velho.gid)
-        mudou = agora[i] != estado_antes
-        registrada = amostra_de(entry)
-        if registrada is None:              # ninguém leu este objeto desde a gravação
-            amostra = None if mudou else velho.amostra
-        else:
-            amostra = registrada or None    # "" = lido, mas não por um padrão do livro
-        estilo = estilo_de(entry)
-        if estilo is None:
-            estilo = velho.estilo
-        elif velho.estilo.sublinhado != estilo.sublinhado:
-            # A medida diz o negrito e o itálico; o sublinhado é do usuário (Ctrl+U) e fica.
-            estilo = replace(estilo, sublinhado=velho.estilo.sublinhado)
+
+class _Reconciliacao:
+    """O que `reconciliar` vai decidindo: os gids de `antes` já usados, o `Box` de cada
+    `BoxEntry` de `depois` (None: ainda nenhum) e a `Diferenca`."""
+
+    def __init__(self, antes: Sequence[Box], depois: Sequence[BoxEntry], amostra_de,
+                 estados: Dict[int, int], estilo_de):
+        self.antes, self.depois = antes, depois
+        self.amostra_de, self.estilo_de = amostra_de, estilo_de
+        self.estados = estados
+        self.usados: Set[int] = set()
+        self.saida: List[Optional[Box]] = [None] * len(depois)
+        self.dif = Diferenca()
+        self.agora = [foto(e) for e in depois]              # uma vez por glifo
+
+    def faltam(self) -> bool:
+        return any(s is None for s in self.saida)
+
+    def manter(self, i: int, velho: Box, entry: BoxEntry, estado_antes) -> None:
+        """O glifo `velho` continua, com o `BoxEntry` de agora no índice `i`."""
+        self.usados.add(velho.gid)
+        mudou = self.agora[i] != estado_antes
+        amostra = self._amostra(velho, entry, mudou)
+        estilo = self._estilo(velho, entry)
         if entry is velho.entry and amostra == velho.amostra and estilo == velho.estilo:
-            saida[i] = velho                # o caso comum: nada a copiar
+            self.saida[i] = velho                # o caso comum: nada a copiar
         else:
-            saida[i] = replace(velho, entry=entry, amostra=amostra, estilo=estilo)
+            self.saida[i] = replace(velho, entry=entry, amostra=amostra, estilo=estilo)
         if mudou or estilo != velho.estilo:
-            dif.mudados.add(velho.gid)
+            self.dif.mudados.add(velho.gid)
 
-    for i, entry in enumerate(depois):                       # 1. o mesmo objeto
-        velho = por_objeto.get(id(entry))
-        if velho is not None and velho.entry is entry and velho.gid not in usados:
-            manter(i, velho, entry, estados.get(velho.gid, agora[i]))
-    if any(s is None for s in saida):                        # 2. a mesma caixa
-        por_caixa: Dict[tuple, List[Box]] = {}
-        for b in antes:
-            if b.gid not in usados:
-                por_caixa.setdefault(_caixa(b.entry), []).append(b)
-        for i, entry in enumerate(depois):
-            if saida[i] is not None:
+    def _amostra(self, velho: Box, entry: BoxEntry, mudou: bool) -> Optional[str]:
+        registrada = self.amostra_de(entry)
+        if registrada is None:              # ninguém leu este objeto desde a gravação
+            return None if mudou else velho.amostra
+        return registrada or None           # "" = lido, mas não por um padrão do livro
+
+    def _estilo(self, velho: Box, entry: BoxEntry) -> Estilo:
+        estilo = self.estilo_de(entry)
+        if estilo is None:
+            return velho.estilo
+        if velho.estilo.sublinhado != estilo.sublinhado:
+            # A medida diz o negrito e o itálico; o sublinhado é do usuário (Ctrl+U) e fica.
+            return replace(estilo, sublinhado=velho.estilo.sublinhado)
+        return estilo
+
+    def pelo_objeto(self) -> None:
+        por_objeto = {id(b.entry): b for b in self.antes}
+        for i, entry in enumerate(self.depois):
+            velho = por_objeto.get(id(entry))
+            if velho is not None and velho.entry is entry and velho.gid not in self.usados:
+                self.manter(i, velho, entry, self.estados.get(velho.gid, self.agora[i]))
+
+    def pela_caixa(self) -> None:
+        por_caixa = self._por_caixa()
+        for i, entry in enumerate(self.depois):
+            if self.saida[i] is not None:
                 continue
-            velho = next((b for b in por_caixa.get(_caixa(entry), []) if b.gid not in usados),
-                         None)
+            velho = next((b for b in por_caixa.get(_caixa(entry), [])
+                          if b.gid not in self.usados), None)
             if velho is not None:
-                manter(i, velho, entry, estados.get(velho.gid, foto(velho.entry)))
-    if iou_minimo is not None and any(s is None for s in saida):   # 2½. pela sobreposição
-        celulas: Dict[tuple, List[Box]] = {}       # só os vizinhos, não a página inteira
-        for b in antes:
-            if b.gid not in usados:
-                for celula in _celulas(b.entry):
-                    celulas.setdefault(celula, []).append(b)
+                self.manter(i, velho, entry, self.estados.get(velho.gid, foto(velho.entry)))
+
+    def _por_caixa(self) -> Dict[tuple, List[Box]]:
+        por_caixa: Dict[tuple, List[Box]] = {}
+        for b in self.antes:
+            if b.gid not in self.usados:
+                por_caixa.setdefault(_caixa(b.entry), []).append(b)
+        return por_caixa
+
+    def pela_sobreposicao(self, iou_minimo: float) -> None:
+        """Os que sobram casam um a um, da maior IoU para a menor."""
+        for _iou_do_par, i, velho in self._pares(iou_minimo):
+            if self.saida[i] is None and velho.gid not in self.usados:
+                self.manter(i, velho, self.depois[i],
+                            self.estados.get(velho.gid, foto(velho.entry)))
+
+    def _pares(self, iou_minimo: float) -> list:
+        """(IoU, índice em `depois`, glifo de `antes`) dos que sobram dos dois lados e se
+        sobrepõem ao menos `iou_minimo`, da maior IoU para a menor."""
+        celulas = self._celulas_dos_que_sobram()
         pares = []
-        for i, entry in enumerate(depois):
-            if saida[i] is None:
+        for i, entry in enumerate(self.depois):
+            if self.saida[i] is None:
                 vistos = {}
                 for celula in _celulas(entry):
                     for velho in celulas.get(celula, ()):
@@ -530,21 +572,32 @@ def reconciliar(antes: Sequence[Box], depois: Sequence[BoxEntry], alocar,
                 pares.extend((iou, i, velho) for velho in vistos.values()
                              if (iou := _iou(velho.entry, entry)) >= iou_minimo)
         pares.sort(key=lambda par: -par[0])
-        for _iou_do_par, i, velho in pares:
-            if saida[i] is None and velho.gid not in usados:
-                manter(i, velho, depois[i], estados.get(velho.gid, foto(velho.entry)))
-    saidos = [b for b in antes if b.gid not in usados]
-    for i, entry in enumerate(depois):                       # 3. nascidos
-        if saida[i] is not None:
-            continue
-        novo = Box(alocar(), entry, amostra_de(entry) or None,
-                   estilo_de(entry) or SEM_ESTILO)
-        saida[i] = novo
-        dif.novos.append(novo)
-    for velho in saidos:
-        dif.removidos.add(velho.gid)
-        dif.sucessores[velho.gid] = [n.gid for n in dif.novos if _sobrepoe(velho.entry, n.entry)]
-    return list(saida), dif
+        return pares
+
+    def _celulas_dos_que_sobram(self) -> Dict[tuple, List[Box]]:
+        celulas: Dict[tuple, List[Box]] = {}       # só os vizinhos, não a página inteira
+        for b in self.antes:
+            if b.gid not in self.usados:
+                for celula in _celulas(b.entry):
+                    celulas.setdefault(celula, []).append(b)
+        return celulas
+
+    def nascidos(self, alocar) -> None:
+        """O que sobra de `depois` nasce com gid novo."""
+        for i, entry in enumerate(self.depois):
+            if self.saida[i] is not None:
+                continue
+            novo = Box(alocar(), entry, self.amostra_de(entry) or None,
+                       self.estilo_de(entry) or SEM_ESTILO)
+            self.saida[i] = novo
+            self.dif.novos.append(novo)
+
+    def sucessores(self, saidos: Sequence[Box]) -> None:
+        """Cada glifo que saiu tem por sucessores os nascidos que se sobrepõem a ele."""
+        for velho in saidos:
+            self.dif.removidos.add(velho.gid)
+            self.dif.sucessores[velho.gid] = [n.gid for n in self.dif.novos
+                                              if _sobrepoe(velho.entry, n.entry)]
 
 
 def foto(entry: BoxEntry) -> int:

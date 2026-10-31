@@ -899,10 +899,10 @@ class ProjetoDeLivro:
         diz que a gravação é a de um reconhecimento (F5 ou lote), e não de uma edição:
         o estado vai por `proximo_estado` (§4.4).
 
-        A mudança feita **no lugar** num `BoxEntry` (a ferramenta que muda o que
-        `carregar_pagina` devolveu) só é vista se a página tem foto (veio do disco ou de outra
-        gravação por aqui); a página que a janela entregou ao gravador não tem, e a mudança
-        no lugar não entra em `mudados`. Quem trabalha por listas, passe objetos novos.
+        `carregar_pagina` dá cópias, que acham o glifo pela caixa (a que mudou de caixa nasce
+        com gid novo). A mudança **no lugar** num `BoxEntry` que já é da página (de uma lista
+        gravada antes) só é vista se a página tem foto, e a que a janela entregou ao gravador
+        não tem. Quem trabalha por listas, passe objetos novos.
 
         `diagramas` é a leitura de cada tabuleiro (`abbychess.diagramas`). Sem
         `diagramas` (`None`), ficam os já gravados cujo tabuleiro continua na página:
@@ -938,12 +938,12 @@ class ProjetoDeLivro:
         return self._pid_em(indice)
 
     def carregar_pagina(self, indice: int) -> Optional[List[BoxEntry]]:
-        """Os boxes gravados da página, ou `None` se ela ainda não foi lida nem marcada.
-        Os objetos são os do modelo: a janela os edita, e a gravação os reconcilia."""
+        """Os boxes gravados da página (None se ela não foi lida nem marcada), em cópias
+        (Q-P9): mudá-los não muda o projeto; a janela edita o modelo (`pagina_para_editar`)."""
         pagina = self.carregar_modelo(indice)
         if pagina is None or (not pagina.boxes and pagina.estado == NAO_RECONHECIDA):
             return None
-        return pagina.entries()
+        return [BoxEntry.from_state(b.entry.as_state()) for b in pagina.boxes]
 
     def carregar_tabuleiros(self, indice: int) -> List[Tuple[int, int, int, int]]:
         """As caixas dos tabuleiros achados na página, ou lista vazia."""

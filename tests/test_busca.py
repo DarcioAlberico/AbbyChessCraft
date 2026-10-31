@@ -233,6 +233,15 @@ def test_figurina_igual_a_letra_so_na_peca_de_um_lance():
     assert _achados(indexada, "Td1", figurina_letra=True) == ["Td1"]   # o R do pt é o rei
 
 
+def test_figurina_igual_a_letra_pela_figurina_e_pela_letra_do_ingles():
+    """A figurina digitada, branca ou preta, e a letra do inglês num livro em português
+    acham as quatro formas da peça, e só dela (o B é o bispo)."""
+    indexada = _indice("Cf3 ♘f3 Nf3 ♞f3 Bf3")
+    for texto in ("♘f3", "♞f3", "Nf3"):
+        assert _achados(indexada, texto, maiusculas=True, figurina_letra=True) == [
+            "Cf3", "♘f3", "Nf3", "♞f3"], texto
+
+
 def test_o_tempo_limite_conta_cada_casamento(monkeypatch):
     """Muitos casamentos rápidos numa página não estouram o tempo-limite (só o casamento
     lento conta), nem com outra thread disputando o GIL (o laço em Python entre os

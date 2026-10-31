@@ -1797,7 +1797,7 @@ class ProjetoDeLivro:
                     if a.stem[1:].isdigit()]
         piso = max([self.dados.proximo_pid, *(p + 1 for p in em_disco)])
         total = max([self.total_de_paginas(), *(i + 1 for i in gravados)], default=0)
-        sequencia, proximo = sq.da_v2(total, gravados, (), piso)
+        sequencia, proximo = sq.da_v2(total, gravados, piso)
         for indice, (pid, pagina) in orfaos.items():
             resumo = self._resumo_do_modelo(pagina)
             if self.somente_leitura:            # só na memória; troca, não muda no lugar

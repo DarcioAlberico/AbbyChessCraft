@@ -71,26 +71,20 @@ def test_com_entrada_troca_so_a_do_pid():
 # ----------------------------------------------------------------------
 
 def test_da_v2_mantem_os_pids_gravados_e_da_novos_acima_de_todos():
-    s, proximo = sq.da_v2(6, {0: 0, 2: 5, 4: 1}, indices_v1=(), proximo_pid=6)
+    s, proximo = sq.da_v2(6, {0: 0, 2: 5, 4: 1}, proximo_pid=6)
     assert s.pids == [0, 6, 5, 7, 1, 8] and proximo == 9
     assert [e.pagina for e in s.entradas] == list(range(6))
     assert all(e.fonte == "livro" for e in s.entradas)
 
 
-def test_da_v2_a_pagina_v1_nao_migrada_fica_com_pid_igual_ao_indice():
-    s, proximo = sq.da_v2(5, {1: 7}, indices_v1=(3,), proximo_pid=2)
-    assert s.pids == [8, 7, 9, 3, 10]                      # os novos, acima do 7 gravado
-    assert proximo == 11
-
-
 def test_da_v2_o_contador_alto_vale():
-    s, proximo = sq.da_v2(2, {}, indices_v1=(), proximo_pid=40)
+    s, proximo = sq.da_v2(2, {}, proximo_pid=40)
     assert s.pids == [40, 41] and proximo == 42
 
 
 def test_da_v2_recusa_pid_gravado_repetido():
     with pytest.raises(ValueError):
-        sq.da_v2(3, {0: 4, 1: 4}, indices_v1=(), proximo_pid=0)
+        sq.da_v2(3, {0: 4, 1: 4}, proximo_pid=0)
 
 
 # ----------------------------------------------------------------------

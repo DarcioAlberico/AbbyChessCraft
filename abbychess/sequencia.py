@@ -334,31 +334,25 @@ def _ancora(apagada: Apagada, por_pid: Mapping[int, Apagada], no_livro: set, vol
         atual = por_pid[alvo]                   # apagada antes e que fica: a âncora dela
 
 
-def da_v2(total: int, pids_gravados: Mapping[int, int], indices_v1: Iterable[int],
+def da_v2(total: int, pids_gravados: Mapping[int, int],
           proximo_pid: int) -> Tuple[Sequencia, int]:
     """A sequência de um projeto da v2, de `total` páginas na ordem do PDF, e o próximo
     `pid` depois dela (§12.4, CA-12.7).
 
-    - a página já gravada (`pids_gravados`: índice -> pid) mantém o `pid`;
-    - a v1 ainda não migrada (`indices_v1`) fica com `pid` = índice, o que a migração da v1
-      dá a ela (os `gid` e as amostras dela já usam esse número);
+    - a página já gravada (`pids_gravados`: índice -> pid) mantém o `pid` (a v1, que migra
+      antes, com `pid` = índice, também: SPEC-qualidade Q-P1);
     - as outras ganham `pid` novos, acima do contador e de todo `pid` já usado.
 
     Um `pid` gravado que repete outro (dois arquivos do mesmo índice já foram resolvidos pelo
     `livro.json`; aqui seria um erro) levanta `ValueError`."""
-    v1 = set(indices_v1)
-    usados = set(pids_gravados.values()) | {i for i in v1 if i not in pids_gravados}
-    if len(set(pids_gravados.values())) != len(pids_gravados):
+    usados = set(pids_gravados.values())
+    if len(usados) != len(pids_gravados):
         raise ValueError("dois índices com o mesmo pid gravado")
     proximo = max([proximo_pid, *(p + 1 for p in usados)], default=proximo_pid)
     pids: List[int] = []
     for indice in range(total):
         if indice in pids_gravados:
             pids.append(pids_gravados[indice])
-        elif indice in v1:
-            if indice in pids:
-                raise ValueError(f"o pid {indice} da página v1 já foi dado a outra página")
-            pids.append(indice)
         else:
             pids.append(proximo)
             proximo += 1

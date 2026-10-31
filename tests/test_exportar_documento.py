@@ -169,6 +169,24 @@ def test_so_verificadas_leva_so_a_verificada(projeto, fonte, leitor, tmp_path): 
     assert "Páginas não verificadas" not in so.texto()
 
 
+def test_ca_q_e2_o_pdf_pesquisavel_tambem_leva_so_as_verificadas(projeto, fonte, leitor,  # noqa: F811
+                                                                 tmp_path):
+    """SPEC-qualidade CA-Q-E2: "só as páginas verificadas" vale no PDF pesquisável como nos
+    outros formatos; sem nenhuma verificada, ele também não exporta."""
+    import fitz
+
+    _ensinar_e_ler(projeto, fonte, leitor)
+    so = ex.Opcoes(so_verificadas=True)
+    with pytest.raises(ex.NadaParaExportar, match="verificada"):
+        ex.exportar_com_relatorio(projeto, tmp_path / "nenhuma.pdf", opcoes=so)
+    pagina = projeto.carregar_modelo(1)
+    pagina.estado = VERIFICADA
+    projeto.salvar_modelo(pagina)
+    ex.exportar_com_relatorio(projeto, tmp_path / "so.pdf", opcoes=so)
+    with fitz.open(tmp_path / "so.pdf") as doc:
+        assert len(doc) == 1
+
+
 def test_o_pgn_sem_diagrama_nao_troca_o_anterior(projeto, fonte, leitor, tmp_path):  # noqa: F811
     _ensinar_e_ler(projeto, fonte, leitor)
     destino = tmp_path / "livro.pgn"

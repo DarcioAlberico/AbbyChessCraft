@@ -273,6 +273,12 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
 - **CA-Q-E1:** numa página com uma letra virtual, uma quebra decidida e dois lances colados, o
   texto de cada formato é igual ao `texto.montar` da página (golden normalizado).
 - **Correção mínima:** aplicar as decisões nas palavras da exportação; o fim é Q-E6.
+- **Feito** no Q3 (`ba96dbb`, `ba28f64`, `1399a8c`, `6a9d483`), confirmado: a linha de
+  teste saía "o cavlo … maisum ♘f62.c4", e o Documento "o cavalo … mais um ♘f6 2.c4". A
+  `Estrutura` leva as palavras do texto do Documento (sem os não lidos, como `montar`), e
+  cada linha exportada sai com elas. A medida da exportação achou uma regressão do primeiro
+  passo (o glifo não lido juntava a palavra: "ca o" virava "cao"), que ganhou teste; depois
+  da correção, o TXT da fatia do xv sai igual ao da base, byte a byte.
 
 ### Q-E2 (Alta, confirmado) — o PDF pesquisável ignora "só páginas verificadas"
 
@@ -282,12 +288,15 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
 - **CA-Q-E2:** com `so_verificadas` e uma página não verificada, o PDF não tem camada de texto
   nela e o relatório a cita, como nos outros formatos.
 - **Correção mínima:** uma função `_alvo(projeto, indices, opcoes)` usada pelos três caminhos.
+- **Feito** no Q3 (`7408d5b`, `03b6f03`), como a correção mínima.
 
 ### Q-E3 (Média, confirmado) — o EPUB troca o anterior antes de conferir
 
 - **Evidência:** `_gravar_zip` faz `os.replace` (`epub.py:800`) e o `conferir` vem depois
   (`exportar.py:1329`); o DOCX confere o temporário antes (`escritor_docx.py:449-451`).
 - **CA-Q-E3:** um EPUB que reprova no `conferir` não substitui o arquivo que já existia.
+- **Feito** no Q3 (`b93bb89`, `586d81f`): o EPUB que não passa é recusado, como o DOCX, e o
+  `problemas_do_arquivo` do relatório (sempre vazio agora) saiu.
 
 ### Q-E4 (Média, confirmado) — quatro gravações atômicas fora de `gravacao`
 
@@ -296,6 +305,7 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
 - **CA-Q-E4:** com `PermissionError` na primeira troca (o Word com o DOCX aberto), cada
   formato tenta de novo como `gravacao.gravar_bytes`; uma falha não deixa `.tmp` para trás.
 - **Correção mínima:** `gravacao.gravar_por(caminho, escrever_no_tmp, conferir=None)`.
+- **Feito** no Q3 (`b93bb89`, `586d81f`), como a correção mínima, nos quatro escritores.
 
 ### Q-E5 (Média) — uma decisão em vários lugares na exportação
 
@@ -506,8 +516,8 @@ teste usa como o usuário; senão saem. Os 3 F401 de `camada.py` saem já (o por
 2. **Faixas de páginas:** o "–" do lote e o "-" do diálogo são de propósito (mostrar contra
    digitar)?
 3. **Q-P5:** o segundo processo abre só para leitura ou recusa?
-4. **Q-E1:** a exportação passa a usar `texto.montar` inteira (Q-E6) já no primeiro passo, ou
-   primeiro só as decisões?
+4. ~~**Q-E1:** a exportação passa a usar `texto.montar` inteira (Q-E6) já no primeiro passo, ou
+   primeiro só as decisões?~~ **Decidido** (2026-10-30): só as decisões no Q3; o Q-E6 no Q7.
 5. **Teto da suíte rápida:** 60 s sem cobertura (como hoje na §15.1) e a medida com cobertura
    à parte?
 

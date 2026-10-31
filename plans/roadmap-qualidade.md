@@ -138,6 +138,11 @@ antes de conferir (Q-E3); quatro gravações atômicas próprias fora de `gravac
 **Pronto quando:** os CA passam; `ferramentas/medir_exportacao.py` não piora; o EPUBCheck e o
 Ace passam no livro de referência (ABBY_EPUBCHECK, ABBY_ACE).
 
+**Feito** em 2026-10-30, ramo `qualidade-q3` (`docs/revisoes/qualidade-Q3.md`): os quatro CA;
+a medida da exportação dá os mesmos bytes que a base nos cinco formatos, o EPUB aprovado no
+EPUBCheck, no Ace e no Calibre, e o tempo 2–4 % acima da base medida em seguida (também nos
+formatos que o passo não tocou: ruído, sem prova de regressão).
+
 ## Passo Q4 — Suíte confiável
 
 **Contexto.** Um teste da janela estoura com `-n 4` porque carrega os modelos globais

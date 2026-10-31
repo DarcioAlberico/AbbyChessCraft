@@ -33,7 +33,7 @@ def lido(tmp_path):
 def test_pagina_nova_ganha_pid_estavel_e_gids_dela(lido):
     projeto, _, _ = lido
     modelo = projeto.carregar_modelo(0)
-    assert modelo.pid == 0 and projeto.dados.proximo_pid == 1
+    assert modelo.pid == 0 and projeto.ordem.proximo_pid == 1
     assert {pid_de(b.gid) for b in modelo.boxes} == {0}
     assert projeto.arquivo_da_pagina(0).name == "p0.json"
     assert projeto.resumo.do_livro()[0]["pid"] == 0

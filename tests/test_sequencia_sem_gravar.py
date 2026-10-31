@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
-
 from abbychess.projeto import ARQUIVO_DO_LIVRO, ProjetoDeLivro
 
 
@@ -24,7 +22,7 @@ def test_ler_a_sequencia_nao_muda_nenhum_arquivo(projeto):
     projeto.salvar_pagina(1, [])
     _sem_a_sequencia_gravada(projeto)
     (projeto.pasta / ARQUIVO_DO_LIVRO).unlink()          # a página 2 some do livro.json
-    novo = ProjetoDeLivro(projeto.pasta, replace(projeto.dados, sequencia=None))
+    novo = ProjetoDeLivro(projeto.pasta, projeto.dados)   # sem a sequência gravada
     antes = _fotografia(projeto.pasta)
 
     assert len(novo.sequencia) == len(projeto.sequencia)

@@ -158,6 +158,10 @@ class Limiares:
 
 @dataclass
 class Projeto:
+    """O `projeto.json` sem a sequência do livro e o próximo `pid`, que são da
+    `SequenciaDoLivro` (`ProjetoDeLivro.ordem`, SPEC-qualidade Q-P9): a abertura os
+    entrega a ela, e `salvar` os grava montados dela."""
+
     nome: str
     fonte: str
     criado: str
@@ -174,8 +178,6 @@ class Projeto:
     #: movida (o tamanho separa dois arquivos de começo igual e evita ler os outros).
     fonte_sha256: str = ""
     fonte_tamanho: int = 0
-    #: O próximo `pid` de página (§4.1): estável, nunca reaproveitado.
-    proximo_pid: int = 0
     #: Os campos de `projeto.json` que esta versão não conhece. Não se perdem: ficam aqui
     #: e são regravados em `extras` (os de `limiares` em `extras["limiares"]`), onde uma
     #: versão futura que os entenda vai buscá-los.
@@ -184,9 +186,6 @@ class Projeto:
     #: novo nasce com isto; o que foi criado antes fica sem, porque os boxes
     #: gravados dele estão nas coordenadas da página torta.
     endireitar: bool = False
-    #: A sequência do livro (`sequencia.Sequencia.para_json`, §12.4), desde a v3. Nula num
-    #: projeto da v2 aberto só para leitura (ela é montada na memória).
-    sequencia: Optional[dict] = None
     #: Os glifos que mudaram de página ao dividi-la (§12.4): gid velho -> gid novo (as chaves
     #: em texto, como no JSON). A amostra ensinada antes acha o glifo de origem por aqui.
     gids_movidos: Dict[str, int] = field(default_factory=dict)
@@ -246,7 +245,8 @@ def nome_de_pasta(nome: str) -> str:
 class ProjetoDeLivro:
     """Acesso a um projeto aberto: metadados, padrões e páginas."""
 
-    def __init__(self, pasta: Path, dados: Projeto, *, somente_leitura: bool = False):
+    def __init__(self, pasta: Path, dados: Projeto, gravada: tuple = (None, 0), *,
+                 somente_leitura: bool = False):
         self.pasta = Path(pasta)
         self.dados = dados
         #: Versão mais nova que a do programa: nada é gravado (`gravacao.SomenteLeitura`).
@@ -293,8 +293,9 @@ class ProjetoDeLivro:
         self.nao_gravadas: List[int] = []
         #: As páginas na memória (§4.3): as lidas, a aberta e as entregues ao gravador.
         self.paginas_em_memoria = CacheDoProjeto(self)
-        #: A sequência do livro (§12.4): a posição e o `pid` de cada página.
-        self.ordem = SequenciaDoLivro(self)
+        #: A sequência do livro (§12.4): a posição e o `pid` de cada página, e o próximo
+        #: `pid`; `gravada` é (a sequência, o contador) como o `projeto.json` os tem.
+        self.ordem = SequenciaDoLivro(self, *gravada)
         #: A migração dos formatos antigos, que a abertura chama (`abrir`).
         self.migracoes = Migracoes(self)
         #: A cópia de cada página de antes de o lote a reler (§4.6).
@@ -350,6 +351,8 @@ class ProjetoDeLivro:
             _conferir_tipos(bruto, TIPOS_DO_PROJETO)
             _conferir_tipos(bruto.get("limiares") or {}, TIPOS_DOS_LIMIARES, "limiares.")
             _conferir_valores(bruto)
+            # A sequência e o contador de `pid` vão à SequenciaDoLivro (Q-P9).
+            gravada = (bruto.pop("sequencia", None), bruto.pop("proximo_pid", 0))
             conhecidos, desconhecidos = _separar(bruto, Projeto)
             extras = dict(conhecidos.pop("extras", None) or {})
             dos_limiares, outros_limiares = _separar(conhecidos.pop("limiares", None) or {},
@@ -361,16 +364,16 @@ class ProjetoDeLivro:
         except (ValueError, TypeError) as erro:
             raise ProjetoInvalido(f"{arquivo} está ilegível: {erro}") from erro
         if dados.versao > VERSAO:
-            return cls._abrir_so_para_leitura(pasta, dados, v1_vence=False)
+            return cls._abrir_so_para_leitura(pasta, dados, gravada, v1_vence=False)
         if not gv.tomar_a_pasta(pasta):
             # Outro processo o tem aberto (Q-P5, decisão §13.3): nada aqui grava, nem limpa
             # os temporários das gravações dele.
             return cls._abrir_so_para_leitura(
-                pasta, dados, v1_vence=dados.versao < 2,
+                pasta, dados, gravada, v1_vence=dados.versao < 2,
                 motivo="O projeto já está aberto em outra janela do AbbyChessCraft: este abre "
                        "só para leitura, e o que você mudar aqui não é gravado.")
         try:
-            projeto = cls._abrir_para_gravar(pasta, dados, bytes_do_projeto,
+            projeto = cls._abrir_para_gravar(pasta, dados, gravada, bytes_do_projeto,
                                              bool(desconhecidos or outros_limiares))
         except BaseException:
             gv.soltar_a_pasta(pasta)
@@ -379,11 +382,12 @@ class ProjetoDeLivro:
         return projeto
 
     @classmethod
-    def _abrir_so_para_leitura(cls, pasta: Path, dados: Projeto, *, v1_vence: bool,
-                               motivo: str = "") -> "ProjetoDeLivro":
+    def _abrir_so_para_leitura(cls, pasta: Path, dados: Projeto, gravada: tuple, *,
+                               v1_vence: bool, motivo: str = "") -> "ProjetoDeLivro":
         """O projeto que esta abertura não grava (o de versão mais nova, o que outro processo
-        tem aberto): a fonte achada pelo SHA-256, a v1 e a sequência só na memória."""
-        projeto = cls(pasta, dados, somente_leitura=False)
+        tem aberto): a fonte achada pelo SHA-256, a v1 e a sequência só na memória.
+        `gravada`: a sequência e o contador de `pid` do `projeto.json`."""
+        projeto = cls(pasta, dados, gravada, somente_leitura=False)
         projeto.motivo_so_leitura = motivo
         if projeto.origem.ausente:
             achada = projeto.origem.procurar()
@@ -400,15 +404,16 @@ class ProjetoDeLivro:
         return projeto
 
     @classmethod
-    def _abrir_para_gravar(cls, pasta: Path, dados: Projeto, bytes_do_projeto: bytes,
-                           mudou: bool) -> "ProjetoDeLivro":
+    def _abrir_para_gravar(cls, pasta: Path, dados: Projeto, gravada: tuple,
+                           bytes_do_projeto: bytes, mudou: bool) -> "ProjetoDeLivro":
         """O projeto que este processo tem para gravar (`tomar_a_pasta`): os temporários
         limpos, a fonte achada, a cadeia de migração e os consertos da sequência gravados.
-        `mudou`: o `projeto.json` tinha campos que esta versão regrava em `extras`."""
+        `gravada`: a sequência e o contador de `pid` dele; `mudou`: o `projeto.json` tinha
+        campos que esta versão regrava em `extras`."""
         (pasta / PASTA_DE_PADROES).mkdir(exist_ok=True)
         (pasta / PASTA_DE_PAGINAS).mkdir(exist_ok=True)
         gv.limpar_temporarios(pasta)
-        projeto = cls(pasta, dados)
+        projeto = cls(pasta, dados, gravada)
         # A fonte antes da migração: a sequência da v3 tem uma entrada por página do PDF, e
         # sem o PDF o número de páginas não se sabe.
         if projeto.fonte.is_file():
@@ -495,11 +500,17 @@ class ProjetoDeLivro:
                 self.resumo.atualizar(pagina.pid, self.resumo.do_modelo(pagina))
         self.paginas_em_memoria.gravada(pagina)
 
-    def salvar(self) -> None:
+    def salvar(self, sequencia: Optional[sq.Sequencia] = None, proximo: int = 0) -> None:
+        """O `projeto.json`: os dados, e a sequência do livro e o contador de `pid` montados
+        da `ordem` (`para_o_arquivo`, SPEC-qualidade Q-P9), a de agora ou a `sequencia`
+        que vai entrar, que quem a passa adota depois de gravada."""
         # Na trava do livro: a interface e o gravador (a sequência que cresce) gravam o mesmo
         # `projeto.json`, e o temporário dele é um só.
         with self._trava_do_livro:
-            gv.gravar_json(self.pasta / ARQUIVO_DO_PROJETO, asdict(self.dados))
+            bruta, contador = self.ordem.para_o_arquivo(sequencia, proximo)
+            gv.gravar_json(self.pasta / ARQUIVO_DO_PROJETO,
+                           {**asdict(self.dados), "sequencia": bruta, "proximo_pid": contador})
+            self.ordem.gravou(bruta, contador)
 
     # ------------------------------------------------------------------
     # Caminhos
@@ -731,13 +742,7 @@ class ProjetoDeLivro:
         pagina = self.carregar_modelo(indice)
         if pagina is None:
             pid = self.ordem.pid_em(indice, criar=True)
-            if pid >= self.dados.proximo_pid:
-                # O contador gravado passa do pid da página que nasce, antes do arquivo dela.
-                # Ele não é o teto dos pids em disco (uma página de pid menor nasce sem
-                # gravá-lo): ao montar a sequência, os `p<pid>.json` em disco também contam.
-                self.dados.proximo_pid = pid + 1
-                if not self.somente_leitura:
-                    self.salvar()
+            self.ordem.gravar_o_contador(pid)       # antes do arquivo da página
             entrada = self.sequencia.entrada_de(pid)
             pagina = Pagina(pid=pid, indice=indice)
             if entrada is not None:

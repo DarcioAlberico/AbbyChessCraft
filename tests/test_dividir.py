@@ -273,7 +273,7 @@ def test_falhar_ao_gravar_o_projeto_nao_deixa_o_arquivo_da_direita(projeto, ctl,
     _gravar(projeto, ctl, 2)
     antes = projeto.sequencia
 
-    def falhar():
+    def falhar(*_a):                          # salvar(sequencia, proximo)
         raise OSError("disco cheio")
 
     monkeypatch.setattr(projeto, "salvar", falhar)

@@ -494,8 +494,7 @@ def test_reabrir_volta_a_pagina_aberta_pelo_pid_mesmo_se_ela_mudou_de_lugar(
     s = outro.sequencia                              # o que a reordenação (rodada 2) grava
     nova = Sequencia((s.entradas[12], *s.entradas[:12], *s.entradas[13:]))
     outro.ordem.trocar(nova)
-    outro.dados.sequencia = nova.para_json()
-    outro.salvar()
+    outro.salvar()                                   # a sequência vai montada da ordem
     k = _abrir(ProjetoDeLivro.abrir(projeto.pasta))
     try:
         app.processEvents()

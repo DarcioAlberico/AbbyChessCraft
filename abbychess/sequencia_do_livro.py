@@ -7,8 +7,10 @@ Q-P8), o `pid` de cada posição e a posição de cada `pid` (`pid_em`, `posicao
 posição (`paginas_para_gravar`, `posicoes_das_gravadas`), a página do PDF de cada página
 (`pagina_da_fonte`) e a origem das amostras antigas (`origem_da_amostra`). Trocá-la é das
 operações de página (`gravar`, e `trocar_paginas` para dividir e o desfazer dela): o
-`projeto.json` primeiro, e só depois a memória. As páginas, o cache delas, o resumo do livro, a
-trava do livro e o `projeto.json` são do projeto (`self._p`)."""
+`projeto.json` primeiro, e só depois a memória. A sequência e o contador daqui são a única fonte
+dos dois (SPEC-qualidade Q-P9): o `projeto.json` os recebe montados daqui a cada gravação
+(`para_o_arquivo`). As páginas, o cache delas, o resumo do livro, a trava do livro e o resto do
+`projeto.json` são do projeto (`self._p`)."""
 
 from __future__ import annotations
 
@@ -31,13 +33,20 @@ FORA_DO_PDF = -1
 
 
 class SequenciaDoLivro:
-    def __init__(self, p) -> None:
+    def __init__(self, p, sequencia: Optional[dict] = None, proximo_pid: int = 0) -> None:
         self._p = p
         #: A sequência do livro (§12.4): a posição de cada `pid`. Montada na primeira vez que
-        #: alguém pergunta (`sequencia`), dos dados da v2; `_proximo_pid` é o primeiro `pid`
-        #: acima dela, para as páginas que ela ainda não tem.
+        #: alguém pergunta (`sequencia`), da gravada (v3) ou dos dados da v2; `_proximo_pid` é
+        #: o primeiro `pid` acima dela e de todo `pid` já dado (estável, nunca reaproveitado,
+        #: §4.1), para as páginas que ela ainda não tem. É a única fonte das duas coisas
+        #: (SPEC-qualidade Q-P9): o `projeto.json` as recebe montadas daqui (`para_o_arquivo`).
         self._sequencia: Optional[sq.Sequencia] = None
-        self._proximo_pid = 0
+        self._proximo_pid = proximo_pid
+        #: A sequência (o JSON, `Sequencia.para_json`; None na v2) e o contador como estão no
+        #: `projeto.json`: o que a abertura leu (`sequencia`, `proximo_pid`) e, depois, o que
+        #: cada gravação escreveu (`gravou`). Não é o estado: a montagem lê daqui a gravada, e
+        #: a página que nasce sabe por aqui se o contador do disco já passa dela.
+        self._no_arquivo: Tuple[Optional[dict], int] = (sequencia, proximo_pid)
         #: (sequência, página do PDF -> primeira posição dela): a origem das amostras antigas.
         self._posicoes_do_pdf: Optional[tuple] = None
 
@@ -80,18 +89,53 @@ class SequenciaDoLivro:
         cuja sequência gravada esta versão não lê), com o próximo `pid` acima dela."""
         self._sequencia, self._proximo_pid = sequencia, max(self._proximo_pid, proximo)
 
+    def acima_de(self, pids: Iterable[int]) -> None:
+        """O próximo `pid` passa a ficar acima de cada um de `pids` (a migração da v1)."""
+        self._proximo_pid = max([self._proximo_pid, *(pid + 1 for pid in pids)])
+
+    @property
+    def proximo_pid(self) -> int:
+        """O próximo `pid` (o contador de agora, com os já dados e ainda não gravados)."""
+        return self._proximo_pid
+
+    def para_o_arquivo(self, sequencia: Optional[sq.Sequencia] = None,
+                       proximo: int = 0) -> Tuple[Optional[dict], int]:
+        """A sequência (o JSON) e o contador que vão ao `projeto.json`, montados daqui: a
+        sequência de agora (a da v2 não vai), ou `sequencia`, a que vai entrar (o arquivo
+        primeiro, e só depois a memória: quem a passa a adota depois de gravar), com o
+        contador acima dela e de `proximo`. Antes de montada, a gravada vai como foi lida."""
+        if sequencia is not None:
+            bruta = sequencia.para_json()
+        elif not self.gravada:
+            bruta = None
+        elif self._sequencia is not None:
+            bruta = self._sequencia.para_json()
+        else:
+            bruta = self._no_arquivo[0]
+        pids = sequencia.todos_os_pids if sequencia is not None else ()
+        return bruta, max([self._proximo_pid, proximo, *(pid + 1 for pid in pids)])
+
+    def gravou(self, bruta: Optional[dict], proximo: int) -> None:
+        """O `projeto.json` foi gravado com esta sequência e este contador (`para_o_arquivo`)."""
+        self._no_arquivo = (bruta, proximo)
+
+    def gravar_o_contador(self, pid: int) -> None:
+        """A página `pid` nasce: o contador do `projeto.json` passa dela antes do arquivo dela.
+        Ele não é o teto dos pids em disco (uma página de pid menor nasce sem gravá-lo): ao
+        montar a sequência, os `p<pid>.json` em disco também contam."""
+        if pid >= self._no_arquivo[1] and not self._p.somente_leitura:
+            self._p.salvar()
+
     def _montar(self, gravar: bool) -> Tuple[sq.Sequencia, int]:
         """A sequência gravada (v3), ou a montada dos dados da v2. O projeto da v3 sem ela
         (o projeto novo, ou um `projeto.json` que a perdeu) a monta pela ordem do PDF e, com
         `gravar`, a grava já; o da v2 só para leitura a tem só na memória."""
-        if self._p.dados.sequencia is not None:
+        if self.gravada:
             return self._lida(gravar)
         sequencia, proximo = self.da_v2(gravar)
         if (gravar and self._p.dados.versao >= VERSAO and not self._p.somente_leitura
                 and self._p.fonte.is_file()):
-            self._p.dados.sequencia = sequencia.para_json()
-            self._p.dados.proximo_pid = max(self._p.dados.proximo_pid, proximo)
-            self._p.salvar()
+            self._p.salvar(sequencia, proximo)
         return sequencia, proximo
 
     def _lida(self, gravar: bool) -> Tuple[sq.Sequencia, int]:
@@ -101,7 +145,7 @@ class SequenciaDoLivro:
         from abbychess.projeto import ProjetoInvalido
 
         try:
-            sequencia = sq.Sequencia.de_json(self._p.dados.sequencia)
+            sequencia = sq.Sequencia.de_json(self._no_arquivo[0])
         except (KeyError, TypeError, ValueError) as erro:
             raise ProjetoInvalido(f"A sequência do livro em {ARQUIVO_DO_PROJETO} está "
                                   f"ilegível: {erro}") from erro
@@ -146,7 +190,7 @@ class SequenciaDoLivro:
                 continue
             orfaos.append(sq.Apagada(sq.Entrada(pid, sq.FONTE_DO_LIVRO, max(0, pagina.indice)),
                                      len(sequencia)))
-        proximo = max([self._p.dados.proximo_pid, *(p + 1 for p in em_disco),
+        proximo = max([self._proximo_pid, *(p + 1 for p in em_disco),
                        *(p + 1 for p in sequencia.todos_os_pids)])
         # As páginas do PDF que não estão em entrada nenhuma (uma sequência gravada curta, de
         # antes de a fonte voltar): no fim do livro, com pid novo.
@@ -162,9 +206,7 @@ class SequenciaDoLivro:
             sequencia = sq.Sequencia(sequencia.entradas + novas,
                                      sequencia.apagadas + tuple(orfaos))
             if gravar and not self._p.somente_leitura:
-                self._p.dados.sequencia = sequencia.para_json()
-                self._p.dados.proximo_pid = max(self._p.dados.proximo_pid, proximo)
-                self._p.salvar()
+                self._p.salvar(sequencia, proximo)
         return sequencia, proximo
 
     def da_v2(self, gravar: bool = True) -> Tuple[sq.Sequencia, int]:
@@ -188,7 +230,7 @@ class SequenciaDoLivro:
             gravados[indice] = indice
         em_disco = [int(a.stem[1:]) for a in (self._p.pasta / PASTA_DE_PAGINAS).glob("p*.json")
                     if a.stem[1:].isdigit()]
-        piso = max([self._p.dados.proximo_pid, *(p + 1 for p in em_disco)])
+        piso = max([self._proximo_pid, *(p + 1 for p in em_disco)])
         total = max([self._p.origem.total_de_paginas(), *(i + 1 for i in gravados)], default=0)
         sequencia, proximo = sq.da_v2(total, gravados, piso)
         for indice, (pid, pagina) in orfaos.items():
@@ -251,10 +293,7 @@ class SequenciaDoLivro:
                 self._sequencia = sequencia = sq.Sequencia(sequencia.entradas + novas,
                                                            sequencia.apagadas)
                 if self.gravada and not self._p.somente_leitura:
-                    self._p.dados.sequencia = sequencia.para_json()     # antes da página
-                    self._p.dados.proximo_pid = max(self._p.dados.proximo_pid,
-                                                    self._proximo_pid)
-                    self._p.salvar()
+                    self._p.salvar()                # antes da página
             return sequencia.pid_em(indice)
 
     def posicao_de(self, pid: int) -> Optional[int]:
@@ -288,7 +327,7 @@ class SequenciaDoLivro:
     def gravada(self) -> bool:
         """O projeto tem a sequência no disco (v3): as listas de páginas gravadas são de
         `pid`. Num projeto da v2 aberto só para leitura, de posições."""
-        return self._p.dados.sequencia is not None
+        return self._no_arquivo[0] is not None
 
     def paginas_para_gravar(self, posicoes: Iterable[int]) -> List[int]:
         """As posições como o projeto as grava: os `pid` (v3), ou as próprias posições."""
@@ -374,16 +413,8 @@ class SequenciaDoLivro:
             raise OSError("o projeto ainda está no formato antigo: abra-o com a fonte do livro "
                           "no lugar para passar ao novo")
         with self._p._trava_do_livro:
-            antes = (self._p.dados.sequencia, self._p.dados.proximo_pid)
             velha = self.sequencia
-            self._p.dados.sequencia = nova.para_json()
-            self._p.dados.proximo_pid = max([self._p.dados.proximo_pid, self._proximo_pid,
-                                             *(p + 1 for p in nova.todos_os_pids)])
-            try:
-                self._p.salvar()
-            except BaseException:
-                self._p.dados.sequencia, self._p.dados.proximo_pid = antes
-                raise
+            self._p.salvar(nova)
             self.trocar(nova)
             self._regravar_as_reenquadradas(velha, nova)
 
@@ -446,7 +477,7 @@ class SequenciaDoLivro:
             for pid, pagina in paginas.items():
                 if pagina is not None and nova.posicao_de(pid) is not None:
                     pagina.indice = nova.posicao_de(pid)
-            antes = (p.dados.sequencia, p.dados.proximo_pid, p.dados.gids_movidos)
+            antes = p.dados.gids_movidos
             gravados = []
             try:
                 for pid in entram:
@@ -456,13 +487,10 @@ class SequenciaDoLivro:
                     gv.gravar_json(p._arquivo_v2(pid), pagina_para_json(
                         paginas[pid], entrada.pagina if do_pdf else FORA_DO_PDF))
                     gravados.append(pid)
-                p.dados.sequencia = nova.para_json()
-                p.dados.proximo_pid = max([p.dados.proximo_pid, self._proximo_pid,
-                                           *(pid + 1 for pid in nova.todos_os_pids)])
                 p.dados.gids_movidos = dict(gids_movidos)
-                p.salvar()
+                p.salvar(nova)
             except BaseException:
-                p.dados.sequencia, p.dados.proximo_pid, p.dados.gids_movidos = antes
+                p.dados.gids_movidos = antes
                 for pid in gravados:
                     try:
                         p._arquivo_v2(pid).unlink(missing_ok=True)

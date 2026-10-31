@@ -43,7 +43,7 @@ def test_a_primeira_edicao_usa_o_pid_da_sequencia_e_o_contador_passa_dele(projet
     pid = projeto.ordem.pid_em(41)
     projeto.salvar_pagina(41, [_box()])
     assert projeto.carregar_modelo(41).pid == pid
-    assert projeto.dados.proximo_pid > pid
+    assert projeto.ordem.proximo_pid > pid
     gravado = json.loads(ProjetoDeLivro.abrir(projeto.pasta).pasta.joinpath(
         "projeto.json").read_text(encoding="utf-8"))
     assert gravado["proximo_pid"] > pid            # no disco antes do arquivo da página
@@ -144,7 +144,7 @@ def test_arquivo_em_disco_fora_da_sequencia_vai_as_apagadas_e_reserva_o_pid(proj
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     assert reaberto.ordem.pid_em(0) == projeto.ordem.pid_em(0)
     assert 500 not in reaberto.sequencia.pids and reaberto.sequencia.apagada(500) is not None
-    assert reaberto.ordem._proximo_pid > 500
+    assert reaberto.ordem.proximo_pid > 500
     assert ProjetoDeLivro.abrir(projeto.pasta).sequencia.apagada(500) is not None   # gravada
 
 
@@ -158,7 +158,7 @@ def test_o_perdedor_de_dois_arquivos_da_mesma_pagina_nao_vira_apagada(projeto):
     (projeto.pasta / "paginas" / "p500.json").write_text(json.dumps(bruto), encoding="utf-8")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     assert reaberto.sequencia.apagada(500) is None and 500 not in reaberto.sequencia.pids
-    assert reaberto.ordem._proximo_pid > 500
+    assert reaberto.ordem.proximo_pid > 500
 
 
 def test_sem_a_fonte_a_pagina_gravada_continua_no_lugar(projeto):

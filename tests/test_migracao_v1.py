@@ -221,7 +221,7 @@ def test_volta_do_backup_com_pagina_nova_nao_repete_gid(projeto_v1):
             shutil.copyfile(arquivo, destino)
     reaberto = ProjetoDeLivro.abrir(projeto_v1)
     pids = [reaberto.carregar_modelo(i).pid for i in (0, 1, 2, 5)]
-    assert len(set(pids)) == 4 and reaberto.dados.proximo_pid > max(pids)
+    assert len(set(pids)) == 4 and reaberto.ordem.proximo_pid > max(pids)
     gids = [b.gid for i in (0, 1, 2, 5) for b in reaberto.carregar_modelo(i).boxes]
     assert len(gids) == len(set(gids))
 

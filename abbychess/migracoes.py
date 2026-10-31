@@ -134,8 +134,7 @@ class Migracoes:
             gv.gravar_bytes(backup / ARQUIVO_DO_PROJETO, bruto_do_projeto)
         pids = [int(p.stem[1:]) for p in (self._p.pasta / PASTA_DE_PAGINAS).glob("p*.json")
                 if p.stem[1:].isdigit()]
-        self._p.dados.proximo_pid = max([self._p.dados.proximo_pid, *(i + 1 for i in self.indices_v1()),
-                                         *(p + 1 for p in pids)])
+        self._p.ordem.acima_de([*self.indices_v1(), *pids])
         self._p.dados.versao = 2                    # a 3 vem logo depois (`migrar_para_v3`)
         self._p.salvar()
         gv.apagar(self._p.pasta / ARQUIVO_DO_LIVRO)     # o cache é refeito com os pids
@@ -157,10 +156,8 @@ class Migracoes:
                     gv.gravar_bytes(backup / nome, arquivo.read_bytes())
         sequencia, proximo = self._p.ordem.da_v2()
         self._listas_para_pids(sequencia)
-        self._p.dados.sequencia = sequencia.para_json()
-        self._p.dados.proximo_pid = max(self._p.dados.proximo_pid, proximo)
         self._p.dados.versao = VERSAO
-        self._p.salvar()
+        self._p.salvar(sequencia, proximo)
         self._p.ordem.adotar(sequencia, proximo)
 
     def completar_v3(self) -> None:

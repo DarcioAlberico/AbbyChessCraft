@@ -148,6 +148,27 @@ def test_o_dryer_acha_as_iguais_pela_forma_com_outros_nomes_e_literais(tmp_path)
     assert pares[0].startswith("1.00") and "com_ids" in pares[0] and "outros_ids" in pares[0]
 
 
+def test_o_dryer_falha_com_par_fora_da_lista_de_aceitos_e_com_aceito_que_sumiu(tmp_path):
+    pacote = tmp_path / "pacote"
+    pacote.mkdir()
+    (pacote / "um.py").write_text(_par("com_ids", 0, 1), encoding="utf-8")
+    (pacote / "dois.py").write_text(_par("outros_ids", 5, 2), encoding="utf-8")
+    lista = tmp_path / "aceitos.txt"
+
+    def dryer(texto):
+        lista.write_text(texto, encoding="utf-8")
+        saida = subprocess.run([sys.executable, "-I", str(FERRAMENTAS / "dryer.py"), str(pacote),
+                                "0.8", "20", "--aceitos", str(lista)], capture_output=True)
+        return saida.returncode, saida.stdout.decode("utf-8")
+
+    aceito = "pacote/dois.py outros_ids <-> pacote/um.py com_ids  # o motivo\n"
+    assert dryer(aceito)[0] == 0
+    codigo, texto = dryer("# nenhum aceito\n")
+    assert codigo == 1 and "novo" in texto and "com_ids" in texto
+    codigo, texto = dryer(aceito + "pacote/um.py velha <-> pacote/dois.py antiga\n")
+    assert codigo == 1 and "sumiu" in texto and "velha" in texto
+
+
 def test_o_dryer_nao_casa_a_aninhada_com_a_mae_que_a_contem(tmp_path):
     pacote = tmp_path / "pacote"
     pacote.mkdir()

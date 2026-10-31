@@ -30,7 +30,7 @@ import re
 from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
-from abbychess.modelo import FIGURINAS, Pagina
+from abbychess.modelo import FIGURINAS, PECAS, Pagina
 
 GLIFO, VIRTUAL, ESPACO, LINHA, OUTRO = "glifo", "virtual", "espaco", "linha", "outro"
 #: O que a vista põe no lugar da quebra de parágrafo; o colar de várias linhas também a traz
@@ -622,10 +622,8 @@ def aplicar(pagina: Pagina, plano: Plano, imagem=None, leitor=None) -> None:
 # As figurinas (§6.4)
 # ----------------------------------------------------------------------
 
-#: As letras das peças em cada idioma, na ordem rei, dama, torre, bispo, cavalo. O lance
-#: estrito do core (`core.notacao.RE_LANCE_ESTRITO`) só conhece as letras do inglês; aqui a
-#: forma é a mesma, com as letras do idioma do livro.
-PECAS = {"pt": "RDTBC", "en": "KQRBN", "es": "RDTAC", "de": "KDTLS", "fr": "RDTFC"}
+#: O lance estrito do core (`core.notacao.RE_LANCE_ESTRITO`) só conhece as letras do inglês;
+#: aqui a forma é a mesma, com as letras do idioma do livro (`modelo.PECAS`).
 FIGURINAS_BRANCAS = "♔♕♖♗♘"
 #: A pontuação colada ao lance na prosa: "(Cf3)", "Cf3,", "Cf3." (a de `core.notacao`).
 PONTUACAO_DE_BORDA = ",;:.)(\"'“”‘’[]"

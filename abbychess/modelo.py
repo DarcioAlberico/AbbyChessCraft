@@ -115,6 +115,9 @@ class Box:
 
 #: As figurinas que a leitura escreve (brancas e pretas): o modo das peças nos lances (§6.4).
 FIGURINAS = frozenset("♔♕♖♗♘♙♚♛♜♝♞♟")
+#: As letras das peças em cada idioma, na ordem rei, dama, torre, bispo, cavalo: as do lance
+#: na prosa do livro (a sessão, a busca, o PGN). Uma definição só (SPEC-qualidade Q-E5).
+PECAS = {"pt": "RDTBC", "en": "KQRBN", "es": "RDTAC", "de": "KDTLS", "fr": "RDTFC"}
 
 
 @dataclass(frozen=True, slots=True)

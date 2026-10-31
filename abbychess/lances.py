@@ -18,7 +18,7 @@ número. A linha acaba:
 - num número que não é o esperado: o livro volta a um lance que já passou (`11...` depois
   do `14.`), o que também é variante.
 
-**As letras são as do idioma do livro** (`sessao.PECAS`: `Cf3` em português é `Nf3`) e as
+**As letras são as do idioma do livro** (`modelo.PECAS`: `Cf3` em português é `Nf3`) e as
 figurinas valem em qualquer idioma. Por isso o texto entra no modo impresso: no modo SAN o
 `♖` já virou `R`, que em português seria o rei.
 
@@ -165,7 +165,7 @@ def _tabela(idioma: str) -> Dict[str, str]:
     """Letra do idioma -> letra inglesa; as figurinas -> letra inglesa."""
     from core.notacao import FIGURINAS
 
-    from abbychess.sessao import PECAS
+    from abbychess.modelo import PECAS
 
     tabela = dict(zip(PECAS.get(idioma, _INGLES), _INGLES))
     tabela.update(FIGURINAS)

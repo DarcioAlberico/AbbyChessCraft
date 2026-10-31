@@ -33,7 +33,7 @@ from typing import Callable, Dict, FrozenSet, Iterable, List, Mapping, Optional,
 
 import regex
 
-from abbychess.modelo import FIGURINAS, Pagina
+from abbychess.modelo import FIGURINAS, PECAS, Pagina
 
 log = logging.getLogger(__name__)
 
@@ -46,9 +46,7 @@ _ETIQUETA_DO_CODIGO = {c: e for e, c in _CODIGO.items()}
 #: O tempo-limite de cada página (§7.1: 0,5 s); o primeiro que estoura aborta a busca.
 TEMPO_LIMITE = 0.5
 
-#: As letras das peças em cada idioma (as de `sessao.PECAS`), na ordem rei, dama, torre,
-#: bispo, cavalo; as figurinas brancas e pretas na mesma ordem.
-PECAS = {"pt": "RDTBC", "en": "KQRBN", "es": "RDTAC", "de": "KDTLS", "fr": "RDTFC"}
+#: As figurinas brancas e pretas na ordem das letras de `modelo.PECAS`.
 BRANCAS, PRETAS = "♔♕♖♗♘", "♚♛♜♝♞"
 
 

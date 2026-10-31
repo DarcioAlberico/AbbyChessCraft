@@ -769,11 +769,6 @@ def recorte(imagem, box: BoxEntry) -> np.ndarray:
     return vertical.recorte_de_pe(cinza(imagem), box)
 
 
-def efeitos_de_impressao(imagem: Image.Image, boxes: Sequence[BoxEntry]) -> List[Optional[bool]]:
-    """O negrito de cada glifo (`efeitos_da_pagina`, sem o itálico)."""
-    return efeitos_da_pagina(imagem, boxes)[0]
-
-
 def espessura_do_traco(recorte: np.ndarray) -> Optional[float]:
     """A meia largura do traço do glifo em alturas da tinta, como `core.negrito.espessura`,
     mas pela massa da tinta em tons de cinza: `massa ÷ perímetro`, e não pela transformada de

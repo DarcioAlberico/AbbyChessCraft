@@ -50,7 +50,8 @@ def test_negrito_e_medido_por_palavra_com_a_referencia_da_pagina(monkeypatch):
     monkeypatch.setattr(pg, "recorte", lambda _imagem, box: np.array([[box.x1]]))
     monkeypatch.setattr(pg, "espessura_do_traco", lambda imagem: pesos[int(imagem[0, 0])])
 
-    assert pg.efeitos_de_impressao(Image.new("L", (80, 30)), boxes) == [False, False, True, True]
+    negrito, _italico = pg.efeitos_da_pagina(Image.new("L", (80, 30)), boxes)
+    assert negrito == [False, False, True, True]
 
 
 def test_negrito_converte_a_pagina_uma_vez(monkeypatch):
@@ -61,7 +62,7 @@ def test_negrito_converte_a_pagina_uma_vez(monkeypatch):
                         lambda self, *a, **k: convertidas.append(1) or original(self, *a, **k))
     boxes = [BoxEntry("a", x, 0, x + 8, 20) for x in range(0, 200, 10)]
 
-    assert len(pg.efeitos_de_impressao(Image.new("RGB", (220, 30), "white"), boxes)) == 20
+    assert len(pg.efeitos_da_pagina(Image.new("RGB", (220, 30), "white"), boxes)[0]) == 20
     assert len(convertidas) == 1
 
 

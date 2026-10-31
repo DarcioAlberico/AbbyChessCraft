@@ -190,6 +190,5 @@ def test_reler_mantem_o_sublinhado_do_usuario():
     assert boxes[0].estilo == Estilo(True, False, True)
 
 
-def test_efeitos_de_impressao_continua_so_o_negrito():
-    assert pg.efeitos_de_impressao(Image.new("L", (10, 10)), []) == []
+def test_a_pagina_sem_glifos_nao_tem_efeitos():
     assert pg.efeitos_da_pagina(Image.new("L", (10, 10)), []) == ([], [])

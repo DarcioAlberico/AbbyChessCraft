@@ -35,6 +35,7 @@ from typing import Callable, Deque, Dict, List, Optional, Sequence
 
 from abbychess import arrumacao
 from abbychess import pagina as pg
+from abbychess import editar_boxes as eb
 from abbychess import servidor_de_leitura as sl
 from abbychess.servidor_de_leitura import TEMPO_DO_PEDIDO
 from abbychess.modelo import LIDAS, VERIFICADA
@@ -247,7 +248,7 @@ class CondutorDoLote:
                 raise OSError("a página saiu do livro")    # `_voltou` a conta como fora
             modelo = projeto.carregar_modelo(agora)
             zonas = list(modelo.zonas) if modelo is not None else projeto.carregar_zonas(agora)
-            marcados = (pg.a_manter_na_releitura(modelo.boxes, modelo.estado in LIDAS)
+            marcados = (eb.a_manter_na_releitura(modelo.boxes, modelo.estado in LIDAS)
                         if modelo is not None else [])                     # §4.6
             imagem = fonte.pagina_da_entrada(entrada)
             regua = projeto.resumo.regua_do_negrito(sem_o_pid=pid)

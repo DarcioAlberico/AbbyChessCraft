@@ -24,6 +24,7 @@ from abbychess import diagramas as dg
 from abbychess import margens as mg
 from abbychess import montagem as mo
 from abbychess import pagina as pg
+from abbychess import editar_boxes as eb
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
@@ -82,17 +83,17 @@ def test_roteiro_das_operacoes(request, projeto, leitor):
     pg.confirmar(boxes, 2, "c")
     passos["confirmar_c"] = _estado(boxes)
 
-    pg.juntar(imagem, boxes, 0, 1, leitor)
+    eb.juntar(imagem, boxes, 0, 1, leitor)
     passos["juntar_0_1"] = _estado(boxes)
 
-    pg.dividir(imagem, boxes, 0, leitor)
+    eb.dividir(imagem, boxes, 0, leitor)
     passos["dividir_0"] = _estado(boxes)
 
-    pg.ajustar(imagem, boxes, 3, leitor, esquerda=-2, direita=2)
+    eb.ajustar(imagem, boxes, 3, leitor, esquerda=-2, direita=2)
     passos["ajustar_3"] = _estado(boxes)
 
     a = boxes[5]
-    indice = pg.criar_box(imagem, boxes, (a.x1 - 3, a.y1 - 3, a.x2 + 3, a.y2 + 3), leitor)
+    indice = eb.criar_box(imagem, boxes, (a.x1 - 3, a.y1 - 3, a.x2 + 3, a.y2 + 3), leitor)
     passos["criar_box"] = {"indice": indice, "boxes": _estado(boxes)}
 
     pg.descartar(boxes, len(boxes) - 1)
@@ -108,7 +109,7 @@ def test_manter_marcados(request):
                    BoxEntry("", 40, 0, 50, 10)]
     marcados = [BoxEntry("r", -1, -1, 11, 11, 1.0, FONTE_MANUAL),
                 BoxEntry("p", 18, 0, 34, 10, 1.0, FONTE_MANUAL)]
-    _conferir(request, "manter_marcados.json", _estado(pg.manter_marcados(segmentados, marcados)))
+    _conferir(request, "manter_marcados.json", _estado(eb.manter_marcados(segmentados, marcados)))
 
 
 # ----------------------------------------------------------------------

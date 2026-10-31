@@ -21,6 +21,7 @@ from abbychess import exportar as ex  # noqa: E402
 from abbychess import margens as mg
 from abbychess import livro  # noqa: E402
 from abbychess import pagina as pg  # noqa: E402
+from abbychess import editar_boxes as eb
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro  # noqa: E402
 from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
@@ -136,7 +137,7 @@ def test_pagina_so_marcada_nao_conta_como_lida(tmp_path):
 def test_manter_marcados_tira_o_box_de_baixo():
     segmentados = [BoxEntry("", 0, 0, 10, 10), BoxEntry("", 20, 0, 30, 10)]
     marcado = BoxEntry("r", -1, -1, 11, 11, 1.0, FONTE_MANUAL)
-    saida = pg.manter_marcados(segmentados, [marcado])
+    saida = eb.manter_marcados(segmentados, [marcado])
     assert saida == [marcado, segmentados[1]]
 
 

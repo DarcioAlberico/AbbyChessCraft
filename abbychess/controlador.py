@@ -60,6 +60,7 @@ from abbychess import historico as hs
 from abbychess.historico import Antes
 from abbychess import lances as lc
 from abbychess import pagina as pg
+from abbychess import editar_boxes as eb
 from abbychess.fila_da_pagina import FilaDaPagina
 from abbychess.padroes_do_livro import ControladorDosPadroes
 from abbychess.ponte_de_leitura import PonteDeLeitura
@@ -710,7 +711,7 @@ class ControladorDePagina:
 
         def corpo():
             i = self.indice_de(gid)
-            outro = pg.vizinho(self.boxes, i, passo) if i is not None else None
+            outro = eb.vizinho(self.boxes, i, passo) if i is not None else None
             if outro is None:
                 lado = "seguinte" if passo > 0 else "anterior"
                 self._avisar(f"Não há box {lado} nesta linha para juntar.", 6000)

@@ -106,19 +106,21 @@ def ler_pagina(imagem, zonas, marcados, leitor, *, regua_do_livro: Optional[dict
     O negrito é decidido com a régua do livro (`projeto.resumo.regua_do_negrito`), quando dada."""
     from abbychess import diagramas as dg
     from abbychess import pagina as pg
+    from abbychess import editar_boxes as eb
+    from abbychess import efeitos as ef
     from abbychess import procedencia
     from abbychess import zonas as zn
 
     segmentada = zn.segmentar(imagem, zonas, leitor)
     if marcados:
-        segmentada.boxes = pg.manter_marcados(segmentada.boxes, marcados)
+        segmentada.boxes = eb.manter_marcados(segmentada.boxes, marcados)
     pg.ler_boxes(imagem, segmentada.boxes, leitor, progresso=progresso, cancelado=cancelado)
     if cancelado():
         raise Cancelado
     lidos = dg.ler_diagramas(imagem, segmentada.tabuleiros, escala=segmentada.escala,
                              classificar=leitor.arbitro, boxes=segmentada.boxes)
-    efeitos = pg.medir_efeitos(imagem, segmentada.boxes, regua_do_livro)
-    pg.reler_pelo_efeito(imagem, segmentada.boxes, leitor, efeitos.negritos, efeitos.italicos)
+    efeitos = ef.medir_efeitos(imagem, segmentada.boxes, regua_do_livro)
+    ef.reler_pelo_efeito(imagem, segmentada.boxes, leitor, efeitos.negritos, efeitos.italicos)
     return PaginaLida(segmentada.boxes, [procedencia.amostra_de(b) for b in segmentada.boxes],
                       list(segmentada.tabuleiros), segmentada.escala, lidos, efeitos.negritos,
                       efeitos.italicos, efeitos.regua)

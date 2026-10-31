@@ -22,6 +22,7 @@ from typing import List, Optional, Sequence, Tuple
 from core.box_model import BoxEntry
 
 from abbychess import pagina as pg
+from abbychess import editar_boxes as eb
 from abbychess import procedencia
 from abbychess.modelo import Box, Decisoes, Diferenca, Estilo, GlifoVirtual, Pagina
 
@@ -34,7 +35,7 @@ def dividir(pagina: Pagina, imagem, gid: int, leitor=None, *, x: Optional[int] =
     """O glifo `gid` em dois (ver `pagina.dividir`); as partes são os sucessores dele."""
     i = pagina.indice_de(gid)
     entries = pagina.entries()
-    pg.dividir(imagem, entries, i, leitor, x=x)
+    eb.dividir(imagem, entries, i, leitor, x=x)
     partes = _novos(pagina, entries, i, i + 2)
     dif = Diferenca(removidos={gid}, novos=partes, sucessores={gid: [b.gid for b in partes]})
     return pagina.aplicar(dif, pagina.boxes[:i] + partes + pagina.boxes[i + 1:])
@@ -45,7 +46,7 @@ def juntar(pagina: Pagina, imagem, gid_a: int, gid_b: int, leitor=None) -> Difer
     i, j = sorted((pagina.indice_de(gid_a), pagina.indice_de(gid_b)))
     velhos = (pagina.boxes[i].gid, pagina.boxes[j].gid)
     entries = pagina.entries()
-    pg.juntar(imagem, entries, i, j, leitor)
+    eb.juntar(imagem, entries, i, j, leitor)
     [novo] = _novos(pagina, entries, i, i + 1)
     boxes = list(pagina.boxes)
     boxes[i] = novo
@@ -82,7 +83,7 @@ def _juntados(antigos: Sequence[Box], char: str) -> BoxEntry:
     """Uma cópia dos glifos numa caixa só, com o caractere confirmado."""
     entries = [copia(b.entry) for b in antigos]
     while len(entries) > 1:
-        pg.juntar(None, entries, 0, 1)  # sem leitor: a correção manual vem logo abaixo
+        eb.juntar(None, entries, 0, 1)  # sem leitor: a correção manual vem logo abaixo
     pg.confirmar(entries, 0, char)
     return entries[0]
 
@@ -106,7 +107,7 @@ def dividir_em(pagina: Pagina, imagem, gid: int, chars: str, leitor=None) -> Dif
                 # O maior pedaço ainda é o candidato mais provável a conter outro vão.
                 k = max(range(len(entries)), key=lambda n: ((entries[n].x2 - entries[n].x1)
                                                              * (entries[n].y2 - entries[n].y1)))
-                pg.dividir(imagem, entries, k, None)
+                eb.dividir(imagem, entries, k, None)
         except ValueError:
             entries = [copia(antigo.entry)]
     if len(entries) == len(chars):
@@ -142,7 +143,7 @@ def marcar(pagina: Pagina, imagem, area, leitor=None) -> Diferenca:
     dele saem, e o glifo novo é o sucessor de cada um."""
     entries = pagina.entries()
     por_objeto = {id(b.entry): b for b in pagina.boxes}
-    k = pg.criar_box(imagem, entries, area, leitor)
+    k = eb.criar_box(imagem, entries, area, leitor)
     ficaram = {id(e) for e in entries}
     [novo] = _novos(pagina, entries, k, k + 1)
     sairam = [b.gid for b in pagina.boxes if id(b.entry) not in ficaram]
@@ -170,7 +171,7 @@ def ajustar(pagina: Pagina, imagem, gid: int, leitor=None, **bordas) -> Diferenc
     """Move as bordas do glifo (ver `pagina.ajustar`): o mesmo glifo, com o gid dele."""
     i = pagina.indice_de(gid)
     entries = pagina.entries()
-    pg.ajustar(imagem, entries, i, leitor, **bordas)
+    eb.ajustar(imagem, entries, i, leitor, **bordas)
     boxes = list(pagina.boxes)
     boxes[i] = replace(boxes[i], entry=entries[i],
                        amostra=procedencia.amostra_de(entries[i]) or None)

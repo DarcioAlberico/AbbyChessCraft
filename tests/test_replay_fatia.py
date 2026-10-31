@@ -394,7 +394,7 @@ def _colado(monkeypatch, passo, parte_lida):
     `parte_lida`."""
     from core.box_model import BoxEntry
 
-    from abbychess import pagina as pg
+    from abbychess import editar_boxes as eb
 
     def linhas(boxes, _fonte, _indice, _ex):
         return ([SimpleNamespace(indices=list(range(len(boxes))))], [[0.1, 0.1, 0.9, 0.2]],
@@ -406,7 +406,7 @@ def _colado(monkeypatch, passo, parte_lida):
                           BoxEntry(parte_lida, b.x1 + 10, b.y1, b.x2, b.y2)]
 
     monkeypatch.setattr(rf, "_linhas_da_pagina", linhas)
-    monkeypatch.setattr(pg, "dividir", dividir)
+    monkeypatch.setattr(eb, "dividir", dividir)
     boxes = [BoxEntry("r", 10, 10, 30, 40), BoxEntry("a", 40, 10, 55, 40)]
     gabarito = {"linhas_corpo": [{"caixa_rel": [0.1, 0.1, 0.9, 0.2], "texto": "r,a",
                                   "texto_verificado": True}]}

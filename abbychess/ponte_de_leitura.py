@@ -22,6 +22,7 @@ from abbychess import contexto
 from abbychess import edicao as ed
 from abbychess import historico as hs
 from abbychess import pagina as pg
+from abbychess import editar_boxes as eb
 from abbychess import servidor_de_leitura as sl
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.modelo import LIDAS, Pagina, pid_de
@@ -93,7 +94,7 @@ class PonteDeLeitura:
         imagem, leitor = self._p.imagem, self._p.leitor
         zonas = [zona] if zona is not None else list(pagina.zonas)
         antes = self._p._instantaneo()
-        marcados = pg.a_manter_na_releitura(pagina.boxes, pagina.estado in LIDAS)   # §4.6
+        marcados = eb.a_manter_na_releitura(pagina.boxes, pagina.estado in LIDAS)   # §4.6
         if zona is not None:
             marcados = [b for b in marcados if zona.contem_o_centro(b)]
         servidor = self.servidor_para_pedir()

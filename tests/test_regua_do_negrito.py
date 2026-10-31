@@ -10,7 +10,7 @@ from PIL import Image
 from core.box_model import BoxEntry
 
 from abbychess import livro
-from abbychess import pagina as pg
+from abbychess import efeitos as ef
 from abbychess import regua_do_negrito as rn
 
 
@@ -32,20 +32,20 @@ def _haste(largura: float, fase: float = 0.0) -> np.ndarray:
 def test_a_espessura_segue_a_largura_do_traco_abaixo_do_pixel():
     """O traço do corpo de texto tem uns 2 px: meio pixel a mais é 25% de negrito. A medida
     em tons de cinza vê a diferença; a binária andava de pixel em pixel."""
-    fino, grosso = pg.espessura_do_traco(_haste(2.0)), pg.espessura_do_traco(_haste(2.5))
+    fino, grosso = ef.espessura_do_traco(_haste(2.0)), ef.espessura_do_traco(_haste(2.5))
     assert grosso / fino == pytest.approx(1.25, abs=0.06)
 
 
 def test_a_espessura_nao_depende_da_fase_do_traco_na_grade():
     """O mesmo "t" redondo media 1,00 numa ocorrência e 1,18 na outra pela binária, conforme
     caía na grade: em tons de cinza, a fase não muda a medida."""
-    medidas = [pg.espessura_do_traco(_haste(2.0, fase)) for fase in (0.0, 0.25, 0.5, 0.75)]
+    medidas = [ef.espessura_do_traco(_haste(2.0, fase)) for fase in (0.0, 0.25, 0.5, 0.75)]
     assert max(medidas) / min(medidas) < 1.05
 
 
 def test_o_recorte_sem_contraste_nao_tem_medida():
-    assert pg.espessura_do_traco(np.full((20, 20), 200, np.uint8)) is None
-    assert pg.espessura_do_traco(np.zeros((0, 0), np.uint8)) is None
+    assert ef.espessura_do_traco(np.full((20, 20), 200, np.uint8)) is None
+    assert ef.espessura_do_traco(np.zeros((0, 0), np.uint8)) is None
 
 
 # ----------------------------------------------------------------------
@@ -88,10 +88,10 @@ def _pagina_de_partida():
 def test_a_pagina_de_partida_so_tem_negrito_com_a_regua_do_livro():
     boxes, palavras, medidas = _pagina_de_partida()
     da_pagina = rn.regua_da_pagina([b.char for b in boxes], medidas)
-    assert set(pg.decidir_negritos(boxes, palavras, medidas, da_pagina)) == {False}
+    assert set(ef.decidir_negritos(boxes, palavras, medidas, da_pagina)) == {False}
     # O livro mediu o redondo desses caracteres na prosa e nas variantes.
     do_livro = {char: [1000, 0.10, 0.104] for char in "12.d5aeost"}
-    assert set(pg.decidir_negritos(boxes, palavras, medidas, da_pagina, do_livro)) == {True}
+    assert set(ef.decidir_negritos(boxes, palavras, medidas, da_pagina, do_livro)) == {True}
 
 
 def test_com_a_regua_do_livro_a_prosa_redonda_continua_redonda():
@@ -100,7 +100,7 @@ def test_com_a_regua_do_livro_a_prosa_redonda_continua_redonda():
     medidas = [0.101, 0.099, 0.10, None, 0.102, 0.10, 0.098, 0.10]
     do_livro = {char: [1000, 0.10, 0.104] for char in "thers"}
     da_pagina = rn.regua_da_pagina([b.char for b in boxes], medidas)
-    assert pg.decidir_negritos(boxes, palavras, medidas, da_pagina, do_livro) == [
+    assert ef.decidir_negritos(boxes, palavras, medidas, da_pagina, do_livro) == [
         False, False, False, None, False, False, False, False]
 
 
@@ -125,14 +125,14 @@ def test_a_regua_da_pagina_vai_ao_arquivo_e_ao_resumo_do_livro(projeto):  # noqa
 def test_o_lote_grava_a_regua_de_cada_pagina_e_manda_a_do_livro(projeto, fonte, leitor,  # noqa: F811
                                                                 monkeypatch):
     pedidas = []
-    original = pg.medir_efeitos
+    original = ef.medir_efeitos
 
     def medir(imagem, boxes, regua_do_livro=None):
         pedidas.append(regua_do_livro)
         efeitos = original(imagem, boxes, regua_do_livro)
-        return pg.Efeitos(efeitos.negritos, efeitos.italicos, {"a": [2000, 0.1, 0.11]})
+        return ef.Efeitos(efeitos.negritos, efeitos.italicos, {"a": [2000, 0.1, 0.11]})
 
-    monkeypatch.setattr(pg, "medir_efeitos", medir)
+    monkeypatch.setattr(ef, "medir_efeitos", medir)
     livro.reconhecer_paginas(projeto, fonte, leitor, range(3))
     assert pedidas[0] == {}
     assert pedidas[1] == {"a": [2000, 0.1, 0.11]}

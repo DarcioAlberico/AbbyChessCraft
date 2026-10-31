@@ -27,6 +27,7 @@ from core.box_model import BoxEntry
 
 from abbychess import edicao as ed
 from abbychess import pagina as pg
+from abbychess import editar_boxes as eb
 from abbychess import sessao as ss
 from abbychess import texto as tx
 from abbychess.modelo import Box, Pagina, foto, gid_de, reconciliar
@@ -267,13 +268,13 @@ class MaquinaDaPagina(RuleBasedStateMachine):
     def dividir_pela_janela(self, i):
         if self.pagina.boxes:
             k = i % len(self.pagina.boxes)
-            self._pela_janela(lambda entries: pg.dividir(self.imagem, entries, k))
+            self._pela_janela(lambda entries: eb.dividir(self.imagem, entries, k))
 
     @rule(i=st.integers(0, 10_000))
     def juntar_pela_janela(self, i):
         if len(self.pagina.boxes) >= 2:
             k = i % (len(self.pagina.boxes) - 1)
-            self._pela_janela(lambda entries: pg.juntar(self.imagem, entries, k, k + 1))
+            self._pela_janela(lambda entries: eb.juntar(self.imagem, entries, k, k + 1))
 
     @rule(i=st.integers(0, 10_000))
     def descartar_pela_janela(self, i):

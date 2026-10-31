@@ -11,6 +11,7 @@ import pytest
 from PIL import Image
 
 from abbychess import pagina as pg
+from abbychess import efeitos as ef
 from abbychess import servidor_de_leitura as sl
 from abbychess.modelo import Estilo
 from core.box_model import BoxEntry
@@ -34,7 +35,7 @@ def _efeitos_por_linha(caminho, n_linhas):
     boxes = pg.segmentar(imagem)
     for b in boxes:
         b.char = "a"                     # as palavras e a medida só pedem que seja letra
-    _negritos, italicos = pg.efeitos_da_pagina(imagem, boxes)
+    _negritos, italicos = ef.efeitos_da_pagina(imagem, boxes)
     altura = imagem.height / (60 + 22 * n_linhas)
     linhas = [[] for _ in range(n_linhas)]
     for b, italico in zip(boxes, italicos):
@@ -88,17 +89,17 @@ def test_a_inclinacao_de_hastes_cisalhadas(cisalhamento, esperado, preto_e_branc
     """O pico fica no ângulo do cisalhamento (atan 0,2 ≈ 11°), também em 1 bit, onde a borda
     inclinada é uma escada de degraus verticais (a régua de antes, pelo gradiente, via 0°)."""
     recorte = _hastes(cisalhamento, preto_e_branco)
-    medida = pg._inclinacao_por_projecao(recorte, np.ones_like(recorte, bool))
+    medida = ef._inclinacao_por_projecao(recorte, np.ones_like(recorte, bool))
     assert medida is not None and abs(medida[0] - esperado) <= 1.5 and medida[1] >= 1.0
     if cisalhamento:
-        assert medida[1] > pg.GANHO_DO_ITALICO
+        assert medida[1] > ef.GANHO_DO_ITALICO
 
 
 def test_algarismos_e_palavras_curtas_nao_tem_italico_medido():
     pagina = np.full((40, 200), 255, np.uint8)
     boxes = [BoxEntry(c, 10 + 12 * k, 10, 20 + 12 * k, 30) for k, c in enumerate("1234")]
     boxes += [BoxEntry(c, 120 + 12 * k, 10, 130 + 12 * k, 30) for k, c in enumerate("ab")]
-    assert pg._italicos(pagina, boxes, [[0, 1, 2, 3], [4, 5]]) == [None] * 6
+    assert ef._italicos(pagina, boxes, [[0, 1, 2, 3], [4, 5]]) == [None] * 6
 
 
 def test_o_estilo_da_pagina_lida_leva_o_italico():
@@ -170,12 +171,12 @@ def test_o_lote_rele_o_glifo_lido_por_amostra_de_outro_efeito(tmp_path):
         assert box.char == "n" and not Path(procedencia.amostra_de(box)).is_absolute()
 
     ler_como_o_lote()
-    assert pg.reler_pelo_efeito(imagem, [box], leitor, [False], [None]) == 1
+    assert ef.reler_pelo_efeito(imagem, [box], leitor, [False], [None]) == 1
     assert box.char == "r"
     # Medido em negrito (ou sem medida), a leitura fica.
     for negrito in (True, None):
         ler_como_o_lote()
-        assert pg.reler_pelo_efeito(imagem, [box], leitor, [negrito], [None]) == 0
+        assert ef.reler_pelo_efeito(imagem, [box], leitor, [negrito], [None]) == 0
         assert box.char == "n"
 
 
@@ -191,4 +192,4 @@ def test_reler_mantem_o_sublinhado_do_usuario():
 
 
 def test_a_pagina_sem_glifos_nao_tem_efeitos():
-    assert pg.efeitos_da_pagina(Image.new("L", (10, 10)), []) == ([], [])
+    assert ef.efeitos_da_pagina(Image.new("L", (10, 10)), []) == ([], [])

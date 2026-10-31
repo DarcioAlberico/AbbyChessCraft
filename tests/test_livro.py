@@ -22,6 +22,7 @@ from abbychess import pdf_pesquisavel as pdfp
 from abbychess import montagem as mo
 from abbychess import livro
 from abbychess import pagina as pg
+from abbychess import efeitos as ef
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
@@ -49,10 +50,10 @@ def test_amostra_escolhe_inicio_meio_e_fim_do_corpo():
 def test_negrito_e_medido_por_palavra_com_a_referencia_da_pagina(monkeypatch):
     boxes = [BoxEntry("a", x, 0, x + 8, 20) for x in (0, 10, 40, 50)]
     pesos = {0: 1.0, 10: 1.0, 40: 2.0, 50: 2.0}
-    monkeypatch.setattr(pg, "recorte", lambda _imagem, box: np.array([[box.x1]]))
-    monkeypatch.setattr(pg, "espessura_do_traco", lambda imagem: pesos[int(imagem[0, 0])])
+    monkeypatch.setattr(ef, "recorte", lambda _imagem, box: np.array([[box.x1]]))
+    monkeypatch.setattr(ef, "espessura_do_traco", lambda imagem: pesos[int(imagem[0, 0])])
 
-    negrito, _italico = pg.efeitos_da_pagina(Image.new("L", (80, 30)), boxes)
+    negrito, _italico = ef.efeitos_da_pagina(Image.new("L", (80, 30)), boxes)
     assert negrito == [False, False, True, True]
 
 
@@ -64,7 +65,7 @@ def test_negrito_converte_a_pagina_uma_vez(monkeypatch):
                         lambda self, *a, **k: convertidas.append(1) or original(self, *a, **k))
     boxes = [BoxEntry("a", x, 0, x + 8, 20) for x in range(0, 200, 10)]
 
-    assert len(pg.efeitos_da_pagina(Image.new("RGB", (220, 30), "white"), boxes)[0]) == 20
+    assert len(ef.efeitos_da_pagina(Image.new("RGB", (220, 30), "white"), boxes)[0]) == 20
     assert len(convertidas) == 1
 
 

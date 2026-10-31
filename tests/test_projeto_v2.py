@@ -12,6 +12,7 @@ import json
 
 import pytest
 
+from abbychess import editar_boxes as eb
 from abbychess import livro, pagina as pg
 from abbychess.leitor import FONTE_LIVRO, LeitorDoLivro
 from abbychess.modelo import EM_REVISAO, GLIFOS_MARCADOS, RECONHECIDA, pid_de
@@ -46,7 +47,7 @@ def test_dividir_pela_janela_aposenta_o_gid_e_da_gids_novos(lido):
     projeto, leitor, imagem = lido
     boxes = projeto.carregar_pagina(0)
     antes = [b.gid for b in projeto.carregar_modelo(0).boxes]
-    pg.juntar(imagem, boxes, 0, 1, leitor)
+    eb.juntar(imagem, boxes, 0, 1, leitor)
     projeto.salvar_pagina(0, boxes)
     depois = projeto.carregar_modelo(0)
     assert antes[0] not in depois.vivos and antes[1] not in depois.vivos
@@ -128,7 +129,7 @@ def test_dois_arquivos_do_mesmo_indice_vale_o_gravado_por_ultimo(lido):
 def test_gid_que_a_janela_pede_ja_esta_gravado(lido):
     projeto, leitor, imagem = lido
     boxes = projeto.carregar_pagina(0)
-    pg.dividir(imagem, boxes, 0, leitor)
+    eb.dividir(imagem, boxes, 0, leitor)
     gid = projeto.gid_do_box(0, boxes, 0)
     reaberto = ProjetoDeLivro.abrir(projeto.pasta).carregar_modelo(0)
     assert gid in reaberto.vivos and reaberto.proximo_n > (gid & ((1 << 20) - 1))
@@ -145,7 +146,7 @@ def test_so_leitura_com_pagina_v2_nao_grava_nem_ao_pedir_gid(lido):
     aberto = ProjetoDeLivro.abrir(projeto.pasta)
     try:
         boxes = aberto.carregar_pagina(0)
-        pg.dividir(imagem, boxes, 0, leitor)
+        eb.dividir(imagem, boxes, 0, leitor)
         g1 = aberto.gid_do_box(0, boxes, 0)
         assert aberto.gid_do_box(0, boxes, 0) == g1          # a mesma página, o mesmo gid
         assert {p.name: p.read_bytes() for p in projeto.pasta.rglob("*.json")} == antes

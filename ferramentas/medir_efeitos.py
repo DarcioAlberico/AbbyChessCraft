@@ -208,6 +208,7 @@ def _medir_pagina(fonte, doc, indice: int, perfil: Perfil) -> _Medida:
     import numpy as np
 
     from abbychess import pagina as pg
+    from abbychess import efeitos as ef
     from abbychess import regua_do_negrito as rn
     from core.notacao import palavras_da_pagina
 
@@ -224,9 +225,9 @@ def _medir_pagina(fonte, doc, indice: int, perfil: Perfil) -> _Medida:
         achado = next((g for g in glifos if g[0] <= cx <= g[2] and g[1] <= cy <= g[3]), None)
         b.char = achado[4] if achado else ""
         rotulos.append(achado[5:] if achado else None)
-    efeitos = pg.medir_efeitos(imagem, boxes)
+    efeitos = ef.medir_efeitos(imagem, boxes)
     cinza = pg.cinza(imagem)
-    espessuras = pg.espessuras_da_pagina(cinza, boxes)
+    espessuras = ef.espessuras_da_pagina(cinza, boxes)
     palavras = [[s.indice for s in palavra.simbolos]
                 for linha in palavras_da_pagina(boxes) for palavra in linha]
     recortes = {}
@@ -247,6 +248,7 @@ def medir(pdf: Path, indices: list, perfil: Perfil, livros=LIVROS) -> dict:
     import fitz
 
     from abbychess import pagina as pg
+    from abbychess import efeitos as ef
     from abbychess import regua_do_negrito as rn
 
     fonte = pg.FonteDePaginas(pdf)
@@ -268,7 +270,7 @@ def medir(pdf: Path, indices: list, perfil: Perfil, livros=LIVROS) -> dict:
                 livro = rn.juntar(x.regua for x in medidas[:k])
             else:
                 livro = rn.juntar(x.regua for j, x in enumerate(medidas) if j != k)
-            negritos = pg.decidir_negritos(m.boxes, m.palavras, m.espessuras, m.regua, livro)
+            negritos = ef.decidir_negritos(m.boxes, m.palavras, m.espessuras, m.regua, livro)
             for p, todos in enumerate(m.palavras):
                 if any(m.rotulos[i] is None for i in todos):
                     continue
@@ -342,18 +344,18 @@ def main(argv=None) -> int:
                             help="os modos da régua do livro: pagina, acumulado, todas")
     args = analisador.parse_args(argv)
 
-    from abbychess import pagina as pg
+    from abbychess import efeitos as ef
 
     from abbychess import regua_do_negrito as rn
 
     resultado = {
         "data": datetime.date.today().isoformat(), "git": estado_do_git(), "pdf": args.pdf.name,
         "negrito": {"minimo_do_livro": rn.MINIMO_DO_LIVRO,
-                    "contraste_minimo": pg.CONTRASTE_MINIMO_DO_TRACO},
-        "regra": {"inclinacao_graus": pg.INCLINACAO_DO_ITALICO, "teto_graus": pg.TETO_DO_ITALICO,
-                  "ganho": pg.GANHO_DO_ITALICO,
-                  "minimo_de_letras": pg.MINIMO_DE_LETRAS_DO_ITALICO,
-                  "reta_ate_graus": pg.RETA_ATE},
+                    "contraste_minimo": ef.CONTRASTE_MINIMO_DO_TRACO},
+        "regra": {"inclinacao_graus": ef.INCLINACAO_DO_ITALICO, "teto_graus": ef.TETO_DO_ITALICO,
+                  "ganho": ef.GANHO_DO_ITALICO,
+                  "minimo_de_letras": ef.MINIMO_DE_LETRAS_DO_ITALICO,
+                  "reta_ate_graus": ef.RETA_ATE},
         "perfis": {},
     }
     for nome in args.perfis.split(","):

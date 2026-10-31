@@ -96,10 +96,10 @@ def _cer(conta: dict):
 
 def _estilos(imagem, boxes):
     """O estilo de cada box como a leitura o mede (`PaginaLida.estilos`); None sem medida."""
-    from abbychess import pagina as pg
+    from abbychess import efeitos as ef
     from abbychess.modelo import Estilo
 
-    negritos, italicos = pg.efeitos_da_pagina(imagem, boxes)
+    negritos, italicos = ef.efeitos_da_pagina(imagem, boxes)
     return [Estilo(negrito=bool(n), italico=bool(i)) if n is not None or i else None
             for n, i in zip(negritos, italicos)]
 

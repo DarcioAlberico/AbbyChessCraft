@@ -259,6 +259,7 @@ def replay(livro: str, snapshot: Path, passo: str, indices=None, verdade: Path =
 def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
     from abbychess import montagem as mo
     from abbychess import pagina as pg
+    from abbychess import editar_boxes as eb
     from abbychess.atalhos import carregar as carregar_atalhos
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
@@ -377,10 +378,10 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
             elif acao[0] == "sobra":
                 pg.descartar(boxes, acao[1])
             elif acao[0] == "divisao":
-                pg.dividir(imagem, boxes, acao[1], leitor)
+                eb.dividir(imagem, boxes, acao[1], leitor)
                 mostrado = acao[1]                          # a primeira parte
             elif acao[0] == "juncao":
-                pg.juntar(imagem, boxes, acao[1], acao[2], leitor)
+                eb.juntar(imagem, boxes, acao[1], acao[2], leitor)
                 mostrado = min(acao[1], acao[2])            # o box junto
             texto_conta.usar(f"{acao[0]}_da_fila" if da_fila else acao[0])
         else:
@@ -476,7 +477,7 @@ def _colado(dif: Diferencas, boxes, sem_colado: set, disponiveis: dict, imagem, 
     estimativas são do lado conservador: a parte errada custa o ensinar fora da fila."""
     from dataclasses import replace
 
-    from abbychess import pagina as pg
+    from abbychess import editar_boxes as eb
 
     dividir, ensinar = disponiveis.get("divisao"), disponiveis.get("substituicao")
     if dividir is None or ensinar is None:
@@ -493,7 +494,7 @@ def _colado(dif: Diferencas, boxes, sem_colado: set, disponiveis: dict, imagem, 
             sem_colado.add(caixa)
             copia = [replace(x) for x in boxes]
             try:
-                pg.dividir(imagem, copia, candidato, leitor)
+                eb.dividir(imagem, copia, candidato, leitor)
             except ValueError:
                 continue
             linhas, caixas, palavra = _linhas_da_pagina(copia, fonte, indice, mo)

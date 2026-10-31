@@ -382,24 +382,24 @@ def _operacoes_estruturais(unidades, novo, pares):
 
 
 def _palavras_originais(unidades) -> Dict[int, int]:
-    """gid -> o número da palavra dele no original; e a linha impressa de cada palavra."""
-    palavra, numero = {}, 0
-    for u in unidades:
-        if u.glifo:
-            palavra[u.gid] = numero
-        elif u.tipo in (ESPACO, LINHA):
-            numero += 1
-    return palavra
+    """gid -> o número da palavra dele no original."""
+    return _contados(unidades, (ESPACO, LINHA))
 
 
 def _linha_original(unidades) -> Dict[int, int]:
-    linha, numero = {}, 0
+    """gid -> o número da linha impressa dele no original."""
+    return _contados(unidades, (LINHA,))
+
+
+def _contados(unidades, separadores) -> Dict[int, int]:
+    """gid -> quantos `separadores` vêm antes do glifo dele."""
+    numero_de, numero = {}, 0
     for u in unidades:
         if u.glifo:
-            linha[u.gid] = numero
-        elif u.tipo == LINHA:
+            numero_de[u.gid] = numero
+        elif u.tipo in separadores:
             numero += 1
-    return linha
+    return numero_de
 
 
 def _fronteiras(unidades, itens, plano: Plano) -> None:

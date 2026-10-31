@@ -139,6 +139,7 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
 - **Evidência:** nenhuma trava entre processos; `limpar_temporarios`
   (`gravacao.py:151-157`) apaga o `.tmp` em curso do outro.
 - **CA-Q-P5:** abrir o mesmo projeto num segundo processo o abre só para leitura, com aviso.
+- **Feito** no Q6 (2026-10-31, `126e132`): `gravacao.tomar_a_pasta` trava a `projeto.lock` (msvcrt ou flock, um byte longe do conteúdo); sem ela, `abrir` abre só para leitura com o motivo, antes de criar pasta ou limpar temporário.
 - **Correção mínima:** `projeto.lock` com `msvcrt.locking` (ou `O_EXCL` com o pid) em `abrir`.
 
 ### Q-P6 (Média, confirmado) — `projeto.json` validado pela metade
@@ -149,6 +150,7 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
 - **CA-Q-P6:** para cada campo de `projeto.json`, um valor do tipo errado ao abrir dá
   `ProjetoInvalido` com o nome do campo, e nada é gravado (teste parametrizado, ou hypothesis
   sobre o JSON).
+- **Feito** no Q6 (`5eff49a`): `TIPOS_DO_PROJETO`, `TIPOS_DOS_LIMIARES` e `_conferir_tipos`; o erro diz o campo e nada é gravado (21 casos).
 - **Correção mínima:** uma função de entrada que valida os tipos de `Projeto` e `Limiares`.
 
 ### Q-P7 (Média, confirmado) — a página ilegível é tratada de três jeitos
@@ -177,6 +179,7 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
   `pagina.py:561`, ruff B018), com comentários do tipo "agora, antes de qualquer render".
 - **CA-Q-P8:** ler `projeto.sequencia` não muda nenhum arquivo do projeto (teste por mtime e
   bytes); a montagem da sequência é um método explícito chamado em `abrir`/`criar`.
+- **Feito** no Q6 (`72a3baf`): `montar_sequencia` grava os consertos ao criar e ao abrir; a propriedade e o `_carregar_livro` só leem.
 
 ### Q-P9 (Baixa) — strings mágicas e duas fontes da verdade
 
@@ -188,6 +191,7 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
 - `Box` é `frozen`, mas `entry` é um `BoxEntry` mutável e `carregar_pagina` entrega os objetos
   vivos do cache (`modelo.py:91-96`, `projeto.py:820-823`) → cópia na saída.
 - **CA-Q-P9:** um estado ou uma notação desconhecidos em disco dão `ProjetoInvalido`.
+- **Feito** no Q6 (`6cbbe2b`), em parte: `modelo.Estado` e `projeto.Notacao` (`StrEnum`); a notação desconhecida dá `ProjetoInvalido`, e o estado desconhecido faz a página ilegível (a regra do CA-Q-P7, não `ProjetoInvalido`: uma página não impede o livro). As duas fontes da verdade e a cópia do `Box` ficam para o Q7.
 
 ## 4. Concorrência e falhas silenciosas
 
@@ -224,6 +228,7 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
   `sugerir_recortes` chama `rede.predict` sem a `_trava`.
 - **CA-Q-C3:** todo método do leitor chamado no servidor passa pela mesma trava (teste com um
   leitor falso que registra sobreposição).
+- **Feito** no Q6 (`1b5acf2`): `dar_a_vez` embrulha também `ler_pelo_livro` e `sugerir` (a trava reentrante); o `arbitro` já lê pelo `ler`.
 
 ### Q-C4 (Média, confirmado) — erros engolidos
 
@@ -258,6 +263,7 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
 - `_caiu` reenvia os pendentes ao filho novo sem os cancelamentos
   (`servidor_de_leitura.py:586-587`).
 - `_voltar` aplica e grava antes de mover o histórico (`controlador.py:2263-2283`).
+- **Feito** no Q6 (2026-10-31), um teste e uma correção para cada: o pool confere e se tira numa trava só (`7157ea1`); a busca, a busca por glifo e a procura das amostras leem o projeto do pedido (`31903a2`); os recortes da Galeria conferem a geração (`851e608`); o filho reaberto recebe o cancelar (`22a494a`); o histórico anda com as páginas, antes do disco (`919aa3b`).
 
 ## 5. Exportação
 
@@ -543,7 +549,7 @@ teste usa como o usuário; senão saem. Os 3 F401 de `camada.py` saem já (o por
 2. ~~**Faixas de páginas:** o "–" do lote e o "-" do diálogo são de propósito (mostrar contra
    digitar)?~~ **Decidido** (2026-10-31): sim; uma função só, `sequencia.faixas_de_paginas`,
    com o separador por parâmetro.
-3. **Q-P5:** o segundo processo abre só para leitura ou recusa?
+3. ~~**Q-P5:** o segundo processo abre só para leitura ou recusa?~~ **Decidido** (2026-10-31): só para leitura, com o motivo.
 4. ~~**Q-E1:** a exportação passa a usar `texto.montar` inteira (Q-E6) já no primeiro passo, ou
    primeiro só as decisões?~~ **Decidido** (2026-10-30): só as decisões no Q3; o Q-E6 no Q7.
 5. ~~**Teto da suíte rápida:** 60 s sem cobertura (como hoje na §15.1) e a medida com

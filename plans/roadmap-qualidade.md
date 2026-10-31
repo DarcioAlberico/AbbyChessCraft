@@ -198,6 +198,13 @@ CA-Q-P5 (decidir antes a §13.3), CA-Q-C3, e um teste para cada corrida de Q-C5.
 
 **Pronto quando:** os CA passam; abrir um projeto estragado nunca grava nada.
 
+**Feito** em 2026-10-31, ramo `qualidade-q6` (`docs/revisoes/qualidade-Q6.md`): os seis CA,
+cada um com o teste vermelho antes, e um teste para cada uma das quatro corridas do Q-C5; o
+segundo processo abre só para leitura (decisão §13.3). Desvios: o estado desconhecido numa
+página a faz ilegível (a regra do CA-Q-P7) em vez de `ProjetoInvalido`; as duas fontes da
+verdade da sequência e do próximo pid, e a cópia do `Box` na saída do cache (resto do Q-P9),
+passam ao Q7.
+
 ## Passo Q7 — Cortar os objetos-deus
 
 **Contexto.** `ControladorDePagina` (138 métodos), `ProjetoDeLivro` (~1 640 linhas),

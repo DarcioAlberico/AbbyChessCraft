@@ -22,6 +22,16 @@ O passo fecha quando nenhuma linha diz "a reduzir (Q8)".
 
 | 2. Os módulos puros (`sequencia`, `lances`, `texto`, `historico`, `modelo`, `sessao`) | `9209b87` à mão (o molde: `Entrada.__post_init__`); `bd04683`, `09c9f36`, `631e9e6`, `27927ef` (os testes do `emendar`), `d140872`, `aad6d64`, `a97f6dd`, `3428a31`, `064f64f`, `6afeef8`, `4800a40` por um subagente, revisado aqui; `0e412bb` à mão | as 40 partidas, cada parte com cc ≤ 8; as grandes viraram uma classe com os passos (`_Reconciliacao`, `_Divisao`, `_Reescrita`, `_Linha`); os laços por glifo inteiros (a reconciliação de 3 000 glifos e o `alinhar` medidos antes e depois: iguais) | 255 → 215 |
 
+| 3. A análise da página (`contexto`, `zonas`, `busca`, `ancoragem`, `layout`, `edicao`, `verificacao`) | `926949b`, `33f32e1`, `d5ac063`, `6257eb7`, `eef42f9`, `787bcf6`, `2cff6ba`, `3ddccc0`, `5bddec0`, `ef5bad5`, `3322106` por um subagente, revisado aqui; `475b380`, `13dde31` à mão | as 36 partidas, cada parte com cc ≤ 9; quatro commits só de testes antes de partir (a continuação da legenda e o ponto solto, a figurina digitada na busca, os virtuais ancorados no que se apaga, as listas extras do léxico: regras sem teste nenhum); os laços quentes medidos antes e depois (o `julgar` de 3 066 glifos, o `indexar_pagina`, as linhas das zonas: iguais); dois pares do dryer que o partir expôs, juntados (`texto.chars_dos_gids` para o contexto; `layout.partes_pelo_vao`, a mesma regra do vão no layout e nas zonas) | 215 → 179 |
+
+Na rodada 3, também: `475b380` — o subagente achou e parou em `_linhas_que_atravessam`, que
+recalculava o topo e o pé da fila a cada glifo da página: numa página de duas colunas de 3 410
+glifos, 13,7 ms (quase metade da ordem de leitura); contados uma vez por fila, 1,9 ms, as
+mesmas faixas. Sem teste vermelho (o custo é linear vezes o tamanho da fila: um teste de relógio
+honesto não sai); a prova é a medida. Também anotado, não mudado: `_nada_no_meio`, no
+`partir_depois_do_f`, percorre o trecho a cada partição (~20 ms em 154 partições da página
+sintética; numa página real, bem menos).
+
 Na rodada 2, também:
 - `26af726`: partir levou o `modelo.py` de 966 para 1 154 linhas (a catraca do tamanho
   reprovou); a geometria (reenquadrar, dividir, endireitar) foi para `geometria_do_modelo.py`,
@@ -51,7 +61,7 @@ par, o aceito). A rápida sem cobertura no `0e412bb`: 1990 passaram em 73–85 s
 
 ## O que falta
 
-As 212 de cc ≥ 10 que ainda dizem "a reduzir (Q8)" (eram 252) ("a reduzir (Q8)"): partir, com a suíte como pino (refatoração, sem mudar
+As 176 de cc ≥ 10 que ainda dizem "a reduzir (Q8)" (eram 252) ("a reduzir (Q8)"): partir, com a suíte como pino (refatoração, sem mudar
 comportamento no mesmo commit); as de cobertura < 50 % primeiro ganham o teste. Os `match` e as
 cadeias de `if` de despacho só se partem se a tabela ficar mais clara (§8); senão ficam com
 motivo. Também Q-T3 (os testes que montam estado privado) e Q-T6 (as propriedades que faltam).
@@ -72,3 +82,5 @@ motivo. Também Q-T3 (os testes que montam estado privado) e Q-T6 (as propriedad
 | A geometria num módulo novo, não outro corte do modelo | era a única seção que só dependia do resto e de que o resto não dependia |
 | Os pares do dryer juntados, não aceitos | a repetição era de verdade (a mesma divisão, o mesmo índice); juntar seguiu o molde que o arquivo já tinha (`_levar`) |
 | Daqui em diante, o subagente roda o dryer depois de partir | a medida só o roda no fim; os três pares apareceram nela |
+| Rodada 3 com o dryer e a catraca do tamanho no protocolo | na rodada 3 ele pegou os dois pares na hora, e nenhum arquivo passou de 1 000 linhas |
+| O `_linhas_que_atravessam` sem teste vermelho, com a medida | "se um teste honesto é impraticável, não escreva um ruim": o relógio não separa 13 de 2 ms do ruído sem um alvo, e a spec não tem alvo para a ordem de leitura |

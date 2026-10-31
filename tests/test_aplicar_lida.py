@@ -5,7 +5,7 @@ from __future__ import annotations
 from core.box_model import BoxEntry
 
 from abbychess import pagina as pg
-from abbychess import projeto as pj
+from abbychess.pagina_em_json import comparavel
 from abbychess import servidor_de_leitura as sl
 from abbychess.controlador import ControladorDePagina
 from abbychess.leitor import LeitorDoLivro
@@ -56,4 +56,4 @@ def test_o_f5_e_o_lote_deixam_a_mesma_pagina(tmp_path):
 
     pela_f5, pelo_lote = projeto_f5.carregar_modelo(0), projeto_lote.carregar_modelo(0)
     assert pela_f5.zonas and pela_f5.diagramas         # o caso cobre as áreas e o diagrama
-    assert pj._comparavel(pela_f5) == pj._comparavel(pelo_lote)
+    assert comparavel(pela_f5) == comparavel(pelo_lote)

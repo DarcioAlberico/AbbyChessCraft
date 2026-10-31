@@ -167,12 +167,12 @@ def _indexar_tarefa(tarefa) -> Optional[PaginaIndexada]:
     if isinstance(fonte, Pagina):
         return indexar_pagina(fonte, idioma, versao=versao)
     from abbychess.modelo import reenquadrar
-    from abbychess.projeto import _pagina_de_json
+    from abbychess.pagina_em_json import pagina_de_json
 
     caminho, posicao, geometria, tamanho = (fonte if isinstance(fonte, tuple)
                                             else (fonte, None, None, None))
     try:
-        pagina = _pagina_de_json(json.loads(Path(caminho).read_text(encoding="utf-8")))
+        pagina = pagina_de_json(json.loads(Path(caminho).read_text(encoding="utf-8")))
         if geometria is not None:
             reenquadrar(pagina, geometria, tamanho)
     except (OSError, ValueError, KeyError, TypeError):

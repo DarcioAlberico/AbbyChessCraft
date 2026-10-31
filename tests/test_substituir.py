@@ -233,7 +233,7 @@ def test_areas_e_estado_mudados_depois_da_previa_ficam(sub):
 def test_o_arquivo_mudado_fora_do_cache_nao_e_adotado(sub):
     import json
 
-    from abbychess.projeto import _pagina_para_json
+    from abbychess.pagina_em_json import pagina_para_json
 
     projeto, ctl, s, escrever, eventos = sub
     assert projeto.descarregar(10)
@@ -244,7 +244,7 @@ def test_o_arquivo_mudado_fora_do_cache_nao_e_adotado(sub):
     nova = escrever(1, "nada aqui")                      # o lote gravou outra coisa nela
     assert projeto.descarregar(10)
     arquivo = projeto.arquivo_da_pagina(1)
-    arquivo.write_text(json.dumps(_pagina_para_json(nova)) + " ", encoding="utf-8")
+    arquivo.write_text(json.dumps(pagina_para_json(nova)) + " ", encoding="utf-8")
     with projeto._trava_do_cache:
         projeto._modelos.pop(1, None)
     _aplicar(s, previas)

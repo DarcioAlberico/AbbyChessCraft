@@ -79,8 +79,9 @@ from abbychess import sequencia as sq
 from abbychess.gravador import Gravador
 from abbychess import zonas as zn
 from abbychess.modelo import (FIGURINAS, GLIFOS_MARCADOS, LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
-                              Box, Decisoes, Estado,
-                              Pagina, foto, gid_de, proximo_estado, reconciliar, reenquadrar)
+                              Box, Pagina, foto, gid_de, proximo_estado, reconciliar, reenquadrar)
+from abbychess.pagina_em_json import (com_ids_de_diagramas, comparavel, inteiro, pagina_de_json,
+                                      pagina_para_json, vazia)
 from abbychess.zonas import Zona
 
 if TYPE_CHECKING:
@@ -105,10 +106,6 @@ ARQUIVO_DO_LIVRO = "livro.json"
 #: 3: a sequência do livro em `projeto.json` (passo L, §12.4): toda página tem `pid` gravado,
 #: e as listas de páginas, as inclinações, `janela.json` e `lote.json` são por `pid`.
 VERSAO = 3
-#: A versão do formato de cada `paginas/p<pid>.json`. 3 (passo L): a geometria dos boxes,
-#: o tamanho da fonte e os glifos fora do quadro; a 2 é lida como a geometria inteira.
-VERSAO_DA_PAGINA = 3
-VERSOES_DA_PAGINA = (2, 3)
 #: Onde a primeira abertura v2 guarda o projeto v1 de antes (§4.3).
 PASTA_DO_BACKUP_V1 = "backup-v1"
 #: Onde a primeira abertura v3 guarda os arquivos da v2 que ela muda (§12.4, CA-12.7).
@@ -575,7 +572,7 @@ class ProjetoDeLivro:
         página veio antes."""
         bilhete, pagina = entregue
         self._gravar_arquivo_da_pagina(pagina.pid, bilhete,
-                                       _pagina_para_json(pagina, self._pagina_da_fonte(pagina)))
+                                       pagina_para_json(pagina, self._pagina_da_fonte(pagina)))
         with self._trava_do_livro:
             with self._trava_das_paginas:
                 vale = self._ultimo_bilhete.get(pagina.pid) == bilhete
@@ -733,7 +730,7 @@ class ProjetoDeLivro:
             with self._trava_das_paginas:       # o gravador não troca o arquivo no meio
                 try:
                     dados = arquivo.read_bytes()
-                    _pagina_de_json(json.loads(dados.decode("utf-8")))
+                    pagina_de_json(json.loads(dados.decode("utf-8")))
                     return                      # regravado agora mesmo: vale o novo
                 except FileNotFoundError:
                     return                      # outra leitura já o isolou
@@ -829,7 +826,7 @@ class ProjetoDeLivro:
     def _de_json(self, bruto: dict) -> Pagina:
         """A página do JSON, com a posição dela no livro (a da sequência, e não o `indice`
         gravado no arquivo, que a sequência deixa de seguir no passo L)."""
-        pagina = _pagina_de_json(bruto)
+        pagina = pagina_de_json(bruto)
         posicao = self.sequencia.posicao_de(pagina.pid)
         if posicao is not None:
             pagina.indice = posicao
@@ -876,7 +873,7 @@ class ProjetoDeLivro:
         """A página e o resumo dela em `livro.json` (com a trava do livro); `livro=False`
         deixa o resumo para quem grava várias de uma vez (`trocar_paginas`)."""
         bilhete = next(self._bilhetes)
-        dados = _pagina_para_json(pagina, self._pagina_da_fonte(pagina))
+        dados = pagina_para_json(pagina, self._pagina_da_fonte(pagina))
         self._gravar_arquivo_da_pagina(pagina.pid, bilhete, dados)
         with self._trava_do_cache:
             # A foto da gravação, do mesmo `as_state()` que foi para o JSON.
@@ -1033,8 +1030,8 @@ class ProjetoDeLivro:
         """A página como está agora, antes de o lote com "refazer" a reler: o lote não entra
         no desfazer, e "Voltar ao estado antes do lote" a restaura."""
         gv.gravar_json(self._arquivo_antes_do_lote(pagina.pid),
-                       _pagina_para_json(pagina.instantaneo(),
-                                         self._pagina_da_fonte(pagina)))
+                       pagina_para_json(pagina.instantaneo(),
+                                        self._pagina_da_fonte(pagina)))
 
     def tem_antes_do_lote(self, indice: int) -> bool:
         # O pid do modelo (em memória), e não o do `livro.json`: logo depois do lote, a
@@ -1224,7 +1221,7 @@ class ProjetoDeLivro:
         self._v1_so_leitura = {}
         for pid in self._pids_v1(v1_vence):
             try:
-                self._v1_so_leitura[pid] = _pagina_para_json(self._ler_v1(pid), pid)
+                self._v1_so_leitura[pid] = pagina_para_json(self._ler_v1(pid), pid)
             except (OSError, ValueError, TypeError, KeyError) as erro:
                 log.warning("a página v1 %d está ilegível (%s): fica de fora", pid + 1, erro)
         self._livro = None                      # o resumo do livro é refeito com elas
@@ -1293,7 +1290,7 @@ class ProjetoDeLivro:
         extras = self.dados.extras
 
         def pid(valor) -> Optional[int]:
-            posicao = _inteiro(valor)
+            posicao = inteiro(valor)
             if posicao is None:
                 return None
             return sequencia.pid_em(posicao) if 0 <= posicao < len(sequencia) else None
@@ -1375,7 +1372,7 @@ class ProjetoDeLivro:
         página que saiu do livro, ou o valor ilegível, sai."""
         saida = []
         for valor in gravadas or ():
-            valor = _inteiro(valor)
+            valor = inteiro(valor)
             if valor is None:
                 continue
             posicao = self.posicao_do_pid(valor) if self.sequencia_gravada else valor
@@ -1611,7 +1608,7 @@ class ProjetoDeLivro:
         divisão, pelos `gids_movidos`)."""
         movidos = self.dados.gids_movidos
         for _ in range(len(movidos) + 1):       # uma cadeia não volta, mas o arquivo é de fora
-            novo = _inteiro(movidos.get(str(gid)))
+            novo = inteiro(movidos.get(str(gid)))
             if novo is None or novo == gid:
                 break
             gid = novo
@@ -1679,10 +1676,10 @@ class ProjetoDeLivro:
         if esperada is None:
             # A página vazia que a interface criou na memória (um box desenhado e tirado) e
             # nunca gravou vale a de antes.
-            return atual is None or (_vazia(atual) and not self._arquivo_v2(pid).is_file())
+            return atual is None or (vazia(atual) and not self._arquivo_v2(pid).is_file())
         if atual is None:
             return False
-        return _comparavel(atual) == _comparavel(esperada)
+        return comparavel(atual) == comparavel(esperada)
 
     def trocar_paginas(self, nova: sq.Sequencia, paginas: Dict[int, Optional[Pagina]],
                        gids_movidos: Dict[str, int]) -> None:
@@ -1717,7 +1714,7 @@ class ProjetoDeLivro:
                     entrada = nova.entrada_de(pid)
                     do_pdf = (entrada is not None and entrada.fonte == sq.FONTE_DO_LIVRO
                               and entrada.metade != "direita")
-                    gv.gravar_json(self._arquivo_v2(pid), _pagina_para_json(
+                    gv.gravar_json(self._arquivo_v2(pid), pagina_para_json(
                         paginas[pid], entrada.pagina if do_pdf else FORA_DO_PDF))
                     gravados.append(pid)
                 self.dados.sequencia = nova.para_json()
@@ -1816,7 +1813,7 @@ class ProjetoDeLivro:
         for pid in em_disco:
             if pid in conhecidos and str(pid) not in livro["paginas"]:
                 try:
-                    pagina = _pagina_de_json(json.loads(
+                    pagina = pagina_de_json(json.loads(
                         self._arquivo_v2(pid).read_text(encoding="utf-8")))
                 except (OSError, ValueError, TypeError, KeyError):
                     continue
@@ -1829,7 +1826,7 @@ class ProjetoDeLivro:
             if pid in conhecidos:
                 continue
             try:
-                pagina = _pagina_de_json(json.loads(
+                pagina = pagina_de_json(json.loads(
                     self._arquivo_v2(pid).read_text(encoding="utf-8")))
             except (OSError, ValueError, TypeError, KeyError):
                 continue
@@ -1907,7 +1904,7 @@ class ProjetoDeLivro:
                 continue
             try:
                 bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-                pagina = _pagina_de_json(bruto)
+                pagina = pagina_de_json(bruto)
             except (OSError, ValueError, TypeError, KeyError):
                 continue
             indice = pagina.indice
@@ -1949,7 +1946,7 @@ class ProjetoDeLivro:
                 continue
             try:
                 bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-                pagina = _pagina_de_json(bruto)
+                pagina = pagina_de_json(bruto)
             except (OSError, ValueError, TypeError, KeyError):
                 continue                # página ilegível: fica fora do resumo
             ordem = (bruto.get("gravado_em", ""), pagina.pid)
@@ -1960,7 +1957,7 @@ class ProjetoDeLivro:
                     continue
             por_indice[pagina.indice] = (ordem, pagina)
         for indice, bruto in self._v1_so_leitura.items():
-            por_indice[indice] = ((), _pagina_de_json(bruto))
+            por_indice[indice] = ((), pagina_de_json(bruto))
         paginas = {str(p.pid): self._resumo_do_modelo(p) for _, p in por_indice.values()}
         return {"versao": VERSAO_DO_LIVRO,
                 "paginas": dict(sorted(paginas.items(), key=lambda kv: int(kv[0])))}
@@ -2051,109 +2048,6 @@ class ProjetoDeLivro:
                 "diagramas_por_conferir": max(0, tabuleiros - conferidos),
                 # Alguma figurina lida (o modo "livro" das peças, §6.4, sem abrir as páginas).
                 "figurinas": any(b.entry.char in FIGURINAS for b in pagina.boxes), **regua}
-
-
-def _inteiro(valor) -> Optional[int]:
-    """O número de página de uma lista gravada, ou None (texto, `Infinity`, fração, `true`)."""
-    if isinstance(valor, bool):
-        return None
-    if isinstance(valor, float):
-        return int(valor) if valor.is_integer() else None
-    try:
-        return int(valor)
-    except (TypeError, ValueError, OverflowError):
-        return None
-
-
-def _pagina_para_json(pagina: Pagina, pagina_da_fonte: Optional[int] = None) -> dict:
-    """O JSON da página. O `indice` gravado é o da página no PDF (`pagina_da_fonte`,
-    §12.4), e não a posição no livro, que muda ao reordenar; sem ele, o da página."""
-    quadro, giro = pagina.geometria
-    return {
-        "versao": VERSAO_DA_PAGINA, "pid": pagina.pid,
-        "indice": pagina.indice if pagina_da_fonte is None else pagina_da_fonte,
-        "geometria": [None if quadro is None else list(quadro), int(giro)],
-        "tamanho": None if pagina.tamanho is None else list(pagina.tamanho),
-        "fora": [[lugar, box.para_json()] for lugar, box in pagina.fora],
-        "areas_fora": [[tipo, lugar, _area_para_json(tipo, objeto), aparada]
-                       for tipo, lugar, objeto, aparada in pagina.areas_fora],
-        "estado": pagina.estado, "proximo_n": pagina.proximo_n,
-        "gravado_em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "boxes": [b.para_json() for b in pagina.boxes],
-        "tabuleiros": [list(map(int, t)) for t in pagina.tabuleiros],
-        "diagramas": [d.para_json() for d in pagina.diagramas],
-        "zonas": [z.como_dict() for z in pagina.zonas],
-        "decisoes": pagina.decisoes.para_json(),
-        "regua_do_negrito": pagina.regua_do_negrito,
-    }
-
-
-def _pagina_de_json(bruto: dict) -> Pagina:
-    from abbychess.diagramas import DiagramaLido
-
-    if bruto.get("versao") not in VERSOES_DA_PAGINA:
-        raise ValueError(f"página de versão {bruto.get('versao')!r}")
-    return Pagina(pid=int(bruto["pid"]), indice=int(bruto["indice"]),
-                  boxes=[Box.de_json(b) for b in bruto.get("boxes", [])],
-                  tabuleiros=[tuple(int(v) for v in t) for t in bruto.get("tabuleiros", [])],
-                  diagramas=[DiagramaLido.de_json(d) for d in bruto.get("diagramas", [])],
-                  zonas=[Zona.de_dict(z) for z in bruto.get("zonas", [])],
-                  decisoes=Decisoes.de_json(bruto.get("decisoes")),
-                  estado=Estado(bruto.get("estado", RECONHECIDA)),   # ValueError: ilegível
-                  proximo_n=int(bruto.get("proximo_n", 0)),
-                  geometria=_geometria_de(bruto.get("geometria")),
-                  tamanho=None if bruto.get("tamanho") is None
-                  else tuple(int(v) for v in bruto["tamanho"]),
-                  fora=tuple((int(lugar), Box.de_json(b)) for lugar, b in bruto.get("fora", [])),
-                  areas_fora=tuple((tipo, int(lugar), _area_de_json(tipo, objeto), bool(aparada))
-                                   for tipo, lugar, objeto, aparada
-                                   in bruto.get("areas_fora", [])),
-                  regua_do_negrito=dict(bruto.get("regua_do_negrito") or {}))
-
-
-def _vazia(pagina: Pagina) -> bool:
-    return not (pagina.boxes or pagina.zonas or pagina.tabuleiros or pagina.diagramas
-                or pagina.fora or pagina.areas_fora or pagina.decisoes != Decisoes())
-
-
-def _comparavel(pagina: Pagina) -> str:
-    """A página como o JSON dela, sem o que não é conteúdo (`pagina_igual`)."""
-    bruto = _pagina_para_json(pagina, 0)
-    for chave in ("gravado_em", "indice", "proximo_n"):
-        bruto.pop(chave, None)
-    return json.dumps(bruto, sort_keys=True, ensure_ascii=False)
-
-
-def _area_para_json(tipo: str, objeto):
-    if tipo == "zona":
-        return objeto.como_dict()
-    if tipo == "diagrama":
-        return objeto.para_json()
-    return [int(v) for v in objeto]
-
-
-def _area_de_json(tipo: str, bruto):
-    from abbychess.diagramas import DiagramaLido
-
-    if tipo == "zona":
-        return Zona.de_dict(bruto)
-    if tipo == "diagrama":
-        return DiagramaLido.de_json(bruto)
-    if tipo == "tabuleiro":
-        return tuple(int(v) for v in bruto)
-    raise ValueError(f"área guardada de tipo {tipo!r}")
-
-
-def _geometria_de(bruto) -> tuple:
-    from abbychess import geometria as geo
-
-    return geo.normalizar(bruto)
-
-
-def com_ids_de_diagramas(diagramas):
-    from abbychess.diagramas import com_ids
-
-    return com_ids(diagramas)
 
 
 def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares,

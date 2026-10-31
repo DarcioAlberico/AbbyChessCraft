@@ -136,14 +136,14 @@ def test_a_busca_por_glifo():
 def test_construir_sem_processos_pelos_arquivos(tmp_path):
     import json
 
-    from abbychess.projeto import _pagina_para_json
+    from abbychess.pagina_em_json import pagina_para_json
 
     arquivos = {}
     for i in range(3):
         p = _pagina(f"pagina {i}")
         p.indice = i
         caminho = tmp_path / f"p{i}.json"
-        caminho.write_text(json.dumps(_pagina_para_json(p)), encoding="utf-8")
+        caminho.write_text(json.dumps(pagina_para_json(p)), encoding="utf-8")
         arquivos[i] = (str(caminho), 7)
     indice = bs.construir(arquivos, "pt", paralelo=False)
     assert sorted(indice) == [0, 1, 2] and indice[2].texto == "pagina 2" and indice[1].versao == 7
@@ -386,7 +386,7 @@ def test_trocar_de_projeto_com_o_pool_nao_esvazia_o_indice_novo(tmp_path):
 
     from abbychess.controlador import Eventos
     from abbychess.controladores import ControladorDaBusca
-    from abbychess.projeto import _pagina_para_json
+    from abbychess.pagina_em_json import pagina_para_json
 
     def projeto(nome):
         pasta = tmp_path / nome
@@ -394,7 +394,7 @@ def test_trocar_de_projeto_com_o_pool_nao_esvazia_o_indice_novo(tmp_path):
         for i in range(120):
             p = _pagina(f"{nome} pagina {i} com Cf3 e casa")
             p.indice = i
-            (pasta / f"p{i}.json").write_text(json.dumps(_pagina_para_json(p)), encoding="utf-8")
+            (pasta / f"p{i}.json").write_text(json.dumps(pagina_para_json(p)), encoding="utf-8")
         # A sequência, desde o passo L: o índice lê dela a geometria de cada página.
         from abbychess.sequencia import Sequencia
 
@@ -426,14 +426,14 @@ def test_o_indice_no_pool_de_processos_e_o_mesmo_que_em_serie(tmp_path):
     """O índice montado nos processos (o padrão do programa) é igual ao montado na thread."""
     import json
 
-    from abbychess.projeto import _pagina_para_json
+    from abbychess.pagina_em_json import pagina_para_json
 
     fontes = {}
     for i in range(10):
         p = _pagina(f"pagina {i} com Cf3 e casa")
         p.indice = i
         caminho = tmp_path / f"p{i}.json"
-        caminho.write_text(json.dumps(_pagina_para_json(p)), encoding="utf-8")
+        caminho.write_text(json.dumps(pagina_para_json(p)), encoding="utf-8")
         fontes[i] = (str(caminho), i)
     na_memoria = _pagina("na memória")                  # a página como objeto, também
     na_memoria.indice = 10

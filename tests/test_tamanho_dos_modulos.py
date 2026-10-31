@@ -18,7 +18,7 @@ TETOS = {
     "abbychess/epub.py": 1154,
     "abbychess/exportar.py": 2130,
     "abbychess/pagina.py": 1446,
-    "abbychess/projeto.py": 2215,
+    "abbychess/projeto.py": 2109,
     "abbychess/projeto.py:ProjetoDeLivro": 108,
     "abbychess/controlador.py:ControladorDePagina": 61,
     "abbychess/app/documento.py:VistaDoDocumento": 58,

@@ -456,6 +456,67 @@ def test_abrir_a_pagina_com_aguardando_le_fora_do_desfazer(ctl, projeto, com_ser
     assert p.historico.proximo_a_refazer == "Corrigir para 'k'"     # o refazer ficou
 
 
+def _marcado_aguardando(p):
+    """Marca de novo o primeiro glifo da página aberta, que fica aguardando o servidor (a
+    interface só com os padrões); devolve o gid dele."""
+    from abbychess import pagina as pg
+
+    p.leitor.aguardar = True
+    p.leitor.ocr = None
+    b = p.box(p.gids[0])
+    p.marcar(b.x1 - 1, b.y1 - 1, b.x2 + 1, b.y2 + 1)
+    assert pg.aguardando(p.box(p.atual))
+    return p.atual
+
+
+def test_a_leitura_do_aguardando_entra_no_marcar_e_o_refazer_o_traz_lido(ctl, projeto,
+                                                                          com_servidor):
+    from tests.servidor_falso import entregar
+
+    servidor, fila = com_servidor
+    p = ctl.pagina
+    gid = _marcado_aguardando(p)
+    entregar(fila, esperar_por=1)
+    assert p.box(gid).char == "x"
+    pedidos = len(servidor.pedidos)
+    p.desfazedor.desfazer()
+    p.desfazedor.refazer()
+    assert p.box(gid).char == "x" and len(servidor.pedidos) == pedidos   # sem pedir de novo
+
+
+def test_a_leitura_do_aguardando_nao_passa_por_cima_da_correcao(ctl, projeto, com_servidor):
+    from tests.servidor_falso import entregar
+
+    servidor, fila = com_servidor
+    p = ctl.pagina
+    gid = _marcado_aguardando(p)
+    p.corrigir("k")                                       # antes de a leitura chegar
+    entregar(fila, esperar_por=1)
+    assert p.box(gid).char == "k"
+    assert p.historico.proximo_a_desfazer == "Corrigir para 'k'"
+
+
+def test_a_leitura_do_aguardando_que_falha_deixa_o_glifo_aguardando(ctl, projeto, com_servidor,
+                                                                     monkeypatch, caplog):
+    import logging
+
+    from abbychess import pagina as pg
+    from abbychess import servidor_de_leitura as sl
+    from tests.servidor_falso import entregar
+
+    def falhar(*_a, **_k):
+        raise RuntimeError("o modelo não carregou")
+
+    servidor, fila = com_servidor
+    monkeypatch.setattr(sl, "ler_recortes", falhar)
+    p = ctl.pagina
+    with caplog.at_level(logging.WARNING, logger="abbychess.ponte_de_leitura"):
+        gid = _marcado_aguardando(p)
+        entregar(fila, esperar_por=1)
+    assert pg.aguardando(p.box(gid)) and not p.leitura.lendo
+    assert any("o modelo não carregou" in r.getMessage() for r in caplog.records)
+
+
 def test_com_o_servidor_parado_os_comandos_avisam_e_nao_leem(ctl, projeto, com_servidor):
     servidor, fila = com_servidor
     p = ctl.pagina

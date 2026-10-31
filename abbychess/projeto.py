@@ -212,6 +212,33 @@ def sha_da_fonte(caminho: Path) -> str:
         return hashlib.sha256(arquivo.read(BYTES_DO_SHA)).hexdigest()
 
 
+_NADA = type(None)
+#: O tipo de cada campo conhecido do `projeto.json` e dos limiares (SPEC-qualidade Q-P6): a
+#: entrada confere todos antes de montar o `Projeto` e antes de gravar qualquer coisa.
+TIPOS_DO_PROJETO = {
+    "nome": str, "fonte": str, "criado": str, "limiares": (dict, _NADA), "idioma": str,
+    "notacao": str, "versao": int, "fonte_sha256": str, "fonte_tamanho": int,
+    "proximo_pid": int, "extras": (dict, _NADA), "endireitar": bool, "sequencia": (dict, _NADA),
+    "gids_movidos": dict,
+}
+TIPOS_DOS_LIMIARES = {f.name: (int, float) for f in fields(Limiares)}
+_NOMES_DOS_TIPOS = {str: "texto", int: "inteiro", float: "número", bool: "sim ou não",
+                    dict: "objeto"}
+
+
+def _conferir_tipos(valores: dict, tipos: dict, prefixo: str = "") -> None:
+    """`ValueError` com o nome do primeiro campo de `valores` que não é do tipo de `tipos`
+    (os que `tipos` não conhece passam: vão para `extras`). Um booleano não vale por número."""
+    for nome, valor in valores.items():
+        tipo = tipos.get(nome)
+        if tipo is None:
+            continue
+        aceitos = tipo if isinstance(tipo, tuple) else (tipo,)
+        if not isinstance(valor, aceitos) or (isinstance(valor, bool) and bool not in aceitos):
+            esperado = " ou ".join(_NOMES_DOS_TIPOS[t] for t in aceitos if t is not _NADA)
+            raise ValueError(f"o campo {prefixo}{nome} devia ser {esperado}, e é {valor!r}")
+
+
 def _separar(bruto: dict, classe) -> Tuple[dict, dict]:
     """Os campos que `classe` conhece e os outros."""
     nomes = {f.name for f in fields(classe)}
@@ -333,6 +360,8 @@ class ProjetoDeLivro:
             bruto = json.loads(bytes_do_projeto.decode("utf-8"))
             if not isinstance(bruto, dict):
                 raise ValueError("não é um objeto JSON")
+            _conferir_tipos(bruto, TIPOS_DO_PROJETO)
+            _conferir_tipos(bruto.get("limiares") or {}, TIPOS_DOS_LIMIARES, "limiares.")
             conhecidos, desconhecidos = _separar(bruto, Projeto)
             extras = dict(conhecidos.pop("extras", None) or {})
             dos_limiares, outros_limiares = _separar(conhecidos.pop("limiares", None) or {},
@@ -341,11 +370,6 @@ class ProjetoDeLivro:
                 extras["limiares"] = {**dict(extras.get("limiares") or {}), **outros_limiares}
             extras.update(desconhecidos)
             dados = Projeto(limiares=Limiares(**dos_limiares), extras=extras, **conhecidos)
-            if not isinstance(dados.versao, int):
-                raise ValueError(f"versão {dados.versao!r}")
-            if not isinstance(dados.gids_movidos, dict):
-                log.warning("gids_movidos ilegível no projeto.json: ignorado")
-                dados.gids_movidos = {}
         except (ValueError, TypeError) as erro:
             raise ProjetoInvalido(f"{arquivo} está ilegível: {erro}") from erro
         if dados.versao > VERSAO:

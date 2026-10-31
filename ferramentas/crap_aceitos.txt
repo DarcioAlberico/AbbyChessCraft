@@ -69,8 +69,6 @@ abbychess/controlador_da_substituicao.py ControladorDaSubstituicao._trocar  # a 
 abbychess/controlador_da_substituicao.py ControladorDaSubstituicao.na_pagina  # a reduzir (Q8)
 abbychess/controlador_da_substituicao.py ControladorDaSubstituicao.previa.rodar  # a reduzir (Q8)
 abbychess/controlador_da_substituicao.py _mesma_pagina  # a reduzir (Q8)
-abbychess/controlador_de_layout.py ControladorDeLayout._aprender_margens  # a reduzir (Q8)
-abbychess/controlador_de_layout.py ControladorDeLayout.aplicar_modelo  # a reduzir (Q8)
 abbychess/controlador_do_livro.py ControladorDoLivro._fim_do_lote  # a reduzir (Q8)
 abbychess/controlador_do_livro.py ControladorDoLivro._ler_restante  # a reduzir (Q8)
 abbychess/diagramas.py legendas_dos_boxes  # a reduzir (Q8)

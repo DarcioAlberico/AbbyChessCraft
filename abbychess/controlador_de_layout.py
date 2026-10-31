@@ -117,18 +117,7 @@ class ControladorDeLayout:
         p = self.pagina
         if p.projeto is None or p.imagem is None:
             return zonas
-        paginas = {}
-        for indice in p.projeto.resumo.paginas_lidas():
-            modelo = p.modelo if indice == p.indice else p.projeto.carregar_modelo(indice)
-            if modelo is None:
-                continue
-            lidos = [b.entry for b in modelo.boxes if b.entry.char]
-            # Todas as páginas do livro são renderizadas no mesmo DPI. A altura aberta
-            # evita renderizar as demais só para aprender a margem; pequenas variações de
-            # mídia não atravessam as faixas conservadoras de 10% e 3%.
-            paginas[indice] = (lidos, p.imagem.height)
-        paginas.setdefault(p.indice, ([b.entry for b in (p.modelo.boxes if p.modelo else [])
-                                       if b.entry.char], p.imagem.height))
+        paginas = _lidas_e_a_aberta(p)
         funcoes = mg.funcoes_das_margens(paginas).get(p.indice, {})
         return zn.aplicar_funcoes_de_margem(zonas, paginas[p.indice][0], funcoes)
 
@@ -244,40 +233,75 @@ class ControladorDeLayout:
         p, modelo = self.pagina, self.modelo
         if modelo is None or p.projeto is None or p.fonte is None:
             return
-        from abbychess import geometria as geo
-
-        mudancas, recusadas = {}, []
-        for indice in sorted(set(indices)):
-            if not 0 <= indice < p.fonte.total:
-                continue
-            # O tamanho da imagem da entrada sem renderizar (renderizar cada página, com a
-            # medida da inclinação, prendia a janela ~0,4 s por página nunca vista).
-            entrada = p.fonte.entrada(indice)
-            largura, altura = geo.tamanho_da_imagem((entrada.quadro, entrada.giro),
-                                                    p.fonte.tamanho_da_fonte(entrada))
-            try:
-                zonas = modelo.aplicar(largura, altura)
-            except ValueError:
-                recusadas.append(indice + 1)
-                continue
-            pagina = p.projeto.pagina_para_editar(indice)
-            antes = pagina.instantaneo()
-            pagina.zonas = zonas
-            pagina.zonas = zn.vincular_legendas(zn.com_ids(pagina.zonas), pagina.diagramas)
-            mudancas[pagina.pid] = hs.mudanca(antes, pagina.instantaneo())
-            p.projeto.paginas_em_memoria.agendar(pagina)
+        mudancas, recusadas = _aplicar_nas_paginas(p, modelo, indices)
         if mudancas:
-            p.historico.registrar(hs.Transacao("Aplicar modelo de áreas", mudancas))
-            p.eventos.emitir("acoes_mudaram")
-            aberta = p.projeto.ordem.pid_em(p.indice) if p.indice is not None else None
-            if aberta in mudancas:
-                # A página aberta (lida ou não) mostra as zonas novas já.
-                self.atual = None
-                p.recarregar()
-                p.eventos.emitir("layout_mudou")
+            self._registrar_o_modelo(mudancas)
         complemento = f"; recusadas por resolução: {recusadas}" if recusadas else ""
         p._avisar(f"Modelo aplicado a {len(mudancas)} página(s){complemento}.", AVISO_LONGO_MS)
+
+    def _registrar_o_modelo(self, mudancas: dict) -> None:
+        """O modelo aplicado num passo só do desfazer; a página aberta, se mudou, mostra as
+        áreas novas já."""
+        p = self.pagina
+        p.historico.registrar(hs.Transacao("Aplicar modelo de áreas", mudancas))
+        p.eventos.emitir("acoes_mudaram")
+        aberta = p.projeto.ordem.pid_em(p.indice) if p.indice is not None else None
+        if aberta in mudancas:
+            # A página aberta (lida ou não) mostra as zonas novas já.
+            self.atual = None
+            p.recarregar()
+            p.eventos.emitir("layout_mudou")
 
     def reconhecer_atual(self) -> None:
         if self.atual is not None and 0 <= self.atual < len(self.zonas):
             self.pagina.leitura.reconhecer_zona(self.zonas[self.atual])
+
+
+def _lidos(modelo) -> list:
+    """Os glifos lidos (com caractere) da página do modelo; nenhum sem página."""
+    return [b.entry for b in (modelo.boxes if modelo else []) if b.entry.char]
+
+
+def _lidas_e_a_aberta(p: ControladorDePagina) -> dict:
+    """{índice: (glifos lidos, altura)} das páginas reconhecidas e da aberta, para aprender
+    as margens (`margens.funcoes_das_margens`)."""
+    paginas = {}
+    for indice in p.projeto.resumo.paginas_lidas():
+        modelo = p.modelo if indice == p.indice else p.projeto.carregar_modelo(indice)
+        if modelo is None:
+            continue
+        # Todas as páginas do livro são renderizadas no mesmo DPI. A altura aberta
+        # evita renderizar as demais só para aprender a margem; pequenas variações de
+        # mídia não atravessam as faixas conservadoras de 10% e 3%.
+        paginas[indice] = (_lidos(modelo), p.imagem.height)
+    paginas.setdefault(p.indice, (_lidos(p.modelo), p.imagem.height))
+    return paginas
+
+
+def _aplicar_nas_paginas(p: ControladorDePagina, modelo: zn.ModeloDeAreas,
+                         indices: Sequence[int]):
+    """`(mudanças, recusadas)`: as áreas do modelo em cada página de `indices` (pid ->
+    mudança do desfazer), e as páginas (de 1) de outra resolução, que ficam como estavam."""
+    from abbychess import geometria as geo
+
+    mudancas, recusadas = {}, []
+    for indice in sorted(set(indices)):
+        if not 0 <= indice < p.fonte.total:
+            continue
+        # O tamanho da imagem da entrada sem renderizar (renderizar cada página, com a
+        # medida da inclinação, prendia a janela ~0,4 s por página nunca vista).
+        entrada = p.fonte.entrada(indice)
+        largura, altura = geo.tamanho_da_imagem((entrada.quadro, entrada.giro),
+                                                p.fonte.tamanho_da_fonte(entrada))
+        try:
+            zonas = modelo.aplicar(largura, altura)
+        except ValueError:
+            recusadas.append(indice + 1)
+            continue
+        pagina = p.projeto.pagina_para_editar(indice)
+        antes = pagina.instantaneo()
+        pagina.zonas = zonas
+        pagina.zonas = zn.vincular_legendas(zn.com_ids(pagina.zonas), pagina.diagramas)
+        mudancas[pagina.pid] = hs.mudanca(antes, pagina.instantaneo())
+        p.projeto.paginas_em_memoria.agendar(pagina)
+    return mudancas, recusadas

@@ -413,10 +413,10 @@ def test_visitas_cortam_o_que_vinha_depois_ao_navegar_no_meio(app, janela_de_60)
     p = janela_de_60.pagina
     for k in (3, 10, 20):
         p.ir_para(k)
-    p.voltar_visita()
-    p.voltar_visita()                                  # em 3, com 10 e 20 adiante
+    p.navegador.voltar_visita()
+    p.navegador.voltar_visita()                                  # em 3, com 10 e 20 adiante
     p.ir_para(40)                                      # navegar corta o adiante
-    assert not p.pode_avancar and p.visitas[-2:] == [3, 40]
+    assert not p.navegador.pode_avancar and p.navegador.visitas[-2:] == [3, 40]
 
 
 def test_ligar_outro_projeto_troca_o_cache(app, janela_de_60, tmp_path):
@@ -517,7 +517,7 @@ def test_a_pre_carga_segue_o_sentido_e_vem_ja_quem_folheia(app, janela_de_60, mo
     j.acao_anterior.trigger()                                  # PgUp logo depois
     assert j._pre_carga.interval() == 20
     _ate_a_pre_carga(app, chamadas)
-    assert chamadas == [18] and j.pagina.proxima_provavel == 18
+    assert chamadas == [18] and j.pagina.navegador.proxima_provavel == 18
 
 
 def test_a_qimage_da_pagina_nasce_na_thread_que_renderiza(pdf_de_60_paginas):
@@ -559,10 +559,10 @@ def test_na_ponta_do_livro_a_pre_carga_vai_ao_outro_lado(app, janela_de_60):
     p = janela_de_60.pagina
     p.ir_para(5)
     p.ir_para(0)                                               # o Home: sentido para trás
-    assert p.proxima_provavel == 1
+    assert p.navegador.proxima_provavel == 1
     p.ir_para(58)
     p.ir_para(59)                                              # o End
-    assert p.proxima_provavel == 58
+    assert p.navegador.proxima_provavel == 58
 
 
 def test_a_medida_da_inclinacao_nao_segura_o_render_de_outra_pagina(pdf_de_60_paginas,

@@ -61,6 +61,7 @@ from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL, FONTE_NENHUMA, precisa_revisao
 from abbychess.modelo import (LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
                               Diferenca, Pagina, pid_de, proximo_estado)
+from abbychess.navegador import Navegador
 
 log = logging.getLogger(__name__)
 
@@ -180,8 +181,8 @@ class ControladorDePagina:
         #: Feito com a matriz da página na thread que a renderiza (a da pré-carga, quase
         #: sempre): a janela põe aqui a `QImage` dela, e a conversão sai da interface.
         self.preparar_imagem: Optional[Callable[[np.ndarray], object]] = None
-        #: +1 ou -1: o sentido do último passo entre páginas, o da pré-carga.
-        self._sentido = 1
+        #: As visitas (Alt+←, Alt+→), a primeira, a última e o sentido da pré-carga.
+        self.navegador = Navegador(self)
         #: O livro tem figurinas lidas (o modo "livro" das peças, §6.4): o "sim" fica guardado
         #: até outro projeto; sem ele (None), o resumo das páginas é consultado de novo.
         self._livro_tem_figurinas: Optional[bool] = None
@@ -485,10 +486,7 @@ class ControladorDePagina:
         self.cache = (pg.CacheDePaginas(fonte, preparar=self.preparar_imagem,
                                         renderizador=render.do_programa())
                       if fonte is not None else None)
-        self._sentido = 1
-        #: As páginas visitadas, para Alt+← e Alt+→ (§3.3), e onde se está nelas.
-        self.visitas: List[int] = []
-        self._visita = -1
+        self.navegador.zerar()
         self.historico = hs.HistoricoDoProjeto()
         self.modelo, self.atual, self.pulados, self.selecao = None, None, set(), set()
         self.imagem = self.matriz = None
@@ -509,13 +507,11 @@ class ControladorDePagina:
         except OSError as erro:
             self.eventos.emitir("aviso", "Página", str(erro))
             return False
-        if indice != self.indice:
-            self._sentido = 1 if indice > self.indice else -1
+        de = self.indice
         self.indice, self.imagem, self.matriz = indice, imagem, matriz
         self._matriz_da_imagem = imagem
         self._letra_que_faltava = None
-        if visita:
-            self._registrar_visita(indice)
+        self.navegador.chegou(de, indice, visita=visita)
         self.modelo = self.projeto.carregar_modelo(indice)
         self.atual, self.pulados, self.selecao = None, set(), set()
         self.eventos.emitir("pagina_trocou")
@@ -555,67 +551,6 @@ class ControladorDePagina:
             self._avisar(f"Esta página foi lida antes de {novos} padrão(ões) do livro ensinado(s) "
                          "depois. O {reler_pendentes} relê os pendentes com eles.", 12000)
 
-    def precarregar_seguinte(self) -> None:
-        """Renderiza a próxima página no sentido em que se anda (a seguinte, ou a anterior
-        depois de um PgUp), a mais provável, noutra thread. A janela chama depois de pintar a
-        atual: dentro do `ir_para`, a pré-carga disputava a CPU com a conversão e a pintura
-        da página pedida, e a troca fora do cache ficava ~60 ms mais lenta."""
-        if self.cache is not None and self.fonte is not None:
-            self.cache.precarregar(self.proxima_provavel)
-
-    @property
-    def proxima_provavel(self) -> int:
-        """A página que a pré-carga prepara: a vizinha no sentido do último passo; na ponta do
-        livro (o Home deixa o sentido para trás na primeira), a do outro lado."""
-        alvo = self.indice + self._sentido
-        total = self.fonte.total if self.fonte is not None else 0
-        return alvo if 0 <= alvo < total else self.indice - self._sentido
-
-    # ------------------------------------------------------------------
-    # Navegação (§3.3)
-    # ------------------------------------------------------------------
-    def _registrar_visita(self, indice: int) -> None:
-        if 0 <= self._visita < len(self.visitas) and self.visitas[self._visita] == indice:
-            return
-        del self.visitas[self._visita + 1:]
-        self.visitas.append(indice)
-        self._visita = len(self.visitas) - 1
-
-    @property
-    def pode_voltar(self) -> bool:
-        return self._visita > 0
-
-    @property
-    def pode_avancar(self) -> bool:
-        return self._visita < len(self.visitas) - 1
-
-    def voltar_visita(self) -> bool:
-        """Alt+←: a página visitada antes desta."""
-        return self._andar_na_visita(-1)
-
-    def avancar_visita(self) -> bool:
-        """Alt+→: a página visitada depois (depois de um Alt+←)."""
-        return self._andar_na_visita(+1)
-
-    def _andar_na_visita(self, passo: int) -> bool:
-        alvo = self._visita + passo
-        if not 0 <= alvo < len(self.visitas):
-            return False
-        if not self.ir_para(self.visitas[alvo], visita=False):
-            return False
-        self._visita = alvo
-        self.eventos.emitir("acoes_mudaram")    # Alt+←/→ ligam e desligam pelo lugar novo
-        return True
-
-    def primeira(self) -> bool:
-        return self.ir_para(0)
-
-    def ultima(self) -> bool:
-        return self.fonte is not None and self.ir_para(self.fonte.total - 1)
-
-    def vizinha(self, passo: int) -> bool:
-        """A página anterior (-1) ou a seguinte (+1), se houver."""
-        return self.ir_para(self.indice + passo)
 
     # ------------------------------------------------------------------
     # As operações de página (§12.4, passo L): reordenar, apagar, restaurar, inserir
@@ -991,22 +926,13 @@ class ControladorDePagina:
         vizinha), e `sequencia_mudou` para quem guarda posições."""
         projeto = self.projeto
         aberta = projeto.sequencia.entrada_em(self.indice) if self.imagem is not None else None
-        visitas = [projeto.pid_da_pagina(i) for i in self.visitas]
+        visitas = self.navegador.pids_das_visitas(projeto)
         angulos = self._angulos_a_guardar(projeto.sequencia, nova)
         (gravar or projeto.gravar_sequencia)(nova)      # OSError: nada mudou
         self._guardar_os_angulos(angulos)
         if depois_de_gravar is not None:
             depois_de_gravar()
-        # As visitas pelo pid; a de agora é a que sobra até ela (a mesma página pode estar
-        # duas vezes), e as vizinhas iguais que a saída de uma deixou se juntam.
-        novas, lugar = [], -1
-        for k, pid in enumerate(visitas):
-            posicao = None if pid is None else nova.posicao_de(pid)
-            if posicao is not None and (not novas or novas[-1] != posicao):
-                novas.append(posicao)
-            if k == self._visita:
-                lugar = len(novas) - 1
-        self.visitas, self._visita = novas, lugar if novas else -1
+        self.navegador.seguir_a_sequencia(visitas, nova)
         if aberta is not None:
             alvo = nova.posicao_de(aberta.pid)
             if alvo is None:

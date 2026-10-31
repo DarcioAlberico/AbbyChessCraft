@@ -137,7 +137,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self._pre_carga = QTimer(self)          # a seguinte, depois de pintar a atual
         self._pre_carga.setSingleShot(True)
         self._pre_carga.setInterval(150)
-        self._pre_carga.timeout.connect(self.pagina.precarregar_seguinte)
+        self._pre_carga.timeout.connect(self.pagina.navegador.precarregar_seguinte)
         self._ultima_troca = 0.0                # folheando depressa, a pré-carga vem já
         self.pagina.preparar_imagem = qimage_da_pagina      # a QImage na thread da pré-carga
         self._pre_pixmap = QTimer(self)
@@ -369,7 +369,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
 
     def _pagina_vizinha(self, passo: int) -> None:
         """PgDn no fim da página abre a seguinte no topo; PgUp no topo, a anterior no fim."""
-        if self.pagina.vizinha(passo):
+        if self.pagina.navegador.vizinha(passo):
             if passo > 0:
                 self.visor.ir_ao_topo()
             else:

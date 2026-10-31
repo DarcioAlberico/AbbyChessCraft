@@ -100,8 +100,8 @@ def calcular(p, livro, vista: Vista) -> EstadoDaJanela:
              SEM_ANTES)
     primeira = (pronto and p.indice > 0, NA_PRIMEIRA)
     ultima = (pronto and p.indice < total - 1, NA_ULTIMA)
-    voltar = (pronto and p.pode_voltar, SEM_VISITA)
-    avancar = (pronto and p.pode_avancar, SEM_VISITA)
+    voltar = (pronto and p.navegador.pode_voltar, SEM_VISITA)
+    avancar = (pronto and p.navegador.pode_avancar, SEM_VISITA)
     areas = (vista.areas_ligadas, AREAS_DESLIGADAS)
     area_atual = _primeiro(tem, areas, (vista.area_atual, SEM_AREA_ATUAL))
     desfazer, refazer = p.historico.proximo_a_desfazer, p.historico.proximo_a_refazer

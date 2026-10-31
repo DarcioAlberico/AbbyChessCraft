@@ -43,7 +43,7 @@ def montar(janela) -> None:
     barra.addSeparator()
 
     # --- Página e livro ------------------------------------------------------------
-    j.acao_anterior = acao(j, "pagina_anterior", lambda: p.vizinha(-1),
+    j.acao_anterior = acao(j, "pagina_anterior", lambda: p.navegador.vizinha(-1),
                            texto="Página anterior", barra=barra)
     j.seletor = QSpinBox()
     j.seletor.setMinimum(1)
@@ -53,15 +53,15 @@ def montar(janela) -> None:
     barra.addWidget(j.seletor)
     j.total_de_paginas = QLabel(" de 0 ")
     barra.addWidget(j.total_de_paginas)
-    j.acao_seguinte = acao(j, "pagina_seguinte", lambda: p.vizinha(+1),
+    j.acao_seguinte = acao(j, "pagina_seguinte", lambda: p.navegador.vizinha(+1),
                            texto="Página seguinte", barra=barra)
-    j.acao_primeira = acao(j, "primeira_pagina", p.primeira, texto="Primeira página")
-    j.acao_ultima = acao(j, "ultima_pagina", p.ultima, texto="Última página")
+    j.acao_primeira = acao(j, "primeira_pagina", p.navegador.primeira, texto="Primeira página")
+    j.acao_ultima = acao(j, "ultima_pagina", p.navegador.ultima, texto="Última página")
     j.acao_ir_para = acao(j, "ir_para_pagina", j.ir_para_a_pagina_pedida,
                           texto="Ir para a página…")
-    j.acao_voltar_visita = acao(j, "voltar_visita", p.voltar_visita,
+    j.acao_voltar_visita = acao(j, "voltar_visita", p.navegador.voltar_visita,
                                 texto="Página visitada antes")
-    j.acao_avancar_visita = acao(j, "avancar_visita", p.avancar_visita,
+    j.acao_avancar_visita = acao(j, "avancar_visita", p.navegador.avancar_visita,
                                  texto="Página visitada depois")
     j.acao_rolar_acima = acao(j, "rolar_tela_acima", lambda: j.visor.rolar_tela(-1),
                               widgets=[j.visor])

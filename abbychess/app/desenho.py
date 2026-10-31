@@ -93,8 +93,8 @@ class DesenhoDaJanela:
     def _pre_converter(self) -> None:
         """Converte a próxima provável, se a pré-carga já a renderizou (fora do clique)."""
         p = self.pagina
-        if p.cache is not None and p.cache.tem(p.proxima_provavel):
-            self._pixmap(p.proxima_provavel, p.cache.pagina(p.proxima_provavel)[0])
+        if p.cache is not None and p.cache.tem(p.navegador.proxima_provavel):
+            self._pixmap(p.navegador.proxima_provavel, p.cache.pagina(p.navegador.proxima_provavel)[0])
 
     def _zoom_mudou(self, escala: float, limite: str) -> None:
         self.caixa_de_zoom.blockSignals(True)

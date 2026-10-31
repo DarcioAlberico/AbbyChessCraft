@@ -295,8 +295,8 @@ def test_as_visitas_seguem_as_paginas_pelo_pid(projeto, ctl):
         ctl.ir_para(i)                                       # visitas: 1, 6, 10, 6
     pids = projeto.sequencia.pids
     ctl.mover_paginas([5], 20)                               # a 6 vai para depois da 21
-    assert ctl.visitas == [0, 20, 8, 20] and ctl._visita == 3
-    ctl.voltar_visita()
+    assert ctl.navegador.visitas == [0, 20, 8, 20] and ctl.navegador._visita == 3
+    ctl.navegador.voltar_visita()
     assert projeto.pid_da_pagina(ctl.indice) == pids[9]
 
 

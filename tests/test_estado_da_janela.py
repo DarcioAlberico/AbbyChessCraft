@@ -11,7 +11,7 @@ def _pagina(**mudar):
     projeto = Ns(sequencia=Ns(apagadas=()), somente_leitura=False,
                  tem_antes_do_lote=lambda indice: False)
     base = dict(pronto=True, lote_rodando=False, projeto=projeto, fonte=Ns(total=5), boxes=[1],
-                indice=2, pode_voltar=False, pode_avancar=False,
+                indice=2, navegador=Ns(pode_voltar=False, pode_avancar=False),
                 historico=Ns(proximo_a_desfazer=None, proximo_a_refazer=None),
                 motivo_para_nao_mudar_as_paginas=lambda: None)
     base.update(mudar)

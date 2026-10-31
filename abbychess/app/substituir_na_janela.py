@@ -14,6 +14,7 @@ from dataclasses import replace
 
 from abbychess import busca as bs
 from abbychess import substituir as sb
+from abbychess.controlador import AVISO_LONGO_MS
 from abbychess.controladores import ControladorDaSubstituicao, _descricao
 
 
@@ -92,7 +93,7 @@ class SubstituirNaJanela:
                 return
             # Já está como o substituto ("casa" -> "Casa" sem o Aa): a próxima.
             self._posicao = (self._posicao + 1) % len(self._ocorrencias)
-        self.statusBar().showMessage("Nada mais a substituir.", 8000)
+        self.statusBar().showMessage("Nada mais a substituir.", AVISO_LONGO_MS)
 
     def substituir_todas(self) -> None:
         """Todas: direto na página (ou na seleção); no livro ou num intervalo, a prévia."""
@@ -156,7 +157,7 @@ class SubstituirNaJanela:
     def _substituicao_falhou(self, mensagem: str) -> None:
         self._ida_apos_pendente = None
         self.barra_de_busca.mostrar_erro(mensagem)
-        self.statusBar().showMessage(mensagem, 8000)
+        self.statusBar().showMessage(mensagem, AVISO_LONGO_MS)
 
     def _substituicao_feita(self, casos: int, paginas: int, falhas, sem_traducao: int,
                             saidos: int = 0) -> None:

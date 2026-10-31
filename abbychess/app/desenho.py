@@ -22,6 +22,7 @@ from abbychess.app import acoes
 from abbychess.app.imagens import pixmap_da_pagina
 from abbychess.app import estilo
 from abbychess.app import teclado, vazios
+from abbychess.controlador import AVISO_LONGO_MS
 
 
 class DesenhoDaJanela:
@@ -228,7 +229,7 @@ class DesenhoDaJanela:
                 b.gid for _lugar, b in self.pagina.modelo.fora}:
             self.statusBar().showMessage("O glifo de origem desta amostra saiu da página (o "
                                          "corte o deixou de fora; tirar o corte o devolve).",
-                                         8000)
+                                         AVISO_LONGO_MS)
 
     def _origem_fora_do_livro(self, gid) -> None:
         """A origem numa página apagada (§12.4): a pergunta na barra para restaurá-la, e o

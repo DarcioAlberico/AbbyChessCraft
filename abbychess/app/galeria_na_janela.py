@@ -17,6 +17,7 @@ import numpy as np
 
 from abbychess import pagina as pg
 from abbychess.app.galeria import Item, PainelDaGaleria
+from abbychess.controlador import AVISO_LONGO_MS
 
 log = logging.getLogger(__name__)
 
@@ -224,7 +225,7 @@ class GaleriaNaJanela:
                 [chave for chave, c in aplicadas.items() if c == char], char)
         acao = "ensinado(s)" if ensinou else "corrigido(s)"
         self.statusBar().showMessage(f"Galeria: {feitos} glifo(s) {acao} em {paginas} "
-                                     "página(s) · Ctrl+Z desfaz.", 8000)
+                                     "página(s) · Ctrl+Z desfaz.", AVISO_LONGO_MS)
 
     def _galeria_escolhido(self, item) -> None:
         if item.pagina != self.pagina.indice:

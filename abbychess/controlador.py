@@ -64,9 +64,9 @@ from abbychess.modelo import (IOU_DA_RELEITURA, LIDAS, NAO_RECONHECIDA, RECONHEC
 
 log = logging.getLogger(__name__)
 
-#: O máximo que um pedido da janela espera o servidor (o F5 com os modelos ainda carregando
-#: cabe com folga): um servidor travado sem morrer não prende a fila de tarefas para sempre.
-TEMPO_DO_PEDIDO = 600.0
+#: O aviso que pede leitura (o motivo de uma recusa, o resumo de uma operação), em ms; o
+#: comum fica no padrão de `_avisar`.
+AVISO_LONGO_MS = 8000
 #: Quantas páginas guardam a conta das margens corridas (`gids_de_margem`): as do cache de
 #: páginas (§14.1) e folga.
 MARGENS_GUARDADAS = 8
@@ -429,8 +429,7 @@ class ControladorDePagina:
 
         areas = [z for z in self.modelo.zonas if z.funcao in ex.FORA_DA_EXPORTACAO]
         nas_areas = {b.gid for b in self.modelo.boxes
-                     if any(z.contem((b.entry.x1 + b.entry.x2) / 2, (b.entry.y1 + b.entry.y2) / 2)
-                            for z in areas)} if areas else set()
+                     if any(z.contem_o_centro(b.entry) for z in areas)} if areas else set()
         return (self.gids_de_margem() if margens is None else margens) | nas_areas
 
     def gids_virtuais(self) -> frozenset:
@@ -668,10 +667,10 @@ class ControladorDePagina:
 
         motivo = self.motivo_para_nao_mudar_as_paginas()
         if motivo is not None:
-            self._avisar(motivo, 8000)
+            self._avisar(motivo, AVISO_LONGO_MS)
             return False
         if not 0 <= na_posicao <= len(self.projeto.sequencia) or not caminhos:
-            self._avisar("Inserir páginas: diga os arquivos e onde inseri-los.", 8000)
+            self._avisar("Inserir páginas: diga os arquivos e onde inseri-los.", AVISO_LONGO_MS)
             return False
         novas = []
         try:
@@ -945,7 +944,7 @@ class ControladorDePagina:
         antes e depois). `nota`, que `fazer` também preenche, vai no aviso de feito."""
         motivo = self.motivo_para_nao_mudar_as_paginas()
         if motivo is not None:
-            self._avisar(motivo, 8000)
+            self._avisar(motivo, AVISO_LONGO_MS)
             return False
         if self.antes_de_sair_da_pagina is not None:
             # A sessão do Documento aberta entra antes: `fazer` olha quais páginas têm boxes.
@@ -954,7 +953,7 @@ class ControladorDePagina:
         try:
             nova = fazer(antes)
         except (ValueError, IndexError) as erro:
-            self._avisar(f"{descricao}: {erro}.", 8000)
+            self._avisar(f"{descricao}: {erro}.", AVISO_LONGO_MS)
             return False
         except (OSError, RuntimeError) as erro:   # a fonte ilegível (o tamanho, o ângulo)
             self.eventos.emitir("aviso", "Páginas", f"{descricao}: a fonte não foi lida "
@@ -1104,7 +1103,7 @@ class ControladorDePagina:
             self.antes_de_sair_da_pagina()
         if self._sessoes_na_fila:
             self._avisar("A edição do texto ainda espera a vez dela na fila: marque a página "
-                         "como verificada depois que ela entrar.", 8000)
+                         "como verificada depois que ela entrar.", AVISO_LONGO_MS)
             return
         if self.modelo is None or self.modelo.estado not in LIDAS:
             self._avisar("Reconheça a página antes de marcá-la como verificada "
@@ -1214,7 +1213,7 @@ class ControladorDePagina:
                     return None
             elif self.indice != indice:
                 self._avisar(f"{titulo}: descartado, porque a página mudou (era a {indice + 1}) "
-                             "antes da vez dele na fila.", 8000)
+                             "antes da vez dele na fila.", AVISO_LONGO_MS)
             elif self._pode_editar(precisa_de_glifos):
                 corpo()
                 return None
@@ -1263,8 +1262,7 @@ class ControladorDePagina:
         antes = self._instantaneo()
         marcados = pg.a_manter_na_releitura(pagina.boxes, pagina.estado in LIDAS)   # §4.6
         if zona is not None:
-            marcados = [b for b in marcados
-                        if zona.contem((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)]
+            marcados = [b for b in marcados if zona.contem_o_centro(b)]
         servidor = self._servidor_para_pedir()
         regua = self.projeto.regua_do_negrito(sem_o_pid=pagina.pid)
 
@@ -1274,7 +1272,7 @@ class ControladorDePagina:
                                      progresso=progresso)
             try:
                 lida = servidor.chamar("ler_pagina", (imagem, zonas, marcados, regua),
-                                       timeout=TEMPO_DO_PEDIDO)
+                                       timeout=sl.TEMPO_DO_PEDIDO)
             except sl.Cancelado:                # o projeto fechou: nada a pôr
                 return None
             sl.registrar_procedencia(lida.boxes, lida.amostras)
@@ -1293,9 +1291,7 @@ class ControladorDePagina:
             if zona is not None:
                 from core.services.box_service import BoxService
 
-                fora = [b.entry for b in pagina.boxes
-                        if not zona.contem((b.entry.x1 + b.entry.x2) / 2,
-                                          (b.entry.y1 + b.entry.y2) / 2)]
+                fora = [b.entry for b in pagina.boxes if not zona.contem_o_centro(b.entry)]
                 depois = BoxService.sort_boxes_reading_order(fora + depois)
             novos, dif = reconciliar(pagina.boxes, depois, pagina.alocar,
                                      procedencia.amostra_de,
@@ -1332,7 +1328,7 @@ class ControladorDePagina:
                 resumo = pg.resumir(pagina.entries(), leitor)
                 areas = f", pelas {len(zonas)} área(s) da página" if zonas else ""
                 self._avisar(f"{resumo.boxes} boxes, {resumo.pendentes} a revisar, "
-                             f"{len(pagina.tabuleiros)} diagrama(s){areas}.", 8000)
+                             f"{len(pagina.tabuleiros)} diagrama(s){areas}.", AVISO_LONGO_MS)
 
         return trabalho, pronto
 
@@ -1371,7 +1367,7 @@ class ControladorDePagina:
                 return lidos, resumo
             try:
                 relidos, amostras, resumo = servidor.chamar(
-                    "reler_boxes", (imagem, lidos, not tudo), timeout=TEMPO_DO_PEDIDO)
+                    "reler_boxes", (imagem, lidos, not tudo), timeout=sl.TEMPO_DO_PEDIDO)
             except sl.Cancelado:                # o projeto fechou: nada a pôr
                 return None
             sl.registrar_procedencia(relidos, amostras)
@@ -1708,7 +1704,7 @@ class ControladorDePagina:
         if self.servidor is None or not self.servidor.parado:
             return False
         self._avisar("O servidor de leitura parou. Reabra o projeto (Projeto › Abrir) para "
-                     "voltar a ler as páginas.", 8000)
+                     "voltar a ler as páginas.", AVISO_LONGO_MS)
         return True
 
     def _servidor_para_pedir(self) -> Optional[sl.ServidorDeLeitura]:
@@ -2503,7 +2499,7 @@ class ControladorDePagina:
                          f"em {len(devolvidos)} página(s) · {{desfazer}} desfaz.", 10000)
         else:
             self._avisar(f"Esquecida(s) {quantas} amostra(s); nenhum glifo lido por ela(s) · "
-                         "Ctrl+Z desfaz.", 8000)
+                         "Ctrl+Z desfaz.", AVISO_LONGO_MS)
 
     def aplicar_limiares(self, limiares) -> None:
         """Os limiares do livro, gravados no projeto, e a fila refeita com eles (na fila: a

@@ -32,7 +32,7 @@ from abbychess import lote as lt
 from abbychess import servidor_de_leitura as sl
 from abbychess import verificacao as vf
 from abbychess import zonas as zn
-from abbychess.controlador import TEMPO_DO_PEDIDO, ControladorDePagina, depois_de_editar
+from abbychess.controlador import AVISO_LONGO_MS, ControladorDePagina, depois_de_editar
 from abbychess.leitor import LeitorDoLivro, congelar_para_a_coleta_de_lixo
 
 log = logging.getLogger(__name__)
@@ -120,7 +120,7 @@ class ControladorDeLayout:
                 if servidor is None:
                     return sl.automaticas(imagem, leitor)
                 try:                                  # o árbitro dos colados é o global
-                    return servidor.chamar("automaticas", imagem, timeout=TEMPO_DO_PEDIDO)
+                    return servidor.chamar("automaticas", imagem, timeout=sl.TEMPO_DO_PEDIDO)
                 except sl.Cancelado:                  # o projeto fechou
                     return None
 
@@ -178,7 +178,7 @@ class ControladorDeLayout:
         self._trocar(zonas, len(zonas) - 1, "Desenhar área")
         p._avisar(f"Área {len(zonas)} de texto criada: a letra da função a troca (T texto, "
                   "H título, C cabeçalho, R rodapé, P nº de página, N nota, L legenda, "
-                  "D diagrama, I imagem, X ignorar).", 8000)
+                  "D diagrama, I imagem, X ignorar).", AVISO_LONGO_MS)
 
     def escolher(self, indice: int) -> None:
         if self._ordenacao is not None and 0 <= indice < len(self.zonas):
@@ -247,7 +247,7 @@ class ControladorDeLayout:
         self.atual = None
         self.eventos.emitir("layout_mudou")
         self.pagina._avisar("Ordenar áreas: clique em cada uma na ordem de leitura; Esc cancela.",
-                            8000)
+                            AVISO_LONGO_MS)
 
     def cancelar_ordenacao(self) -> None:
         if self._ordenacao is not None:
@@ -307,7 +307,7 @@ class ControladorDeLayout:
                 p.recarregar()
                 p.eventos.emitir("layout_mudou")
         complemento = f"; recusadas por resolução: {recusadas}" if recusadas else ""
-        p._avisar(f"Modelo aplicado a {len(mudancas)} página(s){complemento}.", 8000)
+        p._avisar(f"Modelo aplicado a {len(mudancas)} página(s){complemento}.", AVISO_LONGO_MS)
 
     def reconhecer_atual(self) -> None:
         if self.atual is not None and 0 <= self.atual < len(self.zonas):
@@ -361,7 +361,7 @@ class ControladorDeVerificacao:
                 self.lexico = lexico
                 if not lexico.sinaliza:
                     p._avisar(f"Não há léxico para o idioma '{projeto.dados.idioma}' no "
-                              "PyBoxEditor.", 8000)
+                              "PyBoxEditor.", AVISO_LONGO_MS)
                 self.eventos.emitir("verificacao_pronta")
             return trabalho, pronto
 
@@ -471,7 +471,7 @@ class ControladorDeVerificacao:
             espacos = vf.quebras(entries, indices, texto)
             mudados = vf.corrigir(entries, indices, texto)
         except ValueError as erro:
-            p._avisar(f"Não corrigiu: {erro}", 8000)
+            p._avisar(f"Não corrigiu: {erro}", AVISO_LONGO_MS)
             return
         for k, _char in mudados:
             ed.trocar(p.modelo, gids[k], entries[k])
@@ -657,7 +657,7 @@ class ControladorDeDiagramas:
                     return sl.ler_diagramas(imagem, caixas, boxes, leitor)
                 try:
                     return servidor.chamar("ler_diagramas", (imagem, caixas, boxes),
-                                           timeout=TEMPO_DO_PEDIDO)
+                                           timeout=sl.TEMPO_DO_PEDIDO)
                 except sl.Cancelado:                  # o projeto fechou
                     return None
 
@@ -687,7 +687,7 @@ class ControladorDeDiagramas:
             return
         d = diagramas[indice]
         if not d.lido:
-            self.pagina._avisar(f"O diagrama não foi lido: {d.erro}", 8000)
+            self.pagina._avisar(f"O diagrama não foi lido: {d.erro}", AVISO_LONGO_MS)
             return
         self.eventos.emitir("conferir", indice)
 
@@ -708,7 +708,7 @@ class ControladorDeDiagramas:
                        if tuple(d.caixa) == tuple(caixa)), None)
         if indice is None:
             p._avisar("O diagrama mudou na página ({reconhecer_pagina}, desfazer ou áreas): reabra a "
-                      "conferência.", 8000)
+                      "conferência.", AVISO_LONGO_MS)
             return False
         if not diagramas[indice].lido:
             p._avisar(f"O diagrama {indice + 1} não foi lido: não há posição a conferir.", 6000)
@@ -728,7 +728,7 @@ class ControladorDeDiagramas:
                 mensagem += f". As amostras não foram guardadas: {erro}"
             else:
                 mensagem += f"; {len(caminhos)} amostra(s) guardadas no projeto"
-        p._avisar(mensagem, 8000)
+        p._avisar(mensagem, AVISO_LONGO_MS)
         return True
 
 
@@ -803,7 +803,13 @@ class ControladorDoLivro:
 
     @property
     def lote_rodando(self) -> bool:
-        return self._condutor is not None
+        return self.pagina.lote_rodando
+
+    def _trocar_condutor(self, condutor) -> None:
+        """O condutor do lote e o `lote_rodando` da página mudam juntos, só aqui (Q-A3): a
+        janela e as recusas da página leem o mesmo estado."""
+        self._condutor = condutor
+        self.pagina.lote_rodando = condutor is not None
 
     def abrir(self, projeto, fonte) -> None:
         """Liga o projeto (a fonte já aberta) e prepara a leitura fora da interface; ao fim,
@@ -890,7 +896,7 @@ class ControladorDoLivro:
             return
         if self._condutor is not None:
             p._avisar("O lote já está lendo o livro. Cancele-o (✕ na barra) antes de começar "
-                      "outro.", 8000)
+                      "outro.", AVISO_LONGO_MS)
             return
         self.restante = None
         self._reler_depois_antes = [i for i in self.reler_depois if i not in indices]
@@ -898,9 +904,8 @@ class ControladorDoLivro:
             p, indices, refazer, forcar=forcar, ao_progresso=self._progrediu,
             ao_gravar=lambda indice: self.eventos.emitir("pagina_do_lote", indice),
             ao_fim=lambda resultado: self._fim_do_lote(condutor, resultado))
-        self._condutor = condutor
+        self._trocar_condutor(condutor)
         self._guardar(condutor.indices, refazer, self._reler_depois_antes)
-        p.lote_rodando = True
         self.eventos.emitir("lote_mudou")
         self.eventos.emitir("acoes_mudaram")
         condutor.comecar()
@@ -946,8 +951,7 @@ class ControladorDoLivro:
         era_amostra = self._amostra_guiada is not None
         paginas_da_amostra = self._amostra_guiada or ()
         self._amostra_guiada = None
-        self._condutor = None
-        self.pagina.lote_rodando = False
+        self._trocar_condutor(None)
         # O que faltou (cancelado, ou o servidor parou) e as páginas para reler depois ficam
         # para "Retomar o lote", guardadas no projeto (`lote.json`).
         faltam = condutor.posicoes_restantes() if resultado.cancelado else []
@@ -1044,7 +1048,7 @@ class ControladorDoLivro:
         que faltava já está em `lote.json`, gravado a cada página."""
         if self._condutor is not None:
             self._condutor.cancelar()
-        self._condutor = None
+        self._trocar_condutor(None)
         self.restante, self.reler_depois = None, []
         self.esperar_a_gravacao()
 
@@ -1068,7 +1072,7 @@ class ControladorDoLivro:
         if not self.pode_retomar:
             if self.restante is not None or self.reler_depois:
                 self.pagina._avisar("O servidor de leitura parou: reabra o projeto para "
-                                    "retomar o lote.", 8000)
+                                    "retomar o lote.", AVISO_LONGO_MS)
             return
         indices, refazer = self.restante if self.restante is not None else ([], False)
         forcar = list(self.reler_depois) if com_reler_depois else []
@@ -1106,7 +1110,7 @@ class ControladorDoLivro:
         p.historico.tocar(pagina.pid)
         p.ir_para(p.indice, visita=False)
         self.eventos.emitir("acoes_mudaram")
-        p._avisar(f"A página {p.indice + 1} voltou ao estado de antes do lote.", 8000)
+        p._avisar(f"A página {p.indice + 1} voltou ao estado de antes do lote.", AVISO_LONGO_MS)
 
     def proximo_pendente(self) -> None:
         """F6: o pendente desta página ou, se ela acabou, a próxima página com pendentes."""
@@ -1118,7 +1122,7 @@ class ControladorDoLivro:
             return
         proxima = livro.proxima_com_pendentes(p.projeto, p.leitor.limiares, p.indice)
         if proxima is None or proxima == p.indice:
-            p._avisar("Nada a revisar nas páginas reconhecidas do livro.", 8000)
+            p._avisar("Nada a revisar nas páginas reconhecidas do livro.", AVISO_LONGO_MS)
             return
         p.ir_para(proxima)
         p._avisar(f"Página {proxima + 1}: {len(p.fila())} a revisar.", 6000)

@@ -159,6 +159,10 @@ class Zona:
     def contem(self, x: float, y: float) -> bool:
         return self.x1 <= x <= self.x2 and self.y1 <= y <= self.y2
 
+    def contem_o_centro(self, caixa) -> bool:
+        """O glifo (qualquer coisa com x1, y1, x2, y2) é da área quando o centro dele cai nela."""
+        return self.contem((caixa.x1 + caixa.x2) / 2, (caixa.y1 + caixa.y2) / 2)
+
     def como_dict(self) -> dict:
         return {"id": self.id, "tipo": self.tipo, "funcao": self.funcao, "caixa": list(self.caixa),
                 "ordem": self.ordem, "automatica": self.automatica,
@@ -366,7 +370,7 @@ def classificar_funcoes(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
         if not zona.automatica or zona.tipo != TEXTO:
             saida.append(zona)
             continue
-        dentro = [b for b in boxes if zona.contem((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)]
+        dentro = [b for b in boxes if zona.contem_o_centro(b)]
         texto = _texto_dos_boxes(dentro)
         funcao = "texto"
         if texto and len(texto) <= 2 and not any(c.isalnum() for c in texto):
@@ -444,7 +448,7 @@ def _continuacoes_da_legenda(zonas: List[Zona], boxes: Sequence[BoxEntry],
         for k, zona in enumerate(saida):
             if not zona.automatica or zona.tipo != TEXTO or zona.funcao != "texto":
                 continue
-            dentro = [b for b in boxes if zona.contem((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)]
+            dentro = [b for b in boxes if zona.contem_o_centro(b)]
             if len(_texto_dos_boxes(dentro)) > TAMANHO_DA_CONTINUACAO:
                 continue
             for legenda in saida:
@@ -595,8 +599,7 @@ def aplicar_funcoes_de_margem(zonas: Sequence[Zona], boxes: Sequence[BoxEntry],
                 "texto", "titulo", "cabecalho", "rodape", "numero_de_pagina"):
             saida.append(zona)
             continue
-        indices = [i for i, box in enumerate(boxes)
-                   if zona.contem((box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2)]
+        indices = [i for i, box in enumerate(boxes) if zona.contem_o_centro(box)]
         votos = [funcoes[i] for i in indices if i in funcoes]
         funcao = votos[0] if indices and len(votos) == len(indices) and len(set(votos)) == 1 else None
         saida.append(replace(zona, funcao=funcao) if funcao else zona)

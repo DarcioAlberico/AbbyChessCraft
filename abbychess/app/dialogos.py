@@ -16,6 +16,7 @@ from abbychess import idioma as idm
 from abbychess import livro
 from abbychess import nativo
 from abbychess import pagina as pg
+from abbychess.controlador import AVISO_LONGO_MS
 from abbychess.projeto import ProjetoDeLivro, ProjetoInvalido
 
 FILTRO_DE_LIVROS = "Livros (*.pdf *.png *.jpg *.jpeg *.tif *.tiff *.bmp)"
@@ -233,7 +234,7 @@ def preparar_abertura(janela, projeto: ProjetoDeLivro) -> Optional[pg.FonteDePag
     if projeto.fonte_ausente and not localizar_fonte(janela, projeto):
         projeto.fechar()
         janela.statusBar().showMessage("O projeto não foi aberto: a fonte do livro não foi "
-                                       "indicada.", 8000)
+                                       "indicada.", AVISO_LONGO_MS)
         return None
     try:
         fonte = pg.fonte_do_projeto(projeto)
@@ -298,7 +299,7 @@ def avisos_dos_modelos(janela, estado: dict, padroes: int) -> None:
                             "carregou. A leitura usa só os padrões e a base global.")
     janela.statusBar().showMessage(
         f"Modelos prontos. Base global com {estado.get('base', 0)} referências; "
-        f"{padroes} padrões deste livro.", 8000)
+        f"{padroes} padrões deste livro.", AVISO_LONGO_MS)
 
 
 def intervalo_do_lote(janela, projeto, total: int) -> Optional[Tuple[List[int], bool]]:

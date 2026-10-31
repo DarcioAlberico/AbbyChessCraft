@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QDockWidget, QLabel, QMess
 from abbychess import atalhos
 from abbychess import avisos as av
 from abbychess import gravacao as gv
+from abbychess.controlador import AVISO_LONGO_MS
 from abbychess.projeto import ARQUIVO_DA_JANELA
 from abbychess import livro as lv
 from abbychess import verificacao as vf
@@ -505,7 +506,7 @@ class EspacoDeTrabalho:
         mudaram = teclado.reaplicar(self)
         nome = dict(dialogo_teclado.PERFIS)[perfil]
         self.statusBar().showMessage(f"Teclado: perfil {nome}, {len(trocas)} troca(s); "
-                                     f"{mudaram} atalho(s) mudaram.", 8000)
+                                     f"{mudaram} atalho(s) mudaram.", AVISO_LONGO_MS)
 
     def textos_do_teclado(self) -> None:
         """Os estados vazios citam a tecla do perfil (§13): ao abrir a janela e a cada troca

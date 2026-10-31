@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QDialog, QDialogButtonBo
 
 from abbychess import busca as bs
 from abbychess.app.barra_de_busca import BarraDeBusca
+from abbychess.controlador import AVISO_LONGO_MS
 from abbychess.controladores import ControladorDaBusca
 
 #: As fontes da busca por glifo (§7.1: rede, base, livro, manual), e o nome de cada uma.
@@ -185,7 +186,7 @@ class BuscaNaJanela:
         self._mandar_para_resultados, self._ida_pendente = False, None
         self.barra_de_busca.mostrar_erro(mensagem)
         self.texto.destacar_busca([])
-        self.statusBar().showMessage(mensagem, 8000)
+        self.statusBar().showMessage(mensagem, AVISO_LONGO_MS)
 
     def _busca_terminou(self, resultado: bs.Resultado) -> None:
         self._ocorrencias = list(resultado.ocorrencias)
@@ -200,10 +201,10 @@ class BuscaNaJanela:
         self.paginas.mostrar_ocorrencias(resultado.por_pagina() if total else {})
         fora = self._fora_da_busca()
         if not total:
-            self.statusBar().showMessage("Nada encontrado." + fora, 8000)
+            self.statusBar().showMessage("Nada encontrado." + fora, AVISO_LONGO_MS)
         else:
             self.statusBar().showMessage(f"{total} ocorrência(s) em "
-                                         f"{len(resultado.por_pagina())} página(s)." + fora, 8000)
+                                         f"{len(resultado.por_pagina())} página(s)." + fora, AVISO_LONGO_MS)
         self._destacar_na_pagina()
         if self._mandar_para_resultados:
             self._mandar_para_resultados = False

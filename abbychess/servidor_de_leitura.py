@@ -52,6 +52,9 @@ FABRICA_PADRAO = "abbychess.servidor_de_leitura:leitor_global"
 INTERATIVO, LOTE = 0, 1
 #: O resultado de um pedido cancelado (ou abandonado ao fechar).
 CANCELADO = "cancelado"
+#: O máximo que um pedido da janela ou do lote espera o servidor (o F5 com os modelos ainda
+#: carregando cabe com folga): um servidor travado sem morrer não prende a fila para sempre.
+TEMPO_DO_PEDIDO = 600.0
 
 
 class Cancelado(Exception):

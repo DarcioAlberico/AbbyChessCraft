@@ -38,7 +38,7 @@ from abbychess import lances as lc
 from abbychess import pagina as pg
 from abbychess import procedencia
 from abbychess import servidor_de_leitura as sl
-from abbychess.controlador import TEMPO_DO_PEDIDO
+from abbychess.servidor_de_leitura import TEMPO_DO_PEDIDO
 from abbychess.modelo import (IOU_DA_RELEITURA, LIDAS, VERIFICADA, descrever_caidas,
                               proximo_estado, reconciliar)
 

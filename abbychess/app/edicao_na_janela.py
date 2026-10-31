@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Optional
 
 from abbychess.app import teclado
+from abbychess.controlador import AVISO_LONGO_MS
 
 class EdicaoNoDocumento:
     def _sessao_do_documento(self, unidades, novo, avancar, ensinar_gid, ultimo, fixos,
@@ -57,7 +58,7 @@ class EdicaoNoDocumento:
     def _aviso_estrutural(self, texto: str) -> None:
         """Na Linha e também na barra de status (a Linha pode estar escondida, Ctrl+F5)."""
         self.linha.avisar(texto)
-        self.statusBar().showMessage(texto, 8000)
+        self.statusBar().showMessage(texto, AVISO_LONGO_MS)
 
     def _no_editor_de_diagrama(self) -> bool:
         """O foco está no editor Diagrama do Inspetor (o desfazer é o do tabuleiro, §10)."""

@@ -53,7 +53,7 @@ from abbychess.app.painel_treino import PainelDeTreino
 from abbychess.app.painel_verificacao import PainelDeVerificacao
 from abbychess.app.trabalho import Executor
 from abbychess.app.visor import VisorDePagina
-from abbychess.controlador import ControladorDePagina, Eventos
+from abbychess.controlador import AVISO_LONGO_MS, ControladorDePagina, Eventos
 from abbychess.controladores import (ControladorDeDiagramas, ControladorDeLayout,
                                      ControladorDeVerificacao, ControladorDoLivro)
 
@@ -428,7 +428,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.visor.definir_modo_treino(sim)
         self.statusBar().showMessage(
             "Marcar glifo à mão: arraste em volta de um glifo para marcá-lo; Ctrl+clique junta "
-            "boxes na seleção." if sim else "Marcar glifo à mão: desligado.", 8000)
+            "boxes na seleção." if sim else "Marcar glifo à mão: desligado.", AVISO_LONGO_MS)
 
     def modo_areas(self, sim: bool) -> None:
         """Liga o editor de áreas, que desliga o modo de treino: os dois usam o arraste."""

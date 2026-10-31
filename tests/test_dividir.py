@@ -5,6 +5,7 @@ divisão. A esquerda fica com o `pid`, a direita ganha um novo, e os glifos dela
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -282,6 +283,70 @@ def test_falhar_ao_gravar_o_projeto_nao_deixa_o_arquivo_da_direita(projeto, ctl,
     assert projeto.sequencia == antes and projeto.dados.gids_movidos == {}
     assert [p.name for p in (projeto.pasta / "paginas").glob("p*.json")] == \
         [f"p{projeto.ordem.pid_em(2)}.json"]
+
+
+def _falhar_ao_trocar(monkeypatch, nome):
+    """O disco cheio ao pôr no lugar o arquivo `nome` (só na thread do teste: o gravador
+    grava de verdade)."""
+    import threading
+
+    from abbychess import gravacao as gv
+
+    real, thread = gv._replace, threading.get_ident()
+
+    def trocar(temporario, caminho):
+        if threading.get_ident() == thread and Path(caminho).name == nome:
+            raise OSError(28, "sem espaço")
+        return real(temporario, caminho)
+
+    monkeypatch.setattr(gv, "_replace", trocar)
+
+
+def test_a_pagina_que_nao_grava_depois_da_ordem_fica_com_o_gravador(projeto, ctl, monkeypatch):
+    _gravar(projeto, ctl, 2)
+    _falhar_ao_trocar(monkeypatch, f"p{projeto.ordem.pid_em(2)}.json")
+    assert ctl.operacoes.dividir_paginas([2])
+    assert len(projeto.sequencia) == 61 and len(projeto.carregar_modelo(2).boxes) == 3
+    monkeypatch.undo()
+    assert projeto.fechar(10)
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert [len(reaberto.carregar_modelo(k).boxes) for k in (2, 3)] == [3, 2]
+
+
+def test_o_livro_json_que_nao_grava_na_divisao_se_refaz_ao_abrir(projeto, ctl, monkeypatch):
+    _gravar(projeto, ctl, 2)
+    _falhar_ao_trocar(monkeypatch, "livro.json")
+    assert ctl.operacoes.dividir_paginas([2])
+    monkeypatch.undo()
+    assert projeto.fechar(10)
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert len(reaberto.sequencia) == 61
+    assert [len(reaberto.carregar_modelo(k).boxes) for k in (2, 3)] == [3, 2]
+    assert {2, 3} <= set(reaberto.resumo.do_livro())
+
+
+def test_o_arquivo_da_direita_que_nao_sai_no_ctrl_z_fica_fora_do_livro(projeto, ctl, monkeypatch):
+    import os
+
+    _gravar(projeto, ctl, 2)
+    antes = projeto.sequencia
+    ctl.operacoes.dividir_paginas([2])
+    preso = projeto.pasta / "paginas" / f"p{projeto.sequencia.entrada_em(3).pid}.json"
+    real = os.unlink
+
+    def unlink(caminho, *args, **kwargs):
+        if Path(caminho) == preso:
+            raise PermissionError("o antivírus segura o arquivo")
+        return real(caminho, *args, **kwargs)
+
+    monkeypatch.setattr(os, "unlink", unlink)
+    ctl.desfazedor.desfazer()
+    assert projeto.sequencia == antes and preso.is_file()
+    monkeypatch.undo()
+    assert projeto.fechar(10)
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert reaberto.sequencia.entradas == antes.entradas
+    assert len(reaberto.carregar_modelo(2).boxes) == 5
 
 
 def test_com_leitura_do_servidor_pendente_as_operacoes_esperam(projeto, ctl):

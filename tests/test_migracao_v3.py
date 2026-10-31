@@ -220,6 +220,28 @@ def test_a_sequencia_gravada_curta_ganha_as_paginas_que_faltam_do_pdf(projeto_v2
     assert s.pid_em(1) == 40 and len(set(s.pids)) == 60
 
 
+def test_a_v2_com_paginas_que_o_livro_json_nao_cita_as_poe_no_lugar_delas(projeto_v2):
+    """Uma queda entre a página e o `livro.json` da v2: o arquivo que ele não cita entra na
+    sequência pela página do PDF dele (o mais recente, se há dois) e no livro; o de uma
+    página que não é do PDF e o ilegível ficam de fora."""
+    from abbychess.resumo_do_livro import VERSAO_DO_LIVRO
+
+    paginas = projeto_v2 / "paginas"
+    _gravar(projeto_v2 / "livro.json", {"versao": VERSAO_DO_LIVRO, "paginas": {}})
+    velha = _json(paginas / "p40.json")
+    velha.update(pid=50, gravado_em="2000-01-01T00:00:00+00:00", boxes=[])
+    _gravar(paginas / "p50.json", velha)                  # a cópia velha da página 2
+    _gravar(paginas / "p51.json", dict(velha, pid=51, indice=-1))    # uma inserida
+    (paginas / "p52.json").write_text("{", encoding="utf-8")
+    projeto = ProjetoDeLivro.abrir(projeto_v2)
+    s = projeto.sequencia
+    assert [e.pagina for e in s.entradas] == list(range(60))
+    assert s.pid_em(0) == 0 and s.pid_em(1) == 40 and not {50, 51, 52} & set(s.pids)
+    assert projeto.carregar_modelo(1).boxes[0].gid == gid_de(40, 0)
+    assert {0: 0, 1: 40}.items() <= {i: r["pid"] for i, r in projeto.resumo.do_livro().items()
+                                     }.items()
+
+
 @pytest.mark.parametrize("valor", [float("inf"), "x", [1], True, 2.5, -1, 999])
 def test_valor_estragado_numa_lista_nao_impede_a_migracao(projeto_v2, valor):
     dados = _json(projeto_v2 / "projeto.json")

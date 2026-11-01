@@ -359,11 +359,20 @@ class _VistaDaPrevia(QListView):
                 self._painel._aplicar()
             return
         if tecla == Qt.Key.Key_Space:
-            linhas = sorted({i.row() for i in self.selectedIndexes()}
-                            or ({self.currentIndex().row()} if self.currentIndex().isValid()
-                                else set()))
-            modelo = self._painel.modelo_da_previa
-            marcados = [modelo._marcas[k] for k in linhas if modelo.caso(k).aplicavel]
-            modelo.marcar(linhas, not all(marcados) if marcados else True)
+            self._alternar_as_marcas()
             return
         super().keyPressEvent(evento)
+
+    def _alternar_as_marcas(self) -> None:
+        """Espaço: os casos escolhidos ficam todos desmarcados se todos os que se aplicam
+        estavam marcados; senão, todos marcados."""
+        linhas = self._linhas_escolhidas()
+        modelo = self._painel.modelo_da_previa
+        marcados = [modelo._marcas[k] for k in linhas if modelo.caso(k).aplicavel]
+        modelo.marcar(linhas, not all(marcados) if marcados else True)
+
+    def _linhas_escolhidas(self) -> list:
+        """As linhas selecionadas, em ordem; sem seleção, a atual (se há)."""
+        return sorted({i.row() for i in self.selectedIndexes()}
+                      or ({self.currentIndex().row()} if self.currentIndex().isValid()
+                          else set()))

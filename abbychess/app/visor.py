@@ -174,17 +174,9 @@ class VisorDePagina(QGraphicsView):
         if self._destaque is not None:
             cena.removeItem(self._destaque)
             self._destaque = None
-        self._itens, self._boxes = [], boxes
+        self._boxes = boxes
         self._tabuleiros = [tuple(t) for t in tabuleiros]
-        for i, (x1, y1, x2, y2) in enumerate(self._tabuleiros):
-            caneta = QPen(cores_dos_tabuleiros[i] if cores_dos_tabuleiros else estilo.DIAGRAMA_POR_LER)
-            caneta.setCosmetic(True)
-            caneta.setWidthF(2.5)
-            caneta.setStyle(Qt.PenStyle.DashLine)
-            item = QGraphicsRectItem(x1, y1, x2 - x1, y2 - y1)
-            item.setPen(caneta)
-            cena.addItem(item)
-            self._itens.append(item)
+        self._itens = _desenhar_tabuleiros(cena, self._tabuleiros, cores_dos_tabuleiros)
         if self.item_dos_boxes is not None:
             self.item_dos_boxes.trocar(boxes, [gd.estado(b, i in pendentes)
                                                for i, b in enumerate(boxes)])
@@ -663,23 +655,8 @@ class VisorDePagina(QGraphicsView):
             self._espaco = True
             self.viewport().setCursor(Qt.CursorShape.OpenHandCursor)
             return
-        if self.modo_areas and self._zona_sel is not None:
-            tecla = evento.key()
-            if tecla in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
-                self.zona_apagada.emit(self._zona_sel)
-                return
-            numeros = (Qt.Key.Key_1, Qt.Key.Key_2, Qt.Key.Key_3, Qt.Key.Key_4)
-            if tecla in numeros:
-                self.zona_tipo.emit(self._zona_sel, zn.TIPOS[numeros.index(tecla)])
-                return
-            funcoes = {Qt.Key.Key_T: "texto", Qt.Key.Key_H: "titulo",
-                       Qt.Key.Key_C: "cabecalho", Qt.Key.Key_R: "rodape",
-                       Qt.Key.Key_P: "numero_de_pagina", Qt.Key.Key_N: "nota",
-                       Qt.Key.Key_L: "legenda", Qt.Key.Key_D: "diagrama",
-                       Qt.Key.Key_I: "figura", Qt.Key.Key_X: "ignorar"}
-            if tecla in funcoes and evento.modifiers() == Qt.KeyboardModifier.NoModifier:
-                self.zona_funcao.emit(self._zona_sel, funcoes[tecla])
-                return
+        if _tecla_da_area(self, evento):
+            return
         if self.modo_areas and tecla == Qt.Key.Key_Escape:
             self.ordenacao_cancelada.emit()
             self.zona_escolhida.emit(-1)
@@ -776,3 +753,50 @@ class VisorDePagina(QGraphicsView):
             barra.setValue(barra.value() - evento.angleDelta().y())
             return
         super().wheelEvent(evento)
+
+
+# ----------------------------------------------------------------------
+# As partes do visor (funções: a classe não cresce)
+# ----------------------------------------------------------------------
+def _desenhar_tabuleiros(cena: QGraphicsScene, tabuleiros, cores) -> List[QGraphicsRectItem]:
+    """O contorno tracejado de cada tabuleiro, na cor do estado da leitura dele."""
+    itens = []
+    for i, (x1, y1, x2, y2) in enumerate(tabuleiros):
+        caneta = QPen(cores[i] if cores else estilo.DIAGRAMA_POR_LER)
+        caneta.setCosmetic(True)
+        caneta.setWidthF(2.5)
+        caneta.setStyle(Qt.PenStyle.DashLine)
+        item = QGraphicsRectItem(x1, y1, x2 - x1, y2 - y1)
+        item.setPen(caneta)
+        cena.addItem(item)
+        itens.append(item)
+    return itens
+
+
+#: No editor de áreas, as teclas do tipo da área escolhida (os de `zn.TIPOS`, na ordem) e as
+#: da função dela.
+TECLAS_DO_TIPO = (Qt.Key.Key_1, Qt.Key.Key_2, Qt.Key.Key_3, Qt.Key.Key_4)
+TECLAS_DA_FUNCAO = {Qt.Key.Key_T: "texto", Qt.Key.Key_H: "titulo",
+                    Qt.Key.Key_C: "cabecalho", Qt.Key.Key_R: "rodape",
+                    Qt.Key.Key_P: "numero_de_pagina", Qt.Key.Key_N: "nota",
+                    Qt.Key.Key_L: "legenda", Qt.Key.Key_D: "diagrama",
+                    Qt.Key.Key_I: "figura", Qt.Key.Key_X: "ignorar"}
+
+
+def _tecla_da_area(visor: VisorDePagina, evento) -> bool:
+    """Delete, 1 a 4 e a letra da função, na área escolhida do editor de áreas: o sinal dela.
+    Falso se a tecla não é da área (ou não há área escolhida)."""
+    zona = visor._zona_sel
+    if not visor.modo_areas or zona is None:
+        return False
+    tecla = evento.key()
+    if tecla in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+        visor.zona_apagada.emit(zona)
+        return True
+    if tecla in TECLAS_DO_TIPO:
+        visor.zona_tipo.emit(zona, zn.TIPOS[TECLAS_DO_TIPO.index(tecla)])
+        return True
+    if tecla in TECLAS_DA_FUNCAO and evento.modifiers() == Qt.KeyboardModifier.NoModifier:
+        visor.zona_funcao.emit(zona, TECLAS_DA_FUNCAO[tecla])
+        return True
+    return False

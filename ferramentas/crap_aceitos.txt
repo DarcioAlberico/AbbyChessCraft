@@ -19,10 +19,8 @@ abbychess/app/painel_paginas.py PainelDePaginas.mostrar  # a reduzir (Q8)
 abbychess/app/painel_resultados.py _VistaDaPrevia.keyPressEvent  # a reduzir (Q8)
 abbychess/app/previa_da_pagina.py PreviaDoCorte.mouseMoveEvent  # a reduzir (Q8)
 abbychess/app/principal.py main  # o ponto de entrada: cria a QApplication do processo e fica no app.exec() até a janela fechar
-abbychess/app/visor.py VisorDePagina.keyPressEvent  # a reduzir (Q8)
-abbychess/app/visor.py VisorDePagina.mostrar_boxes  # a reduzir (Q8)
 abbychess/app/visor.py VisorDePagina.mostrar_zonas  # a reduzir (Q8)
-abbychess/app/visor.py VisorDePagina.mousePressEvent  # a reduzir (Q8)
+abbychess/app/visor.py VisorDePagina.mousePressEvent  # despacho do clique pelo botão e pelo modo (arrastar a página, o editor de áreas, Ctrl+clique, o quadro do treino, o box, o diagrama): uma tabela não fica mais clara que os if
 abbychess/montagem.py _sem_coordenadas.fora  # roda por glifo e por tabuleiro: partir põe chamada nova no laço por glifo
 abbychess/padroes.py PadroesDoLivro.ler  # roda por glifo (ler, propagar, o servidor): partir põe chamada nova no laço por glifo
 abbychess/resumo_do_livro.py resumo_das_confiancas  # roda por glifo de cada página gravada (o livro.json a cada gravação): partir põe chamada nova no laço por glifo

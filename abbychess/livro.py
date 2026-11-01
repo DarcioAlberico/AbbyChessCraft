@@ -72,11 +72,7 @@ def saude(projeto: ProjetoDeLivro, padroes: int = 0) -> SaudeDoLivro:
                 if projeto.ordem.posicoes_das_gravadas([g])]
     paginas = tuple(projeto.ordem.posicoes_das_gravadas(gravadas))
     iniciais = extras.get(CHAVE_DOS_PENDENTES_INICIAIS, {}) or {}
-    resumo = projeto.resumo.do_livro()
-    por_pagina = tuple(
-        (posicao, int(iniciais.get(str(g), iniciais.get(g, 0)) or 0),
-         int(resumo.get(posicao, {}).get("pendentes", 0) or 0))
-        for g, posicao in zip(gravadas, paginas))
+    por_pagina = _pendentes_por_pagina(gravadas, paginas, iniciais, projeto.resumo.do_livro())
     antes = sum(a for _p, a, _g in por_pagina)
     agora = sum(g for _p, _a, g in por_pagina)
     limiar = int(extras.get(CHAVE_DO_LIMIAR_DA_SAUDE, max(3, round(antes * 0.1))) or 0)
@@ -90,6 +86,14 @@ def escolher_limiar_da_saude(projeto: ProjetoDeLivro, limiar: int) -> None:
     projeto.salvar()
 
 
+def _pendentes_por_pagina(gravadas, paginas, iniciais: dict, resumo: dict) -> tuple:
+    """(posição, pendentes de antes, pendentes de agora) de cada página da amostra."""
+    return tuple(
+        (posicao, int(iniciais.get(str(g), iniciais.get(g, 0)) or 0),
+         int(resumo.get(posicao, {}).get("pendentes", 0) or 0))
+        for g, posicao in zip(gravadas, paginas))
+
+
 def interpretar_intervalo(texto: str, total: int) -> List[int]:
     """As páginas de "26-27, 30" como índices de zero, em ordem e sem repetir.
 
@@ -101,22 +105,29 @@ def interpretar_intervalo(texto: str, total: int) -> List[int]:
         return list(range(total))
     paginas = set()
     for parte in re.split(r"[,;\s]+", texto):
-        if not parte:
-            continue
-        casou = re.fullmatch(r"(\d+)?\s*[-–]\s*(\d+)?|(\d+)", parte)
-        if not casou:
-            raise ValueError(f"Não entendi '{parte}'. Use, por exemplo, 26-27, 30.")
-        if casou.group(3):
-            inicio = fim = int(casou.group(3))
-        else:
-            inicio = int(casou.group(1) or 1)
-            fim = int(casou.group(2) or total)
-        if inicio > fim:
-            inicio, fim = fim, inicio
-        if inicio < 1 or fim > total:
-            raise ValueError(f"As páginas vão de 1 a {total}; '{parte}' sai disso.")
-        paginas.update(range(inicio - 1, fim))
+        if parte:
+            paginas.update(_indices_da_parte(parte, total))
     return sorted(paginas)
+
+
+def _indices_da_parte(parte: str, total: int) -> range:
+    """Os índices de "26-27", "40-", "-3" ou "30"; `ValueError` com o que não se entende ou
+    sai do livro."""
+    casou = re.fullmatch(r"(\d+)?\s*[-–]\s*(\d+)?|(\d+)", parte)
+    if not casou:
+        raise ValueError(f"Não entendi '{parte}'. Use, por exemplo, 26-27, 30.")
+    inicio, fim = _limites(casou, total)
+    if inicio > fim:
+        inicio, fim = fim, inicio
+    if inicio < 1 or fim > total:
+        raise ValueError(f"As páginas vão de 1 a {total}; '{parte}' sai disso.")
+    return range(inicio - 1, fim)
+
+
+def _limites(casou, total: int) -> tuple:
+    if casou.group(3):
+        return int(casou.group(3)), int(casou.group(3))
+    return int(casou.group(1) or 1), int(casou.group(2) or total)
 
 
 def paginas_da_amostra(indices: Iterable[int]) -> List[int]:

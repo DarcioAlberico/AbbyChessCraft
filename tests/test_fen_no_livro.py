@@ -63,9 +63,10 @@ def test_lote_refeito_nao_desfaz_a_conferencia(projeto, fonte, leitor):
     outro = "4k3/8/8/8/8/8/8/4K3"
     conferido = _lido(outro, conferido=True, lado="b", lado_origem="usuario")
     _gravar_com(projeto, fonte, conferido)
+    # A página é desenhada aqui (a Arial; sem ela, `pagina_com_diagrama` pula) e o tabuleiro é
+    # achado pela geometria, sem modelo: não achá-lo é regressão da segmentação, não pulo.
     tabuleiros = pg.segmentar_pagina(fonte.pagina(0)).tabuleiros
-    if not tabuleiros:
-        pytest.skip("a segmentação não achou o tabuleiro desta página")
+    assert len(tabuleiros) == 1, "a segmentação não achou o tabuleiro desta página"
     conferido.caixa = tabuleiros[0]
     _gravar_com(projeto, fonte, conferido)
 

@@ -21,18 +21,16 @@ import pytest
 from hypothesis import HealthCheck, Phase, settings
 from hypothesis import strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, initialize, invariant, rule
-from PIL import Image, ImageDraw
-
-from core.box_model import BoxEntry
 
 from abbychess import edicao as ed
 from abbychess import pagina as pg
 from abbychess import editar_boxes as eb
 from abbychess import sessao as ss
-from abbychess import texto as tx
-from abbychess.modelo import Box, Pagina, foto, gid_de, reconciliar
+from abbychess.modelo import foto, reconciliar
 
-LARGURA, ALTURA = 900, 400
+from tests import estrategias as lei
+from tests.estrategias import pagina_sintetica as _pagina_sintetica
+
 #: Os exemplos de cada máquina: na suíte rápida e na camada noturna (§15.1).
 EXEMPLOS, EXEMPLOS_DA_NOITE = 100, 5000
 
@@ -50,22 +48,6 @@ def _casos(maquina, nome: str):
     noturna = type(f"{nome}Noturna", (maquina.TestCase,),
                    {"settings": ajustes(EXEMPLOS_DA_NOITE)})
     return rapida, pytest.mark.noturno(pytest.mark.timeout(1800)(noturna))
-
-
-def _pagina_sintetica(n: int):
-    """`n` glifos em linhas de 12, cada um com dois traços verticais separados por um vão."""
-    imagem = Image.new("L", (LARGURA, ALTURA), 255)
-    desenho = ImageDraw.Draw(imagem)
-    boxes = []
-    for k in range(n):
-        linha, coluna = divmod(k, 12)
-        x, y = 20 + coluna * 72, 20 + linha * 70
-        desenho.rectangle((x, y, x + 8, y + 30), fill=0)
-        desenho.rectangle((x + 20, y, x + 28, y + 30), fill=0)
-        boxes.append(BoxEntry("a", x, y, x + 29, y + 31, 0.95, "net"))
-    pagina = Pagina(pid=7, indice=3, boxes=[Box(gid_de(7, i), b) for i, b in enumerate(boxes)],
-                    estado="reconhecida", proximo_n=n)
-    return imagem, pagina
 
 
 ACOES = ["trocar", "apagar", "inserir", "inserir_antes", "comeco", "espaco", "palavra",
@@ -289,49 +271,30 @@ class MaquinaDaPagina(RuleBasedStateMachine):
             self._pela_janela(lambda entries: pg.confirmar(entries, k, "z"))
 
     # ------------------------------------------------------------------
+    # As invariantes da página (`tests/estrategias.py`, também das propriedades)
     @invariant()
     def gids_unicos(self):
-        vivos = [b.gid for b in self.pagina.boxes]
-        assert len(vivos) == len(set(vivos))
+        lei.gids_unicos(self.pagina)
 
     @invariant()
     def aposentados_e_vivos_nao_se_cruzam(self):
-        vivos = self.pagina.vivos
-        assert not (self.pagina.aposentados & vivos)
-        assert all(g >> 20 == self.pagina.pid for g in vivos)
-        assert all((g & ((1 << 20) - 1)) < self.pagina.proximo_n for g in vivos)
+        lei.aposentados_e_vivos_nao_se_cruzam(self.pagina)
 
     @invariant()
     def nenhuma_decisao_cita_gid_aposentado(self):
-        assert self.pagina.decisoes.gids() <= self.pagina.vivos
+        lei.nenhuma_decisao_cita_gid_aposentado(self.pagina)
 
     @invariant()
     def quebra_e_juncao_nunca_na_mesma_fronteira(self):
-        d = self.pagina.decisoes
-        assert not (d.quebras & {b for _, b in d.juncoes})
+        lei.quebra_e_juncao_nunca_na_mesma_fronteira(self.pagina)
 
     @invariant()
     def a_ancora_de_todo_virtual_esta_na_pagina(self):
-        d = self.pagina.decisoes
-        validos = self.pagina.vivos | {v.gid for v in d.virtuais}
-        for v in d.virtuais:
-            assert v.depois_de is None or v.depois_de in validos
-            assert v.antes_de is None or v.antes_de in validos
-        ancora = {v.gid: v.depois_de if v.depois_de is not None else v.antes_de
-                  for v in d.virtuais}
-        for gid in ancora:                                # e nenhuma cadeia fecha um ciclo
-            vistos = set()
-            while gid in ancora:
-                assert gid not in vistos
-                vistos.add(gid)
-                gid = ancora[gid]
+        lei.a_ancora_de_todo_virtual_esta_na_pagina(self.pagina)
 
     @invariant()
     def montar_cobre_cada_glifo_uma_vez(self):
-        doc = tx.montar(self.pagina)
-        esperados = [b.gid for b in self.pagina.boxes if b.entry.char]
-        esperados += [v.gid for v in self.pagina.decisoes.virtuais]
-        assert sorted(doc.gids()) == sorted(esperados)
+        lei.montar_cobre_cada_glifo_uma_vez(self.pagina)
 
 
 test_maquina_da_pagina, test_maquina_da_pagina_noturna = _casos(MaquinaDaPagina, "Pagina")

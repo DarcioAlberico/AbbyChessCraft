@@ -39,27 +39,8 @@ def perturbar(pecas: str, vez: str, rng: random.Random, origem: int = 0,
     for _ in range(tentativas):
         board = original.copy()
         tipo = rng.choice(_TIPOS)
-        ocupadas = sorted(board.piece_map())
-        sem_rei = [c for c in ocupadas if board.piece_type_at(c) != chess.KING]
-        vazias = [c for c in chess.SQUARES if c not in board.piece_map()]
-        if tipo == "trocada" and sem_rei:
-            casa = rng.choice(sem_rei)
-            antiga = board.piece_at(casa)
-            nova = chess.Piece(rng.choice([chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK,
-                                           chess.QUEEN]), rng.choice([chess.WHITE, chess.BLACK]))
-            if nova == antiga:
-                continue
-            board.set_piece_at(casa, nova)
-            casas = (chess.square_name(casa),)
-        elif tipo == "tirada" and sem_rei:
-            casa = rng.choice(sem_rei)
-            board.remove_piece_at(casa)
-            casas = (chess.square_name(casa),)
-        elif tipo == "movida" and vazias:
-            de, para = rng.choice(ocupadas), rng.choice(vazias)
-            board.set_piece_at(para, board.remove_piece_at(de))
-            casas = (chess.square_name(de), chess.square_name(para))
-        else:
+        casas = _mudar(board, tipo, rng)
+        if casas is None:
             continue
         board.turn = vez != "b"
         if board.is_valid():
@@ -114,3 +95,39 @@ def afetada(p: Perturbacao, casas: Iterable[set]) -> bool:
     """A perturbação toca alguma casa usada por um lance da linha."""
     tocadas = set(p.casas)
     return any(tocadas & c for c in casas)
+
+
+def _mudar(board: chess.Board, tipo: str, rng: random.Random) -> Optional[tuple]:
+    """Troca, tira ou move uma peça do tabuleiro (as mesmas escolhas do `rng`, na mesma
+    ordem); as casas mudadas, ou None se a mudança não cabe nele."""
+    ocupadas, sem_rei, vazias = _casas(board)
+    if tipo == "trocada" and sem_rei:
+        return _trocar(board, rng.choice(sem_rei), rng)
+    if tipo == "tirada" and sem_rei:
+        casa = rng.choice(sem_rei)
+        board.remove_piece_at(casa)
+        return (chess.square_name(casa),)
+    if tipo == "movida" and vazias:
+        de, para = rng.choice(ocupadas), rng.choice(vazias)
+        board.set_piece_at(para, board.remove_piece_at(de))
+        return (chess.square_name(de), chess.square_name(para))
+    return None
+
+
+def _casas(board: chess.Board) -> tuple:
+    """As casas ocupadas, as ocupadas sem o rei e as vazias."""
+    ocupadas = sorted(board.piece_map())
+    sem_rei = [c for c in ocupadas if board.piece_type_at(c) != chess.KING]
+    vazias = [c for c in chess.SQUARES if c not in board.piece_map()]
+    return ocupadas, sem_rei, vazias
+
+
+def _trocar(board: chess.Board, casa: int, rng: random.Random) -> Optional[tuple]:
+    """A peça da casa trocada por outra sorteada; None se saiu a mesma."""
+    antiga = board.piece_at(casa)
+    nova = chess.Piece(rng.choice([chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK,
+                                   chess.QUEEN]), rng.choice([chess.WHITE, chess.BLACK]))
+    if nova == antiga:
+        return None
+    board.set_piece_at(casa, nova)
+    return (chess.square_name(casa),)

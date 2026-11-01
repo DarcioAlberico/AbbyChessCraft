@@ -20,7 +20,7 @@ LISTA = RAIZ / "ferramentas" / "crap_aceitos.txt"
 CC = 10
 
 #: Quantas linhas a lista pode ter (Q8: 281 no começo); desce a cada função reduzida.
-TETO = 57
+TETO = 56
 
 
 def violacoes(pacote: Path, lista: set, teto: int) -> list:

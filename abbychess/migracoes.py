@@ -196,22 +196,12 @@ class Migracoes:
     def _inclinacoes_para_pids(self, sequencia: sq.Sequencia) -> None:
         """`inclinacoes.json` por `pid` (a chave da v3, `pagina._chave_da_inclinacao`)."""
         arquivo = self._p.pasta / ARQUIVO_DE_INCLINACOES
-        if not arquivo.is_file():
-            return
-        try:
-            bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return                              # ilegível: a fonte o ignora e mede de novo
-        if not any(chave.isdigit() for chave in bruto):
+        # Sem ele, ou ilegível: a fonte o ignora e mede de novo.
+        bruto = _json_do_arquivo(arquivo)
+        if bruto is _SEM_ARQUIVO or not any(chave.isdigit() for chave in bruto):
             return                              # já por pid
         do_pdf = {e.pagina: e.pid for e in sequencia.entradas if e.fonte == sq.FONTE_DO_LIVRO}
-        novo = {}
-        for chave, angulo in bruto.items():
-            if chave.isdigit() and int(chave) in do_pdf:
-                novo[f"p{do_pdf[int(chave)]}:inteira:0"] = angulo
-            elif not chave.isdigit():
-                novo[chave] = angulo
-        gv.gravar_json(arquivo, dict(sorted(novo.items())))
+        gv.gravar_json(arquivo, dict(sorted(_inclinacoes_por_pid(bruto, do_pdf).items())))
 
     def _janela_e_lote_para_pids(self, sequencia: sq.Sequencia) -> None:
         """A página aberta em `janela.json` e as páginas de `lote.json` com o `pid` delas."""
@@ -219,24 +209,51 @@ class Migracoes:
             return (sequencia.pid_em(valor) if isinstance(valor, int)
                     and 0 <= valor < len(sequencia) else None)
 
-        for nome in (ARQUIVO_DA_JANELA, ARQUIVO_DO_LOTE):
+        for nome, por_pid in ((ARQUIVO_DA_JANELA, _janela_por_pid), (ARQUIVO_DO_LOTE, _lote_por_pid)):
             arquivo = self._p.pasta / nome
-            if not arquivo.is_file():
-                continue
-            try:
-                bruto = json.loads(arquivo.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                continue                        # ilegível: quem o lê avisa, como antes
-            if not isinstance(bruto, dict):
-                continue
-            if nome == ARQUIVO_DA_JANELA:
-                if "pid" in bruto:
-                    continue                    # já por pid
-                bruto["pid"] = pid(bruto.get("pagina"))
-            else:
-                if bruto.get("pids"):
-                    continue
-                for chave in ("paginas", "reler_depois"):
-                    bruto[chave] = [p for p in map(pid, bruto.get(chave) or []) if p is not None]
-                bruto["pids"] = True
-            gv.gravar_json(arquivo, bruto)
+            bruto = _json_do_arquivo(arquivo)   # ilegível: quem o lê avisa, como antes
+            if isinstance(bruto, dict) and por_pid(bruto, pid):
+                gv.gravar_json(arquivo, bruto)
+
+
+#: O arquivo que não existe ou não se lê (`_json_do_arquivo`).
+_SEM_ARQUIVO = object()
+
+
+def _json_do_arquivo(arquivo: Path):
+    """O JSON do arquivo, ou `_SEM_ARQUIVO` se ele não existe ou é ilegível."""
+    if not arquivo.is_file():
+        return _SEM_ARQUIVO
+    try:
+        return json.loads(arquivo.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return _SEM_ARQUIVO
+
+
+def _inclinacoes_por_pid(bruto: dict, do_pdf: dict) -> dict:
+    """As inclinações da página do PDF pela chave do pid dela; as já por pid ficam."""
+    novo = {}
+    for chave, angulo in bruto.items():
+        if chave.isdigit() and int(chave) in do_pdf:
+            novo[f"p{do_pdf[int(chave)]}:inteira:0"] = angulo
+        elif not chave.isdigit():
+            novo[chave] = angulo
+    return novo
+
+
+def _janela_por_pid(bruto: dict, pid) -> bool:
+    """A página aberta do `janela.json` com o pid; falso se ele já é por pid."""
+    if "pid" in bruto:
+        return False
+    bruto["pid"] = pid(bruto.get("pagina"))
+    return True
+
+
+def _lote_por_pid(bruto: dict, pid) -> bool:
+    """As páginas do `lote.json` pelo pid; falso se ele já é por pid."""
+    if bruto.get("pids"):
+        return False
+    for chave in ("paginas", "reler_depois"):
+        bruto[chave] = [p for p in map(pid, bruto.get(chave) or []) if p is not None]
+    bruto["pids"] = True
+    return True

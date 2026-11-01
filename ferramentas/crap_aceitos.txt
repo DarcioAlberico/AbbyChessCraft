@@ -58,8 +58,6 @@ abbychess/cache_do_projeto.py CacheDoProjeto._no_cache  # a reduzir (Q8)
 abbychess/camada.py discordancias  # a reduzir (Q8)
 abbychess/estado_da_janela.py calcular  # a reduzir (Q8)
 abbychess/fonte_do_livro.py FonteDoLivro.procurar  # a reduzir (Q8)
-abbychess/migracoes.py Migracoes._inclinacoes_para_pids  # a reduzir (Q8)
-abbychess/migracoes.py Migracoes._janela_e_lote_para_pids  # a reduzir (Q8)
 abbychess/montagem.py _sem_coordenadas.fora  # roda por glifo e por tabuleiro: partir põe chamada nova no laço por glifo
 abbychess/operacoes_de_pagina.py ControladorDaSequencia._mudar_sequencia  # a reduzir (Q8)
 abbychess/operacoes_de_pagina.py ControladorDaSequencia.dividir_paginas.fazer  # a reduzir (Q8)

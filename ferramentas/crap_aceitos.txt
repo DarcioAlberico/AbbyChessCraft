@@ -6,9 +6,6 @@
 # Uma linha por função: arquivo Classe.funcao  # o motivo
 
 abbychess/app/acoes.py _menus  # a reduzir (Q8)
-abbychess/app/dialogos.py intervalo_do_lote  # a reduzir (Q8)
-abbychess/app/dialogos.py novo_projeto  # a reduzir (Q8)
-abbychess/app/dialogos.py paginas_do_modelo_de_areas  # a reduzir (Q8)
 abbychess/app/documento.py VistaDoDocumento._destaques_da_busca  # a reduzir (Q8)
 abbychess/app/documento.py VistaDoDocumento._formato_do_glifo  # a reduzir (Q8)
 abbychess/app/documento.py VistaDoDocumento._guardar_as_unidades  # a reduzir (Q8)

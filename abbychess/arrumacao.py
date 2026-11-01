@@ -38,12 +38,7 @@ def aplicar_lida(pagina: Pagina, lida, idioma: str, *,
     depois = list(lida.boxes)
     tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
     if zona is not None:
-        from core.services.box_service import BoxService
-
-        fora = [b.entry for b in pagina.boxes if not zona.contem_o_centro(b.entry)]
-        depois = BoxService.sort_boxes_reading_order(fora + depois)
-        tabuleiros = [t for t in pagina.tabuleiros
-                      if not zona.contem((t[0] + t[2]) / 2, (t[1] + t[3]) / 2)] + tabuleiros
+        depois, tabuleiros = _com_o_de_fora_da_zona(pagina, zona, depois, tabuleiros)
     novos, dif = reconciliar(pagina.boxes, depois, pagina.alocar, procedencia.amostra_de,
                              estilo_de=lambda entry: estilos.get(id(entry)),
                              iou_minimo=IOU_DA_RELEITURA)
@@ -59,3 +54,15 @@ def aplicar_lida(pagina: Pagina, lida, idioma: str, *,
     arrumar(pagina, idioma)
     pagina.estado = proximo_estado(pagina.estado, "reconhecer")
     return descrever_caidas(dif.caidas, de_antes) if dif.caidas else []
+
+
+def _com_o_de_fora_da_zona(pagina: Pagina, zona, depois: list, tabuleiros: list) -> tuple:
+    """Reconhecer a área: os boxes e os tabuleiros lidos nela, com os da página que estão fora
+    dela (os boxes na ordem de leitura)."""
+    from core.services.box_service import BoxService
+
+    fora = [b.entry for b in pagina.boxes if not zona.contem_o_centro(b.entry)]
+    depois = BoxService.sort_boxes_reading_order(fora + depois)
+    tabuleiros = [t for t in pagina.tabuleiros
+                  if not zona.contem((t[0] + t[2]) / 2, (t[1] + t[3]) / 2)] + tabuleiros
+    return depois, tabuleiros

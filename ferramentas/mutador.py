@@ -157,13 +157,17 @@ def mutantes(fonte: str) -> List[Mutante]:
     return sorted(saida, key=lambda m: (m.inicio, m.fim, m.troca))
 
 
-def classificar(codigo: Optional[int], estourou: bool) -> str:
-    """O resultado de um mutante pelo código de saída do pytest."""
+def classificar(codigo: Optional[int], estourou: bool, saida: str = "") -> str:
+    """O resultado de um mutante pelo código de saída do pytest (e pela `saida` dele: o conftest
+    que importa o módulo cai com o mutante que nem importa, e o pytest sai com 4, como num erro
+    de uso; a rodada sem mutante já provou que o conftest carrega)."""
     if estourou:
         return "tempo"
     if codigo == 0:
         return "sobreviveu"
     if codigo in (1, 2, 3):                 # reprovou, a coleta caiu, ou o pytest caiu no mutante
+        return "morto"
+    if codigo == 4 and "ImportError while loading conftest" in saida:
         return "morto"
     raise RuntimeError(f"o pytest saiu com {codigo}: o erro é do mutador, não do mutante")
 
@@ -246,7 +250,8 @@ def _rodar_mutante(copia: Path, modulo: Path, fonte: str, m: Mutante, testes: Li
         rodada = subprocess.run([sys.executable, "-m", "pytest", "-x", "-q", "-p", "no:cacheprovider",
                                  f"@{argumentos.name}"], cwd=copia, capture_output=True,
                                 env=_ambiente(copia), timeout=limite)
-        return classificar(rodada.returncode, False)
+        return classificar(rodada.returncode, False,
+                           (rodada.stdout + rodada.stderr).decode("utf-8", "replace"))
     except subprocess.TimeoutExpired:
         return classificar(None, True)
     finally:

@@ -220,6 +220,23 @@ def test_a_sequencia_gravada_curta_ganha_as_paginas_que_faltam_do_pdf(projeto_v2
     assert s.pid_em(1) == 40 and len(set(s.pids)) == 60
 
 
+def test_as_inclinacoes_ja_por_pid_ficam_e_as_do_pdf_passam_a_pid(projeto_v2):
+    _gravar(projeto_v2 / "inclinacoes.json", {"0": 0.3, "p40:inteira:0": 0.1})
+    projeto = ProjetoDeLivro.abrir(projeto_v2)
+    assert projeto.migrado
+    assert _json(projeto_v2 / "inclinacoes.json") == {"p0:inteira:0": 0.3, "p40:inteira:0": 0.1}
+
+
+def test_os_arquivos_ilegiveis_nao_impedem_a_migracao_e_ficam_como_estavam(projeto_v2):
+    ilegiveis = {"inclinacoes.json": "{", "janela.json": "{pela metade", "lote.json": "[3, 4]"}
+    for nome, texto in ilegiveis.items():
+        (projeto_v2 / nome).write_text(texto, encoding="utf-8")
+    projeto = ProjetoDeLivro.abrir(projeto_v2)
+    assert projeto.migrado and projeto.dados.versao == 3
+    for nome, texto in ilegiveis.items():
+        assert (projeto_v2 / nome).read_text(encoding="utf-8") == texto
+
+
 def test_a_v2_com_paginas_que_o_livro_json_nao_cita_as_poe_no_lugar_delas(projeto_v2):
     """Uma queda entre a página e o `livro.json` da v2: o arquivo que ele não cita entra na
     sequência pela página do PDF dele (o mais recente, se há dois) e no livro; o de uma

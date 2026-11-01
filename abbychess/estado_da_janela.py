@@ -94,21 +94,11 @@ def calcular(p, livro, vista: Vista) -> EstadoDaJanela:
     pronto = p.pronto
     tem = (pronto, SEM_PAGINA)
     sem_lote = (not p.lote_rodando, LOTE_RODANDO)
-    boxes = (pronto and bool(p.boxes), SEM_BOXES)
-    total = p.fonte.total if p.fonte else 0
-    antes = (pronto and not p.projeto.somente_leitura and p.projeto.antes_do_lote.tem(p.indice),
-             SEM_ANTES)
-    primeira = (pronto and p.indice > 0, NA_PRIMEIRA)
-    ultima = (pronto and p.indice < total - 1, NA_ULTIMA)
-    voltar = (pronto and p.navegador.pode_voltar, SEM_VISITA)
-    avancar = (pronto and p.navegador.pode_avancar, SEM_VISITA)
+    boxes, antes = _boxes_e_antes_do_lote(p, pronto)
+    primeira, ultima, voltar, avancar = _navegacao(p, pronto)
     areas = (vista.areas_ligadas, AREAS_DESLIGADAS)
     area_atual = _primeiro(tem, areas, (vista.area_atual, SEM_AREA_ATUAL))
-    desfazer, refazer = p.historico.proximo_a_desfazer, p.historico.proximo_a_refazer
-    if vista.sessao:
-        desfazer = "a palavra"
-    if vista.pode_reaplicar:
-        refazer = "a palavra"
+    desfazer, refazer = _desfazer_e_refazer(p, vista)
     habilitadas = {
         "acao_novo": _primeiro(sem_lote),
         "acao_abrir": _primeiro(sem_lote),
@@ -163,3 +153,29 @@ def calcular(p, livro, vista: Vista) -> EstadoDaJanela:
     return EstadoDaJanela(habilitadas, paginas, paginas_mudam,
                           f"Desfazer: {desfazer}" if desfazer else "Desfazer",
                           f"Refazer: {refazer}" if refazer else "Refazer")
+
+
+def _boxes_e_antes_do_lote(p, pronto: bool) -> tuple:
+    """(pode, motivo) da página com boxes e da que tem a cópia de antes do lote."""
+    boxes = (pronto and bool(p.boxes), SEM_BOXES)
+    antes = (pronto and not p.projeto.somente_leitura and p.projeto.antes_do_lote.tem(p.indice),
+             SEM_ANTES)
+    return boxes, antes
+
+
+def _navegacao(p, pronto: bool) -> tuple:
+    """(pode, motivo) de ir à anterior, à seguinte e de voltar e avançar nas visitas."""
+    total = p.fonte.total if p.fonte else 0
+    return ((pronto and p.indice > 0, NA_PRIMEIRA), (pronto and p.indice < total - 1, NA_ULTIMA),
+            (pronto and p.navegador.pode_voltar, SEM_VISITA),
+            (pronto and p.navegador.pode_avancar, SEM_VISITA))
+
+
+def _desfazer_e_refazer(p, vista: Vista) -> tuple:
+    """O que o Ctrl+Z e o Ctrl+Y fariam: a palavra da sessão do Documento, ou o histórico."""
+    desfazer, refazer = p.historico.proximo_a_desfazer, p.historico.proximo_a_refazer
+    if vista.sessao:
+        desfazer = "a palavra"
+    if vista.pode_reaplicar:
+        refazer = "a palavra"
+    return desfazer, refazer

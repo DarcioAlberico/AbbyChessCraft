@@ -168,10 +168,14 @@ def classificar(codigo: Optional[int], estourou: bool) -> str:
     raise RuntimeError(f"o pytest saiu com {codigo}: o erro é do mutador, não do mutante")
 
 
-def testes_do_mutante(contextos: Dict[int, List[str]], m: Mutante) -> List[str]:
-    """Os testes (o nodeid) que passam pelas linhas do mutante."""
+def testes_do_mutante(contextos: Dict[int, List[str]], m: Mutante, todos: List[str]) -> List[str]:
+    """Os testes (o nodeid) que passam pelas linhas do mutante. A linha que só roda ao importar
+    o módulo (a constante, o valor padrão da dataclass) tem o contexto vazio, porque o pytest
+    importa na coleta, fora de teste nenhum: ela vale para `todos` os testes do módulo."""
     nomes = {c.split("|", 1)[0] for linha in range(m.linha, m.fim_linha + 1)
              for c in contextos.get(linha, ())}
+    if nomes == {""}:
+        return list(todos)
     return sorted(n for n in nomes if n)
 
 
@@ -317,7 +321,7 @@ def main() -> int:
         def fazer(n: int, m: Mutante) -> None:
             if prazo is not None and time.monotonic() > prazo:
                 return
-            dele = testes_do_mutante(contextos, m)
+            dele = testes_do_mutante(contextos, m, testes)
             if dele:
                 copia = livres.get()
                 try:

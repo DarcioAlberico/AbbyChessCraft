@@ -333,59 +333,69 @@ def test_as_amostras_que_nao_gravam_nao_desfazem_a_conferencia(livro_com_diagram
                        "disco cheio"]
 
 
-def test_corrigir_e_ensinar_uma_palavra_e_um_passo_so_do_desfazer(dois_projetos):
-    from abbychess import verificacao as vf
+def _texto(ctl) -> str:
+    """O texto da página como o Documento o mostra (□ no glifo que ninguém leu)."""
+    from abbychess import sessao as ss
+
+    return ss.texto_e_unidades(ctl.modelo)[0]
+
+
+def _digitar(ctl, executor, n: int, novo: str) -> str:
+    """O usuário digita `novo` no lugar da palavra `n` da página, no Documento (a sessão
+    confirmada, na vez dela na fila); devolve o texto da página depois."""
+    import re
+
+    from abbychess import sessao as ss
+
+    texto, unidades = ss.texto_e_unidades(ctl.modelo)
+    comeco = list(re.finditer(r"\S+", texto))[n].start()
+    inicio, fim = ss.palavras_em(unidades, comeco, comeco)
+    ctl.sessoes.confirmar_sessao(unidades[inicio:fim], novo)
+    executor.tudo()
+    return _texto(ctl)
+
+
+def _verificando_a_primeira_palavra(projeto):
+    """A página reconhecida, a primeira palavra digitada "abc" no Documento, e a verificação
+    (F7) contada com um léxico que não a conhece: ela é a palavra em revisão."""
+    from core import lexico
+
     from abbychess.controladores import ControladorDeVerificacao
 
-    a, _ = dois_projetos
     executor = ExecutorManual()
-    ctl = _controlador(a, executor)
+    ctl = _controlador(projeto, executor)
     ctl.leitura.reconhecer()
     executor.tudo()
+    assert _digitar(ctl, executor, 0, "abc").startswith("abc ")
     verificador = ControladorDeVerificacao(ctl)
-    antes = [b for b in ctl.modelo.boxes]
-    class _SemLexico:                                   # não sinaliza nada ao recontar
-        sinaliza = False
+    verificador.lexico = lexico.Lexico(palavras={"casa"})
+    verificador.recontar()
+    assert verificador.atual().palavra == "abc"
+    return ctl, executor, verificador
 
-    verificador.lexico = _SemLexico()
-    verificador._gids = ctl.gids
-    verificador.desconhecidas = [vf.Desconhecida("ab", [0, 1])]
-    verificador.corrigir("xy", ensinar=True)
+
+def test_corrigir_e_ensinar_uma_palavra_e_um_passo_so_do_desfazer(dois_projetos):
+    ctl, executor, verificador = _verificando_a_primeira_palavra(dois_projetos[0])
+    antes = list(ctl.modelo.boxes)
+    verificador.corrigir("xyz", ensinar=True)
     executor.tudo()                                     # a correção e, depois, o ensino
-    assert [ctl.box(g).char for g in ctl.gids[:2]] == ["x", "y"]
-    assert ctl.leitor.total_de_padroes == 2
+    assert _texto(ctl).startswith("xyz ")
+    assert ctl.leitor.total_de_padroes == 3
     ctl.desfazedor.desfazer()
     executor.tudo()
-    assert ctl.modelo.boxes == antes                    # um Ctrl+Z volta as duas coisas
-    assert ctl.leitor.total_de_padroes == 0
-    assert ctl.historico.proximo_a_desfazer == "Reconhecer a página"
+    assert ctl.modelo.boxes == antes and _texto(ctl).startswith("abc ")   # um Ctrl+Z volta
+    assert ctl.leitor.total_de_padroes == 0                               # as duas coisas
+    assert ctl.historico.proximo_a_desfazer == "Editar 'abc'"
 
 
 def test_espaco_na_correcao_separa_a_palavra_e_desfaz_junto(dois_projetos):
-    from abbychess import verificacao as vf
-    from abbychess.controladores import ControladorDeVerificacao
-
-    a, _ = dois_projetos
-    executor = ExecutorManual()
-    ctl = _controlador(a, executor)
-    ctl.leitura.reconhecer()
+    ctl, executor, verificador = _verificando_a_primeira_palavra(dois_projetos[0])
+    verificador.corrigir("x yz")
     executor.tudo()
-    verificador = ControladorDeVerificacao(ctl)
-
-    class _SemLexico:                                   # não sinaliza nada ao recontar
-        sinaliza = False
-
-    verificador.lexico = _SemLexico()
-    verificador._gids = ctl.gids
-    verificador.desconhecidas = [vf.Desconhecida("ab", [0, 1])]
-    primeiro, segundo = ctl.gids[:2]
-    verificador.corrigir("x y")
-    executor.tudo()
-    assert [ctl.box(g).char for g in (primeiro, segundo)] == ["x", "y"]
-    assert ctl.modelo.decisoes.quebras == {segundo}
+    assert _texto(ctl).startswith("x yz ")
     ctl.desfazedor.desfazer()
     executor.tudo()
-    assert ctl.modelo.decisoes.quebras == frozenset()   # a letra e o espaço, um Ctrl+Z
+    assert _texto(ctl).startswith("abc ")               # a letra e o espaço, um Ctrl+Z
 
 
 def test_trocar_de_projeto_solta_o_lote_preso(dois_projetos):
@@ -530,24 +540,22 @@ def test_sair_da_pagina_confirma_a_sessao_na_pagina_dela(tmp_path, na_fila):
 def test_o_box_marcado_confirmado_com_a_letra_que_faltava_tira_o_virtual(dois_projetos, letra, sai):
     """A revisão do D1: o virtual sai só quando o usuário confirma o box marcado ao lado
     dele com a letra dele (a vírgula marcada ali fica vírgula, e o virtual fica)."""
-    from abbychess import sessao as ss
-
     a, _b = dois_projetos
     executor = ExecutorManual()
     ctl = _controlador(a, executor)
+    sugeridas = []
+    ctl.eventos.ligar("caractere_sugerido", sugeridas.append)
     ctl.leitura.reconhecer()
     executor.tudo()
-    texto, unidades = ss.texto_e_unidades(ctl.modelo)
-    inicio, fim = ss.palavras_em(unidades, 0, 0)
-    ctl.sessoes.confirmar_sessao(unidades[inicio:fim], texto[inicio:fim] + "x")
+    assert _digitar(ctl, executor, 0, "□□□x").startswith("□□□x ")   # o "x" que faltava
+    terceiro = ctl.boxes[2]                             # o glifo ao lado do virtual
+    ctl.marcar(terceiro.x1, terceiro.y1, terceiro.x2, terceiro.y2)   # Ctrl+M sobre a tinta
     executor.tudo()
-    [virtual] = [v.gid for v in ctl.modelo.decisoes.virtuais]
-    box = ctl.modelo.boxes[0].gid
-    ctl.escolher(box)
-    ctl._letra_que_faltava = (box, virtual, "x")       # como o `marcar` deixa
-    ctl.corrigir(letra)
+    box = ctl.atual
+    assert sugeridas == ["x"]                           # o Documento sugere a letra virtual
+    ctl.corrigir(letra)                                 # Enter
     executor.tudo()
-    assert (virtual not in {v.gid for v in ctl.modelo.decisoes.virtuais}) == sai
+    assert _texto(ctl).startswith("□□x " if sai else f"□□{letra}x ")
     assert ctl.box(box).char == letra
 
 
@@ -578,25 +586,27 @@ def test_o_ctrl_t_espera_a_sessao_na_fila_e_fechar_aplica_na_hora(dois_projetos)
 
 def test_o_modo_como_o_livro_olha_o_resumo_das_paginas_lidas(tmp_path):
     """A revisão de produto do D1: uma página sem figurinas num livro de figurinas segue o
-    livro, pelo resumo do `livro.json` (sem abrir as páginas)."""
-    from abbychess import sessao as ss
+    livro, pelo resumo do `livro.json` (sem abrir as páginas). O modo se vê no lance
+    digitado no Documento: "Cf3" vira "♘f3" no livro de figurinas e fica como foi digitado
+    no de letras."""
     from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
     try:
         executor = ExecutorManual()
         ctl = _controlador(projeto, executor)
+        assert projeto.dados.notacao == "livro"
         ctl.leitura.reconhecer()
         executor.tudo()
-        assert ctl.sessoes._modo_das_pecas("livro", ctl.modelo) == "letras"
-        texto, unidades = ss.texto_e_unidades(ctl.modelo)
-        inicio, fim = ss.palavras_em(unidades, 0, 0)
-        ctl.sessoes.confirmar_sessao(unidades[inicio:fim], "♘" + texto[inicio + 1:fim])
-        executor.tudo()
+        assert _digitar(ctl, executor, 0, "Cf3").startswith("Cf3 ")   # sem figurinas: letras
+        assert _digitar(ctl, executor, 1, "♘□□").startswith("Cf3 ♘□□ ")
         ctl.ir_para(1)
+        ctl.leitura.reconhecer()
+        executor.tudo()
         ctl.sessoes.zerar()                            # como ao abrir o projeto
-        assert ctl.sessoes._modo_das_pecas("livro", ctl.modelo) == "figurinas"
-        assert ctl.sessoes._modo_das_pecas("letras", ctl.modelo) == "letras"
+        assert _digitar(ctl, executor, 0, "Cf3").startswith("♘f3 ")   # segue o livro
+        ctl.padroes_do_livro.definir_notacao("letras")
+        assert _digitar(ctl, executor, 1, "Cf3").startswith("♘f3 Cf3\n")
     finally:
         projeto.fechar()
 

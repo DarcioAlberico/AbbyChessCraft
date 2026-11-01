@@ -390,31 +390,8 @@ class VisorDePagina(QGraphicsView):
         if not self.modo_areas:
             return
         for i, z in enumerate(self._zonas):
-            cor = estilo.COR_DA_FUNCAO.get(z.funcao, estilo.COR_DA_ZONA[z.tipo])
-            caneta = QPen(cor)
-            caneta.setCosmetic(True)
-            caneta.setWidthF(3.5 if i == self._zona_sel else 2)
-            if i == self._zona_sel:
-                caneta.setStyle(Qt.PenStyle.DashLine)
-            fundo = QColor(cor)
-            fundo.setAlpha(45 if i == self._zona_sel else 25)
-            item = cena.addRect(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1, caneta, QBrush(fundo))
-            item.setZValue(5)
-            if ordem_clicada is not None:
-                numero = ordem_clicada.index(i) + 1 if i in ordem_clicada else "?"
-            else:
-                numero = z.ordem + 1 if z.ordem is not None else i + 1
-            rotulo = cena.addSimpleText(f"{numero} {zn.NOMES_DAS_FUNCOES[z.funcao]}")
-            rotulo.setBrush(QBrush(cor))
-            rotulo.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
-            rotulo.setPos(z.x1 + 2, z.y1 + 2)
-            rotulo.setZValue(6)
-            caixa = rotulo.boundingRect().adjusted(-2, -1, 2, 1)
-            fundo_do_rotulo = cena.addRect(caixa, QPen(cor), QBrush(estilo.PAPEL))
-            fundo_do_rotulo.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
-            fundo_do_rotulo.setPos(z.x1 + 2, z.y1 + 2)
-            fundo_do_rotulo.setZValue(5.5)
-            self._zonas_itens.append((item, fundo_do_rotulo, rotulo))
+            self._zonas_itens.append(_desenhar_zona(cena, z, i == self._zona_sel,
+                                                    _numero_da_zona(i, z, ordem_clicada)))
 
     def menu_da_zona(self, indice: int) -> QMenu:
         """A função da área e apagá-la, pelo botão direito."""
@@ -774,6 +751,40 @@ def _desenhar_tabuleiros(cena: QGraphicsScene, tabuleiros, cores) -> List[QGraph
         cena.addItem(item)
         itens.append(item)
     return itens
+
+
+def _numero_da_zona(i: int, zona, ordem_clicada: Optional[list]):
+    """O número do rótulo da área `i`: a ordem de leitura dela (ou a posição, sem ordem); no
+    Ordenar, a ordem nova das clicadas e um "?" nas outras."""
+    if ordem_clicada is not None:
+        return ordem_clicada.index(i) + 1 if i in ordem_clicada else "?"
+    return zona.ordem + 1 if zona.ordem is not None else i + 1
+
+
+def _desenhar_zona(cena: QGraphicsScene, z, escolhida: bool, numero) -> tuple:
+    """O retângulo da área, na cor da função dela (tracejado e mais forte se escolhida), e o
+    rótulo com o número e a função no canto, sobre um fundo de papel."""
+    cor = estilo.COR_DA_FUNCAO.get(z.funcao, estilo.COR_DA_ZONA[z.tipo])
+    caneta = QPen(cor)
+    caneta.setCosmetic(True)
+    caneta.setWidthF(3.5 if escolhida else 2)
+    if escolhida:
+        caneta.setStyle(Qt.PenStyle.DashLine)
+    fundo = QColor(cor)
+    fundo.setAlpha(45 if escolhida else 25)
+    item = cena.addRect(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1, caneta, QBrush(fundo))
+    item.setZValue(5)
+    rotulo = cena.addSimpleText(f"{numero} {zn.NOMES_DAS_FUNCOES[z.funcao]}")
+    rotulo.setBrush(QBrush(cor))
+    rotulo.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
+    rotulo.setPos(z.x1 + 2, z.y1 + 2)
+    rotulo.setZValue(6)
+    caixa = rotulo.boundingRect().adjusted(-2, -1, 2, 1)
+    fundo_do_rotulo = cena.addRect(caixa, QPen(cor), QBrush(estilo.PAPEL))
+    fundo_do_rotulo.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
+    fundo_do_rotulo.setPos(z.x1 + 2, z.y1 + 2)
+    fundo_do_rotulo.setZValue(5.5)
+    return item, fundo_do_rotulo, rotulo
 
 
 #: No editor de áreas, as teclas do tipo da área escolhida (os de `zn.TIPOS`, na ordem) e as

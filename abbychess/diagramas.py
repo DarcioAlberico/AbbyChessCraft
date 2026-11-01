@@ -347,15 +347,24 @@ def ler_diagrama(imagem, caixa: Caixa, *, escala: Optional[float] = None, classi
         titulo = diagrama.ler_titulo(arr, caixa, escala, classificar, boxes=boxes, rotulos=rotulos)
     except diagrama.ModeloAusente as erro:
         return DiagramaLido(caixa, erro=f"o modelo de diagramas não carregou ({erro})")
+    lido = _lido_do_core(caixa, leitura, rotulos, titulo)
+    if lido.erro:
+        return lido
+    return _com_lado(lido, legendas_dos_boxes(boxes, caixa, rotulos.lados) if boxes else [])
+
+
+def _lido_do_core(caixa: Caixa, leitura, rotulos, titulo) -> DiagramaLido:
+    """O tabuleiro como o core o leu, com o motivo da dúvida; o erro, sem as 64 casas."""
+    from core import diagrama
+
     if len(leitura.casas) != 64:
         motivo = next((a for a in leitura.avisos if a != diagrama.AVISO_CONVENCAO), "")
         return DiagramaLido(caixa, erro=motivo or "não deu para ler o tabuleiro")
     ok, motivo = diagrama.confiavel(leitura)
-    lido = DiagramaLido(caixa, casas=leitura.casas, orientacao=leitura.orientacao,
+    return DiagramaLido(caixa, casas=leitura.casas, orientacao=leitura.orientacao,
                         orientacao_confirmada=rotulos.orientacao is not None,
                         titulo_do_core=titulo.texto, lados_de_rotulo=tuple(rotulos.lados),
                         motivo="" if ok else motivo)
-    return _com_lado(lido, legendas_dos_boxes(boxes, caixa, rotulos.lados) if boxes else [])
 
 
 def _com_lado(d: DiagramaLido, legendas: Sequence[str]) -> DiagramaLido:
@@ -421,25 +430,36 @@ def legendas_dos_boxes(boxes: Sequence[BoxEntry], caixa: Caixa,
     x1, y1, x2, y2 = caixa
     referencia = (referencia or proporcao.altura_de_referencia(list(boxes))
                   or (y2 - y1) / 16.0)
-    faixa = referencia * FAIXA_DA_LEGENDA
-    na_largura = [b for b in boxes if b.char and x1 <= (b.x1 + b.x2) / 2 <= x2
-                  and b.y2 - b.y1 <= referencia * ALTURA_MAXIMA_DA_LEGENDA]
+    na_largura = _na_largura(boxes, x1, x2, referencia)
     textos = []
     for lado in ("acima", "abaixo"):
         if lado in lados_de_rotulo:
             continue
-        if lado == "acima":
-            perto = [(y1 - b.y2, b) for b in na_largura if y1 - faixa <= b.y2 <= y1]
-        else:
-            perto = [(b.y1 - y2, b) for b in na_largura if y2 <= b.y1 <= y2 + faixa]
+        perto = _perto_do_lado(lado, na_largura, y1, y2, referencia * FAIXA_DA_LEGENDA)
         if not perto:
             continue
         semente = min(perto, key=lambda par: par[0])[1]
-        linha = [b for b in na_largura if semente.y1 <= (b.y1 + b.y2) / 2 <= semente.y2]
-        texto = texto_dos_boxes(linha).strip()
+        texto = texto_dos_boxes(_linha_da_semente(semente, na_largura)).strip()
         if texto:
             textos.append(texto)
     return textos
+
+
+def _na_largura(boxes: Sequence[BoxEntry], x1: int, x2: int, referencia: float) -> list:
+    """Os boxes lidos com o centro na largura do tabuleiro e da altura de uma legenda."""
+    return [b for b in boxes if b.char and x1 <= (b.x1 + b.x2) / 2 <= x2
+            and b.y2 - b.y1 <= referencia * ALTURA_MAXIMA_DA_LEGENDA]
+
+
+def _perto_do_lado(lado: str, na_largura: list, y1: int, y2: int, faixa: float) -> list:
+    """(distância, box) dos boxes com a borda na faixa acima (ou abaixo) do tabuleiro."""
+    if lado == "acima":
+        return [(y1 - b.y2, b) for b in na_largura if y1 - faixa <= b.y2 <= y1]
+    return [(b.y1 - y2, b) for b in na_largura if y2 <= b.y1 <= y2 + faixa]
+
+
+def _linha_da_semente(semente, na_largura: list) -> list:
+    return [b for b in na_largura if semente.y1 <= (b.y1 + b.y2) / 2 <= semente.y2]
 
 
 def ler_diagramas(imagem, tabuleiros: Sequence[Caixa], *, escala: Optional[float] = None,

@@ -742,3 +742,69 @@ def test_a_medida_da_inclinacao_nao_segura_o_render_de_outra_pagina(pdf_de_60_pa
     assert pronta_antes                                        # não esperou a medida da 5
     assert cache.tem(5) and cache.tem(9)
     assert set(json.loads((tmp_path / pg.ARQUIVO_DE_INCLINACOES).read_text())) == {"5", "9"}
+
+
+# ----------------------------------------------------------------------
+# A prévia do arraste de uma área
+# ----------------------------------------------------------------------
+
+def _visor_com_tres_areas(app):
+    from PySide6.QtGui import QPixmap
+
+    from abbychess import zonas as zn
+    from abbychess.app.visor import VisorDePagina
+
+    visor = VisorDePagina()
+    visor.resize(900, 760)
+    visor.show()
+    visor.mostrar_pagina(QPixmap(800, 700))
+    visor.resetTransform()
+    visor.definir_modo_areas(True)
+    visor.mostrar_zonas([zn.Zona(zn.TEXTO, 50, 50, 300, 200, id="z0"),
+                         zn.Zona(zn.TEXTO, 50, 250, 300, 400, id="z1"),
+                         zn.Zona(zn.TEXTO, 50, 450, 300, 600, id="z2")], 0)
+    app.processEvents()
+    return visor
+
+
+def _arrastar_sem_soltar(visor, de, para):
+    """O botão esquerdo apertado em `de` e o mouse movido até `para` (pontos da página)."""
+    from PySide6.QtCore import QEvent, QPointF
+    from PySide6.QtGui import QMouseEvent
+
+    tela = visor.viewport()
+    QTest.mousePress(tela, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier,
+                     visor.mapFromScene(*de))
+    fim = visor.mapFromScene(*para)
+    QApplication.sendEvent(tela, QMouseEvent(
+        QEvent.Type.MouseMove, QPointF(fim), QPointF(tela.mapToGlobal(fim)),
+        Qt.MouseButton.NoButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier))
+
+
+def _o_que_se_ve(visor):
+    """Os retângulos das áreas (na página) e a posição de cada rótulo, pelo texto dele."""
+    from PySide6.QtWidgets import QGraphicsItem, QGraphicsRectItem, QGraphicsSimpleTextItem
+
+    solto = QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations
+    itens = visor.scene().items()
+    areas = sorted((r.rect().x(), r.rect().y(), r.rect().width(), r.rect().height())
+                   for r in itens if isinstance(r, QGraphicsRectItem) and not r.flags() & solto)
+    rotulos = {t.text(): (t.pos().x(), t.pos().y())
+               for t in itens if isinstance(t, QGraphicsSimpleTextItem)}
+    return areas, rotulos
+
+
+@pytest.mark.parametrize("area", [0, 1, 2])
+def test_arrastar_uma_area_mostra_ela_e_o_rotulo_onde_vao_ficar(app, area):
+    """Antes de soltar, a área arrastada é desenhada no lugar novo com o rótulo junto, e as
+    outras ficam onde estavam (o fundo do rótulo é um terceiro item de cada área)."""
+    visor = _visor_com_tres_areas(app)
+    topo = 50 + 200 * area
+    _arrastar_sem_soltar(visor, (175, topo + 75), (195, topo + 95))
+    app.processEvents()
+    areas, rotulos = _o_que_se_ve(visor)
+    esperadas = sorted((70.0 if k == area else 50.0, 50.0 + 200 * k + (20 if k == area else 0),
+                        250.0, 150.0) for k in range(3))
+    assert areas == esperadas
+    assert rotulos[f"{area + 1} Texto"] == (72.0, topo + 22.0)
+    visor.close()

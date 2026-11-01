@@ -142,27 +142,10 @@ class PreviaDoCorte(_Previa):
         if self._arraste is None:
             self.setCursor(self._cursor_para(ponto))
             return
-        modo, inicio, (e, c, d, b) = self._arraste
-        agora = self._fracao(ponto)
-        if modo == "novo":
-            e, d = sorted((inicio.x(), agora.x()))
-            c, b = sorted((inicio.y(), agora.y()))
-            if d - e < SOBRA_MINIMA or b - c < SOBRA_MINIMA:
-                return                          # um clique sem arraste não apaga o corte
-        elif modo == "mover":
-            dx = min(max(agora.x() - inicio.x(), -e), 100 - d)
-            dy = min(max(agora.y() - inicio.y(), -c), 100 - b)
-            e, d, c, b = e + dx, d + dx, c + dy, b + dy
-        else:
-            if "e" in modo:
-                e = min(agora.x(), d - SOBRA_MINIMA)
-            if "d" in modo:
-                d = max(agora.x(), e + SOBRA_MINIMA)
-            if "c" in modo:
-                c = min(agora.y(), b - SOBRA_MINIMA)
-            if "b" in modo:
-                b = max(agora.y(), c + SOBRA_MINIMA)
-        self._por(e, c, d, b)
+        modo, inicio, bordas = self._arraste
+        novas = _bordas_arrastadas(modo, inicio, self._fracao(ponto), bordas)
+        if novas is not None:
+            self._por(*novas)
 
     def mouseReleaseEvent(self, _evento) -> None:
         self._arraste = None
@@ -186,6 +169,47 @@ class PreviaDoCorte(_Previa):
         for canto in (r.topLeft(), r.topRight(), r.bottomLeft(), r.bottomRight()):
             pintor.drawRect(QRectF(canto.x() - 3, canto.y() - 3, 6, 6))
         pintor.restore()
+
+
+def _bordas_arrastadas(modo: str, inicio: QPointF, agora: QPointF, bordas):
+    """As bordas do corte (esquerda, cima, direita, baixo, em porcentagem) com o arraste de
+    `inicio` a `agora`: um retângulo novo ("novo"), o mesmo movido ("mover") ou as bordas de
+    `modo` esticadas ("e", "dc"...). None se o novo ainda é um clique sem arraste."""
+    if modo == "novo":
+        return _corte_novo(inicio, agora)
+    if modo == "mover":
+        return _corte_movido(inicio, agora, bordas)
+    return _corte_esticado(modo, agora, bordas)
+
+
+def _corte_novo(inicio: QPointF, agora: QPointF):
+    e, d = sorted((inicio.x(), agora.x()))
+    c, b = sorted((inicio.y(), agora.y()))
+    if d - e < SOBRA_MINIMA or b - c < SOBRA_MINIMA:
+        return None                             # um clique sem arraste não apaga o corte
+    return e, c, d, b
+
+
+def _corte_movido(inicio: QPointF, agora: QPointF, bordas):
+    """O corte inteiro levado junto, sem sair da página."""
+    e, c, d, b = bordas
+    dx = min(max(agora.x() - inicio.x(), -e), 100 - d)
+    dy = min(max(agora.y() - inicio.y(), -c), 100 - b)
+    return e + dx, c + dy, d + dx, b + dy
+
+
+def _corte_esticado(modo: str, agora: QPointF, bordas):
+    """As bordas de `modo` no ponto, sem passar da sobra mínima diante da borda oposta."""
+    e, c, d, b = bordas
+    if "e" in modo:
+        e = min(agora.x(), d - SOBRA_MINIMA)
+    if "d" in modo:
+        d = max(agora.x(), e + SOBRA_MINIMA)
+    if "c" in modo:
+        c = min(agora.y(), b - SOBRA_MINIMA)
+    if "b" in modo:
+        b = max(agora.y(), c + SOBRA_MINIMA)
+    return e, c, d, b
 
 
 class PreviaDaDivisao(_Previa):

@@ -197,37 +197,9 @@ class PainelDePaginas(QWidget):
         `atual` (a página aberta mudou) escolhe a linha dela."""
         self.lista.setUpdatesEnabled(False)
         if self.lista.topLevelItemCount() != total:
-            self.lista.clear()
-            itens = []
-            for i in range(total):
-                item = QTreeWidgetItem()
-                item.setData(0, Qt.ItemDataRole.UserRole, i)
-                for coluna in (0, 2, 3):
-                    item.setTextAlignment(coluna, Qt.AlignmentFlag.AlignRight)
-                itens.append(item)
-            self.lista.addTopLevelItems(itens)
+            _criar_as_linhas(self.lista, total)
         for i in range(total):
-            r = resumo.get(i, {})
-            estado = r.get("estado", md.NAO_RECONHECIDA)
-            pendentes = r.get("pendentes")
-            diagramas = r.get("diagramas_por_conferir", 0)
-            item = self.lista.topLevelItem(i)
-            simbolo, cor = SIMBOLOS_DOS_ESTADOS.get(estado, ("?", estilo.CINZA))
-            cor = estilo.na_interface(cor)
-            for coluna, texto in enumerate((str(i + 1), simbolo,
-                                            "" if pendentes is None else str(pendentes),
-                                            str(diagramas) if diagramas else "")):
-                if item.text(coluna) != texto:
-                    item.setText(coluna, texto)
-            if item.data(1, Qt.ItemDataRole.UserRole) != estado:
-                item.setData(1, Qt.ItemDataRole.UserRole, estado)
-                item.setToolTip(1, NOMES_DOS_ESTADOS.get(estado, estado))
-                item.setForeground(1, cor)
-                apagada = estado == md.NAO_RECONHECIDA      # o que ainda não foi lido, atenuado
-                if apagada:
-                    item.setForeground(0, estilo.cor("texto_secundario"))
-                else:                                   # a cor da paleta, que segue o tema
-                    item.setData(0, Qt.ItemDataRole.ForegroundRole, None)
+            _atualizar_a_linha(self.lista.topLevelItem(i), i, resumo.get(i, {}))
         self._pintar_contagem()
         self._filtrar()
         if atual is not None:
@@ -305,3 +277,40 @@ class PainelDePaginas(QWidget):
             acao.triggered.connect(
                 lambda _=False, m=metodo: self.operacao.emit(m, self.selecionadas()))
         return menu
+
+
+def _criar_as_linhas(lista: QTreeWidget, total: int) -> None:
+    """Uma linha por página, com os números à direita."""
+    lista.clear()
+    itens = []
+    for i in range(total):
+        item = QTreeWidgetItem()
+        item.setData(0, Qt.ItemDataRole.UserRole, i)
+        for coluna in (0, 2, 3):
+            item.setTextAlignment(coluna, Qt.AlignmentFlag.AlignRight)
+        itens.append(item)
+    lista.addTopLevelItems(itens)
+
+
+def _atualizar_a_linha(item: QTreeWidgetItem, i: int, r: dict) -> None:
+    """A linha da página `i` com o resumo dela; só o que mudou é escrito (a cor e a dica do
+    estado, só quando o estado muda)."""
+    estado = r.get("estado", md.NAO_RECONHECIDA)
+    pendentes = r.get("pendentes")
+    diagramas = r.get("diagramas_por_conferir", 0)
+    simbolo, cor = SIMBOLOS_DOS_ESTADOS.get(estado, ("?", estilo.CINZA))
+    cor = estilo.na_interface(cor)
+    for coluna, texto in enumerate((str(i + 1), simbolo,
+                                    "" if pendentes is None else str(pendentes),
+                                    str(diagramas) if diagramas else "")):
+        if item.text(coluna) != texto:
+            item.setText(coluna, texto)
+    if item.data(1, Qt.ItemDataRole.UserRole) != estado:
+        item.setData(1, Qt.ItemDataRole.UserRole, estado)
+        item.setToolTip(1, NOMES_DOS_ESTADOS.get(estado, estado))
+        item.setForeground(1, cor)
+        apagada = estado == md.NAO_RECONHECIDA      # o que ainda não foi lido, atenuado
+        if apagada:
+            item.setForeground(0, estilo.cor("texto_secundario"))
+        else:                                   # a cor da paleta, que segue o tema
+            item.setData(0, Qt.ItemDataRole.ForegroundRole, None)

@@ -384,29 +384,20 @@ class CondutorDoLote:
         if (self.refazer or indice in self.forcar) and pagina.estado in LIDAS \
                 and not projeto.somente_leitura:
             projeto.antes_do_lote.guardar(pagina)                         # §4.6
-        tamanho = None
-        if p.fonte is not None:
-            from abbychess import geometria as geo
-
-            entrada = p.fonte.entrada(indice)
-            tamanho = geo.tamanho_da_imagem((entrada.quadro, entrada.giro),
-                                            p.fonte.tamanho_da_fonte(entrada))
-        caidas = arrumacao.aplicar_lida(pagina, lida, projeto.dados.idioma, tamanho=tamanho)
+        caidas = arrumacao.aplicar_lida(pagina, lida, projeto.dados.idioma,
+                                        tamanho=_tamanho_da_imagem(p, indice))
         if caidas:
             self.resultado.caidas[indice] = caidas
         p._gravar(pagina)
+        self._contar_a_lida(indice, pagina)
+        _mostrar_se_aberta(p, indice, pagina)
+        self.ao_gravar(indice)
+
+    def _contar_a_lida(self, indice: int, pagina) -> None:
         self.resultado.lidas.append(indice)
         self.resultado.pendentes[indice] = pg.resumir(
-            [b.entry for b in pagina.boxes if not b.revisado], p.leitor).pendentes
+            [b.entry for b in pagina.boxes if not b.revisado], self.p.leitor).pendentes
         self.resultado.diagramas[indice] = sum(d.lido for d in pagina.diagramas)
-        if indice == p.indice and p.modelo is None and p.imagem is not None:
-            p.modelo = pagina                   # a página aberta nasceu agora, no lote
-        if pagina is p.modelo:
-            p.atual, p.pulados, p.selecao = None, set(), set()
-            p.eventos.emitir("glifos_mudaram", None)
-            p.eventos.emitir("selecao_mudou")
-            p.fila_da_pagina.ir_ao_primeiro_pendente()
-        self.ao_gravar(indice)
 
     def _avancar(self) -> None:
         self._feitas += 1
@@ -459,17 +450,14 @@ def detalhe_do_fim(resultado: ResultadoDoLote) -> str:
     linhas = [resumo_do_fim(resultado),
               f"Lidas: {_paginas(resultado.lidas) or 'nenhuma'}; "
               f"{sum(resultado.diagramas.values())} diagrama(s) lido(s) em FEN."]
-    if resultado.puladas:
-        linhas.append(f"Já lidas, puladas: {_paginas(resultado.puladas)}.")
-    if resultado.verificadas:
-        linhas.append(f"Verificadas, puladas: {_paginas(resultado.verificadas)}.")
-    if resultado.reler_depois:
-        linhas.append("Para reler depois (mudadas por você nesta sessão, ou enquanto o lote "
-                      f"as lia): {_paginas(resultado.reler_depois)}.")
+    for paginas, frase in ((resultado.puladas, "Já lidas, puladas: {}."),
+                           (resultado.verificadas, "Verificadas, puladas: {}."),
+                           (resultado.reler_depois, "Para reler depois (mudadas por você "
+                            "nesta sessão, ou enquanto o lote as lia): {}.")):
+        if paginas:
+            linhas.append(frase.format(_paginas(paginas)))
     if resultado.falhas:
-        linhas.append("Falharam: " + "; ".join(
-            f"{i + 1} ({(motivo.splitlines() or ['sem motivo'])[0]})"
-            for i, motivo in resultado.falhas.items()) + ".")
+        linhas.append(_linha_das_falhas(resultado.falhas))
     if resultado.fora_do_livro:
         linhas.append(f"{len(resultado.fora_do_livro)} página(s) saíram do livro (apagadas) "
                       "antes de o lote lê-las: nada foi gravado nelas.")
@@ -477,3 +465,32 @@ def detalhe_do_fim(resultado: ResultadoDoLote) -> str:
         linhas.append(f"Página {indice + 1}, decisões que não seguiram os glifos relidos: "
                       + "; ".join(caidas) + ".")
     return "\n".join(linhas)
+
+
+def _linha_das_falhas(falhas: dict) -> str:
+    """As páginas que falharam, com a primeira linha do motivo de cada uma."""
+    return "Falharam: " + "; ".join(
+        f"{i + 1} ({(motivo.splitlines() or ['sem motivo'])[0]})"
+        for i, motivo in falhas.items()) + "."
+
+
+def _tamanho_da_imagem(p, indice: int):
+    """O tamanho da imagem da página na geometria da entrada dela, ou None sem a fonte."""
+    if p.fonte is None:
+        return None
+    from abbychess import geometria as geo
+
+    entrada = p.fonte.entrada(indice)
+    return geo.tamanho_da_imagem((entrada.quadro, entrada.giro), p.fonte.tamanho_da_fonte(entrada))
+
+
+def _mostrar_se_aberta(p, indice: int, pagina) -> None:
+    """A página gravada é a aberta (ou nasceu agora, no lote, na posição aberta): o glifo em
+    revisão, os pulados e a seleção recomeçam."""
+    if indice == p.indice and p.modelo is None and p.imagem is not None:
+        p.modelo = pagina                   # a página aberta nasceu agora, no lote
+    if pagina is p.modelo:
+        p.atual, p.pulados, p.selecao = None, set(), set()
+        p.eventos.emitir("glifos_mudaram", None)
+        p.eventos.emitir("selecao_mudou")
+        p.fila_da_pagina.ir_ao_primeiro_pendente()

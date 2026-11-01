@@ -503,3 +503,137 @@ def test_a_pagina_so_com_um_virtual_e_um_diagrama_monta():
     documento = tx.montar(p)
     assert [b.funcao for b in documento.blocos] == ["texto", "diagrama"]
     assert tx.texto(documento).startswith("Z")
+
+
+# As da mutação do modelo: o JSON, as decisões, a reconciliação e a sobreposição.
+
+def _box(x1, y1, x2, y2, char="a"):
+    return BoxEntry(char, x1, y1, x2, y2, 0.9, "net")
+
+
+def test_o_n_fora_do_gid_diz_o_maior_que_cabe():
+    with pytest.raises(ValueError, match=r"^n=1048576 fora de 0\.\.1048575$"):
+        gid_de(1, 1 << 20)
+
+
+def test_o_estilo_do_json_antigo_e_nao_medido_e_o_de_agora_volta_inteiro():
+    """O JSON de antes do passo I (nada, ou [0, 0, 0]) é "não medido"; o de agora guarda o
+    reto medido no quarto item, e o itálico, o reto e o sublinhado voltam como foram."""
+    assert Estilo.de_json(None) == Estilo.de_json([]) == Estilo.de_json([0, 0, 0]) == Estilo()
+    for estilo in (Estilo(italico=True), Estilo(negrito=False, italico=False),
+                   Estilo(negrito=True, italico=False), Estilo(sublinhado=True)):
+        assert Estilo.de_json(estilo.para_json()) == estilo
+
+
+def test_o_virtual_antes_de_um_glifo_volta_pelo_json():
+    """O `antes_de` vai num sexto item, só quando há: o JSON de antes dele tem cinco."""
+    d = Decisoes(virtuais=(GlifoVirtual(6, "x", None, antes_de=2), GlifoVirtual(7, "y", 2)))
+    assert d.para_json()["virtuais"] == [[6, "x", None, 0, None, 2], [7, "y", 2, 0, None]]
+    assert Decisoes.de_json(d.para_json()) == d
+
+
+def test_o_virtual_antes_de_um_glifo_vai_ao_primeiro_sucessor_ou_cai_para_o_comeco():
+    d = Decisoes(virtuais=(GlifoVirtual(50, "x", None, antes_de=1),))
+    novo, caidas = d.reescrever({1: [10, 11]})
+    assert novo.virtuais[0].antes_de == 10 and caidas == []
+    novo, caidas = d.reescrever({1: []})
+    assert novo.virtuais[0].antes_de is None
+    assert caidas == ["glifo virtual 'x' antes do glifo 1 (o glifo saiu; o virtual foi para o "
+                      "começo da página)"]
+
+
+def test_so_descartar_ou_so_marcar_um_glifo_ja_e_mudanca():
+    p = _pagina(_e(0), _e(30))
+    _, dif = reconciliar(p.boxes, p.entries()[:1], p.alocar)
+    assert dif.removidos == {p.boxes[1].gid} and not dif.vazia
+    _, dif = reconciliar(p.boxes, p.entries() + [_e(60)], p.alocar)
+    assert len(dif.novos) == 1 and not dif.vazia
+
+
+def test_o_mesmo_objeto_e_o_mesmo_glifo_mesmo_com_outro_na_mesma_caixa():
+    """Dois glifos na mesma caixa, trocados de lugar na lista: cada um fica com o seu gid
+    (pelo objeto), e não com o do primeiro que tem a caixa."""
+    p = _pagina(_e(0, "f"), _e(0, "i"))
+    f, i = p.boxes
+    novos, dif = reconciliar(p.boxes, [i.entry, f.entry], p.alocar)
+    assert [(b.gid, b.entry.char) for b in novos] == [(i.gid, "i"), (f.gid, "f")] and dif.vazia
+
+
+def test_a_copia_depois_do_mesmo_objeto_ainda_volta_pela_caixa():
+    p = _pagina(_e(0), _e(30))
+    depois = [p.boxes[0].entry, copy.deepcopy(p.boxes[1].entry)]
+    novos, dif = reconciliar(p.boxes, depois, p.alocar)
+    assert [b.gid for b in novos] == [b.gid for b in p.boxes] and dif.vazia
+
+
+def test_o_estilo_medido_de_novo_vale_para_o_mesmo_glifo():
+    p = _pagina(_e(0), _e(30))
+    entries = p.entries()
+    novos, dif = reconciliar(p.boxes, entries, p.alocar,
+                             estilo_de=lambda e: Estilo(negrito=True) if e is entries[1] else None)
+    assert [b.estilo for b in novos] == [Estilo(), Estilo(negrito=True)]
+    assert dif.mudados == {p.boxes[1].gid}
+
+
+def test_o_glifo_novo_guarda_a_amostra_que_o_leu():
+    p = _pagina(_e(0))
+    nova = _e(30)
+    procedencia.registrar(nova, "lower_b/p.png")
+    novos, dif = reconciliar(p.boxes, [p.boxes[0].entry, nova], p.alocar, procedencia.amostra_de)
+    assert [b.amostra for b in novos] == [None, "lower_b/p.png"] and dif.novos == [novos[1]]
+
+
+def _relida(antes, depois):
+    """A releitura da página inteira (o F5, §4.6): os gids de antes, os de depois e os que
+    saíram."""
+    p = _pagina(*antes)
+    novos, dif = reconciliar(p.boxes, depois, p.alocar, iou_minimo=modelo.IOU_DA_RELEITURA)
+    return [b.gid for b in p.boxes], [b.gid for b in novos], dif.removidos
+
+
+def test_na_releitura_o_glifo_continua_com_ao_menos_0_6_de_intersecao_sobre_a_uniao():
+    [g], [novo], saidos = _relida([_box(100, 100, 110, 110)], [_box(100, 100, 110, 106)])
+    assert novo == g and not saidos                              # 60 / 100
+    [g], [novo], saidos = _relida([_box(100, 100, 110, 110)], [_box(100, 100, 110, 105)])
+    assert novo != g and saidos == {g}                           # 50 / 100
+
+
+def test_na_releitura_o_traco_de_um_pixel_continua_o_mesmo():
+    for antes, depois in ((_box(100, 100, 120, 101, "-"), _box(100, 100, 121, 101, "-")),
+                          (_box(100, 100, 101, 130, "|"), _box(100, 100, 101, 131, "|"))):
+        [g], [novo], _ = _relida([antes], [depois])
+        assert novo == g
+
+
+def test_na_releitura_o_glifo_vai_so_para_a_caixa_mais_parecida():
+    """Duas caixas novas sobre um glifo (IoU 0,9 e 0,7): ele fica com a de 0,9, em qualquer
+    ordem, e a outra nasce."""
+    parecida, menos = _box(100, 100, 110, 109), _box(100, 100, 110, 107, "b")
+    [g], gids, saidos = _relida([_box(100, 100, 110, 110)], [parecida, menos])
+    assert gids[0] == g and gids[1] != g and not saidos
+    [g], gids, _ = _relida([_box(100, 100, 110, 110)], [menos, parecida])
+    assert gids[1] == g and gids[0] != g
+
+
+def _sucessores(antes, depois) -> dict:
+    """Os sucessores de cada glifo que saiu, pelo caractere."""
+    p = _pagina(*antes)
+    novos, dif = reconciliar(p.boxes, depois, p.alocar)
+    char = {b.gid: b.entry.char for b in [*p.boxes, *novos]}
+    return {char[g]: [char[n] for n in ns] for g, ns in dif.sucessores.items()}
+
+
+def test_o_sucessor_cobre_mais_da_metade_da_area_de_um_dos_dois():
+    largo, estreito = _box(0, 10, 40, 40, "v"), _box(0, 10, 20, 40, "v")
+    assert _sucessores([largo], [_box(29, 10, 49, 40, "n")]) == {"v": ["n"]}     # 11/20 do novo
+    assert _sucessores([largo], [_box(30, 10, 50, 40, "n")]) == {"v": []}        # a metade não
+    assert _sucessores([estreito], [_box(9, 10, 49, 40, "n")]) == {"v": ["n"]}   # 11/20 do velho
+    assert _sucessores([_box(0, 10, 20, 40, "v")], [_box(0, 100, 20, 130, "n")]) == {"v": []}
+
+
+def test_o_pedaco_de_um_pixel_tambem_e_sucessor():
+    """O traço, a barra e o pingo de um pixel que saem de um glifo, e o pingo que entra
+    num."""
+    for fino in (_box(0, 39, 20, 40, "_"), _box(19, 10, 20, 40, "|"), _box(5, 20, 6, 21, ".")):
+        assert _sucessores([_box(0, 10, 20, 40, "v")], [fino]) == {"v": [fino.char]}
+    assert _sucessores([_box(5, 20, 6, 21, ".")], [_box(0, 10, 20, 40, "v")]) == {".": ["v"]}

@@ -294,53 +294,51 @@ def _documento(j) -> None:
         d.teclas.ligar(q)
 
 
+def _encher(menu, acoes) -> None:
+    """As ações no menu, na ordem; None é um separador."""
+    for acao in acoes:
+        menu.addSeparator() if acao is None else menu.addAction(acao)
+
+
 def _menus(j) -> None:
-    menu = j.menuBar().addMenu("&Projeto")
-    for acao in (j.acao_novo, j.acao_abrir, None, j.acao_exportar, None, j.acao_lote,
-                 j.acao_cancelar_lote, j.acao_retomar_lote, None, j.acao_sair):
-        menu.addSeparator() if acao is None else menu.addAction(acao)
+    _encher(j.menuBar().addMenu("&Projeto"),
+            (j.acao_novo, j.acao_abrir, None, j.acao_exportar, None, j.acao_lote,
+             j.acao_cancelar_lote, j.acao_retomar_lote, None, j.acao_sair))
     menu = j.menuBar().addMenu("&Editar")
-    menu.addAction(j.acao_desfazer)
-    menu.addAction(j.acao_refazer)
-    menu.addSeparator()                         # localizar (§7.1)
-    for acao in (j.acao_localizar, j.acao_substituir, j.acao_proxima_ocorrencia,
-                 j.acao_ocorrencia_anterior, j.acao_todas_em_resultados, j.acao_buscar_glifo,
-                 j.acao_galeria):
-        menu.addAction(acao)
-    menu.addSeparator()                         # a sessão do Documento (§6.3)
-    for acao in (j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_ensinar_no_documento,
-                 j.acao_novo_paragrafo, j.acao_negrito, j.acao_italico,
-                 j.acao_sublinhado):
-        menu.addAction(acao)
-    menu.addSeparator()
-    menu.addAction(j.acao_paleta)
-    figurinas = menu.addMenu("Figurinas")
-    for acao in j.acoes_das_figurinas:
-        figurinas.addAction(acao)
-    menu = j.menuBar().addMenu("P&ágina")
-    for acao in (j.acao_anterior, j.acao_seguinte, j.acao_primeira, j.acao_ultima,
-                 j.acao_ir_para, j.acao_voltar_visita, j.acao_avancar_visita, None,
-                 j.acao_reconhecer, j.acao_reler, j.acao_verificada, j.acao_antes_do_lote,
-                 None, *j.acoes_de_paginas[:4], None, *j.acoes_de_paginas[4:], None,
-                 j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
-                 j.acao_escopo_da_fila, j.acao_proximo_do_livro, j.acao_diagramas):
-        menu.addSeparator() if acao is None else menu.addAction(acao)
-    menu = j.menuBar().addMenu("E&xibir")
-    for acao in (j.acao_lado_a_lado, j.acao_empilhado, j.acao_so_imagem, j.acao_so_vista,
-                 None, j.acao_paginas, j.doca_inspetor.toggleViewAction(),
-                 j.doca_resultados.toggleViewAction(), j.acao_linha, j.acao_padroes, None,
-                 j.acao_realce, j.acao_margens, None, *j.acoes_de_foco,
-                 None, j.acao_ajustar, j.acao_zoom_largura, j.acao_zoom_100, j.acao_zoom_item,
-                 j.acao_zoom_mais, j.acao_zoom_menos, j.acao_origem, j.acao_seguir):
-        menu.addSeparator() if acao is None else menu.addAction(acao)
+    _encher(menu, (j.acao_desfazer, j.acao_refazer,
+                   None,                        # localizar (§7.1)
+                   j.acao_localizar, j.acao_substituir, j.acao_proxima_ocorrencia,
+                   j.acao_ocorrencia_anterior, j.acao_todas_em_resultados, j.acao_buscar_glifo,
+                   j.acao_galeria,
+                   None,                        # a sessão do Documento (§6.3)
+                   j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_ensinar_no_documento,
+                   j.acao_novo_paragrafo, j.acao_negrito, j.acao_italico,
+                   j.acao_sublinhado,
+                   None,
+                   j.acao_paleta))
+    _encher(menu.addMenu("Figurinas"), j.acoes_das_figurinas)
+    _encher(j.menuBar().addMenu("P&ágina"),
+            (j.acao_anterior, j.acao_seguinte, j.acao_primeira, j.acao_ultima,
+             j.acao_ir_para, j.acao_voltar_visita, j.acao_avancar_visita, None,
+             j.acao_reconhecer, j.acao_reler, j.acao_verificada, j.acao_antes_do_lote,
+             None, *j.acoes_de_paginas[:4], None, *j.acoes_de_paginas[4:], None,
+             j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
+             j.acao_escopo_da_fila, j.acao_proximo_do_livro, j.acao_diagramas))
+    _encher(j.menuBar().addMenu("E&xibir"),
+            (j.acao_lado_a_lado, j.acao_empilhado, j.acao_so_imagem, j.acao_so_vista,
+             None, j.acao_paginas, j.doca_inspetor.toggleViewAction(),
+             j.doca_resultados.toggleViewAction(), j.acao_linha, j.acao_padroes, None,
+             j.acao_realce, j.acao_margens, None, *j.acoes_de_foco,
+             None, j.acao_ajustar, j.acao_zoom_largura, j.acao_zoom_100, j.acao_zoom_item,
+             j.acao_zoom_mais, j.acao_zoom_menos, j.acao_origem, j.acao_seguir))
     j.menu_ferramentas = j.menuBar().addMenu("&Ferramentas")
-    for acao in (j.acao_modo_treino, j.acao_areas, j.acao_areas_auto,
-                 j.acao_reconhecer_zona, j.acao_ordenar_areas,
-                 j.acao_salvar_modelo_areas, j.acao_aplicar_modelo_areas,
-                 j.acao_verificar, None,
-                 j.acao_lote, None,
-                 j.acao_opcoes, j.acao_teclado):
-        j.menu_ferramentas.addSeparator() if acao is None else j.menu_ferramentas.addAction(acao)
+    _encher(j.menu_ferramentas,
+            (j.acao_modo_treino, j.acao_areas, j.acao_areas_auto,
+             j.acao_reconhecer_zona, j.acao_ordenar_areas,
+             j.acao_salvar_modelo_areas, j.acao_aplicar_modelo_areas,
+             j.acao_verificar, None,
+             j.acao_lote, None,
+             j.acao_opcoes, j.acao_teclado))
     menu = j.menuBar().addMenu("Aj&uda")
     menu.addAction("Atalhos do teclado", j.mostrar_atalhos)
     menu.addAction("Sobre o AbbyChessCraft", j.sobre)

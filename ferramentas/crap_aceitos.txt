@@ -5,7 +5,6 @@
 # ou testar: o passo fecha quando nenhuma linha diz isso.
 # Uma linha por função: arquivo Classe.funcao  # o motivo
 
-abbychess/app/acoes.py _menus  # a reduzir (Q8)
 abbychess/app/documento.py VistaDoDocumento._destaques_da_busca  # a reduzir (Q8)
 abbychess/app/documento.py VistaDoDocumento._formato_do_glifo  # a reduzir (Q8)
 abbychess/app/documento.py VistaDoDocumento._guardar_as_unidades  # a reduzir (Q8)

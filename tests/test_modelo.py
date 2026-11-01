@@ -489,3 +489,17 @@ def test_a_correcao_que_muda_as_palavras_do_core_monta_as_linhas_de_novo():
     assert tx.texto(tx.montar(p)) == "Depth of, after for far"
     ed.corrigir(p, p.boxes[7].gid, "a,")
     assert tx.texto(tx.montar(p)) == "Depth of a, after for far"
+
+
+def test_a_pagina_so_com_um_virtual_e_um_diagrama_monta():
+    """Nenhum glifo lido, uma letra digitada sem âncora e um diagrama (achado na mutação do
+    texto): a linha só de virtuais não tem lugar na página, e o diagrama vai para o fim, como
+    sem linha nenhuma na altura dele. Levantava IndexError."""
+    from abbychess import edicao as ed
+
+    p = Pagina(pid=3, indice=0)
+    ed.virtual(p, "Z", None)
+    p.diagramas = [_lido(caixa=(0, 100, 400, 500))]
+    documento = tx.montar(p)
+    assert [b.funcao for b in documento.blocos] == ["texto", "diagrama"]
+    assert tx.texto(documento).startswith("Z")

@@ -295,22 +295,31 @@ def trocar_virtual(pagina: Pagina, gid: int, char: str) -> Diferenca:
 
 
 def apagar_virtual(pagina: Pagina, gid: int) -> Diferenca:
-    """Tira o glifo virtual; os ancorados nele (depois ou antes) passam ao lugar dele."""
+    """Tira o glifo virtual; os ancorados nele (depois ou antes) passam ao lugar dele, e à vez
+    dele na ordem das decisões: dois na mesma âncora, o mais novo fica junto dela, e o que
+    mudou de âncora não salta para a frente de quem já estava lá."""
     d = pagina.decisoes
     saiu = next((v for v in d.virtuais if v.gid == gid), None)
     if saiu is None:
         raise ValueError(f"O glifo {gid} não é virtual.")
-    virtuais = tuple(_no_lugar_do_que_sai(v, saiu) for v in d.virtuais if v.gid != gid)
-    return _decidir(pagina, replace(d, virtuais=virtuais))
+    virtuais: List[GlifoVirtual] = []
+    for v in d.virtuais:
+        if v.gid == gid:
+            virtuais += [_no_lugar_do_que_sai(o, saiu) for o in d.virtuais if _ancorado_no(o, saiu)]
+        elif not _ancorado_no(v, saiu):
+            virtuais.append(v)
+    return _decidir(pagina, replace(d, virtuais=tuple(virtuais)))
+
+
+def _ancorado_no(v: GlifoVirtual, saiu: GlifoVirtual) -> bool:
+    """O virtual ancorado no que sai: depois dele, ou antes dele e sem outra âncora."""
+    return v.depois_de == saiu.gid or (v.antes_de == saiu.gid and v.depois_de is None)
 
 
 def _no_lugar_do_que_sai(v: GlifoVirtual, saiu: GlifoVirtual) -> GlifoVirtual:
-    """O virtual ancorado no que sai (depois dele, ou antes dele e sem outra âncora) no
-    lugar dele, com a palavra nova dele; os outros como estão."""
-    if v.depois_de == saiu.gid or (v.antes_de == saiu.gid and v.depois_de is None):
-        return replace(v, depois_de=saiu.depois_de, antes_de=saiu.antes_de,
-                       palavra_nova=v.palavra_nova or saiu.palavra_nova)
-    return v
+    """O virtual ancorado no que sai no lugar dele, com a palavra nova dele."""
+    return replace(v, depois_de=saiu.depois_de, antes_de=saiu.antes_de,
+                   palavra_nova=v.palavra_nova or saiu.palavra_nova)
 
 
 def ancorar(pagina: Pagina, ancoras) -> Diferenca:

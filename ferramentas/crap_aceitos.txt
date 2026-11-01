@@ -27,8 +27,6 @@ abbychess/app/painel_paginas.py PainelDePaginas.mostrar  # a reduzir (Q8)
 abbychess/app/painel_resultados.py _VistaDaPrevia.keyPressEvent  # a reduzir (Q8)
 abbychess/app/previa_da_pagina.py PreviaDoCorte.mouseMoveEvent  # a reduzir (Q8)
 abbychess/app/principal.py main  # o ponto de entrada: cria a QApplication do processo e fica no app.exec() até a janela fechar
-abbychess/app/substituir_na_janela.py SubstituirNaJanela._substituicao_feita  # a reduzir (Q8)
-abbychess/app/substituir_na_janela.py SubstituirNaJanela.substituir_atual  # a reduzir (Q8)
 abbychess/app/visor.py VisorDePagina.keyPressEvent  # a reduzir (Q8)
 abbychess/app/visor.py VisorDePagina.mostrar_boxes  # a reduzir (Q8)
 abbychess/app/visor.py VisorDePagina.mostrar_zonas  # a reduzir (Q8)

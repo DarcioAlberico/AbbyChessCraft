@@ -68,16 +68,7 @@ class GaleriaNaJanela:
         afetadas = {i.pagina for i in self.galeria.modelo.itens} & posicoes
         leituras = {}
         for posicao in afetadas:
-            pagina = p.modelo if posicao == p.indice and p.modelo is not None \
-                else p.projeto.carregar_modelo(posicao)
-            vivos = set(pagina.vivos)
-            for item in self.galeria.modelo.itens:
-                if item.pagina == posicao:
-                    if item.gid not in vivos:
-                        leituras[(posicao, item.gid)] = None
-                        continue
-                    e = pagina.box(item.gid).entry
-                    leituras[(posicao, item.gid)] = (e.char, float(e.confidence), str(e.source))
+            leituras.update(_leituras_da_pagina(p, posicao, self.galeria.modelo.itens))
         if leituras:
             self.galeria.modelo.atualizar_leituras(leituras)
 
@@ -114,17 +105,25 @@ class GaleriaNaJanela:
         if p.modelo is None or p.projeto is None:
             return
         if char is None:
-            i = p.indice_de(p.atual)
-            char = p.modelo.boxes[i].entry.char if i is not None else ""
+            char = _char_do_atual(p)
         escopo = escopo or self.galeria.escopo.currentData()
         self._char_da_galeria = char
         self._ir_a_galeria()
         nome = f"de '{char}'" if char else "dos glifos sem leitura"
         if escopo == "pagina":
-            itens = [Item(p.indice, b.gid, b.entry.char, float(b.entry.confidence),
-                          str(b.entry.source)) for b in p.modelo.boxes if b.entry.char == char]
-            self._mostrar_na_galeria(f"Galeria {nome} na página {p.indice + 1}", itens, escopo)
+            self._galeria_da_pagina(char, nome, escopo)
             return
+        self._galeria_do_livro(char, nome, escopo)
+
+    def _galeria_da_pagina(self, char: str, nome: str, escopo) -> None:
+        p = self.pagina
+        itens = [Item(p.indice, b.gid, b.entry.char, float(b.entry.confidence),
+                      str(b.entry.source)) for b in p.modelo.boxes if b.entry.char == char]
+        self._mostrar_na_galeria(f"Galeria {nome} na página {p.indice + 1}", itens, escopo)
+
+    def _galeria_do_livro(self, char: str, nome: str, escopo) -> None:
+        """Os glifos do livro lidos como `char`, pelo índice da busca; chegam depois."""
+        p = self.pagina
         quais = f"lidos como '{char}'" if char else "sem leitura"
         self.statusBar().showMessage(f"Juntando do livro os glifos {quais}…", 0)
         self._pedido_da_galeria += 1
@@ -171,19 +170,11 @@ class GaleriaNaJanela:
                 if not vale():                  # outra carga, ou outro projeto
                     return
                 try:
-                    if indice == aberta[0] and aberta[1] is not None and aberta[2] is not None:
-                        imagem, modelo = aberta[1], aberta[2]
-                    else:
-                        modelo = projeto.ler_sem_migrar(indice)
-                        imagem = fonte.pagina(indice) if modelo is not None else None
-                    if modelo is None or imagem is None:
-                        continue
-                    entradas = {b.gid: b.entry for b in modelo.boxes}
-                    cinza = np.asarray(imagem.convert("L"))
-                    recortes = [(indice, g, pg.recorte(cinza, entradas[g]))
-                                for g in gids if g in entradas]
+                    recortes = _recortes_da_pagina(indice, gids, aberta, projeto, fonte)
                 except Exception:
                     log.exception("os recortes da página %d para a Galeria falharam", indice + 1)
+                    continue
+                if recortes is None:
                     continue
                 p.executar.na_interface(lambda r=recortes: self._recortes_chegaram(vale, r))
 
@@ -209,15 +200,20 @@ class GaleriaNaJanela:
         if not itens:
             return
         recortes = self.galeria.modelo.recortes
-        faltam = [i for i in itens if (i.pagina, i.gid) not in recortes]
-        if ensinar and faltam:
-            self.statusBar().showMessage(f"{len(faltam)} recorte(s) ainda carregando: tente "
-                                         "de novo em um instante.", 6000)
+        if ensinar and self._recortes_carregando(itens, recortes):
             return
         leituras = {(i.pagina, i.gid): i.char for i in itens}   # cada um com a dele
         self.pagina.corrigir_no_livro(
             _por_pagina(itens), leituras,
-            recortes={chave: recortes[chave] for chave in leituras} if ensinar else None)
+            recortes=_recortes_dos(leituras, recortes) if ensinar else None)
+
+    def _recortes_carregando(self, itens, recortes) -> bool:
+        """Ensinar pede o recorte de cada glifo: sem algum, o aviso na barra."""
+        faltam = [i for i in itens if (i.pagina, i.gid) not in recortes]
+        if faltam:
+            self.statusBar().showMessage(f"{len(faltam)} recorte(s) ainda carregando: tente "
+                                         "de novo em um instante.", 6000)
+        return bool(faltam)
 
     def _galeria_aplicada(self, feitos: int, paginas: int, ensinou: bool,
                           aplicadas: dict) -> None:
@@ -241,3 +237,52 @@ def _por_pagina(itens) -> dict:
     for item in itens:
         alvos[item.pagina].append(item.gid)
     return dict(alvos)
+
+
+def _recortes_dos(leituras: dict, recortes: dict) -> dict:
+    """(página, gid) -> o recorte de cada glifo a ensinar."""
+    return {chave: recortes[chave] for chave in leituras}
+
+
+def _char_do_atual(p) -> str:
+    """A leitura do glifo atual da página, ou "" sem glifo atual."""
+    i = p.indice_de(p.atual)
+    return p.modelo.boxes[i].entry.char if i is not None else ""
+
+
+def _leituras_da_pagina(p, posicao: int, itens) -> dict:
+    """(posição, gid) -> (char, confiança, fonte) de agora dos itens da página; None para o
+    glifo que sumiu dela."""
+    pagina = p.modelo if posicao == p.indice and p.modelo is not None \
+        else p.projeto.carregar_modelo(posicao)
+    vivos = set(pagina.vivos)
+    leituras = {}
+    for item in itens:
+        if item.pagina == posicao:
+            if item.gid not in vivos:
+                leituras[(posicao, item.gid)] = None
+                continue
+            e = pagina.box(item.gid).entry
+            leituras[(posicao, item.gid)] = (e.char, float(e.confidence), str(e.source))
+    return leituras
+
+
+def _recortes_da_pagina(indice: int, gids, aberta: tuple, projeto, fonte):
+    """[(página, gid, recorte)] dos glifos da página (na thread dos recortes): a aberta pela
+    imagem e pela foto dela, as outras pela fonte e pelo JSON; None se a página não tem os
+    dois."""
+    imagem, modelo = _imagem_e_modelo(indice, aberta, projeto, fonte)
+    if modelo is None or imagem is None:
+        return None
+    entradas = {b.gid: b.entry for b in modelo.boxes}
+    cinza = np.asarray(imagem.convert("L"))
+    return [(indice, g, pg.recorte(cinza, entradas[g])) for g in gids if g in entradas]
+
+
+def _imagem_e_modelo(indice: int, aberta: tuple, projeto, fonte) -> tuple:
+    """(imagem, página) de onde recortar: as da aberta, ou as lidas sem migrar (sem o
+    cache)."""
+    if indice == aberta[0] and aberta[1] is not None and aberta[2] is not None:
+        return aberta[1], aberta[2]
+    modelo = projeto.ler_sem_migrar(indice)
+    return (fonte.pagina(indice) if modelo is not None else None), modelo

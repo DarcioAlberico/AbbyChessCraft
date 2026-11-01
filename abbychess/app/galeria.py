@@ -59,6 +59,12 @@ class Item:
     fonte: str = ""
 
 
+def _dica_do_item(item: Item) -> str:
+    """A dica da célula: a página, a leitura, a confiança e a fonte."""
+    fonte = f", {item.fonte}" if item.fonte else ""
+    return f"Página {item.pagina + 1} · '{item.char or '□'}' · confiança {item.confianca:.2f}{fonte}"
+
+
 class ModeloDaGaleria(QAbstractListModel):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -129,9 +135,7 @@ class ModeloDaGaleria(QAbstractListModel):
         if papel == Qt.ItemDataRole.SizeHintRole:
             return QSize(LADO + 12, LADO + 22)
         if papel == Qt.ItemDataRole.ToolTipRole:
-            fonte = f", {item.fonte}" if item.fonte else ""
-            return (f"Página {item.pagina + 1} · '{item.char or '□'}' · "
-                    f"confiança {item.confianca:.2f}{fonte}")
+            return _dica_do_item(item)
         if papel == Qt.ItemDataRole.UserRole:
             return item
         return None

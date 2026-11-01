@@ -43,6 +43,11 @@ class FaixaDaLinha(QWidget):
         self._relogio_do_aviso.setSingleShot(True)
         self._relogio_do_aviso.timeout.connect(lambda: self.avisar(""))
 
+    @property
+    def glifos(self) -> List:
+        """Os glifos que a faixa mostra (BoxEntry, na ordem da linha); vazia, nenhum."""
+        return list(self._boxes)
+
     def avisar(self, texto: str, ms: int = 6000) -> None:
         """"2 glifo(s) tirado(s) · Ctrl+Z desfaz", no canto da faixa; vazio apaga."""
         self.aviso = texto

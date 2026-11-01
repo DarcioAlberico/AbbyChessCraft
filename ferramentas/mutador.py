@@ -29,6 +29,7 @@ import io
 import json
 import os
 import queue
+import re
 import shutil
 import subprocess
 import sys
@@ -74,7 +75,8 @@ class _Texto:
 
     def __init__(self, fonte: str):
         self.fonte = fonte
-        self.linhas = fonte.splitlines(keepends=True)
+        # Só o \n parte a linha, como no Python (o str.splitlines parte também no U+2029).
+        self.linhas = re.findall(r"[^\n]*\n|[^\n]+$", fonte)
         self.comeco = [0]
         for linha in self.linhas:
             self.comeco.append(self.comeco[-1] + len(linha))

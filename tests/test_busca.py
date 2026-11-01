@@ -323,41 +323,57 @@ def test_os_erros_nas_threads_nao_penduram_a_busca(livro_escrito, monkeypatch):
 
 
 def test_trocar_de_projeto_durante_a_montagem_fica_com_o_novo(livro_escrito, monkeypatch):
+    """A montagem do índice do projeto de antes termina depois da do novo: o índice que fica
+    é o do novo, inteiro (nenhuma página fora da busca, e o "n" que só ele tem contado)."""
     projeto, ctl, busca, escrever, eventos = livro_escrito
-    soltar = threading.Event()
+    soltar, velhas = threading.Event(), []
     original = bs.construir
 
     def devagar(*a, **k):
+        velhas.append(threading.current_thread())
         soltar.wait(5)
         return original(*a, **k)
     monkeypatch.setattr(bs, "construir", devagar)
     busca.abrir()                                        # a montagem velha, presa
-    geracao = busca._geracao
     monkeypatch.setattr(bs, "construir", original)
+    escrever(2, "nova")                                  # o projeto de agora é outro
     busca.abrir()                                        # a nova
     _ate_valer(busca.pronto.is_set)
     soltar.set()
-    assert busca._geracao == geracao + 1 and sorted(busca.indice) == [0, 1, 2]
+    velhas[0].join(5)                                    # a velha termina, atrasada
+    assert not velhas[0].is_alive()
+    assert busca.nao_reconhecidas() == 0 and busca.contar_leitura("n") == 1
 
 
-def test_uma_busca_velha_nao_desfaz_a_pagina_relida_por_uma_mais_nova(livro_escrito):
+def test_uma_busca_velha_nao_desfaz_a_pagina_relida_por_uma_mais_nova(livro_escrito, monkeypatch):
     """A busca 1 termina depois da 2, que releu a página: o texto da 2 fica."""
     projeto, ctl, busca, escrever, eventos = livro_escrito
     busca.buscar(bs.Opcoes("casa"))
     _ate_valer(lambda: eventos["fins"])
+    presa, soltar = [], threading.Event()
+    original = bs.indexar_pagina
+
+    def devagar(pagina, *a, **k):
+        indexada = original(pagina, *a, **k)
+        if indexada.texto == "relida":                   # a busca 1 leu a página relida
+            presa.append(threading.current_thread())
+            soltar.wait(5)
+        return indexada
+    monkeypatch.setattr(bs, "indexar_pagina", devagar)
     escrever(1, "relida")
     busca.marcar_velha(1)
-    leitura_velha, refazer, carregar, _v = busca._paginas_a_refazer()   # a busca 1 a lê antes
-    velha = busca._refazer(projeto, refazer, carregar, lambda: True)
-    assert velha[1].texto == "relida"
+    busca.buscar(bs.Opcoes("relida"))                    # a busca 1, presa depois de ler
+    _ate_valer(lambda: presa)
     escrever(1, "outra")
     busca.marcar_velha(1)
     busca.buscar(bs.Opcoes("outra"))                     # a busca 2, mais nova, termina antes
     _ate_valer(lambda: len(eventos["fins"]) == 2)
-    busca._guardar(leitura_velha, velha)                 # o fim atrasado da busca 1
-    busca.buscar(bs.Opcoes("outra"))
-    _ate_valer(lambda: len(eventos["fins"]) == 3)
-    assert len(eventos["fins"][-1].ocorrencias) == 1
+    soltar.set()
+    presa[0].join(5)                                     # o fim atrasado da busca 1
+    assert not presa[0].is_alive()
+    assert [o.pagina for o in eventos["fins"][-1].ocorrencias] == [1]
+    assert busca.contar_leitura("u") == 1                # o índice de agora: "outra", e não
+                                                         # o "relida" da busca 1
 
 
 def test_a_busca_por_glifo_roda_fora_da_interface(livro_escrito):

@@ -12,10 +12,11 @@ from core.box_model import BoxEntry
 
 from abbychess import busca as bs
 from abbychess import sessao as ss
-from abbychess.modelo import Box
+from abbychess.modelo import Box, Pagina, gid_de
 
 from tests.ajudantes import _pagina  # noqa: E402,F401,F811
 from tests.ajudantes import _ate_valer  # noqa: E402,F401,F811
+from tests.ajudantes import _lido  # noqa: E402,F401,F811
 
 
 def _indice(*linhas, idioma="pt", indice=0):
@@ -472,3 +473,146 @@ def test_o_indice_no_pool_de_processos_e_o_mesmo_que_em_serie(tmp_path):
         pool.liberar()
     serie = bs.construir(fontes, "pt", paralelo=False)
     assert paralelo == serie and len(serie) == 11
+
+
+# ----------------------------------------------------------------------
+# As regras que a mutação achou sem teste (Q9, CA-Q-M1)
+# ----------------------------------------------------------------------
+
+def test_os_fens_da_pagina_sem_texto_ficam_um_por_linha():
+    """A página só de diagramas: o primeiro FEN abre o texto, sem quebra antes dele."""
+    p = Pagina(pid=1, indice=0, estado="reconhecida")
+    p.diagramas = [_lido(caixa=(0, 0, 400, 400)), _lido(caixa=(0, 500, 400, 900))]
+    indexada = bs.indexar_pagina(p, "pt", margens=())
+    fen = p.diagramas[0].fen
+    assert indexada.texto == f"{fen}\n{fen}"
+
+
+def _nas_alturas(*linhas) -> Pagina:
+    """Uma linha de glifos de 30 px de altura em cada topo, (texto, topo), com 14 px a mais
+    entre as palavras (com os 30 px do `_pagina`, o core parte as linhas em colunas)."""
+    boxes = []
+    for texto, topo in linhas:
+        x = 20
+        for palavra in texto.split(" "):
+            for letra in palavra:
+                boxes.append(Box(gid_de(1, len(boxes)),
+                                 BoxEntry(letra, x, topo, x + 18, topo + 30, 0.9, "net")))
+                x += 22
+            x += 14
+    return Pagina(pid=1, indice=0, boxes=boxes, estado="reconhecida", proximo_n=len(boxes))
+
+
+def _das_margens(*linhas) -> list:
+    """As palavras que o índice, sem as margens de quem chama, etiqueta como cabeçalho."""
+    indexada = bs.indexar_pagina(_nas_alturas(*linhas), "pt")
+    return [t.group(0) for t in re.finditer(r"\S+", indexada.texto)
+            if indexada.etiqueta(t.start()) == bs.CABECALHO]
+
+
+#: Quatro linhas de texto, a 10 px umas das outras.
+_CORPO = (("o texto da página", 80), ("segue aqui", 120), ("e mais", 160), ("acaba", 200))
+
+
+def test_o_cabecalho_e_o_rodape_pelas_linhas_montadas():
+    """A primeira e a última linha, curtas, com um número e a 30 px do texto (o vão mediano é
+    10), são as margens; o número da página sozinho, de um algarismo, também."""
+    assert _das_margens(("12 Capítulo", 20), *_CORPO, ("7", 260)) == ["12", "Capítulo", "7"]
+
+
+def test_o_lance_da_primeira_e_da_ultima_linha_colado_ao_texto_nao_e_margem():
+    assert _das_margens(("1.e4 e5", 40), *_CORPO, ("2.Cf3 Cc6", 240)) == []
+
+
+def test_a_margem_e_curta_tem_numero_e_passa_de_1_5_vez_o_vao_mediano():
+    longa = "12 " + "x" * 57                                    # 60 caracteres
+    assert _das_margens((longa, 20), *_CORPO) == longa.split()
+    assert _das_margens((longa + "x", 20), *_CORPO) == []        # 61
+    assert _das_margens(("Capítulo", 20), *_CORPO) == []         # sem número
+    assert _das_margens(("12 Capítulo", 35), *_CORPO) == []      # 15 px: 1,5 vez, não mais
+    # O vão mediano é o do meio: entre os de 10 e os de 30 px, 30 (e 40 px não bastam).
+    assert _das_margens(("12 Capítulo", 20), ("um", 90), ("dois", 130), ("tres", 170),
+                        ("quatro", 230), ("cinco", 290), ("seis", 330)) == []
+    # As linhas coladas (o vão mediano 0): 2 px já separam o cabeçalho.
+    assert _das_margens(("12 Capítulo", 20), ("um", 52), ("dois", 82), ("tres", 112),
+                        ("quatro", 142)) == ["12", "Capítulo"]
+
+
+@pytest.mark.parametrize("nucleos, processos", [(None, 1), (2, 1), (4, 2), (8, 6), (16, 6)])
+def test_o_indice_usa_os_nucleos_menos_dois_de_1_a_6_processos(monkeypatch, nucleos, processos):
+    monkeypatch.setattr(bs.os, "cpu_count", lambda: nucleos)
+    assert bs.processos_para_indexar() == processos
+
+
+def test_a_barra_no_fim_do_padrao_e_invalida():
+    with pytest.raises(bs.PadraoInvalido):
+        bs.buscar({0: _indice("casa")}, bs.Opcoes("casa\\", regex=True))
+
+
+def test_os_colchetes_da_regex():
+    """A classe de xadrez depois de outra letra nos colchetes, o "[" depois do "^" e o "]"
+    logo depois do "[" (os dois literais)."""
+    assert _achados(_indice("x C a"), r"[x\P]", regex=True, maiusculas=True) == ["x", "C"]
+    assert _achados(_indice("a[b"), "[^a]", regex=True) == ["[", "b"]
+    assert _achados(_indice("a]"), "[]a]", regex=True) == ["a", "]"]
+
+
+def test_o_escopo_vale_so_o_que_e_dele():
+    """A barra guarda a seleção e o intervalo de antes quando o escopo muda."""
+    from dataclasses import replace
+
+    lidas = [0, 1, 2, 3]
+    selecao = bs.Opcoes("x", escopo=bs.SELECAO, selecao=(3, 7, 9), pagina_atual=1,
+                        intervalo=(1, 2))
+    assert bs.paginas_do_escopo(lidas, selecao) == [3]
+    assert bs.paginas_do_escopo(lidas, replace(selecao, escopo=bs.PAGINA)) == [1]
+    assert bs.paginas_do_escopo(lidas, replace(selecao, escopo=bs.LIVRO)) == lidas
+
+
+def test_o_padrao_lento_diz_a_pagina_que_o_usuario_ve():
+    longo = _indice("a" * 400 + "!", indice=2)
+    with pytest.raises(bs.PadraoLento, match=r"\(página 3\)"):
+        bs.buscar({2: longo}, bs.Opcoes(r"(\w+)+$", regex=True), tempo_limite=0.02)
+
+
+def test_o_casamento_vazio_anda_uma_posicao_e_nao_conta():
+    assert _achados(_indice("axxb"), "x*", regex=True) == ["xx"]
+
+
+def test_a_selecao_cujo_ultimo_glifo_saiu_da_pagina_nao_acha_nada():
+    indexada = _indice("casa velha")
+    selecao = (0, indexada.gids[0], gid_de(1, 999))
+    assert _achados(indexada, "casa", escopo=bs.SELECAO, selecao=selecao) == []
+
+
+def test_a_ocorrencia_na_segunda_linha_e_entre_palavras():
+    """A ocorrência que começa no espaço tem a etiqueta da palavra, os gids só dos glifos, e
+    a coluna e a linha da segunda linha."""
+    indexada = _indice("joga Cf3")
+    [o] = bs.buscar({0: indexada}, bs.Opcoes(" Cf3", onde=frozenset({bs.NOTACAO}))).ocorrencias
+    assert o.etiqueta == bs.NOTACAO
+    [o] = bs.buscar({0: indexada}, bs.Opcoes("a C")).ocorrencias
+    assert o.gids == (indexada.gids[3], indexada.gids[5])
+    indexada = bs.indexar_pagina(_nas_alturas(("uma casa", 20), ("mais nova", 60)), "pt",
+                                 margens=())
+    assert indexada.texto == "uma casa\nmais nova"
+    [o] = bs.buscar({0: indexada}, bs.Opcoes("nova")).ocorrencias
+    assert (o.linha, o.trecho, o.trecho[o.coluna:o.coluna + 4]) == (2, "mais nova", "nova")
+
+
+def test_a_busca_que_terminou_nao_foi_cancelada():
+    assert not bs.buscar({0: _indice("casa")}, bs.Opcoes("casa")).cancelada
+    assert not bs.buscar({0: _indice("casa")}, bs.Opcoes("")).cancelada
+
+
+def test_a_busca_por_glifo_pelo_grupo_da_fonte_e_nas_pontas_da_confianca():
+    fontes = ("manual", "livro", "", "none", "learner", "base", "net")
+    assert [bs.grupo_da_fonte(f) for f in fontes] == [bs.MANUAL, bs.LIVRO_, bs.SEM_LEITURA,
+                                                     bs.SEM_LEITURA, bs.BASE, bs.BASE, bs.REDE]
+    p = _pagina("casa")
+    p.boxes[1] = Box(p.boxes[1].gid, BoxEntry("a", 42, 20, 60, 50, 0.3, "manual"))
+    indexada = bs.indexar_pagina(p, "pt", margens=())
+    da_rede = bs.buscar_glifos({0: indexada}, "", fontes=[bs.REDE])
+    assert [g.gid for g in da_rede] == [p.boxes[k].gid for k in (0, 2, 3)]
+    assert [g.gid for g in bs.buscar_glifos({0: indexada}, "", confianca_minima=0.3,
+                                            confianca_maxima=0.3)] == [p.boxes[1].gid]

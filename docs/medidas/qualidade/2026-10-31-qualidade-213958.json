@@ -1,0 +1,28 @@
+{
+  "ambiente": {
+    "commit": "124966b",
+    "arvore_suja": false,
+    "arquivos_sujos": [],
+    "data": "2026-10-31"
+  },
+  "camadas": {
+    "rapida": 0,
+    "processo": 0
+  },
+  "cobertura": {
+    "linhas": 24024,
+    "faltando": 1330,
+    "percentual": 94.5
+  },
+  "crap": {
+    "funcoes": 2790,
+    "acima_de_10": 54,
+    "fora_da_lista": 0,
+    "aceitos_sumidos": 0
+  },
+  "duplicacao": {
+    "pares_acima_de_0_8": 1,
+    "fora_da_lista": 0,
+    "aceitos_sumidos": 0
+  }
+}

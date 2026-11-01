@@ -28,6 +28,12 @@ O passo fecha quando nenhuma linha diz "a reduzir (Q8)".
 
 | 5. Os controladores e a página (`controladores`, `pagina`, `ponte_de_leitura`, `controlador`, `fila_da_pagina`) | `deec535` … `ea1c83f` (18 commits) por um subagente, revisado aqui | as 34 partidas, nenhuma exceção, cada parte com cc ≤ 9; as partes do `ControladorDePagina` são funções do módulo (ele está preso em 61 métodos); cinco commits de testes antes de partir (PgDn e PgUp entre diagramas, a conferência que não grava, as palavras desconhecidas pelo livro — de 8 % a 83 % —, o lote a retomar da v2 e o ilegível, a prévia do Substituir que falha e a cancelada, os glifos aguardando a leitura); os laços quentes medidos (`_italicos`, `decidir_negritos`, `devolver_pingos`: iguais; a `fila` de 5 000, de 0,78 para 0,38 ms, as três listas num laço só) | 140 → 106 |
 
+| 6. O resto do núcleo (25 módulos fora de `app/`) | `b469722` … `124966b` (31 commits) por um subagente, revisado aqui | 52 das 55 partidas, cada parte com cc ≤ 9, entre elas o `AplicadorDoHistorico._voltar` (cc 57, a pior do programa, para 7); o `atalhos._regras_da_tecla` partido pelas regras do docstring (não é despacho: uma tecla quebra várias regras), as teclas do Windows numa tabela; as partes do `ProjetoDeLivro` como funções do módulo (ele está preso em 43 métodos); seis commits de testes antes de partir (a sequência, a página ilegível, o servidor na camada `processo`, a sessão, as migrações); as 2 400 saídas com semente do `perturbar` iguais; ensinar e restaurar 300 amostras, 1,64 e 1,69 s antes e depois (o fsync domina). Três ficam com motivo: `PadroesDoLivro.ler` e `resumo_das_confiancas` (rodam por glifo), `_Laco._operar` (o despacho do protocolo com o filho) | 106 → 54 |
+
+Na rodada 6, também: `b574ebc` — partir levava o `projeto.py` a 1 021 linhas; a notação, os
+limiares, o `Projeto` e as conferências do `projeto.json` foram para `dados_do_projeto.py`
+(mudança de lugar): 909 linhas. Fora de `app/`, a lista só tem exceções com motivo.
+
 Na rodada 5, também: `deec535` e `22b025a` — os dois arquivos presos em `TETOS` não podiam
 crescer. Do `controladores.py` saíram quatro controladores, cada um no seu módulo
 (`controlador_de_layout`, `controlador_de_diagramas`, `controlador_do_livro`,
@@ -100,9 +106,15 @@ par aceito. O golden da exportação: 37 arquivos, 0 diferentes. A rápida sem c
 e 85,3 s, com o AbbyChessCraft aberto na máquina (o usuário, desde as 17h32, com o servidor de
 leitura): a folga do teto de 90 s é de poucos segundos.
 
+Medida no `124966b` (`docs/medidas/qualidade/2026-10-31-qualidade-213958.json`): as duas
+camadas passam; cobertura 94,5 %; 54 funções com CRAP ≥ 10, todas na lista (46 "a reduzir", 8
+com motivo); o dryer só com o par aceito. O golden: 37 arquivos, 0 diferentes. A rápida sem
+cobertura: 2055 passaram em 73,9 s.
+
 ## O que falta
 
-As 101 de cc ≥ 10 que ainda dizem "a reduzir (Q8)" (eram 252) ("a reduzir (Q8)"): partir, com a suíte como pino (refatoração, sem mudar
+As 46 de cc ≥ 10 que ainda dizem "a reduzir (Q8)" (eram 252), todas de `app/`: partir, com a
+suíte como pino (refatoração, sem mudar
 comportamento no mesmo commit); as de cobertura < 50 % primeiro ganham o teste. Os `match` e as
 cadeias de `if` de despacho só se partem se a tabela ficar mais clara (§8); senão ficam com
 motivo. Também Q-T3 (os testes que montam estado privado) e Q-T6 (as propriedades que faltam).

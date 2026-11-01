@@ -110,18 +110,13 @@ class DesenhoDaJanela:
         todos = p.gids
         pendentes = {i for i, g in enumerate(todos) if g in na_fila}
         mudados = None if gids is None else [i for i, g in enumerate(todos) if g in gids]
-        if mudados is None or not self.visor.repintar_boxes(p.boxes, pendentes, mudados):
-            diagramas = p.diagramas
-            self.visor.mostrar_boxes(p.boxes, pendentes, [d.caixa for d in diagramas],
-                                     [estilo.cor_do_diagrama(d) for d in diagramas])
+        _pintar_os_boxes(self.visor, p, pendentes, mudados)
         self._selecao_mudou()
         self.relogio_do_texto.start()
         self.relogio_das_paginas.start()        # o estado e os pendentes, na gaveta
         self.atualizar_barra()
         if p.leitor is not None:
-            por_char = p.leitor.padroes_por_caractere()
-            self.treino.mostrar_contagens(len(pendentes), len(p.boxes),
-                                          sum(len(v) for v in por_char.values()), len(por_char))
+            _mostrar_as_contagens(self.treino, p.leitor, len(pendentes), len(p.boxes))
 
     def _atual_mudou(self) -> None:
         p = self.pagina
@@ -155,13 +150,8 @@ class DesenhoDaJanela:
         p, v = self.pagina, self.verificador
         na_fila = set(p.fila_da_pagina.fila())
         da_fila = p.fila_da_pagina.margens_da_fila()  # a conta que a fila usou, talvez de antes
-        estados = {b.gid: gd.estado(b.entry, b.gid in na_fila) for b in p.modelo.boxes} \
-            if p.modelo is not None else {}
-        aviso = vazios.nada_reconhecido() if p.reconhecida else vazios.pagina_nao_reconhecida()
-        if not p.reconhecida and p.projeto is not None:
-            saude = lv.saude(p.projeto, p.leitor.arquivos_de_padrao() if p.leitor else 0)
-            if saude.paginas:
-                aviso = f"{vazios.saude_do_livro(saude)}\n\n{aviso}"
+        estados = _estados_dos_glifos(p.modelo, na_fila)
+        aviso = _aviso_do_documento(p)
         # A palavra fora do léxico que o usuário aceitou (Enter: revisada) não é mais duvidosa.
         revisados = {b.gid for b in p.modelo.boxes if b.revisado} if p.modelo is not None else set()
         margens = p.fila_da_pagina.gids_de_margem()
@@ -223,9 +213,14 @@ class DesenhoDaJanela:
         if pagina != self.pagina.indice:
             self.ir_para_pagina(pagina)
             self.pintar_texto()
-        if gid is not None and gid in set(self.pagina.gids):
+        if gid is not None:
+            self._ir_ao_glifo_de_origem(gid)
+
+    def _ir_ao_glifo_de_origem(self, gid) -> None:
+        """O glifo na página aberta; o que o corte deixou de fora fica no aviso."""
+        if gid in set(self.pagina.gids):
             self.pagina.escolher(gid)
-        elif gid is not None and self.pagina.modelo is not None and gid in {
+        elif self.pagina.modelo is not None and gid in {
                 b.gid for _lugar, b in self.pagina.modelo.fora}:
             self.statusBar().showMessage("O glifo de origem desta amostra saiu da página (o "
                                          "corte o deixou de fora; tirar o corte o devolve).",
@@ -334,14 +329,19 @@ class DesenhoDaJanela:
         else:
             self._limpar_a_mensagem_da_tarefa()
         if not ocupado and self.pagina.box_atual() is not None:
-            self.treino.habilitar(True)
-            foco = QApplication.focusWidget()
-            # O próximo caractere vai para o campo, mas sem tirar o foco de quem o tem por
-            # escolha (o seletor de página, por exemplo): só de ninguém ou do painel de texto.
-            if (self.inspetor.atual() == "glifo" and self.isActiveWindow()
-                    and (foco is None or foco is self.texto or self.treino.isAncestorOf(foco))):
-                self.treino.campo.setFocus()
+            self._devolver_o_painel()
         acoes.atualizar(self)
+
+    def _devolver_o_painel(self) -> None:
+        """A tarefa acabou com um glifo atual: o painel de treino volta, e o campo pega o foco
+        de ninguém ou do painel de texto."""
+        self.treino.habilitar(True)
+        foco = QApplication.focusWidget()
+        # O próximo caractere vai para o campo, mas sem tirar o foco de quem o tem por
+        # escolha (o seletor de página, por exemplo): só de ninguém ou do painel de texto.
+        if (self.inspetor.atual() == "glifo" and self.isActiveWindow()
+                and (foco is None or foco is self.texto or self.treino.isAncestorOf(foco))):
+            self.treino.campo.setFocus()
 
     def _limpar_a_mensagem_da_tarefa(self) -> None:
         """A tarefa acabou: o "Carregando o léxico…" dela sai da barra (uma mensagem que
@@ -360,3 +360,34 @@ class DesenhoDaJanela:
     def _progredir(self, feito: int, total: int) -> None:
         self.progresso.setRange(0, max(total, 1))
         self.progresso.setValue(feito)              # o rótulo do lote é de `_lote_progrediu`
+
+
+def _pintar_os_boxes(visor, p, pendentes: set, mudados) -> None:
+    """Só os boxes `mudados`, se o visor consegue; senão todos, com os diagramas."""
+    if mudados is None or not visor.repintar_boxes(p.boxes, pendentes, mudados):
+        diagramas = p.diagramas
+        visor.mostrar_boxes(p.boxes, pendentes, [d.caixa for d in diagramas],
+                            [estilo.cor_do_diagrama(d) for d in diagramas])
+
+
+def _mostrar_as_contagens(treino, leitor, pendentes: int, glifos: int) -> None:
+    """Os pendentes, os glifos e as amostras do livro, no painel de treino."""
+    por_char = leitor.padroes_por_caractere()
+    treino.mostrar_contagens(pendentes, glifos, sum(len(v) for v in por_char.values()),
+                             len(por_char))
+
+
+def _estados_dos_glifos(modelo, na_fila: set) -> dict:
+    """gid → o estado do realce no Documento (§6.1); vazio sem modelo."""
+    return {b.gid: gd.estado(b.entry, b.gid in na_fila) for b in modelo.boxes} \
+        if modelo is not None else {}
+
+
+def _aviso_do_documento(p) -> str:
+    """O texto do Documento vazio: na página não reconhecida, com a saúde do livro."""
+    aviso = vazios.nada_reconhecido() if p.reconhecida else vazios.pagina_nao_reconhecida()
+    if not p.reconhecida and p.projeto is not None:
+        saude = lv.saude(p.projeto, p.leitor.arquivos_de_padrao() if p.leitor else 0)
+        if saude.paginas:
+            aviso = f"{vazios.saude_do_livro(saude)}\n\n{aviso}"
+    return aviso

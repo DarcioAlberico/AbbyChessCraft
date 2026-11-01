@@ -549,6 +549,22 @@ def test_o_botao_direito_no_editor_de_areas_escolhe_a_area_e_muda_a_funcao(app, 
     assert _botao_direito(app, janela.visor, 800, 240) is None         # fora das áreas: nada
 
 
+def test_as_teclas_da_area_escolhida_dao_o_tipo_a_funcao_e_a_apagam(app, janela):
+    """No editor de áreas, com o foco no visor: 1 a 4 dão o tipo da área escolhida, a letra
+    da função (H, título) a função, e Delete a apaga."""
+    from abbychess import zonas as zn
+
+    _no_editor_de_areas_com_uma_area(app, janela)
+    visor = janela.visor
+    visor.setFocus()
+    QTest.keyClick(visor, Qt.Key.Key_4)
+    assert janela.projeto.carregar_zonas(0)[0].tipo == zn.TIPOS[3]
+    QTest.keyClick(visor, Qt.Key.Key_H)
+    assert janela.projeto.carregar_zonas(0)[0].funcao == "titulo"
+    QTest.keyClick(visor, Qt.Key.Key_Delete)
+    assert janela.areas.zonas == [] and janela.projeto.carregar_zonas(0) == []
+
+
 def test_o_menu_pelo_teclado_no_visor_e_o_do_box_atual(app, janela):
     """Shift+F10 e a tecla Menu (o `QContextMenuEvent` de teclado): o menu do box em revisão,
     e não o do ponto do mouse."""

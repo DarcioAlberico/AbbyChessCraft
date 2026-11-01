@@ -106,6 +106,10 @@ def test_a_linha_que_roda_ao_importar_o_modulo_vale_para_todos_os_testes_dele():
     [m] = [m for m in mutador.mutantes(fonte) if m.linha == 1]
     todos = ["tests/t.py", "tests/u.py"]
     assert mutador.testes_do_mutante({1: [""], 5: ["tests/t.py::test_f|run"]}, m, todos) == todos
+    # Também quando um teste importa o módulo de novo (e a linha roda nele): a importação
+    # da coleta vale para todos, não só para ele.
+    assert mutador.testes_do_mutante({1: ["", "tests/t.py::test_recarrega|run"]}, m,
+                                     todos) == todos
 
 
 def test_o_resumo_conta_o_tempo_como_morto_e_o_sem_teste_como_sobrevivente():

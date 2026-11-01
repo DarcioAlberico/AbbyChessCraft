@@ -87,30 +87,38 @@ class ControladorDosPadroes:
         if i is None:
             return "", ""
         entradas = self._p.modelo.entries()
-        lida = entradas[i].char
-        iguais = sum(1 for k, e in enumerate(entradas) if k != i and lida and e.char == lida)
-        efeito = f"Enter ensina '{char}'" + (f" · {iguais} iguais nesta página" if iguais else "")
-        alvos = self._p.alvos()                     # o que o Ctrl+Enter usaria (`ensinar`)
+        efeito = _efeito_do_ensino(char, entradas, i) + self._corrige_em_lote(char)
+        return efeito, self._conflito_do_ensino(char, entradas, i)
+
+    def _corrige_em_lote(self, char: str) -> str:
+        """" · Ctrl+Enter corrige também…": os alvos do Ctrl+Enter (`ensinar`) de outra
+        leitura que a palavra desmente; "" sem nenhum."""
+        alvos = self._p.alvos()
         lidas = {self._p.box(g).char for g in alvos} - {char, ""}
         em_lote = len(contexto.lote(self._p.modelo, lidas, char, alvos)) if lidas else 0
-        if em_lote:
-            efeito += (f" · Ctrl+Enter corrige também {em_lote} "
-                       f"{'/'.join(repr(c) for c in sorted(lidas))} que a palavra desmente")
-        conflito = ""
-        if self._p.imagem is not None:
-            from core import proporcao
-            from abbychess.leitor import altura_relativa
+        if not em_lote:
+            return ""
+        return (f" · Ctrl+Enter corrige também {em_lote} "
+                f"{'/'.join(repr(c) for c in sorted(lidas))} que a palavra desmente")
 
-            recorte = pg.recorte(self._p._cinza(), entradas[i])
-            referencia = proporcao.altura_de_referencia(entradas)
-            achado = self._p.leitor.padroes.conflito(recorte, char,
-                                                     altura_relativa(recorte, referencia),
-                                                     self._p.leitor.limiares.conflito)
-            if achado is not None:
-                outro, n, distancia = achado
-                conflito = (f"este glifo está a {distancia:.2f} de {n} amostra(s) de "
-                            f"'{outro}'".replace(".", ","))
-        return efeito, conflito
+    def _conflito_do_ensino(self, char: str, entradas, i: int) -> str:
+        """"este glifo está a 0,08 de 14 amostra(s) de '1'", ou "" (sem a imagem ou sem
+        conflito)."""
+        if self._p.imagem is None:
+            return ""
+        from core import proporcao
+        from abbychess.leitor import altura_relativa
+
+        recorte = pg.recorte(self._p._cinza(), entradas[i])
+        referencia = proporcao.altura_de_referencia(entradas)
+        achado = self._p.leitor.padroes.conflito(recorte, char,
+                                                 altura_relativa(recorte, referencia),
+                                                 self._p.leitor.limiares.conflito)
+        if achado is None:
+            return ""
+        outro, n, distancia = achado
+        return (f"este glifo está a {distancia:.2f} de {n} amostra(s) de "
+                f"'{outro}'".replace(".", ","))
 
     def _nome_da_amostra(self, caminho) -> str:
         """O nome da amostra como o `Box.amostra` o guarda (relativo à pasta dos padrões)."""
@@ -125,16 +133,9 @@ class ControladorDosPadroes:
         """Os glifos da página lidos pelas amostras `nomes` (só os de `gids`, se vier)
         voltam à fila; a verificada volta a `em_revisao`. Emenda a `transacao` e grava.
         Devolve quantos voltaram."""
-        alvo = None if gids is None else set(gids)
         antes = pagina.instantaneo()
-        boxes, n = list(pagina.boxes), 0
-        for k, box in enumerate(boxes):
-            if box.amostra in nomes and (alvo is None or box.gid in alvo):
-                entry = ed.copia(box.entry)
-                entry.source = FONTE_NENHUMA
-                procedencia.registrar(entry, procedencia.NENHUMA)
-                boxes[k] = replace(box, entry=entry, amostra=None, revisado=False)
-                n += 1
+        boxes = list(pagina.boxes)
+        n = _sem_as_amostras(boxes, nomes, None if gids is None else set(gids))
         if not n:
             return 0
         pagina.boxes = boxes
@@ -235,3 +236,25 @@ class ControladorDosPadroes:
         else:
             mensagem = "Limiares aplicados nesta sessão (não foram gravados)."
         self._p._avisar(mensagem, 5000)
+
+
+def _efeito_do_ensino(char: str, entradas, i: int) -> str:
+    """"Enter ensina 'l' · 23 iguais nesta página": os glifos da página com a mesma leitura
+    do glifo `i`."""
+    lida = entradas[i].char
+    iguais = sum(1 for k, e in enumerate(entradas) if k != i and lida and e.char == lida)
+    return f"Enter ensina '{char}'" + (f" · {iguais} iguais nesta página" if iguais else "")
+
+
+def _sem_as_amostras(boxes: list, nomes: set, alvo: set | None) -> int:
+    """Os boxes lidos pelas amostras `nomes` (só os de `alvo`, se vier) ficam sem leitura e
+    voltam à fila, trocados na lista; devolve quantos."""
+    n = 0
+    for k, box in enumerate(boxes):
+        if box.amostra in nomes and (alvo is None or box.gid in alvo):
+            entry = ed.copia(box.entry)
+            entry.source = FONTE_NENHUMA
+            procedencia.registrar(entry, procedencia.NENHUMA)
+            boxes[k] = replace(box, entry=entry, amostra=None, revisado=False)
+            n += 1
+    return n

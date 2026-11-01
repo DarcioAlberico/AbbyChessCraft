@@ -53,7 +53,6 @@ abbychess/app/visor.py VisorDePagina.keyPressEvent  # a reduzir (Q8)
 abbychess/app/visor.py VisorDePagina.mostrar_boxes  # a reduzir (Q8)
 abbychess/app/visor.py VisorDePagina.mostrar_zonas  # a reduzir (Q8)
 abbychess/app/visor.py VisorDePagina.mousePressEvent  # a reduzir (Q8)
-abbychess/fonte_do_livro.py FonteDoLivro.procurar  # a reduzir (Q8)
 abbychess/montagem.py _sem_coordenadas.fora  # roda por glifo e por tabuleiro: partir põe chamada nova no laço por glifo
 abbychess/padroes.py PadroesDoLivro.ler  # roda por glifo (ler, propagar, o servidor): partir põe chamada nova no laço por glifo
 abbychess/perturbacoes.py perturbar  # a reduzir (Q8)

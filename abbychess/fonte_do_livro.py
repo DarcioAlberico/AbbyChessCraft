@@ -87,8 +87,25 @@ class FonteDoLivro:
         projeto ou na pasta-mãe do projeto."""
         if not self._p.dados.fonte_sha256:
             return None
+        lidos = 0
+        for chave, candidato in self._candidatos():
+            try:
+                if not self._do_tamanho(candidato):
+                    continue            # tamanho diferente: nem é preciso ler
+                lidos += 1
+                if lidos > CANDIDATOS_DA_FONTE:
+                    return None
+                if sha_da_fonte(candidato) == self._p.dados.fonte_sha256:
+                    return chave
+            except OSError:
+                continue
+        return None
+
+    def _candidatos(self):
+        """(caminho resolvido, caminho) de cada arquivo com a extensão da fonte, uma vez só,
+        na pasta do caminho antigo, na do projeto e na pasta-mãe dele."""
         antigo = self.caminho
-        vistos, lidos = set(), 0
+        vistos = set()
         for pasta in (antigo.parent, self._p.pasta, self._p.pasta.parent):
             if not pasta.is_dir():
                 continue
@@ -97,18 +114,12 @@ class FonteDoLivro:
                 if chave in vistos or not candidato.is_file():
                     continue
                 vistos.add(chave)
-                try:
-                    tamanho = self._p.dados.fonte_tamanho
-                    if tamanho and candidato.stat().st_size != tamanho:
-                        continue        # tamanho diferente: nem é preciso ler
-                    lidos += 1
-                    if lidos > CANDIDATOS_DA_FONTE:
-                        return None
-                    if sha_da_fonte(candidato) == self._p.dados.fonte_sha256:
-                        return chave
-                except OSError:
-                    continue
-        return None
+                yield chave, candidato
+
+    def _do_tamanho(self, candidato: Path) -> bool:
+        """O candidato tem o tamanho da fonte (ou o tamanho dela não foi guardado)."""
+        tamanho = self._p.dados.fonte_tamanho
+        return not tamanho or candidato.stat().st_size == tamanho
 
     def total_de_paginas(self) -> int:
         """Quantas páginas a fonte do livro tem (sem a fonte: 0)."""

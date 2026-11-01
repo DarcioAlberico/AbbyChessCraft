@@ -64,18 +64,27 @@ def juntar(reguas: Iterable[Mapping[str, Sequence[float]]]) -> Regua:
     por_char: Dict[str, List[Tuple[float, float, float]]] = defaultdict(list)
     for regua in reguas:
         for char, valores in (regua or {}).items():
-            try:
-                n, p25, p50 = (float(v) for v in valores[:3])
-            except (TypeError, ValueError):
-                continue                        # o resumo ilegível não estraga a régua
-            if n > 0 and p25 > 0 and p50 > 0:
-                por_char[char].append((n, p25, p50))
-    saida: Regua = {}
-    for char, itens in sorted(por_char.items()):
-        pesos = [n for n, _, _ in itens]
-        saida[char] = [sum(pesos), round(_mediana_ponderada([p for _, p, _ in itens], pesos), CASAS),
-                       round(_mediana_ponderada([m for _, _, m in itens], pesos), CASAS)]
-    return saida
+            quantis = _quantis(valores)
+            if quantis is not None:
+                por_char[char].append(quantis)
+    return {char: _do_conjunto(itens) for char, itens in sorted(por_char.items())}
+
+
+def _quantis(valores) -> Optional[Tuple[float, float, float]]:
+    """(contagem, p25, p50) de um caractere de uma página; None se ilegível (o resumo ilegível
+    não estraga a régua) ou sem medida."""
+    try:
+        n, p25, p50 = (float(v) for v in valores[:3])
+    except (TypeError, ValueError):
+        return None
+    return (n, p25, p50) if n > 0 and p25 > 0 and p50 > 0 else None
+
+
+def _do_conjunto(itens: List[Tuple[float, float, float]]) -> List[float]:
+    """A contagem somada e as medianas dos quantis das páginas, pesadas pela contagem."""
+    pesos = [n for n, _, _ in itens]
+    return [sum(pesos), round(_mediana_ponderada([p for _, p, _ in itens], pesos), CASAS),
+            round(_mediana_ponderada([m for _, _, m in itens], pesos), CASAS)]
 
 
 def tamanho(regua: Optional[Regua]) -> int:

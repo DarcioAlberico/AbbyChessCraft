@@ -55,7 +55,6 @@ abbychess/app/visor.py VisorDePagina.mostrar_zonas  # a reduzir (Q8)
 abbychess/app/visor.py VisorDePagina.mousePressEvent  # a reduzir (Q8)
 abbychess/montagem.py _sem_coordenadas.fora  # roda por glifo e por tabuleiro: partir põe chamada nova no laço por glifo
 abbychess/padroes.py PadroesDoLivro.ler  # roda por glifo (ler, propagar, o servidor): partir põe chamada nova no laço por glifo
-abbychess/regua_do_negrito.py juntar  # a reduzir (Q8)
 abbychess/render.py RenderEmProcesso.renderizar  # a reduzir (Q8)
 abbychess/resumo_do_livro.py resumo_das_confiancas  # a reduzir (Q8)
 abbychess/servidor_de_leitura.py _Laco._operar  # despacho das operações do protocolo com o filho: cada uma desempacota os argumentos dela, e uma tabela não fica mais clara que os if

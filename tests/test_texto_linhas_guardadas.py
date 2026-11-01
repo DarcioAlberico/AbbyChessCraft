@@ -76,32 +76,37 @@ def test_os_numeros_que_o_core_remonta_mudam_a_chave(paginas, k, char):
 
 
 def test_trocar_uma_letra_por_outra_nao_refaz_a_ordem_de_leitura(paginas, monkeypatch):
+    """O documento da página corrigida sai igual ao montado do zero, e a ordem de leitura (o
+    caro do `montar`) não é refeita na troca de letra; na do algarismo, é.
+
+    O espião fica: nada público mostra que a ordem não foi refeita (o documento é comparado
+    por valor, e o tempo não entra num assert)."""
     pagina = paginas[1]
-    tx.montar(pagina)
-    chamadas = []
-    original = OrdemDeLeitura.da_pagina
-    monkeypatch.setattr(OrdemDeLeitura, "da_pagina",
-                        classmethod(lambda cls, e: chamadas.append(1) or original(e)))
     letra = next(k for k, b in enumerate(pagina.boxes) if b.entry.char.isalpha())
-    tx.montar(_corrigida(pagina, letra, "x"))
-    assert chamadas == []
     numero = next(k for k, b in enumerate(pagina.boxes) if b.entry.char.isdigit())
-    tx.montar(_corrigida(pagina, numero, "x"))          # o algarismo: as palavras mudam
-    assert chamadas == [1]
-
-
-def test_a_letra_que_vira_f_refaz_as_palavras(paginas, monkeypatch):
-    """Depois do "f" o limiar de espaço é outro (`layout.partir_depois_do_f`)."""
-    pagina = paginas[1]
-    tx.montar(pagina)
+    de_letra, de_numero = _corrigida(pagina, letra, "x"), _corrigida(pagina, numero, "x")
+    esperados = _do_zero(de_letra), _do_zero(de_numero)
+    _do_zero(pagina)                                    # só as linhas desta página guardadas
     chamadas = []
     original = OrdemDeLeitura.da_pagina
     monkeypatch.setattr(OrdemDeLeitura, "da_pagina",
                         classmethod(lambda cls, e: chamadas.append(1) or original(e)))
-    letra = next(k for k, b in enumerate(pagina.boxes)
-                 if b.entry.char.isalpha() and b.entry.char != "f")
-    tx.montar(_corrigida(pagina, letra, "f"))
+    assert tx.montar(de_letra) == esperados[0]
+    assert chamadas == []
+    assert tx.montar(de_numero) == esperados[1]         # o algarismo: as palavras mudam
     assert chamadas == [1]
+
+
+def test_a_letra_que_vira_f_refaz_as_palavras(paginas):
+    """Depois do "f" o limiar de espaço é outro (`layout.partir_depois_do_f`): na p. 22, o
+    "i" 406 que vira "f" muda as palavras, e o documento com as linhas guardadas sai com as
+    palavras novas, como o montado do zero."""
+    pagina = paginas[1]
+    assert pagina.indice == 21 and pagina.boxes[406].entry.char == "i"
+    corrigida = _corrigida(pagina, 406, "f")
+    esperado = _do_zero(corrigida)
+    assert esperado.blocos != _do_zero(pagina).blocos   # as palavras mudam; só as de antes
+    assert tx.montar(corrigida) == esperado             # estão guardadas
 
 
 def test_o_box_movido_refaz_as_linhas(paginas):

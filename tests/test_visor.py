@@ -636,35 +636,33 @@ def test_zoom_vale_com_o_foco_no_campo_do_treino_e_o_v_nao(app, janela):
     assert "v" in janela.treino.campo.text().lower()
 
 
-def test_a_seguinte_e_pre_carregada_depois_da_pintura(app, janela_de_60, monkeypatch):
+def test_a_seguinte_e_pre_carregada_depois_da_pintura(app, janela_de_60):
+    """A página seguinte chega ao cache das imagens sozinha, depois da pintura da aberta (o
+    relógio da janela), e não no `ir_para`: esperada a pré-carga em curso logo depois dele,
+    ela ainda não está lá."""
     j = janela_de_60
-    chamadas = []
-    monkeypatch.setattr(j.pagina.cache, "precarregar", chamadas.append)
+    cache = j.pagina.cache
+    assert not cache.tem(11)
     j.ir_para_pagina(10)
-    assert chamadas == []                                      # o ir_para não a dispara
-    esperar(lambda: chamadas, 2)                               # o relógio da janela, sim
-    assert chamadas == [11]
+    cache.esperar()                                            # o que o ir_para pediu, feito
+    assert not cache.tem(11)                                   # o ir_para não a dispara
+    assert esperar(lambda: cache.tem(11), 5)                   # o relógio da janela, sim
 
 
-def _ate_a_pre_carga(app, chamadas):
-    esperar(lambda: chamadas, 2)
-
-
-def test_a_pre_carga_segue_o_sentido_e_vem_ja_quem_folheia(app, janela_de_60, monkeypatch):
+def test_a_pre_carga_segue_o_sentido_e_vem_ja_quem_folheia(app, janela_de_60):
     """Depois de um PgUp, a anterior; trocas a menos de 1 s, a pré-carga sem esperar os
     150 ms (a página nunca vista chegava tarde a quem folheia, revisão de produto do A1)."""
     j = janela_de_60
-    chamadas = []
-    monkeypatch.setattr(j.pagina.cache, "precarregar", chamadas.append)
+    cache = j.pagina.cache
     j._ultima_troca = 0.0
     j.ir_para_pagina(20)
     assert j._pre_carga.interval() == 150                      # parado: depois da pintura
-    _ate_a_pre_carga(app, chamadas)
-    chamadas.clear()
+    assert esperar(lambda: cache.tem(21), 5)
+    assert not cache.tem(18)
     j.acao_anterior.trigger()                                  # PgUp logo depois
     assert j._pre_carga.interval() == 20
-    _ate_a_pre_carga(app, chamadas)
-    assert chamadas == [18] and j.pagina.navegador.proxima_provavel == 18
+    assert esperar(lambda: cache.tem(18), 5)                   # a anterior, e não a 20
+    assert j.pagina.navegador.proxima_provavel == 18
 
 
 def test_a_qimage_da_pagina_nasce_na_thread_que_renderiza(pdf_de_60_paginas):

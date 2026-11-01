@@ -132,28 +132,46 @@ def discordancias(camada: Sequence[PalavraDaCamada], boxes: Sequence[BoxEntry], 
     """(lido, índices dos boxes, leitura da camada) das palavras de prosa que o léxico aceita
     mas a camada, com outra palavra que ele também conhece, lê diferente ("am" → "and").
     `ja_vistos`: os índices que a verificação já mostra."""
-    import numpy as np
-
     saida = []
-    lidos = np.array([bool(b.char) for b in boxes])
-    cx = np.array([(b.x1 + b.x2) / 2 for b in boxes], dtype=float)
-    cy = np.array([(b.y1 + b.y2) / 2 for b in boxes], dtype=float)
+    lidos, cx, cy = _centros_lidos(boxes)
     for palavra in camada:
-        x1, y1, x2, y2 = palavra.caixa
-        dentro = np.nonzero(lidos & (cx >= x1) & (cx <= x2) & (cy >= y1) & (cy <= y2))[0]
-        if not len(dentro) or not _conhecida(lex, palavra.texto):
-            continue
-        indices = sorted((int(i) for i in dentro), key=lambda i: boxes[i].x1)
-        if not indices or ja_vistos.intersection(indices):
+        indices = _indices_na_caixa(palavra.caixa, boxes, lidos, cx, cy)
+        if (not indices or not _conhecida(lex, palavra.texto)
+                or ja_vistos.intersection(indices)):
             continue
         lido = "".join(boxes[i].char for i in indices)
-        if any(c in _DE_LANCE for c in lido):
-            continue
-        limpo = _limpa(lido)
-        if limpo and limpo != _limpa(palavra.texto) and limpo.lower() != _limpa(palavra.texto).lower():
-            if _conhecida(lex, limpo):
-                saida.append((lido, indices, _limpa(palavra.texto)))
+        leitura = _outra_conhecida(lex, lido, palavra.texto)
+        if leitura is not None:
+            saida.append((lido, indices, leitura))
     return saida
+
+
+def _centros_lidos(boxes: Sequence[BoxEntry]) -> tuple:
+    """Os boxes lidos e os centros de todos, como vetores."""
+    import numpy as np
+
+    return (np.array([bool(b.char) for b in boxes]),
+            np.array([(b.x1 + b.x2) / 2 for b in boxes], dtype=float),
+            np.array([(b.y1 + b.y2) / 2 for b in boxes], dtype=float))
+
+
+def _indices_na_caixa(caixa, boxes: Sequence[BoxEntry], lidos, cx, cy) -> List[int]:
+    """Os índices dos boxes lidos com o centro na caixa da palavra, da esquerda à direita."""
+    x1, y1, x2, y2 = caixa
+    dentro = (lidos & (cx >= x1) & (cx <= x2) & (cy >= y1) & (cy <= y2)).nonzero()[0]
+    return sorted((int(i) for i in dentro), key=lambda i: boxes[i].x1)
+
+
+def _outra_conhecida(lex, lido: str, texto: str):
+    """A leitura da camada (limpa), se o lido é outra palavra que o léxico conhece; None se é
+    a mesma, se o lido tem caractere de lance ou se o léxico não o conhece."""
+    if any(c in _DE_LANCE for c in lido):
+        return None
+    limpo = _limpa(lido)
+    if limpo and limpo != _limpa(texto) and limpo.lower() != _limpa(texto).lower():
+        if _conhecida(lex, limpo):
+            return _limpa(texto)
+    return None
 
 
 def opinioes(desconhecidas, boxes: Sequence[BoxEntry], camada: Sequence[PalavraDaCamada], lex):

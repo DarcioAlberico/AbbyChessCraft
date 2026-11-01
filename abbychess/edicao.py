@@ -107,7 +107,7 @@ def dividir_em(pagina: Pagina, imagem, gid: int, chars: str, leitor=None) -> Dif
                 # O maior pedaço ainda é o candidato mais provável a conter outro vão.
                 k = max(range(len(entries)), key=lambda n: ((entries[n].x2 - entries[n].x1)
                                                              * (entries[n].y2 - entries[n].y1)))
-                eb.dividir(imagem, entries, k, None)
+                eb.dividir(imagem, entries, k, None, x=eb.corte_entre_letras(imagem, entries[k]))
         except ValueError:
             entries = [copia(antigo.entry)]
     if len(entries) == len(chars):

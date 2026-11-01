@@ -100,6 +100,24 @@ def _corte_sob_o_pingo(partes: List[BoxEntry], box: BoxEntry, tinta) -> Optional
     return box.x1 + vale[0] if vale else None
 
 
+def corte_entre_letras(imagem: Image.Image, box: BoxEntry) -> Optional[int]:
+    """Onde cortar um box que são letras lado a lado (a edição 1 -> k do Documento): None quando
+    o corte de `dividir` já cai entre elas; quando ele cortaria em pé, a coluna do vale vertical
+    mais fundo da tinta, e sem vale, o meio da largura.
+
+    O core escolhe o eixo pela tinta, e sem vão nenhum corta o box alto em y: o certo para o
+    glifo que o usuário manda dividir, o errado para as letras que ele digitou na linha, que
+    sairiam uma em cima da outra."""
+    matriz = np.asarray(imagem.convert("L"))
+    partes = BoxService.split_box(box, matriz)
+    tinta = BoxService._tinta_do_box(box, matriz)
+    if not _cortou_em_y(partes, box) or _corte_sob_o_pingo(partes, box, tinta) is not None:
+        return None
+    vale = (BoxService._vale_mais_fundo(tinta.sum(axis=0), BoxService.MARGEM_DO_CORTE)
+            if tinta is not None else None)
+    return box.x1 + vale[0] if vale else (box.x1 + box.x2) // 2
+
+
 def _cortou_em_y(partes: List[BoxEntry], box: BoxEntry) -> bool:
     """O core partiu o box em pé em dois, um em cima do outro, a de cima com a largura toda."""
     if len(partes) != 2 or (box.angulo or 0) % 180:

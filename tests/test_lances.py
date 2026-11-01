@@ -501,3 +501,13 @@ def test_o_comentario_do_pgn_diz_se_a_posicao_foi_conferida():
     assert _jogo(_lido(P23)).comment == "posição lida, não conferida"
     d = _diagrama_validado(P23, TEXTO_P23)
     assert _jogo(d.conferir(d.edicao())).comment == ""
+
+
+def test_o_aviso_do_primeiro_lance_ilegal_fica_no_pgn_da_posicao_nao_conferida():
+    """Nenhum lance passa (o primeiro já é ilegal): o aviso e a posição não conferida vão os
+    dois para o comentário do jogo, e um não apaga o outro."""
+    d = _diagrama_validado(P23, "1.Cd2 e5 2.e4")
+    jogo = _jogo(d)
+    assert list(jogo.mainline_moves()) == []
+    assert jogo.comment == "posição lida, não conferida; [1.Cd2 do texto não é legal aqui]"
+    assert _jogo(d.conferir(d.edicao())).comment == "[1.Cd2 do texto não é legal aqui]"

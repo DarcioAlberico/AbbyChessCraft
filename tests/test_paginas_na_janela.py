@@ -88,6 +88,20 @@ def test_mover_pelo_menu_e_a_busca_acha_na_posicao_nova(app, janela, monkeypatch
     assert [o.pagina for o in janela.busca.ultimo_resultado.ocorrencias] == [9]
 
 
+def test_a_galeria_do_livro_traz_os_recortes_das_outras_paginas(app, janela):  # noqa: F811
+    projeto = janela.projeto
+    _palavra(projeto, 1, "cavalo")
+    _palavra(projeto, 3, "casa")
+    janela.busca.abrir()
+    _ate(janela.busca.pronto.is_set)
+    janela.ir_para_pagina(1)
+    janela.abrir_galeria("a", "livro")
+    g = janela.galeria
+    _ate(lambda: g.modelo.rowCount() == 4)
+    assert sorted({i.pagina for i in g.modelo.itens}) == [1, 3]
+    _ate(lambda: len(g.modelo.recortes) == 4)            # a aberta e a do disco
+
+
 def test_apagar_pelo_menu_muda_o_seletor_e_o_total(app, janela, monkeypatch):  # noqa: F811
     monkeypatch.setattr(dp, "perguntar_paginas", lambda *_a, **_k: ([2, 6], -1))
     janela.acao_apagar_paginas.trigger()

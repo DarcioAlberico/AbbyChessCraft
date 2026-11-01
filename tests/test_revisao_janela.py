@@ -72,6 +72,19 @@ def test_shift_enter_so_corrige_e_enter_ensina_uma_amostra_por_glifo(jb):  # noq
     _ate(lambda: total() == antes)
 
 
+def test_enter_antes_dos_recortes_pede_um_instante_e_a_dica_diz_o_glifo(jb):  # noqa: F811
+    _uns(jb, 3)
+    jb.abrir_galeria("1", "pagina")
+    g = jb.galeria
+    dica = g.modelo.data(g.modelo.index(0), Qt.ItemDataRole.ToolTipRole)
+    assert dica == "Página 1 · '1' · confiança 0.90, net"
+    g.vista.selectAll()
+    QTest.keyClick(g.vista, Qt.Key.Key_Return)            # os recortes ainda na thread
+    assert "3 recorte(s) ainda carregando" in jb.statusBar().currentMessage()
+    assert not any(b.entry.source == "manual" for b in jb.pagina.modelo.boxes)
+    _ate(lambda: len(g.modelo.recortes) == 3)
+
+
 def test_a_galeria_do_livro_e_a_busca_por_glifo(jb):  # noqa: F811
     _uns(jb, 5)
     jb.abrir_galeria("1", "livro")

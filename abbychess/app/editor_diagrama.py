@@ -511,14 +511,12 @@ class EditorDeDiagrama(QWidget):
         self.conferido.emit(self.diagrama.caixa, tabuleiro, tudo)
         self.diagramas[self.atual] = self.diagrama.conferir(tabuleiro)
         self.tabuleiros[self.atual] = self.diagramas[self.atual].edicao()
-        # Os por conferir que foram lidos: o não lido não tem posição a conferir.
-        faltam = [i for i in range(len(self.diagramas))
-                  if self.diagramas[i].lido and not self.diagramas[i].conferido]
-        if not faltam:
+        proximo = _proximo_por_conferir(self.diagramas, self.atual)
+        if proximo is None:
             self._mostrar()
             self.terminou.emit()
             return
-        self._ir_para(next((i for i in faltam if i > self.atual), faltam[0]))
+        self._ir_para(proximo)
 
     # ------------------------------------------------------------------
     def validacao(self) -> Optional[lances.Validacao]:
@@ -545,19 +543,7 @@ class EditorDeDiagrama(QWidget):
                   self.btn_vazia, *self.botoes_paleta.values()):
             w.setEnabled(aberto)
         if not aberto:
-            self.cabecalho.setText(teclado.com_teclas(
-                "Nenhum diagrama em conferência. Clique num diagrama da Imagem ou use "
-                "{proximo_diagrama}."))
-            self.fen.clear()
-            self.avisos.clear()
-            self.origem_do_lado.clear()
-            self.roque_inferido.clear()
-            self.btn_roque_inferido.setEnabled(False)
-            self.btn_desfazer.setEnabled(False)
-            self.btn_refazer.setEnabled(False)
-            for check in self.checks_roque.values():
-                check.setChecked(False)
-                check.setEnabled(False)
+            self._mostrar_sem_diagrama()
             return
         d, tabuleiro = self.diagrama, self.tabuleiro()
         partes = [f"Diagrama {self.atual + 1} de {len(self.diagramas)}", tabuleiro.resumo()]
@@ -566,30 +552,60 @@ class EditorDeDiagrama(QWidget):
         self.cabecalho.setText("  —  ".join(partes))
         self.fen.setText(tabuleiro.fen())
         self.avisos.setText("\n".join(self.avisos_do_diagrama()))
+        self._mostrar_o_lado(d, tabuleiro)
+        self._mostrar_o_roque(tabuleiro)
+        for simbolo, botao in self.botoes_paleta.items():
+            botao.setChecked(self.posicao.pincel == simbolo)
+        self.btn_vazia.setChecked(self.posicao.pincel == "")
+        self.btn_desfazer.setEnabled(tabuleiro.pode_desfazer)
+        self.btn_refazer.setEnabled(tabuleiro.pode_refazer)
+        self.posicao.update()
 
+    def _mostrar_sem_diagrama(self) -> None:
+        self.cabecalho.setText(teclado.com_teclas(
+            "Nenhum diagrama em conferência. Clique num diagrama da Imagem ou use "
+            "{proximo_diagrama}."))
+        self.fen.clear()
+        self.avisos.clear()
+        self.origem_do_lado.clear()
+        self.roque_inferido.clear()
+        self.btn_roque_inferido.setEnabled(False)
+        self.btn_desfazer.setEnabled(False)
+        self.btn_refazer.setEnabled(False)
+        for check in self.checks_roque.values():
+            check.setChecked(False)
+            check.setEnabled(False)
+
+    def _mostrar_o_lado(self, d: DiagramaLido, tabuleiro: TabuleiroEdicao) -> None:
+        """O grupo do lado a jogar e de onde ele veio, com o papel do aviso."""
         self.grupo_lado.setExclusive(False)
         self.radio_brancas.setChecked(tabuleiro.lado_origem != "convencao" and tabuleiro.lado == "w")
         self.radio_pretas.setChecked(tabuleiro.lado_origem != "convencao" and tabuleiro.lado == "b")
         self.grupo_lado.setExclusive(True)
-        if tabuleiro.lado_origem == "convencao":
-            vez = (self.validacao().vez if self.validacao() is not None else "")
-            dica = (f" O texto começa com {'as pretas' if vez == 'b' else 'as brancas'}."
-                    if vez else "")
-            self.origem_do_lado.setText("A página não diz. Escolha: até lá o FEN sai com "
-                                        f"'w' marcado como assumido.{dica}")
-            estilo.papel(self.origem_do_lado, "erro")
-        elif tabuleiro.lado_origem == LADO_DA_LEGENDA:
-            trecho = f": “{d.lado_trecho}”" if d.lado_trecho else ""
-            self.origem_do_lado.setText(f"Da legenda da página{trecho}. Confira.")
-            estilo.papel(self.origem_do_lado, "aviso")
-        elif tabuleiro.lado_origem == lances.LADO_DOS_LANCES:
-            trecho = f" ({d.lado_trecho})" if d.lado_trecho else ""
-            self.origem_do_lado.setText(f"Pelo número do lance do texto{trecho}. Confira.")
-            estilo.papel(self.origem_do_lado, "aviso")
-        else:
-            self.origem_do_lado.setText("Informado por você.")
-            estilo.papel(self.origem_do_lado, "")
+        texto, papel = self._origem_do_lado(d, tabuleiro)
+        self.origem_do_lado.setText(texto)
+        estilo.papel(self.origem_do_lado, papel)
 
+    def _origem_do_lado(self, d: DiagramaLido, tabuleiro: TabuleiroEdicao) -> Tuple[str, str]:
+        """(o texto, o papel do estilo) da origem do lado a jogar."""
+        if tabuleiro.lado_origem == "convencao":
+            return ("A página não diz. Escolha: até lá o FEN sai com "
+                    f"'w' marcado como assumido.{self._dica_da_vez()}", "erro")
+        if tabuleiro.lado_origem == LADO_DA_LEGENDA:
+            trecho = f": “{d.lado_trecho}”" if d.lado_trecho else ""
+            return f"Da legenda da página{trecho}. Confira.", "aviso"
+        if tabuleiro.lado_origem == lances.LADO_DOS_LANCES:
+            trecho = f" ({d.lado_trecho})" if d.lado_trecho else ""
+            return f"Pelo número do lance do texto{trecho}. Confira.", "aviso"
+        return "Informado por você.", ""
+
+    def _dica_da_vez(self) -> str:
+        """Com quem os lances do texto começam, quando a página não diz o lado."""
+        vez = (self.validacao().vez if self.validacao() is not None else "")
+        return (f" O texto começa com {'as pretas' if vez == 'b' else 'as brancas'}."
+                if vez else "")
+
+    def _mostrar_o_roque(self, tabuleiro: TabuleiroEdicao) -> None:
         possiveis = tabuleiro.roques_possiveis()
         for letra, check in self.checks_roque.items():
             check.setChecked(letra in tabuleiro.roque)
@@ -599,12 +615,6 @@ class EditorDeDiagrama(QWidget):
                                     "não vai ao FEN sem você marcar)" if inferido
                                     else "Nenhum roque inferido.")
         self.btn_roque_inferido.setEnabled(bool(inferido) and inferido != tabuleiro.roque)
-        for simbolo, botao in self.botoes_paleta.items():
-            botao.setChecked(self.posicao.pincel == simbolo)
-        self.btn_vazia.setChecked(self.posicao.pincel == "")
-        self.btn_desfazer.setEnabled(tabuleiro.pode_desfazer)
-        self.btn_refazer.setEnabled(tabuleiro.pode_refazer)
-        self.posicao.update()
 
     def avisos_do_diagrama(self) -> List[str]:
         """O que a página deixou em aberto, o que o leitor desconfia, o que os lances do
@@ -612,37 +622,61 @@ class EditorDeDiagrama(QWidget):
         if not self.aberto:
             return []
         d, tabuleiro = self.diagrama, self.tabuleiro()
-        avisos = []
-        if not d.orientacao_confirmada:
-            avisos.append("Orientação não confirmada: não há coordenadas legíveis em volta do "
-                          "tabuleiro, e a leitura supõe as brancas embaixo. Se o diagrama estiver "
-                          "do lado das pretas, a posição sai girada 180°.")
-        if d.motivo and not d.conferido:
-            avisos.append(f"O leitor não confia nesta leitura: {d.motivo}. Confira casa a casa.")
-        validacao = self.validacao()
-        if validacao is not None and validacao.confiavel:
-            avisos.append(f"Confiável pelos lances: os {validacao.total} lance(s) do texto "
-                          "depois do diagrama são legais nesta posição.")
-        elif validacao is not None:
-            avisos.append(f"{validacao.aviso[:1].upper()}{validacao.aviso[1:]} "
-                          f"({validacao.legais} de {validacao.total} lances passaram).")
-        do_core = tabuleiro.avisos()
-        if tabuleiro.lado_origem == lances.LADO_DOS_LANCES:
-            # O core não conhece o lado dos lances e diz que o FEN "assume brancas": o FEN
-            # está com o lado do número do lance, que o grupo do lado já mostra.
-            do_core = [a for a in do_core if a != AVISO_CONVENCAO]
-        avisos.extend(do_core)
-        legenda = []
-        if any(c.corrigida for c in tabuleiro.casas):
-            legenda.append("verde: corrigida por você")
-        if any(c.arbitrada and not c.corrigida for c in tabuleiro.casas):
-            legenda.append("vermelho: trocada pela legalidade")
-        if any(c.simbolo and not c.corrigida and c.confianca < CONFIANCA_BAIXA
-               for c in tabuleiro.casas):
-            legenda.append("laranja: leitura duvidosa")
+        avisos = _avisos_da_leitura(d) + _avisos_dos_lances(self.validacao())
+        avisos.extend(_avisos_do_core(tabuleiro))
+        legenda = [texto for texto, da_cor in LEGENDA if any(da_cor(c) for c in tabuleiro.casas)]
         if legenda:
             avisos.append("   ".join(legenda))
         return avisos
+
+
+#: A legenda das cores do tabuleiro, cada uma com as casas que a mostram.
+LEGENDA = (("verde: corrigida por você", lambda c: c.corrigida),
+           ("vermelho: trocada pela legalidade", lambda c: c.arbitrada and not c.corrigida),
+           ("laranja: leitura duvidosa",
+            lambda c: c.simbolo and not c.corrigida and c.confianca < CONFIANCA_BAIXA))
+
+
+def _avisos_da_leitura(d: DiagramaLido) -> List[str]:
+    """A orientação suposta e a desconfiança do leitor."""
+    avisos = []
+    if not d.orientacao_confirmada:
+        avisos.append("Orientação não confirmada: não há coordenadas legíveis em volta do "
+                      "tabuleiro, e a leitura supõe as brancas embaixo. Se o diagrama estiver "
+                      "do lado das pretas, a posição sai girada 180°.")
+    if d.motivo and not d.conferido:
+        avisos.append(f"O leitor não confia nesta leitura: {d.motivo}. Confira casa a casa.")
+    return avisos
+
+
+def _avisos_dos_lances(validacao: Optional[lances.Validacao]) -> List[str]:
+    """O que os lances do texto dizem da posição."""
+    if validacao is None:
+        return []
+    if validacao.confiavel:
+        return [f"Confiável pelos lances: os {validacao.total} lance(s) do texto "
+                "depois do diagrama são legais nesta posição."]
+    return [f"{validacao.aviso[:1].upper()}{validacao.aviso[1:]} "
+            f"({validacao.legais} de {validacao.total} lances passaram)."]
+
+
+def _avisos_do_core(tabuleiro: TabuleiroEdicao) -> List[str]:
+    """Os avisos do TabuleiroEdicao (o que o FEN supõe)."""
+    do_core = tabuleiro.avisos()
+    if tabuleiro.lado_origem == lances.LADO_DOS_LANCES:
+        # O core não conhece o lado dos lances e diz que o FEN "assume brancas": o FEN
+        # está com o lado do número do lance, que o grupo do lado já mostra.
+        do_core = [a for a in do_core if a != AVISO_CONVENCAO]
+    return do_core
+
+
+def _proximo_por_conferir(diagramas: List[DiagramaLido], atual: int) -> Optional[int]:
+    """O primeiro por conferir depois do atual, ou o primeiro de todos; None sem nenhum."""
+    # Os por conferir que foram lidos: o não lido não tem posição a conferir.
+    faltam = [i for i in range(len(diagramas)) if diagramas[i].lido and not diagramas[i].conferido]
+    if not faltam:
+        return None
+    return next((i for i in faltam if i > atual), faltam[0])
 
 
 def _chaves(diagramas) -> List[tuple]:

@@ -86,9 +86,5 @@ abbychess/servidor_de_leitura.py _Laco._receber  # a reduzir (Q8)
 abbychess/sessao_do_documento.py ControladorDaSessao._tinta_sem_box  # a reduzir (Q8)
 abbychess/sessao_do_documento.py ControladorDaSessao.confirmar_sessao.corpo  # a reduzir (Q8)
 abbychess/sessao_do_documento.py ControladorDaSessao.novo_paragrafo  # a reduzir (Q8)
-abbychess/substituir.py _juntar_em_casos  # a reduzir (Q8)
-abbychess/substituir.py aplicar_na_pagina  # a reduzir (Q8)
-abbychess/substituir.py casos_da_pagina  # a reduzir (Q8)
-abbychess/substituir.py validar  # a reduzir (Q8)
 abbychess/validacao_do_epub.py _no_calibre  # o validador externo Calibre (ABBY_CALIBRE, o ebook-convert): só roda no portão
 abbychess/validacao_do_epub.py ace  # o validador externo Ace by DAISY (ABBY_ACE, num Chrome sem janela): só roda no portão

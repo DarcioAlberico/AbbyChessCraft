@@ -439,6 +439,64 @@ def test_a_sessao_que_nao_pode_rodar_e_recusada(dois_projetos):
     assert recusas and ss.texto_e_unidades(ctl.modelo)[0] == texto
 
 
+def _sessao_na_primeira_palavra(projeto):
+    from abbychess import sessao as ss
+
+    executor = ExecutorManual()
+    ctl = _controlador(projeto, executor)
+    ctl.leitura.reconhecer()
+    executor.tudo()
+    texto, unidades = ss.texto_e_unidades(ctl.modelo)
+    inicio, fim = ss.palavras_em(unidades, 0, 0)
+    recusas = []
+    ctl.eventos.ligar("sessao_recusada", recusas.append)
+    return ctl, executor, unidades[inicio:fim], recusas
+
+
+def test_apagar_a_palavra_do_glifo_escolhido_tira_a_escolha(dois_projetos):
+    from abbychess import sessao as ss
+
+    ctl, executor, palavra, recusas = _sessao_na_primeira_palavra(dois_projetos[0])
+    palavras = len(ss.texto_e_unidades(ctl.modelo)[0].split())
+    gids = {u.gid for u in palavra if u.glifo}
+    ctl.escolher(next(iter(gids)))
+    ctl.sessoes.confirmar_sessao(palavra, "")
+    executor.tudo()
+    assert ctl.atual is None and not gids & ctl.modelo.vivos and recusas == []
+    assert len(ss.texto_e_unidades(ctl.modelo)[0].split()) == palavras - 1
+
+
+def test_a_sessao_de_glifos_que_sairam_da_pagina_e_recusada(dois_projetos):
+    from abbychess import sessao as ss
+
+    ctl, executor, palavra, recusas = _sessao_na_primeira_palavra(dois_projetos[0])
+    ctl.sessoes.confirmar_sessao(palavra, "")
+    executor.tudo()
+    depois = ss.texto_e_unidades(ctl.modelo)[0]
+    ctl.sessoes.confirmar_sessao(palavra, "y")              # a sessão velha, da mesma palavra
+    executor.tudo()
+    assert recusas == ["a página mudou antes da confirmação"]
+    assert ss.texto_e_unidades(ctl.modelo)[0] == depois
+
+
+def test_a_sessao_que_falha_ao_aplicar_volta_a_pagina(dois_projetos, monkeypatch):
+    from abbychess import sessao as ss
+
+    ctl, executor, palavra, recusas = _sessao_na_primeira_palavra(dois_projetos[0])
+    antes = ss.texto_e_unidades(ctl.modelo)[0]
+    desfazer = len(ctl.historico._desfazer)
+
+    def falhar(*_a, **_k):
+        raise RuntimeError("a edição quebrou no meio")
+
+    monkeypatch.setattr(ss, "aplicar", falhar)
+    ctl.sessoes.confirmar_sessao(palavra, "")
+    executor.tudo()
+    assert recusas == ["a edição falhou e foi desfeita"]
+    assert ss.texto_e_unidades(ctl.modelo)[0] == antes
+    assert len(ctl.historico._desfazer) == desfazer
+
+
 @pytest.mark.parametrize("na_fila", [False, True])
 def test_sair_da_pagina_confirma_a_sessao_na_pagina_dela(tmp_path, na_fila):
     """A revisão de produto do D1 (M3): trocar de página com a sessão aberta a confirma

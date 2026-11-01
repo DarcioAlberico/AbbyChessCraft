@@ -114,7 +114,8 @@ class VisorDePagina(QGraphicsView):
         self.modo_areas = False
         self._zonas: List[zn.Zona] = []
         self._zona_sel: Optional[int] = None
-        self._zonas_itens: list = []
+        #: O que cada área desenha, no índice dela: (o retângulo, o fundo do rótulo, o rótulo).
+        self._zonas_itens: List[tuple] = []
         #: O arraste de uma área em curso: (índice, bordas, ponto inicial).
         self._arraste = None
         self._palavra: Optional[QGraphicsRectItem] = None
@@ -380,7 +381,7 @@ class VisorDePagina(QGraphicsView):
         Ordenar (`ordem_clicada`), as clicadas mostram a ordem nova e as outras um "?"."""
         self.ordenando = ordem_clicada is not None
         cena = self.scene()
-        for item in self._zonas_itens:
+        for item in (item for itens in self._zonas_itens for item in itens):
             cena.removeItem(item)
         self._zonas_itens = []
         self._zonas = list(zonas)
@@ -413,7 +414,7 @@ class VisorDePagina(QGraphicsView):
             fundo_do_rotulo.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
             fundo_do_rotulo.setPos(z.x1 + 2, z.y1 + 2)
             fundo_do_rotulo.setZValue(5.5)
-            self._zonas_itens += [item, fundo_do_rotulo, rotulo]
+            self._zonas_itens.append((item, fundo_do_rotulo, rotulo))
 
     def menu_da_zona(self, indice: int) -> QMenu:
         """A função da área e apagá-la, pelo botão direito."""
@@ -610,9 +611,11 @@ class VisorDePagina(QGraphicsView):
         largura, altura = self._tamanho_da_pagina()
         z = zn.arrastar(self._zonas[indice], bordas, ponto.x() - inicio.x(),
                         ponto.y() - inicio.y(), largura, altura)
-        if 2 * indice + 1 < len(self._zonas_itens):
-            self._zonas_itens[2 * indice].setRect(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1)
-            self._zonas_itens[2 * indice + 1].setPos(z.x1 + 2, z.y1 + 2)
+        if indice < len(self._zonas_itens):
+            retangulo, fundo_do_rotulo, rotulo = self._zonas_itens[indice]
+            retangulo.setRect(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1)
+            fundo_do_rotulo.setPos(z.x1 + 2, z.y1 + 2)
+            rotulo.setPos(z.x1 + 2, z.y1 + 2)
 
     def soltar_arraste(self, fim) -> None:
         """O fim do arraste de uma área: emite o deslocamento, se houve."""

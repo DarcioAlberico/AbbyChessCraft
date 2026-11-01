@@ -62,52 +62,10 @@ class ControladorDaSessao:
             # A página da sessão, mesmo que o usuário já tenha ido a outra (a sessão confirma
             # ao sair da página, e a edição pode esperar a vez dela na fila).
             aberta = pagina is self._p.modelo
-            virtuais = {v.gid for v in pagina.decisoes.virtuais}
-            if not aberta and self._p.projeto.paginas_em_memoria.pagina(indice) is not pagina:
-                # A página saiu da memória e foi lida de novo (o lote, por exemplo): a
-                # edição no objeto velho seria gravada por cima da nova.
-                self._p.eventos.emitir("sessao_recusada", "a página mudou antes da confirmação")
-                return
-            if any(u.glifo and u.gid not in pagina.vivos | virtuais for u in unidades):
-                self._p.eventos.emitir("sessao_recusada", "a página mudou antes da confirmação")
-                return
-            try:
-                plano = ss.planejar(unidades, novo, fixos)
-            except ss.Recusa as recusa:
-                self._p.eventos.emitir("sessao_recusada", str(recusa))
-                return
-            antes = Antes(pagina.instantaneo(), self._p.padroes())
-            vivos_antes = set(pagina.vivos)
-            try:
-                ss.aplicar(pagina, plano, self._p.imagem if aberta else None, self._p.leitor)
-            except Exception:
-                # Nada da sessão fica pela metade: a página volta ao instantâneo (os gids já
-                # alocados não voltam: um gid nunca se repete).
-                pagina.boxes, pagina.decisoes = list(antes.pagina.boxes), antes.pagina.decisoes
-                log.exception("a sessão do Documento falhou ao aplicar")
-                self._p.eventos.emitir("sessao_recusada", "a edição falhou e foi desfeita")
-                return
-            saiu = vivos_antes - pagina.vivos
-            if aberta:
-                self._p.pulados -= saiu
-                self._p.selecao -= saiu
-                if self._p.atual in saiu:
-                    self._p.atual = None
-            palavra = " ".join(novo.split())
-            descricao = (f"Editar '{palavra[:40]}'" if plano.muda
-                         else f"Aceitar '{' '.join(original.split())[:40]}'")
-            self._numero_da_sessao += 1
-            chave = ("sessao", self._numero_da_sessao)   # o Ctrl+Enter emenda nesta
-            self._p._mudou(pagina, indice, descricao, antes, juntar=chave)
-            tinta = aberta and bool(plano.virtuais) and self._tinta_sem_box(pagina, plano)
-            aviso = plano.estrutural(*(["há tinta sem box aqui: Ctrl+M marca o quadro"]
-                                       if tinta else []))
-            if aviso:
-                self._p.eventos.emitir("estrutural", aviso)
-            if aberta and ensinar_gid is not None:
-                self._ensinar_do_documento(ensinar_gid, chave)
-            if aberta and depois is not None:
-                depois()
+            feito = self._aplicar_na_pagina(pagina, indice, unidades, novo, fixos, aberta)
+            if feito is not None:
+                self._registrar(pagina, indice, feito, (novo, original), aberta,
+                                ensinar_gid, depois)
         # A edição que não rodou (a página sem imagem, ou outra na vez dela): o Documento
         # volta ao modelo.
         if pagina is None:
@@ -136,6 +94,76 @@ class ControladorDaSessao:
                         nao_rodou=rodar(lambda: self._p.eventos.emitir(
                             "sessao_recusada", "a página não pode ser editada agora")))
 
+    def _aplicar_na_pagina(self, pagina: Pagina, indice: int, unidades, novo: str, fixos,
+                           aberta: bool) -> Optional[tuple]:
+        """A sessão aplicada na página: (plano, antes, os gids que saíram), ou None com a
+        recusa avisada (a página mudou, ou a edição falhou e foi desfeita)."""
+        if self._pagina_mudou(pagina, indice, unidades, aberta):
+            self._p.eventos.emitir("sessao_recusada", "a página mudou antes da confirmação")
+            return None
+        try:
+            plano = ss.planejar(unidades, novo, fixos)
+        except ss.Recusa as recusa:
+            self._p.eventos.emitir("sessao_recusada", str(recusa))
+            return None
+        antes = Antes(pagina.instantaneo(), self._p.padroes())
+        vivos_antes = set(pagina.vivos)
+        try:
+            ss.aplicar(pagina, plano, self._p.imagem if aberta else None, self._p.leitor)
+        except Exception:
+            # Nada da sessão fica pela metade: a página volta ao instantâneo (os gids já
+            # alocados não voltam: um gid nunca se repete).
+            pagina.boxes, pagina.decisoes = list(antes.pagina.boxes), antes.pagina.decisoes
+            log.exception("a sessão do Documento falhou ao aplicar")
+            self._p.eventos.emitir("sessao_recusada", "a edição falhou e foi desfeita")
+            return None
+        return plano, antes, vivos_antes - pagina.vivos
+
+    def _pagina_mudou(self, pagina: Pagina, indice: int, unidades, aberta: bool) -> bool:
+        virtuais = {v.gid for v in pagina.decisoes.virtuais}
+        if not aberta and self._p.projeto.paginas_em_memoria.pagina(indice) is not pagina:
+            # A página saiu da memória e foi lida de novo (o lote, por exemplo): a
+            # edição no objeto velho seria gravada por cima da nova.
+            return True
+        return any(u.glifo and u.gid not in pagina.vivos | virtuais for u in unidades)
+
+    def _registrar(self, pagina: Pagina, indice: int, feito: tuple, textos: tuple,
+                   aberta: bool, ensinar_gid: Optional[int], depois) -> None:
+        """A sessão aplicada no desfazer (o passo que o Ctrl+Enter emenda), com o aviso
+        estrutural, o ensinar e o `depois` na página aberta."""
+        plano, antes, saiu = feito
+        novo, original = textos
+        if aberta:
+            self._tirar_da_escolha(saiu)
+        palavra = " ".join(novo.split())
+        descricao = (f"Editar '{palavra[:40]}'" if plano.muda
+                     else f"Aceitar '{' '.join(original.split())[:40]}'")
+        self._numero_da_sessao += 1
+        chave = ("sessao", self._numero_da_sessao)   # o Ctrl+Enter emenda nesta
+        self._p._mudou(pagina, indice, descricao, antes, juntar=chave)
+        self._avisar_o_estrutural(pagina, plano, aberta)
+        if aberta:
+            self._depois_na_aberta(ensinar_gid, depois, chave)
+
+    def _tirar_da_escolha(self, saiu: set) -> None:
+        self._p.pulados -= saiu
+        self._p.selecao -= saiu
+        if self._p.atual in saiu:
+            self._p.atual = None
+
+    def _avisar_o_estrutural(self, pagina: Pagina, plano, aberta: bool) -> None:
+        tinta = aberta and bool(plano.virtuais) and self._tinta_sem_box(pagina, plano)
+        aviso = plano.estrutural(*(["há tinta sem box aqui: Ctrl+M marca o quadro"]
+                                   if tinta else []))
+        if aviso:
+            self._p.eventos.emitir("estrutural", aviso)
+
+    def _depois_na_aberta(self, ensinar_gid: Optional[int], depois, chave) -> None:
+        if ensinar_gid is not None:
+            self._ensinar_do_documento(ensinar_gid, chave)
+        if depois is not None:
+            depois()
+
     def novo_paragrafo(self, gid: Optional[int]) -> None:
         """Ctrl+Shift+Enter: começa um parágrafo na linha do glifo indicado, num passo do
         desfazer; de novo na mesma linha, tira o parágrafo. O parágrafo começa sempre no
@@ -147,13 +175,11 @@ class ControladorDaSessao:
         if gid is None:
             self._p._avisar("Ponha o cursor numa palavra para começar o parágrafo nela.", 5000)
             return
-        linha = next((ln for b in self._p.documento().blocos for ln in b.linhas
-                      if any(gid in p.gids for p in ln.palavras)), None)
+        linha = _linha_do_glifo(self._p.documento(), gid)
         # O primeiro glifo da linha com leitura (não um virtual, nem um box ainda não lido:
         # a exportação lê o parágrafo pelo primeiro glifo lido da linha).
         lidos = {b.gid for b in self._p.modelo.boxes if b.entry.char}
-        inicio = next((g for p in linha.palavras for g in p.gids if g in lidos),
-                      gid if gid in lidos else None) if linha else (gid if gid in lidos else None)
+        inicio = _primeiro_lido(linha, gid, lidos)
         if inicio is None:
             self._p._avisar("A linha não tem glifo lido onde começar o parágrafo.", 6000)
             return
@@ -233,13 +259,7 @@ class ControladorDaSessao:
             if e is None:
                 continue
             largura = max(4, (e.x2 - e.x1)) * len(letras)
-            mesma_linha = [b for b in caixas.values() if b is not e and b.y1 < e.y2 and b.y2 > e.y1]
-            if lado == "depois":
-                x1 = e.x2 + 1
-                x2 = min([x1 + largura] + [b.x1 for b in mesma_linha if b.x1 >= e.x2])
-            else:
-                x2 = e.x1 - 1
-                x1 = max([x2 - largura] + [b.x2 for b in mesma_linha if b.x2 <= e.x1])
+            x1, x2 = _faixa_ao_lado(e, lado, largura, _na_mesma_linha(caixas, e))
             recorte = self._p.matriz[max(0, e.y1):e.y2, max(0, x1):max(0, x2)]
             if recorte.size and int((recorte < 128).sum()) >= 12:
                 return True
@@ -261,3 +281,33 @@ class ControladorDaSessao:
         self._p.limpar_selecao()
         self._p.leitura.ensinar_gids({char: [gid]}, f"Ensinar '{char}'",
                                      self._p.leitura.depois_de_ensinar(char, [gid]), juntar=chave)
+
+
+
+def _linha_do_glifo(documento, gid: int):
+    """A linha do Documento que tem o glifo, ou None."""
+    return next((ln for b in documento.blocos for ln in b.linhas
+                 if any(gid in p.gids for p in ln.palavras)), None)
+
+
+def _primeiro_lido(linha, gid: int, lidos: set) -> Optional[int]:
+    """O primeiro glifo lido da linha (sem a linha, o próprio `gid`, se lido); None se não há."""
+    proprio = gid if gid in lidos else None
+    if not linha:
+        return proprio
+    return next((g for p in linha.palavras for g in p.gids if g in lidos), proprio)
+
+
+def _na_mesma_linha(caixas: dict, e) -> list:
+    """As caixas que cruzam a faixa vertical de `e` (sem ela)."""
+    return [b for b in caixas.values() if b is not e and b.y1 < e.y2 and b.y2 > e.y1]
+
+
+def _faixa_ao_lado(e, lado: str, largura: int, mesma_linha: list) -> tuple:
+    """(x1, x2) da faixa de `largura` ao lado de `e` ("depois" ou antes), até o vizinho da
+    linha."""
+    if lado == "depois":
+        x1 = e.x2 + 1
+        return x1, min([x1 + largura] + [b.x1 for b in mesma_linha if b.x1 >= e.x2])
+    x2 = e.x1 - 1
+    return max([x2 - largura] + [b.x2 for b in mesma_linha if b.x2 <= e.x1]), x2

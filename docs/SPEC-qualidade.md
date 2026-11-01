@@ -456,6 +456,11 @@ As piores pela cobertura: `epub.calibre` (CRAP 567, 12 %), `ServidorDeLeitura._o
   ficaria pior partido); o teto da lista desce a cada passo.
 - Os `case`/cadeias de `if` de despacho (`acoes.atualizar`, `atalhos._regras_da_tecla`) só
   são partidos se a tabela de dados ficar mais clara que o código.
+- **Feito** no Q8 (`docs/revisoes/qualidade-Q8.md`): a lista é `ferramentas/crap_aceitos.txt`
+  (o `crapper --aceitos` na medida, `tests/test_complexidade.py` na rápida, o `TETO` que só
+  desce); das 281 do começo sobram 9, cada uma com o motivo (três por glifo, três despachos ou o
+  ponto de entrada, três que só o portão ou a tela de verdade alcançam). O
+  `atalhos._regras_da_tecla` não era despacho (uma tecla quebra várias regras): foi partido.
 
 ## 9. Mutação
 
@@ -505,6 +510,10 @@ Não medido: o `mutmut` 3 não roda no Windows sem `fork`; o `cosmic-ray` roda. 
   (`test_texto_linhas_guardadas.py:81-107`, `test_gravador.py:338`, `test_visor.py:507,531`).
 - **CA-Q-T3:** cada teste desses confere o resultado que o usuário veria; o estado é montado
   por API pública (ganchos de teste pequenos e nomeados, como `projeto.esvaziar_cache()`).
+- **Feito** no Q8: os testes listados montam o estado pelo que o usuário faz e conferem o que
+  ele vê; cada versão nova reprovou com o código quebrado por um instante. Um gancho, só de
+  leitura (`FaixaDaLinha.glifos`); um espião fica, com o motivo (a ordem de leitura não
+  refeita não se vê sem relógio). Os dois restos do Q-T4 também.
 
 ### Q-T4 (Média) — a pirâmide da §15.1 não é imposta
 
@@ -540,6 +549,11 @@ Hypothesis só em `test_modelo_estados.py`. Faltam: as edições fora das máqui
 (`dividir_em`, `estilizar`, `paragrafo`, virtuais, `juntar_varios`, `ajustar`, `revisar`); o
 desfazer entre páginas com o gravador ("gravar, reabrir e comparar"); a sequência (reordenar,
 apagar e restaurar preservam os pids); substituir e desfazer; o ida-e-volta de lances e FEN.
+- **Feito** no Q8: uma propriedade por grupo (`tests/test_propriedades_*.py`, com
+  `tests/estrategias.py`), poucos exemplos na rápida (~1,9 s em série) e 2 000 no `noturno`.
+  Elas acharam dois defeitos, corrigidos com o exemplo mínimo como teste: as letras digitadas
+  na edição 1 → k cortadas uma em cima da outra, e o virtual tirado que trocava a ordem dos
+  outros.
 
 ## 11. Código morto (sai antes de refatorar)
 

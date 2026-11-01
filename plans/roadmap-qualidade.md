@@ -247,6 +247,15 @@ que montam estado privado por API pública. Q-T6: as máquinas de estado que fal
 
 **Pronto quando:** CA-Q-X1 passa e a lista de exceções tem motivo em cada linha.
 
+**Feito** em 2026-11-01, ramo `qualidade-q8` (`docs/revisoes/qualidade-Q8.md`): a lista de
+aceitos com a catraca, e sete rodadas, um grupo de módulos cada; das 281 funções com CRAP ≥ 10
+sobram 9, todas com motivo; a cobertura de 92,2 % para 94,7 %. Partir obrigou a tirar seções
+de `epub.py`, `controladores.py`, `pagina.py`, `projeto.py` e `modelo.py`: nenhum arquivo passa
+de 1 000 linhas. Q-T3 e Q-T6 feitos. Achados e corrigidos em TDD no caminho: o plano da página
+inteira quadrático (534 → 11 ms por confirmação), o topo e o pé recalculados por glifo na
+calha, a prévia do arraste das áreas (desde o passo F), as letras digitadas cortadas em pé e o
+virtual tirado que trocava a ordem dos outros.
+
 ## Passo Q9 — Mutação
 
 **Contexto.** Nenhum teste de mutação até aqui. `cosmic-ray` roda no Windows; o `mutmut` 3

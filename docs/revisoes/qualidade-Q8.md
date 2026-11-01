@@ -1,4 +1,4 @@
-# Passo Q8 — CRAP abaixo de 10 (em andamento, ramo `qualidade-q8`)
+# Passo Q8 — CRAP abaixo de 10 (2026-10-31 a 2026-11-01, ramo `qualidade-q8`)
 
 Nono passo de `plans/roadmap-qualidade.md`, a partir do `9c1f644` (o Q7 mesclado no
 `passo-i-treino`), na worktree irmã `C:\Python-Chess2\AbbyChessCraft-qualidade`. Na medida do
@@ -19,16 +19,86 @@ O passo fecha quando nenhuma linha diz "a reduzir (Q8)".
 | Rodada | Commits | O que mudou | Lista |
 |---|---|---|---|
 | 1. As de cc < 10 (testar) | `a3a96bd` à mão (o molde); `a970061`, `601e16c`, `5d675bb`, `388766f`, `c55c7e4`, `da7f6e0`, `0179591` por um subagente, revisado aqui | testes de comportamento para 26 das 29 (o mouse, o botão direito, as teclas, os diálogos de verdade; o PDF com texto da camada; o lote retomado; o palpite com o veto de proporção): todas abaixo de 10 com os testes do arquivo. Três ficam com motivo: `estilo.tema_do_sistema` (o offscreen da suíte sempre responde `Unknown`), `principal.main` (o ponto de entrada fica no `app.exec()`), `epub.ace` (o validador externo só roda no portão) | 281 → 255 |
-
 | 2. Os módulos puros (`sequencia`, `lances`, `texto`, `historico`, `modelo`, `sessao`) | `9209b87` à mão (o molde: `Entrada.__post_init__`); `bd04683`, `09c9f36`, `631e9e6`, `27927ef` (os testes do `emendar`), `d140872`, `aad6d64`, `a97f6dd`, `3428a31`, `064f64f`, `6afeef8`, `4800a40` por um subagente, revisado aqui; `0e412bb` à mão | as 40 partidas, cada parte com cc ≤ 8; as grandes viraram uma classe com os passos (`_Reconciliacao`, `_Divisao`, `_Reescrita`, `_Linha`); os laços por glifo inteiros (a reconciliação de 3 000 glifos e o `alinhar` medidos antes e depois: iguais) | 255 → 215 |
-
 | 3. A análise da página (`contexto`, `zonas`, `busca`, `ancoragem`, `layout`, `edicao`, `verificacao`) | `926949b`, `33f32e1`, `d5ac063`, `6257eb7`, `eef42f9`, `787bcf6`, `2cff6ba`, `3ddccc0`, `5bddec0`, `ef5bad5`, `3322106` por um subagente, revisado aqui; `475b380`, `13dde31` à mão | as 36 partidas, cada parte com cc ≤ 9; quatro commits só de testes antes de partir (a continuação da legenda e o ponto solto, a figurina digitada na busca, os virtuais ancorados no que se apaga, as listas extras do léxico: regras sem teste nenhum); os laços quentes medidos antes e depois (o `julgar` de 3 066 glifos, o `indexar_pagina`, as linhas das zonas: iguais); dois pares do dryer que o partir expôs, juntados (`texto.chars_dos_gids` para o contexto; `layout.partes_pelo_vao`, a mesma regra do vão no layout e nas zonas) | 215 → 179 |
-
 | 4. A exportação (`montagem`, `epub`, `exportar`, `margens`, `escritor_docx`, `pdf_pesquisavel`, `metadados`, `marcacao`, `previa`) | `e90887d` … `cfc12ea` (20 commits) por um subagente, revisado aqui; `ed33352` à mão | as 41 partidas, cada parte com cc ≤ 9; o golden da exportação (37 arquivos) igual a cada commit; os testes antes de partir: o que a conferência do EPUB recusa (17 casos) e a do DOCX (10), o PGN que sai e o que fica de fora, a palavra digitada sozinha; os tempos da camada do PDF, da `Estrutura.da_pagina` e da `pagina_extraida` iguais (7 páginas do golden, 10 308 glifos). Duas exceções com motivo: `_sem_coordenadas.fora` (roda por glifo e por tabuleiro) e `_no_calibre` (o validador externo, como o `ace`). Dois pares do dryer juntados | 179 → 140 |
-
 | 5. Os controladores e a página (`controladores`, `pagina`, `ponte_de_leitura`, `controlador`, `fila_da_pagina`) | `deec535` … `ea1c83f` (18 commits) por um subagente, revisado aqui | as 34 partidas, nenhuma exceção, cada parte com cc ≤ 9; as partes do `ControladorDePagina` são funções do módulo (ele está preso em 61 métodos); cinco commits de testes antes de partir (PgDn e PgUp entre diagramas, a conferência que não grava, as palavras desconhecidas pelo livro — de 8 % a 83 % —, o lote a retomar da v2 e o ilegível, a prévia do Substituir que falha e a cancelada, os glifos aguardando a leitura); os laços quentes medidos (`_italicos`, `decidir_negritos`, `devolver_pingos`: iguais; a `fila` de 5 000, de 0,78 para 0,38 ms, as três listas num laço só) | 140 → 106 |
-
 | 6. O resto do núcleo (25 módulos fora de `app/`) | `b469722` … `124966b` (31 commits) por um subagente, revisado aqui | 52 das 55 partidas, cada parte com cc ≤ 9, entre elas o `AplicadorDoHistorico._voltar` (cc 57, a pior do programa, para 7); o `atalhos._regras_da_tecla` partido pelas regras do docstring (não é despacho: uma tecla quebra várias regras), as teclas do Windows numa tabela; as partes do `ProjetoDeLivro` como funções do módulo (ele está preso em 43 métodos); seis commits de testes antes de partir (a sequência, a página ilegível, o servidor na camada `processo`, a sessão, as migrações); as 2 400 saídas com semente do `perturbar` iguais; ensinar e restaurar 300 amostras, 1,64 e 1,69 s antes e depois (o fsync domina). Três ficam com motivo: `PadroesDoLivro.ler` e `resumo_das_confiancas` (rodam por glifo), `_Laco._operar` (o despacho do protocolo com o filho) | 106 → 54 |
+| 7. A interface (`app/`) | `1361e58` … (21 commits) por um subagente, revisado aqui; `e724e2a`, `de886d9`, `8a3314c` à mão | 45 das 46 partidas, cada parte com cc ≤ 9; as partes das três classes presas em `TETOS` (`VistaDoDocumento`, `EspacoDeTrabalho`, `VisorDePagina`) são funções do módulo; a `janela.py` intocada (499 linhas); quatro commits de testes antes de partir; a montagem do Documento de 3 000 glifos e o `mostrar_boxes` medidos (iguais ou menos). Fica com motivo: `VisorDePagina.mousePressEvent` (o despacho do clique pelo botão e pelo modo) | 54 → 9 |
+
+Na rodada 7, também: `e724e2a` (vermelho) e `de886d9` — o subagente achou e parou em
+`mostrar_zonas`: desde o passo F (`d38d59c`) cada área desenha três itens (o retângulo, o fundo
+do rótulo e o rótulo), mas a prévia do arraste os contava de dois em dois. No editor de áreas,
+arrastar a primeira área deixava o rótulo parado, a segunda levantava `AttributeError` no
+`mouseMoveEvent` (a prévia não aparecia) e a terceira mexia nos itens de outra. A correção é a
+forma do dado: um trio por área, no índice dela. `8a3314c` partiu o `mostrar_zonas` depois.
+Também anotado, não mudado: nenhum `Caso` recebe `motivo` desde o passo G (o "sem tradução
+ainda" nunca aparece); na janela, a letra da função da área chega antes ao atalho da ação, e o
+ramo do `keyPressEvent` do visor nunca roda; a legenda "laranja: leitura duvidosa" do editor
+de diagrama conta também as casas trocadas pela legalidade, que o tabuleiro pinta de vermelho.
+A mensagem do `1361e58` começa com um BOM (gravada pelo `Set-Content`): sem amend, ficou.
+
+## Q-T3 — os testes de implementação
+
+`60bdbb4` … `7e4d6a3` (10 commits, por um subagente, revisado aqui): os testes que a spec lista
+montam o estado pelo que o usuário faz (a palavra digitada no Documento, o F7 com um léxico de
+verdade, o Ctrl+M, a notação de letras; o cache esvaziado pelo `tirar` que o `CacheDoProjeto`
+já tem) e conferem o que ele vê (o texto do Documento, a aba Padrões, a Imagem, a faixa Linha,
+o projeto reaberto). Cada versão nova reprovou com o código de produção quebrado por um
+instante. Um gancho novo, só de leitura: `FaixaDaLinha.glifos`. Um espião fica, com o motivo:
+a troca de uma letra não refaz a ordem de leitura, e nada público mostra isso sem relógio. Do
+Q-T4: o `test_fen_no_livro` reprova quando a segmentação não acha o tabuleiro (era um pulo), e
+os testes em Times pulam sem a fonte, com o motivo contado. O teste velho das buscas fora de
+ordem nunca via a montagem atrasada: o novo a espera e reprova com a geração trocada.
+
+## Q-T6 — as propriedades
+
+`5f98b2a` … `897f1f8` (5 commits, por um subagente, revisado aqui), com `tests/estrategias.py`
+(a página sintética, as invariantes e o `propriedade()`, que monta a variante da rápida e a
+`noturno`): as edições fora das máquinas de estado, o desfazer entre páginas com o gravador
+(gravar, reabrir e comparar), a sequência (os pids preservados, também no projeto reaberto), o
+Substituir com o desfazer no livro, e a ida e volta dos lances e do FEN. Na rápida, ~1,9 s em
+série; no noturno, 2 000 exemplos cada. Cada uma reprovou com uma regra quebrada por um instante.
+
+As propriedades acharam dois defeitos, corrigidos em TDD:
+- `2d40166` (vermelho) e `4e753ee`: a edição 1 → k do Documento cortava a tinta pelo eixo que
+  o core escolhe, e num traço sem vão vertical mais alto que largo cortava em y: as letras
+  digitadas saíam uma em cima da outra ("x\nyz" no Documento). Agora o corte é entre as
+  letras (`editar_boxes.corte_entre_letras`); o Ctrl+D continua com o eixo do core.
+- `21c68ec` (vermelho) e `3147568`: tirar um virtual levava os ancorados nele à âncora dele no
+  fim da ordem das decisões, e o texto os punha na frente de quem já estava lá ("a213" sem o 1
+  dava "a32"). Agora eles herdam a vez do que sai.
+
+## Verificação final
+
+- `ferramentas/qualidade.py` no `3147568` (árvore limpa,
+  `docs/medidas/qualidade/2026-11-01-qualidade.json`): a rápida com cobertura (120 s) e a
+  `processo` (223 s) passam; cobertura 94,7 % (92,2 % no fim do Q7); **9 funções com CRAP ≥ 10,
+  todas na lista e cada uma com motivo** (281 no começo): o CA-Q-X1 passa. O dryer: 1 par, o
+  aceito, 0 fora da lista.
+- O golden da exportação no `3147568`: 37 arquivos, 0 diferentes (os mesmos bytes do começo
+  do corte 5 do Q7).
+- A rápida sem cobertura: 2075 passaram e 3 pularam em ~80 s (-n 4).
+- Portão `ABBY_PORTAO=1 pytest -m livro_real` no `3147568`, com o EPUBCheck, o Ace e o Calibre:
+  21 passaram, 1 reprovou (`docs/medidas/2026-11-01-medida-falhou.json`), o mesmo CA-7.1 da
+  base, mediana 2412 ms (no Q7, 3003; a base, 2486–2692). As outras medidas, dentro do que
+  eram no Q7 (a releitura com o lote, p95 202 → 223 ms, já passava dos 150 de referência).
+- O CA-14.1 da spec principal (`tests/test_arquitetura.py`) passa.
+
+## O que fica
+
+- As 9 exceções de `ferramentas/crap_aceitos.txt`, cada uma com o motivo: três rodam por glifo
+  (partir põe chamada nova no laço), três são despachos (o clique do visor, o protocolo com o
+  filho do servidor) ou o ponto de entrada (`main`), três dependem do que a suíte não tem (o tema
+  do sistema no offscreen, o Ace e o Calibre, que só rodam no portão).
+- As cinco classes acima de 40 métodos do CA-Q-A1 continuam presas em `TETOS` (§13.6).
+- O `test_suite` confere o `noturno` das máquinas de estado (CA-Q-T4), não o das propriedades
+  novas.
+- Os achados anotados nas rodadas 3 e 7, sem mudança: `_nada_no_meio` a cada partição, o
+  `sem_traducao` sempre zero, o ramo da letra da função no visor que não roda, a legenda do
+  editor de diagrama, a anotação `hs.Instantaneo`, o `except ss.Recusa` inalcançável.
+
+## As notas e as medidas das rodadas 1 a 6
 
 Na rodada 6, também: `b574ebc` — partir levava o `projeto.py` a 1 021 linhas; a notação, os
 limiares, o `Projeto` e as conferências do `projeto.json` foram para `dados_do_projeto.py`
@@ -111,14 +181,6 @@ camadas passam; cobertura 94,5 %; 54 funções com CRAP ≥ 10, todas na lista (
 com motivo); o dryer só com o par aceito. O golden: 37 arquivos, 0 diferentes. A rápida sem
 cobertura: 2055 passaram em 73,9 s.
 
-## O que falta
-
-As 46 de cc ≥ 10 que ainda dizem "a reduzir (Q8)" (eram 252), todas de `app/`: partir, com a
-suíte como pino (refatoração, sem mudar
-comportamento no mesmo commit); as de cobertura < 50 % primeiro ganham o teste. Os `match` e as
-cadeias de `if` de despacho só se partem se a tabela ficar mais clara (§8); senão ficam com
-motivo. Também Q-T3 (os testes que montam estado privado) e Q-T6 (as propriedades que faltam).
-
 ## Registro
 
 | Ação | Por quê |
@@ -140,3 +202,8 @@ motivo. Também Q-T3 (os testes que montam estado privado) e Q-T6 (as propriedad
 | Os validadores do EPUB num módulo próprio antes de partir | o `epub.py` estava preso no teto de 1 144 linhas; partir dentro dele reprovaria a catraca |
 | A rápida de 104 s comparada com a base antes de culpar a rodada | a regra da casa para tempo: conferir na base |
 | O `_linhas_que_atravessam` sem teste vermelho, com a medida | "se um teste honesto é impraticável, não escreva um ruim": o relógio não separa 13 de 2 ms do ruído sem um alvo, e a spec não tem alvo para a ordem de leitura |
+| A rodada 7 com as três classes presas e a `janela.py` no teto | as partes viram funções do módulo; a regra do CA-14.1 vale nos mixins |
+| O defeito da prévia do arraste corrigido pela forma do dado | a conta `2 * indice` errou quando o rótulo ganhou fundo; um trio por área não tem conta para errar |
+| Os dois defeitos do Q-T6 corrigidos aqui, em TDD | agem sobre o que o passo achou; o exemplo mínimo do hypothesis virou teste comum, e a lei perdeu a exclusão |
+| O corte entre letras só na edição 1 → k | o Ctrl+D divide um glifo que pode ser de letras empilhadas: lá o eixo do core é o certo |
+| Medi e rodei o portão com a worktree parada | a regra da casa |

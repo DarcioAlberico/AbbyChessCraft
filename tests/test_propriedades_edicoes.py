@@ -79,10 +79,7 @@ def _dividir_em(pagina, imagem, i, j, c):
     assert "".join(pagina.box(g).entry.char for g in partes) == chars
     _intactos(antes, pagina.boxes, {gid, *partes})
     caixas = [pagina.box(g).entry for g in partes]
-    if any(a.x2 > b.x1 for a, b in zip(caixas, caixas[1:])):
-        # O corte na horizontal (uma parte em cima da outra): as letras digitadas saem fora da
-        # ordem de leitura. É o defeito relatado no Q-T6, fora da lei até a correção.
-        return
+    assert all(a.x2 <= b.x1 for a, b in zip(caixas, caixas[1:])), caixas    # lado a lado
     if gid in ordem:                      # o glifo lido: as partes no lugar dele
         esperada = [p for g in _glifos(ordem, virtuais) for p in (partes if g == gid else [g])]
         assert _glifos(_ordem(pagina), virtuais) == esperada
@@ -248,6 +245,17 @@ def lei_das_edicoes(n, passos):
             continue                    # a edição recusada não muda nada
         conferir_a_pagina(pagina)
         _desfazer_e_refazer(pagina, antes)
+
+
+def test_dividir_em_tres_deixa_as_letras_digitadas_lado_a_lado():
+    """O exemplo mínimo que a propriedade achou (Q-T6): o terceiro caractere digitado corta um
+    traço sem vão vertical, e o `split_box` do core, que escolhe o eixo, o cortava na
+    horizontal; as letras saíam uma em cima da outra, e o Documento ganhava uma quebra de linha
+    no meio do que foi digitado."""
+    lei_das_edicoes(1, [("dividir_em", 0, 1, "x")])
+    imagem, pagina = pagina_sintetica(1)
+    ed.dividir_em(pagina, imagem, pagina.boxes[0].gid, "xyz")
+    assert "\n" not in tx.texto(tx.montar(pagina))
 
 
 test_as_edicoes_mantem_a_pagina_e_voltam_no_desfazer, \

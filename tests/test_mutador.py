@@ -91,10 +91,21 @@ def test_os_testes_de_um_mutante_sao_os_que_cobrem_a_linha_dele():
     contextos = {3: ["tests/t.py::test_b|run", "", "tests/t.py::test_a|setup",
                      "tests/t.py::test_a|run"],
                  4: ["tests/t.py::test_c|run"]}
+    todos = ["tests/t.py", "tests/u.py"]
     [m] = [m for m in mutador.mutantes(BRINQUEDO) if m.linha == 3 and m.troca == "<="]
-    assert mutador.testes_do_mutante(contextos, m) == ["tests/t.py::test_a", "tests/t.py::test_b"]
+    assert mutador.testes_do_mutante(contextos, m, todos) == ["tests/t.py::test_a",
+                                                             "tests/t.py::test_b"]
     [m] = [m for m in mutador.mutantes(BRINQUEDO) if m.linha == 5]
-    assert mutador.testes_do_mutante(contextos, m) == []
+    assert mutador.testes_do_mutante(contextos, m, todos) == []
+
+
+def test_a_linha_que_roda_ao_importar_o_modulo_vale_para_todos_os_testes_dele():
+    """A constante do módulo e o valor padrão de uma dataclass rodam na importação, que o
+    pytest faz na coleta, fora de teste nenhum: a cobertura os marca com o contexto vazio."""
+    fonte = "LIMITE = 3\n\n\ndef f(x):\n    return x < LIMITE\n"
+    [m] = [m for m in mutador.mutantes(fonte) if m.linha == 1]
+    todos = ["tests/t.py", "tests/u.py"]
+    assert mutador.testes_do_mutante({1: [""], 5: ["tests/t.py::test_f|run"]}, m, todos) == todos
 
 
 def test_o_resumo_conta_o_tempo_como_morto_e_o_sem_teste_como_sobrevivente():

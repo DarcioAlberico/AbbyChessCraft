@@ -232,26 +232,7 @@ class ProjetoDeLivro:
         arquivo = pasta / ARQUIVO_DO_PROJETO
         if not arquivo.is_file():
             raise ProjetoInvalido(f"Não há {ARQUIVO_DO_PROJETO} em {pasta}.")
-        try:
-            bytes_do_projeto = arquivo.read_bytes()
-            bruto = json.loads(bytes_do_projeto.decode("utf-8"))
-            if not isinstance(bruto, dict):
-                raise ValueError("não é um objeto JSON")
-            _conferir_tipos(bruto, TIPOS_DO_PROJETO)
-            _conferir_tipos(bruto.get("limiares") or {}, TIPOS_DOS_LIMIARES, "limiares.")
-            _conferir_valores(bruto)
-            # A sequência e o contador de `pid` vão à SequenciaDoLivro (Q-P9).
-            gravada = (bruto.pop("sequencia", None), bruto.pop("proximo_pid", 0))
-            conhecidos, desconhecidos = _separar(bruto, Projeto)
-            extras = dict(conhecidos.pop("extras", None) or {})
-            dos_limiares, outros_limiares = _separar(conhecidos.pop("limiares", None) or {},
-                                                     Limiares)
-            if outros_limiares:
-                extras["limiares"] = {**dict(extras.get("limiares") or {}), **outros_limiares}
-            extras.update(desconhecidos)
-            dados = Projeto(limiares=Limiares(**dos_limiares), extras=extras, **conhecidos)
-        except (ValueError, TypeError) as erro:
-            raise ProjetoInvalido(f"{arquivo} está ilegível: {erro}") from erro
+        dados, gravada, bytes_do_projeto, regravar = _projeto_lido(arquivo)
         if dados.versao > VERSAO:
             return cls._abrir_so_para_leitura(pasta, dados, gravada, v1_vence=False)
         if not gv.tomar_a_pasta(pasta):
@@ -262,8 +243,7 @@ class ProjetoDeLivro:
                 motivo="O projeto já está aberto em outra janela do AbbyChessCraft: este abre "
                        "só para leitura, e o que você mudar aqui não é gravado.")
         try:
-            projeto = cls._abrir_para_gravar(pasta, dados, gravada, bytes_do_projeto,
-                                             bool(desconhecidos or outros_limiares))
+            projeto = cls._abrir_para_gravar(pasta, dados, gravada, bytes_do_projeto, regravar)
         except BaseException:
             gv.soltar_a_pasta(pasta)
             raise
@@ -305,48 +285,13 @@ class ProjetoDeLivro:
         projeto = cls(pasta, dados, gravada)
         # A fonte antes da migração: a sequência da v3 tem uma entrada por página do PDF, e
         # sem o PDF o número de páginas não se sabe.
-        if projeto.fonte.is_file():
-            if not dados.fonte_sha256 or not dados.fonte_tamanho:
-                dados.fonte_sha256 = sha_da_fonte(projeto.fonte)
-                dados.fonte_tamanho, mudou = projeto.fonte.stat().st_size, True
-        else:
-            achada = projeto.origem.procurar()
-            if achada is not None:
-                dados.fonte, mudou = caminho_gravado(achada, pasta), True
-                dados.fonte_tamanho = achada.stat().st_size
-                projeto.fonte_relocalizada = True
+        mudou = _achar_a_fonte(projeto) or mudou
         versao_de_antes = dados.versao
         if dados.versao < VERSAO or projeto.migracoes.indices_v1():
             try:
-                # A cadeia (§12.4): a v1 passa à 2 (o `backup-v1/`), e a 2 à 3 (o `backup-v2/`).
-                if dados.versao < 2:
-                    projeto.migracoes.preparar_migracao(bytes_do_projeto)
-                    projeto.backups_da_migracao.append(pasta / PASTA_DO_BACKUP_V1)
-                    projeto.migrado = True
-                # As páginas v1 migram todas aqui, antes de qualquer leitura (SPEC-qualidade
-                # Q-P1): a queda no meio da cadeia, ou um arquivo v1 copiado de volta, também.
-                projeto.migracoes.migrar_a_v1(v1_vence=versao_de_antes < 2)
-                if dados.versao < VERSAO and projeto.fonte.is_file():
-                    projeto.migracoes.migrar_para_v3()
-                    projeto.backups_da_migracao.append(pasta / PASTA_DO_BACKUP_V2)
-                    projeto.migrado, mudou = True, False
-                elif dados.versao < VERSAO:
-                    # Sem a fonte, a v3 espera: o projeto segue na v2 (que grava as listas
-                    # por posição e a sequência só na memória) até abrir com o PDF.
-                    log.warning("a fonte de %s não foi achada; a passagem à v3 fica para "
-                                "quando ela estiver no lugar", pasta)
+                mudou = _migrar(projeto, bytes_do_projeto, versao_de_antes, mudou)
             except OSError as erro:
-                # Mídia só de leitura (ou sem espaço): sem o backup não se migra nada; o projeto
-                # abre só para leitura, como abria antes, com a sequência só na memória.
-                log.warning("o projeto v%d não pôde migrar (%s); abre só para leitura",
-                            versao_de_antes, erro)
-                projeto.motivo_so_leitura = (
-                    "O projeto é do formato antigo e precisa passar ao novo, mas não deu para "
-                    f"gravar na pasta dele ({erro}). Ele abre só para leitura.")
-                projeto.somente_leitura = projeto._travado = True
-                gv.proteger(pasta)
-                projeto.migracoes.guardar_a_v1_na_memoria(v1_vence=versao_de_antes < 2)
-                projeto.ordem.montar()
+                _so_para_leitura_sem_migrar(projeto, versao_de_antes, erro)
                 return projeto
         if mudou:
             try:
@@ -468,35 +413,14 @@ class ProjetoDeLivro:
         para todos (a busca, a aba Diagramas, a janela, a exportação), e quem a edita começa
         de novo sem apagar o arquivo. Só para leitura, só o resumo da memória muda. O aviso
         (`ao_achar_ilegivel(posição, guardado)`) sai uma vez por página."""
-        guardado = None
         with self._trava_do_livro:
             with self._trava_das_paginas:       # o gravador não troca o arquivo no meio
-                try:
-                    dados = arquivo.read_bytes()
-                    pagina_de_json(json.loads(dados.decode("utf-8")))
-                    return                      # regravado agora mesmo: vale o novo
-                except FileNotFoundError:
-                    return                      # outra leitura já o isolou
-                except ERROS_DE_PAGINA_ILEGIVEL:
-                    pass
-                if not self.somente_leitura:
-                    guardado, n = arquivo.with_name(f"p{pid}.corrompido.json"), 1
-                    while guardado.exists():
-                        n += 1
-                        guardado = arquivo.with_name(f"p{pid}.corrompido-{n}.json")
-                    try:
-                        gv.gravar_bytes(guardado, dados)
-                        gv.apagar(arquivo)
-                    except OSError:
-                        log.warning("a página p%d está ilegível e não foi guardada à parte",
-                                    pid, exc_info=True)
-                        guardado = None
-            livro = self.resumo.carregar()
-            if str(pid) in livro["paginas"] and (guardado is not None or self.somente_leitura):
-                if self.somente_leitura:        # só na memória; troca, não muda no lugar
-                    self.resumo.tirar_da_memoria(pid)
-                else:
-                    self.resumo.atualizar(pid, None)
+                dados = _ainda_ilegivel(arquivo)
+                if dados is None:
+                    return
+                guardado = None if self.somente_leitura else _guardar_a_ilegivel(pid, arquivo,
+                                                                                  dados)
+            _ilegivel_fora_do_livro(self, pid, guardado)
         log.warning("a página p%d está ilegível (%s); %s", pid, erro,
                     f"guardada em {guardado.name}" if guardado is not None else "fica como está")
         if pid in self._ilegiveis_avisadas:
@@ -697,18 +621,10 @@ class ProjetoDeLivro:
                 diagramas = para_caixas(tabuleiros, pagina.diagramas)
             lidos = com_ids_de_diagramas([d for d in diagramas if d.lido or d.erro])
             dif = self._reconciliar(pagina, boxes)
-            mudou = (not dif.vazia or [list(t) for t in tabuleiros] != [list(t) for t in pagina.tabuleiros]
-                     or [d.para_json() for d in lidos] != [d.para_json() for d in pagina.diagramas])
+            mudou = not dif.vazia or _outros_tabuleiros(pagina, tabuleiros, lidos)
             pagina.tabuleiros = [tuple(int(v) for v in t) for t in tabuleiros]
             pagina.diagramas = list(lidos)
-            if not reconhecida:
-                # A página ainda não passou pelo F5 (ou o desfazer voltou a antes dele): é
-                # o "só glifos marcados" do v1, qualquer que fosse o estado gravado.
-                pagina.estado = GLIFOS_MARCADOS if pagina.boxes else NAO_RECONHECIDA
-            elif reconheceu or pagina.estado in (NAO_RECONHECIDA, GLIFOS_MARCADOS):
-                pagina.estado = proximo_estado(pagina.estado, "reconhecer")
-            elif mudou:
-                pagina.estado = proximo_estado(pagina.estado, "editar")
+            pagina.estado = _estado_ao_salvar(pagina, reconhecida, reconheceu, mudou)
             self.salvar_modelo(pagina)
 
     def carregar_pagina(self, indice: int) -> Optional[List[BoxEntry]]:
@@ -837,3 +753,157 @@ class ProjetoDeLivro:
         if atual is None:
             return False
         return comparavel(atual) == comparavel(esperada)
+
+
+
+# ----------------------------------------------------------------------
+# Abrir (`ProjetoDeLivro.abrir`)
+# ----------------------------------------------------------------------
+def _projeto_lido(arquivo: Path) -> Tuple[Projeto, tuple, bytes, bool]:
+    """Os dados do `projeto.json`, a sequência e o contador de `pid` gravados (para a
+    SequenciaDoLivro, Q-P9), os bytes lidos e se ele tinha campos que esta versão regrava em
+    `extras`; `ProjetoInvalido` se ele está ilegível."""
+    try:
+        bytes_do_projeto = arquivo.read_bytes()
+        bruto = json.loads(bytes_do_projeto.decode("utf-8"))
+        if not isinstance(bruto, dict):
+            raise ValueError("não é um objeto JSON")
+        _conferir_tipos(bruto, TIPOS_DO_PROJETO)
+        _conferir_tipos(bruto.get("limiares") or {}, TIPOS_DOS_LIMIARES, "limiares.")
+        _conferir_valores(bruto)
+        gravada = (bruto.pop("sequencia", None), bruto.pop("proximo_pid", 0))
+        dados, regravar = _dados_do_projeto(bruto)
+    except (ValueError, TypeError) as erro:
+        raise ProjetoInvalido(f"{arquivo} está ilegível: {erro}") from erro
+    return dados, gravada, bytes_do_projeto, regravar
+
+
+def _dados_do_projeto(bruto: dict) -> Tuple[Projeto, bool]:
+    conhecidos, desconhecidos = _separar(bruto, Projeto)
+    extras = dict(conhecidos.pop("extras", None) or {})
+    dos_limiares, outros_limiares = _separar(conhecidos.pop("limiares", None) or {}, Limiares)
+    if outros_limiares:
+        extras["limiares"] = {**dict(extras.get("limiares") or {}), **outros_limiares}
+    extras.update(desconhecidos)
+    dados = Projeto(limiares=Limiares(**dos_limiares), extras=extras, **conhecidos)
+    return dados, bool(desconhecidos or outros_limiares)
+
+
+def _achar_a_fonte(projeto: ProjetoDeLivro) -> bool:
+    """O SHA-256 e o tamanho da fonte que não os tem, ou a fonte achada noutro lugar; se o
+    `projeto.json` mudou."""
+    dados = projeto.dados
+    if projeto.fonte.is_file():
+        if not dados.fonte_sha256 or not dados.fonte_tamanho:
+            dados.fonte_sha256 = sha_da_fonte(projeto.fonte)
+            dados.fonte_tamanho = projeto.fonte.stat().st_size
+            return True
+        return False
+    achada = projeto.origem.procurar()
+    if achada is None:
+        return False
+    dados.fonte = caminho_gravado(achada, projeto.pasta)
+    dados.fonte_tamanho = achada.stat().st_size
+    projeto.fonte_relocalizada = True
+    return True
+
+
+def _migrar(projeto: ProjetoDeLivro, bytes_do_projeto: bytes, versao_de_antes: int,
+            mudou: bool) -> bool:
+    """A cadeia (§12.4): a v1 passa à 2 (o `backup-v1/`), e a 2 à 3 (o `backup-v2/`); se o
+    `projeto.json` ainda tem de ser gravado."""
+    dados, pasta = projeto.dados, projeto.pasta
+    if dados.versao < 2:
+        projeto.migracoes.preparar_migracao(bytes_do_projeto)
+        projeto.backups_da_migracao.append(pasta / PASTA_DO_BACKUP_V1)
+        projeto.migrado = True
+    # As páginas v1 migram todas aqui, antes de qualquer leitura (SPEC-qualidade
+    # Q-P1): a queda no meio da cadeia, ou um arquivo v1 copiado de volta, também.
+    projeto.migracoes.migrar_a_v1(v1_vence=versao_de_antes < 2)
+    if dados.versao < VERSAO and projeto.fonte.is_file():
+        projeto.migracoes.migrar_para_v3()
+        projeto.backups_da_migracao.append(pasta / PASTA_DO_BACKUP_V2)
+        projeto.migrado = True
+        return False
+    if dados.versao < VERSAO:
+        # Sem a fonte, a v3 espera: o projeto segue na v2 (que grava as listas
+        # por posição e a sequência só na memória) até abrir com o PDF.
+        log.warning("a fonte de %s não foi achada; a passagem à v3 fica para "
+                    "quando ela estiver no lugar", pasta)
+    return mudou
+
+
+def _so_para_leitura_sem_migrar(projeto: ProjetoDeLivro, versao_de_antes: int,
+                                erro: OSError) -> None:
+    # Mídia só de leitura (ou sem espaço): sem o backup não se migra nada; o projeto
+    # abre só para leitura, como abria antes, com a sequência só na memória.
+    log.warning("o projeto v%d não pôde migrar (%s); abre só para leitura",
+                versao_de_antes, erro)
+    projeto.motivo_so_leitura = (
+        "O projeto é do formato antigo e precisa passar ao novo, mas não deu para "
+        f"gravar na pasta dele ({erro}). Ele abre só para leitura.")
+    projeto.somente_leitura = projeto._travado = True
+    gv.proteger(projeto.pasta)
+    projeto.migracoes.guardar_a_v1_na_memoria(v1_vence=versao_de_antes < 2)
+    projeto.ordem.montar()
+
+
+# ----------------------------------------------------------------------
+# A página ilegível (`ProjetoDeLivro._isolar_a_ilegivel`)
+# ----------------------------------------------------------------------
+def _ainda_ilegivel(arquivo: Path) -> Optional[bytes]:
+    """Os bytes do arquivo, se ele continua ilegível; None se foi regravado agora mesmo
+    (vale o novo) ou se outra leitura já o isolou."""
+    try:
+        dados = arquivo.read_bytes()
+        pagina_de_json(json.loads(dados.decode("utf-8")))
+        return None
+    except FileNotFoundError:
+        return None
+    except ERROS_DE_PAGINA_ILEGIVEL:
+        return dados
+
+
+def _guardar_a_ilegivel(pid: int, arquivo: Path, dados: bytes) -> Optional[Path]:
+    """O arquivo inteiro em `p<pid>.corrompido[-N].json`, e ele sai; None se não deu."""
+    guardado, n = arquivo.with_name(f"p{pid}.corrompido.json"), 1
+    while guardado.exists():
+        n += 1
+        guardado = arquivo.with_name(f"p{pid}.corrompido-{n}.json")
+    try:
+        gv.gravar_bytes(guardado, dados)
+        gv.apagar(arquivo)
+    except OSError:
+        log.warning("a página p%d está ilegível e não foi guardada à parte", pid, exc_info=True)
+        return None
+    return guardado
+
+
+def _ilegivel_fora_do_livro(p: ProjetoDeLivro, pid: int, guardado: Optional[Path]) -> None:
+    livro = p.resumo.carregar()
+    if str(pid) in livro["paginas"] and (guardado is not None or p.somente_leitura):
+        if p.somente_leitura:           # só na memória; troca, não muda no lugar
+            p.resumo.tirar_da_memoria(pid)
+        else:
+            p.resumo.atualizar(pid, None)
+
+
+# ----------------------------------------------------------------------
+# Salvar a página (`ProjetoDeLivro.salvar_pagina`)
+# ----------------------------------------------------------------------
+def _outros_tabuleiros(pagina: Pagina, tabuleiros, lidos) -> bool:
+    """Os tabuleiros ou a leitura dos diagramas não são os da página."""
+    return ([list(t) for t in tabuleiros] != [list(t) for t in pagina.tabuleiros]
+            or [d.para_json() for d in lidos] != [d.para_json() for d in pagina.diagramas])
+
+
+def _estado_ao_salvar(pagina: Pagina, reconhecida: bool, reconheceu: bool, mudou: bool) -> str:
+    if not reconhecida:
+        # A página ainda não passou pelo F5 (ou o desfazer voltou a antes dele): é
+        # o "só glifos marcados" do v1, qualquer que fosse o estado gravado.
+        return GLIFOS_MARCADOS if pagina.boxes else NAO_RECONHECIDA
+    if reconheceu or pagina.estado in (NAO_RECONHECIDA, GLIFOS_MARCADOS):
+        return proximo_estado(pagina.estado, "reconhecer")
+    if mudou:
+        return proximo_estado(pagina.estado, "editar")
+    return pagina.estado

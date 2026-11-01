@@ -646,16 +646,7 @@ class VistaDoDocumento(QTextEdit):
     def _destaques_da_busca(self) -> list:
         if not self._busca:
             return []
-        lugar: Dict[int, tuple] = {}            # gid -> (posição, caracteres)
-        bloco = self.document().begin()
-        while bloco.isValid():
-            mapa = bloco.userData()
-            if isinstance(mapa, _MapaDoBloco):
-                for k, gid in enumerate(mapa.gids):
-                    if gid >= 0:
-                        inicio, n = lugar.get(gid, (bloco.position() + k, 0))
-                        lugar[gid] = (inicio, n + 1)
-            bloco = bloco.next()
+        lugar = _lugares_dos_gids(self.document())
         saida = []
         for n, gids in enumerate(self._busca):
             if gids[0] not in lugar or gids[-1] not in lugar:
@@ -714,13 +705,7 @@ class VistaDoDocumento(QTextEdit):
             self._origem = list(range(len(antes)))
             self._avisar_da_sessao()
             return
-        inicio = 0
-        limite = min(len(atual), len(antes))
-        while inicio < limite and atual[inicio] == antes[inicio]:
-            inicio += 1
-        fim = 0
-        while fim < limite - inicio and atual[-1 - fim] == antes[-1 - fim]:
-            fim += 1
+        inicio, fim = _trecho_mudado(atual, antes)
         a, b = ss.palavras_em(self._unidades, inicio, len(antes) - fim)
         if self._sessao is None:
             self._numero_da_sessao += 1
@@ -787,7 +772,7 @@ class VistaDoDocumento(QTextEdit):
             fixos = self._fixos(a, b)
         unidades = self._unidades[a:b]
         alvo = ss.gid_no_cursor(unidades, novo, posicao - a, fixos) if ensinar else None
-        ultimo = next((u.gid for u in reversed(unidades) if u.glifo), None)
+        ultimo = _ultimo_glifo(unidades)
         self._sessao, self._restaurada = None, None
         self.marca_ao_confirmar = _marca(self.toPlainText(), posicao)
         self._avisar_da_sessao()
@@ -820,8 +805,8 @@ class VistaDoDocumento(QTextEdit):
         texto = self.toPlainText()                  # o fim da palavra reaplicada
         self.marca_ao_confirmar = _marca(texto[:a] + novo, a + len(novo))
         self._avisar_da_sessao()
-        ultimo = next((u.gid for u in reversed(unidades) if u.glifo), None)
-        self.sessao_confirmada.emit(unidades, novo, False, None, ultimo, fixos, False)
+        self.sessao_confirmada.emit(unidades, novo, False, None, _ultimo_glifo(unidades), fixos,
+                                    False)
 
     def ir_a_proxima_duvidosa(self, depois_de: int) -> bool:
         """O cursor no começo da próxima palavra com um glifo duvidoso (pendente, sem
@@ -973,4 +958,35 @@ def _duvidosos(estados, desconhecidos) -> Set[int]:
     duvidosos = {g for g, e in (estados or {}).items()
                  if e in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO)}
     return duvidosos | set(desconhecidos)
+
+
+def _lugares_dos_gids(doc: QTextDocument) -> Dict[int, tuple]:
+    """gid -> (a posição do primeiro caractere dele, quantos caracteres), no documento."""
+    lugar: Dict[int, tuple] = {}
+    bloco = doc.begin()
+    while bloco.isValid():
+        mapa = bloco.userData()
+        if isinstance(mapa, _MapaDoBloco):
+            for k, gid in enumerate(mapa.gids):
+                if gid >= 0:
+                    inicio, n = lugar.get(gid, (bloco.position() + k, 0))
+                    lugar[gid] = (inicio, n + 1)
+        bloco = bloco.next()
+    return lugar
+
+
+def _trecho_mudado(atual: str, antes: str) -> tuple:
+    """(quantos caracteres iguais no começo, quantos no fim) entre o texto e o da montagem."""
+    inicio, limite = 0, min(len(atual), len(antes))
+    while inicio < limite and atual[inicio] == antes[inicio]:
+        inicio += 1
+    fim = 0
+    while fim < limite - inicio and atual[-1 - fim] == antes[-1 - fim]:
+        fim += 1
+    return inicio, fim
+
+
+def _ultimo_glifo(unidades) -> Optional[int]:
+    """O gid do último glifo das unidades da sessão (None sem glifo)."""
+    return next((u.gid for u in reversed(unidades) if u.glifo), None)
 

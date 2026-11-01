@@ -199,6 +199,51 @@ def test_outra_substituicao_tira_a_previa_velha(jb):  # noqa: F811
     assert "A prévia saiu" in jb.resultados.resultados.item(0).text()
 
 
+def test_substituir_sem_o_texto_volta_ao_campo_e_o_grupo_que_falta_avisa(jb):  # noqa: F811
+    from PySide6.QtWidgets import QApplication
+
+    _pagina_lida(jb, "casa velha")
+    _buscar(jb, "casa", regex=True)
+    _substituir_por(jb, r"\2")                            # a regex não tem o grupo 2
+    b = jb.barra_de_busca
+    b.substituto.setFocus()
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return)      # vai à 1ª ocorrência
+    _ate(lambda: b.contador.text() == "1 de 1")
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return)      # e não a troca
+    assert "Regex inválida" in jb.statusBar().currentMessage()
+    assert b.contador.text() == "erro" and _texto(jb) == "casa velha"
+    b.campo.clear()
+    b.substituto.setFocus()
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return)      # falta o que localizar: o campo
+    assert QApplication.focusWidget() is b.campo
+    _ate(lambda: not jb.busca.buscando and not b.relogio.isActive())
+
+
+def test_o_aviso_diz_os_passos_do_desfazer_que_sairam_para_a_troca_caber(jb):  # noqa: F811
+    from abbychess import historico as hs
+
+    jb.pagina.historico = hs.HistoricoDoProjeto(limite=1)    # o desfazer sem memória
+    _pagina_lida(jb, "casa velha casa")
+    _buscar(jb, "casa")
+    jb.barra_de_busca.escolher_escopo(bs.PAGINA)
+    _substituir_por(jb, "lata")
+    jb.substituir_todas()
+    _ate(lambda: _texto(jb) == "lata velha lata")
+    mensagens = []
+    jb.statusBar().messageChanged.connect(mensagens.append)
+    try:
+        _buscar(jb, "velha")
+        _substituir_por(jb, "nova")
+        jb.substituir_todas()
+        _ate(lambda: _texto(jb) == "lata nova lata")
+        _ate(lambda: any("Substituída(s) 1" in m for m in mensagens))
+    finally:
+        jb.statusBar().messageChanged.disconnect(mensagens.append)
+    feita = next(m for m in mensagens if "Substituída(s) 1" in m)
+    assert "1 passo(s) mais antigo(s) do desfazer saíram para esta caber" in feita
+    assert "Ctrl+Z desfaz" in feita
+
+
 def test_substituir_pula_o_ja_trocado_tambem_noutra_pagina(jb, monkeypatch):  # noqa: F811
     from dataclasses import replace
 

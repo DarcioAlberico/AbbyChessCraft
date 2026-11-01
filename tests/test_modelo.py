@@ -14,6 +14,8 @@ from abbychess.modelo import (EM_REVISAO, GLIFOS_MARCADOS, NAO_RECONHECIDA, RECO
                               n_de, pid_de, proximo_estado, reconciliar)
 from abbychess.zonas import Zona
 
+from tests.ajudantes import _lido
+
 
 def _e(x, char="a", y=10, largura=20):
     return BoxEntry(char, x, y, x + largura, y + 30, 0.9, "net")
@@ -325,3 +327,165 @@ def test_procedencia_aceita_o_callback_no_meio_de_registrar():
         gc.collect()                          # o callback roda aqui, na mesma thread
         procedencia.registrar(vivo, "padroes/b.png")
     assert procedencia.amostra_de(vivo) == "padroes/b.png"
+
+
+# ----------------------------------------------------------------------
+# As regras que a mutação achou sem teste (Q9, CA-Q-M1)
+# ----------------------------------------------------------------------
+
+def _blocos_de(pagina) -> list:
+    """O documento da página: o texto de cada bloco, e o id de cada diagrama."""
+    doc = tx.montar(pagina)
+    return [b.diagrama_id or tx.texto_do_bloco(doc, b) for b in doc.blocos]
+
+
+def test_os_lances_colados_partem_ate_numa_palavra_de_quatro_glifos():
+    """"e52." (a resposta e o número do lance seguinte, colados): quatro glifos já bastam."""
+    assert tx.texto(tx.montar(_pagina(*_linha("1.e4 e52. Cf3")))) == "1.e4 e5 2. Cf3"
+
+
+def test_os_diagramas_no_mesmo_lugar_vao_de_cima_para_baixo_e_da_esquerda_para_a_direita():
+    direita, baixo, esquerda = (_lido(caixa=c) for c in ((220, 0, 420, 200), (0, 220, 150, 420),
+                                                         (0, 0, 200, 200)))
+    pagina = tx.pagina_avulsa(_linha("Embaixo", y=450), [direita, baixo, esquerda])  # d0, d1, d2
+    assert _blocos_de(pagina) == ["d2", "d0", "d1", "Embaixo"]
+    # Os que o documento não tem são numerados depois dos dele, na mesma ordem.
+    sem_diagramas = tx.montar(_pagina(*_linha("nada")))
+    assert tx.numeros_dos_diagramas(sem_diagramas, pagina.diagramas) == {"d2": 1, "d0": 2, "d1": 3}
+
+
+def test_o_diagrama_entra_na_coluna_dele():
+    linhas = []
+    for k, y in enumerate((10, 50, 90, 210, 250, 290, 330)):
+        linhas += _linha(f"esquerda longa {k}", y=y) + _linha(f"direita {k}", y=y, x0=700)
+    pagina = tx.pagina_avulsa(linhas, [_lido(caixa=(100, 130, 300, 200)),
+                                       _lido(caixa=(650, 130, 750, 200))])
+    esquerda = [f"esquerda longa {k}" for k in range(7)]
+    direita = [f"direita {k}" for k in range(7)]
+    assert _blocos_de(pagina) == ["\n".join(esquerda[:3]), "d0",
+                                  "\n".join(esquerda[3:] + direita[:3]), "d1",
+                                  "\n".join(direita[3:])]
+
+
+def test_a_linha_ate_uma_altura_de_glifo_acima_do_diagrama_vem_depois_dele():
+    """A linha que começa até uma altura de glifo (30 px) acima do tabuleiro está na altura
+    dele: o diagrama entra antes dela; um pixel mais acima, depois."""
+    for topo, esperado in ((70, ["Antes.", "d0", "logo acima\ndepois"]),
+                           (69, ["Antes.\nlogo acima", "d0", "depois"])):
+        pagina = tx.pagina_avulsa(_linha("Antes.") + _linha("logo acima", y=topo)
+                                  + _linha("depois", y=600), [_lido(caixa=(0, 100, 400, 500))])
+        assert _blocos_de(pagina) == esperado
+
+
+def test_o_diagrama_ao_lado_do_paragrafo_espera_o_fim_da_frase():
+    """O parágrafo que contorna o tabuleiro não é partido no meio: o diagrama entra depois da
+    primeira linha ao lado dele que segue um fim de frase (nunca antes da primeira da
+    página), colada a ele de um lado ou do outro; a linha que começa no pé dele não está ao
+    lado."""
+    from dataclasses import replace
+
+    ao_lado = (_linha("que segue longe", y=100) + _linha("e acaba.", y=140)
+               + _linha("Outra frase", y=180))
+    contornado = ["Começo sem\nque segue longe\ne acaba.", "d0", "Outra frase"]
+    d = _lido(caixa=(400, 100, 800, 500))
+    assert _blocos_de(tx.pagina_avulsa(_linha("Começo sem") + ao_lado, [d])) == contornado
+    assert _blocos_de(tx.pagina_avulsa(_linha("Título.") + ao_lado, [d])) == [
+        "Título.", "d0", "que segue longe\ne acaba.\nOutra frase"]
+    no_pe = _linha("no pé", y=500) + _linha("mais", y=540)
+    assert _blocos_de(tx.pagina_avulsa(_linha("Começo sem") + no_pe, [d])) == [
+        "Começo sem", "d0", "no pé\nmais"]
+    x1 = max(e.x2 for e in ao_lado)
+    colado = _lido(caixa=(x1, 100, x1 + 400, 500))
+    assert _blocos_de(tx.pagina_avulsa(_linha("Começo sem") + ao_lado, [colado])) == contornado
+    a_direita = [replace(e, x1=e.x1 + 290, x2=e.x2 + 290) for e in ao_lado]
+    assert min(e.x1 for e in a_direita) == 300
+    a_esquerda = _lido(caixa=(10, 100, 300, 500))
+    assert _blocos_de(tx.pagina_avulsa(_linha("Começo sem") + a_direita, [a_esquerda])) == contornado
+
+
+def test_o_virtual_ancorado_num_mais_novo_ou_num_ciclo():
+    """A âncora virtual entra antes de quem se ancora nela, mesmo vindo depois na ordem das
+    decisões (`ancorar` muda a âncora, não a ordem); com as duas âncoras, vale o depois_de;
+    no ciclo, um vai para o começo da primeira linha e ninguém se perde; o sem âncora, com
+    palavra nova, é uma palavra no começo."""
+    from abbychess import edicao as ed
+
+    p = _pagina(*_linha("abc"))
+    a, c = p.boxes[0].gid, p.boxes[2].gid
+    _, z = ed.virtual(p, "Z", a)
+    _, x = ed.virtual(p, "X", a)
+    ed.ancorar(p, {z: (None, x, False)})               # antes do X, que é mais novo
+    assert tx.texto(tx.montar(p)) == "aZXbc"
+    ed.ancorar(p, {z: (x, c, False)})                  # depois do X e antes do c
+    assert tx.texto(tx.montar(p)) == "aXZbc"
+
+    p = _pagina(*_linha("abc"))
+    _, x = ed.virtual(p, "X", p.boxes[0].gid)
+    _, y = ed.virtual(p, "Y", x)
+    ed.ancorar(p, {x: (y, None, False)})               # X depois do Y, Y depois do X
+    assert tx.texto(tx.montar(p)) == "YXabc"
+
+    p = _pagina(*_linha("abc de"))
+    ed.virtual(p, "Z", None, palavra_nova=True)
+    assert tx.texto(tx.montar(p)) == "Z abc de"
+
+
+def test_a_area_sem_ordem_fica_no_lugar():
+    p = _pagina(*_linha("titulo"), *_linha("corpo", y=60), *_linha("resto", y=160))
+    p.zonas = [Zona("texto", 0, 0, 400, 45, id="z0", funcao="titulo", ordem=1),
+               Zona("texto", 0, 50, 400, 150, id="z1", ordem=0),
+               Zona("texto", 0, 155, 400, 250, id="z2")]
+    assert [(b.zona_id, b.funcao) for b in tx.montar(p).blocos] == [
+        ("z1", "texto"), ("z0", "titulo"), ("z2", "texto")]
+
+
+def test_o_texto_tem_uma_linha_por_diagrama():
+    pagina = tx.pagina_avulsa(_linha("Observe:") + _linha("1.e4 e5", y=520),
+                              [_lido(caixa=(0, 100, 400, 500))])
+    doc = tx.montar(pagina)
+    assert tx.texto(doc, pagina.diagramas) == (
+        "Observe:\n" + pagina.diagramas[0].linha_de_texto(1) + "\n1.e4 e5")
+    assert tx.texto(doc) == "Observe:\n1.e4 e5"          # sem os diagramas, só as linhas
+
+
+def test_as_palavras_da_vista_tem_o_glifo_nao_lido():
+    """A vista do Documento (e a ordem da camada exportada) conta o glifo que ninguém leu."""
+    p = _pagina(*_linha("ab"), _e(54, ""), *_linha("c", x0=76))
+    assert tx.palavras_dos_gids(p) == [[b.gid for b in p.boxes]]
+
+
+def _com_lacunas(*partes, y=3300):
+    """Uma linha de boxes de largura 16 (a p. 15 do Aagaard): cada parte é `(texto, lacuna
+    antes)`, e dentro da parte as letras ficam a 2 px umas das outras."""
+    boxes, x = [], 200
+    for texto, antes in partes:
+        x += antes
+        for c in texto:
+            boxes.append(BoxEntry(c, x, y, x + 16, y + 25, 1.0, "manual"))
+            x += 18
+        x -= 2
+    return boxes
+
+
+def test_a_correcao_que_muda_as_palavras_do_core_monta_as_linhas_de_novo():
+    """As linhas guardadas só valem para a correção que não muda as palavras do core: o
+    algarismo que vira pontuação desfaz o número que o core remontou ("15" -> "1 §"), a
+    letra que vira "f" ganha o espaço do gancho dele ("oithe" -> "of the"), e a vírgula
+    depois do "f" que era "a," (as duas numa caixa só) também ("of," -> "of a,")."""
+    from abbychess import edicao as ed
+
+    p = _pagina(*_linha("Nota 1 5"))
+    assert tx.texto(tx.montar(p)) == "Nota 15"
+    ed.corrigir(p, p.boxes[-1].gid, "§")
+    assert tx.texto(tx.montar(p)) == "Nota 1 §"
+
+    # Três "f" com o gancho sobre a letra seguinte: o gancho do livro vale.
+    gancho = (("af", 20), ("ter", -3), ("f", 20), ("or", -3), ("f", 20), ("ar", -3))
+    p = tx.pagina_avulsa(_com_lacunas(("Depth", 0), ("oi", 20), ("the", 6), *gancho))
+    assert tx.texto(tx.montar(p)) == "Depth oithe after for far"
+    ed.corrigir(p, p.boxes[6].gid, "f")
+    assert tx.texto(tx.montar(p)) == "Depth of the after for far"
+    p = tx.pagina_avulsa(_com_lacunas(("Depth", 0), ("of", 20), (",", 6), *gancho))
+    assert tx.texto(tx.montar(p)) == "Depth of, after for far"
+    ed.corrigir(p, p.boxes[7].gid, "a,")
+    assert tx.texto(tx.montar(p)) == "Depth of a, after for far"

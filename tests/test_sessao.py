@@ -8,6 +8,8 @@ as operações estruturais do passo G; e as figurinhas (CA-6.7).
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from core.box_model import BoxEntry
 
@@ -280,14 +282,21 @@ def test_colar_a_pagina_inteira_alinha_pelos_trechos_iguais():
 # Fechamento do passo G: juntar ou dividir boxes e mexer nas palavras numa edição só
 # ----------------------------------------------------------------------
 
+#: A fonte da página impressa: a Times New Roman do Windows.
+FONTE_TIMES = Path("C:/Windows/Fonts/times.ttf")
+
+
 def _pagina_impressa(texto):
     """Uma página com o texto impresso em Times (tinta de verdade), um box por letra."""
     import numpy as np
     from PIL import Image, ImageDraw, ImageFont
 
+    if not FONTE_TIMES.exists():
+        # Outra fonte daria outra tinta e outros boxes: o teste pula, não muda.
+        pytest.skip("a Times New Roman não está nesta máquina")
     imagem = Image.new("L", (600, 120), 255)
     desenho = ImageDraw.Draw(imagem)
-    fonte = ImageFont.truetype("times.ttf", 50)
+    fonte = ImageFont.truetype(str(FONTE_TIMES), 50)
     x, boxes = 20, []
     for c in texto:
         if c == " ":

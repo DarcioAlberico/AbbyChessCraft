@@ -595,3 +595,236 @@ def test_refazer_noutra_pagina_abre_a_do_enter_e_propaga(app, tmp_path, monkeypa
         assert sum(b.source == FONTE_LIVRO for b in boxes(j)) >= 1   # propagou de novo
     finally:
         j.close()
+
+
+# ----------------------------------------------------------------------
+# As regras que a mutação achou sem teste (Q9, CA-Q-M1)
+# ----------------------------------------------------------------------
+
+def _registrada(transacao, limite=hs.LIMITE_DE_MEMORIA):
+    h = hs.HistoricoDoProjeto(limite)
+    h.registrar(transacao)
+    return h
+
+
+def _desfazer(m, pagina):
+    hs.conferir(m, pagina, para_tras=True)
+    hs.aplicar(m, pagina, para_tras=True)
+
+
+def test_o_desfazer_guarda_ate_50_mb():
+    """SPEC §14.2: o desfazer do projeto vai até 50 MB."""
+    assert hs.HistoricoDoProjeto().limite == 50 * 2**20
+
+
+def test_a_estimativa_de_memoria_de_cada_parte_da_transacao():
+    """O limite conta a estimativa do histórico (`bytes`): 600 bytes por glifo guardado, no
+    antes e no depois; 5 × 32 pelos vizinhos de cada um que sai ou nasce; 36 por gid de uma
+    ordem refeita; o valor e 4000 por item de um campo; 96 por página da sequência; 600 por
+    glifo e 4000 por página trocada inteira; 64 por gid movido; e o PNG das amostras."""
+    import sys
+    from pathlib import Path
+
+    from abbychess import edicao as ed
+    from abbychess.modelo import RECONHECIDA
+    from abbychess.padroes import Amostra
+    from abbychess.sequencia import Sequencia
+
+    p = _pagina("abcd")
+    corrigidos = _transacao(p, lambda pg: [ed.corrigir(pg, b.gid, "z") for b in pg.boxes[:2]])
+    assert _registrada(corrigidos).bytes == 2 * 2 * 600
+    apagado = _transacao(p, lambda pg: ed.descartar(pg, pg.boxes[1].gid))
+    assert _registrada(apagado).bytes == 2 * 600 + 5 * 32
+    novo = Box((1 << 20) | 9, BoxEntry("x", 50, 0, 58, 9))
+    nascido = _transacao(p, lambda pg: setattr(pg, "boxes", pg.boxes + [novo]))
+    assert _registrada(nascido).bytes == 2 * 600 + 5 * 32
+    # z c d x -> c z x: o "d" sai e a ordem muda (4 gids antes, 3 depois).
+    reordenado = _transacao(p, lambda pg: setattr(pg, "boxes", [pg.boxes[1], pg.boxes[0],
+                                                                pg.boxes[3]]))
+    assert _registrada(reordenado).bytes == 2 * 600 + 5 * 32 + (4 + 3) * 36
+    estado = p.estado
+    reconhecida = _transacao(p, lambda pg: setattr(pg, "estado", RECONHECIDA))
+    assert _registrada(reconhecida).bytes == sum(sys.getsizeof(v) + 4000
+                                                 for v in (estado, RECONHECIDA))
+
+    livro = Sequencia.do_livro([1, 2, 3])
+    apagar = hs.Transacao("Apagar a página 2", sequencia=(livro, livro.apagar([2])))
+    assert _registrada(apagar).bytes == (3 + 0 + 2 + 1) * 96
+    dividir = hs.Transacao("Dividir a página", inteiras={2: (None, _pagina("abc", pid=2))},
+                           movidos=({"1": 5}, {"1": 5, "2": 6}))
+    assert _registrada(dividir).bytes == 3 * 600 + 4000 + (1 + 2) * 64
+    ensinar = hs.Transacao("Ensinar", amostras_criadas=[Amostra(Path("a.png"), b"a" * 100, {})],
+                           amostras_apagadas=[Amostra(Path("b.png"), b"b" * 30, {})])
+    assert _registrada(ensinar).bytes == 130
+
+
+def test_a_transacao_que_cresce_e_medida_de_novo_sem_contar_duas_vezes():
+    """A propagação emendada e os Alt+seta juntados refazem a estimativa da transação (não
+    a somam à de antes); a propagação que chega depois de a transação sair não conta."""
+    from abbychess import edicao as ed
+
+    p = _pagina()
+    h = hs.HistoricoDoProjeto()
+    t = h.registrar(_transacao(p, lambda pg: ed.corrigir(pg, pg.boxes[0].gid, "z")))
+    foto = p.instantaneo()
+    ed.corrigir(p, p.boxes[1].gid, "y")                # o que a propagação resolveu
+    hs.emendar(t.paginas[1], hs.mudanca(foto, p.instantaneo()))
+    h.emendou(t)
+    assert h.bytes == 2 * 2 * 600
+    for c in "xw":
+        h.registrar(_transacao(p, lambda pg, c=c: ed.corrigir(pg, pg.boxes[2].gid, c),
+                               juntar=("ajustar", 3)))
+    assert h.passos == 2 and h.bytes == 2 * 2 * 600 + 2 * 600
+    h.descartar_desfazer()
+    h.descartar_desfazer()
+    h.emendou(t)                                       # já fora do desfazer
+    assert h.bytes == 0
+
+
+def test_a_ultima_transacao_fica_mesmo_maior_que_o_limite():
+    from abbychess import edicao as ed
+
+    p = _pagina()
+    h = hs.HistoricoDoProjeto(limite=1)
+    for c in "zy":
+        h.registrar(_transacao(p, lambda pg, c=c: ed.corrigir(pg, pg.boxes[0].gid, c),
+                               f"Corrigir para '{c}'"))
+    assert h.passos == 1 and h.proximo_a_desfazer == "Corrigir para 'y'"
+
+
+def test_o_lote_ve_as_paginas_que_o_desfazer_ou_o_refazer_mudam():
+    """O lote não grava por cima de uma página que o Ctrl+Z ou o Ctrl+Y mudariam (§11); a
+    ação tirada do refazer e o histórico limpo não a seguram mais."""
+    from abbychess import edicao as ed
+
+    p = _pagina()
+    h = hs.HistoricoDoProjeto()
+    assert not h.toca(1)
+    h.registrar(_transacao(p, lambda pg: ed.corrigir(pg, pg.boxes[0].gid, "z")))
+    assert h.toca(1) and not h.toca(2)
+    h.desfeita()
+    assert h.toca(1)                                   # no refazer
+    h.descartar_refazer()
+    assert not h.toca(1) and h.proximo_a_refazer is None and h.bytes == 0
+    h.descartar_refazer()                              # sem nada para tirar
+    h.registrar(_transacao(p, lambda pg: ed.corrigir(pg, pg.boxes[1].gid, "y")))
+    h.limpar()
+    assert h.passos == 0 and h.bytes == 0 and not h.toca(1)
+
+
+def test_a_versao_da_pagina_nunca_volta_a_um_valor_que_ja_teve():
+    """O lote compara a versão da página antes e depois de ler (§11): cada mudança, por
+    dentro ou por fora do desfazer, dá uma versão que a página nunca teve; a das outras
+    páginas não muda."""
+    from abbychess import edicao as ed
+
+    p = _pagina()
+    h = hs.HistoricoDoProjeto()
+    vistas, outra = [h.versao(1)], h.versao(2)
+    h.tocar(1)
+    vistas.append(h.versao(1))
+    t = h.registrar(_transacao(p, lambda pg: ed.corrigir(pg, pg.boxes[0].gid, "z")))
+    vistas.append(h.versao(1))
+    for mudar in (lambda: h.tocar(1), h.desfeita, h.refeita, lambda: h.emendou(t)):
+        mudar()
+        vistas.append(h.versao(1))
+    assert len(set(vistas)) == len(vistas) == 7 and h.versao(2) == outra
+
+
+def test_o_glifo_que_a_transacao_criou_ou_apagou_e_mudou_por_fora_recusa():
+    from abbychess import edicao as ed
+
+    p = _pagina(pid=2)                                 # a página 2 do livro
+    novo = Box((2 << 20) | 9, BoxEntry("x", 40, 0, 48, 9))
+    m = _transacao(p, lambda pg: setattr(pg, "boxes", pg.boxes + [novo])).paginas[2]
+    p.boxes = p.boxes[:-1]                             # o glifo novo saiu por fora
+    with pytest.raises(hs.Recusa) as recusa:
+        hs.conferir(m, p, para_tras=True)
+    assert str(recusa.value) == ("1 glifo(s) da página 2 mudaram depois (por outra ação, que "
+                                 "não passou por este desfazer)")
+    apagado = p.boxes[0]
+    m = _transacao(p, lambda pg: ed.descartar(pg, apagado.gid)).paginas[2]
+    p.boxes = [apagado] + p.boxes                      # e o apagado voltou por fora
+    with pytest.raises(hs.Recusa):
+        hs.conferir(m, p, para_tras=True)
+
+
+def test_a_leitura_que_chega_depois_nao_impede_o_desfazer():
+    """§11: o glifo novo fica aguardando leitura, e o servidor o lê depois, fora do desfazer.
+    A leitura não é decisão de ninguém: o Ctrl+Z ainda tira o glifo. A leitura manual, a que
+    mexeu na caixa e a releitura de um glifo que já estava lido são outra ação: recusam."""
+    from abbychess import edicao as ed
+
+    casos = [("", dict(char="x", source=FONTE_LIVRO), True),
+             ("", dict(char="x", source=FONTE_MANUAL), False),
+             ("", dict(char="x", source=FONTE_LIVRO, x2=49), False),
+             ("x", dict(char="y", source=FONTE_LIVRO), False)]
+    for char, leitura, aceita in casos:
+        p = _pagina()
+        inicial = list(p.boxes)
+        novo = Box((1 << 20) | 9, BoxEntry(char, 40, 0, 48, 9, 1.0, FONTE_LIVRO if char else ""))
+        m = _transacao(p, lambda pg: setattr(pg, "boxes", pg.boxes + [novo])).paginas[1]
+        lido = ed.copia(novo.entry)
+        for campo, valor in leitura.items():
+            setattr(lido, campo, valor)
+        antes = tuple(p.boxes)
+        ed.aplicar_leituras(p, antes, [lido if b is novo else b.entry for b in antes])
+        assert p.boxes[-1].entry.char == leitura["char"]
+        if aceita:
+            _desfazer(m, p)
+            assert p.boxes == inicial
+        else:
+            with pytest.raises(hs.Recusa):
+                hs.conferir(m, p, para_tras=True)
+
+
+def test_emendar_guarda_o_lugar_do_glifo_do_enter_que_a_propagacao_descartou():
+    """O Enter corrige o "b", e a propagação o descarta e corrige o "c": desfazer devolve o
+    "b" no lugar dele (não no começo da página) e o "c" como era."""
+    from abbychess import edicao as ed
+
+    p = _pagina("abcd")
+    inicial = list(p.boxes)
+    t = _transacao(p, lambda pg: ed.corrigir(pg, pg.boxes[1].gid, "z"))
+    foto = p.instantaneo()
+    ed.descartar(p, p.boxes[1].gid)
+    ed.corrigir(p, p.boxes[1].gid, "y")                # agora o "c"
+    hs.emendar(t.paginas[1], hs.mudanca(foto, p.instantaneo()))
+    m = t.paginas[1]
+    _desfazer(m, p)
+    assert p.boxes == inicial
+    hs.conferir(m, p, para_tras=False)
+    hs.aplicar(m, p, para_tras=False)
+    assert [b.entry.char for b in p.boxes] == ["a", "y", "d"]
+
+
+def test_desfazer_a_ordem_refeita_guarda_os_glifos_de_uma_edicao_feita_depois():
+    """Marcar um quadro refaz a ordem da página; desfazer a devolve, e os glifos que outra
+    ação pôs depois ficam: o do meio logo depois de quem vinha antes dele, o do começo no
+    começo."""
+    p = _pagina("abcd")
+    novo = Box((1 << 20) | 9, BoxEntry("x", 0, 50, 8, 59))
+    m = _transacao(p, lambda pg: setattr(pg, "boxes", [pg.boxes[2], pg.boxes[0], novo,
+                                                       pg.boxes[3]])).paginas[1]
+    c, a, x, d = p.boxes
+    w, z = (Box((1 << 20) | k, BoxEntry(char, 0, 70, 8, 79)) for k, char in ((10, "w"), (11, "Z")))
+    p.boxes = [w, c, a, z, x, d]                       # por fora
+    _desfazer(m, p)
+    assert [b.entry.char for b in p.boxes] == ["w", "a", "b", "Z", "c", "d"]
+
+
+def test_desfazer_devolve_na_ordem_os_glifos_que_o_enter_e_a_propagacao_descartaram():
+    """O Enter descarta o "e", e a propagação, os três antes dele: desfazer devolve cada um
+    depois do vizinho dele, a começar do mais perto do "a" (o "e" guardou só os três
+    vizinhos, e nenhum deles estaria na página se ele voltasse primeiro)."""
+    from abbychess import edicao as ed
+
+    p = _pagina("abcdef")
+    inicial = list(p.boxes)
+    t = _transacao(p, lambda pg: ed.descartar(pg, pg.boxes[4].gid))
+    foto = p.instantaneo()
+    for gid in [b.gid for b in p.boxes[1:4]]:
+        ed.descartar(p, gid)
+    hs.emendar(t.paginas[1], hs.mudanca(foto, p.instantaneo()))
+    _desfazer(t.paginas[1], p)
+    assert p.boxes == inicial

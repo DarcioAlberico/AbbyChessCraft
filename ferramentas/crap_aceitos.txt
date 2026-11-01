@@ -6,9 +6,6 @@
 # Uma linha por função: arquivo Classe.funcao  # o motivo
 
 abbychess/app/acoes.py _menus  # a reduzir (Q8)
-abbychess/app/busca_na_janela.py BuscaNaJanela._andar  # a reduzir (Q8)
-abbychess/app/busca_na_janela.py BuscaNaJanela._busca_terminou  # a reduzir (Q8)
-abbychess/app/busca_na_janela.py BuscaNaJanela._buscar  # a reduzir (Q8)
 abbychess/app/dialogos.py intervalo_do_lote  # a reduzir (Q8)
 abbychess/app/dialogos.py novo_projeto  # a reduzir (Q8)
 abbychess/app/dialogos.py paginas_do_modelo_de_areas  # a reduzir (Q8)

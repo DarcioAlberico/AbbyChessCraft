@@ -27,10 +27,10 @@ def f(a, b):
 
 
 def _linhas_mutadas(fonte):
-    originais = fonte.splitlines()
+    originais = fonte.split("\n")                # as linhas do Python: só o \n as parte
     saida = set()
     for m in mutador.mutantes(fonte):
-        novas = m.aplicar(fonte).splitlines()
+        novas = m.aplicar(fonte).split("\n")
         assert len(novas) == len(originais), m
         [k] = [k for k, (a, b) in enumerate(zip(originais, novas)) if a != b]
         assert k + 1 == m.linha, m
@@ -68,6 +68,13 @@ def test_os_mutantes_de_atribuicao_comparacao_de_identidade_e_laco():
         (5, "            continue"),
         (6, "    return False"),
     }
+
+
+def test_o_separador_de_paragrafo_numa_string_nao_parte_a_linha():
+    """O U+2029 (o parágrafo do Qt, escrito como está numa string do `sessao`) é fim de linha
+    para o `str.splitlines`, mas não para o tokenizador nem para o AST."""
+    fonte = 'SEP = " "\n\n\ndef h(a):\n    return a + 1\n'
+    assert _linhas_mutadas(fonte) == {(5, "    return a - 1"), (5, "    return a + 2")}
 
 
 def test_a_rodada_de_cada_mutante_vira_morto_sobreviveu_ou_tempo():

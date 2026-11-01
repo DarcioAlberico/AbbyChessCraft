@@ -162,16 +162,8 @@ def _apagar_virtual(pagina, _imagem, i, _j, _c):
     if gid is None:
         return None
     antes, ordem = list(pagina.boxes), _ordem(pagina)
-    saiu = next(v for v in pagina.decisoes.virtuais if v.gid == gid)
-    mudam = any(gid in (v.depois_de, v.antes_de) for v in pagina.decisoes.virtuais)
-    irmaos = any(v.gid != gid and (v.depois_de, v.antes_de) == (saiu.depois_de, saiu.antes_de)
-                 for v in pagina.decisoes.virtuais)
     ed.apagar_virtual(pagina, gid)
     assert gid not in _virtuais(pagina) and pagina.boxes == antes
-    if mudam and irmaos:
-        # O ancorado no que sai vai para a âncora dele, na frente do outro que já estava lá
-        # ("a213" sem o 1 dá "a32"): o defeito relatado no Q-T6, fora da lei até a correção.
-        return
     assert _ordem(pagina) == [g for g in ordem if g != gid]
 
 
@@ -256,6 +248,22 @@ def test_dividir_em_tres_deixa_as_letras_digitadas_lado_a_lado():
     imagem, pagina = pagina_sintetica(1)
     ed.dividir_em(pagina, imagem, pagina.boxes[0].gid, "xyz")
     assert "\n" not in tx.texto(tx.montar(pagina))
+
+
+def test_tirar_um_virtual_nao_muda_a_ordem_dos_outros():
+    """O exemplo mínimo que a propriedade achou (Q-T6): o "3" ancorado no "1" que sai vai para
+    a âncora dele, que já tinha o "2"; ele entrava na frente ("a32"), como se fosse o mais
+    novo dela."""
+    lei_das_edicoes(1, [("virtual", 0, 0, "x"), ("virtual", 0, 0, "x"), ("virtual", 1, 0, "x"),
+                        ("apagar_virtual", 0, 0, "x")])
+    _imagem, pagina = pagina_sintetica(1)
+    a = pagina.boxes[0].gid
+    _d, um = ed.virtual(pagina, "1", a)
+    ed.virtual(pagina, "2", a)
+    ed.virtual(pagina, "3", um)
+    assert tx.texto(tx.montar(pagina)) == "a213"
+    ed.apagar_virtual(pagina, um)
+    assert tx.texto(tx.montar(pagina)) == "a23"
 
 
 test_as_edicoes_mantem_a_pagina_e_voltam_no_desfazer, \

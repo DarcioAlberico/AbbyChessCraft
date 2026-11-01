@@ -57,7 +57,8 @@ def test_enter_ensina_e_resolve_as_repeticoes(app, janela):  # noqa: F811
     assert boxes(janela)[0].source == FONTE_MANUAL
     assert sum(b.source == FONTE_LIVRO for b in boxes(janela)) == 4
     assert len(fila(janela)) == pendentes_antes - 5
-    assert "a" in janela.padroes._padroes
+    lista = janela.padroes.caracteres                    # a aba Padrões mostra a amostra
+    assert [lista.item(n).text() for n in range(lista.count())] == ["a    1"]
     # A página gravada já tem a decisão: fechar agora não perde nada.
     assert janela.projeto.carregar_pagina(0)[0].source == FONTE_MANUAL
 

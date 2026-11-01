@@ -177,9 +177,6 @@ class ControladorDaSequencia:
         aviso). Nada é medido aqui (seria um render por página, na thread da interface): a
         direita recebe o ângulo guardado da página, e sem ele mede o mesmo, da mesma página
         inteira, quando abrir."""
-        from abbychess import geometria as geo
-        from abbychess import geometria_do_modelo as gm
-
         fracao = float(fracao)
         if not 0 < fracao < 1:
             self._p._avisar("Dividir páginas: a divisão fica dentro da página.", 6000)
@@ -196,41 +193,14 @@ class ControladorDaSequencia:
                 if e.metade is not None:
                     metades += 1
                     continue
-                tamanho = e.tamanho or self._tamanho(e)
-                largura, altura = geo.tamanho_da_imagem(e.geometria, tamanho)
-                corte = round(fracao * largura)
-                if not 0 < corte < largura:
-                    raise ValueError(f"a página {s.posicao_de(pid) + 1} é estreita demais")
-                pid_novo = projeto.ordem.novo_pid()
-                esquerda = replace(e, metade="esquerda", tamanho=tamanho,
-                                   quadro=geo.quadro_da_vista((0, 0, corte, altura),
-                                                              e.geometria, tamanho))
-                direita = replace(e, pid=pid_novo, metade="direita", tamanho=tamanho,
-                                  quadro=geo.quadro_da_vista((corte, 0, largura, altura),
-                                                             e.geometria, tamanho))
+                esquerda, direita, divididas = self._dividir_a_pagina(s, e, fracao)
                 nova = nova.com_entrada(esquerda)
                 nova = nova.inserir([direita], nova.posicao_de(pid) + 1)
-                pagina = projeto.carregar_modelo(s.posicao_de(pid))
-                if pagina is None:
-                    paginas[pid] = paginas[pid_novo] = (None, None)
-                else:
-                    pagina_e, pagina_d, m = gm.dividir(pagina, corte, esquerda.geometria,
-                                                       direita.geometria, tamanho, pid_novo)
-                    paginas[pid] = (pagina.instantaneo(), pagina_e)
-                    paginas[pid_novo] = (None, pagina_d)
-                    movidos.update({str(velho): novo for velho, novo in m.items()})
-                    # Os boxes da direita estão no ângulo em que a página foi lida (o
-                    # guardado; sem ele, a direita mede o mesmo, da mesma página inteira).
-                    guardado = self._p.fonte.inclinacao_guardada(e)
-                    if guardado is not None:
-                        angulos.append((direita, guardado))
+                self._guardar_as_divididas(e, direita, divididas, paginas, movidos, angulos)
             if metades and nova == s:
                 raise ValueError("as páginas escolhidas já são metades de uma divisão")
             if metades:
-                nota.append(f"{sq.quantas_paginas(metades)} já "
-                            f"{'era metade' if metades == 1 else 'eram metades'}, e "
-                            f"{'ficou' if metades == 1 else 'ficaram'} como "
-                            f"{'estava' if metades == 1 else 'estavam'}")
+                nota.append(_nota_das_metades(metades))
             troca.update(paginas=paginas, movidos=(dict(projeto.dados.gids_movidos), movidos))
             return nova
 
@@ -332,6 +302,49 @@ class ControladorDaSequencia:
             for entrada, _angulo in angulos:
                 self._p.cache.esquecer(entrada)
 
+    def _dividir_a_pagina(self, s: sq.Sequencia, e, fracao: float) -> tuple:
+        """As entradas das duas metades da página `e` cortada em `fracao` da largura do que se
+        vê (a direita com um `pid` novo) e (a página, gm.dividir dela), ou None sem nada
+        gravado; `ValueError` se a página é estreita demais."""
+        from abbychess import geometria as geo
+        from abbychess import geometria_do_modelo as gm
+
+        projeto = self._p.projeto
+        tamanho = e.tamanho or self._tamanho(e)
+        largura, altura = geo.tamanho_da_imagem(e.geometria, tamanho)
+        corte = round(fracao * largura)
+        if not 0 < corte < largura:
+            raise ValueError(f"a página {s.posicao_de(e.pid) + 1} é estreita demais")
+        pid_novo = projeto.ordem.novo_pid()
+        esquerda = replace(e, metade="esquerda", tamanho=tamanho,
+                           quadro=geo.quadro_da_vista((0, 0, corte, altura),
+                                                      e.geometria, tamanho))
+        direita = replace(e, pid=pid_novo, metade="direita", tamanho=tamanho,
+                          quadro=geo.quadro_da_vista((corte, 0, largura, altura),
+                                                     e.geometria, tamanho))
+        pagina = projeto.carregar_modelo(s.posicao_de(e.pid))
+        divididas = None if pagina is None else (
+            pagina, gm.dividir(pagina, corte, esquerda.geometria, direita.geometria, tamanho,
+                               pid_novo))
+        return esquerda, direita, divididas
+
+    def _guardar_as_divididas(self, e, direita, divididas, paginas: dict, movidos: dict,
+                              angulos: list) -> None:
+        """As páginas de antes e de depois, os gids que mudaram de página e o ângulo da
+        direita, para a transação."""
+        if divididas is None:
+            paginas[e.pid] = paginas[direita.pid] = (None, None)
+            return
+        pagina, (pagina_e, pagina_d, m) = divididas
+        paginas[e.pid] = (pagina.instantaneo(), pagina_e)
+        paginas[direita.pid] = (None, pagina_d)
+        movidos.update({str(velho): novo for velho, novo in m.items()})
+        # Os boxes da direita estão no ângulo em que a página foi lida (o
+        # guardado; sem ele, a direita mede o mesmo, da mesma página inteira).
+        guardado = self._p.fonte.inclinacao_guardada(e)
+        if guardado is not None:
+            angulos.append((direita, guardado))
+
     def _mudar_sequencia(self, fazer, descricao: str, *, desfeita=None,
                          depois_de_gravar=None, troca: Optional[dict] = None,
                          nota: Sequence[str] = ()) -> bool:
@@ -350,14 +363,8 @@ class ControladorDaSequencia:
             # A sessão do Documento aberta entra antes: `fazer` olha quais páginas têm boxes.
             self._p.antes_de_sair_da_pagina()
         antes = self._p.projeto.sequencia
-        try:
-            nova = fazer(antes)
-        except (ValueError, IndexError) as erro:
-            self._p._avisar(f"{descricao}: {erro}.", AVISO_LONGO_MS)
-            return False
-        except (OSError, RuntimeError) as erro:   # a fonte ilegível (o tamanho, o ângulo)
-            self._p.eventos.emitir("aviso", "Páginas", f"{descricao}: a fonte não foi lida "
-                                   f"({erro}); nada mudou.")
+        nova = self._nova_sequencia(fazer, antes, descricao)
+        if nova is None:
             return False
         if nova == antes:
             self._p._avisar(f"{descricao}: nada muda.", 6000)
@@ -365,16 +372,7 @@ class ControladorDaSequencia:
         if desfeita is not None:
             antes = desfeita(antes)
         transacao = hs.Transacao(descricao, sequencia=(antes, nova))
-        gravar = None
-        if troca:
-            novas = {pid: depois for pid, (_antes, depois) in troca["paginas"].items()}
-            transacao.inteiras = {
-                pid: (velha, None if depois is None else depois.instantaneo())
-                for pid, (velha, depois) in troca["paginas"].items()}
-            transacao.movidos = troca["movidos"]
-
-            def gravar(s):
-                self._p.projeto.ordem.trocar_paginas(s, novas, troca["movidos"][1])
+        gravar = self._com_as_inteiras(transacao, troca)
         try:
             self.aplicar_sequencia(nova, depois_de_gravar, gravar)
         except OSError as erro:
@@ -386,6 +384,32 @@ class ControladorDaSequencia:
         extra = "".join(f" ({n})" for n in nota)
         self._p._avisar(f"Feito: {descricao}{extra}. Ctrl+Z desfaz.", 6000)
         return True
+
+    def _nova_sequencia(self, fazer, antes: sq.Sequencia, descricao: str):
+        """A sequência que `fazer` monta, ou None com o aviso do que a impediu."""
+        try:
+            return fazer(antes)
+        except (ValueError, IndexError) as erro:
+            self._p._avisar(f"{descricao}: {erro}.", AVISO_LONGO_MS)
+        except (OSError, RuntimeError) as erro:   # a fonte ilegível (o tamanho, o ângulo)
+            self._p.eventos.emitir("aviso", "Páginas", f"{descricao}: a fonte não foi lida "
+                                   f"({erro}); nada mudou.")
+        return None
+
+    def _com_as_inteiras(self, transacao, troca: Optional[dict]):
+        """As páginas trocadas inteiras (dividir) na transação, e o `gravar` que as grava com
+        a sequência; None sem elas."""
+        if not troca:
+            return None
+        novas = {pid: depois for pid, (_antes, depois) in troca["paginas"].items()}
+        transacao.inteiras = {
+            pid: (velha, None if depois is None else depois.instantaneo())
+            for pid, (velha, depois) in troca["paginas"].items()}
+        transacao.movidos = troca["movidos"]
+
+        def gravar(s):
+            self._p.projeto.ordem.trocar_paginas(s, novas, troca["movidos"][1])
+        return gravar
 
     def aplicar_sequencia(self, nova: "sq.Sequencia", depois_de_gravar=None,
                           gravar=None) -> None:
@@ -409,3 +433,11 @@ class ControladorDaSequencia:
                 self._p.ir_para(alvo, visita=False)    # a página aberta mudou de lugar ou saiu
         self.mudancas_da_sequencia += 1
         self._p.eventos.emitir("sequencia_mudou")
+
+
+def _nota_das_metades(metades: int) -> str:
+    """A nota do aviso de feito: quantas das escolhidas já eram metades e ficaram."""
+    return (f"{sq.quantas_paginas(metades)} já "
+            f"{'era metade' if metades == 1 else 'eram metades'}, e "
+            f"{'ficou' if metades == 1 else 'ficaram'} como "
+            f"{'estava' if metades == 1 else 'estavam'}")

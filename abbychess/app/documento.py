@@ -39,20 +39,19 @@ from __future__ import annotations
 from typing import Dict, Iterable, List, Optional, Sequence, Set
 
 import numpy as np
-from PySide6.QtCore import QRectF, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import (QFont, QFontMetrics, QGuiApplication, QImage, QPainter, QPen,
-                           QTextBlockFormat, QTextBlockUserData, QTextCharFormat, QTextCursor,
-                           QTextDocument, QTextImageFormat)
+from PySide6.QtCore import Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import (QFont, QFontMetrics, QGuiApplication, QTextBlockFormat,
+                           QTextBlockUserData, QTextCharFormat, QTextCursor, QTextDocument,
+                           QTextImageFormat)
 from PySide6.QtWidgets import QTextEdit
 
 from abbychess import grade as gd
 from abbychess import sessao as ss
 from abbychess import texto as tx
 from abbychess.app import estilo, teclado
-from abbychess.app.imagens import pixmap_de_cinza
+from abbychess.app.imagens import FONTE, imagem_do_diagrama
 from abbychess.app import vazios
 
-FONTE = "Segoe UI Symbol"
 MONO = "Consolas"
 CORPO_PADRAO = 11
 CORPO_MINIMO, CORPO_MAXIMO = 7, 28
@@ -65,10 +64,6 @@ FUNDO_DA_SESSAO = estilo.FUNDO_DA_SESSAO
 #: As ocorrências da busca na página (§7.1), e a atual.
 FUNDO_DA_BUSCA = estilo.FUNDO_DA_BUSCA
 FUNDO_DA_OCORRENCIA = estilo.FUNDO_DA_OCORRENCIA
-#: A figurina de cada peça no desenho do diagrama.
-FIGURINAS = {"K": "♔", "Q": "♕", "R": "♖", "B": "♗", "N": "♘", "P": "♙",
-             "k": "♚", "q": "♛", "r": "♜", "b": "♝", "n": "♞", "p": "♟"}
-LADO_DA_CASA = 22
 #: A figurina branca e a preta de cada peça (o atalho repetido alterna, §6.4).
 PRETA_DA_BRANCA = dict(zip("♔♕♖♗♘♙", "♚♛♜♝♞♟"))
 BRANCA_DA_PRETA = {p: b for b, p in PRETA_DA_BRANCA.items()}
@@ -100,36 +95,6 @@ class _MapaDoBloco(QTextBlockUserData):
         super().__init__()
         self.gids = gids
         self.diagrama_id = diagrama_id
-
-
-def imagem_do_diagrama(diagrama, matriz: Optional[np.ndarray]) -> QImage:
-    """A posição lida desenhada (casas e figurinas); sem leitura, o recorte da página."""
-    if not diagrama.lido:
-        if matriz is None:
-            imagem = QImage(8 * LADO_DA_CASA, 8 * LADO_DA_CASA, QImage.Format.Format_RGB32)
-            imagem.fill(estilo.FUNDO_SEM_IMAGEM)
-            return imagem
-        x1, y1, x2, y2 = (int(v) for v in diagrama.caixa)
-        recorte = pixmap_de_cinza(matriz[max(0, y1):y2, max(0, x1):x2]).toImage()
-        return recorte.scaledToHeight(8 * LADO_DA_CASA, Qt.TransformationMode.SmoothTransformation)
-    lado = LADO_DA_CASA
-    imagem = QImage(8 * lado + 2, 8 * lado + 2, QImage.Format.Format_RGB32)
-    imagem.fill(estilo.PAPEL)
-    pintor = QPainter(imagem)
-    pintor.setRenderHint(QPainter.RenderHint.Antialiasing)
-    pintor.setFont(QFont(FONTE, int(lado * 0.62)))
-    for n, casa in enumerate(diagrama.casas[:64]):
-        linha, coluna = divmod(n, 8)
-        retangulo = QRectF(1 + coluna * lado, 1 + linha * lado, lado, lado)
-        if (linha + coluna) % 2:
-            pintor.fillRect(retangulo, estilo.CASA_ESCURA_DO_DOCUMENTO)
-        if casa.simbolo:
-            pintor.setPen(estilo.TINTA)
-            pintor.drawText(retangulo, Qt.AlignmentFlag.AlignCenter, FIGURINAS.get(casa.simbolo, "?"))
-    pintor.setPen(QPen(estilo.MOLDURA_DO_TABULEIRO))
-    pintor.drawRect(QRectF(0.5, 0.5, 8 * lado + 1, 8 * lado + 1))
-    pintor.end()
-    return imagem
 
 
 def estado_do_diagrama(diagrama) -> str:

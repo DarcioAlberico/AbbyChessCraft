@@ -221,9 +221,7 @@ class VistaDoDocumento(QTextEdit):
             self.setDocument(novo)
             self.setReadOnly(documento is None)
             self._guardar_as_unidades(virtuais)
-            self._duvidosos = {g for g, e in (estados or {}).items()
-                               if e in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO)}
-            self._duvidosos |= set(desconhecidos)
+            self._duvidosos = _duvidosos(estados, desconhecidos)
             self._voltar_ao_lugar(lugar)
             self.verticalScrollBar().setValue(rolagem)
             self.marcar_atual(self._gid_atual)
@@ -243,19 +241,7 @@ class VistaDoDocumento(QTextEdit):
             if not primeiro:
                 unidades.append(ss.Unidade("\n", None, ss.LINHA))
             primeiro = False
-            mapa = bloco.userData()
-            texto = bloco.text()
-            diagrama = isinstance(mapa, _MapaDoBloco) and mapa.diagrama_id is not None
-            gids = mapa.gids if isinstance(mapa, _MapaDoBloco) else []
-            for i, letra in enumerate(texto):
-                gid = gids[i] if i < len(gids) else -1
-                if diagrama or not isinstance(mapa, _MapaDoBloco):
-                    unidades.append(ss.Unidade(letra, None, ss.OUTRO))
-                elif gid >= 0:
-                    unidades.append(ss.Unidade(letra, gid, ss.VIRTUAL if gid in virtuais
-                                               else ss.GLIFO))
-                else:
-                    unidades.append(ss.Unidade(letra, None, ss.ESPACO))
+            _unidades_do_bloco(unidades, bloco.text(), bloco.userData(), virtuais)
             bloco = bloco.next()
         self._unidades = unidades
         self._texto0 = self.document().toPlainText()
@@ -328,25 +314,8 @@ class VistaDoDocumento(QTextEdit):
                 self._por_diagrama(doc, cursor, self._diagramas.get(bloco.diagrama_id),
                                    numero.get(bloco.diagrama_id, 0), matriz)
                 continue
-            base = self._formato_do_caractere(bloco.funcao)
-            de_margem = self._formato_do_caractere("cabecalho")
-            escritas = 0
-            for linha in bloco.linhas:
-                gids = [g for p in linha.palavras for g in p.gids]
-                margem = self._de_margem(gids, documento, margens, virtuais)
-                if margem and not self.mostrar_margens:
-                    for g in gids:                  # a Linha ainda acha a linha dela
-                        self._linha_do_gid[g] = gids
-                    continue
-                # O parágrafo abre só aqui: um bloco todo de margem, oculto, não deixa um vazio.
-                if not primeiro:
-                    cursor.insertBlock(self._formato_do_bloco(bloco.funcao, continua=bool(escritas)))
-                else:
-                    cursor.setBlockFormat(self._formato_do_bloco(bloco.funcao))
-                primeiro = False
-                escritas += 1
-                self._linha(cursor, linha, documento, de_margem if margem else base, normal,
-                            estados, desconhecidos, virtuais)
+            primeiro = _escrever_as_linhas(self, cursor, bloco, primeiro, documento, normal,
+                                           estados, desconhecidos, virtuais, margens)
 
     @staticmethod
     def _de_margem(gids, documento, margens, virtuais) -> bool:
@@ -356,10 +325,11 @@ class VistaDoDocumento(QTextEdit):
                  and documento.chars.get(g, tx.NAO_LIDO) != tx.NAO_LIDO]
         return bool(lidos) and all(g in margens for g in lidos)
 
-    def _linha(self, cursor, linha, documento, base, normal, estados, desconhecidos,
-               virtuais) -> None:
-        """Uma linha impressa num parágrafo, com o mapa dos gids dele. O texto entra em
-        corridas do mesmo formato (uma inserção por corrida, não por glifo)."""
+    def _linha(self, cursor, linha, gids_da_linha, documento, base, normal, estados,
+               desconhecidos, virtuais) -> None:
+        """Uma linha impressa num parágrafo, com o mapa dos gids dele (`gids_da_linha`, os
+        glifos dela). O texto entra em corridas do mesmo formato (uma inserção por corrida,
+        não por glifo)."""
         gids: List[int] = []
         corrida: List[str] = []
         formato_da_corrida = None
@@ -369,7 +339,6 @@ class VistaDoDocumento(QTextEdit):
                 cursor.insertText("".join(corrida), formato_da_corrida)
                 corrida.clear()
 
-        gids_da_linha = [g for p in linha.palavras for g in p.gids]
         for n_palavra, palavra in enumerate(linha.palavras):
             if n_palavra:
                 if formato_da_corrida is not base:
@@ -454,22 +423,8 @@ class VistaDoDocumento(QTextEdit):
         chave = (id(base), estado, desconhecido, virtual, estilo_do_glifo)
         if chave in self._formatos:
             return self._formatos[chave]
-        formato = QTextCharFormat(base)
-        if tem_estilo:
-            formato.setFontWeight(QFont.Weight.Bold if estilo_do_glifo.negrito
-                                  else QFont.Weight.Normal)
-            formato.setFontItalic(bool(estilo_do_glifo.italico))   # None: não medido
-            formato.setFontUnderline(estilo_do_glifo.sublinhado)
-        if estado in (gd.PENDENTE, gd.SEM_LEITURA):
-            formato.setBackground(FUNDO_DE_BAIXA_CONFIANCA)
-        elif estado == gd.AGUARDANDO:
-            formato.setForeground(estilo.CINZA)
-        if desconhecido:
-            formato.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
-            formato.setUnderlineColor(estilo.VERMELHAO)
-        elif virtual:
-            formato.setUnderlineStyle(QTextCharFormat.UnderlineStyle.DotLine)
-            formato.setUnderlineColor(estilo.AZUL)
+        formato = _formato_novo(base, estado, desconhecido, virtual,
+                                estilo_do_glifo if tem_estilo else None)
         self._formatos[chave] = formato
         return formato
 
@@ -945,4 +900,77 @@ class VistaDoDocumento(QTextEdit):
         super().focusOutEvent(evento)
         if self._sessao is not None and evento.reason() != Qt.FocusReason.PopupFocusReason:
             self._confirmar_depois()            # o clique fora
+
+
+# ----------------------------------------------------------------------
+# As partes da vista (funções: a classe não cresce)
+# ----------------------------------------------------------------------
+def _escrever_as_linhas(vista: VistaDoDocumento, cursor, bloco, primeiro: bool, documento,
+                        normal, estados, desconhecidos, virtuais, margens) -> bool:
+    """As linhas de um bloco de texto, um parágrafo cada; a de margem, oculta, só no mapa da
+    Linha. Devolve se ainda não houve parágrafo (o `primeiro` de `_preencher`)."""
+    base = vista._formato_do_caractere(bloco.funcao)
+    de_margem = vista._formato_do_caractere("cabecalho")
+    escritas = 0
+    for linha in bloco.linhas:
+        gids = [g for p in linha.palavras for g in p.gids]
+        margem = vista._de_margem(gids, documento, margens, virtuais)
+        if margem and not vista.mostrar_margens:
+            vista._linha_do_gid.update(dict.fromkeys(gids, gids))  # a Linha ainda a acha
+            continue
+        # O parágrafo abre só aqui: um bloco todo de margem, oculto, não deixa um vazio.
+        if not primeiro:
+            cursor.insertBlock(vista._formato_do_bloco(bloco.funcao, continua=bool(escritas)))
+        else:
+            cursor.setBlockFormat(vista._formato_do_bloco(bloco.funcao))
+        primeiro = False
+        escritas += 1
+        vista._linha(cursor, linha, gids, documento, de_margem if margem else base, normal,
+                     estados, desconhecidos, virtuais)
+    return primeiro
+
+
+def _formato_novo(base: QTextCharFormat, estado: Optional[str], desconhecido: bool,
+                  virtual: bool, estilo_do_glifo) -> QTextCharFormat:
+    """O realce sobre o `base`: o negrito, o itálico e o sublinhado do glifo (None: sem
+    estilo), o fundo da baixa confiança, o cinza do aguardando, o ondulado e o pontilhado."""
+    formato = QTextCharFormat(base)
+    if estilo_do_glifo is not None:
+        formato.setFontWeight(QFont.Weight.Bold if estilo_do_glifo.negrito
+                              else QFont.Weight.Normal)
+        formato.setFontItalic(bool(estilo_do_glifo.italico))   # None: não medido
+        formato.setFontUnderline(estilo_do_glifo.sublinhado)
+    if estado in (gd.PENDENTE, gd.SEM_LEITURA):
+        formato.setBackground(FUNDO_DE_BAIXA_CONFIANCA)
+    elif estado == gd.AGUARDANDO:
+        formato.setForeground(estilo.CINZA)
+    if desconhecido:
+        formato.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
+        formato.setUnderlineColor(estilo.VERMELHAO)
+    elif virtual:
+        formato.setUnderlineStyle(QTextCharFormat.UnderlineStyle.DotLine)
+        formato.setUnderlineColor(estilo.AZUL)
+    return formato
+
+
+def _unidades_do_bloco(unidades: list, texto: str, mapa, virtuais) -> None:
+    """A unidade de cada caractere do parágrafo, no fim de `unidades`: no diagrama e no
+    parágrafo sem mapa, OUTRO; senão o glifo (ou o virtual) e o espaço."""
+    if not isinstance(mapa, _MapaDoBloco) or mapa.diagrama_id is not None:
+        unidades.extend(ss.Unidade(letra, None, ss.OUTRO) for letra in texto)
+        return
+    gids = mapa.gids
+    for i, letra in enumerate(texto):
+        gid = gids[i] if i < len(gids) else -1
+        if gid >= 0:
+            unidades.append(ss.Unidade(letra, gid, ss.VIRTUAL if gid in virtuais else ss.GLIFO))
+        else:
+            unidades.append(ss.Unidade(letra, None, ss.ESPACO))
+
+
+def _duvidosos(estados, desconhecidos) -> Set[int]:
+    """Os glifos aonde o Enter leva: pendentes, sem leitura, aguardando e fora do léxico."""
+    duvidosos = {g for g, e in (estados or {}).items()
+                 if e in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO)}
+    return duvidosos | set(desconhecidos)
 

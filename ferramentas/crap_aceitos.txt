@@ -6,13 +6,8 @@
 # Uma linha por função: arquivo Classe.funcao  # o motivo
 
 abbychess/app/documento.py VistaDoDocumento._destaques_da_busca  # a reduzir (Q8)
-abbychess/app/documento.py VistaDoDocumento._formato_do_glifo  # a reduzir (Q8)
-abbychess/app/documento.py VistaDoDocumento._guardar_as_unidades  # a reduzir (Q8)
-abbychess/app/documento.py VistaDoDocumento._linha  # a reduzir (Q8)
-abbychess/app/documento.py VistaDoDocumento._preencher  # a reduzir (Q8)
 abbychess/app/documento.py VistaDoDocumento._texto_mudou  # a reduzir (Q8)
 abbychess/app/documento.py VistaDoDocumento.confirmar  # a reduzir (Q8)
-abbychess/app/documento.py VistaDoDocumento.montar  # a reduzir (Q8)
 abbychess/app/estilo.py tema_do_sistema  # lê o esquema de cores do sistema operacional: o offscreen da suíte não o tem nem aceita o pedido (sempre Unknown)
 abbychess/app/principal.py main  # o ponto de entrada: cria a QApplication do processo e fica no app.exec() até a janela fechar
 abbychess/app/visor.py VisorDePagina.mostrar_zonas  # a reduzir (Q8)

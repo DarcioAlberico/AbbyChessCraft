@@ -57,8 +57,6 @@ abbychess/estado_da_janela.py calcular  # a reduzir (Q8)
 abbychess/fonte_do_livro.py FonteDoLivro.procurar  # a reduzir (Q8)
 abbychess/montagem.py _sem_coordenadas.fora  # roda por glifo e por tabuleiro: partir põe chamada nova no laço por glifo
 abbychess/padroes.py PadroesDoLivro.ler  # roda por glifo (ler, propagar, o servidor): partir põe chamada nova no laço por glifo
-abbychess/pagina_em_json.py pagina_de_json  # a reduzir (Q8)
-abbychess/pagina_em_json.py pagina_para_json  # a reduzir (Q8)
 abbychess/perturbacoes.py perturbar  # a reduzir (Q8)
 abbychess/regua_do_negrito.py juntar  # a reduzir (Q8)
 abbychess/render.py RenderEmProcesso.renderizar  # a reduzir (Q8)

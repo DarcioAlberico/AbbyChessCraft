@@ -36,15 +36,13 @@ def inteiro(valor) -> Optional[int]:
 def pagina_para_json(pagina: Pagina, pagina_da_fonte: Optional[int] = None) -> dict:
     """O JSON da página. O `indice` gravado é o da página no PDF (`pagina_da_fonte`,
     §12.4), e não a posição no livro, que muda ao reordenar; sem ele, o da página."""
-    quadro, giro = pagina.geometria
     return {
         "versao": VERSAO_DA_PAGINA, "pid": pagina.pid,
         "indice": pagina.indice if pagina_da_fonte is None else pagina_da_fonte,
-        "geometria": [None if quadro is None else list(quadro), int(giro)],
+        "geometria": _geometria_para_json(pagina.geometria),
         "tamanho": None if pagina.tamanho is None else list(pagina.tamanho),
         "fora": [[lugar, box.para_json()] for lugar, box in pagina.fora],
-        "areas_fora": [[tipo, lugar, _area_para_json(tipo, objeto), aparada]
-                       for tipo, lugar, objeto, aparada in pagina.areas_fora],
+        "areas_fora": _areas_fora_para_json(pagina.areas_fora),
         "estado": pagina.estado, "proximo_n": pagina.proximo_n,
         "gravado_em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "boxes": [b.para_json() for b in pagina.boxes],
@@ -70,12 +68,9 @@ def pagina_de_json(bruto: dict) -> Pagina:
                   estado=Estado(bruto.get("estado", RECONHECIDA)),   # ValueError: ilegível
                   proximo_n=int(bruto.get("proximo_n", 0)),
                   geometria=_geometria_de(bruto.get("geometria")),
-                  tamanho=None if bruto.get("tamanho") is None
-                  else tuple(int(v) for v in bruto["tamanho"]),
+                  tamanho=_tamanho_de(bruto.get("tamanho")),
                   fora=tuple((int(lugar), Box.de_json(b)) for lugar, b in bruto.get("fora", [])),
-                  areas_fora=tuple((tipo, int(lugar), _area_de_json(tipo, objeto), bool(aparada))
-                                   for tipo, lugar, objeto, aparada
-                                   in bruto.get("areas_fora", [])),
+                  areas_fora=_areas_fora_de_json(bruto.get("areas_fora", [])),
                   regua_do_negrito=dict(bruto.get("regua_do_negrito") or {}))
 
 
@@ -90,6 +85,25 @@ def comparavel(pagina: Pagina) -> str:
     for chave in ("gravado_em", "indice", "proximo_n"):
         bruto.pop(chave, None)
     return json.dumps(bruto, sort_keys=True, ensure_ascii=False)
+
+
+def _geometria_para_json(geometria) -> list:
+    quadro, giro = geometria
+    return [None if quadro is None else list(quadro), int(giro)]
+
+
+def _areas_fora_para_json(areas_fora) -> list:
+    return [[tipo, lugar, _area_para_json(tipo, objeto), aparada]
+            for tipo, lugar, objeto, aparada in areas_fora]
+
+
+def _areas_fora_de_json(bruto) -> tuple:
+    return tuple((tipo, int(lugar), _area_de_json(tipo, objeto), bool(aparada))
+                 for tipo, lugar, objeto, aparada in bruto)
+
+
+def _tamanho_de(bruto) -> Optional[tuple]:
+    return None if bruto is None else tuple(int(v) for v in bruto)
 
 
 def _area_para_json(tipo: str, objeto):

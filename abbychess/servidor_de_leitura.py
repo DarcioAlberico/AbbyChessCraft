@@ -272,32 +272,42 @@ class _Laco:
                 self._acordar.clear()
                 return
             bloquear = False
-            tipo = mensagem[0]
-            if tipo == "pedido":
-                (self.interativos if mensagem[2] == INTERATIVO else self.lotes).append(mensagem)
-            elif tipo == "padroes":
-                _, criados, apagados = mensagem
-                with self._trava:                  # não no meio do glifo do lote
-                    for caminho in apagados:
-                        self.leitor.padroes.excluir(caminho)
-                    for criado in criados:
-                        caminho, altura, *resto = criado
-                        self.leitor.padroes.incluir(caminho, altura,
-                                                    resto[0] if resto else None)
-            elif tipo == "limiares":
-                with self._trava:
-                    self.leitor.trocar_limiares(mensagem[1])
-            elif tipo == "cancelar":
-                # O que espera na fila continua nela e, na vez dele, responde "cancelado"
-                # (`_atender`): quem pediu sempre recebe resposta. O que já terminou não guarda
-                # nada (o cancelamento chegou tarde).
-                id_ = mensagem[1]
-                na_fila = any(m[1] == id_ for m in (*self.interativos, *self.lotes))
-                if na_fila or id_ in (self.interativo, self.no_lote):
-                    self.cancelados.add(id_)
-            elif tipo == "sair":
-                self.sair = True
+            if self._tratar(mensagem):
                 return
+
+    def _tratar(self, mensagem) -> bool:
+        """Uma mensagem da interface; verdadeiro no "sair"."""
+        tipo = mensagem[0]
+        if tipo == "pedido":
+            (self.interativos if mensagem[2] == INTERATIVO else self.lotes).append(mensagem)
+        elif tipo == "padroes":
+            self._aplicar_os_deltas(mensagem)
+        elif tipo == "limiares":
+            with self._trava:
+                self.leitor.trocar_limiares(mensagem[1])
+        elif tipo == "cancelar":
+            self._marcar_cancelado(mensagem[1])
+        elif tipo == "sair":
+            self.sair = True
+            return True
+        return False
+
+    def _aplicar_os_deltas(self, mensagem) -> None:
+        _, criados, apagados = mensagem
+        with self._trava:                  # não no meio do glifo do lote
+            for caminho in apagados:
+                self.leitor.padroes.excluir(caminho)
+            for criado in criados:
+                caminho, altura, *resto = criado
+                self.leitor.padroes.incluir(caminho, altura, resto[0] if resto else None)
+
+    def _marcar_cancelado(self, id_) -> None:
+        # O que espera na fila continua nela e, na vez dele, responde "cancelado"
+        # (`_atender`): quem pediu sempre recebe resposta. O que já terminou não guarda
+        # nada (o cancelamento chegou tarde).
+        na_fila = any(m[1] == id_ for m in (*self.interativos, *self.lotes))
+        if na_fila or id_ in (self.interativo, self.no_lote):
+            self.cancelados.add(id_)
 
     def dar_a_vez(self) -> None:
         """Os métodos do leitor que as duas threads chamam passam pela trava (SPEC-qualidade
@@ -551,35 +561,46 @@ class ServidorDeLeitura:
     # ------------------------------------------------------------------
     def _ouvir(self) -> None:
         while not self._fechando:
+            mensagem = self._proxima_do_filho()
+            if mensagem is not None:
+                self._tratar(mensagem)
+
+    def _proxima_do_filho(self):
+        """A mensagem seguinte do filho, ou None (nenhuma em 0,3 s, ou a queda dele, já
+        tratada)."""
+        try:
+            return self._saida.get(timeout=0.3)
+        except queue.Empty:
+            if not self._fechando and not self.processo.is_alive():
+                self._caiu("o processo terminou")
+        except (EOFError, OSError):
+            if not self._fechando:
+                self._caiu("a fila do processo fechou")
+        return None
+
+    def _tratar(self, mensagem) -> None:
+        tipo = mensagem[0]
+        if tipo == "pronto":
+            self._ficou_pronto(mensagem[2])
+        elif tipo == "resposta":
+            _, id_, ok, resultado = mensagem
+            with self._trava:
+                pedido = self._pendentes.pop(id_, None)
+            if pedido is not None:
+                self._concluir(pedido, ok, resultado)
+        elif tipo == "caiu":
+            log.error("o servidor de leitura caiu:\n%s", mensagem[1])
+            self._caiu(mensagem[1].strip().splitlines()[-1] if mensagem[1].strip() else "")
+
+    def _ficou_pronto(self, estado: dict) -> None:
+        primeira = self.estado is None
+        self.estado = estado
+        self.pronto.set()
+        if primeira and self.ao_ficar_pronto is not None:
             try:
-                mensagem = self._saida.get(timeout=0.3)
-            except queue.Empty:
-                if not self._fechando and not self.processo.is_alive():
-                    self._caiu("o processo terminou")
-                continue
-            except (EOFError, OSError):
-                if not self._fechando:
-                    self._caiu("a fila do processo fechou")
-                continue
-            tipo = mensagem[0]
-            if tipo == "pronto":
-                primeira = self.estado is None
-                self.estado = mensagem[2]
-                self.pronto.set()
-                if primeira and self.ao_ficar_pronto is not None:
-                    try:
-                        self.ao_ficar_pronto(self.estado)
-                    except Exception:  # quem ouve falhou: o ouvinte continua
-                        log.exception("o aviso de servidor pronto falhou")
-            elif tipo == "resposta":
-                _, id_, ok, resultado = mensagem
-                with self._trava:
-                    pedido = self._pendentes.pop(id_, None)
-                if pedido is not None:
-                    self._concluir(pedido, ok, resultado)
-            elif tipo == "caiu":
-                log.error("o servidor de leitura caiu:\n%s", mensagem[1])
-                self._caiu(mensagem[1].strip().splitlines()[-1] if mensagem[1].strip() else "")
+                self.ao_ficar_pronto(self.estado)
+            except Exception:  # quem ouve falhou: o ouvinte continua
+                log.exception("o aviso de servidor pronto falhou")
 
     def _concluir(self, pedido: Pedido, ok: bool, resultado) -> None:
         pedido.ok, pedido.resultado = ok, resultado

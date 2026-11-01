@@ -145,6 +145,36 @@ def test_o_filho_de_um_pai_com_qt_nao_carrega_o_qt(tmp_path):
     assert saida.stdout.strip() == "[]", saida.stderr
 
 
+def test_o_aviso_de_pronto_que_falha_nao_para_o_servidor(pasta):
+    vistos = []
+
+    def pronto(estado):
+        vistos.append(estado)
+        raise RuntimeError("quem ouve falhou")
+
+    s = sl.ServidorDeLeitura(pasta, Limiares(), fabrica=FABRICA, ao_ficar_pronto=pronto)
+    try:
+        assert s.chamar("pid", timeout=60) == s.pid
+        assert vistos == [s.estado] and s.estado is not None
+    finally:
+        s.fechar()
+
+
+def test_o_filho_que_cai_ao_comecar_e_reaberto_uma_vez_e_depois_desiste(pasta):
+    from tests.ajudantes import esperar
+
+    avisos = []
+    s = sl.ServidorDeLeitura(pasta, Limiares(), fabrica="tests.leitor_falso:nao_existe",
+                             ao_avisar=lambda titulo, texto, desistiu: avisos.append(desistiu))
+    try:
+        assert esperar(lambda: s.desistiu, 60)
+        assert avisos == [False, True] and s.parado
+        with pytest.raises(sl.ErroDoServidor, match="caiu duas vezes"):
+            s.chamar("pid", timeout=10)
+    finally:
+        s.fechar()
+
+
 def test_cancelar_antes_de_o_filho_ficar_pronto_responde_cancelado(pasta, imagem):
     """O ✕ do lote com os modelos ainda carregando: o pedido que não começou responde
     "cancelado" na vez dele (antes, saía da fila sem resposta, e o lote ficava preso)."""

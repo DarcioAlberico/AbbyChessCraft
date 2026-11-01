@@ -88,7 +88,7 @@ def test_a_rodada_de_cada_mutante_vira_morto_sobreviveu_ou_tempo():
 
 
 def test_os_testes_de_um_mutante_sao_os_que_cobrem_a_linha_dele():
-    contextos = {3: ["tests/t.py::test_b|run", "", "tests/t.py::test_a|setup",
+    contextos = {3: ["tests/t.py::test_b|run", "tests/t.py::test_a|setup",
                      "tests/t.py::test_a|run"],
                  4: ["tests/t.py::test_c|run"]}
     todos = ["tests/t.py", "tests/u.py"]

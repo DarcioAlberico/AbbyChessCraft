@@ -171,10 +171,11 @@ def classificar(codigo: Optional[int], estourou: bool) -> str:
 def testes_do_mutante(contextos: Dict[int, List[str]], m: Mutante, todos: List[str]) -> List[str]:
     """Os testes (o nodeid) que passam pelas linhas do mutante. A linha que só roda ao importar
     o módulo (a constante, o valor padrão da dataclass) tem o contexto vazio, porque o pytest
-    importa na coleta, fora de teste nenhum: ela vale para `todos` os testes do módulo."""
+    importa na coleta, fora de teste nenhum: ela vale para `todos` os testes do módulo, também
+    quando um teste o importa de novo e a linha roda dentro dele."""
     nomes = {c.split("|", 1)[0] for linha in range(m.linha, m.fim_linha + 1)
              for c in contextos.get(linha, ())}
-    if nomes == {""}:
+    if "" in nomes:
         return list(todos)
     return sorted(n for n in nomes if n)
 

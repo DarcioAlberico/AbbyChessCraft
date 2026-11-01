@@ -301,14 +301,15 @@ def test_a_busca_le_a_pagina_girada_fora_da_memoria_na_geometria_da_entrada(proj
 def test_o_ctrl_z_da_divisao_pelo_carimbo_com_o_cache_vazio(projeto, ctl):
     """O caminho rápido do desfazer (o arquivo como `trocar_paginas` o deixou): aceita a página
     intocada e recusa a que mudou por fora."""
+    def esvaziar_o_cache():                                         # as páginas só no disco
+        projeto.paginas_em_memoria.tirar([e.pid for e in projeto.sequencia.entradas])
+
     _ler(projeto, 2)
     ctl.operacoes.dividir_paginas([2])
-    with projeto.paginas_em_memoria._trava_do_cache:
-        projeto.paginas_em_memoria._modelos.clear()
+    esvaziar_o_cache()
     assert ctl.desfazedor.desfazer() is None and len(projeto.sequencia) == 60   # intocada: desfaz
     ctl.desfazedor.refazer()
-    with projeto.paginas_em_memoria._trava_do_cache:
-        projeto.paginas_em_memoria._modelos.clear()
+    esvaziar_o_cache()
     arquivo = projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(3)}.json"
     bruto = json.loads(arquivo.read_text(encoding="utf-8"))
     bruto["estado"] = "verificada"                                  # mudou por fora

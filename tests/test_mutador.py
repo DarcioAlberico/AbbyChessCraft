@@ -87,6 +87,17 @@ def test_a_rodada_de_cada_mutante_vira_morto_sobreviveu_ou_tempo():
             mutador.classificar(codigo, False)
 
 
+def test_o_mutante_que_derruba_o_conftest_esta_morto():
+    """O conftest que importa o módulo (pelas fixtures) cai com o mutante que nem importa, e o
+    pytest sai com 4, como num erro de uso: a rodada sem mutante prova que o conftest carrega,
+    então quem o derrubou foi o mutante."""
+    saida = ("ImportError while loading conftest 'C:\\c0\\tests\\conftest.py'.\n"
+             "E   ValueError: mutable default for field estilo is not allowed\n")
+    assert mutador.classificar(4, False, saida) == "morto"
+    with pytest.raises(RuntimeError):                        # o outro erro de uso continua
+        mutador.classificar(4, False, "ERROR: file or directory not found: tests/x.py\n")
+
+
 def test_os_testes_de_um_mutante_sao_os_que_cobrem_a_linha_dele():
     contextos = {3: ["tests/t.py::test_b|run", "tests/t.py::test_a|setup",
                      "tests/t.py::test_a|run"],

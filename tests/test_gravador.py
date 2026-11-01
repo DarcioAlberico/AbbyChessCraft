@@ -374,15 +374,23 @@ def test_salvar_pagina_nao_muda_a_pagina_que_a_interface_mostra(projeto):
     assert nova is not mostrada and [b.entry.char for b in nova.boxes] == ["q"]
 
 
-def test_agendar_nao_calcula_a_foto_dos_glifos(projeto, monkeypatch):
-    from abbychess import cache_do_projeto as cache_mod
-
-    chamadas = []
-    original = cache_mod.foto
-    monkeypatch.setattr(cache_mod, "foto", lambda e: (chamadas.append(1), original(e))[1])
+def test_agendar_nao_calcula_a_foto_dos_glifos(projeto):
+    """A página que a interface entrega ao gravador não ganha a foto dos glifos (um hash por
+    glifo, das gravações síncronas) a cada edição: o cache fica sem a foto dela, e o que se
+    grava são as edições, que voltam ao reabrir o projeto."""
+    cache = projeto.paginas_em_memoria
     pagina = _pagina(projeto, 0, n=50)
     for k in range(5):
-        projeto.paginas_em_memoria.agendar(pagina)
-        projeto.paginas_em_memoria.descarregar(5)   # a gravação tira a foto; a edição não a refaz
+        cache.agendar(pagina)
+        assert cache.foto_de(pagina.pid) is None
+        assert cache.descarregar(5)
         ed.corrigir(pagina, pagina.boxes[k].gid, "z")
-    assert chamadas == []
+    cache.agendar(pagina)
+    assert cache.foto_de(pagina.pid) is None
+    projeto.fechar()
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    try:
+        lidos = [b.entry.char for b in reaberto.carregar_modelo(0).boxes]
+    finally:
+        reaberto.fechar()
+    assert lidos == ["z"] * 5 + ["a"] * 45

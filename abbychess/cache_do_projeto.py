@@ -166,6 +166,11 @@ class CacheDoProjeto:
             self._estados.pop(pagina.pid, None)
         elif foto_nova or pagina.pid not in self._estados:
             self._estados[pagina.pid] = {b.gid: foto(b.entry) for b in pagina.boxes}
+        self._tirar_as_mais_velhas(pagina)
+
+    def _tirar_as_mais_velhas(self, pagina: Pagina) -> None:
+        """Até `PAGINAS_EM_MEMORIA`, saem as lidas há mais tempo: a com gravação pendente
+        fica, e a aberta, e `pagina`, a que acabou de entrar."""
         sujas = self.sujas
         for pid in list(self._modelos):
             if len(self._modelos) <= PAGINAS_EM_MEMORIA:

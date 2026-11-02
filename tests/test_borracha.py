@@ -269,6 +269,22 @@ def test_a_borracha_na_janela_apaga_o_arraste_e_o_ctrl_z_volta(app, janela):  # 
     assert np.array_equal(np.asarray(j.pagina.imagem.convert("L")), antes)
 
 
+def test_com_zoom_a_vista_fica_onde_estava_depois_de_apagar(app, janela):  # noqa: F811
+    j = janela
+    j.show()
+    app.processEvents()
+    j.visor.definir_zoom(4.0)
+    barra = j.visor.verticalScrollBar()
+    barra.setValue(barra.maximum() // 2)
+    antes = barra.value()
+    assert antes > 0
+    j.acao_borracha.trigger()
+    centro = j.visor.mapToScene(j.visor.viewport().rect().center())
+    _arrastar(j, (centro.x() - 20, centro.y() - 20), (centro.x() + 20, centro.y() + 20))
+    assert j.pagina.projeto.sequencia.entrada_em(0).borrachas
+    assert barra.value() == antes
+
+
 def test_a_borracha_e_os_outros_modos_do_arraste_se_excluem(app, janela):  # noqa: F811
     j = janela
     j.acao_borracha.trigger()

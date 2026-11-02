@@ -264,8 +264,8 @@ def exportar_pdf_pesquisavel(projeto: ProjetoDeLivro, caminho: str | Path,
     """O PDF com as páginas reconhecidas e a leitura do projeto como texto invisível.
 
     A página do PDF do livro sem quadro nem giro sai do original, sem rasterizar; as outras
-    (as inseridas, as cortadas e as giradas, §12.4 CA-12.16, e toda página de fonte em
-    imagem) viram uma página de PDF com a imagem da entrada a 300 dpi, a que se vê no
+    (as inseridas, as cortadas e as giradas, §12.4 CA-12.16, as com borracha, CA-12.17, e
+    toda página de fonte em imagem) viram uma página de PDF com a imagem da entrada a 300 dpi, a que se vê no
     programa, e a camada casa com ela sem conta nenhuma.
 
     O projeto que endireita as páginas tem os boxes nas coordenadas da página
@@ -299,7 +299,7 @@ def _abrir_o_pdf(projeto: ProjetoDeLivro, fonte: pg.FonteDePaginas, alvo: Sequen
     original, a imagem."""
     entradas = [projeto.sequencia.entrada_em(i) for i in alvo]
     imagens = {i for i, e in zip(alvo, entradas)
-               if not projeto.origem.e_pdf or not e.do_livro_sem_geometria}
+               if not projeto.origem.e_pdf or not e.do_livro_sem_geometria or e.borrachas}
     if imagens:
         return _pdf_com_imagens(projeto, fonte, alvo, entradas, imagens), imagens, False
     doc, tinha_rotulos = _pdf_do_original(projeto, [e.pagina for e in entradas])

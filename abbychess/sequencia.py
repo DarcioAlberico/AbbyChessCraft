@@ -39,7 +39,9 @@ class Entrada:
     """Uma página do livro: o `pid` e a receita da imagem dela (§12.4). `quadro` é o
     retângulo `[x0, y0, x1, y1)` em pixels da página da fonte (nulo: a página inteira);
     `giro`, graus no sentido horário, depois do quadro; `metade`, só o rótulo de quem veio de
-    uma divisão; `angulo`, o endireitar à mão (nulo: o medido)."""
+    uma divisão; `angulo`, o endireitar à mão (nulo: o medido); `borrachas`, as áreas apagadas
+    (as manchas do scanner, CA-12.17), cada uma os quatro cantos `(x1, y1, …, x4, y4)` na
+    página da fonte antes de endireitar (`geometria.borracha_na_fonte`)."""
 
     pid: int
     fonte: str = FONTE_DO_LIVRO
@@ -51,15 +53,24 @@ class Entrada:
     #: (largura, altura) da página da fonte renderizada: a conta dos boxes entre uma geometria
     #: e outra (`geometria`) precisa dela; gravado quando a página ganha quadro ou giro.
     tamanho: Optional[Tuple[int, int]] = None
+    borrachas: Tuple[Tuple[float, ...], ...] = ()
 
     def __post_init__(self):
         for campo in ("quadro", "tamanho"):                             # chave de cache: hashável
             valor = getattr(self, campo)
             if valor is not None and not isinstance(valor, tuple):
                 object.__setattr__(self, campo, tuple(valor))
-        motivo = self._rotulos_invalidos() or self._origem_invalida()
+        object.__setattr__(self, "borrachas",
+                           tuple(tuple(float(v) for v in b) for b in self.borrachas))
+        motivo = (self._rotulos_invalidos() or self._origem_invalida()
+                  or self._borrachas_invalidas())
         if motivo:
             raise ValueError(motivo)
+
+    def _borrachas_invalidas(self) -> Optional[str]:
+        """Por que uma borracha não vale (None: valem): cada uma tem quatro cantos."""
+        torta = next((b for b in self.borrachas if len(b) != 8), None)
+        return None if torta is None else f"borracha sem quatro cantos: {list(torta)}"
 
     def _rotulos_invalidos(self) -> Optional[str]:
         """Por que o pid, a página, o giro ou a metade não valem (None: valem)."""
@@ -104,6 +115,8 @@ class Entrada:
             bruto["angulo"] = self.angulo
         if self.tamanho is not None:
             bruto["tamanho"] = list(self.tamanho)
+        if self.borrachas:
+            bruto["borrachas"] = [list(b) for b in self.borrachas]
         return bruto
 
     @classmethod
@@ -116,7 +129,8 @@ class Entrada:
                    quadro=None if quadro is None else tuple(int(v) for v in quadro),
                    giro=int(bruto.get("giro", 0)), metade=bruto.get("metade"),
                    angulo=None if angulo is None else float(angulo),
-                   tamanho=None if tamanho is None else tuple(int(v) for v in tamanho))
+                   tamanho=None if tamanho is None else tuple(int(v) for v in tamanho),
+                   borrachas=tuple(bruto.get("borrachas") or ()))
 
     @property
     def geometria(self) -> tuple:

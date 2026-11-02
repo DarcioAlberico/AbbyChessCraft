@@ -1,5 +1,5 @@
-"""As operações de página (§12.4): mover, apagar, restaurar, inserir, girar, cortar, dividir e
-endireitar, à parte do `ControladorDePagina` (SPEC-qualidade Q-A1). Cada uma grava a sequência
+"""As operações de página (§12.4): mover, apagar, restaurar, inserir, girar, cortar, dividir,
+endireitar e a borracha (CA-12.17), à parte do `ControladorDePagina` (SPEC-qualidade Q-A1). Cada uma grava a sequência
 nova, registra a transação do desfazer e leva a janela junto (`aplicar_sequencia`, que o
 desfazer também usa)."""
 
@@ -167,6 +167,53 @@ class ControladorDaSequencia:
 
         return self._mudar_sequencia(
             fazer, f"Tirar o corte de {sq.quantas_paginas(len(set(posicoes)))}")
+
+    def apagar_manchas(self, posicao: int, caixas: Sequence[Sequence[int]]) -> bool:
+        """A borracha (CA-12.17): as `caixas` `(x1, y1, x2, y2)`, marcadas na imagem que se vê
+        da página na `posicao` (aparadas nela), ficam brancas. Elas vão à entrada da sequência,
+        na página da fonte antes de endireitar (`geometria.borracha_na_fonte`), e seguem o
+        corte, o giro e o ângulo; a leitura não muda (o glifo lido na área fica até o F5 ou o
+        Del, e o aviso diz quantos são)."""
+        from abbychess import geometria as geo
+
+        nota = []
+
+        def fazer(s):
+            e = s.entrada_em(posicao)
+            tamanho = e.tamanho or self._tamanho(e)
+            largura, altura = geo.tamanho_da_imagem(e.geometria, tamanho)
+            vistas = [c for c in (_aparada(c, largura, altura) for c in caixas) if c]
+            if not vistas:
+                raise ValueError("a área marcada fica fora da página")
+            angulo = self._p.fonte.inclinacao_da_entrada(e)
+            novas = tuple(geo.borracha_na_fonte(c, e.geometria, tamanho, angulo) for c in vistas)
+            lidos = self._glifos_nas_caixas(posicao, vistas)
+            if lidos:
+                nota.append(f"{lidos} glifo{' lido fica' if lidos == 1 else 's lidos ficam'} "
+                            "na área; F5 lê de novo, ou Del o apaga")
+            return s.com_entrada(replace(e, tamanho=tamanho, borrachas=e.borrachas + novas))
+
+        return self._mudar_sequencia(fazer, f"Borracha na página {posicao + 1}", nota=nota)
+
+    def tirar_as_borrachas(self, posicoes: Sequence[int]) -> bool:
+        """As áreas apagadas das páginas voltam como eram na fonte."""
+        def fazer(s):
+            nova = s
+            for pid in sq.pids_da_selecao(s, posicoes):
+                nova = nova.com_entrada(replace(nova.entrada_de(pid), borrachas=()))
+            return nova
+
+        return self._mudar_sequencia(
+            fazer, f"Tirar a borracha de {sq.quantas_paginas(len(set(posicoes)))}")
+
+    def _glifos_nas_caixas(self, posicao: int, caixas) -> int:
+        """Quantos glifos lidos da página tocam as caixas (na imagem que se vê)."""
+        pagina = self._p.projeto.carregar_modelo(posicao)
+        if pagina is None:
+            return 0
+        return sum(any(b.entry.x1 < x2 and x1 < b.entry.x2 and b.entry.y1 < y2
+                       and y1 < b.entry.y2 for x1, y1, x2, y2 in caixas)
+                   for b in pagina.boxes)
 
     def dividir_paginas(self, posicoes: Sequence[int], fracao: float = 0.5) -> bool:
         """Divide as páginas espelhadas (§12.4) na `fracao` da largura do que se vê: a metade
@@ -433,6 +480,14 @@ class ControladorDaSequencia:
                 self._p.ir_para(alvo, visita=False)    # a página aberta mudou de lugar ou saiu
         self.mudancas_da_sequencia += 1
         self._p.eventos.emitir("sequencia_mudou")
+
+
+def _aparada(caixa, largura: int, altura: int):
+    """A caixa `(x1, y1, x2, y2)` aparada na imagem `largura` × `altura`, ou None se nada
+    dela fica dentro (ou ela é vazia)."""
+    x1, y1, x2, y2 = (int(v) for v in caixa)
+    x1, y1, x2, y2 = max(x1, 0), max(y1, 0), min(x2, largura), min(y2, altura)
+    return (x1, y1, x2, y2) if x2 > x1 and y2 > y1 else None
 
 
 def _nota_das_metades(metades: int) -> str:

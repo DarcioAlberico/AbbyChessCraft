@@ -234,9 +234,8 @@ def test_a_caixa_da_vista_vai_a_fonte_antes_de_endireitar(angulo):
     quadrilatero = geo.borracha_na_fonte(caixa, geometria, tamanho, angulo)
     a, b, c, d = geo.para_a_fonte(caixa, geometria, tamanho)
     cantos = [(a, b), (c, b), (c, d), (a, d)]
-    esperados = [pg.ponto_original(x, y, angulo, *tamanho) for x, y in cantos]
-    pares = list(zip(quadrilatero[::2], quadrilatero[1::2]))
-    assert pares == pytest.approx(esperados, abs=0.01)
+    esperados = [v for x, y in cantos for v in pg.ponto_original(x, y, angulo, *tamanho)]
+    assert list(quadrilatero) == pytest.approx(esperados, abs=0.01)
 
 
 # ----------------------------------------------------------------------

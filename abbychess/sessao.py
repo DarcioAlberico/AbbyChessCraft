@@ -412,8 +412,6 @@ def _dividir_ligaduras_repetidas(plano, itens, unidades, novo, pares) -> None:
     """Uma inserção no meio de um box multicaractere transforma-o em ``1 -> k``."""
     for gid in _glifos_repetidos(itens):
         posicoes = _posicoes_do_glifo(gid, unidades, pares)
-        if not posicoes:
-            continue
         chars = _caracteres_entre(posicoes, novo, pares)
         primeiro, ultimo = _trecho_do_glifo(itens, gid)
         if chars and all(t in ("glifo", "letra") for t, _v in itens[primeiro:ultimo + 1]):

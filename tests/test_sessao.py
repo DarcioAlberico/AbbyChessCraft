@@ -357,3 +357,178 @@ def test_apagar_um_travessao_solto_no_fim_da_linha_nao_junta_palavras():
     p = _pagina("casa velha -", "plo longe")
     _editar(p, "casa velha -\nplo", "casa velha \nplo")
     assert not p.decisoes.juncoes
+
+
+# ----------------------------------------------------------------------
+# As regras que a mutação achou sem teste (Q9, CA-Q-M1)
+# ----------------------------------------------------------------------
+
+def _gids(pagina):
+    return [b.gid for b in pagina.boxes]
+
+
+@pytest.mark.parametrize("fixos", [
+    [(0, 0), (1, 1), (1, 3), (2, 2), (4, 3)],             # um fora de ordem antes dos outros
+    [(0, 0), (1, 1), (2, 2), (5, 3)],                     # o do original fora da faixa
+    [(0, 0), (1, 1), (2, 2), (4, 4)]])                    # o do novo fora da faixa
+def test_os_fixos_fora_de_ordem_ou_de_faixa_sao_ignorados(fixos):
+    """Apagar o segundo "s" de "cassa" tira o segundo glifo mesmo com fixos que não servem:
+    os de fora de ordem e de faixa são pulados, e os que vêm depois deles ainda valem."""
+    p = _pagina("cassa")
+    segundo = p.boxes[3].gid
+    _texto_, unidades = ss.texto_e_unidades(p)
+    ss.editar(p, unidades, "casa", fixos=fixos)
+    assert _texto(p) == "casa" and segundo not in p.vivos and p.boxes[2].gid != segundo
+
+
+def test_apagar_uma_palavra_repetida_tira_a_primeira():
+    """Sem fixos, as lacunas ficam o mais à esquerda: "aa aa" -> "aa" tira os glifos da
+    primeira palavra (o atalho das palavras iguais é só para o texto longo)."""
+    p = _pagina("aa aa")
+    primeira = set(_gids(p)[:2])
+    plano = _editar(p, "aa aa", "aa")
+    assert plano.sair == primeira and _texto(p) == "aa"
+
+
+def test_colar_a_pagina_de_lances_repetidos_com_uma_palavra_a_mais_e_a_menos():
+    """Colar por cima a página de lances que se repetem (mais de 200 palavras) com 14 lances
+    novos no começo e 14 a menos no fim: as palavras iguais ancoram o alinhamento (também as
+    que se repetem muito), e nenhuma letra é trocada; a faixa sozinha não cobre o deslocamento."""
+    palavras = ["e4", "e5"] * 150
+    p = _pagina(" ".join(palavras))
+    _texto_, unidades = ss.texto_e_unidades(p)
+    plano = ss.planejar(unidades, " ".join(["Cf3"] * 14 + palavras[:-14]))
+    assert not plano.corrigir and plano.sair == set(_gids(p)[-28:])
+    assert "".join(letras for letras, _ancora in plano.virtuais) == "Cf3" * 14
+
+
+def test_colar_a_pagina_sem_nenhuma_palavra_igual_alinha_letra_a_letra():
+    """Sem nenhuma palavra igual para ancorar, o texto longo se alinha na faixa em volta da
+    diagonal: a primeira letra de cada palavra trocada é uma correção, nada sai nem entra."""
+    import random
+
+    r = random.Random(2)
+    original = " ".join("".join(r.choice("abcdefgh") for _ in range(r.randint(3, 8)))
+                        for _ in range(120))
+    novo = "".join("x" if k == 0 or original[k - 1] == " " else c for k, c in enumerate(original))
+    p = _pagina(original)
+    _texto_, unidades = ss.texto_e_unidades(p)
+    plano = ss.planejar(unidades, novo)
+    assert len(plano.corrigir) == 120 and set(plano.corrigir.values()) == {"x"}
+    assert not plano.sair and not plano.virtuais
+
+
+def test_so_apagar_a_quebra_de_linha_e_uma_edicao():
+    """A quebra de linha apagada não tira nem põe glifo, mas o texto digitado mudou: o
+    desfazer diz "Editar", não "Aceitar"."""
+    p = _pagina("casa", "velha")
+    assert _editar(p, "casa\nvelha", "casavelha").muda
+
+
+def test_trocar_a_letra_depois_da_quebra_de_linha_nao_avisa_da_quebra():
+    p = _pagina("casa", "velha")
+    plano = _editar(p, "casa\nvelha", "casa\nvelho")
+    assert _texto(p) == "casa\nvelho" and plano.estrutural() == ""
+
+
+@pytest.mark.parametrize("de, para, aviso", [
+    ("mar", "rnar", "mar → rnar: 1 glifo dividido em 2 · Ctrl+Z desfaz"),
+    ("m m", "rn rn", "m m → rn rn: 2 glifos divididos · Ctrl+Z desfaz"),
+    ("carn", "cam", "carn → cam: 2 glifos juntados · Ctrl+Z desfaz"),          # no fim
+    ("cxsa rnar", "casa mar", "cxsa rnar → casa mar: 2 glifos juntados · Ctrl+Z desfaz")])
+def test_o_aviso_das_operacoes_estruturais(de, para, aviso):
+    """Um glifo dividido diz em quantos; dois, quantos glifos. A junção no fim da sessão e a
+    que vem depois de uma troca simples também são achadas."""
+    p = _pagina(de)
+    plano = _editar(p, de, para)
+    assert _texto(p) == para and plano.estrutural() == aviso
+
+
+def test_o_aviso_encurta_a_palavra_de_mais_de_30_letras():
+    longa = "abcdefghij" * 3
+    p = _pagina(longa + "x")
+    plano = _editar(p, longa + "x", longa)
+    assert plano.estrutural() == f"{longa[:29]}… → {longa}: 1 glifo tirado · Ctrl+Z desfaz"
+
+
+def test_gid_no_cursor_logo_depois_do_espaco_e_no_fim():
+    """Logo depois do espaço, o glifo do Ctrl+Enter é o que vem depois dele; no fim, depois de
+    um espaço digitado, não há glifo."""
+    p = _pagina("ab cd")
+    _texto_, unidades = ss.texto_e_unidades(p)
+    assert ss.gid_no_cursor(unidades, "ab cd", 3) == p.boxes[2].gid
+    assert ss.gid_no_cursor(unidades, "ab cd ", 6) is None
+
+
+def test_a_ligadura_dividida_no_meio_de_uma_palavra_revisa_as_vizinhas():
+    """A letra no meio da ligadura "fi" a divide; as letras em volta dela, na mesma palavra e
+    na seguinte, ficam com o glifo delas e revisadas, e a letra nova logo depois dela entra
+    depois dos boxes da divisão."""
+    for pagina, de, para in [("afb", "afib", "afxib"), ("af b", "afi b", "afxi b"),
+                             ("afb", "afib", "afxiyb")]:
+        p = _pagina(pagina)
+        p.boxes[1] = Box(p.boxes[1].gid, BoxEntry("fi", 42, 20, 60, 50, 0.9, "net"))
+        a, b = p.boxes[0].gid, p.boxes[2].gid
+        plano = _editar(p, de, para)
+        assert _texto(p) == para and len(plano.dividir_boxes) == 1
+        assert a in p.vivos and b in p.vivos and p.box(a).revisado and p.box(b).revisado
+
+
+@pytest.mark.parametrize("linhas, de, para, letras, lado, ancora", [
+    (("a csa b",), "csa", "casa", "a", "depois", 1),     # depois do glifo antes dela
+    (("x asa",), "x asa", "x casa", "c", "antes", 1),    # no começo da palavra, depois de outra
+    (("o sol",), "o sol", "o bem sol", "bem", "depois", 0),   # palavra nova entre duas
+    (("um sol",), "sol", "sol bem", "bem", "depois", 4),      # palavra nova no fim
+    (("casa", "longe"), "longe", "muito longe", "muito", "antes", 4),   # no começo da linha
+    (("casa", "longe"), "casa\nlonge", "casa\nmuito longe", "muito", "antes", 4)])
+def test_a_ancora_das_letras_novas_no_plano(linhas, de, para, letras, lado, ancora):
+    """A âncora de cada letra nova no plano (a da tinta sem box, §6.3): depois do glifo antes
+    dela na palavra; sem ele, antes do seguinte; a palavra nova, depois do último glifo antes
+    dela se ele está na linha do primeiro depois (ou se não há glifo depois), senão antes do
+    primeiro depois (a palavra no começo de uma linha)."""
+    p = _pagina(*linhas)
+    gids = _gids(p)
+    plano = _editar(p, de, para)
+    assert plano.virtuais == [(letras, (lado, gids[ancora]))]
+
+
+@pytest.mark.parametrize("linhas, de, para, juncao", [
+    (("e-", "plo"), "e-\nplo", "e\nplo", (0, 2)),         # a linha de duas letras
+    (("a b-", "plo"), "b-\nplo", "b\nplo", (1, 3)),       # a palavra antes da partida
+    (("exem-", "plo"), "exem-\nplo", "eem\nplo", (3, 5))])   # outra letra sai antes do hífen
+def test_o_hifen_de_fim_de_linha_que_sai_junta_a_palavra(linhas, de, para, juncao):
+    p = _pagina(*linhas)
+    gids = _gids(p)
+    _editar(p, de, para)
+    assert _texto(p) == "\n".join(linhas).replace(de, para)
+    assert (gids[juncao[0]], gids[juncao[1]]) in p.decisoes.juncoes
+
+
+@pytest.mark.parametrize("linhas, de, para", [
+    (("casa velha-",), "velha-", "velha"),                # o hífen da última linha
+    (("-bem", "fim"), "-bem", "bem"),                     # o hífen que abre a linha
+    (("casa", "velha"), "casa", "cas")])                  # a última letra da linha não é hífen
+def test_o_que_sai_no_fim_ou_no_comeco_da_linha_e_nao_parte_palavra_nao_junta(linhas, de, para):
+    p = _pagina(*linhas)
+    _editar(p, de, para)
+    assert _texto(p) == "\n".join(linhas).replace(de, para) and not p.decisoes.juncoes
+
+
+def test_apagar_a_quebra_gravada_onde_a_tinta_tambem_separa_junta():
+    """A quebra gravada entre duas palavras que a tinta também separa (o box mexido depois
+    dela): apagar o espaço tira a quebra e junta as palavras."""
+    from abbychess.modelo import Decisoes
+
+    p = _pagina("ab cd")
+    p.decisoes = Decisoes(quebras=frozenset({p.boxes[2].gid}))
+    _editar(p, "ab cd", "abcd")
+    assert _texto(p) == "abcd" and not p.decisoes.quebras
+
+
+def test_figurinas_com_o_espaco_digitado_antes_e_na_pagina_longa_de_lances():
+    """O espaço digitado antes do lance fica; na página longa de lances que se repetem (mais
+    de 200), só o lance mudado vira figurina."""
+    assert ss.com_figurinas(" Cf3 e5", "Cf3 e5", "pt", "figurinas") == " Cf3 e5"
+    original = " ".join(["Cf3", "e5"] * 120)
+    novo = "Cf6" + original[3:]                           # o primeiro lance mudado
+    assert ss.com_figurinas(novo, original, "pt", "figurinas") == "♘f6" + original[3:]

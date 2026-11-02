@@ -184,9 +184,9 @@ class Plano:
     quebrar: Set[int] = field(default_factory=set)
     #: (último, primeiro): as palavras juntadas (o espaço apagado).
     juntar: Set[Tuple[int, int]] = field(default_factory=set)
-    #: As letras que faltaram: (letras, âncora, a palavra é nova?), a âncora como
-    #: ("depois", gid) ou ("antes", gid).
-    virtuais: List[Tuple[str, Tuple[str, Optional[int]], bool]] = field(default_factory=list)
+    #: As letras que faltaram: (letras, âncora), a âncora como ("depois", gid) ou
+    #: ("antes", gid).
+    virtuais: List[Tuple[str, Tuple[str, Optional[int]]]] = field(default_factory=list)
     #: Operações estruturais do passo G, na ordem em que aparecem no texto.
     juntar_boxes: List[Tuple[Tuple[int, ...], str]] = field(default_factory=list)
     dividir_boxes: List[Tuple[int, str]] = field(default_factory=list)
@@ -228,7 +228,7 @@ class Plano:
         if self.sair:
             n = len(self.sair)
             partes.append(f"{n} glifo tirado" if n == 1 else f"{n} glifos tirados")
-        letras = sum(len(t) for t, _a, _n in self.virtuais)
+        letras = sum(len(t) for t, _a in self.virtuais)
         if letras:
             partes.append(f"{letras} glifo virtual" if letras == 1 else f"{letras} glifos virtuais")
         return partes
@@ -575,7 +575,7 @@ def _letras_novas(unidades, itens, plano: Plano) -> None:
     linha = _linha_original(unidades)
     for k, fim in _sequencias_de_letras(itens):
         letras = "".join(c for _item, c in itens[k:fim])
-        plano.virtuais.append((letras, *_ancora_das_letras(itens, k, fim, linha)))
+        plano.virtuais.append((letras, _ancora_das_letras(itens, k, fim, linha)))
 
 
 def _sequencias_de_letras(itens):
@@ -593,15 +593,15 @@ def _sequencias_de_letras(itens):
 
 
 def _ancora_das_letras(itens, k: int, fim: int, linha: Dict[int, int]):
-    """(a âncora, a palavra é nova?) das letras `itens[k:fim]`: o glifo logo antes delas ou,
-    sem ele, o logo depois; sem os dois, a de uma palavra nova inteira."""
+    """A âncora das letras `itens[k:fim]`: o glifo logo antes delas ou, sem ele, o logo
+    depois; sem os dois, a de uma palavra nova inteira."""
     antes = itens[k - 1] if k else None
     depois = itens[fim] if fim < len(itens) else None
     if antes is not None and antes[0] == "glifo":
-        return ("depois", antes[1]), False
+        return ("depois", antes[1])
     if depois is not None and depois[0] == "glifo":
-        return ("antes", depois[1]), False
-    return _ancora_da_palavra_nova(itens, k, fim, linha), True
+        return ("antes", depois[1])
+    return _ancora_da_palavra_nova(itens, k, fim, linha)
 
 
 def _ancora_da_palavra_nova(itens, k: int, fim: int, linha: Dict[int, int]):

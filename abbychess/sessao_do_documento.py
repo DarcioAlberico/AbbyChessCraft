@@ -254,7 +254,7 @@ class ControladorDaSessao:
         if self._p.matriz is None:
             return False
         caixas = {b.gid: b.entry for b in pagina.boxes}
-        for letras, (lado, ancora), _nova in plano.virtuais:
+        for letras, (lado, ancora) in plano.virtuais:
             e = caixas.get(ancora)
             if e is None:
                 continue

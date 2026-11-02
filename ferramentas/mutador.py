@@ -265,6 +265,21 @@ def _rodar_mutante(copia: Path, modulo: Path, fonte: str, m: Mutante, testes: Li
         caminho.write_text(fonte, encoding="utf-8", newline="")
 
 
+def _contextos(destino: Path, chave: dict, continuar: bool, medir) -> Dict[int, List[str]]:
+    """Os contextos por linha: os guardados ao lado da medida, se ela continua com o mesmo
+    módulo, os mesmos testes e as mesmas marcas; senão os de uma rodada nova (`medir`), que
+    ficam guardados. Cada parte de uma medida longa não refaz a cobertura."""
+    guardados = destino.with_suffix(".contextos")
+    if continuar and guardados.is_file():
+        bruto = json.loads(guardados.read_text(encoding="utf-8"))
+        if bruto.get("chave") == chave:
+            return {int(k): v for k, v in bruto["contextos"].items()}
+    contextos = medir()
+    guardados.write_text(json.dumps({"chave": chave, "contextos": contextos}, ensure_ascii=False),
+                         encoding="utf-8", newline="\n")
+    return contextos
+
+
 def _commit(raiz: Path) -> str:
     rodada = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=raiz, capture_output=True)
     return rodada.stdout.decode().strip() if rodada.returncode == 0 else "sem-git"
@@ -327,7 +342,10 @@ def main() -> int:
         copias = [Path(pasta) / f"c{k}" for k in range(trabalhadores)]
         for copia in copias:
             shutil.copytree(raiz, copia, ignore=IGNORAR_NA_COPIA)
-        contextos = cobertura_por_teste(copias[0], args.modulo, testes, trabalhadores, args.marcas)
+        contextos = _contextos(destino, {"sha": sha, "testes": testes, "marcas": args.marcas},
+                               args.continuar,
+                               lambda: cobertura_por_teste(copias[0], args.modulo, testes,
+                                                           trabalhadores, args.marcas))
         livres: "queue.Queue[Path]" = queue.Queue()
         for copia in copias:
             livres.put(copia)

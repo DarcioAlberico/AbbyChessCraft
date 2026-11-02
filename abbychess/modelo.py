@@ -61,11 +61,6 @@ class Estilo:
     italico: Optional[bool] = None
     sublinhado: bool = False
 
-    @property
-    def conhecido(self) -> bool:
-        """Se o negrito ou o itálico foi medido (ou decidido pelo usuário)."""
-        return self.negrito is not None or self.italico is not None
-
     def para_json(self) -> list:
         """[negrito, itálico, sublinhado], e um quarto item com o que foi medido como reto
         (1: o negrito, 2: o itálico) quando há: o JSON de antes do fechamento do passo I não

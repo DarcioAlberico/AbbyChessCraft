@@ -268,10 +268,13 @@ def _lugar_do_diagrama(caixa, ordem: OrdemDeLeitura, linhas, topos, trechos,
     a do parágrafo que o contorna, pede um fim de frase antes: o parágrafo não é partido no
     meio. A linha de lances logo acima ("52.bxc7 ♔d7 … 54.♔xa5", sem ponto) não segura
     mais o diagrama, que caía depois do parágrafo de baixo (p. 54 do Aagaard).
+
+    Só as linhas com lugar na página contam: a linha só de virtuais, na página sem glifo
+    lido, não tem trecho nem topo, e o diagrama vai para o fim.
     """
     x1, y1, x2, y2 = caixa
     chave = ordem.chave((x1 + x2) / 2, y1)
-    j = next((j for j in range(len(linhas)) if (trechos[j], topos[j]) >= (chave, y1 - altura)),
+    j = next((j for j in range(len(trechos)) if (trechos[j], topos[j]) >= (chave, y1 - altura)),
              len(linhas))
     if j == len(linhas) or trechos[j] != chave:
         return j

@@ -238,10 +238,10 @@ class PoolDoIndice:
         self._pronto = threading.Event()
         self._usos = 0
 
-    def aquecer(self, ocioso: float = None) -> None:
+    def aquecer(self) -> None:
         """Abre os processos e carrega os módulos neles, numa thread (volta na hora)."""
         threading.Thread(target=self._abrir, name="pool-do-indice", daemon=True).start()
-        relogio = threading.Timer(OCIOSO if ocioso is None else ocioso, self._fechar_se_ocioso)
+        relogio = threading.Timer(OCIOSO, self._fechar_se_ocioso)
         relogio.daemon = True
         relogio.start()
 
@@ -636,7 +636,7 @@ def _ocorrencias(pagina: PaginaIndexada, expressao, trecho: Tuple[int, int],
     inicio, fim = trecho
     for casado in casamentos(pagina, expressao, inicio, fim, tempo_limite, indice):
         ocorrencia = _ocorrencia(pagina, casado.start(), casado.end())
-        if ocorrencia is not None and ocorrencia.etiqueta in onde:
+        if ocorrencia.etiqueta in onde:
             yield ocorrencia
 
 
@@ -672,9 +672,8 @@ def _trecho_da_selecao(pagina: PaginaIndexada, selecao) -> Optional[Tuple[int, i
     return (inicio, fim) if inicio < fim else None
 
 
-def _ocorrencia(pagina: PaginaIndexada, inicio: int, fim: int) -> Optional[Ocorrencia]:
-    if fim <= inicio:                           # o casamento vazio não é ocorrência
-        return None
+def _ocorrencia(pagina: PaginaIndexada, inicio: int, fim: int) -> Ocorrencia:
+    """A ocorrência do casamento não vazio (`casamentos` já pula o vazio)."""
     texto = pagina.texto
     comeco_da_linha = texto.rfind("\n", 0, inicio) + 1
     fim_da_linha = texto.find("\n", inicio)

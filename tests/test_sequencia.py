@@ -177,3 +177,95 @@ def test_a_selecao_segue_a_ordem_do_livro_depois_de_reordenar():
     reordenada = Sequencia.do_livro([10, 11, 12, 13])
     reordenada = Sequencia(tuple(reordenada.entradas[i] for i in (2, 0, 3, 1)))
     assert sq.pids_da_selecao(reordenada, sq.selecao("ímpares", 4)) == [12, 13]
+
+
+# ----------------------------------------------------------------------
+# As regras que a mutação achou sem teste (Q9, CA-Q-M1)
+# ----------------------------------------------------------------------
+
+@pytest.mark.parametrize("fonte", ["inseridas/a\\b.png", "inseridas/C:x.png"])
+def test_a_inserida_com_um_caminho_do_windows_no_nome_e_recusada(fonte):
+    with pytest.raises(ValueError, match="fonte"):
+        Entrada(1, fonte=fonte)
+
+
+def test_o_quadro_sem_altura_e_recusado():
+    with pytest.raises(ValueError, match="quadro"):
+        Entrada(1, quadro=(0, 10, 5, 10))
+
+
+def test_o_quadro_e_o_tamanho_em_lista_viram_tupla_e_a_entrada_serve_de_chave():
+    """O JSON traz listas; a entrada é chave do cache das imagens."""
+    e = Entrada(1, quadro=[0, 0, 5, 5], tamanho=[100, 200])
+    assert e.quadro == (0, 0, 5, 5) and e.tamanho == (100, 200)
+    assert {e: "a"}[Entrada(1, quadro=(0, 0, 5, 5), tamanho=(100, 200))] == "a"
+
+
+def test_a_entrada_so_com_o_pid_e_a_primeira_pagina_do_livro():
+    assert Entrada(4) == Entrada(4, "livro", 0) == Entrada.de_json({"pid": 4})
+    assert Entrada(4).pagina == 0
+    assert Apagada.de_json({"pid": 4}) == Apagada(Entrada(4), 0, None)
+
+
+def test_a_sequencia_e_a_apagada_nao_mudam_no_lugar():
+    """Imutáveis: o desfazer guarda a de antes e a de depois, e uma não pode mudar a outra."""
+    from dataclasses import FrozenInstanceError
+
+    s = Sequencia.do_livro([1, 2]).apagar([2])
+    with pytest.raises(FrozenInstanceError):
+        s.entradas = ()
+    with pytest.raises(FrozenInstanceError):
+        s.apagadas[0].posicao = 5
+
+
+def test_a_pagina_fora_do_livro_diz_o_numero_que_o_usuario_ve():
+    s = Sequencia.do_livro([7, 3, 9])
+    for chamar in (s.pid_em, s.entrada_em):
+        with pytest.raises(IndexError, match=r"^Página 4 fora de 1\.\.3$"):
+            chamar(3)
+        with pytest.raises(IndexError, match=r"^Página 0 fora de 1\.\.3$"):
+            chamar(-1)
+    with pytest.raises(ValueError, match=r"^posição 5 fora do livro$"):
+        s.inserir([Entrada(20)], 4)
+    with pytest.raises(ValueError, match="não há a página 4 "):
+        s.mover([7], 3)
+    with pytest.raises(ValueError, match="não há a página -1 "):
+        s.mover([7], -2)
+
+
+def test_a_primeira_pagina_nao_serve_de_referencia_se_ela_mesma_se_move():
+    with pytest.raises(ValueError, match="referência"):
+        Sequencia.do_livro([7, 3, 9]).mover([7, 9], 0)
+
+
+def test_as_apagadas_fora_de_uma_lista_sao_recusadas():
+    with pytest.raises(TypeError):
+        Sequencia.de_json({"entradas": [], "apagadas": {}})
+
+
+def test_a_pagina_restaurada_volta_ao_comeco_quando_a_ancora_dela_era_a_primeira():
+    """A 2 saiu depois da 1; a 1 saiu depois, sendo a primeira. Só a 2 volta: a âncora dela
+    (a 1) está apagada e era a primeira, então a 2 vai para o começo, antes da 3."""
+    s = Sequencia.do_livro([1, 2, 3]).apagar([2]).apagar([1])
+    assert s.restaurar([2]).pids == [2, 3]
+
+
+def test_a_ancora_que_nao_existe_volta_pela_posicao_gravada():
+    """Um `projeto.json` de fora com a âncora num pid que não há: vale a posição gravada."""
+    s = Sequencia.de_json({"entradas": [{"pid": 1}, {"pid": 2}],
+                           "apagadas": [{"pid": 5, "posicao": 1, "depois_de": 99}]})
+    assert s.restaurar([5]).pids == [1, 5, 2]
+
+
+def test_as_ancoras_em_ciclo_nao_travam_o_restaurar():
+    """Duas apagadas que se ancoram uma na outra (não acontece, só num JSON estragado): a mais
+    nova volta pela posição gravada, e a outra logo depois dela."""
+    s = Sequencia.de_json({"entradas": [{"pid": 1}],
+                           "apagadas": [{"pid": 5, "posicao": 0, "depois_de": 6},
+                                        {"pid": 6, "posicao": 0, "depois_de": 5}]})
+    assert s.restaurar([5, 6]).pids == [6, 5, 1]
+
+
+def test_as_paginas_novas_da_v2_ganham_pid_acima_dos_gravados():
+    s, proximo = sq.da_v2(4, {0: 10, 2: 11}, proximo_pid=3)
+    assert s.pids == [10, 12, 11, 13] and proximo == 14

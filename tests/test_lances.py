@@ -396,3 +396,118 @@ def test_o_roque_que_uma_casa_corrigida_impede_nao_vai_ao_fen():
     conferido = d.conferir(tabuleiro)
     assert conferido.fen.split()[2] == "k"
     assert chess.Board(conferido.fen).is_valid()
+
+
+# ----------------------------------------------------------------------
+# As regras que a mutação achou sem teste (Q9, CA-Q-M1)
+# ----------------------------------------------------------------------
+
+def _jogo(diagrama):
+    return chess.pgn.read_game(io.StringIO(lc.pgn_do_diagrama(diagrama)))
+
+
+def test_palavras_que_parecem_numero_ou_casa_nao_entram_na_linha():
+    """O "el" depois do lance não é e1; "lo." não é o lance 10; "2I." solto (uma referência)
+    não é número, e colado ao lance ("2I.Cf3") é o 21 que o OCR leu."""
+    assert _sans(lc.primeira_linha("1.e4 el peón", "es")) == ["e4"]
+    assert lc.primeira_linha("y no lo. Cf3 Cc6", "es") == []
+    assert lc.primeira_linha("Tabla 2I. Cf3 Cc6", "es") == []
+    assert [(lance.numero, lance.pretas) for lance in lc.primeira_linha("2I.Cf3 Cc6", "es")] == [
+        (21, False), (21, True)]
+
+
+def test_a_variante_sem_numero_e_o_parentese_que_fecha_acabam_a_linha():
+    assert _sans(lc.primeira_linha("1.e4 (d4) e5 2.Cf3", "pt")) == ["e4"]
+    # O diagrama no meio de uma variante: a linha acaba no parêntese que a fecha.
+    assert _sans(lc.primeira_linha("12.Te1 Cf6) 13.Dd2 Dd7", "pt")) == ["Re1", "Nf6"]
+
+
+def test_o_lance_das_brancas_sem_numero_acaba_a_linha():
+    assert _sans(lc.primeira_linha("1.e4 e5 Cf3 é o natural, mas 2.Bc4 Cf6", "pt")) == ["e4", "e5"]
+
+
+def test_o_mate_do_texto_tem_de_ser_mate():
+    v = lc.validar(chess.STARTING_BOARD_FEN, lc.primeira_linha("1.e4#", "pt"))
+    assert v.aviso == "1.e4# do texto não dá mate aqui"
+    v = lc.validar(chess.STARTING_BOARD_FEN, lc.primeira_linha("1.f3 e5 2.g4 Dh4#", "pt"))
+    assert v.confiavel and v.lances[-1] == "Qh4#"
+
+
+def test_a_posicao_que_nao_vale_nao_passa_lance_nenhum():
+    assert lc.validar(P25, lc.primeira_linha(TEXTO_P25, "pt"), lado="w") == lc.Validacao(
+        lc.ILEGAL, 8, 0, "10...Rf8 do texto diz que jogam as pretas, mas o diagrama diz as brancas",
+        "b", 10)
+    assert lc.validar("isto não é FEN", lc.primeira_linha("1.e4", "pt")) == lc.Validacao(
+        lc.ILEGAL, 1, 0, "a posição lida não é legal com as brancas a jogar", "w", 1)
+    # O lance 0 (que nenhum livro imprime) conta como o 1.
+    assert lc.validar(chess.STARTING_BOARD_FEN, lc.primeira_linha("0.e4 e5", "pt")).numero == 1
+
+
+def test_a_validacao_gravada_sem_os_campos_novos_volta_com_os_padroes():
+    assert lc.Validacao.de_json({"estado": lc.CONFIAVEL, "lances": ["e4", "e5"]}) == lc.Validacao(
+        lc.CONFIAVEL, 0, 0, "", "", 1, ("e4", "e5"), ("", ""))
+    assert lc.Validacao.de_json({"estado": lc.ILEGAL, "numero": 0}).numero == 1
+
+
+def test_o_texto_do_diagrama_nao_tem_a_legenda():
+    from abbychess.zonas import Zona
+
+    boxes = _linha("Observe:", 0) + _linha("Brancas jogam", 470) + _linha("1.e4 e5", 520)
+    legenda = Zona("texto", 0, 465, 400, 495, id="z1", funcao="legenda")
+    pagina = tx.pagina_avulsa(boxes, [_lido(P23, caixa=(0, 40, 400, 440))], [legenda])
+    assert lc.textos_depois(tx.montar(pagina)) == {"d0": "1.e4 e5"}
+
+
+def test_o_diagrama_que_deixou_de_estar_lido_perde_a_validacao_e_o_lado_dos_lances():
+    validado = _diagrama_validado(P25, TEXTO_P25, lado="b")
+    outra = (0, 500, 400, 900)
+    por_ler = [dg.DiagramaLido(validado.caixa, id="d0", validacao=validado.validacao, lado="b",
+                               lado_origem="legenda"),
+               dg.DiagramaLido(outra, id="d1", lado="b", lado_origem=lc.LADO_DOS_LANCES,
+                               lado_trecho="10...Rf8")]
+    pagina = tx.pagina_avulsa(_linha("1.e4 e5", 950), por_ler)
+    assert lc.validar_pagina(pagina, "pt") == [
+        dg.DiagramaLido(validado.caixa, id="d0", lado="b", lado_origem="legenda"),
+        dg.DiagramaLido(outra, id="d1")]
+
+
+def test_o_pgn_comeca_no_lance_do_texto_com_o_lado_dele():
+    """Sem lances, o lance 1 das brancas; com eles, o número e o lado do texto, mesmo contra
+    a legenda; sem eles, o lado do diagrama."""
+    assert _jogo(_lido(P23)).headers["FEN"] == P23 + " w - - 0 1"
+    assert _jogo(_diagrama_validado(P23, "1.e4 e5")).headers["FEN"] == P23 + " w - - 0 1"
+    assert _jogo(_diagrama_validado(P25, TEXTO_P25, lado="w")).headers["FEN"] == P25 + " b - - 0 10"
+    d = _lido(P25)
+    pela_legenda = dg.DiagramaLido(d.caixa, casas=d.casas, lado="b", lado_origem="legenda")
+    assert _jogo(pela_legenda).headers["FEN"] == P25 + " b - - 0 1"
+
+
+def test_o_pgn_da_validacao_de_outra_posicao_para_no_lance_que_nao_cabe():
+    """A validação gravada é de outra posição (a casa corrigida depois): o PGN não joga nem
+    declara o roque dos lances que vêm depois do primeiro que não cabe."""
+    pecas = "r3k2r/8/8/8/8/8/8/R3K2R"
+    gravada = lc.Validacao.de_json({"estado": lc.CONFIAVEL, "total": 3, "legais": 3, "vez": "w",
+                                    "numero": 1, "lances": ["Qd5", "O-O", "Ra2"]})
+    jogo = _jogo(replace(_lido(pecas), validacao=gravada))
+    assert jogo.headers["FEN"] == pecas + " w - - 0 1"
+    assert list(jogo.mainline_moves()) == []
+
+
+def test_o_comentario_do_pgn_diz_se_a_posicao_foi_conferida():
+    assert _jogo(_diagrama_validado(P23, TEXTO_P23)).comment == (
+        "posição lida, não conferida; confiável pelos lances")
+    assert _jogo(_diagrama_validado(P23.replace("KBNR", "KBBR"), TEXTO_P23)).comment == (
+        "posição lida, não conferida")
+    assert _jogo(_lido(P23)).comment == "posição lida, não conferida"
+    d = _diagrama_validado(P23, TEXTO_P23)
+    assert _jogo(d.conferir(d.edicao())).comment == ""
+
+
+def test_o_aviso_do_primeiro_lance_ilegal_fica_no_pgn_da_posicao_nao_conferida():
+    """Nenhum lance passa (o primeiro já é ilegal): o aviso e a posição não conferida vão os
+    dois para o comentário do jogo, e um não apaga o outro."""
+    d = _diagrama_validado(P23, "1.Cd2 e5 2.e4")
+    jogo = _jogo(d)
+    assert list(jogo.mainline_moves()) == []
+    assert jogo.comment == "posição lida, não conferida; [1.Cd2 do texto não é legal aqui]"
+    assert _jogo(d.conferir(d.edicao())).comment == "[1.Cd2 do texto não é legal aqui]"

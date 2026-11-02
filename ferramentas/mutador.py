@@ -218,13 +218,20 @@ def _ambiente(copia: Path, **mais) -> dict:
                 ABBY_TETO_DA_RAPIDA_S="1000000", **mais)
 
 
-def cobertura_por_teste(copia: Path, modulo: Path, testes: List[str], trabalhadores: int):
+def argumentos_do_pytest(marcas: Optional[str]) -> List[str]:
+    """Os argumentos das duas rodadas, a da cobertura e a de cada mutante: sem `marcas`, as
+    camadas do `addopts` do pyproject (a suíte rápida); com elas, a expressão `-m` delas."""
+    return ["-q", "-p", "no:cacheprovider", *(["-m", marcas] if marcas else [])]
+
+
+def cobertura_por_teste(copia: Path, modulo: Path, testes: List[str], trabalhadores: int,
+                        marcas: Optional[str] = None):
     """Linha -> os contextos (`nodeid|fase`) que passam por ela, de uma rodada sem mutante."""
     import coverage
 
     arquivo = copia / ".coverage.mutador"
     pontuado = ".".join(modulo.with_suffix("").parts)
-    comando = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+    comando = [sys.executable, "-m", "pytest", *argumentos_do_pytest(marcas),
                f"--cov={pontuado}", "--cov-context=test", "--cov-report=",
                *(["-n", str(trabalhadores)] if trabalhadores > 1 else []), *testes]
     rodada = subprocess.run(comando, cwd=copia, capture_output=True,
@@ -240,14 +247,14 @@ def cobertura_por_teste(copia: Path, modulo: Path, testes: List[str], trabalhado
 
 
 def _rodar_mutante(copia: Path, modulo: Path, fonte: str, m: Mutante, testes: List[str],
-                   limite: float) -> str:
+                   limite: float, marcas: Optional[str] = None) -> str:
     """Põe o mutante na cópia, roda os testes dele e devolve o módulo de volta."""
     caminho = copia / modulo
     argumentos = copia / ".testes-do-mutante.txt"
     argumentos.write_text("\n".join(testes) + "\n", encoding="utf-8")
     caminho.write_text(m.aplicar(fonte), encoding="utf-8", newline="")
     try:
-        rodada = subprocess.run([sys.executable, "-m", "pytest", "-x", "-q", "-p", "no:cacheprovider",
+        rodada = subprocess.run([sys.executable, "-m", "pytest", "-x", *argumentos_do_pytest(marcas),
                                  f"@{argumentos.name}"], cwd=copia, capture_output=True,
                                 env=_ambiente(copia), timeout=limite)
         return classificar(rodada.returncode, False,
@@ -296,6 +303,7 @@ def main() -> int:
     partes.add_argument("--ate-minutos", type=float)
     partes.add_argument("--continuar", action="store_true")
     partes.add_argument("--saida", type=Path)
+    partes.add_argument("--marcas", help="a expressão -m do pytest (sem ela: a suíte rápida)")
     args = partes.parse_args()
     raiz = args.raiz.resolve()
     trabalhadores = max(1, min(4, args.trabalhadores))
@@ -307,7 +315,7 @@ def main() -> int:
     destino = saida / f"{args.modulo.stem}-{_commit(raiz)}.json"
     sha = hashlib.sha256(fonte.encode("utf-8")).hexdigest()
     dados = {"modulo": args.modulo.as_posix(), "commit": _commit(raiz), "sha": sha,
-             "testes": testes, "parcial": True}
+             "testes": testes, "marcas": args.marcas, "parcial": True}
     resultados: Dict[int, dict] = {}
     if args.continuar and destino.is_file():
         anterior = json.loads(destino.read_text(encoding="utf-8"))
@@ -319,7 +327,7 @@ def main() -> int:
         copias = [Path(pasta) / f"c{k}" for k in range(trabalhadores)]
         for copia in copias:
             shutil.copytree(raiz, copia, ignore=IGNORAR_NA_COPIA)
-        contextos = cobertura_por_teste(copias[0], args.modulo, testes, trabalhadores)
+        contextos = cobertura_por_teste(copias[0], args.modulo, testes, trabalhadores, args.marcas)
         livres: "queue.Queue[Path]" = queue.Queue()
         for copia in copias:
             livres.put(copia)
@@ -332,7 +340,7 @@ def main() -> int:
                 copia = livres.get()
                 try:
                     resultado = _rodar_mutante(copia, args.modulo, fonte, m, dele,
-                                               args.tempo_por_mutante)
+                                               args.tempo_por_mutante, args.marcas)
                 finally:
                     livres.put(copia)
             else:

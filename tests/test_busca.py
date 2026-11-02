@@ -616,3 +616,38 @@ def test_a_busca_por_glifo_pelo_grupo_da_fonte_e_nas_pontas_da_confianca():
     assert [g.gid for g in da_rede] == [p.boxes[k].gid for k in (0, 2, 3)]
     assert [g.gid for g in bs.buscar_glifos({0: indexada}, "", confianca_minima=0.3,
                                             confianca_maxima=0.3)] == [p.boxes[1].gid]
+
+
+@pytest.mark.parametrize("nucleos, processos", [(12, 6), (8, 6), (4, 2), (3, 1), (None, 1)])
+def test_o_indice_usa_os_nucleos_menos_dois_de_1_a_6(monkeypatch, nucleos, processos):
+    """A janela e o servidor de leitura ficam com dois núcleos; mais de 6 processos não ganha."""
+    monkeypatch.setattr(bs.os, "cpu_count", lambda: nucleos)
+    assert bs.processos_para_indexar() == processos
+
+
+@pytest.mark.processo
+def test_o_pool_do_indice_fica_aberto_enquanto_ha_uso_e_fecha_com_o_ultimo():
+    """`obter` e `devolver` contam os usos: os processos são os mesmos enquanto há um uso, o
+    último fecha (o próximo `obter` abre outros), devolver a mais não deixa a conta negativa, e
+    `liberar` fecha na hora, com uso ou sem."""
+    pool = bs.PoolDoIndice()
+    try:
+        primeiro = pool.obter()
+        assert primeiro is not None and pool.obter() is primeiro     # dois usos, um pool
+        pool.devolver()
+        assert pool.obter() is primeiro                               # ainda há uso: o mesmo
+        pool.devolver()
+        pool.devolver()                                               # o último fecha
+        segundo = pool.obter()
+        assert segundo is not None and segundo is not primeiro
+        pool.liberar()                                                # fecha com o uso aberto
+        terceiro = pool.obter()
+        assert terceiro is not segundo
+        for _ in range(4):                                            # devolver a mais: zero
+            pool.devolver()
+        quarto = pool.obter()
+        assert quarto is not terceiro
+        pool.devolver()                                               # um uso, devolvido: fecha
+        assert pool.obter() is not quarto
+    finally:
+        pool.liberar()

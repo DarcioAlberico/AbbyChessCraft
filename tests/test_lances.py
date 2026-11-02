@@ -15,21 +15,19 @@ from core.box_model import BoxEntry
 
 from abbychess import diagramas as dg
 from abbychess import lances as lc
+from abbychess import perturbacoes as pt
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
 
-from tests.test_diagramas import _lido
+from tests.ajudantes import _lido  # noqa: E402,F401,F811
+from tests.ajudantes import P25, TEXTO_P25  # noqa: E402,F401,F811
 
 RAIZ = Path(__file__).resolve().parent.parent
 
 #: Xadrez Vitorioso, p. 23 (Diagrama 4: sem o cavalo de b1) e p. 25 (Diagrama 5).
 P23 = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR"
-P25 = "rnbqk2r/ppp3pp/3p1n2/8/2Bb1B2/5Q2/PPP3PP/4RR1K"
 TEXTO_P23 = ("1.e4 e5 2.f4\nAs brancas mostram imediatamente que estão dispostas a entregar\n"
              "2...exf4 3.Cf3 f5?\nUm lance muito ruim. Seria melhor algo como 2...d5 (que")
-TEXTO_P25 = ("10...Rf8 11.Dd5??\nAs brancas ameaçam o mate e esperam que as pretas se\n"
-             "entusiasmem por 11...Cxd5 12.Bxd6+ + Rg8 13.Bxd5+ Be6 14.Bxe6 xeque-mate.\n"
-             "11...Dd7 12.Dxd4 Cc6")
 
 
 def _sans(linha):
@@ -156,9 +154,9 @@ def test_roque_conferido_vai_ao_fen():
 def test_exportar_o_fen_do_diagrama_sem_conferir_nao_tem_roque():
     from PIL import Image
 
-    from abbychess import exportar as ex
+    from abbychess import montagem as mo
 
-    figura = ex.figura_do_diagrama(Image.new("L", (800, 600), 255), _lido())
+    figura = mo.figura_do_diagrama(Image.new("L", (800, 600), 255), _lido())
     assert figura.fen and figura.fen.split()[2] == "-"
 
 
@@ -282,7 +280,7 @@ def test_validacao_vai_e_volta_no_json():
 
 def test_perturbacoes_sao_legais_reprodutiveis_e_diferentes():
     posicoes = [(P23, "w"), (P25, "b")]
-    a, b = lc.perturbacoes(posicoes, 30), lc.perturbacoes(posicoes, 30)
+    a, b = pt.perturbacoes(posicoes, 30), pt.perturbacoes(posicoes, 30)
     assert a == b and len(a) == 30
     assert {p.tipo for p in a} == {"trocada", "tirada", "movida"}
     for p in a:
@@ -316,6 +314,23 @@ def test_numero_separado_do_lance_e_reticencias_curtas():
         "e4", "e5", "Nf3", "Nc6", "Bb5"]
     linha = lc.primeira_linha("1..e5 2.Cf3", "pt")
     assert linha[0].pretas and _sans(linha) == ["e5", "Nf3"]
+
+
+def test_numero_e_fileira_lidos_com_letras_pelo_ocr():
+    """Mirkovic, *Chess School 1*: o `1` lido como `l` no número ("l.d6", "l9...") e na casa
+    ("♔fl"), e o `0` como `o` ("l0.f3"). Sem isso a linha começava num lance de variante."""
+    linha = lc.primeira_linha("l9...♘f2! 20.♔f2 ♕h4 2l.♔fl ♕h2", "en")
+    assert [(lance.numero, lance.pretas) for lance in linha][:2] == [(19, True), (20, False)]
+    assert _sans(linha) == ["Nf2", "Kf2", "Qh4", "Kf1", "Qh2"]
+    assert _sans(lc.primeira_linha("l.d6! defeat would be l.♔b3?", "en")) == ["d6"]
+    assert lc.primeira_linha("l0.f3 c5", "en")[0].numero == 10
+    assert lc.primeira_linha("l...♔d7 2.♔e3", "en")[0].pretas
+
+
+def test_letras_soltas_nao_viram_numero_nem_casa():
+    """"lo." é palavra, "I." é inicial, e o "el" do espanhol não é e1 (só no lance de peça)."""
+    assert _sans(lc.primeira_linha("eso lo. I. Ivanov jugó 1.e4", "es")) == ["e4"]
+    assert lc.primeira_linha("el peón", "es") == []
 
 
 def test_linha_legal_nao_anula_a_duvida_do_porteiro():
@@ -354,3 +369,30 @@ def test_entradas_estranhas_nao_derrubam():
     assert lc.validar("isto não é FEN", lc.primeira_linha("1.e4", "pt")).estado == lc.ILEGAL
     assert lc.pgn_do_diagrama(dg.DiagramaLido((0, 0, 10, 10))) == ""
     assert lc.Validacao.de_json({"estado": lc.CONFIAVEL, "total": "x"}) is None
+
+def test_conferir_sem_tocar_no_lado_mantem_o_que_os_lances_dizem():
+    """O lado que só o número do lance dizia (10...): o editor abre com ele, e conferir sem
+    tocar no lado não o troca por "brancas, assumido" (o FEN, o texto e o PGN concordam)."""
+    boxes = (_linha("Observe a posição seguinte:", 0) + _linha("10...Rf8 11.Dd5 Dd7 12.Dxd4", 520)
+             + _linha("Agora as brancas atacam.", 560))
+    pagina = tx.pagina_avulsa(boxes, [_lido(P25, caixa=(0, 60, 400, 460))])
+    d = lc.validar_pagina(pagina, "pt")[0]
+    tabuleiro = d.edicao()
+    assert tabuleiro.lado == "b" and tabuleiro.fen().split()[1] == "b"
+    pagina.diagramas = [d.conferir(tabuleiro)]
+    conferido = lc.validar_pagina(pagina, "pt")[0]
+    assert conferido.conferido and conferido.lado == "b"
+    assert conferido.lado_origem == lc.LADO_DOS_LANCES and conferido.fen.split()[1] == "b"
+    assert lc.pgn_do_diagrama(conferido).count(" b - - 0 10") == 1
+
+
+def test_o_roque_que_uma_casa_corrigida_impede_nao_vai_ao_fen():
+    """Marcar o roque e depois tirar a torre: o FEN conferido sai sem o direito impossível
+    (antes, um FEN inválido que caía do PGN)."""
+    d = _lido("4k2r/8/8/8/8/8/8/4K2R")
+    tabuleiro = d.edicao()
+    tabuleiro.definir_roque("Kk")
+    tabuleiro.limpar(7, 7)                              # a torre de h1
+    conferido = d.conferir(tabuleiro)
+    assert conferido.fen.split()[2] == "k"
+    assert chess.Board(conferido.fen).is_valid()

@@ -55,6 +55,8 @@ class SaudeDoLivro:
     pendentes_agora: int
     padroes: int
     limiar: int
+    #: Por página da amostra (§9.1): (posição, pendentes antes, pendentes agora).
+    por_pagina: tuple = ()
 
     @property
     def pode_reconhecer_o_livro(self) -> bool:
@@ -67,14 +69,29 @@ def saude(projeto: ProjetoDeLivro, padroes: int = 0) -> SaudeDoLivro:
     # Gravadas por `pid` (§12.4): `paginas` é a posição de agora de cada uma; os pendentes
     # iniciais são chaveados pelo valor gravado.
     gravadas = [g for g in extras.get(CHAVE_DA_AMOSTRA, ())
-                if projeto.posicoes_das_gravadas([g])]
-    paginas = tuple(projeto.posicoes_das_gravadas(gravadas))
+                if projeto.ordem.posicoes_das_gravadas([g])]
+    paginas = tuple(projeto.ordem.posicoes_das_gravadas(gravadas))
     iniciais = extras.get(CHAVE_DOS_PENDENTES_INICIAIS, {}) or {}
-    resumo = projeto.resumo_do_livro()
-    antes = sum(int(iniciais.get(str(g), iniciais.get(g, 0)) or 0) for g in gravadas)
-    agora = sum(int(resumo.get(i, {}).get("pendentes", 0) or 0) for i in paginas)
+    por_pagina = _pendentes_por_pagina(gravadas, paginas, iniciais, projeto.resumo.do_livro())
+    antes = sum(a for _p, a, _g in por_pagina)
+    agora = sum(g for _p, _a, g in por_pagina)
     limiar = int(extras.get(CHAVE_DO_LIMIAR_DA_SAUDE, max(3, round(antes * 0.1))) or 0)
-    return SaudeDoLivro(paginas, antes, agora, int(padroes), limiar)
+    return SaudeDoLivro(paginas, antes, agora, int(padroes), limiar, por_pagina)
+
+
+def escolher_limiar_da_saude(projeto: ProjetoDeLivro, limiar: int) -> None:
+    """O limiar do cartão Saúde, escolhido pelo usuário (§9.1): com até `limiar` pendentes
+    na amostra, "Reconhecer o livro" fica em destaque."""
+    projeto.dados.extras[CHAVE_DO_LIMIAR_DA_SAUDE] = max(0, int(limiar))
+    projeto.salvar()
+
+
+def _pendentes_por_pagina(gravadas, paginas, iniciais: dict, resumo: dict) -> tuple:
+    """(posição, pendentes de antes, pendentes de agora) de cada página da amostra."""
+    return tuple(
+        (posicao, int(iniciais.get(str(g), iniciais.get(g, 0)) or 0),
+         int(resumo.get(posicao, {}).get("pendentes", 0) or 0))
+        for g, posicao in zip(gravadas, paginas))
 
 
 def interpretar_intervalo(texto: str, total: int) -> List[int]:
@@ -88,22 +105,29 @@ def interpretar_intervalo(texto: str, total: int) -> List[int]:
         return list(range(total))
     paginas = set()
     for parte in re.split(r"[,;\s]+", texto):
-        if not parte:
-            continue
-        casou = re.fullmatch(r"(\d+)?\s*[-–]\s*(\d+)?|(\d+)", parte)
-        if not casou:
-            raise ValueError(f"Não entendi '{parte}'. Use, por exemplo, 26-27, 30.")
-        if casou.group(3):
-            inicio = fim = int(casou.group(3))
-        else:
-            inicio = int(casou.group(1) or 1)
-            fim = int(casou.group(2) or total)
-        if inicio > fim:
-            inicio, fim = fim, inicio
-        if inicio < 1 or fim > total:
-            raise ValueError(f"As páginas vão de 1 a {total}; '{parte}' sai disso.")
-        paginas.update(range(inicio - 1, fim))
+        if parte:
+            paginas.update(_indices_da_parte(parte, total))
     return sorted(paginas)
+
+
+def _indices_da_parte(parte: str, total: int) -> range:
+    """Os índices de "26-27", "40-", "-3" ou "30"; `ValueError` com o que não se entende ou
+    sai do livro."""
+    casou = re.fullmatch(r"(\d+)?\s*[-–]\s*(\d+)?|(\d+)", parte)
+    if not casou:
+        raise ValueError(f"Não entendi '{parte}'. Use, por exemplo, 26-27, 30.")
+    inicio, fim = _limites(casou, total)
+    if inicio > fim:
+        inicio, fim = fim, inicio
+    if inicio < 1 or fim > total:
+        raise ValueError(f"As páginas vão de 1 a {total}; '{parte}' sai disso.")
+    return range(inicio - 1, fim)
+
+
+def _limites(casou, total: int) -> tuple:
+    if casou.group(3):
+        return int(casou.group(3)), int(casou.group(3))
+    return int(casou.group(1) or 1), int(casou.group(2) or total)
 
 
 def paginas_da_amostra(indices: Iterable[int]) -> List[int]:
@@ -121,7 +145,7 @@ def paginas_da_amostra(indices: Iterable[int]) -> List[int]:
 
 def ja_lidas(projeto: ProjetoDeLivro, indices: Iterable[int]) -> List[int]:
     """Quais destas páginas já têm boxes gravados no projeto."""
-    lidas = set(projeto.paginas_lidas())
+    lidas = set(projeto.resumo.paginas_lidas())
     return [i for i in indices if i in lidas]
 
 
@@ -160,8 +184,9 @@ def reconhecer_paginas(projeto: ProjetoDeLivro, fonte: pg.FonteDePaginas,
         ao_progresso=(lambda feitas, total, _estimativa: progresso(feitas, total))
         if progresso else None, ao_fim=fim.append)
     condutor.comecar()
-    if not projeto.descarregar(60):
-        log.warning("o lote leu, mas o gravador não gravou tudo: %s", projeto.paginas_sujas())
+    if not projeto.paginas_em_memoria.descarregar(60):
+        log.warning("o lote leu, mas o gravador não gravou tudo: %s",
+                    projeto.paginas_em_memoria.paginas_sujas())
     return fim[0] if fim else condutor.resultado
 
 
@@ -182,7 +207,7 @@ def pendentes_por_pagina(projeto: ProjetoDeLivro, limiares: Limiares) -> Dict[in
     from abbychess.projeto import pendentes_pelo_histograma
 
     contagem = {}
-    for indice, resumo in projeto.resumo_do_livro().items():
+    for indice, resumo in projeto.resumo.do_livro().items():
         try:
             n = pendentes_pelo_histograma(resumo, limiares.revisao)
         except (KeyError, TypeError, ValueError):   # um resumo antigo, sem o histograma

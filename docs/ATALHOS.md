@@ -87,7 +87,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 
 | Ação | Padrão | FineReader | Escopo | Desde |
 |---|---|---|---|---|
-| Aplicar modelo de áreas nesta página | — | — | imagem_areas | F |
+| Aplicar o modelo de áreas a páginas… | — | — | imagem_areas | F |
 | Função da zona: cabeçalho | C | C | imagem_areas | F |
 | Função da zona: diagrama | D | D | imagem_areas | F |
 | Função da zona: ignorar | X | X | imagem_areas | F |

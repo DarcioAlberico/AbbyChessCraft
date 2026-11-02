@@ -2,7 +2,9 @@
 o arquivo e antes de escrever, com a pré-visualização (§12.2) do que sairia.
 
 As opções valem conforme o formato: o PDF pesquisável guarda a página inteira (nenhuma opção
-de texto vale); o PGN só olha as páginas verificadas; as marcas de página são do TXT. Os
+de texto vale); o PGN leva os diagramas conferidos ou confiáveis pelos lances, e só escolhe
+páginas pelo "Só as páginas verificadas"; as marcas de página são do TXT. A opção que o
+formato não oferece fica cinza e vale o padrão. Os
 metadados (título, autores, editora, data, assuntos, direitos, identificador, edição
 impressa e capa) são do EPUB e do DOCX e vão para `<projeto>/metadados.json`: o que se
 preenche uma vez vale nas exportações seguintes. A capa escolhida fora do projeto é copiada
@@ -17,11 +19,13 @@ from typing import Optional
 
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
+from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QPushButton, QTextBrowser, QVBoxLayout, QWidget)
+                               QMessageBox, QPushButton, QRadioButton, QSpinBox, QTextBrowser,
+                               QVBoxLayout, QWidget)
 
 from abbychess import exportar as ex
+from abbychess import metadados as mtd
 from abbychess import links_de_analise as la
 
 #: Os formatos com metadados (o PDF guarda o do arquivo original; TXT e PGN não têm).
@@ -40,19 +44,34 @@ class Escolha:
 
 class DialogoDeExportacao(QDialog):
     def __init__(self, parent, formato: str, opcoes: ex.Opcoes, metadados: dict,
-                 pasta_do_projeto: Path, titulo_padrao: str):
+                 pasta_do_projeto: Path, titulo_padrao: str, total_de_paginas: int = 0):
         super().__init__(parent)
         self.setWindowTitle(f"Exportar {formato.upper()}")
         self.formato = formato
         self.pasta = Path(pasta_do_projeto)
         self.capa_escolhida: Optional[Path] = None
-        self.capa_atual = str(metadados.get("capa", "") or "")
+        self.capa_atual = _texto(metadados, "capa")
         #: Quem faz a prévia: `(formato, opcoes, metadados)`; ela chega por `mostrar_previa`.
         self.ao_previsualizar = None
         self.janela_da_previa: Optional[JanelaDaPrevia] = None
         #: Falso depois de fechar: a prévia que chegar tarde não abre janela nenhuma.
         self.vivo = True
 
+        linha_da_analise = self._montar_as_opcoes(opcoes)
+        caixa_paginas = self._montar_as_paginas(total_de_paginas)
+        caixa_opcoes = self._montar_a_caixa_de_opcoes(formato, linha_da_analise)
+        self._montar_os_metadados(metadados, titulo_padrao, formato)
+        botoes = self._montar_os_botoes(formato)
+        corpo = QVBoxLayout(self)
+        corpo.addWidget(caixa_paginas)
+        caixa_paginas.setHidden(total_de_paginas <= 0)    # depois de pôr no layout
+        corpo.addWidget(caixa_opcoes)
+        corpo.addWidget(self.caixa_metadados)
+        corpo.addWidget(botoes)
+
+    def _montar_as_opcoes(self, opcoes: ex.Opcoes) -> QWidget:
+        """Os controles das opções, marcados como as lembradas; devolve a linha do link de
+        análise."""
         self.manter_margens = QCheckBox("Manter cabeçalhos, rodapés e números de página")
         self.so_verificadas = QCheckBox("Só as páginas verificadas")
         self.desenhar = QCheckBox("Diagramas confiáveis redesenhados do FEN (senão, o recorte)")
@@ -84,6 +103,34 @@ class DialogoDeExportacao(QDialog):
         analise_layout.addWidget(rotulo_da_analise)
         analise_layout.addWidget(self.analise)
         analise_layout.addStretch(1)
+        return linha_da_analise
+
+    def _montar_as_paginas(self, total_de_paginas: int) -> QGroupBox:
+        """O intervalo (§12.1): todas as páginas lidas, ou de uma a outra (nunca lembrado)."""
+        self.todas = QRadioButton("Todas as páginas lidas")
+        self.de_ate = QRadioButton("Da página")
+        escolha_das_paginas = QButtonGroup(self)      # exclusivos já antes de ter o pai
+        escolha_das_paginas.addButton(self.todas)
+        escolha_das_paginas.addButton(self.de_ate)
+        self.primeira, self.ultima = QSpinBox(), QSpinBox()
+        for spin, nome in ((self.primeira, "Primeira página"), (self.ultima, "Última página")):
+            spin.setRange(1, max(1, total_de_paginas))
+            spin.setAccessibleName(nome)
+            spin.valueChanged.connect(lambda _v: self.de_ate.setChecked(True))
+        self.ultima.setValue(max(1, total_de_paginas))
+        self.todas.setChecked(True)
+        caixa_paginas = QGroupBox("Páginas")
+        linha_das_paginas = QHBoxLayout(caixa_paginas)
+        ate = QLabel("à")
+        ate.setBuddy(self.ultima)
+        for w in (self.todas, self.de_ate, self.primeira, ate, self.ultima):
+            linha_das_paginas.addWidget(w)
+        linha_das_paginas.addStretch(1)
+        self.caixa_paginas = caixa_paginas
+        return caixa_paginas
+
+    def _montar_a_caixa_de_opcoes(self, formato: str, linha_da_analise: QWidget) -> QGroupBox:
+        """As opções, cinza as que o formato não oferece."""
         caixa_opcoes = QGroupBox("Opções")
         coluna = QVBoxLayout(caixa_opcoes)
         for check in (self.manter_margens, self.manter_quebras, self.so_verificadas,
@@ -92,7 +139,7 @@ class DialogoDeExportacao(QDialog):
         texto = formato in ("epub", "docx", "txt")
         self.manter_margens.setEnabled(texto)
         self.manter_quebras.setEnabled(texto)
-        self.desenhar.setEnabled(formato in ("epub", "docx"))
+        self.desenhar.setEnabled(texto)
         self.marcas.setEnabled(formato == "txt")
         self.realcar.setEnabled(formato == "docx")
         linha_da_analise.setEnabled(formato in ("epub", "docx"))
@@ -100,22 +147,30 @@ class DialogoDeExportacao(QDialog):
         if formato == "pdf":
             coluna.addWidget(QLabel("O PDF pesquisável guarda as páginas inteiras: as opções de "
                                     "texto não se aplicam."))
+        return caixa_opcoes
 
-        self.titulo = QLineEdit(str(metadados.get("titulo", "") or ""))
+    def _montar_os_metadados(self, metadados: dict, titulo_padrao: str, formato: str) -> None:
+        """Os campos dos metadados do livro, com o que o projeto já tem."""
+        self.titulo = QLineEdit(_texto(metadados, "titulo"))
         self.titulo.setPlaceholderText(titulo_padrao)
         self.autores = QLineEdit("; ".join(_lista(metadados.get("autores")
                                                   or metadados.get("autor"))))
         self.autores.setPlaceholderText("Separe os nomes com ;")
-        self.editora = QLineEdit(str(metadados.get("editora", "") or ""))
-        self.data = QLineEdit(str(metadados.get("data", "") or ""))
+        self.editora = QLineEdit(_texto(metadados, "editora"))
+        self.data = QLineEdit(_texto(metadados, "data"))
         self.data.setPlaceholderText("AAAA, AAAA-MM ou AAAA-MM-DD")
         self.assuntos = QLineEdit("; ".join(_lista(metadados.get("assuntos"))))
         self.assuntos.setPlaceholderText("Xadrez; Finais")
-        self.direitos = QLineEdit(str(metadados.get("direitos", "") or ""))
-        self.identificador = QLineEdit(str(metadados.get("identificador", "") or ""))
+        self.direitos = QLineEdit(_texto(metadados, "direitos"))
+        self.identificador = QLineEdit(_texto(metadados, "identificador"))
         self.identificador.setPlaceholderText("vazio: um identificador estável pelo título e autores")
-        self.fonte = QLineEdit(str(metadados.get("fonte", "") or ""))
+        self.fonte = QLineEdit(_texto(metadados, "fonte"))
         self.fonte.setPlaceholderText("a edição impressa; vazio: o título")
+        linha_da_capa = self._montar_a_capa()
+        self._montar_o_formulario(linha_da_capa, formato)
+
+    def _montar_a_capa(self) -> QWidget:
+        """O campo da capa, só de leitura, com Escolher e Tirar."""
         self.capa = QLineEdit(self.capa_atual)
         self.capa.setReadOnly(True)
         self.capa.setPlaceholderText("sem capa")
@@ -129,7 +184,10 @@ class DialogoDeExportacao(QDialog):
         capa_layout.addWidget(self.capa, 1)
         capa_layout.addWidget(escolher)
         capa_layout.addWidget(tirar)
+        return linha_da_capa
 
+    def _montar_o_formulario(self, linha_da_capa: QWidget, formato: str) -> None:
+        """A caixa dos metadados, cinza fora do EPUB e do DOCX."""
         self.caixa_metadados = QGroupBox("Metadados do livro")
         formulario = QFormLayout(self.caixa_metadados)
         for rotulo, campo in (("Título", self.titulo), ("Autores", self.autores),
@@ -144,6 +202,8 @@ class DialogoDeExportacao(QDialog):
         if formato not in COM_METADADOS:
             self.caixa_metadados.setToolTip("Os metadados são do EPUB e do DOCX.")
 
+    def _montar_os_botoes(self, formato: str) -> QDialogButtonBox:
+        """Exportar, Cancelar e Pré-visualizar… (cinza no PDF)."""
         botoes = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                   QDialogButtonBox.StandardButton.Cancel)
         botoes.button(QDialogButtonBox.StandardButton.Ok).setText("Exportar")
@@ -156,10 +216,7 @@ class DialogoDeExportacao(QDialog):
         self.btn_exportar = botoes.button(QDialogButtonBox.StandardButton.Ok)
         botoes.accepted.connect(self._aceitar)
         botoes.rejected.connect(self.reject)
-        corpo = QVBoxLayout(self)
-        corpo.addWidget(caixa_opcoes)
-        corpo.addWidget(self.caixa_metadados)
-        corpo.addWidget(botoes)
+        return botoes
 
     # ------------------------------------------------------------------
     def _escolher_capa(self) -> None:
@@ -175,13 +232,28 @@ class DialogoDeExportacao(QDialog):
         self.capa.clear()
 
     def opcoes(self) -> ex.Opcoes:
-        return ex.Opcoes(manter_margens=self.manter_margens.isChecked(),
-                         so_verificadas=self.so_verificadas.isChecked(),
-                         desenhar_diagramas=self.desenhar.isChecked(),
-                         marcas_de_pagina=self.marcas.isChecked(),
-                         manter_quebras=self.manter_quebras.isChecked(),
-                         realcar_duvidosos=self.realcar.isChecked(),
-                         links_de_analise=self.analise.currentData())
+        """As opções marcadas; a que o formato não oferece (o controle cinza) fica no padrão,
+        para a lembrada de outro formato não mudar este sem o usuário ver."""
+        padrao = ex.Opcoes()
+
+        def marcada(campo: str, check) -> bool:
+            return check.isChecked() if check.isEnabled() else getattr(padrao, campo)
+        return ex.Opcoes(manter_margens=marcada("manter_margens", self.manter_margens),
+                         so_verificadas=marcada("so_verificadas", self.so_verificadas),
+                         desenhar_diagramas=marcada("desenhar_diagramas", self.desenhar),
+                         marcas_de_pagina=marcada("marcas_de_pagina", self.marcas),
+                         manter_quebras=marcada("manter_quebras", self.manter_quebras),
+                         realcar_duvidosos=marcada("realcar_duvidosos", self.realcar),
+                         links_de_analise=(self.analise.currentData() if self.analise.isEnabled()
+                                           else padrao.links_de_analise),
+                         intervalo=self._intervalo())
+
+    def _intervalo(self):
+        """`(primeira, última)` em índices, ou `None` para todas; a ordem trocada se acerta."""
+        if self.caixa_paginas.isHidden() or self.todas.isChecked():
+            return None
+        a, b = sorted((self.primeira.value(), self.ultima.value()))
+        return (a - 1, b - 1)
 
     def metadados(self) -> dict:
         """O formulário como `metadados.json`. A capa é a de antes (também quando outra foi
@@ -195,7 +267,7 @@ class DialogoDeExportacao(QDialog):
                  "identificador": self.identificador.text(), "fonte": self.fonte.text()}
         if self.capa.text() and self.capa_atual:
             bruto["capa"] = self.capa_atual
-        return ex.normalizar_metadados(bruto)
+        return mtd.normalizar_metadados(bruto)
 
     def escolha(self) -> Escolha:
         return Escolha(self.opcoes(), self.metadados(), self.capa_escolhida)
@@ -279,6 +351,11 @@ def _abrir_fora(url: QUrl) -> None:
         QDesktopServices.openUrl(url)
 
 
+def _texto(metadados: dict, chave: str) -> str:
+    """O campo de texto do arquivo, vazio se ausente ou nulo."""
+    return str(metadados.get(chave, "") or "")
+
+
 def _lista(valor) -> list:
     """Os itens de uma lista do arquivo, tolerando o que foi escrito à mão (texto, número)."""
     if valor is None:
@@ -307,7 +384,12 @@ def opcoes_lembradas(config) -> ex.Opcoes:
         bruto = ",".join(str(b) for b in bruto)
     if not isinstance(bruto, str) or not bruto:
         return padrao
-    marcadas = set(bruto.split(","))
+    return ex.Opcoes(**_campos_lembrados(padrao, set(bruto.split(","))))
+
+
+def _campos_lembrados(padrao: ex.Opcoes, marcadas: set) -> dict:
+    """Os campos das opções lembradas: as de ligar pelo nome; as de escolher, `campo=valor`
+    com um valor que ainda vale."""
     escolhas = dict(m.split("=", 1) for m in marcadas if "=" in m)
     campos = {}
     for campo, valor in vars(padrao).items():
@@ -315,20 +397,22 @@ def opcoes_lembradas(config) -> ex.Opcoes:
             campos[campo] = campo in marcadas
         elif campo == "links_de_analise" and escolhas.get(campo) in la.SITES:
             campos[campo] = escolhas[campo]
-    return ex.Opcoes(**campos)
+    return campos
 
 
 def lembrar_opcoes(config, opcoes: ex.Opcoes) -> None:
     config.setValue(CHAVE, ",".join(c if v is True else f"{c}={v}"
                                     for c, v in vars(opcoes).items()
-                                    if v is True or not isinstance(v, bool)) or "nenhuma")
+                                    if c != "intervalo"           # o intervalo não se lembra
+                                    and (v is True or not isinstance(v, bool))) or "nenhuma")
 
 
 def perguntar(janela, projeto, destino: Path) -> Optional[Escolha]:
     """O diálogo para o `destino`; `None` se o usuário cancelar."""
     formato = ex.formato_do_caminho(destino)
     dialogo = DialogoDeExportacao(janela, formato, opcoes_lembradas(janela.config),
-                                  ex.ler_metadados(projeto), projeto.pasta, projeto.dados.nome)
+                                  mtd.ler_metadados(projeto), projeto.pasta, projeto.dados.nome,
+                                  len(projeto.sequencia))     # as páginas do livro, não do PDF
 
     def previsualizar(formato_, opcoes, metadados):
         janela.livro.previa(formato_, opcoes, metadados, dialogo.mostrar_previa,

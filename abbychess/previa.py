@@ -24,15 +24,18 @@ from abbychess import links_de_analise
 #: Quantas páginas a prévia mostra (o relatório cobre todas).
 LIMITE = 30
 
+#: A prévia é o livro: papel e tinta nos dois temas, como o Documento (§13: o livro não
+#: inverte). Os cinzas têm 4,5:1 ou mais sobre o branco e sobre o fundo do relatório.
 CSS = """
-body { font-family: Georgia, serif; margin: 12px 16px; }
-h1.previa { font-family: 'Segoe UI', sans-serif; font-size: 13pt; color: #555; }
-div.relatorio { font-family: 'Segoe UI', sans-serif; font-size: 9pt; color: #333;
-                background: #f4f4f4; padding: 6px 10px; }
-div.pagina { font-family: 'Segoe UI', sans-serif; font-size: 8pt; color: #888;
-             border-top: 1px solid #ccc; margin-top: 14px; padding-top: 2px; }
-p.alt { font-family: 'Segoe UI', sans-serif; font-size: 8pt; color: #666; }
-p.resto { font-style: italic; color: #888; }
+body { font-family: Georgia, serif; margin: 12px 16px; background: #ffffff; color: #111111; }
+h1.previa { font-family: 'Segoe UI', sans-serif; font-size: 13pt; color: #444444; }
+div.relatorio { font-family: 'Segoe UI', sans-serif; font-size: 9pt; color: #222222;
+                background: #f2f2f2; padding: 6px 10px; }
+div.pagina { font-family: 'Segoe UI', sans-serif; font-size: 8pt; color: #595959;
+             border-top: 1px solid #bbbbbb; margin-top: 14px; padding-top: 2px; }
+p.alt { font-family: 'Segoe UI', sans-serif; font-size: 8pt; color: #595959; }
+p.resto { font-style: italic; color: #595959; }
+a { color: #0b57a4; }
 """
 
 
@@ -64,28 +67,37 @@ def html_do_livro(paginas: Sequence[PaginaExtraida], linhas_do_relatorio: Sequen
                       f"{pagina.numero + 1}</div>")
         for bloco in pagina.blocos:
             if isinstance(bloco, Figura):
-                tipo, _ = epub.tipo_da_imagem(bloco.png)
-                dados = base64.b64encode(bloco.png).decode("ascii")
-                alt = epub.alternativo(bloco, msg, idioma)
-                partes.append(f'<p><img src="data:{tipo};base64,{dados}" width="220" '
-                              f'alt="{html.escape(alt, quote=True)}"></p>'
-                              f'<p class="alt">{html.escape(alt)}</p>')
-                endereco = links_de_analise.link_da_figura(bloco, analise)
-                if endereco:
-                    partes.append(f'<p class="alt"><a href="{html.escape(endereco, quote=True)}">'
-                                  f"{html.escape(links_de_analise.rotulo(analise, idioma))}</a></p>")
+                partes.append(_html_da_figura(bloco, msg, idioma, analise))
             elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
-                corpo = epub.xhtml_do_texto(bloco, "", quebras=quebras, realce=realce)
-                if bloco.titulo:
-                    nivel = 1 if bloco.nivel == 1 else 2
-                    partes.append(f"<h{nivel + 1}>{corpo}</h{nivel + 1}>")
-                else:
-                    partes.append(f"<p>{corpo}</p>")
+                partes.append(_html_do_paragrafo(bloco, quebras, realce))
     if len(paginas) > limite:
         partes.append(f'<p class="resto">… e mais {len(paginas) - limite} página(s), que a '
                       "exportação inclui.</p>")
     partes.append("</body></html>")
     return "".join(partes)
+
+
+def _html_da_figura(bloco: Figura, msg, idioma: str, analise: str) -> str:
+    """A imagem dentro do HTML, o texto alternativo embaixo e o link de análise, se há."""
+    tipo, _ = epub.tipo_da_imagem(bloco.png)
+    dados = base64.b64encode(bloco.png).decode("ascii")
+    alt = epub.alternativo(bloco, msg, idioma)
+    figura = (f'<p><img src="data:{tipo};base64,{dados}" width="220" '
+              f'alt="{html.escape(alt, quote=True)}"></p>'
+              f'<p class="alt">{html.escape(alt)}</p>')
+    endereco = links_de_analise.link_da_figura(bloco, analise)
+    if endereco:
+        figura += (f'<p class="alt"><a href="{html.escape(endereco, quote=True)}">'
+                   f"{html.escape(links_de_analise.rotulo(analise, idioma))}</a></p>")
+    return figura
+
+
+def _html_do_paragrafo(bloco: Paragrafo, quebras: bool, realce: bool) -> str:
+    corpo = epub.xhtml_do_texto(bloco, "", quebras=quebras, realce=realce)
+    if bloco.titulo:
+        nivel = 1 if bloco.nivel == 1 else 2
+        return f"<h{nivel + 1}>{corpo}</h{nivel + 1}>"
+    return f"<p>{corpo}</p>"
 
 
 def html_do_texto(texto: str, linhas_do_relatorio: Sequence[str], titulo: str,

@@ -3,12 +3,15 @@ palavra contra a das palavras retas da página (`pagina._italicos`)."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import fitz
 import numpy as np
 import pytest
 from PIL import Image
 
 from abbychess import pagina as pg
+from abbychess import efeitos as ef
 from abbychess import servidor_de_leitura as sl
 from abbychess.modelo import Estilo
 from core.box_model import BoxEntry
@@ -32,7 +35,7 @@ def _efeitos_por_linha(caminho, n_linhas):
     boxes = pg.segmentar(imagem)
     for b in boxes:
         b.char = "a"                     # as palavras e a medida só pedem que seja letra
-    _negritos, italicos = pg.efeitos_da_pagina(imagem, boxes)
+    _negritos, italicos = ef.efeitos_da_pagina(imagem, boxes)
     altura = imagem.height / (60 + 22 * n_linhas)
     linhas = [[] for _ in range(n_linhas)]
     for b, italico in zip(boxes, italicos):
@@ -68,26 +71,35 @@ def test_a_pagina_quase_toda_em_italico_nao_puxa_a_referencia(tmp_path):
     assert _fracao_italica(medidas[2]) == 0.0
 
 
-@pytest.mark.parametrize("cisalhamento, esperado", [(0.0, 0), (0.2, 11), (0.3, 17), (-0.2, -11)])
-def test_a_inclinacao_das_bordas_de_hastes_cisalhadas(cisalhamento, esperado):
-    """Hastes verticais cisalhadas: o pico fica no ângulo do cisalhamento (atan 0,2 ≈ 11°).
-    Desenhadas a 4× e reduzidas, com a borda suave de um render de verdade (a escada de um
-    pixel tem as bordas todas verticais)."""
+def _hastes(cisalhamento: float, preto_e_branco: bool = False) -> np.ndarray:
+    """Hastes verticais cisalhadas, desenhadas a 4× e reduzidas (a borda suave de um render
+    de verdade); em preto e branco, a escada de um pixel do escâner de 1 bit."""
     grande = np.full((240, 480), 255, np.uint8)
     for x0 in range(80, 400, 64):
         for y in range(40, 200):
             x = int(round(x0 + cisalhamento * (120 - y)))
             grande[y, x:x + 16] = 0
     recorte = np.asarray(Image.fromarray(grande).resize((120, 60), Image.Resampling.BOX))
-    medida = pg._inclinacao_das_bordas(recorte, np.ones_like(recorte, bool))
-    assert medida is not None and abs(medida[0] - esperado) <= 2 and medida[1] >= 1.0
+    return np.where(recorte < 128, 0, 255).astype(np.uint8) if preto_e_branco else recorte
+
+
+@pytest.mark.parametrize("preto_e_branco", [False, True])
+@pytest.mark.parametrize("cisalhamento, esperado", [(0.0, 0), (0.2, 11), (0.3, 17), (-0.2, -11)])
+def test_a_inclinacao_de_hastes_cisalhadas(cisalhamento, esperado, preto_e_branco):
+    """O pico fica no ângulo do cisalhamento (atan 0,2 ≈ 11°), também em 1 bit, onde a borda
+    inclinada é uma escada de degraus verticais (a régua de antes, pelo gradiente, via 0°)."""
+    recorte = _hastes(cisalhamento, preto_e_branco)
+    medida = ef._inclinacao_por_projecao(recorte, np.ones_like(recorte, bool))
+    assert medida is not None and abs(medida[0] - esperado) <= 1.5 and medida[1] >= 1.0
+    if cisalhamento:
+        assert medida[1] > ef.GANHO_DO_ITALICO
 
 
 def test_algarismos_e_palavras_curtas_nao_tem_italico_medido():
     pagina = np.full((40, 200), 255, np.uint8)
     boxes = [BoxEntry(c, 10 + 12 * k, 10, 20 + 12 * k, 30) for k, c in enumerate("1234")]
     boxes += [BoxEntry(c, 120 + 12 * k, 10, 130 + 12 * k, 30) for k, c in enumerate("ab")]
-    assert pg._italicos(pagina, boxes, [[0, 1, 2, 3], [4, 5]]) == [None] * 6
+    assert ef._italicos(pagina, boxes, [[0, 1, 2, 3], [4, 5]]) == [None] * 6
 
 
 def test_o_estilo_da_pagina_lida_leva_o_italico():
@@ -96,13 +108,88 @@ def test_o_estilo_da_pagina_lida_leva_o_italico():
                          italicos=[False, True, True, None])
     estilos = lida.estilos()
     assert [estilos.get(id(e)) for e in entradas] == [
-        Estilo(negrito=True), Estilo(italico=True), Estilo(italico=True), None]
-    # O servidor que não mede o itálico (o falso dos testes) dá o estilo de antes.
+        Estilo(True, False), Estilo(False, True), Estilo(None, True), None]
+    # O servidor que não mede o itálico (o falso dos testes): o itálico fica não medido, e
+    # o reto medido no negrito é reto (False), não desconhecido.
     so_negrito = sl.PaginaLida(entradas, [None] * 4, [], None, [], negritos=[True, None, False, None])
     assert [so_negrito.estilos().get(id(e)) for e in entradas] == [
-        Estilo(negrito=True), None, Estilo(), None]
+        Estilo(negrito=True), None, Estilo(negrito=False), None]
 
 
-def test_efeitos_de_impressao_continua_so_o_negrito():
-    assert pg.efeitos_de_impressao(Image.new("L", (10, 10)), []) == []
-    assert pg.efeitos_da_pagina(Image.new("L", (10, 10)), []) == ([], [])
+def test_o_estilo_nao_medido_nao_vira_reto():
+    """O box sem medida tem o efeito desconhecido (None), que o JSON guarda e devolve; o reto
+    medido (False) também volta como reto, e o JSON de antes ([0, 0, 0]) é "não medido"."""
+    from abbychess.modelo import SEM_ESTILO
+
+    assert SEM_ESTILO.negrito is None and SEM_ESTILO.italico is None
+    for estilo in (Estilo(), Estilo(False, None), Estilo(None, False), Estilo(False, False),
+                   Estilo(True, None), Estilo(True, False, True), Estilo(sublinhado=True)):
+        assert Estilo.de_json(estilo.para_json()) == estilo, estilo
+    assert Estilo.de_json([0, 0, 0]) is SEM_ESTILO
+
+
+def test_o_glifo_sem_medida_acha_a_amostra_em_negrito(tmp_path):
+    """O box sem medida (SEM_ESTILO, o padrão) compara com todas as amostras: a amostra em
+    negrito continua vizinha dele; o reto medido, não."""
+    import numpy as np
+
+    from abbychess.leitor import LeitorDoLivro
+    from abbychess.modelo import SEM_ESTILO
+
+    recorte = np.full((40, 30), 255, dtype=np.uint8)
+    recorte[5:35, 10:20] = 0
+    leitor = LeitorDoLivro(tmp_path / "padroes")
+    leitor.ensinar(recorte, "l", altura_de_referencia=40, efeito=Estilo(True, False))
+    assert leitor.ler(recorte, altura_de_referencia=40, efeito=SEM_ESTILO).char == "l"
+    assert leitor.ler(recorte, altura_de_referencia=40, efeito=Estilo(None, False)).char == "l"
+    assert leitor.ler(recorte, altura_de_referencia=40, efeito=Estilo(False, False)).char == ""
+
+
+def test_o_lote_rele_o_glifo_lido_por_amostra_de_outro_efeito(tmp_path):
+    """CA-9.3 no caminho do lote e do F5: lido antes de o efeito ser medido, o glifo que uma
+    amostra em negrito leu é lido de novo quando a página o mede reto."""
+    from core import vertical
+
+    from abbychess import procedencia
+    from abbychess.leitor import LeitorDoLivro
+
+    imagem = Image.new("L", (100, 60), 255)
+    imagem.paste(0, (40, 10, 50, 40))
+    box = BoxEntry("", 35, 5, 55, 45)
+    recorte = vertical.recorte_de_pe(np.asarray(imagem), box)
+    leitor = LeitorDoLivro(tmp_path / "padroes")
+    leitor.ensinar(recorte, "n", altura_de_referencia=40, efeito=Estilo(True, False))
+    parecido = recorte.copy()
+    parecido[0, 0] = 255 - int(parecido[0, 0])          # um pixel: o "n" fica mais perto
+    leitor.ensinar(parecido, "r", altura_de_referencia=40, efeito=Estilo(False, False))
+    referencia = 40
+
+    def ler_como_o_lote():
+        # A leitura e a procedência como o lote e o F5 as fazem (`ler_boxes`): a amostra
+        # registrada é o caminho relativo à pasta dos padrões, não o absoluto.
+        pg.por_leitura(box, leitor.ler(recorte, altura_de_referencia=referencia))
+        assert box.char == "n" and not Path(procedencia.amostra_de(box)).is_absolute()
+
+    ler_como_o_lote()
+    assert ef.reler_pelo_efeito(imagem, [box], leitor, [False], [None]) == 1
+    assert box.char == "r"
+    # Medido em negrito (ou sem medida), a leitura fica.
+    for negrito in (True, None):
+        ler_como_o_lote()
+        assert ef.reler_pelo_efeito(imagem, [box], leitor, [negrito], [None]) == 0
+        assert box.char == "n"
+
+
+def test_reler_mantem_o_sublinhado_do_usuario():
+    """A medida nova diz o negrito e o itálico; o sublinhado (Ctrl+U) é do usuário e fica."""
+    from abbychess.modelo import Box, reconciliar
+
+    antes = [Box(0, BoxEntry("a", 0, 0, 5, 5), estilo=Estilo(False, False, True))]
+    nova = BoxEntry("a", 0, 0, 5, 5)
+    boxes, _dif = reconciliar(antes, [nova], alocar=lambda: 1,
+                              estilo_de=lambda e: Estilo(True, False))
+    assert boxes[0].estilo == Estilo(True, False, True)
+
+
+def test_a_pagina_sem_glifos_nao_tem_efeitos():
+    assert ef.efeitos_da_pagina(Image.new("L", (10, 10)), []) == ([], [])

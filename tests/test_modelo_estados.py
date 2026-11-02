@@ -11,45 +11,43 @@ ela não tocou, e uma quebra e uma junção nunca valem na mesma fronteira. Do D
 confirmada (sem recusa) deixa na página o texto digitado, e a âncora de todo virtual é um box
 vivo ou outro virtual.
 
-Suíte rápida: `derandomize=True`, `max_examples=100`. A camada noturna roda 5.000.
+Suíte rápida: `derandomize=True`, `max_examples=100`. A camada noturna (`-m noturno`) roda
+as mesmas máquinas com 5.000 (SPEC-qualidade CA-Q-T4).
 """
 
 from __future__ import annotations
-
-import os
 
 import pytest
 from hypothesis import HealthCheck, Phase, settings
 from hypothesis import strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, initialize, invariant, rule
-from PIL import Image, ImageDraw
-
-from core.box_model import BoxEntry
 
 from abbychess import edicao as ed
 from abbychess import pagina as pg
+from abbychess import editar_boxes as eb
 from abbychess import sessao as ss
-from abbychess import texto as tx
-from abbychess.modelo import Box, Pagina, foto, gid_de, reconciliar
+from abbychess.modelo import foto, reconciliar
 
-LARGURA, ALTURA = 900, 400
-EXEMPLOS = 5000 if os.environ.get("ABBY_NOTURNO") == "1" else 100
+from tests import estrategias as lei
+from tests.estrategias import pagina_sintetica as _pagina_sintetica
+
+#: Os exemplos de cada máquina: na suíte rápida e na camada noturna (§15.1).
+EXEMPLOS, EXEMPLOS_DA_NOITE = 100, 5000
 
 
-def _pagina_sintetica(n: int):
-    """`n` glifos em linhas de 12, cada um com dois traços verticais separados por um vão."""
-    imagem = Image.new("L", (LARGURA, ALTURA), 255)
-    desenho = ImageDraw.Draw(imagem)
-    boxes = []
-    for k in range(n):
-        linha, coluna = divmod(k, 12)
-        x, y = 20 + coluna * 72, 20 + linha * 70
-        desenho.rectangle((x, y, x + 8, y + 30), fill=0)
-        desenho.rectangle((x + 20, y, x + 28, y + 30), fill=0)
-        boxes.append(BoxEntry("a", x, y, x + 29, y + 31, 0.95, "net"))
-    pagina = Pagina(pid=7, indice=3, boxes=[Box(gid_de(7, i), b) for i, b in enumerate(boxes)],
-                    estado="reconhecida", proximo_n=n)
-    return imagem, pagina
+def _casos(maquina, nome: str):
+    """A máquina nas duas camadas: (a da suíte rápida, a noturna, marcada)."""
+    def ajustes(exemplos):
+        return settings(
+            max_examples=exemplos, derandomize=True, stateful_step_count=25, deadline=None,
+            # Sem a fase "explain": ela roda com rastreio linha a linha e leva minutos.
+            phases=[Phase.explicit, Phase.reuse, Phase.generate, Phase.target, Phase.shrink],
+            suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+
+    rapida = type(f"{nome}Rapida", (maquina.TestCase,), {"settings": ajustes(EXEMPLOS)})
+    noturna = type(f"{nome}Noturna", (maquina.TestCase,),
+                   {"settings": ajustes(EXEMPLOS_DA_NOITE)})
+    return rapida, pytest.mark.noturno(pytest.mark.timeout(1800)(noturna))
 
 
 ACOES = ["trocar", "apagar", "inserir", "inserir_antes", "comeco", "espaco", "palavra",
@@ -252,13 +250,13 @@ class MaquinaDaPagina(RuleBasedStateMachine):
     def dividir_pela_janela(self, i):
         if self.pagina.boxes:
             k = i % len(self.pagina.boxes)
-            self._pela_janela(lambda entries: pg.dividir(self.imagem, entries, k))
+            self._pela_janela(lambda entries: eb.dividir(self.imagem, entries, k))
 
     @rule(i=st.integers(0, 10_000))
     def juntar_pela_janela(self, i):
         if len(self.pagina.boxes) >= 2:
             k = i % (len(self.pagina.boxes) - 1)
-            self._pela_janela(lambda entries: pg.juntar(self.imagem, entries, k, k + 1))
+            self._pela_janela(lambda entries: eb.juntar(self.imagem, entries, k, k + 1))
 
     @rule(i=st.integers(0, 10_000))
     def descartar_pela_janela(self, i):
@@ -273,57 +271,33 @@ class MaquinaDaPagina(RuleBasedStateMachine):
             self._pela_janela(lambda entries: pg.confirmar(entries, k, "z"))
 
     # ------------------------------------------------------------------
+    # As invariantes da página (`tests/estrategias.py`, também das propriedades)
     @invariant()
     def gids_unicos(self):
-        vivos = [b.gid for b in self.pagina.boxes]
-        assert len(vivos) == len(set(vivos))
+        lei.gids_unicos(self.pagina)
 
     @invariant()
     def aposentados_e_vivos_nao_se_cruzam(self):
-        vivos = self.pagina.vivos
-        assert not (self.pagina.aposentados & vivos)
-        assert all(g >> 20 == self.pagina.pid for g in vivos)
-        assert all((g & ((1 << 20) - 1)) < self.pagina.proximo_n for g in vivos)
+        lei.aposentados_e_vivos_nao_se_cruzam(self.pagina)
 
     @invariant()
     def nenhuma_decisao_cita_gid_aposentado(self):
-        assert self.pagina.decisoes.gids() <= self.pagina.vivos
+        lei.nenhuma_decisao_cita_gid_aposentado(self.pagina)
 
     @invariant()
     def quebra_e_juncao_nunca_na_mesma_fronteira(self):
-        d = self.pagina.decisoes
-        assert not (d.quebras & {b for _, b in d.juncoes})
+        lei.quebra_e_juncao_nunca_na_mesma_fronteira(self.pagina)
 
     @invariant()
     def a_ancora_de_todo_virtual_esta_na_pagina(self):
-        d = self.pagina.decisoes
-        validos = self.pagina.vivos | {v.gid for v in d.virtuais}
-        for v in d.virtuais:
-            assert v.depois_de is None or v.depois_de in validos
-            assert v.antes_de is None or v.antes_de in validos
-        ancora = {v.gid: v.depois_de if v.depois_de is not None else v.antes_de
-                  for v in d.virtuais}
-        for gid in ancora:                                # e nenhuma cadeia fecha um ciclo
-            vistos = set()
-            while gid in ancora:
-                assert gid not in vistos
-                vistos.add(gid)
-                gid = ancora[gid]
+        lei.a_ancora_de_todo_virtual_esta_na_pagina(self.pagina)
 
     @invariant()
     def montar_cobre_cada_glifo_uma_vez(self):
-        doc = tx.montar(self.pagina)
-        esperados = [b.gid for b in self.pagina.boxes if b.entry.char]
-        esperados += [v.gid for v in self.pagina.decisoes.virtuais]
-        assert sorted(doc.gids()) == sorted(esperados)
+        lei.montar_cobre_cada_glifo_uma_vez(self.pagina)
 
 
-MaquinaDaPagina.TestCase.settings = settings(
-    max_examples=EXEMPLOS, derandomize=True, stateful_step_count=25, deadline=None,
-    # Sem a fase "explain": ela roda com rastreio linha a linha e leva minutos.
-    phases=[Phase.explicit, Phase.reuse, Phase.generate, Phase.target, Phase.shrink],
-    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
-test_maquina_da_pagina = pytest.mark.timeout(600)(MaquinaDaPagina.TestCase)
+test_maquina_da_pagina, test_maquina_da_pagina_noturna = _casos(MaquinaDaPagina, "Pagina")
 
 
 # ----------------------------------------------------------------------
@@ -343,6 +317,8 @@ class _ProjetoNaMemoria:
     def __init__(self, pagina):
         self.pagina = pagina
         self.agendadas = 0
+        self.paginas_em_memoria = self             # prender e agendar, como o cache
+        self.ordem = self                          # e a posição do pid, como a sequência
 
     def carregar_modelo(self, indice):
         return self.pagina
@@ -350,8 +326,11 @@ class _ProjetoNaMemoria:
     def pagina_para_editar(self, indice):
         return self.pagina
 
-    def posicao_do_pid(self, pid):                  # a página única, na posição 0
+    def posicao_de(self, pid):                      # a página única, na posição 0
         return 0 if pid == self.pagina.pid else None
+
+    def prender(self, pid):                         # sem cache, nada a despejar
+        pass
 
     def agendar(self, pagina):
         self.agendadas += 1
@@ -431,7 +410,7 @@ class MaquinaDoControlador(RuleBasedStateMachine):
 
     @rule(passo=st.sampled_from([+1, -1]))
     def pular(self, passo):
-        self.ctl.andar(passo)
+        self.ctl.fila_da_pagina.andar(passo)
 
     @rule(i=st.integers(0, 10_000))
     def selecionar(self, i):
@@ -477,14 +456,14 @@ class MaquinaDoControlador(RuleBasedStateMachine):
     @rule(c=st.sampled_from("ab"))
     def ensinar(self, c):
         atual = self.ctl.atual
-        self.ctl.ensinar(c)
+        self.ctl.leitura.ensinar(c)
         if atual is not None:
             assert self.ctl.box(atual).char == c and self.ctl.box(atual).source == "manual"
 
     @rule(tudo=st.booleans())
     def reler(self, tudo):
         antes = list(self.ctl.modelo.boxes)
-        self.ctl.reler_pendentes(tudo)
+        self.ctl.leitura.reler_pendentes(tudo)
         self.mudou_por_fora |= self.ctl.modelo.boxes != antes
 
     @rule()
@@ -494,7 +473,7 @@ class MaquinaDoControlador(RuleBasedStateMachine):
         historico = self.ctl.historico
         while historico.proxima_a_desfazer() is not None:
             antes = historico.proxima_a_desfazer()
-            self.ctl.desfazer()
+            self.ctl.desfazedor.desfazer()
             if historico.proxima_a_desfazer() is antes:
                 assert self.mudou_por_fora, "desfazer recusado sem mudança por fora"
                 return
@@ -508,15 +487,15 @@ class MaquinaDoControlador(RuleBasedStateMachine):
         """D1: a sessão do Documento pelo controlador (um passo do desfazer)."""
         sessao = sessao_de_uma_palavra(self.ctl.modelo, i, acao, c)
         if sessao is not None:
-            self.ctl.confirmar_sessao(*sessao)
+            self.ctl.sessoes.confirmar_sessao(*sessao)
 
     @rule()
     def desfazer(self):
-        self.ctl.desfazer()
+        self.ctl.desfazedor.desfazer()
 
     @rule()
     def refazer(self):
-        self.ctl.refazer()
+        self.ctl.desfazedor.refazer()
 
     @rule(c=st.sampled_from("ab"), qual=st.sampled_from(["corrigir", "descartar", "juntar"]))
     def editar_e_desfazer(self, c, qual):
@@ -529,7 +508,7 @@ class MaquinaDoControlador(RuleBasedStateMachine):
          "juntar": lambda: self.ctl.juntar(+1)}[qual]()
         if self.ctl.modelo.boxes == antes:
             return                                   # a edição não se aplicou (sem vizinho)
-        self.ctl.desfazer()
+        self.ctl.desfazedor.desfazer()
         assert self.ctl.modelo.boxes == antes and self.ctl.modelo.estado == estado
         assert self.ctl.modelo.decisoes == decisoes
 
@@ -543,7 +522,7 @@ class MaquinaDoControlador(RuleBasedStateMachine):
 
     @invariant()
     def fila_e_uma_permutacao_dos_pendentes(self):
-        fila = self.ctl.fila()
+        fila = self.ctl.fila_da_pagina.fila()
         assert len(fila) == len(set(fila)) and set(fila) <= set(self.ctl.gids)
 
     @invariant()
@@ -554,9 +533,5 @@ class MaquinaDoControlador(RuleBasedStateMachine):
         assert modelo.decisoes.gids() <= modelo.vivos
 
 
-MaquinaDoControlador.TestCase.settings = settings(
-    max_examples=EXEMPLOS, derandomize=True, stateful_step_count=25, deadline=None,
-    # Sem a fase "explain": ela roda com rastreio linha a linha e leva minutos.
-    phases=[Phase.explicit, Phase.reuse, Phase.generate, Phase.target, Phase.shrink],
-    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
-test_maquina_do_controlador = pytest.mark.timeout(600)(MaquinaDoControlador.TestCase)
+test_maquina_do_controlador, test_maquina_do_controlador_noturna = _casos(MaquinaDoControlador,
+                                                                           "Controlador")

@@ -638,6 +638,13 @@ menor que a margem configurada (matriz montada à mão).
   seleção múltipla, desfazer (que é o *Back* do FineReader).
 - **Efeitos**: negrito e itálico (`core.negrito`) guardados com a amostra; o k-NN só compara
   amostras do mesmo efeito quando o efeito do glifo é conhecido.
+  **Na página escaneada** (2026-10-30, `ferramentas/medir_efeitos.py`): o negrito mede a
+  espessura do traço em tons de cinza e decide com a **régua do livro** — cada página guarda,
+  por caractere, a contagem, o quantil 25 e a mediana das espessuras (no arquivo dela e no
+  `livro.json`), e o lote e o F5 mandam a régua das outras páginas com o pedido de leitura;
+  na página de partida, a página sozinha não tem o redondo dos algarismos e das casas. O
+  itálico mede a inclinação pela projeção cisalhada da tinta, que vale também na página em
+  preto e branco.
 - **Ligaduras**: padrão de vários caracteres (`ﬁ` como "fi"); no Documento, cada letra
   sincroniza com o mesmo gid.
 - A faixa Linha no lugar do rótulo "Na linha".
@@ -791,7 +798,7 @@ A partir do L:
   diagramas e os tabuleiros com conta exata (`abbychess.geometria`; o `gid` fica). **Cada
   JSON de página (versão 3) grava a `geometria` (quadro e giro) em que os boxes estão** e o
   tamanho da fonte; ao carregar, se ela difere da entrada da sequência, os boxes são levados
-  nessa hora (`modelo.reenquadrar`). Assim o Ctrl+Z de girar e cortar é a sequência de
+  nessa hora (`geometria_do_modelo.reenquadrar`). Assim o Ctrl+Z de girar e cortar é a sequência de
   antes, e uma queda no meio não deixa boxes no quadro errado: a sequência é gravada
   primeiro, e só depois as páginas gravadas vão ao gravador já levadas à geometria nova (o
   arquivo, o `livro.json` e a busca seguem a imagem; rodada 4). **O glifo que
@@ -839,9 +846,10 @@ A partir do L:
   `gids_movidos`; o nome do arquivo da amostra (com o número antigo da página) não é
   renomeado e não é usado para navegar. As amostras antigas sem `_g` vão à entrada
   `fonte="livro"` da página do nome (a metade esquerda, se ela foi dividida). Origem numa
-  página apagada: "a página de origem saiu do livro" (restaurar é por **Páginas
-  apagadas…**; oferecer na hora fica para depois, fechamento do L); glifo cortado fora: "o
-  glifo de origem saiu da página".
+  página apagada: a pergunta na barra (§8.4) oferece restaurá-la na hora (2026-10-30), e o
+  Enter a devolve ao lugar e vai ao glifo (o Ctrl+Z apaga de novo); a amostra antiga, sem
+  `_g`, não diz qual das apagadas era: "a página de origem saiu do livro", e restaurar é por
+  **Páginas apagadas…**. Glifo cortado fora: "o glifo de origem saiu da página".
 - **Cada operação é uma transação do desfazer** (§14.2): a sequência antes e depois (aplica
   só se a sequência atual é a de depois) e a `Diferenca` de cada página cujos boxes mudaram.
   Desfazer uma divisão aposenta o `pid` novo (nunca reaproveitado) e tira os `gids_movidos`
@@ -856,9 +864,13 @@ A partir do L:
   servidor está lendo glifos da página (a leitura que chega grava a página de quando foi
   pedida). Em projeto só para leitura, as operações de página ficam desligadas.
 - **Cortar e dividir são por números** (fechamento do L, 2026-10-23): as margens em
-  porcentagem do que se vê e a divisão em porcentagem da largura, conferidas na página
-  depois (o Ctrl+Z é imediato). Marcar o retângulo e a linha sobre a imagem, com prévia,
-  como no FineReader, fica para depois. Girar à direita e à esquerda são um gesto (o menu e a
+  porcentagem do que se vê e a divisão em porcentagem da largura (o Ctrl+Z é imediato).
+  **Marcados sobre a imagem, com prévia** (2026-10-30, como no FineReader): os diálogos
+  mostram a página aberta (ou, se ela não está entre as escolhidas, a primeira delas) em
+  miniatura, com o retângulo do corte (arrastar as bordas, os cantos, o retângulo inteiro,
+  ou desenhar outro) e a linha da divisão (clicar ou arrastar). A miniatura e os campos andam
+  juntos; os números continuam valendo para todas as escolhidas, e o teclado segue pelos
+  campos. Girar à direita e à esquerda são um gesto (o menu e a
   gaveta), sem diálogo; a gaveta oferece todas as operações para as páginas escolhidas, e o
   menu Página vale para as escolhidas na gaveta quando são mais de uma.
 
@@ -1009,7 +1021,7 @@ dentro da meta de §2.
 | Propriedade | — | máquinas de estado (gid, decisões, edição, desfazer), `derandomize` | ≤ 10 s |
 | Controlador | — | `tmp_path`, páginas sintéticas, falhas injetadas | ≤ 15 s |
 | Interface | — | pytest-qt offscreen, `waitUntil`, janela ativa | ≤ 15 s |
-| **Suíte rápida** | `pytest -q -n auto` (em paralelo, pytest-xdist) | as quatro acima | **< 60 s** (falha se passar) |
+| **Suíte rápida** | `pytest -q -n auto` (em paralelo, pytest-xdist; no máximo 4 workers) | as quatro acima | **< 90 s** com 4 workers, sem cobertura (falha se passar: o `conftest`; era < 60 s com `-n auto`, antes do teto de 4 workers; decisão de 2026-10-30, SPEC-qualidade §13.5) |
 | Processo | `processo` | servidor com leitor falso, matança do gravador; só correção | ≤ 90 s |
 | Livro real | `livro_real` | gabaritos, modelos reais, replay da fatia | ≤ 5 min |
 | Desempenho | `desempenho` | §2 em p95, na máquina cadastrada | ≤ 10 min |

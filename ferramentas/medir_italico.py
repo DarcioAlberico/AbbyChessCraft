@@ -73,6 +73,7 @@ def medir_pdf(pdf: Path, indices: list) -> dict:
     import fitz
 
     from abbychess import pagina as pg
+    from abbychess import efeitos as ef
     from core.notacao import palavras_da_pagina
 
     fonte = pg.FonteDePaginas(pdf)
@@ -92,7 +93,7 @@ def medir_pdf(pdf: Path, indices: list) -> dict:
             b.char = achado[4] if achado else ""
             rotulos.append(achado[5] if achado else None)
         t0 = time.perf_counter()
-        _negritos, italicos = pg.efeitos_da_pagina(imagem, boxes)
+        _negritos, italicos = ef.efeitos_da_pagina(imagem, boxes)
         tempos.append((time.perf_counter() - t0) * 1000)
         for linha in palavras_da_pagina(boxes):
             for palavra in linha:
@@ -130,6 +131,7 @@ def medir_fatia(zip_: Path, folha: Path | None) -> dict:
     from PIL import Image
 
     from abbychess import pagina as pg
+    from abbychess import efeitos as ef
     from abbychess.projeto import ProjetoDeLivro
     from core.notacao import palavras_da_pagina
 
@@ -140,11 +142,11 @@ def medir_fatia(zip_: Path, folha: Path | None) -> dict:
     por_pagina, recortes = {}, []
     try:
         fonte = pg.fonte_do_projeto(projeto)
-        for indice in projeto.paginas_lidas():
+        for indice in projeto.resumo.paginas_lidas():
             modelo = projeto.carregar_modelo(indice)
             boxes = [b.entry for b in modelo.boxes]
             imagem = fonte.pagina(indice)
-            _negritos, italicos = pg.efeitos_da_pagina(imagem, boxes)
+            _negritos, italicos = ef.efeitos_da_pagina(imagem, boxes)
             cinza = pg.cinza(imagem)
             medidas = marcadas = 0
             palavras = []
@@ -189,14 +191,15 @@ def main(argv=None) -> int:
     analisador.add_argument("--folha", type=Path, help="a imagem com as palavras marcadas na fatia")
     args = analisador.parse_args(argv)
 
-    from abbychess import pagina as pg
+    from abbychess import efeitos as ef
 
     resultado = {
         "data": datetime.date.today().isoformat(), "git": estado_do_git(),
         "pdf": args.pdf.name,
-        "regra": {"inclinacao_graus": pg.INCLINACAO_DO_ITALICO, "forca": pg.FORCA_DO_ITALICO,
-                  "minimo_de_letras": pg.MINIMO_DE_LETRAS_DO_ITALICO,
-                  "janela_graus": pg.JANELA_DO_ITALICO, "reta_ate_graus": pg.RETA_ATE},
+        "regra": {"inclinacao_graus": ef.INCLINACAO_DO_ITALICO, "teto_graus": ef.TETO_DO_ITALICO,
+                  "ganho": ef.GANHO_DO_ITALICO,
+                  "minimo_de_letras": ef.MINIMO_DE_LETRAS_DO_ITALICO,
+                  "reta_ate_graus": ef.RETA_ATE},
         "ajuste": medir_pdf(args.pdf, paginas(args.ajuste)),
         "validacao": medir_pdf(args.pdf, paginas(args.validacao)),
     }

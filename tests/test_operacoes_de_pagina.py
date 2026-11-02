@@ -19,7 +19,6 @@ from abbychess.leitor import LeitorDoLivro, nome_de_origem
 from abbychess.modelo import pid_de
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_visor import pdf_de_60_paginas  # noqa: F401
 
 
 def _box(char, x=10):
@@ -69,7 +68,7 @@ def test_ca_12_8_reordenar_so_reescreve_a_sequencia(projeto, ctl):
     pids = projeto.sequencia.pids
     antes = _hashes(projeto)
     ctl.ir_para(2)                                   # a página 3 aberta
-    assert ctl.mover_paginas([1, 2, 3], 9)           # as páginas 2-4 depois da 10
+    assert ctl.operacoes.mover_paginas([1, 2, 3], 9)           # as páginas 2-4 depois da 10
     esperado = [pids[0], *pids[4:10], pids[1], pids[2], pids[3], *pids[10:]]
     assert projeto.sequencia.pids == esperado
     assert _hashes(projeto) == antes                 # nenhum JSON de página mudou
@@ -83,22 +82,22 @@ def test_ca_12_8_desfazer_devolve_a_ordem_e_o_seguinte_desfaz_a_edicao_de_antes(
     ctl.marcar(0, 0, largura - 1, altura // 4)       # uma edição na página 1
     assert projeto.carregar_modelo(0).boxes
     pids = projeto.sequencia.pids
-    ctl.mover_paginas([0], 4)
+    ctl.operacoes.mover_paginas([0], 4)
     assert projeto.sequencia.pids[4] == pids[0]
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia.pids == pids
-    ctl.desfazer()                                   # a edição de antes da reordenação
+    ctl.desfazedor.desfazer()                                   # a edição de antes da reordenação
     assert not projeto.carregar_modelo(0).boxes
-    ctl.refazer()
-    ctl.refazer()
+    ctl.desfazedor.refazer()
+    ctl.desfazedor.refazer()
     assert projeto.sequencia.pids[4] == pids[0] and projeto.carregar_modelo(4).boxes
 
 
 def test_desfazer_a_reordenacao_e_recusado_se_a_ordem_mudou_por_fora(projeto, ctl):
-    ctl.mover_paginas([0], 4)
+    ctl.operacoes.mover_paginas([0], 4)
     s = projeto.sequencia
-    projeto.gravar_sequencia(s.mover([s.pid_em(10)], -1))    # outra mudança, sem o desfazer
-    ctl.desfazer()
+    projeto.ordem.gravar(s.mover([s.pid_em(10)], -1))    # outra mudança, sem o desfazer
+    ctl.desfazedor.desfazer()
     assert any("mudou depois" in a for a in ctl.avisos)
     assert projeto.sequencia.pid_em(0) == s.pid_em(10)       # nada foi mudado
 
@@ -130,7 +129,7 @@ def test_ca_12_9_inserir_copia_os_arquivos_e_as_paginas_renderizam_iguais(projet
     esperadas = [np.asarray(pg.FonteDePaginas(pdf).pagina(k).convert("L")) for k in (0, 1)]
     esperadas.append(np.asarray(Image.open(png).convert("L")))
     antes = set(projeto.sequencia.todos_os_pids)
-    assert ctl.inserir_paginas([pdf, png], 5)        # depois da posição 5
+    assert ctl.operacoes.inserir_paginas([pdf, png], 5)        # depois da posição 5
     s = projeto.sequencia
     novas = [s.entrada_em(i) for i in (5, 6, 7)]
     assert len(s) == 63 and all(e.pid > max(antes) for e in novas)
@@ -146,10 +145,10 @@ def test_ca_12_9_inserir_copia_os_arquivos_e_as_paginas_renderizam_iguais(projet
 
 def test_ca_12_9_inserir_antes_da_primeira_e_ler_e_exportar_a_inserida(projeto, ctl, tmp_path):
     pdf = _pdf(tmp_path / "rosto.pdf", ["Rosto"])
-    assert ctl.inserir_paginas([pdf], 0)
+    assert ctl.operacoes.inserir_paginas([pdf], 0)
     assert projeto.sequencia.entrada_em(0).fonte.startswith("inseridas/")
     projeto.salvar_pagina(0, [_box("q"), _box("q", x=20)])     # lida (os boxes de um F5)
-    assert projeto.carregar_modelo(0).pid == projeto.pid_da_pagina(0)
+    assert projeto.carregar_modelo(0).pid == projeto.ordem.pid_em(0)
     assert _texto(projeto).startswith("qq")
 
 
@@ -161,7 +160,7 @@ def test_ca_12_9_pdf_cifrado_e_recusado_e_nada_muda(projeto, ctl, tmp_path):
         doc.new_page()
         doc.save(str(cifrado), encryption=fitz.PDF_ENCRYPT_AES_256, user_pw="x", owner_pw="y")
     antes = (projeto.pasta / "projeto.json").read_bytes()
-    assert not ctl.inserir_paginas([cifrado], 3)
+    assert not ctl.operacoes.inserir_paginas([cifrado], 3)
     assert any("cifrado" in a for a in ctl.avisos)
     assert (projeto.pasta / "projeto.json").read_bytes() == antes
     assert not (projeto.pasta / "inseridas").exists()
@@ -176,27 +175,27 @@ def test_ca_12_10_apagar_tira_do_livro_e_guarda_os_arquivos(projeto, ctl):
         projeto.salvar_pagina(i, [_box(letra), _box(letra, x=20)])
     pids = projeto.sequencia.pids
     antes = _hashes(projeto)
-    assert ctl.apagar_paginas([2, 6])                # as páginas 3 e 7
+    assert ctl.operacoes.apagar_paginas([2, 6])                # as páginas 3 e 7
     s = projeto.sequencia
     assert pids[2] not in s.pids and pids[6] not in s.pids and len(s) == 58
     # A posição conta as que ficaram: a 7 tinha 5 páginas do livro antes dela.
     assert {a.entrada.pid: a.posicao for a in s.apagadas} == {pids[2]: 2, pids[6]: 5}
-    assert sorted(projeto.resumo_do_livro()) == [s.posicao_de(pids[8])]
-    assert projeto.paginas_lidas() == [s.posicao_de(pids[8])]
+    assert sorted(projeto.resumo.do_livro()) == [s.posicao_de(pids[8])]
+    assert projeto.resumo.paginas_lidas() == [s.posicao_de(pids[8])]
     assert _texto(projeto).strip() == "zz"           # a exportação também
     assert _hashes(projeto) == antes                 # os arquivos continuam no disco
-    ctl.desfazer()
-    assert projeto.sequencia.pids == pids and sorted(projeto.resumo_do_livro()) == [2, 6, 8]
+    ctl.desfazedor.desfazer()
+    assert projeto.sequencia.pids == pids and sorted(projeto.resumo.do_livro()) == [2, 6, 8]
 
 
 def test_ca_12_10_restaurar_depois_de_reabrir_devolve_ao_lugar(projeto, ctl):
     projeto.salvar_pagina(6, [_box("y")])
     pids = projeto.sequencia.pids
-    ctl.apagar_paginas([2, 6])
+    ctl.operacoes.apagar_paginas([2, 6])
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
     assert {a.entrada.pid for a in reaberto.sequencia.apagadas} == {pids[2], pids[6]}
     outro = _ligar(reaberto)
-    assert outro.restaurar_paginas([pids[6], pids[2]])
+    assert outro.operacoes.restaurar_paginas([pids[6], pids[2]])
     assert reaberto.sequencia.pids == pids and not reaberto.sequencia.apagadas
     assert reaberto.carregar_pagina(6)[0].char == "y"
 
@@ -204,13 +203,13 @@ def test_ca_12_10_restaurar_depois_de_reabrir_devolve_ao_lugar(projeto, ctl):
 def test_a_pagina_aberta_que_e_apagada_da_lugar_a_vizinha(projeto, ctl):
     ctl.ir_para(59)
     pids = projeto.sequencia.pids
-    ctl.apagar_paginas([59])
-    assert ctl.indice == 58 and projeto.pid_da_pagina(ctl.indice) == pids[58]
+    ctl.operacoes.apagar_paginas([59])
+    assert ctl.indice == 58 and projeto.ordem.pid_em(ctl.indice) == pids[58]
     assert ctl.fonte.total == 59
 
 
 def test_apagar_todas_e_recusado(projeto, ctl):
-    assert not ctl.apagar_paginas(list(range(60)))
+    assert not ctl.operacoes.apagar_paginas(list(range(60)))
     assert len(projeto.sequencia) == 60
 
 
@@ -219,12 +218,12 @@ def test_apagar_todas_e_recusado(projeto, ctl):
 # ----------------------------------------------------------------------
 
 def test_ca_12_15_a_selecao_e_do_livro_e_a_operacao_e_uma_transacao(projeto, ctl):
-    ctl.mover_paginas([30], -1)                      # reordenado: a 31 do PDF é a 1 do livro
+    ctl.operacoes.mover_paginas([30], -1)                      # reordenado: a 31 do PDF é a 1 do livro
     passos = ctl.historico.passos
     impares = sq.selecao("ímpares", len(projeto.sequencia))
     pids = sq.pids_da_selecao(projeto.sequencia, impares)
     assert pids[0] == projeto.sequencia.pid_em(0) == ctl.projeto.sequencia.pids[0]
-    ctl.apagar_paginas(impares)
+    ctl.operacoes.apagar_paginas(impares)
     assert ctl.historico.passos == passos + 1
     assert not set(pids) & set(projeto.sequencia.pids)
 
@@ -236,30 +235,30 @@ def test_ca_12_15_com_o_lote_ou_so_para_leitura_nada_muda(projeto, ctl, como, tm
     else:
         projeto.somente_leitura = True
     arquivos = {a: a.read_bytes() for a in projeto.pasta.rglob("*") if a.is_file()}
-    assert ctl.motivo_para_nao_mudar_as_paginas() is not None
-    assert not ctl.mover_paginas([1], 5)
-    assert not ctl.apagar_paginas([1])
-    assert not ctl.inserir_paginas([_png(tmp_path / "x.png")], 0)
+    assert ctl.operacoes.motivo_para_nao_mudar_as_paginas() is not None
+    assert not ctl.operacoes.mover_paginas([1], 5)
+    assert not ctl.operacoes.apagar_paginas([1])
+    assert not ctl.operacoes.inserir_paginas([_png(tmp_path / "x.png")], 0)
     assert {a: a.read_bytes() for a in projeto.pasta.rglob("*") if a.is_file()} == arquivos
 
 
 def test_com_uma_tarefa_em_curso_as_operacoes_e_o_desfazer_delas_esperam(projeto, ctl,
                                                                          monkeypatch):
-    ctl.mover_paginas([0], 4)
+    ctl.operacoes.mover_paginas([0], 4)
     pids = projeto.sequencia.pids
     monkeypatch.setattr(ctl, "_agora", lambda: False)        # o F5 rodando, por exemplo
-    assert not ctl.apagar_paginas([1])
-    ctl.desfazer()
+    assert not ctl.operacoes.apagar_paginas([1])
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia.pids == pids and any("não pode voltar" in a for a in ctl.avisos)
     monkeypatch.undo()
     ctl.lote_rodando = True
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia.pids == pids                    # nem com o lote rodando
 
 
 def test_a_operacao_que_nao_muda_nada_nao_vira_passo(projeto, ctl):
     passos = ctl.historico.passos
-    assert not ctl.mover_paginas([3], 2)                     # a 4 já está depois da 3
+    assert not ctl.operacoes.mover_paginas([3], 2)                     # a 4 já está depois da 3
     assert ctl.historico.passos == passos
 
 
@@ -272,22 +271,22 @@ def test_falha_ao_gravar_a_ordem_nao_muda_nada(projeto, ctl, monkeypatch):
         raise PermissionError("o projeto.json está aberto noutro programa")
 
     monkeypatch.setattr(gv, "gravar_json", recusar)
-    assert not ctl.apagar_paginas([2])
+    assert not ctl.operacoes.apagar_paginas([2])
     assert projeto.sequencia.pids == pids and ctl.historico.passos == 0
     assert any("não foi gravado" in a for a in ctl.avisos)
 
 
 def test_desfazer_o_inserir_poe_as_inseridas_nas_apagadas(projeto, ctl, tmp_path):
-    ctl.inserir_paginas([_png(tmp_path / "x.png")], 3)
-    pid = projeto.pid_da_pagina(3)
+    ctl.operacoes.inserir_paginas([_png(tmp_path / "x.png")], 3)
+    pid = projeto.ordem.pid_em(3)
     projeto.salvar_pagina(3, [_box("w")])                     # lida, fora do desfazer
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert pid not in projeto.sequencia.pids
     apagada = projeto.sequencia.apagada(pid)
     assert apagada is not None and apagada.entrada.fonte.startswith("inseridas/")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)           # e não vira página do livro
     assert reaberto.sequencia.apagada(pid).entrada.fonte.startswith("inseridas/")
-    ctl.refazer()
+    ctl.desfazedor.refazer()
     assert projeto.sequencia.pid_em(3) == pid and not projeto.sequencia.apagadas
 
 
@@ -295,10 +294,10 @@ def test_as_visitas_seguem_as_paginas_pelo_pid(projeto, ctl):
     for i in (5, 9, 5):
         ctl.ir_para(i)                                       # visitas: 1, 6, 10, 6
     pids = projeto.sequencia.pids
-    ctl.mover_paginas([5], 20)                               # a 6 vai para depois da 21
-    assert ctl.visitas == [0, 20, 8, 20] and ctl._visita == 3
-    ctl.voltar_visita()
-    assert projeto.pid_da_pagina(ctl.indice) == pids[9]
+    ctl.operacoes.mover_paginas([5], 20)                               # a 6 vai para depois da 21
+    assert ctl.navegador.visitas == [0, 20, 8, 20] and ctl.navegador._visita == 3
+    ctl.navegador.voltar_visita()
+    assert projeto.ordem.pid_em(ctl.indice) == pids[9]
 
 
 def test_pdf_cifrado_diz_que_e_cifrado(projeto, tmp_path):
@@ -311,7 +310,7 @@ def test_pdf_cifrado_diz_que_e_cifrado(projeto, tmp_path):
         doc.new_page()
         doc.save(str(cifrado), encryption=fitz.PDF_ENCRYPT_AES_256, user_pw="x", owner_pw="y")
     with pytest.raises(ProjetoInvalido, match="é um PDF cifrado"):
-        projeto.inserir_arquivo(cifrado)
+        projeto.ordem.inserir_arquivo(cifrado)
 
 
 # ----------------------------------------------------------------------
@@ -323,13 +322,13 @@ def test_ca_4_6_nenhum_gid_se_repete_e_a_amostra_acha_a_origem(projeto, ctl, tmp
         projeto.salvar_pagina(i, [_box("m"), _box("n", x=20)])
     gid = projeto.carregar_modelo(1).boxes[1].gid
     origem = nome_de_origem("livro", 1, 1, gid)
-    ctl.inserir_paginas([_png(tmp_path / "antes.png")], 0)
-    ctl.mover_paginas([1, 2, 3], 10)
+    ctl.operacoes.inserir_paginas([_png(tmp_path / "antes.png")], 0)
+    ctl.operacoes.mover_paginas([1, 2, 3], 10)
     projeto.salvar_pagina(0, [_box("p"), _box("q", x=20)])      # a inserida, lida
     todos = []
     for arquivo in (projeto.pasta / "paginas").glob("p*.json"):
         todos += [b[0] for b in json.loads(arquivo.read_text(encoding="utf-8"))["boxes"]]
     assert len(todos) == len(set(todos)) == 8
-    posicao, achado = projeto.origem_da_amostra(origem)
-    assert achado == gid and projeto.pid_da_pagina(posicao) == pid_de(gid)
+    posicao, achado = projeto.ordem.origem_da_amostra(origem)
+    assert achado == gid and projeto.ordem.pid_em(posicao) == pid_de(gid)
     assert gid in {b.gid for b in projeto.carregar_modelo(posicao).boxes}

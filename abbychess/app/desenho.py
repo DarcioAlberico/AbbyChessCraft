@@ -7,6 +7,7 @@ lê o estado dos controladores e desenha; nenhum decide nada.
 
 from __future__ import annotations
 
+import functools
 import time
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from abbychess.app import acoes
 from abbychess.app.imagens import pixmap_da_pagina
 from abbychess.app import estilo
 from abbychess.app import teclado, vazios
+from abbychess.controlador import AVISO_LONGO_MS
 
 
 class DesenhoDaJanela:
@@ -28,6 +30,8 @@ class DesenhoDaJanela:
 
     def _pagina_trocou(self) -> None:
         p = self.pagina
+        if self.confirmacao.aberta:             # a pergunta do Ctrl+T era da outra página
+            self.confirmacao.recusar()
         self.seletor.blockSignals(True)
         self.seletor.setMaximum(max(1, p.fonte.total))
         self.seletor.setValue(p.indice + 1)
@@ -89,8 +93,8 @@ class DesenhoDaJanela:
     def _pre_converter(self) -> None:
         """Converte a próxima provável, se a pré-carga já a renderizou (fora do clique)."""
         p = self.pagina
-        if p.cache is not None and p.cache.tem(p.proxima_provavel):
-            self._pixmap(p.proxima_provavel, p.cache.pagina(p.proxima_provavel)[0])
+        if p.cache is not None and p.cache.tem(p.navegador.proxima_provavel):
+            self._pixmap(p.navegador.proxima_provavel, p.cache.pagina(p.navegador.proxima_provavel)[0])
 
     def _zoom_mudou(self, escala: float, limite: str) -> None:
         self.caixa_de_zoom.blockSignals(True)
@@ -102,22 +106,17 @@ class DesenhoDaJanela:
     def _glifos_mudaram(self, gids=None) -> None:
         """`gids`: só esses mudaram (a leitura, não a caixa nem a lista); None: tudo."""
         p = self.pagina
-        na_fila = set(p.fila())
+        na_fila = set(p.fila_da_pagina.fila())
         todos = p.gids
         pendentes = {i for i, g in enumerate(todos) if g in na_fila}
         mudados = None if gids is None else [i for i, g in enumerate(todos) if g in gids]
-        if mudados is None or not self.visor.repintar_boxes(p.boxes, pendentes, mudados):
-            diagramas = p.diagramas
-            self.visor.mostrar_boxes(p.boxes, pendentes, [d.caixa for d in diagramas],
-                                     [estilo.cor_do_diagrama(d) for d in diagramas])
+        _pintar_os_boxes(self.visor, p, pendentes, mudados)
         self._selecao_mudou()
         self.relogio_do_texto.start()
         self.relogio_das_paginas.start()        # o estado e os pendentes, na gaveta
         self.atualizar_barra()
         if p.leitor is not None:
-            por_char = p.leitor.padroes_por_caractere()
-            self.treino.mostrar_contagens(len(pendentes), len(p.boxes),
-                                          sum(len(v) for v in por_char.values()), len(por_char))
+            _mostrar_as_contagens(self.treino, p.leitor, len(pendentes), len(p.boxes))
 
     def _atual_mudou(self) -> None:
         p = self.pagina
@@ -130,9 +129,11 @@ class DesenhoDaJanela:
                                + teclado.com_teclas("ou vá para o próximo pendente do livro "
                                                     "({proxima_pagina_pendente})."))
             return
-        self.treino.mostrar(p.matriz, p.box_atual(), p.posicao_do_atual())
-        if (sugestao := p.sugestao_do_atual()) is not None:    # §9.2: o palpite da rede
+        self.treino.mostrar(p.matriz, p.box_atual(), p.fila_da_pagina.posicao_do_atual())
+        if (sugestao := p.leitura.sugestao_do_atual()) is not None:    # §9.2: o palpite da rede
             self.treino.sugerir(*sugestao)
+        elif (troca := p.leitura.sugestao_do_contexto()) is not None:  # a palavra ou a linha desmente
+            self.treino.sugerir_pelo_contexto(*troca)
         # A fila e a Imagem levam o Documento e a Linha ao glifo (§6.2).
         self.texto.ir_ao_gid(p.atual, rolar=True)   # §6.2: o Documento rola até o glifo
         self.texto.marcar_atual(p.atual)            # e o marca, também sem o foco nele
@@ -147,21 +148,18 @@ class DesenhoDaJanela:
         """O Documento da página, com o realce de cada glifo (§6.1), sem perder o lugar."""
         self.relogio_do_texto.stop()
         p, v = self.pagina, self.verificador
-        na_fila = set(p.fila())
-        estados = {b.gid: gd.estado(b.entry, b.gid in na_fila) for b in p.modelo.boxes} \
-            if p.modelo is not None else {}
-        aviso = vazios.nada_reconhecido() if p.reconhecida else vazios.pagina_nao_reconhecida()
-        if not p.reconhecida and p.projeto is not None:
-            saude = lv.saude(p.projeto, p.leitor.arquivos_de_padrao() if p.leitor else 0)
-            if saude.paginas:
-                aviso = (f"Saúde do livro\n\nAmostra: {len(saude.paginas)} página(s)\n"
-                         f"Pendentes: {saude.pendentes_antes} → {saude.pendentes_agora}\n"
-                         f"Padrões ensinados: {saude.padroes}\n\n{aviso}")
+        na_fila = set(p.fila_da_pagina.fila())
+        da_fila = p.fila_da_pagina.margens_da_fila()  # a conta que a fila usou, talvez de antes
+        estados = _estados_dos_glifos(p.modelo, na_fila)
+        aviso = _aviso_do_documento(p)
         # A palavra fora do léxico que o usuário aceitou (Enter: revisada) não é mais duvidosa.
         revisados = {b.gid for b in p.modelo.boxes if b.revisado} if p.modelo is not None else set()
+        margens = p.fila_da_pagina.gids_de_margem()
         self.texto.montar(p.documento(), p.diagramas, estados, v.gids_desconhecidos() - revisados,
-                          p.gids_virtuais(), p.matriz, p.gids_de_margem(), aviso)
+                          p.gids_virtuais(), p.matriz, margens, aviso)
         self._mostrar_a_linha()
+        if margens != da_fila:                  # a ordem da fila mudou com a conta nova
+            self.atualizar_fila()
 
     def _selecao_mudou(self) -> None:
         p = self.pagina
@@ -172,7 +170,7 @@ class DesenhoDaJanela:
         """O efeito e o conflito de ensinar o caractere do campo (§8.3); no escopo livro da
         fila, também quantos glifos do livro têm a mesma leitura (pelo índice da busca)."""
         p = self.pagina
-        efeito, conflito = p.aviso_de_ensino(self.treino.campo.text())
+        efeito, conflito = p.padroes_do_livro.aviso_de_ensino(self.treino.campo.text())
         livro = ""
         if efeito and self.fila.escopo == "livro" and p.atual is not None:
             i = p.indice_de(p.atual)
@@ -187,18 +185,18 @@ class DesenhoDaJanela:
         if self.leitor is None or self.projeto is None:
             return
         padroes = self.leitor.padroes
-        pasta = Path(self.projeto.pasta_de_padroes).resolve()
+        pasta = Path(padroes.pasta)               # os arquivos são dela (sem resolver cada um)
         lidos = self.busca.lidos_por_amostra() if hasattr(self, "busca") else {}
         detalhes = {}
         for arquivos in self.leitor.padroes_por_caractere().values():
             for arquivo in arquivos:
                 meta = padroes.meta_de(arquivo)
                 try:
-                    nome = Path(arquivo).resolve().relative_to(pasta).as_posix() if pasta else ""
+                    nome = Path(arquivo).relative_to(pasta).as_posix()
                 except ValueError:
                     nome = ""
                 # (posição de agora, gid): pelo gid da amostra, que segue a página (§12.4).
-                origem = self.projeto.origem_da_amostra(meta.get("origem", ""))
+                origem = self.projeto.ordem.origem_da_amostra(meta.get("origem", ""))
                 detalhes[str(arquivo)] = {"origem": origem,
                                           "altura": meta.get("altura"),
                                           "efeito": meta.get("efeito"),
@@ -207,25 +205,53 @@ class DesenhoDaJanela:
 
     def ir_a_origem(self, pagina: int, gid) -> None:
         """A página e o glifo de onde a amostra veio (a aba Padrões, "ir para"); `pagina` é a
-        posição de agora (`projeto.origem_da_amostra`), ou None se ela saiu do livro."""
+        posição de agora (`projeto.ordem.origem_da_amostra`), ou None se ela saiu do livro."""
         if self.fonte is None or pagina is None or not 0 <= pagina < self.fonte.total:
             if pagina is None:
-                self.statusBar().showMessage("A página de origem desta amostra saiu do livro.",
-                                             6000)
+                self._origem_fora_do_livro(gid)
             return
         if pagina != self.pagina.indice:
             self.ir_para_pagina(pagina)
             self.pintar_texto()
-        if gid is not None and gid in set(self.pagina.gids):
+        if gid is not None:
+            self._ir_ao_glifo_de_origem(gid)
+
+    def _ir_ao_glifo_de_origem(self, gid) -> None:
+        """O glifo na página aberta; o que o corte deixou de fora fica no aviso."""
+        if gid in set(self.pagina.gids):
             self.pagina.escolher(gid)
-        elif gid is not None and self.pagina.modelo is not None and gid in {
+        elif self.pagina.modelo is not None and gid in {
                 b.gid for _lugar, b in self.pagina.modelo.fora}:
             self.statusBar().showMessage("O glifo de origem desta amostra saiu da página (o "
                                          "corte o deixou de fora; tirar o corte o devolve).",
-                                         8000)
+                                         AVISO_LONGO_MS)
+
+    def _origem_fora_do_livro(self, gid) -> None:
+        """A origem numa página apagada (§12.4): a pergunta na barra para restaurá-la, e o
+        Enter a devolve ao lugar e vai ao glifo. A amostra antiga, sem `gid`, não diz qual das
+        apagadas era: fica o aviso, e Página › Páginas apagadas… a devolve."""
+        from abbychess.modelo import pid_de
+
+        projeto = self.projeto
+        apagada = (projeto.sequencia.apagada(pid_de(gid))
+                   if projeto is not None and gid is not None else None)
+        if apagada is None:
+            self.statusBar().showMessage("A página de origem desta amostra saiu do livro.",
+                                         6000)
+            return
+        lugar = (f"depois da página {apagada.posicao}" if apagada.posicao
+                 else "no começo do livro")
+        self.confirmacao.perguntar(
+            f"A página de origem desta amostra foi apagada (estava {lugar}). Restaurá-la e ir "
+            "ao glifo? Enter restaura · Esc não",
+            functools.partial(self._restaurar_a_origem, apagada.entrada.pid, gid))
+
+    def _restaurar_a_origem(self, pid: int, gid: int) -> None:
+        if self.pagina.operacoes.restaurar_paginas([pid]):
+            self.ir_a_origem(self.projeto.sequencia.posicao_de(pid), gid)
 
     def _layout_mudou(self) -> None:
-        self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual)
+        self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual, self.areas.ordem_clicada)
 
     def _palavra_mudou(self) -> None:
         v, p = self.verificador, self.pagina
@@ -256,17 +282,39 @@ class DesenhoDaJanela:
         self.registrar_aviso(av.AVISO, titulo, texto)
         QMessageBox.warning(self, titulo, texto)
 
-    def _relatorio(self, titulo: str, texto: str) -> None:
-        """Um relatório (o da exportação, §12.2): vai a Resultados / Avisos, sem diálogo."""
-        self.registrar_aviso(av.AVISO, titulo, texto)
+    def _relatorio(self, titulo: str, linhas) -> None:
+        """Um relatório (o da exportação, §12.2): vai a Resultados / Avisos, sem diálogo, um
+        aviso por linha (o duplo clique no item abre a página que ele cita)."""
+        for linha in linhas:
+            self.registrar_aviso(av.AVISO, titulo, linha)
 
     def _gravacao_falhou(self, indice, erro) -> None:
         """CA-4.2 (A2): a falha de gravação vai para Avisos, além da barra."""
+        self._avisar_da_pagina("Gravação", indice, (
+            f"não foi gravada ({erro}). Ela continua com as mudanças em memória e o programa "
+            "tenta de novo; não feche antes de liberar o disco."))
+
+    def _avisar_da_pagina(self, titulo: str, indice, resto: str) -> None:
+        """O aviso de uma página na barra e em Avisos: "A página N " + `resto`."""
         pagina = f"A página {indice + 1}" if indice is not None else "Uma página"
-        texto = (f"{pagina} não foi gravada ({erro}). Ela continua com as mudanças em memória "
-                 "e o programa tenta de novo; não feche antes de liberar o disco.")
+        texto = f"{pagina} {resto}"
         self.statusBar().showMessage(texto)
-        self.registrar_aviso(av.ERRO, "Gravação", texto)
+        self.registrar_aviso(av.ERRO, titulo, texto)
+
+    def ligar_os_avisos_do_projeto(self, projeto) -> None:
+        """Os avisos do projeto que abre: a falha de gravação e a página ilegível (que chegam
+        de qualquer thread, pelos sinais), e o registro de Avisos dele."""
+        projeto.ao_falhar_gravacao = self.falha_de_gravacao.emit
+        projeto.ao_achar_ilegivel = self.pagina_ilegivel.emit
+        self.abrir_avisos_do_projeto(projeto)
+
+    def _pagina_ilegivel(self, indice, guardado) -> None:
+        """SPEC-qualidade Q-P7: a página cujo arquivo não se lê passa a não reconhecida; o
+        aviso diz qual e onde ficou o arquivo de antes."""
+        onde = (f" O arquivo dela foi guardado em paginas/{guardado}." if guardado else "")
+        self._avisar_da_pagina("Página ilegível", indice, (
+            f"estava com o arquivo ilegível e ficou como não reconhecida.{onde} Reconheça-a de "
+            "novo (F5)."))
 
     def _ocupado_mudou(self, ocupado: bool, titulo: str) -> None:
         self.progresso.setVisible(ocupado)
@@ -281,14 +329,19 @@ class DesenhoDaJanela:
         else:
             self._limpar_a_mensagem_da_tarefa()
         if not ocupado and self.pagina.box_atual() is not None:
-            self.treino.habilitar(True)
-            foco = QApplication.focusWidget()
-            # O próximo caractere vai para o campo, mas sem tirar o foco de quem o tem por
-            # escolha (o seletor de página, por exemplo): só de ninguém ou do painel de texto.
-            if (self.inspetor.atual() == "glifo" and self.isActiveWindow()
-                    and (foco is None or foco is self.texto or self.treino.isAncestorOf(foco))):
-                self.treino.campo.setFocus()
+            self._devolver_o_painel()
         acoes.atualizar(self)
+
+    def _devolver_o_painel(self) -> None:
+        """A tarefa acabou com um glifo atual: o painel de treino volta, e o campo pega o foco
+        de ninguém ou do painel de texto."""
+        self.treino.habilitar(True)
+        foco = QApplication.focusWidget()
+        # O próximo caractere vai para o campo, mas sem tirar o foco de quem o tem por
+        # escolha (o seletor de página, por exemplo): só de ninguém ou do painel de texto.
+        if (self.inspetor.atual() == "glifo" and self.isActiveWindow()
+                and (foco is None or foco is self.texto or self.treino.isAncestorOf(foco))):
+            self.treino.campo.setFocus()
 
     def _limpar_a_mensagem_da_tarefa(self) -> None:
         """A tarefa acabou: o "Carregando o léxico…" dela sai da barra (uma mensagem que
@@ -307,3 +360,34 @@ class DesenhoDaJanela:
     def _progredir(self, feito: int, total: int) -> None:
         self.progresso.setRange(0, max(total, 1))
         self.progresso.setValue(feito)              # o rótulo do lote é de `_lote_progrediu`
+
+
+def _pintar_os_boxes(visor, p, pendentes: set, mudados) -> None:
+    """Só os boxes `mudados`, se o visor consegue; senão todos, com os diagramas."""
+    if mudados is None or not visor.repintar_boxes(p.boxes, pendentes, mudados):
+        diagramas = p.diagramas
+        visor.mostrar_boxes(p.boxes, pendentes, [d.caixa for d in diagramas],
+                            [estilo.cor_do_diagrama(d) for d in diagramas])
+
+
+def _mostrar_as_contagens(treino, leitor, pendentes: int, glifos: int) -> None:
+    """Os pendentes, os glifos e as amostras do livro, no painel de treino."""
+    por_char = leitor.padroes_por_caractere()
+    treino.mostrar_contagens(pendentes, glifos, sum(len(v) for v in por_char.values()),
+                             len(por_char))
+
+
+def _estados_dos_glifos(modelo, na_fila: set) -> dict:
+    """gid → o estado do realce no Documento (§6.1); vazio sem modelo."""
+    return {b.gid: gd.estado(b.entry, b.gid in na_fila) for b in modelo.boxes} \
+        if modelo is not None else {}
+
+
+def _aviso_do_documento(p) -> str:
+    """O texto do Documento vazio: na página não reconhecida, com a saúde do livro."""
+    aviso = vazios.nada_reconhecido() if p.reconhecida else vazios.pagina_nao_reconhecida()
+    if not p.reconhecida and p.projeto is not None:
+        saude = lv.saude(p.projeto, p.leitor.arquivos_de_padrao() if p.leitor else 0)
+        if saude.paginas:
+            aviso = f"{vazios.saude_do_livro(saude)}\n\n{aviso}"
+    return aviso

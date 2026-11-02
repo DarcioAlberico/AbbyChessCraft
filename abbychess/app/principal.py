@@ -4,6 +4,26 @@ from __future__ import annotations
 
 import logging
 import sys
+import threading
+
+log = logging.getLogger(__name__)
+
+
+def registrar_os_erros_soltos() -> None:
+    """O erro que ninguém pegou, num slot do Qt (`sys.excepthook`) ou numa thread
+    (`threading.excepthook`), vai ao log com o rastro: o programa aberto pelo atalho não tem
+    o stderr onde ele iria parar (SPEC-qualidade Q-C1)."""
+    def na_interface(tipo, erro, rastro):
+        log.critical("erro não tratado", exc_info=(tipo, erro, rastro))
+
+    def na_thread(args):
+        if args.exc_type is not SystemExit:
+            log.critical("erro não tratado na thread %s",
+                         args.thread.name if args.thread is not None else "?",
+                         exc_info=(args.exc_type, args.exc_value, args.exc_traceback))
+
+    sys.excepthook = na_interface
+    threading.excepthook = na_thread
 
 
 def traduzir_o_qt(app) -> None:
@@ -21,6 +41,7 @@ def traduzir_o_qt(app) -> None:
 def main(argv=None) -> int:
     argv = list(sys.argv if argv is None else argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    registrar_os_erros_soltos()
 
     # Importados aqui para `--help` e os testes não pagarem a carga do Qt.
     from PySide6.QtWidgets import QApplication

@@ -25,12 +25,13 @@ from abbychess import gravacao as gv
 from abbychess import pagina as pg
 from abbychess import verificacao as vf
 from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL, FONTE_NENHUMA, LeitorDoLivro
+from abbychess.modelo import NAO_RECONHECIDA
 from abbychess.padroes import PadroesDoLivro
 from abbychess.projeto import (ARQUIVO_DO_LIVRO, VERSAO_DO_LIVRO, Limiares, ProjetoDeLivro, ProjetoInvalido,
                                pendentes_pelo_histograma, resumo_das_confiancas)
 from abbychess.zonas import Zona
 
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 
 @pytest.fixture(autouse=True)
@@ -109,6 +110,24 @@ def test_tres_falhas_e_depois_sucesso_grava_o_novo(tmp_path, monkeypatch, chamad
     gv.gravar_texto(arquivo, "novo")
     assert arquivo.read_text(encoding="utf-8") == "novo" and sistema.chamadas == 4
     assert not list(tmp_path.glob("*.tmp")) and sistema.fds_abertos() == []
+
+
+def test_apagar_tenta_de_novo_como_a_gravacao(tmp_path, monkeypatch):
+    """SPEC-qualidade Q-P2: o antivírus que segura o arquivo um instante não faz o apagar
+    falhar (nem deixar uma sobra)."""
+    arquivo = tmp_path / "a.json"
+    arquivo.write_text("antigo", encoding="utf-8")
+    real, falhas = os.unlink, []
+
+    def unlink(caminho, *args, **kwargs):
+        if Path(caminho) == arquivo and len(falhas) < 3:
+            falhas.append(caminho)
+            raise PermissionError("injetada")
+        return real(caminho, *args, **kwargs)
+
+    monkeypatch.setattr(os, "unlink", unlink)
+    gv.apagar(arquivo)
+    assert not arquivo.exists() and len(falhas) == 3
 
 
 @pytest.mark.parametrize("chamada", CHAMADAS)
@@ -201,7 +220,7 @@ def _cada_arquivo_do_projeto(projeto: ProjetoDeLivro, tmp_path: Path):
 
     # No v2, a página, a marca dela (o estado) e as áreas ficam no arquivo da página; desde a
     # v3 (§12.4), o pid dela é o da sequência.
-    arquivo_da_pagina = projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(0)}.json"
+    arquivo_da_pagina = projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(0)}.json"
     return [("pagina", arquivo_da_pagina, pagina),
             ("marcadas", arquivo_da_pagina, marcadas),
             ("projeto.json", projeto.pasta / "projeto.json", projeto_json),
@@ -271,8 +290,118 @@ def test_padrao_ensinado_esquecido_e_restaurado_passam_pela_gravacao(projeto, mo
     padroes.esquecer(png)
     assert png.resolve() in [a.resolve() for a in apagados] and not png.exists()
     gravados.clear()
-    padroes.restaurar(amostra)
+    padroes.restaurar_varios([amostra])
     assert png.resolve() in [g.resolve() for g in gravados] and png.exists()
+
+
+def test_metadados_dos_padroes_ilegiveis_ficam_guardados_e_nao_sao_sobrescritos(projeto, caplog):
+    """SPEC-qualidade Q-C4: o `metadados.json` ilegível (a altura e o efeito de cada padrão)
+    não vira `{}` em silêncio para ser apagado na gravação seguinte: os bytes dele ficam ao
+    lado, e o log avisa."""
+    import logging
+
+    import numpy as np
+
+    pasta = Path(projeto.pasta_de_padroes)
+    PadroesDoLivro(pasta).ensinar(np.full((20, 10), 255, np.uint8), "a", origem="x",
+                                  altura_relativa=0.5)
+    metadados = pasta / "metadados.json"
+    estragado = metadados.read_bytes()[:-7]          # truncado: a queda de um editor
+    metadados.write_bytes(estragado)
+    with caplog.at_level(logging.WARNING, logger="abbychess.padroes"):
+        padroes = PadroesDoLivro(pasta)
+    padroes.ensinar(np.full((20, 10), 0, np.uint8), "b", origem="y")   # grava os metadados
+    guardados = sorted(pasta.glob("metadados*corrompido*"))
+    assert [g.read_bytes() for g in guardados] == [estragado]
+    assert any("metadados" in r.getMessage() for r in caplog.records)
+
+
+def test_a_pagina_ilegivel_fica_guardada_e_e_nao_reconhecida_em_todo_lugar(projeto):
+    """SPEC-qualidade CA-Q-P7: um p<pid>.json truncado não é "reconhecida" no livro e
+    "nada gravado" na busca, nem levanta ao abrir a página: na primeira leitura ele vai
+    inteiro para p<pid>.corrompido.json, sai do livro.json, e a página é não reconhecida para
+    todos (a busca, a aba Diagramas, a janela, a exportação); o aviso sai uma vez."""
+    projeto.salvar_pagina(0, [_box()], reconhecida=True)
+    assert projeto.fechar()
+    arquivo = projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(0)}.json"
+    estragado = arquivo.read_bytes()[:-9]
+    arquivo.write_bytes(estragado)
+
+    aberto = ProjetoDeLivro.abrir(projeto.pasta)
+    avisos = []
+    aberto.ao_achar_ilegivel = lambda posicao, guardado: avisos.append((posicao, guardado))
+    assert aberto.ler_sem_migrar(0) is None              # a busca, numa thread
+    assert aberto.ler_sem_guardar(0) is None             # a aba Diagramas
+    assert aberto.carregar_modelo(0) is None             # a janela: não levanta
+    assert aberto.resumo.estado_da_pagina(0) == NAO_RECONHECIDA and aberto.resumo.paginas_lidas() == []
+    [guardado] = sorted((projeto.pasta / "paginas").glob("p*.corrompido*.json"))
+    assert guardado.read_bytes() == estragado and not arquivo.exists()
+    assert avisos == [(0, guardado.name)]
+    assert aberto.fechar()
+
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert reaberto.carregar_modelo(0) is None and reaberto.resumo.paginas_lidas() == []
+    assert len(list((projeto.pasta / "paginas").glob("p*.corrompido*.json"))) == 1
+
+
+def _truncar_a_pagina_0(projeto) -> tuple:
+    projeto.salvar_pagina(0, [_box()], reconhecida=True)
+    assert projeto.fechar()
+    arquivo = projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(0)}.json"
+    estragado = arquivo.read_bytes()[:-9]
+    arquivo.write_bytes(estragado)
+    return arquivo, estragado
+
+
+def test_a_pagina_ilegivel_de_novo_guarda_outra_copia(projeto):
+    arquivo, _ = _truncar_a_pagina_0(projeto)
+    primeiro = ProjetoDeLivro.abrir(projeto.pasta)
+    assert primeiro.carregar_modelo(0) is None
+    primeiro.salvar_pagina(0, [_box("b")], reconhecida=True)
+    assert primeiro.fechar()
+    segunda = arquivo.read_bytes()[:-9]
+    arquivo.write_bytes(segunda)
+    aberto = ProjetoDeLivro.abrir(projeto.pasta)
+    avisos = []
+    aberto.ao_achar_ilegivel = lambda posicao, guardado: avisos.append((posicao, guardado))
+    assert aberto.carregar_modelo(0) is None
+    copia = arquivo.with_name(f"{arquivo.stem}.corrompido-2.json")
+    assert avisos == [(0, copia.name)] and copia.read_bytes() == segunda
+    assert aberto.fechar()
+
+
+def test_a_pagina_ilegivel_que_nao_se_guarda_fica_e_avisa_uma_vez(projeto, monkeypatch):
+    arquivo, estragado = _truncar_a_pagina_0(projeto)
+    aberto = ProjetoDeLivro.abrir(projeto.pasta)
+    real = gv._replace
+
+    def disco_cheio(temporario, caminho):
+        if "corrompido" in Path(caminho).name:
+            raise OSError(28, "sem espaço")
+        return real(temporario, caminho)
+
+    monkeypatch.setattr(gv, "_replace", disco_cheio)
+    avisos = []
+    aberto.ao_achar_ilegivel = lambda posicao, guardado: avisos.append((posicao, guardado))
+    assert aberto.carregar_modelo(0) is None and aberto.ler_sem_migrar(0) is None
+    assert avisos == [(0, None)] and arquivo.read_bytes() == estragado
+    assert not list(arquivo.parent.glob("p*.corrompido*.json"))
+    monkeypatch.undo()
+    assert aberto.fechar()
+
+
+def test_a_pagina_ilegivel_so_para_leitura_nao_muda_o_disco(projeto):
+    arquivo, estragado = _truncar_a_pagina_0(projeto)
+    _versao_99(projeto)
+    livro_antes = (projeto.pasta / ARQUIVO_DO_LIVRO).read_bytes()
+    aberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert aberto.somente_leitura and aberto.resumo.paginas_lidas() == [0]
+    assert aberto.carregar_modelo(0) is None
+    assert aberto.resumo.estado_da_pagina(0) == NAO_RECONHECIDA and aberto.resumo.paginas_lidas() == []
+    assert arquivo.read_bytes() == estragado
+    assert (projeto.pasta / ARQUIVO_DO_LIVRO).read_bytes() == livro_antes
+    assert not list(arquivo.parent.glob("p*.corrompido*.json"))
+    aberto.fechar()
 
 
 def test_temporarios_sobrando_sao_apagados_ao_abrir(projeto):
@@ -325,7 +454,7 @@ def test_versao_maior_abre_so_para_leitura_e_nada_muda(projeto, tmp_path):
     try:
         assert aberto.somente_leitura
         assert aberto.carregar_pagina(0) == [_box()]
-        assert aberto.resumo_do_livro()[0]["boxes"] == 1
+        assert aberto.resumo.do_livro()[0]["boxes"] == 1
         with pytest.raises(gv.SomenteLeitura):
             aberto.salvar_pagina(0, [_box("b")])
         with pytest.raises(gv.SomenteLeitura):
@@ -353,7 +482,7 @@ def test_livro_json_que_falta_em_projeto_so_leitura_nao_e_gravado(projeto):
     _editar_projeto_json(projeto, versao=99)
     aberto = ProjetoDeLivro.abrir(projeto.pasta)
     try:
-        assert aberto.resumo_do_livro()[0]["boxes"] == 1
+        assert aberto.resumo.do_livro()[0]["boxes"] == 1
         assert not (projeto.pasta / ARQUIVO_DO_LIVRO).exists()
     finally:
         aberto.fechar()
@@ -379,10 +508,11 @@ def test_fonte_dentro_do_projeto_fica_relativa_e_o_projeto_pode_mudar_de_pasta(t
     fonte = _pagina_sintetica(pasta / "pagina.png")
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Dentro", fonte)
     assert projeto.pasta == pasta.resolve() and projeto.dados.fonte == "pagina.png"
+    projeto.fechar()                    # aberto, ele segura a pasta (a trava entre processos)
     movida = tmp_path / "outro_lugar" / "dentro"
     shutil.move(str(pasta), str(movida))
     reaberto = ProjetoDeLivro.abrir(movida)
-    assert reaberto.fonte == movida.resolve() / "pagina.png" and not reaberto.fonte_ausente
+    assert reaberto.fonte == movida.resolve() / "pagina.png" and not reaberto.origem.ausente
 
 
 def test_fonte_renomeada_e_achada_pelo_sha(projeto):
@@ -390,7 +520,7 @@ def test_fonte_renomeada_e_achada_pelo_sha(projeto):
     nova = antiga.with_name("renomeada.png")
     antiga.rename(nova)
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.fonte == nova.resolve() and not reaberto.fonte_ausente
+    assert reaberto.fonte == nova.resolve() and not reaberto.origem.ausente
     gravado = json.loads((projeto.pasta / "projeto.json").read_text(encoding="utf-8"))
     assert Path(gravado["fonte"]) == nova.resolve()
 
@@ -402,11 +532,11 @@ def test_fonte_sumida_sem_copia_fica_ausente_e_relocalizar_confere_o_conteudo(pr
     antiga.rename(guardada)
     outra = _pagina_sintetica(tmp_path / "longe" / "outra.png", ("xyz",))
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.fonte_ausente
+    assert reaberto.origem.ausente
     with pytest.raises(ProjetoInvalido, match="não é a fonte"):
-        reaberto.relocalizar(outra)
-    reaberto.relocalizar(guardada)
-    assert reaberto.fonte == guardada.resolve() and not reaberto.fonte_ausente
+        reaberto.origem.relocalizar(outra)
+    reaberto.origem.relocalizar(guardada)
+    assert reaberto.fonte == guardada.resolve() and not reaberto.origem.ausente
     assert ProjetoDeLivro.abrir(projeto.pasta).fonte == guardada.resolve()
 
 
@@ -436,15 +566,15 @@ def test_livro_json_e_igual_ao_recalculado_depois_de_qualquer_sequencia(projeto,
         tabuleiros = [(0, 0, 100, 100)] * sorteio.randint(0, 2)
         projeto.salvar_pagina(indice, boxes, tabuleiros, reconhecida=sorteio.random() > 0.3)
     gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
-    assert gravado == projeto.recalcular_livro()
-    assert ProjetoDeLivro.abrir(projeto.pasta).resumo_do_livro() == projeto.resumo_do_livro()
+    assert gravado == projeto.resumo.recalcular()
+    assert ProjetoDeLivro.abrir(projeto.pasta).resumo.do_livro() == projeto.resumo.do_livro()
 
 
 def test_livro_json_que_falta_e_refeito(projeto):
     projeto.salvar_pagina(2, [_box(), _box(source=FONTE_MANUAL)], reconhecida=False)
-    pid = projeto.pid_da_pagina(2)
+    pid = projeto.ordem.pid_em(2)
     (projeto.pasta / ARQUIVO_DO_LIVRO).unlink()
-    resumo = ProjetoDeLivro.abrir(projeto.pasta).resumo_do_livro()
+    resumo = ProjetoDeLivro.abrir(projeto.pasta).resumo.do_livro()
     assert resumo == {2: {"pid": pid, "pagina_da_fonte": 2, "estado": "glifos_marcados", "boxes": 2,
                           "pendentes": 1,
                           "confirmados": 1, "sem_leitura": 0, "improvaveis": 0,
@@ -456,7 +586,7 @@ def test_livro_json_que_falta_e_refeito(projeto):
 def test_livro_json_estragado_e_refeito(projeto):
     projeto.salvar_pagina(0, [_box()])
     (projeto.pasta / ARQUIVO_DO_LIVRO).write_text("{nada", encoding="utf-8")
-    assert ProjetoDeLivro.abrir(projeto.pasta).resumo_do_livro()[0]["boxes"] == 1
+    assert ProjetoDeLivro.abrir(projeto.pasta).resumo.do_livro()[0]["boxes"] == 1
 
 
 def test_histograma_da_os_pendentes_de_outro_limiar():
@@ -529,7 +659,7 @@ def test_so_leitura_acha_a_fonte_renomeada_e_relocaliza_so_na_memoria(projeto, t
         longe = tmp_path / "longe"
         longe.mkdir()
         nova.rename(longe / "outra.png")
-        aberto.relocalizar(longe / "outra.png")     # não levanta, não grava
+        aberto.origem.relocalizar(longe / "outra.png")     # não levanta, não grava
         assert aberto.fonte == (longe / "outra.png").resolve()
         assert _instantaneo(projeto.pasta) == antes
     finally:
@@ -546,7 +676,7 @@ def test_relocalizar_que_falha_ao_gravar_nao_muda_a_memoria(projeto, tmp_path, m
 
     monkeypatch.setattr(gv, "gravar_bytes", falhar)
     with pytest.raises(PermissionError):
-        projeto.relocalizar(nova)
+        projeto.origem.relocalizar(nova)
     assert (projeto.dados.fonte, projeto.dados.fonte_sha256) == antes
 
 
@@ -557,9 +687,9 @@ def test_fonte_de_mesmo_comeco_e_tamanho_diferente_nao_e_a_fonte(projeto, tmp_pa
     projeto.fonte.rename(longe / "guardada.png")
     (projeto.fonte.parent / "parecida.png").write_bytes(conteudo + b"anexo")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.fonte_ausente                    # mesmo SHA dos 4 MB, outro tamanho
+    assert reaberto.origem.ausente                    # mesmo SHA dos 4 MB, outro tamanho
     with pytest.raises(ProjetoInvalido, match="não é a fonte"):
-        reaberto.relocalizar(projeto.fonte.parent / "parecida.png")
+        reaberto.origem.relocalizar(projeto.fonte.parent / "parecida.png")
 
 
 def test_abrir_em_midia_so_de_leitura_abre_sem_gravar_o_ajuste(projeto, monkeypatch):
@@ -579,9 +709,9 @@ def test_livro_json_igual_ao_recalculado_depois_de_mudar_o_limiar(projeto):
         projeto.salvar_pagina(indice, _pagina_aleatoria(sorteio))
     projeto.dados.limiares = Limiares(revisao=0.55)
     projeto.salvar()
-    projeto.reaplicar_limiar()
+    projeto.resumo.reaplicar_limiar()
     gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
-    assert gravado == projeto.recalcular_livro()
+    assert gravado == projeto.resumo.recalcular()
 
 
 def test_gravacoes_de_duas_threads_deixam_o_livro_coerente(projeto):
@@ -605,14 +735,14 @@ def test_gravacoes_de_duas_threads_deixam_o_livro_coerente(projeto):
         t.join()
     assert erros == []
     gravado = json.loads((projeto.pasta / ARQUIVO_DO_LIVRO).read_text(encoding="utf-8"))
-    assert gravado == projeto.recalcular_livro()
+    assert gravado == projeto.resumo.recalcular()
 
 
 def test_resumo_do_livro_e_copia(projeto):
     projeto.salvar_pagina(0, [_box()])
-    resumo = projeto.resumo_do_livro()
+    resumo = projeto.resumo.do_livro()
     resumo[0]["histograma"]["50"] = 999
-    assert projeto.resumo_do_livro()[0]["histograma"] == {"50": 1}
+    assert projeto.resumo.do_livro()[0]["histograma"] == {"50": 1}
 
 
 def test_temporario_de_arquivo_do_usuario_nao_e_apagado(projeto):
@@ -627,10 +757,10 @@ def test_livro_json_da_versao_1_e_refeito_com_a_faixa_100(projeto):
     arquivo = projeto.pasta / ARQUIVO_DO_LIVRO
     velho = json.loads(arquivo.read_text(encoding="utf-8"))
     velho["versao"] = 1
-    velho["paginas"][str(projeto.pid_da_pagina(0))]["histograma"] = {"99": 1}  # a da versão 1
+    velho["paginas"][str(projeto.ordem.pid_em(0))]["histograma"] = {"99": 1}  # a da versão 1
     arquivo.write_text(json.dumps(velho), encoding="utf-8")
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
-    assert reaberto.resumo_do_livro()[0]["histograma"] == {"100": 1}
+    assert reaberto.resumo.do_livro()[0]["histograma"] == {"100": 1}
     assert json.loads(arquivo.read_text(encoding="utf-8"))["versao"] == VERSAO_DO_LIVRO
 
 
@@ -644,17 +774,17 @@ def _copias_da_fonte(conteudo: bytes, pasta: Path, n: int, outro_tamanho: int):
 
 
 def test_busca_da_fonte_desiste_depois_do_limite_de_arquivos_do_tamanho_certo(projeto, monkeypatch):
-    import abbychess.projeto as modulo
+    import abbychess.fonte_do_livro as modulo
 
     monkeypatch.setattr(modulo, "CANDIDATOS_DA_FONTE", 2)
     pasta, conteudo = projeto.fonte.parent, projeto.fonte.read_bytes()
     projeto.fonte.rename(pasta / "zz-renomeada.png")          # vem depois das cópias
     _copias_da_fonte(conteudo, pasta, n=3, outro_tamanho=0)
-    assert ProjetoDeLivro.abrir(projeto.pasta).fonte_ausente
+    assert ProjetoDeLivro.abrir(projeto.pasta).origem.ausente
 
 
 def test_arquivos_de_outro_tamanho_nao_contam_no_limite(projeto, monkeypatch):
-    import abbychess.projeto as modulo
+    import abbychess.fonte_do_livro as modulo
 
     monkeypatch.setattr(modulo, "CANDIDATOS_DA_FONTE", 2)
     pasta, conteudo = projeto.fonte.parent, projeto.fonte.read_bytes()
@@ -675,12 +805,12 @@ def test_relocalizacao_automatica_grava_o_tamanho(projeto):
 
 def test_falha_ao_gravar_o_livro_nao_muda_o_cache(projeto, monkeypatch):
     projeto.salvar_pagina(0, [_box()])
-    antes = projeto.resumo_do_livro()
+    antes = projeto.resumo.do_livro()
 
     def falhar(*_args):
         raise PermissionError("disco")
 
     monkeypatch.setattr(gv, "gravar_bytes", falhar)
     with pytest.raises(PermissionError):
-        projeto._atualizar_livro(5, {"estado": "reconhecida"})
-    assert projeto.resumo_do_livro() == antes
+        projeto.resumo.atualizar(5, {"estado": "reconhecida"})
+    assert projeto.resumo.do_livro() == antes

@@ -195,6 +195,11 @@ class PainelDeVerificacao(QWidget):
         self.lido.setText(f"Glifos: {lidos}")
         # O glifo sem leitura não ganha letra inventada: falta digitá-la.
         texto = "".join(boxes[i].char for i in palavra.indices)
+        if palavra.sugestao:
+            # A leitura da camada de texto do PDF (`camada.opinioes`): o espaço dela parte a
+            # palavra, como o digitado.
+            self.lido.setText(f"Glifos: {lidos}   ·   a camada do PDF lê: {palavra.sugestao}")
+            texto = palavra.sugestao
         self.campo.setText(texto)
         self.campo.selectAll()
         self.habilitar(True)

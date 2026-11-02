@@ -21,9 +21,9 @@ from abbychess.app import teclado  # noqa: E402
 from abbychess.app.janela import configuracao  # noqa: E402
 from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
-from tests.test_espaco import _abrir, _dentro, conferir_os_registrados  # noqa: E402
-from tests.test_janela import _esperar  # noqa: E402
-from tests.test_treino_por_livro import _pagina_sintetica  # noqa: E402
+from tests.ajudantes import _abrir, _dentro, conferir_os_registrados  # noqa: E402,F401,F811
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 
 @pytest.fixture(scope="module")
@@ -124,6 +124,13 @@ def test_tirar_a_tecla_e_uma_troca_valida():
     assert teclado.problemas("padrao", {"proximo_diagrama": []}) == []
     teclado.definir("padrao", {"proximo_diagrama": []})
     assert teclado.sequencias("proximo_diagrama") == []
+
+
+def test_a_acao_com_excecao_so_num_perfil_se_reatribui():
+    """O Ctrl+Tab do FineReader tem a exceção do QTabWidget; trocá-lo ou tirá-lo leva a
+    exceção junto, em vez de recusar a troca por "exceção sem uso"."""
+    assert teclado.problemas("finereader", {"painel_seguinte": ["Ctrl+F11"]}) == []
+    assert teclado.problemas("finereader", {"painel_seguinte": []}) == []
 
 
 # ----------------------------------------------------------------------
@@ -290,7 +297,8 @@ def test_o_menu_teclado_grava_e_reaplica(app, padrao, perfil_limpo, monkeypatch)
 #: Teclas novas para ações que os painéis citam (nenhuma é usada no perfil padrão).
 TROCAS_VISIVEIS = {"reconhecer_pagina": ["Ctrl+Shift+F12"], "paleta": ["Ctrl+Shift+F11"],
                    "proxima_ocorrencia": ["Ctrl+Shift+F9"], "dividir": ["Ctrl+Shift+F6"],
-                   "proximo_da_fila": ["Ctrl+Shift+F4"]}
+                   "proximo_da_fila": ["Ctrl+Shift+F4"], "desfazer": ["Ctrl+Shift+F3"],
+                   "foco_vista": ["Ctrl+Shift+F2"]}
 
 
 def _textos_da_janela(j):
@@ -341,8 +349,7 @@ def test_todo_modelo_de_texto_cita_acao_do_yaml():
 
     raiz = Path(abbychess.__file__).parent
     ids = {a.id for a in teclado.tabela().acoes}
-    arquivos = [*raiz.joinpath("app").glob("*.py"), raiz / "controlador.py",
-                raiz / "controladores.py"]
+    arquivos = [*raiz.joinpath("app").glob("*.py"), *raiz.glob("controlador*.py")]
     citados = {}
     for arquivo in arquivos:
         arvore = ast.parse(arquivo.read_text(encoding="utf-8"))
@@ -387,7 +394,7 @@ def _linha_de(dialogo, id_):
     return dialogo._ids.index(id_)
 
 
-def test_o_dialogo_devolve_so_o_que_difere_do_perfil(app):
+def test_o_dialogo_devolve_so_o_que_difere_do_perfil(app, monkeypatch):
     from abbychess.app.dialogo_teclado import ACAO, TECLAS, DialogoDoTeclado
 
     d = DialogoDoTeclado(None, "finereader")
@@ -397,8 +404,18 @@ def test_o_dialogo_devolve_so_o_que_difere_do_perfil(app):
     assert d.tabela.item(linha, ACAO).flags() & Qt.ItemFlag.ItemIsEditable == Qt.ItemFlag(0)
     d.tabela.item(linha, TECLAS).setText("ctrl+shift+f12 ; ")
     assert d.escolha() == ("finereader", {"proximo_diagrama": ["Ctrl+Shift+F12"]})
-    d.perfil.setCurrentIndex(d.perfil.findData("padrao"))           # trocar de perfil desfaz
-    assert d.trocas() == {}
+    # Trocar de perfil desfaz as trocas: com uma feita, pergunta; o Não fica onde estava.
+    perguntas = []
+    respostas = iter([QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes])
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda _p, _t, texto: perguntas.append(texto) or next(respostas))
+    d.perfil.setCurrentIndex(d.perfil.findData("padrao"))
+    assert d.escolha() == ("finereader", {"proximo_diagrama": ["Ctrl+Shift+F12"]})
+    d.perfil.setCurrentIndex(d.perfil.findData("padrao"))
+    assert d.escolha() == ("padrao", {})
+    assert len(perguntas) == 2 and "1 troca" in perguntas[0]
+    d.perfil.setCurrentIndex(d.perfil.findData("finereader"))      # sem troca, sem pergunta
+    assert len(perguntas) == 2
     d.deleteLater()
 
 

@@ -20,14 +20,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from abbychess import exportar as ex
+from abbychess import montagem as mo
 from abbychess import livro as lv
 from abbychess import pagina as pg
 from abbychess.atalhos import carregar as carregar_atalhos
 from abbychess.leitor import LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ferramentas"))
 import replay_fatia as rf  # noqa: E402
@@ -63,7 +63,7 @@ def cenario(tmp_path):
     (verdade / "sint").mkdir(parents=True)
     certos = ["abcabc abc", "cab bc"]
     for indice in (0, 1):
-        _, caixas, _ = rf._linhas_da_pagina(projeto.carregar_pagina(indice), fonte, indice, ex)
+        _, caixas, _ = rf._linhas_da_pagina(projeto.carregar_pagina(indice), fonte, indice, mo)
         gabarito = {"blocos": [], "diagramas": [], "revisado_por": "Teste", "verdade_versao": 1,
                     "linhas_corpo": [{"id": f"l{k}", "caixa_rel": caixas[k], "texto": certos[k],
                                       "texto_verificado": True} for k in range(2)]}
@@ -394,7 +394,7 @@ def _colado(monkeypatch, passo, parte_lida):
     `parte_lida`."""
     from core.box_model import BoxEntry
 
-    from abbychess import pagina as pg
+    from abbychess import editar_boxes as eb
 
     def linhas(boxes, _fonte, _indice, _ex):
         return ([SimpleNamespace(indices=list(range(len(boxes))))], [[0.1, 0.1, 0.9, 0.2]],
@@ -406,7 +406,7 @@ def _colado(monkeypatch, passo, parte_lida):
                           BoxEntry(parte_lida, b.x1 + 10, b.y1, b.x2, b.y2)]
 
     monkeypatch.setattr(rf, "_linhas_da_pagina", linhas)
-    monkeypatch.setattr(pg, "dividir", dividir)
+    monkeypatch.setattr(eb, "dividir", dividir)
     boxes = [BoxEntry("r", 10, 10, 30, 40), BoxEntry("a", 40, 10, 55, 40)]
     gabarito = {"linhas_corpo": [{"caixa_rel": [0.1, 0.1, 0.9, 0.2], "texto": "r,a",
                                   "texto_verificado": True}]}

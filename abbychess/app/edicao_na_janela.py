@@ -8,10 +8,11 @@ from __future__ import annotations
 from typing import Optional
 
 from abbychess.app import teclado
+from abbychess.controlador import AVISO_LONGO_MS
 
 class EdicaoNoDocumento:
     def _sessao_do_documento(self, unidades, novo, avancar, ensinar_gid, ultimo, fixos,
-                             fim_de_linha=False, agora=False) -> None:
+                             agora=False) -> None:
         """A sessão confirmada: o controlador aplica; quando a edição entra na página (na
         hora, ou na vez dela na fila), o Documento é montado de novo do modelo e o cursor fica
         onde estava ao confirmar (o texto montado é o digitado: sair da sessão para outra
@@ -25,9 +26,8 @@ class EdicaoNoDocumento:
                 self.texto.ir_a_proxima_duvidosa(depois if depois is not None else 0)
             else:
                 self.texto.ir_a_marca(marca)
-        self.pagina.confirmar_sessao(unidades, novo, ensinar_gid=ensinar_gid, fixos=fixos,
-                                     depois=entrou, fim_de_linha=fim_de_linha,
-                                     agora=agora)
+        self.pagina.sessoes.confirmar_sessao(unidades, novo, ensinar_gid=ensinar_gid, fixos=fixos,
+                                     depois=entrou, agora=agora)
 
     def confirmar_a_sessao_aberta(self, agora: bool = False) -> None:
         """Antes de sair da página (outra página, o Ctrl+T, fechar o projeto): a sessão aberta
@@ -58,7 +58,7 @@ class EdicaoNoDocumento:
     def _aviso_estrutural(self, texto: str) -> None:
         """Na Linha e também na barra de status (a Linha pode estar escondida, Ctrl+F5)."""
         self.linha.avisar(texto)
-        self.statusBar().showMessage(texto, 8000)
+        self.statusBar().showMessage(texto, AVISO_LONGO_MS)
 
     def _no_editor_de_diagrama(self) -> bool:
         """O foco está no editor Diagrama do Inspetor (o desfazer é o do tabuleiro, §10)."""
@@ -77,7 +77,7 @@ class EdicaoNoDocumento:
             self.texto.restaurar()
         else:
             self.texto.esquecer_a_restaurada()
-            self.pagina.desfazer()
+            self.pagina.desfazedor.desfazer()
 
     def refazer(self) -> None:
         if self._no_editor_de_diagrama() and self.editor_diagrama.pode_refazer:
@@ -85,7 +85,7 @@ class EdicaoNoDocumento:
         elif self.texto.pode_reaplicar:
             self.texto.reaplicar()
         else:
-            self.pagina.refazer()
+            self.pagina.desfazedor.refazer()
 
     def abrir_paleta(self) -> None:
         """F2: a paleta no Documento (o cursor de texto) ou no campo do Glifo."""
@@ -108,9 +108,9 @@ class EdicaoNoDocumento:
     def novo_paragrafo(self) -> None:
         gid = self.texto.primeiro_gid_da_palavra()
         self.confirmar_a_sessao_aberta()
-        self.pagina.novo_paragrafo(gid)
+        self.pagina.sessoes.novo_paragrafo(gid)
 
     def alternar_estilo(self, campo: str) -> None:
         gids = self.texto.gids_selecionados()
         self.confirmar_a_sessao_aberta()
-        self.pagina.alternar_estilo(gids, campo)
+        self.pagina.sessoes.alternar_estilo(gids, campo)

@@ -8,6 +8,8 @@ as operações estruturais do passo G; e as figurinhas (CA-6.7).
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from core.box_model import BoxEntry
 
@@ -15,34 +17,11 @@ from abbychess import sessao as ss
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.modelo import Box, Pagina, gid_de
-
-
-def _pagina(*linhas: str) -> Pagina:
-    """Cada letra um box de 18 px (passo de 22 na palavra, 30 a mais entre palavras)."""
-    boxes, n = [], 0
-    for k, linha in enumerate(linhas):
-        x, y = 20, 20 + 60 * k
-        for palavra in linha.split(" "):
-            for letra in palavra:
-                boxes.append(Box(gid_de(1, n), BoxEntry(letra, x, y, x + 18, y + 30, 0.9, "net")))
-                n += 1
-                x += 22
-            x += 30
-    return Pagina(pid=1, indice=0, boxes=boxes, estado="reconhecida", proximo_n=n)
+from tests.ajudantes import _editar, _pagina  # noqa: E402,F401,F811
 
 
 def _texto(pagina) -> str:
     return ss.texto_e_unidades(pagina)[0]
-
-
-def _editar(pagina, de: str, para: str) -> ss.Plano:
-    """Troca a primeira ocorrência de `de` (palavras inteiras) por `para`, como a vista faz:
-    a sessão é a menor sequência de palavras que cobre o trecho."""
-    texto, unidades = ss.texto_e_unidades(pagina)
-    inicio = texto.index(de)
-    a, b = ss.palavras_em(unidades, inicio, inicio + len(de))
-    novo = texto[a:inicio] + para + texto[inicio + len(de):b]
-    return ss.editar(pagina, unidades[a:b], novo)
 
 
 def test_ca_6_2_trocar_o_1_por_l_corrige_um_box_sem_virtual():
@@ -297,3 +276,84 @@ def test_colar_a_pagina_inteira_alinha_pelos_trechos_iguais():
     pares = ss.alinhar(original, novo)
     trocas = [(i, j) for i, j in pares if i is not None and j is not None and original[i] != novo[j]]
     assert len(trocas) == 10 and all(i == j for i, j in pares)
+
+
+# ----------------------------------------------------------------------
+# Fechamento do passo G: juntar ou dividir boxes e mexer nas palavras numa edição só
+# ----------------------------------------------------------------------
+
+#: A fonte da página impressa: a Times New Roman do Windows.
+FONTE_TIMES = Path("C:/Windows/Fonts/times.ttf")
+
+
+def _pagina_impressa(texto):
+    """Uma página com o texto impresso em Times (tinta de verdade), um box por letra."""
+    import numpy as np
+    from PIL import Image, ImageDraw, ImageFont
+
+    if not FONTE_TIMES.exists():
+        # Outra fonte daria outra tinta e outros boxes: o teste pula, não muda.
+        pytest.skip("a Times New Roman não está nesta máquina")
+    imagem = Image.new("L", (600, 120), 255)
+    desenho = ImageDraw.Draw(imagem)
+    fonte = ImageFont.truetype(str(FONTE_TIMES), 50)
+    x, boxes = 20, []
+    for c in texto:
+        if c == " ":
+            x += 30
+            continue
+        solta = Image.new("L", (200, 120), 255)
+        ImageDraw.Draw(solta).text((10, 10), c, font=fonte, fill=0)
+        ys, xs = np.nonzero(np.asarray(solta) < 128)
+        largura = int(xs.max() - xs.min() + 1)
+        desenho.text((x - (int(xs.min()) - 10), 10), c, font=fonte, fill=0)
+        boxes.append(Box(gid_de(1, len(boxes)),
+                         BoxEntry(c, x, int(ys.min()), x + largura, int(ys.max()) + 1, 0.9, "net")))
+        x += largura + 6
+    return imagem.convert("RGB"), Pagina(1, 0, boxes, estado="reconhecida",
+                                         proximo_n=len(boxes))
+
+
+@pytest.mark.parametrize("antes, depois", [
+    ("rn b", "mb"), ("b rn", "bm"), ("b m b", "brn b"), ("b m b", "b rnb"), ("bm b", "brnb")])
+def test_juntar_ou_dividir_e_mexer_na_palavra_numa_edicao_so(antes, depois):
+    """Consertar o "rn" lido e o espaço sobrando de uma vez ("rn b" -> "mb"): a quebra e a
+    junção de palavras citam os gids de antes, que juntar ou dividir aposentou (antes,
+    ValueError e a edição inteira desfeita)."""
+    imagem, pagina = _pagina_impressa(antes)
+    _texto, unidades = ss.texto_e_unidades(pagina)
+    ss.aplicar(pagina, ss.planejar(unidades, depois), imagem, None)
+    assert ss.texto_e_unidades(pagina)[0] == depois
+
+
+def test_m_impresso_vira_rn_com_tinta_pela_sessao():
+    """CA-6.6 pela sessão: "m" -> "rn" num "m" impresso dá dois boxes com tinta e nenhum
+    virtual."""
+    imagem, pagina = _pagina_impressa("cama")
+    _texto, unidades = ss.texto_e_unidades(pagina)
+    ss.aplicar(pagina, ss.planejar(unidades, "carna"), imagem, None)
+    assert ss.texto_e_unidades(pagina)[0] == "carna"
+    assert [b.entry.char for b in pagina.boxes] == list("carna")
+    assert not pagina.decisoes.virtuais
+
+
+def test_apagar_o_hifen_de_fim_de_linha_junta_a_palavra_na_exportacao():
+    """§6.3: apagar o hífen de quebra junta a palavra. O Documento mostra as linhas como
+    impressas, e a exportação sai "exemplo" (antes, "exem plo": pior que sem tocar)."""
+    from abbychess import montagem as mo
+    from abbychess.modelo import Decisoes
+
+    p = _pagina("exem-", "plo")
+    p.decisoes = Decisoes(hifen_de_quebra=frozenset({p.boxes[4].gid}))
+    _editar(p, "exem-\nplo", "exemplo")
+    entries, estrutura = mo.Estrutura.da_pagina(p)
+    blocos = mo.pagina_extraida(0, entries, estrutura=estrutura).blocos
+    assert [b.texto for b in blocos if hasattr(b, "texto")] == ["exemplo"]
+
+
+def test_apagar_um_travessao_solto_no_fim_da_linha_nao_junta_palavras():
+    """Só o hífen colado à palavra a parte: o travessão solto ("velha -") que sai não junta
+    "velha" com a palavra da linha seguinte."""
+    p = _pagina("casa velha -", "plo longe")
+    _editar(p, "casa velha -\nplo", "casa velha \nplo")
+    assert not p.decisoes.juncoes

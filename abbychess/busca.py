@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re as _re
 import threading
@@ -32,7 +33,9 @@ from typing import Callable, Dict, FrozenSet, Iterable, List, Mapping, Optional,
 
 import regex
 
-from abbychess.modelo import FIGURINAS, Pagina
+from abbychess.modelo import FIGURINAS, PECAS, Pagina
+
+log = logging.getLogger(__name__)
 
 PROSA, NOTACAO, LEGENDA, CABECALHO, FEN = "prosa", "notacao", "legenda", "cabecalho", "fen"
 ETIQUETAS = (PROSA, NOTACAO, FEN, LEGENDA, CABECALHO)
@@ -43,9 +46,7 @@ _ETIQUETA_DO_CODIGO = {c: e for e, c in _CODIGO.items()}
 #: O tempo-limite de cada página (§7.1: 0,5 s); o primeiro que estoura aborta a busca.
 TEMPO_LIMITE = 0.5
 
-#: As letras das peças em cada idioma (as de `sessao.PECAS`), na ordem rei, dama, torre,
-#: bispo, cavalo; as figurinas brancas e pretas na mesma ordem.
-PECAS = {"pt": "RDTBC", "en": "KQRBN", "es": "RDTAC", "de": "KDTLS", "fr": "RDTFC"}
+#: As figurinas brancas e pretas na ordem das letras de `modelo.PECAS`.
 BRANCAS, PRETAS = "♔♕♖♗♘", "♚♛♜♝♞"
 
 
@@ -97,6 +98,19 @@ def indexar_pagina(pagina: Pagina, idioma: str = "pt", margens: Optional[Iterabl
     texto, unidades = montada if montada is not None else ss.texto_e_unidades(pagina)
     gids: List[Optional[int]] = [u.gid for u in unidades]
     margens = set(_margens_pelas_linhas(pagina, texto, gids) if margens is None else margens)
+    partes, etiquetas = [texto], [_etiquetas_do_texto(texto, gids, margens, idioma)]
+    _acrescentar_os_fens(pagina, partes, etiquetas, gids)
+    glifos = tuple((b.gid, b.entry.char, str(b.entry.source), float(b.entry.confidence))
+                   for b in pagina.boxes)
+    amostras = tuple((b.gid, b.amostra) for b in pagina.boxes if b.amostra)
+    return PaginaIndexada(pagina.indice, "".join(partes), tuple(gids), "".join(etiquetas),
+                          glifos, pagina.pid, versao, amostras)
+
+
+def _etiquetas_do_texto(texto: str, gids: Sequence[Optional[int]], margens: set,
+                        idioma: str) -> str:
+    """O código da etiqueta de cada caractere do texto, por palavra: cabeçalho (um glifo
+    dela nas `margens`), notação (`e_lance`) ou prosa; o espaço e a quebra, " "."""
     codigos = [" "] * len(texto)
     for token in _re.finditer(r"\S+", texto):
         a, b = token.span()
@@ -107,18 +121,19 @@ def indexar_pagina(pagina: Pagina, idioma: str = "pt", margens: Optional[Iterabl
         else:
             codigo = _CODIGO[PROSA]
         codigos[a:b] = [codigo] * (b - a)
-    partes, etiquetas = [texto], ["".join(codigos)]
-    for diagrama in pagina.diagramas:            # o FEN de cada diagrama lido, numa linha dele
+    return "".join(codigos)
+
+
+def _acrescentar_os_fens(pagina: Pagina, partes: List[str], etiquetas: List[str],
+                         gids: List[Optional[int]]) -> None:
+    """O FEN de cada diagrama lido, numa linha dele, no fim de `partes`, com a etiqueta FEN
+    e sem gid."""
+    for diagrama in pagina.diagramas:
         if getattr(diagrama, "lido", False) and getattr(diagrama, "fen", ""):
             linha = ("\n" if partes[0] or len(partes) > 1 else "") + diagrama.fen
             partes.append(linha)
             etiquetas.append(" " * (len(linha) - len(diagrama.fen)) + _CODIGO[FEN] * len(diagrama.fen))
             gids.extend([None] * len(linha))
-    glifos = tuple((b.gid, b.entry.char, str(b.entry.source), float(b.entry.confidence))
-                   for b in pagina.boxes)
-    amostras = tuple((b.gid, b.amostra) for b in pagina.boxes if b.amostra)
-    return PaginaIndexada(pagina.indice, "".join(partes), tuple(gids), "".join(etiquetas),
-                          glifos, pagina.pid, versao, amostras)
 
 
 #: A linha de margem (cabeçalho, rodapé, número de página) é curta e tem um número.
@@ -127,30 +142,43 @@ _LINHA_DE_MARGEM = _re.compile(r"\d")
 
 def _margens_pelas_linhas(pagina: Pagina, texto: str, gids: Sequence[Optional[int]]) -> set:
     """Os gids do cabeçalho e do rodapé, pelas linhas já montadas (barato: a regra da
-    exportação, `exportar.margens_corridas`, monta as linhas de novo e custa ~15 ms por
+    exportação, `margens.margens_corridas`, monta as linhas de novo e custa ~15 ms por
     página): a primeira e a última linha, curtas (até 60 caracteres), com um número, e
     separadas do texto por um vão maior que 1,5 vez o vão mediano entre as linhas."""
-    caixa = {b.gid: b.entry for b in pagina.boxes}
-    linhas, inicio = [], 0
-    for parte in texto.split("\n"):
-        fim = inicio + len(parte)
-        meus = {g for g in gids[inicio:fim] if g is not None and g in caixa}
-        if meus:
-            linhas.append((parte, meus, min(caixa[g].y1 for g in meus),
-                           max(caixa[g].y2 for g in meus)))
-        inicio = fim + 1
+    linhas = _linhas_com_altura(pagina, texto, gids)
     if len(linhas) < 3:
         return set()
     vaos = sorted(max(0, b[2] - a[3]) for a, b in zip(linhas, linhas[1:]))
     mediano = vaos[len(vaos) // 2]
     saida: set = set()
     for k, vizinho in ((0, 1), (len(linhas) - 1, len(linhas) - 2)):
-        parte, meus, topo, base = linhas[k]
-        _p, _m, topo_v, base_v = linhas[vizinho]
-        vao = topo_v - base if k == 0 else topo - base_v
-        if len(parte.strip()) <= 60 and _LINHA_DE_MARGEM.search(parte) and vao > 1.5 * max(1, mediano):
-            saida |= meus
+        if _e_margem(linhas[k], linhas[vizinho], k == 0, mediano):
+            saida |= linhas[k][1]
     return saida
+
+
+def _linhas_com_altura(pagina: Pagina, texto: str, gids: Sequence[Optional[int]]) -> list:
+    """(texto, gids, topo, base) de cada linha montada que tem um glifo da página."""
+    caixa = {b.gid: b.entry for b in pagina.boxes}
+    linhas, inicio = [], 0
+    for parte in texto.split("\n"):
+        fim = inicio + len(parte)
+        meus = {g for g in gids[inicio:fim] if g in caixa}      # o None não é gid
+        if meus:
+            linhas.append((parte, meus, min(caixa[g].y1 for g in meus),
+                           max(caixa[g].y2 for g in meus)))
+        inicio = fim + 1
+    return linhas
+
+
+def _e_margem(linha: tuple, vizinha: tuple, primeira: bool, mediano: float) -> bool:
+    """Se a linha da ponta (a primeira, ou a última) é curta, tem um número e está separada
+    da `vizinha` por mais de 1,5 vez o vão `mediano`."""
+    parte, _meus, topo, base = linha
+    _p, _m, topo_v, base_v = vizinha
+    vao = topo_v - base if primeira else topo - base_v
+    return (len(parte.strip()) <= 60 and bool(_LINHA_DE_MARGEM.search(parte))
+            and vao > 1.5 * max(1, mediano))
 
 
 def _indexar_tarefa(tarefa) -> Optional[PaginaIndexada]:
@@ -163,13 +191,13 @@ def _indexar_tarefa(tarefa) -> Optional[PaginaIndexada]:
     fonte, idioma, versao = tarefa
     if isinstance(fonte, Pagina):
         return indexar_pagina(fonte, idioma, versao=versao)
-    from abbychess.modelo import reenquadrar
-    from abbychess.projeto import _pagina_de_json
+    from abbychess.geometria_do_modelo import reenquadrar
+    from abbychess.pagina_em_json import pagina_de_json
 
     caminho, posicao, geometria, tamanho = (fonte if isinstance(fonte, tuple)
                                             else (fonte, None, None, None))
     try:
-        pagina = _pagina_de_json(json.loads(Path(caminho).read_text(encoding="utf-8")))
+        pagina = pagina_de_json(json.loads(Path(caminho).read_text(encoding="utf-8")))
         if geometria is not None:
             reenquadrar(pagina, geometria, tamanho)
     except (OSError, ValueError, KeyError, TypeError):
@@ -218,10 +246,18 @@ class PoolDoIndice:
         relogio.start()
 
     def _fechar_se_ocioso(self) -> None:
+        self._fechar(lambda: self._usos == 0)
+
+    def _fechar(self, se: Callable[[], bool]) -> None:
+        """Tira o pool na mesma trava em que confere `se` (um `obter` de outra thread nunca
+        recebe o pool que vai ser fechado: o seguinte abre outro), e o fecha fora dela."""
         with self._trava:
-            ocioso = self._usos == 0
-        if ocioso:
-            self.liberar()
+            pool = None
+            if se():
+                pool, self._pool = self._pool, None
+                self._pronto.clear()
+        if pool is not None:
+            pool.shutdown(wait=False, cancel_futures=True)
 
     def _abrir(self) -> Optional[ProcessPoolExecutor]:
         import multiprocessing
@@ -238,6 +274,8 @@ class PoolDoIndice:
                 try:
                     list(self._pool.map(_aquecer, range(n)))
                 except Exception:               # o pool quebrado: o índice monta sem ele
+                    log.warning("o pool do índice da busca não abriu; o índice monta sem "
+                                "ele, mais devagar", exc_info=True)
                     self._pool.shutdown(wait=False, cancel_futures=True)
                     self._pool = None
             self._pronto.set()
@@ -253,22 +291,15 @@ class PoolDoIndice:
     def devolver(self) -> None:
         """O fim de um uso; o último fecha os processos (as tarefas de outro uso nunca são
         canceladas por este)."""
-        with self._trava:                       # o último tira o pool na mesma trava: um
-            self._usos = max(0, self._usos - 1)  # obter() que vem depois abre outro
-            pool = None
-            if self._usos == 0:
-                pool, self._pool = self._pool, None
-                self._pronto.clear()
-        if pool is not None:
-            pool.shutdown(wait=False, cancel_futures=True)
+        def ultimo() -> bool:
+            self._usos = max(0, self._usos - 1)
+            return self._usos == 0
+
+        self._fechar(ultimo)
 
     def liberar(self) -> None:
         """Fecha os processos agora."""
-        with self._trava:
-            pool, self._pool = self._pool, None
-            self._pronto.clear()
-        if pool is not None:
-            pool.shutdown(wait=False, cancel_futures=True)
+        self._fechar(lambda: True)
 
 
 def construir(fontes: Mapping[int, Tuple[object, int]], idioma: str = "pt", *,
@@ -284,28 +315,47 @@ def construir(fontes: Mapping[int, Tuple[object, int]], idioma: str = "pt", *,
     if not tarefas:
         return saida
     usado = None
-    if not paralelo or len(tarefas) < 8:
-        resultados: Iterable = map(_indexar_tarefa, tarefas)
-    else:
+    if paralelo and len(tarefas) >= 8:
         usado = pool if pool is not None else PoolDoIndice()
-        executor = usado.obter()
-        resultados = (executor.map(_indexar_tarefa, tarefas, chunksize=4) if executor is not None
-                      else map(_indexar_tarefa, tarefas))
+    resultados = _indexadas(tarefas, usado)
     try:
-        for indexada in resultados:
-            if cancelado():
-                break
-            if indexada is not None:
-                saida[indexada.indice] = indexada
-                if ao_indexar is not None:
-                    ao_indexar(indexada)
+        _recolher(resultados, saida, cancelado, ao_indexar)
     finally:
-        fechar = getattr(resultados, "close", None)
-        if fechar is not None:                  # cancela as tarefas deste índice que faltam
-            fechar()
-        if usado is not None:
-            usado.devolver()
+        _encerrar(resultados, usado)
     return saida
+
+
+def _indexadas(tarefas: list, usado: Optional[PoolDoIndice]) -> Iterable:
+    """As páginas indexadas, na ordem das tarefas: nos processos de `usado` (contado como
+    um uso), ou aqui, sem ele ou se ele não abriu."""
+    if usado is None:
+        return map(_indexar_tarefa, tarefas)
+    executor = usado.obter()
+    if executor is None:
+        return map(_indexar_tarefa, tarefas)
+    return executor.map(_indexar_tarefa, tarefas, chunksize=4)
+
+
+def _recolher(resultados: Iterable, saida: Dict[int, PaginaIndexada], cancelado,
+              ao_indexar) -> None:
+    """As indexadas em `saida`, pelo índice, avisando `ao_indexar` de cada uma, até
+    `cancelado()`."""
+    for indexada in resultados:
+        if cancelado():
+            break
+        if indexada is not None:
+            saida[indexada.indice] = indexada
+            if ao_indexar is not None:
+                ao_indexar(indexada)
+
+
+def _encerrar(resultados: Iterable, usado: Optional[PoolDoIndice]) -> None:
+    """Cancela as tarefas deste índice que faltam e devolve o uso do pool."""
+    fechar = getattr(resultados, "close", None)
+    if fechar is not None:
+        fechar()
+    if usado is not None:
+        usado.devolver()
 
 
 # ----------------------------------------------------------------------
@@ -347,48 +397,74 @@ def expandir_classes(padrao: str, idioma: str) -> Tuple[str, str]:
     """O padrão com `\\L`, `\\P`, `\\C` e `\\V` expandidos (fora de `[...]`; dentro, `\\P`
     vira as peças e `\\C`, `a-h1-8`), e a dica com a expansão das que apareceram. `\\P{...}`
     (a propriedade Unicode do `regex`) fica como está."""
-    expansao = classes(idioma)
-    saida: List[str] = []
-    usadas: List[str] = []
-    dentro, k = False, 0
-    while k < len(padrao):
-        c = padrao[k]
-        if c == "\\" and k + 1 < len(padrao):
-            proximo = padrao[k + 1]
-            propriedade = proximo == "P" and padrao[k + 2:k + 3] == "{"
-            if proximo in expansao and not propriedade:
-                if dentro:
-                    if proximo == "P":
-                        saida.append(regex.escape(_classe_de_pecas(idioma)))
-                    elif proximo == "C":
-                        saida.append("a-h1-8")
-                    else:
-                        raise PadraoInvalido(f"\\{proximo} não cabe dentro de [ ]")
-                else:
-                    saida.append(expansao[proximo])
-                if proximo not in usadas:
-                    usadas.append(proximo)
-            else:
-                saida.append(c + proximo)
-            k += 2
-            continue
-        if c == "[" and not dentro:
-            dentro = True
-            saida.append(c)
+    expansao = _Expansao(padrao, idioma)
+    return expansao.expandir(), expansao.dica()
+
+
+class _Expansao:
+    """O que `expandir_classes` vai montando: a saída, as classes usadas (na ordem em que
+    apareceram) e se está dentro de `[...]`."""
+
+    def __init__(self, padrao: str, idioma: str):
+        self.padrao, self.idioma = padrao, idioma
+        self.expansao = classes(idioma)
+        self.saida: List[str] = []
+        self.usadas: List[str] = []
+        self.dentro = False
+
+    def expandir(self) -> str:
+        k = 0
+        while k < len(self.padrao):
+            k = self._passo(k)
+        return "".join(self.saida)
+
+    def dica(self) -> str:
+        return "; ".join(f"\\{c} = {DESCRICOES[c]}: {self.expansao[c]}" for c in self.usadas)
+
+    def _passo(self, k: int) -> int:
+        """Leva à saída o que começa em `k`; devolve onde começa o seguinte."""
+        c = self.padrao[k]
+        if c == "\\" and k + 1 < len(self.padrao):
+            self._barra(self.padrao[k + 1], self.padrao[k + 2:k + 3] == "{")
+            return k + 2
+        if c == "[" and not self.dentro:
+            return self._abrir(k + 1)
+        if c == "]" and self.dentro:
+            self.dentro = False
+        self.saida.append(c)
+        return k + 1
+
+    def _barra(self, proximo: str, chave: bool) -> None:
+        """A barra e o caractere seguinte: a classe expandida, ou os dois como estão (o
+        escape do `regex`, e `\\P{...}`, a propriedade Unicode)."""
+        if proximo not in self.expansao or (proximo == "P" and chave):
+            self.saida.append("\\" + proximo)
+            return
+        self.saida.append(self._entre_colchetes(proximo) if self.dentro
+                          else self.expansao[proximo])
+        if proximo not in self.usadas:
+            self.usadas.append(proximo)
+
+    def _entre_colchetes(self, proximo: str) -> str:
+        """Dentro de `[...]`, `\\P` são as peças e `\\C`, `a-h1-8`; as outras não cabem."""
+        if proximo == "P":
+            return regex.escape(_classe_de_pecas(self.idioma))
+        if proximo == "C":
+            return "a-h1-8"
+        raise PadraoInvalido(f"\\{proximo} não cabe dentro de [ ]")
+
+    def _abrir(self, k: int) -> int:
+        """O `[` que abre a classe, com o `^` e o `]` que vêm logo depois dele em `k` (os
+        dois são literais ali); devolve onde começa o seguinte."""
+        self.dentro = True
+        self.saida.append("[")
+        if self.padrao[k:k + 1] == "^":
+            self.saida.append("^")
             k += 1
-            if padrao[k:k + 1] == "^":         # "[^" e o "]" logo depois são literais
-                saida.append("^")
-                k += 1
-            if padrao[k:k + 1] == "]":
-                saida.append("]")
-                k += 1
-            continue
-        if c == "]" and dentro:
-            dentro = False
-        saida.append(c)
-        k += 1
-    dica = "; ".join(f"\\{c} = {DESCRICOES[c]}: {expansao[c]}" for c in usadas)
-    return "".join(saida), dica
+        if self.padrao[k:k + 1] == "]":
+            self.saida.append("]")
+            k += 1
+        return k
 
 
 #: A peça de um lance no texto literal: a letra seguida de uma casa (com a desambiguação
@@ -404,25 +480,36 @@ def _figurina_igual_a_letra(texto: str, idioma: str) -> str:
     pecas, ingles = PECAS.get(idioma, PECAS["en"]), PECAS["en"]
     saida: List[str] = []
     for k, c in enumerate(texto):
-        papel = None
-        if c in BRANCAS:
-            papel = BRANCAS.index(c)
-        elif c in PRETAS:
-            papel = PRETAS.index(c)
-        elif _DEPOIS_DA_PECA.match(texto, k + 1):
-            if c in pecas:
-                papel = pecas.index(c)
-            elif c in ingles:
-                papel = ingles.index(c)
-        if papel is None:
-            saida.append(regex.escape(c))
-            continue
-        formas = {BRANCAS[papel], PRETAS[papel], pecas[papel]}
-        letra_inglesa = ingles[papel]
-        if letra_inglesa not in pecas or pecas.index(letra_inglesa) == papel:
-            formas.add(letra_inglesa)
-        saida.append("(?-i:[" + "".join(regex.escape(f) for f in sorted(formas)) + "])")
+        papel = _papel(texto, k, pecas, ingles)
+        saida.append(regex.escape(c) if papel is None else _formas(papel, pecas, ingles))
     return "".join(saida)
+
+
+def _papel(texto: str, k: int, pecas: str, ingles: str) -> Optional[int]:
+    """A peça (o índice em `modelo.PECAS`) que o caractere `k` do texto é: a figurina, ou a
+    letra do idioma ou do inglês seguida de casa; None se não é peça."""
+    c = texto[k]
+    if c in BRANCAS:
+        return BRANCAS.index(c)
+    if c in PRETAS:
+        return PRETAS.index(c)
+    if not _DEPOIS_DA_PECA.match(texto, k + 1):
+        return None
+    if c in pecas:
+        return pecas.index(c)
+    if c in ingles:
+        return ingles.index(c)
+    return None
+
+
+def _formas(papel: int, pecas: str, ingles: str) -> str:
+    """A classe das formas da peça: as duas figurinas, a letra do idioma e a do inglês
+    (menos quando a do inglês é outra peça no idioma)."""
+    formas = {BRANCAS[papel], PRETAS[papel], pecas[papel]}
+    letra_inglesa = ingles[papel]
+    if letra_inglesa not in pecas or pecas.index(letra_inglesa) == papel:
+        formas.add(letra_inglesa)
+    return "(?-i:[" + "".join(regex.escape(f) for f in sorted(formas)) + "])"
 
 
 # ----------------------------------------------------------------------
@@ -496,14 +583,17 @@ def compilar(opcoes: Opcoes):
         raise PadraoInvalido(str(erro)) from erro
 
 
-def _paginas_do_escopo(paginas: Mapping[int, PaginaIndexada], opcoes: Opcoes) -> List[int]:
+def paginas_do_escopo(paginas: Iterable[int], opcoes: Opcoes) -> List[int]:
+    """Das páginas (as lidas, as do índice), as que o escopo pede, em ordem. A regra da busca
+    e a do Substituir tudo (CA-Q-D1)."""
+    lidas = sorted(paginas)
     if opcoes.escopo in (PAGINA, SELECAO):
         alvo = opcoes.selecao[0] if opcoes.escopo == SELECAO and opcoes.selecao else opcoes.pagina_atual
-        return [alvo] if alvo in paginas else []
+        return [alvo] if alvo in lidas else []
     if opcoes.escopo == INTERVALO and opcoes.intervalo is not None:
         a, b = sorted(opcoes.intervalo)
-        return [i for i in sorted(paginas) if a <= i <= b]
-    return sorted(paginas)
+        return [i for i in lidas if a <= i <= b]
+    return lidas
 
 
 def buscar(paginas: Mapping[int, PaginaIndexada], opcoes: Opcoes,
@@ -519,23 +609,35 @@ def buscar(paginas: Mapping[int, PaginaIndexada], opcoes: Opcoes,
     if expressao is None:
         expressao, _dica = compilar(opcoes)
     resultado = Resultado()
-    for indice in _paginas_do_escopo(paginas, opcoes):
+    for indice in paginas_do_escopo(paginas, opcoes):
         if cancelado():
             resultado.cancelada = True
             break
         pagina = paginas[indice]
         resultado.paginas_buscadas += 1
-        inicio, fim = 0, len(pagina.texto)
-        if opcoes.escopo == SELECAO:
-            trecho = _trecho_da_selecao(pagina, opcoes.selecao)
-            if trecho is None:
-                continue
-            inicio, fim = trecho
-        for casado in casamentos(pagina, expressao, inicio, fim, tempo_limite, indice):
-            ocorrencia = _ocorrencia(pagina, casado.start(), casado.end())
-            if ocorrencia is not None and ocorrencia.etiqueta in opcoes.onde:
-                resultado.ocorrencias.append(ocorrencia)
+        trecho = _trecho_da_busca(pagina, opcoes)
+        if trecho is not None:
+            resultado.ocorrencias.extend(_ocorrencias(pagina, expressao, trecho, tempo_limite,
+                                                      indice, opcoes.onde))
     return resultado
+
+
+def _trecho_da_busca(pagina: PaginaIndexada, opcoes: Opcoes) -> Optional[Tuple[int, int]]:
+    """(início, fim) do texto da página onde a busca procura: o texto inteiro, ou o da
+    seleção (None: ela não está na página)."""
+    if opcoes.escopo == SELECAO:
+        return _trecho_da_selecao(pagina, opcoes.selecao)
+    return 0, len(pagina.texto)
+
+
+def _ocorrencias(pagina: PaginaIndexada, expressao, trecho: Tuple[int, int],
+                 tempo_limite: float, indice: int, onde: FrozenSet[str]):
+    """As ocorrências da página no trecho, das etiquetas de `onde`."""
+    inicio, fim = trecho
+    for casado in casamentos(pagina, expressao, inicio, fim, tempo_limite, indice):
+        ocorrencia = _ocorrencia(pagina, casado.start(), casado.end())
+        if ocorrencia is not None and ocorrencia.etiqueta in onde:
+            yield ocorrencia
 
 
 def casamentos(pagina: PaginaIndexada, expressao, inicio: int, fim: int,

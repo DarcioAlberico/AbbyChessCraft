@@ -1,9 +1,9 @@
 """Configuração comum dos testes: o Qt sem tela (`offscreen`) e o portão das camadas lentas.
 
-As fixtures da janela (`app`, `janela`) e a página sintética ainda moram em
-`tests/test_janela.py` e `tests/test_treino_por_livro.py`, importadas pelos outros
-módulos; elas vêm para cá no passo 2a, quando a janela passa a ser montada pelo
-controlador e as fixtures mudam de qualquer jeito.
+Nenhum teste importa de outro (SPEC-qualidade Q-T5): a `app` é daqui; as fixtures de mais
+de um módulo moram em `tests/fixturas.py` e chegam a todos por aqui, menos as três `janela`
+de nome repetido (`tests/fixturas_<origem>.py`, importadas por quem as usa); as páginas, os
+PDFs, os falsos e a espera única (`esperar`), em `tests/ajudantes.py`.
 
 O portão (SPEC §15.1): com `ABBY_PORTAO=1`, um teste `livro_real` que pularia por
 falta do PDF ou do modelo **falha** (na preparação, numa fixture ou na chamada; um xfail
@@ -33,6 +33,9 @@ os.environ.setdefault("ABBY_RENDER_EM_PROCESSO", "0")
 if os.name == "nt":
     os.environ.setdefault("QT_QPA_FONTDIR", os.path.join(os.environ.get("WINDIR", r"C:\Windows"),
                                                          "Fonts"))
+
+from tests.fixturas import *  # noqa: E402,F401,F403 (as fixtures de mais de um módulo)
+from tests.fixturas import _janela_do_modulo  # noqa: E402,F401 (o `*` não traz o `_`)
 
 
 def pytest_configure(config):
@@ -85,6 +88,42 @@ def gravadores_descarregados():
                 pass
 
 
+@pytest.fixture(scope="session")
+def app():
+    """A `QApplication` da suíte, uma por processo (SPEC §15.1, SPEC-qualidade Q-T5)."""
+    from PySide6.QtWidgets import QApplication
+
+    return QApplication.instance() or QApplication([])
+
+
+@pytest.fixture(autouse=True)
+def avisos_que_nao_param(monkeypatch):
+    """Na suíte, o aviso estático do Qt (`warning`, `information`, `critical`) não abre a
+    caixa modal, que no offscreen esperaria um clique até o timeout (o da rede que não
+    carregou, sem os modelos globais, parava o teste da tarefa em voo). O teste que confere
+    um aviso os troca por um que anota, por cima deste."""
+    from PySide6.QtWidgets import QMessageBox
+
+    for nome in ("warning", "information", "critical"):
+        monkeypatch.setattr(QMessageBox, nome,
+                            staticmethod(lambda *a, **k: QMessageBox.StandardButton.Ok))
+
+
+@pytest.fixture(autouse=True)
+def sem_os_modelos_globais(request, monkeypatch):
+    """Fora das camadas `livro_real` e `desempenho`, `com_modelos_globais` devolve o leitor só
+    com os padrões do livro (SPEC-qualidade CA-Q-T1): a rede e a base global do PyBoxEditor
+    custam segundos e gigabytes por worker, e a janela que abre um projeto (`livro.abrir`)
+    as carregava em toda a suíte rápida."""
+    if any(request.node.get_closest_marker(nome) for nome in ("livro_real", "desempenho")):
+        return
+    from abbychess.leitor import LeitorDoLivro
+
+    monkeypatch.setattr(LeitorDoLivro, "com_modelos_globais", classmethod(
+        lambda cls, pasta, *, limiares=None, easyocr=False: cls(pasta, limiares=limiares,
+                                                                 easyocr=easyocr)))
+
+
 @pytest.fixture(autouse=True, scope="module")
 def janelas_apagadas_no_fim_do_modulo():
     """As janelas e os diálogos que os testes do módulo deixaram vivos (fechados, mas ainda
@@ -124,6 +163,85 @@ def pytest_runtest_makereport(item, call):
         relatorio.outcome = "failed"
         relatorio.longrepr = (f"[portão] {item.nodeid} pulou, mas no portão o livro real é "
                               f"obrigatório: {relatorio.longrepr}")
+
+
+#: O teto de workers do `-n auto`. Cada worker sobe o Qt, o PyMuPDF e o OpenCV: com `-n 4` a
+#: suíte soma ~3,4 GB no pico, e um worker chega a 1,8 GB. Sem teto o `-n auto` abria um por
+#: núcleo físico (6), e duas ou três suítes ao mesmo tempo (sessões e subagentes), mais as
+#: medidas, esgotavam os 16 GB: o Windows paginava num HDD e a máquina travava até o reset
+#: (cinco vezes em 2026-10-28).
+MAX_WORKERS = 4
+#: A memória livre que cada worker reserva ao decidir quantos abrir.
+GB_POR_WORKER = 1.5
+
+
+def pytest_xdist_auto_num_workers(config):
+    """O `-n auto` abre no máximo `MAX_WORKERS`, e menos se a memória livre não couber
+    `GB_POR_WORKER` para cada um (outra suíte ou uma medida já rodando). O
+    `PYTEST_XDIST_AUTO_NUM_WORKERS` do pytest-xdist continua valendo por cima."""
+    if os.environ.get("PYTEST_XDIST_AUTO_NUM_WORKERS"):
+        return None
+    import psutil
+
+    livre_gb = psutil.virtual_memory().available / 2**30
+    nucleos = psutil.cpu_count(logical=False) or psutil.cpu_count() or 1
+    return max(1, min(MAX_WORKERS, nucleos, int(livre_gb / GB_POR_WORKER)))
+
+
+#: O teto da suíte rápida com -n 4, sem cobertura (SPEC §15.1, decisão §13.5 da
+#: SPEC-qualidade): passar dele reprova a rodada. `ABBY_TETO_DA_RAPIDA_S` o troca.
+TETO_DA_RAPIDA_S = 90.0
+_CAMADAS_LENTAS = ("livro_real", "desempenho", "processo", "noturno")
+
+
+def _teto_da_rodada(config):
+    """O teto desta rodada, ou None: só a suíte rápida (sem `-m` que peça uma camada lenta)
+    e sem a cobertura, que a deixa mais lenta e tem a medida dela (`ferramentas/qualidade.py`)."""
+    marcas = config.getoption("markexpr", "") or ""
+    pede_lenta = any(c in marcas and f"not {c}" not in marcas for c in _CAMADAS_LENTAS)
+    if pede_lenta or config.getoption("cov_source", None):
+        return None
+    return float(os.environ.get("ABBY_TETO_DA_RAPIDA_S", TETO_DA_RAPIDA_S))
+
+
+def pytest_sessionstart(session):
+    import time
+
+    session.config._abby_inicio = time.perf_counter()
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """CA-Q-T4: a suíte rápida que passa do teto reprova, mesmo com todos os testes verdes."""
+    import time
+
+    teto = _teto_da_rodada(session.config)
+    inicio = getattr(session.config, "_abby_inicio", None)
+    if teto is None or inicio is None or hasattr(session.config, "workerinput"):
+        return                                  # o worker do xdist não conta: o controlador sim
+    duracao = time.perf_counter() - inicio
+    if duracao > teto and exitstatus == 0:
+        session.config._abby_estourou = (duracao, teto)
+        session.exitstatus = 1
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """Os pulos por motivo, e o teto estourado (CA-Q-T4)."""
+    from collections import Counter
+
+    motivos = Counter()
+    for relatorio in terminalreporter.stats.get("skipped", []):
+        longrepr = getattr(relatorio, "longrepr", None)
+        motivo = longrepr[2] if isinstance(longrepr, tuple) and len(longrepr) == 3 else str(longrepr)
+        motivos[motivo.removeprefix("Skipped: ")] += 1
+    if motivos:
+        terminalreporter.write_sep("-", "pulados por motivo")
+        for motivo, quantos in motivos.most_common():
+            terminalreporter.write_line(f"{quantos} × {motivo}")
+    estourou = getattr(config, "_abby_estourou", None)
+    if estourou is not None:
+        duracao, teto = estourou
+        terminalreporter.write_sep("!", f"a rodada levou {duracao:.0f} s: passou do teto da suíte "
+                                        f"rápida ({teto:.0f} s, SPEC §15.1)")
 
 
 def pytest_addoption(parser):

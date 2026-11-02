@@ -5,6 +5,7 @@ divisão. A esquerda fica com o `pid`, a direita ganha um novo, e os glifos dela
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -13,10 +14,10 @@ from core.box_model import BoxEntry
 from abbychess import pagina as pg
 from abbychess.controlador import ControladorDePagina
 from abbychess.leitor import LeitorDoLivro, nome_de_origem
-from abbychess.modelo import Box, Decisoes, GlifoVirtual, Pagina, dividir, pid_de
+from abbychess.geometria_do_modelo import dividir
+from abbychess.modelo import Box, Decisoes, GlifoVirtual, Pagina, pid_de
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_visor import pdf_de_60_paginas  # noqa: F401
 
 
 @pytest.fixture
@@ -69,8 +70,8 @@ def test_ca_12_13_dividir_da_duas_paginas_com_metade_dos_pixels(projeto, ctl):
     imagem = _imagem(ctl, 2)
     recortes = _recortes(ctl, projeto, 2)
     gids = [b.gid for b in projeto.carregar_modelo(2).boxes]
-    pid = projeto.pid_da_pagina(2)
-    assert ctl.dividir_paginas([2])
+    pid = projeto.ordem.pid_em(2)
+    assert ctl.operacoes.dividir_paginas([2])
     assert len(projeto.sequencia) == 61
     esquerda, direita = projeto.sequencia.entrada_em(2), projeto.sequencia.entrada_em(3)
     assert (esquerda.pid, esquerda.metade, direita.metade) == (pid, "esquerda", "direita")
@@ -90,21 +91,21 @@ def test_ca_12_13_a_amostra_de_um_glifo_da_direita_acha_a_origem(projeto, ctl):
     _gravar(projeto, ctl, 5)
     gid = projeto.carregar_modelo(5).boxes[4].gid
     origem = nome_de_origem("Dividir", 5, 4, gid)
-    ctl.dividir_paginas([5])
+    ctl.operacoes.dividir_paginas([5])
     novo = projeto.dados.gids_movidos[str(gid)]
-    assert projeto.origem_da_amostra(origem) == (6, novo)
+    assert projeto.ordem.origem_da_amostra(origem) == (6, novo)
     assert projeto.carregar_modelo(6).boxes[1].gid == novo
     # a amostra antiga, sem gid, vai à metade esquerda
-    assert projeto.origem_da_amostra(nome_de_origem("Dividir", 5, 4)) == (5, None)
+    assert projeto.ordem.origem_da_amostra(nome_de_origem("Dividir", 5, 4)) == (5, None)
 
 
 def test_ca_12_13_dividir_uma_metade_e_recusado(projeto, ctl):
-    ctl.dividir_paginas([1])
+    ctl.operacoes.dividir_paginas([1])
     antes = projeto.sequencia
-    assert not ctl.dividir_paginas([1])
-    assert not ctl.dividir_paginas([2])
+    assert not ctl.operacoes.dividir_paginas([1])
+    assert not ctl.operacoes.dividir_paginas([2])
     assert projeto.sequencia == antes
-    assert not ctl.tirar_o_corte([2])
+    assert not ctl.operacoes.tirar_o_corte([2])
 
 
 def test_ca_12_13_o_ctrl_z_junta_e_aposenta_o_pid_novo(projeto, ctl):
@@ -112,45 +113,45 @@ def test_ca_12_13_o_ctrl_z_junta_e_aposenta_o_pid_novo(projeto, ctl):
     antes = projeto.sequencia
     gids = [b.gid for b in projeto.carregar_modelo(2).boxes]
     recortes = _recortes(ctl, projeto, 2)
-    ctl.dividir_paginas([2])
+    ctl.operacoes.dividir_paginas([2])
     pid_novo = projeto.sequencia.entrada_em(3).pid
     assert (projeto.pasta / "paginas" / f"p{pid_novo}.json").is_file()
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia == antes
     assert projeto.dados.gids_movidos == {}
     assert not (projeto.pasta / "paginas" / f"p{pid_novo}.json").exists()
     assert [b.gid for b in projeto.carregar_modelo(2).boxes] == gids
     assert _recortes(ctl, projeto, 2) == recortes
-    assert projeto.novo_pid() > pid_novo                         # aposentado
+    assert projeto.ordem.novo_pid() > pid_novo                         # aposentado
     livro = json.loads((projeto.pasta / "livro.json").read_text(encoding="utf-8"))
     assert str(pid_novo) not in livro["paginas"]
-    ctl.refazer()
+    ctl.desfazedor.refazer()
     assert projeto.sequencia.entrada_em(3).pid == pid_novo
     assert len(projeto.carregar_modelo(3).boxes) == 2
 
 
 def test_o_ctrl_z_recusa_se_a_metade_mudou_depois(projeto, ctl):
     _gravar(projeto, ctl, 2)
-    ctl.dividir_paginas([2])
+    ctl.operacoes.dividir_paginas([2])
     pagina = projeto.carregar_modelo(3)
     projeto.salvar_pagina(3, [b.entry for b in pagina.boxes[:1]])   # por fora do desfazer
     sequencia = projeto.sequencia
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia == sequencia
 
 
 def test_dividir_pagina_sem_glifos_so_muda_a_sequencia(projeto, ctl):
-    assert ctl.dividir_paginas([7, 9])
+    assert ctl.operacoes.dividir_paginas([7, 9])
     assert [projeto.sequencia.entrada_em(i).metade for i in (7, 8, 10, 11)] == \
         ["esquerda", "direita", "esquerda", "direita"]
     assert not list((projeto.pasta / "paginas").glob("p*.json"))
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert len(projeto.sequencia) == 60
 
 
 def test_a_divisao_sobrevive_a_reabrir(projeto, ctl):
     _gravar(projeto, ctl, 0)
-    ctl.dividir_paginas([0])
+    ctl.operacoes.dividir_paginas([0])
     recortes = {**_recortes(ctl, projeto, 0), **_recortes(ctl, projeto, 1)}
     projeto.fechar()
     reaberto = ProjetoDeLivro.abrir(projeto.pasta)
@@ -161,12 +162,12 @@ def test_a_divisao_sobrevive_a_reabrir(projeto, ctl):
 
 def test_dividir_uma_pagina_girada_divide_o_que_se_ve(projeto, ctl):
     _gravar(projeto, ctl, 4)
-    ctl.girar_paginas([4], 90)
+    ctl.operacoes.girar_paginas([4], 90)
     vista = _imagem(ctl, 4)
     recortes = _recortes(ctl, projeto, 4)
     gids = [b.gid for b in projeto.carregar_modelo(4).boxes]
     largura = vista.shape[1]
-    ctl.dividir_paginas([4], 0.4)
+    ctl.operacoes.dividir_paginas([4], 0.4)
     corte = round(0.4 * largura)
     assert np.array_equal(_imagem(ctl, 4), vista[:, :corte])
     assert np.array_equal(_imagem(ctl, 5), vista[:, corte:])
@@ -179,7 +180,7 @@ def test_dividir_uma_pagina_girada_divide_o_que_se_ve(projeto, ctl):
 def test_ca_4_6_nenhum_gid_se_repete_depois_de_dividir(projeto, ctl):
     for posicao in (0, 3):
         _gravar(projeto, ctl, posicao)
-    ctl.dividir_paginas([0, 3])
+    ctl.operacoes.dividir_paginas([0, 3])
     vistos = []
     for posicao in range(len(projeto.sequencia)):
         modelo = projeto.carregar_modelo(posicao)
@@ -190,7 +191,7 @@ def test_ca_4_6_nenhum_gid_se_repete_depois_de_dividir(projeto, ctl):
 
 
 # ----------------------------------------------------------------------
-# modelo.dividir: as decisões, as áreas, os diagramas
+# geometria_do_modelo.dividir: as decisões, as áreas, os diagramas
 # ----------------------------------------------------------------------
 
 def _box(gid, x):
@@ -248,12 +249,12 @@ def test_as_areas_sao_cortadas_e_os_diagramas_vao_pelo_centro():
 
 def test_refazer_a_divisao_nao_reaproveita_um_gid_da_direita(projeto, ctl):
     _gravar(projeto, ctl, 2)
-    ctl.dividir_paginas([2])
+    ctl.operacoes.dividir_paginas([2])
     direita = projeto.carregar_modelo(3)
     direita.alocar()                                 # uma edição na direita, desfeita
     contador = direita.proximo_n
-    ctl.desfazer()
-    ctl.refazer()
+    ctl.desfazedor.desfazer()
+    ctl.desfazedor.refazer()
     assert projeto.carregar_modelo(3).proximo_n >= contador
 
 
@@ -264,7 +265,7 @@ def test_o_glifo_fora_da_pagina_fica_guardado_na_esquerda(projeto, ctl):
     perdido = Box(gid=pagina.alocar(), entry=BoxEntry(char="z", x1=-30, y1=40, x2=-5, y2=70))
     pagina.boxes = [*pagina.boxes, perdido]
     projeto.salvar_modelo(pagina)
-    assert ctl.dividir_paginas([2])
+    assert ctl.operacoes.dividir_paginas([2])
     esquerda = projeto.carregar_modelo(2)
     assert [b.entry.char for b in esquerda.boxes] == ["a"]
     assert [b.gid for _lugar, b in esquerda.fora] == [perdido.gid]
@@ -274,31 +275,95 @@ def test_falhar_ao_gravar_o_projeto_nao_deixa_o_arquivo_da_direita(projeto, ctl,
     _gravar(projeto, ctl, 2)
     antes = projeto.sequencia
 
-    def falhar():
+    def falhar(*_a):                          # salvar(sequencia, proximo)
         raise OSError("disco cheio")
 
     monkeypatch.setattr(projeto, "salvar", falhar)
-    assert not ctl.dividir_paginas([2])
+    assert not ctl.operacoes.dividir_paginas([2])
     assert projeto.sequencia == antes and projeto.dados.gids_movidos == {}
     assert [p.name for p in (projeto.pasta / "paginas").glob("p*.json")] == \
-        [f"p{projeto.pid_da_pagina(2)}.json"]
+        [f"p{projeto.ordem.pid_em(2)}.json"]
+
+
+def _falhar_ao_trocar(monkeypatch, nome):
+    """O disco cheio ao pôr no lugar o arquivo `nome` (só na thread do teste: o gravador
+    grava de verdade)."""
+    import threading
+
+    from abbychess import gravacao as gv
+
+    real, thread = gv._replace, threading.get_ident()
+
+    def trocar(temporario, caminho):
+        if threading.get_ident() == thread and Path(caminho).name == nome:
+            raise OSError(28, "sem espaço")
+        return real(temporario, caminho)
+
+    monkeypatch.setattr(gv, "_replace", trocar)
+
+
+def test_a_pagina_que_nao_grava_depois_da_ordem_fica_com_o_gravador(projeto, ctl, monkeypatch):
+    _gravar(projeto, ctl, 2)
+    _falhar_ao_trocar(monkeypatch, f"p{projeto.ordem.pid_em(2)}.json")
+    assert ctl.operacoes.dividir_paginas([2])
+    assert len(projeto.sequencia) == 61 and len(projeto.carregar_modelo(2).boxes) == 3
+    monkeypatch.undo()
+    assert projeto.fechar(10)
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert [len(reaberto.carregar_modelo(k).boxes) for k in (2, 3)] == [3, 2]
+
+
+def test_o_livro_json_que_nao_grava_na_divisao_se_refaz_ao_abrir(projeto, ctl, monkeypatch):
+    _gravar(projeto, ctl, 2)
+    _falhar_ao_trocar(monkeypatch, "livro.json")
+    assert ctl.operacoes.dividir_paginas([2])
+    monkeypatch.undo()
+    assert projeto.fechar(10)
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert len(reaberto.sequencia) == 61
+    assert [len(reaberto.carregar_modelo(k).boxes) for k in (2, 3)] == [3, 2]
+    assert {2, 3} <= set(reaberto.resumo.do_livro())
+
+
+def test_o_arquivo_da_direita_que_nao_sai_no_ctrl_z_fica_fora_do_livro(projeto, ctl, monkeypatch):
+    import os
+
+    _gravar(projeto, ctl, 2)
+    antes = projeto.sequencia
+    ctl.operacoes.dividir_paginas([2])
+    preso = projeto.pasta / "paginas" / f"p{projeto.sequencia.entrada_em(3).pid}.json"
+    real = os.unlink
+
+    def unlink(caminho, *args, **kwargs):
+        if Path(caminho) == preso:
+            raise PermissionError("o antivírus segura o arquivo")
+        return real(caminho, *args, **kwargs)
+
+    monkeypatch.setattr(os, "unlink", unlink)
+    ctl.desfazedor.desfazer()
+    assert projeto.sequencia == antes and preso.is_file()
+    monkeypatch.undo()
+    assert projeto.fechar(10)
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)
+    assert reaberto.sequencia.entradas == antes.entradas
+    assert len(reaberto.carregar_modelo(2).boxes) == 5
 
 
 def test_com_leitura_do_servidor_pendente_as_operacoes_esperam(projeto, ctl):
-    ctl._em_leitura = {123}
-    assert "servidor" in ctl.motivo_para_nao_mudar_as_paginas()
-    assert not ctl.dividir_paginas([2])
+    ctl.leitura._em_leitura = {123}
+    assert "servidor" in ctl.operacoes.motivo_para_nao_mudar_as_paginas()
+    assert not ctl.operacoes.dividir_paginas([2])
 
 
 def test_a_pagina_vazia_na_memoria_nao_impede_o_desfazer(projeto, ctl):
-    ctl.dividir_paginas([7])
+    ctl.operacoes.dividir_paginas([7])
     projeto.pagina_para_editar(8)                    # nasce vazia na memória, sem arquivo
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert len(projeto.sequencia) == 60
 
 
 def test_a_amostra_antiga_vai_a_esquerda_mesmo_com_a_direita_antes(projeto, ctl):
-    ctl.dividir_paginas([5])
-    ctl.mover_paginas([6], -1)                       # a direita vai para o começo
+    ctl.operacoes.dividir_paginas([5])
+    ctl.operacoes.mover_paginas([6], -1)                       # a direita vai para o começo
     assert projeto.sequencia.entrada_em(0).metade == "direita"
-    assert projeto.origem_da_amostra(nome_de_origem("Dividir", 5, 0)) == (6, None)
+    assert projeto.ordem.origem_da_amostra(nome_de_origem("Dividir", 5, 0)) == (6, None)

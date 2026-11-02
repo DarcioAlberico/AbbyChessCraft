@@ -1,0 +1,16 @@
+# As funções com CRAP >= 10 aceitas, com motivo (SPEC-qualidade CA-Q-X1). A medida
+# (qualidade.py) falha com uma função acima de 10 fora daqui, e com uma daqui que não passa
+# mais de 10; a rápida (tests/test_complexidade.py) falha com cc >= 10 fora daqui, com um nome
+# que não existe e com a lista maior que o teto. "a reduzir (Q8)" é o que o Q8 ainda vai partir
+# ou testar: o passo fecha quando nenhuma linha diz isso.
+# Uma linha por função: arquivo Classe.funcao  # o motivo
+
+abbychess/app/estilo.py tema_do_sistema  # lê o esquema de cores do sistema operacional: o offscreen da suíte não o tem nem aceita o pedido (sempre Unknown)
+abbychess/app/principal.py main  # o ponto de entrada: cria a QApplication do processo e fica no app.exec() até a janela fechar
+abbychess/app/visor.py VisorDePagina.mousePressEvent  # despacho do clique pelo botão e pelo modo (arrastar a página, o editor de áreas, Ctrl+clique, o quadro do treino, o box, o diagrama): uma tabela não fica mais clara que os if
+abbychess/montagem.py _sem_coordenadas.fora  # roda por glifo e por tabuleiro: partir põe chamada nova no laço por glifo
+abbychess/padroes.py PadroesDoLivro.ler  # roda por glifo (ler, propagar, o servidor): partir põe chamada nova no laço por glifo
+abbychess/resumo_do_livro.py resumo_das_confiancas  # roda por glifo de cada página gravada (o livro.json a cada gravação): partir põe chamada nova no laço por glifo
+abbychess/servidor_de_leitura.py _Laco._operar  # despacho das operações do protocolo com o filho: cada uma desempacota os argumentos dela, e uma tabela não fica mais clara que os if
+abbychess/validacao_do_epub.py _no_calibre  # o validador externo Calibre (ABBY_CALIBRE, o ebook-convert): só roda no portão
+abbychess/validacao_do_epub.py ace  # o validador externo Ace by DAISY (ABBY_ACE, num Chrome sem janela): só roda no portão

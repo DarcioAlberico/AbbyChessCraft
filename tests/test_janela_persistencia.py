@@ -12,41 +12,15 @@ import json
 from pathlib import Path
 
 import pytest
-from PySide6.QtWidgets import QFileDialog, QMessageBox
+from PySide6.QtWidgets import QFileDialog
 
 from abbychess import gravacao as gv
 from abbychess.app.janela import JanelaPrincipal
-from abbychess.leitor import LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_janela import _esperar, app  # noqa: F401 (fixture)
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
-
-
-@pytest.fixture
-def sem_dialogos(monkeypatch):
-    """Registra os avisos em vez de abrir caixas de diálogo."""
-    avisos = []
-    for nome in ("information", "warning"):
-        monkeypatch.setattr(QMessageBox, nome,
-                            lambda _pai, titulo, texto, *a, **k: avisos.append(texto))
-    monkeypatch.setattr(QMessageBox, "question",
-                        lambda *a, **k: QMessageBox.StandardButton.Yes)
-    monkeypatch.setattr(LeitorDoLivro, "com_modelos_globais",
-                        classmethod(lambda cls, pasta, limiares=None: cls(pasta, limiares=limiares)))
-    return avisos
-
-
-@pytest.fixture
-def projeto_lido(tmp_path, app):  # noqa: F811
-    from abbychess import livro, pagina as pg
-
-    fonte = _pagina_sintetica(tmp_path / "pagina.png")
-    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Janela", fonte)
-    leitor = LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
-    livro.reconhecer_paginas(projeto, pg.fonte_do_projeto(projeto), leitor, [0])
-    return projeto
 
 
 def _instantaneo(pasta: Path) -> dict:
@@ -81,7 +55,8 @@ def test_versao_mais_nova_abre_so_para_leitura_e_nada_e_gravado(app, projeto_lid
         janela.areas.desenhar(1, 1, 60, 60)              # nem a área nova
         from abbychess.projeto import Limiares
 
-        janela.pagina.aplicar_limiares(Limiares(revisao=0.5))   # vale na sessão, não no disco
+        # Vale na sessão, não no disco.
+        janela.pagina.padroes_do_livro.aplicar_limiares(Limiares(revisao=0.5))
         assert "nesta sessão" in janela.statusBar().currentMessage()
         janela.ir_para_pagina(0)                         # a troca de página grava, se puder
         assert _instantaneo(projeto_lido.pasta) == antes
@@ -198,7 +173,7 @@ def test_limiares_que_nao_gravam_avisam_e_nao_dizem_gravados(app, projeto_lido, 
             raise PermissionError("disco")
 
         monkeypatch.setattr(gv, "gravar_bytes", falhar)
-        janela.pagina.aplicar_limiares(Limiares(revisao=0.5))
+        janela.pagina.padroes_do_livro.aplicar_limiares(Limiares(revisao=0.5))
         assert any("não foram gravados" in a for a in sem_dialogos)
         assert janela.statusBar().currentMessage() == ("Limiares aplicados nesta sessão "
                                                        "(não foram gravados).")

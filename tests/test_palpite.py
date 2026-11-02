@@ -13,13 +13,13 @@ from PySide6.QtTest import QTest
 
 from abbychess.leitor import FONTE_MANUAL
 
-from tests import leitor_falso, servidor_falso, test_janela
+from tests import leitor_falso, servidor_falso
+from tests import fixturas_janela
 from tests.janela_util import boxes, fila, mostrar, trocar_entries
-from tests.test_custo_dos_comandos import _pronta
-from tests.test_janela import _esperar
+from tests.ajudantes import _pronta  # noqa: E402,F401,F811
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 
-app = test_janela.app
-janela = test_janela.janela
+janela = fixturas_janela.janela  # a fixture do apoio, com o nome que os testes pedem
 
 
 def _com_rede(app, janela):
@@ -40,14 +40,14 @@ def test_o_glifo_lido_nao_tem_palpite(app, janela):
     mostrar(janela, 0)
     app.processEvents()
     assert campo.text() == "a" and "Palpite" not in janela.treino.leitura.text()
-    assert janela.pagina.sugestao_do_atual() is None
+    assert janela.pagina.leitura.sugestao_do_atual() is None
 
 
 def test_sem_rede_o_campo_fica_vazio(app, janela):
     _pronta(app, janela)
     mostrar(janela, fila(janela)[0])
     app.processEvents()
-    assert janela.treino.campo.text() == "" and janela.pagina.sugestao_do_atual() is None
+    assert janela.treino.campo.text() == "" and janela.pagina.leitura.sugestao_do_atual() is None
 
 
 def test_digitar_troca_o_palpite(app, janela):
@@ -79,12 +79,12 @@ def test_o_palpite_vale_para_o_mesmo_glifo(app, janela):
     p = janela.pagina
     primeiro = fila(janela)[0]
     mostrar(janela, primeiro)
-    velho = p._sugestoes[p.atual][0]
-    assert velho is p.box_atual() and p.sugestao_do_atual() == (
+    velho = p.leitura._sugestoes[p.atual][0]
+    assert velho is p.box_atual() and p.leitura.sugestao_do_atual() == (
         leitor_falso.PALPITE, leitor_falso.CONFIANCA_DO_PALPITE)
     trocar_entries(janela, p.indice, lambda e: None)    # cópias novas
     _esperar(app, janela)
-    assert p.box_atual() is not velho and p._sugestoes[p.atual][0] is p.box_atual()
+    assert p.box_atual() is not velho and p.leitura._sugestoes[p.atual][0] is p.box_atual()
 
 
 def test_o_glifo_aguardando_ganha_o_palpite_quando_a_leitura_chega(app, janela):
@@ -100,7 +100,7 @@ def test_o_glifo_aguardando_ganha_o_palpite_quando_a_leitura_chega(app, janela):
     _esperar(app, janela)
     mostrar(janela, 0)
     app.processEvents()
-    assert campo.text() == "" and janela.pagina.sugestao_do_atual() is None
+    assert campo.text() == "" and janela.pagina.leitura.sugestao_do_atual() is None
 
     def ninguem_leu(e):
         if (e.x1, e.y1) == caixa:
@@ -142,3 +142,63 @@ def test_a_rede_que_falha_nao_prende_o_painel(app, janela, caplog):
     assert janela.treino.campo.isEnabled() and campo.text() == ""
     assert janela.pagina.atual == janela.pagina.gid_em(fila(janela)[1])
     assert "rede quebrada" in caplog.text
+
+
+class _RedeDoTraco:
+    """Uma rede que lê traço nos glifos de letra: o veto de proporção do core (o traço é
+    deitado) a faz pular para a próxima candidata dela que caiba."""
+
+    def __init__(self, candidatas, carregada=True):
+        self.candidatas, self.loaded = candidatas, carregada
+
+    def predict(self, _recorte):
+        return self.candidatas[0]
+
+    def predict_topk(self, _recorte, k=5):
+        return self.candidatas[:k]
+
+
+def test_o_palpite_que_nao_cabe_no_glifo_cede_a_proxima_candidata_da_rede(app, janela):
+    """§9.2: o palpite passa pelo veto de proporção, como a cadeia global: o traço num glifo
+    de letra cede à primeira candidata que cabe; sem nenhuma que caiba, ou com a rede que não
+    carregou, o campo fica vazio."""
+    _pronta(app, janela)
+    campo = janela.treino.campo
+    primeiro, segundo, terceiro = fila(janela)[:3]
+    janela.leitor.rede = _RedeDoTraco([("-", 0.35), ("—", 0.2), ("c", 0.1)])
+    mostrar(janela, primeiro)
+    app.processEvents()
+    assert campo.text() == "c" and janela.pagina.leitura.sugestao_do_atual() == ("c", 0.1)
+
+    janela.leitor.rede = _RedeDoTraco([("-", 0.35), ("_", 0.2)])
+    mostrar(janela, segundo)
+    app.processEvents()
+    assert campo.text() == "" and janela.pagina.leitura.sugestao_do_atual() is None
+
+    janela.leitor.rede = _RedeDoTraco([("c", 0.3)], carregada=False)
+    mostrar(janela, terceiro)
+    app.processEvents()
+    assert campo.text() == "" and janela.pagina.leitura.sugestao_do_atual() is None
+
+
+def test_a_troca_pelo_contexto_vai_ao_campo(app, janela, monkeypatch):
+    """O glifo que a palavra ou a linha desmente (`contexto.sugestoes`) chega com a troca no
+    campo; vírgula e apóstrofo têm o mesmo desenho, e a leitura pede "só esta"."""
+    from abbychess import contexto
+
+    _pronta(app, janela)
+    caixa = (boxes(janela)[0].x1, boxes(janela)[0].y1)
+
+    def virgula(e):
+        if (e.x1, e.y1) == caixa:
+            e.char, e.source, e.confidence = ",", "neural", 0.99
+    trocar_entries(janela, janela.pagina.indice, virgula)
+    _esperar(app, janela)
+    gid = janela.pagina.modelo.boxes[0].gid
+    monkeypatch.setattr(contexto, "sugestoes", lambda pagina: {gid: "'"})
+    mostrar(janela, 0)
+    app.processEvents()
+    assert janela.pagina.leitura.sugestao_do_contexto() == ("'", True)
+    assert janela.treino.campo.text() == "'"
+    assert "Pelo contexto" in janela.treino.leitura.text()
+    assert "corrija só esta" in janela.treino.leitura.text()

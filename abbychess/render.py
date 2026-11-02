@@ -110,15 +110,9 @@ class RenderEmProcesso:
         """Se o processo filho está aberto agora."""
         return self._pool is not None
 
-    def renderizar(self, caminho: str | Path, indice: int) -> Optional[Image.Image]:
-        """A página `indice` do PDF em `caminho`, renderizada no processo à parte; `None` se
-        não deu (o processo não abriu, caiu, travou, ou a página não renderizou lá): quem
-        chama renderiza no próprio processo e dá o erro certo."""
-        try:
-            estado = os.stat(caminho)
-        except OSError:
-            return None
-        arquivo = (str(caminho), estado.st_size, estado.st_mtime_ns)
+    def _pool_aberto(self):
+        """O processo à parte (aberto agora, se não há), com o relógio do ocioso parado; None
+        se desistiu."""
         with self._trava:
             if self.desistiu:
                 return None
@@ -128,24 +122,47 @@ class RenderEmProcesso:
             if self._pool is None:
                 self._pool = cf.ProcessPoolExecutor(1, mp_context=mp.get_context("spawn"),
                                                     initializer=vigiar_o_pai)
-            pool = self._pool
-        try:
-            resultado = pool.submit(_renderizar_no_filho, str(caminho), arquivo,
-                                    indice).result(self.limite_s)
-        except Exception as erro:  # noqa: BLE001 — processo quebrado, tempo esgotado, pickle
-            log.warning("o render em processo da página %d falhou: %r", indice + 1, erro)
-            with self._trava:
-                self._falhas += 1
-                if self._pool is pool:
-                    self._pool = None
-            _matar(pool)
-            return None
+            return self._pool
+
+    def _falhou(self, pool) -> None:
+        """Mais uma falha seguida; o processo que falhou é morto (o próximo render abre
+        outro)."""
+        with self._trava:
+            self._falhas += 1
+            if self._pool is pool:
+                self._pool = None
+        _matar(pool)
+
+    def _deu_certo(self, pool) -> None:
+        """As falhas zeram, e o relógio do ocioso recomeça."""
         with self._trava:
             self._falhas = 0
             if self._pool is pool and not self._fechado:
                 self._relogio = threading.Timer(self.ocioso_s, self._fechar_ocioso, (pool,))
                 self._relogio.daemon = True
                 self._relogio.start()
+
+    def renderizar(self, caminho: str | Path, indice: int) -> Optional[Image.Image]:
+        """A página `indice` do PDF em `caminho`, renderizada no processo à parte; `None` se
+        não deu (o processo não abriu, caiu, travou, ou a página não renderizou lá): quem
+        chama renderiza no próprio processo e dá o erro certo."""
+        try:
+            estado = os.stat(caminho)
+        except OSError:
+            return None
+        arquivo = (str(caminho), estado.st_size, estado.st_mtime_ns)
+        pool = self._pool_aberto()
+        if pool is None:
+            return None
+        try:
+            resultado = pool.submit(_renderizar_no_filho, str(caminho), arquivo,
+                                    indice).result(self.limite_s)
+        except Exception as erro:  # noqa: BLE001 — processo quebrado, tempo esgotado, pickle
+            log.warning("o render em processo da página %d falhou: %r", indice + 1, erro,
+                        exc_info=True)
+            self._falhou(pool)
+            return None
+        self._deu_certo(pool)
         if resultado is None:
             return None
         modo, tamanho, dados = resultado

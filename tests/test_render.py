@@ -8,7 +8,8 @@ from PIL import Image
 from abbychess import pagina as pg
 from abbychess import render
 
-from tests.test_livro import pdf_sintetico
+from tests.ajudantes import esperar
+from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
 
 class _RenderFalso:
@@ -50,24 +51,25 @@ def test_sem_resposta_do_processo_a_pre_carga_renderiza_aqui(fonte):
 
 def test_a_pagina_pedida_nao_espera_a_pre_carga_travada_no_processo(fonte, monkeypatch):
     """O processo de render que trava não prende a interface: quem pede a página que a
-    pré-carga renderiza lá espera `ESPERA_PELA_PRE_CARGA_S` e renderiza aqui."""
+    pré-carga renderiza lá espera `ESPERA_PELA_PRE_CARGA_S` e renderiza aqui, com a pré-carga
+    ainda presa: se a esperasse, só voltaria depois de ela sair (`saiu`)."""
     import threading
-    import time
 
     monkeypatch.setattr(pg, "ESPERA_PELA_PRE_CARGA_S", 0.2)
-    solta = threading.Event()
+    entrou, solta, saiu = threading.Event(), threading.Event(), threading.Event()
 
     class _Travado(_RenderFalso):
         def renderizar(self, caminho, indice):
+            entrou.set()
             solta.wait(10)
+            saiu.set()
             return super().renderizar(caminho, indice)
 
     cache = pg.CacheDePaginas(fonte, renderizador=_Travado(fonte))
     cache.precarregar(1)
-    time.sleep(0.05)                                  # a pré-carga já está no processo
-    inicio = time.perf_counter()
+    assert entrou.wait(10)                            # a pré-carga já está no processo
     imagem, _ = cache.pagina(1)
-    assert time.perf_counter() - inicio < 2.0
+    assert not saiu.is_set()                          # voltou com a pré-carga presa
     assert imagem.tobytes() == fonte.pagina(1).tobytes()
     solta.set()
     cache.esperar()
@@ -98,11 +100,8 @@ def test_o_processo_da_os_mesmos_pixels_e_desiste_quando_fecha(tmp_path):
 
 def _filhos_vivos(limite: float = 10.0) -> list:
     import multiprocessing as mp
-    import time
 
-    fim = time.monotonic() + limite
-    while mp.active_children() and time.monotonic() < fim:
-        time.sleep(0.05)
+    esperar(lambda: not mp.active_children(), limite)
     return mp.active_children()
 
 

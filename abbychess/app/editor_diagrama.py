@@ -22,6 +22,7 @@ legalidade) é o `core.tabuleiro_edicao.TabuleiroEdicao`, e o desenho da posiç�
 
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from typing import Dict, List, Optional, Tuple
 
@@ -31,14 +32,16 @@ from PySide6.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QGridLayou
                                QHBoxLayout, QLabel, QLineEdit, QPushButton, QRadioButton,
                                QSizePolicy, QToolButton, QVBoxLayout, QWidget)
 
-from core.tabuleiro_edicao import SIMBOLOS, TabuleiroEdicao
+from core.tabuleiro_edicao import AVISO_CONVENCAO, SIMBOLOS, TabuleiroEdicao
 
 from abbychess import lances
 from abbychess.diagramas import LADO_DA_LEGENDA, DiagramaLido, afirmar_lado
 from abbychess.app import estilo, teclado
 
+log = logging.getLogger(__name__)
+
 #: O lado de uma casa no Inspetor (o tabuleiro cabe nos 296 px de 1366, §3.1).
-LADO_CASA = 30
+LADO_CASA = 32                  # §3.2: a casa do tabuleiro do Inspetor, ≥ 32 px
 
 #: Abaixo disto a peça lida é pintada de laranja (o `CONFIANCA_BAIXA` do PyBoxEditor).
 CONFIANCA_BAIXA = 0.55
@@ -194,6 +197,7 @@ def _desenhar_posicao(fen_das_pecas: str, orientacao: str, lado_px: int) -> Opti
         png, _largura, _altura = render_diagrama.desenhar(
             fen_das_pecas, lado_px=lado_px, moldura="sem", orientacao=orientacao, tons=0)
     except Exception:  # fonte de diagrama ausente ou ilegível: o widget cai nos glifos
+        log.warning("o diagrama não foi desenhado; o editor mostra os glifos", exc_info=True)
         return None
     pixmap = QPixmap()
     return pixmap if pixmap.loadFromData(png, "PNG") else None
@@ -298,10 +302,13 @@ class EditorDeDiagrama(QWidget):
         self.fen.setReadOnly(True)
         self.fen.setFont(QFont("Consolas", 9))
         self.fen.setAccessibleName("FEN do diagrama")
-        copiar = QPushButton("FEN")
+        self.fen.setMinimumWidth(80)
+        copiar = QToolButton()
+        copiar.setText("FEN")
         copiar.setToolTip("Copiar o FEN")
         copiar.clicked.connect(lambda: QApplication.clipboard().setText(self.fen.text()))
-        copiar_pgn = QPushButton("PGN")
+        copiar_pgn = QToolButton()
+        copiar_pgn.setText("PGN")
         copiar_pgn.setToolTip("Copiar o PGN: a posição e os lances do texto que passaram na "
                               "validação")
         copiar_pgn.clicked.connect(lambda: QApplication.clipboard().setText(self.pgn()))
@@ -315,19 +322,29 @@ class EditorDeDiagrama(QWidget):
         self.avisos.setTextFormat(Qt.TextFormat.PlainText)
         self.avisos.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
 
-        self.btn_anterior = QPushButton("◀")
+        self.btn_anterior = QToolButton()
+        self.btn_anterior.setText("◀")
         teclado.texto_vivo(self.btn_anterior, "setToolTip",
                            "O diagrama anterior do livro ({diagrama_anterior})")
         self.btn_anterior.setAccessibleName("Diagrama anterior")
         self.btn_anterior.clicked.connect(lambda: self.ir(-1))
-        self.btn_seguinte = QPushButton("▶")
+        self.btn_seguinte = QToolButton()
+        self.btn_seguinte.setText("▶")
         teclado.texto_vivo(self.btn_seguinte, "setToolTip",
                            "O diagrama seguinte do livro ({diagrama_seguinte})")
         self.btn_seguinte.setAccessibleName("Diagrama seguinte")
         self.btn_seguinte.clicked.connect(lambda: self.ir(+1))
-        self.btn_desfazer = QPushButton("Desfazer")
+        self.btn_desfazer = QToolButton()
+        self.btn_desfazer.setText("↶")              # curtos: o Inspetor de 1366 tem 296 px
+        self.btn_desfazer.setFont(QFont("Segoe UI Symbol", 13))   # legíveis (eram ~6 px)
+        self.btn_desfazer.setToolTip("Desfazer a última casa (Ctrl+Z com o foco no editor)")
+        self.btn_desfazer.setAccessibleName("Desfazer")
         self.btn_desfazer.clicked.connect(self.desfazer)
-        self.btn_refazer = QPushButton("Refazer")
+        self.btn_refazer = QToolButton()
+        self.btn_refazer.setText("↷")
+        self.btn_refazer.setFont(QFont("Segoe UI Symbol", 13))
+        self.btn_refazer.setToolTip("Refazer a casa desfeita")
+        self.btn_refazer.setAccessibleName("Refazer")
         self.btn_refazer.clicked.connect(self.refazer)
         self.btn_conferido = QPushButton("Conferido")
         teclado.texto_vivo(self.btn_conferido, "setToolTip",
@@ -337,16 +354,20 @@ class EditorDeDiagrama(QWidget):
         navegar = QHBoxLayout()
         for botao in (self.btn_anterior, self.btn_seguinte, self.btn_desfazer, self.btn_refazer):
             navegar.addWidget(botao)
+        navegar.addWidget(self.btn_conferido, 1)
 
         corpo = QVBoxLayout(self)
         corpo.setContentsMargins(0, 0, 0, 0)
         corpo.addWidget(self.cabecalho)
         corpo.addWidget(self.posicao, 0, Qt.AlignmentFlag.AlignHCenter)
         corpo.addLayout(navegar)
-        corpo.addWidget(self.btn_conferido)
+        controles = self._montar_controles()
+        # O lado logo depois de conferir: em 1366 ele ficava abaixo da dobra, e quem conferia
+        # depressa gravava "assumido" sem vê-lo.
+        corpo.addWidget(self.grupo_do_lado)
         corpo.addLayout(linha_fen)
         corpo.addWidget(self.avisos)
-        corpo.addWidget(self._montar_controles())
+        corpo.addWidget(controles)
         corpo.addStretch(1)
 
     def _montar_controles(self) -> QWidget:
@@ -380,17 +401,21 @@ class EditorDeDiagrama(QWidget):
 
         lado = QGroupBox("Lado a jogar")
         coluna_lado = QVBoxLayout(lado)
+        linha_lado = QHBoxLayout()
         self.grupo_lado = QButtonGroup(self)
-        self.radio_brancas = QRadioButton("Brancas jogam")
-        self.radio_pretas = QRadioButton("Pretas jogam")
+        self.radio_brancas = QRadioButton("Brancas")
+        self.radio_pretas = QRadioButton("Pretas")
         for valor, radio in (("w", self.radio_brancas), ("b", self.radio_pretas)):
             self.grupo_lado.addButton(radio)
+            radio.setAccessibleName(f"{radio.text()} jogam")
             radio.clicked.connect(lambda _=False, v=valor: self._mudar_lado(v))
-            coluna_lado.addWidget(radio)
+            linha_lado.addWidget(radio)
+        linha_lado.addStretch(1)
+        coluna_lado.addLayout(linha_lado)
         self.origem_do_lado = QLabel()
         self.origem_do_lado.setWordWrap(True)
         coluna_lado.addWidget(self.origem_do_lado)
-        caixa.addWidget(lado)
+        self.grupo_do_lado = lado
 
         roque = QGroupBox("Roque")
         grade_roque = QGridLayout(roque)
@@ -411,7 +436,8 @@ class EditorDeDiagrama(QWidget):
         grade_roque.addWidget(self.btn_roque_inferido, 3, 0, 1, 2)
         caixa.addWidget(roque)
 
-        self.check_inteiro = QCheckBox("Conferi as 64 casas: guardar todas como amostras")
+        # Curto: no Inspetor de 1366 (296 px) o texto longo de antes cortava o editor.
+        self.check_inteiro = QCheckBox("Conferi as 64: todas viram amostra")
         self.check_inteiro.setToolTip(
             "Sem isto, só as casas corrigidas viram amostra. As amostras ficam na pasta "
             "do projeto (diagramas/), nunca na base global do PyBoxEditor.")
@@ -461,6 +487,8 @@ class EditorDeDiagrama(QWidget):
         if not self.aberto:
             return
         alvo = self.atual + passo
+        while 0 <= alvo < len(self.diagramas) and not self.diagramas[alvo].lido:
+            alvo += passo                       # o não lido não tem posição a conferir
         if not 0 <= alvo < len(self.diagramas):
             self.fora_da_pagina.emit(passo)
             return
@@ -483,12 +511,12 @@ class EditorDeDiagrama(QWidget):
         self.conferido.emit(self.diagrama.caixa, tabuleiro, tudo)
         self.diagramas[self.atual] = self.diagrama.conferir(tabuleiro)
         self.tabuleiros[self.atual] = self.diagramas[self.atual].edicao()
-        faltam = [i for i in range(len(self.diagramas)) if not self.diagramas[i].conferido]
-        if not faltam:
+        proximo = _proximo_por_conferir(self.diagramas, self.atual)
+        if proximo is None:
             self._mostrar()
             self.terminou.emit()
             return
-        self._ir_para(next((i for i in faltam if i > self.atual), faltam[0]))
+        self._ir_para(proximo)
 
     # ------------------------------------------------------------------
     def validacao(self) -> Optional[lances.Validacao]:
@@ -515,19 +543,7 @@ class EditorDeDiagrama(QWidget):
                   self.btn_vazia, *self.botoes_paleta.values()):
             w.setEnabled(aberto)
         if not aberto:
-            self.cabecalho.setText(teclado.com_teclas(
-                "Nenhum diagrama em conferência. Clique num diagrama da Imagem ou use "
-                "{proximo_diagrama}."))
-            self.fen.clear()
-            self.avisos.clear()
-            self.origem_do_lado.clear()
-            self.roque_inferido.clear()
-            self.btn_roque_inferido.setEnabled(False)
-            self.btn_desfazer.setEnabled(False)
-            self.btn_refazer.setEnabled(False)
-            for check in self.checks_roque.values():
-                check.setChecked(False)
-                check.setEnabled(False)
+            self._mostrar_sem_diagrama()
             return
         d, tabuleiro = self.diagrama, self.tabuleiro()
         partes = [f"Diagrama {self.atual + 1} de {len(self.diagramas)}", tabuleiro.resumo()]
@@ -536,26 +552,60 @@ class EditorDeDiagrama(QWidget):
         self.cabecalho.setText("  —  ".join(partes))
         self.fen.setText(tabuleiro.fen())
         self.avisos.setText("\n".join(self.avisos_do_diagrama()))
+        self._mostrar_o_lado(d, tabuleiro)
+        self._mostrar_o_roque(tabuleiro)
+        for simbolo, botao in self.botoes_paleta.items():
+            botao.setChecked(self.posicao.pincel == simbolo)
+        self.btn_vazia.setChecked(self.posicao.pincel == "")
+        self.btn_desfazer.setEnabled(tabuleiro.pode_desfazer)
+        self.btn_refazer.setEnabled(tabuleiro.pode_refazer)
+        self.posicao.update()
 
+    def _mostrar_sem_diagrama(self) -> None:
+        self.cabecalho.setText(teclado.com_teclas(
+            "Nenhum diagrama em conferência. Clique num diagrama da Imagem ou use "
+            "{proximo_diagrama}."))
+        self.fen.clear()
+        self.avisos.clear()
+        self.origem_do_lado.clear()
+        self.roque_inferido.clear()
+        self.btn_roque_inferido.setEnabled(False)
+        self.btn_desfazer.setEnabled(False)
+        self.btn_refazer.setEnabled(False)
+        for check in self.checks_roque.values():
+            check.setChecked(False)
+            check.setEnabled(False)
+
+    def _mostrar_o_lado(self, d: DiagramaLido, tabuleiro: TabuleiroEdicao) -> None:
+        """O grupo do lado a jogar e de onde ele veio, com o papel do aviso."""
         self.grupo_lado.setExclusive(False)
         self.radio_brancas.setChecked(tabuleiro.lado_origem != "convencao" and tabuleiro.lado == "w")
         self.radio_pretas.setChecked(tabuleiro.lado_origem != "convencao" and tabuleiro.lado == "b")
         self.grupo_lado.setExclusive(True)
-        if tabuleiro.lado_origem == "convencao":
-            vez = (self.validacao().vez if self.validacao() is not None else "")
-            dica = (f" O texto começa com {'as pretas' if vez == 'b' else 'as brancas'}."
-                    if vez else "")
-            self.origem_do_lado.setText("A página não diz. Escolha: até lá o FEN sai com "
-                                        f"'w' marcado como assumido.{dica}")
-            estilo.papel(self.origem_do_lado, "erro")
-        elif tabuleiro.lado_origem == LADO_DA_LEGENDA:
-            trecho = f": “{d.lado_trecho}”" if d.lado_trecho else ""
-            self.origem_do_lado.setText(f"Da legenda da página{trecho}. Confira.")
-            estilo.papel(self.origem_do_lado, "aviso")
-        else:
-            self.origem_do_lado.setText("Informado por você.")
-            estilo.papel(self.origem_do_lado, "")
+        texto, papel = self._origem_do_lado(d, tabuleiro)
+        self.origem_do_lado.setText(texto)
+        estilo.papel(self.origem_do_lado, papel)
 
+    def _origem_do_lado(self, d: DiagramaLido, tabuleiro: TabuleiroEdicao) -> Tuple[str, str]:
+        """(o texto, o papel do estilo) da origem do lado a jogar."""
+        if tabuleiro.lado_origem == "convencao":
+            return ("A página não diz. Escolha: até lá o FEN sai com "
+                    f"'w' marcado como assumido.{self._dica_da_vez()}", "erro")
+        if tabuleiro.lado_origem == LADO_DA_LEGENDA:
+            trecho = f": “{d.lado_trecho}”" if d.lado_trecho else ""
+            return f"Da legenda da página{trecho}. Confira.", "aviso"
+        if tabuleiro.lado_origem == lances.LADO_DOS_LANCES:
+            trecho = f" ({d.lado_trecho})" if d.lado_trecho else ""
+            return f"Pelo número do lance do texto{trecho}. Confira.", "aviso"
+        return "Informado por você.", ""
+
+    def _dica_da_vez(self) -> str:
+        """Com quem os lances do texto começam, quando a página não diz o lado."""
+        vez = (self.validacao().vez if self.validacao() is not None else "")
+        return (f" O texto começa com {'as pretas' if vez == 'b' else 'as brancas'}."
+                if vez else "")
+
+    def _mostrar_o_roque(self, tabuleiro: TabuleiroEdicao) -> None:
         possiveis = tabuleiro.roques_possiveis()
         for letra, check in self.checks_roque.items():
             check.setChecked(letra in tabuleiro.roque)
@@ -565,12 +615,6 @@ class EditorDeDiagrama(QWidget):
                                     "não vai ao FEN sem você marcar)" if inferido
                                     else "Nenhum roque inferido.")
         self.btn_roque_inferido.setEnabled(bool(inferido) and inferido != tabuleiro.roque)
-        for simbolo, botao in self.botoes_paleta.items():
-            botao.setChecked(self.posicao.pincel == simbolo)
-        self.btn_vazia.setChecked(self.posicao.pincel == "")
-        self.btn_desfazer.setEnabled(tabuleiro.pode_desfazer)
-        self.btn_refazer.setEnabled(tabuleiro.pode_refazer)
-        self.posicao.update()
 
     def avisos_do_diagrama(self) -> List[str]:
         """O que a página deixou em aberto, o que o leitor desconfia, o que os lances do
@@ -578,32 +622,61 @@ class EditorDeDiagrama(QWidget):
         if not self.aberto:
             return []
         d, tabuleiro = self.diagrama, self.tabuleiro()
-        avisos = []
-        if not d.orientacao_confirmada:
-            avisos.append("Orientação não confirmada: não há coordenadas legíveis em volta do "
-                          "tabuleiro, e a leitura supõe as brancas embaixo. Se o diagrama estiver "
-                          "do lado das pretas, a posição sai girada 180°.")
-        if d.motivo and not d.conferido:
-            avisos.append(f"O leitor não confia nesta leitura: {d.motivo}. Confira casa a casa.")
-        validacao = self.validacao()
-        if validacao is not None and validacao.confiavel:
-            avisos.append(f"Confiável pelos lances: os {validacao.total} lance(s) do texto "
-                          "depois do diagrama são legais nesta posição.")
-        elif validacao is not None:
-            avisos.append(f"{validacao.aviso[:1].upper()}{validacao.aviso[1:]} "
-                          f"({validacao.legais} de {validacao.total} lances passaram).")
-        avisos.extend(tabuleiro.avisos())
-        legenda = []
-        if any(c.corrigida for c in tabuleiro.casas):
-            legenda.append("verde: corrigida por você")
-        if any(c.arbitrada and not c.corrigida for c in tabuleiro.casas):
-            legenda.append("vermelho: trocada pela legalidade")
-        if any(c.simbolo and not c.corrigida and c.confianca < CONFIANCA_BAIXA
-               for c in tabuleiro.casas):
-            legenda.append("laranja: leitura duvidosa")
+        avisos = _avisos_da_leitura(d) + _avisos_dos_lances(self.validacao())
+        avisos.extend(_avisos_do_core(tabuleiro))
+        legenda = [texto for texto, da_cor in LEGENDA if any(da_cor(c) for c in tabuleiro.casas)]
         if legenda:
             avisos.append("   ".join(legenda))
         return avisos
+
+
+#: A legenda das cores do tabuleiro, cada uma com as casas que a mostram.
+LEGENDA = (("verde: corrigida por você", lambda c: c.corrigida),
+           ("vermelho: trocada pela legalidade", lambda c: c.arbitrada and not c.corrigida),
+           ("laranja: leitura duvidosa",
+            lambda c: c.simbolo and not c.corrigida and c.confianca < CONFIANCA_BAIXA))
+
+
+def _avisos_da_leitura(d: DiagramaLido) -> List[str]:
+    """A orientação suposta e a desconfiança do leitor."""
+    avisos = []
+    if not d.orientacao_confirmada:
+        avisos.append("Orientação não confirmada: não há coordenadas legíveis em volta do "
+                      "tabuleiro, e a leitura supõe as brancas embaixo. Se o diagrama estiver "
+                      "do lado das pretas, a posição sai girada 180°.")
+    if d.motivo and not d.conferido:
+        avisos.append(f"O leitor não confia nesta leitura: {d.motivo}. Confira casa a casa.")
+    return avisos
+
+
+def _avisos_dos_lances(validacao: Optional[lances.Validacao]) -> List[str]:
+    """O que os lances do texto dizem da posição."""
+    if validacao is None:
+        return []
+    if validacao.confiavel:
+        return [f"Confiável pelos lances: os {validacao.total} lance(s) do texto "
+                "depois do diagrama são legais nesta posição."]
+    return [f"{validacao.aviso[:1].upper()}{validacao.aviso[1:]} "
+            f"({validacao.legais} de {validacao.total} lances passaram)."]
+
+
+def _avisos_do_core(tabuleiro: TabuleiroEdicao) -> List[str]:
+    """Os avisos do TabuleiroEdicao (o que o FEN supõe)."""
+    do_core = tabuleiro.avisos()
+    if tabuleiro.lado_origem == lances.LADO_DOS_LANCES:
+        # O core não conhece o lado dos lances e diz que o FEN "assume brancas": o FEN
+        # está com o lado do número do lance, que o grupo do lado já mostra.
+        do_core = [a for a in do_core if a != AVISO_CONVENCAO]
+    return do_core
+
+
+def _proximo_por_conferir(diagramas: List[DiagramaLido], atual: int) -> Optional[int]:
+    """O primeiro por conferir depois do atual, ou o primeiro de todos; None sem nenhum."""
+    # Os por conferir que foram lidos: o não lido não tem posição a conferir.
+    faltam = [i for i in range(len(diagramas)) if diagramas[i].lido and not diagramas[i].conferido]
+    if not faltam:
+        return None
+    return next((i for i in faltam if i > atual), faltam[0])
 
 
 def _chaves(diagramas) -> List[tuple]:

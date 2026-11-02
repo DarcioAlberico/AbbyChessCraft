@@ -70,13 +70,15 @@ def normalizar(sequencia: str) -> str:
         raise ValueError(f"modificador desconhecido em {sequencia!r}: {sorted(desconhecidos)}")
     if not tecla:
         raise ValueError(f"sequência sem tecla: {sequencia!r}")
+    return "+".join([m for m in MODIFICADORES if m in mods] + [_tecla_canonica(sequencia, tecla)])
+
+
+def _tecla_canonica(sequencia: str, tecla: str) -> str:
     if tecla.lower() in _SINONIMOS:
-        tecla = _SINONIMOS[tecla.lower()]
-    elif len(tecla) == 1 or _TECLA_DE_FUNCAO.fullmatch(tecla):
-        tecla = tecla.upper()
-    else:
-        raise ValueError(f"tecla desconhecida em {sequencia!r}: {tecla!r}")
-    return "+".join([m for m in MODIFICADORES if m in mods] + [tecla])
+        return _SINONIMOS[tecla.lower()]
+    if len(tecla) == 1 or _TECLA_DE_FUNCAO.fullmatch(tecla):
+        return tecla.upper()
+    raise ValueError(f"tecla desconhecida em {sequencia!r}: {tecla!r}")
 
 
 def _modificadores(sequencia: str) -> Tuple[set, str]:
@@ -141,41 +143,68 @@ def carregar(caminho: Path = ARQUIVO) -> Tabela:
 
     bruto = yaml.safe_load(Path(caminho).read_text(encoding="utf-8"))
     perfis = list(bruto["perfis"])
-    acoes = []
-    for n, item in enumerate(bruto["acoes"]):
-        forma = [f"chave desconhecida {k!r}" for k in sorted(set(item) - _CHAVES_DA_ACAO
-                                                             - set(perfis))]
-        forma += [f"falta `{k}`" for k in ("id", "descricao", "desde_passo") if not item.get(k)]
-        if not _lista(item.get("escopo")):
-            forma.append("`escopo` vazio ou ausente")
-        excecoes = []
-        for e in item.get("excecoes") or []:
-            faltam = [k for k in ("tecla", "widget", "tipo", "motivo") if not isinstance(e, dict)
-                      or k not in e]
-            if faltam:
-                forma.append(f"exceção sem {', '.join(faltam)}")
-                continue
-            excecoes.append(Excecao(normalizar(e["tecla"]), str(e["widget"]), str(e["tipo"]),
-                                    str(e["motivo"])))
-        sem = _lista(item.get("sem_atalho"))
-        padrao = [normalizar(s) for s in _lista(item.get(perfis[0]))]
-        sequencias = {perfis[0]: [] if perfis[0] in sem else padrao}
-        declarados = [perfis[0]] if padrao else []
-        for perfil in perfis[1:]:
-            proprio = [normalizar(s) for s in _lista(item.get(perfil))]
-            if proprio:
-                declarados.append(perfil)
-            sequencias[perfil] = [] if perfil in sem else (proprio or list(padrao))
-        acoes.append(Acao(
-            id=str(item.get("id") or f"<ação {n + 1}>"), descricao=str(item.get("descricao", "")),
-            escopo=_lista(item.get("escopo")), sequencias=sequencias, sem_atalho=sem,
-            desde_passo=str(item.get("desde_passo", "")),
-            excecoes=excecoes,
-            declarados=declarados, problemas_de_forma=forma))
+    acoes = [_acao(n, item, perfis) for n, item in enumerate(bruto["acoes"])]
     return Tabela(perfis, [str(p) for p in bruto["passos"]], bruto["escopos"],
                   list(bruto["widgets_da_janela"]),
                   {w: {k: [normalizar(s) for s in v] for k, v in n.items()}
                    for w, n in bruto["nativos"].items()}, acoes)
+
+
+def _acao(n: int, item: dict, perfis: List[str]) -> Acao:
+    """A ação do item `n` do YAML, com o que faltou ou sobrou na forma dele."""
+    forma = _problemas_de_forma(item, perfis)
+    excecoes, sem_forma = _excecoes(item)
+    forma += sem_forma
+    sem = _lista(item.get("sem_atalho"))
+    sequencias, declarados = _sequencias(item, perfis, sem)
+    return Acao(
+        id=str(item.get("id") or f"<ação {n + 1}>"), descricao=str(item.get("descricao", "")),
+        escopo=_lista(item.get("escopo")), sequencias=sequencias, sem_atalho=sem,
+        desde_passo=str(item.get("desde_passo", "")),
+        excecoes=excecoes,
+        declarados=declarados, problemas_de_forma=forma)
+
+
+def _problemas_de_forma(item: dict, perfis: List[str]) -> List[str]:
+    forma = [f"chave desconhecida {k!r}" for k in sorted(set(item) - _CHAVES_DA_ACAO
+                                                         - set(perfis))]
+    forma += [f"falta `{k}`" for k in ("id", "descricao", "desde_passo") if not item.get(k)]
+    if not _lista(item.get("escopo")):
+        forma.append("`escopo` vazio ou ausente")
+    return forma
+
+
+def _excecoes(item: dict) -> Tuple[List[Excecao], List[str]]:
+    """As exceções declaradas e o problema de cada uma sem os quatro campos."""
+    excecoes, forma = [], []
+    for e in item.get("excecoes") or []:
+        faltam = [k for k in ("tecla", "widget", "tipo", "motivo") if not isinstance(e, dict)
+                  or k not in e]
+        if faltam:
+            forma.append(f"exceção sem {', '.join(faltam)}")
+            continue
+        excecoes.append(Excecao(normalizar(e["tecla"]), str(e["widget"]), str(e["tipo"]),
+                                str(e["motivo"])))
+    return excecoes, forma
+
+
+def _sequencias(item: dict, perfis: List[str],
+                sem: List[str]) -> Tuple[Dict[str, List[str]], List[str]]:
+    """perfil -> as sequências (o primeiro perfil é o padrão dos outros), e os perfis com
+    sequência própria no YAML."""
+    padrao = _proprias(item, perfis[0])
+    sequencias = {perfis[0]: [] if perfis[0] in sem else padrao}
+    declarados = [perfis[0]] if padrao else []
+    for perfil in perfis[1:]:
+        proprio = _proprias(item, perfil)
+        if proprio:
+            declarados.append(perfil)
+        sequencias[perfil] = [] if perfil in sem else (proprio or list(padrao))
+    return sequencias, declarados
+
+
+def _proprias(item: dict, perfil: str) -> List[str]:
+    return [normalizar(s) for s in _lista(item.get(perfil))]
 
 
 # ----------------------------------------------------------------------
@@ -230,33 +259,55 @@ def _editavel(tabela: Tabela, escopos: Sequence[str]) -> bool:
 
 def verificar(tabela: Tabela) -> List[str]:
     """Os problemas da tabela, em frases; lista vazia é tabela válida."""
-    problemas: List[str] = _problemas_dos_escopos(tabela)
-    ids = [a.id for a in tabela.acoes]
-    for repetido in sorted({i for i in ids if ids.count(i) > 1}):
-        problemas.append(f"id repetido: {repetido}")
+    problemas: List[str] = _problemas_dos_escopos(tabela) + _ids_repetidos(tabela)
     for a in tabela.acoes:
-        problemas.extend(f"{a.id}: {p}" for p in a.problemas_de_forma)
-        if a.desde_passo not in tabela.passos:
-            problemas.append(f"{a.id}: desde_passo {a.desde_passo!r} não é passo do roadmap")
-        for e in a.escopo:
-            if e not in tabela.escopos:
-                problemas.append(f"{a.id}: escopo desconhecido {e!r}")
-        for perfil in a.sem_atalho:
-            if perfil not in tabela.perfis:
-                problemas.append(f"{a.id}: perfil desconhecido em `sem_atalho`: {perfil!r}")
-            elif perfil in a.declarados:
-                problemas.append(f"{a.id}: perfil {perfil} em `sem_atalho` e com sequência")
-        for perfil in tabela.perfis:
-            if not a.sequencias.get(perfil) and perfil not in a.sem_atalho:
-                problemas.append(f"{a.id}: sem sequência no perfil {perfil} e sem `sem_atalho`")
-        for ex in a.excecoes:
-            if ex.tipo not in ("redireciona", "substitui") or not ex.motivo.strip():
-                problemas.append(f"{a.id}: exceção de {ex.tecla} sem tipo válido ou sem motivo")
+        problemas.extend(_problemas_da_acao(tabela, a))
     if problemas:
         return sorted(set(problemas))
 
     for a in tabela.acoes:
         problemas.extend(_excecoes_sem_uso(tabela, a))
+    problemas.extend(_problemas_das_teclas(tabela))
+    return sorted(set(problemas))
+
+
+def _ids_repetidos(tabela: Tabela) -> List[str]:
+    ids = [a.id for a in tabela.acoes]
+    return [f"id repetido: {repetido}" for repetido in sorted({i for i in ids if ids.count(i) > 1})]
+
+
+def _problemas_da_acao(tabela: Tabela, a: Acao) -> List[str]:
+    """A forma da ação, o passo, os escopos, os perfis e as exceções dela."""
+    problemas = [f"{a.id}: {p}" for p in a.problemas_de_forma]
+    if a.desde_passo not in tabela.passos:
+        problemas.append(f"{a.id}: desde_passo {a.desde_passo!r} não é passo do roadmap")
+    for e in a.escopo:
+        if e not in tabela.escopos:
+            problemas.append(f"{a.id}: escopo desconhecido {e!r}")
+    problemas += _problemas_dos_perfis(tabela, a)
+    for ex in a.excecoes:
+        if ex.tipo not in ("redireciona", "substitui") or not ex.motivo.strip():
+            problemas.append(f"{a.id}: exceção de {ex.tecla} sem tipo válido ou sem motivo")
+    return problemas
+
+
+def _problemas_dos_perfis(tabela: Tabela, a: Acao) -> List[str]:
+    """Regra 1: sequência em cada perfil, ou `sem_atalho` para ele (e não as duas coisas)."""
+    problemas = []
+    for perfil in a.sem_atalho:
+        if perfil not in tabela.perfis:
+            problemas.append(f"{a.id}: perfil desconhecido em `sem_atalho`: {perfil!r}")
+        elif perfil in a.declarados:
+            problemas.append(f"{a.id}: perfil {perfil} em `sem_atalho` e com sequência")
+    for perfil in tabela.perfis:
+        if not a.sequencias.get(perfil) and perfil not in a.sem_atalho:
+            problemas.append(f"{a.id}: sem sequência no perfil {perfil} e sem `sem_atalho`")
+    return problemas
+
+
+def _problemas_das_teclas(tabela: Tabela) -> List[str]:
+    """As regras de cada sequência ativa (3 a 5) e as colisões entre elas (regra 2)."""
+    problemas = []
     for perfil in tabela.perfis:
         ativas = tabela.ativas(perfil)
         for i, (a, seqs_a) in enumerate(ativas):
@@ -265,7 +316,7 @@ def verificar(tabela: Tabela) -> List[str]:
                 for b, seqs_b in ativas[i + 1:]:
                     if seq in seqs_b and _sobrepoem(tabela, a.escopo, b.escopo):
                         problemas.append(f"[{perfil}] {seq}: {a.id} colide com {b.id}")
-    return sorted(set(problemas))
+    return problemas
 
 
 def _excecoes_sem_uso(tabela: Tabela, acao: Acao) -> List[str]:
@@ -285,59 +336,92 @@ def _excecoes_sem_uso(tabela: Tabela, acao: Acao) -> List[str]:
     return problemas
 
 
+#: Regra 4: as sequências que o Windows já usa, e o que cada uma faz.
+_DO_WINDOWS = {
+    "Shift+F10": "é o menu de contexto do Windows",
+    "Menu": "é o menu de contexto do Windows",
+    "F10": "F10 ativa a barra de menus no Windows",
+    "Alt+F4": "Alt+F4 fecha a janela no Windows",
+}
+
+
 def _regras_da_tecla(tabela: Tabela, perfil: str, acao: Acao, seq: str) -> List[str]:
-    problemas = []
     mods, tecla = _modificadores(seq)
     rotulo = f"[{perfil}] {seq} ({acao.id})"
-    if {"Ctrl", "Alt"} <= mods:
-        problemas.append(f"{rotulo}: Ctrl+Alt é AltGr nos teclados ABNT2 e PT")
-    if mods == {"Alt"} and len(tecla) == 1 and tecla.isalpha():
-        problemas.append(f"{rotulo}: Alt+letra é dos menus")
-    if tecla == "Tab" and "Ctrl" not in mods:
-        problemas.append(f"{rotulo}: Tab nunca é atalho")
-    if seq in ("Shift+F10", "Menu"):
-        problemas.append(f"{rotulo}: é o menu de contexto do Windows")
-    if seq == "F10":
-        problemas.append(f"{rotulo}: F10 ativa a barra de menus no Windows")
-    if seq == "Alt+F4":
-        problemas.append(f"{rotulo}: Alt+F4 fecha a janela no Windows")
-    if (len(tecla) == 1 and not mods & {"Ctrl", "Alt", "Meta"}
-            and _editavel(tabela, acao.escopo)):
-        problemas.append(f"{rotulo}: caractere sem Ctrl/Alt num escopo editável (seria digitado)")
     declaradas = {(e.tecla, e.widget) for e in acao.excecoes}
-    if (tecla in _TECLAS_DE_EDICAO and not mods & {"Ctrl", "Alt", "Meta"}
-            and _editavel(tabela, acao.escopo) and not any(t == seq for t, _ in declaradas)):
-        problemas.append(f"{rotulo}: tecla de edição sem Ctrl/Alt num escopo editável, sem "
-                         "exceção que diga quem fica com ela")
+    motivos = _do_teclado(mods, tecla)
+    if seq in _DO_WINDOWS:
+        motivos.append(_DO_WINDOWS[seq])
+    digitada = _digitada(tabela, acao, mods, tecla, seq, declaradas)
+    if digitada is not None:
+        motivos.append(digitada)
+    motivos += _nativas_encobertas(tabela, acao, seq, declaradas)
+    return [f"{rotulo}: {motivo}" for motivo in motivos]
+
+
+def _do_teclado(mods: set, tecla: str) -> List[str]:
+    """Regra 4: o AltGr, os menus e o Tab."""
+    motivos = []
+    if {"Ctrl", "Alt"} <= mods:
+        motivos.append("Ctrl+Alt é AltGr nos teclados ABNT2 e PT")
+    if mods == {"Alt"} and len(tecla) == 1 and tecla.isalpha():
+        motivos.append("Alt+letra é dos menus")
+    if tecla == "Tab" and "Ctrl" not in mods:
+        motivos.append("Tab nunca é atalho")
+    return motivos
+
+
+def _digitada(tabela: Tabela, acao: Acao, mods: set, tecla: str, seq: str,
+              declaradas: set) -> Optional[str]:
+    """Regra 3: o caractere e a tecla de edição sem Ctrl/Alt num escopo editável."""
+    if mods & {"Ctrl", "Alt", "Meta"} or not _editavel(tabela, acao.escopo):
+        return None
+    if len(tecla) == 1:
+        return "caractere sem Ctrl/Alt num escopo editável (seria digitado)"
+    if tecla in _TECLAS_DE_EDICAO and not any(t == seq for t, _ in declaradas):
+        return ("tecla de edição sem Ctrl/Alt num escopo editável, sem exceção que diga quem "
+                "fica com ela")
+    return None
+
+
+def _nativas_encobertas(tabela: Tabela, acao: Acao, seq: str, declaradas: set) -> List[str]:
+    """Regra 5: a ligação nativa de widget que a sequência encobre, ou que a encobre."""
+    motivos = []
     for widget in _widgets(tabela, acao.escopo):
         for lado in ("vence", "perde"):
             if seq in tabela.nativos.get(widget, {}).get(lado, []) and (seq, widget) not in declaradas:
                 quem = ("o widget fica com a tecla e o atalho não dispara" if lado == "vence"
                         else "o atalho apaga a ligação nativa")
-                problemas.append(f"{rotulo}: nativo de {widget} ({quem}) sem exceção declarada")
-    return problemas
+                motivos.append(f"nativo de {widget} ({quem}) sem exceção declarada")
+    return motivos
 
 
 # ----------------------------------------------------------------------
 # A documentação gerada
 # ----------------------------------------------------------------------
 
+_NOMES_DOS_PERFIS = {"padrao": "Padrão", "finereader": "FineReader"}
+
+
 def markdown(tabela: Tabela) -> str:
     """`docs/ATALHOS.md`: uma tabela por escopo, com as duas colunas de perfil."""
     linhas = ["# Atalhos do AbbyChessCraft", "",
               "Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.", ""]
-    nomes = {"padrao": "Padrão", "finereader": "FineReader"}
     for escopo in tabela.escopos:
         do_escopo = [a for a in tabela.acoes if a.escopo and a.escopo[0] == escopo]
-        if not do_escopo:
-            continue
-        linhas += [f"## {escopo}", "",
-                   "| Ação | " + " | ".join(nomes.get(p, p) for p in tabela.perfis)
-                   + " | Escopo | Desde |",
-                   "|---|" + "---|" * len(tabela.perfis) + "---|---|"]
-        for a in sorted(do_escopo, key=lambda a: a.descricao.lower()):
-            colunas = [" / ".join(a.sequencias.get(p) or []) or "—" for p in tabela.perfis]
-            linhas.append(f"| {a.descricao} | " + " | ".join(colunas)
-                          + f" | {', '.join(a.escopo)} | {a.desde_passo} |")
-        linhas.append("")
+        if do_escopo:
+            linhas += _secao_do_escopo(tabela, escopo, do_escopo)
     return "\n".join(linhas)
+
+
+def _secao_do_escopo(tabela: Tabela, escopo: str, do_escopo: List[Acao]) -> List[str]:
+    linhas = [f"## {escopo}", "",
+              "| Ação | " + " | ".join(_NOMES_DOS_PERFIS.get(p, p) for p in tabela.perfis)
+              + " | Escopo | Desde |",
+              "|---|" + "---|" * len(tabela.perfis) + "---|---|"]
+    for a in sorted(do_escopo, key=lambda a: a.descricao.lower()):
+        colunas = [" / ".join(a.sequencias.get(p) or []) or "—" for p in tabela.perfis]
+        linhas.append(f"| {a.descricao} | " + " | ".join(colunas)
+                      + f" | {', '.join(a.escopo)} | {a.desde_passo} |")
+    linhas.append("")
+    return linhas

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QDialog, QDialogButtonBo
 
 from abbychess import busca as bs
 from abbychess.app.barra_de_busca import BarraDeBusca
+from abbychess.controlador import AVISO_LONGO_MS
 from abbychess.controladores import ControladorDaBusca
 
 #: As fontes da busca por glifo (§7.1: rede, base, livro, manual), e o nome de cada uma.
@@ -27,7 +28,7 @@ SELECAO_LONGA = 40
 class BuscaNaJanela:
     def _montar_busca(self) -> None:
         self.busca = ControladorDaBusca(self.pagina)
-        self.pagina.lidos_pelas_amostras = self.busca.lidos_por   # o esquecer (§8.3)
+        self.pagina.padroes_do_livro.lidos_pelas_amostras = self.busca.lidos_por   # o esquecer (§8.3)
         self.barra_de_busca = BarraDeBusca()
         self.painel_do_documento.layout().insertWidget(0, self.barra_de_busca)
         b = self.barra_de_busca
@@ -136,20 +137,26 @@ class BuscaNaJanela:
         self._ocorrencias, self._posicao = [], None
         self._versao_buscada = self._versao_da_aberta()
         if not b.campo.text():
-            self.busca.cancelar()
-            self._ida_pendente = None
-            b.mostrar_contagem(None, 0)
-            self.texto.destacar_busca([])
-            self.paginas.mostrar_ocorrencias(None)
+            self._limpar_a_busca()
             return
-        if b.escopo.currentData() == bs.INTERVALO and b.intervalo_de_paginas() is None:
+        recusa = _recusa_da_busca(b, self._selecao_congelada)
+        if recusa is not None:
             self.busca.cancelar()
-            b.mostrar_erro("Intervalo inválido: escreva as páginas como 3-10 (ou só 7).")
+            b.mostrar_erro(recusa)
             return
-        if b.escopo.currentData() == bs.SELECAO and self._selecao_congelada is None:
-            self.busca.cancelar()
-            b.mostrar_erro("Sem seleção: selecione o trecho no Documento e escolha Seleção.")
-            return
+        self._pedir_a_busca()
+
+    def _limpar_a_busca(self) -> None:
+        """O campo vazio: nenhuma busca, nenhuma contagem, nenhum destaque."""
+        self.busca.cancelar()
+        self._ida_pendente = None
+        self.barra_de_busca.mostrar_contagem(None, 0)
+        self.texto.destacar_busca([])
+        self.paginas.mostrar_ocorrencias(None)
+
+    def _pedir_a_busca(self) -> None:
+        """A busca ao controlador, com a dica do que fazer na barra."""
+        b = self.barra_de_busca
         if not self.busca.pronto.is_set():
             self.statusBar().showMessage("Montando o índice da busca…", 0)
         dica = self.busca.buscar(self._opcoes())
@@ -185,7 +192,7 @@ class BuscaNaJanela:
         self._mandar_para_resultados, self._ida_pendente = False, None
         self.barra_de_busca.mostrar_erro(mensagem)
         self.texto.destacar_busca([])
-        self.statusBar().showMessage(mensagem, 8000)
+        self.statusBar().showMessage(mensagem, AVISO_LONGO_MS)
 
     def _busca_terminou(self, resultado: bs.Resultado) -> None:
         self._ocorrencias = list(resultado.ocorrencias)
@@ -193,17 +200,12 @@ class BuscaNaJanela:
         antes, self._atual_antes = getattr(self, "_atual_antes", None), None
         if antes is not None and antes[2] == self.barra_de_busca.campo.text():
             # A mesma busca refeita (depois de uma edição): a ocorrência atual continua.
-            self._posicao = next((n for n, o in enumerate(self._ocorrencias)
-                                  if (o.pagina, o.gids[:1]) == antes[:2]), None)
+            self._posicao = _a_mesma_ocorrencia(self._ocorrencias, antes)
         total = len(self._ocorrencias)
         self.barra_de_busca.mostrar_contagem(self._posicao, total)
         self.paginas.mostrar_ocorrencias(resultado.por_pagina() if total else {})
-        fora = self._fora_da_busca()
-        if not total:
-            self.statusBar().showMessage("Nada encontrado." + fora, 8000)
-        else:
-            self.statusBar().showMessage(f"{total} ocorrência(s) em "
-                                         f"{len(resultado.por_pagina())} página(s)." + fora, 8000)
+        self.statusBar().showMessage(_contagem(resultado, total) + self._fora_da_busca(),
+                                     AVISO_LONGO_MS)
         self._destacar_na_pagina()
         if self._mandar_para_resultados:
             self._mandar_para_resultados = False
@@ -249,25 +251,21 @@ class BuscaNaJanela:
             self.localizar()
             return
         if b.relogio.isActive() or self.busca.buscando:
-            # Digitou e já pediu a próxima: a ida espera esta busca (não a anterior).
-            self._ida_pendente = passo
-            if b.relogio.isActive():
-                b.relogio.stop()
-                self._buscar()
+            self._andar_depois_da_busca(passo)
             return
         if not self._ocorrencias:
             return
-        n = len(self._ocorrencias)
-        if self._posicao is None:               # a primeira a partir da página aberta
-            aqui = self.pagina.indice
-            ordem = range(n) if passo > 0 else range(n - 1, -1, -1)
-            self._posicao = next((k for k in ordem
-                                  if (self._ocorrencias[k].pagina >= aqui if passo > 0
-                                      else self._ocorrencias[k].pagina <= aqui)),
-                                 0 if passo > 0 else n - 1)
-        else:
-            self._posicao = (self._posicao + passo) % n
+        self._posicao = _posicao_seguinte(self._ocorrencias, self._posicao, passo,
+                                          self.pagina.indice)
         self._ir_a_ocorrencia(self._posicao)
+
+    def _andar_depois_da_busca(self, passo: int) -> None:
+        """Digitou e já pediu a próxima: a ida espera esta busca (não a anterior)."""
+        b = self.barra_de_busca
+        self._ida_pendente = passo
+        if b.relogio.isActive():
+            b.relogio.stop()
+            self._buscar()
 
     def _ir_a_pagina_ja_montada(self, indice: int) -> None:
         """Outra página, com o Documento já montado (o relógio do texto montaria depois, e o
@@ -371,6 +369,42 @@ class BuscaNaJanela:
         foco = QApplication.focusWidget()
         return (self.barra_de_busca.isVisible() and foco is not None
                 and (foco is self.barra_de_busca or self.barra_de_busca.isAncestorOf(foco)))
+
+
+def _recusa_da_busca(barra: BarraDeBusca, selecao_congelada) -> Optional[str]:
+    """O erro do escopo que não dá para buscar (o intervalo ilegível, a Seleção sem seleção),
+    ou None."""
+    if barra.escopo.currentData() == bs.INTERVALO and barra.intervalo_de_paginas() is None:
+        return "Intervalo inválido: escreva as páginas como 3-10 (ou só 7)."
+    if barra.escopo.currentData() == bs.SELECAO and selecao_congelada is None:
+        return "Sem seleção: selecione o trecho no Documento e escolha Seleção."
+    return None
+
+
+def _a_mesma_ocorrencia(ocorrencias: List[bs.Ocorrencia], antes) -> Optional[int]:
+    """A posição da ocorrência de antes (a página e o primeiro glifo) na busca refeita."""
+    return next((n for n, o in enumerate(ocorrencias) if (o.pagina, o.gids[:1]) == antes[:2]),
+                None)
+
+
+def _contagem(resultado: bs.Resultado, total: int) -> str:
+    """A mensagem da barra com o que a busca achou."""
+    if not total:
+        return "Nada encontrado."
+    return f"{total} ocorrência(s) em {len(resultado.por_pagina())} página(s)."
+
+
+def _posicao_seguinte(ocorrencias: List[bs.Ocorrencia], posicao: Optional[int], passo: int,
+                      aqui: int) -> int:
+    """A ocorrência seguinte (+1) ou anterior (-1), dando a volta; sem atual, a primeira a
+    partir da página `aqui` no sentido do passo."""
+    n = len(ocorrencias)
+    if posicao is not None:
+        return (posicao + passo) % n
+    ordem = range(n) if passo > 0 else range(n - 1, -1, -1)
+    return next((k for k in ordem
+                 if (ocorrencias[k].pagina >= aqui if passo > 0 else ocorrencias[k].pagina <= aqui)),
+                0 if passo > 0 else n - 1)
 
 
 #: "Página 12" e "em (340, 1180)" num aviso (as decisões que caíram na releitura, §4.6).

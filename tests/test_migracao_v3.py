@@ -16,10 +16,10 @@ import pytest
 from abbychess import gravacao as gv
 from abbychess import livro
 from abbychess import pagina as pg
+from abbychess.migracoes import Migracoes
 from abbychess.modelo import gid_de
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_visor import pdf_de_60_paginas  # noqa: F401
 
 ESTADO = ["a", 1, 1, 5, 5, 1.0, "manual", 0, False, -1.0, False]
 
@@ -88,14 +88,14 @@ def test_ca_12_7_os_gids_e_os_dados_ficam(projeto_v2):
     assert projeto.carregar_modelo(0).boxes[0].gid == gid_de(0, 0)
     v1 = projeto.carregar_modelo(7)
     assert v1.pid == 7 and v1.boxes[0].entry.char == "b" and v1.boxes[0].gid == gid_de(7, 0)
-    assert sorted(projeto.resumo_do_livro()) == [0, 1, 7]
+    assert sorted(projeto.resumo.do_livro()) == [0, 1, 7]
 
 
 def test_ca_12_7_inclinacoes_por_pid_sem_medir_de_novo(projeto_v2, monkeypatch):
     projeto = ProjetoDeLivro.abrir(projeto_v2)
     assert _json(projeto_v2 / "inclinacoes.json") == {
-        f"p{projeto.pid_da_pagina(0)}:inteira:0": 0.3,
-        f"p{projeto.pid_da_pagina(5)}:inteira:0": -0.2}
+        f"p{projeto.ordem.pid_em(0)}:inteira:0": 0.3,
+        f"p{projeto.ordem.pid_em(5)}:inteira:0": -0.2}
     monkeypatch.setattr(pg, "medir_inclinacao", lambda *_a, **_k: pytest.fail("mediu"))
     fonte = pg.fonte_do_projeto(projeto)
     assert fonte.inclinacao(0) == 0.3 and fonte.inclinacao(5) == -0.2
@@ -103,15 +103,15 @@ def test_ca_12_7_inclinacoes_por_pid_sem_medir_de_novo(projeto_v2, monkeypatch):
 
 def test_ca_12_7_janela_lote_e_listas_por_pid(projeto_v2):
     projeto = ProjetoDeLivro.abrir(projeto_v2)
-    pid = projeto.pid_da_pagina
+    pid = projeto.ordem.pid_em
     assert _json(projeto_v2 / "janela.json")["pid"] == pid(5)
     lote = _json(projeto_v2 / "lote.json")
     assert lote["pids"] and lote["paginas"] == [pid(3), pid(4)] and lote["reler_depois"] == [40]
-    assert projeto.posicoes_das_gravadas(lote["paginas"]) == [3, 4]
+    assert projeto.ordem.posicoes_das_gravadas(lote["paginas"]) == [3, 4]
     extras = projeto.dados.extras
-    assert projeto.posicoes_das_gravadas(extras["intervalo_do_corpo"]) == [2, 50]
-    assert projeto.posicoes_das_gravadas(extras["candidatos_da_amostra_guiada"]) == [3, 4, 5]
-    assert projeto.posicoes_das_gravadas(extras["paginas_da_camada_nativa"]) == [0]
+    assert projeto.ordem.posicoes_das_gravadas(extras["intervalo_do_corpo"]) == [2, 50]
+    assert projeto.ordem.posicoes_das_gravadas(extras["candidatos_da_amostra_guiada"]) == [3, 4, 5]
+    assert projeto.ordem.posicoes_das_gravadas(extras["paginas_da_camada_nativa"]) == [0]
     assert extras["pendentes_iniciais_da_amostra"] == {str(pid(10)): 4}
     saude = livro.saude(projeto)
     assert saude.paginas == (10, 20) and saude.pendentes_antes == 4
@@ -127,18 +127,18 @@ def test_ca_12_7_reabrir_nao_migra_de_novo(projeto_v2):
 
 def test_ca_12_7_copiar_o_backup_de_volta_reabre_igual(projeto_v2):
     projeto = ProjetoDeLivro.abrir(projeto_v2)
-    pids = {i: projeto.pid_da_pagina(i) for i in (0, 1, 7)}
+    pids = {i: projeto.ordem.pid_em(i) for i in (0, 1, 7)}
     projeto.fechar()
     for arquivo in (projeto_v2 / "backup-v2").iterdir():
         shutil.copy2(arquivo, projeto_v2 / arquivo.name)
     reaberto = ProjetoDeLivro.abrir(projeto_v2)
-    assert reaberto.migrado and {i: reaberto.pid_da_pagina(i) for i in (0, 1, 7)} == pids
+    assert reaberto.migrado and {i: reaberto.ordem.pid_em(i) for i in (0, 1, 7)} == pids
     assert reaberto.carregar_modelo(1).boxes[0].gid == gid_de(40, 0)
     # As listas, o lote e as inclinações também voltam a pid, pelas mesmas páginas.
-    assert reaberto.posicoes_das_gravadas(
+    assert reaberto.ordem.posicoes_das_gravadas(
         reaberto.dados.extras["paginas_da_amostra_guiada"]) == [10, 20]
-    assert reaberto.posicoes_das_gravadas(_json(projeto_v2 / "lote.json")["paginas"]) == [3, 4]
-    assert _json(projeto_v2 / "inclinacoes.json")[f"p{reaberto.pid_da_pagina(0)}:inteira:0"] \
+    assert reaberto.ordem.posicoes_das_gravadas(_json(projeto_v2 / "lote.json")["paginas"]) == [3, 4]
+    assert _json(projeto_v2 / "inclinacoes.json")[f"p{reaberto.ordem.pid_em(0)}:inteira:0"] \
         == 0.3
 
 
@@ -152,7 +152,7 @@ def test_ca_12_7_a_queda_depois_do_projeto_json_nao_perde_as_inclinacoes(projeto
     def cair(*_a, **_k):
         raise Queda
 
-    monkeypatch.setattr(ProjetoDeLivro, "_inclinacoes_para_pids", cair)
+    monkeypatch.setattr(Migracoes, "_inclinacoes_para_pids", cair)
     with pytest.raises(Queda):
         ProjetoDeLivro.abrir(projeto_v2)
     monkeypatch.undo()
@@ -171,14 +171,14 @@ def test_ca_12_7_sem_gravar_na_pasta_abre_so_para_leitura_com_a_sequencia_na_mem
 
     monkeypatch.setattr(gv, "gravar_bytes", recusar)
     projeto = ProjetoDeLivro.abrir(projeto_v2)
-    assert projeto.somente_leitura and not projeto.sequencia_gravada
-    assert projeto.pid_da_pagina(1) == 40 and len(projeto.sequencia) == 60
+    assert projeto.somente_leitura and not projeto.ordem.gravada
+    assert projeto.ordem.pid_em(1) == 40 and len(projeto.sequencia) == 60
     assert (projeto_v2 / "projeto.json").read_bytes() == antes
     projeto.fechar()
 
 
 def test_ca_12_7_o_projeto_v1_vai_direto_a_v3(tmp_path):
-    from tests.test_migracao_v1 import FIXTURE
+    from tests.ajudantes import FIXTURE  # noqa: E402,F401,F811
 
     pasta = tmp_path / "v1"
     shutil.copytree(FIXTURE, pasta)
@@ -186,7 +186,7 @@ def test_ca_12_7_o_projeto_v1_vai_direto_a_v3(tmp_path):
     assert projeto.migrado and projeto.dados.versao == 3
     assert projeto.backups_da_migracao == [pasta / "backup-v1", pasta / "backup-v2"]
     assert _json(pasta / "backup-v2" / "projeto.json")["versao"] == 2   # o meio da cadeia
-    assert projeto.pid_da_pagina(0) == 0 and projeto.pid_da_pagina(2) == 2   # v1: pid = índice
+    assert projeto.ordem.pid_em(0) == 0 and projeto.ordem.pid_em(2) == 2   # v1: pid = índice
     assert _json(pasta / "projeto.json")["sequencia"]["entradas"][1]["pid"] == 1
 
 
@@ -199,9 +199,9 @@ def test_ca_12_7_sem_a_fonte_a_v3_espera_e_vem_quando_ela_volta(projeto_v2):
     escondida = fonte.with_name("escondida.bin")
     fonte.rename(escondida)
     sem = ProjetoDeLivro.abrir(projeto_v2)
-    assert not sem.migrado and not sem.sequencia_gravada and not sem.somente_leitura
+    assert not sem.migrado and not sem.ordem.gravada and not sem.somente_leitura
     assert _json(projeto_v2 / "projeto.json")["versao"] == 2
-    assert sem.pid_da_pagina(1) == 40
+    assert sem.ordem.pid_em(1) == 40
     sem.fechar()
     escondida.rename(fonte)
     com = ProjetoDeLivro.abrir(projeto_v2)
@@ -220,13 +220,52 @@ def test_a_sequencia_gravada_curta_ganha_as_paginas_que_faltam_do_pdf(projeto_v2
     assert s.pid_em(1) == 40 and len(set(s.pids)) == 60
 
 
+def test_as_inclinacoes_ja_por_pid_ficam_e_as_do_pdf_passam_a_pid(projeto_v2):
+    _gravar(projeto_v2 / "inclinacoes.json", {"0": 0.3, "p40:inteira:0": 0.1})
+    projeto = ProjetoDeLivro.abrir(projeto_v2)
+    assert projeto.migrado
+    assert _json(projeto_v2 / "inclinacoes.json") == {"p0:inteira:0": 0.3, "p40:inteira:0": 0.1}
+
+
+def test_os_arquivos_ilegiveis_nao_impedem_a_migracao_e_ficam_como_estavam(projeto_v2):
+    ilegiveis = {"inclinacoes.json": "{", "janela.json": "{pela metade", "lote.json": "[3, 4]"}
+    for nome, texto in ilegiveis.items():
+        (projeto_v2 / nome).write_text(texto, encoding="utf-8")
+    projeto = ProjetoDeLivro.abrir(projeto_v2)
+    assert projeto.migrado and projeto.dados.versao == 3
+    for nome, texto in ilegiveis.items():
+        assert (projeto_v2 / nome).read_text(encoding="utf-8") == texto
+
+
+def test_a_v2_com_paginas_que_o_livro_json_nao_cita_as_poe_no_lugar_delas(projeto_v2):
+    """Uma queda entre a página e o `livro.json` da v2: o arquivo que ele não cita entra na
+    sequência pela página do PDF dele (o mais recente, se há dois) e no livro; o de uma
+    página que não é do PDF e o ilegível ficam de fora."""
+    from abbychess.resumo_do_livro import VERSAO_DO_LIVRO
+
+    paginas = projeto_v2 / "paginas"
+    _gravar(projeto_v2 / "livro.json", {"versao": VERSAO_DO_LIVRO, "paginas": {}})
+    velha = _json(paginas / "p40.json")
+    velha.update(pid=50, gravado_em="2000-01-01T00:00:00+00:00", boxes=[])
+    _gravar(paginas / "p50.json", velha)                  # a cópia velha da página 2
+    _gravar(paginas / "p51.json", dict(velha, pid=51, indice=-1))    # uma inserida
+    (paginas / "p52.json").write_text("{", encoding="utf-8")
+    projeto = ProjetoDeLivro.abrir(projeto_v2)
+    s = projeto.sequencia
+    assert [e.pagina for e in s.entradas] == list(range(60))
+    assert s.pid_em(0) == 0 and s.pid_em(1) == 40 and not {50, 51, 52} & set(s.pids)
+    assert projeto.carregar_modelo(1).boxes[0].gid == gid_de(40, 0)
+    assert {0: 0, 1: 40}.items() <= {i: r["pid"] for i, r in projeto.resumo.do_livro().items()
+                                     }.items()
+
+
 @pytest.mark.parametrize("valor", [float("inf"), "x", [1], True, 2.5, -1, 999])
 def test_valor_estragado_numa_lista_nao_impede_a_migracao(projeto_v2, valor):
     dados = _json(projeto_v2 / "projeto.json")
     dados["extras"]["paginas_da_amostra_guiada"] = [10, valor]
     (projeto_v2 / "projeto.json").write_text(json.dumps(dados), encoding="utf-8")
     projeto = ProjetoDeLivro.abrir(projeto_v2)
-    assert projeto.posicoes_das_gravadas(projeto.dados.extras["paginas_da_amostra_guiada"]) \
+    assert projeto.ordem.posicoes_das_gravadas(projeto.dados.extras["paginas_da_amostra_guiada"]) \
         == [10]
 
 
@@ -246,7 +285,7 @@ def test_falha_de_gravacao_depois_do_projeto_json_migra_e_completa_na_proxima(pr
     projeto.fechar()
     monkeypatch.undo()
     reaberto = ProjetoDeLivro.abrir(projeto_v2)              # completa o que faltou
-    assert _json(projeto_v2 / "janela.json")["pid"] == reaberto.pid_da_pagina(5)
+    assert _json(projeto_v2 / "janela.json")["pid"] == reaberto.ordem.pid_em(5)
     assert _json(projeto_v2 / "lote.json")["pids"]
     assert not any(k.isdigit() for k in _json(projeto_v2 / "inclinacoes.json"))
 
@@ -257,7 +296,7 @@ def test_o_projeto_de_versao_mais_nova_com_sequencia_estranha_abre_so_para_leitu
     _gravar(projeto_v2 / "projeto.json", dados)
     projeto = ProjetoDeLivro.abrir(projeto_v2)
     assert projeto.somente_leitura and len(projeto.sequencia) == 60
-    assert projeto.pid_da_pagina(1) == 40
+    assert projeto.ordem.pid_em(1) == 40
     projeto.fechar()
 
 

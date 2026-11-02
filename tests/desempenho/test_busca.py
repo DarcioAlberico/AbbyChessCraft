@@ -46,10 +46,10 @@ def livro_de_230(tmp_path_factory):
         z.extractall(pasta / "fatia")
     projeto = ProjetoDeLivro.abrir(next(p.parent for p in (pasta / "fatia").rglob("projeto.json")))
     try:
-        lidas = projeto.paginas_lidas()
+        lidas = projeto.resumo.paginas_lidas()
         for i in lidas:
             projeto.carregar_modelo(i)                # a migração para o v2
-        assert projeto.descarregar(30)
+        assert projeto.paginas_em_memoria.descarregar(30)
         originais = [json.loads(projeto.arquivo_da_pagina(i).read_text(encoding="utf-8"))
                      for i in lidas]
     finally:
@@ -224,10 +224,10 @@ def _projeto_de_230(pasta: Path) -> Path:
         z.extractall(pasta)
     projeto = ProjetoDeLivro.abrir(next(p.parent for p in pasta.rglob("projeto.json")))
     try:
-        modelos = [projeto.carregar_modelo(i) for i in projeto.paginas_lidas()]
+        modelos = [projeto.carregar_modelo(i) for i in projeto.resumo.paginas_lidas()]
         for k in range(PAGINAS):
             molde = modelos[k % len(modelos)]
-            pagina = projeto.pagina_para_editar(k) if k not in projeto.paginas_lidas() else None
+            pagina = projeto.pagina_para_editar(k) if k not in projeto.resumo.paginas_lidas() else None
             if pagina is None:
                 continue
             pagina.boxes = [Box(gid_de(pagina.pid, n), b.entry, b.amostra, b.estilo, b.revisado)
@@ -237,8 +237,8 @@ def _projeto_de_230(pasta: Path) -> Path:
             pagina.diagramas = [replace(d) for d in molde.diagramas]
             pagina.estado = molde.estado
             projeto.salvar_modelo(pagina)
-        assert projeto.descarregar(60)
-        assert len(projeto.paginas_lidas()) >= PAGINAS
+        assert projeto.paginas_em_memoria.descarregar(60)
+        assert len(projeto.resumo.paginas_lidas()) >= PAGINAS
         return projeto.pasta
     finally:
         projeto.fechar()

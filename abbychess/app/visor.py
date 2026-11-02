@@ -114,7 +114,8 @@ class VisorDePagina(QGraphicsView):
         self.modo_areas = False
         self._zonas: List[zn.Zona] = []
         self._zona_sel: Optional[int] = None
-        self._zonas_itens: list = []
+        #: O que cada área desenha, no índice dela: (o retângulo, o fundo do rótulo, o rótulo).
+        self._zonas_itens: List[tuple] = []
         #: O arraste de uma área em curso: (índice, bordas, ponto inicial).
         self._arraste = None
         self._palavra: Optional[QGraphicsRectItem] = None
@@ -174,17 +175,9 @@ class VisorDePagina(QGraphicsView):
         if self._destaque is not None:
             cena.removeItem(self._destaque)
             self._destaque = None
-        self._itens, self._boxes = [], boxes
+        self._boxes = boxes
         self._tabuleiros = [tuple(t) for t in tabuleiros]
-        for i, (x1, y1, x2, y2) in enumerate(self._tabuleiros):
-            caneta = QPen(cores_dos_tabuleiros[i] if cores_dos_tabuleiros else estilo.DIAGRAMA_POR_LER)
-            caneta.setCosmetic(True)
-            caneta.setWidthF(2.5)
-            caneta.setStyle(Qt.PenStyle.DashLine)
-            item = QGraphicsRectItem(x1, y1, x2 - x1, y2 - y1)
-            item.setPen(caneta)
-            cena.addItem(item)
-            self._itens.append(item)
+        self._itens = _desenhar_tabuleiros(cena, self._tabuleiros, cores_dos_tabuleiros)
         if self.item_dos_boxes is not None:
             self.item_dos_boxes.trocar(boxes, [gd.estado(b, i in pendentes)
                                                for i, b in enumerate(boxes)])
@@ -381,10 +374,14 @@ class VisorDePagina(QGraphicsView):
         self.viewport().setCursor(Qt.CursorShape.OpenHandCursor if livre
                                   else Qt.CursorShape.CrossCursor)
 
-    def mostrar_zonas(self, zonas, selecionada: Optional[int] = None) -> None:
-        """Desenha as áreas, com o número e o tipo no canto. Só no editor de áreas."""
+    def mostrar_zonas(self, zonas, selecionada: Optional[int] = None,
+                      ordem_clicada: Optional[list] = None) -> None:
+        """Desenha as áreas, com o número da ordem e a função no canto, sobre um fundo de
+        papel (o texto colorido solto sumia sobre o impresso). Só no editor de áreas. No
+        Ordenar (`ordem_clicada`), as clicadas mostram a ordem nova e as outras um "?"."""
+        self.ordenando = ordem_clicada is not None
         cena = self.scene()
-        for item in self._zonas_itens:
+        for item in (item for itens in self._zonas_itens for item in itens):
             cena.removeItem(item)
         self._zonas_itens = []
         self._zonas = list(zonas)
@@ -393,23 +390,8 @@ class VisorDePagina(QGraphicsView):
         if not self.modo_areas:
             return
         for i, z in enumerate(self._zonas):
-            cor = estilo.COR_DA_FUNCAO.get(z.funcao, estilo.COR_DA_ZONA[z.tipo])
-            caneta = QPen(cor)
-            caneta.setCosmetic(True)
-            caneta.setWidthF(3.5 if i == self._zona_sel else 2)
-            if i == self._zona_sel:
-                caneta.setStyle(Qt.PenStyle.DashLine)
-            fundo = QColor(cor)
-            fundo.setAlpha(45 if i == self._zona_sel else 25)
-            item = cena.addRect(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1, caneta, QBrush(fundo))
-            item.setZValue(5)
-            numero = z.ordem + 1 if z.ordem is not None else i + 1
-            rotulo = cena.addSimpleText(f"{numero} {zn.NOMES_DAS_FUNCOES[z.funcao]}")
-            rotulo.setBrush(QBrush(cor))
-            rotulo.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
-            rotulo.setPos(z.x1 + 2, z.y1 + 2)
-            rotulo.setZValue(6)
-            self._zonas_itens += [item, rotulo]
+            self._zonas_itens.append(_desenhar_zona(cena, z, i == self._zona_sel,
+                                                    _numero_da_zona(i, z, ordem_clicada)))
 
     def menu_da_zona(self, indice: int) -> QMenu:
         """A função da área e apagá-la, pelo botão direito."""
@@ -444,35 +426,32 @@ class VisorDePagina(QGraphicsView):
 
     def marcar_palavra(self, caixa) -> None:
         """Contorna a palavra em verificação e a traz para a vista, ou apaga o contorno."""
+        self._palavra = self._contornar(self._palavra, caixa, QPen(estilo.PALAVRA), 3, 6, 13)
         if self._palavra is not None:
-            self.scene().removeItem(self._palavra)
-            self._palavra = None
-        if caixa is None:
-            return
-        x1, y1, x2, y2 = caixa
-        caneta = QPen(estilo.PALAVRA)
-        caneta.setCosmetic(True)
-        caneta.setWidthF(3)
-        self._palavra = self.scene().addRect(x1 - 6, y1 - 6, x2 - x1 + 12, y2 - y1 + 12, caneta)
-        self._palavra.setZValue(13)
-        self.ensureVisible(self._palavra, 150, 150)
+            self.ensureVisible(self._palavra, 150, 150)
 
     def marcar_palavra_do_documento(self, caixa) -> None:
         """Contorna (tracejado) a palavra sob o cursor do Documento, sem rolar: quem rola é o
         Seguir (`mostrar_caixa`)."""
-        if self._palavra_do_documento is not None:
-            self.scene().removeItem(self._palavra_do_documento)
-            self._palavra_do_documento = None
-        if caixa is None:
-            return
-        x1, y1, x2, y2 = caixa
         caneta = QPen(estilo.AZUL)
-        caneta.setCosmetic(True)
-        caneta.setWidthF(2)
         caneta.setStyle(Qt.PenStyle.DashLine)
-        self._palavra_do_documento = self.scene().addRect(x1 - 4, y1 - 4, x2 - x1 + 8,
-                                                          y2 - y1 + 8, caneta)
-        self._palavra_do_documento.setZValue(12)
+        self._palavra_do_documento = self._contornar(self._palavra_do_documento, caixa, caneta,
+                                                     2, 4, 12)
+
+    def _contornar(self, atual, caixa, caneta: QPen, largura: float, folga: int, z: int):
+        """Apaga o contorno `atual` e, se há `caixa`, desenha o novo (`folga` pixels em volta);
+        devolve o novo, ou None."""
+        if atual is not None:
+            self.scene().removeItem(atual)
+        if caixa is None:
+            return None
+        x1, y1, x2, y2 = caixa
+        caneta.setCosmetic(True)
+        caneta.setWidthF(largura)
+        novo = self.scene().addRect(x1 - folga, y1 - folga, x2 - x1 + 2 * folga,
+                                    y2 - y1 + 2 * folga, caneta)
+        novo.setZValue(z)
+        return novo
 
     def menu_do_box(self, indice: int, coluna: int) -> QMenu:
         """O menu de edição do box, com a coluna onde o botão direito caiu."""
@@ -506,6 +485,11 @@ class VisorDePagina(QGraphicsView):
         fora de todas, começa uma área nova."""
         x, y = ponto.x(), ponto.y()
         sel = self._zona_sel
+        if getattr(self, "ordenando", False):
+            indice = zn.zona_em(self._zonas, x, y)
+            if indice is not None:
+                self.zona_escolhida.emit(indice)
+            return
         if sel is not None:
             bordas = zn.bordas_em(self._zonas[sel], x, y, self._pega())
             if bordas:
@@ -604,9 +588,11 @@ class VisorDePagina(QGraphicsView):
         largura, altura = self._tamanho_da_pagina()
         z = zn.arrastar(self._zonas[indice], bordas, ponto.x() - inicio.x(),
                         ponto.y() - inicio.y(), largura, altura)
-        if 2 * indice + 1 < len(self._zonas_itens):
-            self._zonas_itens[2 * indice].setRect(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1)
-            self._zonas_itens[2 * indice + 1].setPos(z.x1 + 2, z.y1 + 2)
+        if indice < len(self._zonas_itens):
+            retangulo, fundo_do_rotulo, rotulo = self._zonas_itens[indice]
+            retangulo.setRect(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1)
+            fundo_do_rotulo.setPos(z.x1 + 2, z.y1 + 2)
+            rotulo.setPos(z.x1 + 2, z.y1 + 2)
 
     def soltar_arraste(self, fim) -> None:
         """O fim do arraste de uma área: emite o deslocamento, se houve."""
@@ -649,23 +635,8 @@ class VisorDePagina(QGraphicsView):
             self._espaco = True
             self.viewport().setCursor(Qt.CursorShape.OpenHandCursor)
             return
-        if self.modo_areas and self._zona_sel is not None:
-            tecla = evento.key()
-            if tecla in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
-                self.zona_apagada.emit(self._zona_sel)
-                return
-            numeros = (Qt.Key.Key_1, Qt.Key.Key_2, Qt.Key.Key_3, Qt.Key.Key_4)
-            if tecla in numeros:
-                self.zona_tipo.emit(self._zona_sel, zn.TIPOS[numeros.index(tecla)])
-                return
-            funcoes = {Qt.Key.Key_T: "texto", Qt.Key.Key_H: "titulo",
-                       Qt.Key.Key_C: "cabecalho", Qt.Key.Key_R: "rodape",
-                       Qt.Key.Key_P: "numero_de_pagina", Qt.Key.Key_N: "nota",
-                       Qt.Key.Key_L: "legenda", Qt.Key.Key_D: "diagrama",
-                       Qt.Key.Key_I: "figura", Qt.Key.Key_X: "ignorar"}
-            if tecla in funcoes and evento.modifiers() == Qt.KeyboardModifier.NoModifier:
-                self.zona_funcao.emit(self._zona_sel, funcoes[tecla])
-                return
+        if _tecla_da_area(self, evento):
+            return
         if self.modo_areas and tecla == Qt.Key.Key_Escape:
             self.ordenacao_cancelada.emit()
             self.zona_escolhida.emit(-1)
@@ -762,3 +733,84 @@ class VisorDePagina(QGraphicsView):
             barra.setValue(barra.value() - evento.angleDelta().y())
             return
         super().wheelEvent(evento)
+
+
+# ----------------------------------------------------------------------
+# As partes do visor (funções: a classe não cresce)
+# ----------------------------------------------------------------------
+def _desenhar_tabuleiros(cena: QGraphicsScene, tabuleiros, cores) -> List[QGraphicsRectItem]:
+    """O contorno tracejado de cada tabuleiro, na cor do estado da leitura dele."""
+    itens = []
+    for i, (x1, y1, x2, y2) in enumerate(tabuleiros):
+        caneta = QPen(cores[i] if cores else estilo.DIAGRAMA_POR_LER)
+        caneta.setCosmetic(True)
+        caneta.setWidthF(2.5)
+        caneta.setStyle(Qt.PenStyle.DashLine)
+        item = QGraphicsRectItem(x1, y1, x2 - x1, y2 - y1)
+        item.setPen(caneta)
+        cena.addItem(item)
+        itens.append(item)
+    return itens
+
+
+def _numero_da_zona(i: int, zona, ordem_clicada: Optional[list]):
+    """O número do rótulo da área `i`: a ordem de leitura dela (ou a posição, sem ordem); no
+    Ordenar, a ordem nova das clicadas e um "?" nas outras."""
+    if ordem_clicada is not None:
+        return ordem_clicada.index(i) + 1 if i in ordem_clicada else "?"
+    return zona.ordem + 1 if zona.ordem is not None else i + 1
+
+
+def _desenhar_zona(cena: QGraphicsScene, z, escolhida: bool, numero) -> tuple:
+    """O retângulo da área, na cor da função dela (tracejado e mais forte se escolhida), e o
+    rótulo com o número e a função no canto, sobre um fundo de papel."""
+    cor = estilo.COR_DA_FUNCAO.get(z.funcao, estilo.COR_DA_ZONA[z.tipo])
+    caneta = QPen(cor)
+    caneta.setCosmetic(True)
+    caneta.setWidthF(3.5 if escolhida else 2)
+    if escolhida:
+        caneta.setStyle(Qt.PenStyle.DashLine)
+    fundo = QColor(cor)
+    fundo.setAlpha(45 if escolhida else 25)
+    item = cena.addRect(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1, caneta, QBrush(fundo))
+    item.setZValue(5)
+    rotulo = cena.addSimpleText(f"{numero} {zn.NOMES_DAS_FUNCOES[z.funcao]}")
+    rotulo.setBrush(QBrush(cor))
+    rotulo.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
+    rotulo.setPos(z.x1 + 2, z.y1 + 2)
+    rotulo.setZValue(6)
+    caixa = rotulo.boundingRect().adjusted(-2, -1, 2, 1)
+    fundo_do_rotulo = cena.addRect(caixa, QPen(cor), QBrush(estilo.PAPEL))
+    fundo_do_rotulo.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
+    fundo_do_rotulo.setPos(z.x1 + 2, z.y1 + 2)
+    fundo_do_rotulo.setZValue(5.5)
+    return item, fundo_do_rotulo, rotulo
+
+
+#: No editor de áreas, as teclas do tipo da área escolhida (os de `zn.TIPOS`, na ordem) e as
+#: da função dela.
+TECLAS_DO_TIPO = (Qt.Key.Key_1, Qt.Key.Key_2, Qt.Key.Key_3, Qt.Key.Key_4)
+TECLAS_DA_FUNCAO = {Qt.Key.Key_T: "texto", Qt.Key.Key_H: "titulo",
+                    Qt.Key.Key_C: "cabecalho", Qt.Key.Key_R: "rodape",
+                    Qt.Key.Key_P: "numero_de_pagina", Qt.Key.Key_N: "nota",
+                    Qt.Key.Key_L: "legenda", Qt.Key.Key_D: "diagrama",
+                    Qt.Key.Key_I: "figura", Qt.Key.Key_X: "ignorar"}
+
+
+def _tecla_da_area(visor: VisorDePagina, evento) -> bool:
+    """Delete, 1 a 4 e a letra da função, na área escolhida do editor de áreas: o sinal dela.
+    Falso se a tecla não é da área (ou não há área escolhida)."""
+    zona = visor._zona_sel
+    if not visor.modo_areas or zona is None:
+        return False
+    tecla = evento.key()
+    if tecla in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+        visor.zona_apagada.emit(zona)
+        return True
+    if tecla in TECLAS_DO_TIPO:
+        visor.zona_tipo.emit(zona, zn.TIPOS[TECLAS_DO_TIPO.index(tecla)])
+        return True
+    if tecla in TECLAS_DA_FUNCAO and evento.modifiers() == Qt.KeyboardModifier.NoModifier:
+        visor.zona_funcao.emit(zona, TECLAS_DA_FUNCAO[tecla])
+        return True
+    return False

@@ -119,6 +119,10 @@ MARCADO = QColor(0, 128, 140)               # ciano: na seleção do modo de tre
 PALAVRA = QColor(194, 24, 91)               # rosa: a palavra na verificação de texto
 #: Em volta da página na Imagem.
 FUNDO_DA_IMAGEM = QColor(90, 90, 90)
+#: A miniatura dos diálogos de cortar e dividir (`previa_da_pagina`): o que sai do corte,
+#: escurecido (a página ainda se vê por baixo), e a metade que vira a página seguinte.
+FORA_DO_CORTE = QColor(0, 0, 0, 110)
+METADE_DA_DIREITA = QColor(0, 114, 178, 40)
 
 #: O tracejado do tabuleiro na Imagem, pelo estado do diagrama.
 DIAGRAMA_POR_LER = CINZA
@@ -134,12 +138,12 @@ COR_DA_ZONA = {
     "ignorar": QColor(127, 140, 141),
 }
 COR_DA_FUNCAO = {
-    "texto": QColor(46, 134, 222), "titulo": QColor(52, 73, 94),
-    "cabecalho": QColor(142, 68, 173), "rodape": QColor(125, 60, 152),
-    "numero_de_pagina": QColor(91, 44, 111), "nota": QColor(22, 160, 133),
-    "legenda": QColor(243, 156, 18), "diagrama": QColor(39, 174, 96),
-    "figura": QColor(211, 84, 0), "tabela": QColor(192, 57, 43),
-    "ignorar": QColor(127, 140, 141),
+    "texto": QColor(0, 95, 170), "titulo": QColor(120, 40, 150),
+    "cabecalho": QColor(170, 70, 0), "rodape": QColor(110, 100, 0),
+    "numero_de_pagina": QColor(160, 0, 90), "nota": QColor(0, 115, 105),
+    "legenda": QColor(0, 125, 45), "diagrama": QColor(40, 40, 40),
+    "figura": QColor(190, 30, 30), "tabela": QColor(90, 60, 30),
+    "ignorar": QColor(105, 105, 105),
 }
 
 #: O Documento é papel nos dois temas: os fundos dos destaques são deste papel.
@@ -278,6 +282,10 @@ def folha_de_estilo(t: Tema) -> str:
               for nome, campo in PAPEIS.items()]
     linhas.append(f"QToolTip {{ color: {t.texto.name()}; background: {t.dica_fundo.name()}; "
                   f"border: 1px solid {t.borda.name()}; padding: {ESPACOS[0]}px; }}")
+    # O botão que já vale apertar (o "Reconhecer o livro" do cartão Saúde, §9.1).
+    linhas.append(f'QPushButton[pronto="true"] {{ color: {t.texto_do_destaque.name()}; '
+                  f"background: {t.destaque.name()}; font-weight: bold; "
+                  f"border: 1px solid {t.destaque.name()}; padding: {ESPACOS[0]}px; }}")
     return "\n".join(linhas) + "\n"
 
 
@@ -336,8 +344,13 @@ def papel(widget, nome: str) -> None:
 
 def aplicar(app, nome: str = "") -> Tema:
     """Aplica o tema `nome` ("claro", "escuro"; vazio: o do sistema): paleta e folha de
-    estilo. Devolve o tema aplicado."""
+    estilo. Devolve o tema aplicado.
+
+    O estilo do Qt passa a ser o Fusion, que pinta tudo pela paleta: o nativo do Windows
+    (`windowsvista`) desenha botão, combo e spinbox pelo tema do sistema, claros sob a
+    paleta escura, com o texto claro ilegível em cima."""
     global _atual
+    app.setStyle("Fusion")                      # (com a folha, o estilo não diz o nome)
     _atual = TEMAS.get(nome or tema_do_sistema(), CLARO)
     app.setPalette(paleta(_atual))
     app.setStyleSheet(folha_de_estilo(_atual))

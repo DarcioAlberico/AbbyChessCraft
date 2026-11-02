@@ -1,0 +1,123 @@
+{
+ "data": "2026-10-29",
+ "commit": "cd6681a",
+ "arvore_suja": false,
+ "arquivos_sujos": [],
+ "livro": "xv",
+ "paginas": [
+  21,
+  22,
+  23,
+  24,
+  25,
+  26,
+  27
+ ],
+ "pdf": "Xadrez Vitorioso - Estrategias - Yasser Seirawan.pdf",
+ "leitura_da_fatia_s": 68.0,
+ "modelos": "globais (projeto novo, sem padrões)",
+ "metodo": "§15.3: 5 aquecimentos, 30 repetições; os mesmos bytes com SOURCE_DATE_EPOCH=1700000000",
+ "formatos": {
+  "epub": {
+   "tempo": {
+    "p50_ms": 1405.7,
+    "p95_ms": 1452.0,
+    "max_ms": 1465.5,
+    "n": 30,
+    "aquecimentos": 5
+   },
+   "bytes": 771875,
+   "mesmos_bytes": true,
+   "resumo": "7 página(s), 10055 caracteres; 1 título(s); 3 diagrama(s) desenhado(s) do FEN e 4 como recorte; 10 linha(s) de cabeçalho/rodapé tirada(s); 7 página(s) não verificada(s); 1541 palavra(s) sinalizada(s); 2 capítulo(s); página impressa 21 na posição 21 do PDF; imagens 15 KB menores, sem perda.",
+   "capitulos": 2,
+   "titulos": 1,
+   "desenhados": 3,
+   "recortados": 4,
+   "no_pgn": 0,
+   "palavras_sinalizadas": 1541,
+   "problemas_do_arquivo": [],
+   "epubcheck": [],
+   "ace": [],
+   "calibre": []
+  },
+  "docx": {
+   "tempo": {
+    "p50_ms": 1493.9,
+    "p95_ms": 1551.2,
+    "max_ms": 1552.1,
+    "n": 30,
+    "aquecimentos": 5
+   },
+   "bytes": 803969,
+   "mesmos_bytes": true,
+   "resumo": "7 página(s), 10055 caracteres; 1 título(s); 3 diagrama(s) desenhado(s) do FEN e 4 como recorte; 10 linha(s) de cabeçalho/rodapé tirada(s); 7 página(s) não verificada(s); 1541 palavra(s) sinalizada(s).",
+   "capitulos": 0,
+   "titulos": 1,
+   "desenhados": 3,
+   "recortados": 4,
+   "no_pgn": 0,
+   "palavras_sinalizadas": 1541,
+   "problemas_do_arquivo": []
+  },
+  "txt": {
+   "tempo": {
+    "p50_ms": 1079.6,
+    "p95_ms": 1117.1,
+    "max_ms": 1229.8,
+    "n": 30,
+    "aquecimentos": 5
+   },
+   "bytes": 13301,
+   "mesmos_bytes": true,
+   "resumo": "7 página(s), 10055 caracteres; 1 título(s); 3 diagrama(s) desenhado(s) do FEN e 4 como recorte; 10 linha(s) de cabeçalho/rodapé tirada(s); 7 página(s) não verificada(s); 1541 palavra(s) sinalizada(s).",
+   "capitulos": 0,
+   "titulos": 1,
+   "desenhados": 3,
+   "recortados": 4,
+   "no_pgn": 0,
+   "palavras_sinalizadas": 1541,
+   "problemas_do_arquivo": []
+  },
+  "pgn": {
+   "tempo": {
+    "p50_ms": 7.6,
+    "p95_ms": 9.0,
+    "max_ms": 9.3,
+    "n": 30,
+    "aquecimentos": 5
+   },
+   "bytes": 677,
+   "mesmos_bytes": true,
+   "resumo": "2 diagrama(s) com a posição e os lances; 5 de fora (ver Resultados).",
+   "capitulos": 0,
+   "titulos": 0,
+   "desenhados": 0,
+   "recortados": 0,
+   "no_pgn": 2,
+   "palavras_sinalizadas": 0,
+   "problemas_do_arquivo": []
+  },
+  "pdf": {
+   "tempo": {
+    "p50_ms": 3149.9,
+    "p95_ms": 3223.1,
+    "max_ms": 3223.5,
+    "n": 30,
+    "aquecimentos": 5
+   },
+   "bytes": 1157087,
+   "mesmos_bytes": true,
+   "resumo": "7 página(s), 10247 caracteres na camada; 3 diagrama(s) com o FEN pesquisável; 1 marcador(es) pelos títulos; páginas com o número impresso como rótulo.",
+   "capitulos": 0,
+   "titulos": 0,
+   "desenhados": 0,
+   "recortados": 0,
+   "no_pgn": 0,
+   "palavras_sinalizadas": 0,
+   "problemas_do_arquivo": []
+  }
+ },
+ "epub_aprovado": true,
+ "validadores_ausentes": [],
+ "todos_com_os_mesmos_bytes": true
+}

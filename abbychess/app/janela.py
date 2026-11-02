@@ -53,9 +53,9 @@ from abbychess.app.painel_treino import PainelDeTreino
 from abbychess.app.painel_verificacao import PainelDeVerificacao
 from abbychess.app.trabalho import Executor
 from abbychess.app.visor import VisorDePagina
-from abbychess.controlador import ControladorDePagina, Eventos
-from abbychess.controladores import (ControladorDeDiagramas, ControladorDeLayout,
-                                     ControladorDeVerificacao, ControladorDoLivro)
+from abbychess.controlador import AVISO_LONGO_MS, ControladorDePagina, Eventos
+from abbychess import controlador_de_diagramas, controlador_de_layout, controlador_do_livro
+from abbychess.controladores import ControladorDeVerificacao
 
 log = logging.getLogger(__name__)
 
@@ -74,6 +74,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
                       PaginasNaJanela, QMainWindow):
     #: Da thread do gravador: a página `indice` não gravou (o erro).
     falha_de_gravacao = Signal(object, object)
+    pagina_ilegivel = Signal(object, object)
 
     def __init__(self):
         super().__init__()
@@ -85,10 +86,10 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.executor = Executor(self)
         self.eventos = Eventos()
         self.pagina = ControladorDePagina(self.eventos, self.executor)
-        self.areas = ControladorDeLayout(self.pagina)
+        self.areas = controlador_de_layout.ControladorDeLayout(self.pagina)
         self.verificador = ControladorDeVerificacao(self.pagina)
-        self.conferencia = ControladorDeDiagramas(self.pagina)
-        self.livro = ControladorDoLivro(self.pagina)
+        self.conferencia = controlador_de_diagramas.ControladorDeDiagramas(self.pagina)
+        self.livro = controlador_do_livro.ControladorDoLivro(self.pagina)
         self._montar_paineis()
         self._montar_espaco()
         self._montar_busca()
@@ -136,7 +137,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self._pre_carga = QTimer(self)          # a seguinte, depois de pintar a atual
         self._pre_carga.setSingleShot(True)
         self._pre_carga.setInterval(150)
-        self._pre_carga.timeout.connect(self.pagina.precarregar_seguinte)
+        self._pre_carga.timeout.connect(self.pagina.navegador.precarregar_seguinte)
         self._ultima_troca = 0.0                # folheando depressa, a pré-carga vem já
         self.pagina.preparar_imagem = qimage_da_pagina      # a QImage na thread da pré-carga
         self._pre_pixmap = QTimer(self)
@@ -146,11 +147,11 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self._montar_diagramas()                # o editor Diagrama e a aba (§10)
 
         self.treino = PainelDeTreino()
-        self.treino.ensinar.connect(p.ensinar)
+        self.treino.ensinar.connect(p.leitura.ensinar)
         self.treino.so_corrigir.connect(p.corrigir)
         self.treino.descartar.connect(p.descartar)
-        self.treino.pular.connect(lambda: self.pagina.andar(+1))
-        self.treino.anterior.connect(lambda: self.pagina.andar(-1))
+        self.treino.pular.connect(lambda: self.pagina.fila_da_pagina.andar(+1))
+        self.treino.anterior.connect(lambda: self.pagina.fila_da_pagina.andar(-1))
         self.treino.dividir.connect(p.dividir)
         self.treino.juntar.connect(p.juntar)
         self.treino.ajustar.connect(p.ajustar)
@@ -184,6 +185,9 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.relogio_do_texto.setSingleShot(True)
         self.relogio_do_texto.setInterval(150)
         self.relogio_do_texto.timeout.connect(self.pintar_texto)
+        # E com ele a conta das margens corridas da fila (~25 ms), que o Enter e a releitura
+        # não esperam: `pintar_texto` a refaz e mostra a fila de novo se ela mudou.
+        self.pagina.fila_da_pagina.margens_com_o_texto = True
 
     def _ligar_eventos(self) -> None:
         e = self.eventos
@@ -225,6 +229,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.executor.fila_mudou.connect(self._fila_mudou)
         self.executor.progresso.connect(self._progredir)
         self.falha_de_gravacao.connect(self._gravacao_falhou)
+        self.pagina_ilegivel.connect(self._pagina_ilegivel)
 
     # ------------------------------------------------------------------
     # Projeto
@@ -261,22 +266,21 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
             if not self._fechar_projeto():
                 projeto.fechar()                # o usuário ficou com o aberto
                 return
-        projeto.ao_falhar_gravacao = self.falha_de_gravacao.emit
         self._pixmaps.clear()                   # as páginas do projeto anterior saem
-        self.abrir_avisos_do_projeto(projeto)
+        self.ligar_os_avisos_do_projeto(projeto)
         self.verificador.esquecer_projeto()
         so_leitura = " (só leitura)" if projeto.somente_leitura else ""
         self.setWindowTitle(f"{projeto.dados.nome}{so_leitura} — {TITULO}")
         self.livro.abrir(projeto, fonte)
         # O espaço e a gaveta já, pelo livro.json, sem esperar o leitor (§8.1, CA-8.3: o
-        # painel de Páginas com o livro todo logo ao abrir); `_projeto_aberto` os refaz.
+        # painel de Páginas com o livro todo logo ao abrir); `_projeto_aberto` só os atualiza.
         self._espaco_do_projeto_aberto()
+        self._espaco_ja_de = projeto
 
     def usar(self, projeto, fonte, leitor, servidor=None) -> None:
         """O projeto com o leitor já pronto (os testes e as medidas; a abertura passa por
         `abrir`). Com o `servidor`, o leitor é o da interface (só os padrões do livro)."""
-        projeto.ao_falhar_gravacao = self.falha_de_gravacao.emit
-        self.abrir_avisos_do_projeto(projeto)
+        self.ligar_os_avisos_do_projeto(projeto)
         self.livro.usar(projeto, fonte, leitor, servidor)
         self._espaco_do_projeto_aberto()
 
@@ -285,7 +289,12 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self._limpar_previa()
         self.busca.abrir()                      # o índice da busca, em segundo plano (§7.3)
         self._padroes_mudaram()
-        self._espaco_do_projeto_aberto()
+        if getattr(self, "_espaco_ja_de", None) is self.projeto:
+            self.atualizar_paginas(seguir=True)  # o espaço já veio no trocar_projeto
+            self.atualizar_barra()
+            self.atualizar_fila()
+        else:
+            self._espaco_do_projeto_aberto()
         dialogos.avisos_da_abertura(self, self.projeto)
         servidor = self.pagina.servidor
         if servidor is not None and not servidor.pronto.is_set():
@@ -306,7 +315,9 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         if self.executor.ocupado:
             self.executor.esvaziar()
             self.statusBar().showMessage("Esperando a tarefa em andamento terminar…")
-            self.executor.esperar()
+            if not self.executor.esperar():     # Q-C4: fecha mesmo assim, mas não calado
+                log.warning("a tarefa %r não terminou em 30 s; o projeto fecha com ela rodando",
+                            self.executor.titulo)
             QApplication.processEvents()        # o fim da tarefa chega antes de fechar
 
     def _fechar_projeto(self) -> bool:
@@ -319,11 +330,11 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self._parar_tarefas()                   # o fim da tarefa em voo ainda entra
         # A sessão aberta do Documento entra agora, depois da tarefa em voo (um F5 dela que
         # entrasse depois passaria por cima) e sem a fila, que acabou de ser esvaziada.
-        self.pagina.aplicar_as_sessoes_na_fila()
+        self.pagina.sessoes.aplicar_as_sessoes_na_fila()
         self.confirmar_a_sessao_aberta(agora=True)
         self.livro.esperar_a_gravacao()
         if not self._gravou_ou_perder(projeto):   # e o que ele entregou também é gravado
-            self.pagina.ler_os_aguardando()     # ficou aberto: o que foi abandonado volta
+            self.pagina.leitura.ler_os_aguardando()     # ficou aberto: o que foi abandonado volta
             return False
         self.gravar_espaco()
         self.abrir_avisos_do_projeto(None)
@@ -333,9 +344,9 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
 
     def _gravou_ou_perder(self, projeto) -> bool:
         """Verdadeiro se o gravador gravou tudo, ou se o usuário aceita perder o que falta."""
-        if projeto.descarregar(10):
+        if projeto.paginas_em_memoria.descarregar(10):
             return True
-        paginas = ", ".join(str(i + 1) for i in projeto.paginas_sujas())
+        paginas = ", ".join(str(i + 1) for i in projeto.paginas_em_memoria.paginas_sujas())
         return dialogos.confirmar(self, "Gravar", f"As mudanças da(s) página(s) {paginas} não "
                                   "puderam ser gravadas (veja a barra de status). Fechar mesmo "
                                   "assim e perder essas mudanças?")
@@ -358,22 +369,11 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
 
     def _pagina_vizinha(self, passo: int) -> None:
         """PgDn no fim da página abre a seguinte no topo; PgUp no topo, a anterior no fim."""
-        if self.pagina.vizinha(passo):
+        if self.pagina.navegador.vizinha(passo):
             if passo > 0:
                 self.visor.ir_ao_topo()
             else:
                 self.visor.ir_ao_fim()
-
-    def verificar_pagina(self) -> None:
-        """Ctrl+T: com glifos a revisar, pergunta na barra (§8.4: Enter aceita, Esc não
-        marca e fecha só a pergunta) antes de marcar a página como verificada."""
-        pendentes = len(self.pagina.fila()) if self.pagina.modelo is not None else 0
-        if pendentes:
-            self.confirmacao.perguntar(
-                f"Aceitar {pendentes} pendente(s) como estão e marcar a página como "
-                "verificada? Enter aceita · Esc não marca", self.pagina.verificar)
-            return
-        self.pagina.verificar()
 
     def reconhecer(self) -> None:
         p = self.pagina
@@ -382,20 +382,19 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
                 "A página já foi reconhecida. Reconhecer de novo descarta os boxes e as "
                 "correções só desta ocorrência. Os padrões ensinados ficam. Continuar?"):
             return
-        p.reconhecer()
-
-    def esquecer(self, caminhos: list) -> None:
-        if self.leitor is not None:              # sem pergunta: o Ctrl+Z desfaz (§8.3)
-            self.pagina.esquecer(caminhos)
+        p.leitura.reconhecer()
 
     def opcoes(self) -> None:
         if not self.pagina.pronto:
             return
         dialogo = DialogoDeOpcoes(self.projeto.dados.limiares, self,
-                                  notacao=self.projeto.dados.notacao)
+                                  notacao=self.projeto.dados.notacao,
+                                  idioma=self.projeto.dados.idioma)
         if dialogo.exec() == DialogoDeOpcoes.DialogCode.Accepted:
-            self.pagina.definir_notacao(dialogo.notacao())
-            self.pagina.aplicar_limiares(dialogo.limiares())
+            self.pagina.padroes_do_livro.definir_notacao(dialogo.notacao())
+            if self.pagina.padroes_do_livro.definir_idioma(dialogo.idioma()):
+                self.verificador.esquecer_projeto()     # o léxico do idioma novo, no próximo F7
+            self.pagina.padroes_do_livro.aplicar_limiares(dialogo.limiares())
 
     def reconhecer_livro(self) -> None:
         """Reconhece um intervalo de páginas em segundo plano, gravando cada uma."""
@@ -429,7 +428,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.visor.definir_modo_treino(sim)
         self.statusBar().showMessage(
             "Marcar glifo à mão: arraste em volta de um glifo para marcá-lo; Ctrl+clique junta "
-            "boxes na seleção." if sim else "Marcar glifo à mão: desligado.", 8000)
+            "boxes na seleção." if sim else "Marcar glifo à mão: desligado.", AVISO_LONGO_MS)
 
     def modo_areas(self, sim: bool) -> None:
         """Liga o editor de áreas, que desliga o modo de treino: os dois usam o arraste."""
@@ -444,7 +443,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         elif sim:
             self.statusBar().showMessage(
                 "Editor de áreas: arraste para desenhar, dentro para mover, na borda para "
-                "esticar; 1 texto, 2 diagrama, 3 imagem, 4 ignorar; Del apaga. "
+                "esticar; a letra troca a função (T texto, H título, C cabeçalho, R rodapé, "
+                "L legenda, X ignorar… ou o botão direito); Del apaga. "
                 + teclado.com_teclas("{reconhecer_pagina} reconhece pelas áreas."), 10000)
         else:
             self.statusBar().showMessage("Editor de áreas desligado.", 5000)
@@ -480,14 +480,14 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         if self.pagina.escolhido and self.pagina.box_atual() is not None:
             self.pagina.escolher(self.pagina.atual)     # fica, com a leitura de agora
         else:
-            self.pagina.ir_ao_primeiro_pendente()
+            self.pagina.fila_da_pagina.ir_ao_primeiro_pendente()
 
     def _recusa(self, refazer: bool, texto: str) -> None:
         pilha = "refazer" if refazer else "desfazer"
         self.registrar_aviso(av.AVISO, "Desfazer" if not refazer else "Refazer", texto)
         if dialogos.confirmar(self, "Desfazer", texto + f"\n\nTirar esta ação do {pilha} e "
                               "continuar com as outras?"):
-            self.pagina.tirar_do_desfazer(refazer)
+            self.pagina.desfazedor.tirar_do_desfazer(refazer)
 
     def closeEvent(self, evento):
         self.config.setValue("geometria", self.saveGeometry())

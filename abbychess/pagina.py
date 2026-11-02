@@ -5,6 +5,9 @@ testes chamarem direto. A segmentação é a do PyBoxEditor
 (`BoxService.generate_boxes_opencv`), com o leitor do livro como árbitro do
 separador de glifos colados: medido lá, separar sem árbitro tira 2,3 pontos de
 F1 da página, e com árbitro devolve 0,3 acima de não separar.
+
+O negrito e o itálico dos glifos estão em `efeitos`; dividir, juntar, criar e mover as
+bordas dos boxes, em `editar_boxes`.
 """
 
 from __future__ import annotations
@@ -45,7 +48,6 @@ INCLINACAO_MAXIMA = 3.0
 PASSO_DA_INCLINACAO = 0.05
 #: Abaixo disto a página fica como está: girar custa uma interpolação.
 INCLINACAO_MINIMA = 0.1
-
 
 
 def medir_inclinacao(cinza: np.ndarray, limite: float = INCLINACAO_MAXIMA,
@@ -236,10 +238,14 @@ class FonteDePaginas:
             return
         with self._trava_das_inclinacoes:
             self._inclinacoes.update(novas)
-            if self._arquivo_das_inclinacoes is not None and not self.somente_leitura:
-                gv.gravar_json(self._arquivo_das_inclinacoes, {
-                    str(k): v for k, v in sorted(self._inclinacoes.items(),
-                                                 key=_ordem_da_chave)})
+            self._gravar_as_inclinacoes()
+
+    def _gravar_as_inclinacoes(self) -> None:
+        """Grava o `inclinacoes.json` (com a trava das inclinações tomada), se há onde e o
+        projeto não é só leitura."""
+        if self._arquivo_das_inclinacoes is not None and not self.somente_leitura:
+            gv.gravar_json(self._arquivo_das_inclinacoes, {
+                str(k): v for k, v in sorted(self._inclinacoes.items(), key=_ordem_da_chave)})
 
     def inclinacao_guardada(self, entrada: "sq.Entrada") -> Optional[float]:
         """O ângulo medido e guardado da entrada, sem medir (None: ainda não foi medido)."""
@@ -248,6 +254,8 @@ class FonteDePaginas:
         with self._trava_das_inclinacoes:
             angulo = self._inclinacoes.get(_chave_da_inclinacao(entrada, self.por_pid))
             if angulo is None and self.por_pid and entrada.do_livro_sem_geometria:
+                # A medida da v2, pelo índice do PDF: a migração a passa a `pid`, e uma queda
+                # no meio dela não faz medir de novo (os boxes estão no ângulo medido).
                 angulo = self._inclinacoes.get(entrada.pagina)
         return angulo
 
@@ -261,30 +269,28 @@ class FonteDePaginas:
             return entrada.angulo if abs(entrada.angulo) >= INCLINACAO_MINIMA else 0.0
         if not self.endireitar:
             return 0.0
+        angulo = self.inclinacao_guardada(entrada)
+        if angulo is None:
+            angulo = self._medir_e_guardar(entrada, imagem)
+        return angulo if abs(angulo) >= INCLINACAO_MINIMA else 0.0
+
+    def _medir_e_guardar(self, entrada: "sq.Entrada", imagem: Optional[Image.Image]) -> float:
+        """Mede a inclinação da entrada (fora das travas) e a grava; se outra thread gravou a
+        dela antes, vale a primeira.
+
+        Medida na página inteira da fonte, já girada (o texto deitado de uma página escaneada
+        de lado mede em pé); como girar de 90 e endireitar comutam em volta do centro (a menos
+        de um pixel na página não quadrada), o ângulo vale aplicado à página da fonte."""
         chave = _chave_da_inclinacao(entrada, self.por_pid)
+        imagem = imagem if imagem is not None else self._da_fonte(entrada)
+        medido = medir_inclinacao(np.asarray(
+            com_geometria(imagem, None, entrada.giro).convert("L")))   # fora das travas
         with self._trava_das_inclinacoes:
             angulo = self._inclinacoes.get(chave)
-            if angulo is None and self.por_pid and entrada.do_livro_sem_geometria:
-                # A medida da v2, pelo índice do PDF: a migração a passa a `pid`, e uma queda
-                # no meio dela não faz medir de novo (os boxes estão no ângulo medido).
-                angulo = self._inclinacoes.get(entrada.pagina)
-        if angulo is None:
-            # Medida na página inteira da fonte, já girada (o texto deitado de uma página
-            # escaneada de lado mede em pé); como girar de 90 e endireitar comutam em volta
-            # do centro (a menos de um pixel na página não quadrada), o ângulo vale aplicado
-            # à página da fonte.
-            imagem = imagem if imagem is not None else self._da_fonte(entrada)
-            medido = medir_inclinacao(np.asarray(
-                com_geometria(imagem, None, entrada.giro).convert("L")))   # fora das travas
-            with self._trava_das_inclinacoes:
-                angulo = self._inclinacoes.get(chave)
-                if angulo is None:
-                    angulo = self._inclinacoes[chave] = medido
-                    if self._arquivo_das_inclinacoes is not None and not self.somente_leitura:
-                        gv.gravar_json(self._arquivo_das_inclinacoes, {
-                            str(k): v for k, v in sorted(self._inclinacoes.items(),
-                                                         key=_ordem_da_chave)})
-        return angulo if abs(angulo) >= INCLINACAO_MINIMA else 0.0
+            if angulo is None:
+                angulo = self._inclinacoes[chave] = medido
+                self._gravar_as_inclinacoes()
+        return angulo
 
 
 def _ordem_da_chave(item) -> tuple:
@@ -556,13 +562,12 @@ class CacheDePaginas:
 
 def fonte_do_projeto(projeto: ProjetoDeLivro) -> FonteDePaginas:
     """As páginas do livro como o projeto as lê: pela sequência dele, endireitadas se ele
-    nasceu assim. A sequência é montada aqui, na thread de quem abre (o fitz que conta as
-    páginas não roda junto com um render da pré-carga)."""
-    projeto.sequencia
+    nasceu assim. A sequência já foi montada ao abrir (`ordem.montar`), na thread de quem
+    abre (o fitz que conta as páginas não roda junto com um render da pré-carga)."""
     return FonteDePaginas(projeto.fonte, endireitar=projeto.dados.endireitar,
                           pasta=projeto.pasta, somente_leitura=projeto.somente_leitura,
                           sequencia=lambda: projeto.sequencia,
-                          por_pid=projeto.sequencia_gravada)
+                          por_pid=projeto.ordem.gravada)
 
 
 @dataclass
@@ -629,7 +634,7 @@ def segmentar_tudo(imagem: Image.Image, leitor: Optional[LeitorDoLivro] = None
     """
     from core import diagrama
 
-    cinza = imagem.convert("L")
+    cinza = apagar_fios(imagem.convert("L"))
     matriz = np.asarray(cinza)
     binaria = BoxService.binaria_para_segmentacao(
         matriz, max_contornos=BoxService.MAX_CONTORNOS_DE_TEXTO)
@@ -643,6 +648,41 @@ def segmentar_tudo(imagem: Image.Image, leitor: Optional[LeitorDoLivro] = None
     todas = BoxService.generate_boxes_opencv(cinza, arbitro=arbitro, binaria=binaria)
     todas = devolver_pingos(todas, binaria, escala)
     return SegmentacaoBruta(todas, tabuleiros, escala)
+
+
+#: O fio horizontal (`apagar_fios`): ao menos esta fração da largura da página, no máximo esta
+#: da altura, e com a tinta enchendo ao menos esta fração da caixa dele.
+FIO_LARGURA, FIO_ALTURA, FIO_CHEIO = 0.25, 0.012, 0.6
+
+
+def apagar_fios(cinza: Image.Image) -> Image.Image:
+    """A página em tons de cinza sem os fios horizontais soltos: o traço embaixo do cabeçalho
+    corrido, o de cima do rodapé.
+
+    **O fio levava o cabeçalho junto.** No *Chess School 1* do Mirkovic o cabeçalho corrido
+    fica de 4 a 11 px acima de um fio da largura do texto: "CHESS SCHOOL" (p. 18) saía sem
+    box nenhum, e o da p. 89 em dez pedaços lidos como "bi i i h i h ifi ♘", no meio do texto.
+    Sem o fio, saem os 11 e os 36 glifos, e os tabuleiros são os mesmos.
+
+    O fio é um componente de tinta sozinho, longo (`FIO_LARGURA`), fino (`FIO_ALTURA`) e
+    cheio (`FIO_CHEIO`). A moldura do tabuleiro tem os lados no mesmo componente e não é
+    fio; o sublinhado encostado nas letras também não (as letras esvaziam a caixa)."""
+    import cv2
+
+    matriz = np.asarray(cinza)
+    altura, largura = matriz.shape[:2]
+    tinta = (matriz < 128).astype(np.uint8)
+    total, rotulos, medidas, _c = cv2.connectedComponentsWithStats(tinta, connectivity=8)
+    larguras, alturas, areas = (medidas[:, k] for k in (cv2.CC_STAT_WIDTH, cv2.CC_STAT_HEIGHT,
+                                                         cv2.CC_STAT_AREA))
+    fios = np.nonzero((larguras >= FIO_LARGURA * largura) & (alturas <= FIO_ALTURA * altura)
+                      & (areas >= FIO_CHEIO * larguras * alturas))[0]
+    fios = fios[fios != 0]                               # o fundo
+    if not len(fios):
+        return cinza
+    limpa = matriz.copy()
+    limpa[np.isin(rotulos, fios)] = 255
+    return Image.fromarray(limpa)
 
 
 #: O pingo perdido: até esta fração da escala de texto nos dois eixos, e com pelo menos
@@ -672,13 +712,36 @@ def devolver_pingos(boxes: List[BoxEntry], binaria: np.ndarray, escala: float
 
     # A tinta sem box (quase nada numa página): a binária com os boxes apagados. O componente
     # dela que encosta em tinta coberta é pedaço de um glifo que tem box.
+    orfa = _sem_os_boxes(binaria, boxes)
+    total, rotulos, medidas, _c = cv2.connectedComponentsWithStats(orfa, connectivity=8)
+    saida = list(boxes)
+    crescidos = set()
+    for rotulo, x, y, w, h in _orfaos_pequenos(medidas, escala):
+        if _encosta_em_tinta_coberta(rotulos, rotulo, binaria, orfa, x, y, w, h):
+            continue
+        k = _glifo_de_baixo(saida, crescidos, x, y, w, h)
+        if k is None:
+            continue
+        b = saida[k]
+        saida[k] = replace(b, x1=min(b.x1, x), y1=y, x2=max(b.x2, x + w))
+        crescidos.add(k)
+    return saida
+
+
+def _sem_os_boxes(binaria: np.ndarray, boxes: List[BoxEntry]) -> np.ndarray:
+    """A binária com a tinta dos boxes apagada: a tinta sem box."""
     orfa = binaria.copy()
     for b in boxes:
         orfa[b.y1:b.y2, b.x1:b.x2] = 0
-    total, rotulos, medidas, _c = cv2.connectedComponentsWithStats(orfa, connectivity=8)
+    return orfa
+
+
+def _orfaos_pequenos(medidas: np.ndarray, escala: float):
+    """`(rótulo, x, y, w, h)` de cada componente da tinta sem box com tamanho de pingo: até
+    `PINGO_PERDIDO_MAXIMO` escalas nos dois eixos e com a área mínima (abaixo é poeira)."""
+    import cv2
+
     maximo, area_minima = PINGO_PERDIDO_MAXIMO * escala, PINGO_PERDIDO_AREA_MINIMA * escala ** 2
-    saida = list(boxes)
-    crescidos = set()
     larguras, alturas, areas = (medidas[:, k] for k in (cv2.CC_STAT_WIDTH, cv2.CC_STAT_HEIGHT,
                                                          cv2.CC_STAT_AREA))
     pequenos = (larguras <= maximo) & (alturas <= maximo) & (areas >= area_minima)
@@ -686,24 +749,34 @@ def devolver_pingos(boxes: List[BoxEntry], binaria: np.ndarray, escala: float
         if rotulo == 0:                                  # o fundo
             continue
         x, y, w, h = (int(v) for v in medidas[rotulo][:4])
-        y0, x0 = max(0, y - 1), max(0, x - 1)
-        janela = np.s_[y0:y + h + 1, x0:x + w + 1]
-        vizinhanca = cv2.dilate((rotulos[janela] == rotulo).astype(np.uint8),
-                                np.ones((3, 3), np.uint8)) > 0
-        if (vizinhanca & (binaria[janela] > 0) & (orfa[janela] == 0)).any():
-            continue
-        centro = x + w / 2
-        candidatos = [k for k, b in enumerate(saida)
-                      if k not in crescidos and not (b.angulo or 0) % 180
-                      and b.x1 <= centro <= b.x2 and w <= b.width + 1
-                      and 0 <= b.y1 - (y + h) <= BoxService.FOLGA_DE_DIACRITICO * b.height]
-        if not candidatos:
-            continue
-        k = min(candidatos, key=lambda k: saida[k].y1 - (y + h))
-        b = saida[k]
-        saida[k] = replace(b, x1=min(b.x1, x), y1=y, x2=max(b.x2, x + w))
-        crescidos.add(k)
-    return saida
+        yield rotulo, x, y, w, h
+
+
+def _encosta_em_tinta_coberta(rotulos: np.ndarray, rotulo, binaria: np.ndarray,
+                              orfa: np.ndarray, x: int, y: int, w: int, h: int) -> bool:
+    """O componente encosta em tinta que tem box: é pedaço de um glifo (a cauda de um "p"
+    cortada), e não um pingo inteiro."""
+    import cv2
+
+    y0, x0 = max(0, y - 1), max(0, x - 1)
+    janela = np.s_[y0:y + h + 1, x0:x + w + 1]
+    vizinhanca = cv2.dilate((rotulos[janela] == rotulo).astype(np.uint8),
+                            np.ones((3, 3), np.uint8)) > 0
+    return bool((vizinhanca & (binaria[janela] > 0) & (orfa[janela] == 0)).any())
+
+
+def _glifo_de_baixo(saida: List[BoxEntry], crescidos: set, x: int, y: int, w: int, h: int
+                    ) -> Optional[int]:
+    """O box em pé, ainda sem pingo devolvido, com o centro do pingo sobre ele e logo abaixo
+    (até `FOLGA_DE_DIACRITICO` da altura dele); o mais perto, ou None."""
+    centro = x + w / 2
+    candidatos = [k for k, b in enumerate(saida)
+                  if k not in crescidos and not (b.angulo or 0) % 180
+                  and b.x1 <= centro <= b.x2 and w <= b.width + 1
+                  and 0 <= b.y1 - (y + h) <= BoxService.FOLGA_DE_DIACRITICO * b.height]
+    if not candidatos:
+        return None
+    return min(candidatos, key=lambda k: saida[k].y1 - (y + h))
 
 
 def segmentar(imagem: Image.Image, leitor: Optional[LeitorDoLivro] = None) -> List[BoxEntry]:
@@ -734,147 +807,6 @@ def recorte(imagem, box: BoxEntry) -> np.ndarray:
     return vertical.recorte_de_pe(cinza(imagem), box)
 
 
-def efeitos_de_impressao(imagem: Image.Image, boxes: Sequence[BoxEntry]) -> List[Optional[bool]]:
-    """O negrito de cada glifo (`efeitos_da_pagina`, sem o itálico)."""
-    return efeitos_da_pagina(imagem, boxes)[0]
-
-
-def efeitos_da_pagina(imagem: Image.Image, boxes: Sequence[BoxEntry]
-                      ) -> Tuple[List[Optional[bool]], List[Optional[bool]]]:
-    """O negrito e o itálico de cada glifo, medidos por palavra.
-
-    ``None`` quando a palavra não basta para uma decisão, ``False``/``True`` quando o efeito
-    é conhecido. O negrito é a régua pública do core (`_negritos`); o itálico, a inclinação
-    das bordas das letras (`_italicos`), porque o core não tem régua do itálico."""
-    from core.notacao import palavras_da_pagina
-
-    if not boxes:
-        return [], []
-    # A página em tons de cinza uma vez: convertê-la a cada glifo dobrava o tempo do lote.
-    pagina = cinza(imagem)
-    palavras = [[simbolo.indice for simbolo in palavra.simbolos]
-                for linha in palavras_da_pagina(list(boxes)) for palavra in linha]
-    return _negritos(pagina, boxes, palavras), _italicos(pagina, boxes, palavras)
-
-
-def _negritos(pagina: np.ndarray, boxes: Sequence[BoxEntry], palavras: Sequence[List[int]]
-              ) -> List[Optional[bool]]:
-    """O negrito de cada glifo, medido por palavra com a régua pública do core. A referência
-    é a página inteira: a régua compara a espessura de cada caractere com as outras
-    ocorrências dele, como :mod:`core.negrito` exige."""
-    from collections import defaultdict
-    from math import isnan
-
-    from core import negrito
-
-    medidas = [negrito.espessura(recorte(pagina, box)) for box in boxes]
-    amostras = defaultdict(list)
-    for box, medida in zip(boxes, medidas):
-        if box.char and medida is not None and not isnan(medida):
-            amostras[box.char].append(medida)
-    referencia = negrito.referencia(amostras)
-
-    pesos = []
-    for indices in palavras:
-        glifos = [(boxes[i].char, medidas[i]) for i in indices
-                  if boxes[i].char and medidas[i] is not None and not isnan(medidas[i])]
-        pesos.append(negrito.relativo(glifos, referencia) if len(glifos) >= 2 else None)
-    normal = negrito.escala([peso for peso in pesos if peso is not None])
-    efeitos: List[Optional[bool]] = [None] * len(boxes)
-    for indices, peso in zip(palavras, pesos):
-        if peso is None:
-            continue
-        forte = negrito.e_negrito(peso, normal)
-        for i in indices:
-            efeitos[i] = forte
-    return efeitos
-
-
-#: O itálico (`_italicos`): a palavra cujas bordas quase verticais pendem
-#: `INCLINACAO_DO_ITALICO` graus além das da página, com o pico `FORCA_DO_ITALICO` vezes o da
-#: vertical, medida em `MINIMO_DE_LETRAS_DO_ITALICO` letras ou mais. Ajustados no Odds & Ends
-#: (o itálico pela fonte do PDF): 0 falsos em 17.950 palavras retas e 95,8% das itálicas nas
-#: páginas que não entraram no ajuste (`ferramentas/medir_italico.py`).
-INCLINACAO_DO_ITALICO = 7.0
-FORCA_DO_ITALICO = 2.0
-MINIMO_DE_LETRAS_DO_ITALICO = 3
-#: Até quantos graus da vertical uma borda conta: o itálico dos livros pende ~10–17°; a
-#: diagonal do Z (~34°) e a da perna do y (~22°, fraca) ficam de fora ou não vencem.
-JANELA_DO_ITALICO = 25
-#: A inclinação até a qual a palavra conta como reta na referência da página (a página quase
-#: toda em itálico não puxa a referência para o itálico).
-RETA_ATE = 5.0
-
-
-def _inclinacao_das_bordas(recorte: np.ndarray, mascara: np.ndarray
-                           ) -> Optional[Tuple[float, float]]:
-    """`(graus, força)`: a inclinação mais comum das bordas quase verticais da tinta (positiva
-    com o topo à direita) e quantas vezes o pico pesa o que pesa a vertical. As hastes e os
-    lados das letras redondas fazem o pico; as diagonais (v, w, y) se espalham dos dois lados.
-    `None` com borda de menos."""
-    import cv2
-
-    tons = recorte.astype(np.float32)
-    gx = cv2.Sobel(tons, cv2.CV_32F, 1, 0, ksize=3)
-    gy = cv2.Sobel(tons, cv2.CV_32F, 0, 1, ksize=3)
-    magnitude = np.hypot(gx, gy)
-    if not magnitude.size or magnitude.max() <= 0:
-        return None
-    usar = mascara & (magnitude > 0.25 * magnitude.max()) & (np.abs(gx) > 1e-3)
-    if usar.sum() < 30:
-        return None
-    # A borda que pende α da vertical tem o gradiente em α da horizontal: tan α = gy/gx.
-    angulo = np.degrees(np.arctan(gy[usar] / gx[usar]))
-    dentro = np.abs(angulo) <= JANELA_DO_ITALICO
-    if dentro.sum() < 20:
-        return None
-    janela = JANELA_DO_ITALICO
-    h = np.bincount(np.round(angulo[dentro]).astype(int) + janela,
-                    weights=magnitude[usar][dentro], minlength=2 * janela + 1)
-    h = np.convolve(h, np.exp(-0.5 * (np.arange(-6, 7) / 2.0) ** 2), mode="same")
-    pico = int(np.argmax(h))
-    return float(pico - janela), float(h[pico] / max(h[janela], 1e-9))
-
-
-def _italicos(pagina: np.ndarray, boxes: Sequence[BoxEntry], palavras: Sequence[List[int]]
-              ) -> List[Optional[bool]]:
-    """O itálico de cada glifo, pela inclinação das letras da palavra (`_inclinacao_das_bordas`)
-    contra a das palavras retas da página (a página escaneada torta não vira itálico). Só as
-    letras de pé contam: algarismos, figurinas e a barra do ½ têm diagonais que não são
-    itálico. A palavra inteira leva o resultado; sem letras que bastem, `None`."""
-    from statistics import median
-
-    altura, largura = pagina.shape[:2]
-    medidas = []
-    for indices in palavras:
-        letras = [boxes[i] for i in indices
-                  if boxes[i].char.isalpha() and not boxes[i].angulo
-                  and not getattr(boxes[i], "negativo", False)]
-        medida = None
-        if len(letras) >= MINIMO_DE_LETRAS_DO_ITALICO:
-            x1, y1 = max(0, min(b.x1 for b in letras)), max(0, min(b.y1 for b in letras))
-            x2 = min(largura, max(b.x2 for b in letras))
-            y2 = min(altura, max(b.y2 for b in letras))
-            if x2 - x1 > 2 and y2 - y1 > 2:
-                mascara = np.zeros((y2 - y1, x2 - x1), bool)
-                for b in letras:
-                    mascara[max(0, b.y1 - y1):max(0, b.y2 - y1),
-                            max(0, b.x1 - x1):max(0, b.x2 - x1)] = True
-                medida = _inclinacao_das_bordas(pagina[y1:y2, x1:x2], mascara)
-        medidas.append(medida)
-    retas = [m[0] for m in medidas if m is not None and abs(m[0]) <= RETA_ATE]
-    normal = median(retas) if retas else 0.0
-    efeitos: List[Optional[bool]] = [None] * len(boxes)
-    for indices, medida in zip(palavras, medidas):
-        if medida is None:
-            continue
-        inclinada = (medida[0] - normal >= INCLINACAO_DO_ITALICO
-                     and medida[1] >= FORCA_DO_ITALICO)
-        for i in indices:
-            efeitos[i] = inclinada
-    return efeitos
-
-
 def ler_boxes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorDoLivro, *,
               so_pendentes: bool = False, progresso: Optional[Progresso] = None,
               cancelado: Callable[[], bool] = lambda: False,
@@ -889,15 +821,28 @@ def ler_boxes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorDoLivro,
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
     if so_pendentes and pendentes is None:
         pendentes = contexto.pendentes(boxes, leitor.limiares)
-    alvos = [b for i, b in enumerate(boxes) if b.source != FONTE_MANUAL and (
+    _ler_os_alvos(pagina, _alvos_da_leitura(boxes, so_pendentes, pendentes), leitor, referencia,
+                  progresso, cancelado)
+    return resumir(boxes, leitor)
+
+
+def _alvos_da_leitura(boxes: List[BoxEntry], so_pendentes: bool,
+                      pendentes: Optional[Sequence[bool]]) -> List[BoxEntry]:
+    """Os boxes a ler: nunca os manuais; com `so_pendentes`, só os pendentes."""
+    return [b for i, b in enumerate(boxes) if b.source != FONTE_MANUAL and (
         not so_pendentes or pendentes[i])]
+
+
+def _ler_os_alvos(pagina: np.ndarray, alvos: List[BoxEntry], leitor: LeitorDoLivro,
+                  referencia: Optional[float], progresso: Optional[Progresso],
+                  cancelado: Callable[[], bool]) -> None:
+    """Lê os boxes no lugar, um por um, até o `cancelado`; o `progresso` a cada 10 e no fim."""
     for i, box in enumerate(alvos):
         if cancelado():
             break
         _ler_um(pagina, box, leitor, referencia)
         if progresso and (i % 10 == 0 or i == len(alvos) - 1):
             progresso(i + 1, len(alvos))
-    return resumir(boxes, leitor)
 
 
 def _ler_um(pagina: np.ndarray, box: BoxEntry, leitor: LeitorDoLivro,
@@ -932,17 +877,6 @@ def recortes_para_ler(imagem: Image.Image, boxes: List[BoxEntry], indices: Seque
     return [(vertical.recorte_de_pe(pagina, boxes[i]), referencia) for i in indices]
 
 
-def _reler(imagem: Image.Image, boxes: List[BoxEntry], indices: List[int],
-           leitor: Optional[LeitorDoLivro]) -> None:
-    """Lê de novo só os boxes que uma edição criou ou mudou."""
-    if leitor is None:
-        return
-    pagina = cinza(imagem)
-    referencia = proporcao.altura_de_referencia(boxes) if boxes else None
-    for i in indices:
-        _ler_um(pagina, boxes[i], leitor, referencia)
-
-
 def resumir(boxes: List[BoxEntry], leitor: LeitorDoLivro) -> ResumoDaLeitura:
     por_fonte: dict = {}
     for b in boxes:
@@ -957,7 +891,7 @@ def fila_de_revisao(boxes: List[BoxEntry], leitor: LeitorDoLivro,
     Em empate de confiança fica a ordem de leitura, para o usuário andar pela
     página e não pular de um canto para outro. O glifo que a palavra desmente
     (`contexto`) entra mesmo com a confiança alta. Os de `no_fim` (as margens que a
-    exportação tira, `exportar.margens_da_pagina`) vêm depois de todos os outros.
+    exportação tira, `margens.margens_da_pagina`) vêm depois de todos os outros.
     """
     pendentes = [i for i, p in enumerate(contexto.pendentes(boxes, leitor.limiares)) if p]
     no_fim = set(no_fim)
@@ -1062,220 +996,3 @@ def texto(boxes: List[BoxEntry]) -> str:
     from abbychess import texto as tx
 
     return tx.texto(tx.montar(tx.pagina_avulsa(boxes)), modo=tx.SAN)
-
-
-# ----------------------------------------------------------------------
-# Editar os boxes: dividir, juntar e mover as bordas
-# ----------------------------------------------------------------------
-
-def dividir(imagem: Image.Image, boxes: List[BoxEntry], indice: int,
-            leitor: Optional[LeitorDoLivro] = None, *, x: Optional[int] = None) -> List[int]:
-    """Divide em dois o box que juntou dois glifos, e relê as partes.
-
-    Com `x`, a coluna da página onde cortar, o corte é vertical ali: é o ponto
-    que o usuário escolheu no recorte ampliado. Sem `x`, quem decide é o
-    `BoxService.split_box` do PyBoxEditor, que corta no vão mais fundo da tinta
-    e escolhe o eixo sozinho.
-
-    **Cada parte é aparada à própria tinta.** Num "rp" colado, o box vai da
-    altura do x ao fim da perna do "p"; sem aparar, o "r" sairia com a altura
-    do par, e a altura relativa que o padrão do livro grava ensinaria um "r"
-    do tamanho de um "p".
-
-    **O pingo do "i" não é um glifo.** Em "vi", "wi" e "xi" o vão horizontal sob o
-    pingo é mais fundo que o vertical entre as letras, e o core corta ali (ele diz
-    isso na própria `split_box`): saíam o pingo e o par sem pingo, um em cima do
-    outro, e o pingo solto partia a linha. Quando a parte de cima é só um pingo, o
-    corte vai para o vão vertical mais fundo do resto (`_corte_sob_o_pingo`).
-
-    As partes entram no lugar do box, a da esquerda (ou de cima) primeiro, sem
-    leitura e fora do manual. Com `leitor`, são relidas na hora. Devolve os
-    índices das duas; os boxes depois de `indice` andam uma casa para a frente.
-    """
-    box = boxes[indice]
-    matriz = np.asarray(imagem.convert("L"))
-    tinta = BoxService._tinta_do_box(box, matriz)
-    if x is None:
-        partes = BoxService.split_box(box, matriz)
-        coluna = _corte_sob_o_pingo(partes, box, tinta)
-        if coluna is not None:
-            partes = [replace(box, x2=coluna), replace(box, x1=coluna)]
-    else:
-        if not box.x1 < x < box.x2:
-            raise ValueError(f"O corte em x={x} está fora do box ({box.x1}..{box.x2}).")
-        partes = [replace(box, x2=x), replace(box, x1=x)]
-    novas = []
-    for parte in partes:
-        parte = replace(parte, char="", source="", confidence=0.0,
-                        angulo=box.angulo, negativo=box.negativo, moldura=box.moldura)
-        aparada = _aparar(parte, box, tinta)
-        if aparada is None:
-            raise ValueError("Um dos lados do corte ficou sem tinta.")
-        novas.append(aparada)
-    boxes[indice:indice + 1] = novas
-    _reler(imagem, boxes, [indice, indice + 1], leitor)
-    return [indice, indice + 1]
-
-
-#: O pingo: a parte de cima aparada com até esta fração da altura e da largura do box.
-PINGO_ALTURA, PINGO_LARGURA = 0.3, 0.5
-
-
-def _corte_sob_o_pingo(partes: List[BoxEntry], box: BoxEntry, tinta) -> Optional[int]:
-    """A coluna onde cortar quando o core cortou sob o pingo de um "i"; senão, `None`.
-
-    O vão vertical é medido só na tinta de baixo do corte do core, sem o pingo, pela
-    mesma régua do core (`_vale_mais_fundo`, com a margem dele)."""
-    if tinta is None or len(partes) != 2 or (box.angulo or 0) % 180:
-        return None                                  # girado, o corte em y é o certo
-    de_cima = partes[0]
-    if (de_cima.x1, de_cima.x2) != (box.x1, box.x2) or de_cima.y2 >= box.y2:
-        return None                                  # o core cortou na coluna
-    pingo = _aparar(de_cima, box, tinta)
-    if pingo is None or (pingo.y2 - pingo.y1 > PINGO_ALTURA * box.height
-                         or pingo.x2 - pingo.x1 > PINGO_LARGURA * box.width):
-        return None
-    vale = BoxService._vale_mais_fundo(tinta[de_cima.y2 - box.y1:].sum(axis=0),
-                                       BoxService.MARGEM_DO_CORTE)
-    return box.x1 + vale[0] if vale else None
-
-
-def _aparar(parte: BoxEntry, inteiro: BoxEntry, tinta) -> Optional[BoxEntry]:
-    """A parte encolhida até a tinta dela, medida na máscara do box inteiro."""
-    if tinta is None:
-        return parte
-    pedaco = tinta[parte.y1 - inteiro.y1:parte.y2 - inteiro.y1,
-                   parte.x1 - inteiro.x1:parte.x2 - inteiro.x1]
-    linhas, colunas = np.nonzero(pedaco)
-    if not linhas.size:
-        return None
-    return replace(parte, x1=parte.x1 + int(colunas.min()), x2=parte.x1 + int(colunas.max()) + 1,
-                   y1=parte.y1 + int(linhas.min()), y2=parte.y1 + int(linhas.max()) + 1)
-
-
-def criar_box(imagem: Image.Image, boxes: List[BoxEntry], area: Caixa,
-              leitor: Optional[LeitorDoLivro] = None) -> int:
-    """Cria o box do glifo dentro da área que o usuário desenhou, e o lê.
-
-    É o quadro do treino de padrões do FineReader: o glifo que a segmentação
-    perdeu, partiu ou juntou com o vizinho se marca à mão. A área é aparada à
-    tinta, e os boxes que ficam dentro dela (o "m" quebrado em três) saem: o
-    quadro novo os substitui. O box entra na ordem de leitura da página.
-
-    Devolve o índice dele; os outros índices mudam, e quem guarda índices os
-    remapeia pela identidade dos boxes.
-    """
-    largura, altura = imagem.size
-    x1, y1, x2, y2 = area
-    x1, x2 = sorted((x1, x2))
-    y1, y2 = sorted((y1, y2))
-    quadro = BoxService.clamp_box(BoxEntry("", x1, y1, x2, y2), largura, altura)
-    if quadro.x2 - quadro.x1 < 1 or quadro.y2 - quadro.y1 < 1:
-        raise ValueError("A área está fora da página.")
-    tinta = BoxService._tinta_do_box(quadro, np.asarray(imagem.convert("L")))
-    novo = _aparar(quadro, quadro, tinta) if tinta is not None and tinta.any() else None
-    if novo is None:
-        raise ValueError("Não há tinta na área marcada.")
-    dentro = [b for b in boxes if _contido(b, (novo.x1, novo.y1, novo.x2, novo.y2))
-              or _centro_dentro(b, novo)]
-    restantes = [b for b in boxes if not any(b is d for d in dentro)]
-    boxes[:] = BoxService.sort_boxes_reading_order(restantes + [novo])
-    indice = next(i for i, b in enumerate(boxes) if b is novo)
-    _reler(imagem, boxes, [indice], leitor)
-    return indice
-
-
-def a_manter_na_releitura(boxes, lida: bool) -> List[BoxEntry]:
-    """Os glifos que reconhecer de novo não troca (§4.6), como cópias dos `BoxEntry`: numa
-    página ainda não lida, os marcados à mão (todos os boxes dela); numa lida, os que o usuário
-    decidiu (fonte `manual`) ou viu e aceitou (`revisado`). `boxes` são os `Box` do modelo.
-    As decisões dos outros passam aos glifos novos pela sobreposição (`modelo.reconciliar`)."""
-    from abbychess.edicao import copia
-    from abbychess.leitor import FONTE_MANUAL
-
-    return [copia(b.entry) for b in boxes
-            if not lida or b.entry.source == FONTE_MANUAL or b.revisado]
-
-
-def manter_marcados(segmentados: List[BoxEntry], marcados: List[BoxEntry]) -> List[BoxEntry]:
-    """Os boxes da segmentação com os glifos marcados à mão no lugar dos de baixo.
-
-    É o F5 (ou o lote) numa página em que o usuário marcou glifos antes de
-    reconhecer: o quadro dele vale mais que o box que a segmentação achou ali.
-    Sai o box segmentado cujo centro cai dentro de um marcado, ou que tem mais
-    da metade da área dentro dele. O resto fica, em ordem de leitura.
-    """
-    def coberto(b: BoxEntry) -> bool:
-        area = max((b.x2 - b.x1) * (b.y2 - b.y1), 1)
-        for m in marcados:
-            largura = min(b.x2, m.x2) - max(b.x1, m.x1)
-            altura = min(b.y2, m.y2) - max(b.y1, m.y1)
-            if _centro_dentro(b, m) or (largura > 0 and altura > 0
-                                        and largura * altura > 0.5 * area):
-                return True
-        return False
-
-    return BoxService.sort_boxes_reading_order(
-        [b for b in segmentados if not coberto(b)] + list(marcados))
-
-
-def _centro_dentro(b: BoxEntry, quadro: BoxEntry) -> bool:
-    cx, cy = (b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2
-    return quadro.x1 <= cx <= quadro.x2 and quadro.y1 <= cy <= quadro.y2
-
-
-def vizinho(boxes: List[BoxEntry], indice: int, passo: int) -> Optional[int]:
-    """O box ao lado na ordem de leitura, se ele estiver na mesma linha.
-
-    Mesma linha é sobrepor na vertical: o fim de uma linha e o começo da
-    seguinte são vizinhos na lista, mas juntá-los não é o que se quer.
-    """
-    outro = indice + passo
-    if not 0 <= outro < len(boxes) or passo == 0:
-        return None
-    a, b = boxes[indice], boxes[outro]
-    return outro if min(a.y2, b.y2) > max(a.y1, b.y1) else None
-
-
-def juntar(imagem: Image.Image, boxes: List[BoxEntry], i: int, j: int,
-           leitor: Optional[LeitorDoLivro] = None) -> int:
-    """Junta dois boxes num só, o retângulo que cobre os dois, e o relê.
-
-    É o contrário de `dividir`: para o glifo que a segmentação partiu, como um
-    "m" quebrado em dois ou um acento solto da letra. O box novo fica no lugar
-    do primeiro na ordem de leitura e herda o ângulo e a polaridade dele.
-    Devolve o índice dele; os boxes depois do segundo andam uma casa para trás.
-    """
-    if i == j:
-        raise ValueError("Não dá para juntar um box com ele mesmo.")
-    i, j = sorted((i, j))
-    a, b = boxes[i], boxes[j]
-    boxes[i] = replace(a, char="", source="", confidence=0.0,
-                       x1=min(a.x1, b.x1), y1=min(a.y1, b.y1),
-                       x2=max(a.x2, b.x2), y2=max(a.y2, b.y2))
-    del boxes[j]
-    _reler(imagem, boxes, [i], leitor)
-    return i
-
-
-def ajustar(imagem: Image.Image, boxes: List[BoxEntry], indice: int,
-            leitor: Optional[LeitorDoLivro] = None, *,
-            esquerda: int = 0, cima: int = 0, direita: int = 0, baixo: int = 0) -> BoxEntry:
-    """Move as bordas do box, em pixels da página, e o relê.
-
-    Positivo move a borda para a direita ou para baixo, como as coordenadas.
-    O box fica dentro da página (`BoxService.clamp_box`) e com pelo menos um
-    pixel de cada lado; a leitura antiga, mesmo a manual, vale para o desenho
-    antigo e sai.
-    """
-    box = boxes[indice]
-    largura, altura = imagem.size
-    novo = BoxService.clamp_box(replace(box, x1=box.x1 + esquerda, y1=box.y1 + cima,
-                                        x2=box.x2 + direita, y2=box.y2 + baixo),
-                                largura, altura)
-    if novo.x2 - novo.x1 < 1 or novo.y2 - novo.y1 < 1:
-        raise ValueError("O box ficaria vazio.")
-    boxes[indice] = replace(box, char="", source="", confidence=0.0,
-                            x1=novo.x1, y1=novo.y1, x2=novo.x2, y2=novo.y2)
-    _reler(imagem, boxes, [indice], leitor)
-    return boxes[indice]

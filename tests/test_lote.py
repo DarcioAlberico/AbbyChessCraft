@@ -21,13 +21,13 @@ import pytest
 from abbychess import livro as lv
 from abbychess import pagina as pg
 from abbychess.controlador import ControladorDePagina, Eventos
-from abbychess.controladores import ControladorDoLivro
+from abbychess.controlador_do_livro import ControladorDoLivro
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro
 from abbychess.modelo import VERIFICADA
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_controlador import ExecutorManual
-from tests.test_livro import pdf_sintetico
+from tests.ajudantes import ExecutorManual  # noqa: E402,F401,F811
+from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
 
 @pytest.fixture(scope="module")
@@ -64,7 +64,7 @@ def _sem_hora(dados: bytes) -> dict:
 
 
 def _hash(projeto, indice) -> str:
-    pid = projeto.pid_da_pagina(indice)
+    pid = projeto.ordem.pid_em(indice)
     return hashlib.sha256(projeto._arquivo_v2(pid).read_bytes()).hexdigest()
 
 
@@ -113,7 +113,7 @@ def test_amostra_guiada_usa_apenas_as_paginas_que_ficaram_para_ocr(ctl, projeto)
     ctl.executor.tudo()
 
     assert terminou == [(1, 2)]
-    assert projeto.paginas_lidas() == [1, 2]
+    assert projeto.resumo.paginas_lidas() == [1, 2]
 
 
 def test_o_lote_le_e_grava_as_paginas_e_a_aberta_aparece(ctl, projeto):
@@ -122,7 +122,7 @@ def test_o_lote_le_e_grava_as_paginas_e_a_aberta_aparece(ctl, projeto):
     ctl.executor.tudo()
     [resultado] = ctl.fins
     assert resultado.lidas == [0, 1, 2] and not ctl.lote_rodando
-    assert projeto.paginas_lidas() == [0, 1, 2]
+    assert projeto.resumo.paginas_lidas() == [0, 1, 2]
     assert ctl.pagina.boxes                               # a página aberta, já com os glifos
 
 
@@ -130,20 +130,56 @@ def test_ca_11_4_a_pagina_aberta_e_suja_nao_e_sobrescrita(ctl, projeto):
     p = ctl.pagina
     ctl.reconhecer([0], refazer=False)
     ctl.executor.tudo()
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     antes = _hash(projeto, 0)
     p.escolher(p.gids[0])
     p.corrigir("Z")                                       # a aberta, com um passo no desfazer
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     gravado = _hash(projeto, 0)
     assert gravado != antes
     ctl.reconhecer([0, 1], refazer=True)
     ctl.executor.tudo()
     resultado = ctl.fins[-1]
     assert resultado.reler_depois == [0] and resultado.lidas == [1]
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     assert _hash(projeto, 0) == gravado                   # o arquivo não mudou
     assert p.box(p.gids[0]).char == "Z"
+
+
+def test_a_pagina_aberta_nao_sai_do_cache_num_lote_maior_que_ele(ctl, projeto, monkeypatch):
+    """CA-Q-P3: o lote de mais páginas que o cache (aqui o cache de 1 e o lote de 3) não
+    despeja a página aberta e limpa: o lote que a relê depois mostra a leitura nova na
+    janela, e a correção seguinte, feita lá, não a apaga do disco."""
+    from abbychess import lote
+    from abbychess import cache_do_projeto as modulo
+
+    p = ctl.pagina
+    ctl.reconhecer([0], refazer=False)
+    ctl.executor.tudo()
+    projeto.paginas_em_memoria.descarregar(10)
+    monkeypatch.setattr(modulo, "PAGINAS_EM_MEMORIA", 1)
+    ctl.reconhecer([1, 2], refazer=False)
+    ctl.executor.tudo()
+
+    ler_pagina = lote.sl.ler_pagina
+
+    def outra_leitura(*args, **kwargs):          # a releitura acha outra letra no 1º glifo
+        lida = ler_pagina(*args, **kwargs)
+        lida.boxes[0].char = "W"
+        return lida
+
+    monkeypatch.setattr(lote.sl, "ler_pagina", outra_leitura)
+    primeiro, segundo = p.gids[0], p.gids[1]
+    ctl.reconhecer([0], refazer=True)
+    ctl.executor.tudo()
+    assert ctl.fins[-1].lidas == [0]
+    assert p.box(primeiro).char == "W"           # a janela mostra o que o lote leu
+    p.escolher(segundo)
+    p.corrigir("Z")
+    projeto.paginas_em_memoria.descarregar(10)
+    gravada = {b.gid: b.entry.char for b in ProjetoDeLivro.abrir(projeto.pasta)
+               .carregar_modelo(0).boxes}
+    assert (gravada[primeiro], gravada[segundo]) == ("W", "Z")
 
 
 def test_sem_servidor_a_edicao_espera_a_pagina_do_lote_e_vale_depois(ctl, projeto):
@@ -166,7 +202,7 @@ def test_sem_servidor_a_edicao_espera_a_pagina_do_lote_e_vale_depois(ctl, projet
 def test_ca_8_5_o_lote_pula_as_verificadas_mesmo_com_refazer(ctl, projeto):
     ctl.reconhecer([0, 1], refazer=False)
     ctl.executor.tudo()
-    projeto.descarregar(10)                               # o gravador não passa por cima
+    projeto.paginas_em_memoria.descarregar(10)                               # o gravador não passa por cima
     pagina = projeto.carregar_modelo(1)
     pagina.estado = VERIFICADA
     projeto.salvar_modelo(pagina)
@@ -196,13 +232,13 @@ def test_ca_11_5_cancelar_e_retomar_le_cada_pagina_uma_vez(ctl, projeto):
 def test_cancelar_no_meio_da_leitura_deixa_a_pagina_como_estava(ctl, projeto):
     ctl.reconhecer([0], refazer=False)
     ctl.executor.tudo()
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     antes = _hash(projeto, 0)
     ctl.reconhecer([0], refazer=True)
     ctl.cancelar()                                        # antes de a leitura começar
     ctl.executor.tudo()
     assert ctl.fins[-1].cancelado and ctl.fins[-1].lidas == []
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     assert _hash(projeto, 0) == antes and ctl.restante == ([0], True)
 
 
@@ -215,16 +251,16 @@ def test_ca_4_8_voltar_ao_estado_antes_do_lote_devolve_o_json_copiado(ctl, proje
     p.corrigir("W")                                       # manual: o refazer o mantém (§4.6)
     p.ir_para(0)                                          # a 1 não está aberta: o lote a relê
     p.escolher(p.gids[0])
-    p.ensinar("a")                                        # o lote lê os "a" da 1 pelo padrão
+    p.leitura.ensinar("a")                                        # o lote lê os "a" da 1 pelo padrão
     ctl.executor.tudo()
-    projeto.descarregar(10)
-    copia_esperada = (projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(1)}.json").read_bytes()
+    projeto.paginas_em_memoria.descarregar(10)
+    copia_esperada = (projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(1)}.json").read_bytes()
     assert not any(b.entry.source == "livro" for b in projeto.carregar_modelo(1).boxes)
     ctl.reconhecer([1], refazer=True)
     ctl.executor.tudo()
     assert ctl.fins[-1].lidas == [1]
-    projeto.descarregar(10)
-    pid = projeto.pid_da_pagina(1)
+    projeto.paginas_em_memoria.descarregar(10)
+    pid = projeto.ordem.pid_em(1)
     copia = projeto.pasta / "paginas" / ".antes-do-lote" / f"p{pid}.json"
     relida = projeto.carregar_modelo(1)
     assert any(b.entry.char == "W" and b.entry.source == FONTE_MANUAL for b in relida.boxes)
@@ -238,12 +274,12 @@ def test_ca_4_8_voltar_ao_estado_antes_do_lote_devolve_o_json_copiado(ctl, proje
     recusas = []
     p.eventos.ligar("recusa", lambda refazer, texto: recusas.append(texto))
     ctl.voltar_ao_antes_do_lote()
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     assert (projeto.pasta / "paginas" / f"p{pid}.json").read_bytes() == guardado
-    assert not copia.exists() and not projeto.tem_antes_do_lote(1)
+    assert not copia.exists() and not projeto.antes_do_lote.tem(1)
     assert not any(b.source == "livro" for b in p.boxes)       # a aberta mostra a de antes
     assert any(b.char == "W" for b in p.boxes) and not any(b.char == "Z" for b in p.boxes)
-    p.desfazer()                                          # o "Z" não está mais lá: recusa
+    p.desfazedor.desfazer()                                          # o "Z" não está mais lá: recusa
     assert recusas and "Corrigir para 'Z'" in recusas[0]
 
 
@@ -254,7 +290,7 @@ def test_voltar_ao_antes_do_lote_nao_grava_no_projeto_so_de_leitura(ctl, projeto
     p.ir_para(1)
     ctl.reconhecer([0], refazer=True)
     ctl.executor.tudo()
-    projeto.descarregar(10)
+    projeto.paginas_em_memoria.descarregar(10)
     p.ir_para(0)
     antes = _hash(projeto, 0)
     avisos = []
@@ -262,7 +298,7 @@ def test_voltar_ao_antes_do_lote_nao_grava_no_projeto_so_de_leitura(ctl, projeto
     projeto.somente_leitura = True
     ctl.voltar_ao_antes_do_lote()
     assert avisos and "só para leitura" in avisos[0]
-    assert _hash(projeto, 0) == antes and projeto.tem_antes_do_lote(0)
+    assert _hash(projeto, 0) == antes and projeto.antes_do_lote.tem(0)
 
 
 # ----------------------------------------------------------------------
@@ -293,11 +329,11 @@ def test_g2_a_pagina_verificada_durante_a_leitura_continua_verificada(ctl, proje
     servidor.segurar.clear()
     ctl.reconhecer([0], refazer=True)
     p.verificar()                                         # Ctrl+T: verifica a 0 e abre a 1
-    assert p.indice == 1 and projeto.estado_da_pagina(0) == VERIFICADA
+    assert p.indice == 1 and projeto.resumo.estado_da_pagina(0) == VERIFICADA
     servidor.segurar.set()
     entregar(fila, esperar_por=1)
     assert ctl.fins[-1].verificadas == [0] and ctl.fins[-1].lidas == []
-    assert projeto.estado_da_pagina(0) == VERIFICADA
+    assert projeto.resumo.estado_da_pagina(0) == VERIFICADA
 
 
 def test_g2_a_correcao_feita_durante_a_leitura_numa_pagina_deixada_fica(ctl, projeto,
@@ -318,8 +354,43 @@ def test_g2_a_correcao_feita_durante_a_leitura_numa_pagina_deixada_fica(ctl, pro
     corrigido = projeto.carregar_modelo(0).box(gid).entry
     assert (corrigido.char, corrigido.source) == ("Q", FONTE_MANUAL)
     p.ir_para(0)
-    p.desfazer()                                          # o Ctrl+Z dela continua valendo
+    p.desfazedor.desfazer()                                          # o Ctrl+Z dela continua valendo
     assert projeto.carregar_modelo(0).box(gid).entry.char != "Q"
+
+
+def test_o_lote_deixa_para_depois_a_pagina_com_um_f5_em_voo(ctl, projeto, com_servidor,
+                                                             monkeypatch):
+    """CA-Q-C2: com o servidor, o lote grava pela fila da interface, fora do executor. Um F5
+    da página aberta já leu e espera o `pronto`; o lote que termina a mesma página nesse meio
+    a deixa para reler depois (vale o comando do usuário), e o Ctrl+Z do F5 volta à página de
+    antes dele, sem desfazer nem misturar uma leitura do lote."""
+    from abbychess import lote
+    from tests.servidor_falso import entregar
+
+    _servidor, fila = com_servidor
+    p = ctl.pagina
+    gid = p.gids[0]
+    antes = p.box(gid).char
+    p.leitura.reconhecer()
+    fim_do_f5 = ctl.executor.comecar()                    # o F5 leu; o pronto não veio
+    ler_pagina = lote.sl.ler_pagina
+
+    def outra_leitura(*args, **kwargs):                  # o lote acha outra letra no 1º glifo
+        lida = ler_pagina(*args, **kwargs)
+        lida.boxes[0].char = "W"
+        return lida
+
+    monkeypatch.setattr(lote.sl, "ler_pagina", outra_leitura)
+    ctl.reconhecer([0], refazer=True)
+    entregar(fila, esperar_por=1)
+    fim_do_f5()
+    ctl.executor.tudo()
+    assert ctl.fins[-1].reler_depois == [0] and ctl.fins[-1].lidas == []
+    assert p.box(gid).char != "W"
+    p.desfazedor.desfazer()
+    assert p.box(gid).char == antes
+    projeto.paginas_em_memoria.descarregar(10)
+    assert ProjetoDeLivro.abrir(projeto.pasta).carregar_modelo(0).box(gid).entry.char == antes
 
 
 def test_a_procedencia_volta_do_servidor_com_a_leitura(ctl, projeto, com_servidor):
@@ -328,7 +399,7 @@ def test_a_procedencia_volta_do_servidor_com_a_leitura(ctl, projeto, com_servido
     servidor, fila = com_servidor
     p = ctl.pagina
     p.escolher(p.gids[0])
-    p.ensinar("a")                                        # o padrão vai ao servidor
+    p.leitura.ensinar("a")                                        # o padrão vai ao servidor
     ctl.executor.tudo()
     ctl.reconhecer([1], refazer=True)
     entregar(fila, esperar_por=1)
@@ -350,17 +421,17 @@ def test_o_glifo_aguardando_que_volta_no_refazer_e_lido_e_o_desfazer_vale(ctl, p
     p.marcar(b.x1 - 1, b.y1 - 1, b.x2 + 1, b.y2 + 1)
     gid = p.atual
     assert pg.aguardando(p.box(gid))
-    p.desfazer()                                          # antes de a leitura chegar
-    p.refazer()
+    p.desfazedor.desfazer()                                          # antes de a leitura chegar
+    p.desfazedor.refazer()
     assert pg.aguardando(p.box(gid))
     entregar(fila, esperar_por=1)                         # a leitura do primeiro pedido
     assert p.box(gid).char == "x"
     assert p.historico.proximo_a_desfazer == "Marcar glifo"
     recusas = []
     p.eventos.ligar("recusa", lambda refazer, texto: recusas.append(texto))
-    p.desfazer()                                          # a leitura não impede o desfazer
+    p.desfazedor.desfazer()                                          # a leitura não impede o desfazer
     assert not recusas and gid not in p.gids and len(p.gids) == antes
-    p.refazer()
+    p.desfazedor.refazer()
     entregar(fila, esperar_por=1)
     assert p.box(gid).char == "x"
 
@@ -374,7 +445,7 @@ def test_abrir_a_pagina_com_aguardando_le_fora_do_desfazer(ctl, projeto, com_ser
     p = ctl.pagina
     p.escolher(p.gids[0])
     p.corrigir("k")
-    p.desfazer()                                          # algo para refazer
+    p.desfazedor.desfazer()                                          # algo para refazer
     pagina = projeto.carregar_modelo(1)
     pagina.boxes = [replace(b, entry=replace(b.entry, char="", source="", confidence=0.0))
                     if k == 0 else b for k, b in enumerate(pagina.boxes)]
@@ -385,6 +456,67 @@ def test_abrir_a_pagina_com_aguardando_le_fora_do_desfazer(ctl, projeto, com_ser
     assert p.historico.proximo_a_refazer == "Corrigir para 'k'"     # o refazer ficou
 
 
+def _marcado_aguardando(p):
+    """Marca de novo o primeiro glifo da página aberta, que fica aguardando o servidor (a
+    interface só com os padrões); devolve o gid dele."""
+    from abbychess import pagina as pg
+
+    p.leitor.aguardar = True
+    p.leitor.ocr = None
+    b = p.box(p.gids[0])
+    p.marcar(b.x1 - 1, b.y1 - 1, b.x2 + 1, b.y2 + 1)
+    assert pg.aguardando(p.box(p.atual))
+    return p.atual
+
+
+def test_a_leitura_do_aguardando_entra_no_marcar_e_o_refazer_o_traz_lido(ctl, projeto,
+                                                                          com_servidor):
+    from tests.servidor_falso import entregar
+
+    servidor, fila = com_servidor
+    p = ctl.pagina
+    gid = _marcado_aguardando(p)
+    entregar(fila, esperar_por=1)
+    assert p.box(gid).char == "x"
+    pedidos = len(servidor.pedidos)
+    p.desfazedor.desfazer()
+    p.desfazedor.refazer()
+    assert p.box(gid).char == "x" and len(servidor.pedidos) == pedidos   # sem pedir de novo
+
+
+def test_a_leitura_do_aguardando_nao_passa_por_cima_da_correcao(ctl, projeto, com_servidor):
+    from tests.servidor_falso import entregar
+
+    servidor, fila = com_servidor
+    p = ctl.pagina
+    gid = _marcado_aguardando(p)
+    p.corrigir("k")                                       # antes de a leitura chegar
+    entregar(fila, esperar_por=1)
+    assert p.box(gid).char == "k"
+    assert p.historico.proximo_a_desfazer == "Corrigir para 'k'"
+
+
+def test_a_leitura_do_aguardando_que_falha_deixa_o_glifo_aguardando(ctl, projeto, com_servidor,
+                                                                     monkeypatch, caplog):
+    import logging
+
+    from abbychess import pagina as pg
+    from abbychess import servidor_de_leitura as sl
+    from tests.servidor_falso import entregar
+
+    def falhar(*_a, **_k):
+        raise RuntimeError("o modelo não carregou")
+
+    servidor, fila = com_servidor
+    monkeypatch.setattr(sl, "ler_recortes", falhar)
+    p = ctl.pagina
+    with caplog.at_level(logging.WARNING, logger="abbychess.ponte_de_leitura"):
+        gid = _marcado_aguardando(p)
+        entregar(fila, esperar_por=1)
+    assert pg.aguardando(p.box(gid)) and not p.leitura.lendo
+    assert any("o modelo não carregou" in r.getMessage() for r in caplog.records)
+
+
 def test_com_o_servidor_parado_os_comandos_avisam_e_nao_leem(ctl, projeto, com_servidor):
     servidor, fila = com_servidor
     p = ctl.pagina
@@ -392,8 +524,8 @@ def test_com_o_servidor_parado_os_comandos_avisam_e_nao_leem(ctl, projeto, com_s
     p.eventos.ligar("mensagem", lambda texto, ms: mensagens.append(texto))
     servidor.desistiu = True
     pedidos = len(servidor.pedidos)
-    p.reconhecer()
-    p.reler_pendentes()
+    p.leitura.reconhecer()
+    p.leitura.reler_pendentes()
     assert len(servidor.pedidos) == pedidos and not ctl.executor.fila
     assert sum("Reabra o projeto" in m for m in mensagens) == 2
 
@@ -405,7 +537,7 @@ def test_o_lote_sincrono_de_centenas_de_paginas_nao_aninha_a_pilha(projeto, monk
     from abbychess import servidor_de_leitura as sl
 
     monkeypatch.setattr(lote.sl, "ler_pagina", lambda *a, **k: sl.PaginaLida([], [], [], None))
-    monkeypatch.setattr(projeto, "guardar_antes_do_lote", lambda pagina: None)   # o disco, não
+    monkeypatch.setattr(projeto.antes_do_lote, "guardar", lambda pagina: None)   # o disco, não
     pagina = ControladorDePagina(Eventos())
     pagina.ligar(projeto, pg.FonteDePaginas(projeto.fonte),
                  LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
@@ -432,7 +564,7 @@ def test_voltar_ao_antes_do_lote_durante_a_releitura_nao_e_sobrescrito(ctl, proj
 
 
 def test_o_que_falta_retomar_fica_no_projeto_e_volta_ao_reabrir(ctl, projeto):
-    from abbychess.controladores import ARQUIVO_DO_LOTE
+    from abbychess.controlador_do_livro import ARQUIVO_DO_LOTE
 
     ctl.reconhecer([0, 1, 2], refazer=True)
     fim = ctl.executor.comecar()
@@ -442,7 +574,7 @@ def test_o_que_falta_retomar_fica_no_projeto_e_volta_ao_reabrir(ctl, projeto):
     arquivo = projeto.pasta / ARQUIVO_DO_LOTE
     # Por pid desde a v3 (§12.4): no projeto novo, o pid da página é a posição dela.
     assert json.loads(arquivo.read_text(encoding="utf-8")) == {
-        "paginas": [projeto.pid_da_pagina(1), projeto.pid_da_pagina(2)], "refazer": True,
+        "paginas": [projeto.ordem.pid_em(1), projeto.ordem.pid_em(2)], "refazer": True,
         "reler_depois": [], "pids": True}
     p = ctl.pagina                                        # reabre o projeto
     ctl.usar(projeto, p.fonte, p.leitor)
@@ -451,6 +583,30 @@ def test_o_que_falta_retomar_fica_no_projeto_e_volta_ao_reabrir(ctl, projeto):
     ctl.executor.tudo()
     assert ctl.fins[-1].lidas == [1, 2]
     assert not arquivo.exists() and ctl.restante is None
+
+
+def test_o_lote_a_retomar_gravado_por_posicao_volta_sem_as_de_fora_do_livro(ctl, projeto):
+    """O `lote.json` da v2 é por posição (sem "pids"): as páginas fora do livro saem."""
+    from abbychess.controlador_do_livro import ARQUIVO_DO_LOTE
+
+    (projeto.pasta / ARQUIVO_DO_LOTE).write_text(json.dumps(
+        {"paginas": [1, 2, 7], "refazer": False, "reler_depois": [0, 9]}), encoding="utf-8")
+    p = ctl.pagina                                        # reabre o projeto
+    ctl.usar(projeto, p.fonte, p.leitor)
+    assert ctl.restante == ([1, 2], False) and ctl.reler_depois == [0] and ctl.pode_retomar
+
+
+def test_o_lote_a_retomar_ilegivel_nao_impede_abrir(ctl, projeto, caplog):
+    import logging
+
+    from abbychess.controlador_do_livro import ARQUIVO_DO_LOTE
+
+    (projeto.pasta / ARQUIVO_DO_LOTE).write_text('{"paginas": [1', encoding="utf-8")
+    p = ctl.pagina
+    with caplog.at_level(logging.WARNING, logger="abbychess.controlador_do_livro"):
+        ctl.usar(projeto, p.fonte, p.leitor)
+    assert ctl.restante is None and ctl.reler_depois == [] and not ctl.pode_retomar
+    assert any("não abriu" in r.getMessage() for r in caplog.records)
 
 
 def test_o_servidor_que_desiste_para_o_lote_e_retomar_vale_ao_reabrir(ctl, projeto,
@@ -483,7 +639,7 @@ def test_g1_fechar_com_o_lote_ativo_guarda_o_ponto_e_nao_rele_nada(ctl, projeto,
                                                                   com_servidor):
     """Rodada 3: fechar no meio do lote (a resposta da página em curso nunca chega à janela)
     deixa em `lote.json` só o que falta; um arquivo de um lote anterior não volta."""
-    from abbychess.controladores import ARQUIVO_DO_LOTE
+    from abbychess.controlador_do_livro import ARQUIVO_DO_LOTE
     from tests import servidor_falso
 
     servidor, fila = com_servidor
@@ -571,7 +727,7 @@ def test_retomar_com_reler_depois_nao_rele_o_que_o_lote_mandou_pular(ctl, projet
 
 
 def test_o_f5_tira_a_pagina_de_reler_depois(ctl, projeto):
-    from abbychess.controladores import ARQUIVO_DO_LOTE
+    from abbychess.controlador_do_livro import ARQUIVO_DO_LOTE
 
     p = ctl.pagina
     ctl.reconhecer([0], refazer=False)
@@ -581,7 +737,7 @@ def test_o_f5_tira_a_pagina_de_reler_depois(ctl, projeto):
     ctl.reconhecer([0], refazer=True)
     ctl.executor.tudo()
     assert ctl.reler_depois == [0] and (projeto.pasta / ARQUIVO_DO_LOTE).exists()
-    p.reconhecer()                                        # o F5 a releu
+    p.leitura.reconhecer()                                        # o F5 a releu
     ctl.executor.tudo()
     assert ctl.reler_depois == [] and not (projeto.pasta / ARQUIVO_DO_LOTE).exists()
 
@@ -619,7 +775,7 @@ def test_o_gravador_do_lote_fica_com_o_mais_novo_e_apaga(tmp_path, monkeypatch):
     import threading
 
     from abbychess import gravacao as gv
-    from abbychess.controladores import _GravadorDoLote
+    from abbychess.controlador_do_livro import _GravadorDoLote
 
     arquivo = tmp_path / "lote.json"
     liberar = threading.Event()
@@ -639,3 +795,15 @@ def test_o_gravador_do_lote_fica_com_o_mais_novo_e_apaga(tmp_path, monkeypatch):
     gravador.gravar(arquivo, None)                        # o lote acabou: o arquivo sai
     gravador.esperar()
     assert not arquivo.exists()
+
+
+def test_a_pagina_lida_pelo_lote_ganha_as_areas_automaticas(projeto):
+    """A página sem área nenhuma sai do lote com as automáticas (o título chega ao
+    Documento e ao sumário sem abrir o modo Áreas)."""
+    from tests.ajudantes import _ensinar_e_ler  # noqa: E402,F401,F811
+
+    leitor = LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
+    _ensinar_e_ler(projeto, pg.FonteDePaginas(projeto.fonte), leitor)   # o lote, sem janela
+    pagina = projeto.carregar_modelo(0)
+    assert any(b.entry.char for b in pagina.boxes)
+    assert pagina.zonas and all(z.automatica for z in pagina.zonas)

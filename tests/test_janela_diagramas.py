@@ -23,8 +23,8 @@ from abbychess.app.janela import JanelaPrincipal  # noqa: E402
 from abbychess.leitor import LeitorDoLivro  # noqa: E402
 from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
-from tests.test_diagramas import FEN, pagina_com_diagrama, sem_modelo  # noqa: E402
-from tests.test_janela import _esperar  # noqa: E402
+from tests.ajudantes import FEN, pagina_com_diagrama, sem_modelo  # noqa: E402,F401,F811
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
 pytestmark = sem_modelo
@@ -76,8 +76,8 @@ def test_reconhecer_le_o_diagrama_e_poe_o_fen_no_texto(app, janela):
     assert d.lado is None
     texto = _texto(janela)
     assert f"[Diagrama 1: {FEN} w - - 0 1 — brancas a jogar (assumido: a página não diz)" in texto
-    janela.projeto.descarregar()
-    gravado = json.loads(janela.projeto._arquivo_da_pagina(0).read_text(encoding="utf-8"))
+    janela.projeto.paginas_em_memoria.descarregar()
+    gravado = json.loads(janela.projeto.arquivo_da_pagina(0).read_text(encoding="utf-8"))
     assert gravado["diagramas"][0]["fen"] == d.fen
 
 
@@ -165,20 +165,27 @@ def test_conferencia_sobrevive_a_reabrir_e_a_reconhecer(app, janela):
 
 
 def test_pagina_antiga_le_o_diagrama_no_primeiro_clique(app, janela):
-    """Página gravada antes da leitura: só as caixas; o clique lê e abre."""
-    imagem = janela.pagina.imagem
-    segmentada = pg.segmentar_pagina(imagem)
-    arquivo = janela.projeto.pasta / "paginas" / "0001.json"
-    arquivo.write_text(json.dumps({"pagina": 1, "boxes": [],
-                                   "tabuleiros": [list(t) for t in segmentada.tabuleiros]}),
-                       encoding="utf-8")
-    janela.ir_para_pagina(0)
-    assert len(janela.pagina.tabuleiros) == 1 and not janela.pagina.diagramas[0].lido
-    assert "[Diagrama 1: ainda não lido]" in _texto(janela)
+    """Página gravada antes da leitura, no formato v1 (só as caixas): ela migra quando o
+    projeto abre (SPEC-qualidade Q-P1), e o clique lê o diagrama e abre."""
+    segmentada = pg.segmentar_pagina(janela.pagina.imagem)
+    pasta = janela.projeto.pasta
+    (pasta / "paginas" / "0001.json").write_text(
+        json.dumps({"pagina": 1, "boxes": [],
+                    "tabuleiros": [list(t) for t in segmentada.tabuleiros]}), encoding="utf-8")
+    projeto = ProjetoDeLivro.abrir(pasta)
+    reaberta = JanelaPrincipal()
+    reaberta.usar(projeto, pg.FonteDePaginas(projeto.fonte),
+                  LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
+    try:
+        reaberta.ir_para_pagina(0)
+        assert len(reaberta.pagina.tabuleiros) == 1 and not reaberta.pagina.diagramas[0].lido
+        assert "[Diagrama 1: ainda não lido]" in _texto(reaberta)
 
-    dialogo = _clicar_no_diagrama(app, janela)
-    assert dialogo.fen.text() == FEN + " w - - 0 1"
-    assert janela.pagina.diagramas[0].lido
+        dialogo = _clicar_no_diagrama(app, reaberta)
+        assert dialogo.fen.text() == FEN + " w - - 0 1"
+        assert reaberta.pagina.diagramas[0].lido
+    finally:
+        reaberta.close()
 
 
 def test_lote_le_o_diagrama_e_a_pagina_nao_fica_por_ler(app, janela, monkeypatch):
@@ -188,7 +195,7 @@ def test_lote_le_o_diagrama_e_a_pagina_nao_fica_por_ler(app, janela, monkeypatch
     monkeypatch.setattr(QInputDialog, "getText", lambda *a, **k: ("1", True))
     janela.reconhecer_livro()
     _esperar(app, janela)
-    assert janela.projeto.paginas_lidas() == [0]
+    assert janela.projeto.resumo.paginas_lidas() == [0]
     [d] = janela.pagina.diagramas
     assert d.lido and d.fen == FEN + " w - - 0 1" and d.lado is None
     texto = _texto(janela)
@@ -237,11 +244,11 @@ def test_corrigir_a_legenda_muda_o_lado_sem_f5_e_desfaz_junto(app, janela_com_le
     assert d.casas == casas and d.fen == FEN + " b - - 0 1"
     assert "pretas a jogar (da legenda)" in _texto(janela)
 
-    p.desfazer()
+    p.desfazedor.desfazer()
     _esperar(app, janela)
     assert p.diagramas[0].lado is None
     assert "(assumido: a página não diz)" in _texto(janela)
-    p.refazer()
+    p.desfazedor.refazer()
     _esperar(app, janela)
     assert p.diagramas[0].lado == "b"
 
@@ -267,7 +274,7 @@ def _texto(janela) -> str:
 
 def test_a_conferencia_valida_pelos_lances_e_oferece_o_roque_inferido(app):
     from abbychess import lances as lc
-    from tests.test_diagramas import _lido
+    from tests.ajudantes import _lido  # noqa: E402,F401,F811
 
     linha = lc.primeira_linha("12.O-O-O Cxd4 13.Cxd4", "pt")
     dialogo = dd.EditorDeDiagrama()
@@ -320,7 +327,7 @@ def test_pgdn_na_ponta_do_livro_avisa_e_fica(app, janela):
 def test_estado_e_filtros_da_aba():
     from abbychess import lances as lc
     from abbychess.app import painel_diagramas as pd
-    from tests.test_diagramas import _lido
+    from tests.ajudantes import _lido  # noqa: E402,F401,F811
 
     lido, conferido = _lido(), replace(_lido(), conferido=True)
     duvidoso = replace(_lido(), motivo="casa duvidosa")
@@ -384,3 +391,41 @@ def test_ctrl_z_sem_casa_editada_desfaz_a_conferencia_e_o_editor_acompanha(app, 
     _esperar(app, janela)
     assert not janela.pagina.diagramas[0].conferido
     assert editor.aberto and not editor.diagrama.conferido     # sincronizado, não fechado
+
+def test_o_editor_cabe_no_inspetor_de_1366_com_a_casa_de_32(app):
+    """CA-3.2 (a cláusula do tabuleiro, verificada no passo H): a casa do tabuleiro do
+    Inspetor tem ≥ 32 px, e o editor inteiro cabe nos 296 px do Inspetor em 1366 (nada
+    cortado: a coluna h, os botões, a paleta). O lado a jogar vem antes do FEN e da paleta,
+    à vista sem rolar."""
+    from PySide6.QtGui import QFont
+
+    fonte = app.font()
+    app.setFont(QFont("Segoe UI", 9))                     # a fonte que o Windows dá ao programa
+    try:
+        editor = dd.EditorDeDiagrama()
+        largura = editor.minimumSizeHint().width()
+    finally:
+        app.setFont(fonte)
+    assert dd.LADO_CASA >= 32 and editor.posicao.width() == 8 * dd.LADO_CASA
+    # 296 px menos as margens do Inspetor e a barra de rolagem (a revisão de produto viu
+    # ~8 px cortados quando o editor pedia os 296 inteiros).
+    assert largura <= 270, largura
+    corpo = editor.layout()
+    posicoes = {corpo.itemAt(k).widget(): k for k in range(corpo.count())
+                if corpo.itemAt(k).widget() is not None}
+    assert posicoes[editor.grupo_do_lado] < posicoes[editor.avisos]
+
+
+def test_o_lado_dos_lances_nao_ganha_o_aviso_de_brancas_assumidas(app):
+    """Com o lado do número do lance, o editor não repete o "o FEN assume brancas" do core:
+    o FEN está com o lado dos lances, e o grupo do lado o diz."""
+    from core.tabuleiro_edicao import AVISO_CONVENCAO
+
+    from abbychess import lances as lc
+    from tests.ajudantes import _lido  # noqa: E402,F401,F811
+
+    d = replace(_lido(), lado="b", lado_origem=lc.LADO_DOS_LANCES, lado_trecho="10...Rf8")
+    editor = dd.EditorDeDiagrama()
+    editor.abrir([d], 0)
+    assert editor.tabuleiro().lado == "b"
+    assert AVISO_CONVENCAO not in editor.avisos_do_diagrama()

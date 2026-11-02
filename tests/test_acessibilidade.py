@@ -141,4 +141,4 @@ def test_padroes_vazios_explicam_como_ensinar(app):
 
     painel = PainelDePadroes()
     painel.atualizar({})
-    assert painel.resumo.text() == vazios.SEM_PADROES
+    assert painel.resumo.text() == vazios.sem_padroes()

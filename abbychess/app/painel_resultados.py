@@ -50,6 +50,8 @@ class _DelegadoHtml(QStyledItemDelegate):
     def _documento(self, option, index) -> QTextDocument:
         documento = QTextDocument()
         documento.setDefaultFont(option.font)
+        # A cor pela classe, lida do tema na hora de pintar: o HTML guardado não a fixa.
+        documento.setDefaultStyleSheet(f".local {{ color: {estilo.hex_de('texto_secundario')} }}")
         documento.setHtml(index.data(PAPEL_DO_HTML) or html.escape(index.data() or ""))
         return documento
 
@@ -230,8 +232,7 @@ class PainelDeResultados(QTabWidget):
             depois = o.trecho[o.coluna + tamanho:o.coluna + tamanho + 60]
             local = f"p. {o.pagina + 1}, l. {o.linha}"
             item = QListWidgetItem(f"{local}: {antes}{casado}{depois}")
-            secundario = estilo.hex_de("texto_secundario")
-            item.setData(PAPEL_DO_HTML, f"<span style='color:{secundario}'>{local}:</span> "
+            item.setData(PAPEL_DO_HTML, f"<span class='local'>{local}:</span> "
                                         f"{html.escape(antes)}<b>{html.escape(casado)}</b>"
                                         f"{html.escape(depois)}")
             item.setData(PAPEL_DO_ALVO, o)
@@ -247,24 +248,6 @@ class PainelDeResultados(QTabWidget):
         lugar = lugar_do_aviso(item.toolTip() or item.text())
         if lugar is not None:
             self.aviso_escolhido.emit(*lugar)
-
-    def mostrar_glifos(self, glifos: Sequence, cabecalho: str, nomes=None) -> None:
-        """Os glifos da busca por glifo (até a Galeria do passo C); `nomes`, o nome de cada
-        grupo de fonte."""
-        from abbychess import busca as bs
-
-        self._limpar()
-        self.resultados.addItem(cabecalho)
-        for g in glifos[:LIMITE_DE_LINHAS]:
-            grupo = bs.grupo_da_fonte(g.fonte)
-            fonte = (nomes or {}).get(grupo, grupo)
-            item = QListWidgetItem(f"p. {g.pagina + 1}: '{g.char or '□'}', {fonte.lower()}, "
-                                   f"confiança {g.confianca:.2f}")
-            item.setData(PAPEL_DO_ALVO, g)
-            self.resultados.addItem(item)
-        if len(glifos) > LIMITE_DE_LINHAS:
-            self.resultados.addItem(f"… e mais {len(glifos) - LIMITE_DE_LINHAS}")
-        self.setCurrentWidget(self.aba_de_resultados)
 
     def ir_aos_avisos(self) -> None:
         self.setCurrentWidget(self.avisos)
@@ -376,11 +359,20 @@ class _VistaDaPrevia(QListView):
                 self._painel._aplicar()
             return
         if tecla == Qt.Key.Key_Space:
-            linhas = sorted({i.row() for i in self.selectedIndexes()}
-                            or ({self.currentIndex().row()} if self.currentIndex().isValid()
-                                else set()))
-            modelo = self._painel.modelo_da_previa
-            marcados = [modelo._marcas[k] for k in linhas if modelo.caso(k).aplicavel]
-            modelo.marcar(linhas, not all(marcados) if marcados else True)
+            self._alternar_as_marcas()
             return
         super().keyPressEvent(evento)
+
+    def _alternar_as_marcas(self) -> None:
+        """Espaço: os casos escolhidos ficam todos desmarcados se todos os que se aplicam
+        estavam marcados; senão, todos marcados."""
+        linhas = self._linhas_escolhidas()
+        modelo = self._painel.modelo_da_previa
+        marcados = [modelo._marcas[k] for k in linhas if modelo.caso(k).aplicavel]
+        modelo.marcar(linhas, not all(marcados) if marcados else True)
+
+    def _linhas_escolhidas(self) -> list:
+        """As linhas selecionadas, em ordem; sem seleção, a atual (se há)."""
+        return sorted({i.row() for i in self.selectedIndexes()}
+                      or ({self.currentIndex().row()} if self.currentIndex().isValid()
+                          else set()))

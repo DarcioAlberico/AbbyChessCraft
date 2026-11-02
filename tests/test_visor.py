@@ -27,8 +27,9 @@ from abbychess.app.janela import JanelaPrincipal  # noqa: E402
 from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL, FONTE_NENHUMA, LeitorDoLivro  # noqa: E402
 from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
+from tests.ajudantes import esperar  # noqa: E402
 from tests.janela_util import boxes, mostrar  # noqa: E402
-from tests.test_janela import _esperar  # noqa: E402
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 
 
 @pytest.fixture(scope="module")
@@ -71,18 +72,6 @@ def test_cada_estado_tem_traco_distinto():
 # ----------------------------------------------------------------------
 # O cache de páginas e as visitas
 # ----------------------------------------------------------------------
-
-@pytest.fixture
-def pdf_de_60_paginas(tmp_path):
-    import fitz
-
-    caminho = tmp_path / "sessenta.pdf"
-    with fitz.open() as doc:
-        for k in range(60):
-            pagina = doc.new_page(width=200, height=300)
-            pagina.insert_text((20, 40), f"Pagina {k + 1}", fontsize=14)
-        doc.save(str(caminho))
-    return caminho
 
 
 def test_cache_guarda_as_ultimas_e_pre_carrega(pdf_de_60_paginas):
@@ -198,7 +187,7 @@ def test_os_modos_de_zoom(app, janela_de_60):
 
 @pytest.fixture
 def janela(app, tmp_path, monkeypatch):
-    from tests.test_treino_por_livro import _pagina_sintetica
+    from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
     monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Teste",
@@ -250,7 +239,7 @@ def test_seguir_deixa_o_item_atual_a_120_px_da_borda(app, janela):
     janela.visor.definir_zoom(3.0)
     assert janela.acao_seguir.isChecked()
     for _ in range(4):
-        janela.pagina.andar(+1)
+        janela.pagina.fila_da_pagina.andar(+1)
         b = boxes(janela)[janela.pagina.indice_de(janela.pagina.atual)]
         topo = janela.visor.mapFromScene(b.x1, b.y1)
         fundo = janela.visor.mapFromScene(b.x2, b.y2)
@@ -261,13 +250,13 @@ def test_seguir_deixa_o_item_atual_a_120_px_da_borda(app, janela):
 
 def test_f8_vai_ao_proximo_diagrama_por_conferir_do_livro(app, tmp_path, monkeypatch):
     from abbychess import diagramas as dg
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
     modelo = projeto.pagina_para_editar(2)
     modelo.tabuleiros = [(10, 10, 210, 210)]
-    projeto.agendar(modelo)
+    projeto.paginas_em_memoria.agendar(modelo)
     j = _janela(projeto)
     try:
         abertas = []
@@ -331,7 +320,7 @@ def test_seguir_desligado_nao_move_a_vista(app, janela):
     barra_h.setValue(0)
     barra_v.setValue(0)
     for _ in range(4):
-        janela.pagina.andar(+1)
+        janela.pagina.fila_da_pagina.andar(+1)
     assert (barra_h.value(), barra_v.value()) == (0, 0)
 
 
@@ -424,14 +413,14 @@ def test_visitas_cortam_o_que_vinha_depois_ao_navegar_no_meio(app, janela_de_60)
     p = janela_de_60.pagina
     for k in (3, 10, 20):
         p.ir_para(k)
-    p.voltar_visita()
-    p.voltar_visita()                                  # em 3, com 10 e 20 adiante
+    p.navegador.voltar_visita()
+    p.navegador.voltar_visita()                                  # em 3, com 10 e 20 adiante
     p.ir_para(40)                                      # navegar corta o adiante
-    assert not p.pode_avancar and p.visitas[-2:] == [3, 40]
+    assert not p.navegador.pode_avancar and p.navegador.visitas[-2:] == [3, 40]
 
 
 def test_ligar_outro_projeto_troca_o_cache(app, janela_de_60, tmp_path):
-    from tests.test_treino_por_livro import _pagina_sintetica
+    from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
     antigo = janela_de_60.pagina.cache
     outro = ProjetoDeLivro.criar(tmp_path / "outros", "Outro",
@@ -440,6 +429,153 @@ def test_ligar_outro_projeto_troca_o_cache(app, janela_de_60, tmp_path):
                       LeitorDoLivro(outro.pasta_de_padroes))
     assert janela_de_60.pagina.cache is not antigo
     assert janela_de_60.pagina.cache.fonte is janela_de_60.pagina.fonte
+
+
+# ----------------------------------------------------------------------
+# O cursor sobre as áreas e os menus do botão direito
+# ----------------------------------------------------------------------
+
+def _no_editor_de_areas_com_uma_area(app, janela, caixa=(100, 50, 500, 200)):
+    """O editor de áreas ligado, com uma área só (a desenhada, que fica escolhida), a página a
+    100% no canto da vista."""
+    from PySide6.QtCore import QPointF
+
+    janela.show()
+    janela.acao_areas.setChecked(True)
+    janela.modo_areas(True)
+    _esperar(app, janela)
+    for _ in list(janela.areas.zonas):
+        janela.areas.apagar(0)
+    janela.visor.resetTransform()
+    janela.visor.horizontalScrollBar().setValue(0)
+    janela.visor.verticalScrollBar().setValue(0)
+    x1, y1, x2, y2 = caixa
+    janela.visor.soltar_area(QPointF(x1, y1), QPointF(x2 - 1, y2 - 1))
+    app.processEvents()
+    assert [z.caixa for z in janela.areas.zonas] == [caixa] and janela.areas.atual == 0
+
+
+def _cursor_em(visor, x, y):
+    """A forma do cursor com o mouse parado no ponto (x, y) da página."""
+    QTest.mouseMove(visor.viewport(), visor.mapFromScene(x, y))
+    return visor.viewport().cursor().shape()
+
+
+def test_o_cursor_sobre_a_area_diz_o_que_o_arraste_vai_fazer(app, janela):
+    """No editor de áreas, o cursor sobre a área escolhida: nos cantos, a seta diagonal; nas
+    bordas, a horizontal ou a vertical; no miolo, a de mover; fora, a cruz de desenhar."""
+    _no_editor_de_areas_com_uma_area(app, janela)
+    visor = janela.visor
+    forma = Qt.CursorShape
+    assert _cursor_em(visor, 100, 50) == forma.SizeFDiagCursor        # esquerda e cima
+    assert _cursor_em(visor, 500, 200) == forma.SizeFDiagCursor       # direita e baixo
+    assert _cursor_em(visor, 500, 50) == forma.SizeBDiagCursor        # direita e cima
+    assert _cursor_em(visor, 100, 200) == forma.SizeBDiagCursor       # esquerda e baixo
+    assert _cursor_em(visor, 100, 120) == forma.SizeHorCursor
+    assert _cursor_em(visor, 500, 120) == forma.SizeHorCursor
+    assert _cursor_em(visor, 300, 50) == forma.SizeVerCursor
+    assert _cursor_em(visor, 300, 200) == forma.SizeVerCursor
+    assert _cursor_em(visor, 300, 120) == forma.SizeAllCursor         # o miolo move
+    assert _cursor_em(visor, 800, 240) == forma.CrossCursor           # fora: área nova
+    janela.areas.escolher(-1)                     # sem área escolhida, a borda não estica
+    app.processEvents()
+    assert _cursor_em(visor, 100, 120) == forma.SizeAllCursor
+    assert _cursor_em(visor, 800, 240) == forma.CrossCursor
+
+
+def _botao_direito(app, visor, x, y, *, escolher=None, razao=None):
+    """O botão direito no ponto (x, y) da página: devolve os textos do menu que abriu (None
+    se nenhum abriu) e, com `escolher`, aciona a opção que começa com esse texto."""
+    from PySide6.QtCore import QTimer
+    from PySide6.QtGui import QContextMenuEvent
+
+    vistos = []
+
+    def ler_e_fechar():
+        menu = QApplication.activePopupWidget()
+        if menu is None:
+            return
+        vistos.append([a.text() for a in menu.actions() if not a.isSeparator()])
+        if escolher is not None:
+            next(a for a in menu.actions() if a.text().startswith(escolher)).trigger()
+        menu.close()
+
+    QTimer.singleShot(0, ler_e_fechar)
+    ponto = visor.mapFromScene(x, y)
+    razao = QContextMenuEvent.Reason.Mouse if razao is None else razao
+    QApplication.sendEvent(visor.viewport(), QContextMenuEvent(
+        razao, ponto, visor.viewport().mapToGlobal(ponto)))
+    app.processEvents()
+    return vistos[0] if vistos else None
+
+
+def test_o_botao_direito_num_box_o_escolhe_e_junta_com_o_seguinte(app, janela):
+    janela.show()
+    janela.visor.resetTransform()
+    app.processEvents()
+    primeiro, segundo = boxes(janela)[3], boxes(janela)[4]
+    total = len(boxes(janela))
+    textos = _botao_direito(app, janela.visor, (primeiro.x1 + primeiro.x2) / 2,
+                            (primeiro.y1 + primeiro.y2) / 2, escolher="Juntar com o seguinte")
+    assert textos == ["Dividir aqui", "Juntar com o anterior", "Juntar com o seguinte"]
+    assert len(boxes(janela)) == total - 1
+    junto = boxes(janela)[3]
+    assert (junto.x1, junto.x2) == (primeiro.x1, segundo.x2)
+    assert janela.pagina.indice_de(janela.pagina.atual) == 3          # o clicado é o atual
+
+
+def test_o_botao_direito_fora_dos_boxes_abre_o_zoom_e_a_origem(app, janela):
+    janela.show()
+    janela.visor.definir_zoom(2.0)
+    app.processEvents()
+    textos = _botao_direito(app, janela.visor, 5, 5, escolher="100%")
+    assert textos == ["Página inteira", "Largura da página", "100%", "Zoom no item atual",
+                      "Aproximar", "Afastar", "Mostrar a origem das leituras"]
+    assert janela.visor.escala() == pytest.approx(1.0)
+    assert len(boxes(janela)) == 15                                    # nada da página mudou
+
+
+def test_o_botao_direito_no_editor_de_areas_escolhe_a_area_e_muda_a_funcao(app, janela):
+    _no_editor_de_areas_com_uma_area(app, janela)
+    from PySide6.QtCore import QPointF
+
+    janela.visor.soltar_area(QPointF(100, 220), QPointF(499, 254))       # uma segunda área
+    app.processEvents()
+    assert janela.areas.atual == 1
+    textos = _botao_direito(app, janela.visor, 300, 120, escolher="Título")
+    assert textos[0].startswith("Texto") and textos[-1] == "Apagar área\tDel"
+    assert janela.areas.atual == 0
+    assert janela.projeto.carregar_zonas(0)[0].funcao == "titulo"
+    assert _botao_direito(app, janela.visor, 800, 240) is None         # fora das áreas: nada
+
+
+def test_as_teclas_da_area_escolhida_dao_o_tipo_a_funcao_e_a_apagam(app, janela):
+    """No editor de áreas, com o foco no visor: 1 a 4 dão o tipo da área escolhida, a letra
+    da função (H, título) a função, e Delete a apaga."""
+    from abbychess import zonas as zn
+
+    _no_editor_de_areas_com_uma_area(app, janela)
+    visor = janela.visor
+    visor.setFocus()
+    QTest.keyClick(visor, Qt.Key.Key_4)
+    assert janela.projeto.carregar_zonas(0)[0].tipo == zn.TIPOS[3]
+    QTest.keyClick(visor, Qt.Key.Key_H)
+    assert janela.projeto.carregar_zonas(0)[0].funcao == "titulo"
+    QTest.keyClick(visor, Qt.Key.Key_Delete)
+    assert janela.areas.zonas == [] and janela.projeto.carregar_zonas(0) == []
+
+
+def test_o_menu_pelo_teclado_no_visor_e_o_do_box_atual(app, janela):
+    """Shift+F10 e a tecla Menu (o `QContextMenuEvent` de teclado): o menu do box em revisão,
+    e não o do ponto do mouse."""
+    from PySide6.QtGui import QContextMenuEvent
+
+    janela.show()
+    janela.visor.resetTransform()
+    app.processEvents()
+    mostrar(janela, 2)
+    textos = _botao_direito(app, janela.visor, 5, 5, razao=QContextMenuEvent.Reason.Keyboard)
+    assert textos == ["Dividir aqui", "Juntar com o anterior", "Juntar com o seguinte"]
 
 
 def test_paint_desenha_o_traco_do_box_logo_fora_do_retangulo_exposto(app):
@@ -500,45 +636,33 @@ def test_zoom_vale_com_o_foco_no_campo_do_treino_e_o_v_nao(app, janela):
     assert "v" in janela.treino.campo.text().lower()
 
 
-def test_a_seguinte_e_pre_carregada_depois_da_pintura(app, janela_de_60, monkeypatch):
-    import time
-
+def test_a_seguinte_e_pre_carregada_depois_da_pintura(app, janela_de_60):
+    """A página seguinte chega ao cache das imagens sozinha, depois da pintura da aberta (o
+    relógio da janela), e não no `ir_para`: esperada a pré-carga em curso logo depois dele,
+    ela ainda não está lá."""
     j = janela_de_60
-    chamadas = []
-    monkeypatch.setattr(j.pagina.cache, "precarregar", chamadas.append)
+    cache = j.pagina.cache
+    assert not cache.tem(11)
     j.ir_para_pagina(10)
-    assert chamadas == []                                      # o ir_para não a dispara
-    fim = time.monotonic() + 2
-    while not chamadas and time.monotonic() < fim:             # o relógio da janela, sim
-        app.processEvents()
-        time.sleep(0.01)
-    assert chamadas == [11]
+    cache.esperar()                                            # o que o ir_para pediu, feito
+    assert not cache.tem(11)                                   # o ir_para não a dispara
+    assert esperar(lambda: cache.tem(11), 5)                   # o relógio da janela, sim
 
 
-def _ate_a_pre_carga(app, chamadas):
-    import time
-
-    fim = time.monotonic() + 2
-    while not chamadas and time.monotonic() < fim:
-        app.processEvents()
-        time.sleep(0.005)
-
-
-def test_a_pre_carga_segue_o_sentido_e_vem_ja_quem_folheia(app, janela_de_60, monkeypatch):
+def test_a_pre_carga_segue_o_sentido_e_vem_ja_quem_folheia(app, janela_de_60):
     """Depois de um PgUp, a anterior; trocas a menos de 1 s, a pré-carga sem esperar os
     150 ms (a página nunca vista chegava tarde a quem folheia, revisão de produto do A1)."""
     j = janela_de_60
-    chamadas = []
-    monkeypatch.setattr(j.pagina.cache, "precarregar", chamadas.append)
+    cache = j.pagina.cache
     j._ultima_troca = 0.0
     j.ir_para_pagina(20)
     assert j._pre_carga.interval() == 150                      # parado: depois da pintura
-    _ate_a_pre_carga(app, chamadas)
-    chamadas.clear()
+    assert esperar(lambda: cache.tem(21), 5)
+    assert not cache.tem(18)
     j.acao_anterior.trigger()                                  # PgUp logo depois
     assert j._pre_carga.interval() == 20
-    _ate_a_pre_carga(app, chamadas)
-    assert chamadas == [18] and j.pagina.proxima_provavel == 18
+    assert esperar(lambda: cache.tem(18), 5)                   # a anterior, e não a 20
+    assert j.pagina.navegador.proxima_provavel == 18
 
 
 def test_a_qimage_da_pagina_nasce_na_thread_que_renderiza(pdf_de_60_paginas):
@@ -580,10 +704,10 @@ def test_na_ponta_do_livro_a_pre_carga_vai_ao_outro_lado(app, janela_de_60):
     p = janela_de_60.pagina
     p.ir_para(5)
     p.ir_para(0)                                               # o Home: sentido para trás
-    assert p.proxima_provavel == 1
+    assert p.navegador.proxima_provavel == 1
     p.ir_para(58)
     p.ir_para(59)                                              # o End
-    assert p.proxima_provavel == 58
+    assert p.navegador.proxima_provavel == 58
 
 
 def test_a_medida_da_inclinacao_nao_segura_o_render_de_outra_pagina(pdf_de_60_paginas,
@@ -616,3 +740,69 @@ def test_a_medida_da_inclinacao_nao_segura_o_render_de_outra_pagina(pdf_de_60_pa
     assert pronta_antes                                        # não esperou a medida da 5
     assert cache.tem(5) and cache.tem(9)
     assert set(json.loads((tmp_path / pg.ARQUIVO_DE_INCLINACOES).read_text())) == {"5", "9"}
+
+
+# ----------------------------------------------------------------------
+# A prévia do arraste de uma área
+# ----------------------------------------------------------------------
+
+def _visor_com_tres_areas(app):
+    from PySide6.QtGui import QPixmap
+
+    from abbychess import zonas as zn
+    from abbychess.app.visor import VisorDePagina
+
+    visor = VisorDePagina()
+    visor.resize(900, 760)
+    visor.show()
+    visor.mostrar_pagina(QPixmap(800, 700))
+    visor.resetTransform()
+    visor.definir_modo_areas(True)
+    visor.mostrar_zonas([zn.Zona(zn.TEXTO, 50, 50, 300, 200, id="z0"),
+                         zn.Zona(zn.TEXTO, 50, 250, 300, 400, id="z1"),
+                         zn.Zona(zn.TEXTO, 50, 450, 300, 600, id="z2")], 0)
+    app.processEvents()
+    return visor
+
+
+def _arrastar_sem_soltar(visor, de, para):
+    """O botão esquerdo apertado em `de` e o mouse movido até `para` (pontos da página)."""
+    from PySide6.QtCore import QEvent, QPointF
+    from PySide6.QtGui import QMouseEvent
+
+    tela = visor.viewport()
+    QTest.mousePress(tela, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier,
+                     visor.mapFromScene(*de))
+    fim = visor.mapFromScene(*para)
+    QApplication.sendEvent(tela, QMouseEvent(
+        QEvent.Type.MouseMove, QPointF(fim), QPointF(tela.mapToGlobal(fim)),
+        Qt.MouseButton.NoButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier))
+
+
+def _o_que_se_ve(visor):
+    """Os retângulos das áreas (na página) e a posição de cada rótulo, pelo texto dele."""
+    from PySide6.QtWidgets import QGraphicsItem, QGraphicsRectItem, QGraphicsSimpleTextItem
+
+    solto = QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations
+    itens = visor.scene().items()
+    areas = sorted((r.rect().x(), r.rect().y(), r.rect().width(), r.rect().height())
+                   for r in itens if isinstance(r, QGraphicsRectItem) and not r.flags() & solto)
+    rotulos = {t.text(): (t.pos().x(), t.pos().y())
+               for t in itens if isinstance(t, QGraphicsSimpleTextItem)}
+    return areas, rotulos
+
+
+@pytest.mark.parametrize("area", [0, 1, 2])
+def test_arrastar_uma_area_mostra_ela_e_o_rotulo_onde_vao_ficar(app, area):
+    """Antes de soltar, a área arrastada é desenhada no lugar novo com o rótulo junto, e as
+    outras ficam onde estavam (o fundo do rótulo é um terceiro item de cada área)."""
+    visor = _visor_com_tres_areas(app)
+    topo = 50 + 200 * area
+    _arrastar_sem_soltar(visor, (175, topo + 75), (195, topo + 95))
+    app.processEvents()
+    areas, rotulos = _o_que_se_ve(visor)
+    esperadas = sorted((70.0 if k == area else 50.0, 50.0 + 200 * k + (20 if k == area else 0),
+                        250.0, 150.0) for k in range(3))
+    assert areas == esperadas
+    assert rotulos[f"{area + 1} Texto"] == (72.0, topo + 22.0)
+    visor.close()

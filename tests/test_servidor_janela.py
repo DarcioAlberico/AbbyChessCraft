@@ -18,9 +18,8 @@ from abbychess.app.janela import JanelaPrincipal
 
 from tests import leitor_falso
 from tests.janela_util import boxes
-from tests.test_janela import _esperar, app  # noqa: F401 (fixture)
-from tests.test_janela_persistencia import projeto_lido, sem_dialogos  # noqa: F401 (fixtures)
-from tests.test_livro import PAGINAS, pdf_sintetico
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
+from tests.ajudantes import PAGINAS, pdf_sintetico  # noqa: E402,F401,F811
 
 pytestmark = pytest.mark.processo
 
@@ -75,7 +74,7 @@ def test_o_glifo_marcado_fica_aguardando_e_recebe_a_leitura_do_servidor(app, jan
     marcado = p.box(gid)
     assert (marcado.char, marcado.source) == (leitor_falso.LETRA, leitor_falso.FONTE)
     assert not any(pg.aguardando(x) for x in p.boxes)
-    p.desfazer()                                               # o quadro e a leitura: um passo
+    p.desfazedor.desfazer()                                               # o quadro e a leitura: um passo
     assert len(boxes(janela)) == antes and p.historico.proxima_a_desfazer().descricao \
         == "Reconhecer a página"
 
@@ -85,11 +84,11 @@ def test_o_padrao_ensinado_vai_ao_servidor_antes_do_pedido_seguinte(app, janela)
     janela.reconhecer()
     _esperar(app, janela)
     p.escolher(p.gids[0])
-    p.ensinar("a")
+    p.leitura.ensinar("a")
     _esperar(app, janela)
     assert len(p.padroes()) == 1
     assert p.servidor.chamar("padroes", timeout=10) == 1        # CA-11.2: o delta chegou
-    p.desfazer()                                               # o desfazer apaga a amostra
+    p.desfazedor.desfazer()                                               # o desfazer apaga a amostra
     _esperar(app, janela)
     assert p.servidor.chamar("padroes", timeout=10) == 0
 
@@ -163,13 +162,13 @@ def test_ca_11_1_e_11_2_durante_o_lote_navegar_e_ensinar_valem_na_hora(app, jane
     j.reconhecer()                                       # a página 1, pelo servidor
     _esperar(app, j)
     j.livro.reconhecer(list(range(1, 51)), refazer=False)
-    _ate(app, lambda: len(p.projeto.paginas_lidas()) >= 3)
+    _ate(app, lambda: len(p.projeto.resumo.paginas_lidas()) >= 3)
     assert j.livro.lote_rodando and not j.executor.ocupado    # o lote não prende a fila
     p.escolher(p.gids[0])
-    p.ensinar("a")                                       # o primeiro glifo é um "a"
+    p.leitura.ensinar("a")                                       # o primeiro glifo é um "a"
     assert p.box(p.gids[0]).char == "a"                  # na hora, sem esperar o lote
     assert j.pagina.ir_para(1) and p.indice == 1         # navegar também
-    feitas_ao_ensinar = len(p.projeto.paginas_lidas())
+    feitas_ao_ensinar = len(p.projeto.resumo.paginas_lidas())
     # A busca também (passo B): as páginas que o lote já leu entram nela.
     j.localizar()
     j.barra_de_busca.campo.setText("x")
@@ -185,9 +184,9 @@ def test_ca_11_1_e_11_2_durante_o_lote_navegar_e_ensinar_valem_na_hora(app, jane
     assert feitas_ao_ensinar < 49
     assert any(b.entry.char == "a" and b.entry.source == "livro" for b in ultima.boxes)
     # CA-4.4: o livro.json é o recalculado, com as páginas que vieram do servidor.
-    assert p.projeto.descarregar(10)
+    assert p.projeto.paginas_em_memoria.descarregar(10)
     gravado = json.loads((p.projeto.pasta / "livro.json").read_text(encoding="utf-8"))
-    assert gravado == p.projeto.recalcular_livro()
+    assert gravado == p.projeto.resumo.recalcular()
 
 
 def test_ca_11_4_a_aberta_editada_durante_a_leitura_fica_para_reler_depois(
@@ -218,7 +217,7 @@ def test_ca_11_3_fechar_com_o_lote_ativo_termina_o_filho_e_as_paginas_carregam(a
     p = j.pagina
     pasta, pid = p.projeto.pasta, p.servidor.pid
     j.livro.reconhecer(list(range(51)), refazer=False)
-    _ate(app, lambda: len(p.projeto.paginas_lidas()) >= 2)
+    _ate(app, lambda: len(p.projeto.resumo.paginas_lidas()) >= 2)
     inicio = time.perf_counter()
     j.close()
     assert time.perf_counter() - inicio <= 6
@@ -227,7 +226,7 @@ def test_ca_11_3_fechar_com_o_lote_ativo_termina_o_filho_e_as_paginas_carregam(a
         json.loads(arquivo.read_text(encoding="utf-8"))  # toda página gravada carrega
     reaberto = ProjetoDeLivro.abrir(pasta)
     try:
-        assert len(reaberto.paginas_lidas()) >= 2
+        assert len(reaberto.resumo.paginas_lidas()) >= 2
     finally:
         reaberto.fechar()
 
@@ -242,10 +241,10 @@ def test_o_lote_para_quando_o_servidor_desiste(app, janela_do_livro, monkeypatch
     p = j.pagina
     servidor = p.servidor
     j.livro.reconhecer(list(range(51)), refazer=False)
-    _ate(app, lambda: len(p.projeto.paginas_lidas()) >= 1)
+    _ate(app, lambda: len(p.projeto.resumo.paginas_lidas()) >= 1)
     servidor.processo.kill()
     _ate(app, lambda: servidor.reinicios == 1 and servidor.pronto.is_set())
-    _ate(app, lambda: len(p.projeto.paginas_lidas()) >= 3)        # o lote seguiu no reaberto
+    _ate(app, lambda: len(p.projeto.resumo.paginas_lidas()) >= 3)        # o lote seguiu no reaberto
     servidor.processo.kill()
     _ate(app, lambda: not j.livro.lote_rodando, 60)
     resultado = j.fins[-1]
@@ -259,7 +258,7 @@ def test_a_procedencia_do_padrao_volta_do_filho_no_f5(app, janela):  # noqa: F81
     janela.reconhecer()
     _esperar(app, janela)
     p.escolher(p.gids[0])
-    p.ensinar("a")                                       # o primeiro glifo é um "a"
+    p.leitura.ensinar("a")                                       # o primeiro glifo é um "a"
     _esperar(app, janela)
     janela.reconhecer()                                  # os outros "a", pelo padrão, no filho
     _esperar(app, janela)
@@ -283,7 +282,7 @@ def test_ca_11_7_sem_servidor_pronto_o_glifo_fica_aguardando_sem_prender_a_fila(
         gid = p.atual
         assert pg.aguardando(p.box(gid)) and not janela.executor.ocupado
         p.escolher(p.gids[1])
-        p.ensinar("b")                                   # o Enter não espera os modelos
+        p.leitura.ensinar("b")                                   # o Enter não espera os modelos
         assert p.box(p.gids[1]).char == "b"
         _esperar(app, janela)                            # a propagação, com o "b" só
         assert pg.aguardando(p.box(gid)) and not p.servidor.pronto.is_set()

@@ -6,6 +6,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .hypothesis/
+# A cobertura do pytest-cov (e a dos processos filhos, `.coverage.<máquina>.pid…`)
+.coverage
+.coverage.*
 
 # Outro repositório clonado aqui dentro
 rea/

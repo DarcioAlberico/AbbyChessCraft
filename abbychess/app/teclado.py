@@ -187,18 +187,28 @@ def dica(q: QAction, modelo: str) -> None:
 def tabela_com_trocas(perfil: str, trocas_: Mapping[str, List[str]]) -> atalhos.Tabela:
     """A tabela do YAML com as trocas no perfil (para conferir pelas mesmas regras)."""
     base = tabela()
-    acoes = []
-    for a in base.acoes:
-        if a.id in trocas_:
-            sequencias_ = dict(a.sequencias)
-            sequencias_[perfil] = [atalhos.normalizar(s) for s in trocas_[a.id]]
-            sem = ([p for p in a.sem_atalho if p != perfil] if sequencias_[perfil]
-                   else sorted(set(a.sem_atalho) | {perfil}))      # tirar a tecla é declarar
-            declarados = (sorted(set(a.declarados) | {perfil}) if sequencias_[perfil]
-                          else [p for p in a.declarados if p != perfil])
-            a = replace(a, sequencias=sequencias_, sem_atalho=sem, declarados=declarados)
-        acoes.append(a)
+    acoes = [_com_a_troca(a, perfil, trocas_[a.id]) if a.id in trocas_ else a
+             for a in base.acoes]
     return replace(base, acoes=acoes)
+
+
+def _com_a_troca(a: atalhos.Acao, perfil: str, teclas: List[str]) -> atalhos.Acao:
+    """A ação do YAML com as teclas trocadas no perfil."""
+    sequencias_ = dict(a.sequencias)
+    sequencias_[perfil] = [atalhos.normalizar(s) for s in teclas]
+    sem, declarados = _sem_e_declarados(a, perfil, bool(sequencias_[perfil]))
+    # A exceção da tecla que saiu da ação (o Ctrl+Tab trocado no FineReader) não vale
+    # mais: ficando, viraria "exceção sem uso" e recusaria a troca.
+    todas = {s for seqs in sequencias_.values() for s in seqs}
+    return replace(a, sequencias=sequencias_, sem_atalho=sem, declarados=declarados,
+                   excecoes=[e for e in a.excecoes if e.tecla in todas])
+
+
+def _sem_e_declarados(a: atalhos.Acao, perfil: str, com_tecla: bool) -> tuple:
+    """(sem_atalho, declarados) da ação trocada: tirar a tecla é declarar o perfil sem ela."""
+    if com_tecla:
+        return [p for p in a.sem_atalho if p != perfil], sorted(set(a.declarados) | {perfil})
+    return sorted(set(a.sem_atalho) | {perfil}), [p for p in a.declarados if p != perfil]
 
 
 def problemas(perfil: str, trocas_: Mapping[str, List[str]]) -> List[str]:
@@ -206,6 +216,14 @@ def problemas(perfil: str, trocas_: Mapping[str, List[str]]) -> List[str]:
     Uma sequência que não se escreve (`Ctrl+Xyz`) também é problema."""
     if perfil not in tabela().perfis:
         return [f"perfil desconhecido: {perfil!r}"]
+    erros = _trocas_ilegiveis(trocas_)
+    if erros:
+        return erros
+    return _so_do_perfil(perfil, trocas_)
+
+
+def _trocas_ilegiveis(trocas_: Mapping[str, List[str]]) -> List[str]:
+    """As ações que o YAML não tem e as sequências que não se escrevem."""
     erros = []
     for id_, lista in trocas_.items():
         try:
@@ -218,8 +236,11 @@ def problemas(perfil: str, trocas_: Mapping[str, List[str]]) -> List[str]:
                 atalhos.normalizar(s)
             except ValueError as erro:
                 erros.append(f"{id_}: {erro}")
-    if erros:
-        return erros
+    return erros
+
+
+def _so_do_perfil(perfil: str, trocas_: Mapping[str, List[str]]) -> List[str]:
+    """O que as regras do YAML acham com as trocas, sem os problemas dos outros perfis."""
     marca = f"[{perfil}]"
     outros = [p for p in tabela().perfis if p != perfil]
     return [p for p in atalhos.verificar(tabela_com_trocas(perfil, trocas_))
@@ -245,12 +266,27 @@ def carregar(config) -> List[str]:
     perfil = str(config.value(CHAVE_DO_PERFIL, "padrao"))
     if perfil not in tabela().perfis:
         perfil = "padrao"
+    validas, fora = _trocas_que_valem(perfil, _trocas_gravadas(config))
+    if fora:
+        log.warning("trocas de teclado deixadas de lado: %s", ", ".join(fora))
+    definir(perfil, validas)
+    return fora
+
+
+def _trocas_gravadas(config) -> dict:
+    """O JSON das trocas gravadas; o ilegível é nenhuma, e o que não é objeto fica de lado."""
     try:
         gravadas = json.loads(config.value(CHAVE_DAS_TROCAS, "") or "{}")
     except (TypeError, ValueError):
         gravadas = {}
     if not isinstance(gravadas, dict):
         gravadas = {"(as trocas gravadas)": None}
+    return gravadas
+
+
+def _trocas_que_valem(perfil: str, gravadas: dict) -> tuple:
+    """(as trocas que valem, as ações das deixadas de lado): cada uma vale sozinha, sobre as
+    que já valeram."""
     validas: Dict[str, List[str]] = {}
     fora = []
     for id_, lista in sorted(gravadas.items()):
@@ -259,10 +295,7 @@ def carregar(config) -> List[str]:
             validas[id_] = lista
         else:
             fora.append(str(id_))
-    if fora:
-        log.warning("trocas de teclado deixadas de lado: %s", ", ".join(fora))
-    definir(perfil, validas)
-    return fora
+    return validas, fora
 
 
 def gravar(config) -> None:
@@ -276,15 +309,27 @@ def reaplicar(janela) -> int:
     ids = {a.id for a in tabela().acoes}
     mudaram = 0
     for q in janela.findChildren(QAction):
-        if q.objectName() in ids:
-            novas = sequencias(q.objectName())
-            if [do_qt(s) for s in q.shortcuts()] != [do_qt(s) for s in novas]:
-                gerada = q.toolTip() == _dica(q)      # a dica era a nossa: segue a tecla
-                q.setShortcuts(novas)
-                if gerada:
-                    q.setToolTip(_dica(q))
-                mudaram += 1
+        if q.objectName() in ids and _trocar_as_teclas(q):
+            mudaram += 1
     _refazer_os_textos()
+    _religar_as_teclas()
+    return mudaram
+
+
+def _trocar_as_teclas(q: QAction) -> bool:
+    """As teclas do perfil de agora na ação do YAML, com a dica nossa; falso se já estavam."""
+    novas = sequencias(q.objectName())
+    if [do_qt(s) for s in q.shortcuts()] == [do_qt(s) for s in novas]:
+        return False
+    gerada = q.toolTip() == _dica(q)            # a dica era a nossa: segue a tecla
+    q.setShortcuts(novas)
+    if gerada:
+        q.setToolTip(_dica(q))
+    return True
+
+
+def _religar_as_teclas() -> None:
+    """O mapa de cada `AcoesDaTecla` vivo; o de uma janela já fechada sai."""
     for teclas in list(_com_teclas):
         try:
             teclas.religar()
@@ -292,7 +337,6 @@ def reaplicar(janela) -> int:
             if not _apagado(erro):
                 raise
             _com_teclas.discard(teclas)
-    return mudaram
 
 
 #: Os `AcoesDaTecla` vivos, para `reaplicar` refazer o mapa deles.

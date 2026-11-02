@@ -62,6 +62,17 @@ NOMES_DOS_SIMBOLOS = {
 
 FONTE_DE_SIMBOLOS = "Segoe UI Symbol"
 
+
+def menu_da_paleta(pai, inserir) -> QMenu:
+    """A paleta (F2) como menu: o símbolo escolhido vai a `inserir` (o campo do treino, o
+    cursor do Documento)."""
+    menu = QMenu(pai)
+    menu.setFont(QFont(FONTE_DE_SIMBOLOS, 12))
+    for simbolo in PALETA:
+        menu.addAction(f"{simbolo}   {NOMES_DOS_SIMBOLOS.get(simbolo, '')}",
+                       lambda s=simbolo: inserir(s))
+    return menu
+
 NOMES_DAS_FONTES = {
     "manual": "confirmado por você",
     "livro": "padrão deste livro",
@@ -174,6 +185,8 @@ class PainelDeTreino(QWidget):
         self.leitura = QLabel("Abra um projeto e reconheça uma página.")
         #: O efeito e o conflito de ensinar o que está no campo (§8.3).
         self.aviso_de_ensino = QLabel("")
+        self._aviso = ("", "", "")
+        estilo.avisos().tema_mudou.connect(self._tema_mudou)
         # Sempre HTML: só o efeito, sem o <span> do conflito, o Qt o adivinhava texto puro e
         # mostrava o escape ("Enter ensina &#x27;1&#x27;").
         self.aviso_de_ensino.setTextFormat(Qt.TextFormat.RichText)
@@ -305,12 +318,18 @@ class PainelDeTreino(QWidget):
     def mostrar_aviso_de_ensino(self, efeito: str, conflito: str, livro: str = "") -> None:
         """O efeito ("Enter ensina 'l' · 23 iguais nesta página · 410 no livro") e, em
         laranja, o conflito ("⚠ este glifo está a 0,08 de 14 amostras de '1'")."""
+        self._aviso = (efeito, conflito, livro)          # para repintar no tema novo
         partes = [html.escape(efeito + livro)] if efeito else []
         if conflito:
             # A cor de aviso do tema de agora (legível no claro e no escuro).
             partes.append(f"<span style='color:{estilo.hex_de('aviso')}'>⚠ "
                           f"{html.escape(conflito)}</span>")
         self.aviso_de_ensino.setText("<br>".join(partes))
+
+    def _tema_mudou(self, _nome: str) -> None:
+        """O conflito guardou a cor do tema de antes no HTML: refeito no de agora."""
+        if any(self._aviso):
+            self.mostrar_aviso_de_ensino(*self._aviso)
 
     def mostrar(self, pagina: np.ndarray, box: BoxEntry, posicao: str) -> None:
         """Mostra o box em revisão e põe a leitura atual no campo, selecionada."""
@@ -339,6 +358,21 @@ class PainelDeTreino(QWidget):
         self.campo.setText(char)
         self.campo.selectAll()
 
+    def sugerir_pelo_contexto(self, char: str, mesmo_desenho: bool) -> None:
+        """A troca que a palavra ou a linha pede (`contexto.sugestoes`), no campo e selecionada.
+        Quando os dois caracteres têm o mesmo desenho (a vírgula e o apóstrofo, o w e o W, o l
+        e o 1 de algumas fontes), ensinar faria o livro ler assim todos os outros: a leitura
+        pede a tecla de "só esta"."""
+        if self._box is None or not char or self.campo.text() != self._box.char:
+            return
+        tecla = teclado.com_teclas("{so_corrigir}" if mesmo_desenho else "{ensinar}")
+        porque = (" — o desenho é o mesmo: corrija só esta" if mesmo_desenho else "")
+        self.leitura.setText(self.leitura.text() + "<br>Pelo contexto: <b style='font-size:"
+                             f"16pt'>{html.escape(char)}</b> &nbsp;({html.escape(tecla)}"
+                             f"{porque})")
+        self.campo.setText(char)
+        self.campo.selectAll()
+
     def limpar(self, mensagem: str) -> None:
         self._pagina, self._box = None, None
         self._definir_corte(None)
@@ -361,8 +395,9 @@ class PainelDeTreino(QWidget):
 
     def mostrar_contagens(self, pendentes: int, total: int, padroes: int, caracteres: int) -> None:
         self.fila.setText(f"<b>A revisar nesta página:</b> {pendentes} de {total} boxes")
-        self.padroes.setText(f"<b>Padrões deste livro:</b> {padroes} amostras em "
-                             f"{caracteres} caracteres")
+        self.padroes.setText(f"<b>Padrões deste livro:</b> {padroes} "
+                             f"{'amostra' if padroes == 1 else 'amostras'} em {caracteres} "
+                             f"{'caractere' if caracteres == 1 else 'caracteres'}")
 
     # ------------------------------------------------------------------
     def _desenhar_glifo(self) -> None:
@@ -431,13 +466,8 @@ class PainelDeTreino(QWidget):
         """F2: a paleta como menu, no campo; o símbolo escolhido entra no cursor."""
         if not self._ativo:
             return
-        menu = QMenu(self)
-        menu.setFont(QFont(FONTE_DE_SIMBOLOS, 12))
-        for simbolo in PALETA:
-            menu.addAction(f"{simbolo}   {NOMES_DOS_SIMBOLOS.get(simbolo, '')}",
-                           lambda s=simbolo: self._inserir(s))
-        self.menu_da_paleta = menu              # os testes escolhem sem abrir
-        menu.popup(self.campo.mapToGlobal(self.campo.rect().bottomLeft()))
+        self.menu_da_paleta = menu_da_paleta(self, self._inserir)  # os testes escolhem sem abrir
+        self.menu_da_paleta.popup(self.campo.mapToGlobal(self.campo.rect().bottomLeft()))
 
     def inserir_figurina(self, branca: str) -> None:
         """Ctrl+Shift+peça no campo: a figurina; o mesmo atalho de novo alterna a cor."""

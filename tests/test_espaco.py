@@ -18,7 +18,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QPoint, Qt, QTimer  # noqa: E402
-from PySide6.QtGui import QAction, QContextMenuEvent, QShortcut  # noqa: E402
+from PySide6.QtGui import QContextMenuEvent  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
@@ -27,54 +27,19 @@ from abbychess import avisos as av  # noqa: E402
 from abbychess import modelo as md  # noqa: E402
 from abbychess import pagina as pg  # noqa: E402
 from abbychess.app import espaco, teclado  # noqa: E402
-from abbychess.app.janela import JanelaPrincipal  # noqa: E402
 from abbychess.leitor import LeitorDoLivro  # noqa: E402
 from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
 from tests.janela_util import atual, boxes, fila  # noqa: E402
-from tests.test_janela import _esperar  # noqa: E402
-from tests.test_treino_por_livro import _pagina_sintetica  # noqa: E402
-from tests.test_visor import pdf_de_60_paginas  # noqa: E402,F401
-
-RAIZ = Path(__file__).resolve().parent.parent
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
+from tests.ajudantes import RAIZ, _abrir, _dentro, _x_height_do_gabarito, conferir_os_registrados  # noqa: E402,F401,F811
+from tests.fixturas_espaco import janela  # noqa: E402,F401,F811
 
 
 @pytest.fixture(scope="module")
 def app():
     return QApplication.instance() or QApplication([])
-
-
-def _abrir(projeto, largura=1366, altura=768):
-    j = JanelaPrincipal()
-    j.resize(largura, altura)
-    j.show()
-    j.activateWindow()
-    QApplication.processEvents()
-    j.usar(projeto, pg.FonteDePaginas(projeto.fonte),
-           LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
-    QApplication.processEvents()
-    return j
-
-
-@pytest.fixture
-def sim(monkeypatch):
-    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
-
-
-@pytest.fixture
-def janela(app, tmp_path, sim):
-    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Teste",
-                                   _pagina_sintetica(tmp_path / "pagina.png"))
-    j = _abrir(projeto)
-    yield j
-    j.close()
-
-
-@pytest.fixture
-def lida(app, janela):
-    janela.reconhecer()
-    _esperar(app, janela)
-    return janela
 
 
 @pytest.fixture
@@ -89,62 +54,9 @@ def janela_de_60(app, tmp_path, pdf_de_60_paginas, sim):  # noqa: F811
 # CA-3.7, a parte da janela
 # ----------------------------------------------------------------------
 
-def _esperado_do_yaml():
-    """As ações com tecla até o passo, lidas do YAML sem passar por `abbychess.atalhos`."""
-    import yaml
 
-    bruto = yaml.safe_load((RAIZ / "docs" / "atalhos.yaml").read_text(encoding="utf-8"))
-    passos = [str(x) for x in bruto["passos"]]
-    limite = passos.index(teclado.PASSO)
-    esperado = {}
-    for item in bruto["acoes"]:
-        sem = item.get("sem_atalho") or []
-        sequencias = item.get(teclado.PERFIL) or item.get(bruto["perfis"][0])   # herda o padrão
-        if (passos.index(str(item["desde_passo"])) <= limite and sequencias
-                and teclado.PERFIL not in sem):
-            lista = sequencias if isinstance(sequencias, list) else [sequencias]
-            esperado[item["id"]] = ({atalhos.normalizar(str(x)) for x in lista}, item["escopo"])
-    return esperado
-
-
-def _widgets_do_escopo(janela):
-    return {"imagem": {janela.visor}, "imagem_areas": {janela.visor}, "glifo": {janela.treino},
-            "campo_glifo": {janela.treino.campo}, "palavra": {janela.verificacao},
-            "documento": {janela.texto}, "galeria": set(), "diagrama": {janela.editor_diagrama}}
-
-
-#: (ação, escopo) que só passam a valer depois (nenhum, desde que o Documento ficou editável
-#: no D1).
-_SO_DEPOIS_DA_EDICAO: set = set()
-
-
-def test_os_atalhos_registrados_sao_exatamente_os_do_yaml_ate_o_passo(janela):
+def test_os_atalhos_registrados_sao_exatamente_os_do_yaml_ate_o_passo(janela):  # noqa: F811
     conferir_os_registrados(janela)
-
-
-def conferir_os_registrados(janela):
-    """As teclas da janela são as do YAML no perfil de agora (`teclado.PERFIL`); o perfil
-    FineReader usa o mesmo em `tests/test_teclado.py`."""
-    esperado = _esperado_do_yaml()
-    por_escopo = _widgets_do_escopo(janela)
-    registrados = {}
-    for q in janela.findChildren(QAction):
-        if not q.shortcuts():
-            continue
-        assert q.objectName() not in registrados, q.objectName()   # uma ação por id
-        registrados[q.objectName()] = {teclado.do_qt(x) for x in q.shortcuts()}
-        sequencias, escopo = esperado.get(q.objectName(), (None, None))
-        assert escopo is not None, f"{q.objectName()} tem tecla e não está no YAML até o passo"
-        if escopo == ["global"]:
-            assert q.shortcutContext() == Qt.ShortcutContext.WindowShortcut, q.objectName()
-        else:
-            assert q.shortcutContext() == Qt.ShortcutContext.WidgetWithChildrenShortcut
-            onde = set().union(*(por_escopo[e] for e in escopo
-                                 if (q.objectName(), e) not in _SO_DEPOIS_DA_EDICAO))
-            assert onde and onde <= set(q.associatedObjects()), (q.objectName(), escopo)
-        assert q.receivers("2triggered(bool)") > 0, q.objectName()       # ligada a um comando
-    assert registrados == {k: v for k, (v, _) in esperado.items()}
-    assert janela.findChildren(QShortcut) == []           # nada fora do YAML
 
 
 #: O que o README e a SPEC escrevem com cara de atalho e não é uma tecla: gestos e famílias.
@@ -195,16 +107,11 @@ def test_atalho_citado_no_readme_ou_na_spec_existe_no_yaml():
     ("acao_empilhado", True, True, Qt.Orientation.Vertical),
     ("acao_so_vista", False, True, Qt.Orientation.Horizontal),
 ])
-def test_cada_arranjo_mostra_os_paineis_da_tabela(janela, acao, visor, vista, orientacao):
+def test_cada_arranjo_mostra_os_paineis_da_tabela(janela, acao, visor, vista, orientacao):  # noqa: F811
     getattr(janela, acao).trigger()
     assert janela.visor.isVisible() is visor and janela.vista.isVisible() is vista
     assert janela.divisor.orientation() == orientacao
     assert janela.doca_inspetor.isVisible()                # o Inspetor fica
-
-
-def _dentro(painel):
-    foco = QApplication.focusWidget()
-    return foco is not None and (foco is painel or painel.isAncestorOf(foco))
 
 
 def test_alt_n_poe_o_foco_no_painel_certo(app, lida):
@@ -218,7 +125,7 @@ def test_alt_n_poe_o_foco_no_painel_certo(app, lida):
     assert j.doca_paginas.isVisible() and j.doca_resultados.isVisible()   # abrem
 
 
-def test_alt_3_de_novo_cicla_as_abas_da_vista(app, janela):
+def test_alt_3_de_novo_cicla_as_abas_da_vista(app, janela):  # noqa: F811
     janela.focar(3)
     assert janela.vista.currentWidget() is janela.painel_do_documento
     QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_3, Qt.KeyboardModifier.AltModifier)
@@ -229,14 +136,14 @@ def test_alt_3_de_novo_cicla_as_abas_da_vista(app, janela):
 # CA-3.2: os tamanhos
 # ----------------------------------------------------------------------
 
-def _larguras(app, janela):
+def _larguras(app, janela):  # noqa: F811
     for _ in range(3):
         app.processEvents()
     return (janela.doca_paginas.width() if janela.doca_paginas.isVisible() else 0,
             janela.visor.width(), janela.vista.width(), janela.doca_inspetor.width())
 
 
-def test_tamanhos_padrao_em_1366(app, janela):
+def test_tamanhos_padrao_em_1366(app, janela):  # noqa: F811
     paginas, imagem, vista, inspetor = _larguras(app, janela)
     assert janela.arranjo == "lado_a_lado" and paginas == 0       # a gaveta fechada
     assert abs(imagem - 556) <= 12 and abs(vista - 500) <= 12 and abs(inspetor - 296) <= 4
@@ -319,10 +226,10 @@ def test_alt_baixo_anda_na_fila_com_o_foco_em_cada_painel_sem_mudar_texto(app, l
     assert [(b.char, b.source) for b in boxes(j)] == leituras
 
 
-def test_alt_baixo_no_modo_das_palavras_anda_pelas_desconhecidas(app, janela):
+def test_alt_baixo_no_modo_das_palavras_anda_pelas_desconhecidas(app, janela):  # noqa: F811
     from core import lexico
 
-    from tests.test_janela_areas_e_verificacao import _ler_a_mao
+    from tests.ajudantes import _ler_a_mao  # noqa: E402,F401,F811
 
     j = janela
     _ler_a_mao(app, j)
@@ -343,7 +250,7 @@ def test_f7_cicla_o_modo_e_o_editor_do_inspetor(app, lida, monkeypatch):
     monkeypatch.setattr(j.verificador, "verificar", lambda: False)    # sem carregar o léxico
     assert j.fila.modo == "confianca" and j.inspetor.atual() == "glifo"
     QTest.keyClick(j.visor, Qt.Key.Key_F7)
-    assert j.fila.modo == "leitura" and j.pagina.ordem_da_fila == "leitura"
+    assert j.fila.modo == "leitura" and j.pagina.fila_da_pagina.ordem_da_fila == "leitura"
     assert fila(j) == sorted(fila(j), key=j.pagina.gids.index)       # na ordem da página
     QTest.keyClick(j.visor, Qt.Key.Key_F7)
     assert j.fila.modo == "caractere" and j.inspetor.atual() == "glifo"   # passo C
@@ -393,9 +300,9 @@ def test_ctrl_t_verifica_a_pagina_e_editar_a_devolve_a_revisao(app, lida):
         QTest.keyClick(j.confirmacao.aceitar, Qt.Key.Key_Return)
     assert j.pagina.modelo.estado == md.VERIFICADA
     assert "verificada" in j.rotulo_da_pagina.text()
-    j.pagina.desfazer()
+    j.pagina.desfazedor.desfazer()
     assert j.pagina.modelo.estado != md.VERIFICADA
-    j.pagina.refazer()
+    j.pagina.desfazedor.refazer()
     assert j.pagina.modelo.estado == md.VERIFICADA
     j.treino.campo.setText("x")
     j.treino.pedir_so_corrigir()
@@ -403,7 +310,7 @@ def test_ctrl_t_verifica_a_pagina_e_editar_a_devolve_a_revisao(app, lida):
     assert j.pagina.modelo.estado == md.EM_REVISAO
 
 
-def test_ctrl_t_numa_pagina_nao_reconhecida_avisa(janela):
+def test_ctrl_t_numa_pagina_nao_reconhecida_avisa(janela):  # noqa: F811
     assert janela.pagina.modelo is None                     # a página não foi lida
     QTest.keyClick(janela.visor, Qt.Key.Key_T, Qt.KeyboardModifier.ControlModifier)
     assert janela.pagina.modelo is None and janela.pagina.historico.proximo_a_desfazer is None
@@ -508,7 +415,7 @@ def test_shift_f10_e_a_tecla_menu_abrem_o_menu_de_contexto_em_todo_painel(app, l
         assert _menu_pelo_teclado(app, alvo) is not None, widget
 
 
-def test_a_falha_de_gravacao_aparece_em_avisos_e_fica_no_projeto(app, janela):
+def test_a_falha_de_gravacao_aparece_em_avisos_e_fica_no_projeto(app, janela):  # noqa: F811
     janela.falha_de_gravacao.emit(0, OSError("disco cheio"))
     app.processEvents()
     assert janela.botao_avisos.text() == "⚠1"
@@ -520,7 +427,7 @@ def test_a_falha_de_gravacao_aparece_em_avisos_e_fica_no_projeto(app, janela):
     assert registro.itens[-1].tipo == av.ERRO and "disco cheio" in registro.itens[-1].texto
 
 
-def test_o_espaco_gravado_e_atomico(app, janela, monkeypatch):
+def test_o_espaco_gravado_e_atomico(app, janela, monkeypatch):  # noqa: F811
     from abbychess import gravacao as gv
 
     janela.gravar_espaco()
@@ -581,18 +488,17 @@ def test_reabrir_volta_a_pagina_aberta_pelo_pid_mesmo_se_ela_mudou_de_lugar(
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Pid", pdf_de_60_paginas)
     j = _abrir(projeto)
     j.ir_para_pagina(12)
-    pid = projeto.pid_da_pagina(12)
+    pid = projeto.ordem.pid_em(12)
     j.close()
     outro = ProjetoDeLivro.abrir(projeto.pasta)
     s = outro.sequencia                              # o que a reordenação (rodada 2) grava
     nova = Sequencia((s.entradas[12], *s.entradas[:12], *s.entradas[13:]))
-    outro._trocar_sequencia(nova)
-    outro.dados.sequencia = nova.para_json()
-    outro.salvar()
+    outro.ordem.trocar(nova)
+    outro.salvar()                                   # a sequência vai montada da ordem
     k = _abrir(ProjetoDeLivro.abrir(projeto.pasta))
     try:
         app.processEvents()
-        assert k.pagina.indice == 0 and k.pagina.projeto.pid_da_pagina(0) == pid
+        assert k.pagina.indice == 0 and k.pagina.projeto.ordem.pid_em(0) == pid
     finally:
         k.close()
 
@@ -636,20 +542,6 @@ def test_o_projeto_seguinte_sem_espaco_comeca_do_padrao(app, tmp_path, sim):
 # ----------------------------------------------------------------------
 # CA-3.2, a x-height no livro de referência
 # ----------------------------------------------------------------------
-
-def _x_height_do_gabarito(matriz, verdade) -> float:
-    """A x-height mediana das linhas do corpo do gabarito, em pixels da página: em cada
-    linha, a faixa de linhas de pixels com mais da metade da tinta da mais cheia."""
-    import statistics
-
-    h, w = matriz.shape
-    alturas = []
-    for linha in verdade["linhas_corpo"]:
-        x1, y1, x2, y2 = linha["caixa_rel"]
-        perfil = (matriz[int(y1 * h):int(y2 * h), int(x1 * w):int(x2 * w)] < 128).sum(axis=1)
-        if perfil.max():
-            alturas.append(int((perfil > perfil.max() / 2).sum()))
-    return statistics.median(alturas)
 
 
 @pytest.mark.livro_real
@@ -726,7 +618,22 @@ def test_ctrl_t_com_pendentes_pergunta_e_o_nao_deixa_a_pagina(app, lida, monkeyp
     j.fechar_busca()
 
 
-def test_f9_em_1366_abre_a_gaveta_de_150_sem_estreitar_a_imagem(app, janela):
+def test_o_cartao_saude_cabe_na_gaveta_de_150(app, janela):  # noqa: F811
+    """O cartão Saúde aparece na primeira sessão de um livro novo: com ele visível (o limiar,
+    as páginas da amostra e o total), a gaveta continua com 150 px e a Imagem não estreita."""
+    from abbychess import livro as lv
+
+    j = janela
+    imagem = _larguras(app, j)[1]
+    QTest.keyClick(j.visor, Qt.Key.Key_F9)
+    j.paginas.mostrar_saude(lv.SaudeDoLivro((1, 6, 10), 333, 270, 12, 3,
+                                            ((1, 109, 93), (6, 115, 115), (10, 109, 62))))
+    paginas, depois, _, _ = _larguras(app, j)
+    assert j.paginas.saude.isVisible()
+    assert abs(paginas - 150) <= 4 and abs(depois - imagem) <= 6
+
+
+def test_f9_em_1366_abre_a_gaveta_de_150_sem_estreitar_a_imagem(app, janela):  # noqa: F811
     j = janela
     imagem = _larguras(app, j)[1]
     QTest.keyClick(j.visor, Qt.Key.Key_F9)
@@ -753,7 +660,7 @@ def test_esc_em_resultados_devolve_o_foco_ao_painel_de_antes(app, lida):
     assert not j.doca_resultados.isVisible() and QApplication.focusWidget() is j.texto
 
 
-def test_resultados_em_768_de_altura_abre_com_130(app, janela):
+def test_resultados_em_768_de_altura_abre_com_130(app, janela):  # noqa: F811
     janela.abrir_avisos()
     for _ in range(3):
         app.processEvents()
@@ -794,7 +701,7 @@ def test_esconder_a_imagem_nao_avisa_zoom_minimo(app, lida):
     assert "zoom" not in j.statusBar().currentMessage()
 
 
-def test_abrir_e_fechar_a_gaveta_nao_deixa_os_tamanhos_derivarem(app, janela):
+def test_abrir_e_fechar_a_gaveta_nao_deixa_os_tamanhos_derivarem(app, janela):  # noqa: F811
     j = janela
     inicio = _larguras(app, j)
     for _ in range(3):
@@ -816,7 +723,7 @@ def test_esc_com_resultados_aberto_pelo_aviso_nao_tira_o_foco_do_campo(app, lida
     assert not j.doca_resultados.isVisible() and QApplication.focusWidget() is j.treino.campo
 
 
-def test_fechar_a_gaveta_pelo_x_tambem_devolve_a_largura(app, janela):
+def test_fechar_a_gaveta_pelo_x_tambem_devolve_a_largura(app, janela):  # noqa: F811
     j = janela
     inicio = _larguras(app, j)
     j.alternar_paginas()

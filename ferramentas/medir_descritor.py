@@ -98,7 +98,7 @@ def rotulados_da_fatia(snapshot: Path) -> list:
             z.extractall(pasta)
         projeto = ProjetoDeLivro.abrir(next(p.parent for p in pasta.rglob("projeto.json")))
         fonte = pg.fonte_do_projeto(projeto)
-        for indice in projeto.paginas_lidas():
+        for indice in projeto.resumo.paginas_lidas():
             g = json.loads((VERDADE / "xv" / f"i{indice:03d}.json").read_text(encoding="utf-8"))
             verificadas = [ln for ln in g["linhas_corpo"] if ln.get("texto_verificado")]
             boxes = projeto.carregar_pagina(indice) or []

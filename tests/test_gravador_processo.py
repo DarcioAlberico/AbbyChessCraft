@@ -27,7 +27,7 @@ from abbychess import gravacao as gv
 from abbychess.projeto import ProjetoDeLivro
 
 from tests.filho_do_gravador import editar_sem_parar
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 pytestmark = pytest.mark.processo
 

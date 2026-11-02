@@ -96,10 +96,10 @@ def _cer(conta: dict):
 
 def _estilos(imagem, boxes):
     """O estilo de cada box como a leitura o mede (`PaginaLida.estilos`); None sem medida."""
-    from abbychess import pagina as pg
+    from abbychess import efeitos as ef
     from abbychess.modelo import Estilo
 
-    negritos, italicos = pg.efeitos_da_pagina(imagem, boxes)
+    negritos, italicos = ef.efeitos_da_pagina(imagem, boxes)
     return [Estilo(negrito=bool(n), italico=bool(i)) if n is not None or i else None
             for n, i in zip(negritos, italicos)]
 
@@ -119,7 +119,7 @@ def _rodada(livro, snapshot, com_estilo, verdade, pasta) -> dict:
     projeto = ProjetoDeLivro.abrir(next(p.parent for p in pasta.rglob("projeto.json")))
     leitor = LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
     fonte = pg.fonte_do_projeto(projeto)
-    indices = projeto.paginas_lidas()
+    indices = projeto.resumo.paginas_lidas()
     gabaritos = {i: json.loads((verdade / livro / f"i{i:03d}.json").read_text(encoding="utf-8"))
                  for i in indices}
     paginas = {i: (fonte.pagina(i), projeto.carregar_pagina(i) or []) for i in indices}

@@ -33,14 +33,12 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Callable, Deque, Dict, List, Optional, Sequence
 
-from abbychess import diagramas as dg
-from abbychess import lances as lc
+from abbychess import arrumacao
 from abbychess import pagina as pg
-from abbychess import procedencia
+from abbychess import editar_boxes as eb
 from abbychess import servidor_de_leitura as sl
-from abbychess.controlador import TEMPO_DO_PEDIDO
-from abbychess.modelo import (IOU_DA_RELEITURA, LIDAS, VERIFICADA, descrever_caidas,
-                              proximo_estado, reconciliar)
+from abbychess.servidor_de_leitura import TEMPO_DO_PEDIDO
+from abbychess.modelo import LIDAS, VERIFICADA
 
 log = logging.getLogger(__name__)
 
@@ -114,7 +112,7 @@ class CondutorDoLote:
         self.restante: Deque[int] = deque()
         self.resultado = ResultadoDoLote()
         for indice in self.indices:
-            pid = pagina.projeto.pid_da_pagina(indice)
+            pid = pagina.projeto.ordem.pid_em(indice)
             if pid is None:
                 self.resultado.falhas[indice] = "a página não está no livro"
             else:
@@ -147,7 +145,7 @@ class CondutorDoLote:
     def posicoes_restantes(self) -> List[int]:
         """As posições de agora das páginas que faltam (as que saíram do livro, não)."""
         projeto = self.p.projeto
-        return [p for p in map(projeto.posicao_do_pid, self.restante) if p is not None]
+        return [p for p in map(projeto.ordem.posicao_de, self.restante) if p is not None]
 
     def comecar(self) -> None:
         self.ao_progresso(0, self.total, None)
@@ -193,7 +191,7 @@ class CondutorDoLote:
             if not self.restante:
                 self._terminar()
                 return
-            indice = self.p.projeto.posicao_do_pid(self.restante[0])
+            indice = self.p.projeto.ordem.posicao_de(self.restante[0])
             if indice is None:                  # apagada antes da vez dela
                 self.resultado.fora_do_livro.append(self.restante.popleft())
                 self._avancar()
@@ -211,7 +209,7 @@ class CondutorDoLote:
         self._avancar()
 
     def _fica_de_fora(self, indice: int) -> Optional[str]:
-        estado = self.p.projeto.estado_da_pagina(indice)
+        estado = self.p.projeto.resumo.estado_da_pagina(indice)
         if estado == VERIFICADA:
             return VERIFICADA_PULADA
         forcada = indice in self.forcar
@@ -233,11 +231,11 @@ class CondutorDoLote:
 
     def _ler(self, indice: int) -> None:
         p = self.p
-        projeto, fonte, leitor, servidor = p.projeto, p.fonte, p.leitor, p._servidor_para_pedir()
+        projeto, fonte, leitor, servidor = p.projeto, p.fonte, p.leitor, p.leitura.servidor_para_pedir()
         # Na janela, só o pid e a versão (sem ler o JSON da página: isso, e o que o §4.6
         # mantém, vão para a thread da leitura). Uma mudança do usuário depois daqui sobe a
         # versão, e `_mudou_durante` a pega.
-        pid = projeto.pid_da_pagina(indice)
+        pid = projeto.ordem.pid_em(indice)
         # A entrada e o pid são tomados aqui, na interface: a thread da leitura não resolve a
         # posição de novo (uma reordenação no meio daria a imagem de outra página).
         entrada = fonte.entrada(indice)
@@ -245,17 +243,19 @@ class CondutorDoLote:
         self.em_leitura = indice
 
         def ler(cancelado) -> sl.PaginaLida:
-            agora = projeto.posicao_do_pid(pid)
+            agora = projeto.ordem.posicao_de(pid)
             if agora is None:
                 raise OSError("a página saiu do livro")    # `_voltou` a conta como fora
             modelo = projeto.carregar_modelo(agora)
             zonas = list(modelo.zonas) if modelo is not None else projeto.carregar_zonas(agora)
-            marcados = (pg.a_manter_na_releitura(modelo.boxes, modelo.estado in LIDAS)
+            marcados = (eb.a_manter_na_releitura(modelo.boxes, modelo.estado in LIDAS)
                         if modelo is not None else [])                     # §4.6
             imagem = fonte.pagina_da_entrada(entrada)
+            regua = projeto.resumo.regua_do_negrito(sem_o_pid=pid)
             if servidor is None:
-                return sl.ler_pagina(imagem, zonas, marcados, leitor, cancelado=cancelado)
-            return self._ler_no_servidor(servidor, (imagem, zonas, marcados), cancelado)
+                return sl.ler_pagina(imagem, zonas, marcados, leitor, regua_do_livro=regua,
+                                     cancelado=cancelado)
+            return self._ler_no_servidor(servidor, (imagem, zonas, marcados, regua), cancelado)
 
         def voltou(resultado) -> None:
             self._pedido = None
@@ -299,7 +299,7 @@ class CondutorDoLote:
 
     def _voltou(self, pedida: _Pedida, resultado) -> None:
         # A posição de agora: a página pode ter mudado de lugar enquanto era lida.
-        indice = self.p.projeto.posicao_do_pid(pedida.pid)
+        indice = self.p.projeto.ordem.posicao_de(pedida.pid)
         self._tempos.append(time.perf_counter() - pedida.inicio)
         self.em_leitura = None
         p = self.p
@@ -320,7 +320,8 @@ class CondutorDoLote:
             self._avancar()
             return
         if isinstance(resultado, Exception):
-            log.warning("a página %d não foi reconhecida: %s", indice + 1, resultado)
+            log.warning("a página %d não foi reconhecida: %s", indice + 1, resultado,
+                        exc_info=resultado)
             self.restante.popleft()
             self.resultado.falhas[indice] = str(resultado)
             self._avancar()
@@ -337,12 +338,14 @@ class CondutorDoLote:
         """A página verificada, ou mudada pelo usuário, enquanto era lida (aberta ou não).
         `indice` é a posição de agora da página pedida (ela pode ter mudado de lugar)."""
         p = self.p
-        if p.projeto.estado_da_pagina(indice) == VERIFICADA:
+        if p.projeto.resumo.estado_da_pagina(indice) == VERIFICADA:
             return VERIFICADA_PULADA
         # O pid da sequência (§12.4): a página ainda sem dados já tem o dela, e a mudança do
         # usuário no meio da leitura (a primeira, que cria a página, também) sobe a versão.
-        pid = p.projeto.pid_da_pagina(indice)
+        pid = p.projeto.ordem.pid_em(indice)
         if pid != pedida.pid or p.historico.versao(pid) != pedida.versao:
+            return RELER_DEPOIS
+        if pid in p.leitura.lendo_no_f5:        # o pronto do F5 viria por cima (CA-Q-C2)
             return RELER_DEPOIS
         return None
 
@@ -380,33 +383,21 @@ class CondutorDoLote:
         pagina = projeto.pagina_para_editar(indice)
         if (self.refazer or indice in self.forcar) and pagina.estado in LIDAS \
                 and not projeto.somente_leitura:
-            projeto.guardar_antes_do_lote(pagina)                         # §4.6
-        de_antes = list(pagina.boxes)
-        estilos = lida.estilos()
-        novos, dif = reconciliar(pagina.boxes, lida.boxes, pagina.alocar, procedencia.amostra_de,
-                                 estilo_de=lambda entry: estilos.get(id(entry)),
-                                 iou_minimo=IOU_DA_RELEITURA)
-        pagina.aplicar(dif, novos)
-        if dif.caidas:
-            self.resultado.caidas[indice] = descrever_caidas(dif.caidas, de_antes)
-        pagina.tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
-        pagina.diagramas = dg.com_ids(dg.mesclar(lida.diagramas, dg.para_caixas(pagina.tabuleiros,
-                                                                     pagina.diagramas)))
-        pagina.diagramas = lc.validar_pagina(pagina, projeto.dados.idioma)
-        pagina.estado = proximo_estado(pagina.estado, "reconhecer")
+            projeto.antes_do_lote.guardar(pagina)                         # §4.6
+        caidas = arrumacao.aplicar_lida(pagina, lida, projeto.dados.idioma,
+                                        tamanho=_tamanho_da_imagem(p, indice))
+        if caidas:
+            self.resultado.caidas[indice] = caidas
         p._gravar(pagina)
+        self._contar_a_lida(indice, pagina)
+        _mostrar_se_aberta(p, indice, pagina)
+        self.ao_gravar(indice)
+
+    def _contar_a_lida(self, indice: int, pagina) -> None:
         self.resultado.lidas.append(indice)
         self.resultado.pendentes[indice] = pg.resumir(
-            [b.entry for b in pagina.boxes if not b.revisado], p.leitor).pendentes
+            [b.entry for b in pagina.boxes if not b.revisado], self.p.leitor).pendentes
         self.resultado.diagramas[indice] = sum(d.lido for d in pagina.diagramas)
-        if indice == p.indice and p.modelo is None and p.imagem is not None:
-            p.modelo = pagina                   # a página aberta nasceu agora, no lote
-        if pagina is p.modelo:
-            p.atual, p.pulados, p.selecao = None, set(), set()
-            p.eventos.emitir("glifos_mudaram", None)
-            p.eventos.emitir("selecao_mudou")
-            p.ir_ao_primeiro_pendente()
-        self.ao_gravar(indice)
 
     def _avancar(self) -> None:
         self._feitas += 1
@@ -425,13 +416,9 @@ class CondutorDoLote:
 
 def _paginas(indices) -> str:
     """As páginas como o usuário as vê, com as seguidas em faixa: "2–51, 60"."""
-    faixas, numeros = [], sorted({int(i) + 1 for i in indices})
-    for n in numeros:
-        if faixas and n == faixas[-1][1] + 1:
-            faixas[-1][1] = n
-        else:
-            faixas.append([n, n])
-    return ", ".join(f"{a}–{b}" if b > a else str(a) for a, b in faixas)
+    from abbychess import sequencia as sq
+
+    return sq.faixas_de_paginas(indices)
 
 
 def tem_detalhe(resultado: ResultadoDoLote) -> bool:
@@ -463,17 +450,14 @@ def detalhe_do_fim(resultado: ResultadoDoLote) -> str:
     linhas = [resumo_do_fim(resultado),
               f"Lidas: {_paginas(resultado.lidas) or 'nenhuma'}; "
               f"{sum(resultado.diagramas.values())} diagrama(s) lido(s) em FEN."]
-    if resultado.puladas:
-        linhas.append(f"Já lidas, puladas: {_paginas(resultado.puladas)}.")
-    if resultado.verificadas:
-        linhas.append(f"Verificadas, puladas: {_paginas(resultado.verificadas)}.")
-    if resultado.reler_depois:
-        linhas.append("Para reler depois (mudadas por você nesta sessão, ou enquanto o lote "
-                      f"as lia): {_paginas(resultado.reler_depois)}.")
+    for paginas, frase in ((resultado.puladas, "Já lidas, puladas: {}."),
+                           (resultado.verificadas, "Verificadas, puladas: {}."),
+                           (resultado.reler_depois, "Para reler depois (mudadas por você "
+                            "nesta sessão, ou enquanto o lote as lia): {}.")):
+        if paginas:
+            linhas.append(frase.format(_paginas(paginas)))
     if resultado.falhas:
-        linhas.append("Falharam: " + "; ".join(
-            f"{i + 1} ({(motivo.splitlines() or ['sem motivo'])[0]})"
-            for i, motivo in resultado.falhas.items()) + ".")
+        linhas.append(_linha_das_falhas(resultado.falhas))
     if resultado.fora_do_livro:
         linhas.append(f"{len(resultado.fora_do_livro)} página(s) saíram do livro (apagadas) "
                       "antes de o lote lê-las: nada foi gravado nelas.")
@@ -481,3 +465,32 @@ def detalhe_do_fim(resultado: ResultadoDoLote) -> str:
         linhas.append(f"Página {indice + 1}, decisões que não seguiram os glifos relidos: "
                       + "; ".join(caidas) + ".")
     return "\n".join(linhas)
+
+
+def _linha_das_falhas(falhas: dict) -> str:
+    """As páginas que falharam, com a primeira linha do motivo de cada uma."""
+    return "Falharam: " + "; ".join(
+        f"{i + 1} ({(motivo.splitlines() or ['sem motivo'])[0]})"
+        for i, motivo in falhas.items()) + "."
+
+
+def _tamanho_da_imagem(p, indice: int):
+    """O tamanho da imagem da página na geometria da entrada dela, ou None sem a fonte."""
+    if p.fonte is None:
+        return None
+    from abbychess import geometria as geo
+
+    entrada = p.fonte.entrada(indice)
+    return geo.tamanho_da_imagem((entrada.quadro, entrada.giro), p.fonte.tamanho_da_fonte(entrada))
+
+
+def _mostrar_se_aberta(p, indice: int, pagina) -> None:
+    """A página gravada é a aberta (ou nasceu agora, no lote, na posição aberta): o glifo em
+    revisão, os pulados e a seleção recomeçam."""
+    if indice == p.indice and p.modelo is None and p.imagem is not None:
+        p.modelo = pagina                   # a página aberta nasceu agora, no lote
+    if pagina is p.modelo:
+        p.atual, p.pulados, p.selecao = None, set(), set()
+        p.eventos.emitir("glifos_mudaram", None)
+        p.eventos.emitir("selecao_mudou")
+        p.fila_da_pagina.ir_ao_primeiro_pendente()

@@ -6,7 +6,7 @@ import pytest
 
 from abbychess.app import dialogos
 from abbychess.projeto import ProjetoDeLivro
-from tests.test_livro import pdf_sintetico
+from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
 
 @pytest.mark.parametrize(("texto", "total", "esperado"), [
@@ -37,7 +37,44 @@ def test_modelo_de_areas_filtra_intervalo_por_numero_visivel(monkeypatch, parida
     assert dialogos.paginas_do_modelo_de_areas(None, 10) == esperado
 
 
-def test_novo_projeto_guarda_idioma_e_intervalo_no_mesmo_fluxo(tmp_path, monkeypatch):
+def test_cancelar_ou_errar_o_intervalo_nao_da_paginas_ao_lote_nem_ao_modelo(projeto, monkeypatch):
+    avisos = []
+    monkeypatch.setattr(dialogos.QMessageBox, "warning", lambda _j, _t, texto: avisos.append(texto))
+    monkeypatch.setattr(dialogos.QInputDialog, "getText", lambda *_a, **_k: ("1-3", False))
+    assert dialogos.intervalo_do_lote(None, projeto, 3) is None          # Cancelar
+    assert dialogos.paginas_do_modelo_de_areas(None, 3) is None
+    monkeypatch.setattr(dialogos.QInputDialog, "getText", lambda *_a, **_k: ("1-x", True))
+    assert dialogos.intervalo_do_lote(None, projeto, 3) is None          # o aviso diz o quê
+    assert dialogos.paginas_do_modelo_de_areas(None, 3) is None
+    assert avisos == ["Não entendi '1-x'. Use, por exemplo, 26-27, 30."] * 2
+
+
+def test_o_lote_pergunta_pelas_ja_lidas_e_conta_as_verificadas(projeto, monkeypatch):
+    from core.box_model import BoxEntry
+
+    from abbychess.modelo import VERIFICADA
+
+    caixa = [BoxEntry(char="a", x1=10, y1=10, x2=20, y2=30, source="manual", confidence=1.0)]
+    projeto.salvar_pagina(0, caixa)
+    projeto.salvar_pagina(1, caixa)
+    verificada = projeto.pagina_para_editar(1)
+    verificada.estado = VERIFICADA
+    projeto.salvar_modelo(verificada)
+    botoes = dialogos.QMessageBox.StandardButton
+    perguntas, respostas = [], iter([botoes.Cancel, botoes.Yes])
+
+    def responder(_janela, _titulo, texto, *_a):
+        perguntas.append(texto)
+        return next(respostas)
+    monkeypatch.setattr(dialogos.QMessageBox, "question", responder)
+    monkeypatch.setattr(dialogos.QInputDialog, "getText", lambda *_a, **_k: ("1-3", True))
+    assert dialogos.intervalo_do_lote(None, projeto, 3) is None          # Cancelar
+    assert dialogos.intervalo_do_lote(None, projeto, 3) == ([0, 1, 2], True)   # Sim: de novo
+    assert perguntas[0].startswith("1 das 3 páginas já foram reconhecidas (1 verificada(s), "
+                                   "que o lote pula sempre). Ler essas de novo?")
+
+
+def test_novo_projeto_guarda_idioma_e_intervalo_no_mesmo_fluxo(app, tmp_path, monkeypatch):  # noqa: F811
     fonte = pdf_sintetico(tmp_path)
     destino = tmp_path / "projetos"
     valores = {}
@@ -75,7 +112,7 @@ def test_novo_projeto_guarda_idioma_e_intervalo_no_mesmo_fluxo(tmp_path, monkeyp
     assert valores["ultima_fonte"] == str(fonte.parent)
 
 
-def test_texto_nativo_parcial_deixa_so_as_recusadas_para_a_amostra(tmp_path, monkeypatch):
+def test_texto_nativo_parcial_deixa_so_as_recusadas_para_a_amostra(app, tmp_path, monkeypatch):  # noqa: F811
     fonte = pdf_sintetico(tmp_path)
     janela = SimpleNamespace(
         config=SimpleNamespace(value=lambda _chave, padrao: padrao, setValue=lambda *_: None),
@@ -99,3 +136,29 @@ def test_texto_nativo_parcial_deixa_so_as_recusadas_para_a_amostra(tmp_path, mon
     finally:
         projeto.fechar()
 
+
+
+def test_o_idioma_sugerido_pela_camada_do_pdf_vem_escolhido(app, tmp_path, monkeypatch):  # noqa: F811
+    """O novo projeto pergunta o idioma já com o que a camada de texto do PDF diz (Mirkovic:
+    o projeto em inglês nasceu em português, o primeiro da lista)."""
+    from abbychess.app.opcoes import DialogoDeOpcoes
+    from abbychess.projeto import Limiares
+
+    fonte = pdf_sintetico(tmp_path)
+    vistos = {}
+
+    def obter(_parent, nome, total, idioma=None):
+        vistos["idioma"] = idioma
+        return None
+    monkeypatch.setattr(dialogos.idm, "da_camada_do_pdf", lambda caminho: "en")
+    monkeypatch.setattr(dialogos.DialogoDeNovoProjeto, "obter", obter)
+    monkeypatch.setattr(dialogos.QFileDialog, "getOpenFileName",
+                        lambda *_a, **_k: (str(fonte), ""))
+    janela = SimpleNamespace(config=SimpleNamespace(value=lambda _c, p: p, setValue=lambda *_: None))
+    assert dialogos.novo_projeto(janela) is None and vistos["idioma"] == "en"
+
+    dialogo = dialogos.DialogoDeNovoProjeto(None, "Livro", 10, "en")
+    assert dialogo.idioma.currentData() == "en"
+    assert dialogos.DialogoDeNovoProjeto(None, "Livro", 10).idioma.currentData() == "pt"
+    opcoes = DialogoDeOpcoes(Limiares(), None, idioma="en")
+    assert opcoes.idioma() == "en"

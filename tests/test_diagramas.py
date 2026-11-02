@@ -8,60 +8,23 @@ fica de fora, como nos outros testes.
 
 from __future__ import annotations
 
-import io
 import json
 from pathlib import Path
 
 import pytest
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
 from core import diagrama
 from core.box_model import BoxEntry
 
 from abbychess import diagramas as dg
 from abbychess import pagina as pg
+from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.projeto import ProjetoDeLivro
 
 from tests.livros import PASTA_DOS_PDFS
-
-FONTE_TTF = Path("C:/Windows/Fonts/arial.ttf")
-
-#: Uma posição com roque possível dos dois lados.
-FEN = "r3k2r/pp3ppp/2n5/3q4/3P4/2N2N2/PP3PPP/R3K2R"
-
-sem_modelo = pytest.mark.skipif(not Path(diagrama.CAMINHO_MODELO).is_file()
-                                or not Path(diagrama.CAMINHO_OCUPACAO).is_file(),
-                                reason="os modelos de diagrama do PyBoxEditor não estão aqui")
-
-
-def pagina_com_diagrama(caminho: Path, fen: str = FEN, legenda: str = "") -> Path:
-    """Uma página com uma linha de texto, um tabuleiro de 400 px e outra linha."""
-    from core import render_diagrama
-
-    png, _l, _a = render_diagrama.desenhar(fen, lado_px=400, moldura="simples", tons=0)
-    tabuleiro = Image.open(io.BytesIO(png)).convert("L")
-    pagina = Image.new("L", (1000, 760), 255)
-    desenho = ImageDraw.Draw(pagina)
-    if not FONTE_TTF.exists():
-        pytest.skip("a Arial não está nesta máquina")
-    fonte = ImageFont.truetype(str(FONTE_TTF), 40)
-    desenho.text((40, 30), "abc abc:", fill=0, font=fonte)
-    pagina.paste(tabuleiro, (300, 110))
-    if legenda:
-        desenho.text((300, 110 + tabuleiro.size[1] + 30), legenda, fill=0, font=fonte)
-    desenho.text((40, 680), "cab bca.", fill=0, font=fonte)
-    pagina.save(caminho)
-    return caminho
-
-
-def _lido(fen: str = FEN, **campos) -> dg.DiagramaLido:
-    from core.tabuleiro_edicao import TabuleiroEdicao
-
-    casas = [diagrama.Casa(c.linha, c.coluna, c.simbolo, 0.99 if c.simbolo else 0.0,
-                           confianca_ocupacao=0.999)
-             for c in TabuleiroEdicao.de_fen(fen).casas]
-    return dg.DiagramaLido(campos.pop("caixa", (300, 110, 704, 514)), casas=casas, **campos)
+from tests.ajudantes import FEN, _CAIXA, _legenda, _lido, pagina_com_diagrama, sem_modelo  # noqa: E402,F401,F811
 
 
 # ----------------------------------------------------------------------
@@ -211,7 +174,7 @@ def test_fen_gravado_volta_com_a_pagina(projeto):
     d = _lido(caixa=caixa).conferir(_lido().edicao())
     projeto.salvar_pagina(0, boxes, [caixa], [d])
 
-    bruto = json.loads(projeto._arquivo_da_pagina(0).read_text(encoding="utf-8"))
+    bruto = json.loads(projeto.arquivo_da_pagina(0).read_text(encoding="utf-8"))
     assert bruto["tabuleiros"] == [list(caixa)]
     assert bruto["diagramas"][0]["fen"] == d.fen
 
@@ -221,10 +184,12 @@ def test_fen_gravado_volta_com_a_pagina(projeto):
 
 
 def test_pagina_gravada_antes_da_leitura_abre_com_diagramas_por_ler(projeto):
-    """O formato antigo (v1, sem a chave "diagramas") continua valendo: a página migra."""
+    """O formato antigo (v1, sem a chave "diagramas") continua valendo: a página migra quando
+    o projeto abre (SPEC-qualidade Q-P1)."""
     arquivo = projeto.pasta / "paginas" / "0001.json"
     arquivo.write_text(json.dumps({"pagina": 1, "boxes": [], "tabuleiros": [[1, 2, 401, 402]]}),
                        encoding="utf-8")
+    projeto = ProjetoDeLivro.abrir(projeto.pasta)
     assert projeto.carregar_diagramas(0) == []
     assert projeto.carregar_tabuleiros(0) == [(1, 2, 401, 402)]
     por_ler = dg.para_caixas(projeto.carregar_tabuleiros(0), projeto.carregar_diagramas(0))
@@ -360,17 +325,6 @@ def test_darcy_p26_tres_diagramas_lidos_e_conferiveis():
 # A legenda pelas linhas da página
 # ----------------------------------------------------------------------
 
-def _legenda(texto: str, x: int, topo: int, char: int = 10):
-    """Uma linha de legenda: a maiúscula sobe acima das minúsculas, que têm 7 px."""
-    boxes, cursor = [], x
-    for c in texto:
-        if c != " ":
-            alto = c.isupper() or c.isdigit()
-            boxes.append(BoxEntry(c, cursor, topo if alto else topo + char // 2 + 8,
-                                  cursor + 10, topo + 2 * char, 1.0, FONTE_MANUAL))
-        cursor += 14
-    return boxes
-
 
 def test_legenda_sai_da_linha_inteira_dos_boxes():
     # Altura de referência 10: a faixa (3,5) acaba 35 px abaixo do tabuleiro.
@@ -425,8 +379,6 @@ def test_legenda_sem_leitura_nos_boxes_continua_assumida(tmp_path):
 # O lado de novo quando a legenda muda (sem reler o tabuleiro)
 # ----------------------------------------------------------------------
 
-_CAIXA = (100, 100, 500, 500)
-
 
 def test_ensinar_a_legenda_diz_o_lado_sem_reler_o_tabuleiro():
     antes = _legenda("Diagrama 5. Jo9am as pretas.", 110, 530)
@@ -466,3 +418,18 @@ def test_conferido_informado_e_legenda_que_nao_mudou_ficam_como_estao():
     # A mesma legenda antes e depois: nada é relido, mesmo o que diria outro lado.
     assumido = _lido(caixa=_CAIXA)
     assert dg.rederivar_lados([assumido], depois, list(depois))[0] is assumido
+
+
+def test_legenda_pelo_verbo_diz_o_lado():
+    """Mirkovic, *Chess School 1*: "White moves - a draw", "Black moves – a draw", com o
+    espaço perdido e o `o` lido como `0`; a prosa "Black moves the knight" não diz nada."""
+    assert (dg.ler_legenda("White moves - a draw").lado, dg.ler_legenda("whitemoves - a draw").lado,
+            dg.ler_legenda("Black m0ves – a □aw").lado) == ("w", "w", "b")
+    assert dg.ler_legenda("White moves - winning").origem == dg.LADO_DA_LEGENDA
+    assert dg.ler_legenda("Black moves the knight to f6").lado is None
+    assert dg.ler_legendas("White moves - a draw", "Black moves - White winning").origem == "ambigua"
+    # A linha da legenda nos boxes diz o lado, e a área dela é legenda.
+    d = _lido(caixa=_CAIXA)
+    [novo] = dg.rederivar_lados([d], [], _legenda("Black moves - a draw", 110, 530))
+    assert (novo.lado, novo.lado_origem) == ("b", dg.LADO_DA_LEGENDA)
+    assert zn._parece_legenda("White moves - a draw")

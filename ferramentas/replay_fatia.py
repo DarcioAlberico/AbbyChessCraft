@@ -180,7 +180,7 @@ def _palavras_por_glifo(texto: str):
     return saida
 
 
-def _linhas_da_pagina(boxes, fonte, indice, ex):
+def _linhas_da_pagina(boxes, fonte, indice, mo):
     """As linhas lidas (com os boxes sem leitura dentro), as caixas relativas e a palavra
     de cada box, pelo mesmo corte em palavras que a exportação usa."""
     imagem = fonte.pagina(indice)
@@ -190,9 +190,9 @@ def _linhas_da_pagina(boxes, fonte, indice, ex):
     try:
         for b in sem_leitura:
             b.char = SEM_LEITURA          # sem leitura também é glifo a corrigir
-        linhas = ex._linhas(boxes)
+        linhas = mo._linhas(boxes)
         palavra_do_box = {}
-        for n, (_, grupo) in enumerate(p for linha in ex.palavras(boxes) for p in linha):
+        for n, (_, grupo) in enumerate(p for linha in mo.palavras(boxes) for p in linha):
             palavra_do_box.update({i: n for i in grupo})
     finally:
         for b in sem_leitura:
@@ -257,8 +257,9 @@ def replay(livro: str, snapshot: Path, passo: str, indices=None, verdade: Path =
 
 
 def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
-    from abbychess import exportar as ex
+    from abbychess import montagem as mo
     from abbychess import pagina as pg
+    from abbychess import editar_boxes as eb
     from abbychess.atalhos import carregar as carregar_atalhos
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
@@ -280,7 +281,7 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
         from abbychess.leitor import rede_global
         sugeridor = LeitorDoLivro(projeto.pasta_de_padroes, rede=rede_global())
     fonte = pg.fonte_do_projeto(projeto)
-    indices = indices or projeto.paginas_lidas()
+    indices = indices or projeto.resumo.paginas_lidas()
     gabaritos = {i: json.loads((verdade / livro / f"i{i:03d}.json").read_text(encoding="utf-8"))
                  for i in indices}
 
@@ -306,7 +307,7 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
             navegacao.usar("trocar_pagina")
         # Os erros da página são os do snapshot, antes de qualquer correção (o reler
         # inclusive): o N da CA-F.2 não pode depender do passo nem da ordem das páginas.
-        linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
+        linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, mo)
         inicial = diferencas(boxes, linhas, caixas, palavra, gabarito)
         erros_iniciais = (len(inicial.acoes) + inicial.faltas + inicial.espacos
                           + inicial.caracteres_sem_par)
@@ -328,13 +329,13 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
                 # Com um padrão novo, a parte de um box colado pode sair certa ao dividir.
                 sem_colado.clear()
                 padroes_vistos = len(ensinados)
-            linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
+            linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, mo)
             dif = diferencas(boxes, linhas, caixas, palavra, gabarito)
             acao, da_fila = _proxima_acao(dif, boxes, leitor, disponiveis, imagem.height,
                                           mostrado)
             if acao is None:
                 colado = _colado(dif, boxes, sem_colado, disponiveis, imagem, leitor,
-                                 fonte, indice, ex, gabarito, mostrado)
+                                 fonte, indice, mo, gabarito, mostrado)
                 if colado is None:
                     break
                 acao, da_fila = ("divisao", colado), colado == mostrado
@@ -377,16 +378,16 @@ def _replay(livro, snapshot, passo, indices, verdade, pasta) -> dict:
             elif acao[0] == "sobra":
                 pg.descartar(boxes, acao[1])
             elif acao[0] == "divisao":
-                pg.dividir(imagem, boxes, acao[1], leitor)
+                eb.dividir(imagem, boxes, acao[1], leitor)
                 mostrado = acao[1]                          # a primeira parte
             elif acao[0] == "juncao":
-                pg.juntar(imagem, boxes, acao[1], acao[2], leitor)
+                eb.juntar(imagem, boxes, acao[1], acao[2], leitor)
                 mostrado = min(acao[1], acao[2])            # o box junto
             texto_conta.usar(f"{acao[0]}_da_fila" if da_fila else acao[0])
         else:
             raise RuntimeError(f"i{indice:03d}: o replay não convergiu")
 
-        linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, ex)
+        linhas, caixas, palavra = _linhas_da_pagina(boxes, fonte, indice, mo)
         dif = diferencas(boxes, linhas, caixas, palavra, gabarito)
         if dif.faltas:
             _faltas_pelo_mais_barato(texto_conta, dif, disponiveis)
@@ -462,7 +463,7 @@ def _proxima_acao(dif: Diferencas, boxes, leitor, disponiveis: dict, altura=None
 
 
 def _colado(dif: Diferencas, boxes, sem_colado: set, disponiveis: dict, imagem, leitor,
-            fonte, indice, ex, gabarito, mostrado=None):
+            fonte, indice, mo, gabarito, mostrado=None):
     """O box colado a dividir com o Ctrl+D, ou `None` (desde o catálogo 9).
 
     Um trecho que falta ao lado de um box pode ser o box que juntou dois glifos e foi lido
@@ -476,7 +477,7 @@ def _colado(dif: Diferencas, boxes, sem_colado: set, disponiveis: dict, imagem, 
     estimativas são do lado conservador: a parte errada custa o ensinar fora da fila."""
     from dataclasses import replace
 
-    from abbychess import pagina as pg
+    from abbychess import editar_boxes as eb
 
     dividir, ensinar = disponiveis.get("divisao"), disponiveis.get("substituicao")
     if dividir is None or ensinar is None:
@@ -493,10 +494,10 @@ def _colado(dif: Diferencas, boxes, sem_colado: set, disponiveis: dict, imagem, 
             sem_colado.add(caixa)
             copia = [replace(x) for x in boxes]
             try:
-                pg.dividir(imagem, copia, candidato, leitor)
+                eb.dividir(imagem, copia, candidato, leitor)
             except ValueError:
                 continue
-            linhas, caixas, palavra = _linhas_da_pagina(copia, fonte, indice, ex)
+            linhas, caixas, palavra = _linhas_da_pagina(copia, fonte, indice, mo)
             depois_de_dividir = diferencas(copia, linhas, caixas, palavra, gabarito)
             deixam = dif.faltas - depois_de_dividir.faltas
             if deixam <= 0:
@@ -517,7 +518,7 @@ def _colado(dif: Diferencas, boxes, sem_colado: set, disponiveis: dict, imagem, 
 
 def _fila(boxes, leitor, altura=None) -> list:
     """A fila de revisão da janela, com as margens no fim quando o código as tem
-    (`exportar.margens_da_pagina`, desde o `2e3d9a1`; a linha de base roda este arquivo no
+    (`margens.margens_da_pagina`, desde o `2e3d9a1`; a linha de base roda este arquivo no
     código do passo 0, que não as tem)."""
     from abbychess import exportar as ex
     from abbychess import pagina as pg

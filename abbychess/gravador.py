@@ -106,14 +106,10 @@ class Gravador:
             inicio = dict(self._tentativas)
             self._cond.notify_all()
             while True:
-                restantes = set(self._pendentes)
-                if self._gravando is not None:
-                    restantes.add(self._gravando)
+                restantes = self._restantes()
                 if not restantes:
                     return True
-                if self._gravando is None and all(
-                        p in self._falhas and self._tentativas.get(p, 0) > inicio.get(p, 0)
-                        for p in restantes):
+                if self._falharam_de_novo(restantes, inicio):
                     return False                # cada uma que sobrou já falhou de novo
                 espera = 0.05 if fim is None else min(0.05, fim - time.monotonic())
                 if espera <= 0:
@@ -146,6 +142,20 @@ class Gravador:
             self._cond.wait(None if not self._pendentes
                             else min(0.05, max(0.0, min(futuros, default=agora) - agora)))
 
+    def _restantes(self) -> set:
+        """As pendentes e a que está sendo gravada (com a trava)."""
+        restantes = set(self._pendentes)
+        if self._gravando is not None:
+            restantes.add(self._gravando)
+        return restantes
+
+    def _falharam_de_novo(self, restantes: set, inicio: dict) -> bool:
+        """Nenhuma sendo gravada, e cada uma das `restantes` falhou depois de `inicio` (as
+        tentativas de cada página no começo do `descarregar`)."""
+        return self._gravando is None and all(
+            p in self._falhas and self._tentativas.get(p, 0) > inicio.get(p, 0)
+            for p in restantes)
+
     def _rodar(self) -> None:
         while True:
             with self._cond:
@@ -161,28 +171,37 @@ class Gravador:
             except Exception as falha:           # disco cheio, sem permissão, antivírus
                 erro = falha
                 log.exception("a página p%d não foi gravada", pid)
-            with self._cond:
-                self._gravando = None
-                self._tentativas[pid] = self._tentativas.get(pid, 0) + 1
-                seguidas = 0
-                if erro is None:
-                    self.gravacoes += 1
-                    self._falhas.pop(pid, None)
-                    self._ultima_falha.pop(pid, None)
-                else:
-                    seguidas = self._falhas.get(pid, 0) + 1
-                    self._falhas[pid] = seguidas
-                    self._ultima_falha[pid] = self._relogio()
-                    if pid not in self._pendentes:    # nada mais novo: tenta o mesmo depois
-                        self._pendentes[pid] = instantaneo
-                        self._prazos[pid] = self._relogio() + min(
-                            ESPERA_MAXIMA, self.atraso * 2 ** seguidas)
-                self._cond.notify_all()
-            try:                                # um aviso que falha não para o gravador
-                if erro is None:
-                    if self.ao_gravar is not None:
-                        self.ao_gravar(pid)
-                elif seguidas == 1 and self.ao_falhar is not None:
-                    self.ao_falhar(pid, erro)
-            except Exception:
-                log.exception("o aviso do gravador falhou (página p%d)", pid)
+            seguidas = self._registrar_o_fim(pid, instantaneo, erro)
+            self._avisar_quem_ouve(pid, erro, seguidas)
+
+    def _registrar_o_fim(self, pid: int, instantaneo, erro: Optional[BaseException]) -> int:
+        """A gravação de `pid` terminou (com a trava): as contas dela e, se falhou, o mesmo
+        instantâneo de novo na fila, se nada mais novo veio. Devolve as falhas seguidas."""
+        with self._cond:
+            self._gravando = None
+            self._tentativas[pid] = self._tentativas.get(pid, 0) + 1
+            seguidas = 0
+            if erro is None:
+                self.gravacoes += 1
+                self._falhas.pop(pid, None)
+                self._ultima_falha.pop(pid, None)
+            else:
+                seguidas = self._falhas.get(pid, 0) + 1
+                self._falhas[pid] = seguidas
+                self._ultima_falha[pid] = self._relogio()
+                if pid not in self._pendentes:    # nada mais novo: tenta o mesmo depois
+                    self._pendentes[pid] = instantaneo
+                    self._prazos[pid] = self._relogio() + min(
+                        ESPERA_MAXIMA, self.atraso * 2 ** seguidas)
+            self._cond.notify_all()
+        return seguidas
+
+    def _avisar_quem_ouve(self, pid: int, erro: Optional[BaseException], seguidas: int) -> None:
+        try:                                # um aviso que falha não para o gravador
+            if erro is None:
+                if self.ao_gravar is not None:
+                    self.ao_gravar(pid)
+            elif seguidas == 1 and self.ao_falhar is not None:
+                self.ao_falhar(pid, erro)
+        except Exception:
+            log.exception("o aviso do gravador falhou (página p%d)", pid)

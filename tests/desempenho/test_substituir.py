@@ -33,13 +33,13 @@ def _livro_de_230(pasta, pdf_do_tamanho_da_fatia: bool = False):
     operações de página do passo L dependem disso)."""
     from abbychess.modelo import Box, Decisoes, gid_de
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_livro import PAGINAS as LINHAS, pdf_sintetico
+    from tests.ajudantes import PAGINAS as LINHAS, pdf_sintetico  # noqa: E402,F401,F811
 
     with zipfile.ZipFile(SNAPSHOT) as z:
         z.extractall(pasta / "fatia")
     fatia = ProjetoDeLivro.abrir(next(p.parent for p in (pasta / "fatia").rglob("projeto.json")))
     try:
-        modelos = [fatia.carregar_modelo(i) for i in fatia.paginas_lidas()]
+        modelos = [fatia.carregar_modelo(i) for i in fatia.resumo.paginas_lidas()]
     finally:
         fatia.fechar()
     if pdf_do_tamanho_da_fatia:
@@ -65,7 +65,7 @@ def _livro_de_230(pasta, pdf_do_tamanho_da_fatia: bool = False):
         pagina.diagramas = [replace(d) for d in molde.diagramas]
         pagina.estado = molde.estado
         projeto.salvar_modelo(pagina)
-    assert projeto.descarregar(60)
+    assert projeto.paginas_em_memoria.descarregar(60)
     return projeto
 
 
@@ -77,8 +77,9 @@ def _esperar(condicao, limite=120.0):
 
 
 def test_ca_7_2_substituir_todas_no_livro_e_um_ctrl_z(tmp_path, medidas):
-    from abbychess.controladores import ControladorDaBusca, ControladorDaSubstituicao
-    from tests.test_controlador import ExecutorManual, _controlador
+    from abbychess.controlador_da_substituicao import ControladorDaSubstituicao
+    from abbychess.controladores import ControladorDaBusca
+    from tests.ajudantes import ExecutorManual, _controlador  # noqa: E402,F401,F811
 
     projeto = _livro_de_230(tmp_path)
     try:
@@ -112,7 +113,7 @@ def test_ca_7_2_substituir_todas_no_livro_e_um_ctrl_z(tmp_path, medidas):
         desfazer_mb = ctl.historico.bytes / 2**20
 
         inicio = time.perf_counter()
-        ctl.desfazer()                                    # um Ctrl+Z
+        ctl.desfazedor.desfazer()                                    # um Ctrl+Z
         executor.tudo()
         t_desfazer = time.perf_counter() - inicio
         for i in range(PAGINAS):                          # todas voltaram
@@ -122,7 +123,7 @@ def test_ca_7_2_substituir_todas_no_livro_e_um_ctrl_z(tmp_path, medidas):
             assert agora.decisoes == antes.decisoes and agora.estado == antes.estado
             assert list(agora.zonas) == list(antes.zonas)
             assert [d.lado for d in agora.diagramas] == [d.lado for d in antes.diagramas]
-        ctl.refazer()
+        ctl.desfazedor.refazer()
         executor.tudo()
         assert sum(1 for i in range(PAGINAS)
                    if any(b.entry.char == "E" for b in projeto.carregar_modelo(i).boxes)) == PAGINAS

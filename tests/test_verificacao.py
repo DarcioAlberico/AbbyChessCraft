@@ -16,7 +16,7 @@ from abbychess import pagina as pg
 from abbychess import verificacao as vf
 from abbychess.leitor import FONTE_MANUAL
 
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 LINHAS = ("abc Bxf6 bca", "cab abc")
 
@@ -170,6 +170,17 @@ def test_nome_com_iniciais_entra_no_dicionario(tmp_path):
     assert not vf.adicionar(lex, "L.Shamkovich", arquivo)  # já estava
     assert not vf.adicionar(lex, "L.2", arquivo)
     assert vf.carregar_lexico("xx", arquivo).conhece("L.Shamkovich")
+
+
+def test_as_listas_extras_valem_sem_ir_para_o_dicionario_do_livro(tmp_path):
+    """A lista que o PyBoxEditor guarda ao lado do PDF vale na verificação, e a que não
+    existe é pulada; nada delas vai para o `lexico.txt` do projeto."""
+    extra = tmp_path / "livro.lexico.txt"
+    extra.write_text("nimzowitsch\n", encoding="utf-8")
+    arquivo = tmp_path / "lexico.txt"
+    lex = vf.carregar_lexico("xx", arquivo, extras=[extra, tmp_path / "nao_existe.txt"])
+    assert lex.conhece("Nimzowitsch") and not lex.conhece("Capablanca")
+    assert not arquivo.exists()
 
 
 def test_recorte_da_palavra_tem_a_palavra_e_folga(imagem, boxes, lex):

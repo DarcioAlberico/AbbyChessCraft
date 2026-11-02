@@ -4,12 +4,12 @@ from abbychess import nativo
 from abbychess import pagina as pg
 from abbychess import texto as tx
 from abbychess.controlador import ControladorDePagina
-from abbychess.controladores import ControladorDoLivro
+from abbychess.controlador_do_livro import ControladorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
 from tests import leitor_falso, servidor_falso
-from tests.test_controlador import ExecutorManual
-from tests.test_exportar_preciso import _pdf_digital
+from tests.ajudantes import ExecutorManual  # noqa: E402,F401,F811
+from tests.ajudantes import _pdf_digital  # noqa: E402,F401,F811
 
 
 def test_pdf_nativo_e_oferecido_e_cria_paginas_sem_ocr(tmp_path):
@@ -20,7 +20,7 @@ def test_pdf_nativo_e_oferecido_e_cria_paginas_sem_ocr(tmp_path):
     projeto = ProjetoDeLivro.criar(tmp_path / "projetos", "Digital", pdf)
     resultado = nativo.importar(projeto)
     assert resultado.importadas == (0, 1) and resultado.recusadas == ()
-    assert projeto.paginas_lidas() == [0, 1]
+    assert projeto.resumo.paginas_lidas() == [0, 1]
     pagina = projeto.carregar_modelo(0)
     assert "The knight on d5 is strong" in tx.texto(tx.montar(pagina))
     assert all(b.entry.source == nativo.FONTE_NATIVA and b.revisado for b in pagina.boxes)

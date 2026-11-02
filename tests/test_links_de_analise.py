@@ -13,6 +13,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from core.pagina import Figura, PaginaExtraida, Paragrafo  # noqa: E402
 
 from abbychess import epub  # noqa: E402
+from abbychess import validacao_do_epub as validacao  # noqa: E402
 from abbychess import escritor_docx  # noqa: E402
 from abbychess import exportar as ex  # noqa: E402
 from abbychess import links_de_analise as la  # noqa: E402
@@ -98,7 +99,7 @@ def test_o_epub_poe_o_link_so_no_diagrama_lido(tmp_path):
     assert corpo.count('class="analise"') == 1
     assert ('<a class="analise" href="https://lichess.org/analysis/standard/'
             '8/8/8/8/8/8/8/K6k_w_-_-_0_1?color=black">Analisar no Lichess</a>') in corpo
-    assert epub.conferir(caminho) == []
+    assert validacao.conferir(caminho) == []
 
 
 def test_o_epub_sem_link_sai_igual_ao_de_antes(tmp_path, monkeypatch):

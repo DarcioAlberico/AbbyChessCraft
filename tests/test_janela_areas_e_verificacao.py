@@ -13,19 +13,10 @@ from core import lexico
 from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL
 
-from tests.test_janela import _esperar, app, janela  # noqa: F401  (fixtures)
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
+from tests.fixturas_janela import janela  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
-
-
-def _ler_a_mao(app, janela):  # noqa: F811
-    """Reconhece e dá aos glifos a leitura certa, como se a rede tivesse lido."""
-    letras = list("abcabcabc" + "cabbca")
-    janela.reconhecer()
-    _esperar(app, janela)
-    assert len(boxes(janela)) == len(letras)
-    for b, c in zip(boxes(janela), letras):
-        b.char, b.source, b.confidence = c, "neural", 0.99
-    janela._glifos_mudaram()
+from tests.ajudantes import _ler_a_mao  # noqa: E402,F401,F811
 
 
 # ----------------------------------------------------------------------
@@ -126,7 +117,7 @@ def test_funcao_e_ordem_das_areas_atualizam_o_documento_e_desfazem(app, janela):
     janela.areas.escolher(0)
     janela.areas.trocar_funcao_atual("titulo")
     assert janela.pagina.documento().blocos[0].funcao == "titulo"
-    janela.pagina.desfazer()
+    janela.pagina.desfazedor.desfazer()
     assert janela.areas.zonas[0].funcao == "texto"
 
     janela.areas.iniciar_ordenacao()
@@ -137,14 +128,73 @@ def test_funcao_e_ordem_das_areas_atualizam_o_documento_e_desfazem(app, janela):
 
 
 def test_esc_cancela_a_ordenacao_sem_mudar_as_areas(app, janela):  # noqa: F811
+    """O Esc de verdade, com o foco no visor: a ação global do Esc o leva antes do visor, e
+    cancelava outra coisa (CA-5.5)."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+
     janela.acao_areas.setChecked(True)
     janela.modo_areas(True)
     _esperar(app, janela)
     antes = list(janela.areas.zonas)
     janela.areas.iniciar_ordenacao()
     janela.areas.escolher(0)
-    janela.areas.cancelar_ordenacao()
+    janela.visor.setFocus()
+    QTest.keyClick(janela.visor, Qt.Key.Key_Escape)
+    assert not janela.areas.ordenando
     assert janela.areas.zonas == antes
+
+
+def test_ca_5_5_ordenar_quatro_areas_na_ordem_inversa(app, janela):  # noqa: F811
+    """Quatro zonas clicadas da última à primeira: o Documento sai nessa ordem, e o Ctrl+Z
+    a desfaz num passo."""
+    _ler_a_mao(app, janela)
+    largura, altura = janela.pagina.imagem.size
+    quarto = altura // 4
+    janela.pagina.modelo.zonas = [zn.Zona(zn.TEXTO, 0, k * quarto, largura, (k + 1) * quarto,
+                                          id=f"z{k}") for k in range(4)]
+    janela.areas.iniciar_ordenacao()
+    for k in (3, 2, 1, 0):
+        janela.areas.escolher(k)
+    assert not janela.areas.ordenando
+    assert [z.ordem for z in janela.areas.zonas] == [3, 2, 1, 0]
+    ids = [b.zona_id for b in janela.pagina.documento().blocos if b.zona_id]
+    assert ids == sorted(ids, reverse=True)
+    janela.pagina.desfazedor.desfazer()
+    assert all(z.ordem is None for z in janela.areas.zonas)
+
+
+def test_apagar_no_meio_do_ordenar_cancela_a_ordenacao(app, janela):  # noqa: F811
+    _ler_a_mao(app, janela)
+    largura, altura = janela.pagina.imagem.size
+    quarto = altura // 4
+    janela.pagina.modelo.zonas = [zn.Zona(zn.TEXTO, 0, k * quarto, largura, (k + 1) * quarto,
+                                          id=f"z{k}") for k in range(4)]
+    janela.areas.iniciar_ordenacao()
+    janela.areas.escolher(3)
+    janela.areas.escolher(1)
+    janela.areas.apagar(0)
+    assert not janela.areas.ordenando
+    janela.areas.escolher(0)                    # um clique comum, sem ValueError
+    assert janela.areas.atual == 0
+
+
+def test_ca_5_4_o_modelo_vai_so_as_impares_e_aparece_na_pagina_aberta(app, janela):  # noqa: F811
+    """O modelo de áreas aplicado às ímpares de um intervalo: as zonas só nelas, num passo
+    do desfazer; a página aberta, ainda não lida, já mostra as zonas."""
+    largura, altura = janela.pagina.imagem.size
+    janela.pagina.modelo = None
+    janela.areas.modelo = zn.ModeloDeAreas(
+        largura, altura, (zn.Zona(zn.TEXTO, 10, 10, largura - 10, altura - 10, id="z0"),))
+    total = janela.fonte.total
+    impares = [i for i in range(total) if (i + 1) % 2 == 1]
+    janela.areas.aplicar_modelo(impares)
+    for i in range(total):
+        tem = bool(janela.projeto.carregar_zonas(i))
+        assert tem == (i in impares), i
+    assert janela.pagina.indice in impares and janela.areas.zonas
+    janela.pagina.desfazedor.desfazer()
+    assert not any(janela.projeto.carregar_zonas(i) for i in range(total))
 
 
 def test_reconhecer_so_a_zona_preserva_boxes_de_fora(app, janela):  # noqa: F811
@@ -156,7 +206,7 @@ def test_reconhecer_so_a_zona_preserva_boxes_de_fora(app, janela):  # noqa: F811
     pagina.escolher(fora.gid)
     pagina.corrigir("Z")
 
-    pagina.reconhecer_zona(alvo)
+    pagina.leitura.reconhecer_zona(alvo)
     _esperar(app, janela)
 
     assert pagina.modelo.box(fora.gid).entry.char == "Z"
@@ -227,3 +277,66 @@ def test_clique_no_glifo_abre_o_treino(app, janela):  # noqa: F811
     janela.verificacao._clicar((x1 + x2) / 2, 0)
     assert janela.inspetor.atual() == "glifo"
     assert atual(janela) == palavra.indices[1]
+
+
+def test_o_clique_no_recorte_da_palavra_abre_o_glifo_no_treino(app, janela):  # noqa: F811
+    """O clique de verdade no recorte ampliado (centrado no painel): o botão esquerdo no
+    glifo do meio o abre no Glifo; o direito não."""
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+
+    _ler_a_mao(app, janela)
+    janela.resize(1366, 768)
+    janela.show()
+    janela.verificador.lexico = lexico.Lexico(palavras={"abc", "cab"})
+    janela.verificar_texto()
+    app.processEvents()
+    painel = janela.verificacao
+    recorte, palavra = painel.recorte, janela.verificador.desconhecidas[0]
+    imagem = recorte.pixmap()
+    colunas = [x for x in range(imagem.width()) if painel.glifo_em(x) == palavra.indices[1]]
+    assert 0 < colunas[0] and colunas[-1] < imagem.width() - 1      # o do meio, entre dois
+    ponto = QPoint(int((recorte.width() - imagem.width()) / 2 + (colunas[0] + colunas[-1]) / 2),
+                   recorte.height() // 2)
+    QTest.mouseClick(recorte, Qt.MouseButton.RightButton, pos=ponto)
+    assert janela.inspetor.atual() == "palavra"
+    QTest.mouseClick(recorte, Qt.MouseButton.LeftButton, pos=ponto)
+    assert janela.inspetor.atual() == "glifo"
+    assert atual(janela) == palavra.indices[1]
+
+
+def test_o_texto_noutro_idioma_avisa_uma_vez(app, janela, monkeypatch):  # noqa: F811
+    """Mirkovic, em inglês num projeto em português: a verificação diz que o dicionário é o
+    errado, e onde trocar; só uma vez por página."""
+    from abbychess import idioma
+
+    _ler_a_mao(app, janela)
+    janela.projeto.dados.idioma = "pt"
+    monkeypatch.setattr(idioma, "provavel", lambda texto: "en")
+    janela.verificador.lexico = lexico.Lexico(palavras={"abc", "cab"})
+    janela.verificar_texto()
+    mensagem = janela.statusBar().currentMessage()
+    assert "parece em inglês" in mensagem and "português" in mensagem and "Opções" in mensagem
+    janela.statusBar().clearMessage()
+    janela.verificador.recontar(0)
+    assert "parece em" not in janela.statusBar().currentMessage()
+    # Trocar o idioma nas opções esquece o léxico (o do idioma novo vem no próximo F7).
+    opcoes = janela.pagina.padroes_do_livro
+    assert opcoes.definir_idioma("en") and not opcoes.definir_idioma("en")
+
+
+def test_a_camada_do_pdf_sugere_no_campo(app, janela, monkeypatch):  # noqa: F811
+    """A palavra marcada chega com a leitura da camada de texto do PDF no campo, quando o
+    léxico a conhece (`camada.opinioes`)."""
+    from abbychess import camada
+
+    _ler_a_mao(app, janela)
+    ultimos = boxes(janela)[-3:]
+    caixa = (min(b.x1 for b in ultimos), min(b.y1 for b in ultimos),
+             max(b.x2 for b in ultimos), max(b.y2 for b in ultimos))
+    monkeypatch.setattr(camada, "da_pagina", lambda *_a: [camada.PalavraDaCamada(caixa, "cab")])
+    janela.verificador.lexico = lexico.Lexico(palavras={"abc", "cab"})
+    janela.verificar_texto()
+    assert [(d.palavra, d.sugestao) for d in janela.verificador.desconhecidas] == [("bca", "cab")]
+    assert janela.verificacao.campo.text() == "cab"
+    assert "camada do PDF" in janela.verificacao.lido.text()

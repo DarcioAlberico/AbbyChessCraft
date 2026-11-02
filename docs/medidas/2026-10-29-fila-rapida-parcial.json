@@ -1,0 +1,65 @@
+{
+ "data": "2026-10-29",
+ "rotulo": "fila-rapida-parcial",
+ "exitstatus": 0,
+ "metas_ausentes": [
+  "enter_ensinar",
+  "memoria_do_desfazer",
+  "atraso_durante_o_lote",
+  "memoria_total_com_o_lote"
+ ],
+ "ordem": "cada módulo tem a janela e o projeto dele, em ordem fixa: na linha de base o Enter ensina antes da releitura; o lote (desde o E, em test_servidor.py) lê num projeto novo, sem padrões",
+ "configuracao": "desde o passo E, a janela com o servidor de leitura (o leitor real no filho), como o programa abre o projeto",
+ "ambiente": {
+  "objetos_congelados": 0,
+  "maquina": "DESKTOP-E025G20",
+  "maquina_cadastrada": true,
+  "cpu": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
+  "ram_gb": 15.9,
+  "python": "3.13.2",
+  "pyside6": "6.11.1",
+  "pymupdf": "1.26.6",
+  "torch": "2.14.0+cpu",
+  "threads_do_torch": 6,
+  "commit": "223ea36",
+  "arvore_suja": true,
+  "arquivos_sujos": [
+   "?? .idea/",
+   "?? corrigir_lances.py"
+  ]
+ },
+ "medidas": {
+  "troca_de_pagina": {
+   "p50_ms": 17.39,
+   "p95_ms": 25.31,
+   "max_ms": 27.11,
+   "n": 30,
+   "alvo_no_cache_ms": 150,
+   "como": "mesmo processo, alternando 2 páginas lidas, as duas no cache (desde o A1)"
+  },
+  "troca_fora_do_cache": {
+   "p50_ms": 132.7,
+   "p95_ms": 150.07,
+   "max_ms": 159.05,
+   "n": 12,
+   "alvo_ms": 600,
+   "como": "mesmo processo, o cache de páginas e o de pixmaps esvaziados antes de cada troca (o processo novo, com a primeira carga do PDF, não está nesta medida); 2 aquecimentos e 12 repetições, não os 5 e 30 da §15.3: cada troca renderiza e endireita a página de novo, e a medida inteira segue em poucos segundos"
+  },
+  "texto_da_pagina": {
+   "p50_ms": 24.21,
+   "p95_ms": 28.5,
+   "max_ms": 30.64,
+   "n": 30,
+   "como": "refazer o painel de texto da página (montar o documento e pôr no painel), que desde o 2b roda 150 ms depois da última mudança, e não dentro do Enter nem da releitura"
+  },
+  "releitura_de_um_glifo": {
+   "p50_ms": 74.28,
+   "p95_ms": 85.32,
+   "max_ms": 116.03,
+   "n": 30,
+   "alvo_ms": 150,
+   "pelo_servidor": 30,
+   "como": "Alt+→/← alternados num glifo, do comando à leitura dele (pelos padrões na janela, ou pelo servidor, sem o lote; com o lote: releitura_com_o_lote)"
+  }
+ }
+}

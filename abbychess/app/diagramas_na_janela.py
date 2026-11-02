@@ -11,7 +11,7 @@ from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QImage
 
 from abbychess.app import acoes
-from abbychess.app.documento import imagem_do_diagrama
+from abbychess.app.imagens import imagem_do_diagrama
 from abbychess.app.editor_diagrama import EditorDeDiagrama
 from abbychess.app.painel_diagramas import PainelDeDiagramas
 

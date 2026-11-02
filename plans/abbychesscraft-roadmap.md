@@ -30,7 +30,10 @@ Paralelos, só com git e worktrees e com arquivos disjuntos:
   passo depois do 2a).
 - Atalho novo entra primeiro em `docs/atalhos.yaml` (CA-3.7).
 - Verificação, sempre:
-  - `.venv\Scripts\python.exe -m pytest -q -n auto` (< 60 s; em paralelo desde 2026-10-23);
+  - `.venv\Scripts\python.exe -m pytest -q -n auto` (< 90 s, o `conftest` reprova acima,
+    desde 2026-10-30; era < 60 s; em paralelo desde 2026-10-23,
+    no máximo 4 workers desde 2026-10-28); uma carga pesada por vez: nunca duas suítes, ou uma
+    suíte e uma medida, ao mesmo tempo em sessões ou subagentes;
   - `-m processo` quando o passo toca processo ou gravação;
   - `ABBY_PORTAO=1 .venv\Scripts\python.exe -m pytest -q -m "livro_real or desempenho"` no
     fechamento;
@@ -391,8 +394,17 @@ automaticamente as três páginas da amostra dentro desse intervalo, abre a fila
 mostra a evolução dos pendentes e dos padrões no cartão Saúde, na gaveta e no estado vazio
 do Documento; o cartão também oferece o lote completo e o destaca ao atingir o limiar
 (CA-9.4). A faixa Linha única substituiu o antigo recorte “Na linha” do Inspetor Glifo e
-continua sincronizada com a fila e o Documento. A medição do itálico em imagens OCR aguarda
-uma régua pública do core; CA-9.1 também continua pendente.
+continua sincronizada com a fila e o Documento. O itálico no OCR e o CA-9.1 saíram nas
+pendências (a régua do itálico é do AbbyChessCraft; o CA-9.1, definitivo em 2026-10-28).
+
+**Fechamento (2026-10-28, `docs/revisoes/passo-i.md`).** As revisões de código e de produto
+do fechamento pegaram, entre outras coisas: o estilo não medido valia como reto no k-NN (o
+`Estilo` passou a ter três estados por eixo); o filtro do efeito não chegava ao lote nem ao
+F5 (`pagina.reler_pelo_efeito`); a camada nativa rodava na thread da interface; a ligadura
+saía `ﬁ` na exportação; o fim da amostra deixava a janela fora dela e o primeiro Enter sem
+efeito; o cartão Saúde não tinha os pendentes por página nem o limiar escolhível; o CA-9.4
+não era medido por gestos (agora `tests/test_ca_9_4.py`, e a cláusula de desempenho em
+`tests/desempenho/test_carregar_modelos.py`).
 
 **Tarefas.**
 1. O livro novo guiado:
@@ -500,8 +512,11 @@ sobre os gabaritos do Xadrez Vitorioso: os 2 diagramas com lances saem confiáve
 perturbações (semente 1234), 23 tocam uma casa usada pela linha e as 23 são detectadas
 (1,0 ≥ 0,6), nenhuma afetada sai confiável. As 73 não afetadas que saem confiáveis estão
 fora do alcance de qualquer validação pelos lances; a precisão 1,0 "nas perturbadas" do
-CA-10.1 só é atingível lida sobre as afetadas — **decisão pendente do usuário** sobre a
-redação do critério.
+CA-10.1 só é atingível lida sobre as afetadas. **Resolvido com o sim do usuário** (ver
+"Pendências"): a precisão 1,0 nos FEN do gabarito e a detecção ≥ 60% das perturbadas afetadas,
+as não afetadas fora da conta. A medida joga os lances rotulados no gabarito
+(`lances_seguintes`), não a linha que o programa extrai do OCR: ela mede a validação, não o
+extrator (na p. 25 o extrator pega a linha hipotética da prosa, "11...Cxd5").
 
 A conferência deixou de ser um diálogo modal: é o editor Diagrama do Inspetor
 (`app/editor_diagrama.py`). A Imagem enquadra o diagrama impresso (`VisorDePagina.enquadrar`)
@@ -519,7 +534,8 @@ diagrama (nunca no diagrama errado depois de um F5, desfazer ou edição de áre
 página mantém as casas em edição; sem casa a desfazer, o Ctrl+Z no editor desfaz a página
 (a conferência); a aba lê o livro sem passar pelo cache de páginas.
 
-**Concluído em 2026-10-22**, salvo a decisão pendente sobre a redação do CA-10.1.
+**Concluído em 2026-10-22**; o CA-10.1 com a redação nova em 2026-10-23; o fechamento formal
+em 2026-10-28 (`docs/revisoes/passo-h.md`).
 
 **Tarefas.**
 1. ~~O editor Diagrama no Inspetor, com a Imagem dando zoom no diagrama, PgUp e PgDn pelo
@@ -642,8 +658,9 @@ DOCX iguais byte a byte com o mesmo `SOURCE_DATE_EPOCH`).
    prévia que chega depois de fechar o diálogo é ignorada, fechar o diálogo fecha a prévia e
    libera a memória, Exportar espera a prévia em curso, e a prévia do TXT é o próprio TXT.)
 6. ~~Validação automática (EPUBCheck, Ace, referências internas e smoke tests de leitores).~~
-   (EPUBCheck e Ace na rodada 2; o Calibre nas pendências, `18af9f0`. Thorium e o leitor do
-   celular pedem quem os abra.)
+   (EPUBCheck e Ace na rodada 2; o Calibre nas pendências, `18af9f0`; o Thorium conferido
+   pelo usuário em 2026-10-30, com os EPUB do Odds & Ends e do Mirkovic exportados em
+   `2242ccf`; no celular, os mesmos EPUB no ReadEra, conferidos pelo usuário no mesmo dia.)
 7. ~~Deduplicação/otimização de recursos e divisão dos XHTML por capítulo e tamanho.~~
    (A otimização sem perda das imagens, nas pendências, `3d7d66c`.)
 8. ~~`SOURCE_DATE_EPOCH` e pacote byte a byte reprodutível.~~
@@ -743,6 +760,15 @@ testadas uma a uma, não pela diferença declarada); as aspas curvas do core (PD
 escritores próprios não aplicam. Os gabaritos do EPUB (EPUBCheck 5.4.0 e Ace 1.4.6) passam
 sem violação, erro ou advertência.
 
+**O fechamento formal pela §16** foi feito em 2026-10-28 (`docs/revisoes/passo-j.md`):
+código aceito na rodada 3 e produto na 2, com o portão. A opção cinza do diálogo vale o
+padrão; o relatório tem uma linha por página, que o duplo clique abre; o intervalo de
+páginas; o PDF reproduzível; a página lida ganha as áreas automáticas (o sumário com
+capítulos no livro de referência); a exportação medida em
+`docs/medidas/2026-10-29-exportacao-xv.json` (o EPUBCheck, o Ace e o Calibre sem problema, os
+cinco formatos com os mesmos bytes). O Thorium e o ReadEra, no celular, conferidos pelo
+usuário (2026-10-30).
+
 ## Passo K — Aparência e teclado (§13, §3.4)
 
 **Execução iniciada em 2026-10-22, ramo `passo-i-treino`.** Rodada 1: `app/estilo.py` tem
@@ -770,11 +796,14 @@ cobre a janela e os diálogos, com os botões internos do Qt nomeados. O perfil 
 entrou com as ações que só ele tem (Ctrl+F7, Alt+4, Ctrl+Tab, Ctrl+1…5), e
 **Ferramentas › Teclado…** escolhe o perfil e troca as teclas pelas regras do YAML, sem
 reiniciar, lembrado no `QSettings` (os testes usam um INI temporário). Desempenho: a
-`QImage` da página nasce na thread que a renderiza (a troca no cache, 23 → 13 ms); a trava
-da fonte cobre só o render do fitz, e a medida da inclinação (~370 ms) não segura mais o
-clique noutra página; a pré-carga segue o sentido do passo e, quem folheia (trocas a menos
-de 1 s), a tem já: parado 0,25 s em cada página nunca vista, ~390 → ~250 ms por troca
-(medido no Xadrez Vitorioso, offscreen).
+`QImage` da página nasce na thread que a renderiza; a trava da fonte cobre só o render do
+fitz, e a medida da inclinação (~370 ms) não segura mais o clique noutra página; a pré-carga
+segue o sentido do passo e, quem folheia (trocas a menos de 1 s), a tem já. No portão do
+fechamento (`docs/medidas/2026-10-28-passo-fechamento.json`, §15.3): a troca no cache p95 52 ms (alvo 150; era 19,7 ms em 23/10, e a
+bisseção pôs a alta em `2e3d9a1`, a fila que calcula o que a exportação tira; ver
+`docs/revisoes/passo-k.md`; de volta a 25,3 ms em `223ea36`), fora do cache p95 175 ms (alvo 600), e quem folheia páginas
+nunca vistas, parado 0,25 s em cada, p50 283 / p95 335 ms por troca, com a maior parada da
+interface p95 6,4 ms.
 
 **Pendente.** O render do fitz segura o GIL (~80 ms por página nunca vista, a interface
 para nesse tempo durante a pré-carga); tirá-lo da interface pede um processo, como o
@@ -805,6 +834,15 @@ mudaria os ângulos gravados dos projetos novos: fica para quando houver gabarit
      pedida.
 
 **Verificação.** CA-13.1, CA-13.2 e CA-13.3; CA-3.3 e CA-3.7 nos dois perfis.
+
+**O fechamento formal pela §16** foi feito em 2026-10-28 (`docs/revisoes/passo-k.md`):
+código aceito na rodada 2 e produto na 2, com o portão
+(`docs/medidas/2026-10-28-passo-fechamento.json`). O tema põe o estilo Fusion (o nativo do
+Windows deixava os controles ilegíveis no escuro); o HTML guardado segue o tema; o Ctrl+Tab do
+FineReader se reatribui; os textos citam a tecla do perfil; o banco mede quem folheia. A
+troca no cache (52 ms) e a releitura de um glifo (166 ms, acima do alvo de 150), mais lentas
+desde `2e3d9a1`, voltaram em `223ea36` a 25,3 e 85,3 ms no p95 (`docs/medidas/2026-10-29-fila-rapida-parcial.json`). A nota humana da
+CA-13.2 é do usuário.
 
 ## Passo L — Editor de imagem e páginas (§12.4)
 
@@ -962,9 +1000,10 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
 
 - A exportação lê a página pela `OrdemDeLeitura` do Documento (F, J): as duas liam igual em
   157 de 160 páginas de 8 livros, e nas 3 outras a da exportação inventava colunas.
-- A pré-carga renderiza o PDF num processo à parte (K): a interface não para mais ~85 ms a
-  cada página nunca vista (a maior parada, 13–14 ms).
-- A suíte rápida roda em paralelo (`-n auto`, pytest-xdist): ~32–39 s.
+- A pré-carga renderiza o PDF num processo à parte (K): a interface não para mais a cada
+  página nunca vista (a maior parada, p95 6,4 ms, folheando; `docs/medidas/2026-10-28-passo-fechamento.json`).
+- A suíte rápida roda em paralelo (`-n auto`, pytest-xdist): ~32–39 s sem teto; com o teto de 4
+  workers (2026-10-28, contra os travamentos por falta de memória), ~57 s com 3.
 
 - O itálico no OCR (I), com uma régua do AbbyChessCraft (o core não tem): no Odds & Ends, 0
   falsos em 17.941 palavras retas e ~96% das itálicas (`ferramentas/medir_italico.py`).
@@ -1018,8 +1057,32 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
   as letras inseridas no Documento desde o D1 (o clique e uma tecla por letra). Linha de base
   1.076, passo L 739: 68,7%.
 
-Continuam: os FEN e a estrutura das p. 21–27; o EPUB no
-Thorium e no celular. A página pedida na hora renderiza
+- A estrutura, os FEN e os lados das p. 21–27 revisados pelo usuário (`8194283`, pela folha de
+  `ferramentas/folha_de_conferencia.py`, `d47eb41`): a estrutura ficou como estava. Medido de
+  novo no `8194283`: o CA-9.1 aprova como **definitivo** (o CER do corpo 4,22% → 4,22%, nenhum
+  glifo estragado); o CA-F.1 segue em 1.076 → 739 (68,7%); os 7 FEN do gabarito são iguais aos
+  lidos (0 casa errada), e o lado sai certo em 2 dos 5 diagramas que o dizem. Os três estados
+  agora só esperam a conferência cega (§15.2: uma página transcrita e um FEN montado às cegas);
+  a qualidade, também as 28 linhas do sumário (i007) sem texto verificado.
+
+- O corte e a divisão marcados sobre a imagem, com prévia (a dívida do fechamento do L,
+  §12.4): a miniatura da página nos diálogos, com o retângulo e a linha arrastáveis, ligados
+  aos campos de porcentagem (`abbychess/app/previa_da_pagina.py`).
+- A origem da amostra numa página apagada oferece restaurá-la na hora (a outra dívida do
+  fechamento do L, §12.4): a pergunta na barra, e o Enter devolve a página e vai ao glifo.
+- O EPUB no Thorium, conferido pelo usuário (2026-10-30): os do Odds & Ends (375 páginas,
+  235 capítulos, 217 diagramas desenhados) e do Mirkovic, exportados em `2242ccf` com o link
+  do Lichess e sem erro no EPUBCheck. O sumário, as páginas impressas, os diagramas e os
+  links deles, os links internos, os símbolos e o modo escuro saíram certos.
+- O EPUB no celular, conferido pelo usuário (2026-10-30): os mesmos dois no ReadEra, com
+  os símbolos de avaliação e as figurinas normais.
+- O negrito e o itálico na página escaneada (2026-10-30, com o pedido do usuário;
+  `docs/revisoes/pendencias.md`): medidos no Odds & Ends limpo e degradado como escaneado
+  (`ferramentas/medir_efeitos.py`). Nas páginas de validação, o itálico achado passa de
+  95,9 / 88,7 / 0 / 37,8% (limpa, escaneada, preto e branco, ruim) a 99,8 / 98,9 / 99,1 /
+  99,0%, sem falsos; o negrito, de 78,6 / 39,7 / 70,7 / 23,4% a 98,9 / 90,8 / 94,5 / 71,0%.
+
+Continuam: a conferência cega da fatia. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).
 
 ---

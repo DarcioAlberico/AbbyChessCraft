@@ -25,7 +25,10 @@ py -3.13 -m venv --system-site-packages .venv
 ```
 
 Os testes vêm em camadas (SPEC §15.1). A suíte rápida roda sempre e fica abaixo de 60 s em
-paralelo (`-n auto`, do pytest-xdist: ~32 s em 12 núcleos; em série, ~100 s); as outras rodam
+paralelo (`-n auto`, do pytest-xdist: ~57 s com 3 workers; em série, ~100 s). O `-n auto` abre
+no máximo 4 workers, e menos se a memória livre não couber 1,5 GB para cada um
+(`tests/conftest.py`): sem o teto, suítes e medidas ao mesmo tempo esgotavam os 16 GB e
+travavam a máquina. Uma carga pesada por vez (suíte, medidas, replay, Ace); as outras rodam
 com `-m`, em série, porque as de desempenho medem tempo:
 
 ```text
@@ -51,10 +54,18 @@ letra solta em campo de texto, Ctrl+Alt e ligação nativa encoberta sem exceç�
 
 ## O fluxo de treino
 
-1. **Novo projeto** (Ctrl+N) liga um PDF ou uma imagem a uma pasta de projeto do livro. Se a
-   régua conservadora do `core.pdf_nativo` encontra texto tipográfico confiável no PDF, o
-   programa oferece importá-lo: aceitando, cria essas páginas diretamente e não pede OCR ao
-   servidor; as páginas recusadas pela régua continuam disponíveis para o F5 ou o lote.
+1. **Novo projeto** (Ctrl+N) liga um PDF ou uma imagem a uma pasta de projeto do livro. Um
+   formulário só pede o nome, o idioma e o intervalo do corpo (sem capa e sumário); Enter o
+   aceita. Se a régua conservadora do `core.pdf_nativo` encontra texto tipográfico confiável
+   no PDF, o programa oferece importá-lo (numa thread, com progresso): aceitando, cria essas
+   páginas diretamente e não pede OCR ao servidor; as recusadas continuam para o F5 ou o lote.
+   Com os modelos prontos, três páginas do corpo (a 10%, 50% e 90% dele) são reconhecidas
+   como **amostra**; a janela abre a primeira delas com a fila por caractere, o primeiro
+   glifo no Glifo e o foco no campo, e o Enter seguinte já ensina (CA-9.4: do Ctrl+N ao
+   primeiro Enter, 3 gestos além dos diálogos de arquivo, em `tests/test_ca_9_4.py`). O
+   cartão **Saúde do livro**, na gaveta e no estado vazio do Documento, mostra os pendentes
+   de cada página da amostra, antes e agora (cada página é um link para ela), e destaca
+   "Reconhecer o livro" quando eles caem até o limiar escolhido no próprio cartão.
 2. **Reconhecer página** (F5) segmenta a página, separa os diagramas do texto, lê cada glifo
    e lê cada diagrama em FEN, que entra no texto reconhecido da página.
 3. O **Inspetor**, à direita, mostra o glifo menos confiável, ampliado e na linha em que
@@ -184,9 +195,8 @@ mais como texto puro:
   o rodapé corridos** (a linha curta na faixa de cima ou de baixo, separada do texto, com o
   número da página: a mesma regra que os tira da exportação) saem em cinza pequeno, e
   **Ctrl+Shift+H** (ou "Cabeçalhos e rodapés", na barra do Documento) os oculta. Os títulos
-  em negrito e as notas em corpo menor dependem da função das áreas, que só o layout do
-  passo F dá: até lá, o título sai como o corpo. Refluir as linhas em parágrafos também fica
-  para o F: sem os parágrafos, o título e o corpo da mesma área se juntariam.
+  em negrito e as notas em corpo menor vêm da função das áreas (desde o passo F: o título, a
+  legenda, a nota, o cabeçalho e o rodapé aprendidos pelo livro; ver "Editor de áreas").
 - **Os diagramas no lugar deles**, inteiros: o desenho da posição lida (o recorte da página,
   se ainda não lida), a linha do diagrama em monoespaçado, o estado (conferido, lido e não
   conferido, não lido; o "confiável pelos lances" de §6.1 vem com a validação pelos lances,
@@ -242,10 +252,13 @@ O Documento se edita como um editor de texto, e cada edição vira o que ela é 
   Backspace no segundo "s" tira o segundo). As edições que mudam a estrutura (glifo tirado,
   glifo virtual) avisam na Linha e na barra de status ("casxa → casa: 1 glifo tirado · Ctrl+Z
   desfaz").
-- **Ainda não** (passo G): trocar duas letras por uma ("rn" → "m", que é juntar os glifos) ou
-  uma por duas ("m" → "rn", dividir, e também uma letra no meio de uma ligadura como "fi").
-  A sessão é recusada, a palavra volta ao que era, e a Linha diz "este tipo de edição chega
-  numa próxima versão". Negrito, itálico e sublinhado e o parágrafo novo também são do G.
+- **Desde o passo G**: duas letras viram uma ("rn" → "m" junta os glifos num box) e uma vira
+  duas ("m" → "rn" divide o box pela tinta, ou faz uma caixa de duas letras quando a tinta
+  não tem vão); a mesma edição pode mexer nas palavras ao mesmo tempo ("rn b" → "mb").
+  Apagar o hífen de fim de linha junta a palavra: o Documento continua mostrando as linhas
+  como impressas, e a exportação sai "exemplo". **Ctrl+Shift+Enter** começa um parágrafo no
+  começo da linha do cursor (de novo, tira), e **Ctrl+B/I/U** alternam negrito, itálico e
+  sublinhado na seleção; tudo entra no Ctrl+Z.
 - **As figurinas** (§6.4): num lance que você digitou, a letra da peça vira figurina ao
   confirmar, quando o livro é de figurinas ("Cf3" → "♘f3" em português; "Nf3" → "♘f3" em
   inglês; "(Cf3)," → "(♘f3),"). O lance que ficou igual e no mesmo lugar não muda. **Opções ›
@@ -328,10 +341,11 @@ você digita:
   tabela da edição no Documento (§6.3): uma letra trocada fica `manual`, uma letra que sobra
   tira o glifo dela, uma que falta vira glifo virtual; as correções de leitura comuns têm
   tradução ("cassa" → "casa", "ivro" → "livro", "conc1uir" → "concluir", "casas" → "casa").
-  Só o que é do passo G fica de fora: duas letras virando uma, ou uma virando duas, no mesmo
-  trecho ("rn" → "m", "m" → "rn", e também "casa" → "lar", onde "sa" vira "r"). Esse caso
-  aparece na prévia desmarcado e desabilitado, com o trecho e o motivo na dica, e na página
-  aberta fica de fora, com o aviso. Substituir não ensina nem marca nada como revisado.
+  Desde o passo G, duas letras virando uma ou uma virando duas também se aplicam ("rn" →
+  "m", "m" → "rn", "casa" → "lar"); na substituição, o "m" → "rn" faz uma caixa de duas
+  letras (sem a imagem, ele não divide pela tinta: isso é da edição no Documento).
+  Substituir não ensina nem marca nada como revisado, nem os boxes que nascem de juntar ou
+  dividir.
 - Tudo o que uma vez Substituir ou Todas trocou, mesmo no livro inteiro, é **um passo** do
   desfazer: um Ctrl+Z volta todas as páginas. Uma página editada entre a prévia e o Aplicar
   recebe a troca na versão de agora, se as palavras de cada caso ainda são as mesmas; senão
@@ -352,8 +366,8 @@ você digita:
   página com pendentes (e o Alt+↑ no primeiro, a anterior), pelo resumo do `livro.json`, sem
   abrir as páginas; nas palavras, a página seguinte; o contador diz "3/12 · livro 410". A
   fila julga de novo só os glifos que mudaram. O **F6** também conta pelo resumo.
-- **A Galeria** (a terceira aba da vista direita; Editar › Galeria do caractere, ou a busca
-  por glifo): a grade dos recortes dos glifos lidos como o caractere do glifo atual, da
+- **A Galeria** (a aba Galeria da vista direita, que se preenche pelo glifo atual ao ser
+  aberta vazia; Editar › Galeria do caractere, ou a busca por glifo): a grade dos recortes dos glifos lidos como o caractere do glifo atual, da
   página ou do livro, do menos confiável ao mais, com a página e a confiança na dica. As
   setas, Shift e Ctrl+A selecionam; **digitar um caractere** o aplica à seleção, em quantas
   páginas forem, num passo do desfazer (sem ensinar); **Enter** ensina a seleção, uma amostra
@@ -449,9 +463,16 @@ o número do primeiro lance (`10...`) o diz. O PGN por diagrama parte do FEN (`S
 os lances que passaram.
 
 **A aba Diagramas** (vista direita) mostra os diagramas do livro numa grade: o recorte (das
-páginas já abertas), a posição desenhada e o estado, com os filtros por conferir, lidos sem
-confiança, confiáveis pelos lances e conferidos. Enter ou duplo clique abre o diagrama no
-editor.
+páginas já abertas), a posição desenhada e o estado, com os filtros por conferir, **lado não
+dito** (ninguém disse de quem é a vez: nem a legenda, nem quem conferiu, nem o número do
+lance; o FEN sai com "w" assumido, também no conferido assim), lidos sem confiança,
+confiáveis pelos lances e conferidos. Enter ou duplo clique abre o diagrama no editor.
+
+O **lado certo** das medidas (2/5 no Xadrez Vitorioso) conta só os diagramas cujo lado a página
+diz; os 3 errados são lado **não dito** pelo programa (assumido "w", que o filtro acima mostra),
+não lado afirmado errado. O **CA-10.1** (`validacao_pelos_lances` no JSON) joga os lances
+rotulados no gabarito: mede a validação, não o extrator da linha do OCR, que ainda pode pegar
+uma linha hipotética da prosa como a principal.
 
 O diagrama conferido não é relido: reconhecer a página de novo, pelo F5 ou pelo lote, mantém
 a conferência do tabuleiro que está no mesmo lugar. Uma página gravada antes desta leitura
@@ -516,8 +537,21 @@ sempre com as pastas do projeto.
   a página ganha as áreas automáticas que a segmentação sugere: um bloco de texto por grupo de
   linhas sem vão grande e um diagrama por tabuleiro, com a margem das coordenadas. O arraste
   fora das áreas desenha uma área de texto; dentro de uma área, a escolhe e move; na borda da
-  escolhida, a estica. As teclas **1** a **4** trocam o tipo (texto, diagrama, imagem,
-  ignorar), **Del** apaga, e o botão direito faz as duas coisas. O F5 e o lote passam a
+  escolhida, a estica. Desde o passo F, cada área tem uma **função**, com a cor e o nome no
+  canto: a letra a troca (**T** texto, **H** título, **C** cabeçalho, **R** rodapé, **P** nº
+  de página, **N** nota, **L** legenda, **D** diagrama, **I** imagem, **X** ignorar; também
+  pelo botão direito), e as teclas **1** a **4** trocam o tipo (texto, diagrama, imagem,
+  ignorar). As automáticas já vêm com função: o título pelo tamanho das maiúsculas, a legenda
+  ("Diagrama N", "Teste N", de quem é a vez, ao lado ou embaixo do diagrama) ligada a ele, a
+  poeira como ignorar, e o cabeçalho, o rodapé e o número de página aprendidos pelas páginas
+  lidas do livro. Uma área que você mexe deixa de ser automática: nada a reclassifica.
+  **Ordenar áreas** pede um clique em cada área na ordem de leitura (a barra conta "2 de 13",
+  e cada área mostra a ordem nova; **Esc** cancela), e o texto do Documento segue essa ordem
+  (os diagramas ficam onde a leitura os pôs). As áreas feitas antes de reconhecer saem como
+  texto, e o F5 dá a função das que continuam automáticas pelo texto lido.
+  **Salvar o modelo de áreas** guarda as áreas da página, e **Aplicar o modelo** as leva a um
+  intervalo, a todas, às pares ou às ímpares (num passo do Ctrl+Z; página de outra resolução
+  é recusada). **Ctrl+Shift+R** relê só a área escolhida. **Del** apaga. O F5 e o lote passam a
   reconhecer pelas áreas: só o que está numa área de texto vira box, cada diagrama vira
   tabuleiro (o achado dentro dele, ou a própria área) e imagem e ignorar não geram nada. Onde
   áreas se sobrepõem vence a mais restritiva: ignorar e imagem, depois diagrama, depois texto.
@@ -681,8 +715,11 @@ de cada página, e os títulos do Documento viram os **marcadores** (o sumário 
 PDF original já trazia ficam).
 
 Depois de gravar, o arquivo é relido e conferido (pacote, manifesto, XML e cada link); com
-`ABBY_EPUBCHECK` apontando o `epubcheck.jar`, `epub.epubcheck` roda o EPUBCheck também. O EPUBCheck 5.4.0
-aprova o EPUB da fatia do Xadrez Vitorioso sem erro nem advertência; para rodá-lo nos testes:
+`ABBY_EPUBCHECK` apontando o `epubcheck.jar`, `epub.epubcheck` roda o EPUBCheck também. O EPUBCheck 5.4.0,
+o Ace by DAISY 1.4.6 e o Calibre 9.14 aprovam o EPUB da fatia do Xadrez Vitorioso (p. 21–27,
+lidas com os modelos globais) sem nenhum problema, e os cinco formatos saem com os mesmos
+bytes em duas exportações (`docs/medidas/2026-10-29-exportacao-xv.json`, de `ferramentas\medir_exportacao.py`); para rodá-los nos
+testes:
 
 ```powershell
 $env:ABBY_EPUBCHECK = "C:\tools\epubcheck-5.4.0\epubcheck.jar"
@@ -745,8 +782,9 @@ motivo no aviso e sem FEN, para um FEN duvidoso não passar por leitura. Na p. 2
 Lima o porteiro recusa os três diagramas, e eles saem como recorte até serem conferidos;
 conferido o primeiro, ele saiu desenhado nos três formatos e o FEN dele foi achado no PDF.
 
-Nas páginas 26 e 27 do Darcy Lima, o lote levou 24 s depois de 13 s carregando os modelos, e
-os três arquivos saíram em 1,5 s (PDF), 0,8 s (DOCX) e 0,5 s (EPUB).
+Na fatia do Xadrez Vitorioso (7 páginas), a exportação leva, no p95 de 30 repetições
+(§15.3): 3,2 s o PDF pesquisável, 1,6 s o DOCX, 1,5 s o EPUB, 1,1 s o TXT e 9 ms o PGN
+(`docs/medidas/2026-10-29-exportacao-xv.json`).
 
 ### As páginas do livro: mover, apagar, inserir, girar, cortar, dividir (passo L)
 
@@ -849,7 +887,7 @@ programa sabe quem veio de quem. O que muda para você:
 - **O texto da página** (o Documento, a busca e as exportações de hoje) sai de um
   documento montado das páginas (`abbychess.texto.montar`), com as decisões que você toma
   editando no Documento desde o passo D1 (espaço a mais ou a menos, o caractere que falta;
-  o parágrafo é do passo G). Sem edições, ele sai igual ao de antes, conferido pelos testes
+  desde o G, o parágrafo, os estilos e o hífen apagado). Sem edições, ele sai igual ao de antes, conferido pelos testes
   de caracterização.
 
 ### A página torta
@@ -897,6 +935,10 @@ Páginas 21 a 27, projeto novo, sem nenhum padrão ensinado, com os modelos reai
 | Glifos na fila | 1.966 (19%) | 1.914 (19%) |
 | Diagramas confiáveis, de 7 | 2 | 3 |
 | Diagramas exportados desenhados do FEN | 2 | 3 |
+
+A tabela é da medida de quando a página passou a ser endireitada, sem JSON; a linha dos
+diagramas exportados confere com o portão do fechamento dos passos: 3 desenhados do FEN e 4
+como recorte, no EPUB da fatia (`docs/medidas/2026-10-29-exportacao-xv.json`).
 
 Na p. 26, endireitada, a primeira linha sai "TESTE 1. As pretas têm a vantagem de uma Dama,
 mas agora ela está sob ataque." inteira, e o Diagrama 7, que lia uma torre em a2, lê o peão.
@@ -1001,38 +1043,38 @@ Desempenho, de `docs/medidas/2026-10-16-linha-de-base.json` (commit 76ba432; má
 
 Desempenho por passo, em ms ou MB (uma rodada cada, a do portão, que roda no mesmo processo depois dos testes `livro_real` e por isso não é a condição das rodadas repetidas; quanto o mesmo código varia, e o que se conclui, está nelas, abaixo):
 
-| Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) | 2a (`2026-10-16-passo-2a.json`) | 2b (`2026-10-16-passo-2b.json`) | a1 (`2026-10-16-passo-a1.json`) | a2 (`2026-10-16-passo-a2.json`) | a3 (`2026-10-17-passo-a3.json`) | e (`2026-10-17-passo-e.json`) | d1 (`2026-10-17-passo-d1-094555.json`) | b (`2026-10-17-passo-b.json`) | d2 (`2026-10-17-passo-d2.json`) | l (`2026-10-23-passo-l.json`) | pendencias (`2026-10-23-passo-pendencias-181911.json`) |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,89 | 15,21 | 16,04 | 14,5 | 16,74 | 17,44 | 18,97 | 18,6 | 18,82 | 20,76 |
-| Troca fora do cache, p95 | — | — | — | — | — | 147,1 | 144,68 | 145,27 | 146,97 | 147,86 | 150,02 | 153,78 | 135,34 | 144,73 |
-| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 23,68 | 26,63 | 26,8 | 22,41 | 26,12 | 29,66 | 27,35 | 32,23 | 54,04 | 57,98 |
-| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 16,92 | 20,23 | 20,88 | 20,15 | 44,48 | 45,03 | 46,99 | 51,44 | 57,97 | 57,68 |
-| Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 | 164 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8,6 | 8,6 |
-| Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 12,9 | 22 | 12 | 9,5 | 2,2 | 2,3 | 2,4 | 2,5 | 2,2 | 6 |
-| Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1654 | 1793 | 1799 | 1823 | 2050 | 2053 | 2459 | 2468 | 2752 | 2002 |
-| Releitura com o lote, p95 | — | — | — | — | — | — | — | — | 124,11 | 113,34 | 92,99 | 111,17 | 169,14 | 72,63 |
-| Atraso no lote falso (51 p.), p99 | — | — | — | — | — | — | — | — | 14,1 | 2,8 | 4,1 | 4,6 | 2,1 | 2,6 |
-| Gravar uma página do lote, p95 | — | — | — | — | — | — | — | — | 17,6 | 19,2 | 19,7 | 22 | 32 | 36,2 |
-| Lote com servidor (s/p.) | — | — | — | — | — | — | — | — | 8,33 | 8,34 | 8,5 | 8,71 | 17,2 | 9 |
-| Lote sem servidor (s/p.) | — | — | — | — | — | — | — | — | 8,26 | 8,52 | 8,48 | 8,71 | 17,4 | 9,43 |
-| Pintura de 2.000 boxes, p95 | — | — | — | — | — | 11,5 | 13,14 | 13,2 | 13,12 | 13,27 | 13,2 | 13,46 | 12 | 13,21 |
-| Montar o Documento, p95 | — | — | — | — | 25,61 | 22,72 | 25,97 | 31,78 | 39,82 | 34,81 | 35,42 | 34,88 | 41,17 | 22,48 |
-| Clique no Documento, p95 | — | — | — | — | — | — | — | 2,84 | 3,25 | 3,46 | 3,26 | 3,43 | 11,33 | 5,47 |
-| Clique acha o box, p95 | — | — | — | — | — | 0,0016 | 0,0016 | 0,0016 | 0,0017 | 0,0017 | 0,0017 | 0,0017 | 0,0016 | 0,002 |
-| Montar o índice da busca (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | 1395,66 | 1430,76 | 1422,75 | 948,67 |
-| Buscar regex no livro (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | 17,25 | 15,07 | 13,51 | 18,89 |
-| Atraso durante a busca, p99 | — | — | — | — | — | — | — | — | — | — | 2 | 1,8 | 1,6 | 2,2 |
-| Atraso durante o aborto, p99 | — | — | — | — | — | — | — | — | — | — | 2 | 1,2 | 1,5 | 1,6 |
-| Índice pela janela (230 p.), máx. | — | — | — | — | — | — | — | — | — | — | 2217 | 2257 | 2379 | 2862 |
-| Substituir no livro: a janela presa (230 p.) | — | — | — | — | — | — | — | — | — | — | — | 371 | 355 | 359 |
-| Substituir no livro: o Ctrl+Z (230 p.) | — | — | — | — | — | — | — | — | — | — | — | 563 | 527 | 525 |
-| Substituir no livro: o desfazer (MB) | — | — | — | — | — | — | — | — | — | — | — | 43,4 | 44 | 44 |
-| Abrir ao painel de Páginas (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | — | — | 54,8 | 66,2 |
-| Dividir o livro lido (230 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 7741 | 8332 |
-| Dividir o livro: o Ctrl+Z (230 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 2347 | 2671 |
-| Dividir o livro antes de ler (231 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 129 | 136 |
-| Girar o livro lido (230 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 342 | 708 |
-| Girar uma página, p95 | — | — | — | — | — | — | — | — | — | — | — | — | 16,43 | 22,22 |
+| Meta | linha de base | 1a (`2026-10-16-passo-1a.json`) | 1b (`2026-10-16-passo-1b.json`) | 2a (`2026-10-16-passo-2a.json`) | 2b (`2026-10-16-passo-2b.json`) | a1 (`2026-10-16-passo-a1.json`) | a2 (`2026-10-16-passo-a2.json`) | a3 (`2026-10-17-passo-a3.json`) | e (`2026-10-17-passo-e.json`) | d1 (`2026-10-17-passo-d1-094555.json`) | b (`2026-10-17-passo-b.json`) | d2 (`2026-10-17-passo-d2.json`) | l (`2026-10-23-passo-l.json`) | pendencias (`2026-10-23-passo-pendencias-181911.json`) | fechamento (`2026-10-28-passo-fechamento.json`) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Troca de página, p95 | 194,22 | 190,06 | 186,8 | 190,79 | 161,89 | 15,21 | 16,04 | 14,5 | 16,74 | 17,44 | 18,97 | 18,6 | 18,82 | 20,76 | 52,37 |
+| Troca fora do cache, p95 | — | — | — | — | — | 147,1 | 144,68 | 145,27 | 146,97 | 147,86 | 150,02 | 153,78 | 135,34 | 144,73 | 174,69 |
+| Enter, p95 | 110,88 | 119,73 | 138,17 | 89,43 | 23,68 | 26,63 | 26,8 | 22,41 | 26,12 | 29,66 | 27,35 | 32,23 | 54,04 | 57,98 | 51,59 |
+| Releitura, p95 | 145,73 | 122,08 | 166,34 | 85,98 | 16,92 | 20,23 | 20,88 | 20,15 | 44,48 | 45,03 | 46,99 | 51,44 | 57,97 | 57,68 | 166,41 |
+| Desfazer (MB) | 4182,9 | 4182,9 | 4120,9 | 164 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8,6 | 8,6 | 8,6 |
+| Atraso no lote, p99 | 8,5 | 8,6 | 15,1 | 13,1 | 12,9 | 22 | 12 | 9,5 | 2,2 | 2,3 | 2,4 | 2,5 | 2,2 | 6 | 2,6 |
+| Memória com o lote (MB) | 1620 | 1661 | 1676 | 1653 | 1654 | 1793 | 1799 | 1823 | 2050 | 2053 | 2459 | 2468 | 2752 | 2002 | 2015 |
+| Releitura com o lote, p95 | — | — | — | — | — | — | — | — | 124,11 | 113,34 | 92,99 | 111,17 | 169,14 | 72,63 | 218,77 |
+| Atraso no lote falso (51 p.), p99 | — | — | — | — | — | — | — | — | 14,1 | 2,8 | 4,1 | 4,6 | 2,1 | 2,6 | 2,7 |
+| Gravar uma página do lote, p95 | — | — | — | — | — | — | — | — | 17,6 | 19,2 | 19,7 | 22 | 32 | 36,2 | 120,2 |
+| Lote com servidor (s/p.) | — | — | — | — | — | — | — | — | 8,33 | 8,34 | 8,5 | 8,71 | 17,2 | 9 | 8,59 |
+| Lote sem servidor (s/p.) | — | — | — | — | — | — | — | — | 8,26 | 8,52 | 8,48 | 8,71 | 17,4 | 9,43 | 8,94 |
+| Pintura de 2.000 boxes, p95 | — | — | — | — | — | 11,5 | 13,14 | 13,2 | 13,12 | 13,27 | 13,2 | 13,46 | 12 | 13,21 | 13,3 |
+| Montar o Documento, p95 | — | — | — | — | 25,61 | 22,72 | 25,97 | 31,78 | 39,82 | 34,81 | 35,42 | 34,88 | 41,17 | 22,48 | 36,1 |
+| Clique no Documento, p95 | — | — | — | — | — | — | — | 2,84 | 3,25 | 3,46 | 3,26 | 3,43 | 11,33 | 5,47 | 5,78 |
+| Clique acha o box, p95 | — | — | — | — | — | 0,0016 | 0,0016 | 0,0016 | 0,0017 | 0,0017 | 0,0017 | 0,0017 | 0,0016 | 0,002 | 0,002 |
+| Montar o índice da busca (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | 1395,66 | 1430,76 | 1422,75 | 948,67 | 881,44 |
+| Buscar regex no livro (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | 17,25 | 15,07 | 13,51 | 18,89 | 14,81 |
+| Atraso durante a busca, p99 | — | — | — | — | — | — | — | — | — | — | 2 | 1,8 | 1,6 | 2,2 | 2 |
+| Atraso durante o aborto, p99 | — | — | — | — | — | — | — | — | — | — | 2 | 1,2 | 1,5 | 1,6 | 1,1 |
+| Índice pela janela (230 p.), máx. | — | — | — | — | — | — | — | — | — | — | 2217 | 2257 | 2379 | 2862 | 2762 |
+| Substituir no livro: a janela presa (230 p.) | — | — | — | — | — | — | — | — | — | — | — | 371 | 355 | 359 | 371 |
+| Substituir no livro: o Ctrl+Z (230 p.) | — | — | — | — | — | — | — | — | — | — | — | 563 | 527 | 525 | 1827 |
+| Substituir no livro: o desfazer (MB) | — | — | — | — | — | — | — | — | — | — | — | 43,4 | 44 | 44 | 44 |
+| Abrir ao painel de Páginas (230 p.), p95 | — | — | — | — | — | — | — | — | — | — | — | — | 54,8 | 66,2 | 39,8 |
+| Dividir o livro lido (230 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 7741 | 8332 | 9959 |
+| Dividir o livro: o Ctrl+Z (230 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 2347 | 2671 | 4173 |
+| Dividir o livro antes de ler (231 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 129 | 136 | 143 |
+| Girar o livro lido (230 p.) | — | — | — | — | — | — | — | — | — | — | — | — | 342 | 708 | 815 |
+| Girar uma página, p95 | — | — | — | — | — | — | — | — | — | — | — | — | 16,43 | 22,22 | 17,78 |
 
 Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem o congelamento dos modelos para a coleta de lixo (até o 1a, e no 1b com `ABBY_SEM_CONGELAR=1`), o p95 do Enter do passo 0 ao 1b tem duas faixas no mesmo código (perto de 110–130 e de 180–235; no 2a, uma só, perto de 90); o atraso no lote tem duas faixas sempre (perto de 8–10 e de 21). Desde o 2b o congelamento é desligado (`ABBY_CONGELAR=1` liga): as duas linhas do 2b rodam o mesmo programa (o rótulo `sem_congelar` é do roteiro de medida), e a coluna do Enter mede até a cor mudar (até o 2a, até o fim da propagação). Desde o A1 a troca é no cache de páginas (a vizinha já pré-carregada); a de fora do cache tem coluna própria. Compare pela mediana (p50), que varia bem menos (mas uma rodada solta pode sair alta):
 
@@ -1057,15 +1099,13 @@ Rodadas repetidas, em ms (cada valor é uma rodada, na ordem em que rodou). Sem 
 | passo 2a sem congelar | d19c858 | completa | 174,66; 175,73; 178,05 | 188,01; 188,63; 188,4 | — | 82,23; 82,43; 82,52 | 91,7; 89,92; 92,03 | 73,15; 70,64; 75,29 | 88,33; 91,91; 92,78 | 11,7; 20,8; 21,5 | — |
 | passo 2b sem congelar | 6f863c3 | completa | 153,56; 153,19; 157,37 | 173,65; 165,46; 168,14 | — | 20,55; 20,57; 21,47 | 24,01; 27,01; 27,08 | 14,4; 13,82; 14,5 | 16,9; 16,99; 18,83 | 22,3; 9,1; 9,8 | — |
 
-Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
+Qualidade contra os gabaritos (`ferramentas\medir.py`). **Margens corridas**: cabeçalho, número de página e rodapé tirados do texto. **Sem par**: linhas lidas que não casam com nenhuma linha do gabarito (inventadas); as das páginas negativas (capa, sumário) vão à parte. **Perdidas**: linhas do gabarito que a leitura não achou. **Casas** e **lado** só contam nos diagramas que você conferiu; o provisório, entre parênteses, é contra o FEN rotulado pelo assistente (casa a casa, contra o recorte), ainda não conferido por você, e a coluna **FEN = leitura** diz em quantos ele é igual ao que o programa leu. O **lado certo** conta os diagramas cujo lado a página diz; o errado pode ser o lado não dito pelo programa (assumido 'w'), e não o afirmado errado. **Ordem**: pares de linhas casadas fora da ordem de leitura do gabarito (não vê onde o diagrama cai no texto). "—" é nada a medir.
 
-| Livro | Commit | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por diagrama | Lado certo | Ordem | CER do corpo | Estado |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| xv | 7511f02 | 9 | 0,5385 / 1 | 7/7 (1) | 5 | 1486 (2 pág.) | 1 (+10 nas negativas) | 7/7 | pendente (provisório: 0) | pendente (provisório: 2/5) | 0 | 2,81% | provisória: estrutura revisada em 0/9 páginas; FEN conferido em 0/7 diagramas; texto verificado em 213/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-| yusupov | 071b8e5 | 3 | 1 / 0,75 | 3/3 (0) | 8 | — | 5 | 3/3 | pendente (provisório: 0) | pendente (provisório: 1/3) | 0 | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-| darcy | 071b8e5 | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
-
-Ainda não medido: a ligação da legenda ao diagrama, no passo H (a leitura de hoje não liga legenda a diagrama); precisão e revocação por função de bloco, no passo F (a leitura de hoje não classifica blocos).
+| Livro | Commit | Páginas | Margens corridas P / R | Diagramas achados (falsos) | Sem par | Sem par nas negativas | Perdidas | FEN = leitura | Casas erradas por diagrama | Lado certo | Ordem | Funções P / R (CA-5.1) | Legendas ligadas | CER do corpo | Estado |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| xv | cd6681a | 9 | 0,5385 / 1 | 7/7 (1) | 5 | 1497 (2 pág.) | 1 (+9 nas negativas) | 7/7 | 0 | 2/5 | 0 | título 0,6667 / 0,5; cabeçalho 1 / 1; legenda 1 / 1 | 17/17 | 2,80% | provisória: texto verificado em 213/241 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| yusupov | cd6681a | 3 | 1 / 0,75 | 3/3 (0) | 10 | — | 5 | 3/3 | pendente (provisório: 0) | pendente (provisório: 1/3) | 0 | título 1 / 0,0333; cabeçalho — / 0; nº de página 1 / 1; legenda — / 0 | — | pendente | provisória: estrutura revisada em 0/3 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/157 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
+| darcy | cd6681a | 2 | — / 0 | 3/3 (0) | 1 | — | 0 | 2/3 | pendente (provisório: 3) | pendente (provisório: 0/1) | 0 | título — / 0; cabeçalho — / 0; nº de página 1 / 1 | — | pendente | provisória: estrutura revisada em 0/2 páginas; FEN conferido em 0/3 diagramas; texto verificado em 0/97 linhas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual |
 
 Histórico da qualidade (todas as medidas; casas e lado provisórios):
 
@@ -1097,6 +1137,8 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | xv | a6555df | 0,5 / 1 | 7/7 (1) | 6 | 3 | 0 | 2/5 | 454,8 s |
 | xv | c9e5751 | 0,5 / 1 | 7/7 (1) | 6 | 3 | 0 | 2/5 | 469,9 s |
 | xv | 7511f02 | 0,5385 / 1 | 7/7 (1) | 5 | 1 | 0 | 2/5 | 462,7 s |
+| xv | 8194283 | 0,5385 / 1 | 7/7 (1) | 5 | 1 | 0 | 2/5 | 455 s |
+| xv | cd6681a | 0,5385 / 1 | 7/7 (1) | 5 | 1 | 0 | 2/5 | 461,6 s |
 | yusupov | bb0b7e5 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23 s |
 | yusupov | 0ebbf9c | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,1 s |
 | yusupov | 3bf1ad3 | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,4 s |
@@ -1118,6 +1160,7 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | yusupov | c96247f | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 23,8 s |
 | yusupov | 6a6564a | 1 / 0,75 | 3/3 (0) | 8 | 13 | 0 | 0/3 | 24,6 s |
 | yusupov | 071b8e5 | 1 / 0,75 | 3/3 (0) | 8 | 5 | 0 | 1/3 | 35,8 s |
+| yusupov | cd6681a | 1 / 0,75 | 3/3 (0) | 10 | 5 | 0 | 1/3 | 25 s |
 | darcy | bb0b7e5 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,5 s |
 | darcy | 0ebbf9c | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,7 s |
 | darcy | 3bf1ad3 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 23,8 s |
@@ -1139,12 +1182,13 @@ Histórico da qualidade (todas as medidas; casas e lado provisórios):
 | darcy | c96247f | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 24,5 s |
 | darcy | 6a6564a | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 25,5 s |
 | darcy | 071b8e5 | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 49,4 s |
+| darcy | cd6681a | — / 0 | 3/3 (0) | 1 | 0 | 3 | 0/1 | 25,1 s |
 
 Fatia (`ferramentas\replay_fatia.py`; **erros** são as diferenças do snapshot contra o gabarito, o N da medida humana):
 
 | Livro | Passo | Páginas | Total | Gestos dos diagramas | Navegação | Erros | Estado | JSON |
 |---|---|---|---|---|---|---|---|---|
-| xv | 0 | i020, i021, i022, i023, i024, i025, i026 | 1076 gestos (782 sem os impossíveis) | 14 | 6 | 442 | provisório: estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-25-fatia-xv-passo-0.json` |
+| xv | 0 | i020, i021, i022, i023, i024, i025, i026 | 1076 gestos (782 sem os impossíveis) | 14 | 6 | 442 | provisório: sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-28-fatia-xv-passo-0-233825.json` |
 | xv | 1a | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-16-fatia-xv-passo-1a.json` |
 | xv | 1b | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-16-fatia-xv-passo-1b.json` |
 | xv | 2a | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-16-fatia-xv-passo-2a.json` |
@@ -1156,7 +1200,7 @@ Fatia (`ferramentas\replay_fatia.py`; **erros** são as diferenças do snapshot 
 | xv | D1 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-D1-101106.json` |
 | xv | B | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-B.json` |
 | xv | D2 | i020, i021, i022, i023, i024, i025, i026 | gestos pendentes | 14 | 6 | 4 (diagramas; texto pendente) | pendente: nenhuma linha com texto verificado; estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-17-fatia-xv-passo-D2.json` |
-| xv | L | i020, i021, i022, i023, i024, i025, i026 | 739 gestos (683 sem os impossíveis) | 14 | 6 | 400 | provisório: estrutura revisada em 0/7 páginas; FEN conferido em 0/7 diagramas; sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-25-fatia-xv-passo-L.json` |
+| xv | L | i020, i021, i022, i023, i024, i025, i026 | 739 gestos (683 sem os impossíveis) | 14 | 6 | 400 | provisório: sem conferência cega do texto aprovada e em dia; sem conferência cega de FEN igual | `2026-10-28-fatia-xv-passo-L-233716.json` |
 <!-- medidas:fim -->
 
 O replay da fatia (os gestos para levar as p. 21–27 ao gabarito) é
@@ -1210,6 +1254,12 @@ porque a linha de base pode ser medida de novo a qualquer momento no worktree da
 verificados antes do fechamento do D1**, o primeiro passo julgado pelos gestos da fatia
 (sem eles, o número não existe; até a versão 0.7 do roadmap o prazo era o A3). Enquanto isso, as medidas de texto ficam "pendentes" e as
 de diagrama e estrutura, "provisórias", e o README diz isso em cada tabela.
+
+**No Xadrez Vitorioso, as etapas 1 e 2 estão feitas**: o texto das p. 21–27 em `7a824ec`, e a
+estrutura, os FEN e os lados das 9 páginas em `8194283` (a folha
+`ferramentas\folha_de_conferencia.py --livro xv` mostra cada página com os blocos e cada
+diagrama ao lado do tabuleiro pelo FEN). Lá falta a etapa 3, a conferência cega, e o texto
+do sumário (i007); no Yusupov e no Darcy Lima, todas.
 
 **A ordem importa para a conferência cega.** Se você faz tudo sozinho, comece por ela: gere
 o modelo e transcreva a página às cegas (etapa 3), e monte às cegas o FEN de um diagrama por
@@ -1290,6 +1340,21 @@ ele compara com o texto verificado e fica preso à versão do gabarito, que o im
 `.rotulagem` fica fora do git. "p. N" nas seções mais acima é o número da página no
 programa (a do PDF, índice N − 1); os gabaritos dizem também a página impressa.
 
+### A qualidade do código
+
+A cobertura combinada da suíte rápida e da camada `processo` (em série, ~6 min, nada mais
+rodando), e sobre ela o CRAP por função e os pares de funções com a mesma forma
+(`docs\SPEC-qualidade.md` §1, §7, §8; `plans\roadmap-qualidade.md`):
+
+```text
+.venv\Scripts\python.exe ferramentas\qualidade.py
+```
+
+Grava `docs\medidas\qualidade\crap-<commit>.txt`, `duplicacao-<commit>.txt` e
+`AAAA-MM-DD-qualidade.json`. Sem rodar a suíte, sobre um `coverage.json` pronto:
+`--cobertura <arquivo>`. As duas ferramentas também rodam sozinhas:
+`ferramentas\crapper.py abbychess <coverage.json> 10` e `ferramentas\dryer.py abbychess 0.8 60`.
+
 ## Onde está o quê
 
 | Arquivo | O que faz |
@@ -1311,7 +1376,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | `abbychess/diagramas.py` | Ler cada tabuleiro em FEN, o lado a jogar (pela legenda nos boxes), a conferência, as amostras no projeto e o FEN no texto |
 | `abbychess/livro.py` | O lote síncrono das ferramentas e dos testes, e a fila de revisão do livro todo |
 | `abbychess/servidor_de_leitura.py` | O servidor de leitura (§11): o processo filho com os modelos globais, a vez entre glifos, os deltas dos padrões, a queda e o fechamento |
-| `abbychess/sessao.py` | A sessão de edição do Documento sem Qt (§6.3): alinhar, planejar (ou recusar o que é do passo G), aplicar; as figurinas (§6.4) |
+| `abbychess/sessao.py` | A sessão de edição do Documento sem Qt (§6.3): alinhar, planejar, aplicar (juntar e dividir boxes desde o G); as figurinas (§6.4) |
 | `abbychess/busca.py` | Localizar sem Qt (§7.1, §7.3): o índice das páginas (montado em processos), a busca com o `regex` e o tempo-limite, as classes `\L` `\P` `\C` `\V`, figurina = letra, a busca por glifo |
 | `abbychess/substituir.py` | Substituir sem Qt (§7.2): os casos (Prosa, Notação, Ambos; o FEN nunca), `\1` e `\g<nome>`, o que ainda não tem tradução, e aplicar numa página como uma sessão de edição |
 | `abbychess/ancoragem.py` | Onde os glifos virtuais da sessão ficam (a âncora de cada um, como o usuário os digitou) e as palavras que a montagem do core parte ou junta quando um box sai |
@@ -1327,7 +1392,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 | `docs/atalhos.yaml`, `docs/ATALHOS.md` | Os atalhos (a fonte única) e a tabela gerada |
 | `docs/medidas/` | A máquina cadastrada e cada medida, em JSON |
 | `abbychess/atalhos.py` | Ler e conferir a tabela de atalhos, sem Qt |
-| `ferramentas/` | `rotular.py` (gabaritos, conferência cega, revisão), `medir.py` (qualidade), `replay_fatia.py` e `replay/comandos.yaml` (a fatia), `tempo_da_fatia.py` (CA-F.2), `atalhos.py`, `resumo_medidas.py` (as tabelas do README) |
+| `ferramentas/` | `rotular.py` (gabaritos, conferência cega, revisão), `folha_de_conferencia.py` (a folha HTML para revisar a estrutura e os FEN), `medir.py` (qualidade), `replay_fatia.py` e `replay/comandos.yaml` (a fatia), `tempo_da_fatia.py` (CA-F.2), `atalhos.py`, `resumo_medidas.py` (as tabelas do README), `qualidade.py`, `crapper.py` e `dryer.py` (a qualidade do código) |
 | `abbychess/app/registro_de_eventos.py` | O registro de gestos da CA-F.2, ligado por `ABBY_REGISTRO_DE_EVENTOS` |
 | `tests/verdade/`, `tests/dados/fatia/` | Os gabaritos e o snapshot da fatia (conteúdo de livros: não publicar) |
 | `tests/golden/caracterizacao/` | O comportamento de hoje, fixado antes da refatoração do roadmap |
@@ -1471,7 +1536,8 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   vêm do Windows como pedido de menu de contexto; o teste confere que cada painel abre o
   menu nesse pedido, não a tecla em si. A gaveta de Páginas é refeita do `livro.json` a cada
   troca de página e meio segundo depois de uma rajada de edições; com 230 páginas, ela fica
-  pronta ~0,1 s depois de abrir o projeto (CA-8.3, desde o passo C). Com ela aberta (o padrão de um projeto novo numa janela de
+  pronta logo depois de abrir o projeto (CA-8.3, desde o passo C: "Abrir ao painel de
+  Páginas" na tabela de desempenho, do `abrir()` do projeto, 5 aquecimentos e 30 rodadas). Com ela aberta (o padrão de um projeto novo numa janela de
   1600 px ou mais), a troca no cache passa de ~11 para ~16 ms na mediana (medida da revisão
   de produto, fora do protocolo); as medidas oficiais rodam com ela fechada.
 - **A memória do desfazer está no alvo** para correções de um glifo (é o que a medida faz:
@@ -1536,7 +1602,7 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   à página seguinte, uma a uma (o léxico não tem resumo no `livro.json`); o "iguais nesta
   página" do aviso de ensino conta os glifos com a mesma leitura, e não os de forma
   parecida; a Galeria do livro tira os recortes de cada página da fonte (a primeira vez,
-  ~0,15 s por página, em segundo plano); desde o passo I, o negrito medido por palavra fica
+  em segundo plano, sem medida no protocolo); desde o passo I, o negrito medido por palavra fica
   no glifo, é guardado na amostra ensinada e separa os vizinhos do k-NN, e o itálico também
   (pela inclinação das letras: palavra com 3 letras ou mais; no Odds & Ends, 0 falsos e ~96%
   das itálicas; no escaneado, a revocação não foi medida); o glifo devolvido à fila por um esquecer fica com a leitura e sem a fonte (a
@@ -1550,15 +1616,15 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   com os processos já abertos (o primeiro projeto, aberto um pouco depois do programa); o
   projeto aberto junto com o programa, e o segundo da sessão, levam 2,0–2,9 s, e pela janela
   o índice chega a 2,4 s (CA-7.1, uma limitação conhecida).
-- **Substituir, desde o passo D2**: o que é do passo G fica de fora (desabilitado na
-  prévia): o caso comum é "rn" → "m" (e "m" → "rn"), que espera o juntar e o dividir glifos;
-  uma troca editorial em que duas letras viram uma ("casa" → "lar") também. As figurinas não
+- **Substituir, desde o passo D2**: o "m" → "rn" faz uma caixa de duas letras, e não divide
+  pela tinta (a substituição não tem a imagem da página). As figurinas não
   entram sozinhas no texto substituído (o §6.4 é da digitação). Uma troca no livro inteiro
   pode ocupar quase todo o desfazer (~43 MB em 230 páginas e 28 mil casos; a partir de ~270
   páginas com uma troca tão comum, passa dos 50 MB e fica sozinha no desfazer: os passos de
   antes saem, e a barra de status diz quantos).
-- **A edição no Documento, desde o D1**: o que é do passo G (k letras por 1, 1 por k, o
-  parágrafo, os estilos) é recusado com aviso; o Ctrl+T com uma edição do texto ainda na fila
+- **A edição no Documento, desde o D1**: uma linha não se divide em dois parágrafos (o
+  Ctrl+Shift+Enter no meio dela começa o parágrafo no começo da linha, com aviso); o
+  sublinhado fica só no Documento (a exportação leva negrito e itálico); o Ctrl+T com uma edição do texto ainda na fila
   pede para tentar de novo depois que ela entrar; num projeto com páginas lidas antes do D1,
   o modo das peças "como o livro" só vê as figurinas delas quando forem gravadas de novo
   (escolha "Figurinas" nas Opções); apagar a quebra de linha impressa entre duas
@@ -1582,9 +1648,10 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
 - **A camada do PDF pesquisável supõe página sem rotação.** Página com `/Rotate` no PDF
   recebe o texto nas coordenadas da página renderizada, que não batem com as da página
   girada.
-- **O cabeçalho corrido é achado por regra, não por layout.** A linha de cabeçalho colada no
-  texto (sem o vão), ou o cabeçalho que não tem número e aparece numa página só da
-  exportação, entra no texto como parágrafo.
+- **O cabeçalho corrido é aprendido pelas páginas lidas.** O cabeçalho que não tem número e
+  aparece numa página só entra no texto como parágrafo; o Documento não mostra o editor
+  "Área" no Inspetor (a função se troca pela letra ou pelo botão direito), e o vínculo da
+  legenda ao diagrama não se edita à mão (ele vem do vizinho mais perto).
 - **As áreas valem no próximo reconhecimento.** Mudar uma área não tira nem acrescenta boxes
   na hora: é preciso o F5, que troca os boxes da página pelos das áreas.
 - **A verificação de texto não junta nem separa palavras.** "ganhartempos" aparece como uma
@@ -1623,11 +1690,17 @@ programa (a do PDF, índice N − 1); os gabaritos dizem também a página impre
   clique no Documento a 3,7 ms. **A releitura de um glifo com o lote** passa do alvo de 150 ms
   no p95 numa parte das rodadas (206 no primeiro portão, 101–153 em três repetições, 103 no
   segundo portão; no L, 106–169). **A pré-carga** renderiza o PDF num processo à parte
-  (`abbychess/render.py`): a interface não para mais ~85 ms a cada página nunca vista; a
-  página pedida na hora ainda renderiza na thread da interface. **O Enter** que
+  (`abbychess/render.py`): quem folheia páginas nunca vistas vê a interface parar no
+  máximo ~6 ms (p95; `docs/medidas/2026-10-28-passo-fechamento.json`); a página pedida na hora ainda renderiza na thread da interface.
+  **A troca no cache** chegou a 52 ms no p95 e **a releitura de um glifo**, sem o lote, a
+  166 ms (alvo 150) no portão: a fila de revisão calculava, a cada vez, o que a exportação
+  tira (`2e3d9a1`; a bisseção em `docs/revisoes/passo-k.md`). Corrigido em `223ea36`: a troca
+  no cache p95 25,3 ms e a releitura 85,3 ms (`docs/medidas/2026-10-29-fila-rapida-parcial.json`). **Gravar uma página do lote** na thread da interface foi de 36 a
+  120 ms no p95 (as áreas automáticas e a fila), sem pesar no atraso durante o lote (p99
+  2,6 ms). **O Enter** que
   confirma a leitura ficou em ~25 ms na mediana (três rodadas do `9c98367`); o que corrige um
   caractere ainda paga ~25 ms a mais, da validação pelos lances, que monta o texto da página.
-  **A suíte rápida** leva ~32 s em paralelo (`-n auto`), dentro dos 60 s da §15.1; em série,
-  ~100 s. Manter as quebras
+  **A suíte rápida** leva ~57 s em paralelo (`-n auto`, com o teto de 4 workers desde
+  2026-10-28; eram ~32 s sem ele), no limite dos 60 s da §15.1; em série, ~100 s. Manter as quebras
   numa página da camada nativa não devolve a quebra onde a camada tirou o hífen da palavra
   partida.

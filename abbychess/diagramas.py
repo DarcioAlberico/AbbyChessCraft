@@ -79,6 +79,45 @@ PASTA_DE_DIAGRAMAS = "diagramas"
 
 _FIM_DE_FRASE = re.compile(r"[.:!?…»”\"]\s*$")
 
+#: "White moves - a draw", "Black moves – winning": a legenda do Mirkovic (*Chess School 1*),
+#: que o core não lê (ele conhece "to move" e "to play"). Só no começo da legenda e com
+#: travessão, dois-pontos ou o fim logo depois: "Black moves the knight" é prosa. O OCR
+#: perde o espaço ("whitemoves") e lê o `o` como `0` ("Black m0ves").
+_VEZ_PELO_VERBO = re.compile(r"^\W*(white|black)\s*m[o0]ves?\s*(?:[-–—:,.]|$)", re.IGNORECASE)
+
+
+def ler_legenda(texto: Optional[str]) -> "lado_a_jogar.LadoLido":
+    """O lado dito por uma legenda (`core.lado_a_jogar.ler`), e também pelo verbo
+    (`_VEZ_PELO_VERBO`) quando o core não achou nada."""
+    lido = lado_a_jogar.ler(texto)
+    if lido or lido.origem != "ausente":
+        return lido
+    casado = _VEZ_PELO_VERBO.match(str(texto or "").strip())
+    if casado is None:
+        return lido
+    return lado_a_jogar.LadoLido("w" if casado.group(1).lower() == "white" else "b",
+                                 "legenda", casado.group(0).strip(" -–—:,."))
+
+
+def ler_legendas(*textos: Optional[str]) -> "lado_a_jogar.LadoLido":
+    """`core.lado_a_jogar.ler_varios` com `ler_legenda`: cada texto em separado, e dois que
+    discordam são `ambigua`."""
+    lidos = [item for item in (ler_legenda(lado_a_jogar.normalizar_legenda(t))
+                               for t in textos if t) if item]
+    if not lidos:
+        return lado_a_jogar.LadoLido()
+    if len({item.lado for item in lidos}) > 1:
+        return lado_a_jogar.LadoLido(None, "ambigua", "; ".join(item.trecho for item in lidos))
+    return lidos[0]
+
+
+def roque_possivel(pecas: str, roque: str) -> str:
+    """Os direitos de `roque` que rei e torre ainda permitem nas casas iniciais de `pecas`."""
+    if not roque:
+        return ""
+    possiveis = lances.roque_inferido(pecas)
+    return "".join(c for c in roque if c in possiveis)
+
 
 @dataclass
 class DiagramaLido:
@@ -146,7 +185,8 @@ class DiagramaLido:
         """O FEN da posição. Sem lado dito, o campo é `w` por exigência do formato."""
         if not self.lido:
             return ""
-        return f"{self.leitura().tabuleiro().board_fen()} {self.lado or 'w'} {self.roque or '-'} - 0 1"
+        pecas = self.leitura().tabuleiro().board_fen()
+        return f"{pecas} {self.lado or 'w'} {roque_possivel(pecas, self.roque) or '-'} - 0 1"
 
     def marca_do_lado(self) -> str:
         """`brancas a jogar (assumido: a página não diz)` e as outras procedências."""
@@ -181,6 +221,10 @@ class DiagramaLido:
         if self.lado_origem == LADO_DO_USUARIO and self.lado in lado_a_jogar.LADOS:
             tabuleiro.lado, tabuleiro.lado_origem, tabuleiro.lado_informado = (
                 self.lado, LADO_DO_USUARIO, True)
+        elif self.lado_origem == lances.LADO_DOS_LANCES and self.lado in lado_a_jogar.LADOS:
+            # O lado que o número do lance diz: o editor mostra e copia o mesmo FEN que a
+            # página (não é "informado": conferir sem tocar nele o deixa vir dos lances).
+            tabuleiro.lado, tabuleiro.lado_origem = self.lado, lances.LADO_DOS_LANCES
         if self.roque or self.roque_informado:
             tabuleiro.roque, tabuleiro.roque_informado = self.roque, True
         # O que veio gravado é o ponto de partida: não há o que desfazer antes dele.
@@ -198,7 +242,9 @@ class DiagramaLido:
                        lado=tabuleiro.lado if dito else None,
                        lado_origem=tabuleiro.lado_origem if dito else "",
                        lado_trecho=self.lado_trecho if tabuleiro.lado_origem == LADO_DA_LEGENDA else "",
-                       roque=tabuleiro.roque,
+                       # O roque marcado que uma casa corrigida tornou impossível não vai
+                       # ao FEN (ele sairia inválido e cairia do PGN).
+                       roque=roque_possivel(tabuleiro.tabuleiro().board_fen(), tabuleiro.roque),
                        roque_informado=bool(tabuleiro.roque_informado or tabuleiro.roque),
                        conferido=conferido)
 
@@ -255,16 +301,9 @@ class DiagramaLido:
 
 def com_ids(diagramas: Sequence[DiagramaLido]) -> List[DiagramaLido]:
     """Os diagramas com `id` cada um: os que não têm ganham o próximo `dN` livre."""
-    usados = {d.id for d in diagramas if d.id}
-    proximo, saida = 0, []
-    for d in diagramas:
-        if not d.id:
-            while f"d{proximo}" in usados:
-                proximo += 1
-            d = replace(d, id=f"d{proximo}")
-            usados.add(d.id)
-        saida.append(d)
-    return saida
+    from abbychess.zonas import ids_livres
+
+    return ids_livres(diagramas, "d")
 
 
 def afirmar_lado(tabuleiro: TabuleiroEdicao, lado: str) -> bool:
@@ -308,15 +347,24 @@ def ler_diagrama(imagem, caixa: Caixa, *, escala: Optional[float] = None, classi
         titulo = diagrama.ler_titulo(arr, caixa, escala, classificar, boxes=boxes, rotulos=rotulos)
     except diagrama.ModeloAusente as erro:
         return DiagramaLido(caixa, erro=f"o modelo de diagramas não carregou ({erro})")
+    lido = _lido_do_core(caixa, leitura, rotulos, titulo)
+    if lido.erro:
+        return lido
+    return _com_lado(lido, legendas_dos_boxes(boxes, caixa, rotulos.lados) if boxes else [])
+
+
+def _lido_do_core(caixa: Caixa, leitura, rotulos, titulo) -> DiagramaLido:
+    """O tabuleiro como o core o leu, com o motivo da dúvida; o erro, sem as 64 casas."""
+    from core import diagrama
+
     if len(leitura.casas) != 64:
         motivo = next((a for a in leitura.avisos if a != diagrama.AVISO_CONVENCAO), "")
         return DiagramaLido(caixa, erro=motivo or "não deu para ler o tabuleiro")
     ok, motivo = diagrama.confiavel(leitura)
-    lido = DiagramaLido(caixa, casas=leitura.casas, orientacao=leitura.orientacao,
+    return DiagramaLido(caixa, casas=leitura.casas, orientacao=leitura.orientacao,
                         orientacao_confirmada=rotulos.orientacao is not None,
                         titulo_do_core=titulo.texto, lados_de_rotulo=tuple(rotulos.lados),
                         motivo="" if ok else motivo)
-    return _com_lado(lido, legendas_dos_boxes(boxes, caixa, rotulos.lados) if boxes else [])
 
 
 def _com_lado(d: DiagramaLido, legendas: Sequence[str]) -> DiagramaLido:
@@ -326,8 +374,8 @@ def _com_lado(d: DiagramaLido, legendas: Sequence[str]) -> DiagramaLido:
     livro e as correções do usuário (ver `legendas_dos_boxes`). Sem lado nelas,
     vale o título do core.
     """
-    dito, titulo = lado_a_jogar.ler(d.titulo_do_core), d.titulo_do_core
-    da_pagina = lado_a_jogar.ler_varios(*legendas) if legendas else None
+    dito, titulo = ler_legenda(d.titulo_do_core), d.titulo_do_core
+    da_pagina = ler_legendas(*legendas) if legendas else None
     if da_pagina and da_pagina.lado:
         dito, titulo = da_pagina, " / ".join(legendas)
     dito = dito if dito and dito.lado else None
@@ -382,25 +430,36 @@ def legendas_dos_boxes(boxes: Sequence[BoxEntry], caixa: Caixa,
     x1, y1, x2, y2 = caixa
     referencia = (referencia or proporcao.altura_de_referencia(list(boxes))
                   or (y2 - y1) / 16.0)
-    faixa = referencia * FAIXA_DA_LEGENDA
-    na_largura = [b for b in boxes if b.char and x1 <= (b.x1 + b.x2) / 2 <= x2
-                  and b.y2 - b.y1 <= referencia * ALTURA_MAXIMA_DA_LEGENDA]
+    na_largura = _na_largura(boxes, x1, x2, referencia)
     textos = []
     for lado in ("acima", "abaixo"):
         if lado in lados_de_rotulo:
             continue
-        if lado == "acima":
-            perto = [(y1 - b.y2, b) for b in na_largura if y1 - faixa <= b.y2 <= y1]
-        else:
-            perto = [(b.y1 - y2, b) for b in na_largura if y2 <= b.y1 <= y2 + faixa]
+        perto = _perto_do_lado(lado, na_largura, y1, y2, referencia * FAIXA_DA_LEGENDA)
         if not perto:
             continue
         semente = min(perto, key=lambda par: par[0])[1]
-        linha = [b for b in na_largura if semente.y1 <= (b.y1 + b.y2) / 2 <= semente.y2]
-        texto = texto_dos_boxes(linha).strip()
+        texto = texto_dos_boxes(_linha_da_semente(semente, na_largura)).strip()
         if texto:
             textos.append(texto)
     return textos
+
+
+def _na_largura(boxes: Sequence[BoxEntry], x1: int, x2: int, referencia: float) -> list:
+    """Os boxes lidos com o centro na largura do tabuleiro e da altura de uma legenda."""
+    return [b for b in boxes if b.char and x1 <= (b.x1 + b.x2) / 2 <= x2
+            and b.y2 - b.y1 <= referencia * ALTURA_MAXIMA_DA_LEGENDA]
+
+
+def _perto_do_lado(lado: str, na_largura: list, y1: int, y2: int, faixa: float) -> list:
+    """(distância, box) dos boxes com a borda na faixa acima (ou abaixo) do tabuleiro."""
+    if lado == "acima":
+        return [(y1 - b.y2, b) for b in na_largura if y1 - faixa <= b.y2 <= y1]
+    return [(b.y1 - y2, b) for b in na_largura if y2 <= b.y1 <= y2 + faixa]
+
+
+def _linha_da_semente(semente, na_largura: list) -> list:
+    return [b for b in na_largura if semente.y1 <= (b.y1 + b.y2) / 2 <= semente.y2]
 
 
 def ler_diagramas(imagem, tabuleiros: Sequence[Caixa], *, escala: Optional[float] = None,
@@ -428,12 +487,16 @@ def mesclar(novos: Sequence[DiagramaLido], antigos: Sequence[DiagramaLido]) -> L
     Reconhecer a página de novo não pode desfazer uma conferência: o FEN
     corrigido à mão vale mais que a releitura do mesmo tabuleiro.
     """
-    saida = []
-    for novo in novos:
-        igual = next((a for a in antigos if a.conferido
-                      and _sobreposicao(a.caixa, novo.caixa) >= SOBREPOSICAO_DO_MESMO), None)
-        saida.append(replace(igual, caixa=novo.caixa) if igual is not None else novo)
-    return saida
+    conferidos = [a for a in antigos if a.conferido]
+    return [_o_de_antes(conferidos, novo.caixa, novo) for novo in novos]
+
+
+def _o_de_antes(antigos: Sequence[DiagramaLido], caixa: Caixa,
+                senao: DiagramaLido) -> DiagramaLido:
+    """O antigo que ocupa o mesmo lugar que `caixa`, com a caixa nova; `senao` se nenhum."""
+    igual = next((a for a in antigos if _sobreposicao(a.caixa, caixa) >= SOBREPOSICAO_DO_MESMO),
+                 None)
+    return replace(igual, caixa=caixa) if igual is not None else senao
 
 
 def diagrama_em(diagramas: Sequence[DiagramaLido], x: float, y: float) -> Optional[int]:
@@ -452,12 +515,7 @@ def para_caixas(tabuleiros: Sequence[Caixa], diagramas: Sequence[DiagramaLido]
     Uma página gravada antes da leitura dos diagramas só tem as caixas; elas
     entram aqui como diagramas por ler, e a leitura vem no primeiro clique.
     """
-    saida = []
-    for caixa in em_ordem(tabuleiros):
-        lido = next((d for d in diagramas
-                     if _sobreposicao(d.caixa, caixa) >= SOBREPOSICAO_DO_MESMO), None)
-        saida.append(replace(lido, caixa=caixa) if lido is not None else DiagramaLido(caixa))
-    return saida
+    return [_o_de_antes(diagramas, caixa, DiagramaLido(caixa)) for caixa in em_ordem(tabuleiros)]
 
 
 # ----------------------------------------------------------------------

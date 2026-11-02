@@ -1,0 +1,17 @@
+funções com >= 60 nós: 1210; pares com rank >= 0.8: 16
+1.00    24 linhas  abbychess/diagramas.py:302 com_ids  <->  abbychess/zonas.py:182 com_ids
+0.98    16 linhas  abbychess/controladores.py:222 trocar_tipo  <->  abbychess/controladores.py:231 trocar_funcao
+0.91    17 linhas  abbychess/sessao.py:395 _linha_original  <->  abbychess/sessao.py:384 _palavras_originais
+0.87    18 linhas  abbychess/lote.py:443 _paginas  <->  abbychess/app/dialogo_paginas.py:23 texto_da_selecao
+0.87    30 linhas  abbychess/app/visor.py:457 marcar_palavra  <->  abbychess/app/visor.py:472 marcar_palavra_do_documento
+0.86    24 linhas  abbychess/app/painel_treino.py:454 abrir_paleta  <->  abbychess/app/documento.py:967 abrir_paleta
+0.86    24 linhas  abbychess/app/paginas_na_janela.py:85 apagar_paginas  <->  abbychess/app/paginas_na_janela.py:71 mover_paginas
+0.86    15 linhas  abbychess/controlador.py:358 documento  <->  abbychess/controlador.py:350 texto
+0.85    21 linhas  abbychess/app/paginas_na_janela.py:154 tirar_o_corte  <->  abbychess/app/paginas_na_janela.py:85 apagar_paginas
+0.84    17 linhas  abbychess/app/barra_de_busca.py:144 _botao  <->  abbychess/app/barra_de_busca.py:153 _acao_simples
+0.84    18 linhas  abbychess/controlador.py:585 voltar_visita  <->  abbychess/controlador.py:595 avancar_visita
+0.82    17 linhas  abbychess/edicao.py:146 corrigir  <->  abbychess/edicao.py:156 ajustar
+0.82    20 linhas  abbychess/busca.py:499 _paginas_do_escopo  <->  abbychess/controladores.py:1758 _paginas
+0.82    22 linhas  abbychess/app/paginas_na_janela.py:85 apagar_paginas  <->  abbychess/app/paginas_na_janela.py:120 girar_paginas
+0.81    17 linhas  abbychess/padroes.py:399 esquecer  <->  abbychess/padroes.py:468 restaurar
+0.81    25 linhas  abbychess/diagramas.py:494 para_caixas  <->  abbychess/diagramas.py:471 mesclar

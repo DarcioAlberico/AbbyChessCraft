@@ -120,6 +120,12 @@ verificados pelo usuário; a fatia segue "gestos pendentes"). Pela versão 0.8 d
 prazo dessa verificação é o fechamento do D1; a escolha entre esperá-la para a tag ou adiar
 o prazo no roadmap é do usuário.
 
+**Julgado em 2026-10-28.** Com o sim do usuário, o alvo passou de ≤ 70% depois do D1 a ≤ 85%
+no fim do roadmap (SPEC §15.4, roadmap "Pendências"). O texto (`7a824ec`), a estrutura e os
+FEN (`8194283`) das p. 21–27 estão verificados, e a fatia dá 1.076 gestos na linha de base e
+739 no código de hoje (`3ad7775`), razão 0,687: passa, provisório só pela conferência cega
+da §15.2. A tag `passo-d1` vai no `a9428bf`, o commit aprovado pelas duas revisões.
+
 ## Limitações conhecidas
 
 - O que é do passo G (juntar e dividir glifos, o parágrafo, os estilos, juntar linhas) é

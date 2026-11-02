@@ -145,8 +145,9 @@ class Executor(QObject):
                 tarefa.sinais.progresso.connect(self.progresso.emit)
                 if progresso is not None:
                     tarefa.sinais.progresso.connect(progresso)
-                tarefa.sinais.concluido.connect(lambda r, f=pronto: self._fim(f, r))
-                tarefa.sinais.falhou.connect(lambda m, f=falhou: self._fim(f, m))
+                tarefa.sinais.concluido.connect(
+                    lambda r, f=pronto, t=titulo, x=falhou: self._fim(f, r, t, x))
+                tarefa.sinais.falhou.connect(lambda m, f=falhou, t=titulo: self._fim(f, m, t))
                 self._tarefa, self.titulo = tarefa, titulo   # mantém os sinais vivos até o fim
                 self._leve = leve
                 self.ocupado_mudou.emit(True, titulo)
@@ -159,12 +160,19 @@ class Executor(QObject):
         finally:
             self._no_laco = False
 
-    def _fim(self, callback, valor) -> None:
+    def _fim(self, callback, valor, titulo: str, falhou=None) -> None:
+        """O `pronto` (ou o `falhou`) da tarefa, na interface. O que levanta aqui vai ao log
+        com o rastro e ao `falhou` da tarefa, como a falha do trabalho, e não ao laço do Qt
+        (SPEC-qualidade Q-C1); a fila segue."""
         self._tarefa = None
         self._no_laco = True                    # o que o `pronto` pedir espera a vez
         try:
             if callback is not None:
                 callback(valor)
+        except Exception as erro:
+            log.exception("o fim de %r falhou", titulo)
+            if falhou is not None:
+                falhou(f"{erro}\n\n{traceback.format_exc(limit=3)}")
         finally:
             self._no_laco = False
             self._proxima()                     # um erro no fim não para a fila

@@ -85,7 +85,7 @@ def importar(projeto: ProjetoDeLivro, indices: Optional[Sequence[int]] = None, *
     # Por `pid` (§12.4), como as outras listas de páginas do projeto.
     projeto.dados.extras[CHAVE_DAS_PAGINAS] = sorted(set(
         projeto.dados.extras.get(CHAVE_DAS_PAGINAS, ())) | set(
-        projeto.paginas_para_gravar(importadas)))
+        projeto.ordem.paginas_para_gravar(importadas)))
     projeto.salvar()
     return Resultado(tuple(importadas), tuple(recusadas))
 

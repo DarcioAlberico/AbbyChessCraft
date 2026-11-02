@@ -21,7 +21,7 @@ sem editar o core e sem gabarito novo. Ramo `pendencias`, a partir da tag `passo
 | A suíte rápida em paralelo (`-n auto`): ~32 s | §15.1 | `5612211` |
 | A exportação lê a página pela `OrdemDeLeitura` do Documento | F, J | `8a991b2` |
 | O teste do pool do índice (camada `processo`), quebrado desde o L | achado aqui | `13b3e91` |
-| A pré-carga renderiza o PDF num processo à parte (a interface não para mais ~85 ms) | K | `be40bab`, `8388a7a` |
+| A pré-carga renderiza o PDF num processo à parte (a interface não para mais a cada página nunca vista) | K | `be40bab`, `8388a7a` |
 | Os processos do índice da busca morrem com o programa morto à força | achado aqui | `0c0918c` |
 | Corrigir um caractere não refaz a ordem de leitura nem as linhas (validar, 13,6 → 2,8 ms) | H, pendência daqui | `ad255a8` |
 | Manter as quebras na camada nativa devolve o hífen que o core tirou | J, pendência daqui | `12dd644` |
@@ -99,7 +99,8 @@ O fitz segura o GIL: cada página nunca vista que a pré-carga renderizava parav
 mesmos pixels), e só a pré-carga o usa; a página pedida na hora renderiza aqui, que é mais
 rápido. Pelo `CacheDePaginas`, 10 páginas nunca vistas do Xadrez Vitorioso, endireitadas, duas
 rodadas: a maior parada da thread principal foi de 81–89 ms para 13–14 ms, e as paradas acima
-de 20 ms de uma por página para nenhuma; cada pré-carga leva ~20–30 ms a mais (~500 ms com a
+de 20 ms de uma por página para nenhuma (esses números são da medida de então, fora do método
+da §15.3; o portão do fechamento dos passos, `docs/medidas/2026-10-28-passo-fechamento.json`, mede quem folheia: a maior parada p95 6,4 ms); cada pré-carga leva ~20–30 ms a mais (~500 ms com a
 medida da inclinação). A revisão de código (`8388a7a`) pegou o que acontece quando o filho
 trava: quem pede a página espera a pré-carga dele no máximo 1 s e renderiza aqui, o filho que
 não responde é morto, o PDF trocado no mesmo lugar é lido de novo, e o filho fecha ocioso e
@@ -169,8 +170,83 @@ do CA-12.3 e do teste dos links. Visto nas páginas: os diagramas, as figurinas 
 (⩲ ⩱ ∓ ⯹ ∞ ⇄), o negrito, e "Diagrama 1" e "capítulo 1" levando ao lugar certo. No Odds & Ends,
 três coisas da camada do core, não do leitor: as três linhas grandes da capa ("July 2011
 Newsletter", "By", "The QC Team") saem como três títulos; duas entradas do sumário saem num
-parágrafo só; a tabela de símbolos sai com o símbolo depois da descrição. Thorium e leitor de
-celular continuam por abrir.
+parágrafo só; a tabela de símbolos sai com o símbolo depois da descrição. O leitor de celular
+veio depois (seção abaixo).
+
+## O EPUB no Thorium e no celular
+
+Conferido pelo usuário em 2026-10-30 (o Thorium não aceita a porta de depuração do
+Chromium: fecha na hora, e a conferência não se automatiza). Os EPUB do Odds & Ends (375
+páginas, 235 capítulos, 217 diagramas desenhados do FEN e 241 recortados, 35 referências
+com link) e do Mirkovic (7 páginas), exportados dos projetos do usuário no `2242ccf`, com o
+link do Lichess, sem erro no EPUBCheck. Visto: o sumário pelos títulos, a lista de páginas
+levando à página impressa, os diagramas e o link do Lichess deles, "Diagrama N" e
+"capítulo N", as figurinas e os símbolos, e o texto no modo escuro e no tamanho de fonte
+do leitor. Nenhum problema.
+
+No celular, os mesmos dois EPUB abertos no ReadEra pelo usuário, no mesmo dia: tudo
+normal, com os símbolos de avaliação e as figurinas das peças.
+
+## O negrito e o itálico na página escaneada
+
+Pedido do usuário em 2026-10-30, depois do EPUB conferido: "o que falta são melhorias no
+reconhecimento de itálicos, negrito". As duas réguas só tinham sido medidas no Odds & Ends
+renderizado do PDF digital (o itálico) e no Dvoretsky (o negrito, no core).
+
+**A medida** (`ferramentas/medir_efeitos.py`, `f2c66f8`): o Odds & Ends com o negrito e o
+itálico pela camada, a página renderizada e degradada como um escâner — `escaneado` (220
+dpi, borrão, ruído, 0,3° de giro, JPEG), `binario` (o mesmo em preto e branco), `ruim` (150
+dpi, mais borrão e giro). As mesmas páginas de ajuste e de validação do `medir_italico`. O
+gabarito precisou de uma correção: o ChessBase imprime os lances da linha principal e o
+cabeçalho das partidas (p. 75–86) num negrito falso, o mesmo glifo desenhado quatro vezes
+com 0,24 pt de passo numa fonte que se diz redonda; sem isso, os acertos da régua contavam
+como ~700 falsos.
+
+**O que estava errado:**
+
+- O negrito comparava a espessura de cada glifo com a do mesmo caractere **na página**. Numa
+  página de partida, quase todo algarismo e letra de casa está num lance negrito: o
+  "redondo" deles sai negrito, e o negrito some (o core mede com o livro inteiro por isso).
+- A espessura era a da tinta binarizada: o traço do corpo tem ~2 px, e o mesmo "t" redondo
+  media 1,00 ou 1,18 conforme a fase na grade.
+- O itálico media a inclinação pela direção do gradiente das bordas: na página em preto e
+  branco a borda inclinada é uma escada de degraus verticais, e o itálico sumia (0%).
+
+**O que mudou** (`ec5b145`, `cd499b4`): a espessura pela massa da tinta em tons de cinza ÷ o
+perímetro; a régua do livro (`abbychess/regua_do_negrito.py`: cada página guarda, por
+caractere, a contagem, o quantil 25 e a mediana, no arquivo e no `livro.json`, e o lote e o
+F5 mandam a das outras páginas com o pedido); o itálico pela projeção cisalhada da tinta,
+entre 7° e 22° além das retas, com o ganho de 1,03 (o teto tira as palavras de diagonais,
+v, w, y, que a projeção afia a 25–30°).
+
+**Medido** nas páginas de validação (`docs/medidas/2026-10-30-efeitos-linha-de-base.json`,
+`2026-10-30-efeitos.json`, no `cd499b4`), o negrito com a régua das páginas lidas antes,
+como o lote:
+
+| perfil | itálico antes | itálico agora | negrito antes | negrito agora | falsos do negrito |
+|---|---|---|---|---|---|
+| limpo | 95,9% | 99,8% | 78,6% | 98,9% | 228 → 132 em 16.641 |
+| escaneado | 88,7% | 98,9% | 39,7% | 90,8% | 75 → 103 em 16.582 |
+| preto e branco | 0% | 99,1% | 70,7% | 94,5% | 83 → 61 em 16.582 |
+| ruim | 37,8% | 99,0% | 23,4% | 71,0% | 107 → 115 em 16.305 |
+
+O itálico continua sem falso. Dos falsos do negrito que sobram na página limpa, boa parte é
+do gabarito: as p. 7 e 15 têm a camada com os caracteres trocados ("very" vem "2222"), o
+"½–½" do fim das partidas é negrito falso que escapa da detecção, e as ligaduras (ﬁ, Th)
+vêm como um caractere da camada. Os de verdade são palavras de 2 glifos ("by", "be"),
+números em itálico e uma página em fonte sem serifa (p. 587: a régua mede peso, não
+família). Uma regra para as palavras curtas (negrito só com a vizinha firme, ou com o peso
+1,3 vez o normal) tirou 10 dos 35 falsos do escaneado no ajuste e custou 0,5 ponto de
+acerto: ficou de fora.
+
+**O Karolyi** (`2026-10-30-efeitos-karolyi.json`), com a camada ClearScan do Acrobat como
+segunda opinião (o palpite do OCR dele, não um gabarito): concordamos em 86% do negrito
+dele, e as 358 palavras que marcamos e ele não são, na maior parte, lances da linha principal
+em negrito que o Acrobat leu como redondos (p. 61). O itálico dele tem 9 palavras: sem
+conclusão.
+
+**O custo**: os efeitos da página passam de ~105 para ~250 ms (a espessura nova, ~100 ms
+pelo histograma dos tons; o `np.percentile` custava 290), +2% no lote.
 
 ## A revisão de código
 
@@ -288,6 +364,30 @@ A qualidade do Xadrez Vitorioso com o texto verificado (`2026-10-23-qualidade-xv
 dá CER do corpo de 3,23%, nas 213 linhas e com espaços (o `medir.py` conta por caractere). O
 resto é igual ao de antes.
 
+## A estrutura e os FEN das p. 21–27 (2026-10-28)
+
+O usuário revisou as 9 páginas do Xadrez Vitorioso (i000, i007, i020–i026) pela folha de
+conferência (`ferramentas/folha_de_conferencia.py`, `d47eb41`) e conferiu os 7 diagramas casa a
+casa e o lado de cada um (`8194283`). A estrutura que o assistente rotulou ficou como estava:
+o commit só traz `revisado_por` e as marcas `fen_verificado` / `lado_verificado`. O
+`rotular.py validar --livro xv` não acusa nada.
+
+Medido de novo no `8194283`, num worktree limpo; a linha de base no worktree da tag
+`passo-0`, com os gabaritos copiados:
+- **CA-9.1**, `2026-10-28-legendas-xv.json`: aprovado e **definitivo**. O CER do corpo fica
+  em 4,22% → 4,22% (9.870 glifos), sem glifo estragado. O das legendas, 10,95% → 1,82% (o
+  código mudou desde o `c9e5751`; a medida anterior dava 26,3% → 20,1%).
+- **CA-F.1**, `2026-10-28-fatia-xv-passo-0.json` e `2026-10-28-fatia-xv-passo-L.json`: 1.076
+  → 739 gestos, razão 0,687, como no `f38e5d7`.
+- **Qualidade**, `2026-10-28-qualidade-xv.json`: os 7 FEN do gabarito são os lidos (0 casa
+  errada por diagrama), e o lado sai certo em 2 dos 5 diagramas que o dizem, agora contra o
+  lado conferido. CER do corpo de 2,80%.
+
+O estado das três já não cita a estrutura nem os FEN. O CA-F.1 e a qualidade continuam
+provisórios só pela conferência cega da §15.2 (uma página transcrita do zero e um FEN montado
+sem ver o gabarito); a qualidade, também pelas 28 linhas do sumário (i007) sem texto
+verificado.
+
 ## Verificação
 
 - Suíte rápida: 1553 passed, 2 skipped, em ~2 min no `2cbbdf6`; 1555 passed no `d29d399`, em
@@ -331,9 +431,12 @@ Medido com o texto verificado (seção acima):
   detalhe e o que falta estão em `docs/revisoes/ca-f1-investigacao.md`.
 
 Precisa do usuário:
-- **Os FEN e a estrutura das p. 21–27** (os diagramas e as legendas revisados), para as
-  medidas deixarem de ser provisórias.
-- **Os leitores que não estão na máquina** (Thorium, celular); o Calibre já confere.
+- ~~**Os FEN e a estrutura das p. 21–27** (os diagramas e as legendas revisados), para as
+  medidas deixarem de ser provisórias.~~ Feito em 2026-10-28 (`8194283`, seção abaixo).
+- **A conferência cega da fatia** (§15.2: uma página transcrita e um FEN montado sem ver o
+  gabarito): é o que falta para o CA-F.1 e a qualidade deixarem de ser provisórios.
+- ~~**O leitor do celular**.~~ O Calibre confere, e o Thorium e o ReadEra foram conferidos
+  pelo usuário em 2026-10-30 (seção acima).
 
 Decididos como estão:
 - **A página pedida na hora renderiza na thread da interface** (~85 ms, mais a medida da

@@ -22,6 +22,25 @@ def pagina_nao_reconhecida() -> str:
             f"reconhece; {_tecla('marcar_glifo', 'o menu da Imagem')} marca glifos à mão.")
 
 
+def saude_do_livro(saude) -> str:
+    """O cartão Saúde no estado vazio do Documento (§9.1): os pendentes por página da amostra,
+    antes e agora, as amostras ensinadas, e o que fazer quando ela já basta."""
+    linhas = ["Saúde do livro: a amostra, pendentes antes → agora"]
+    linhas += [f"  p. {posicao + 1}: {antes} → {agora}" for posicao, antes, agora in saude.por_pagina]
+    n = saude.padroes
+    linhas.append(f"  total: {saude.pendentes_antes} → {saude.pendentes_agora} · "
+                  f"{n} {'amostra ensinada' if n == 1 else 'amostras ensinadas'}")
+    acao = _tecla("reconhecer_livro", "Projeto › Reconhecer o livro")
+    if saude.pode_reconhecer_o_livro:
+        linhas.append(f"A amostra está pronta: {acao} reconhece o livro inteiro.")
+    else:
+        linhas.append(f"Revise a amostra até restarem {saude.limiar} pendentes ou menos; depois "
+                      f"{acao} reconhece o livro inteiro "
+                      f"({_tecla('proxima_pagina_pendente', 'Editar › Próxima página com pendentes')}"
+                      " vai à página com pendentes).")
+    return "\n".join(linhas)
+
+
 def nada_reconhecido() -> str:
     return (f"Nada reconhecido nesta página. {_tecla('marcar_glifo', 'O menu da Imagem')} marca "
             f"glifos à mão; {_tecla('reconhecer_pagina', 'Página › Reconhecer')} lê de novo.")
@@ -36,5 +55,7 @@ def escolha_a_fila_de_palavras() -> str:
     return f"Escolha a fila de palavras desconhecidas ({como}) para verificar o texto."
 
 
-SEM_PADROES = ("Nenhum padrão ensinado ainda. No Glifo, digite o caractere do box e aperte "
-               "Enter: ele vira padrão deste livro.")
+def sem_padroes() -> str:
+    """O painel Padrões sem amostra: a tecla de ensinar do perfil de agora."""
+    return teclado.com_teclas("Nenhum padrão ensinado ainda. No Glifo, digite o caractere do "
+                              "box e aperte {ensinar}: ele vira padrão deste livro.")

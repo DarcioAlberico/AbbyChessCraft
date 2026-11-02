@@ -19,20 +19,44 @@ se misturam de propósito. O glifo improvável vai para a revisão mesmo com con
 inclusive o lido por um padrão do livro (o padrão foi ensinado noutro contexto: um `1` de
 "1.e4" lendo o `l` de uma palavra). Só o que o usuário confirmou (manual, revisado) e o texto
 nativo do PDF não voltam.
+
+O contrário também (Mirkovic, *Chess School 1*, onde o `1` e o `l` da fonte quase não
+diferem): **a letra onde o lance ou o número pede algarismo** — "l.♗h7!", "♕el", "♖adl",
+"l0.f3", "l6l9" — é improvável, e a sugestão é o algarismo. Só quando a troca faz da palavra
+um lance com figurina ou algarismo de verdade, ou um número: o "el" do espanhol fica.
+
+E a linha decide o que a palavra não vê (`_pela_linha`), pelo desenho igual em dois tamanhos
+ou em duas alturas, e pela palavra seguinte (o "l" solto antes de "...d3" é o número):
+
+- **a vírgula no alto da linha é apóstrofo** ("pawn,s", "couldn,t"), e o apóstrofo encostado
+  na base é vírgula ("Linares' 2005"): na fonte do Mirkovic os dois são o mesmo glifo;
+- **a minúscula do tamanho das maiúsculas é maiúscula** ("white moves", "oPPOSITIoN"), e o
+  contrário, nas letras de mesmo desenho nas duas caixas (c, o, s, v, w, x, z).
+
+A página decide a figurina larga demais (`_figurinas_largas`): as figurinas de um livro têm
+todas a mesma largura, e a que passa disso engoliu a letra colada nela ("♘f4" lido "♘4" na
+p. 88 do Mirkovic, com confiança alta). Ela não tem sugestão: a revisão a divide.
+
+Cada improvável traz a sugestão quando há uma (`sugestoes`): o painel a põe no campo e o
+Enter a ensina.
 """
 
 from __future__ import annotations
 
 import re
 import threading
-from typing import Collection, FrozenSet, List, Optional, Sequence, Tuple
+from types import MappingProxyType
+from typing import Collection, Dict, FrozenSet, List, Optional, Sequence, Tuple
 
-#: Um lance em SAN, com as letras das peças em inglês e em português (a figurina vira a letra
-#: antes, `core.notacao.FIGURINAS`), o número do lance antes e a pontuação depois: a casa
-#: ("Cxh2", "a8=D", "exd6e.p."), a troca entre peças ("NxN", "DxD+") ou o roque. Basta
-#: reconhecer a palavra, não validar o lance.
-_LANCE = re.compile(r"^[(\[]?(\d+\.+)?([KQRBNDTCP]?[a-h]?[1-8]?[x:]?[a-h][1-8](=?[KQRBNDTC])?"
-                    r"(e\.p\.)?|[KQRBNDTCP][x:][KQRBNDTCP]|[O0]-[O0](-[O0])?)"
+from abbychess.modelo import LETRAS_DAS_PECAS
+
+#: Um lance em SAN, com as letras das peças de todos os idiomas (`modelo.LETRAS_DAS_PECAS`, e
+#: o P do peão; a figurina vira a letra antes, `core.notacao.FIGURINAS`), o número do lance
+#: antes e a pontuação depois: a casa ("Cxh2", "a8=D", "exd6e.p."), a troca entre peças
+#: ("NxN", "DxD+", "LxS") ou o roque. Basta reconhecer a palavra, não validar o lance.
+_PECA, _PROMOCAO = f"[{LETRAS_DAS_PECAS}P]", f"[{LETRAS_DAS_PECAS}]"
+_LANCE = re.compile(rf"^[(\[]?(\d+\.+)?({_PECA}?[a-h]?[1-8]?[x:]?[a-h][1-8](=?{_PROMOCAO})?"
+                    rf"(e\.p\.)?|{_PECA}[x:]{_PECA}|[O0][-–—][O0]([-–—][O0])?)"
                     r"[+#‡†]*[!?]*[)\],.;:]*$")
 
 
@@ -61,38 +85,300 @@ def _letras_seguidas(tipos: Sequence[str], inicio: int, passo: int) -> int:
     return n
 
 
-def improvaveis_na_palavra(chars: Sequence[str]) -> List[bool]:
-    """Para cada glifo da palavra (o caractere de cada box, em ordem), se ele é improvável."""
-    saida = [False] * len(chars)
+#: A letra que um algarismo parece, para a sugestão do algarismo entre letras ("c0l0ca").
+_LETRA_DO_ALGARISMO = {"0": "o", "1": "l", "5": "s"}
+#: O algarismo que cada letra parece, para a letra onde o lance ou o número pede algarismo.
+_ALGARISMO_DA_LETRA = {"l": "1", "I": "1", "|": "1", "O": "0", "o": "0"}
+#: Um número solto: o ano ("1997", "1619"), o número do lance ("10."), entre parênteses.
+_NUMERO = re.compile(r"^[(\[]?\d{1,4}[.,;:)\]]*$")
+
+
+def _algarismos_pedidos(chars: Sequence[str]) -> List[Optional[str]]:
+    """Para cada glifo, o algarismo que a palavra pede no lugar da letra lida, ou None: só
+    quando trocar as letras-algarismo faz da palavra um lance com figurina ou algarismo de
+    verdade ("l.♗h7!", "♕el", "l0.f3") ou um número com algarismo de verdade ("l997")."""
+    trocas = [_ALGARISMO_DA_LETRA.get(c) for c in chars]
+    nada = [None] * len(chars)
+    if not any(trocas) or _e_lance(chars):
+        return nada
+    trocada = [t or c for t, c in zip(trocas, chars)]
+    return trocas if _pede_algarismo(chars, trocada) else nada
+
+
+def _pede_algarismo(chars: Sequence[str], trocada: Sequence[str]) -> bool:
+    """Se a palavra `trocada` (as letras-algarismo de `chars` trocadas) é um lance e `chars`
+    tem figurina ou algarismo de verdade, ou é um número e `chars` tem algarismo de verdade."""
+    from core.notacao import FIGURINAS
+
+    com_algarismo = any(c and c.isdigit() for c in chars)
+    com_figurina = any(c in FIGURINAS for c in chars)
+    if _e_lance(trocada) and (com_algarismo or com_figurina):
+        return True
+    return bool(com_algarismo and _NUMERO.match("".join(trocada)))
+
+
+def _na_outra_caixa(c: str, maiuscula: bool) -> str:
+    """A letra trocada de caixa, com o I e o l que se confundem pelo desenho."""
+    if maiuscula:
+        return "I" if c == "l" else c.upper()
+    return "l" if c == "I" else c.lower()
+
+
+def julgar_palavra(chars: Sequence[str]) -> List[Optional[str]]:
+    """Para cada glifo da palavra: None se ele é provável; senão a sugestão ("" sem uma)."""
+    saida: List[Optional[str]] = [None] * len(chars)
+    algarismos = _algarismos_pedidos(chars)
+    if any(algarismos):
+        return algarismos
     if _e_lance(chars):
         return saida
     tipos = [_tipo(c) for c in chars]
+    _algarismos_entre_letras(chars, tipos, saida)
+    _caixas_trocadas(chars, tipos, saida)
+    return saida
+
+
+def _algarismos_entre_letras(chars: Sequence[str], tipos: Sequence[str],
+                             saida: List[Optional[str]]) -> None:
+    """Na `saida`, a letra que parece cada algarismo de uma série entre letras, no começo
+    seguida de duas letras ou mais, ou no fim depois de duas ("c0l0ca", "1ibera", "muit0")."""
+    maiuscula = tipos.count("M") > tipos.count("m")
     k = 0
     while k < len(tipos):
         if tipos[k] != "d":
             k += 1
             continue
-        fim = k
-        while fim + 1 < len(tipos) and tipos[fim + 1] == "d":
-            fim += 1
-        antes = _letras_seguidas(tipos, k - 1, -1)
-        depois = _letras_seguidas(tipos, fim + 1, 1)
-        if (antes and depois) or (k == 0 and depois >= 2) or (fim == len(tipos) - 1 and antes >= 2):
-            saida[k:fim + 1] = [True] * (fim + 1 - k)
+        fim = _fim_da_serie(tipos, k)
+        if _entre_letras(tipos, k, fim):
+            for j in range(k, fim + 1):
+                letra = _LETRA_DO_ALGARISMO.get(chars[j], "")
+                saida[j] = _na_outra_caixa(letra, True) if letra and maiuscula else letra
         k = fim + 1
-    minuscula = tipos.count("m") > tipos.count("M")     # "anteS", e não "VITORlOSO"
+
+
+def _fim_da_serie(tipos: Sequence[str], k: int) -> int:
+    """O índice do último algarismo da série que começa em `k`."""
+    fim = k
+    while fim + 1 < len(tipos) and tipos[fim + 1] == "d":
+        fim += 1
+    return fim
+
+
+def _entre_letras(tipos: Sequence[str], k: int, fim: int) -> bool:
+    """Se a série de algarismos de `k` a `fim` tem letras dos dois lados, ou duas letras ou
+    mais depois dela no começo da palavra, ou antes dela no fim."""
+    antes = _letras_seguidas(tipos, k - 1, -1)
+    depois = _letras_seguidas(tipos, fim + 1, 1)
+    return bool((antes and depois) or (k == 0 and depois >= 2)
+                or (fim == len(tipos) - 1 and antes >= 2))
+
+
+def _caixas_trocadas(chars: Sequence[str], tipos: Sequence[str],
+                     saida: List[Optional[str]]) -> None:
+    """Na `saida`, a maiúscula depois de uma minúscula numa palavra mais minúscula do que
+    maiúscula ("anteS", e não "VITORlOSO") e a minúscula entre maiúsculas ("VITORlOSO")."""
+    minuscula = tipos.count("m") > tipos.count("M")
     for k in range(1, len(tipos)):
         if minuscula and tipos[k] == "M" and tipos[k - 1] == "m":
-            saida[k] = True
+            saida[k] = _na_outra_caixa(chars[k], False)
         elif (tipos[k] == "m" and tipos[k - 1] == "M" and k + 1 < len(tipos)
               and tipos[k + 1] == "M"):
-            saida[k] = True
+            saida[k] = _na_outra_caixa(chars[k], True)
+
+
+def improvaveis_na_palavra(chars: Sequence[str]) -> List[bool]:
+    """Para cada glifo da palavra (o caractere de cada box, em ordem), se ele é improvável."""
+    return [s is not None for s in julgar_palavra(chars)]
+
+
+# ----------------------------------------------------------------------
+# A linha: o mesmo desenho em dois tamanhos ou em duas alturas
+# ----------------------------------------------------------------------
+
+#: As letras de mesmo desenho nas duas caixas: só o tamanho diz qual é.
+CAIXA_PELO_TAMANHO = frozenset("cosvwxzCOSVWXZ")
+#: As letras cuja minúscula não tem haste: o tamanho delas diz a caixa, mesmo quando o
+#: desenho também diria (a sugestão da palavra não troca a caixa que a altura confirma).
+_CAIXA_NA_ALTURA = frozenset("acemnorsuvwxzACEMNORSUVWXZ")
+#: As referências da altura das maiúsculas (sem as de desenho igual, que podem estar trocadas,
+#: e sem as que descem) e a da altura do x (as minúsculas sem haste nem cauda).
+_ALTAS = frozenset("ABDEFGHIKLMNPRTUYbdhkl")
+_BAIXAS = frozenset("aemnru")
+_QUE_DESCEM = frozenset("gjpqyQJ,;()[]{}")
+#: Quantas linhas da página precisam medir as duas alturas para a razão entre elas valer.
+LINHAS_DA_RAZAO = 3
+#: Abaixo disto (maiúscula / x), a linha não separa as caixas pelo tamanho.
+RAZAO_QUE_SEPARA = 1.2
+_APOSTROFOS = frozenset("'’‘")
+
+
+def _medidas(entries) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+    """(altura das maiúsculas, altura do x, linha de base) da linha, pelas letras dela."""
+    altas = [e.y2 - e.y1 for e in entries if e.char in _ALTAS]
+    baixas = [e.y2 - e.y1 for e in entries if e.char in _BAIXAS]
+    return _mediana(altas), _mediana(baixas), _mediana(_bases(entries))
+
+
+def _bases(entries) -> List[int]:
+    """O pé das letras e algarismos que não descem."""
+    return [e.y2 for e in entries if e.char and e.char[:1].isalnum()
+            and e.char not in _QUE_DESCEM]
+
+
+def _mediana(valores: Sequence[int]) -> Optional[float]:
+    """A mediana de duas medidas ou mais; com menos, None."""
+    from statistics import median
+
+    return median(valores) if len(valores) >= 2 else None
+
+
+def _pela_linha(linhas: Sequence[Sequence[Sequence[int]]], por_gid) -> Tuple[dict, dict]:
+    """({gid: sugestão}, {gid: maiúscula pela altura}): os glifos que a linha desmente (a
+    vírgula no alto e o apóstrofo na base, a letra de `CAIXA_PELO_TAMANHO` do tamanho da outra
+    caixa) e, para as letras de `_CAIXA_NA_ALTURA`, a caixa que a altura delas diz."""
+    medidas = _medidas_das_linhas(linhas, por_gid)
+    razao = _razao_da_pagina(medidas)
+    saida, alturas = {}, {}
+    for pares, (maiuscula, x, base) in medidas:
+        completas = _alturas_completas(maiuscula, x, razao)
+        if completas is None:
+            continue
+        maiuscula, x = completas
+        if base is not None and x:
+            _virgulas_e_apostrofos(pares, base, x, saida)
+        if maiuscula < RAZAO_QUE_SEPARA * x:
+            continue
+        _caixas_pela_altura(pares, maiuscula, x, alturas)
+        _letras_da_outra_caixa(pares, alturas, saida)
+    return saida, alturas
+
+
+def _medidas_das_linhas(linhas: Sequence[Sequence[Sequence[int]]], por_gid) -> list:
+    """Para cada linha, os pares (gid, `BoxEntry`) dela e as `_medidas` deles."""
+    medidas = []
+    for linha in linhas:
+        pares = [(g, por_gid[g]) for p in linha for g in p if g in por_gid]
+        medidas.append((pares, _medidas([e for _g, e in pares])))
+    return medidas
+
+
+def _razao_da_pagina(medidas: list) -> Optional[float]:
+    """A razão x / maiúscula mediana das linhas que medem as duas alturas, se elas são
+    `LINHAS_DA_RAZAO` ou mais: ela completa a linha que só mede uma ("oPPOSITIoN", sem
+    minúscula de referência)."""
+    razoes = sorted(x / m for _p, (m, x, _b) in medidas if m and x)
+    return razoes[len(razoes) // 2] if len(razoes) >= LINHAS_DA_RAZAO else None
+
+
+def _alturas_completas(maiuscula: Optional[float], x: Optional[float],
+                       razao: Optional[float]) -> Optional[Tuple[float, float]]:
+    """(maiúscula, x) da linha, a que ela não mede pela `razao` da página; None se ela não
+    mede nenhuma das duas, ou só uma e a página não tem razão."""
+    if (maiuscula is None or x is None) and (razao is None or (maiuscula, x) == (None, None)):
+        return None
+    maiuscula = maiuscula or x / razao
+    return maiuscula, x or maiuscula * razao
+
+
+def _virgulas_e_apostrofos(pares: list, base: float, x: float, saida: dict) -> None:
+    """Na `saida`, o apóstrofo da vírgula no alto e a vírgula do apóstrofo na base."""
+    for g, e in pares:
+        if e.char == "," and e.y2 < base - 0.5 * x:
+            saida[g] = "'"
+        elif e.char in _APOSTROFOS and e.y2 > base - 0.25 * x:
+            saida[g] = ","
+
+
+def _caixas_pela_altura(pares: list, maiuscula: float, x: float, alturas: dict) -> None:
+    """Em `alturas`, a caixa que a altura diz das letras de `_CAIXA_NA_ALTURA` (True:
+    maiúscula); a do meio, entre 40 % e 60 % do caminho do x à maiúscula, fica sem."""
+    alta, baixa = x + 0.6 * (maiuscula - x), x + 0.4 * (maiuscula - x)
+    for g, e in pares:
+        if e.char in _CAIXA_NA_ALTURA:
+            altura = e.y2 - e.y1
+            if altura >= alta:
+                alturas[g] = True
+            elif altura <= baixa:
+                alturas[g] = False
+
+
+def _letras_da_outra_caixa(pares: list, alturas: dict, saida: dict) -> None:
+    """Na `saida`, a letra de `CAIXA_PELO_TAMANHO` com a altura da outra caixa, trocada."""
+    for g, e in pares:
+        caixa = alturas.get(g)
+        if caixa is not None and e.char in CAIXA_PELO_TAMANHO and caixa != e.char.isupper():
+            saida[g] = e.char.swapcase()
+
+
+def _numeros_soltos(linhas: Sequence[Sequence[Sequence[int]]], char) -> Dict[int, str]:
+    """{gid: algarismo} da letra solta que é o número do lance das pretas logo depois,
+    separado das reticências ("l ...d3", `lances._NUMERO_SEPARADO`)."""
+    saida = {}
+    for linha in linhas:
+        for palavra, seguinte in zip(linha, linha[1:]):
+            chars = [char[g] for g in palavra]
+            numero = "".join(_ALGARISMO_DA_LETRA.get(c, c) for c in chars)
+            if (numero.isdigit() and not numero.startswith("0")     # "o ...Cf6" é o artigo
+                    and _lance_das_pretas(seguinte, char)):
+                saida.update(_letras_algarismo(palavra, chars))
     return saida
 
 
-#: A última página julgada: (chave, gids improváveis). A fila da janela pergunta várias vezes
-#: por ação (~2–3 ms cada numa página do livro); a chave custa uma fração disso.
-_ULTIMA: Tuple[Optional[tuple], FrozenSet[int]] = (None, frozenset())
+def _lance_das_pretas(palavra: Sequence[int], char) -> bool:
+    """Se a palavra é um lance depois das reticências ("...d3", "…d3")."""
+    depois = "".join(char[g] for g in palavra)
+    lance = depois.lstrip(".…")
+    if len(depois) - len(lance) < 2 and not depois.startswith("…"):
+        return False
+    return bool(lance) and _e_lance(list(lance))
+
+
+def _letras_algarismo(palavra: Sequence[int], chars: Sequence[str]) -> List[Tuple[int, str]]:
+    """(gid, algarismo) das letras da palavra que parecem algarismo."""
+    return [(g, _ALGARISMO_DA_LETRA[c]) for g, c in zip(palavra, chars)
+            if c in _ALGARISMO_DA_LETRA]
+
+
+#: Quanto a figurina pode passar da largura das outras iguais da página, em frações da altura
+#: dela: as do Mirkovic variam 2 px em 36, e uma letra colada acrescenta pelo menos um "l".
+FOLGA_DA_FIGURINA = 0.2
+#: Quantas figurinas iguais a página precisa ter para a mediana delas medir a largura; com
+#: menos, a medida é a de todas as figurinas da página.
+FIGURINAS_DA_MEDIDA = 3
+
+
+def _figurinas_largas(pagina) -> FrozenSet[int]:
+    """Os gids das figurinas mais largas que as outras da página (`FOLGA_DA_FIGURINA`)."""
+    from core.notacao import FIGURINAS
+
+    figurinas = [b for b in pagina.boxes if b.entry.char and b.entry.char in FIGURINAS]
+    if len(figurinas) < FIGURINAS_DA_MEDIDA:
+        return frozenset()
+    medida = _largura_de_cada_figurina(figurinas)
+    return frozenset(b.gid for b in figurinas
+                     if b.entry.x2 - b.entry.x1
+                     > medida[b.entry.char] + FOLGA_DA_FIGURINA * (b.entry.y2 - b.entry.y1))
+
+
+def _largura_de_cada_figurina(figurinas) -> Dict[str, float]:
+    """{figurina: a largura dela na página}: a mediana das iguais, ou a de todas as figurinas
+    quando as iguais são menos de `FIGURINAS_DA_MEDIDA`."""
+    from statistics import median
+
+    larguras: Dict[str, List[int]] = {}
+    for b in figurinas:
+        larguras.setdefault(b.entry.char, []).append(b.entry.x2 - b.entry.x1)
+    todas = median(w for ws in larguras.values() for w in ws)
+    return {c: median(ws) if len(ws) >= FIGURINAS_DA_MEDIDA else todas
+            for c, ws in larguras.items()}
+
+
+#: As últimas páginas julgadas: chave -> {gid: sugestão}, a mais recente no fim. A fila da
+#: janela pergunta várias vezes por ação (~2–3 ms cada numa página do livro); a chave custa
+#: uma fração disso. Mais de uma: o resumo da página gravada (`improvaveis_da_lista`, com os
+#: gids provisórios) julgava no meio, e a fila seguinte refazia a conta.
+_JULGADAS: dict = {}
+_GUARDADAS = 4
 _TRAVA = threading.Lock()
 
 
@@ -102,26 +388,94 @@ def _chave(pagina) -> tuple:
                    getattr(b.entry, "angulo", 0)) for b in pagina.boxes), pagina.decisoes)
 
 
-def improvaveis(pagina) -> FrozenSet[int]:
-    """Os gids dos glifos improváveis da página (`modelo.Pagina`), pelas palavras do
-    Documento (`texto.palavras_dos_gids`)."""
-    global _ULTIMA
+def julgar(pagina) -> Dict[int, str]:
+    """{gid: sugestão} dos glifos improváveis da página (`modelo.Pagina`), pelas palavras e
+    pelas linhas do Documento (`texto.linhas_dos_gids`); a sugestão é "" quando não há uma."""
+    chave = _chave(pagina)
+    julgada = _guardada(chave)
+    if julgada is None:
+        julgada = MappingProxyType(_julgada(pagina))
+        _guardar(chave, julgada)
+    return julgada
+
+
+def _guardada(chave: tuple):
+    """A página julgada com essa chave, agora a mais recente; None se ela não está guardada."""
+    with _TRAVA:
+        if (julgada := _JULGADAS.pop(chave, None)) is not None:
+            _JULGADAS[chave] = julgada
+        return julgada
+
+
+def _guardar(chave: tuple, julgada) -> None:
+    """Guarda a página julgada como a mais recente, e esquece as mais antigas que sobram."""
+    with _TRAVA:
+        _JULGADAS[chave] = julgada
+        while len(_JULGADAS) > _GUARDADAS:
+            del _JULGADAS[next(iter(_JULGADAS))]
+
+
+def _julgada(pagina) -> Dict[int, str]:
+    """{gid: sugestão}: pela linha, pela palavra, os números soltos e as figurinas largas."""
     from abbychess import texto as tx
 
-    chave = _chave(pagina)
-    with _TRAVA:
-        if _ULTIMA[0] == chave:
-            return _ULTIMA[1]
-    char = {b.gid: b.entry.char for b in pagina.boxes}
-    char.update({v.gid: v.char for v in pagina.decisoes.virtuais})
-    saida = set()
-    for palavra in tx.palavras_dos_gids(pagina):
-        for gid, improvavel in zip(palavra, improvaveis_na_palavra([char[g] for g in palavra])):
-            if improvavel:
-                saida.add(gid)
-    with _TRAVA:
-        _ULTIMA = (chave, frozenset(saida))
-        return _ULTIMA[1]
+    char = _chars(pagina)
+    linhas = tx.linhas_dos_gids(pagina)
+    saida, alturas = _pela_linha(linhas, {b.gid: b.entry for b in pagina.boxes
+                                          if b.entry.char})
+    for linha in linhas:
+        for palavra in linha:
+            _pela_palavra(palavra, char, alturas, saida)
+    saida.update(_numeros_soltos(linhas, char))
+    saida.update((g, "") for g in _figurinas_largas(pagina) if g not in saida)
+    return saida
+
+
+def _chars(pagina) -> Dict[int, str]:
+    """{gid: caractere} dos glifos e dos virtuais da página."""
+    from abbychess import texto as tx
+
+    return tx.chars_dos_gids(pagina, pagina.boxes, [b.entry for b in pagina.boxes])
+
+
+def _pela_palavra(palavra: Sequence[int], char: Dict[int, str], alturas: dict,
+                  saida: dict) -> None:
+    """Na `saida`, as sugestões de `julgar_palavra`; a sem sugestão não apaga a da linha."""
+    for gid, sugestao in zip(palavra, julgar_palavra([char[g] for g in palavra])):
+        if sugestao is None or (gid in saida and not sugestao):
+            continue
+        if sugestao and _so_falta_o_espaco(sugestao, char[gid], alturas.get(gid)):
+            sugestao = ""
+        saida[gid] = sugestao
+
+
+def _so_falta_o_espaco(sugestao: str, atual: str, maiuscula: Optional[bool]) -> bool:
+    """"whereWhite": a sugestão só troca a caixa, e a altura da letra confirma a lida (o W
+    tem a altura de maiúscula); o que falta é o espaço."""
+    return (sugestao.lower() == atual.lower() and sugestao != atual
+            and maiuscula == atual.isupper())
+
+
+def improvaveis(pagina) -> FrozenSet[int]:
+    """Os gids dos glifos improváveis da página (`julgar`)."""
+    return frozenset(julgar(pagina))
+
+
+def sugestoes(pagina) -> Dict[int, str]:
+    """{gid: o caractere que o contexto sugere} dos improváveis que têm sugestão."""
+    return {g: s for g, s in julgar(pagina).items() if s}
+
+
+_DESENHOS_IGUAIS = ({",", "'", "’", "‘"}, {"l", "I", "|", "1"})
+
+
+def mesmo_desenho(lido: str, sugestao: str) -> bool:
+    """Se o caractere lido e o sugerido têm o mesmo desenho (a vírgula e o apóstrofo, as duas
+    caixas de `CAIXA_PELO_TAMANHO`, o l e o 1): ensinar o padrão faria o livro ler
+    todos os outros como a sugestão, e a troca é "só esta"."""
+    if lido in CAIXA_PELO_TAMANHO and sugestao == lido.swapcase():
+        return True
+    return any(lido in grupo and sugestao in grupo for grupo in _DESENHOS_IGUAIS)
 
 
 def volta_pelo_contexto(fonte: str) -> bool:
@@ -170,27 +524,48 @@ def pendentes_da_pagina(pagina, limiares, *, com_os_revisados: bool = False) -> 
 
 
 def _do_lote(pagina, lidas: Collection[str], novo: str, fora: Collection[int]) -> List[bool]:
-    from abbychess import texto as tx
-
-    contra = improvaveis(pagina)
-    candidatos = {b.gid for b in pagina.boxes
-                  if b.gid in contra and b.gid not in fora and b.entry.char
-                  and b.entry.char in lidas and not b.revisado
-                  and volta_pelo_contexto(b.entry.source)}
+    candidatos = _candidatos_do_lote(pagina, lidas, novo, fora)
     if not candidatos:
         return [False] * len(pagina.boxes)
-    # A troca tem de deixar o glifo provável na palavra: o "0" de "C0L0CA" não vira "o".
-    char = {b.gid: b.entry.char for b in pagina.boxes}
-    char.update({v.gid: v.char for v in pagina.decisoes.virtuais})
+    provaveis = _provaveis_com_a_troca(pagina, candidatos, novo)
+    return [b.gid in provaveis for b in pagina.boxes]
+
+
+def _candidatos_do_lote(pagina, lidas: Collection[str], novo: str,
+                        fora: Collection[int]) -> set:
+    """Os gids lidos como um de `lidas` que a palavra desmente sem sugestão ou sugerindo
+    `novo`, menos os de `fora`, os revisados e os que não voltam pelo contexto."""
+    contra = _contra_o_lote(pagina, novo, fora)
+    return {b.gid for b in pagina.boxes
+            if b.gid in contra and b.entry.char and b.entry.char in lidas and not b.revisado
+            and volta_pelo_contexto(b.entry.source)}
+
+
+def _contra_o_lote(pagina, novo: str, fora: Collection[int]) -> set:
+    """Os gids que a página julga improváveis sem sugestão ou sugerindo `novo`, menos os de
+    `fora`."""
+    return {g for g, sugestao in julgar(pagina).items()
+            if g not in fora and (not sugestao or sugestao == novo)}
+
+
+def _provaveis_com_a_troca(pagina, candidatos: set, novo: str) -> set:
+    """Os candidatos que, trocados por `novo`, ficam prováveis na palavra: o "0" de "C0L0CA"
+    não vira "o"."""
+    from abbychess import texto as tx
+
+    char = _chars(pagina)
     provaveis = set()
     for palavra in tx.palavras_dos_gids(pagina):
-        trocados = [g for g in palavra if g in candidatos]
-        if trocados:
-            julgados = improvaveis_na_palavra([novo if g in candidatos else char[g]
-                                               for g in palavra])
-            provaveis.update(g for g, improvavel in zip(palavra, julgados)
-                             if g in candidatos and not improvavel)
-    return [b.gid in provaveis for b in pagina.boxes]
+        if any(g in candidatos for g in palavra):
+            provaveis.update(_provaveis_na_palavra(palavra, candidatos, novo, char))
+    return provaveis
+
+
+def _provaveis_na_palavra(palavra: Sequence[int], candidatos: set, novo: str,
+                          char: Dict[int, str]) -> List[int]:
+    """Os candidatos da palavra que ficam prováveis nela com todos eles trocados por `novo`."""
+    na_palavra = improvaveis_na_palavra([novo if g in candidatos else char[g] for g in palavra])
+    return [g for g, improvavel in zip(palavra, na_palavra) if g in candidatos and not improvavel]
 
 
 def lote(pagina, lidas: Collection[str], novo: str, fora: Collection[int] = ()) -> List[int]:

@@ -15,7 +15,9 @@ from PIL import Image
 from core.pagina import Figura, PaginaExtraida, Paragrafo
 
 from abbychess import epub
+from abbychess import validacao_do_epub as validacao
 from abbychess import exportar as ex
+from abbychess import metadados as mtd
 
 FEN = "r3k2r/pp3ppp/2n5/3q4/3P4/2N2N2/PP3PPP/R3K2R w - - 0 1"
 
@@ -53,7 +55,7 @@ def test_o_epub_tem_capitulos_sumario_paginas_e_marcos(tmp_path):
     m = epub.Metadados("A Book", idioma="en", autores=("Jacob Aagaard",), editora="QC",
                        data="2012", assuntos=("Chess",), direitos="©", capa=_png(128))
     escrito = epub.escrever(_livro(), destino, m)
-    assert epub.conferir(destino) == []
+    assert validacao.conferir(destino) == []
     assert (escrito.capitulos, escrito.paginas, escrito.titulos) == (2, 3, 3)
     assert escrito.imagens == 2 and escrito.reutilizadas == 1 and escrito.sem_fen == 1
 
@@ -110,7 +112,7 @@ def test_sem_titulo_o_sumario_lista_as_paginas_e_o_capitulo_parte_pelo_tamanho(t
     assert escrito.capitulos == 3                     # 2 páginas por capítulo
     nav = _ler(destino)[0]["OEBPS/nav.xhtml"].decode("utf-8")
     assert "Páginas 1–2" in nav and "Páginas 5</a>" in nav
-    assert epub.conferir(destino) == []
+    assert validacao.conferir(destino) == []
 
 
 def test_ca_12_6_os_mesmos_bytes(tmp_path, monkeypatch):
@@ -141,7 +143,7 @@ def test_conferir_acusa_link_quebrado_e_mimetype_fora_do_lugar(tmp_path):
     with zipfile.ZipFile(ruim, "w", zipfile.ZIP_DEFLATED) as z:
         for nome in sorted(partes):                       # META-INF/ antes do mimetype
             z.writestr(nome, partes[nome])
-    problemas = epub.conferir(ruim)
+    problemas = validacao.conferir(ruim)
     assert "o mimetype não é a primeira entrada" in problemas
     assert any("link quebrado capitulo-009.xhtml#x" in p for p in problemas)
     assert any("âncora inexistente #nada" in p for p in problemas)
@@ -149,22 +151,22 @@ def test_conferir_acusa_link_quebrado_e_mimetype_fora_do_lugar(tmp_path):
 
 def test_metadados_do_projeto_pelo_arquivo(tmp_path):
     (tmp_path / "capa.png").write_bytes(_png(9))
-    (tmp_path / ex.ARQUIVO_DE_METADADOS).write_text(json.dumps({
+    (tmp_path / mtd.ARQUIVO_DE_METADADOS).write_text(json.dumps({
         "autores": ["Jacob Aagaard"], "editora": "Quality Chess", "data": "2012",
         "assuntos": "Chess", "capa": "capa.png"}), encoding="utf-8")
     projeto = SimpleNamespace(pasta=tmp_path, dados=SimpleNamespace(nome="Endgame"))
-    m = ex.metadados_do_projeto(projeto, "en")
+    m = mtd.metadados_do_projeto(projeto, "en")
     assert (m.titulo, m.idioma, m.autores, m.editora, m.assuntos) == (
         "Endgame", "en", ("Jacob Aagaard",), "Quality Chess", ("Chess",))
     assert m.capa == _png(9)
-    vazio = ex.metadados_do_projeto(SimpleNamespace(pasta=tmp_path / "x",
+    vazio = mtd.metadados_do_projeto(SimpleNamespace(pasta=tmp_path / "x",
                                                     dados=SimpleNamespace(nome="T")), "pt-BR")
     assert vazio.titulo == "T" and vazio.capa is None
 
 
 def test_epubcheck_sem_configuracao_e_none(tmp_path, monkeypatch):
     monkeypatch.delenv("ABBY_EPUBCHECK", raising=False)
-    assert epub.epubcheck(tmp_path / "x.epub") is None
+    assert validacao.epubcheck(tmp_path / "x.epub") is None
 
 
 @pytest.mark.parametrize("idioma,titulo", [("es", "Índice"), ("de", "Inhalt"),
@@ -186,7 +188,7 @@ def test_a_fonte_dos_simbolos_e_achada_pelo_css(tmp_path):
     if "@font-face" in css:                           # há fonte de símbolos nesta máquina
         assert 'url("fontes/' in css
         assert '<span class="s">' in partes["OEBPS/texto/capitulo-001.xhtml"].decode("utf-8")
-    assert epub.conferir(destino) == []
+    assert validacao.conferir(destino) == []
 
 
 def test_caracteres_de_controle_do_ocr_nao_quebram_o_xml(tmp_path):
@@ -194,7 +196,7 @@ def test_caracteres_de_controle_do_ocr_nao_quebram_o_xml(tmp_path):
                                                 Paragrafo("um\x00 texto", negrito=[(0, 2)])])]
     destino = tmp_path / "a.epub"
     epub.escrever(paginas, destino, epub.Metadados("Livro\x0c"))
-    assert epub.conferir(destino) == []
+    assert validacao.conferir(destino) == []
 
 
 def test_livro_vazio_nao_vira_pacote_invalido(tmp_path):
@@ -238,18 +240,87 @@ def test_conferir_acusa_id_repetido_e_toc_vazio(tmp_path):
         z.writestr(zipfile.ZipInfo("mimetype"), partes.pop("mimetype"))
         for nome in sorted(partes):
             z.writestr(nome, partes[nome], zipfile.ZIP_DEFLATED)
-    problemas = epub.conferir(ruim)
+    problemas = validacao.conferir(ruim)
     assert "OEBPS/texto/capitulo-001.xhtml: o id t1 se repete" in problemas
     assert "o toc do nav está vazio" in problemas
+
+
+@pytest.fixture(scope="module")
+def partes_de_um_livro(tmp_path_factory):
+    """As entradas de um EPUB são (um capítulo, sem imagem), escrito uma vez."""
+    destino = tmp_path_factory.mktemp("conferir") / "a.epub"
+    epub.escrever([PaginaExtraida(numero=0, blocos=[Paragrafo("T", titulo=True, nivel=1),
+                                                    Paragrafo("x")])],
+                  destino, epub.Metadados("L"))
+    return {n: v.decode("utf-8") for n, v in _ler(destino)[0].items()}
+
+
+def _trocar(nome, de, para):
+    def estragar(partes):
+        partes[nome] = partes[nome].replace(de, para)
+    return estragar
+
+
+def _tirar(nome):
+    def estragar(partes):
+        del partes[nome]
+    return estragar
+
+
+OPF, NAV, CSS = "OEBPS/content.opf", "OEBPS/nav.xhtml", "OEBPS/estilo.css"
+CAPITULO = "OEBPS/texto/capitulo-001.xhtml"
+
+
+@pytest.mark.parametrize("estragar,esperado", [
+    (_trocar("mimetype", "epub+zip", "zip"), "o mimetype não é application/epub+zip"),
+    (_tirar("META-INF/container.xml"), "o META-INF/container.xml falta ou não aponta o OPF"),
+    (_trocar("META-INF/container.xml", "content.opf", "outro.opf"),
+     "o OPF OEBPS/outro.opf não está no pacote"),
+    (_trocar(OPF, "</package>", ""), "o OPF não é XML legível ("),
+    (_trocar(OPF, "<dc:title>L</dc:title>", ""), "o OPF não tem dc:title"),
+    (_trocar(OPF, '"dcterms:modified"', '"x"'), "o OPF não tem dcterms:modified"),
+    (_trocar(OPF, 'id="c1"', 'id="css"'), "o id css se repete no manifesto"),
+    (_trocar(OPF, 'href="estilo.css" ', ""), "o item css não tem href"),
+    (_tirar(CSS), "o item estilo.css do manifesto não está no pacote"),
+    (_trocar(OPF, '<itemref idref="c1"/><itemref idref="nav" linear="no"/>', ""),
+     "a espinha está vazia"),
+    (_trocar(OPF, 'idref="c1"', 'idref="c9"'), "o itemref c9 não está no manifesto"),
+    (_trocar(OPF, ' properties="nav"', ""), "o manifesto tem 0 nav (precisa de um)"),
+    (_trocar(CAPITULO, "</body>", ""), f"{CAPITULO}: XML inválido ("),
+    (_trocar(OPF, '<itemref idref="nav" linear="no"/>', ""),
+     f"{NAV}: link para fora da espinha nav.xhtml#toc"),
+    (_trocar(CSS, "body {", 'body { background: url("fundo.png");'),
+     f"{CSS}: url() quebrada fundo.png"),
+    (_trocar(NAV, 'epub:type="page-list"', 'epub:type="x"'), "o nav não tem page-list"),
+])
+def test_conferir_acusa_o_que_um_leitor_recusaria(partes_de_um_livro, tmp_path, estragar,
+                                                  esperado):
+    partes = dict(partes_de_um_livro)
+    estragar(partes)
+    ruim = tmp_path / "ruim.epub"
+    with zipfile.ZipFile(ruim, "w") as z:
+        z.writestr(zipfile.ZipInfo("mimetype"), partes.pop("mimetype"))
+        for nome in sorted(partes):
+            z.writestr(nome, partes[nome], zipfile.ZIP_DEFLATED)
+    problemas = validacao.conferir(ruim)
+    assert any(p.startswith(esperado) for p in problemas), problemas
+
+
+def test_conferir_acusa_o_mimetype_comprimido(partes_de_um_livro, tmp_path):
+    ruim = tmp_path / "ruim.epub"
+    with zipfile.ZipFile(ruim, "w", zipfile.ZIP_DEFLATED) as z:
+        for nome, texto in partes_de_um_livro.items():       # o mimetype primeiro
+            z.writestr(nome, texto)
+    assert validacao.conferir(ruim) == ["o mimetype está comprimido"]
 
 
 def test_metadados_nulos_e_capa_fora_da_pasta(tmp_path):
     projeto_dir = tmp_path / "projeto"
     projeto_dir.mkdir()
     (tmp_path / "fora.png").write_bytes(_png(1))
-    (projeto_dir / ex.ARQUIVO_DE_METADADOS).write_text(json.dumps({
+    (projeto_dir / mtd.ARQUIVO_DE_METADADOS).write_text(json.dumps({
         "editora": None, "autores": [None, "A"], "capa": "../fora.png"}), encoding="utf-8")
-    m = ex.metadados_do_projeto(SimpleNamespace(pasta=projeto_dir,
+    m = mtd.metadados_do_projeto(SimpleNamespace(pasta=projeto_dir,
                                                 dados=SimpleNamespace(nome="T")), "pt-BR")
     assert m.editora == "" and m.autores == ("A",) and m.capa is None
 
@@ -262,8 +333,8 @@ def test_o_epubcheck_aprova_o_livro_com_capa_fonte_e_recortes(tmp_path):
         destino = tmp_path / f"livro-{idioma}.epub"
         epub.escrever(_livro(), destino, epub.Metadados(
             "A Book & <More>", idioma=idioma, autores=("A",), data="2012-05", capa=capa))
-        assert epub.conferir(destino) == []
-        assert epub.epubcheck(destino) == []
+        assert validacao.conferir(destino) == []
+        assert validacao.epubcheck(destino) == []
 
 @pytest.mark.skipif(not os.environ.get("ABBY_ACE"),
                     reason="o Ace by DAISY não está configurado (ABBY_ACE)")
@@ -272,7 +343,7 @@ def test_o_ace_nao_acha_violacao(tmp_path):
     epub.escrever(_livro(), destino, epub.Metadados("A Book", idioma="en", autores=("A",),
                                                     capa=_png(90)),
                   numeros={0: 10, 1: 11, 2: 12})
-    assert epub.ace(destino) == []
+    assert validacao.ace(destino) == []
 
 
 def test_o_opf_declara_o_idioma_e_a_fonte_da_paginacao(tmp_path):
@@ -287,7 +358,7 @@ def test_o_opf_declara_o_idioma_e_a_fonte_da_paginacao(tmp_path):
 
 def test_ace_sem_configuracao_e_none(tmp_path, monkeypatch):
     monkeypatch.delenv("ABBY_ACE", raising=False)
-    assert epub.ace(tmp_path / "x.epub") is None
+    assert validacao.ace(tmp_path / "x.epub") is None
 
 
 # ----------------------------------------------------------------------
@@ -346,6 +417,6 @@ def test_o_epub_guarda_o_png_otimizado_e_o_relatorio_conta(tmp_path):
     destino = tmp_path / "a.epub"
     escrito = epub.escrever([PaginaExtraida(numero=0, blocos=[figura])], destino,
                             epub.Metadados("L"))
-    assert escrito.poupados > 0 and epub.conferir(destino) == []
+    assert escrito.poupados > 0 and validacao.conferir(destino) == []
     imagens = [v for n, v in _ler(destino)[0].items() if n.startswith("OEBPS/imagens/")]
     assert len(imagens) == 1 and len(imagens[0]) == len(figura.png) - escrito.poupados

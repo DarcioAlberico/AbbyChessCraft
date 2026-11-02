@@ -19,15 +19,15 @@ exportação) e escreve um EPUB 3 que a auditoria do EPUB do Aagaard pediu (road
 - **Diagramas**: o texto alternativo diz o FEN e o lado a jogar (e se foi assumido); o
   recorte diz que o diagrama não foi lido. Imagens iguais byte a byte são um recurso só.
 - **Links internos**: "página 23", "Diagrama 6" (pelo número da legenda) e "capítulo 3"
-  (pelo número do título) viram link quando o alvo está no livro (`referencias_internas`).
+  (pelo número do título) viram link quando o alvo está no livro (`links_internos`).
 - **Links de análise**, se pedidos: na legenda de cada diagrama lido, o link que abre a
   posição no Lichess ou no Chess.com (`links_de_analise`).
 - **Os mesmos bytes**: com o mesmo `SOURCE_DATE_EPOCH`, o mesmo arquivo (CA-12.6): a data
   do pacote e das entradas do zip vem de `core.exportar.instante`, e nada mais varia.
 
 Do core só se usam funções públicas: a fonte dos símbolos (`fonte_dos_simbolos`) e o
-instante reprodutível (`instante`, `agora`, `data_no_zip`). `conferir` lê o arquivo
-escrito e acusa o que um leitor recusaria (o pacote, o manifesto, os links, o XML).
+instante reprodutível (`instante`, `agora`, `data_no_zip`). A conferência do arquivo
+escrito e os validadores externos estão em `abbychess.validacao_do_epub`.
 """
 
 from __future__ import annotations
@@ -37,20 +37,21 @@ import html
 import io
 import logging
 import os
-import posixpath
 import re
-import tempfile
 import uuid
 import zipfile
-from urllib.parse import unquote
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
-from xml.etree import ElementTree
 
 from core.pagina import Figura, PaginaExtraida, Paragrafo
 
+from abbychess import gravacao as gv
 from abbychess import links_de_analise
+from abbychess import marcacao
+from abbychess.marcacao import trechos_marcados
+from abbychess.validacao_do_epub import conferir
+from abbychess.links_internos import Numerados, numerados, referencias_internas
 
 log = logging.getLogger(__name__)
 
@@ -140,10 +141,6 @@ _CONTAINER = ('<?xml version="1.0" encoding="UTF-8"?>\n'
               '<rootfiles><rootfile full-path="OEBPS/content.opf" '
               'media-type="application/oebps-package+xml"/></rootfiles></container>\n')
 
-_NS = {"opf": "http://www.idpf.org/2007/opf", "x": "http://www.w3.org/1999/xhtml",
-       "epub": "http://www.idpf.org/2007/ops",
-       "c": "urn:oasis:names:tc:opendocument:xmlns:container"}
-
 
 @dataclass(frozen=True)
 class Metadados:
@@ -212,173 +209,32 @@ def xhtml_do_texto(paragrafo: Paragrafo, simbolos: str,
     # Tirar caracteres mudaria os trechos de estilo: os proibidos viram espaço. As aspas
     # retas do OCR viram as curvas do impresso (PD-07), também uma por uma.
     texto = aspas_curvas(sem_proibidos(texto))
-    marcas = [[False, False, c in simbolos, -1, False] for c in texto]
     duvidosos = getattr(paragrafo, "duvidosos", ()) if realce else ()
-    for k, trechos in ((0, paragrafo.negrito), (1, paragrafo.italico), (4, duvidosos)):
-        for inicio, fim in trechos or ():
-            for i in range(max(0, inicio), min(fim, len(texto))):
-                marcas[i][k] = True
-    for n, (inicio, fim, _href) in enumerate(links):
-        for i in range(max(0, inicio), min(fim, len(texto))):
-            marcas[i][3] = n
-    saida, i = [], 0
-    while i < len(texto):
-        j = i
-        while j < len(texto) and marcas[j] == marcas[i]:
-            j += 1
-        pedaco = html.escape(texto[i:j], quote=False)
+    saida = []
+    for cru, (negrito, italico, simbolo, link, duvidoso) in trechos_marcados(
+            texto, simbolos, paragrafo.negrito, paragrafo.italico, duvidosos, links):
+        pedaco = html.escape(cru, quote=False)
         if quebras:
             pedaco = pedaco.replace("\n", "<br/>")
-        negrito, italico, simbolo, link, duvidoso = marcas[i]
-        if duvidoso:
-            pedaco = f"<mark>{pedaco}</mark>"
-        if simbolo:
-            pedaco = f'<span class="s">{pedaco}</span>'
-        if italico:
-            pedaco = f"<em>{pedaco}</em>"
-        if negrito:
-            pedaco = f"<strong>{pedaco}</strong>"
+        pedaco = _com_estilo(pedaco, negrito, italico, simbolo, duvidoso)
         if link >= 0:
             pedaco = f'<a href="{html.escape(links[link][2], quote=True)}">{pedaco}</a>'
         saida.append(pedaco)
-        i = j
     return "".join(saida)
 
 
-#: As referências a uma página impressa, por idioma: "página 23", "on page 23", "p. 23".
-#: O número é o grupo 1. Só viram link quando a página existe no livro exportado.
-REFERENCIAS = {
-    "pt": re.compile(r"\b(?:p[áa]gina|p[áa]g\.|p\.)\s*(\d{1,4})\b", re.IGNORECASE),
-    "en": re.compile(r"\b(?:page|p\.)\s*(\d{1,4})\b", re.IGNORECASE),
-    "es": re.compile(r"\b(?:p[áa]gina|p[áa]g\.|p\.)\s*(\d{1,4})\b", re.IGNORECASE),
-    "de": re.compile(r"\b(?:Seite|S\.)\s*(\d{1,4})\b"),
-    "fr": re.compile(r"\b(?:page|p\.)\s*(\d{1,4})\b", re.IGNORECASE),
-}
-
-
-def referencias(texto: str, idioma: str, alvos: Dict[int, str]) -> List[Tuple[int, int, str]]:
-    """`(início, fim, href)` das referências do texto a páginas impressas que estão em
-    `alvos` (número impresso -> href da âncora); as outras ficam como texto."""
-    padrao = REFERENCIAS.get((idioma or "pt").split("-")[0].lower(), REFERENCIAS["en"])
-    saida = []
-    for achado in padrao.finditer(texto):
-        if _citacao(texto, achado.start()):
-            continue
-        href = alvos.get(int(achado.group(1)))
-        if href:
-            saida.append((achado.start(), achado.end(), href))
-    return saida
-
-
-def _citacao(texto: str, inicio: int) -> bool:
-    """A referência é a página de outra obra: "(Informator 45, p. 12)", "Fine, p. 3" —
-    vem depois de uma vírgula, dentro de parênteses ainda abertos, ou logo depois de um
-    nome com vírgula."""
-    antes = texto[:inicio].rstrip()
-    if not antes.endswith(","):
-        return False
-    return antes.count("(") > antes.count(")") or bool(re.search(r"[A-ZÀ-Ý][\w.'-]*,$", antes))
-
-
-#: "Diagrama 6", "Diagram 6", "Diagramm 6", "diagramme 6", "diag. 6": a referência a um
-#: diagrama numerado, em qualquer idioma (grupo 1). No começo de um parágrafo vizinho do
-#: diagrama, é a legenda que o numera (`LEGENDA`).
-#: "Diagrama 6.1" e "Diagrama 6,2" são outra numeração (por capítulo): não são o 6.
-DIAGRAMA = re.compile(r"\b(?:diagram(?:a|me|m)?|diag\.)\s*(\d{1,4})\b(?![.,]\d)", re.IGNORECASE)
-LEGENDA = re.compile(r"\s*(?:diagram(?:a|me|m)?|diag\.)\s*(\d{1,4})\b(?![.,]\d)", re.IGNORECASE)
-#: "Capítulo 3", "Chapter III", "Kapitel 3", "chapitre 3": a referência a um capítulo
-#: (grupo 1, arábico ou romano). No começo de um título de capítulo, é o número dele. O
-#: romano só em maiúsculas ("in chapter i" não é o capítulo 1). O "I" pronome depois de
-#: "chapter" ("the chapter I wrote") continua ambíguo: só vira link se houver capítulo I.
-CAPITULO = re.compile(r"\b(?i:cap[íi]tulo|chapter|kapitel|chapitre)\s+(\d{1,3}|[IVXLC]{1,7})\b")
-_ROMANOS = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100}
-
-
-def _numero_do_capitulo(texto: str) -> Optional[int]:
-    """`3`, `III` -> 3; `None` para o romano malformado ("IIII", "VX")."""
-    if texto.isdigit():
-        return int(texto)
-    letras = texto.upper()
-    total = 0
-    for i, letra in enumerate(letras):
-        valor = _ROMANOS[letra]
-        seguinte = _ROMANOS[letras[i + 1]] if i + 1 < len(letras) else 0
-        total += -valor if valor < seguinte else valor
-    canonico = ""
-    resto = total
-    for valor, simbolo in ((100, "C"), (90, "XC"), (50, "L"), (40, "XL"), (10, "X"), (9, "IX"),
-                           (5, "V"), (4, "IV"), (1, "I")):
-        while resto >= valor:
-            canonico, resto = canonico + simbolo, resto - valor
-    return total if total and canonico == letras else None
-
-
-@dataclass
-class Numerados:
-    """O que o livro numera e o texto pode citar: `figuras` (id da `Figura` -> o número que a
-    legenda dela imprime), `legendas` (id dos parágrafos que são essas legendas, onde a
-    referência não vira link para si mesma) e `capitulos` (id do título -> o número dele).
-
-    Número que se repete no livro (a numeração que recomeça a cada capítulo) não é alvo: o
-    link iria para o diagrama errado."""
-    figuras: Dict[int, int] = field(default_factory=dict)
-    legendas: set = field(default_factory=set)
-    capitulos: Dict[int, int] = field(default_factory=dict)
-
-
-def numerados(paginas: Sequence[PaginaExtraida]) -> Numerados:
-    """Os diagramas e os capítulos que o livro numera (`Numerados`).
-
-    A legenda do diagrama é o parágrafo logo depois dele, ou logo antes: vale o lado que o
-    livro mais usa, contado em todos os diagramas, porque o parágrafo de depois de um
-    diagrama pode ser a legenda impressa acima do seguinte."""
-    from collections import Counter
-
-    lados: Dict[str, Dict[int, Tuple[int, int]]] = {"depois": {}, "antes": {}}
-    titulos: Dict[int, int] = {}
-    for pagina in paginas:
-        blocos = pagina.blocos
-        for k, bloco in enumerate(blocos):
-            if isinstance(bloco, Paragrafo) and bloco.titulo and bloco.nivel == 1:
-                achado = CAPITULO.match(bloco.texto.strip())
-                numero = _numero_do_capitulo(achado.group(1)) if achado else None
-                if numero is not None:
-                    titulos[id(bloco)] = numero
-            if not isinstance(bloco, Figura):
-                continue
-            for lado, j in (("depois", k + 1), ("antes", k - 1)):
-                if 0 <= j < len(blocos) and isinstance(blocos[j], Paragrafo):
-                    achado = LEGENDA.match(blocos[j].texto)
-                    if achado:
-                        lados[lado][id(bloco)] = (int(achado.group(1)), id(blocos[j]))
-    escolhido = lados["depois"] if len(lados["depois"]) >= len(lados["antes"]) else lados["antes"]
-    vezes = Counter(n for n, _ in escolhido.values())
-    capitulos = Counter(titulos.values())
-    return Numerados(figuras={f: n for f, (n, _) in escolhido.items() if vezes[n] == 1},
-                     legendas={p for _, p in escolhido.values()},
-                     capitulos={t: n for t, n in titulos.items() if capitulos[n] == 1})
-
-
-def referencias_internas(texto: str, idioma: str, paginas: Dict[int, str],
-                         diagramas: Dict[int, str], capitulos: Dict[int, str]
-                         ) -> List[Tuple[int, int, str]]:
-    """As referências do texto que viram link: às páginas impressas (`referencias`), aos
-    diagramas ("ver o Diagrama 6") e aos capítulos ("no capítulo 3") que estão nos alvos
-    (número -> href). Sem sobrepor: "Diagrama 6, p. 23" são dois links."""
-    achados = list(referencias(texto, idioma, paginas))
-    for padrao, alvos, numero in ((DIAGRAMA, diagramas, int), (CAPITULO, capitulos,
-                                                               _numero_do_capitulo)):
-        if not alvos:
-            continue
-        for achado in padrao.finditer(texto):
-            href = alvos.get(numero(achado.group(1)))
-            if href:
-                achados.append((achado.start(), achado.end(), href))
-    saida: List[Tuple[int, int, str]] = []
-    for inicio, fim, href in sorted(achados):
-        if not saida or inicio >= saida[-1][1]:
-            saida.append((inicio, fim, href))
-    return saida
+def _com_estilo(pedaco: str, negrito: bool, italico: bool, simbolo: bool, duvidoso: bool) -> str:
+    """O trecho dentro da marcação do estilo dele, de dentro para fora: o realce, os
+    símbolos, o itálico e o negrito."""
+    if duvidoso:
+        pedaco = f"<mark>{pedaco}</mark>"
+    if simbolo:
+        pedaco = f'<span class="s">{pedaco}</span>'
+    if italico:
+        pedaco = f"<em>{pedaco}</em>"
+    if negrito:
+        pedaco = f"<strong>{pedaco}</strong>"
+    return pedaco
 
 
 #: A procedência do lado a jogar nos idiomas sem a frase do core (`lado_a_jogar.marca`, que
@@ -461,92 +317,142 @@ def _capitulos(paginas: Sequence[PaginaExtraida], imagens: Dict[int, str], simbo
     numerado (`"paginas"`, `"diagramas"`, `"capitulos"`: número -> href), para as
     referências do texto virarem link; `numeros`, o que o livro numera (`numerados`);
     `analise`, o site do link de análise de cada diagrama lido (`links_de_analise`)."""
-    rotulos = rotulos or {}
     alvos = alvos or {}
-    numeros = numeros or Numerados()
-    por_pagina, por_diagrama, por_capitulo = (alvos.get(k, {}) for k in
-                                              ("paginas", "diagramas", "capitulos"))
-    capitulos = [_Capitulo("capitulo-001.xhtml")]
-    numero_do_titulo = 0
-
-    def novo() -> _Capitulo:
-        capitulos.append(_Capitulo(f"capitulo-{len(capitulos) + 1:03d}.xhtml"))
-        return capitulos[-1]
-
-    atual = capitulos[0]
-    vistas: set = set()
-
-    def ancorar(numero: int) -> None:
-        """A âncora da página no capítulo em que o primeiro bloco dela cai; o rótulo é o
-        número impresso, quando se sabe."""
-        ancora = f"pg{numero}"
-        if ancora in vistas:                    # a mesma página duas vezes: uma âncora só
-            return
-        vistas.add(ancora)
-        # Com a paginação conhecida, a página sem número impresso (as de rosto) não leva o
-        # número da posição, que colidiria com um impresso: vai entre colchetes.
-        rotulo = rotulos.get(numero - 1, f"[{numero}]" if rotulos else numero)
-        atual.paginas.append((rotulo, ancora))
-        atual.partes.append(f'<span epub:type="pagebreak" role="doc-pagebreak" '
-                            f'id="{ancora}" aria-label="{rotulo}"></span>')
-
+    escrita = _EscritaDosCapitulos(
+        imagens, simbolos, msg, idioma, rotulos or {}, numeros or Numerados(),
+        por_pagina=alvos.get("paginas", {}), por_diagrama=alvos.get("diagramas", {}),
+        por_capitulo=alvos.get("capitulos", {}), quebras=quebras, analise=analise)
     for pagina in paginas:
-        if atual.tamanho > limite:
-            atual = novo()
+        if escrita.atual.tamanho > limite:
+            escrita.novo()
+        escrita.pagina(pagina)
+    return [c for c in escrita.capitulos if c.partes]
+
+
+def _abre_capitulo(bloco) -> bool:
+    """O título de capítulo (`<h1>`) com texto."""
+    return isinstance(bloco, Paragrafo) and bloco.titulo and bloco.nivel == 1 \
+        and bool(bloco.texto.strip())
+
+
+def _tem_conteudo(bloco) -> bool:
+    """A figura, ou o parágrafo com texto: o bloco que vai ao capítulo."""
+    return isinstance(bloco, Figura) or (isinstance(bloco, Paragrafo)
+                                         and bool(bloco.texto.strip()))
+
+
+@dataclass
+class _EscritaDosCapitulos:
+    """O que `_capitulos` sabe enquanto passa pelos blocos: o que entra no texto (as imagens,
+    os símbolos, as mensagens, os alvos dos links) e o que já escreveu (os capítulos, as
+    âncoras de página postas e quantos títulos vieram)."""
+
+    imagens: Dict[int, str]
+    simbolos: str
+    msg: Dict[str, str]
+    idioma: str
+    rotulos: Dict[int, int]
+    numeros: Numerados
+    por_pagina: Dict[int, str]
+    por_diagrama: Dict[int, str]
+    por_capitulo: Dict[int, str]
+    quebras: bool = False
+    analise: str = "nenhum"
+    capitulos: List[_Capitulo] = field(
+        default_factory=lambda: [_Capitulo("capitulo-001.xhtml")])
+    vistas: set = field(default_factory=set)
+    numero_do_titulo: int = 0
+
+    @property
+    def atual(self) -> _Capitulo:
+        return self.capitulos[-1]
+
+    def novo(self) -> None:
+        self.capitulos.append(_Capitulo(f"capitulo-{len(self.capitulos) + 1:03d}.xhtml"))
+
+    def pagina(self, pagina: PaginaExtraida) -> None:
         numero = pagina.numero + 1
         pendente = True
         for bloco in pagina.blocos:
-            if isinstance(bloco, Paragrafo) and bloco.titulo and bloco.nivel == 1 \
-                    and bloco.texto.strip() and atual.tamanho > 0:
-                atual = novo()
-            if pendente and (isinstance(bloco, Figura) or (isinstance(bloco, Paragrafo)
-                                                           and bloco.texto.strip())):
-                ancorar(numero)
-                pendente = False
-            if isinstance(bloco, Figura):
-                nome = imagens[id(bloco)]
-                classe = "diagrama" if bloco.fen else "diagrama recorte"
-                alt = _e(alternativo(bloco, msg, idioma), aspas=True)
-                # A ressalva do diagrama que ninguém conferiu fica à vista (PD-21), além do alt.
-                # E o link de análise, quando pedido, embaixo da ressalva.
-                na_legenda = []
-                if getattr(bloco, "revisao_pendente", False):
-                    ressalva = ([marca_do_lado(bloco, idioma)] if bloco.fen else []) + [msg["nao_revisado"]]
-                    na_legenda.append(_e('; '.join(ressalva)))
-                endereco = links_de_analise.link_da_figura(bloco, analise)
-                if endereco:
-                    na_legenda.append(f'<a class="analise" href="{_e(endereco, aspas=True)}">'
-                                      f'{_e(links_de_analise.rotulo(analise, idioma))}</a>')
-                    atual.analises += 1
-                legenda = (f"<figcaption>{'<br/>'.join(na_legenda)}</figcaption>"
-                           if na_legenda else "")
-                ident = ""
-                if id(bloco) in numeros.figuras:
-                    ancora_do_diagrama = f"dg{numeros.figuras[id(bloco)]}"
-                    atual.diagramas.append((numeros.figuras[id(bloco)], ancora_do_diagrama))
-                    ident = f' id="{ancora_do_diagrama}"'
-                atual.partes.append(f'<figure class="{classe}"{ident}><img src="../{nome}" '
-                                    f'alt="{alt}"/>{legenda}</figure>')
-            elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
-                links = ([] if bloco.titulo else referencias_internas(
-                    bloco.texto, idioma, por_pagina,
-                    {} if id(bloco) in numeros.legendas else por_diagrama, por_capitulo))
-                atual.links += len(links)
-                corpo = xhtml_do_texto(bloco, simbolos, links, quebras=quebras)
-                if bloco.titulo:
-                    numero_do_titulo += 1
-                    nivel = 1 if bloco.nivel == 1 else 2
-                    alvo = f"t{numero_do_titulo}"
-                    atual.partes.append(f'<h{nivel} id="{alvo}">{corpo}</h{nivel}>')
-                    atual.titulos.append((nivel, alvo, aspas_curvas(bloco.texto.strip())))
-                    if id(bloco) in numeros.capitulos:
-                        atual.numerados.append((numeros.capitulos[id(bloco)], alvo))
-                else:
-                    atual.partes.append(f"<p>{corpo}</p>")
-                atual.tamanho += len(bloco.texto)
+            pendente = self.bloco(bloco, numero, pendente)
         if pendente:                            # página sem bloco: a âncora fica mesmo assim
-            ancorar(numero)
-    return [c for c in capitulos if c.partes]
+            self.ancorar(numero)
+
+    def bloco(self, bloco, numero: int, pendente: bool) -> bool:
+        """O bloco no capítulo (num novo, se ele abre um capítulo), com a âncora da página
+        antes do primeiro que tem conteúdo; devolve se ela ainda está pendente."""
+        if _abre_capitulo(bloco) and self.atual.tamanho > 0:
+            self.novo()
+        if pendente and _tem_conteudo(bloco):
+            self.ancorar(numero)
+            pendente = False
+        if isinstance(bloco, Figura):
+            self.figura(bloco)
+        elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
+            self.paragrafo(bloco)
+        return pendente
+
+    def ancorar(self, numero: int) -> None:
+        """A âncora da página no capítulo em que o primeiro bloco dela cai; o rótulo é o
+        número impresso, quando se sabe."""
+        ancora = f"pg{numero}"
+        if ancora in self.vistas:               # a mesma página duas vezes: uma âncora só
+            return
+        self.vistas.add(ancora)
+        # Com a paginação conhecida, a página sem número impresso (as de rosto) não leva o
+        # número da posição, que colidiria com um impresso: vai entre colchetes.
+        rotulo = self.rotulos.get(numero - 1, f"[{numero}]" if self.rotulos else numero)
+        self.atual.paginas.append((rotulo, ancora))
+        self.atual.partes.append(f'<span epub:type="pagebreak" role="doc-pagebreak" '
+                                 f'id="{ancora}" aria-label="{rotulo}"></span>')
+
+    def figura(self, bloco: Figura) -> None:
+        nome = self.imagens[id(bloco)]
+        classe = "diagrama" if bloco.fen else "diagrama recorte"
+        alt = _e(alternativo(bloco, self.msg, self.idioma), aspas=True)
+        legenda = self.legenda(bloco)
+        ident = ""
+        if id(bloco) in self.numeros.figuras:
+            ancora_do_diagrama = f"dg{self.numeros.figuras[id(bloco)]}"
+            self.atual.diagramas.append((self.numeros.figuras[id(bloco)], ancora_do_diagrama))
+            ident = f' id="{ancora_do_diagrama}"'
+        self.atual.partes.append(f'<figure class="{classe}"{ident}><img src="../{nome}" '
+                                 f'alt="{alt}"/>{legenda}</figure>')
+
+    def legenda(self, bloco: Figura) -> str:
+        """A ressalva do diagrama que ninguém conferiu fica à vista (PD-21), além do alt. E o
+        link de análise, quando pedido, embaixo da ressalva."""
+        na_legenda = []
+        ressalva = marcacao.ressalva_do_diagrama(bloco, self.idioma)
+        if ressalva:
+            na_legenda.append(_e(ressalva))
+        endereco = links_de_analise.link_da_figura(bloco, self.analise)
+        if endereco:
+            na_legenda.append(f'<a class="analise" href="{_e(endereco, aspas=True)}">'
+                              f'{_e(links_de_analise.rotulo(self.analise, self.idioma))}</a>')
+            self.atual.analises += 1
+        return f"<figcaption>{'<br/>'.join(na_legenda)}</figcaption>" if na_legenda else ""
+
+    def paragrafo(self, bloco: Paragrafo) -> None:
+        links = ([] if bloco.titulo else referencias_internas(
+            bloco.texto, self.idioma, self.por_pagina,
+            {} if id(bloco) in self.numeros.legendas else self.por_diagrama, self.por_capitulo))
+        self.atual.links += len(links)
+        corpo = xhtml_do_texto(bloco, self.simbolos, links, quebras=self.quebras)
+        if bloco.titulo:
+            self.titulo(bloco, corpo)
+        else:
+            self.atual.partes.append(f"<p>{corpo}</p>")
+        self.atual.tamanho += len(bloco.texto)
+
+    def titulo(self, bloco: Paragrafo, corpo: str) -> None:
+        self.numero_do_titulo += 1
+        nivel = 1 if bloco.nivel == 1 else 2
+        alvo = f"t{self.numero_do_titulo}"
+        self.atual.partes.append(f'<h{nivel} id="{alvo}">{corpo}</h{nivel}>')
+        self.atual.titulos.append((nivel, alvo, aspas_curvas(bloco.texto.strip())))
+        if id(bloco) in self.numeros.capitulos:
+            self.atual.numerados.append((self.numeros.capitulos[id(bloco)], alvo))
 
 
 def _xhtml(titulo: str, idioma: str, corpo: str, css: bool = True) -> str:
@@ -562,24 +468,10 @@ def _xhtml(titulo: str, idioma: str, corpo: str, css: bool = True) -> str:
 def _nav(capitulos: Sequence[_Capitulo], msg: Dict[str, str], idioma: str,
          tem_capa: bool) -> str:
     titulos = [(c.nome, n, a, t) for c in capitulos for n, a, t in c.titulos]
-    if titulos:
-        lista = lista_do_sumario(titulos)
-    else:
-        itens = []
-        for c in capitulos:
-            primeira, ultima = c.paginas[0][0], c.paginas[-1][0]
-            faixa = f"{primeira}" if primeira == ultima else f"{primeira}–{ultima}"
-            itens.append(f'<li><a href="texto/{c.nome}">{msg["paginas"]} {faixa}</a></li>')
-        lista = "".join(itens)
+    lista = lista_do_sumario(titulos) if titulos else _sumario_pelas_paginas(capitulos, msg)
     paginas = "".join(f'<li><a href="texto/{c.nome}#{a}">{n}</a></li>'
                       for c in capitulos for n, a in c.paginas)
-    marcos = []
-    if tem_capa:
-        marcos.append(f'<li><a epub:type="cover" href="texto/capa.xhtml">{msg["capa"]}</a></li>')
-    marcos.append(f'<li><a epub:type="toc" href="nav.xhtml#toc">{msg["sumario"]}</a></li>')
-    if capitulos:
-        marcos.append(f'<li><a epub:type="bodymatter" href="texto/{capitulos[0].nome}">'
-                      f'{msg["inicio"]}</a></li>')
+    marcos = _marcos(capitulos, msg, tem_capa)
     lang = html.escape(idioma, quote=True)
     return ('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n'
             '<html xmlns="http://www.w3.org/1999/xhtml" '
@@ -592,6 +484,28 @@ def _nav(capitulos: Sequence[_Capitulo], msg: Dict[str, str], idioma: str,
             f'<nav epub:type="landmarks" id="marcos" hidden="hidden"><h1>'
             f'{html.escape(msg["marcos"])}</h1><ol>{"".join(marcos)}</ol></nav>'
             "</body></html>\n")
+
+
+def _sumario_pelas_paginas(capitulos: Sequence[_Capitulo], msg: Dict[str, str]) -> str:
+    """Sem título nenhum, o sumário lista os capítulos pelas páginas que cobrem."""
+    itens = []
+    for c in capitulos:
+        primeira, ultima = c.paginas[0][0], c.paginas[-1][0]
+        faixa = f"{primeira}" if primeira == ultima else f"{primeira}–{ultima}"
+        itens.append(f'<li><a href="texto/{c.nome}">{msg["paginas"]} {faixa}</a></li>')
+    return "".join(itens)
+
+
+def _marcos(capitulos: Sequence[_Capitulo], msg: Dict[str, str], tem_capa: bool) -> List[str]:
+    """Os `landmarks`: a capa, se há, o sumário e o começo do texto."""
+    marcos = []
+    if tem_capa:
+        marcos.append(f'<li><a epub:type="cover" href="texto/capa.xhtml">{msg["capa"]}</a></li>')
+    marcos.append(f'<li><a epub:type="toc" href="nav.xhtml#toc">{msg["sumario"]}</a></li>')
+    if capitulos:
+        marcos.append(f'<li><a epub:type="bodymatter" href="texto/{capitulos[0].nome}">'
+                      f'{msg["inicio"]}</a></li>')
+    return marcos
 
 
 def lista_do_sumario(titulos: Sequence[Tuple[str, int, str, str]]) -> str:
@@ -640,10 +554,20 @@ def png_otimizado(dados: bytes) -> bytes:
     fica o menor; o que não é PNG, não abre ou traz gestão de cor (perfil ICC, gama,
     cromaticidade, sRGB: o Pillow não a regrava inteira) volta como veio. Os mesmos bytes
     de entrada dão os mesmos de saída (CA-12.6)."""
-    from PIL import Image
-
     if not dados.startswith(b"\x89PNG"):
         return dados
+    original, info = _png_aberto(dados)
+    if original is None:
+        return dados
+    referencia = original.convert("RGBA").tobytes()
+    return _o_menor_sem_perda(dados, _candidatos(original), info, referencia)
+
+
+def _png_aberto(dados: bytes):
+    """(a imagem, o dpi para regravar), ou (None, {}) se o PNG não abre, traz gestão de cor
+    ou tem um modo que o Pillow não regrava sem perda."""
+    from PIL import Image
+
     try:
         with Image.open(io.BytesIO(dados)) as aberta:
             aberta.load()
@@ -651,16 +575,31 @@ def png_otimizado(dados: bytes) -> bytes:
             info = {k: v for k, v in aberta.info.items() if k == "dpi"}
             de_cor = {"icc_profile", "gamma", "chromaticity", "srgb"} & set(aberta.info)
     except Exception:                          # PNG estragado: o escritor decide
-        return dados
+        log.warning("o PNG não foi otimizado; vai como estava", exc_info=True)
+        return None, {}
     if de_cor or original.mode not in ("1", "L", "LA", "P", "RGB", "RGBA"):
-        return dados
-    referencia = original.convert("RGBA").tobytes()
+        return None, {}
+    return original, info
+
+
+def _candidatos(original) -> list:
+    """O original e, se colorido, em tons de cinza e em paleta (com até 256 cores)."""
+    from PIL import Image
+
     candidatos = [original]
     if original.mode in ("RGB", "RGBA"):
         sem_alfa = original.mode == "RGB" or original.getextrema()[3] == (255, 255)
         candidatos.append(original.convert("L" if sem_alfa else "LA"))
         if original.getcolors(256) is not None:
             candidatos.append(original.convert("RGBA").quantize(colors=256, method=Image.Quantize.FASTOCTREE))
+    return candidatos
+
+
+def _o_menor_sem_perda(dados: bytes, candidatos: list, info: dict, referencia: bytes) -> bytes:
+    """O menor dos candidatos gravados com a compressão máxima que, lido de volta, dá os
+    mesmos pixels; nenhum menor que `dados`, `dados`."""
+    from PIL import Image
+
     melhor = dados
     for candidato in candidatos:
         saida = io.BytesIO()
@@ -696,14 +635,66 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
     `analise` põe na legenda de cada diagrama lido o link que abre a posição no Lichess ou
     no Chess.com (`Opcoes.links_de_analise`); `nenhum`, nenhum link."""
     links_de_analise.validar(analise)
-    from core.exportar import agora, data_no_zip, fonte_dos_simbolos, instante
+    from core.exportar import agora, data_no_zip, instante
 
     idioma = metadados.idioma or "pt-BR"
     msg = mensagens(idioma)
     escrito = Escrito(paginas=len(paginas))
+    pacote = _Pacote()
+    imagens = _imagens(paginas, escrito, pacote)
+    css, simbolos = _css_e_simbolos(paginas, pacote)
+    pacote.manifesto.append('<item id="css" href="estilo.css" media-type="text/css"/>')
+    pacote.manifesto.append('<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" '
+                            'properties="nav"/>')
+    tem_capa = metadados.capa is not None
+    if tem_capa:
+        _capa(metadados.capa, msg, idioma, pacote)
 
-    arquivos: List[Tuple[str, bytes]] = []
-    manifesto: List[str] = []
+    # Duas passadas: a primeira diz em que capítulo cai cada página, diagrama e capítulo
+    # numerado, e a segunda escreve as referências já com o arquivo certo.
+    numeros = numeros or {}
+    contados = numerados(paginas)
+    capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
+                           numeros, numeros=contados, quebras=quebras, analise=analise)
+    alvos = _alvos(capitulos, numeros)
+    if any(alvos.values()):
+        capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
+                               numeros, alvos, contados, quebras, analise)
+    if not capitulos:
+        raise ValueError("Nada para escrever no EPUB: as páginas não têm texto nem diagrama.")
+    _contar_os_capitulos(escrito, capitulos)
+    _textos_dos_capitulos(capitulos, metadados.titulo, idioma, pacote)
+    # O marco do sumário aponta o nav: fora da espinha, é RSC-011 no EPUBCheck. Fora da
+    # leitura corrida (`linear="no"`), o leitor não o mostra entre a capa e o texto.
+    pacote.espinha.append('<itemref idref="nav" linear="no"/>')
+
+    momento = instante()
+    opf = _opf(metadados, idioma, msg, pacote.manifesto, pacote.espinha, agora(momento),
+               tem_figura=bool(imagens), todos_com_fen=escrito.sem_fen == 0,
+               tem_titulos=escrito.titulos > 0, tem_capa=tem_capa)
+    nav = _nav(capitulos, msg, idioma, tem_capa)
+    _gravar_zip(Path(caminho), data_no_zip(momento),
+                [("META-INF/container.xml", _CONTAINER.encode("utf-8")),
+                 ("OEBPS/content.opf", opf.encode("utf-8")),
+                 ("OEBPS/nav.xhtml", nav.encode("utf-8")),
+                 ("OEBPS/estilo.css", css.encode("utf-8"))] + pacote.arquivos)
+    return escrito
+
+
+@dataclass
+class _Pacote:
+    """O que o EPUB leva além do OPF, do nav e do CSS (`arquivos`: entrada do zip, bytes),
+    e as linhas do manifesto e da espinha, na ordem em que entram."""
+
+    arquivos: List[Tuple[str, bytes]] = field(default_factory=list)
+    manifesto: List[str] = field(default_factory=list)
+    espinha: List[str] = field(default_factory=list)
+
+
+def _imagens(paginas: Sequence[PaginaExtraida], escrito: Escrito, pacote: _Pacote
+             ) -> Dict[int, str]:
+    """A entrada do zip da imagem de cada figura (id da `Figura` -> nome), com o PNG
+    otimizado; as iguais byte a byte são um recurso só."""
     por_hash: Dict[str, str] = {}
     imagens: Dict[int, str] = {}
     for pagina in paginas:
@@ -720,12 +711,19 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
                 tipo, extensao = tipo_da_imagem(png)
                 nome = f"imagens/{soma[:20]}{extensao}"
                 por_hash[soma] = nome
-                arquivos.append((f"OEBPS/{nome}", png))
+                pacote.arquivos.append((f"OEBPS/{nome}", png))
                 escrito.poupados += len(bloco.png) - len(png)
-                manifesto.append(f'<item id="i{len(por_hash)}" href="{nome}" '
-                                 f'media-type="{tipo}"/>')
+                pacote.manifesto.append(f'<item id="i{len(por_hash)}" href="{nome}" '
+                                        f'media-type="{tipo}"/>')
             imagens[id(bloco)] = por_hash[soma]
     escrito.imagens = len(por_hash)
+    return imagens
+
+
+def _css_e_simbolos(paginas: Sequence[PaginaExtraida], pacote: _Pacote) -> Tuple[str, str]:
+    """(o CSS, os símbolos que a fonte cobre): com uma fonte de símbolos para o texto do
+    livro, o CSS a declara e ela vai no pacote."""
+    from core.exportar import fonte_dos_simbolos
 
     css = CSS
     recurso = fonte_dos_simbolos("".join(b.texto for p in paginas for b in p.blocos
@@ -737,72 +735,57 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
         css += CSS_DOS_SIMBOLOS % {"familia": familia.replace('"', ""),
                                    "arquivo": arquivo.replace('"', "%22")}
         with open(origem, "rb") as f:
-            arquivos.append((f"OEBPS/fontes/{arquivo}", f.read()))
+            pacote.arquivos.append((f"OEBPS/fontes/{arquivo}", f.read()))
         tipo = TIPOS_DE_FONTE.get(os.path.splitext(arquivo)[1].lower(), "font/otf")
-        manifesto.append(f'<item id="fonte" href="fontes/{_e(arquivo, aspas=True)}" '
-                         f'media-type="{tipo}"/>')
-    manifesto.append('<item id="css" href="estilo.css" media-type="text/css"/>')
-    manifesto.append('<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" '
-                     'properties="nav"/>')
+        pacote.manifesto.append(f'<item id="fonte" href="fontes/{_e(arquivo, aspas=True)}" '
+                                f'media-type="{tipo}"/>')
+    return css, simbolos
 
-    espinha = []
-    tem_capa = metadados.capa is not None
-    if tem_capa:
-        tipo, extensao = tipo_da_imagem(metadados.capa)
-        arquivos.append((f"OEBPS/imagens/capa{extensao}", metadados.capa))
-        manifesto.append(f'<item id="capa-imagem" href="imagens/capa{extensao}" '
-                         f'media-type="{tipo}" properties="cover-image"/>')
-        corpo = (f'<section epub:type="cover"><img class="capa" src="../imagens/capa{extensao}" '
-                 f'alt="{html.escape(msg["capa"], quote=True)}"/></section>')
-        arquivos.append(("OEBPS/texto/capa.xhtml",
-                         _xhtml(msg["capa"], idioma, corpo).encode("utf-8")))
-        manifesto.append('<item id="capa" href="texto/capa.xhtml" '
-                         'media-type="application/xhtml+xml"/>')
-        espinha.append('<itemref idref="capa"/>')
 
-    # Duas passadas: a primeira diz em que capítulo cai cada página, diagrama e capítulo
-    # numerado, e a segunda escreve as referências já com o arquivo certo.
-    numeros = numeros or {}
-    contados = numerados(paginas)
-    capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
-                           numeros, numeros=contados, quebras=quebras, analise=analise)
-    alvos = {
+def _capa(capa: bytes, msg: Dict[str, str], idioma: str, pacote: _Pacote) -> None:
+    """A imagem da capa e a página dela, primeira na espinha."""
+    tipo, extensao = tipo_da_imagem(capa)
+    pacote.arquivos.append((f"OEBPS/imagens/capa{extensao}", capa))
+    pacote.manifesto.append(f'<item id="capa-imagem" href="imagens/capa{extensao}" '
+                            f'media-type="{tipo}" properties="cover-image"/>')
+    corpo = (f'<section epub:type="cover"><img class="capa" src="../imagens/capa{extensao}" '
+             f'alt="{html.escape(msg["capa"], quote=True)}"/></section>')
+    pacote.arquivos.append(("OEBPS/texto/capa.xhtml",
+                            _xhtml(msg["capa"], idioma, corpo).encode("utf-8")))
+    pacote.manifesto.append('<item id="capa" href="texto/capa.xhtml" '
+                            'media-type="application/xhtml+xml"/>')
+    pacote.espinha.append('<itemref idref="capa"/>')
+
+
+def _alvos(capitulos: Sequence[_Capitulo], numeros: Dict[int, int]) -> Dict[str, Dict[int, str]]:
+    """O href de cada página impressa (só com a paginação conhecida), diagrama e capítulo
+    numerado, pelo capítulo em que caíram."""
+    return {
         "paginas": ({rotulo: f"{c.nome}#{ancora}" for c in capitulos
                      for rotulo, ancora in c.paginas} if numeros else {}),
         "diagramas": {n: f"{c.nome}#{ancora}" for c in capitulos for n, ancora in c.diagramas},
         "capitulos": {n: f"{c.nome}#{ancora}" for c in capitulos for n, ancora in c.numerados},
     }
-    if any(alvos.values()):
-        capitulos = _capitulos(paginas, imagens, simbolos, msg, idioma, limite_do_capitulo,
-                               numeros, alvos, contados, quebras, analise)
+
+
+def _contar_os_capitulos(escrito: Escrito, capitulos: Sequence[_Capitulo]) -> None:
     escrito.links = sum(c.links for c in capitulos)
     escrito.analises = sum(c.analises for c in capitulos)
-    if not capitulos:
-        raise ValueError("Nada para escrever no EPUB: as páginas não têm texto nem diagrama.")
     escrito.capitulos = len(capitulos)
     escrito.titulos = sum(len(c.titulos) for c in capitulos)
-    for n, c in enumerate(capitulos, start=1):
-        titulo = c.titulos[0][2] if c.titulos else metadados.titulo
-        arquivos.append((f"OEBPS/texto/{c.nome}",
-                         _xhtml(titulo, idioma, "".join(c.partes)).encode("utf-8")))
-        manifesto.append(f'<item id="c{n}" href="texto/{c.nome}" '
-                         'media-type="application/xhtml+xml"/>')
-        espinha.append(f'<itemref idref="c{n}"/>')
-    # O marco do sumário aponta o nav: fora da espinha, é RSC-011 no EPUBCheck. Fora da
-    # leitura corrida (`linear="no"`), o leitor não o mostra entre a capa e o texto.
-    espinha.append('<itemref idref="nav" linear="no"/>')
 
-    momento = instante()
-    opf = _opf(metadados, idioma, msg, manifesto, espinha, agora(momento),
-               tem_figura=bool(imagens), todos_com_fen=escrito.sem_fen == 0,
-               tem_titulos=escrito.titulos > 0, tem_capa=tem_capa)
-    nav = _nav(capitulos, msg, idioma, tem_capa)
-    _gravar_zip(Path(caminho), data_no_zip(momento),
-                [("META-INF/container.xml", _CONTAINER.encode("utf-8")),
-                 ("OEBPS/content.opf", opf.encode("utf-8")),
-                 ("OEBPS/nav.xhtml", nav.encode("utf-8")),
-                 ("OEBPS/estilo.css", css.encode("utf-8"))] + arquivos)
-    return escrito
+
+def _textos_dos_capitulos(capitulos: Sequence[_Capitulo], titulo_do_livro: str, idioma: str,
+                          pacote: _Pacote) -> None:
+    """O XHTML de cada capítulo, com o título dele (ou o do livro), no manifesto e na
+    espinha."""
+    for n, c in enumerate(capitulos, start=1):
+        titulo = c.titulos[0][2] if c.titulos else titulo_do_livro
+        pacote.arquivos.append((f"OEBPS/texto/{c.nome}",
+                                _xhtml(titulo, idioma, "".join(c.partes)).encode("utf-8")))
+        pacote.manifesto.append(f'<item id="c{n}" href="texto/{c.nome}" '
+                                'media-type="application/xhtml+xml"/>')
+        pacote.espinha.append(f'<itemref idref="c{n}"/>')
 
 
 def _opf(m: Metadados, idioma: str, msg: Dict[str, str], manifesto: List[str],
@@ -818,31 +801,9 @@ def _opf(m: Metadados, idioma: str, msg: Dict[str, str], manifesto: List[str],
           # EPUBCheck 5.4 o recusa (OPF-027): fica de fora.
           f'<dc:source id="pub-fonte">{e(m.fonte or titulo)}</dc:source>',
           '<meta refines="#pub-fonte" property="source-of">pagination</meta>']
-    dc += [f"<dc:creator>{e(a)}</dc:creator>" for a in m.autores if a]
-    if m.editora:
-        dc.append(f"<dc:publisher>{e(m.editora)}</dc:publisher>")
-    if m.data and re.fullmatch(r"\d{4}(-\d{2}(-\d{2})?)?", m.data.strip()):
-        dc.append(f"<dc:date>{e(m.data.strip())}</dc:date>")
-    elif m.data:
-        log.warning("A data %r não é AAAA, AAAA-MM nem AAAA-MM-DD: fica fora do EPUB.", m.data)
-    dc += [f"<dc:subject>{e(s)}</dc:subject>" for s in m.assuntos if s]
-    if m.direitos:
-        dc.append(f"<dc:rights>{e(m.direitos)}</dc:rights>")
-    # A acessibilidade do que foi escrito, e só dele (EPUB Accessibility 1.1).
-    a11y = ['<meta property="schema:accessMode">textual</meta>']
-    if tem_figura or tem_capa:
-        a11y.append('<meta property="schema:accessMode">visual</meta>')
-    a11y.append('<meta property="schema:accessModeSufficient">textual</meta>'
-                if not tem_figura or todos_com_fen else
-                '<meta property="schema:accessModeSufficient">textual,visual</meta>')
-    if tem_figura and todos_com_fen:
-        a11y.append('<meta property="schema:accessibilityFeature">alternativeText</meta>')
-    if tem_titulos:
-        a11y.append('<meta property="schema:accessibilityFeature">structuralNavigation</meta>')
-    a11y += ['<meta property="schema:accessibilityFeature">pageNavigation</meta>',
-             '<meta property="schema:accessibilityFeature">readingOrder</meta>',
-             '<meta property="schema:accessibilityHazard">unknown</meta>',
-             f'<meta property="schema:accessibilitySummary">{e(msg["resumo"])}</meta>']
+    dc += _dc_do_livro(m)
+    a11y = _acessibilidade(msg, tem_figura=tem_figura, todos_com_fen=todos_com_fen,
+                           tem_titulos=tem_titulos, tem_capa=tem_capa)
     capa = '<meta name="cover" content="capa-imagem"/>' if tem_capa else ""
     return ('<?xml version="1.0" encoding="UTF-8"?>\n'
             # O idioma também no `<package>` (o Ace: epub-lang), além do `dc:language`.
@@ -857,11 +818,52 @@ def _opf(m: Metadados, idioma: str, msg: Dict[str, str], manifesto: List[str],
             f'<spine>{"".join(espinha)}</spine>\n</package>\n')
 
 
+def _dc_do_livro(m: Metadados) -> List[str]:
+    """Os autores, a editora, a data, os assuntos e os direitos que os metadados trazem."""
+    e = _e
+    dc = [f"<dc:creator>{e(a)}</dc:creator>" for a in m.autores if a]
+    if m.editora:
+        dc.append(f"<dc:publisher>{e(m.editora)}</dc:publisher>")
+    dc += _data(m)
+    dc += [f"<dc:subject>{e(s)}</dc:subject>" for s in m.assuntos if s]
+    if m.direitos:
+        dc.append(f"<dc:rights>{e(m.direitos)}</dc:rights>")
+    return dc
+
+
+def _data(m: Metadados) -> List[str]:
+    """O `dc:date`, se a data é AAAA, AAAA-MM ou AAAA-MM-DD; fora disso, fica de fora."""
+    if m.data and re.fullmatch(r"\d{4}(-\d{2}(-\d{2})?)?", m.data.strip()):
+        return [f"<dc:date>{_e(m.data.strip())}</dc:date>"]
+    if m.data:
+        log.warning("A data %r não é AAAA, AAAA-MM nem AAAA-MM-DD: fica fora do EPUB.", m.data)
+    return []
+
+
+def _acessibilidade(msg: Dict[str, str], *, tem_figura: bool, todos_com_fen: bool,
+                    tem_titulos: bool, tem_capa: bool) -> List[str]:
+    """A acessibilidade do que foi escrito, e só dele (EPUB Accessibility 1.1)."""
+    a11y = ['<meta property="schema:accessMode">textual</meta>']
+    if tem_figura or tem_capa:
+        a11y.append('<meta property="schema:accessMode">visual</meta>')
+    a11y.append('<meta property="schema:accessModeSufficient">textual</meta>'
+                if not tem_figura or todos_com_fen else
+                '<meta property="schema:accessModeSufficient">textual,visual</meta>')
+    if tem_figura and todos_com_fen:
+        a11y.append('<meta property="schema:accessibilityFeature">alternativeText</meta>')
+    if tem_titulos:
+        a11y.append('<meta property="schema:accessibilityFeature">structuralNavigation</meta>')
+    a11y += ['<meta property="schema:accessibilityFeature">pageNavigation</meta>',
+             '<meta property="schema:accessibilityFeature">readingOrder</meta>',
+             '<meta property="schema:accessibilityHazard">unknown</meta>',
+             f'<meta property="schema:accessibilitySummary">{_e(msg["resumo"])}</meta>']
+    return a11y
+
+
 def _gravar_zip(caminho: Path, data_hora, entradas: List[Tuple[str, bytes]]) -> None:
-    caminho.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporario = tempfile.mkstemp(prefix=".epub-", suffix=".tmp", dir=caminho.parent)
-    os.close(fd)
-    try:
+    """O EPUB ao lado, conferido (`conferir`) antes de trocar com o anterior
+    (SPEC-qualidade Q-E3): o que não passa não é publicado, como no DOCX."""
+    def escrever(temporario: Path) -> None:
         with zipfile.ZipFile(temporario, "w", zipfile.ZIP_DEFLATED) as z:
             _entrada(z, "mimetype", b"application/epub+zip", data_hora, zipfile.ZIP_STORED)
             for nome, dados in entradas:
@@ -869,11 +871,13 @@ def _gravar_zip(caminho: Path, data_hora, entradas: List[Tuple[str, bytes]]) -> 
         with zipfile.ZipFile(temporario) as z:
             if z.testzip() is not None:
                 raise zipfile.BadZipFile("EPUB temporário com entrada inválida")
-        os.chmod(temporario, 0o644)             # o mkstemp nasce 0600
-        os.replace(temporario, caminho)
-    except BaseException:
-        Path(temporario).unlink(missing_ok=True)
-        raise
+
+    def recusar_o_estragado(temporario: Path) -> None:
+        problemas = conferir(temporario)
+        if problemas:
+            raise ValueError("O EPUB não passou na conferência: " + "; ".join(problemas))
+
+    gv.gravar_por(caminho, escrever, recusar_o_estragado)
 
 
 def _entrada(z: zipfile.ZipFile, nome: str, dados: bytes, data_hora, compressao: int) -> None:
@@ -884,268 +888,3 @@ def _entrada(z: zipfile.ZipFile, nome: str, dados: bytes, data_hora, compressao:
     z.writestr(info, dados)
 
 
-# ----------------------------------------------------------------------
-# Conferir
-# ----------------------------------------------------------------------
-
-_URL_DO_CSS = re.compile(r"url\(\s*[\"']?([^\"')]+)[\"']?\s*\)")
-_EPUB_TYPE = "{http://www.idpf.org/2007/ops}type"
-
-
-def _resolver(base_do_arquivo: str, link: str) -> Tuple[str, str]:
-    """(entrada do zip, fragmento) de um link relativo, já decodificado (`%20`)."""
-    arquivo, _, fragmento = link.partition("#")
-    arquivo = unquote(arquivo)
-    alvo = posixpath.normpath(posixpath.join(base_do_arquivo, arquivo)) if arquivo else ""
-    return alvo, unquote(fragmento)
-
-
-def conferir(caminho: str | Path) -> List[str]:
-    """Os problemas do EPUB que um leitor recusaria; lista vazia é arquivo são.
-
-    Confere o pacote (`mimetype` primeiro e sem compressão, o `container.xml`), o OPF (XML
-    legível, `dc:title`, `dc:language`, `dcterms:modified`, ids sem repetição, todo item
-    existe, todo `itemref` está no manifesto, um `nav`, espinha não vazia), cada XHTML (XML
-    legível, ids sem repetição, cada `href` e `src` — decodificados — apontando um item do
-    manifesto e, com `#`, um id dele), o `url()` do CSS e o `nav` (`toc` e `page-list` com
-    itens). Não substitui o EPUBCheck (`epubcheck`), que confere o esquema inteiro."""
-    problemas: List[str] = []
-    with zipfile.ZipFile(caminho) as z:
-        nomes = set(z.namelist())
-        infos = z.infolist()
-        if not infos or infos[0].filename != "mimetype":
-            problemas.append("o mimetype não é a primeira entrada")
-        elif infos[0].compress_type != zipfile.ZIP_STORED:
-            problemas.append("o mimetype está comprimido")
-        elif z.read("mimetype") != b"application/epub+zip":
-            problemas.append("o mimetype não é application/epub+zip")
-        try:
-            container = ElementTree.fromstring(z.read("META-INF/container.xml"))
-            opf_nome = container.find(".//c:rootfile", _NS).get("full-path")
-        except (KeyError, ElementTree.ParseError, AttributeError):
-            return problemas + ["o META-INF/container.xml falta ou não aponta o OPF"]
-        if opf_nome not in nomes:
-            return problemas + [f"o OPF {opf_nome} não está no pacote"]
-        try:
-            opf = ElementTree.fromstring(z.read(opf_nome))
-        except ElementTree.ParseError as erro:
-            return problemas + [f"o OPF não é XML legível ({erro})"]
-        base = posixpath.dirname(opf_nome)
-        metadados = opf.find("opf:metadata", _NS)
-        dc = "{http://purl.org/dc/elements/1.1/}"
-        for campo in ("title", "language", "identifier"):
-            achado = metadados.find(dc + campo) if metadados is not None else None
-            if achado is None or not (achado.text or "").strip():
-                problemas.append(f"o OPF não tem dc:{campo}")
-        if metadados is None or not any(m.get("property") == "dcterms:modified"
-                                        for m in metadados.findall("opf:meta", _NS)):
-            problemas.append("o OPF não tem dcterms:modified")
-        itens: Dict[str, ElementTree.Element] = {}
-        no_manifesto: Dict[str, str] = {}         # entrada do zip -> media-type
-        for item in opf.findall(".//opf:manifest/opf:item", _NS):
-            ident, href = item.get("id"), item.get("href")
-            if ident in itens:
-                problemas.append(f"o id {ident} se repete no manifesto")
-            itens[ident] = item
-            if not href:
-                problemas.append(f"o item {ident} não tem href")
-                continue
-            alvo, _ = _resolver(base, href)
-            no_manifesto[alvo] = item.get("media-type") or ""
-            if alvo not in nomes:
-                problemas.append(f"o item {href} do manifesto não está no pacote")
-        refs = opf.findall(".//opf:spine/opf:itemref", _NS)
-        if not refs:
-            problemas.append("a espinha está vazia")
-        na_espinha = set()
-        for ref in refs:
-            if ref.get("idref") not in itens:
-                problemas.append(f"o itemref {ref.get('idref')} não está no manifesto")
-            else:
-                na_espinha.add(_resolver(base, itens[ref.get("idref")].get("href") or "")[0])
-        navs = [i for i in itens.values() if "nav" in (i.get("properties") or "").split()]
-        if len(navs) != 1:
-            problemas.append(f"o manifesto tem {len(navs)} nav (precisa de um)")
-
-        arvores: Dict[str, ElementTree.Element] = {}
-        ids: Dict[str, set] = {}
-        for nome, tipo in sorted(no_manifesto.items()):
-            if tipo != "application/xhtml+xml" or nome not in nomes:
-                continue
-            try:
-                arvore = ElementTree.fromstring(z.read(nome))
-            except ElementTree.ParseError as erro:
-                problemas.append(f"{nome}: XML inválido ({erro})")
-                continue
-            arvores[nome] = arvore
-            vistos: set = set()
-            for el in arvore.iter():
-                ident = el.get("id")
-                if ident is None:
-                    continue
-                if ident in vistos:
-                    problemas.append(f"{nome}: o id {ident} se repete")
-                vistos.add(ident)
-            ids[nome] = vistos
-        for nome, arvore in arvores.items():
-            pasta = posixpath.dirname(nome)
-            for el in arvore.iter():
-                for atributo in ("href", "src"):
-                    link = el.get(atributo)
-                    if not link or re.match(r"^[a-z][a-z0-9+.-]*:", link, re.I):
-                        continue                # http:, mailto:, data:
-                    alvo, fragmento = _resolver(pasta, link)
-                    alvo = alvo or nome
-                    if alvo not in no_manifesto:
-                        problemas.append(f"{nome}: link quebrado {link}")
-                    elif fragmento and alvo in ids and fragmento not in ids[alvo]:
-                        problemas.append(f"{nome}: âncora inexistente {link}")
-                    elif (el.tag == "{http://www.w3.org/1999/xhtml}a"
-                          and no_manifesto[alvo] == "application/xhtml+xml"
-                          and alvo not in na_espinha):
-                        # O que o EPUBCheck chama RSC-011.
-                        problemas.append(f"{nome}: link para fora da espinha {link}")
-        for nome, tipo in sorted(no_manifesto.items()):
-            if tipo == "text/css" and nome in nomes:
-                for link in _URL_DO_CSS.findall(z.read(nome).decode("utf-8", "replace")):
-                    alvo, _ = _resolver(posixpath.dirname(nome), link)
-                    if alvo not in no_manifesto:
-                        problemas.append(f"{nome}: url() quebrada {link}")
-        if navs:
-            nav_nome, _ = _resolver(base, navs[0].get("href") or "")
-            nav = arvores.get(nav_nome)
-            for tipo in ("toc", "page-list"):
-                el = None if nav is None else next(
-                    (n for n in nav.iter("{http://www.w3.org/1999/xhtml}nav")
-                     if n.get(_EPUB_TYPE) == tipo), None)
-                if el is None:
-                    problemas.append(f"o nav não tem {tipo}")
-                elif el.find(".//x:li", _NS) is None:
-                    problemas.append(f"o {tipo} do nav está vazio")
-    return problemas
-
-
-def ace(caminho: str | Path) -> Optional[List[str]]:
-    """As violações de acessibilidade que o Ace by DAISY acha, se ele estiver configurado
-    (`ABBY_ACE`: o caminho do executável `ace`, ou `ace.cmd` no Windows); `None` sem ele.
-
-    Cada violação vem como "[impacto] arquivo: regra — descrição". O Ace roda num Chrome
-    sem janela (Puppeteer) e leva alguns segundos; o relatório dele vai a uma pasta
-    temporária, que some depois."""
-    import json
-    import subprocess
-
-    executavel = os.environ.get("ABBY_ACE")
-    if not executavel or not Path(executavel).is_file():
-        return None
-    with tempfile.TemporaryDirectory(prefix="ace-") as pasta:
-        subprocess.run([executavel, "--force", "--silent", "-o", pasta, str(caminho)],
-                       capture_output=True, text=True, encoding="utf-8", errors="replace",
-                       timeout=600, check=False)
-        relatorio = Path(pasta) / "report.json"
-        if not relatorio.is_file():
-            return ["o Ace não produziu relatório"]
-        dados = json.loads(relatorio.read_text(encoding="utf-8"))
-    violacoes = []
-    for documento in dados.get("assertions", []):
-        alvo = documento.get("earl:testSubject", {}).get("url", "")
-        for teste in documento.get("assertions", []):
-            resultado = teste.get("earl:result", {})
-            if resultado.get("earl:outcome") == "pass":
-                continue
-            regra = teste.get("earl:test", {})
-            violacoes.append(f"[{regra.get('earl:impact', '?')}] {alvo}: "
-                             f"{regra.get('dct:title', '?')} — {resultado.get('dct:description', '')}")
-    return violacoes
-
-
-def calibre(caminho: str | Path) -> Optional[List[str]]:
-    """Os problemas do EPUB aberto num leitor de verdade, o Calibre, se ele estiver
-    configurado (`ABBY_CALIBRE`: o caminho do `ebook-convert`); `None` sem ele.
-
-    O Calibre converte o EPUB em PDF pelo motor dele (o mesmo Chromium do leitor): a conversão
-    tem de acabar sem erro, e cada link interno do texto (os do `nav` à parte) tem de sair como
-    link para uma página do PDF. É o que dá para conferir sem olhar; o resto (a figura, a
-    fonte dos símbolos) se vê no PDF."""
-    import subprocess
-
-    import fitz
-
-    executavel = os.environ.get("ABBY_CALIBRE")
-    if not executavel or not Path(executavel).is_file():
-        return None
-    problemas: List[str] = []
-    do_texto: List[str] = []                    # o texto de cada link interno, fora do nav
-    with zipfile.ZipFile(caminho) as z:
-        for nome in z.namelist():
-            if nome.endswith(".xhtml") and not nome.endswith("nav.xhtml"):
-                xhtml = z.read(nome).decode("utf-8")
-                for href, texto in re.findall(r'<a [^>]*href="([^"]+)"[^>]*>(.*?)</a>', xhtml,
-                                              re.S):
-                    # O `<br/>` do `manter_quebras` é um espaço no texto do PDF; o link só de
-                    # imagem (sem texto) não tem o que casar.
-                    visivel = html.unescape(re.sub(r"<[^>]+>", "",
-                                                   re.sub(r"<br\s*/?>", " ", texto)))
-                    visivel = " ".join(visivel.split())
-                    if visivel and not re.match(r"[a-z][a-z0-9+.-]*:", href):
-                        do_texto.append(visivel)
-    with tempfile.TemporaryDirectory(prefix="calibre-") as pasta:
-        pdf = Path(pasta) / "livro.pdf"
-        processo = subprocess.Popen([executavel, str(caminho), str(pdf)], stdout=subprocess.PIPE,
-                                    stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-                                    errors="replace")
-        try:
-            texto_da_saida, _ = processo.communicate(timeout=600)
-        except subprocess.TimeoutExpired:
-            # O `ebook-convert` abre filhos (`calibre-parallel`): a árvore inteira sai.
-            if os.name == "nt":
-                subprocess.run(["taskkill", "/F", "/T", "/PID", str(processo.pid)],
-                               capture_output=True, check=False)
-            processo.kill()
-            processo.communicate()
-            return ["o Calibre não converteu o EPUB em 600 s"]
-        if processo.returncode != 0 or not pdf.is_file():
-            ultimas = texto_da_saida.strip().splitlines()[-3:]
-            return [f"o Calibre não converteu o EPUB (código {processo.returncode}): "
-                    + " | ".join(ultimas)]
-        problemas += [f"o Calibre avisou: {linha.strip()}"
-                      for linha in texto_da_saida.splitlines()
-                      if re.search(r"Traceback|Failed to|Could not|not found|Unknown link",
-                                   linha)]
-        with fitz.open(pdf) as doc:
-            no_pdf, fora = [], 0
-            for pagina in doc:
-                for link in pagina.get_links():
-                    if link.get("kind") != fitz.LINK_GOTO:
-                        continue
-                    if not 0 <= link.get("page", -1) < doc.page_count:
-                        fora += 1
-                    no_pdf.append(" ".join(pagina.get_textbox(link["from"]).split()))
-    # Cada link do texto casa com um do PDF de texto igual, ou, sem ele, com o mais curto que
-    # contém o texto dele (a caixa do PDF pode levar a pontuação vizinha; "Diagrama 1" não
-    # gasta o "Diagrama 12" de outro link). Os do sumário sobram, e tudo bem.
-    for texto in do_texto:
-        iguais = [k for k, t in enumerate(no_pdf) if t == texto]
-        contem = sorted((len(t), k) for k, t in enumerate(no_pdf) if texto in t)
-        achado = iguais[0] if iguais else (contem[0][1] if contem else None)
-        if achado is None:
-            problemas.append(f"o link \"{texto}\" não saiu como link no PDF do Calibre")
-        else:
-            del no_pdf[achado]
-    if fora:
-        problemas.append(f"{fora} link(s) do PDF do Calibre levam para fora do livro")
-    return problemas
-
-
-def epubcheck(caminho: str | Path) -> Optional[List[str]]:
-    """Os erros do EPUBCheck, se ele estiver configurado (`ABBY_EPUBCHECK`: o caminho do
-    `epubcheck.jar`); `None` sem ele."""
-    import subprocess
-
-    jar = os.environ.get("ABBY_EPUBCHECK")
-    if not jar or not Path(jar).is_file():
-        return None
-    saida = subprocess.run(["java", "-jar", jar, str(caminho)], capture_output=True,
-                           text=True, encoding="utf-8", errors="replace", timeout=600)
-    return [linha for linha in (saida.stdout + saida.stderr).splitlines()
-            if linha.startswith(("ERROR", "FATAL"))]

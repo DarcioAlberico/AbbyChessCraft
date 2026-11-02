@@ -7,16 +7,38 @@ como `EspacoDeTrabalho`.
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Tuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QCheckBox, QFileDialog, QLabel
 
 from abbychess import sequencia as sq
 from abbychess.app import dialogo_paginas as dp
+from abbychess.app import imagens
+from abbychess.app import previa_da_pagina as pp
 
 
 class PaginasNaJanela:
+    def _miniatura(self, posicoes: Sequence[int]):
+        """(pixmap, legenda) da página que a miniatura do corte e da divisão mostra: a aberta,
+        se ela está entre as escolhidas; senão a primeira delas. None se não há imagem (a
+        miniatura sai, e os números continuam)."""
+        if not posicoes or self.pagina.fonte is None:
+            return None
+        aberta = self.pagina.indice
+        posicao = aberta if aberta in posicoes else min(posicoes)
+        try:
+            if posicao == aberta and self.pagina.matriz is not None:
+                matriz = self.pagina.matriz
+            else:
+                matriz = self.pagina.cache.pagina(posicao)[1]
+        except (OSError, IndexError, AttributeError):
+            return None
+        legenda = f"A página {posicao + 1}"
+        if len(posicoes) > 1:
+            legenda += " (as outras escolhidas seguem os mesmos números)"
+        return imagens.pixmap_de_cinza(matriz), legenda
+
     def _posicoes_de_agora(self, selecionadas: Optional[Sequence[int]]) -> list:
         """As pedidas (a gaveta, pelo menu de contexto); senão as escolhidas na gaveta, se ela
         tem mais de uma (o menu Página vale para elas); senão a página aberta."""
@@ -41,36 +63,39 @@ class PaginasNaJanela:
 
     def girar_a_direita(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         """Um gesto (o menu, a gaveta): 90° à direita, sem diálogo."""
-        self.pagina.girar_paginas(self._posicoes_de_agora(selecionadas), 90)
+        self.pagina.operacoes.girar_paginas(self._posicoes_de_agora(selecionadas), 90)
 
     def girar_a_esquerda(self, selecionadas: Optional[Sequence[int]] = None) -> None:
-        self.pagina.girar_paginas(self._posicoes_de_agora(selecionadas), 270)
+        self.pagina.operacoes.girar_paginas(self._posicoes_de_agora(selecionadas), 270)
 
     def mover_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
-        total = self.pagina.fonte.total if self.pagina.fonte else 0
-        escolha = dp.perguntar_paginas(
-            self, "Mover páginas", total, selecao=self._selecao_de_agora(selecionadas),
-            lugar="Depois da página", lugar_padrao=self.pagina.indice,
-            efeito=dp.efeito("1 página muda de lugar: {PAGINAS}.",
-                             "{N} páginas mudam de lugar: {PAGINAS}."),
-            validar=_mover_vale, ok="Mover",
-            explicacao="As páginas saem de onde estão e entram, na mesma ordem, depois da "
-                       "página escolhida (contada como está agora). Ctrl+Z desfaz.")
+        escolha = self._perguntar_pela_selecao(
+            "Mover páginas", selecionadas, ("1 página muda de lugar: {PAGINAS}.",
+                                            "{N} páginas mudam de lugar: {PAGINAS}."),
+            "Mover", "As páginas saem de onde estão e entram, na mesma ordem, depois da "
+                     "página escolhida (contada como está agora). {desfazer} desfaz.",
+            lugar="Depois da página", lugar_padrao=self.pagina.indice, validar=_mover_vale)
         if escolha is not None:
             posicoes, depois_da = escolha
-            self.pagina.mover_paginas(posicoes, depois_da)
+            self.pagina.operacoes.mover_paginas(posicoes, depois_da)
 
     def apagar_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
-        total = self.pagina.fonte.total if self.pagina.fonte else 0
-        escolha = dp.perguntar_paginas(
-            self, "Apagar páginas", total, selecao=self._selecao_de_agora(selecionadas),
-            efeito=dp.efeito("1 página sai do livro: {PAGINAS}.",
-                             "{N} páginas saem do livro: {PAGINAS}."), ok="Apagar",
-            explicacao="As páginas saem do livro, da busca e das exportações, mas ficam "
-                       "guardadas no projeto, com os glifos e as correções: Ctrl+Z, ou "
-                       "Página › Páginas apagadas…, as devolvem.")
+        escolha = self._perguntar_pela_selecao(
+            "Apagar páginas", selecionadas, ("1 página sai do livro: {PAGINAS}.",
+                                             "{N} páginas saem do livro: {PAGINAS}."),
+            "Apagar", "As páginas saem do livro, da busca e das exportações, mas ficam "
+                      "guardadas no projeto, com os glifos e as correções: {desfazer}, ou "
+                      "Página › Páginas apagadas…, as devolvem.")
         if escolha is not None:
-            self.pagina.apagar_paginas(escolha[0])
+            self.pagina.operacoes.apagar_paginas(escolha[0])
+
+    def _perguntar_pela_selecao(self, titulo: str, selecionadas, efeito: Tuple[str, str],
+                                ok: str, explicacao: str, **mais):
+        """O diálogo das páginas a partir da seleção de agora; `efeito` é a frase de uma
+        página e a de várias. A escolha, ou None se cancelou."""
+        return dp.perguntar_paginas(
+            self, titulo, self._total(), selecao=self._selecao_de_agora(selecionadas),
+            efeito=dp.efeito(*efeito), ok=ok, explicacao=explicacao, **mais)
 
     def inserir_paginas(self) -> None:
         caminhos, _ = QFileDialog.getOpenFileNames(
@@ -84,13 +109,13 @@ class PaginasNaJanela:
             lugar="Depois da página", lugar_padrao=self.pagina.indice + 1,
             ok="Inserir",
             explicacao=("1 arquivo. Cada página dele vira uma página do livro; ele é copiado "
-                        "para o projeto (o original pode sair do lugar). Ctrl+Z desfaz."
+                        "para o projeto (o original pode sair do lugar). {desfazer} desfaz."
                         if len(caminhos) == 1 else
                         f"{len(caminhos)} arquivos. Cada página deles vira uma página do livro; "
                         "eles são copiados para o projeto (os originais podem sair do lugar). "
-                        "Ctrl+Z desfaz."))
+                        "{desfazer} desfaz."))
         if escolha is not None:
-            self.pagina.inserir_paginas(caminhos, escolha[1] + 1)
+            self.pagina.operacoes.inserir_paginas(caminhos, escolha[1] + 1)
 
     def _total(self) -> int:
         return self.pagina.fonte.total if self.pagina.fonte else 0
@@ -103,41 +128,49 @@ class PaginasNaJanela:
             efeito=dp.efeito("1 página gira: {PAGINAS}.", "{N} páginas giram: {PAGINAS}."),
             ok="Girar",
             explicacao="A imagem gira, e os glifos, as áreas e os diagramas lidos vão junto. "
-                       "Ctrl+Z desfaz.")
+                       "{desfazer} desfaz.")
         if escolha is not None:
-            self.pagina.girar_paginas(*escolha)
+            self.pagina.operacoes.girar_paginas(*escolha)
 
     def cortar_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         margens = [dp.campo_de_porcentagem(0.0, 0.0, 95.0) for _ in range(4)]
+        posicoes = self._posicoes_de_agora(selecionadas)
+        miniatura = self._miniatura(posicoes)
+        if miniatura is not None:
+            miniatura = pp.PreviaDoCorte(miniatura[0], margens, miniatura[1])
         escolha = dp.perguntar_com(
             self, "Cortar páginas", self._total(),
             list(zip(("Margem esquerda", "Margem de cima", "Margem direita", "Margem de baixo"),
                      margens)),
             lambda: tuple(m.value() / 100 for m in margens),
-            selecao=self._selecao_de_agora(selecionadas),
+            selecao=dp.texto_da_selecao(posicoes), miniatura=miniatura,
             efeito=dp.efeito("1 página é cortada: {PAGINAS}.",
                              "{N} páginas são cortadas: {PAGINAS}."), ok="Cortar",
-            explicacao="Cada margem é a parte da imagem que se vê agora que sai, em "
-                       "porcentagem da largura ou da altura (confira na página depois: o "
-                       "corte é por números). Os glifos que ficam de fora são guardados: "
-                       "Ctrl+Z, ou Tirar o corte…, os devolvem.")
+            explicacao="Marque na página o que fica: arraste as bordas ou os cantos, ou "
+                       "desenhe outro retângulo. Cada margem é a parte da imagem que se vê "
+                       "agora que sai, em porcentagem da largura ou da altura. Os glifos que "
+                       "ficam de fora são guardados: {desfazer}, ou Tirar o corte…, os "
+                       "devolvem.")
         if escolha is not None:
-            self.pagina.cortar_paginas(*escolha)
+            self.pagina.operacoes.cortar_paginas(*escolha)
 
     def tirar_o_corte(self, selecionadas: Optional[Sequence[int]] = None) -> None:
-        escolha = dp.perguntar_paginas(
-            self, "Tirar o corte", self._total(), selecao=self._selecao_de_agora(selecionadas),
-            efeito=dp.efeito("1 página volta inteira: {PAGINAS}.",
-                             "{N} páginas voltam inteiras: {PAGINAS}."), ok="Tirar o corte",
-            explicacao="A página volta inteira (o giro fica), com os glifos que o corte "
-                       "guardou. A metade de uma página dividida não: o Ctrl+Z da divisão "
-                       "junta as metades.")
+        escolha = self._perguntar_pela_selecao(
+            "Tirar o corte", selecionadas, ("1 página volta inteira: {PAGINAS}.",
+                                            "{N} páginas voltam inteiras: {PAGINAS}."),
+            "Tirar o corte", "A página volta inteira (o giro fica), com os glifos que o corte "
+                             "guardou. A metade de uma página dividida não: o {desfazer} da "
+                             "divisão junta as metades.")
         if escolha is not None:
-            self.pagina.tirar_o_corte(escolha[0])
+            self.pagina.operacoes.tirar_o_corte(escolha[0])
 
     def dividir_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         onde = dp.campo_de_porcentagem(50.0, 5.0, 95.0, " % da largura")
-        lidas = set(self.projeto.paginas_lidas()) if self.projeto is not None else set()
+        posicoes = self._posicoes_de_agora(selecionadas)
+        miniatura = self._miniatura(posicoes)
+        if miniatura is not None:
+            miniatura = pp.PreviaDaDivisao(miniatura[0], onde, miniatura[1])
+        lidas = set(self.projeto.resumo.paginas_lidas()) if self.projeto is not None else set()
         contagem = dp.efeito("1 página dupla vira duas: {PAGINAS}.",
                              "{N} páginas duplas viram duas cada: {PAGINAS}.")
 
@@ -152,15 +185,16 @@ class PaginasNaJanela:
 
         escolha = dp.perguntar_com(
             self, "Dividir páginas", self._total(), [("Dividir em", onde)],
-            lambda: onde.value() / 100, selecao=self._selecao_de_agora(selecionadas),
-            efeito=efeito, ok="Dividir",
+            lambda: onde.value() / 100, selecao=dp.texto_da_selecao(posicoes),
+            miniatura=miniatura, efeito=efeito, ok="Dividir",
             explicacao="A imagem com duas páginas do livro lado a lado (a página dupla) vira "
-                       "duas: a metade esquerda fica no lugar e a direita entra logo depois, "
+                       "duas, na linha que se marca na página (clique ou arraste): a metade "
+                       "esquerda fica no lugar e a direita entra logo depois, "
                        "cada uma com os glifos dela. A que já é metade de uma divisão fica "
-                       "como está. Ctrl+Z junta de novo.")
+                       "como está. {desfazer} junta de novo.")
         if escolha is not None:
             with _ocupado(self, "Dividindo as páginas…"):
-                self.pagina.dividir_paginas(*escolha)
+                self.pagina.operacoes.dividir_paginas(*escolha)
 
     def endireitar_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         limite = self.pagina.ENDIREITAR_NO_MAXIMO
@@ -175,7 +209,7 @@ class PaginasNaJanela:
         medido.toggled.connect(lambda sim: angulo.setEnabled(not sim))
         medido.setChecked(True)
         nota = QLabel(f"Medido nesta página: {agora:.2f}°".replace(".", ","))
-        lidas = set(self.projeto.paginas_lidas()) if self.projeto is not None else set()
+        lidas = set(self.projeto.resumo.paginas_lidas()) if self.projeto is not None else set()
         # As com ângulo à mão: só elas mudam quando o pedido é o medido.
         a_mao = ({i for i, e in enumerate(self.projeto.sequencia.entradas)
                   if e.angulo is not None} if self.projeto is not None else set())
@@ -215,10 +249,10 @@ class PaginasNaJanela:
             explicacao="O ângulo positivo gira a página no sentido anti-horário. Na página "
                        "lida, a leitura se desfaz: ficam só os glifos marcados à mão (a "
                        "leitura digitada ou aceita na revisão), girados com a página, e as "
-                       "áreas que você desenhou; o F5 lê de novo. Ctrl+Z desfaz.")
+                       "áreas que você desenhou; o F5 lê de novo. {desfazer} desfaz.")
         if escolha is not None:
             with _ocupado(self, "Endireitando as páginas…"):
-                self.pagina.endireitar_paginas(*escolha)
+                self.pagina.operacoes.endireitar_paginas(*escolha)
 
     def paginas_apagadas(self) -> None:
         apagadas = self.projeto.sequencia.apagadas if self.projeto is not None else ()
@@ -227,7 +261,7 @@ class PaginasNaJanela:
             return
         pids = dp.perguntar_apagadas(self, apagadas)
         if pids:
-            self.pagina.restaurar_paginas(pids)
+            self.pagina.operacoes.restaurar_paginas(pids)
 
 
 def _mover_vale(posicoes, depois_da: int):

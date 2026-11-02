@@ -8,13 +8,14 @@ import pytest
 from core.box_model import BoxEntry
 
 from abbychess import exportar as ex
+from abbychess import pdf_pesquisavel as pdfp
+from abbychess import montagem as mo
 from abbychess import pagina as pg
 from abbychess.leitor import nome_de_origem
 from abbychess.modelo import gid_de
 from abbychess.projeto import ProjetoDeLivro
 from abbychess.sequencia import Apagada, Entrada, Sequencia
 
-from tests.test_visor import pdf_de_60_paginas  # noqa: F401
 
 
 def _box(char, x=10):
@@ -30,7 +31,7 @@ def _reordenar(projeto, ordem, apagar=()):
     s = projeto.sequencia
     entradas = tuple(s.entradas[i] for i in ordem)
     apagadas = tuple(Apagada(s.entradas[i], i) for i in apagar)
-    projeto._trocar_sequencia(Sequencia(entradas, apagadas))
+    projeto.ordem.trocar(Sequencia(entradas, apagadas))
 
 
 # ----------------------------------------------------------------------
@@ -41,29 +42,29 @@ def test_a_amostra_acha_a_pagina_pelo_gid_depois_de_reordenar(projeto):
     projeto.salvar_pagina(4, [_box("a")])
     gid = projeto.carregar_modelo(4).boxes[0].gid
     origem = nome_de_origem("livro", 4, 0, gid)                   # "…_p0005_b0_g…"
-    assert projeto.origem_da_amostra(origem) == (4, gid)
+    assert projeto.ordem.origem_da_amostra(origem) == (4, gid)
     _reordenar(projeto, [4, *range(4), *range(5, 60)])            # a página 5 vai à frente
-    assert projeto.origem_da_amostra(origem) == (0, gid)
+    assert projeto.ordem.origem_da_amostra(origem) == (0, gid)
 
 
 def test_a_amostra_cuja_pagina_saiu_do_livro_diz_que_saiu(projeto):
     projeto.salvar_pagina(4, [_box("a")])
     gid = projeto.carregar_modelo(4).boxes[0].gid
     _reordenar(projeto, [i for i in range(60) if i != 4], apagar=[4])
-    assert projeto.origem_da_amostra(nome_de_origem("livro", 4, 0, gid)) == (None, gid)
+    assert projeto.ordem.origem_da_amostra(nome_de_origem("livro", 4, 0, gid)) == (None, gid)
 
 
 def test_a_amostra_antiga_sem_gid_vai_a_pagina_do_pdf_do_nome(projeto):
     _reordenar(projeto, [9, *range(9), *range(10, 60)])
-    assert projeto.origem_da_amostra("livro_p0010_b3") == (0, None)
-    assert projeto.origem_da_amostra("sem o padrão de nome") is None
+    assert projeto.ordem.origem_da_amostra("livro_p0010_b3") == (0, None)
+    assert projeto.ordem.origem_da_amostra("sem o padrão de nome") is None
 
 
 def test_a_origem_vem_do_gid_e_nao_do_numero_da_pagina_no_nome(projeto):
     """O nome diz a página 13 (a de quando foi ensinada); o gid diz a página do pid 30."""
     origem = nome_de_origem("livro", 12, 3, gid_de(30, 3))
     _reordenar(projeto, [*range(30, 60), *range(30)])            # o pid 30 vai à posição 1
-    assert projeto.origem_da_amostra(origem) == (0, gid_de(30, 3))
+    assert projeto.ordem.origem_da_amostra(origem) == (0, gid_de(30, 3))
 
 
 def test_o_sinal_ir_para_leva_o_none_da_pagina_que_saiu():
@@ -100,7 +101,7 @@ def test_a_importacao_da_camada_segue_a_ordem_do_livro(tmp_path):
     from abbychess import nativo
     from abbychess import texto as tx
 
-    from tests.test_exportar_preciso import _pdf_digital
+    from tests.ajudantes import _pdf_digital  # noqa: E402,F401,F811
 
     pdf = _pdf_digital(tmp_path / "digital.pdf", paginas=3)
     projeto = ProjetoDeLivro.criar(tmp_path / "projetos", "Digital", pdf)
@@ -137,7 +138,7 @@ def test_o_pdf_pesquisavel_sai_na_ordem_do_livro(projeto, tmp_path):
     _ler(projeto, [(0, "a"), (1, "b"), (2, "c")])
     _reordenar(projeto, [2, 0, 1, *range(3, 60)])
     saida = tmp_path / "pesquisavel.pdf"
-    ex.exportar_pdf_pesquisavel(projeto, saida)
+    pdfp.exportar_pdf_pesquisavel(projeto, saida)
     with fitz.open(str(saida)) as doc:
         impressas = [doc[k].get_text().split("Pagina")[1].split()[0] for k in range(3)]
     assert impressas == ["3", "1", "2"]                  # o texto impresso do PDF de cada uma
@@ -154,17 +155,17 @@ def test_ca_12_16_o_pdf_pesquisavel_usa_as_imagens_transformadas(projeto, tmp_pa
     fonte = pg.fonte_do_projeto(projeto)
     e = projeto.sequencia.entrada_em(0)
     largura, altura = fonte.tamanho_da_fonte(e)
-    projeto._trocar_sequencia(projeto.sequencia.com_entrada(
+    projeto.ordem.trocar(projeto.sequencia.com_entrada(
         Entrada(e.pid, "livro", e.pagina, giro=90, tamanho=(largura, altura))))
     caixa = projeto.carregar_pagina(0)[0]                  # o "a" na página girada
     imagem = tmp_path / "solta.png"
     Image.fromarray(np.full((400, 300), 255, np.uint8)).save(imagem)
-    inseridas = projeto.inserir_arquivo(imagem)
-    projeto.gravar_sequencia(projeto.sequencia.inserir(inseridas, 2))
+    inseridas = projeto.ordem.inserir_arquivo(imagem)
+    projeto.ordem.gravar(projeto.sequencia.inserir(inseridas, 2))
     projeto.salvar_pagina(2, [_box("c"), _box("c", x=20)])
     saida = tmp_path / "pesquisavel.pdf"
-    ex.exportar_pdf_pesquisavel(projeto, saida)
-    escala = 72.0 / ex.DPI_DA_LEITURA
+    pdfp.exportar_pdf_pesquisavel(projeto, saida)
+    escala = 72.0 / mo.DPI_DA_LEITURA
     with fitz.open(str(saida)) as doc:
         assert len(doc) == 3
         girada, original, inserida = doc[0], doc[1], doc[2]
@@ -190,9 +191,9 @@ def test_a_altura_vem_da_pagina_do_pdf_da_entrada(tmp_path):
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Alturas", pdf)
     _reordenar(projeto, [2, 0, 1])
     assert [ex._altura_da_pagina(projeto, i) for i in range(3)] == [
-        round(a * ex.DPI_DA_LEITURA / 72) for a in (500, 300, 400)]
+        round(a * mo.DPI_DA_LEITURA / 72) for a in (500, 300, 400)]
     e = projeto.sequencia.entrada_em(0)                          # girada: renderiza
-    projeto._trocar_sequencia(projeto.sequencia.com_entrada(
+    projeto.ordem.trocar(projeto.sequencia.com_entrada(
         Entrada(e.pid, "livro", e.pagina, giro=90,
                 tamanho=pg.fonte_do_projeto(projeto).tamanho_da_fonte(e))))
     assert ex._altura_da_pagina(projeto, 0) == pg.fonte_do_projeto(projeto).original(0).height
@@ -208,7 +209,7 @@ def test_o_sumario_do_original_fora_de_ordem_nao_vai_para_o_pdf(projeto, tmp_pat
     projeto.fonte.write_bytes((tmp_path / "com_sumario.pdf").read_bytes())
     _reordenar(projeto, [2, 0, 1, *range(3, 60)])
     saida = tmp_path / "pesquisavel.pdf"
-    ex.exportar_pdf_pesquisavel(projeto, saida)
+    pdfp.exportar_pdf_pesquisavel(projeto, saida)
     with fitz.open(str(saida)) as doc:
         paginas = [m[2] for m in doc.get_toc()]
     assert paginas == sorted(paginas)                            # nenhum destino para trás

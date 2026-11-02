@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import io
 import zipfile
-from pathlib import Path
 
 import fitz
 import numpy as np
@@ -19,46 +18,16 @@ from PIL import Image
 from core.box_model import BoxEntry
 
 from abbychess import exportar as ex
+from abbychess import pdf_pesquisavel as pdfp
+from abbychess import montagem as mo
 from abbychess import livro
 from abbychess import pagina as pg
+from abbychess import efeitos as ef
 from abbychess.leitor import FONTE_MANUAL, LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_treino_por_livro import _pagina_sintetica
-
-PAGINAS = (("abc abc abc", "cab bca"), ("bca cab", "abc"), ("cba cba", "bac abc"))
-
-
-def pdf_sintetico(pasta: Path, paginas=PAGINAS, *, camada_antiga: bool = False) -> Path:
-    """Um PDF de imagens, uma página por grupo de linhas, como um livro digitalizado."""
-    doc = fitz.open()
-    for i, linhas in enumerate(paginas):
-        caminho = _pagina_sintetica(pasta / f"p{i}.png", linhas)
-        with Image.open(caminho) as imagem:
-            largura, altura = imagem.size
-        page = doc.new_page(width=largura * 72 / 300, height=altura * 72 / 300)
-        page.insert_image(page.rect, filename=str(caminho))
-        if camada_antiga:
-            page.insert_text((5, 15), "hb7 lixo", fontsize=8, render_mode=3)
-    destino = pasta / "livro.pdf"
-    doc.save(destino)
-    doc.close()
-    return destino
-
-
-@pytest.fixture
-def projeto(tmp_path):
-    return ProjetoDeLivro.criar(tmp_path / "livros", "Livro de Teste", pdf_sintetico(tmp_path))
-
-
-@pytest.fixture
-def leitor(projeto):
-    return LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares)
-
-
-@pytest.fixture
-def fonte(projeto):
-    return pg.FonteDePaginas(projeto.fonte)
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
+from tests.ajudantes import _ensinar_e_ler, pdf_sintetico  # noqa: E402,F401,F811
 
 
 # ----------------------------------------------------------------------
@@ -81,10 +50,11 @@ def test_amostra_escolhe_inicio_meio_e_fim_do_corpo():
 def test_negrito_e_medido_por_palavra_com_a_referencia_da_pagina(monkeypatch):
     boxes = [BoxEntry("a", x, 0, x + 8, 20) for x in (0, 10, 40, 50)]
     pesos = {0: 1.0, 10: 1.0, 40: 2.0, 50: 2.0}
-    monkeypatch.setattr(pg, "recorte", lambda _imagem, box: np.array([[box.x1]]))
-    monkeypatch.setattr("core.negrito.espessura", lambda imagem: pesos[int(imagem[0, 0])])
+    monkeypatch.setattr(ef, "recorte", lambda _imagem, box: np.array([[box.x1]]))
+    monkeypatch.setattr(ef, "espessura_do_traco", lambda imagem: pesos[int(imagem[0, 0])])
 
-    assert pg.efeitos_de_impressao(Image.new("L", (80, 30)), boxes) == [False, False, True, True]
+    negrito, _italico = ef.efeitos_da_pagina(Image.new("L", (80, 30)), boxes)
+    assert negrito == [False, False, True, True]
 
 
 def test_negrito_converte_a_pagina_uma_vez(monkeypatch):
@@ -95,7 +65,7 @@ def test_negrito_converte_a_pagina_uma_vez(monkeypatch):
                         lambda self, *a, **k: convertidas.append(1) or original(self, *a, **k))
     boxes = [BoxEntry("a", x, 0, x + 8, 20) for x in range(0, 200, 10)]
 
-    assert len(pg.efeitos_de_impressao(Image.new("RGB", (220, 30), "white"), boxes)) == 20
+    assert len(ef.efeitos_da_pagina(Image.new("RGB", (220, 30), "white"), boxes)[0]) == 20
     assert len(convertidas) == 1
 
 
@@ -115,7 +85,7 @@ def test_lote_grava_cada_pagina_com_progresso(projeto, fonte, leitor):
         projeto, fonte, leitor, range(3), progresso=lambda f, t: progresso.append((f, t)),
         ao_gravar=lambda i, _r: gravadas.append(i))
     assert resultado.lidas == gravadas == [0, 1, 2]
-    assert projeto.paginas_lidas() == [0, 1, 2]
+    assert projeto.resumo.paginas_lidas() == [0, 1, 2]
     assert progresso == [(0, 3), (1, 3), (2, 3), (3, 3)]
     # Sem rede nem padrão, todo glifo fica para a revisão.
     assert resultado.pendentes[0] == len(projeto.carregar_pagina(0)) > 10
@@ -153,7 +123,7 @@ def test_cancelar_para_entre_paginas_e_guarda_as_feitas(projeto, fonte, leitor):
                                          cancelado=lambda: len(gravadas) >= 1,
                                          ao_gravar=lambda i, _r: gravadas.append(i))
     assert resultado.cancelado
-    assert projeto.paginas_lidas() == [0]
+    assert projeto.resumo.paginas_lidas() == [0]
 
 
 def test_cancelar_no_meio_da_pagina_nao_grava_ela_pela_metade(projeto, fonte, leitor):
@@ -165,7 +135,7 @@ def test_cancelar_no_meio_da_pagina_nao_grava_ela_pela_metade(projeto, fonte, le
 
     resultado = livro.reconhecer_paginas(projeto, fonte, leitor, [0], cancelado=cancelado)
     assert resultado.cancelado and resultado.lidas == []
-    assert projeto.paginas_lidas() == []
+    assert projeto.resumo.paginas_lidas() == []
 
 
 def test_pagina_que_falha_nao_derruba_o_lote(projeto, fonte, leitor, monkeypatch):
@@ -212,13 +182,6 @@ def test_sem_pendentes_no_livro_nao_ha_proxima(projeto, fonte, leitor):
 # Exportar
 # ----------------------------------------------------------------------
 
-def _ensinar_e_ler(projeto, fonte, leitor):
-    imagem = fonte.pagina(0)
-    boxes = pg.segmentar(imagem)
-    for indice, char in enumerate("abc"):
-        pg.ensinar(imagem, boxes, indice, char, leitor, projeto, pagina=0, propagar=False)
-    livro.reconhecer_paginas(projeto, fonte, leitor, range(3), refazer=True)
-
 
 def test_paragrafos_cortam_no_vao_e_juntam_hifen():
     def linha(texto, y):
@@ -226,13 +189,13 @@ def test_paragrafos_cortam_no_vao_e_juntam_hifen():
                 for i, c in enumerate(texto) if c != " "]
 
     boxes = linha("abc-", 0) + linha("de fg", 40) + linha("jk", 80) + linha("hi", 200)
-    blocos = ex.paragrafos(boxes)
+    blocos = mo.paragrafos(boxes)
     assert [p.texto for p in blocos] == ["abcde fg jk", "hi"]
 
 
 def test_figurina_sai_como_impressa_e_nao_como_letra_do_san():
     boxes = [pg.BoxEntry(c, 10 + 20 * i, 0, 25 + 20 * i, 20) for i, c in enumerate("1.♘f3")]
-    assert [p.texto for p in ex.paragrafos(boxes)] == ["1.♘f3"]
+    assert [p.texto for p in mo.paragrafos(boxes)] == ["1.♘f3"]
 
 
 def test_docx_e_epub_tem_o_texto_das_paginas(projeto, fonte, leitor, tmp_path):
@@ -258,7 +221,7 @@ def test_diagrama_entra_como_recorte_na_altura_dele(projeto, fonte):
     for b in boxes:
         b.char = "a"
     meio = (boxes[0].y2 + max(b.y1 for b in boxes)) // 2
-    pagina = ex.pagina_extraida(0, boxes, [(10, meio, 60, meio + 5)], imagem)
+    pagina = mo.pagina_extraida(0, boxes, [(10, meio, 60, meio + 5)], imagem)
     tipos = ["Figura" if isinstance(b, ex.Figura) else "Paragrafo" if isinstance(b, ex.Paragrafo)
              else type(b).__name__ for b in pagina.blocos]
     assert tipos == ["Paragrafo", "Figura", "Paragrafo"]
@@ -275,7 +238,7 @@ def test_pdf_pesquisavel_troca_a_camada_antiga(tmp_path):
     _ensinar_e_ler(projeto, fonte, leitor)
 
     destino = tmp_path / "saida.pdf"
-    resumo = ex.exportar_pdf_pesquisavel(projeto, destino, [0, 2])
+    resumo = pdfp.exportar_pdf_pesquisavel(projeto, destino, [0, 2])
     assert resumo.paginas == 2 and resumo.camadas_trocadas == 2 and resumo.caracteres > 20
     doc = fitz.open(destino)
     assert len(doc) == 2

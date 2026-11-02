@@ -15,17 +15,28 @@ class LoteNaJanela:
         self.carregando.hide()
         leitor = self.leitor
         dialogos.avisos_dos_modelos(self, estado, leitor.arquivos_de_padrao() if leitor else 0)
+        guardada = getattr(self, "mensagem_depois_dos_modelos", None)
+        if guardada:                              # a do Ctrl+N (a camada nativa) fica à vista
+            self.mensagem_depois_dos_modelos = None
+            self.statusBar().showMessage(guardada, 15000)
         self.livro.iniciar_amostra_guiada()
 
     def _amostra_terminou(self, paginas) -> None:
-        """A primeira fila já abre por caractere, pronta para o primeiro Enter."""
+        """A primeira fila já abre por caractere, na primeira página da amostra com o que
+        revisar, com o primeiro glifo no Glifo e o foco no campo: o Enter seguinte ensina."""
         self.fila.definir("caractere")
         self.fila.definir_escopo("pagina")
+        p = self.pagina
+        pendentes = p.projeto.resumo.do_livro() if p.projeto is not None else {}
+        com_fila = [i for i in paginas if (pendentes.get(i, {}).get("pendentes") or 0) > 0]
+        alvo = (com_fila or list(paginas) or [p.indice])[0]
+        if alvo != p.indice:
+            p.ir_para(alvo)
+        p.fila_da_pagina.ir_ao_primeiro_pendente()
         self.atualizar_fila()
         self.relogio_das_paginas.start()
-        self.statusBar().showMessage(
-            f"Amostra pronta nas páginas {', '.join(str(i + 1) for i in paginas)}. "
-            "Revise por caractere e ensine com Enter.", 15000)
+        self.vista.setCurrentWidget(self.painel_do_documento)
+        self.inspetor.focar()
 
     def _servidor_caiu(self, texto: str, desistiu: bool) -> None:
         """§11: a primeira queda do servidor de leitura (reaberto sozinho) vai para os Avisos;
@@ -52,7 +63,7 @@ class LoteNaJanela:
                 self.abrir_caminho(str(pasta))
 
     def voltar_ao_antes_do_lote(self) -> None:
-        quando = self.projeto.data_antes_do_lote(self.pagina.indice) if self.projeto else None
+        quando = self.projeto.antes_do_lote.data(self.pagina.indice) if self.projeto else None
         de = f" (a cópia de {quando:%d/%m/%Y às %H:%M})" if quando else ""
         if dialogos.confirmar(self, "Voltar ao estado antes do lote", "A página volta a ser a "
                               f"de antes do último lote com \u201crefazer\u201d{de}; tudo o que "

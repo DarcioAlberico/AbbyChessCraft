@@ -414,3 +414,8 @@ do Ctrl+D continuam do lado conservador: a parte errada custa o ensinar fora da 
 Na linha de base o Ctrl+D não sai mais barato em nenhum box: dividir (2) e ensinar a parte
 (3) passam de marcar a vírgula (4). A razão vai a **0,687**, abaixo também dos 0,70 do alvo
 antigo. O CA-F.1 passa, provisório até a estrutura e os FEN das p. 21–27 serem revisados.
+
+Em 2026-10-28 o usuário revisou a estrutura e conferiu os FEN e os lados (`8194283`), sem
+mudar a estrutura. Medido de novo nesse commit (`2026-10-28-fatia-xv-passo-0.json`,
+`2026-10-28-fatia-xv-passo-L.json`): os mesmos 1.076 e 739 gestos, razão 0,687. O estado agora
+só espera a conferência cega da §15.2.

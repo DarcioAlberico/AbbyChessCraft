@@ -17,7 +17,7 @@ from abbychess import zonas as zn
 from abbychess.diagramas import DiagramaLido
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_treino_por_livro import _pagina_sintetica
+from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 
 
 @pytest.fixture
@@ -255,9 +255,9 @@ def test_areas_gravadas_voltam_iguais_e_nao_contam_como_pagina_lida(projeto):
     assert [(z.tipo, z.caixa) for z in gravadas] == [(z.tipo, z.caixa) for z in zonas]
     assert [z.id for z in gravadas] == ["z0", "z1"]           # cada área ganha um id (v2)
     assert projeto.carregar_zonas(1) == []
-    assert projeto.paginas_lidas() == []
+    assert projeto.resumo.paginas_lidas() == []
     assert projeto.carregar_pagina(0) is None
-    assert projeto.estado_da_pagina(0) == "nao_reconhecida"
+    assert projeto.resumo.estado_da_pagina(0) == "nao_reconhecida"
     projeto.salvar_zonas(0, [])
     assert projeto.carregar_zonas(0) == []
 
@@ -271,3 +271,150 @@ def test_projeto_antigo_abre_sem_areas_e_em_portugues(projeto):
     assert reaberto.dados.idioma == "pt"
     assert reaberto.carregar_zonas(0) == []
     assert not (reaberto.pasta / "zonas").exists()
+
+
+# ----------------------------------------------------------------------
+# Fechamento do passo F: legendas lado a lado, a regra da legenda e a zona do usuário
+# ----------------------------------------------------------------------
+
+def _linha_de_boxes(texto, x, y, passo=12, altura=16):
+    """Uma linha de boxes, um por letra, a partir de (x, y); o espaço é um vão de um passo."""
+    from core.box_model import BoxEntry
+
+    saida = []
+    for c in texto:
+        if c != " ":
+            saida.append(BoxEntry(c, x, y, x + passo - 2, y + altura, 0.99, "neural"))
+        x += passo
+    return saida
+
+
+def test_legendas_lado_a_lado_viram_duas_zonas_ligadas_a_cada_diagrama():
+    """Dois tabuleiros lado a lado, com "Diagrama 6…" e "Diagrama 7…" na mesma linha: duas
+    legendas, uma para cada diagrama (CA-5.1, a ligação da legenda)."""
+    from types import SimpleNamespace
+
+    tabuleiros = [(50, 50, 330, 330), (420, 50, 700, 330)]
+    # Como na p. 25 do Xadrez Vitorioso: cada legenda sob o seu tabuleiro, com um vão de
+    # mais de 8 alturas de letra entre elas.
+    boxes = (_linha_de_boxes("Diagrama 6. Jogam as brancas.", 60, 345, passo=8)
+             + _linha_de_boxes("Diagrama 7. Jogam as brancas.", 430, 345, passo=8))
+    zonas = zn.automaticas(boxes, tabuleiros, 760, 1000, escala=16)
+    legendas = [z for z in zonas if z.funcao == "legenda"]
+    assert len(legendas) == 2
+    diagramas = [SimpleNamespace(id=f"d{k}", caixa=c) for k, c in enumerate(tabuleiros)]
+    ligadas = zn.vincular_legendas(legendas, diagramas)
+    assert sorted(z.diagrama_id for z in ligadas) == ["d0", "d1"]
+
+
+def test_prosa_e_lances_abaixo_do_diagrama_nao_sao_legenda():
+    tabuleiro = [(50, 50, 330, 330)]
+    for texto in ("Black moves the knight to f6 and the game is equal again after all",
+                  "1.e4 e5 2.Nf3 Nc6 3.Bb5 a6"):
+        zonas = zn.automaticas(_linha_de_boxes(texto, 55, 345, passo=5), tabuleiro, 760, 1000,
+                               escala=16)
+        assert not any(z.funcao == "legenda" for z in zonas), texto
+    for texto in ("Diagrama 5. Jogam as pretas.", "White to play", "12"):
+        zonas = zn.automaticas(_linha_de_boxes(texto, 60, 345), tabuleiro, 760, 1000, escala=16)
+        assert any(z.funcao == "legenda" for z in zonas), texto
+
+
+def test_a_zona_mexida_pelo_usuario_deixa_de_ser_automatica():
+    zona = zn.Zona(zn.TEXTO, 0, 0, 100, 100, funcao="cabecalho", automatica=True, id="z0")
+    for mexer in (lambda zs: zn.trocar_funcao(zs, 0, "texto"),
+                  lambda zs: zn.trocar_tipo(zs, 0, zn.IGNORAR)):
+        zonas = [zona]
+        mexer(zonas)
+        assert zonas[0].automatica is False
+    assert zn.arrastar(zona, "d", 10, 0, 500, 500).automatica is False
+
+
+def test_a_legenda_tolera_o_ocr_so_no_diagrama():
+    """"Dia9rama", "iagrama" (o OCR) são legenda; a prosa curta que lembra "teste" ("These
+    squares", "Tea time") não é: a tolerância vale só para a palavra longa."""
+    for texto in ("Dia9rama 5. J09am as pretas.", "iagrama 3.", "Teste 1", "Diag ama 8."):
+        assert zn._parece_legenda(texto), texto
+    for texto in ("These squares", "Tea time", "Testing the plan", "Tesla moves", "Teen"):
+        assert not zn._parece_legenda(texto), texto
+
+
+def test_areas_antes_de_ler_saem_texto_e_o_f5_as_classifica():
+    """O fluxo do FineReader: as áreas feitas antes de reconhecer (boxes sem leitura) não
+    viram título pelo tamanho; depois de ler, as que continuam automáticas ganham a função
+    pelo texto (a legenda, ligada ao diagrama), e a do usuário fica."""
+    from core.box_model import BoxEntry
+
+    tabuleiro = [(50, 50, 330, 330)]
+    lidos = (_linha_de_boxes("Diagrama 5. Jogam as pretas.", 60, 345)
+             + _linha_de_boxes("O corpo do texto segue aqui, com as letras de sempre.", 60, 500,
+                               passo=10))
+    sem_leitura = [BoxEntry("", b.x1, b.y1, b.x2, b.y2, 0.0, "aguardando") for b in lidos]
+    antes = zn.automaticas(sem_leitura, tabuleiro, 760, 1000)
+    assert all(z.funcao in ("texto", "diagrama") for z in antes)
+    desenhada = zn.Zona(zn.TEXTO, 600, 900, 700, 960, funcao="nota", id="zu")
+    depois = zn.reclassificar_automaticas(antes + [desenhada], lidos, 760, 1000)
+    assert any(z.funcao == "legenda" for z in depois)
+    assert depois[-1] == desenhada
+
+
+def test_a_linha_de_lances_com_o_numero_mal_lido_nao_e_titulo():
+    """No Xadrez Vitorioso o OCR leu "21.exf4" como "2lI.exf4": as casas ainda dizem lance."""
+    assert zn._parece_lances("2lI.exf4 3.Cf3 f5?")
+    assert zn._parece_lances("2lI.exf43.Cf3f5?")              # o texto da área, sem espaços
+    assert not zn._parece_lances("Partidasde1972e1980")
+    assert zn._parece_lances("exf4 Cf3 f5")
+    assert zn._parece_lances("O-O e Txe8")
+    assert not zn._parece_lances("TROCAR PEÇAS PARA TER UM FINAL VITORIOSO")
+    assert not zn._parece_lances("Capítulo 1: a abertura")
+
+
+@pytest.mark.parametrize("linha", [
+    "Bb5 Bc4",          # português e inglês: B, o bispo
+    "Ab5 Ac4",          # espanhol: A, o alfil
+    "Sf3 Lb5",          # alemão: S, o Springer; L, o Läufer
+    "Fb5 Fc4",          # francês: F, o fou
+])
+def test_a_linha_de_lances_de_qualquer_idioma_nao_e_titulo(linha):
+    """Uma linha curta de lances, centrada e sozinha, é texto: as letras das peças de todos
+    os idiomas de `modelo.PECAS` dizem lance, não só as do português e do inglês."""
+    largura, passo = 1000, 12
+    x = (largura - len(linha) * passo) // 2
+    boxes = _linha_de_boxes(linha, x, 300, passo=passo)
+    zona = zn.Zona(zn.TEXTO, x - 4, 296, x + len(linha) * passo + 4, 320, automatica=True)
+    [classificada] = zn.classificar_funcoes([zona], boxes, largura, 1400, 16)
+    assert classificada.funcao == "texto"
+
+
+def test_a_pagina_lida_sem_areas_ganha_as_automaticas():
+    """O lote e o F5: sem área nenhuma, as automáticas pela leitura (o título chega ao
+    Documento e ao sumário); sem leitura, nada; com áreas, as do usuário ficam."""
+    titulo = _linha_de_boxes("CAPITULO", 300, 100, passo=24, altura=32)
+    corpo = [b for y in range(300, 700, 30) for b in _linha_de_boxes("texto corrido aqui", 100, y)]
+    zonas = zn.depois_de_ler([], titulo + corpo, [], [], 1000, 1400)
+    assert zonas and all(z.automatica for z in zonas)
+    assert "titulo" in {z.funcao for z in zonas}
+    sem_leitura = [BoxEntry("", b.x1, b.y1, b.x2, b.y2) for b in corpo]
+    assert zn.depois_de_ler([], sem_leitura, [], [], 1000, 1400) == []
+    do_usuario = [zn.Zona("texto", 0, 0, 1000, 1400)]
+    assert zn.depois_de_ler(do_usuario, titulo + corpo, [], [], 1000, 1400) == do_usuario
+
+
+def test_as_linhas_curtas_embaixo_da_legenda_a_continuam_e_a_prosa_nao():
+    """"Gormon-Silman / Memorial Ervin, 1987" embaixo de "Diagrama 5…", cada uma na sua
+    zona: as duas continuam a legenda; a linha longa de prosa logo depois, não."""
+    tabuleiro = [(50, 50, 330, 330)]
+    boxes = (_linha_de_boxes("Diagrama 5. Jogam as pretas.", 60, 345)
+             + _linha_de_boxes("Gormon-Silman", 60, 381)
+             + _linha_de_boxes("Memorial Ervin, 1987", 60, 417)
+             + _linha_de_boxes("O corpo do texto segue aqui, com as letras de sempre.", 60, 453,
+                               passo=10))
+    zonas = zn.automaticas(boxes, tabuleiro, 760, 1000, escala=16)
+    textos = sorted((z for z in zonas if z.tipo == zn.TEXTO), key=lambda z: z.y1)
+    assert [z.funcao for z in textos] == ["legenda", "legenda", "legenda", "texto"]
+
+
+def test_o_ponto_solto_da_digitalizacao_fica_fora_do_texto():
+    boxes = _boxes_de("texto normal bastante longo", 100, 250) + _boxes_de(".", 400, 600)
+    zonas = zn.automaticas(boxes, [], 800, 1000, escala=10)
+    assert [(z.tipo, z.funcao) for z in sorted(zonas, key=lambda z: z.y1)] == [
+        (zn.TEXTO, "texto"), (zn.IGNORAR, "ignorar")]

@@ -18,8 +18,7 @@ ensinado nem marcado como revisado.
 
 from __future__ import annotations
 
-import difflib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 import regex
@@ -97,28 +96,38 @@ def validar(modelo: str, expressao, regex_ligada: bool) -> None:
     while k < len(modelo):
         if modelo[k] != "\\" or k + 1 == len(modelo):
             k += 1
-            continue
-        seguinte = modelo[k + 1]
-        if seguinte.isdigit():
-            fim = k + 1
-            while fim < len(modelo) and modelo[fim].isdigit() and fim - k <= 2:
-                fim += 1
-            numero = int(modelo[k + 1:fim])
-            if numero > expressao.groups:
-                raise bs.PadraoInvalido(f"substituto inválido: o grupo \\{numero} não existe")
-            k = fim
-        elif seguinte == "g" and modelo[k + 2:k + 3] == "<":
-            fecha = modelo.find(">", k + 3)
-            if fecha < 0:
-                raise bs.PadraoInvalido("substituto inválido: falta o > de \\g<nome>")
-            nome = modelo[k + 3:fecha]
-            existe = (int(nome) <= expressao.groups if nome.isdigit()
-                      else nome in expressao.groupindex)
-            if not existe:
-                raise bs.PadraoInvalido(f"substituto inválido: o grupo {nome} não existe")
-            k = fecha + 1
+        elif modelo[k + 1].isdigit():
+            k = _depois_do_grupo_numerado(modelo, k, expressao)
+        elif modelo[k + 1:k + 3] == "g<":
+            k = _depois_do_grupo_nomeado(modelo, k, expressao)
         else:
             k += 2
+
+
+def _depois_do_grupo_numerado(modelo: str, k: int, expressao) -> int:
+    """Onde termina o `\\N` que começa em `k` (até dois dígitos); `PadraoInvalido` se a regex
+    não tem o grupo."""
+    fim = k + 1
+    while fim < len(modelo) and modelo[fim].isdigit() and fim - k <= 2:
+        fim += 1
+    numero = int(modelo[k + 1:fim])
+    if numero > expressao.groups:
+        raise bs.PadraoInvalido(f"substituto inválido: o grupo \\{numero} não existe")
+    return fim
+
+
+def _depois_do_grupo_nomeado(modelo: str, k: int, expressao) -> int:
+    """Onde termina o `\\g<nome>` que começa em `k`; `PadraoInvalido` sem o `>` ou sem o
+    grupo."""
+    fecha = modelo.find(">", k + 3)
+    if fecha < 0:
+        raise bs.PadraoInvalido("substituto inválido: falta o > de \\g<nome>")
+    nome = modelo[k + 3:fecha]
+    existe = (int(nome) <= expressao.groups if nome.isdigit()
+              else nome in expressao.groupindex)
+    if not existe:
+        raise bs.PadraoInvalido(f"substituto inválido: o grupo {nome} não existe")
+    return fecha + 1
 
 
 def casos_da_pagina(indexada: bs.PaginaIndexada, unidades: Sequence[ss.Unidade], expressao,
@@ -135,26 +144,42 @@ def casos_da_pagina(indexada: bs.PaginaIndexada, unidades: Sequence[ss.Unidade],
     texto = "".join(u.texto for u in unidades)
     if not indexada.texto.startswith(texto):
         raise ValueError("o índice da página não é o das unidades dela")
-    permitidas = ETIQUETAS_DO_ALVO[alvo] & onde
-    substituiveis = ETIQUETAS_DO_ALVO[AMBOS] & onde
     inicio, fim = trecho if trecho is not None else (0, len(texto))
-    trocas: List[Tuple[int, int, str]] = []
-    for casado in bs.casamentos(indexada, expressao, inicio, min(fim, len(texto)),
-                                bs.TEMPO_LIMITE if tempo_limite is None else tempo_limite,
-                                indice=indexada.indice):
-        a, b = casado.start(), casado.end()
-        etiquetas = {indexada.etiqueta(k) for k in range(a, b) if not texto[k].isspace()}
-        if not etiquetas or not etiquetas <= permitidas:
-            if fora is not None and etiquetas and etiquetas <= substituiveis:
-                fora[0] += 1
-            continue
-        novo = trocar(casado)
-        if novo != texto[a:b]:
-            trocas.append((a, b, novo))
+    casamentos = bs.casamentos(indexada, expressao, inicio, min(fim, len(texto)),
+                               bs.TEMPO_LIMITE if tempo_limite is None else tempo_limite,
+                               indice=indexada.indice)
+    trocas = _trocas(indexada, texto, casamentos, trocar, ETIQUETAS_DO_ALVO[alvo] & onde,
+                     ETIQUETAS_DO_ALVO[AMBOS] & onde, fora if fora is not None else [0])
     return _juntar_em_casos(indexada, unidades, texto, trocas)
 
 
+def _trocas(indexada, texto: str, casamentos, trocar, permitidas, substituiveis,
+            fora: List[int]) -> List[Tuple[int, int, str]]:
+    """(início, fim, novo) de cada casamento só em palavras `permitidas` que muda o texto;
+    `fora` conta os que tocam as outras `substituiveis`."""
+    trocas: List[Tuple[int, int, str]] = []
+    for casado in casamentos:
+        a, b = casado.start(), casado.end()
+        etiquetas = {indexada.etiqueta(k) for k in range(a, b) if not texto[k].isspace()}
+        if etiquetas and etiquetas <= permitidas:
+            novo = trocar(casado)
+            if novo != texto[a:b]:
+                trocas.append((a, b, novo))
+        elif etiquetas and etiquetas <= substituiveis:
+            fora[0] += 1
+    return trocas
+
+
 def _juntar_em_casos(indexada, unidades, texto: str, trocas) -> List[Caso]:
+    faixas, grupos = _nas_mesmas_palavras(unidades, trocas)
+    return [_caso(indexada, unidades, texto, de, ate, grupo)
+            for (de, ate), grupo in zip(faixas, grupos)]
+
+
+def _nas_mesmas_palavras(unidades, trocas) -> Tuple[List[Tuple[int, int]],
+                                                     List[List[Tuple[int, int, str]]]]:
+    """As faixas de palavras das trocas e as trocas de cada uma: as que tocam as mesmas
+    palavras são um caso só."""
     grupos: List[List[Tuple[int, int, str]]] = []
     faixas: List[Tuple[int, int]] = []
     for a, b, novo in trocas:
@@ -165,48 +190,23 @@ def _juntar_em_casos(indexada, unidades, texto: str, trocas) -> List[Caso]:
         else:
             faixas.append((de, ate))
             grupos.append([(a, b, novo)])
-    casos = []
-    for (de, ate), grupo in zip(faixas, grupos):
-        depois = _trocado(texto, de, ate, grupo)
-        fim_de_linha = ate < len(unidades) and unidades[ate].tipo == ss.LINHA
-        motivo = ""
-        try:
-            ss.planejar(unidades[de:ate], depois, fim_de_linha=fim_de_linha)
-        except ss.Recusa as recusa:
-            motivo = _motivo(texto[de:ate], depois, str(recusa))
-        gids = tuple(dict.fromkeys(u.gid for u in unidades[de:ate] if u.glifo))
-        primeiro = next((k for k in range(grupo[0][0], grupo[0][1]) if not texto[k].isspace()),
-                        grupo[0][0])
-        casos.append(Caso(indexada.indice, de, ate, texto[de:ate], depois,
-                          bs.NOTACAO if indexada.etiqueta(primeiro) == bs.NOTACAO else bs.PROSA,
-                          texto.count("\n", 0, de) + 1, gids, len(grupo), motivo))
-    return casos
+    return faixas, grupos
 
 
-def _motivo(antes: str, depois: str, recusa: str) -> str:
-    """O motivo da recusa com o trecho que a causou ("'sa' → 'r': este tipo de edição chega
-    numa próxima versão (juntar glifos); corrija no Documento")."""
-    trechos = [(antes[i1:i2], depois[j1:j2]) for op, i1, i2, j1, j2
-               in difflib.SequenceMatcher(None, antes, depois, autojunk=False).get_opcodes()
-               if op != "equal"]
-    de, para = next(((a, b) for a, b in trechos if a and b and len(a) != len(b)),
-                    trechos[0] if trechos else (antes, depois))
-    return f"'{de}' → '{para}': {recusa}; corrija no Documento"
+def _caso(indexada, unidades, texto: str, de: int, ate: int, grupo) -> Caso:
+    depois = _trocado(texto, de, ate, grupo)
+    gids = tuple(dict.fromkeys(u.gid for u in unidades[de:ate] if u.glifo))
+    primeiro = next((k for k in range(grupo[0][0], grupo[0][1]) if not texto[k].isspace()),
+                    grupo[0][0])
+    return Caso(indexada.indice, de, ate, texto[de:ate], depois,
+                bs.NOTACAO if indexada.etiqueta(primeiro) == bs.NOTACAO else bs.PROSA,
+                texto.count("\n", 0, de) + 1, gids, len(grupo))
 
 
-def _trocado(texto: str, de: int, ate: int, grupo) -> str:
-    partes, posicao = [], de
-    for a, b, novo in grupo:
-        partes += [texto[posicao:a], novo]
-        posicao = b
-    partes.append(texto[posicao:ate])
-    return "".join(partes)
-
-
-def aplicar_na_pagina(pagina: Pagina, casos: Sequence[Caso]) -> ss.Plano:
-    """Os casos aceitos na página, numa sessão só (ver o docstring do módulo). Levanta
-    `sessao.Recusa` sem mudar nada se o conjunto não tem tradução."""
-    texto, unidades = ss.texto_e_unidades(pagina)
+def _texto_com_os_casos(texto: str, unidades, casos: Sequence[Caso]
+                        ) -> Tuple[str, List[Tuple[int, int]]]:
+    """O texto da página com os casos trocados, e as posições que não mudam (de antes ->
+    de depois); `sessao.Recusa` se um caso não é mais o da página."""
     partes: List[str] = []
     fixos: List[Tuple[int, int]] = []
     posicao = j = 0
@@ -224,7 +224,32 @@ def aplicar_na_pagina(pagina: Pagina, casos: Sequence[Caso]) -> ss.Plano:
     for i in range(posicao, len(texto)):
         fixos.append((i, j + i - posicao))
     partes.append(texto[posicao:])
-    plano = ss.planejar(unidades, "".join(partes), fixos)
+    return "".join(partes), fixos
+
+
+def _trocado(texto: str, de: int, ate: int, grupo) -> str:
+    partes, posicao = [], de
+    for a, b, novo in grupo:
+        partes += [texto[posicao:a], novo]
+        posicao = b
+    partes.append(texto[posicao:ate])
+    return "".join(partes)
+
+
+def aplicar_na_pagina(pagina: Pagina, casos: Sequence[Caso]) -> ss.Plano:
+    """Os casos aceitos na página, numa sessão só (ver o docstring do módulo). Levanta
+    `sessao.Recusa` sem mudar nada se o conjunto não tem tradução."""
+    texto, unidades = ss.texto_e_unidades(pagina)
+    novo, fixos = _texto_com_os_casos(texto, unidades, casos)
+    plano = ss.planejar(unidades, novo, fixos)
     plano.revisar = set()                       # substituir não revisa nem ensina (§7.2)
+    # A cópia da página (`instantaneo`) guarda os boxes numa tupla, e juntar ou dividir
+    # monta a lista nova somando pedaços dela (antes, TypeError em todo caso estrutural).
+    pagina.boxes = list(pagina.boxes)
+    antes = {b.gid for b in pagina.boxes}
     ss.aplicar(pagina, plano)
+    # Os boxes que nascem de juntar ou dividir também ficam por revisar (o substituir não
+    # revisa nada; a edição pelo Documento é que os marca revisados).
+    pagina.boxes = [replace(b, revisado=False) if b.gid not in antes and b.revisado else b
+                    for b in pagina.boxes]
     return plano

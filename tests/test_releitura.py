@@ -14,7 +14,8 @@ from abbychess.leitor import FONTE_MANUAL
 from abbychess.modelo import GlifoVirtual
 
 from tests.janela_util import boxes
-from tests.test_janela import _esperar, app, janela  # noqa: F401
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
+from tests.fixturas_janela import janela  # noqa: E402,F401,F811
 
 
 def test_ca_4_8_o_f5_mantem_correcoes_quebras_virtual_e_funcao_da_area(app, janela):  # noqa: F811
@@ -47,7 +48,7 @@ def test_ca_4_8_o_f5_mantem_correcoes_quebras_virtual_e_funcao_da_area(app, jane
     assert p.modelo.decisoes.virtuais == (virtual,)
     assert [z.funcao for z in p.modelo.zonas] == ["titulo"]
 
-    p.desfazer()                                           # o F5 é uma transação
+    p.desfazedor.desfazer()                                           # o F5 é uma transação
     assert [b.entry.as_state() for b in p.modelo.boxes] == [b.entry.as_state() for b in antes.boxes]
     assert p.modelo.decisoes == antes.decisoes
     assert len(boxes(janela)) == len(antes.boxes)

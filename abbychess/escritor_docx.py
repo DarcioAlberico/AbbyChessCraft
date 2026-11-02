@@ -9,9 +9,9 @@ Lê as mesmas `core.pagina.PaginaExtraida` que o EPUB e escreve pelo python-docx
   procedência, ou que o diagrama não foi lido) no `descr` da figura; imagens iguais são uma
   parte só (o python-docx já guarda pela soma).
 - **Páginas impressas**: cada página começa com um marcador (`pg23`), e as referências do
-  texto ("página 23", `epub.referencias`) viram hiperlink interno para ele, quando a página
+  texto ("página 23", `links_internos.referencias`) viram hiperlink interno para ele, quando a página
   está no arquivo. Os diagramas numerados pela legenda e os capítulos numerados pelo título
-  (`epub.numerados`) têm marcador (`dg6`, `cap3`), e "ver o Diagrama 6" e "no capítulo 3"
+  (`links_internos.numerados`) têm marcador (`dg6`, `cap3`), e "ver o Diagrama 6" e "no capítulo 3"
   viram hiperlink para eles.
 - **Links de análise**, se pedidos: embaixo de cada diagrama lido, o hiperlink externo que
   abre a posição no Lichess ou no Chess.com (`links_de_analise`).
@@ -30,8 +30,6 @@ from __future__ import annotations
 
 import datetime
 import io
-import os
-import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,7 +39,10 @@ from xml.etree import ElementTree
 from core.pagina import Figura, PaginaExtraida, Paragrafo
 
 from abbychess import epub
+from abbychess import links_internos
+from abbychess import gravacao as gv
 from abbychess import links_de_analise
+from abbychess import marcacao
 
 #: A largura do diagrama sem medida de casa e a máxima de qualquer figura, em centímetros.
 LARGURA_DO_DIAGRAMA_CM = 6.5
@@ -131,7 +132,6 @@ def _texto_com_estilo(paragrafo, bloco: Paragrafo, simbolos: str, familia: str,
                       realce: bool = False) -> None:
     """Os trechos do parágrafo como runs: negrito, itálico, fonte dos símbolos e o
     hiperlink interno por fora (o mesmo corte de `epub.xhtml_do_texto`)."""
-    from docx.enum.text import WD_COLOR_INDEX
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
     from docx.shared import RGBColor
@@ -142,32 +142,12 @@ def _texto_com_estilo(paragrafo, bloco: Paragrafo, simbolos: str, familia: str,
     texto = epub.aspas_curvas(epub.sem_proibidos(bloco.texto).replace("\r", " "))
     if not quebras:
         texto = texto.replace("\n", " ")
-    marcas = [[False, False, c in simbolos, -1, False] for c in texto]
     duvidosos = getattr(bloco, "duvidosos", ()) if realce else ()
-    for k, trechos in ((0, bloco.negrito), (1, bloco.italico), (4, duvidosos)):
-        for inicio, fim in trechos or ():
-            for i in range(max(0, inicio), min(fim, len(texto))):
-                marcas[i][k] = True
-    for n, (inicio, fim, _alvo) in enumerate(links):
-        for i in range(max(0, inicio), min(fim, len(texto))):
-            marcas[i][3] = n
     hiperlink, do_hiperlink = None, -1
-    i = 0
-    while i < len(texto):
-        j = i
-        while j < len(texto) and marcas[j] == marcas[i]:
-            j += 1
-        negrito, italico, simbolo, link, duvidoso = marcas[i]
-        run = paragrafo.add_run(texto[i:j])
-        run.bold = negrito or None
-        run.italic = italico or None
-        if duvidoso:
-            run.font.highlight_color = WD_COLOR_INDEX.YELLOW
-        if simbolo and familia:
-            run.font.name = familia
-            fontes = run._r.get_or_add_rPr().get_or_add_rFonts()
-            fontes.set(qn("w:cs"), familia)
-            fontes.set(qn("w:eastAsia"), familia)
+    for pedaco, (negrito, italico, simbolo, link, duvidoso) in marcacao.trechos_marcados(
+            texto, simbolos, bloco.negrito, bloco.italico, duvidosos, links):
+        run = paragrafo.add_run(pedaco)
+        _estilo_do_run(run, negrito, italico, duvidoso, simbolo, familia)
         if link >= 0:
             if hiperlink is None or do_hiperlink != link:
                 hiperlink = OxmlElement("w:hyperlink")
@@ -180,7 +160,26 @@ def _texto_com_estilo(paragrafo, bloco: Paragrafo, simbolos: str, familia: str,
             hiperlink.append(run._r)
         else:
             hiperlink, do_hiperlink = None, -1
-        i = j
+
+
+def _estilo_do_run(run, negrito: bool, italico: bool, duvidoso: bool, simbolo: bool,
+                   familia: str) -> None:
+    """O negrito, o itálico, o realce do duvidoso e, no símbolo, a fonte dos símbolos
+    (nos atributos que o Word lê para cada escrita). Os imports só no caso que os usa: isto roda
+    por trecho."""
+    run.bold = negrito or None
+    run.italic = italico or None
+    if duvidoso:
+        from docx.enum.text import WD_COLOR_INDEX
+
+        run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+    if simbolo and familia:
+        from docx.oxml.ns import qn
+
+        run.font.name = familia
+        fontes = run._r.get_or_add_rPr().get_or_add_rFonts()
+        fontes.set(qn("w:cs"), familia)
+        fontes.set(qn("w:eastAsia"), familia)
 
 
 def _figura(doc, figura: Figura, alt: str, numero: int) -> None:
@@ -209,12 +208,10 @@ def _figura(doc, figura: Figura, alt: str, numero: int) -> None:
 def _ressalva(doc, figura: Figura, idioma: str) -> bool:
     """A legenda visível do diagrama cuja posição ninguém conferiu (PD-21): de quem é a vez
     e "não revisado". Fica no `descr` também, mas quem vê a página precisa ver isto."""
-    if not getattr(figura, "revisao_pendente", False):
+    ressalva = marcacao.ressalva_do_diagrama(figura, idioma)
+    if not ressalva:
         return False
-    msg = epub.mensagens(idioma)
-    partes = [epub.marca_do_lado(figura, idioma)] if figura.fen else []
-    partes.append(msg["nao_revisado"])
-    paragrafo = doc.add_paragraph(epub.limpo("; ".join(partes)))
+    paragrafo = doc.add_paragraph(epub.limpo(ressalva))
     _como_legenda(doc, paragrafo)
     return True
 
@@ -269,10 +266,11 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
     links_de_analise.validar(analise)
     from docx import Document
 
-    from core.exportar import data_no_zip, fonte_dos_simbolos, instante
+    from core.exportar import data_no_zip, instante
 
-    if not any(isinstance(b, Figura) or (isinstance(b, Paragrafo) and b.texto.strip())
-               for p in paginas for b in p.blocos):
+    # Só as páginas que têm o que escrever ganham marcador; só elas são alvo de link.
+    com_conteudo = _com_conteudo(paginas)
+    if not com_conteudo:
         raise ValueError("Nada para escrever no DOCX: as páginas não têm texto nem diagrama.")
     idioma = metadados.idioma or "pt-BR"
     msg = epub.mensagens(idioma)
@@ -282,76 +280,136 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
     _desenho_da_pagina(doc)
     _idioma_no_estilo(doc, idioma)
 
-    recurso = fonte_dos_simbolos("".join(b.texto for p in paginas for b in p.blocos
-                                         if isinstance(b, Paragrafo)))
+    recurso = _fonte_dos_simbolos(paginas)
     familia, simbolos = (recurso[0], recurso[2]) if recurso else ("", "")
+    # Os diagramas e os capítulos numerados ganham marcador (`dg6`, `cap3`) e são alvo de
+    # "ver o Diagrama 6" e "no capítulo 3", como no EPUB.
+    escrita = _EscritaDoDocx(doc, escrito, idioma, msg, simbolos, familia,
+                             _alvos_das_paginas(com_conteudo, numeros),
+                             links_internos.numerados(com_conteudo), quebras, realce, analise)
+    for numero_da_pagina, pagina in enumerate(com_conteudo):
+        escrita.pagina(numero_da_pagina, pagina)
 
-    # Só as páginas que têm o que escrever ganham marcador; só elas são alvo de link.
-    com_conteudo = [p for p in paginas if any(
+    momento = instante()
+    _propriedades(doc, metadados, idioma, momento)
+    bruto = io.BytesIO()
+    doc.save(bruto)
+    partes = _partes_finais(bruto.getvalue(), recurso)
+    _gravar_reprodutivel(Path(caminho), partes, data_no_zip(momento))
+    return escrito
+
+
+def _com_conteudo(paginas: Sequence[PaginaExtraida]) -> List[PaginaExtraida]:
+    """As páginas com uma figura ou um parágrafo com texto."""
+    return [p for p in paginas if any(
         isinstance(b, Figura) or (isinstance(b, Paragrafo) and b.texto.strip())
         for b in p.blocos)]
+
+
+def _fonte_dos_simbolos(paginas: Sequence[PaginaExtraida]):
+    """(família, arquivo, símbolos) da fonte que cobre os símbolos do texto, ou nada."""
+    from core.exportar import fonte_dos_simbolos
+
+    return fonte_dos_simbolos("".join(b.texto for p in paginas for b in p.blocos
+                                      if isinstance(b, Paragrafo)))
+
+
+def _alvos_das_paginas(com_conteudo: Sequence[PaginaExtraida],
+                       numeros: Optional[Dict[int, int]]) -> Dict[int, str]:
+    """O marcador de cada página pelo número impresso dela, quando se sabe."""
     alvos = {}
     for pagina in com_conteudo:
         if numeros and pagina.numero in numeros:
             alvos[numeros[pagina.numero]] = f"pg{pagina.numero + 1}"
-    # Os diagramas e os capítulos numerados ganham marcador (`dg6`, `cap3`) e são alvo de
-    # "ver o Diagrama 6" e "no capítulo 3", como no EPUB.
-    contados = epub.numerados(com_conteudo)
-    por_diagrama = {n: f"dg{n}" for n in contados.figuras.values()}
-    por_capitulo = {n: f"cap{n}" for n in contados.capitulos.values()}
+    return alvos
 
-    ident = 0
-    for numero_da_pagina, pagina in enumerate(com_conteudo):
-        primeiro = True
+
+@dataclass
+class _EscritaDoDocx:
+    """O que `escrever` sabe enquanto passa pelos blocos: o documento, o que entra no texto e
+    o último id de marcador; `pendente` é o marcador da página que ainda não caiu num
+    parágrafo, e `quebrar`, se ela começa numa página nova."""
+
+    doc: object
+    escrito: EscritoDocx
+    idioma: str
+    msg: Dict[str, str]
+    simbolos: str
+    familia: str
+    alvos: Dict[int, str]
+    contados: links_internos.Numerados
+    quebras: bool
+    realce: bool
+    analise: str
+    ident: int = 0
+    pendente: str = ""
+    quebrar: bool = False
+
+    def __post_init__(self) -> None:
+        self.por_diagrama = {n: f"dg{n}" for n in self.contados.figuras.values()}
+        self.por_capitulo = {n: f"cap{n}" for n in self.contados.capitulos.values()}
+
+    def marcar(self, paragrafo, nome: str) -> None:
+        self.ident += 1
+        _marcador(paragrafo, nome, self.ident)
+
+    def pagina(self, numero_da_pagina: int, pagina: PaginaExtraida) -> None:
+        self.pendente = f"pg{pagina.numero + 1}"
+        self.quebrar = bool(numero_da_pagina)
         for bloco in pagina.blocos:
             if isinstance(bloco, Figura):
-                escrito.figuras += 1
-                _figura(doc, bloco, epub.alternativo(bloco, msg, idioma), escrito.figuras)
-                paragrafo = doc.paragraphs[-1]
-                if primeiro and numero_da_pagina:
-                    paragrafo.paragraph_format.page_break_before = True
-                if primeiro:
-                    ident += 1
-                    _marcador(paragrafo, f"pg{pagina.numero + 1}", ident)
-                    primeiro = False
-                if id(bloco) in contados.figuras:
-                    ident += 1
-                    _marcador(paragrafo, f"dg{contados.figuras[id(bloco)]}", ident)
-                _ressalva(doc, bloco, idioma)
-                if _link_de_analise(doc, bloco, analise, idioma):
-                    escrito.analises += 1
-                continue
+                self.figura(bloco)
             elif isinstance(bloco, Paragrafo) and bloco.texto.strip():
-                if bloco.titulo:
-                    estilo = "Heading 1" if bloco.nivel == 1 else "Heading 2"
-                    escrito.titulos += 1
-                    links: list = []
-                else:
-                    estilo = None
-                    links = epub.referencias_internas(
-                        bloco.texto, idioma, alvos,
-                        {} if id(bloco) in contados.legendas else por_diagrama, por_capitulo)
-                    escrito.links += len(links)
-                paragrafo = doc.add_paragraph(style=estilo)
-                _texto_com_estilo(paragrafo, bloco, simbolos, familia, links, quebras, realce)
-                if realce and getattr(bloco, "duvidosos", None):
-                    escrito.realcados += 1
-                escrito.paragrafos += 1
-                if id(bloco) in contados.capitulos:
-                    ident += 1
-                    _marcador(paragrafo, f"cap{contados.capitulos[id(bloco)]}", ident)
-            else:
-                continue
-            if primeiro:
-                # A página impressa começa numa página nova, como no livro (o DOCX é o
-                # formato de editar o livro, e o número dela fica no marcador).
-                if numero_da_pagina:
-                    paragrafo.paragraph_format.page_break_before = True
-                ident += 1
-                _marcador(paragrafo, f"pg{pagina.numero + 1}", ident)
-                primeiro = False
+                self.paragrafo(bloco)
 
-    momento = instante()
+    def comecar_a_pagina(self, paragrafo) -> None:
+        """O primeiro parágrafo da página leva o marcador dela. A página impressa começa numa
+        página nova, como no livro (o DOCX é o formato de editar o livro, e o número dela
+        fica no marcador)."""
+        if not self.pendente:
+            return
+        if self.quebrar:
+            paragrafo.paragraph_format.page_break_before = True
+        self.marcar(paragrafo, self.pendente)
+        self.pendente = ""
+
+    def figura(self, bloco: Figura) -> None:
+        self.escrito.figuras += 1
+        _figura(self.doc, bloco, epub.alternativo(bloco, self.msg, self.idioma),
+                self.escrito.figuras)
+        paragrafo = self.doc.paragraphs[-1]
+        self.comecar_a_pagina(paragrafo)
+        if id(bloco) in self.contados.figuras:
+            self.marcar(paragrafo, f"dg{self.contados.figuras[id(bloco)]}")
+        _ressalva(self.doc, bloco, self.idioma)
+        if _link_de_analise(self.doc, bloco, self.analise, self.idioma):
+            self.escrito.analises += 1
+
+    def paragrafo(self, bloco: Paragrafo) -> None:
+        if bloco.titulo:
+            estilo = "Heading 1" if bloco.nivel == 1 else "Heading 2"
+            self.escrito.titulos += 1
+            links: list = []
+        else:
+            estilo = None
+            links = links_internos.referencias_internas(
+                bloco.texto, self.idioma, self.alvos,
+                {} if id(bloco) in self.contados.legendas else self.por_diagrama,
+                self.por_capitulo)
+            self.escrito.links += len(links)
+        paragrafo = self.doc.add_paragraph(style=estilo)
+        _texto_com_estilo(paragrafo, bloco, self.simbolos, self.familia, links, self.quebras,
+                          self.realce)
+        if self.realce and getattr(bloco, "duvidosos", None):
+            self.escrito.realcados += 1
+        self.escrito.paragrafos += 1
+        if id(bloco) in self.contados.capitulos:
+            self.marcar(paragrafo, f"cap{self.contados.capitulos[id(bloco)]}")
+        self.comecar_a_pagina(paragrafo)
+
+
+def _propriedades(doc, metadados: epub.Metadados, idioma: str, momento) -> None:
+    """As propriedades do documento, com a data do `instante` (os mesmos bytes, CA-12.6)."""
     data = datetime.datetime.fromtimestamp(momento, datetime.timezone.utc).replace(tzinfo=None)
     propriedades = doc.core_properties
     propriedades.title = epub.limpo(metadados.titulo)
@@ -365,12 +423,6 @@ def escrever(paginas: Sequence[PaginaExtraida], caminho: str | Path, metadados: 
     propriedades.revision = 1
     propriedades.created = data
     propriedades.modified = data
-
-    bruto = io.BytesIO()
-    doc.save(bruto)
-    partes = _partes_finais(bruto.getvalue(), recurso)
-    _gravar_reprodutivel(Path(caminho), partes, data_no_zip(momento))
-    return escrito
 
 
 def _partes_finais(dados: bytes, recurso) -> Dict[str, bytes]:
@@ -435,10 +487,7 @@ def _gravar_reprodutivel(caminho: Path, partes: Dict[str, bytes], data_hora) -> 
     """As partes num zip com a mesma data e os mesmos atributos em toda entrada (o
     python-docx carimba a hora de agora), ao lado; conferido antes de trocar com o
     anterior: um DOCX que não passa em `conferir` não é publicado."""
-    caminho.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporario = tempfile.mkstemp(prefix=".docx-", suffix=".tmp", dir=caminho.parent)
-    os.close(fd)
-    try:
+    def escrever(temporario: Path) -> None:
         with zipfile.ZipFile(temporario, "w", zipfile.ZIP_DEFLATED) as destino:
             for nome, dados in partes.items():
                 info = zipfile.ZipInfo(nome, date_time=data_hora)
@@ -446,14 +495,13 @@ def _gravar_reprodutivel(caminho: Path, partes: Dict[str, bytes], data_hora) -> 
                 info.create_system = 0
                 info.external_attr = 0o644 << 16
                 destino.writestr(info, dados)
+
+    def recusar_o_estragado(temporario: Path) -> None:
         problemas = conferir(temporario)
         if problemas:
             raise ValueError("O DOCX não passou na conferência: " + "; ".join(problemas))
-        os.chmod(temporario, 0o644)
-        os.replace(temporario, caminho)
-    except BaseException:
-        Path(temporario).unlink(missing_ok=True)
-        raise
+
+    gv.gravar_por(caminho, escrever, recusar_o_estragado)
 
 
 # ----------------------------------------------------------------------
@@ -463,66 +511,14 @@ def _gravar_reprodutivel(caminho: Path, partes: Dict[str, bytes], data_hora) -> 
 def conferir(caminho: str | Path) -> List[str]:
     """Os problemas do DOCX que o Word recusaria ou mostraria quebrado; lista vazia é
     arquivo são."""
-    problemas: List[str] = []
     try:
         z = zipfile.ZipFile(caminho)
     except (zipfile.BadZipFile, OSError) as erro:
         return [f"o DOCX não abre como zip ({erro})"]
     with z:
-        nomes = set(z.namelist())
-        for obrigatorio in ("[Content_Types].xml", "word/document.xml",
-                            "word/_rels/document.xml.rels"):
-            if obrigatorio not in nomes:
-                problemas.append(f"falta {obrigatorio}")
-        if problemas:
-            return problemas
-        try:
-            documento = ElementTree.fromstring(z.read("word/document.xml"))
-            relacoes = ElementTree.fromstring(z.read("word/_rels/document.xml.rels"))
-        except ElementTree.ParseError as erro:
-            return [f"XML ilegível ({erro})"]
-        alvos = {r.get("Id"): r.get("Target") for r in relacoes}
-        externos = {r.get("Id"): r.get("Target") for r in relacoes
-                    if r.get("TargetMode") == "External"}
-        for blip in documento.iter(f"{{{_A}}}blip"):
-            ident = blip.get(f"{{{_R}}}embed")
-            alvo = alvos.get(ident)
-            if alvo is None or f"word/{alvo}" not in nomes:
-                problemas.append(f"a imagem {ident} não está no pacote")
-        marcadores, ids = set(), set()
-        for marca in documento.iter(f"{{{_W}}}bookmarkStart"):
-            nome, ident = marca.get(f"{{{_W}}}name"), marca.get(f"{{{_W}}}id")
-            if nome in marcadores:
-                problemas.append(f"o marcador {nome} se repete")
-            if ident in ids:
-                problemas.append(f"o id de marcador {ident} se repete")
-            marcadores.add(nome)
-            ids.add(ident)
-        fechados = {m.get(f"{{{_W}}}id") for m in documento.iter(f"{{{_W}}}bookmarkEnd")}
-        for ident in ids - fechados:
-            problemas.append(f"o marcador de id {ident} não fecha")
-        for link in documento.iter(f"{{{_W}}}hyperlink"):
-            ancora = link.get(f"{{{_W}}}anchor")
-            if ancora is None and link.get(f"{{{_R}}}id") is None:
-                problemas.append("hiperlink sem destino")
-            elif ancora is not None and ancora not in marcadores:
-                problemas.append(f"o hiperlink para {ancora} não tem marcador")
-            elif ancora is None and not externos.get(link.get(f"{{{_R}}}id")):
-                problemas.append(f"o hiperlink {link.get(f'{{{_R}}}id')} não tem endereço externo")
-        figuras = [d.get("id") for d in documento.iter(
-            "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr")]
-        if len(figuras) != len(set(figuras)):
-            problemas.append("ids de figura repetidos")
-        if "word/fontTable.xml" in nomes:
-            tabela = z.read("word/fontTable.xml")
-            if b"embedRegular" in tabela:
-                rels = "word/_rels/fontTable.xml.rels"
-                if rels not in nomes:
-                    problemas.append("a fonte embutida não tem relacionamento")
-                else:
-                    for rel in ElementTree.fromstring(z.read(rels)):
-                        if f"word/{rel.get('Target')}" not in nomes:
-                            problemas.append(f"a fonte {rel.get('Target')} não está no pacote")
+        problemas, seguir = _problemas_do_pacote(z)
+    if not seguir:
+        return problemas
     try:
         from docx import Document
 
@@ -530,3 +526,98 @@ def conferir(caminho: str | Path) -> List[str]:
     except Exception as erro:  # noqa: BLE001 — o que o python-docx não abre, o Word também não
         problemas.append(f"o python-docx não abre o arquivo ({erro})")
     return problemas
+
+
+def _problemas_do_pacote(z: zipfile.ZipFile) -> Tuple[List[str], bool]:
+    """(os problemas, se vale abrir pelo python-docx): sem as partes obrigatórias ou com o
+    XML ilegível, o resto nem se confere."""
+    nomes = set(z.namelist())
+    faltam = [f"falta {obrigatorio}" for obrigatorio in (
+        "[Content_Types].xml", "word/document.xml", "word/_rels/document.xml.rels")
+        if obrigatorio not in nomes]
+    if faltam:
+        return faltam, False
+    try:
+        documento = ElementTree.fromstring(z.read("word/document.xml"))
+        relacoes = ElementTree.fromstring(z.read("word/_rels/document.xml.rels"))
+    except ElementTree.ParseError as erro:
+        return [f"XML ilegível ({erro})"], False
+    problemas = _problemas_das_imagens(documento, relacoes, nomes)
+    marcadores = _marcadores(documento, problemas)
+    problemas += _problemas_dos_hiperlinks(documento, relacoes, marcadores)
+    problemas += _figuras_repetidas(documento)
+    problemas += _problemas_da_fonte(z, nomes)
+    return problemas, True
+
+
+def _problemas_das_imagens(documento: ElementTree.Element, relacoes: ElementTree.Element,
+                           nomes: set) -> List[str]:
+    """Cada imagem citada aponta uma parte do pacote."""
+    alvos = {r.get("Id"): r.get("Target") for r in relacoes}
+    problemas = []
+    for blip in documento.iter(f"{{{_A}}}blip"):
+        ident = blip.get(f"{{{_R}}}embed")
+        alvo = alvos.get(ident)
+        if alvo is None or f"word/{alvo}" not in nomes:
+            problemas.append(f"a imagem {ident} não está no pacote")
+    return problemas
+
+
+def _marcadores(documento: ElementTree.Element, problemas: List[str]) -> set:
+    """Os nomes dos marcadores; acusa o nome e o id repetidos e o marcador que não fecha."""
+    marcadores, ids = set(), set()
+    for marca in documento.iter(f"{{{_W}}}bookmarkStart"):
+        nome, ident = marca.get(f"{{{_W}}}name"), marca.get(f"{{{_W}}}id")
+        if nome in marcadores:
+            problemas.append(f"o marcador {nome} se repete")
+        if ident in ids:
+            problemas.append(f"o id de marcador {ident} se repete")
+        marcadores.add(nome)
+        ids.add(ident)
+    fechados = {m.get(f"{{{_W}}}id") for m in documento.iter(f"{{{_W}}}bookmarkEnd")}
+    for ident in ids - fechados:
+        problemas.append(f"o marcador de id {ident} não fecha")
+    return marcadores
+
+
+def _problemas_dos_hiperlinks(documento: ElementTree.Element, relacoes: ElementTree.Element,
+                              marcadores: set) -> List[str]:
+    """O hiperlink interno vai a um marcador; o externo, a um endereço."""
+    externos = {r.get("Id"): r.get("Target") for r in relacoes
+                if r.get("TargetMode") == "External"}
+    problemas = []
+    for link in documento.iter(f"{{{_W}}}hyperlink"):
+        problema = _problema_do_hiperlink(link, marcadores, externos)
+        if problema:
+            problemas.append(problema)
+    return problemas
+
+
+def _problema_do_hiperlink(link: ElementTree.Element, marcadores: set,
+                           externos: Dict[str, str]) -> str:
+    ancora = link.get(f"{{{_W}}}anchor")
+    if ancora is None and link.get(f"{{{_R}}}id") is None:
+        return "hiperlink sem destino"
+    if ancora is not None and ancora not in marcadores:
+        return f"o hiperlink para {ancora} não tem marcador"
+    if ancora is None and not externos.get(link.get(f"{{{_R}}}id")):
+        return f"o hiperlink {link.get(f'{{{_R}}}id')} não tem endereço externo"
+    return ""
+
+
+def _figuras_repetidas(documento: ElementTree.Element) -> List[str]:
+    figuras = [d.get("id") for d in documento.iter(
+        "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr")]
+    return ["ids de figura repetidos"] if len(figuras) != len(set(figuras)) else []
+
+
+def _problemas_da_fonte(z: zipfile.ZipFile, nomes: set) -> List[str]:
+    """A fonte embutida tem relacionamento, e o arquivo dela está no pacote."""
+    if "word/fontTable.xml" not in nomes or b"embedRegular" not in z.read("word/fontTable.xml"):
+        return []
+    rels = "word/_rels/fontTable.xml.rels"
+    if rels not in nomes:
+        return ["a fonte embutida não tem relacionamento"]
+    return [f"a fonte {rel.get('Target')} não está no pacote"
+            for rel in ElementTree.fromstring(z.read(rels))
+            if f"word/{rel.get('Target')}" not in nomes]

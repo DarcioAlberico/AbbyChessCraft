@@ -33,7 +33,7 @@ def test_dividir_e_girar_o_livro_inteiro(tmp_path, medidas):
     from abbychess.controlador import ControladorDePagina
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_controlador import ExecutorManual
+    from tests.ajudantes import ExecutorManual  # noqa: E402,F401,F811
 
     projeto = _livro_de_230(tmp_path, pdf_do_tamanho_da_fatia=True)
     try:
@@ -42,17 +42,17 @@ def test_dividir_e_girar_o_livro_inteiro(tmp_path, medidas):
                   LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares))
         ctl.ir_para(0)
         todas, total = list(range(PAGINAS)), len(projeto.sequencia)   # o PDF tem uma a mais
-        dividir = _segundos(lambda: ctl.dividir_paginas(todas))
+        dividir = _segundos(lambda: ctl.operacoes.dividir_paginas(todas))
         assert len(projeto.sequencia) == total + PAGINAS
-        desfazer_dividir = _segundos(ctl.desfazer)
+        desfazer_dividir = _segundos(ctl.desfazedor.desfazer)
         assert len(projeto.sequencia) == total
-        girar = _segundos(lambda: ctl.girar_paginas(todas, 90))
-        desfazer_girar = _segundos(ctl.desfazer)
+        girar = _segundos(lambda: ctl.operacoes.girar_paginas(todas, 90))
+        desfazer_girar = _segundos(ctl.desfazedor.desfazer)
         assert projeto.sequencia.entrada_em(0).giro == 0
-        assert projeto.descarregar(120)
+        assert projeto.paginas_em_memoria.descarregar(120)
 
         def um_giro(i):
-            ctl.girar_paginas([3], 90 if i % 2 == 0 else 270)
+            ctl.operacoes.girar_paginas([3], 90 if i % 2 == 0 else 270)
 
         uma = cronometrar(um_giro)
     finally:
@@ -64,7 +64,7 @@ def test_dividir_e_girar_o_livro_inteiro(tmp_path, medidas):
         ctl.ligar(novo, pg.fonte_do_projeto(novo),
                   LeitorDoLivro(novo.pasta_de_padroes, limiares=novo.dados.limiares))
         ctl.ir_para(0)
-        sem_leitura = _segundos(lambda: ctl.dividir_paginas(list(range(len(novo.sequencia)))))
+        sem_leitura = _segundos(lambda: ctl.operacoes.dividir_paginas(list(range(len(novo.sequencia)))))
     finally:
         novo.fechar()
     medidas["paginas_no_livro"] = {

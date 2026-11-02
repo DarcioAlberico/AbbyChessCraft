@@ -14,12 +14,13 @@ import fitz
 import pytest
 
 from abbychess import exportar as ex
+from abbychess import montagem as mo
 from abbychess import livro
 from abbychess import pagina as pg
 from abbychess.leitor import LeitorDoLivro
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.test_diagramas import FEN, _lido, pagina_com_diagrama, sem_modelo
+from tests.ajudantes import FEN, _lido, pagina_com_diagrama, sem_modelo  # noqa: E402,F401,F811
 
 
 @pytest.fixture
@@ -62,9 +63,10 @@ def test_lote_refeito_nao_desfaz_a_conferencia(projeto, fonte, leitor):
     outro = "4k3/8/8/8/8/8/8/4K3"
     conferido = _lido(outro, conferido=True, lado="b", lado_origem="usuario")
     _gravar_com(projeto, fonte, conferido)
+    # A página é desenhada aqui (a Arial; sem ela, `pagina_com_diagrama` pula) e o tabuleiro é
+    # achado pela geometria, sem modelo: não achá-lo é regressão da segmentação, não pulo.
     tabuleiros = pg.segmentar_pagina(fonte.pagina(0)).tabuleiros
-    if not tabuleiros:
-        pytest.skip("a segmentação não achou o tabuleiro desta página")
+    assert len(tabuleiros) == 1, "a segmentação não achou o tabuleiro desta página"
     conferido.caixa = tabuleiros[0]
     _gravar_com(projeto, fonte, conferido)
 
@@ -81,7 +83,7 @@ def test_lote_refeito_nao_desfaz_a_conferencia(projeto, fonte, leitor):
 def test_diagrama_conferido_sai_desenhado_do_fen(fonte):
     imagem = fonte.pagina(0)
     diagrama = _lido(conferido=True, lado="b", lado_origem="usuario")
-    pagina = ex.pagina_extraida(0, [], [diagrama.caixa], imagem, [diagrama])
+    pagina = mo.pagina_extraida(0, [], [diagrama.caixa], imagem, [diagrama])
     [figura] = [b for b in pagina.blocos if isinstance(b, ex.Figura)]
     assert figura.origem == "render"
     assert figura.fen == diagrama.fen and figura.fen.split()[1] == "b"
@@ -94,7 +96,7 @@ def test_diagrama_sem_confianca_sai_como_recorte_com_o_motivo(fonte):
     duvidoso = _lido(motivo="duas damas brancas a mais")
     por_ler = _lido(caixa=(10, 10, 60, 60))
     por_ler.casas = []
-    pagina = ex.pagina_extraida(0, [], [duvidoso.caixa, por_ler.caixa], imagem,
+    pagina = mo.pagina_extraida(0, [], [duvidoso.caixa, por_ler.caixa], imagem,
                                 [duvidoso, por_ler])
     figuras = [b for b in pagina.blocos if isinstance(b, ex.Figura)]
     assert [f.origem for f in figuras] == ["recorte", "recorte"]

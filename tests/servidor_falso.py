@@ -58,8 +58,9 @@ class ServidorFalso:
                     raise sl.Cancelado
                 if self.desistiu:
                     raise RuntimeError("o servidor de leitura caiu duas vezes")
-                imagem, zonas, marcados = argumentos
-                resultado = sl.ler_pagina(imagem, zonas, marcados, self.leitor)
+                imagem, zonas, marcados, *regua = argumentos
+                resultado = sl.ler_pagina(imagem, zonas, marcados, self.leitor,
+                                          regua_do_livro=regua[0] if regua else None)
             elif pedido.operacao == "reler_boxes":
                 imagem, boxes, so_pendentes = argumentos
                 resultado = sl.reler_boxes(imagem, boxes, self.leitor, so_pendentes=so_pendentes)
@@ -117,7 +118,7 @@ def ligar(controlador, servidor: ServidorFalso) -> list:
     """Põe o servidor falso no controlador (como `ligar(..., servidor)`) e devolve a lista
     do que volta à interface; `entregar(lista)` a esvazia."""
     controlador.servidor = servidor
-    controlador._enviados = controlador.padroes()
+    controlador.leitura._enviados = controlador.padroes()
     fila: list = []
     controlador.executar.na_interface = fila.append
     return fila

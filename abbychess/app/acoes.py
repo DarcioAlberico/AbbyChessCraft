@@ -43,7 +43,7 @@ def montar(janela) -> None:
     barra.addSeparator()
 
     # --- Página e livro ------------------------------------------------------------
-    j.acao_anterior = acao(j, "pagina_anterior", lambda: p.vizinha(-1),
+    j.acao_anterior = acao(j, "pagina_anterior", lambda: p.navegador.vizinha(-1),
                            texto="Página anterior", barra=barra)
     j.seletor = QSpinBox()
     j.seletor.setMinimum(1)
@@ -53,15 +53,15 @@ def montar(janela) -> None:
     barra.addWidget(j.seletor)
     j.total_de_paginas = QLabel(" de 0 ")
     barra.addWidget(j.total_de_paginas)
-    j.acao_seguinte = acao(j, "pagina_seguinte", lambda: p.vizinha(+1),
+    j.acao_seguinte = acao(j, "pagina_seguinte", lambda: p.navegador.vizinha(+1),
                            texto="Página seguinte", barra=barra)
-    j.acao_primeira = acao(j, "primeira_pagina", p.primeira, texto="Primeira página")
-    j.acao_ultima = acao(j, "ultima_pagina", p.ultima, texto="Última página")
+    j.acao_primeira = acao(j, "primeira_pagina", p.navegador.primeira, texto="Primeira página")
+    j.acao_ultima = acao(j, "ultima_pagina", p.navegador.ultima, texto="Última página")
     j.acao_ir_para = acao(j, "ir_para_pagina", j.ir_para_a_pagina_pedida,
                           texto="Ir para a página…")
-    j.acao_voltar_visita = acao(j, "voltar_visita", p.voltar_visita,
+    j.acao_voltar_visita = acao(j, "voltar_visita", p.navegador.voltar_visita,
                                 texto="Página visitada antes")
-    j.acao_avancar_visita = acao(j, "avancar_visita", p.avancar_visita,
+    j.acao_avancar_visita = acao(j, "avancar_visita", p.navegador.avancar_visita,
                                  texto="Página visitada depois")
     j.acao_rolar_acima = acao(j, "rolar_tela_acima", lambda: j.visor.rolar_tela(-1),
                               widgets=[j.visor])
@@ -70,7 +70,7 @@ def montar(janela) -> None:
     barra.addSeparator()
     j.acao_reconhecer = acao(j, "reconhecer_pagina", j.reconhecer,
                              texto="Reconhecer página", barra=barra)
-    j.acao_reler = acao(j, "reler_pendentes", lambda: p.reler_pendentes(),
+    j.acao_reler = acao(j, "reler_pendentes", lambda: p.leitura.reler_pendentes(),
                         texto="Reler pendentes", barra=barra)
     j.acao_lote = acao(j, "reconhecer_livro", j.reconhecer_livro, texto="Reconhecer o livro…")
     j.acao_proximo_do_livro = acao(j, "proxima_pagina_pendente", livro.proximo_pendente,
@@ -200,8 +200,9 @@ def montar(janela) -> None:
     j.acao_areas = acao(j, "modo_areas", j.modo_areas, texto="Editor de áreas",
                         barra=barra, marcavel=True)
     teclado.dica(j.acao_areas, "Editor de áreas ({modo_areas}): arraste para desenhar uma área; "
-                               "arraste dentro dela para mover e na borda para esticar. 1-4 "
-                               "trocam o tipo, Del apaga.")
+                               "arraste dentro dela para mover e na borda para esticar. A "
+                               "letra da função a troca (T, H, C, R, P, N, L, D, I, X; o botão "
+                               "direito mostra a lista), Del apaga.")
     j.acao_areas_auto = acao(j, "areas_automaticas", j.areas.automaticas,
                              texto="Refazer as áreas automáticas")
     j.acao_reconhecer_zona = acao(j, "reconhecer_zona", j.areas.reconhecer_atual,
@@ -232,7 +233,7 @@ def montar(janela) -> None:
                               texto="Só esta ocorrência", widgets=[campo])
     j.acao_ensinar_em_lote = acao(j, "ensinar_em_lote", t.pedir_ensinar_em_lote,
                                   texto="Ensinar e corrigir em lote", widgets=[campo])
-    t.ensinar_em_lote.connect(p.ensinar_em_lote)
+    t.ensinar_em_lote.connect(p.leitura.ensinar_em_lote)
     j.acao_descartar = acao(j, "descartar_box", t.pedir_descartar, texto="Não é caractere",
                             widgets=[t])
     j.acao_dividir = acao(j, "dividir", t.pedir_dividir, texto="Dividir o box", widgets=[t])
@@ -293,53 +294,51 @@ def _documento(j) -> None:
         d.teclas.ligar(q)
 
 
+def _encher(menu, acoes) -> None:
+    """As ações no menu, na ordem; None é um separador."""
+    for acao in acoes:
+        menu.addSeparator() if acao is None else menu.addAction(acao)
+
+
 def _menus(j) -> None:
-    menu = j.menuBar().addMenu("&Projeto")
-    for acao in (j.acao_novo, j.acao_abrir, None, j.acao_exportar, None, j.acao_lote,
-                 j.acao_cancelar_lote, j.acao_retomar_lote, None, j.acao_sair):
-        menu.addSeparator() if acao is None else menu.addAction(acao)
+    _encher(j.menuBar().addMenu("&Projeto"),
+            (j.acao_novo, j.acao_abrir, None, j.acao_exportar, None, j.acao_lote,
+             j.acao_cancelar_lote, j.acao_retomar_lote, None, j.acao_sair))
     menu = j.menuBar().addMenu("&Editar")
-    menu.addAction(j.acao_desfazer)
-    menu.addAction(j.acao_refazer)
-    menu.addSeparator()                         # localizar (§7.1)
-    for acao in (j.acao_localizar, j.acao_substituir, j.acao_proxima_ocorrencia,
-                 j.acao_ocorrencia_anterior, j.acao_todas_em_resultados, j.acao_buscar_glifo,
-                 j.acao_galeria):
-        menu.addAction(acao)
-    menu.addSeparator()                         # a sessão do Documento (§6.3)
-    for acao in (j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_ensinar_no_documento,
-                 j.acao_novo_paragrafo, j.acao_negrito, j.acao_italico,
-                 j.acao_sublinhado):
-        menu.addAction(acao)
-    menu.addSeparator()
-    menu.addAction(j.acao_paleta)
-    figurinas = menu.addMenu("Figurinas")
-    for acao in j.acoes_das_figurinas:
-        figurinas.addAction(acao)
-    menu = j.menuBar().addMenu("P&ágina")
-    for acao in (j.acao_anterior, j.acao_seguinte, j.acao_primeira, j.acao_ultima,
-                 j.acao_ir_para, j.acao_voltar_visita, j.acao_avancar_visita, None,
-                 j.acao_reconhecer, j.acao_reler, j.acao_verificada, j.acao_antes_do_lote,
-                 None, *j.acoes_de_paginas[:4], None, *j.acoes_de_paginas[4:], None,
-                 j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
-                 j.acao_escopo_da_fila, j.acao_proximo_do_livro, j.acao_diagramas):
-        menu.addSeparator() if acao is None else menu.addAction(acao)
-    menu = j.menuBar().addMenu("E&xibir")
-    for acao in (j.acao_lado_a_lado, j.acao_empilhado, j.acao_so_imagem, j.acao_so_vista,
-                 None, j.acao_paginas, j.doca_inspetor.toggleViewAction(),
-                 j.doca_resultados.toggleViewAction(), j.acao_linha, j.acao_padroes, None,
-                 j.acao_realce, j.acao_margens, None, *j.acoes_de_foco,
-                 None, j.acao_ajustar, j.acao_zoom_largura, j.acao_zoom_100, j.acao_zoom_item,
-                 j.acao_zoom_mais, j.acao_zoom_menos, j.acao_origem, j.acao_seguir):
-        menu.addSeparator() if acao is None else menu.addAction(acao)
+    _encher(menu, (j.acao_desfazer, j.acao_refazer,
+                   None,                        # localizar (§7.1)
+                   j.acao_localizar, j.acao_substituir, j.acao_proxima_ocorrencia,
+                   j.acao_ocorrencia_anterior, j.acao_todas_em_resultados, j.acao_buscar_glifo,
+                   j.acao_galeria,
+                   None,                        # a sessão do Documento (§6.3)
+                   j.acao_confirmar, j.acao_confirmar_sem_avancar, j.acao_ensinar_no_documento,
+                   j.acao_novo_paragrafo, j.acao_negrito, j.acao_italico,
+                   j.acao_sublinhado,
+                   None,
+                   j.acao_paleta))
+    _encher(menu.addMenu("Figurinas"), j.acoes_das_figurinas)
+    _encher(j.menuBar().addMenu("P&ágina"),
+            (j.acao_anterior, j.acao_seguinte, j.acao_primeira, j.acao_ultima,
+             j.acao_ir_para, j.acao_voltar_visita, j.acao_avancar_visita, None,
+             j.acao_reconhecer, j.acao_reler, j.acao_verificada, j.acao_antes_do_lote,
+             None, *j.acoes_de_paginas[:4], None, *j.acoes_de_paginas[4:], None,
+             j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
+             j.acao_escopo_da_fila, j.acao_proximo_do_livro, j.acao_diagramas))
+    _encher(j.menuBar().addMenu("E&xibir"),
+            (j.acao_lado_a_lado, j.acao_empilhado, j.acao_so_imagem, j.acao_so_vista,
+             None, j.acao_paginas, j.doca_inspetor.toggleViewAction(),
+             j.doca_resultados.toggleViewAction(), j.acao_linha, j.acao_padroes, None,
+             j.acao_realce, j.acao_margens, None, *j.acoes_de_foco,
+             None, j.acao_ajustar, j.acao_zoom_largura, j.acao_zoom_100, j.acao_zoom_item,
+             j.acao_zoom_mais, j.acao_zoom_menos, j.acao_origem, j.acao_seguir))
     j.menu_ferramentas = j.menuBar().addMenu("&Ferramentas")
-    for acao in (j.acao_modo_treino, j.acao_areas, j.acao_areas_auto,
-                 j.acao_reconhecer_zona, j.acao_ordenar_areas,
-                 j.acao_salvar_modelo_areas, j.acao_aplicar_modelo_areas,
-                 j.acao_verificar, None,
-                 j.acao_lote, None,
-                 j.acao_opcoes, j.acao_teclado):
-        j.menu_ferramentas.addSeparator() if acao is None else j.menu_ferramentas.addAction(acao)
+    _encher(j.menu_ferramentas,
+            (j.acao_modo_treino, j.acao_areas, j.acao_areas_auto,
+             j.acao_reconhecer_zona, j.acao_ordenar_areas,
+             j.acao_salvar_modelo_areas, j.acao_aplicar_modelo_areas,
+             j.acao_verificar, None,
+             j.acao_lote, None,
+             j.acao_opcoes, j.acao_teclado))
     menu = j.menuBar().addMenu("Aj&uda")
     menu.addAction("Atalhos do teclado", j.mostrar_atalhos)
     menu.addAction("Sobre o AbbyChessCraft", j.sobre)
@@ -350,90 +349,22 @@ def _menus(j) -> None:
 
 
 def atualizar(janela) -> None:
-    """Liga e desliga as ações pelo estado: projeto aberto, lote rodando, o que a página tem.
+    """Aplica nas ações o estado da janela (`estado_da_janela.calcular`): quem decide é ele."""
+    from abbychess import estado_da_janela as ej
 
-    Uma tarefa rodando não desliga quase nada: o comando pedido entra na fila do
-    executor, que a barra de status mostra. O lote (passo E) também não: ele grava entre um
-    comando e outro; só abrir outro projeto e começar outro lote esperam o fim dele."""
-    j, p = janela, janela.pagina
-    tem = p.pronto
-    sem_lote = not p.lote_rodando
-    # As operações de página: desligadas, com o motivo na dica (só para leitura, o lote, uma
-    # tarefa em curso, o projeto ainda na v2).
-    motivo = p.motivo_para_nao_mudar_as_paginas()
-    apagadas = bool(p.projeto.sequencia.apagadas) if p.projeto is not None else False
-    dicas = ("Muda páginas de lugar (as escolhidas, depois de outra)",
-             "Tira páginas do livro; elas ficam guardadas no projeto",
-             "Põe páginas de um PDF ou de imagens no livro",
-             "Devolve ao livro as páginas apagadas",
-             "Gira 90° no sentido horário a página aberta (ou as escolhidas na gaveta)",
-             "Gira 90° no sentido anti-horário a página aberta (ou as escolhidas na gaveta)",
-             "Gira as páginas de 90 em 90 graus, com os glifos",
-             "Corta as margens das páginas; os glifos de fora ficam guardados",
-             "Devolve as páginas cortadas inteiras",
-             "Divide a página espelhada em duas",
-             "Endireita as páginas por um ângulo à mão; a leitura delas se desfaz")
-    valem = (True, True, True, apagadas, True, True, True, True, True, True, True)
-    for q, dica, vale in zip(j.acoes_de_paginas, dicas, valem):
-        q.setEnabled(motivo is None and vale)
-        q.setToolTip(dica if motivo is None else f"{dica}. {motivo}")
-    j.paginas.paginas_mudam = motivo is None
-    total = p.fonte.total if p.fonte else 0
-    editar = tem
-    j.acao_novo.setEnabled(sem_lote)
-    j.acao_abrir.setEnabled(sem_lote)
-    j.acao_reconhecer.setEnabled(editar)
-    j.acao_reler.setEnabled(editar and bool(p.boxes))
-    j.acao_verificada.setEnabled(editar)
-    j.acao_anterior.setEnabled(tem and p.indice > 0)
-    j.acao_seguinte.setEnabled(tem and p.indice < total - 1)
-    j.acao_primeira.setEnabled(tem and p.indice > 0)
-    j.acao_ultima.setEnabled(tem and p.indice < total - 1)
-    j.acao_ir_para.setEnabled(tem)
-    j.acao_voltar_visita.setEnabled(tem and p.pode_voltar)
-    j.acao_avancar_visita.setEnabled(tem and p.pode_avancar)
-    j.seletor.setEnabled(tem)
-    j.acao_modo_treino.setEnabled(tem)
-    j.acao_opcoes.setEnabled(editar)
-    j.acao_lote.setEnabled(tem and sem_lote)
-    j.acao_cancelar_lote.setEnabled(j.livro.lote_rodando)
-    j.acao_retomar_lote.setEnabled(tem and j.livro.pode_retomar)
-    j.acao_antes_do_lote.setEnabled(tem and not p.projeto.somente_leitura
-                                    and p.projeto.tem_antes_do_lote(p.indice))
-    j.acao_proximo_do_livro.setEnabled(tem)
-    j.acao_exportar.setEnabled(tem)
-    for q in (j.acao_localizar, j.acao_proxima_ocorrencia, j.acao_ocorrencia_anterior,
-              j.acao_todas_em_resultados, j.acao_buscar_glifo):
-        q.setEnabled(tem)
-    j.acao_substituir.setEnabled(editar)
-    j.acao_galeria.setEnabled(tem and bool(p.boxes))
-    j.acao_areas.setEnabled(tem)
-    j.acao_areas_auto.setEnabled(editar and j.acao_areas.isChecked())
-    area_atual = editar and j.acao_areas.isChecked() and j.areas.atual is not None
-    j.acao_reconhecer_zona.setEnabled(area_atual)
-    j.acao_ordenar_areas.setEnabled(editar and j.acao_areas.isChecked() and bool(j.areas.zonas))
-    j.acao_salvar_modelo_areas.setEnabled(editar and j.acao_areas.isChecked()
-                                          and bool(j.areas.zonas))
-    j.acao_aplicar_modelo_areas.setEnabled(editar and j.acao_areas.isChecked()
-                                           and j.areas.modelo is not None)
-    for q in (*j.acoes_das_funcoes, *j.acoes_dos_tipos):
-        q.setEnabled(area_atual)
-    j.acao_verificar.setEnabled(tem and bool(p.boxes))
-    j.acao_diagramas.setEnabled(tem)
-    for q in (j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
-              j.acao_escopo_da_fila):
-        q.setEnabled(tem)
-    for q in (j.acao_realce, j.acao_margens):     # sem página reconhecida, nada a realçar
-        q.setEnabled(tem and bool(p.boxes))
-    desfazer = p.historico.proximo_a_desfazer
-    refazer = p.historico.proximo_a_refazer
-    if j.texto.tem_sessao:                      # na sessão, o Ctrl+Z é dela (§6.3)
-        desfazer = "a palavra"
-    if j.texto.pode_reaplicar:                  # depois do Esc, o Ctrl+Y a reaplica
-        refazer = "a palavra"
-    # Com o editor Diagrama aberto, o Ctrl+Z dele (o do tabuleiro) vale sem histórico.
-    no_diagrama = j.editor_diagrama.aberto and j.editor_diagrama.isVisible()
-    j.acao_desfazer.setEnabled(editar and (desfazer is not None or no_diagrama))
-    j.acao_refazer.setEnabled(editar and (refazer is not None or no_diagrama))
-    j.acao_desfazer.setText(f"Desfazer: {desfazer}" if desfazer else "Desfazer")
-    j.acao_refazer.setText(f"Refazer: {refazer}" if refazer else "Refazer")
+    j = janela
+    vista = ej.Vista(areas_ligadas=j.acao_areas.isChecked(), area_atual=j.areas.atual is not None,
+                     tem_zonas=bool(j.areas.zonas), tem_modelo=j.areas.modelo is not None,
+                     sessao=j.texto.tem_sessao, pode_reaplicar=j.texto.pode_reaplicar,
+                     no_diagrama=j.editor_diagrama.aberto and j.editor_diagrama.isVisible())
+    estado = ej.calcular(j.pagina, j.livro, vista)
+    for nome, motivo in estado.habilitadas.items():
+        alvo = getattr(j, nome)
+        for q in alvo if isinstance(alvo, (list, tuple)) else (alvo,):
+            q.setEnabled(motivo is None)
+    for q, (motivo, dica) in zip(j.acoes_de_paginas, estado.paginas):
+        q.setEnabled(motivo is None)
+        q.setToolTip(dica)
+    j.paginas.paginas_mudam = estado.paginas_mudam
+    j.acao_desfazer.setText(estado.texto_do_desfazer)
+    j.acao_refazer.setText(estado.texto_do_refazer)

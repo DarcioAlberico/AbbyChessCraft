@@ -29,6 +29,7 @@ NOMES = {NAO_LIDO: "não lido", CONFERIDO: "conferido", LANCE_ILEGAL: "lance do 
 
 #: (filtro, nome no seletor), na ordem do seletor.
 FILTROS = (("todos", "Todos"), ("por_conferir", "Por conferir"),
+           ("lado_assumido", "Lado não dito"),
            ("sem_confianca", "Lidos sem confiança"), ("pelos_lances", "Confiáveis pelos lances"),
            ("conferidos", "Conferidos"))
 
@@ -57,6 +58,10 @@ def passa(d, filtro: str) -> bool:
     e = estado(d)
     if filtro == "por_conferir":
         return e != CONFERIDO
+    if filtro == "lado_assumido":
+        # Nem a legenda, nem quem conferiu, nem o número do lance disse de quem é a vez: o
+        # FEN sai com "w" assumido (o erro mais comum do lado a jogar, §10).
+        return d.lido and not d.lado            # também o conferido que ficou sem lado
     if filtro == "sem_confianca":
         return e in (SEM_CONFIANCA, LANCE_ILEGAL)
     if filtro == "pelos_lances":
@@ -141,6 +146,8 @@ class PainelDeDiagramas(QWidget):
                 mostrados += 1
                 e = estado(d)
                 texto = f"p. {pagina + 1} · {k + 1}\n{NOMES[e]}"
+                if passa(d, "lado_assumido"):
+                    texto += "\nlado não dito"
                 item = QListWidgetItem(self._icone(pagina, d), texto)
                 item.setData(Qt.ItemDataRole.UserRole, (pagina, k))
                 dica = d.validacao.aviso if e == LANCE_ILEGAL else (d.motivo or NOMES[e])

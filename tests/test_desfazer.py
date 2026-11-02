@@ -18,13 +18,11 @@ from abbychess.modelo import Box, Pagina  # noqa: E402
 from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL  # noqa: E402
 from abbychess.padroes import PadroesDoLivro  # noqa: E402
 
-from tests import test_janela  # noqa: E402
-from tests.test_janela import _esperar  # noqa: E402
+from tests import fixturas_janela  # noqa: E402
+janela = fixturas_janela.janela  # a fixture do apoio, com o nome que os testes pedem
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
-# As fixtures da janela de `test_janela`, com o mesmo nome aqui.
-app = test_janela.app
-janela = test_janela.janela
 
 
 def _caixas(boxes):
@@ -137,6 +135,57 @@ def test_emendar_junta_a_propagacao_no_depois():
     assert [b.entry.char for b in p.boxes] == ["a", "b", "c"]
 
 
+def test_emendar_a_propagacao_que_descarta_reordena_e_muda_o_estado():
+    """A propagação descarta o glifo do Enter, reordena a página e muda o estado: desfazer a
+    transação emendada volta à página de antes do Enter, e refazer, à de depois de tudo."""
+    from abbychess import edicao as ed
+    from abbychess.modelo import NAO_RECONHECIDA, RECONHECIDA
+
+    p = _pagina("abcd")
+    inicial = list(p.boxes)
+    t = _transacao(p, lambda pg: ed.corrigir(pg, pg.boxes[0].gid, "z"))
+    foto = p.instantaneo()
+    ed.descartar(p, p.boxes[0].gid)                    # o glifo do Enter sai
+    p.boxes = [p.boxes[1], p.boxes[0], p.boxes[2]]     # e a ordem muda
+    p.estado = RECONHECIDA
+    hs.emendar(t.paginas[1], hs.mudanca(foto, p.instantaneo()))
+    m = t.paginas[1]
+    hs.conferir(m, p, para_tras=True)
+    hs.aplicar(m, p, para_tras=True)
+    assert p.boxes == inicial and p.estado == NAO_RECONHECIDA
+    hs.conferir(m, p, para_tras=False)
+    hs.aplicar(m, p, para_tras=False)
+    assert [b.entry.char for b in p.boxes] == ["c", "b", "d"] and p.estado == RECONHECIDA
+
+
+def test_emendar_esquece_o_que_a_propagacao_desfez_e_guarda_o_que_ela_criou():
+    """O glifo que o Enter criou e a propagação descartou, e o estado que ela voltou, saem da
+    transação; o glifo que a propagação criou entra, e desfazer o tira."""
+    from abbychess.modelo import NAO_RECONHECIDA, RECONHECIDA
+
+    p = _pagina("abc")
+    inicial = list(p.boxes)
+    criado = Box((1 << 20) | 9, BoxEntry("x", 40, 0, 48, 9))
+
+    def enter(pg):
+        pg.boxes = pg.boxes + [criado]
+        pg.estado = RECONHECIDA
+
+    t = _transacao(p, enter)
+    foto = p.instantaneo()
+    da_propagacao = Box((1 << 20) | 10, BoxEntry("y", 50, 0, 58, 9))
+    p.boxes = inicial[:2] + [da_propagacao] + inicial[2:]
+    p.estado = NAO_RECONHECIDA
+    hs.emendar(t.paginas[1], hs.mudanca(foto, p.instantaneo()))
+    m = t.paginas[1]
+    assert set(m.antes) == {da_propagacao.gid} and m.campos == {}
+    hs.conferir(m, p, para_tras=True)
+    hs.aplicar(m, p, para_tras=True)
+    assert p.boxes == inicial
+    hs.aplicar(m, p, para_tras=False)
+    assert [b.entry.char for b in p.boxes] == ["a", "b", "y", "c"]
+
+
 def test_padrao_guardado_volta_inteiro(tmp_path):
     import numpy as np
 
@@ -148,11 +197,11 @@ def test_padrao_guardado_volta_inteiro(tmp_path):
     padroes.esquecer(caminho)
     assert padroes.total == 0
 
-    padroes.restaurar(amostra)
+    padroes.restaurar_varios([amostra])
     assert padroes.total == 1
     assert padroes.amostras_de("a") == [(caminho.resolve(), pytest.approx(0.8))]
     with pytest.raises(ValueError):
-        padroes.restaurar(type(amostra)(tmp_path / "fora.png", amostra.png, {}))
+        padroes.restaurar_varios([type(amostra)(tmp_path / "fora.png", amostra.png, {})])
 
 
 # ----------------------------------------------------------------------
@@ -191,6 +240,28 @@ def test_ctrl_z_desfaz_o_ensinar_e_apaga_o_padrao(app, janela):
     assert sum(b.source == FONTE_LIVRO for b in boxes(janela)) == 4
 
 
+def test_o_desfazer_que_falha_nos_padroes_ja_moveu_o_historico(app, janela, monkeypatch):
+    """SPEC-qualidade Q-C5: as páginas voltam e o histórico anda junto com elas; um padrão
+    que não sai do disco é avisado, e não deixa a transação para trás, já aplicada."""
+    inicio = _reconhecida(app, janela)
+    mostrar(janela, 0)
+    janela.treino.campo.setText("a")
+    janela.treino.pedir_ensinar()
+    _esperar(app, janela)
+    avisos = []
+    janela.pagina.eventos.ligar("aviso", lambda titulo, texto: avisos.append(texto))
+
+    def disco_cheio(caminhos):
+        raise OSError("disco cheio")
+    monkeypatch.setattr(janela.leitor, "esquecer_varios", disco_cheio)
+    janela.pagina.desfazedor.desfazer()
+    _esperar(app, janela)
+
+    assert _caixas(boxes(janela)) == inicio
+    assert janela.pagina.historico.proxima_a_refazer().descricao == "Ensinar 'a'"
+    assert any("disco cheio" in texto for texto in avisos)
+
+
 def test_desfazer_dividir_e_descartar(app, janela):
     inicio = _reconhecida(app, janela)
     mostrar(janela, 0)
@@ -200,11 +271,11 @@ def test_desfazer_dividir_e_descartar(app, janela):
     janela.treino.pedir_descartar()
     assert len(boxes(janela)) == len(inicio) - 1
 
-    janela.pagina.desfazer()                    # volta o descartado
+    janela.pagina.desfazedor.desfazer()                    # volta o descartado
     assert len(boxes(janela)) == len(inicio)
-    janela.pagina.desfazer()                    # desfaz a divisão: o par colado volta
+    janela.pagina.desfazedor.desfazer()                    # desfaz a divisão: o par colado volta
     assert len(boxes(janela)) == len(inicio) - 1
-    janela.pagina.desfazer()                    # desfaz a junção
+    janela.pagina.desfazedor.desfazer()                    # desfaz a junção
     assert _caixas(boxes(janela)) == inicio
     # O que sobra é o próprio F5, que também se desfaz.
     assert janela.acao_desfazer.text() == "Desfazer: Reconhecer a página"
@@ -215,7 +286,7 @@ def test_alt_seta_seguidos_se_desfazem_de_uma_vez(app, janela):
     mostrar(janela, 0)
     for _ in range(3):
         janela.treino.pedir_ajustar(0, 0, 1, 0)
-    janela.pagina.desfazer()
+    janela.pagina.desfazedor.desfazer()
     assert _caixas(boxes(janela)) == inicio
 
 
@@ -231,7 +302,7 @@ def test_desfazer_o_reconhecimento_volta_a_pagina_de_antes(app, janela):
     _esperar(app, janela)
     assert boxes(janela)[0].char == "Z"
     assert janela.pagina.historico.proximo_a_desfazer == "Reconhecer a página"
-    janela.pagina.desfazer()
+    janela.pagina.desfazedor.desfazer()
     assert _caixas(boxes(janela)) == corrigida
 
 
@@ -246,7 +317,7 @@ def test_desfazer_e_do_projeto_e_mostra_a_pagina_que_volta(app, tmp_path, monkey
     from abbychess.app.janela import JanelaPrincipal
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
@@ -260,9 +331,9 @@ def test_desfazer_e_do_projeto_e_mostra_a_pagina_que_volta(app, tmp_path, monkey
         j.pagina.corrigir("Z")
         j.ir_para_pagina(1)
         assert j.acao_desfazer.text() == "Desfazer: Corrigir para 'Z'"
-        j.pagina.desfazer()                           # na página 1, desfaz a da página 0
+        j.pagina.desfazedor.desfazer()                           # na página 1, desfaz a da página 0
         assert j.pagina.indice == 0 and boxes(j)[0].char != "Z"
-        j.pagina.refazer()
+        j.pagina.desfazedor.refazer()
         assert boxes(j)[0].char == "Z"
     finally:
         j.close()
@@ -285,11 +356,11 @@ def test_mudanca_por_fora_nos_gids_recusa_o_desfazer_e_em_outros_nao(app, janela
     ed.corrigir(modelo, modelo.boxes[1].gid, "q")      # por fora, noutro glifo: não impede
     ed.corrigir(modelo, modelo.boxes[0].gid, "W")      # por fora, no glifo da transação
     antes = list(modelo.boxes)
-    janela.pagina.desfazer()
+    janela.pagina.desfazedor.desfazer()
     assert avisos and "Não dá para desfazer" in avisos[0] and "Nada foi mudado" in avisos[0]
     assert modelo.boxes == antes and janela.acao_desfazer.text() == "Desfazer: Corrigir para 'Z'"
     ed.corrigir(modelo, modelo.boxes[0].gid, "Z")      # outro objeto, igual ao "depois"
-    janela.pagina.desfazer()
+    janela.pagina.desfazedor.desfazer()
     assert len(avisos) == 1 and boxes(janela)[0].char != "Z"   # igual por valor: desfaz
 
 
@@ -313,7 +384,7 @@ def test_desfazer_depois_da_propagacao_volta_a_pagina_toda(app, janela):
     janela.treino.pedir_ensinar()
     _esperar(app, janela)
     assert sum(b.source == FONTE_LIVRO for b in boxes(janela)) == 4   # a propagação resolveu
-    janela.pagina.desfazer()
+    janela.pagina.desfazedor.desfazer()
     assert _caixas(boxes(janela)) == inicio and janela.leitor.padroes_por_caractere() == {}
 
 
@@ -325,7 +396,7 @@ def test_desfazer_com_a_propagacao_rodando_descarta_o_resultado_dela(app, janela
     janela.treino.pedir_ensinar()
     assert boxes(janela)[0].source == FONTE_MANUAL       # a parte síncrona, na hora
     assert janela.executor.ocupado                        # a propagação, presa
-    janela.pagina.desfazer()                              # roda na hora, com ela presa
+    janela.pagina.desfazedor.desfazer()                              # roda na hora, com ela presa
     assert _caixas(boxes(janela)) == inicio
     solto.set()
     _esperar(app, janela)
@@ -350,8 +421,8 @@ def test_enter_durante_uma_propagacao_nao_perde_nem_duplica_leitura(app, janela,
     assert sum(b.source == FONTE_LIVRO and b.char == "a" for b in boxes(janela)) == 4
     por_char = janela.leitor.padroes_por_caractere()
     assert len(por_char["a"]) == 1 and len(por_char["b"]) == 1     # uma amostra de cada
-    janela.pagina.desfazer()                              # o "b" e a propagação dele
-    janela.pagina.desfazer()                              # o "a" e a propagação dele
+    janela.pagina.desfazedor.desfazer()                              # o "b" e a propagação dele
+    janela.pagina.desfazedor.desfazer()                              # o "a" e a propagação dele
     assert janela.leitor.padroes_por_caractere() == {}
     assert _caixas(boxes(janela)) == inicio               # e a página volta inteira
 
@@ -360,11 +431,11 @@ def test_desfazer_e_refazer_uma_area(app, janela):
     janela.areas.desenhar(10, 10, 300, 120)
     criada = janela.areas.zonas
     assert len(criada) == 1 and criada[0].id            # o id nasceu com ela
-    janela.pagina.desfazer()
+    janela.pagina.desfazedor.desfazer()
     assert janela.areas.zonas == []
-    janela.pagina.refazer()
+    janela.pagina.desfazedor.refazer()
     assert janela.areas.zonas == criada
-    janela.projeto.descarregar(5)
+    janela.projeto.paginas_em_memoria.descarregar(5)
     assert janela.projeto.carregar_zonas(0) == criada
 
 
@@ -376,7 +447,7 @@ def test_desfazer_depois_de_a_pagina_sair_da_memoria(app, tmp_path, monkeypatch)
     from abbychess.app.janela import JanelaPrincipal
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     avisos = []
     monkeypatch.setattr(QMessageBox, "warning", lambda _p, _t, texto, *a: avisos.append(texto))
@@ -390,9 +461,9 @@ def test_desfazer_depois_de_a_pagina_sair_da_memoria(app, tmp_path, monkeypatch)
         mostrar(j, 0)
         j.pagina.corrigir("Z")
         j.ir_para_pagina(1)
-        projeto.descarregar(5)
-        projeto._modelos.pop(0)                         # como se 16 páginas tivessem passado
-        j.pagina.desfazer()
+        projeto.paginas_em_memoria.descarregar(5)
+        projeto.paginas_em_memoria._modelos.pop(0)     # como se 16 páginas tivessem passado
+        j.pagina.desfazedor.desfazer()
         assert avisos == [] and j.pagina.indice == 0 and boxes(j)[0].char != "Z"
     finally:
         j.close()
@@ -455,9 +526,9 @@ def test_recusa_pode_tirar_a_acao_e_seguir_com_as_anteriores(app, janela, monkey
     modelo = janela.pagina.modelo
     ed.corrigir(modelo, modelo.boxes[0].gid, "W")       # por fora
     monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
-    janela.pagina.desfazer()                            # recusa, e "sim": tira a ação
+    janela.pagina.desfazedor.desfazer()                            # recusa, e "sim": tira a ação
     assert janela.acao_desfazer.text() == "Desfazer: Corrigir para 'Q'"
-    janela.pagina.desfazer()                            # e a anterior volta
+    janela.pagina.desfazedor.desfazer()                            # e a anterior volta
     assert boxes(janela)[1].char != "Q" and boxes(janela)[0].char == "W"
 
 
@@ -467,13 +538,13 @@ def test_reler_pendentes_entra_no_desfazer(app, janela):
     janela.treino.campo.setText("a")
     janela.treino.pedir_ensinar()
     _esperar(app, janela)
-    janela.pagina.desfazer()                            # o Enter e a propagação saem
-    janela.leitor.padroes.restaurar(janela.pagina.historico.proxima_a_refazer()
-                                    .amostras_criadas[0])      # o padrão volta por fora
-    janela.pagina.reler_pendentes()
+    janela.pagina.desfazedor.desfazer()                            # o Enter e a propagação saem
+    janela.leitor.padroes.restaurar_varios(janela.pagina.historico.proxima_a_refazer()
+                                           .amostras_criadas[:1])  # o padrão volta por fora
+    janela.pagina.leitura.reler_pendentes()
     _esperar(app, janela)
     assert janela.acao_desfazer.text() == "Desfazer: Reler pendentes"
-    janela.pagina.desfazer()
+    janela.pagina.desfazedor.desfazer()
     assert _caixas(boxes(janela)) == inicio
 
 
@@ -483,13 +554,13 @@ def test_refazer_um_enter_desfeito_na_propagacao_propaga_de_novo(app, janela, mo
     mostrar(janela, 0)
     janela.treino.campo.setText("a")
     janela.treino.pedir_ensinar()
-    janela.pagina.desfazer()                            # com a propagação presa
+    janela.pagina.desfazedor.desfazer()                            # com a propagação presa
     solto.set()
     _esperar(app, janela)
-    janela.pagina.refazer()                             # refaz e propaga de novo
+    janela.pagina.desfazedor.refazer()                             # refaz e propaga de novo
     _esperar(app, janela)
     assert sum(b.source == FONTE_LIVRO for b in boxes(janela)) == 4
-    janela.pagina.desfazer()                            # e o desfazer leva as duas coisas
+    janela.pagina.desfazedor.desfazer()                            # e o desfazer leva as duas coisas
     assert not any(b.source in (FONTE_LIVRO, FONTE_MANUAL) for b in boxes(janela))
 
 
@@ -500,7 +571,7 @@ def test_refazer_noutra_pagina_abre_a_do_enter_e_propaga(app, tmp_path, monkeypa
     from abbychess.app.janela import JanelaPrincipal
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
@@ -514,11 +585,11 @@ def test_refazer_noutra_pagina_abre_a_do_enter_e_propaga(app, tmp_path, monkeypa
         mostrar(j, 0)
         j.treino.campo.setText("a")
         j.treino.pedir_ensinar()
-        j.pagina.desfazer()                             # com a propagação presa
+        j.pagina.desfazedor.desfazer()                             # com a propagação presa
         solto.set()
         _esperar(app, j)
         j.ir_para_pagina(1)
-        j.pagina.refazer()                              # da página 1
+        j.pagina.desfazedor.refazer()                              # da página 1
         _esperar(app, j)
         assert j.pagina.indice == 0
         assert sum(b.source == FONTE_LIVRO for b in boxes(j)) >= 1   # propagou de novo

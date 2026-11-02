@@ -29,7 +29,8 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from abbychess.leitor import FONTE_MANUAL
-from abbychess.modelo import Box, Decisoes, Pagina, decisoes_dos_vivos
+from abbychess.geometria_do_modelo import decisoes_dos_vivos
+from abbychess.modelo import NAO_RECONHECIDA, Box, Decisoes, Pagina
 
 #: O que o desfazer do projeto guarda, no máximo (estimado); as mais antigas saem.
 LIMITE_DE_MEMORIA = 50 * 2**20
@@ -41,6 +42,14 @@ CAMPOS = ("decisoes", "zonas", "tabuleiros", "diagramas", "estado")
 BYTES_POR_GLIFO = 600
 #: E de uma área ou um diagrama guardado (um diagrama lido tem 64 casas).
 BYTES_POR_ITEM = 4000
+
+
+@dataclass(frozen=True)
+class Antes:
+    """A página e os padrões do livro quando uma edição começou (o "antes" da transação)."""
+
+    pagina: Optional[Pagina]
+    padroes: frozenset
 
 
 @dataclass
@@ -97,16 +106,26 @@ class Transacao:
     inteiras: Dict[int, tuple] = field(default_factory=dict)
     #: (antes, depois) dos `gids_movidos` do projeto, com as `inteiras`.
     movidos: Optional[tuple] = None
+    #: Os nomes das amostras que ela esqueceu (§8.3): o refazer de um esquecer desfeito antes
+    #: de a procura no livro voltar procura de novo.
+    esquecidas: frozenset = frozenset()
 
     def bytes(self) -> int:
-        ordem = 0 if self.sequencia is None else sum(
+        return (sum(m.bytes() for m in self.paginas.values()) + self._bytes_da_sequencia()
+                + self._bytes_das_inteiras()
+                + sum(len(a.png) for a in self.amostras_criadas + self.amostras_apagadas))
+
+    def _bytes_da_sequencia(self) -> int:
+        return 0 if self.sequencia is None else sum(
             (len(s.entradas) + len(s.apagadas)) * 96 for s in self.sequencia)
+
+    def _bytes_das_inteiras(self) -> int:
+        """As páginas trocadas inteiras e os `gids_movidos` que vão com elas."""
         inteiras = sum(len(p.boxes) * BYTES_POR_GLIFO + BYTES_POR_ITEM
                        for par in self.inteiras.values() for p in par if p is not None)
         if self.movidos is not None:
             inteiras += sum(len(m) for m in self.movidos) * 64
-        return (sum(m.bytes() for m in self.paginas.values()) + ordem + inteiras
-                + sum(len(a.png) for a in self.amostras_criadas + self.amostras_apagadas))
+        return inteiras
 
 
 # ----------------------------------------------------------------------
@@ -116,32 +135,68 @@ class Transacao:
 def mudanca(antes: Optional[Pagina], depois: Pagina) -> MudancaDaPagina:
     """O que mudou de `antes` (instantâneo; None = a página não existia) a `depois`."""
     m = MudancaDaPagina(depois.pid, depois.indice)
-    velhos = {b.gid: b for b in (antes.boxes if antes is not None else ())}
-    novos = {b.gid: b for b in depois.boxes}
+    _glifos_mudados(m, _por_gid(antes), _por_gid(depois))
+    ordem_antes = [b.gid for b in antes.boxes] if antes is not None else []
+    ordem_depois = [b.gid for b in depois.boxes]
+    _vizinhancas(m, ordem_antes, ordem_depois)
+    m.ordem = _ordem_mudada(ordem_antes, ordem_depois)
+    m.campos = _campos_mudados(antes, depois)
+    return m
+
+
+def _por_gid(pagina: Optional[Pagina]) -> Dict[int, Box]:
+    return {b.gid: b for b in pagina.boxes} if pagina is not None else {}
+
+
+def _glifos_mudados(m: MudancaDaPagina, velhos: Dict[int, Box], novos: Dict[int, Box]) -> None:
+    """O antes e o depois de cada gid que mudou, saiu ou nasceu."""
     for gid, box in velhos.items():
         if novos.get(gid) is not box:
             m.antes[gid], m.depois[gid] = box, novos.get(gid)
     for gid, box in novos.items():
         if gid not in velhos:
             m.antes[gid], m.depois[gid] = None, box
-    ordem_antes = [b.gid for b in antes.boxes] if antes is not None else []
-    ordem_depois = [b.gid for b in depois.boxes]
+
+
+def _vizinhancas(m: MudancaDaPagina, ordem_antes: List[int], ordem_depois: List[int]) -> None:
+    """Os vizinhos de antes dos que saíram (desfazer os põe de volta) e dos que nasceram
+    (refazer)."""
     m.vizinhos_antes = _vizinhos(ordem_antes, {g for g in m.antes if m.depois[g] is None})
     m.vizinhos_depois = _vizinhos(ordem_depois, {g for g in m.antes if m.antes[g] is None})
+
+
+def _ordem_mudada(ordem_antes: List[int], ordem_depois: List[int]):
+    """As duas ordens, se a edição reordenou os gids que ficaram; senão None."""
     ficaram = set(ordem_antes) & set(ordem_depois)
     if [g for g in ordem_antes if g in ficaram] != [g for g in ordem_depois if g in ficaram]:
-        m.ordem = (tuple(ordem_antes), tuple(ordem_depois))
+        return (tuple(ordem_antes), tuple(ordem_depois))
+    return None
+
+
+def _campos_mudados(antes: Optional[Pagina], depois: Pagina) -> Dict[str, tuple]:
+    """campo -> (valor antes, valor depois), congelados, só os que mudaram."""
+    campos = {}
     for campo in CAMPOS:
         valor_antes = getattr(antes, campo) if antes is not None else _vazio(campo)
         valor_depois = getattr(depois, campo)
         if _congelar(valor_antes) != _congelar(valor_depois):
-            m.campos[campo] = (_congelar(valor_antes), _congelar(valor_depois))
-    return m
+            campos[campo] = (_congelar(valor_antes), _congelar(valor_depois))
+    return campos
 
 
 def emendar(m: MudancaDaPagina, mais: MudancaDaPagina) -> None:
     """Acrescenta a `m` o que `mais` mudou depois (a propagação de um Enter): o `antes` de
     um gid fica o de `m`, o `depois` passa a ser o de `mais`."""
+    _emendar_glifos(m, mais)
+    for gid in [g for g in m.antes if m.antes[g] is m.depois[g]]:
+        del m.antes[gid], m.depois[gid]              # voltou ao que era: não mudou
+    if mais.ordem is not None:
+        m.ordem = ((m.ordem or mais.ordem)[0], mais.ordem[1])
+    _emendar_campos(m, mais)
+
+
+def _emendar_glifos(m: MudancaDaPagina, mais: MudancaDaPagina) -> None:
+    """O antes de `m` e o depois de `mais` de cada gid, com os vizinhos."""
     for gid in mais.antes:
         if gid not in m.antes:
             m.antes[gid] = mais.antes[gid]
@@ -151,10 +206,10 @@ def emendar(m: MudancaDaPagina, mais: MudancaDaPagina) -> None:
         m.depois[gid] = mais.depois[gid]
         if gid in mais.vizinhos_depois:
             m.vizinhos_depois[gid] = mais.vizinhos_depois[gid]
-    for gid in [g for g in m.antes if m.antes[g] is m.depois[g]]:
-        del m.antes[gid], m.depois[gid]              # voltou ao que era: não mudou
-    if mais.ordem is not None:
-        m.ordem = ((m.ordem or mais.ordem)[0], mais.ordem[1])
+
+
+def _emendar_campos(m: MudancaDaPagina, mais: MudancaDaPagina) -> None:
+    """O antes de `m` e o depois de `mais` de cada campo; o que voltou ao que era sai."""
     for campo, (_antes, depois) in mais.campos.items():
         antes = m.campos.get(campo, (_antes, None))[0]
         if antes == depois:
@@ -172,7 +227,7 @@ def _vizinhos(ordem: Sequence[int], quais: set) -> Dict[int, Tuple[int, ...]]:
 
 
 def _vazio(campo: str):
-    return {"decisoes": Decisoes(), "estado": "nao_reconhecida"}.get(campo, ())
+    return {"decisoes": Decisoes(), "estado": NAO_RECONHECIDA}.get(campo, ())
 
 
 def _congelar(valor):
@@ -224,12 +279,34 @@ def conferir(m: MudancaDaPagina, pagina: Optional[Pagina], *, para_tras: bool) -
 def aplicar(m: MudancaDaPagina, pagina: Pagina, *, para_tras: bool) -> None:
     """Põe a página no `antes` (para trás) ou no `depois` da mudança, nos gids dela e nos
     campos que ainda estão como a mudança os deixou. Chame `conferir` antes."""
+    _aplicar_glifos(m, pagina, para_tras)
+    _aplicar_campos(m, pagina, para_tras)
+    # O que cita um glifo que saiu cai.
+    pagina.decisoes = decisoes_dos_vivos(pagina.decisoes, pagina.vivos)
+
+
+def _aplicar_glifos(m: MudancaDaPagina, pagina: Pagina, para_tras: bool) -> None:
+    """Os glifos da página no alvo: os que saem, os que voltam ao lugar e a ordem."""
     alvo = m.antes if para_tras else m.depois
     vizinhos = m.vizinhos_antes if para_tras else m.vizinhos_depois
     atuais = {b.gid: b for b in pagina.boxes}
-    ordem = [b.gid for b in pagina.boxes]
+    ordem = _sem_os_que_saem(pagina, alvo)
+    _com_os_que_voltam(ordem, alvo, vizinhos, atuais)
+    if m.ordem is not None:
+        ordem = _na_ordem(ordem, m.ordem[0] if para_tras else m.ordem[1])
+    pagina.boxes = _caixas_na_ordem(ordem, atuais, alvo)
+
+
+def _sem_os_que_saem(pagina: Pagina, alvo: Dict[int, Optional[Box]]) -> List[int]:
+    """Os gids da página na ordem dela, sem os que o alvo não tem."""
     sair = {gid for gid, box in alvo.items() if box is None}
-    ordem = [g for g in ordem if g not in sair]
+    return [b.gid for b in pagina.boxes if b.gid not in sair]
+
+
+def _com_os_que_voltam(ordem: List[int], alvo: Dict[int, Optional[Box]],
+                       vizinhos: Dict[int, Tuple[int, ...]], atuais: Dict[int, Box]) -> None:
+    """Põe na ordem cada gid que volta, logo depois do vizinho mais perto que está nela (sem
+    nenhum, no começo)."""
     voltar = [gid for gid, box in alvo.items() if box is not None and gid not in atuais]
     # Na ordem de antes, para o vizinho de um que volta já estar no lugar quando ele vier.
     for gid in sorted(voltar, key=lambda g: _posicao(g, vizinhos)):
@@ -239,17 +316,22 @@ def aplicar(m: MudancaDaPagina, pagina: Pagina, *, para_tras: bool) -> None:
                 lugar = ordem.index(vizinho) + 1
                 break
         ordem.insert(lugar, gid)
-    if m.ordem is not None:
-        ordem = _na_ordem(ordem, m.ordem[0] if para_tras else m.ordem[1])
+
+
+def _caixas_na_ordem(ordem: List[int], atuais: Dict[int, Box],
+                     alvo: Dict[int, Optional[Box]]) -> List[Box]:
+    """O Box de cada gid da ordem: o do alvo, ou o de hoje para os que ele não toca."""
     caixas = {**atuais, **{g: b for g, b in alvo.items() if b is not None}}
-    pagina.boxes = [caixas[g] for g in ordem]
+    return [caixas[g] for g in ordem]
+
+
+def _aplicar_campos(m: MudancaDaPagina, pagina: Pagina, para_tras: bool) -> None:
+    """Os campos que ainda estão como a mudança os deixou vão para o alvo."""
     for campo, (antes, depois) in m.campos.items():
         hoje, de_la, para = (_congelar(getattr(pagina, campo)), *(
             (depois, antes) if para_tras else (antes, depois)))
         if hoje == de_la:
             setattr(pagina, campo, list(para) if isinstance(para, tuple) else para)
-    # O que cita um glifo que saiu cai.
-    pagina.decisoes = decisoes_dos_vivos(pagina.decisoes, pagina.vivos)
 
 
 def _na_ordem(ordem: List[int], alvo: Sequence[int]) -> List[int]:
@@ -318,33 +400,44 @@ class HistoricoDoProjeto:
         `juntar` da última se junta a ela (e é a última que volta)."""
         self._mudou(transacao)
         ultima = self._desfazer[-1] if self._desfazer else None
-        if (transacao.juntar is not None and ultima is not None and not self._refazer
-                and ultima.juntar == transacao.juntar and not ultima.invalidada):
-            for pid, m in transacao.paginas.items():
-                if pid in ultima.paginas:
-                    emendar(ultima.paginas[pid], m)
-                else:
-                    ultima.paginas[pid] = m
-            ultima.amostras_criadas.extend(transacao.amostras_criadas)
-            ultima.amostras_apagadas.extend(transacao.amostras_apagadas)
-            self._medir(ultima)
+        if self._junta_com(ultima, transacao):
+            self._juntar(ultima, transacao)
             return ultima
         self._desfazer.append(transacao)
         for velha in self._refazer:
             self._esquecer(velha)
         self._refazer.clear()
         self._medir(transacao)
+        self._caber()
+        return transacao
+
+    def _junta_com(self, ultima: Optional[Transacao], transacao: Transacao) -> bool:
+        """A transação tem a chave `juntar` da última, que nada desfez nem invalidou."""
+        return (transacao.juntar is not None and ultima is not None and not self._refazer
+                and ultima.juntar == transacao.juntar and not ultima.invalidada)
+
+    def _juntar(self, ultima: Transacao, transacao: Transacao) -> None:
+        """As páginas e as amostras da transação emendadas na última."""
+        for pid, m in transacao.paginas.items():
+            if pid in ultima.paginas:
+                emendar(ultima.paginas[pid], m)
+            else:
+                ultima.paginas[pid] = m
+        ultima.amostras_criadas.extend(transacao.amostras_criadas)
+        ultima.amostras_apagadas.extend(transacao.amostras_apagadas)
+        self._medir(ultima)
+
+    def _caber(self) -> None:
+        """As mais antigas saem até o desfazer caber no limite (a última fica sempre)."""
         while self._total > self.limite and len(self._desfazer) > 1:
             self._esquecer(self._desfazer.pop(0))
-        return transacao
 
     def emendou(self, transacao: Transacao) -> None:
         """A transação cresceu (a propagação a emendou): a estimativa é refeita."""
         self._mudou(transacao)
         if id(transacao) in self._tamanho:
             self._medir(transacao)
-            while self._total > self.limite and len(self._desfazer) > 1:
-                self._esquecer(self._desfazer.pop(0))
+            self._caber()
 
     @property
     def bytes(self) -> int:

@@ -9,7 +9,6 @@ CA-6.4 (as linhas D1, cada uma desfeita com um Ctrl+Z), CA-6.7, CA-6.8 e CA-6.9.
 from __future__ import annotations
 
 import pytest
-from core.box_model import BoxEntry
 from PySide6.QtCore import QMimeData, Qt
 from PySide6.QtGui import QInputMethodEvent
 from PySide6.QtTest import QTest
@@ -18,32 +17,8 @@ from PySide6.QtWidgets import QApplication
 from abbychess import diagramas as dg
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.app.documento import FUNDO_DA_SESSAO
-from abbychess.modelo import Box
 
-from tests.test_documento import app  # noqa: F401 (fixture)
-
-
-def _escrever(j, *linhas, estados=None):
-    """A página aberta com estas linhas, cada letra um box (0,9 de confiança, "net")."""
-    p = j.pagina
-    pagina = p._pagina_para_editar()
-    boxes = []
-    for k, linha in enumerate(linhas):
-        x, y = 20, 20 + 60 * k
-        for palavra in linha.split(" "):
-            for letra in palavra:
-                boxes.append(Box(pagina.alocar(), BoxEntry(letra, x, y, x + 18, y + 30, 0.9, "net")))
-                x += 22
-            x += 30
-    pagina.boxes = boxes
-    pagina.decisoes = type(pagina.decisoes)()
-    pagina.tabuleiros, pagina.diagramas = [], []
-    pagina.estado = "reconhecida"
-    p.ir_para(0)
-    j.pintar_texto()
-    j.texto.setFocus()
-    QApplication.processEvents()
-    return pagina
+from tests.ajudantes import _escrever  # noqa: E402,F401,F811
 
 
 def _por_o_cursor(j, posicao: int, ate: int = None):
@@ -65,40 +40,6 @@ def _texto(j) -> str:
     return j.texto.toPlainText()
 
 
-@pytest.fixture(scope="module")
-def _janela_do_modulo(app, tmp_path_factory):  # noqa: F811
-    """Uma janela para o módulo (abrir uma por teste custava ~2,5 s da suíte rápida)."""
-    from PySide6.QtWidgets import QMessageBox
-
-    from abbychess.projeto import ProjetoDeLivro
-    from tests.test_espaco import _abrir
-    from tests.test_treino_por_livro import _pagina_sintetica
-
-    remendo = pytest.MonkeyPatch()
-    remendo.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
-    pasta = tmp_path_factory.mktemp("edicao")
-    janela = _abrir(ProjetoDeLivro.criar(pasta / "livros", "Edição",
-                                         _pagina_sintetica(pasta / "pagina.png")))
-    yield janela
-    janela.close()
-    remendo.undo()
-
-
-@pytest.fixture
-def j(_janela_do_modulo):
-    """A janela do módulo com o desfazer, a sessão e o modo do livro de volta ao começo."""
-    from abbychess import historico as hs
-
-    janela = _janela_do_modulo
-    if janela.texto.tem_sessao:
-        janela.texto.restaurar()
-    janela.texto._restaurada = None
-    janela.pagina.historico = hs.HistoricoDoProjeto()
-    janela.projeto.dados.idioma, janela.projeto.dados.notacao = "pt", "figurinas"
-    janela.linha.avisar("")
-    return janela
-
-
 def test_digitar_abre_uma_sessao_e_o_modelo_so_muda_ao_confirmar(j):
     pagina = _escrever(j, "vou conc1uir hoje")
     _por_o_cursor(j, 9)                                   # depois do "1"
@@ -109,7 +50,7 @@ def test_digitar_abre_uma_sessao_e_o_modelo_so_muda_ao_confirmar(j):
     assert not j.texto.tem_sessao
     assert pagina.boxes[7].entry.char == "l" and pagina.boxes[7].entry.source == FONTE_MANUAL
     assert not pagina.decisoes.virtuais and _texto(j) == "vou concluir hoje"
-    assert pagina.boxes[7].gid not in j.pagina.fila()
+    assert pagina.boxes[7].gid not in j.pagina.fila_da_pagina.fila()
 
 
 def test_ca_6_3_o_espaco_digitado_parte_a_palavra(j):
@@ -131,6 +72,19 @@ def test_ca_6_9_esc_restaura_e_ctrl_y_reaplica(j):
     assert _texto(j) == "casas velha" and len(pagina.decisoes.virtuais) == 1
 
 
+def test_o_ctrl_y_da_palavra_do_esc_vale_ate_o_cursor_sair_dela(j):
+    pagina = _escrever(j, "casa velha")
+    _por_o_cursor(j, 4)
+    QTest.keyClicks(j.texto, "s")
+    j.fechar_sobreposicao()                               # Esc: "casa" volta
+    _por_o_cursor(j, 1)                                   # andando dentro dela, o Ctrl+Y vale
+    assert j.acao_refazer.isEnabled()
+    _por_o_cursor(j, 7)                                   # em "velha": não vale mais
+    assert not j.acao_refazer.isEnabled()
+    _tecla(j, Qt.Key.Key_Y, Qt.KeyboardModifier.ControlModifier)
+    assert _texto(j) == "casa velha" and not pagina.decisoes.virtuais
+
+
 def test_ca_6_9_enter_numa_palavra_sem_mudanca_a_tira_da_fila(j):
     pagina = _escrever(j, "casa velha")
     for b in pagina.boxes:
@@ -139,7 +93,7 @@ def test_ca_6_9_enter_numa_palavra_sem_mudanca_a_tira_da_fila(j):
     _por_o_cursor(j, 2)
     _tecla(j, Qt.Key.Key_Return)
     casa = {b.gid for b in pagina.boxes[:4]}
-    assert casa.isdisjoint(j.pagina.fila()) and all(b.revisado for b in pagina.boxes[:4])
+    assert casa.isdisjoint(j.pagina.fila_da_pagina.fila()) and all(b.revisado for b in pagina.boxes[:4])
     assert {b.entry.source for b in pagina.boxes[:4]} == {"net"}   # a fonte não muda
     assert j.texto.textCursor().position() == 5           # a próxima duvidosa: "velha"
 
@@ -307,8 +261,8 @@ def test_o_modo_das_pecas_fica_nas_opcoes_do_livro(j):
 
     dialogo = DialogoDeOpcoes(j.projeto.dados.limiares, j, notacao="letras")
     assert dialogo.notacao() == "letras"
-    j.pagina.definir_notacao("letras")
-    j.pagina._aplicar_limiares(j.projeto.dados.limiares)  # grava o projeto
+    j.pagina.padroes_do_livro.definir_notacao("letras")
+    j.pagina.padroes_do_livro._aplicar_limiares(j.projeto.dados.limiares)  # grava o projeto
     bruto = json.loads((j.projeto.pasta / "projeto.json").read_text(encoding="utf-8"))
     assert bruto["notacao"] == "letras"
 
@@ -325,7 +279,6 @@ def test_a_letra_que_faltou_sobre_tinta_sem_box_oferece_o_ctrl_m(j):
     _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
     assert len(pagina.decisoes.virtuais) == 1
     assert "Ctrl+M marca o quadro" in j.linha.aviso
-
 
 
 # ----------------------------------------------------------------------
@@ -550,6 +503,36 @@ def test_ctrl_shift_enter_e_estilos_gravam_e_desfazem(j):
     _tecla(j, Qt.Key.Key_I, Qt.KeyboardModifier.ControlModifier)
     _tecla(j, Qt.Key.Key_U, Qt.KeyboardModifier.ControlModifier)
     assert all(box.estilo.italico and box.estilo.sublinhado for box in pagina.boxes[:4])
+
+
+def test_ctrl_shift_enter_no_meio_da_linha_abre_a_linha_e_de_novo_tira(j):
+    """Numa palavra do meio da linha, o parágrafo começa no começo dela: o Documento e a
+    exportação concordam (antes, o Documento abria um bloco e a exportação não); de novo
+    na mesma linha, o parágrafo sai."""
+    pagina = _escrever(j, "casa", "velha longe")
+    _por_o_cursor(j, 13)                                  # dentro de "longe"
+    chord = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier
+    _tecla(j, Qt.Key.Key_Return, chord)
+    inicio_da_linha = pagina.boxes[4].gid                 # o "v" de "velha"
+    # A exportação abre o parágrafo pelo primeiro glifo da linha (`linha.paragrafo`).
+    assert pagina.decisoes.paragrafo_antes == {inicio_da_linha}
+    _tecla(j, Qt.Key.Key_Return, chord)
+    assert not pagina.decisoes.paragrafo_antes
+
+
+def test_ctrl_shift_enter_com_um_virtual_no_comeco_da_linha(j):
+    """A linha que começa por uma letra digitada (um virtual, sem box): o parágrafo vai ao
+    primeiro glifo lido dela (antes, ValueError dentro da edição)."""
+    pagina = _escrever(j, "casa", "longe")
+    _por_o_cursor(j, 5)                                   # o começo de "longe"
+    QTest.keyClicks(j.texto, "y")
+    _tecla(j, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    assert pagina.decisoes.virtuais
+    _por_o_cursor(j, 8)
+    _tecla(j, Qt.Key.Key_Return,
+           Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+    l_de_longe = next(b.gid for b in pagina.boxes if b.entry.char == "l")
+    assert pagina.decisoes.paragrafo_antes == {l_de_longe}
 
 
 def test_o_cursor_volta_ao_lugar_quando_a_montagem_tira_o_espaco_a_mais(j):

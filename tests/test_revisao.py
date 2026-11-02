@@ -12,6 +12,8 @@ from core.box_model import BoxEntry
 from abbychess import livro as lv
 from abbychess.modelo import Box, gid_de
 
+from tests import ajudantes
+
 
 def _escrever(projeto, indice, texto, confiancas):
     """A página `indice` com uma letra por box (as confianças na ordem das letras)."""
@@ -33,8 +35,8 @@ def livro(tmp_path):
     """Três páginas: a 1 e a 3 com glifos a revisar (confiança abaixo de 0,90), a 2 sem."""
     from abbychess.controladores import ControladorDaFila
     from abbychess.projeto import ProjetoDeLivro
-    from tests.test_controlador import ExecutorManual, _controlador
-    from tests.test_livro import pdf_sintetico
+    from tests.ajudantes import ExecutorManual, _controlador  # noqa: E402,F401,F811
+    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
 
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Três", pdf_sintetico(tmp_path))
     _escrever(projeto, 0, "cab bca", [0.5, 0.2, 0.95, 0.3, 0.6, 0.4])
@@ -55,11 +57,11 @@ def _letras(ctl, gids):
 def test_os_modos_ordenam_a_fila(livro):
     projeto, ctl, fila = livro
     fila.definir("confianca")
-    assert _letras(ctl, ctl.fila()) == "abacc"            # 0,2 0,3 0,4 0,5 0,6
+    assert _letras(ctl, ctl.fila_da_pagina.fila()) == "abacc"  # 0,2 0,3 0,4 0,5 0,6
     fila.definir("leitura")
-    assert _letras(ctl, ctl.fila()) == "cabca"            # a ordem da página, sem o 0,95
+    assert _letras(ctl, ctl.fila_da_pagina.fila()) == "cabca"  # a ordem da página, sem o 0,95
     fila.definir("caractere")
-    assert _letras(ctl, ctl.fila()) == "aabcc"            # pela leitura; em cada uma, a confiança
+    assert _letras(ctl, ctl.fila_da_pagina.fila()) == "aabcc"  # pela leitura; em cada uma, a confiança
     fila.ciclar()
     assert fila.modo == "palavras"
 
@@ -68,22 +70,22 @@ def test_no_escopo_livro_o_fim_da_pagina_leva_a_proxima_com_pendentes(livro):
     projeto, ctl, fila = livro
     fila.definir("leitura")
     fila.definir_escopo("livro")
-    ctl.escolher(ctl.fila()[-1])
+    ctl.escolher(ctl.fila_da_pagina.fila()[-1])
     fila.andar(+1)                                        # a página 2 não tem pendentes
-    assert ctl.indice == 2 and ctl.atual == ctl.fila()[0]
+    assert ctl.indice == 2 and ctl.atual == ctl.fila_da_pagina.fila()[0]
     fila.andar(-1)                                        # o começo da 3 volta ao fim da 1
-    assert ctl.indice == 0 and ctl.atual == ctl.fila()[-1]
+    assert ctl.indice == 0 and ctl.atual == ctl.fila_da_pagina.fila()[-1]
     assert fila.contador() == "5/5 · livro 8"
     fila.alternar_escopo()                                # Shift+F7: só a página
     fila.andar(+1)
-    assert ctl.indice == 0 and ctl.atual == ctl.fila()[0]
+    assert ctl.indice == 0 and ctl.atual == ctl.fila_da_pagina.fila()[0]
 
 
 def test_na_confianca_o_livro_segue_depois_de_pular_todos(livro):
     projeto, ctl, fila = livro
     fila.definir("confianca")
     fila.definir_escopo("livro")
-    ctl.ir_ao_primeiro_pendente()
+    ctl.fila_da_pagina.ir_ao_primeiro_pendente()
     for _ in range(4):                                    # os 4 primeiros vão para o fim
         fila.andar(+1)
     assert ctl.indice == 0
@@ -91,25 +93,31 @@ def test_na_confianca_o_livro_segue_depois_de_pular_todos(livro):
     assert ctl.indice == 2
 
 
-def test_a_fila_julga_de_novo_so_os_glifos_tocados(livro, monkeypatch):
-    from abbychess import controlador as cp
-    from abbychess import edicao as ed
+def test_nas_palavras_o_livro_vai_a_pagina_lida_vizinha_e_da_a_volta(livro):
+    """Nas palavras desconhecidas, no escopo livro, passar da última palavra da página (ou da
+    página sem nenhuma) leva à página lida seguinte; da última, à primeira. A página só com
+    glifos marcados não foi lida e fica de fora."""
+    from abbychess.modelo import GLIFOS_MARCADOS
 
     projeto, ctl, fila = livro
-    ctl.fila()
-    julgados = []
-    original = cp.precisa_revisao
-    monkeypatch.setattr(cp, "precisa_revisao", lambda *a: (julgados.append(a), original(*a))[1])
-    ctl.fila()
-    assert julgados == []                                 # nada mudou
-    ed.corrigir(ctl.modelo, ctl.modelo.boxes[0].gid, "x")
-    ctl.fila()
-    assert len(julgados) == 1                             # só o corrigido
+    marcada = projeto.pagina_para_editar(1)
+    marcada.estado = GLIFOS_MARCADOS
+    projeto.salvar_modelo(marcada)
+    fila.definir("palavras")
+    fila.definir_escopo("livro")
+    paginas = []
+    for passo in (+1, +1, -1, -1):
+        fila.andar(passo)
+        paginas.append(ctl.indice)
+    assert paginas == [2, 0, 2, 0]
+    fila.alternar_escopo()                                # Shift+F7: só a página
+    fila.andar(+1)
+    assert ctl.indice == 0
 
 
 def test_o_f6_conta_pelo_resumo_sem_abrir_as_paginas(livro, monkeypatch):
     projeto, ctl, fila = livro
-    assert projeto.descarregar(10)
+    assert projeto.paginas_em_memoria.descarregar(10)
     monkeypatch.setattr(projeto, "carregar_modelo", lambda i: (_ for _ in ()).throw(
         AssertionError("abriu a página")))
     limiares = ctl.leitor.limiares
@@ -120,15 +128,14 @@ def test_o_f6_conta_pelo_resumo_sem_abrir_as_paginas(livro, monkeypatch):
     assert lv.pendentes_por_pagina(projeto, mais_baixo) == {0: 2, 2: 1}   # outro limiar
 
 
-def test_ca_8_4_esquecer_devolve_a_fila_os_lidos_no_livro_e_desfazer_os_tira(livro):
-    """Uma amostra que leu 30 glifos em 3 páginas (uma verificada): esquecê-la devolve os 30
-    à fila (a verificada volta a em_revisao); desfazer os tira de novo."""
-    import time
+def _amostra_em_tres_paginas(livro):
+    """Uma amostra "e" que leu 10 glifos em cada uma das 3 páginas (a 2 verificada), o índice
+    da busca pronto e a fila da interface à mão (`esperar` a esvazia)."""
 
     import numpy as np
 
     from abbychess.controladores import ControladorDaBusca
-    from abbychess.modelo import EM_REVISAO, VERIFICADA
+    from abbychess.modelo import VERIFICADA
 
     projeto, ctl, fila = livro
     caminho = ctl.leitor.ensinar(np.full((30, 18), 255, np.uint8), "e", origem="teste")
@@ -144,16 +151,15 @@ def test_ca_8_4_esquecer_devolve_a_fila_os_lidos_no_livro_e_desfazer_os_tira(liv
     fila_da_interface = []
     ctl.executar.na_interface = fila_da_interface.append
     busca = ControladorDaBusca(ctl, paralelo=False)
-    ctl.lidos_pelas_amostras = busca.lidos_por
+    ctl.padroes_do_livro.lidos_pelas_amostras = busca.lidos_por
     busca.abrir()
 
+    def na_interface():
+        while fila_da_interface:
+            fila_da_interface.pop(0)()
+
     def esperar(condicao):
-        fim = time.monotonic() + 20
-        while not condicao() and time.monotonic() < fim:
-            while fila_da_interface:
-                fila_da_interface.pop(0)()
-            time.sleep(0.01)
-        assert condicao()
+        assert ajudantes.esperar(condicao, 20, a_cada=na_interface)
     esperar(busca.pronto.is_set)
 
     def da_amostra():
@@ -163,17 +169,137 @@ def test_ca_8_4_esquecer_devolve_a_fila_os_lidos_no_livro_e_desfazer_os_tira(liv
     def na_fila():
         return sum(1 for i in range(3) for b in projeto.carregar_modelo(i).boxes
                    if b.gid % 1000 >= 100 and b.entry.source == "none" and b.entry.char == "e")
-    assert da_amostra() == 30 and na_fila() == 0
-    ctl.esquecer([caminho])
+    return SimpleNamespace(projeto=projeto, ctl=ctl, caminho=caminho, esperar=esperar,
+                           da_amostra=da_amostra, na_fila=na_fila, fila=fila_da_interface)
+
+
+def test_ca_8_4_esquecer_devolve_a_fila_os_lidos_no_livro_e_desfazer_os_tira(livro):
+    """Uma amostra que leu 30 glifos em 3 páginas (uma verificada): esquecê-la devolve os 30
+    à fila (a verificada volta a em_revisao); desfazer os tira de novo."""
+    from abbychess.modelo import EM_REVISAO, VERIFICADA
+
+    c = _amostra_em_tres_paginas(livro)
+    assert c.da_amostra() == 30 and c.na_fila() == 0
+    c.ctl.padroes_do_livro.esquecer([c.caminho])
+    c.ctl.executar.tudo()
+    c.esperar(lambda: c.na_fila() == 30)
+    assert c.da_amostra() == 0 and c.projeto.carregar_modelo(1).estado == EM_REVISAO
+    assert len(c.ctl.historico.proxima_a_desfazer().paginas) == 3     # uma transação só
+    c.ctl.desfazedor.desfazer()
+    c.ctl.executar.tudo()
+    assert c.na_fila() == 0 and c.da_amostra() == 30
+    assert c.projeto.carregar_modelo(1).estado == VERIFICADA
+    assert Path(c.caminho).exists()                     # a amostra voltou
+
+
+def test_refazer_o_esquecer_desfeito_antes_da_procura_devolve_os_30(livro):
+    """O Ctrl+Z antes de a procura no livro voltar descarta o resultado dela; o Ctrl+Y procura
+    de novo (e não fica só com a página aberta)."""
+    c = _amostra_em_tres_paginas(livro)
+    c.ctl.padroes_do_livro.esquecer([c.caminho])
+    c.ctl.executar.tudo()
+    assert c.na_fila() == 10                            # só a página aberta, por enquanto
+    c.ctl.desfazedor.desfazer()                                    # a procura ainda não voltou
+    c.ctl.executar.tudo()
+    c.esperar(lambda: not c.fila and c.na_fila() == 0)  # a volta dela é descartada
+    assert c.da_amostra() == 30
+    c.ctl.desfazedor.refazer()
+    c.ctl.executar.tudo()
+    c.esperar(lambda: c.na_fila() == 30)
+    assert c.da_amostra() == 0 and not Path(c.caminho).exists()
+
+
+def test_a_ordem_que_muda_durante_a_procura_do_esquecer_procura_de_novo(livro):
+    """Mover páginas enquanto a procura do esquecer roda: as posições achadas são as de antes;
+    a procura roda de novo pela ordem nova, e os 30 glifos voltam à fila nas páginas certas."""
+    c = _amostra_em_tres_paginas(livro)
+    c.ctl.padroes_do_livro.esquecer([c.caminho])
+    c.ctl.executar.tudo()
+    assert c.na_fila() == 10                            # só a página aberta, por enquanto
+    assert c.ctl.operacoes.mover_paginas([2], -1)                 # a 3ª vai para o começo
+    c.ctl.executar.tudo()
+    c.esperar(lambda: c.na_fila() == 30)
+    assert c.da_amostra() == 0
+
+
+def test_a_galeria_em_duas_paginas_com_leituras_diferentes_e_um_passo(livro):
+    """`corrigir_no_livro` com uma leitura por glifo, em duas páginas: um passo do desfazer, e
+    o Ctrl+Z devolve as duas páginas."""
+    projeto, ctl, fila = livro
+    g0 = [b.gid for b in projeto.carregar_modelo(0).boxes][:2]
+    g2 = [b.gid for b in projeto.carregar_modelo(2).boxes][:1]
+    ctl.corrigir_no_livro({0: g0, 2: g2}, {(0, g0[0]): "x", (0, g0[1]): "y", (2, g2[0]): "z"})
     ctl.executar.tudo()
-    esperar(lambda: na_fila() == 30)
-    assert da_amostra() == 0 and projeto.carregar_modelo(1).estado == EM_REVISAO
-    assert len(ctl.historico.proxima_a_desfazer().paginas) == 3      # uma transação só
-    ctl.desfazer()
+    leituras = lambda i, gids: [projeto.carregar_modelo(i).box(g).entry.char for g in gids]  # noqa: E731
+    assert leituras(0, g0) == ["x", "y"] and leituras(2, g2) == ["z"]
+    transacao = ctl.historico.proxima_a_desfazer()
+    assert len(transacao.paginas) == 2                  # as duas páginas, num passo só
+    ctl.desfazedor.desfazer()
     ctl.executar.tudo()
-    assert na_fila() == 0 and da_amostra() == 30
-    assert projeto.carregar_modelo(1).estado == VERIFICADA
-    assert Path(caminho).exists()                        # a amostra voltou
+    assert leituras(0, g0) == ["c", "a"] and leituras(2, g2) == ["b"]
+
+
+def test_a_galeria_que_corrige_a_legenda_refaz_o_lado_do_diagrama(livro):
+    """Corrigir pela Galeria um glifo da legenda numa página fechada faz o que toda edição
+    faz: o lado do diagrama sai de novo da legenda, sem esperar o F5."""
+    from tests.ajudantes import _CAIXA, _legenda, _lido  # noqa: E402,F401,F811
+
+    projeto, ctl, fila = livro
+    pagina = projeto.pagina_para_editar(2)
+    entradas = _legenda("Diagrama 5. Jo9am as pretas.", 110, 530)
+    pagina.boxes = [Box(gid_de(pagina.pid, n), e) for n, e in enumerate(entradas)]
+    pagina.proximo_n = len(entradas)
+    pagina.diagramas = [_lido(caixa=_CAIXA, titulo="Di5", titulo_do_core="Di5")]
+    projeto.salvar_modelo(pagina)
+    nove = next(b.gid for b in pagina.boxes if b.entry.char == "9")
+    ctl.corrigir_no_livro({2: [nove]}, "g")
+    ctl.executar.tudo()
+    assert projeto.carregar_modelo(2).diagramas[0].lado == "b"
+
+
+def test_restaurar_varios_devolve_as_linhas_sem_reler_a_base(tmp_path, monkeypatch):
+    """O Ctrl+Z de um esquecer devolve as amostras à matriz sem `_carregar` (que decodifica
+    cada PNG do livro): o mesmo estado que reabrir os padrões daria."""
+    import numpy as np
+
+    from abbychess.leitor import LeitorDoLivro
+    from abbychess.modelo import Estilo
+    from abbychess.padroes import PadroesDoLivro
+
+    leitor = LeitorDoLivro(tmp_path / "padroes")
+    recortes = [np.full((30, 18), 40 * k, np.uint8) for k in range(1, 6)]
+    caminhos = [leitor.ensinar(r, "abcde"[k], altura_de_referencia=30, origem=f"o{k}",
+                               efeito=Estilo(k % 2 == 0, None))
+                for k, r in enumerate(recortes)]
+    padroes = leitor.padroes
+    guardadas = [padroes.guardar(c) for c in caminhos[:3]]
+    padroes.esquecer_varios(caminhos[:3])
+    monkeypatch.setattr(PadroesDoLivro, "_carregar",
+                        lambda self: pytest.fail("restaurar_varios releu a base inteira"))
+    padroes.restaurar_varios(guardadas)
+    monkeypatch.undo()
+    reaberto = PadroesDoLivro(tmp_path / "padroes")
+    por_caminho = lambda p: {Path(c).name: (ch, ef) for c, ch, ef in  # noqa: E731
+                             zip(p._caminhos, p._chars, p._efeitos)}
+    assert por_caminho(padroes) == por_caminho(reaberto)
+    assert padroes._X.shape == reaberto._X.shape
+
+
+def test_ensinar_e_esquecer_varios_de_uma_vez(tmp_path):
+    import numpy as np
+
+    from abbychess.padroes import PadroesDoLivro
+
+    padroes = PadroesDoLivro(tmp_path / "padroes")
+    barra = np.full((30, 12), 255, np.uint8)
+    barra[:, 5:7] = 0
+    caminhos = padroes.ensinar_varios([(barra, "1", 1.0, f"o{k}") for k in range(3)]
+                                      + [(255 - barra, "l", None, "x")])
+    assert padroes.total == 4 and padroes.ler(barra).char == "1"
+    assert padroes.altura_de(caminhos[0]) == 1.0 and padroes.meta_de(caminhos[3])["origem"] == "x"
+    assert PadroesDoLivro(tmp_path / "padroes").total == 4        # gravados, e o meta também
+    padroes.esquecer_varios(caminhos[:2])
+    assert padroes.total == 2 and not caminhos[0].exists()
 
 
 # ----------------------------------------------------------------------
@@ -216,11 +342,11 @@ def test_o_aviso_de_ensino_diz_o_efeito_e_o_conflito(livro):
     projeto, ctl, fila = livro
     fila.definir("leitura")
     ctl.escolher(ctl.modelo.boxes[0].gid)                 # o primeiro "c" (há outro)
-    efeito, conflito = ctl.aviso_de_ensino("e")
+    efeito, conflito = ctl.padroes_do_livro.aviso_de_ensino("e")
     assert efeito == "Enter ensina 'e' · 1 iguais nesta página" and conflito == ""
     recorte = pg.recorte(ctl.imagem, ctl.modelo.boxes[0].entry)
     ctl.leitor.ensinar(recorte, "o", origem="teste")
-    efeito, conflito = ctl.aviso_de_ensino("e")
+    efeito, conflito = ctl.padroes_do_livro.aviso_de_ensino("e")
     assert "amostra(s) de 'o'" in conflito
 
 
@@ -237,11 +363,11 @@ def test_o_aviso_e_o_enter_recortam_da_matriz_do_cache(livro, monkeypatch):
     original = Image.Image.convert
     monkeypatch.setattr(Image.Image, "convert",
                         lambda self, *a, **k: convertidas.append(1) or original(self, *a, **k))
-    ctl.aviso_de_ensino("e")
+    ctl.padroes_do_livro.aviso_de_ensino("e")
     assert convertidas == []
     # O Enter (a parte síncrona) e a propagação dele, na tarefa, também não.
     gid = ctl.atual
-    ctl.ensinar("c")
+    ctl.leitura.ensinar("c")
     ctl.executar.tudo()
     assert ctl.modelo.box(gid).entry.char == "c" and convertidas == []
     # Quem troca a imagem à mão não leva a matriz da outra junto.
@@ -249,14 +375,57 @@ def test_o_aviso_e_o_enter_recortam_da_matriz_do_cache(livro, monkeypatch):
     assert ctl._cinza() is ctl.imagem
 
 
+#: A tabela do §4.4 escrita aqui, à mão (e não lida do `modelo`): cada (estado, evento) que
+#: muda o estado. Marcar um glifo também é edição; reconhecer de novo deixa `em_revisao`.
+_SAIDAS_DO_4_4 = {
+    ("nao_reconhecida", "marcar"): "glifos_marcados",
+    ("nao_reconhecida", "reconhecer"): "reconhecida",
+    ("glifos_marcados", "reconhecer"): "reconhecida",
+    ("reconhecida", "editar"): "em_revisao",
+    ("reconhecida", "marcar"): "em_revisao",
+    ("reconhecida", "verificar"): "verificada",
+    ("em_revisao", "verificar"): "verificada",
+    ("verificada", "editar"): "em_revisao",
+    ("verificada", "marcar"): "em_revisao",
+    ("verificada", "reconhecer"): "em_revisao",
+    ("verificada", "esquecer_padrao"): "em_revisao",
+}
+
+
 def test_ca_8_5_todas_as_transicoes_do_4_4():
-    """Cada par (estado, evento) da tabela, e todo par fora dela deixa o estado como está."""
+    """Cada par (estado, evento) do §4.4 vai aonde a tabela diz; todo par fora dela deixa o
+    estado como está (o evento que não se aplica não estraga a página)."""
     from abbychess import modelo as md
 
-    eventos = {e for _s, e in md._TRANSICOES}
+    eventos = {"marcar", "reconhecer", "editar", "verificar", "esquecer_padrao"}
+    assert set(md.ESTADOS) == {"nao_reconhecida", "glifos_marcados", "reconhecida",
+                               "em_revisao", "verificada"}
     for estado in md.ESTADOS:
         for evento in eventos:
-            esperado = md._TRANSICOES.get((estado, evento), estado)
+            esperado = _SAIDAS_DO_4_4.get((estado, evento), estado)
             assert md.proximo_estado(estado, evento) == esperado, (estado, evento)
-    assert md.proximo_estado(md.VERIFICADA, "esquecer_padrao") == md.EM_REVISAO
-    assert md.proximo_estado(md.RECONHECIDA, "verificar") == md.VERIFICADA
+
+
+def test_alt_baixo_fora_da_fila_vai_ao_primeiro_dela(livro):
+    """O glifo atual fora da fila (um confiável escolhido com o mouse): Alt+↓ vai ao primeiro
+    da fila e Alt+↑ ao último, sem pular nenhum."""
+    projeto, ctl, fila = livro
+    fila.definir("confianca")
+    confiavel = next(b.gid for b in ctl.modelo.boxes if b.entry.confidence >= 0.9)
+    ctl.escolher(confiavel)
+    ctl.fila_da_pagina.andar(+1)
+    assert ctl.atual == ctl.fila_da_pagina.fila()[0]
+    ctl.escolher(confiavel)
+    ctl.fila_da_pagina.andar(-1)
+    assert ctl.atual == ctl.fila_da_pagina.fila()[-1]
+
+
+def test_o_ctrl_t_da_pergunta_nao_marca_outra_pagina(livro):
+    """A pergunta do Ctrl+T leva a página dela: aceita depois de abrir outra, não marca nada."""
+    from abbychess.modelo import VERIFICADA
+
+    projeto, ctl, fila = livro
+    ctl.verificar(2)                                    # a pergunta era da página 3
+    ctl.executar.tudo()
+    assert ctl.indice == 0 and ctl.modelo.estado != VERIFICADA
+    assert projeto.carregar_modelo(2).estado != VERIFICADA

@@ -24,8 +24,6 @@ from abbychess.controlador import ControladorDePagina  # noqa: E402
 from abbychess.leitor import LeitorDoLivro  # noqa: E402
 from abbychess.projeto import FORA_DO_PDF, ProjetoDeLivro  # noqa: E402
 
-from tests.test_espaco import sim  # noqa: E402,F401
-from tests.test_visor import pdf_de_60_paginas  # noqa: E402,F401
 
 
 class _Medidas:
@@ -70,46 +68,46 @@ def _ler(projeto, posicao):
 def test_o_ctrl_z_do_giro_guarda_o_angulo_em_que_a_pagina_foi_lida(projeto, ctl):
     """A página sem leitura girada, lida deitada (0,6°) e o giro desfeito: a imagem de pé fica
     endireitada pelos 0,6° em que os boxes foram lidos, e não pelos 0° medidos agora."""
-    ctl.girar_paginas([2], 90)
+    ctl.operacoes.girar_paginas([2], 90)
     assert ctl.fonte.inclinacao(2) == 0.6
     _ler(projeto, 2)
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert projeto.sequencia.entrada_em(2).giro == 0
     assert ctl.fonte.inclinacao(2) == 0.6
-    ctl.refazer()
+    ctl.desfazedor.refazer()
     assert ctl.fonte.inclinacao(2) == 0.6
 
 
 def test_dividir_nao_mede_a_pagina_sem_leitura(projeto, ctl, medidas):
     antes = medidas.chamadas
-    assert ctl.dividir_paginas([3, 4, 5, 6, 7])
+    assert ctl.operacoes.dividir_paginas([3, 4, 5, 6, 7])
     assert medidas.chamadas == antes
 
 
 def test_dividir_pula_as_metades_e_avisa(projeto, ctl):
     avisos = []
     ctl.eventos.ligar("mensagem", lambda texto, *_: avisos.append(texto))
-    ctl.dividir_paginas([1])
-    assert ctl.dividir_paginas([1, 2, 3])                     # 1 e 2 já são metades
+    ctl.operacoes.dividir_paginas([1])
+    assert ctl.operacoes.dividir_paginas([1, 2, 3])                     # 1 e 2 já são metades
     assert len(projeto.sequencia) == 62
     assert "2 páginas já eram metades" in avisos[-1]
-    assert not ctl.dividir_paginas([1, 2])                    # só metades: nada muda
+    assert not ctl.operacoes.dividir_paginas([1, 2])                    # só metades: nada muda
 
 
 def test_a_inserida_e_a_metade_direita_nao_gravam_o_indice_do_pdf(projeto, ctl, tmp_path):
     imagem = tmp_path / "solta.png"
     Image.fromarray(np.full((300, 200), 255, np.uint8)).save(imagem)
-    projeto.gravar_sequencia(projeto.sequencia.inserir(projeto.inserir_arquivo(imagem), 5))
+    projeto.ordem.gravar(projeto.sequencia.inserir(projeto.ordem.inserir_arquivo(imagem), 5))
     _ler(projeto, 5)
     _ler(projeto, 8)
-    ctl.dividir_paginas([8])
-    projeto.descarregar()
+    ctl.operacoes.dividir_paginas([8])
+    projeto.paginas_em_memoria.descarregar()
     livro = json.loads((projeto.pasta / "livro.json").read_text(encoding="utf-8"))
     por_pid = {int(k): v["pagina_da_fonte"] for k, v in livro["paginas"].items()}
-    assert por_pid[projeto.pid_da_pagina(5)] == FORA_DO_PDF          # a inserida
-    assert por_pid[projeto.pid_da_pagina(8)] == 7                    # a esquerda: a p. 8
-    assert por_pid[projeto.pid_da_pagina(9)] == FORA_DO_PDF          # a direita
-    bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(5)}.json")
+    assert por_pid[projeto.ordem.pid_em(5)] == FORA_DO_PDF          # a inserida
+    assert por_pid[projeto.ordem.pid_em(8)] == 7                    # a esquerda: a p. 8
+    assert por_pid[projeto.ordem.pid_em(9)] == FORA_DO_PDF          # a direita
+    bruto = json.loads((projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(5)}.json")
                        .read_text(encoding="utf-8"))
     assert bruto["indice"] == FORA_DO_PDF
 
@@ -208,7 +206,7 @@ def test_o_endireitar_diz_o_que_o_ok_faz_conforme_a_caixa(app, janela, monkeypat
     habilitado, rotulo, previa = vistos["a_mao"]
     assert habilitado and rotulo == "Endireitar e desfazer a leitura"
     assert "A leitura de 1 página se desfaz" in previa
-    janela.pagina.endireitar_paginas([2], 1.5)                # uma com ângulo à mão
+    janela.pagina.operacoes.endireitar_paginas([2], 1.5)                # uma com ângulo à mão
     janela.endireitar_paginas([0, 1, 2])
     habilitado, rotulo, previa, _valor = vistos["medido"]
     assert habilitado and rotulo == "Voltar ao ângulo medido"
@@ -226,8 +224,8 @@ def test_mover_para_onde_ja_estao_e_recusado_no_dialogo():
 def test_o_aviso_de_dividir_conta_as_divididas(projeto, ctl):
     avisos = []
     ctl.eventos.ligar("mensagem", lambda texto, *_: avisos.append(texto))
-    ctl.dividir_paginas([1])
-    ctl.dividir_paginas([1, 2, 3, 4])                         # 1 e 2 são metades
+    ctl.operacoes.dividir_paginas([1])
+    ctl.operacoes.dividir_paginas([1, 2, 3, 4])                         # 1 e 2 são metades
     assert avisos[-1].startswith("Feito: Dividir 2 páginas (2 páginas já eram metades")
 
 
@@ -245,11 +243,39 @@ def test_ir_a_origem_diz_que_o_glifo_saiu_da_pagina_ou_do_livro(app, janela):
     _ler(projeto, 3)
     janela.ir_para_pagina(3)
     gid = projeto.carregar_modelo(3).boxes[0].gid
-    janela.pagina.cortar_paginas([3], (0.5, 0, 0, 0))          # o glifo fica de fora
+    janela.pagina.operacoes.cortar_paginas([3], (0.5, 0, 0, 0))          # o glifo fica de fora
     janela.ir_a_origem(3, gid)
     assert "saiu da página" in janela.statusBar().currentMessage()
     janela.ir_a_origem(None, gid)
     assert "saiu do livro" in janela.statusBar().currentMessage()
+    assert not janela.confirmacao.aberta          # a página está no livro: nada a restaurar
+
+
+def test_a_origem_numa_pagina_apagada_oferece_restaura_la(app, janela):
+    """§12.4: a amostra que vem de uma página apagada pergunta na barra; o Enter devolve a
+    página ao lugar e vai ao glifo, e o Esc não muda nada."""
+    projeto = janela.projeto
+    _ler(projeto, 3)
+    gid = projeto.carregar_modelo(3).boxes[0].gid
+    janela.pagina.operacoes.apagar_paginas([3])
+    assert projeto.sequencia.posicao_de(gid >> 20) is None
+    janela.ir_a_origem(None, gid)
+    assert janela.confirmacao.aberta
+    assert "depois da página 3" in janela.confirmacao.pergunta.text()
+    janela.confirmacao.recusar()
+    assert projeto.sequencia.posicao_de(gid >> 20) is None
+    janela.ir_a_origem(None, gid)
+    janela.confirmacao.aceitar.click()
+    assert projeto.sequencia.posicao_de(gid >> 20) == 3
+    assert janela.pagina.indice == 3 and janela.pagina.atual == gid
+    janela.pagina.desfazedor.desfazer()                      # o Ctrl+Z apaga de novo
+    assert projeto.sequencia.posicao_de(gid >> 20) is None
+
+
+def test_a_amostra_antiga_sem_gid_numa_pagina_apagada_so_avisa(app, janela):
+    janela.ir_a_origem(None, None)
+    assert "saiu do livro" in janela.statusBar().currentMessage()
+    assert not janela.confirmacao.aberta
 
 
 def test_a_busca_le_a_pagina_girada_fora_da_memoria_na_geometria_da_entrada(projeto, ctl):
@@ -262,9 +288,9 @@ def test_a_busca_le_a_pagina_girada_fora_da_memoria_na_geometria_da_entrada(proj
     caixas += [BoxEntry(char=c, x1=40 + 14 * k, y1=400, x2=52 + 14 * k, y2=420,
                         source="manual", confidence=1.0) for k, c in enumerate("mundo")]
     projeto.salvar_pagina(3, caixas)
-    ctl.girar_paginas([3], 90)
-    ctl.mover_paginas([3], 9)                                  # e muda de lugar
-    posicao = projeto.posicao_do_pid(projeto.sequencia.entradas[9].pid)
+    ctl.operacoes.girar_paginas([3], 90)
+    ctl.operacoes.mover_paginas([3], 9)                                  # e muda de lugar
+    posicao = projeto.ordem.posicao_de(projeto.sequencia.entradas[9].pid)
     na_memoria = bs._indexar_tarefa((projeto.carregar_modelo(posicao).instantaneo(), "pt", 0))
     entrada = projeto.sequencia.entrada_em(posicao)
     do_arquivo = bs._indexar_tarefa(((str(projeto.arquivo_da_pagina(posicao)), posicao,
@@ -275,17 +301,18 @@ def test_a_busca_le_a_pagina_girada_fora_da_memoria_na_geometria_da_entrada(proj
 def test_o_ctrl_z_da_divisao_pelo_carimbo_com_o_cache_vazio(projeto, ctl):
     """O caminho rápido do desfazer (o arquivo como `trocar_paginas` o deixou): aceita a página
     intocada e recusa a que mudou por fora."""
+    def esvaziar_o_cache():                                         # as páginas só no disco
+        projeto.paginas_em_memoria.tirar([e.pid for e in projeto.sequencia.entradas])
+
     _ler(projeto, 2)
-    ctl.dividir_paginas([2])
-    with projeto._trava_do_cache:
-        projeto._modelos.clear()
-    assert ctl.desfazer() is None and len(projeto.sequencia) == 60   # intocada: desfaz
-    ctl.refazer()
-    with projeto._trava_do_cache:
-        projeto._modelos.clear()
-    arquivo = projeto.pasta / "paginas" / f"p{projeto.pid_da_pagina(3)}.json"
+    ctl.operacoes.dividir_paginas([2])
+    esvaziar_o_cache()
+    assert ctl.desfazedor.desfazer() is None and len(projeto.sequencia) == 60   # intocada: desfaz
+    ctl.desfazedor.refazer()
+    esvaziar_o_cache()
+    arquivo = projeto.pasta / "paginas" / f"p{projeto.ordem.pid_em(3)}.json"
     bruto = json.loads(arquivo.read_text(encoding="utf-8"))
     bruto["estado"] = "verificada"                                  # mudou por fora
     arquivo.write_text(json.dumps(bruto), encoding="utf-8")
-    ctl.desfazer()
+    ctl.desfazedor.desfazer()
     assert len(projeto.sequencia) == 61                             # recusado

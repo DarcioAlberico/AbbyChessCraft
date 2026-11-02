@@ -16,15 +16,17 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QPoint, Qt  # noqa: E402
 from PySide6.QtGui import QTextCharFormat  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
-from PySide6.QtWidgets import QApplication, QLabel  # noqa: E402
+from PySide6.QtWidgets import QApplication, QGraphicsRectItem, QLabel  # noqa: E402
 
 from abbychess import texto as tx  # noqa: E402
 from abbychess.modelo import Estilo  # noqa: E402
+from abbychess.app import estilo  # noqa: E402
 from abbychess.app.documento import VistaDoDocumento  # noqa: E402
 
 from tests.janela_util import atual, boxes, fila  # noqa: E402
-from tests.test_espaco import _abrir, _dentro, janela, lida, sim  # noqa: E402,F401
-from tests.test_janela import _esperar  # noqa: E402
+from tests.ajudantes import _abrir, _dentro  # noqa: E402,F401,F811
+from tests.fixturas_espaco import janela  # noqa: E402,F401,F811
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 
 
 @pytest.fixture(scope="module")
@@ -176,7 +178,7 @@ def test_o_diagrama_entra_com_o_desenho_a_linha_o_estado_e_copiar_fen(app):
 
 @pytest.fixture
 def lida_a_mao(app, janela):  # noqa: F811
-    from tests.test_janela_areas_e_verificacao import _ler_a_mao
+    from tests.ajudantes import _ler_a_mao  # noqa: E402,F401,F811
 
     _ler_a_mao(app, janela)
     janela.pintar_texto()
@@ -192,16 +194,34 @@ def _clicar_no_gid(app, j, gid):
     app.processEvents()
 
 
+#: Os contornos de palavra que a Imagem desenha: (a cor, o traço, a camada). O tracejado azul
+#: é a palavra sob o cursor do Documento; o rosa contínuo, a palavra em verificação.
+DO_DOCUMENTO = (estilo.AZUL, Qt.PenStyle.DashLine, 12)
+EM_VERIFICACAO = (estilo.PALAVRA, Qt.PenStyle.SolidLine, 13)
+
+
+def _contornos(j, caneta) -> list:
+    """Os retângulos que a cena da Imagem tem com a `caneta` (o que o usuário vê)."""
+    cor, traco, camada = caneta
+    return [item.rect() for item in j.visor.scene().items()
+            if isinstance(item, QGraphicsRectItem) and item.pen().color() == cor
+            and item.pen().style() == traco and item.zValue() == camada]
+
+
+def _gids_da_faixa(j) -> list:
+    """Os glifos que a faixa Linha mostra, como gids."""
+    return [j.pagina.gids[j.pagina.boxes.index(b)] for b in j.linha.glifos]
+
+
 def test_ca_6_1_clicar_numa_palavra_destaca_os_glifos_dela_na_imagem(app, lida_a_mao):
     j = lida_a_mao
     alvo = j.pagina.gids[4]
     palavra = j.texto.palavra_de(alvo)
     _clicar_no_gid(app, j, alvo)
-    destaque = j.visor._palavra_do_documento               # o destaque gravado no item
+    [r] = _contornos(j, DO_DOCUMENTO)                      # o destaque, na cena
     escolhidos = [boxes(j)[j.pagina.indice_de(g)] for g in palavra]
     esperado = (min(b.x1 for b in escolhidos), min(b.y1 for b in escolhidos),
                 max(b.x2 for b in escolhidos), max(b.y2 for b in escolhidos))
-    r = destaque.rect()
     assert abs(r.left() - esperado[0]) <= 8 and abs(r.right() - esperado[2]) <= 8   # a margem
     assert atual(j) == alvo and j.inspetor.atual() == "glifo"
 
@@ -250,9 +270,9 @@ def test_o_cursor_no_documento_destaca_a_palavra_certa_e_mostra_a_linha(app, lid
     app.processEvents()
     gid = j.texto.gid_no_cursor()
     x1, y1, x2, y2 = _caixa_de(j, j.texto.palavra_de(gid))
-    r = j.visor._palavra_do_documento.rect()
+    [r] = _contornos(j, DO_DOCUMENTO)
     assert abs(r.left() - (x1 - 4)) < 1 and abs(r.right() - (x2 + 4)) < 1
-    linha = [j.pagina.gids[j.pagina.boxes.index(b)] for b in j.linha._boxes]
+    linha = _gids_da_faixa(j)
     assert gid in linha and linha == j.texto.linha_de(gid)
 
 
@@ -262,13 +282,14 @@ def test_o_cursor_do_documento_nao_apaga_a_palavra_em_verificacao(app, lida_a_ma
     j = lida_a_mao
     j.verificador.lexico = lexico.Lexico(palavras={"abc"})
     j.fila.definir("palavras")
-    contorno = j.visor._palavra
-    assert contorno is not None
+    [contorno] = _contornos(j, EM_VERIFICACAO)
+    assert _contornos(j, DO_DOCUMENTO) == []
     j.texto.setFocus()
     j.texto.ir_ao_gid(j.pagina.gids[0], rolar=False)
     QTest.keyClick(j.texto, Qt.Key.Key_Down)
     app.processEvents()
-    assert j.visor._palavra is contorno and j.visor._palavra_do_documento is not None
+    assert _contornos(j, EM_VERIFICACAO) == [contorno]     # a de antes, no mesmo lugar
+    assert len(_contornos(j, DO_DOCUMENTO)) == 1
 
 
 def test_sem_seguir_o_cursor_do_documento_nao_rola_a_imagem(app, lida_a_mao):
@@ -299,11 +320,15 @@ def test_o_clique_no_branco_depois_da_linha_nao_escolhe_glifo(app, lida_a_mao):
 
 
 def test_a_linha_sem_o_mapa_do_documento_vem_da_geometria(app, lida):  # noqa: F811
+    """O glifo novo de uma edição (Ctrl+D) antes de o Documento montar de novo, no relógio
+    dele: a Linha o acha pela altura dele na página."""
     j = lida
-    j.texto._linha_do_gid = {}                             # o instante antes de montar
-    j._mostrar_a_linha()
-    linha = [j.pagina.gids[j.pagina.boxes.index(b)] for b in j.linha._boxes]
-    assert atual(j) in linha and len(linha) > 1
+    j.pagina.escolher(j.pagina.gids[4])
+    j.pagina.dividir()                                     # Ctrl+D: a primeira parte, escolhida
+    novo = j.pagina.atual
+    assert novo not in j.texto.linha_de(novo)              # o Documento ainda não a tem
+    linha = _gids_da_faixa(j)
+    assert novo in linha and len(linha) > 1
 
 
 def test_montar_de_novo_mantem_a_selecao(app, lida_a_mao):
@@ -330,8 +355,7 @@ def test_ctrl_f5_esconde_e_mostra_a_linha(app, lida):  # noqa: F811
 def test_a_linha_mostra_a_linha_do_glifo_atual(app, lida):  # noqa: F811
     j = lida
     j.pintar_texto()
-    assert j.linha._boxes and atual(j) in [j.pagina.gids[j.pagina.boxes.index(b)]
-                                         for b in j.linha._boxes]
+    assert atual(j) is not None and j.pagina.atual in _gids_da_faixa(j)
     assert j.linha.escala > 0
 
 
@@ -339,7 +363,7 @@ def test_o_inspetor_usa_a_faixa_linha_sem_duplicar_o_recorte_na_linha(app, lida)
     j = lida
     rotulos = [rotulo.text() for rotulo in j.treino.findChildren(QLabel)]
     assert "<b>Na linha</b>" not in rotulos
-    assert j.linha._boxes and j.linha.isVisible()
+    assert j.linha.glifos and j.linha.isVisible()
 
 
 def test_o_zoom_no_documento_muda_o_corpo_e_nao_a_imagem(app, lida_a_mao):
@@ -388,7 +412,7 @@ def test_x_height_na_linha(app, tmp_path, sim, largura, altura):  # noqa: F811
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
     from tests.livros import PASTA_DOS_PDFS
-    from tests.test_espaco import _x_height_do_gabarito
+    from tests.ajudantes import _x_height_do_gabarito  # noqa: E402,F401,F811
 
     raiz = Path(__file__).resolve().parent.parent
     verdade = json.loads((raiz / "tests" / "verdade" / "xv" / "i025.json").read_text(encoding="utf-8"))
@@ -522,13 +546,13 @@ def test_as_margens_seguem_o_texto_e_a_posicao_dos_glifos(app):
     p = ControladorDePagina(Eventos(), ExecutorSincrono())
     p.imagem = Image.new("L", (2000, 2800), 255)
     p.modelo = pagina("12", 60)
-    assert 1 in p.gids_de_margem()                         # "12": o número da página
+    assert 1 in p.fila_da_pagina.gids_de_margem()          # "12": o número da página
     p.modelo = pagina("lz", 60)                            # os mesmos gids, outro texto
-    assert 1 not in p.gids_de_margem()
+    assert 1 not in p.fila_da_pagina.gids_de_margem()
     p.modelo = pagina("12", 60)
-    assert 1 in p.gids_de_margem()
+    assert 1 in p.fila_da_pagina.gids_de_margem()
     p.modelo = pagina("12", 1300)                          # no meio da página: não é margem
-    assert 1 not in p.gids_de_margem()
+    assert 1 not in p.fila_da_pagina.gids_de_margem()
 
 
 def test_a_pagina_reconhecida_e_vazia_diz_nada_reconhecido(app, janela, monkeypatch):  # noqa: F811

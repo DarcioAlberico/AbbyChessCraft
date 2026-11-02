@@ -49,6 +49,7 @@ pode ser promovida para lá. A leitura e a gravação usam `np.fromfile` e
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -60,6 +61,8 @@ import numpy as np
 from core.learner import char_to_folder, folder_to_char
 
 from abbychess import gravacao as gv
+
+log = logging.getLogger(__name__)
 
 LADO = 32
 METADADOS = "metadados.json"
@@ -80,19 +83,39 @@ TOLERANCIA_DE_ALTURA = 0.20
 PROPORCAO_MAXIMA = 1.6
 
 
-def _efeito(valor) -> Optional[Tuple[bool, bool]]:
-    """Normaliza o efeito conhecido para ``(negrito, italico)``.
+def _eixo(valor) -> Optional[bool]:
+    return None if valor is None else bool(valor)
 
-    ``None`` significa que o efeito ainda não foi medido. Aceitar tanto o ``Estilo`` do
-    modelo quanto uma sequência curta mantém este módulo independente do modelo da página.
-    Sublinhado é uma decisão editorial, não um efeito de impressão reconhecido.
+
+def _efeito(valor) -> Optional[Tuple[Optional[bool], Optional[bool]]]:
+    """Normaliza o efeito para ``(negrito, italico)``, cada eixo ``None`` quando não foi
+    medido; ``None`` inteiro quando nenhum dos dois foi.
+
+    Aceitar tanto o ``Estilo`` do modelo quanto uma sequência curta mantém este módulo
+    independente do modelo da página. Sublinhado é uma decisão editorial, não um efeito de
+    impressão reconhecido.
     """
     if valor is None:
         return None
     if hasattr(valor, "negrito"):
-        return bool(valor.negrito), bool(valor.italico)
-    itens = list(valor)
-    return bool(itens[0]) if itens else False, bool(itens[1]) if len(itens) > 1 else False
+        par = _eixo(valor.negrito), _eixo(valor.italico)
+    else:
+        itens = list(valor) + [None, None]
+        par = _eixo(itens[0]), _eixo(itens[1])
+    return None if par == (None, None) else par
+
+
+def _efeito_json(efeito) -> list:
+    """O efeito no `metadados.json`: [negrito, itálico], com `null` no eixo não medido."""
+    return [None if v is None else int(v) for v in efeito]
+
+
+def efeitos_compativeis(a, b) -> bool:
+    """Se uma amostra de efeito `a` pode ser vizinha de um glifo de efeito `b`: em cada eixo
+    que os dois conhecem, o mesmo valor (o eixo não medido vale para os dois lados)."""
+    if a is None or b is None:
+        return True
+    return all(x is None or y is None or x == y for x, y in zip(a, b))
 
 
 @dataclass(frozen=True)
@@ -126,6 +149,26 @@ def _ler_png(caminho: Path) -> Optional[np.ndarray]:
     return cv2.imdecode(dados, cv2.IMREAD_GRAYSCALE) if dados.size else None
 
 
+def _cinza(recorte: np.ndarray) -> np.ndarray:
+    return recorte if recorte.ndim == 2 else cv2.cvtColor(recorte, cv2.COLOR_RGB2GRAY)
+
+
+def _png(cinza: np.ndarray, char: str) -> bytes:
+    ok, png = cv2.imencode(".png", cinza)
+    if not ok:
+        raise OSError(f"O recorte de '{char}' não pôde ser codificado em PNG.")
+    return png.tobytes()
+
+
+def _meta_da_amostra(altura_relativa: Optional[float], origem: str, efeito) -> dict:
+    """Os metadados de uma amostra ensinada: a altura (arredondada), a origem e o efeito."""
+    return {
+        "altura": None if altura_relativa is None else round(float(altura_relativa), 4),
+        "origem": origem,
+        **({"efeito": _efeito_json(efeito)} if efeito is not None else {}),
+    }
+
+
 def _nome_limpo(origem: str) -> str:
     limpo = "".join(c for c in origem if c.isascii() and (c.isalnum() or c in "-_"))
     return f"{limpo[:70]}_{uuid.uuid4().hex[:8]}" if limpo else uuid.uuid4().hex
@@ -157,27 +200,16 @@ class PadroesDoLivro:
 
     # ------------------------------------------------------------------
     def _carregar(self) -> None:
-        arquivo = self.pasta / METADADOS
-        try:
-            self._meta: Dict[str, dict] = (json.loads(arquivo.read_text(encoding="utf-8"))
-                                           if arquivo.is_file() else {})
-        except ValueError:
-            self._meta = {}
+        self._meta: Dict[str, dict] = self._metadados_lidos()
         vetores, chars, alturas, proporcoes, efeitos, caminhos = [], [], [], [], [], []
-        subpastas = self.pasta.iterdir() if self.pasta.is_dir() else ()
-        for pasta in sorted(p for p in subpastas if p.is_dir()):
-            char = folder_to_char(pasta.name)
-            for png in sorted(pasta.glob("*.png")):
-                imagem = _ler_png(png)
-                if imagem is None:
-                    continue
-                vetores.append(_vetor(imagem))
-                chars.append(char)
-                proporcoes.append(_proporcao(imagem))
-                meta = self._meta.get(self._chave(png), {})
-                alturas.append(meta.get("altura", np.nan))
-                efeitos.append(_efeito(meta.get("efeito")))
-                caminhos.append(png)
+        for char, png, imagem in self._amostras_em_disco():
+            vetores.append(_vetor(imagem))
+            chars.append(char)
+            proporcoes.append(_proporcao(imagem))
+            meta = self._meta.get(self._chave(png), {})
+            alturas.append(meta.get("altura", np.nan))
+            efeitos.append(_efeito(meta.get("efeito")))
+            caminhos.append(png)
         self._X = (np.stack(vetores) if vetores else np.zeros((0, LADO * LADO), np.float32))
         self._normas = (self._X * self._X).sum(axis=1)
         self._chars, self._caminhos = chars, caminhos
@@ -185,8 +217,59 @@ class PadroesDoLivro:
         self._proporcoes = np.array(proporcoes, dtype=np.float32)
         self._efeitos = efeitos
 
+    def _metadados_lidos(self) -> Dict[str, dict]:
+        arquivo = self.pasta / METADADOS
+        try:
+            return json.loads(arquivo.read_text(encoding="utf-8")) if arquivo.is_file() else {}
+        except ValueError:
+            self._guardar_os_metadados_ilegiveis(arquivo)
+            return {}
+
+    def _amostras_em_disco(self):
+        """(caractere, caminho, imagem) de cada PNG legível, pasta por pasta, em ordem."""
+        subpastas = self.pasta.iterdir() if self.pasta.is_dir() else ()
+        for pasta in sorted(p for p in subpastas if p.is_dir()):
+            char = folder_to_char(pasta.name)
+            for png in sorted(pasta.glob("*.png")):
+                imagem = _ler_png(png)
+                if imagem is not None:
+                    yield char, png, imagem
+
+    def _guardar_os_metadados_ilegiveis(self, arquivo: Path) -> None:
+        """O `metadados.json` ilegível vai inteiro para `metadados.corrompido[-N].json` antes
+        que a próxima gravação o substitua (SPEC-qualidade Q-C4): a altura e o efeito dos
+        padrões não somem sem rastro."""
+        destino, n = self.pasta / "metadados.corrompido.json", 1
+        while destino.exists():
+            n += 1
+            destino = self.pasta / f"metadados.corrompido-{n}.json"
+        try:
+            gv.gravar_bytes(destino, arquivo.read_bytes())
+        except OSError:
+            log.warning("o %s dos padrões está ilegível e não foi guardado à parte",
+                        arquivo, exc_info=True)
+            return
+        log.warning("o %s dos padrões está ilegível: a altura e o efeito deles recomeçam, e o "
+                    "arquivo foi guardado em %s", arquivo, destino.name)
+
+    def _do_livro(self, caminho: str | Path) -> Path:
+        """O caminho resolvido de um padrão; erro se ele não está na pasta deste livro (nem
+        esquecer nem restaurar escrevem fora dela)."""
+        caminho = Path(caminho).resolve()
+        if self.pasta.resolve() not in caminho.parents:
+            raise ValueError(f"{caminho} não é um padrão deste livro.")
+        return caminho
+
     def _chave(self, caminho: Path) -> str:
-        return caminho.relative_to(self.pasta).as_posix()
+        """A chave do `metadados.json`: o caminho relativo à pasta dos padrões. Aceita também
+        o caminho já relativo, que é a procedência gravada no `Box` (`relativo`)."""
+        caminho = Path(caminho)
+        if not caminho.is_absolute():
+            return caminho.as_posix()
+        try:
+            return caminho.relative_to(self.pasta).as_posix()
+        except ValueError:                       # o mesmo arquivo por outro nome (8.3, link)
+            return caminho.resolve().relative_to(self.pasta.resolve()).as_posix()
 
     def relativo(self, caminho) -> Optional[str]:
         """O caminho da amostra relativo à pasta dos padrões (a procedência gravada no `Box`)."""
@@ -231,9 +314,10 @@ class PadroesDoLivro:
         efeito = _efeito(efeito)
         if efeito is not None and candidatos.size:
             # Padrões antigos, sem efeito, continuam utilizáveis. Quando ambos os lados
-            # são conhecidos, porém, pesos diferentes nunca chegam a ser vizinhos.
+            # conhecem um eixo, porém, pesos diferentes nunca chegam a ser vizinhos.
             candidatos = np.array([i for i in candidatos
-                                   if self._efeitos[int(i)] in (None, efeito)], dtype=int)
+                                   if efeitos_compativeis(self._efeitos[int(i)], efeito)],
+                                  dtype=int)
         if not candidatos.size:
             return Resposta("", 0.0, float(distancias.min()), None)
         i = int(candidatos[np.argmin(distancias[candidatos])])
@@ -279,19 +363,12 @@ class PadroesDoLivro:
         """Grava o recorte no tamanho original e o torna consultável na hora."""
         if not char:
             raise ValueError("O caractere ensinado não pode ser vazio.")
-        cinza = recorte if recorte.ndim == 2 else cv2.cvtColor(recorte, cv2.COLOR_RGB2GRAY)
+        cinza = _cinza(recorte)
         pasta = self.pasta / char_to_folder(char)
         caminho = pasta / f"{_nome_limpo(origem)}.png"
-        ok, png = cv2.imencode(".png", cinza)
-        if not ok:
-            raise OSError(f"O recorte de '{char}' não pôde ser codificado em PNG.")
-        gv.gravar_bytes(caminho, png.tobytes())
+        gv.gravar_bytes(caminho, _png(cinza, char))
         efeito = _efeito(efeito)
-        self._meta[self._chave(caminho)] = {
-            "altura": None if altura_relativa is None else round(float(altura_relativa), 4),
-            "origem": origem,
-            **({"efeito": [int(v) for v in efeito]} if efeito is not None else {}),
-        }
+        self._meta[self._chave(caminho)] = _meta_da_amostra(altura_relativa, origem, efeito)
         self._gravar_meta()
         v = _vetor(cinza)
         # Listas novas, e não `append`: um instantâneo (a propagação lendo noutra thread)
@@ -306,10 +383,69 @@ class PadroesDoLivro:
         self._efeitos = self._efeitos + [efeito]
         return caminho
 
+    def ensinar_varios(self, pedidos) -> List[Path]:
+        """Vários `ensinar` de uma vez, com os metadados gravados uma vez e a matriz crescida
+        uma vez (a Galeria ensina centenas): `pedidos` é [(recorte, char, altura, origem)],
+        com o efeito como quinto item opcional (sem ele, o efeito é desconhecido)."""
+        gravados = [self._gravar_o_pedido(pedido) for pedido in pedidos]
+        if not gravados:
+            return []
+        self._gravar_meta()
+        caminhos, cinzas, chars, alturas, efeitos = map(list, zip(*gravados))
+        self._acrescentar(np.vstack([_vetor(cinza) for cinza in cinzas]), chars, caminhos,
+                          [_proporcao(cinza) for cinza in cinzas], alturas, efeitos)
+        return caminhos
+
+    def _gravar_o_pedido(self, pedido) -> tuple:
+        """Grava o recorte de um pedido do `ensinar_varios` e os metadados dele (sem
+        gravá-los); (caminho, cinza, caractere, altura, efeito)."""
+        recorte, char, altura_relativa, origem = pedido[:4]
+        efeito = _efeito(pedido[4] if len(pedido) > 4 else None)
+        if not char:
+            raise ValueError("O caractere ensinado não pode ser vazio.")
+        cinza = _cinza(recorte)
+        caminho = self.pasta / char_to_folder(char) / f"{_nome_limpo(origem)}.png"
+        gv.gravar_bytes(caminho, _png(cinza, char))
+        self._meta[self._chave(caminho)] = _meta_da_amostra(altura_relativa, origem, efeito)
+        return caminho, cinza, char, altura_relativa, efeito
+
+    def _acrescentar(self, matriz: np.ndarray, chars, caminhos, proporcoes, alturas,
+                     efeitos) -> None:
+        """As linhas novas na matriz e nas listas, trocadas e não mudadas no lugar (o
+        instantâneo de outra thread nunca vê tamanhos diferentes), sem reler os padrões."""
+        self._X = np.vstack([self._X, matriz])
+        self._normas = np.append(self._normas, np.einsum("ij,ij->i", matriz, matriz))
+        self._chars = self._chars + chars
+        self._caminhos = self._caminhos + caminhos
+        self._proporcoes = np.append(self._proporcoes, np.array(proporcoes, np.float32))
+        self._alturas = np.append(self._alturas, np.array(
+            [np.nan if a is None else a for a in alturas], np.float32))
+        self._efeitos = self._efeitos + efeitos
+
+    def _manter(self, manter: List[int]) -> None:
+        """Só as linhas `manter` na matriz e nas listas."""
+        self._X = self._X[manter] if manter else np.zeros((0, LADO * LADO), np.float32)
+        self._normas = self._normas[manter]
+        self._chars = [self._chars[i] for i in manter]
+        self._caminhos = [self._caminhos[i] for i in manter]
+        self._proporcoes = self._proporcoes[manter]
+        self._alturas = self._alturas[manter]
+        self._efeitos = [self._efeitos[i] for i in manter]
+
+    def esquecer_varios(self, caminhos) -> None:
+        """Vários `esquecer` de uma vez: os arquivos saem, os metadados são gravados uma vez
+        e as linhas deles saem da matriz (sem reler os outros padrões)."""
+        raiz = self.pasta.resolve()
+        resolvidos = [self._do_livro(c) for c in caminhos]
+        for caminho in resolvidos:
+            gv.apagar(caminho)
+            self._meta.pop(caminho.relative_to(raiz).as_posix(), None)
+        self._gravar_meta()
+        saem = set(resolvidos) | {Path(c) for c in caminhos}   # sem resolver a base inteira
+        self._manter([i for i, c in enumerate(self._caminhos) if Path(c) not in saem])
+
     def esquecer(self, caminho: str | Path) -> None:
-        caminho = Path(caminho).resolve()
-        if self.pasta.resolve() not in caminho.parents:
-            raise ValueError(f"{caminho} não é um padrão deste livro.")
+        caminho = self._do_livro(caminho)
         gv.apagar(caminho)
         self._meta.pop(caminho.relative_to(self.pasta.resolve()).as_posix(), None)
         self._gravar_meta()
@@ -345,13 +481,7 @@ class PadroesDoLivro:
         manter = [i for i, c in enumerate(self._caminhos) if Path(c) != caminho]
         if len(manter) == len(self._caminhos):
             return
-        self._X = self._X[manter] if manter else np.zeros((0, LADO * LADO), np.float32)
-        self._normas = self._normas[manter]
-        self._chars = [self._chars[i] for i in manter]
-        self._caminhos = [self._caminhos[i] for i in manter]
-        self._proporcoes = self._proporcoes[manter]
-        self._alturas = self._alturas[manter]
-        self._efeitos = [self._efeitos[i] for i in manter]
+        self._manter(manter)
 
     def altura_de(self, caminho: str | Path) -> Optional[float]:
         """A altura relativa gravada da amostra (para o delta que vai ao servidor)."""
@@ -375,15 +505,46 @@ class PadroesDoLivro:
         chave = caminho.relative_to(self.pasta.resolve()).as_posix()
         return Amostra(caminho, caminho.read_bytes(), dict(self._meta.get(chave, {})))
 
-    def restaurar(self, amostra: Amostra) -> None:
-        """Devolve um padrão apagado, com a altura gravada, e o torna consultável."""
-        caminho = Path(amostra.caminho).resolve()
-        if self.pasta.resolve() not in caminho.parents:
-            raise ValueError(f"{caminho} não é um padrão deste livro.")
-        gv.gravar_bytes(caminho, amostra.png)
-        self._meta[caminho.relative_to(self.pasta.resolve()).as_posix()] = dict(amostra.meta)
+    def restaurar_varios(self, amostras) -> None:
+        """Devolve os padrões apagados, com a altura gravada, e os torna consultáveis (o
+        desfazer de um esquecer, o refazer de um ensinar da Galeria): os metadados gravados
+        e os padrões relidos uma vez só."""
+        raiz = self.pasta.resolve()
+        resolvidos = [(self._do_livro(a.caminho), a) for a in amostras]
+        novos = []
+        for caminho, amostra in resolvidos:
+            novo = self._restaurar_a_amostra(raiz, caminho, amostra)
+            if novo is not None:
+                novos.append(novo)
+        if not resolvidos:
+            return
         self._gravar_meta()
-        self._carregar()
+        if novos:
+            self._acrescentar_as_restauradas(novos)
+
+    def _restaurar_a_amostra(self, raiz: Path, caminho: Path, amostra: Amostra):
+        """Grava o arquivo e os metadados da amostra; (caminho, cinza, metadados) da que
+        ainda não é lida, ou None."""
+        gv.gravar_bytes(caminho, amostra.png)
+        self._meta[caminho.relative_to(raiz).as_posix()] = dict(amostra.meta)
+        # O caminho como o `_carregar` o monta (a pasta do livro sem resolver).
+        local = self.pasta / caminho.relative_to(raiz)
+        if local not in self._caminhos:
+            cinza = cv2.imdecode(np.frombuffer(amostra.png, np.uint8), cv2.IMREAD_GRAYSCALE)
+            if cinza is not None:
+                return local, cinza, amostra.meta
+        return None
+
+    def _acrescentar_as_restauradas(self, novos: list) -> None:
+        # As linhas entram na matriz como no `ensinar_varios` (sem reler os outros padrões:
+        # o Ctrl+Z de um esquecer de 40 numa base de 2.000 levava segundos).
+        locais, cinzas, metas = map(list, zip(*novos))
+        alturas = [m.get("altura") for m in metas]
+        self._acrescentar(np.vstack([_vetor(cinza) for cinza in cinzas]),
+                          [folder_to_char(c.parent.name) for c in locais], locais,
+                          [_proporcao(cinza) for cinza in cinzas],
+                          [None if a is None else float(a) for a in alturas],
+                          [_efeito(m.get("efeito")) for m in metas])
 
     def meta_de(self, caminho: str | Path) -> dict:
         """Os metadados gravados da amostra (a altura relativa, a origem; o efeito, desde o
@@ -392,6 +553,18 @@ class PadroesDoLivro:
             return dict(self._meta.get(self._chave(Path(caminho)), {}))
         except ValueError:
             return {}
+
+    def ensinados_depois(self, instante: float) -> int:
+        """Quantos padrões foram gravados depois de `instante` (o `st_mtime` de um arquivo): a
+        página lida antes deles não os usou (Mirkovic: as pp. 10 e 89, lidas na criação do
+        projeto, ficaram com o O lido como 0 depois do treino nas pp. 18, 19 e 160)."""
+        novos = 0
+        for caminho in self._caminhos:
+            try:
+                novos += Path(caminho).stat().st_mtime > instante
+            except OSError:
+                continue
+        return novos
 
     def por_caractere(self) -> Dict[str, List[Path]]:
         resultado: Dict[str, List[Path]] = {}

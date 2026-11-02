@@ -17,9 +17,9 @@ import time
 
 import pytest
 
-from tests.desempenho.conftest import cronometrar, p95, percentil
+from tests.desempenho.conftest import AQUECIMENTOS, REPETICOES, cronometrar, p95, percentil
 from tests.livros import PASTA_DOS_PDFS
-from tests.test_janela import _esperar
+from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar
 
 pytestmark = [pytest.mark.desempenho, pytest.mark.livro_real, pytest.mark.timeout(1800)]
@@ -119,7 +119,65 @@ def test_troca_de_pagina_fora_do_cache(ambiente, medidas):
     medidas["troca_fora_do_cache"] = {
         **resultado, "alvo_ms": 600,
         "como": "mesmo processo, o cache de páginas e o de pixmaps esvaziados antes de cada "
-                "troca (o processo novo, com a primeira carga do PDF, não está nesta medida)"}
+                "troca (o processo novo, com a primeira carga do PDF, não está nesta medida); "
+                "2 aquecimentos e 12 repetições, não os 5 e 30 da §15.3: cada troca renderiza "
+                "e endireita a página de novo, e a medida inteira segue em poucos segundos"}
+
+
+#: A primeira das páginas nunca vistas que quem folheia atravessa (longe das lidas).
+PRIMEIRA_NUNCA_VISTA = 60
+#: Quanto quem folheia fica em cada página (a pré-carga trabalha nesse tempo).
+PARADO_EM_CADA = 0.25
+
+
+def test_folhear_paginas_nunca_vistas(ambiente, medidas):
+    """Quem folheia (passo K): uma página nunca vista atrás da outra, parado 0,25 s em cada.
+    A troca vai de `ir_para_pagina` ao visor pintado; com a pré-carga no sentido do passo,
+    a página seguinte já está renderizada quando chega. No tempo parado, um relógio de 1 ms
+    na thread principal mede a maior parada da interface (o render da pré-carga num
+    processo à parte não segura o GIL daqui)."""
+    from PySide6.QtCore import QTimer
+    from PySide6.QtGui import QImage, QPainter
+
+    app, janela = ambiente
+    imagem = QImage(1600, 1000, QImage.Format.Format_ARGB32)
+    paginas = iter(range(PRIMEIRA_NUNCA_VISTA,
+                         PRIMEIRA_NUNCA_VISTA + AQUECIMENTOS + REPETICOES))
+    marcas: list = []
+    relogio = QTimer()
+    relogio.setInterval(1)
+    relogio.timeout.connect(lambda: marcas.append(time.perf_counter()))
+    paradas: list = []
+
+    def parado(i):
+        if i == 0:
+            return
+        marcas.clear()
+        relogio.start()
+        fim = time.monotonic() + PARADO_EM_CADA
+        while time.monotonic() < fim:
+            app.processEvents()
+            time.sleep(0.001)
+        relogio.stop()
+        if i > AQUECIMENTOS:            # a parada depois de uma troca medida
+            vaos = [b - a for a, b in zip(marcas, marcas[1:])]
+            paradas.append(1000 * max(vaos) if vaos else 0.0)
+
+    def folhear(_i):
+        janela.ir_para_pagina(next(paginas))
+        pintor = QPainter(imagem)
+        janela.visor.render(pintor)
+        pintor.end()
+
+    resultado = cronometrar(folhear, antes=parado)
+    medidas["folhear_nunca_vistas"] = {
+        **resultado,
+        "parada_da_interface_p50_ms": round(percentil(paradas, 0.5), 2),
+        "parada_da_interface_p95_ms": round(p95(paradas), 2),
+        "parada_da_interface_max_ms": round(max(paradas), 2),
+        "como": f"páginas {PRIMEIRA_NUNCA_VISTA + 1} em diante, nunca vistas nem lidas, uma "
+                f"atrás da outra, parado {PARADO_EM_CADA} s em cada; a parada é o maior vão "
+                "entre os tiques de um QTimer de 1 ms na thread principal no tempo parado"}
 
 
 def test_enter_ensinar(ambiente, medidas):
@@ -301,13 +359,13 @@ def _memoria_do_historico(app, janela) -> dict:
         # O gravador (outra thread, que o `tracemalloc` também vê) termina antes de cada
         # leitura: sem isso, o que ele aloca e solta entre as duas era maior que o que o
         # histórico prende (rodadas do 2b com −9,6 e 0,2 MB).
-        janela.projeto.descarregar(10)
+        janela.projeto.paginas_em_memoria.descarregar(10)
         gc.collect()
         cheio, _ = tracemalloc.get_traced_memory()
         rss_cheio = processo.memory_info().rss
         estimativa = janela.pagina.historico.bytes
         janela.pagina.historico.limpar()
-        janela.projeto.descarregar(10)
+        janela.projeto.paginas_em_memoria.descarregar(10)
         gc.collect()
         vazio, _ = tracemalloc.get_traced_memory()
     finally:

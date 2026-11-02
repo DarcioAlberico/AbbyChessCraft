@@ -16,17 +16,19 @@ from __future__ import annotations
 
 import zipfile
 
-import fitz
 import pytest
 from PIL import Image
 
 from core.box_model import BoxEntry
 
 from abbychess import exportar as ex
+from abbychess import margens as mg
+from abbychess import montagem as mo
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.modelo import Box, Pagina
 from abbychess.projeto import ProjetoDeLivro
+from tests.ajudantes import _pdf_digital  # noqa: E402,F401,F811
 
 
 def _linha(texto, y, x=300, altura=50, largura=30, alturas=None):
@@ -42,7 +44,7 @@ def _linha(texto, y, x=300, altura=50, largura=30, alturas=None):
 
 
 def _texto(boxes):
-    return " ".join(t for linha in ex.palavras(boxes) for t, _ in linha)
+    return " ".join(t for linha in mo.palavras(boxes) for t, _ in linha)
 
 
 # ----------------------------------------------------------------------
@@ -81,20 +83,20 @@ def test_as_coordenadas_do_tabuleiro_saem_do_texto():
     letras = [BoxEntry("abcdefgh"[k], 1015 + 50 * k, 1410, 1035, 1440, 1.0, FONTE_MANUAL)
               for k in range(8)]
     acima = _linha("9.e4 Qh5", 940, x=1000, altura=40)
-    assert ex._sem_coordenadas(numeros + letras + acima, [TABULEIRO]) == acima
+    assert mo._sem_coordenadas(numeros + letras + acima, [TABULEIRO]) == acima
     # Sem coordenadas impressas, a legenda colada embaixo do tabuleiro, com
     # letras de `a` a `h` e números, fica inteira.
     legenda = _linha("1-40 Branco joga", 1405, x=1000, altura=30, largura=22)
-    assert ex._sem_coordenadas(legenda, [TABULEIRO]) == legenda
+    assert mo._sem_coordenadas(legenda, [TABULEIRO]) == legenda
 
 
 def test_linha_de_lances_no_pe_da_pagina_nao_e_rodape():
     corpo = [b for k in range(6) for b in _linha(FRASES[k], 400 + 60 * k)]
     # A contraprova: no mesmo lugar, o rodapé com o número da página sai.
     rodape = _linha("22 YASSER SEIRAWAN", 3300)
-    assert ex.margens_corridas({0: (corpo + rodape, 3500)})[0]
+    assert mg.margens_corridas({0: (corpo + rodape, 3500)})[0]
     lances = _linha("13.Qb3 0-0-0", 3300)
-    assert not ex.margens_corridas({0: (corpo + lances, 3500)})[0]
+    assert not mg.margens_corridas({0: (corpo + lances, 3500)})[0]
 
 
 #: Linhas de tamanhos diferentes: com o mesmo texto em todas, os espaços se
@@ -125,7 +127,7 @@ def _lado_a_lado(esquerda, direita, vao_em_alturas, y=3300):
 def test_as_legendas_lado_a_lado_sao_duas_linhas():
     """Xadrez Vitorioso p. 25: as legendas dos dois diagramas saíam numa frase só."""
     boxes = _lado_a_lado("Diagrama 6. Jogam as brancas.", "Diagrama 7. Jogam as brancas.", 10.5)
-    assert [" ".join(t for t, _ in linha) for linha in ex.palavras(boxes)] == [
+    assert [" ".join(t for t, _ in linha) for linha in mo.palavras(boxes)] == [
         "Diagrama 6. Jogam as brancas.", "Diagrama 7. Jogam as brancas."]
 
     pagina = Pagina(1, 0, boxes=[Box(i, e) for i, e in enumerate(boxes)], proximo_n=len(boxes))
@@ -138,18 +140,18 @@ def test_as_legendas_lado_a_lado_sao_duas_linhas():
     ("Capitulo um", "Diagrama 7. Jogam as brancas.", 12),  # só duas palavras de um lado
 ])
 def test_o_vao_que_nao_parte_a_linha(esquerda, direita, vao):
-    assert len(ex.palavras(_lado_a_lado(esquerda, direita, vao))) == 1
+    assert len(mo.palavras(_lado_a_lado(esquerda, direita, vao))) == 1
 
 
 def test_as_colunas_nao_se_misturam_na_linha():
-    textos = [b.texto for b in ex.paragrafos(_duas_colunas())]
+    textos = [b.texto for b in mo.paragrafos(_duas_colunas())]
     juntos = " ".join(textos)
     assert not any(t != t.upper() and t != t.lower() for t in textos)
     assert juntos.index(f"{FRASES[5]} 11") < juntos.index(f"{FRASES[3].upper()} 00")
 
 
 def test_o_titulo_que_atravessa_a_calha_vem_primeiro():
-    textos = [b.texto for b in ex.paragrafos(_duas_colunas(titulo="Games"))]
+    textos = [b.texto for b in mo.paragrafos(_duas_colunas(titulo="Games"))]
     assert textos[0] == "Games"
 
 
@@ -197,7 +199,7 @@ def test_a_pagina_de_uma_coluna_detecta_as_colunas_uma_vez(monkeypatch, saida):
         if saida == "documento":
             tx._LINHAS_VISTAS.clear()              # as linhas guardadas pulariam a detecção
             return tx.texto(tx.montar(tx.pagina_avulsa(entries)))
-        return [p.texto for p in ex.paragrafos(entries)]
+        return [p.texto for p in mo.paragrafos(entries)]
 
     with monkeypatch.context() as m:
         refeitas = _contar_deteccoes(m, refazer=True)
@@ -210,24 +212,6 @@ def test_a_pagina_de_uma_coluna_detecta_as_colunas_uma_vez(monkeypatch, saida):
 # ----------------------------------------------------------------------
 # A camada de texto do PDF nascido digital
 # ----------------------------------------------------------------------
-
-PROSA = ("The knight on d5 is strong and the bishop has no square. It is not easy for "
-         "Black to defend the king, and White has a clear plan after the exchange of the "
-         "queens on the long diagonal of the board.")
-
-
-def _pdf_digital(caminho, paginas=2):
-    doc = fitz.open()
-    for numero in range(paginas):
-        p = doc.new_page(width=480, height=680)
-        p.insert_text((40, 60), f"Chapter {numero + 1}", fontname="hebo", fontsize=18)
-        palavras = (PROSA + " " + PROSA).split()
-        for k in range(0, len(palavras), 8):
-            p.insert_text((40, 100 + 14 * (k // 8)), " ".join(palavras[k:k + 8]),
-                          fontname="helv", fontsize=11)
-    doc.save(caminho)
-    doc.close()
-    return caminho
 
 
 def _projeto_digital(tmp_path):
@@ -273,15 +257,86 @@ def test_o_epub_leva_o_idioma_do_livro(tmp_path):
     assert "1 página(s) lida(s) da camada de texto do PDF" in resumo
 
 
+#: O diagrama 1-7 do Dvoretsky, e onde ele fica na página do PDF (em pontos).
+FEN_DO_DIAGRAMA = "8/1k6/1p6/1K6/P1P5/8/8/8"
+X_DO_DIAGRAMA, Y_DO_DIAGRAMA, CASA = 220, 200, 20
+
+
+def _pdf_com_diagrama(caminho):
+    """Uma página nascida digital: prosa em Helvetica e o diagrama composto na ChessMerida do
+    PyBoxEditor, uma casa por glifo (como o `core.pdf_nativo` o lê)."""
+    import fitz
+
+    from core import render_diagrama
+
+    fonte = render_diagrama.carregar("ChessMerida-Diagram")
+    doc = fitz.open()
+    p = doc.new_page(width=600, height=800)
+    p.insert_text((200, 60), "Chapter 1 Pawn Endgames", fontname="hebo", fontsize=16)
+    for k, linha in enumerate(["White has the opposition, but it is not enough",
+                               "to win, and the whole ending turns on that."]):
+        p.insert_text((60, 100 + 12 * k), linha, fontname="helv", fontsize=10)
+    for k, linha in enumerate(render_diagrama.linhas(FEN_DO_DIAGRAMA, fonte, "branca")):
+        p.insert_text((X_DO_DIAGRAMA, Y_DO_DIAGRAMA + (k + 1) * CASA), linha,
+                      fontfile=fonte.arquivo, fontname="merida", fontsize=CASA)
+    for k, linha in enumerate(["Since 2.c5 would be useless, the king starts an",
+                               "outflanking maneuver."]):
+        p.insert_text((60, 500 + 12 * k), linha, fontname="helv", fontsize=10)
+    doc.save(caminho)
+    doc.close()
+    return caminho
+
+
+@pytest.mark.parametrize("conferido, lado, esperado", [
+    (True, "b", "b"),                    # o lado conferido na revisão vale sobre o da camada
+    (False, "b", "w"),                   # o lido e não conferido, não
+    (True, None, "w"),                   # conferido sem lado escolhido: fica o da camada
+])
+def test_o_lado_conferido_na_revisao_vai_ao_diagrama_da_camada(tmp_path, conferido, lado,
+                                                               esperado):
+    from tests.ajudantes import _lido
+
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Digital",
+                                   _pdf_com_diagrama(tmp_path / "livro.pdf"))
+    escala = 300 / 72                                     # a página lida, a 300 dpi
+    caixa = tuple(round(v * escala) for v in (X_DO_DIAGRAMA, Y_DO_DIAGRAMA,
+                                              X_DO_DIAGRAMA + 8 * CASA, Y_DO_DIAGRAMA + 8 * CASA))
+    pagina = projeto.pagina_para_editar(0)
+    pagina.diagramas = [_lido(FEN_DO_DIAGRAMA, caixa=caixa, conferido=conferido, lado=lado)]
+    projeto.salvar_modelo(pagina)
+    [figura] = [b for b in ex.paginas_da_camada(projeto, [0])[0].blocos
+                if isinstance(b, ex.Figura)]
+    assert figura.fen.split()[:2] == [FEN_DO_DIAGRAMA, esperado]
+
+
+def test_o_idioma_do_livro_e_lido_uma_vez_por_exportacao(tmp_path, monkeypatch):
+    """O idioma pela camada do PDF abre o livro: a exportação e a prévia o pedem uma vez, e a
+    camada de texto e os metadados levam o mesmo (SPEC-qualidade Q-E5, Q-E6)."""
+    from core import pdf_nativo
+
+    projeto = _projeto_digital(tmp_path)
+    pedidos = []
+    original = pdf_nativo.idioma_do_pdf
+    monkeypatch.setattr(pdf_nativo, "idioma_do_pdf",
+                        lambda *a, **k: pedidos.append(1) or original(*a, **k))
+    ex.exportar(projeto, tmp_path / "livro.epub")
+    assert len(pedidos) == 1
+    pedidos.clear()
+    ex.previa(projeto, "docx")
+    assert len(pedidos) == 1
+
+
 def test_o_idioma_do_arquivo():
-    assert ex.idioma_do_arquivo("pt") == "pt-BR"
-    assert ex.idioma_do_arquivo("en") == "en"
+    from abbychess import pedido
+
+    assert pedido.idioma_do_arquivo("pt") == "pt-BR"
+    assert pedido.idioma_do_arquivo("en") == "en"
 
 
 def test_a_captura_sai_em_minuscula():
-    assert ex._captura_minuscula("♖Xf2!") == "♖xf2!"
-    assert ex._captura_minuscula("eXd5") == "exd5"
-    assert ex._captura_minuscula("XIIIIIY") == "XIIIIIY"
+    assert mo._captura_minuscula("♖Xf2!") == "♖xf2!"
+    assert mo._captura_minuscula("eXd5") == "exd5"
+    assert mo._captura_minuscula("XIIIIIY") == "XIIIIIY"
 
 
 def _com_lacunas(*partes, y=3300):

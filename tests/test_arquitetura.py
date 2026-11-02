@@ -5,6 +5,9 @@
   controlador (`self.pagina.…`, `self.areas.…`, `self.verificador.…`, `self.conferencia.…`,
   `self.livro.…`): a lógica não volta a crescer em closures da janela.
 - A lógica (`abbychess/*.py`, fora de `app/`) não importa Qt.
+- Nenhum `except` amplo engole o erro (SPEC-qualidade CA-Q-C4): o que pega `Exception` (ou
+  `BaseException`, ou tudo) levanta de novo, vai ao log com o rastro (`log.exception`,
+  `exc_info=`), ou leva o erro adiante como valor, numa das funções de `LEVAM_O_ERRO`.
 """
 
 from __future__ import annotations
@@ -104,6 +107,100 @@ def test_closures_da_janela_nao_tem_atribuicao_nem_controle_de_fluxo():
     achados = [(f.lineno, type(no).__name__) for f in _aninhadas(classe)
                for no in ast.walk(f) if isinstance(no, proibidos)]
     assert achados == []
+
+
+#: (arquivo, função) -> por que o `except` amplo dela não engole o erro: ele o leva adiante.
+LEVAM_O_ERRO = {
+    ("app/dialogos.py", "rodar"): "a thread guarda o erro, levantado de novo na interface",
+    ("controlador_da_substituicao.py", "_na_de_agora"):
+        "a substituição que falha vai à lista de falhas, ao usuário",
+    ("escritor_docx.py", "conferir"): "o que o python-docx não abre vira problema do relatório",
+    ("lote.py", "rodar"): "a leitura que falhou volta ao lote como resultado, com o rastro",
+    ("servidor_de_leitura.py", "_atender"): "a resposta leva o erro e o rastro à interface",
+    ("servidor_de_leitura.py", "_principal"): "a queda do filho vai à interface com o rastro",
+    ("render.py", "_matar"): "matar o processo que já morreu",
+}
+
+
+def _amplo(tipo) -> bool:
+    if tipo is None:
+        return True
+    nomes = tipo.elts if isinstance(tipo, ast.Tuple) else [tipo]
+    return any(isinstance(n, ast.Name) and n.id in ("Exception", "BaseException") for n in nomes)
+
+
+def _registra_ou_levanta(handler: ast.ExceptHandler) -> bool:
+    for no in ast.walk(handler):
+        if isinstance(no, ast.Raise):
+            return True
+        if isinstance(no, ast.Call) and isinstance(no.func, ast.Attribute) and (
+                no.func.attr == "exception" or any(k.arg == "exc_info" for k in no.keywords)):
+            return True
+    return False
+
+
+def excepts_que_engolem(fonte: str):
+    """(função, linha) de cada `except` amplo que nem levanta nem registra o rastro."""
+    achados = []
+
+    def visitar(no, funcao):
+        for filho in ast.iter_child_nodes(no):
+            if isinstance(filho, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                visitar(filho, filho.name)
+                continue
+            if isinstance(filho, ast.ExceptHandler) and _amplo(filho.type) \
+                    and not _registra_ou_levanta(filho):
+                achados.append((funcao, filho.lineno))
+            visitar(filho, funcao)
+
+    visitar(ast.parse(fonte), "<módulo>")
+    return achados
+
+
+def test_nenhum_except_amplo_engole_o_erro():
+    achados = []
+    for arquivo in sorted(RAIZ.rglob("*.py")):
+        relativo = arquivo.relative_to(RAIZ).as_posix()
+        for funcao, linha in excepts_que_engolem(arquivo.read_text(encoding="utf-8")):
+            if (relativo, funcao) not in LEVAM_O_ERRO:
+                achados.append(f"{relativo}:{linha} ({funcao})")
+    assert achados == []
+
+
+def test_a_regra_dos_excepts_pega_o_que_engole_e_aceita_o_que_registra():
+    fonte = '''
+def engole():
+    try:
+        x()
+    except Exception:
+        pass
+
+def registra():
+    try:
+        x()
+    except Exception:
+        log.exception("x falhou")
+
+def avisa_com_o_rastro():
+    try:
+        x()
+    except (OSError, Exception) as erro:
+        log.warning("x falhou: %s", erro, exc_info=True)
+
+def levanta():
+    try:
+        x()
+    except BaseException:
+        limpar()
+        raise
+
+def estreito():
+    try:
+        x()
+    except ValueError:
+        return None
+'''
+    assert excepts_que_engolem(fonte) == [("engole", 5)]
 
 
 def test_lambdas_das_acoes_so_chamam_a_janela_ou_os_controladores():

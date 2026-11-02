@@ -10,9 +10,7 @@ from PySide6.QtTest import QTest
 from abbychess import busca as bs
 from abbychess import sessao as ss
 
-from tests.test_busca_janela import _ate, _buscar, _pagina_lida, jb  # noqa: F401 (fixture)
-from tests.test_documento import app  # noqa: F401 (fixture)
-from tests.test_documento_edicao import _janela_do_modulo, j  # noqa: F401 (fixtures)
+from tests.ajudantes import _ate, _buscar, _pagina_lida  # noqa: E402,F401,F811
 
 
 def _texto(jb):  # noqa: F811
@@ -75,6 +73,48 @@ def test_todas_na_pagina_aplica_direto(jb):  # noqa: F811
     jb.substituir_todas()
     _ate(lambda: _texto(jb) == "lata velha lata")
     assert not jb.resultados.na_previa
+
+
+def test_enter_no_substituto_substitui_e_ctrl_enter_substitui_todas(jb):  # noqa: F811
+    _pagina_lida(jb, "casa velha casa casa")
+    _buscar(jb, "casa")
+    jb.barra_de_busca.escolher_escopo(bs.PAGINA)
+    _substituir_por(jb, "lata")
+    b = jb.barra_de_busca
+    b.substituto.setFocus()
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return)      # o Ctrl+H buscou de novo: vai à 1ª
+    _ate(lambda: b.contador.text() == "1 de 3")
+    QTest.keyClick(b.substituto, Qt.Key.Key_Enter, Qt.KeyboardModifier.KeypadModifier)
+    _ate(lambda: _texto(jb) == "lata velha casa casa")   # troca ela e vai à próxima
+    _ate(lambda: b.contador.text() == "1 de 2")
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+    _ate(lambda: _texto(jb) == "lata velha lata lata")   # Todas, na página: direto
+    jb.desfazer()
+    _ate(lambda: _texto(jb) == "lata velha casa casa")
+
+
+def test_todas_sem_o_texto_sem_selecao_ou_com_o_intervalo_errado_nao_substitui(jb):  # noqa: F811
+    from PySide6.QtWidgets import QApplication
+
+    _pagina_lida(jb, "casa velha casa")
+    _buscar(jb, "casa")
+    _substituir_por(jb, "lata")
+    b = jb.barra_de_busca
+    b.escolher_escopo(bs.SELECAO)                         # sem trecho escolhido no Documento
+    b.substituto.setFocus()
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+    assert b.contador.text() == "erro" and "Sem seleção" in b.contador.toolTip()
+    b.escolher_escopo(bs.INTERVALO)
+    b.intervalo.setText("abc")
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+    assert b.contador.text() == "erro" and "Intervalo inválido" in b.contador.toolTip()
+    b.escolher_escopo(bs.PAGINA)
+    b.campo.clear()
+    b.substituto.setFocus()
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+    assert QApplication.focusWidget() is b.campo          # falta o que localizar: o campo
+    _ate(lambda: not jb.busca.buscando and not b.relogio.isActive())
+    assert _texto(jb) == "casa velha casa" and not jb.resultados.na_previa
 
 
 def test_o_caso_estrutural_vem_habilitado_na_previa(jb):  # noqa: F811
@@ -157,6 +197,51 @@ def test_outra_substituicao_tira_a_previa_velha(jb):  # noqa: F811
     _ate(lambda: _texto(jb) == "casas velha casas")
     _ate(lambda: not jb.resultados.na_previa)
     assert "A prévia saiu" in jb.resultados.resultados.item(0).text()
+
+
+def test_substituir_sem_o_texto_volta_ao_campo_e_o_grupo_que_falta_avisa(jb):  # noqa: F811
+    from PySide6.QtWidgets import QApplication
+
+    _pagina_lida(jb, "casa velha")
+    _buscar(jb, "casa", regex=True)
+    _substituir_por(jb, r"\2")                            # a regex não tem o grupo 2
+    b = jb.barra_de_busca
+    b.substituto.setFocus()
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return)      # vai à 1ª ocorrência
+    _ate(lambda: b.contador.text() == "1 de 1")
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return)      # e não a troca
+    assert "Regex inválida" in jb.statusBar().currentMessage()
+    assert b.contador.text() == "erro" and _texto(jb) == "casa velha"
+    b.campo.clear()
+    b.substituto.setFocus()
+    QTest.keyClick(b.substituto, Qt.Key.Key_Return)      # falta o que localizar: o campo
+    assert QApplication.focusWidget() is b.campo
+    _ate(lambda: not jb.busca.buscando and not b.relogio.isActive())
+
+
+def test_o_aviso_diz_os_passos_do_desfazer_que_sairam_para_a_troca_caber(jb):  # noqa: F811
+    from abbychess import historico as hs
+
+    jb.pagina.historico = hs.HistoricoDoProjeto(limite=1)    # o desfazer sem memória
+    _pagina_lida(jb, "casa velha casa")
+    _buscar(jb, "casa")
+    jb.barra_de_busca.escolher_escopo(bs.PAGINA)
+    _substituir_por(jb, "lata")
+    jb.substituir_todas()
+    _ate(lambda: _texto(jb) == "lata velha lata")
+    mensagens = []
+    jb.statusBar().messageChanged.connect(mensagens.append)
+    try:
+        _buscar(jb, "velha")
+        _substituir_por(jb, "nova")
+        jb.substituir_todas()
+        _ate(lambda: _texto(jb) == "lata nova lata")
+        _ate(lambda: any("Substituída(s) 1" in m for m in mensagens))
+    finally:
+        jb.statusBar().messageChanged.disconnect(mensagens.append)
+    feita = next(m for m in mensagens if "Substituída(s) 1" in m)
+    assert "1 passo(s) mais antigo(s) do desfazer saíram para esta caber" in feita
+    assert "Ctrl+Z desfaz" in feita
 
 
 def test_substituir_pula_o_ja_trocado_tambem_noutra_pagina(jb, monkeypatch):  # noqa: F811

@@ -14,7 +14,8 @@ from dataclasses import replace
 
 from abbychess import busca as bs
 from abbychess import substituir as sb
-from abbychess.controladores import ControladorDaSubstituicao, _descricao
+from abbychess.controlador import AVISO_LONGO_MS
+from abbychess.controlador_da_substituicao import ControladorDaSubstituicao, _descricao
 
 
 class SubstituirNaJanela:
@@ -65,14 +66,19 @@ class SubstituirNaJanela:
             self._andar(+1)
             return
         escopo = b.escopo.currentData()
-        opcoes = replace(self._opcoes(), escopo=escopo if escopo in (bs.PAGINA, bs.SELECAO)
-                         else bs.PAGINA)
+        opcoes = _na_pagina(self._opcoes(), escopo)
         modelo, alvo = self._alvo_e_substituto()
         try:
             expressao, trocar = self.substituicao._preparar(opcoes, modelo)
         except bs.PadraoInvalido as erro:
             self._substituicao_falhou(f"Regex inválida: {erro}")
             return
+        if not self._substituir_da_atual(opcoes, modelo, alvo, expressao, trocar):
+            self.statusBar().showMessage("Nada mais a substituir.", AVISO_LONGO_MS)
+
+    def _substituir_da_atual(self, opcoes, modelo: str, alvo: str, expressao, trocar) -> bool:
+        """Da ocorrência atual em diante, a primeira que não está como o substituto: trocada,
+        se está na página aberta, ou aberta, se não; falso se nenhuma (todas já estão)."""
         for _vez in range(len(self._ocorrencias)):
             o = self._ocorrencias[self._posicao]
             if self.substituicao._ja_trocado(o.trecho, expressao, trocar, o.coluna):
@@ -82,17 +88,17 @@ class SubstituirNaJanela:
                 continue
             if o.pagina != self.pagina.indice:
                 self._ir_a_ocorrencia(self._posicao)
-                return
+                return True
             feitos = self.substituicao.na_pagina(opcoes, modelo, alvo, posicao=o.inicio)
             if feitos is None:                  # o aviso já saiu
-                return
+                return True
             if feitos:
                 caso = feitos[0]
                 self._ida_apos_pendente = (caso.pagina, caso.inicio + len(caso.depois))
-                return
+                return True
             # Já está como o substituto ("casa" -> "Casa" sem o Aa): a próxima.
             self._posicao = (self._posicao + 1) % len(self._ocorrencias)
-        self.statusBar().showMessage("Nada mais a substituir.", 8000)
+        return False
 
     def substituir_todas(self) -> None:
         """Todas: direto na página (ou na seleção); no livro ou num intervalo, a prévia."""
@@ -156,22 +162,14 @@ class SubstituirNaJanela:
     def _substituicao_falhou(self, mensagem: str) -> None:
         self._ida_apos_pendente = None
         self.barra_de_busca.mostrar_erro(mensagem)
-        self.statusBar().showMessage(mensagem, 8000)
+        self.statusBar().showMessage(mensagem, AVISO_LONGO_MS)
 
     def _substituicao_feita(self, casos: int, paginas: int, falhas, sem_traducao: int,
                             saidos: int = 0) -> None:
-        partes = [f"Substituída(s) {casos} ocorrência(s) em {paginas} página(s)"]
-        if sem_traducao:
-            partes.append(f"{sem_traducao} sem tradução ainda ficaram")
-        if falhas:
-            partes.append(f"{len(falhas)} página(s) ficaram de fora (veja os Avisos)")
-            for indice, motivo in sorted(falhas.items()):
-                self.eventos.emitir("aviso", "Substituir",
-                                    f"Página {indice + 1} ficou fora da substituição: {motivo}.")
-        if saidos:
-            partes.append(f"{saidos} passo(s) mais antigo(s) do desfazer saíram para esta caber")
-        if casos:
-            partes.append("Ctrl+Z desfaz")
+        partes = _partes_do_aviso(casos, paginas, falhas, sem_traducao, saidos)
+        for indice, motivo in sorted(falhas.items()):
+            self.eventos.emitir("aviso", "Substituir",
+                                f"Página {indice + 1} ficou fora da substituição: {motivo}.")
         self.statusBar().showMessage(" · ".join(partes) + ".", 10000)
         if casos and self.resultados.na_previa:  # uma prévia de antes desta troca: velha
             self._previas = {}
@@ -193,3 +191,22 @@ class SubstituirNaJanela:
         self._ida_pendente = None
         self._ir_a_ocorrencia(n)
         return True
+
+
+def _na_pagina(opcoes: bs.Opcoes, escopo: str) -> bs.Opcoes:
+    """As opções do Substituir de um: na Seleção, nela; em qualquer outro escopo, na página."""
+    return replace(opcoes, escopo=escopo if escopo in (bs.PAGINA, bs.SELECAO) else bs.PAGINA)
+
+
+def _partes_do_aviso(casos: int, paginas: int, falhas, sem_traducao: int, saidos: int) -> list:
+    """As partes da mensagem da barra depois de uma substituição."""
+    partes = [f"Substituída(s) {casos} ocorrência(s) em {paginas} página(s)"]
+    if sem_traducao:
+        partes.append(f"{sem_traducao} sem tradução ainda ficaram")
+    if falhas:
+        partes.append(f"{len(falhas)} página(s) ficaram de fora (veja os Avisos)")
+    if saidos:
+        partes.append(f"{saidos} passo(s) mais antigo(s) do desfazer saíram para esta caber")
+    if casos:
+        partes.append("Ctrl+Z desfaz")
+    return partes

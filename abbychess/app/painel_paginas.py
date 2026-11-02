@@ -13,8 +13,8 @@ from typing import Dict, List, Optional
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QGroupBox, QHeaderView, QLabel,
-                               QMenu, QProgressBar, QPushButton, QTreeWidget, QTreeWidgetItem,
-                               QVBoxLayout, QWidget)
+                               QMenu, QProgressBar, QPushButton, QSizePolicy, QSpinBox,
+                               QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from abbychess import modelo as md
 from abbychess.livro import SaudeDoLivro
@@ -53,6 +53,8 @@ class PainelDePaginas(QWidget):
     reconhecer = Signal(list)
     #: O livro inteiro, a partir do cartão Saúde do livro.
     reconhecer_livro = Signal()
+    #: O limiar do cartão Saúde escolhido (pendentes na amostra).
+    limiar_mudou = Signal(int)
     #: As operações de página nas selecionadas (§12.4): mover (pergunta o lugar) e apagar.
     mover = Signal(list)
     apagar = Signal(list)
@@ -103,14 +105,32 @@ class PainelDePaginas(QWidget):
         self.saude = QGroupBox("Saúde do livro")
         caixa_da_saude = QVBoxLayout(self.saude)
         caixa_da_saude.setContentsMargins(6, 6, 6, 6)
+        # A gaveta tem 150 px (§3.1): todo texto do cartão quebra a linha, e nada nele pede
+        # largura (o cartão aparece justo na primeira sessão de um livro novo).
         self.amostra_da_saude = QLabel()
+        self.amostra_da_saude.setWordWrap(True)
+        # As páginas da amostra, cada uma um link para ela, com os pendentes antes → agora.
         self.pendentes_da_saude = QLabel()
+        self.pendentes_da_saude.setWordWrap(True)
+        self.pendentes_da_saude.setTextFormat(Qt.TextFormat.RichText)
+        self.pendentes_da_saude.linkActivated.connect(lambda alvo: self.abrir.emit(int(alvo)))
         self.padroes_da_saude = QLabel()
+        self.padroes_da_saude.setWordWrap(True)
+        self.rotulo_do_limiar = QLabel("Destacar \"Reconhecer o livro\" com até estes pendentes:")
+        self.rotulo_do_limiar.setWordWrap(True)
+        self.limiar_da_saude = QSpinBox()
+        self.limiar_da_saude.setRange(0, 9999)
+        self.rotulo_do_limiar.setBuddy(self.limiar_da_saude)
+        self.limiar_da_saude.setAccessibleName("Limiar do cartão Saúde: pendentes na amostra")
+        self.limiar_da_saude.setToolTip("Com até este número de pendentes na amostra, "
+                                        "\"Reconhecer o livro\" fica em destaque.")
+        self.limiar_da_saude.valueChanged.connect(self._limiar_escolhido)
         self.botao_reconhecer_livro = QPushButton("Reconhecer o livro")
         self.botao_reconhecer_livro.clicked.connect(self.reconhecer_livro)
-        for widget in (self.amostra_da_saude, self.pendentes_da_saude,
-                       self.padroes_da_saude, self.botao_reconhecer_livro):
+        for widget in (self.amostra_da_saude, self.pendentes_da_saude, self.padroes_da_saude,
+                       self.rotulo_do_limiar, self.limiar_da_saude, self.botao_reconhecer_livro):
             caixa_da_saude.addWidget(widget)
+        self.saude.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.saude.hide()
 
         #: O progresso do lote (passo E): as páginas feitas, e o tempo estimado na dica.
@@ -142,10 +162,20 @@ class PainelDePaginas(QWidget):
             self.saude.hide()
             return
         n = len(saude.paginas)
-        self.amostra_da_saude.setText(f"Amostra: {n} página{'s' if n != 1 else ''}")
-        self.pendentes_da_saude.setText(
-            f"Pendentes: {saude.pendentes_antes} → {saude.pendentes_agora}")
-        self.padroes_da_saude.setText(f"Padrões ensinados: {saude.padroes}")
+        self.amostra_da_saude.setText(f"Amostra ({n} página{'s' if n != 1 else ''}), "
+                                      "pendentes antes → agora:")
+        link = estilo.hex_de("link")
+        linhas = [f'<a href="{posicao}" style="color:{link}">p. {posicao + 1}</a>: '
+                  f"{antes} → {agora}" for posicao, antes, agora in saude.por_pagina]
+        linhas.append(f"<b>Total: {saude.pendentes_antes} → {saude.pendentes_agora}</b>")
+        self.pendentes_da_saude.setText("<br>".join(linhas))
+        n_padroes = saude.padroes
+        self.padroes_da_saude.setText(
+            f"{n_padroes} amostra{'s' if n_padroes != 1 else ''} ensinada"
+            f"{'s' if n_padroes != 1 else ''}")
+        self.limiar_da_saude.blockSignals(True)
+        self.limiar_da_saude.setValue(saude.limiar)
+        self.limiar_da_saude.blockSignals(False)
         pronto = saude.pode_reconhecer_o_livro
         self.botao_reconhecer_livro.setDefault(pronto)
         self.botao_reconhecer_livro.setProperty("pronto", pronto)
@@ -157,6 +187,9 @@ class PainelDePaginas(QWidget):
         self.botao_reconhecer_livro.style().polish(self.botao_reconhecer_livro)
         self.saude.show()
 
+    def _limiar_escolhido(self, valor: int) -> None:
+        self.limiar_mudou.emit(int(valor))
+
     # ------------------------------------------------------------------
     def mostrar(self, total: int, resumo: Dict[int, dict], atual: Optional[int]) -> None:
         """As `total` páginas do livro, com o resumo das que estão em `livro.json`. Com o
@@ -164,37 +197,9 @@ class PainelDePaginas(QWidget):
         `atual` (a página aberta mudou) escolhe a linha dela."""
         self.lista.setUpdatesEnabled(False)
         if self.lista.topLevelItemCount() != total:
-            self.lista.clear()
-            itens = []
-            for i in range(total):
-                item = QTreeWidgetItem()
-                item.setData(0, Qt.ItemDataRole.UserRole, i)
-                for coluna in (0, 2, 3):
-                    item.setTextAlignment(coluna, Qt.AlignmentFlag.AlignRight)
-                itens.append(item)
-            self.lista.addTopLevelItems(itens)
+            _criar_as_linhas(self.lista, total)
         for i in range(total):
-            r = resumo.get(i, {})
-            estado = r.get("estado", md.NAO_RECONHECIDA)
-            pendentes = r.get("pendentes")
-            diagramas = r.get("diagramas_por_conferir", 0)
-            item = self.lista.topLevelItem(i)
-            simbolo, cor = SIMBOLOS_DOS_ESTADOS.get(estado, ("?", estilo.CINZA))
-            cor = estilo.na_interface(cor)
-            for coluna, texto in enumerate((str(i + 1), simbolo,
-                                            "" if pendentes is None else str(pendentes),
-                                            str(diagramas) if diagramas else "")):
-                if item.text(coluna) != texto:
-                    item.setText(coluna, texto)
-            if item.data(1, Qt.ItemDataRole.UserRole) != estado:
-                item.setData(1, Qt.ItemDataRole.UserRole, estado)
-                item.setToolTip(1, NOMES_DOS_ESTADOS.get(estado, estado))
-                item.setForeground(1, cor)
-                apagada = estado == md.NAO_RECONHECIDA      # o que ainda não foi lido, atenuado
-                if apagada:
-                    item.setForeground(0, estilo.cor("texto_secundario"))
-                else:                                   # a cor da paleta, que segue o tema
-                    item.setData(0, Qt.ItemDataRole.ForegroundRole, None)
+            _atualizar_a_linha(self.lista.topLevelItem(i), i, resumo.get(i, {}))
         self._pintar_contagem()
         self._filtrar()
         if atual is not None:
@@ -272,3 +277,40 @@ class PainelDePaginas(QWidget):
             acao.triggered.connect(
                 lambda _=False, m=metodo: self.operacao.emit(m, self.selecionadas()))
         return menu
+
+
+def _criar_as_linhas(lista: QTreeWidget, total: int) -> None:
+    """Uma linha por página, com os números à direita."""
+    lista.clear()
+    itens = []
+    for i in range(total):
+        item = QTreeWidgetItem()
+        item.setData(0, Qt.ItemDataRole.UserRole, i)
+        for coluna in (0, 2, 3):
+            item.setTextAlignment(coluna, Qt.AlignmentFlag.AlignRight)
+        itens.append(item)
+    lista.addTopLevelItems(itens)
+
+
+def _atualizar_a_linha(item: QTreeWidgetItem, i: int, r: dict) -> None:
+    """A linha da página `i` com o resumo dela; só o que mudou é escrito (a cor e a dica do
+    estado, só quando o estado muda)."""
+    estado = r.get("estado", md.NAO_RECONHECIDA)
+    pendentes = r.get("pendentes")
+    diagramas = r.get("diagramas_por_conferir", 0)
+    simbolo, cor = SIMBOLOS_DOS_ESTADOS.get(estado, ("?", estilo.CINZA))
+    cor = estilo.na_interface(cor)
+    for coluna, texto in enumerate((str(i + 1), simbolo,
+                                    "" if pendentes is None else str(pendentes),
+                                    str(diagramas) if diagramas else "")):
+        if item.text(coluna) != texto:
+            item.setText(coluna, texto)
+    if item.data(1, Qt.ItemDataRole.UserRole) != estado:
+        item.setData(1, Qt.ItemDataRole.UserRole, estado)
+        item.setToolTip(1, NOMES_DOS_ESTADOS.get(estado, estado))
+        item.setForeground(1, cor)
+        apagada = estado == md.NAO_RECONHECIDA      # o que ainda não foi lido, atenuado
+        if apagada:
+            item.setForeground(0, estilo.cor("texto_secundario"))
+        else:                                   # a cor da paleta, que segue o tema
+            item.setData(0, Qt.ItemDataRole.ForegroundRole, None)

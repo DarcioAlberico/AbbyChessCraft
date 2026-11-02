@@ -52,6 +52,9 @@ FABRICA_PADRAO = "abbychess.servidor_de_leitura:leitor_global"
 INTERATIVO, LOTE = 0, 1
 #: O resultado de um pedido cancelado (ou abandonado ao fechar).
 CANCELADO = "cancelado"
+#: O máximo que um pedido da janela ou do lote espera o servidor (o F5 com os modelos ainda
+#: carregando cabe com folga): um servidor travado sem morrer não prende a fila para sempre.
+TEMPO_DO_PEDIDO = 600.0
 
 
 class Cancelado(Exception):
@@ -80,38 +83,47 @@ class PaginaLida:
     negritos: list = field(default_factory=list)
     #: O mesmo para o itálico (vazio: não medido, como no servidor falso dos testes).
     italicos: list = field(default_factory=list)
+    #: A régua do negrito da página (`regua_do_negrito.regua_da_pagina`), que a interface
+    #: grava com ela (vazia: não medida).
+    regua_do_negrito: dict = field(default_factory=dict)
 
     def estilos(self) -> dict:
-        """`{id(entry): Estilo}` dos boxes com o negrito medido, ou em itálico: o box sem
-        estilo tem o efeito desconhecido, e o k-NN o compara com todas as amostras."""
+        """`{id(entry): Estilo}` dos boxes com o negrito ou o itálico medido; o eixo sem
+        medida fica `None` (o efeito desconhecido, que o k-NN compara com todas as
+        amostras), e o box sem medida nenhuma fica de fora."""
         from abbychess.modelo import Estilo
 
         vazio = [None] * len(self.boxes)
-        return {id(entry): Estilo(negrito=bool(negrito), italico=bool(italico))
+        return {id(entry): Estilo(negrito=negrito, italico=italico)
                 for entry, negrito, italico in zip(self.boxes, self.negritos or vazio,
                                                    self.italicos or vazio)
-                if negrito is not None or italico}
+                if negrito is not None or italico is not None}
 
 
-def ler_pagina(imagem, zonas, marcados, leitor, *, progresso=None,
-               cancelado: Callable[[], bool] = lambda: False) -> PaginaLida:
-    """Segmenta pelas áreas, põe no lugar os glifos que ficam (§4.6), lê e acha os diagramas."""
+def ler_pagina(imagem, zonas, marcados, leitor, *, regua_do_livro: Optional[dict] = None,
+               progresso=None, cancelado: Callable[[], bool] = lambda: False) -> PaginaLida:
+    """Segmenta pelas áreas, põe no lugar os glifos que ficam (§4.6), lê e acha os diagramas.
+    O negrito é decidido com a régua do livro (`projeto.resumo.regua_do_negrito`), quando dada."""
     from abbychess import diagramas as dg
     from abbychess import pagina as pg
+    from abbychess import editar_boxes as eb
+    from abbychess import efeitos as ef
     from abbychess import procedencia
     from abbychess import zonas as zn
 
     segmentada = zn.segmentar(imagem, zonas, leitor)
     if marcados:
-        segmentada.boxes = pg.manter_marcados(segmentada.boxes, marcados)
+        segmentada.boxes = eb.manter_marcados(segmentada.boxes, marcados)
     pg.ler_boxes(imagem, segmentada.boxes, leitor, progresso=progresso, cancelado=cancelado)
     if cancelado():
         raise Cancelado
     lidos = dg.ler_diagramas(imagem, segmentada.tabuleiros, escala=segmentada.escala,
                              classificar=leitor.arbitro, boxes=segmentada.boxes)
-    negritos, italicos = pg.efeitos_da_pagina(imagem, segmentada.boxes)
+    efeitos = ef.medir_efeitos(imagem, segmentada.boxes, regua_do_livro)
+    ef.reler_pelo_efeito(imagem, segmentada.boxes, leitor, efeitos.negritos, efeitos.italicos)
     return PaginaLida(segmentada.boxes, [procedencia.amostra_de(b) for b in segmentada.boxes],
-                      list(segmentada.tabuleiros), segmentada.escala, lidos, negritos, italicos)
+                      list(segmentada.tabuleiros), segmentada.escala, lidos, efeitos.negritos,
+                      efeitos.italicos, efeitos.regua)
 
 
 def reler_boxes(imagem, boxes, leitor, *, so_pendentes: bool, progresso=None):
@@ -223,7 +235,8 @@ class _Laco:
         #: CA-11.8 e a vez entre glifos).
         self.ordem: List[int] = []
         self.fins: List[int] = []
-        self._trava = threading.Lock()             # o leitor: um glifo por vez
+        #: O leitor: um glifo por vez. Reentrante: o `ler` chama o `ler_pelo_livro`.
+        self._trava = threading.RLock()
         self._livre = threading.Event()            # nenhum interativo rodando
         self._livre.set()
         self._acordar = threading.Event()          # a página do lote terminou
@@ -232,8 +245,7 @@ class _Laco:
     def rodar(self) -> None:
         self.leitor = _fabrica(self.fabrica)(self.pasta, self.limiares)
         _baixar_a_prioridade()
-        ler_original = self.leitor.ler
-        self.leitor.ler = lambda recorte, **k: self._ler_com_vez(ler_original, recorte, **k)
+        self.dar_a_vez()
         self.saida.put(("pronto", os.getpid(), estado_do_leitor(self.leitor)))
         while not self.sair:
             self._receber(bloquear=not (self.interativos or (self.lotes and not self._no_lote())))
@@ -260,32 +272,57 @@ class _Laco:
                 self._acordar.clear()
                 return
             bloquear = False
-            tipo = mensagem[0]
-            if tipo == "pedido":
-                (self.interativos if mensagem[2] == INTERATIVO else self.lotes).append(mensagem)
-            elif tipo == "padroes":
-                _, criados, apagados = mensagem
-                with self._trava:                  # não no meio do glifo do lote
-                    for caminho in apagados:
-                        self.leitor.padroes.excluir(caminho)
-                    for criado in criados:
-                        caminho, altura, *resto = criado
-                        self.leitor.padroes.incluir(caminho, altura,
-                                                    resto[0] if resto else None)
-            elif tipo == "limiares":
-                with self._trava:
-                    self.leitor.trocar_limiares(mensagem[1])
-            elif tipo == "cancelar":
-                # O que espera na fila continua nela e, na vez dele, responde "cancelado"
-                # (`_atender`): quem pediu sempre recebe resposta. O que já terminou não guarda
-                # nada (o cancelamento chegou tarde).
-                id_ = mensagem[1]
-                na_fila = any(m[1] == id_ for m in (*self.interativos, *self.lotes))
-                if na_fila or id_ in (self.interativo, self.no_lote):
-                    self.cancelados.add(id_)
-            elif tipo == "sair":
-                self.sair = True
+            if self._tratar(mensagem):
                 return
+
+    def _tratar(self, mensagem) -> bool:
+        """Uma mensagem da interface; verdadeiro no "sair"."""
+        tipo = mensagem[0]
+        if tipo == "pedido":
+            (self.interativos if mensagem[2] == INTERATIVO else self.lotes).append(mensagem)
+        elif tipo == "padroes":
+            self._aplicar_os_deltas(mensagem)
+        elif tipo == "limiares":
+            with self._trava:
+                self.leitor.trocar_limiares(mensagem[1])
+        elif tipo == "cancelar":
+            self._marcar_cancelado(mensagem[1])
+        elif tipo == "sair":
+            self.sair = True
+            return True
+        return False
+
+    def _aplicar_os_deltas(self, mensagem) -> None:
+        _, criados, apagados = mensagem
+        with self._trava:                  # não no meio do glifo do lote
+            for caminho in apagados:
+                self.leitor.padroes.excluir(caminho)
+            for criado in criados:
+                caminho, altura, *resto = criado
+                self.leitor.padroes.incluir(caminho, altura, resto[0] if resto else None)
+
+    def _marcar_cancelado(self, id_) -> None:
+        # O que espera na fila continua nela e, na vez dele, responde "cancelado"
+        # (`_atender`): quem pediu sempre recebe resposta. O que já terminou não guarda
+        # nada (o cancelamento chegou tarde).
+        na_fila = any(m[1] == id_ for m in (*self.interativos, *self.lotes))
+        if na_fila or id_ in (self.interativo, self.no_lote):
+            self.cancelados.add(id_)
+
+    def dar_a_vez(self) -> None:
+        """Os métodos do leitor que as duas threads chamam passam pela trava (SPEC-qualidade
+        Q-C3): o `ler` pela vez inteira (`_ler_com_vez`), o `ler_pelo_livro` (os padrões que
+        os deltas mudam) e o `sugerir` (a rede) só pela trava. O `arbitro` lê pelo `ler`."""
+        ler_original = self.leitor.ler
+        self.leitor.ler = lambda recorte, **k: self._ler_com_vez(ler_original, recorte, **k)
+        for nome in ("ler_pelo_livro", "sugerir"):
+            setattr(self.leitor, nome, self._com_a_trava(getattr(self.leitor, nome)))
+
+    def _com_a_trava(self, metodo):
+        def com_a_trava(*args, **k):
+            with self._trava:
+                return metodo(*args, **k)
+        return com_a_trava
 
     def _ler_com_vez(self, ler, recorte, **k):
         """Um glifo. O do lote espera os interativos em curso e para se foi cancelado (ou se
@@ -344,8 +381,10 @@ class _Laco:
     def _operar(self, operacao: str, argumentos):
         leitor = self.leitor
         if operacao == "ler_pagina":
-            imagem, zonas, marcados = argumentos
-            return ler_pagina(imagem, zonas, marcados, leitor)
+            # A régua do livro é o quarto argumento (os pedidos de antes dela têm três).
+            imagem, zonas, marcados, *regua = argumentos
+            return ler_pagina(imagem, zonas, marcados, leitor,
+                              regua_do_livro=regua[0] if regua else None)
         if operacao == "reler_boxes":
             imagem, boxes, so_pendentes = argumentos
             return reler_boxes(imagem, boxes, leitor, so_pendentes=so_pendentes)
@@ -395,6 +434,8 @@ class Pedido:
     ok: bool = False
     resultado: Any = None
     enviado_em: float = field(default_factory=time.perf_counter)
+    #: O cancelar foi pedido: o filho reaberto depois de uma queda o recebe de novo.
+    cancelar_pedido: bool = False
 
     @property
     def cancelado(self) -> bool:
@@ -491,6 +532,7 @@ class ServidorDeLeitura:
         responde "cancelado" na vez dele)."""
         with self._trava:
             if not pedido.feito.is_set() and not self._fechando:
+                pedido.cancelar_pedido = True
                 self._entrada.put(("cancelar", pedido.id))
 
     def abandonar_pendentes(self) -> None:
@@ -519,35 +561,46 @@ class ServidorDeLeitura:
     # ------------------------------------------------------------------
     def _ouvir(self) -> None:
         while not self._fechando:
+            mensagem = self._proxima_do_filho()
+            if mensagem is not None:
+                self._tratar(mensagem)
+
+    def _proxima_do_filho(self):
+        """A mensagem seguinte do filho, ou None (nenhuma em 0,3 s, ou a queda dele, já
+        tratada)."""
+        try:
+            return self._saida.get(timeout=0.3)
+        except queue.Empty:
+            if not self._fechando and not self.processo.is_alive():
+                self._caiu("o processo terminou")
+        except (EOFError, OSError):
+            if not self._fechando:
+                self._caiu("a fila do processo fechou")
+        return None
+
+    def _tratar(self, mensagem) -> None:
+        tipo = mensagem[0]
+        if tipo == "pronto":
+            self._ficou_pronto(mensagem[2])
+        elif tipo == "resposta":
+            _, id_, ok, resultado = mensagem
+            with self._trava:
+                pedido = self._pendentes.pop(id_, None)
+            if pedido is not None:
+                self._concluir(pedido, ok, resultado)
+        elif tipo == "caiu":
+            log.error("o servidor de leitura caiu:\n%s", mensagem[1])
+            self._caiu(mensagem[1].strip().splitlines()[-1] if mensagem[1].strip() else "")
+
+    def _ficou_pronto(self, estado: dict) -> None:
+        primeira = self.estado is None
+        self.estado = estado
+        self.pronto.set()
+        if primeira and self.ao_ficar_pronto is not None:
             try:
-                mensagem = self._saida.get(timeout=0.3)
-            except queue.Empty:
-                if not self._fechando and not self.processo.is_alive():
-                    self._caiu("o processo terminou")
-                continue
-            except (EOFError, OSError):
-                if not self._fechando:
-                    self._caiu("a fila do processo fechou")
-                continue
-            tipo = mensagem[0]
-            if tipo == "pronto":
-                primeira = self.estado is None
-                self.estado = mensagem[2]
-                self.pronto.set()
-                if primeira and self.ao_ficar_pronto is not None:
-                    try:
-                        self.ao_ficar_pronto(self.estado)
-                    except Exception:  # quem ouve falhou: o ouvinte continua
-                        log.exception("o aviso de servidor pronto falhou")
-            elif tipo == "resposta":
-                _, id_, ok, resultado = mensagem
-                with self._trava:
-                    pedido = self._pendentes.pop(id_, None)
-                if pedido is not None:
-                    self._concluir(pedido, ok, resultado)
-            elif tipo == "caiu":
-                log.error("o servidor de leitura caiu:\n%s", mensagem[1])
-                self._caiu(mensagem[1].strip().splitlines()[-1] if mensagem[1].strip() else "")
+                self.ao_ficar_pronto(self.estado)
+            except Exception:  # quem ouve falhou: o ouvinte continua
+                log.exception("o aviso de servidor pronto falhou")
 
     def _concluir(self, pedido: Pedido, ok: bool, resultado) -> None:
         pedido.ok, pedido.resultado = ok, resultado
@@ -565,8 +618,8 @@ class ServidorDeLeitura:
                 return
             try:
                 self.processo.join(0.1)
-            except Exception:
-                pass
+            except Exception:                   # o filho que caiu pode nem ter começado
+                log.debug("a espera do filho que caiu falhou", exc_info=True)
             if self.reinicios >= 1:
                 self.desistiu = True
                 pendentes, self._pendentes = list(self._pendentes.values()), {}
@@ -576,6 +629,8 @@ class ServidorDeLeitura:
                 self._abrir()
                 for pedido in self._pendentes.values():
                     self._entrada.put(pedido.mensagem)
+                    if pedido.cancelar_pedido:     # o cancelar foi ao filho que caiu
+                        self._entrada.put(("cancelar", pedido.id))
         if pendentes is None:
             self._avisar(f"O servidor de leitura parou ({motivo}) e foi aberto de novo; os "
                          "pedidos em curso foram reenviados.", False)

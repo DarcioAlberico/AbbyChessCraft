@@ -29,14 +29,16 @@ from PIL import Image
 from core.box_model import BoxEntry
 
 from abbychess import epub
+from abbychess import validacao_do_epub as validacao
 from abbychess import escritor_docx as ed
 from abbychess import exportar as ex
+from abbychess import montagem as mo
 from abbychess import texto as tx
 from abbychess.leitor import FONTE_MANUAL, Limiares
 from abbychess.modelo import Decisoes, Estilo
 from abbychess.zonas import Zona
 
-from tests.test_diagramas import _lido
+from tests.ajudantes import _lido  # noqa: E402,F401,F811
 
 GOLDEN = Path(__file__).with_name("golden")
 _W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -80,8 +82,8 @@ def _pagina():
 def _extraida(opcoes: ex.Opcoes):
     pagina = _pagina()
     limiares = Limiares() if opcoes.realcar_duvidosos else None
-    entries, estrutura = ex.Estrutura.da_pagina(pagina, limiares)
-    return [ex.pagina_extraida(0, entries, pagina.tabuleiros, Image.new("L", (1000, 1400), 255),
+    entries, estrutura = mo.Estrutura.da_pagina(pagina, limiares)
+    return [mo.pagina_extraida(0, entries, pagina.tabuleiros, Image.new("L", (1000, 1400), 255),
                                pagina.diagramas, estrutura=estrutura,
                                manter_margens=opcoes.manter_margens,
                                desenhar_diagramas=opcoes.desenhar_diagramas,
@@ -166,9 +168,9 @@ def _formas(tmp_path: Path, opcoes: ex.Opcoes) -> dict:
                   analise=opcoes.links_de_analise)
     txt.write_text(ex.texto_do_livro(paginas, marcas_de_pagina=opcoes.marcas_de_pagina),
                    encoding="utf-8")
-    assert ed.conferir(docx) == [] and epub.conferir(livro) == []
+    assert ed.conferir(docx) == [] and validacao.conferir(livro) == []
     if os.environ.get("ABBY_EPUBCHECK"):
-        assert epub.epubcheck(livro) == []
+        assert validacao.epubcheck(livro) == []
     return {"docx": forma_do_docx(docx), "epub": forma_do_epub(livro), "txt": forma_do_txt(txt)}
 
 
@@ -225,10 +227,13 @@ def test_ca_12_3_a_opcao_produz_so_a_diferenca_declarada(tmp_path, nome):
     declarada = _declaracao()[nome]
     if declarada.get("escopo") == "livro":
         # A opção escolhe páginas do projeto, não muda a página: os testes que ela cita.
-        import tests.test_exportar_documento as documento
+        import ast
 
+        arquivo = Path(__file__).with_name("test_exportar_documento.py")
+        existentes = {no.name for no in ast.parse(arquivo.read_text(encoding="utf-8")).body
+                      if isinstance(no, ast.FunctionDef)}
         for teste in declarada["testes"]:
-            assert hasattr(documento, teste), teste
+            assert teste in existentes, teste
         return
     padrao = getattr(ex.Opcoes(), nome)
     ligada = declarada.get("valor", not padrao)
@@ -264,12 +269,12 @@ def test_manter_quebras_fica_com_as_linhas_e_o_hifen():
 def test_manter_quebras_na_camada_nativa_volta_pelos_inicios():
     paragrafo = ex.Paragrafo("uma linha outra linha", inicios=[0, 10])
     pagina = ex.PaginaExtraida(numero=0, blocos=[paragrafo])
-    ex._quebras_da_camada(pagina)
+    mo._quebras_da_camada(pagina)
     assert paragrafo.texto == "uma linha\noutra linha"
     # A camada guarda o hífen colado (`inter-essante`): o `\n` entra depois dele, e o
     # negrito de "essante" e o da linha de antes seguem nas letras deles.
     partida = ex.Paragrafo("o inter-essante fim", inicios=[0, 8], negrito=[(2, 8), (8, 15)])
-    ex._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[partida]))
+    mo._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[partida]))
     assert partida.texto == "o inter-\nessante fim"
     assert [partida.texto[a:z] for a, z in partida.negrito] == ["inter-", "essante"]
     assert partida.inicios == [0, 9] and partida.pesos is None
@@ -281,14 +286,14 @@ def test_manter_quebras_na_camada_nativa_devolve_o_hifen_que_o_core_tirou():
     impressa, e o hífen fica no negrito da sílaba de antes."""
     partida = ex.Paragrafo("o interessante fim e mais", inicios=[0, 7, 19],
                            negrito=[(2, 14)], italico=[(15, 18)])
-    ex._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[partida]))
+    mo._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[partida]))
     assert partida.texto == "o inter-\nessante fim\ne mais"
     assert [partida.texto[a:z] for a, z in partida.negrito] == ["inter-\nessante"]
     assert [partida.texto[a:z] for a, z in partida.italico] == ["fim"]
     assert partida.inicios == [0, 9, 21]
     # Sem letra dos dois lados, não é palavra partida: nada entra.
     numero = ex.Paragrafo("lance 12.e4", inicios=[0, 8])
-    ex._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[numero]))
+    mo._quebras_da_camada(ex.PaginaExtraida(numero=0, blocos=[numero]))
     assert numero.texto == "lance 12.e4"
 
 
@@ -313,7 +318,7 @@ def test_manter_quebras_com_a_camada_de_um_pdf_que_parte_palavras(tmp_path, com_
     extraida = pdf_nativo.extrair(str(caminho), [0], idioma="en", lex=lex).paginas[0]
     textos = [b.texto for b in extraida.blocos if isinstance(b, ex.Paragrafo)]
     assert any(("beautiful" if com_dicionario else "beauti-ful") in t for t in textos), textos
-    ex._quebras_da_camada(extraida)
+    mo._quebras_da_camada(extraida)
     textos = [b.texto for b in extraida.blocos if isinstance(b, ex.Paragrafo)]
     assert "Then came a very beauti-\nful combination in the game and\nit ends here." in textos
 
@@ -323,11 +328,11 @@ def test_o_realce_marca_so_a_palavra_duvidosa_e_atravessa_a_pagina():
                  if isinstance(b, ex.Paragrafo) and "duvida" in b.texto)
     assert [corpo.texto[a:z] for a, z in corpo.duvidosos] == ["duvida"]
     # O parágrafo que a paginação partiu volta com os duvidosos dele no lugar certo.
-    antes = ex.ParagrafoExportado("fim da pagina sem ponto")
-    depois = ex.ParagrafoExportado("e segue duvida", duvidosos=[(8, 14)])
+    antes = mo.ParagrafoExportado("fim da pagina sem ponto")
+    depois = mo.ParagrafoExportado("e segue duvida", duvidosos=[(8, 14)])
     paginas = [ex.PaginaExtraida(numero=0, blocos=[antes]),
                ex.PaginaExtraida(numero=1, blocos=[depois])]
-    ex._juntar_entre_paginas(paginas)
+    mo._juntar_entre_paginas(paginas)
     assert [antes.texto[a:z] for a, z in antes.duvidosos] == ["duvida"]
 
 
@@ -346,5 +351,15 @@ def test_o_dialogo_oferece_as_opcoes_novas_so_onde_valem():
         dialogo.manter_quebras.setChecked(True)
         dialogo.realcar.setChecked(True)
         opcoes = dialogo.opcoes()
-        assert opcoes.manter_quebras and opcoes.realcar_duvidosos
+        # A marcada vale só onde o formato a oferece; no controle cinza, o padrão.
+        assert opcoes.manter_quebras is quebras and opcoes.realcar_duvidosos is realce
         dialogo.deleteLater()
+    # A lembrada de outro formato não muda, escondida, este: o desenho desligado no EPUB
+    # vale no TXT (o controle fica ativo), e o PGN fica no padrão.
+    lembradas = ex.Opcoes(desenhar_diagramas=False, manter_quebras=True)
+    txt = DialogoDeExportacao(None, "txt", lembradas, {}, Path("."), "T")
+    assert txt.desenhar.isEnabled() and txt.opcoes().desenhar_diagramas is False
+    pgn = DialogoDeExportacao(None, "pgn", lembradas, {}, Path("."), "T")
+    assert pgn.opcoes() == ex.Opcoes()
+    txt.deleteLater()
+    pgn.deleteLater()

@@ -123,6 +123,15 @@ def test_a_linha_que_roda_ao_importar_o_modulo_vale_para_todos_os_testes_dele():
                                      todos) == todos
 
 
+def test_as_marcas_valem_na_cobertura_e_em_cada_mutante():
+    """Sem `--marcas`, as camadas da suíte rápida (o `addopts` do pyproject); com elas, a
+    mesma expressão `-m` nas duas rodadas (o código que abre processos tem os testes na
+    camada `processo`)."""
+    assert mutador.argumentos_do_pytest(None) == ["-q", "-p", "no:cacheprovider"]
+    assert mutador.argumentos_do_pytest("not livro_real") == [
+        "-q", "-p", "no:cacheprovider", "-m", "not livro_real"]
+
+
 def test_o_resumo_conta_o_tempo_como_morto_e_o_sem_teste_como_sobrevivente():
     resultados = ["morto", "morto", "tempo", "sobreviveu", "sem_teste"]
     assert mutador.resumo(resultados) == {"mutantes": 5, "mortos": 3, "sobreviventes": 1,

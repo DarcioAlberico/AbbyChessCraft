@@ -8,6 +8,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 |---|---|---|---|---|
 | Abrir projeto | Ctrl+O | Ctrl+O | global | A2 |
 | Alternar o escopo da fila (página ou livro) | Shift+F7 | Ctrl+Shift+F8 | global | C |
+| Borracha (apagar uma mancha da imagem) | Ctrl+Shift+E | Ctrl+Shift+E | global | L |
 | Cancelar o lote (também o ✕ da barra de status) | — | — | global | A2 |
 | Ciclar o modo da fila | F7 | Ctrl+Shift+F7 | global | A2 |
 | Desfazer | Ctrl+Z | Ctrl+Z | global | A2 |

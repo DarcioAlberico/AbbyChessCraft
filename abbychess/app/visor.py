@@ -8,6 +8,9 @@ página: é como se marca o que a segmentação perdeu, partiu ou colou. Em
 qualquer modo, Ctrl+clique põe o box na seleção (ou o tira dela), para
 ensinar várias ocorrências do mesmo glifo de uma vez.
 
+Na **borracha** (CA-12.17) o arraste desenha, do mesmo jeito, a área a apagar da imagem (a
+mancha do scanner): o visor só emite `borracha_desenhada`, e a janela apaga.
+
 No **editor de áreas** o arraste desenha uma área, o arraste dentro de uma área
 a move e o das bordas a estica; Del apaga a selecionada e as teclas 1 a 4
 trocam o tipo (texto, diagrama, imagem, ignorar). É outro modo, separado do de
@@ -48,6 +51,8 @@ class VisorDePagina(QGraphicsView):
     juntar_com = Signal(int, int)
     #: O quadro desenhado no modo de treino: x1, y1, x2, y2 da página.
     area_desenhada = Signal(int, int, int, int)
+    #: A área desenhada na borracha: x1, y1, x2, y2 da página.
+    borracha_desenhada = Signal(int, int, int, int)
     #: Ctrl+clique num box: entra na seleção, ou sai se já estava.
     box_alternado = Signal(int)
     #: Clique num diagrama, fora dos boxes: x, y da página (a janela acha qual é).
@@ -109,6 +114,7 @@ class VisorDePagina(QGraphicsView):
         self._marcados: List[QGraphicsRectItem] = []
         self._marcados_indices: set = set()
         self.modo_treino = False
+        self.modo_borracha = False
         self._inicio = None
         self._quadro: Optional[QGraphicsRectItem] = None
         self.modo_areas = False
@@ -350,25 +356,26 @@ class VisorDePagina(QGraphicsView):
             item.setZValue(9)
             self._marcados.append(item)
 
-    def definir_modo_treino(self, sim: bool) -> None:
-        """No modo de treino o arraste desenha o quadro de um glifo."""
-        if sim and self.modo_areas:
+    def definir_modo_do_quadro(self, modo: Optional[str]) -> None:
+        """O arraste desenha um quadro: o de um glifo no modo de treino (`"treino"`), a área a
+        apagar na borracha (`"borracha"`); None desliga os dois."""
+        if modo and self.modo_areas:
             self.definir_modo_areas(False)
-        self.modo_treino = sim
+        self.modo_treino, self.modo_borracha = modo == "treino", modo == "borracha"
         self._cursor_do_modo()
 
     def definir_modo_areas(self, sim: bool) -> None:
         """No editor de áreas o arraste desenha, move e estica as áreas da página."""
         self.modo_areas = sim
         if sim:
-            self.modo_treino = False
+            self.modo_treino = self.modo_borracha = False
         self._arraste, self._inicio = None, None
         self.viewport().setMouseTracking(sim)
         self._cursor_do_modo()
         self.mostrar_zonas(self._zonas, self._zona_sel)
 
     def _cursor_do_modo(self) -> None:
-        livre = not (self.modo_treino or self.modo_areas)
+        livre = not (self.modo_treino or self.modo_areas or self.modo_borracha)
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag if livre
                          else QGraphicsView.DragMode.NoDrag)
         self.viewport().setCursor(Qt.CursorShape.OpenHandCursor if livre
@@ -542,7 +549,7 @@ class VisorDePagina(QGraphicsView):
                 if indice is not None:
                     self.box_alternado.emit(indice)
                 return
-            if self.modo_treino:
+            if self.modo_treino or self.modo_borracha:
                 # Clique escolhe o box; arraste desenha o quadro (ver mouseRelease).
                 self._inicio = ponto
                 return
@@ -571,7 +578,7 @@ class VisorDePagina(QGraphicsView):
             ponto = self.mapToScene(evento.position().toPoint())
             retangulo = QRectF(self._inicio, ponto).normalized()
             if self._quadro is None:
-                caneta = QPen(estilo.COR_DA_ZONA[zn.TEXTO] if self.modo_areas else estilo.MARCADO)
+                caneta = QPen(_cor_do_quadro(self))
                 caneta.setCosmetic(True)
                 caneta.setWidthF(1.5)
                 caneta.setStyle(Qt.PenStyle.DashLine)
@@ -658,11 +665,12 @@ class VisorDePagina(QGraphicsView):
         super().keyReleaseEvent(evento)
 
     def soltar_quadro(self, inicio, fim) -> None:
-        """O fim do arraste no modo de treino: quadro novo, ou clique num box."""
+        """O fim do arraste no modo de treino ou na borracha: quadro novo, ou clique num box."""
         retangulo = QRectF(inicio, fim).normalized()
         if min(retangulo.width(), retangulo.height()) >= self.MENOR_QUADRO:
-            self.area_desenhada.emit(int(retangulo.left()), int(retangulo.top()),
-                                     int(retangulo.right()) + 1, int(retangulo.bottom()) + 1)
+            sinal = self.borracha_desenhada if self.modo_borracha else self.area_desenhada
+            sinal.emit(int(retangulo.left()), int(retangulo.top()),
+                       int(retangulo.right()) + 1, int(retangulo.bottom()) + 1)
             return
         indice = self._box_em(fim)
         if indice is not None:
@@ -795,6 +803,13 @@ TECLAS_DA_FUNCAO = {Qt.Key.Key_T: "texto", Qt.Key.Key_H: "titulo",
                     Qt.Key.Key_P: "numero_de_pagina", Qt.Key.Key_N: "nota",
                     Qt.Key.Key_L: "legenda", Qt.Key.Key_D: "diagrama",
                     Qt.Key.Key_I: "figura", Qt.Key.Key_X: "ignorar"}
+
+
+def _cor_do_quadro(visor: VisorDePagina) -> QColor:
+    """A cor do quadro em arraste: a de uma área, a da borracha ou a do glifo marcado."""
+    if visor.modo_areas:
+        return estilo.COR_DA_ZONA[zn.TEXTO]
+    return estilo.VERMELHAO if visor.modo_borracha else estilo.MARCADO
 
 
 def _tecla_da_area(visor: VisorDePagina, evento) -> bool:

@@ -122,6 +122,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.visor.dividir_em.connect(p.dividir_em)
         self.visor.juntar_com.connect(p.juntar_com)
         self.visor.area_desenhada.connect(p.marcar)
+        self.visor.borracha_desenhada.connect(self._apagar_mancha)
         self.visor.box_alternado.connect(p.alternar_na_selecao)
         self.visor.diagrama_clicado.connect(self.conferencia.clicado)
         self.visor.zona_desenhada.connect(self.areas.desenhar)
@@ -421,20 +422,47 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
                 meta = escolha.metadados if destino.suffix.lower() in (".epub", ".docx") else None
                 self.livro.exportar(destino, escolha.opcoes, meta, escolha.capa)
 
+    def _so_um_modo(self, ligada) -> None:
+        """Os modos do arraste (marcar glifo, áreas, borracha) se excluem: os outros saem."""
+        for q in (self.acao_modo_treino, self.acao_areas, self.acao_borracha):
+            if q is not ligada and q.isChecked():
+                q.setChecked(False)
+                if q is self.acao_areas:
+                    self.modo_areas(False)
+                else:
+                    self.visor.definir_modo_do_quadro(None)
+
     def modo_treino(self, sim: bool) -> None:
-        if sim and self.acao_areas.isChecked():
-            self.acao_areas.setChecked(False)
-            self.modo_areas(False)
-        self.visor.definir_modo_treino(sim)
+        if sim:
+            self._so_um_modo(self.acao_modo_treino)
+        self.visor.definir_modo_do_quadro("treino" if sim else None)
         self.statusBar().showMessage(
             "Marcar glifo à mão: arraste em volta de um glifo para marcá-lo; Ctrl+clique junta "
             "boxes na seleção." if sim else "Marcar glifo à mão: desligado.", AVISO_LONGO_MS)
 
+    def modo_borracha(self, sim: bool) -> None:
+        """A borracha (CA-12.17): o arraste apaga a área da imagem (a mancha do scanner)."""
+        if sim:
+            self._so_um_modo(self.acao_borracha)
+        self.visor.definir_modo_do_quadro("borracha" if sim else None)
+        self.statusBar().showMessage(teclado.com_teclas(
+            "Borracha: arraste em volta da mancha para apagá-la da imagem; {desfazer} a "
+            "devolve.") if sim else "Borracha: desligada.", AVISO_LONGO_MS)
+
+    def _apagar_mancha(self, x1: int, y1: int, x2: int, y2: int) -> None:
+        """A área da borracha apagada na página aberta; a vista fica onde estava (a página
+        apagada é mostrada de novo, e começaria no topo)."""
+        barras = (self.visor.horizontalScrollBar(), self.visor.verticalScrollBar())
+        lugar = [b.value() for b in barras]
+        if self.pagina.operacoes.apagar_manchas(self.pagina.indice, [(x1, y1, x2, y2)]):
+            for barra, valor in zip(barras, lugar):
+                barra.setValue(valor)
+
     def modo_areas(self, sim: bool) -> None:
-        """Liga o editor de áreas, que desliga o modo de treino: os dois usam o arraste."""
-        if sim and self.acao_modo_treino.isChecked():
-            self.acao_modo_treino.setChecked(False)
-            self.visor.definir_modo_treino(False)
+        """Liga o editor de áreas, que desliga o modo de treino e a borracha: todos usam o
+        arraste."""
+        if sim:
+            self._so_um_modo(self.acao_areas)
         self.visor.definir_modo_areas(sim)
         self._layout_mudou()
         acoes.atualizar(self)

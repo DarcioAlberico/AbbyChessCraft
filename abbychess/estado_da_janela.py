@@ -40,6 +40,7 @@ DICAS_DAS_PAGINAS = (
     "Gira as páginas de 90 em 90 graus, com os glifos",
     "Corta as margens das páginas; os glifos de fora ficam guardados",
     "Devolve as páginas cortadas inteiras",
+    "Devolve as áreas que a borracha apagou",
     "Divide a página espelhada em duas",
     "Endireita as páginas por um ângulo à mão; a leitura delas se desfaz",
 )
@@ -99,6 +100,7 @@ def calcular(p, livro, vista: Vista) -> EstadoDaJanela:
     areas = (vista.areas_ligadas, AREAS_DESLIGADAS)
     area_atual = _primeiro(tem, areas, (vista.area_atual, SEM_AREA_ATUAL))
     desfazer, refazer = _desfazer_e_refazer(p, vista)
+    paginas, paginas_mudam = _das_paginas(p)
     habilitadas = {
         "acao_novo": _primeiro(sem_lote),
         "acao_abrir": _primeiro(sem_lote),
@@ -129,6 +131,8 @@ def calcular(p, livro, vista: Vista) -> EstadoDaJanela:
         "acao_substituir": _primeiro(tem),
         "acao_galeria": _primeiro(tem, boxes),
         "acao_areas": _primeiro(tem),
+        # A borracha é uma operação de página: vale quando elas valem (o motivo é o delas).
+        "acao_borracha": _primeiro(tem, (paginas_mudam, paginas[0][0])),
         "acao_areas_auto": _primeiro(tem, areas),
         "acao_reconhecer_zona": area_atual,
         "acoes_das_funcoes": area_atual,
@@ -149,7 +153,6 @@ def calcular(p, livro, vista: Vista) -> EstadoDaJanela:
         "acao_refazer": _primeiro(tem, (refazer is not None or vista.no_diagrama,
                                         NADA_A_REFAZER)),
     }
-    paginas, paginas_mudam = _das_paginas(p)
     return EstadoDaJanela(habilitadas, paginas, paginas_mudam,
                           f"Desfazer: {desfazer}" if desfazer else "Desfazer",
                           f"Refazer: {refazer}" if refazer else "Refazer")

@@ -1,7 +1,7 @@
 """As operações de página vistas da janela (SPEC §12.4, passo L): os diálogos do menu Página e
 da gaveta, que perguntam e chamam os comandos do controlador (`mover_paginas`,
 `apagar_paginas`, `inserir_paginas`, `restaurar_paginas`, `girar_paginas`, `cortar_paginas`,
-`tirar_o_corte`, `dividir_paginas`, `endireitar_paginas`). Um mixin da `JanelaPrincipal`,
+`tirar_o_corte`, `tirar_as_borrachas`, `dividir_paginas`, `endireitar_paginas`). Um mixin da `JanelaPrincipal`,
 como `EspacoDeTrabalho`.
 """
 
@@ -57,6 +57,7 @@ class PaginasNaJanela:
                      "girar_a_esquerda": self.girar_a_esquerda,
                      "girar_paginas": self.girar_paginas, "cortar_paginas": self.cortar_paginas,
                      "tirar_o_corte": self.tirar_o_corte,
+                     "tirar_as_borrachas": self.tirar_as_borrachas,
                      "dividir_paginas": self.dividir_paginas,
                      "endireitar_paginas": self.endireitar_paginas}
         operacoes[metodo](posicoes)
@@ -163,6 +164,16 @@ class PaginasNaJanela:
                              "divisão junta as metades.")
         if escolha is not None:
             self.pagina.operacoes.tirar_o_corte(escolha[0])
+
+    def tirar_as_borrachas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
+        escolha = self._perguntar_pela_selecao(
+            "Tirar a borracha", selecionadas,
+            ("1 página volta como era na fonte: {PAGINAS}.",
+             "{N} páginas voltam como eram na fonte: {PAGINAS}."),
+            "Tirar a borracha", "As áreas que a borracha apagou voltam à imagem; o corte, o "
+                                "giro e a leitura ficam. {desfazer} desfaz.")
+        if escolha is not None:
+            self.pagina.operacoes.tirar_as_borrachas(escolha[0])
 
     def dividir_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         onde = dp.campo_de_porcentagem(50.0, 5.0, 95.0, " % da largura")

@@ -253,16 +253,31 @@ def _rodar_mutante(copia: Path, modulo: Path, fonte: str, m: Mutante, testes: Li
     argumentos = copia / ".testes-do-mutante.txt"
     argumentos.write_text("\n".join(testes) + "\n", encoding="utf-8")
     caminho.write_text(m.aplicar(fonte), encoding="utf-8", newline="")
+    rodada = subprocess.Popen([sys.executable, "-m", "pytest", "-x", *argumentos_do_pytest(marcas),
+                               f"@{argumentos.name}"], cwd=copia, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, env=_ambiente(copia))
     try:
-        rodada = subprocess.run([sys.executable, "-m", "pytest", "-x", *argumentos_do_pytest(marcas),
-                                 f"@{argumentos.name}"], cwd=copia, capture_output=True,
-                                env=_ambiente(copia), timeout=limite)
-        return classificar(rodada.returncode, False,
-                           (rodada.stdout + rodada.stderr).decode("utf-8", "replace"))
+        saida, _ = rodada.communicate(timeout=limite)
+        return classificar(rodada.returncode, False, saida.decode("utf-8", "replace"))
     except subprocess.TimeoutExpired:
+        _matar_a_arvore(rodada)
         return classificar(None, True)
     finally:
         caminho.write_text(fonte, encoding="utf-8", newline="")
+
+
+def _matar_a_arvore(rodada: subprocess.Popen) -> None:
+    """O pytest que estourou o tempo e os filhos dele: o teste que abre processos (o servidor,
+    o pool do índice) deixa um neto que segura a saída aberta, e esperar por ela esperava o
+    neto acabar (uma parte de 8,5 minutos chegou a 29)."""
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(rodada.pid)], capture_output=True)
+    else:
+        rodada.kill()
+    try:
+        rodada.communicate(timeout=30)
+    except subprocess.TimeoutExpired:
+        pass
 
 
 def _contextos(destino: Path, chave: dict, continuar: bool, medir) -> Dict[int, List[str]]:

@@ -572,3 +572,47 @@ def test_a_palavra_nova_junto_da_quebra_de_linha_fica_na_linha_digitada(para):
     p = _pagina("casa", "longe")
     _editar(p, "casa\nlonge", para)
     assert _texto(p) == para
+
+
+def _com_a_ligadura_fi(tinta_sem_corte: bool = False):
+    """A página "afib" impressa em Times, com o "f" e o "i" num box só, a ligadura "fi";
+    `tinta_sem_corte`: no box, só um fio de tinta, que não se corta em duas letras (todo
+    corte deixa um lado sem tinta)."""
+    from PIL import ImageDraw
+
+    imagem, impressa = _pagina_impressa("afib")
+    a, f, i, b = impressa.boxes
+    fi = BoxEntry("fi", f.entry.x1, min(f.entry.y1, i.entry.y1), i.entry.x2,
+                  max(f.entry.y2, i.entry.y2), 0.9, "net")
+    if tinta_sem_corte:
+        desenho = ImageDraw.Draw(imagem)
+        desenho.rectangle([fi.x1, fi.y1, fi.x2, fi.y2], fill=(255, 255, 255))
+        desenho.rectangle([fi.x1, fi.y1, fi.x1 + 1, fi.y2 - 1], fill=(0, 0, 0))
+    return imagem, Pagina(1, 0, [a, Box(f.gid, fi), b], estado="reconhecida",
+                          proximo_n=impressa.proximo_n)
+
+
+def test_o_espaco_digitado_dentro_da_ligadura_parte_a_palavra_ali():
+    """O espaço digitado no meio da ligadura "fi" ("afib" -> "af ib") divide o box pela tinta
+    e parte a palavra entre os pedaços (antes, a quebra entrava antes da ligadura inteira, e
+    a página ficava "a fib")."""
+    imagem, pagina = _com_a_ligadura_fi()
+    _texto_, unidades = ss.texto_e_unidades(pagina)
+    ss.aplicar(pagina, ss.planejar(unidades, "af ib"), imagem, None)
+    assert _texto(pagina) == "af ib"
+    assert [b.entry.char for b in pagina.boxes] == ["a", "f", "i", "b"]
+
+
+@pytest.mark.parametrize("sem_imagem", [True, False])
+def test_o_espaco_dentro_da_ligadura_sem_tinta_para_cortar_e_recusado(sem_imagem):
+    """Sem a tinta para cortar a ligadura (a página sem imagem, ou uma tinta que não se corta
+    em duas letras), o espaço não tem onde ficar: a sessão é recusada, com o motivo, e a
+    página fica como estava; o usuário divide o glifo antes (Ctrl+D)."""
+    imagem, pagina = _com_a_ligadura_fi(tinta_sem_corte=not sem_imagem)
+    antes = ([(b.gid, b.entry.as_state()) for b in pagina.boxes], pagina.decisoes)
+    _texto_, unidades = ss.texto_e_unidades(pagina)
+    plano = ss.planejar(unidades, "af ib")
+    with pytest.raises(ss.Recusa, match="não dá para pôr um espaço dentro do glifo “fi”"):
+        ss.aplicar(pagina, plano, None if sem_imagem else imagem, None)
+    assert ([(b.gid, b.entry.as_state()) for b in pagina.boxes], pagina.decisoes) == antes
+    assert _texto(pagina) == "afib"

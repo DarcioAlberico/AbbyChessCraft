@@ -547,12 +547,16 @@ def _exportado(pagina):
             if hasattr(b, "texto")]
 
 
-def test_apagar_a_letra_e_o_hifen_de_fim_de_linha_juntos_junta_a_palavra():
-    """§6.3: apagar o hífen de quebra junta a palavra, também quando a letra antes dele sai
-    na mesma edição ("exem-" / "plo" -> "exeplo"; antes, a exportação saía "exe plo")."""
+@pytest.mark.parametrize("para, documento", [
+    ("exeplo", "exe\nplo"),                               # a letra antes do hífen também sai
+    ("exemlo", "exem\nlo"),                               # a primeira da linha seguinte também
+    ("exelo", "exe\nlo")])                                # as duas
+def test_apagar_a_letra_e_o_hifen_de_fim_de_linha_juntos_junta_a_palavra(para, documento):
+    """§6.3: apagar o hífen de quebra junta a palavra, também quando uma letra em volta dele
+    sai na mesma edição ("exem-" / "plo" -> "exeplo"; antes, a exportação saía "exe plo")."""
     from abbychess.modelo import Decisoes
 
     p = _pagina("exem-", "plo")
     p.decisoes = Decisoes(hifen_de_quebra=frozenset({p.boxes[4].gid}))
-    _editar(p, "exem-\nplo", "exeplo")
-    assert _texto(p) == "exe\nplo" and _exportado(p) == ["exeplo"]
+    _editar(p, "exem-\nplo", para)
+    assert _texto(p) == documento and _exportado(p) == [para]

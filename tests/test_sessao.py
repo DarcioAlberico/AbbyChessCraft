@@ -532,3 +532,27 @@ def test_figurinas_com_o_espaco_digitado_antes_e_na_pagina_longa_de_lances():
     original = " ".join(["Cf3", "e5"] * 120)
     novo = "Cf6" + original[3:]                           # o primeiro lance mudado
     assert ss.com_figurinas(novo, original, "pt", "figurinas") == "♘f6" + original[3:]
+
+
+# ----------------------------------------------------------------------
+# Os defeitos que a mutação achou (Q9)
+# ----------------------------------------------------------------------
+
+def _exportado(pagina):
+    """Os parágrafos da página como a exportação os escreve."""
+    from abbychess import montagem as mo
+
+    entries, estrutura = mo.Estrutura.da_pagina(pagina)
+    return [b.texto for b in mo.pagina_extraida(0, entries, estrutura=estrutura).blocos
+            if hasattr(b, "texto")]
+
+
+def test_apagar_a_letra_e_o_hifen_de_fim_de_linha_juntos_junta_a_palavra():
+    """§6.3: apagar o hífen de quebra junta a palavra, também quando a letra antes dele sai
+    na mesma edição ("exem-" / "plo" -> "exeplo"; antes, a exportação saía "exe plo")."""
+    from abbychess.modelo import Decisoes
+
+    p = _pagina("exem-", "plo")
+    p.decisoes = Decisoes(hifen_de_quebra=frozenset({p.boxes[4].gid}))
+    _editar(p, "exem-\nplo", "exeplo")
+    assert _texto(p) == "exe\nplo" and _exportado(p) == ["exeplo"]

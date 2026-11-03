@@ -114,12 +114,14 @@ def _trechos_longos_iguais(original: str, novo: str) -> List[Tuple[int, int]]:
 
 
 def _troca(a: str, b: str) -> int:
-    """O custo de alinhar `a` com `b`: 0 iguais, 1 duas letras; 2 uma letra com o espaço
-    (nunca menos que apagar e inserir): trocar o x de "ganhaxtempos" por "r " corrige o
-    glifo e insere o espaço, não tira o box para pôr um virtual."""
+    """O custo de alinhar `a` com `b`: 0 iguais, 1 duas letras; 2 uma letra com o espaço ou a
+    quebra de linha (nunca menos que apagar e inserir): trocar o x de "ganhaxtempos" por "r "
+    corrige o glifo e insere o espaço, não tira o box para pôr um virtual. O espaço com a
+    quebra de linha custa 1: os dois separam palavras, mas a quebra impressa prefere a
+    digitada (a palavra digitada logo depois dela fica na linha de baixo)."""
     if a == b:
         return 0
-    return 2 if (a == " ") != (b == " ") else 1
+    return 2 if (a in " \n") != (b in " \n") else 1
 
 
 def _levenshtein(original: str, novo: str) -> List[Tuple[Optional[int], Optional[int]]]:
@@ -184,9 +186,9 @@ class Plano:
     quebrar: Set[int] = field(default_factory=set)
     #: (último, primeiro): as palavras juntadas (o espaço apagado).
     juntar: Set[Tuple[int, int]] = field(default_factory=set)
-    #: As letras que faltaram: (letras, âncora, a palavra é nova?), a âncora como
-    #: ("depois", gid) ou ("antes", gid).
-    virtuais: List[Tuple[str, Tuple[str, Optional[int]], bool]] = field(default_factory=list)
+    #: As letras que faltaram: (letras, âncora), a âncora como ("depois", gid) ou
+    #: ("antes", gid).
+    virtuais: List[Tuple[str, Tuple[str, Optional[int]]]] = field(default_factory=list)
     #: Operações estruturais do passo G, na ordem em que aparecem no texto.
     juntar_boxes: List[Tuple[Tuple[int, ...], str]] = field(default_factory=list)
     dividir_boxes: List[Tuple[int, str]] = field(default_factory=list)
@@ -228,7 +230,7 @@ class Plano:
         if self.sair:
             n = len(self.sair)
             partes.append(f"{n} glifo tirado" if n == 1 else f"{n} glifos tirados")
-        letras = sum(len(t) for t, _a, _n in self.virtuais)
+        letras = sum(len(t) for t, _a in self.virtuais)
         if letras:
             partes.append(f"{letras} glifo virtual" if letras == 1 else f"{letras} glifos virtuais")
         return partes
@@ -267,9 +269,8 @@ def gid_no_cursor(unidades: Sequence[Unidade], novo: str, onde: int,
     """O glifo do original que ficou sob o cursor na posição `onde` do texto novo (o
     caractere antes dele; num espaço, o depois): o do Ctrl+Enter. `LETRA_NOVA` se ali há
     uma letra digitada agora; None se não há glifo."""
-    original = _texto_original(unidades)
+    por_novo = {j: i for i, j in _alinhar_a_sessao(unidades, novo, fixos) if j is not None}
     novo = _normalizar(novo)
-    por_novo = _por_novo(original, novo, fixos)
     for j in (onde - 1, onde):
         if not 0 <= j < len(novo) or novo[j] == " ":
             continue
@@ -286,9 +287,12 @@ def _texto_original(unidades: Sequence[Unidade]) -> str:
     return "".join(u.texto if u.tipo != LINHA else " " for u in unidades)
 
 
-def _por_novo(original: str, novo: str, fixos) -> Dict[int, int]:
-    """j no novo -> i no original, dos caracteres alinhados."""
-    return {j: i for i, j in alinhar(original, novo, fixos) if j is not None}
+def _alinhar_a_sessao(unidades: Sequence[Unidade], novo: str, fixos
+                      ) -> List[Tuple[Optional[int], Optional[int]]]:
+    """O alinhamento das unidades com o texto novo, com a quebra de linha como "\\n" dos dois
+    lados (o tab colado é um espaço): a quebra impressa se alinha com a digitada, não com o
+    espaço ao lado dela (ver `_troca`)."""
+    return alinhar("".join(u.texto for u in unidades), novo.replace("\t", " "), fixos)
 
 
 def planejar(unidades: Sequence[Unidade], novo: str,
@@ -296,9 +300,9 @@ def planejar(unidades: Sequence[Unidade], novo: str,
     """O plano da sessão: o que fica, o que sai, o que entra, e as fronteiras. `fixos`, os
     pares (no original, no novo) que nenhuma edição tocou (ver `alinhar`). O hífen de fim de
     linha que sai junta a palavra na aplicação (`_hifens_de_fim_de_linha`)."""
+    pares = _alinhar_a_sessao(unidades, novo, fixos)
     novo = _normalizar(novo)
     original = _texto_original(unidades)
-    pares = alinhar(original, novo, fixos)
     plano = Plano(linha=_linha_original(unidades), texto_mudou=original != novo,
                   de=" ".join(original.split()), para=" ".join(novo.split()))
     letras_do_gid = _itens_do_texto_novo(plano, unidades, novo, pares)
@@ -412,8 +416,6 @@ def _dividir_ligaduras_repetidas(plano, itens, unidades, novo, pares) -> None:
     """Uma inserção no meio de um box multicaractere transforma-o em ``1 -> k``."""
     for gid in _glifos_repetidos(itens):
         posicoes = _posicoes_do_glifo(gid, unidades, pares)
-        if not posicoes:
-            continue
         chars = _caracteres_entre(posicoes, novo, pares)
         primeiro, ultimo = _trecho_do_glifo(itens, gid)
         if chars and all(t in ("glifo", "letra") for t, _v in itens[primeiro:ultimo + 1]):
@@ -575,7 +577,7 @@ def _letras_novas(unidades, itens, plano: Plano) -> None:
     linha = _linha_original(unidades)
     for k, fim in _sequencias_de_letras(itens):
         letras = "".join(c for _item, c in itens[k:fim])
-        plano.virtuais.append((letras, *_ancora_das_letras(itens, k, fim, linha)))
+        plano.virtuais.append((letras, _ancora_das_letras(itens, k, fim, linha)))
 
 
 def _sequencias_de_letras(itens):
@@ -593,15 +595,15 @@ def _sequencias_de_letras(itens):
 
 
 def _ancora_das_letras(itens, k: int, fim: int, linha: Dict[int, int]):
-    """(a âncora, a palavra é nova?) das letras `itens[k:fim]`: o glifo logo antes delas ou,
-    sem ele, o logo depois; sem os dois, a de uma palavra nova inteira."""
+    """A âncora das letras `itens[k:fim]`: o glifo logo antes delas ou, sem ele, o logo
+    depois; sem os dois, a de uma palavra nova inteira."""
     antes = itens[k - 1] if k else None
     depois = itens[fim] if fim < len(itens) else None
     if antes is not None and antes[0] == "glifo":
-        return ("depois", antes[1]), False
+        return ("depois", antes[1])
     if depois is not None and depois[0] == "glifo":
-        return ("antes", depois[1]), False
-    return _ancora_da_palavra_nova(itens, k, fim, linha), True
+        return ("antes", depois[1])
+    return _ancora_da_palavra_nova(itens, k, fim, linha)
 
 
 def _ancora_da_palavra_nova(itens, k: int, fim: int, linha: Dict[int, int]):
@@ -693,7 +695,7 @@ def _hifens_de_fim_de_linha(pagina: Pagina, saem, onde) -> List[Tuple[int, int]]
     for gid in saem:
         if not _hifen_que_sai(pagina, gid, onde):
             continue
-        juncao = _juncao_do_hifen(gid, onde, por_linha, ordem)
+        juncao = _juncao_do_hifen(gid, onde, por_linha, ordem, saem)
         if juncao is not None:
             saida.append(juncao)
     return saida
@@ -713,17 +715,24 @@ def _hifen_que_sai(pagina: Pagina, gid: int, onde) -> bool:
     return box is not None and box.entry.char in ("-", "\u00ad") and gid in onde
 
 
-def _juncao_do_hifen(gid: int, onde, por_linha, ordem) -> Optional[Tuple[int, int]]:
+def _juncao_do_hifen(gid: int, onde, por_linha, ordem, saem) -> Optional[Tuple[int, int]]:
     """(a letra antes do hífen, a primeira da linha seguinte), se o hífen é o último glifo da
-    linha, colado na palavra, e há uma linha depois; senão None."""
+    linha, colado na palavra, e há uma linha depois; senão None. Os glifos que também saem
+    (`saem`) não contam: a junção é entre as letras que ficam ("exem-" / "plo" -> "exeplo"
+    junta o "e" com o "p")."""
     b, n, k = onde[gid]
-    linha = sorted(por_linha[(b, n)], key=ordem.__getitem__)
-    seguinte = sorted(por_linha.get((b, n + 1), []), key=ordem.__getitem__)
+    linha = _os_que_ficam(por_linha[(b, n)], ordem, saem - {gid})
+    seguinte = _os_que_ficam(por_linha.get((b, n + 1), []), ordem, saem)
     if linha[-1] != gid or len(linha) < 2 or not seguinte:
         return None
     if onde.get(linha[-2], (None, None, None))[2] != k:
         return None                             # um travessão solto ("velha -") não parte palavra
     return (linha[-2], seguinte[0])
+
+
+def _os_que_ficam(gids, ordem, saem) -> List[int]:
+    """Os `gids` na ordem da página montada, sem os que saem."""
+    return sorted((g for g in gids if g not in saem), key=ordem.__getitem__)
 
 
 def aplicar(pagina: Pagina, plano: Plano, imagem=None, leitor=None) -> None:

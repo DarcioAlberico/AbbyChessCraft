@@ -17,7 +17,17 @@ PEDIDOS = RAIZ / "docs" / "pedidos-ao-pyboxeditor.md"
 CONTRATOS = RAIZ / "tests" / "test_contrato_do_core.py"
 
 #: (arquivo, "Dono._nome") -> o teste de contrato (em `CONTRATOS`) que fixa o uso.
-EXCECOES: dict = {}
+EXCECOES = {
+    ("abbychess/diagramas.py", "TabuleiroEdicao._estado"): "test_contrato_do_historico_do_tabuleiro",
+    ("abbychess/diagramas.py", "TabuleiroEdicao._historico"): "test_contrato_do_historico_do_tabuleiro",
+    ("abbychess/diagramas.py", "TabuleiroEdicao._indice"): "test_contrato_do_historico_do_tabuleiro",
+    ("abbychess/diagramas.py", "TabuleiroEdicao._registrar"): "test_contrato_do_historico_do_tabuleiro",
+    ("abbychess/editar_boxes.py", "BoxService._tinta_do_box"): "test_contrato_da_tinta_do_box",
+    ("abbychess/editar_boxes.py", "BoxService._vale_mais_fundo"): "test_contrato_do_vale_mais_fundo",
+    ("abbychess/leitor.py", "LearningService._get_learner"): "test_contrato_do_servico_de_aprendizado",
+    ("abbychess/leitor.py", "LearningService._predictor"): "test_contrato_do_servico_de_aprendizado",
+    ("abbychess/verificacao.py", "lexico._ler"): "test_contrato_da_lista_de_palavras",
+}
 
 
 def _do_core(arvore) -> dict:

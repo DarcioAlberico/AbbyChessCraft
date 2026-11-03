@@ -603,10 +603,14 @@ teste usa como o usuário; senão saem. Os 3 F401 de `camada.py` saem já (o por
    descem.
 7. **Idioma do livro:** a exportação usa o detector do core (pt e en) e o projeto novo o de
    `idioma.py` (cinco idiomas); escolher um só muda o `dc:language` do EPUB. Qual vale?
-8. **O espaço digitado dentro de uma ligadura** (achado no Q9, defeito B): "afib" → "af ib",
+8. ~~**O espaço digitado dentro de uma ligadura** (achado no Q9, defeito B): "afib" → "af ib",
    com o box "fi", deixa a página "a fib". Corrigir mexe no plano da sessão (um item por pedaço
    da divisão), e, sem tinta para cortar (a imagem indisponível ou as letras coladas), a sessão
-   pode recusar a edição ou guardar a caixa e perder o espaço. Qual?
+   pode recusar a edição ou guardar a caixa e perder o espaço. Qual?~~ **Decidido**
+   (2026-11-03): recusar, com o motivo ("divida-o antes (Ctrl+D)"). **Feito** no ramo
+   `ligadura-com-espaco` (`1bb99f5` vermelho, `bc4611c`): a ligadura com espaço dentro se
+   divide pela tinta e a palavra parte entre os pedaços; a página sem imagem, ou a tinta que
+   não dá duas partes, recusa (o core corta até as letras coladas, no meio da largura).
 
 ## Apêndice — registro da análise
 

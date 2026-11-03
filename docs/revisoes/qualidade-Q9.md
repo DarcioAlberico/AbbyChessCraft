@@ -75,7 +75,9 @@ Cada um com o teste vermelho antes da correção:
 **Fica, à espera de uma decisão (§13.8 da spec): B, o espaço digitado dentro de uma ligadura**
 ("afib" → "af ib", com o box "fi", deixa a página "a fib"). A correção mexe em cinco ou seis
 lugares do plano da sessão, e o caso sem tinta para cortar pede escolher entre recusar a edição
-e guardar a caixa perdendo o espaço. O rascunho do teste está pronto.
+e guardar a caixa perdendo o espaço. O rascunho do teste está pronto. *Depois do Q9:* o usuário
+decidiu recusar, e o B foi feito no ramo `ligadura-com-espaco` (`1bb99f5`, `bc4611c`); a
+mutação do `sessao` nele dá 92,9 % (470 de 506).
 
 Também anotados, sem mudança: na rodada do `zonas`, a vírgula com o centro abaixo da linha de
 base ganha uma área automática só dela numa linha sem letra de perna (a função e o texto não

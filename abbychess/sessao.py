@@ -407,21 +407,50 @@ def _itens_do_original(plano: Plano) -> List[Tuple[str, object]]:
             itens_do_original.append(("glifo", plano.juntar_boxes[valor][0][0]))
         elif item == "dividir":
             itens_do_original.append(("glifo", plano.dividir_boxes[valor][0]))
+        elif item == "parte":
+            itens_do_original.append(("glifo", plano.dividir_boxes[valor[0]][0]))
         else:
             itens_do_original.append((item, valor))
     return itens_do_original
 
 
 def _dividir_ligaduras_repetidas(plano, itens, unidades, novo, pares) -> None:
-    """Uma inserção no meio de um box multicaractere transforma-o em ``1 -> k``."""
+    """Uma inserção no meio de um box multicaractere transforma-o em ``1 -> k``. Com um espaço
+    dentro dele ("afib" -> "af ib", o box "fi"), a divisão vira um item por pedaço
+    (("parte", (divisão, k))), com o espaço entre eles: a palavra se parte ali."""
     for gid in _glifos_repetidos(itens):
         posicoes = _posicoes_do_glifo(gid, unidades, pares)
         chars = _caracteres_entre(posicoes, novo, pares)
         primeiro, ultimo = _trecho_do_glifo(itens, gid)
-        if chars and all(t in ("glifo", "letra") for t, _v in itens[primeiro:ultimo + 1]):
-            indice = len(plano.dividir_boxes)
-            plano.dividir_boxes.append((gid, chars))
+        tipos = {t for t, _v in itens[primeiro:ultimo + 1]}
+        if not chars or not tipos <= {"glifo", "letra", "espaco", "linha"}:
+            continue
+        indice = len(plano.dividir_boxes)
+        plano.dividir_boxes.append((gid, chars))
+        if tipos <= {"glifo", "letra"}:
             itens[primeiro:ultimo + 1] = [("dividir", indice)]
+        else:
+            trecho = pares[posicoes[0]:posicoes[-1] + 1]
+            itens[primeiro:ultimo + 1] = _partes(indice, unidades, novo, trecho)
+
+
+def _partes(indice: int, unidades, novo: str, trecho) -> List[Tuple[str, object]]:
+    """Os itens da divisão `indice` com espaço dentro: um ("parte", (indice, k)) por letra do
+    `trecho` do alinhamento e os separadores entre elas (os de antes da primeira letra e os de
+    depois da última já estão nos itens, fora do trecho do glifo)."""
+    itens: List[Tuple[str, object]] = []
+    k = 0                                       # as letras até aqui: o pedaço da próxima
+    for i, j in trecho:
+        if j is None:
+            continue
+        if novo[j] != " ":
+            itens.append(("parte", (indice, k)))
+            k += 1
+        elif k:
+            itens.append(_item_novo(unidades[i] if i is not None else None, " "))
+    while itens[-1][0] != "parte":
+        itens.pop()
+    return itens
 
 
 def _glifos_repetidos(itens) -> List[int]:
@@ -552,7 +581,8 @@ def _fronteiras(unidades, itens, plano: Plano) -> None:
             continue
         if item == "letra" or tipo[gid] != GLIFO:
             continue
-        _fronteira(plano, palavra, anterior, gid, separado)
+        if gid != anterior:                     # os pedaços da ligadura: `como_digitado` os parte
+            _fronteira(plano, palavra, anterior, gid, separado)
         anterior, separado = gid, False
 
 
@@ -738,12 +768,14 @@ def _os_que_ficam(gids, ordem, saem) -> List[int]:
 def aplicar(pagina: Pagina, plano: Plano, imagem=None, leitor=None) -> None:
     """O plano na página: as letras, as fronteiras, as letras novas (virtuais), os virtuais
     que saem, as âncoras de todos como ficaram no texto, e só então os boxes que saem (já
-    não são âncora de ninguém)."""
+    não são âncora de ninguém). `Recusa`, sem mudar nada, se um espaço cai dentro de um glifo
+    que a tinta não corta (`_recusar_o_espaco_sem_tinta`)."""
     # Aqui, e não no topo: `edicao` traz o core de segmentação (cv2, numpy), que o índice da
     # busca, num processo à parte, não precisa (§7.3).
     from abbychess import ancoragem as ag
     from abbychess import edicao as ed
 
+    _recusar_o_espaco_sem_tinta(pagina, plano, imagem)
     sucessores_estruturais, sucessor = _aplicar_estruturais(pagina, plano, imagem, leitor)
 
     def primeiro(gid: int) -> int:
@@ -764,9 +796,29 @@ def aplicar(pagina: Pagina, plano: Plano, imagem=None, leitor=None) -> None:
     plano.linha_sem_boxes = _linha_sem_boxes(pagina, sequencia, plano.linha, virtuais,
                                              boxes_que_saem)
     ag.ancorar(pagina, sequencia, boxes_que_saem, plano.linha)
-    _tirar_os_boxes(pagina, sequencia, boxes_que_saem, plano.linha)
+    _tirar_os_boxes(pagina, sequencia, boxes_que_saem, plano.linha,
+                    bool(_divisoes_com_espaco(plano)))
     lidos = {b.gid for b in pagina.boxes if b.entry.char}
     ed.revisar(pagina, plano.revisar & lidos)   # o □ e o aguardando ficam na fila
+
+
+def _divisoes_com_espaco(plano: Plano) -> List[int]:
+    """As divisões do plano com um espaço dentro do glifo (as que viraram pedaços)."""
+    return sorted({valor[0] for item, valor in plano.itens if item == "parte"})
+
+
+def _recusar_o_espaco_sem_tinta(pagina: Pagina, plano: Plano, imagem) -> None:
+    """`Recusa` se a tinta de um glifo com um espaço dentro não se corta nas letras dele (a
+    página sem imagem, ou um corte com um lado sem tinta): sem os pedaços, o espaço não tem
+    onde ficar. Antes de qualquer mudança: nada é alterado."""
+    from abbychess import edicao as ed
+
+    for indice in _divisoes_com_espaco(plano):
+        gid, chars = plano.dividir_boxes[indice]
+        entry = pagina.box(gid).entry
+        if len(ed.partes_pela_tinta(imagem, entry, len(chars))) < len(chars):
+            raise Recusa(f"não dá para pôr um espaço dentro do glifo “{entry.char}” sem "
+                         "cortá-lo pela tinta: divida-o antes (Ctrl+D)")
 
 
 def _aplicar_estruturais(pagina: Pagina, plano: Plano, imagem, leitor):
@@ -832,6 +884,8 @@ def _sequencia_digitada(pagina: Pagina, itens, sucessores_estruturais
             sequencia.append(("glifo", gid))
         elif item in ("juntar", "dividir"):
             sequencia.extend(("glifo", gid) for gid in sucessores_estruturais[(item, valor)])
+        elif item == "parte":                   # o pedaço k da divisão
+            sequencia.append(("glifo", sucessores_estruturais[("dividir", valor[0])][valor[1]]))
         else:
             sequencia.append((item, valor))
     return sequencia
@@ -849,9 +903,11 @@ def _linha_sem_boxes(pagina: Pagina, sequencia, linha, virtuais: Set[int],
     return any(lp not in com_box for lp, _p in ag.palavras_da_sequencia(sequencia, linha))
 
 
-def _tirar_os_boxes(pagina: Pagina, sequencia, boxes_que_saem: Set[int], linha) -> None:
+def _tirar_os_boxes(pagina: Pagina, sequencia, boxes_que_saem: Set[int], linha,
+                    partiu_um_glifo: bool = False) -> None:
     """Descarta os boxes que saem (já não são âncora de ninguém), junta a palavra partida pelo
-    hífen de fim de linha que saiu e fecha o vão que o box tirado deixa."""
+    hífen de fim de linha que saiu e fecha o vão que o box tirado deixa; e parte a palavra
+    no espaço digitado dentro de um glifo dividido (`partiu_um_glifo`), entre os pedaços."""
     from abbychess import ancoragem as ag
     from abbychess import edicao as ed
 
@@ -860,7 +916,7 @@ def _tirar_os_boxes(pagina: Pagina, sequencia, boxes_que_saem: Set[int], linha) 
     for gid in boxes_que_saem:
         ed.descartar(pagina, gid)
     _juntar_os_hifens(pagina, juntar_a_palavra)
-    if boxes_que_saem:                          # só o box tirado deixa um vão na página
+    if boxes_que_saem or partiu_um_glifo:       # o vão do box tirado, ou o espaço no glifo
         ag.como_digitado(pagina, sequencia, {g for _i, g in sequencia} | set(linha), antes)
 
 

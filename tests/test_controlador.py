@@ -507,6 +507,26 @@ def test_a_sessao_que_falha_ao_aplicar_volta_a_pagina(dois_projetos, monkeypatch
     assert len(ctl.historico._desfazer) == desfazer
 
 
+def test_a_recusa_do_aplicar_chega_a_janela_com_o_motivo(dois_projetos, monkeypatch):
+    """A `Recusa` do `aplicar` (o espaço num glifo que a tinta não corta) chega à janela com o
+    motivo dela, não como falha, e a página e o desfazer ficam como estavam."""
+    from abbychess import sessao as ss
+
+    ctl, executor, palavra, recusas = _sessao_na_primeira_palavra(dois_projetos[0])
+    antes = ss.texto_e_unidades(ctl.modelo)[0]
+    desfazer = len(ctl.historico._desfazer)
+
+    def recusar(*_a, **_k):
+        raise ss.Recusa("não dá para pôr um espaço dentro do glifo “fi”")
+
+    monkeypatch.setattr(ss, "aplicar", recusar)
+    ctl.sessoes.confirmar_sessao(palavra, "")
+    executor.tudo()
+    assert recusas == ["não dá para pôr um espaço dentro do glifo “fi”"]
+    assert ss.texto_e_unidades(ctl.modelo)[0] == antes
+    assert len(ctl.historico._desfazer) == desfazer
+
+
 @pytest.mark.parametrize("na_fila", [False, True])
 def test_sair_da_pagina_confirma_a_sessao_na_pagina_dela(tmp_path, na_fila):
     """A revisão de produto do D1 (M3): trocar de página com a sessão aberta a confirma

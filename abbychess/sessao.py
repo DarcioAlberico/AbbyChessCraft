@@ -114,12 +114,14 @@ def _trechos_longos_iguais(original: str, novo: str) -> List[Tuple[int, int]]:
 
 
 def _troca(a: str, b: str) -> int:
-    """O custo de alinhar `a` com `b`: 0 iguais, 1 duas letras; 2 uma letra com o espaço
-    (nunca menos que apagar e inserir): trocar o x de "ganhaxtempos" por "r " corrige o
-    glifo e insere o espaço, não tira o box para pôr um virtual."""
+    """O custo de alinhar `a` com `b`: 0 iguais, 1 duas letras; 2 uma letra com o espaço ou a
+    quebra de linha (nunca menos que apagar e inserir): trocar o x de "ganhaxtempos" por "r "
+    corrige o glifo e insere o espaço, não tira o box para pôr um virtual. O espaço com a
+    quebra de linha custa 1: os dois separam palavras, mas a quebra impressa prefere a
+    digitada (a palavra digitada logo depois dela fica na linha de baixo)."""
     if a == b:
         return 0
-    return 2 if (a == " ") != (b == " ") else 1
+    return 2 if (a in " \n") != (b in " \n") else 1
 
 
 def _levenshtein(original: str, novo: str) -> List[Tuple[Optional[int], Optional[int]]]:
@@ -267,9 +269,8 @@ def gid_no_cursor(unidades: Sequence[Unidade], novo: str, onde: int,
     """O glifo do original que ficou sob o cursor na posição `onde` do texto novo (o
     caractere antes dele; num espaço, o depois): o do Ctrl+Enter. `LETRA_NOVA` se ali há
     uma letra digitada agora; None se não há glifo."""
-    original = _texto_original(unidades)
+    por_novo = {j: i for i, j in _alinhar_a_sessao(unidades, novo, fixos) if j is not None}
     novo = _normalizar(novo)
-    por_novo = _por_novo(original, novo, fixos)
     for j in (onde - 1, onde):
         if not 0 <= j < len(novo) or novo[j] == " ":
             continue
@@ -286,9 +287,12 @@ def _texto_original(unidades: Sequence[Unidade]) -> str:
     return "".join(u.texto if u.tipo != LINHA else " " for u in unidades)
 
 
-def _por_novo(original: str, novo: str, fixos) -> Dict[int, int]:
-    """j no novo -> i no original, dos caracteres alinhados."""
-    return {j: i for i, j in alinhar(original, novo, fixos) if j is not None}
+def _alinhar_a_sessao(unidades: Sequence[Unidade], novo: str, fixos
+                      ) -> List[Tuple[Optional[int], Optional[int]]]:
+    """O alinhamento das unidades com o texto novo, com a quebra de linha como "\\n" dos dois
+    lados (o tab colado é um espaço): a quebra impressa se alinha com a digitada, não com o
+    espaço ao lado dela (ver `_troca`)."""
+    return alinhar("".join(u.texto for u in unidades), novo.replace("\t", " "), fixos)
 
 
 def planejar(unidades: Sequence[Unidade], novo: str,
@@ -296,9 +300,9 @@ def planejar(unidades: Sequence[Unidade], novo: str,
     """O plano da sessão: o que fica, o que sai, o que entra, e as fronteiras. `fixos`, os
     pares (no original, no novo) que nenhuma edição tocou (ver `alinhar`). O hífen de fim de
     linha que sai junta a palavra na aplicação (`_hifens_de_fim_de_linha`)."""
+    pares = _alinhar_a_sessao(unidades, novo, fixos)
     novo = _normalizar(novo)
     original = _texto_original(unidades)
-    pares = alinhar(original, novo, fixos)
     plano = Plano(linha=_linha_original(unidades), texto_mudou=original != novo,
                   de=" ".join(original.split()), para=" ".join(novo.split()))
     letras_do_gid = _itens_do_texto_novo(plano, unidades, novo, pares)

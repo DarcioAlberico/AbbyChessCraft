@@ -691,7 +691,7 @@ def _hifens_de_fim_de_linha(pagina: Pagina, saem, onde) -> List[Tuple[int, int]]
     for gid in saem:
         if not _hifen_que_sai(pagina, gid, onde):
             continue
-        juncao = _juncao_do_hifen(gid, onde, por_linha, ordem)
+        juncao = _juncao_do_hifen(gid, onde, por_linha, ordem, saem)
         if juncao is not None:
             saida.append(juncao)
     return saida
@@ -711,17 +711,24 @@ def _hifen_que_sai(pagina: Pagina, gid: int, onde) -> bool:
     return box is not None and box.entry.char in ("-", "\u00ad") and gid in onde
 
 
-def _juncao_do_hifen(gid: int, onde, por_linha, ordem) -> Optional[Tuple[int, int]]:
+def _juncao_do_hifen(gid: int, onde, por_linha, ordem, saem) -> Optional[Tuple[int, int]]:
     """(a letra antes do hífen, a primeira da linha seguinte), se o hífen é o último glifo da
-    linha, colado na palavra, e há uma linha depois; senão None."""
+    linha, colado na palavra, e há uma linha depois; senão None. Os glifos que também saem
+    (`saem`) não contam: a junção é entre as letras que ficam ("exem-" / "plo" -> "exeplo"
+    junta o "e" com o "p")."""
     b, n, k = onde[gid]
-    linha = sorted(por_linha[(b, n)], key=ordem.__getitem__)
-    seguinte = sorted(por_linha.get((b, n + 1), []), key=ordem.__getitem__)
+    linha = _os_que_ficam(por_linha[(b, n)], ordem, saem - {gid})
+    seguinte = _os_que_ficam(por_linha.get((b, n + 1), []), ordem, saem)
     if linha[-1] != gid or len(linha) < 2 or not seguinte:
         return None
     if onde.get(linha[-2], (None, None, None))[2] != k:
         return None                             # um travessão solto ("velha -") não parte palavra
     return (linha[-2], seguinte[0])
+
+
+def _os_que_ficam(gids, ordem, saem) -> List[int]:
+    """Os `gids` na ordem da página montada, sem os que saem."""
+    return sorted((g for g in gids if g not in saem), key=ordem.__getitem__)
 
 
 def aplicar(pagina: Pagina, plano: Plano, imagem=None, leitor=None) -> None:

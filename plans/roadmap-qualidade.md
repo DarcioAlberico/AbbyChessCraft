@@ -268,6 +268,12 @@ os testes de contrato contra o core e os pedidos em `docs/pedidos-ao-pyboxeditor
 
 **Pronto quando:** CA-Q-M1 (≥ 85 % de mutantes mortos por módulo puro) e CA-Q-E7.
 
+**Feito** em 2026-11-03, ramo `qualidade-q9` (`docs/revisoes/qualidade-Q9.md`): o mutador da
+casa e os oito módulos puros acima de 85 % (92,2 % ao todo); os privados do core numa lista
+com pedido e contrato. Achados e corrigidos em TDD: o aviso do PGN que sumia, o `IndexError` do
+`montar`, o hífen que saía com a letra, a palavra nova que subia de linha. Fica o espaço dentro
+da ligadura, à espera da decisão (§13.8). Com o Q9, o roadmap de qualidade está feito.
+
 ## Antipadrões
 
 - Corrigir sem o teste que falhou antes (e sem registrar por que falhou).

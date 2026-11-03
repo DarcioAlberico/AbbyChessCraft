@@ -359,6 +359,9 @@ pede o seu passo, com o golden de cada formato.
 - **CA-Q-E7:** um teste de arquitetura reprova `._x` de módulos do PyBoxEditor fora de uma
   lista de exceções que encolhe; cada exceção tem um pedido em
   `docs/pedidos-ao-pyboxeditor.md` e um teste de contrato que fixa o comportamento usado.
+- **Feito** no Q9 (`docs/revisoes/qualidade-Q9.md`): `tests/test_privados_do_core.py` e
+  `tests/test_contrato_do_core.py`; nove acessos em quatro pedidos. As regras copiadas do core
+  ficam fora do CA.
 
 ## 6. Arquitetura
 
@@ -469,6 +472,9 @@ Não medido: o `mutmut` 3 não roda no Windows sem `fork`; o `cosmic-ray` roda. 
 - **CA-Q-M1:** os módulos puros (`modelo`, `texto`, `lances`, `sequencia`, `historico`,
   `sessao`, `zonas`, `busca`) com ≥ 85 % de mutantes mortos, um módulo por sessão, só os
   testes que importam o módulo, `-n` ≤ 4; os sobreviventes viram teste ou código apagado.
+- **Feito** no Q9 (`docs/revisoes/qualidade-Q9.md`): `ferramentas/mutador.py` (da casa, pelo
+  AST, cada mutante só com os testes da linha dele); os oito módulos de 86,0 % (`busca`) a
+  98,4 % (`sequencia`), 92,2 % ao todo, medidos no `3265d20` com 2 trabalhadores.
 
 ## 10. A suíte de testes
 
@@ -597,6 +603,10 @@ teste usa como o usuário; senão saem. Os 3 F401 de `camada.py` saem já (o por
    descem.
 7. **Idioma do livro:** a exportação usa o detector do core (pt e en) e o projeto novo o de
    `idioma.py` (cinco idiomas); escolher um só muda o `dc:language` do EPUB. Qual vale?
+8. **O espaço digitado dentro de uma ligadura** (achado no Q9, defeito B): "afib" → "af ib",
+   com o box "fi", deixa a página "a fib". Corrigir mexe no plano da sessão (um item por pedaço
+   da divisão), e, sem tinta para cortar (a imagem indisponível ou as letras coladas), a sessão
+   pode recusar a edição ou guardar a caixa e perder o espaço. Qual?
 
 ## Apêndice — registro da análise
 

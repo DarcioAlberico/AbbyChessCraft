@@ -560,3 +560,15 @@ def test_apagar_a_letra_e_o_hifen_de_fim_de_linha_juntos_junta_a_palavra(para, d
     p.decisoes = Decisoes(hifen_de_quebra=frozenset({p.boxes[4].gid}))
     _editar(p, "exem-\nplo", para)
     assert _texto(p) == documento and _exportado(p) == [para]
+
+
+@pytest.mark.parametrize("para", [
+    "casa\nmuito longe",                                  # no começo da segunda linha
+    "casa muito\nlonge"])                                 # no fim da primeira
+def test_a_palavra_nova_junto_da_quebra_de_linha_fica_na_linha_digitada(para):
+    """Na sessão que pega as duas linhas impressas, a palavra digitada logo depois da quebra
+    de linha fica no começo da segunda linha, e a digitada logo antes, no fim da primeira
+    (antes, as duas iam para o fim da primeira: "casa muito\\nlonge")."""
+    p = _pagina("casa", "longe")
+    _editar(p, "casa\nlonge", para)
+    assert _texto(p) == para

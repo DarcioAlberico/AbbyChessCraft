@@ -14,6 +14,7 @@ from abbychess import montagem as mo
 from abbychess import texto as tx
 from abbychess.layout import OrdemDeLeitura
 from tests.ajudantes import _lido
+from tests.livros import PASTA_DOS_PDFS
 
 PILHA = ((100, 100, 400, 400), (100, 450, 400, 750), (100, 800, 400, 1100))
 VERDADE = Path(__file__).resolve().parent / "verdade" / "yusupov"
@@ -117,7 +118,6 @@ def _ler_as_paginas(pasta, indices):
     from abbychess import pagina as pg
     from abbychess.leitor import LeitorDoLivro
     from abbychess.projeto import ProjetoDeLivro
-    from tests.livros import PASTA_DOS_PDFS
 
     pdf = next(Path(PASTA_DOS_PDFS).rglob("Artur Yusupov - Chess Evolution 1*editable.pdf"))
     projeto = ProjetoDeLivro.criar(pasta, "ca-5-2", pdf)

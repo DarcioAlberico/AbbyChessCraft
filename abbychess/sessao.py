@@ -942,7 +942,7 @@ PONTUACAO_DE_BORDA = ",;:.)(\"'“”‘’[]"
 def _lance(idioma: str):
     pecas = PECAS.get(idioma, PECAS["en"])
     return re.compile(rf"^(\d{{1,3}}\.(?:\.\.)?)?([{pecas}])([a-h]?[1-8]?x?[a-h][1-8])"
-                      rf"(=[{pecas}])?([+#]?[!?]{{0,2}}[±∓⩱⩲=∞]?)$")
+                      rf"(=[{pecas}])?([+#]?[!?]{{0,2}}[±∓⩱⩲=∞⯹⇄⇆↑→⟳○⨀⨁]?)$")
 
 
 def figurinas(token: str, idioma: str) -> str:

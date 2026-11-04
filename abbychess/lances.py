@@ -84,7 +84,8 @@ _NUMERO_SEPARADO = re.compile(r"(?<!\S)([(\[{]?[1-9lI|][0-9lI|Oo]{0,2})\s+"
 _FILEIRA_1_DO_OCR = re.compile(r"(?<=[a-h])[lI|](?=[+#!?‼⁇⁈⁉]*$)")
 _LANCE = re.compile(r"^(?P<lance>O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?[x:×]?[a-h][1-8](?:=?[QRBN])?)"
                     r"(?P<marca>[+#]*)(?P<juizo>[!?‼⁇⁈⁉]*)(?:e\.?p\.?)?$")
-_SINAL = re.compile(r"^[+#!?‼⁇⁈⁉±∓⩱⩲=∞□■△▼→↑⇆–—-]+$")
+#: Δ, ∇, ⌓ e ∟ ficam de fora: eles anunciam outro lance ("Δ Cf3"), que não é a resposta.
+_SINAL = re.compile(r"^[+#!?‼⁇⁈⁉±∓⩱⩲=∞⯹□■△▼→↑⇆⇄⟳○⨀⨁⇔⇗⊞⟪⟫✕⊥⯺⯻⯼⯽–—-]+$")
 
 #: Os sinais de juízo que viram NAG no PGN.
 _NAGS = {"!": chess.pgn.NAG_GOOD_MOVE, "?": chess.pgn.NAG_MISTAKE,

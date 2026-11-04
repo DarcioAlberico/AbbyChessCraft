@@ -375,14 +375,14 @@ def classes(idioma: str) -> Dict[str, str]:
     lance = (rf"(?-i:(?<!\w)(?:[{pecas}]?[a-h]?[1-8]?[-x]?[a-h][1-8](?:=[{pecas}])?"
              r"|O-O(?:-O)?|0-0(?:-0)?)[+#]?(?![\w+#]))")
     casa = r"(?-i:(?<![a-wyz][a-wyz])(?<![i-wyz09])[a-h][1-8](?![0-9]))"
-    valoracao = (r"(?-i:(?:\+-|-\+|\+=|=\+|!!|\?\?|!\?|\?!|‼|⁇|⁉|⁈|[±∓⩲⩱∞□!?]"
+    valoracao = (r"(?-i:(?:\+-|-\+|\+=|=\+|!!|\?\?|!\?|\?!|‼|⁇|⁉|⁈|[±∓⩲⩱∞⯹⇄⇆↑→⟳○⨀⨁□!?]"
                  r"|(?<!\w)=(?!\w)))")
     return {"L": lance, "P": f"(?-i:[{pecas}])", "C": casa, "V": valoracao}
 
 
 DESCRICOES = {"L": "lance (Cf3, exd5, O-O, e8=D+)", "P": "peça (figurinas e letras do idioma)",
               "C": "casa (a1 a h8)",
-              "V": "valoração (± ∓ ⩲ ⩱ +- -+ += =+ = ∞ ! ? !! ?? !? ?! □)"}
+              "V": "valoração (± ∓ ⩲ ⩱ +- -+ += =+ = ∞ ⯹ ⇄ ↑ → ⟳ ○ ⨀ ⨁ ! ? !! ?? !? ?! □)"}
 
 
 class PadraoInvalido(ValueError):

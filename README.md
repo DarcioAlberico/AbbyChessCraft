@@ -84,7 +84,9 @@ letra solta em campo de texto, Ctrl+Alt e ligação nativa encoberta sem exceç�
      de cima (desde o A2; antes, Alt+seta, que agora é das páginas visitadas). Valem no campo
      do caractere e com o foco na página. O box é relido a cada passo.
    - O botão direito sobre um box, na página, também divide no ponto e junta.
-   - A paleta insere figurinas e símbolos de avaliação.
+   - A paleta insere figurinas e os símbolos de avaliação do padrão PGN e do Informator
+     (⯹ compensação, ⇄ contrajogo, ⟳ desenvolvimento, ⨀ zugzwang…); a dica de cada botão diz
+     o nome.
    - **Ctrl+Z** desfaz e **Ctrl+Y** (ou Ctrl+Shift+Z) refaz, também com o foco no campo do
      caractere: ensinar, corrigir, descartar, dividir, juntar, ajustar as bordas, marcar um
      glifo, corrigir uma palavra na verificação, conferir um diagrama, o próprio F5, as
@@ -278,7 +280,7 @@ você digita:
 - **Aa** separa maiúsculas e minúsculas; **ab|** acha só a palavra inteira; **.\*** liga a
   expressão regular, com as classes de xadrez **`\L`** (lance: Cf3, exd5, O-O, e8=D+),
   **`\P`** (peça: as figurinas e as letras do idioma do livro), **`\C`** (casa: a1 a h8) e
-  **`\V`** (valoração: ± ∓ ⩲ ⩱ +- -+ += =+ = ∞ ! ? !! ?? !? ?! □); a expansão delas aparece na
+  **`\V`** (valoração: ± ∓ ⩲ ⩱ +- -+ += =+ = ∞ ⯹ ⇄ ↑ → ⟳ ○ ⨀ ⨁ ! ? !! ?? !? ?! □); a expansão delas aparece na
   dica do campo. As classes valem com qualquer **Aa** (B, o bispo, não é b, a coluna), e
   `^` e `$` valem em cada linha impressa. **♘=C** (figurina = letra) faz "Cf3" achar também
   "♘f3" e "Nf3" (a letra conta como peça quando vem seguida de uma casa).

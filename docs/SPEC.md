@@ -934,8 +934,10 @@ leitura, nas amostras e nas exportações; a página com borracha sai como image
 pesquisável. A área vai à entrada da sequência (`borrachas`: os quatro cantos de cada uma, na
 página da fonte antes de endireitar), pintada depois de medir o ângulo e antes de endireitar:
 ela segue o corte, o giro e o ângulo. Cada área é um passo do Ctrl+Z; Página › Tirar a
-borracha… (e a gaveta) devolve a página como era. A leitura não muda: o glifo lido na área
-fica até o F5 ou o Del, e o aviso diz quantos são.
+borracha… (e a gaveta) devolve a imagem como era. Desde 2026-11-04, o glifo lido com o centro
+na área sai junto, com as decisões que o citavam (a mancha lida como "." não vai à exportação);
+o só tocado fica até o F5 ou o Del; o aviso diz quantos são de cada, e o mesmo Ctrl+Z devolve
+os glifos com os mesmos gids (Tirar a borracha não os devolve: o F5 lê a página de novo).
 **CA-4.6** vale também depois de dividir, de apagar e restaurar, e de inserir na posição 1.
 
 **CA-12.1** Golden normalizado: DOCX = `word/document.xml` em C14N sem `w:rsid*`, texto por

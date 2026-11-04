@@ -1,6 +1,7 @@
 """O modelo da página levado entre geometrias (SPEC §12.4, passo L): os glifos, as áreas, os
 diagramas e as decisões quando a página ganha quadro ou giro (`reenquadrar`), quando se
-divide em duas (`dividir`) e quando o usuário a endireita à mão (`endireitar`).
+divide em duas (`dividir`), quando o usuário a endireita à mão (`endireitar`) e quando a
+borracha leva os glifos de uma área (`sem_os_glifos`).
 
 Saiu de `abbychess.modelo` no Q8 (o arquivo passou de 1 000 linhas ao partir as funções);
 o modelo não depende daqui. Sem Qt.
@@ -420,6 +421,24 @@ def _virtuais_ancorados(virtuais, vivos: Set[int]) -> Tuple[GlifoVirtual, ...]:
 def _ancorado(v: GlifoVirtual, gids: Set[int]) -> bool:
     return ((v.depois_de is None or v.depois_de in gids)
             and (v.antes_de is None or v.antes_de in gids))
+
+
+def sem_os_glifos(pagina: Pagina, caixas) -> Pagina:
+    """A página sem os glifos com o centro nas `caixas` (a borracha, CA-12.17), e sem as decisões
+    que os citavam; sem glifo nenhum, ela volta a `nao_reconhecida`. Sem nada a tirar, devolve a
+    própria página; a de entrada não muda."""
+    def dentro(box: Box) -> bool:
+        e = box.entry
+        cx, cy = (e.x1 + e.x2) / 2, (e.y1 + e.y2) / 2
+        return any(x1 <= cx < x2 and y1 <= cy < y2 for x1, y1, x2, y2 in caixas)
+
+    boxes = [b for b in pagina.boxes if not dentro(b)]
+    if len(boxes) == len(pagina.boxes):
+        return pagina
+    vivos = {b.gid for b in boxes} | {b.gid for _lugar, b in pagina.fora}
+    return replace(viva(pagina), boxes=boxes,
+                   decisoes=decisoes_dos_vivos(pagina.decisoes, vivos),
+                   estado=pagina.estado if boxes else NAO_RECONHECIDA)
 
 
 def _girada_no_centro(caixa, delta: float, tamanho: Tuple[int, int]):

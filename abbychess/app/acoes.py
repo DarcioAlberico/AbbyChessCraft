@@ -209,8 +209,9 @@ def montar(janela) -> None:
     j.acao_borracha = acao(j, "borracha", j.modo_borracha, texto="Borracha", barra=barra,
                            marcavel=True)
     teclado.dica(j.acao_borracha, "Borracha ({borracha}): arraste em volta de uma mancha do "
-                                  "scanner para apagá-la da imagem; {desfazer} a devolve, e "
-                                  "Página › Tirar a borracha… volta a página como era.")
+                                  "scanner para apagá-la da imagem, com o glifo lido nela; "
+                                  "{desfazer} devolve os dois, e Página › Tirar a borracha… "
+                                  "volta a imagem como era.")
     j.acao_areas_auto = acao(j, "areas_automaticas", j.areas.automaticas,
                              texto="Refazer as áreas automáticas")
     j.acao_reconhecer_zona = acao(j, "reconhecer_zona", j.areas.reconhecer_atual,

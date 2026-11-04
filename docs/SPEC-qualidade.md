@@ -349,6 +349,14 @@ margens, no caminho das páginas: o `Pedido` os levaria sem mudar nada que se ve
 exportação consumindo `texto.montar` inteira fica: muda o texto exportado (não é estrutura) e
 pede o seu passo, com o golden de cada formato.
 
+**Medido em 2026-11-04, e não feito:** na fatia do Xadrez Vitorioso (snapshot inicial, sete
+páginas, com as margens, sem a camada), `texto.montar` e a exportação têm 95,0 % das palavras em
+comum (2 053 de 2 160), em 81 trechos diferentes. Nos 40 que li, a exportação sai melhor: corrige
+a caixa pela altura (`eSse` → `esse`, `CC6` → `Cc6`) e junta o hífen de quebra (`van- tagem` →
+`vantagem`). Ler `montar` inteira perderia isso no livro exportado. Antes do Q-E6, é preciso
+decidir se a correção da caixa vai para o Documento (mudaria a tela, a verificação e o CER), e
+o hífen pede a junção na exportação de qualquer jeito.
+
 ### Q-E7 (Média) — privados do core
 
 `leitor.py:75,128,130` (`_predictor`, `_get_learner`), `verificacao.py:93,96`

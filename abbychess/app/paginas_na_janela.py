@@ -1,9 +1,9 @@
 """As operações de página vistas da janela (SPEC §12.4, passo L): os diálogos do menu Página e
 da gaveta, que perguntam e chamam os comandos do controlador (`mover_paginas`,
 `apagar_paginas`, `inserir_paginas`, `restaurar_paginas`, `girar_paginas`, `cortar_paginas`,
-`tirar_o_corte`, `tirar_as_borrachas`, `dividir_paginas`, `endireitar_paginas`), e o modo
-da borracha (CA-12.17), com os outros modos do arraste que ela exclui. Um mixin da
-`JanelaPrincipal`, como `EspacoDeTrabalho`.
+`tirar_o_corte`, `tirar_as_borrachas`, `tirar_as_coordenadas`, `dividir_paginas`,
+`endireitar_paginas`), e o modo da borracha (CA-12.17), com os outros modos do arraste que ela
+exclui. Um mixin da `JanelaPrincipal`, como `EspacoDeTrabalho`.
 """
 
 from __future__ import annotations
@@ -61,6 +61,7 @@ class PaginasNaJanela:
                      "girar_paginas": self.girar_paginas, "cortar_paginas": self.cortar_paginas,
                      "tirar_o_corte": self.tirar_o_corte,
                      "tirar_as_borrachas": self.tirar_as_borrachas,
+                     "tirar_as_coordenadas": self.tirar_as_coordenadas,
                      "dividir_paginas": self.dividir_paginas,
                      "endireitar_paginas": self.endireitar_paginas}
         operacoes[metodo](posicoes)
@@ -205,6 +206,18 @@ class PaginasNaJanela:
                                 "giro e a leitura ficam. {desfazer} desfaz.")
         if escolha is not None:
             self.pagina.operacoes.tirar_as_borrachas(escolha[0])
+
+    def tirar_as_coordenadas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
+        escolha = self._perguntar_pela_selecao(
+            "Tirar as coordenadas", selecionadas,
+            ("1 página fica sem as coordenadas dos diagramas: {PAGINAS}.",
+             "{N} páginas ficam sem as coordenadas dos diagramas: {PAGINAS}."),
+            "Tirar as coordenadas",
+            "As letras e os números impressos em volta dos diagramas lidos saem da imagem e das "
+            "exportações; a legenda e o texto em volta ficam, e o diagrama segue na orientação "
+            "em que foi lido. {desfazer} desfaz, e Tirar a borracha… as devolve.")
+        if escolha is not None:
+            self.pagina.operacoes.tirar_as_coordenadas(escolha[0])
 
     def dividir_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         onde = dp.campo_de_porcentagem(50.0, 5.0, 95.0, " % da largura")

@@ -485,10 +485,30 @@ def mesclar(novos: Sequence[DiagramaLido], antigos: Sequence[DiagramaLido]) -> L
     """Os diagramas relidos, com o conferido de antes onde ele ocupa o mesmo lugar.
 
     Reconhecer a página de novo não pode desfazer uma conferência: o FEN
-    corrigido à mão vale mais que a releitura do mesmo tabuleiro.
+    corrigido à mão vale mais que a releitura do mesmo tabuleiro. Nem a orientação que as
+    coordenadas impressas confirmaram (`_com_a_orientacao_de_antes`).
     """
     conferidos = [a for a in antigos if a.conferido]
-    return [_o_de_antes(conferidos, novo.caixa, novo) for novo in novos]
+    confirmados = [a for a in antigos if a.lido and a.orientacao_confirmada]
+    return [_com_a_orientacao_de_antes(_o_de_antes(conferidos, novo.caixa, novo), confirmados)
+            for novo in novos]
+
+
+def _com_a_orientacao_de_antes(d: DiagramaLido, confirmados: Sequence[DiagramaLido]) -> DiagramaLido:
+    """O relido sem rótulo legível, com a orientação que eles confirmaram antes neste lugar.
+
+    As coordenadas podem ter saído da imagem (CA-10.4), e sem elas a leitura supõe as brancas
+    embaixo: o tabuleiro impresso com as pretas embaixo sairia de cabeça para baixo. As casas
+    giram aqui, sem reler, como `core.diagrama.ler` as gira depois de lidas.
+    """
+    if not d.lido or d.conferido or d.orientacao_confirmada:
+        return d
+    igual = _o_de_antes(confirmados, d.caixa, None)
+    if igual is None:
+        return d
+    casas = d.casas if igual.orientacao == d.orientacao else [
+        replace(c, linha=7 - c.linha, coluna=7 - c.coluna) for c in reversed(d.casas)]
+    return replace(d, casas=casas, orientacao=igual.orientacao, orientacao_confirmada=True)
 
 
 def _o_de_antes(antigos: Sequence[DiagramaLido], caixa: Caixa,

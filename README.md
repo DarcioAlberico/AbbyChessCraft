@@ -826,6 +826,12 @@ livro: `3-7, 12`, `ímpares`, `pares`, `todas` ou uma paridade num intervalo (`�
   livro espelhado antes de ler: é instantâneo (nada a gravar). O livro já lido leva uns
   segundos, com o cursor de espera, porque as duas metades de cada página são gravadas
   (os números estão em "As medidas do roadmap", linhas "Dividir o livro").
+- **Tirar as coordenadas** apaga da imagem as letras e os números impressos em volta dos
+  diagramas lidos (uma borracha automática): a tela e o PDF pesquisável saem sem eles, e os
+  glifos lidos ali saem do texto. Só apaga o que tem a forma de coordenada, uma marca centrada em
+  cada casa; a legenda e o texto em volta ficam. O diagrama por ler fica como está, porque é
+  delas que sai a orientação; o lido segue na orientação dele quando o F5 lê a página de novo.
+  **Tirar a borracha…** as devolve.
 
 Cada operação é um passo do **Ctrl+Z**. Elas ficam desligadas, com o motivo na dica, no
 projeto só para leitura, com o lote rodando, com uma tarefa em curso ou com o servidor lendo

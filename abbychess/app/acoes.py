@@ -95,6 +95,8 @@ def montar(janela) -> None:
     j.acao_tirar_o_corte = teclado.sem_atalho(j, "Tirar o corte…", lambda: j.tirar_o_corte())
     j.acao_tirar_as_borrachas = teclado.sem_atalho(j, "Tirar a borracha…",
                                                    lambda: j.tirar_as_borrachas())
+    j.acao_tirar_as_coordenadas = teclado.sem_atalho(j, "Tirar as coordenadas…",
+                                                     lambda: j.tirar_as_coordenadas())
     j.acao_dividir_paginas = teclado.sem_atalho(j, "Dividir páginas…",
                                                 lambda: j.dividir_paginas())
     j.acao_endireitar_paginas = teclado.sem_atalho(j, "Endireitar páginas…",
@@ -103,7 +105,7 @@ def montar(janela) -> None:
                           j.acao_paginas_apagadas, j.acao_girar_a_direita,
                           j.acao_girar_a_esquerda, j.acao_girar_paginas, j.acao_cortar_paginas,
                           j.acao_tirar_o_corte, j.acao_tirar_as_borrachas,
-                          j.acao_dividir_paginas,
+                          j.acao_tirar_as_coordenadas, j.acao_dividir_paginas,
                           j.acao_endireitar_paginas)
     barra.addSeparator()
 

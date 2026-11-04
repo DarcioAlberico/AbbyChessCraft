@@ -1085,6 +1085,29 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
 Continuam: a conferência cega da fatia. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).
 
+## Tirar as coordenadas dos diagramas (2026-11-04, ramo `tirar-coordenadas`; §10, CA-10.4)
+
+Com o pedido do usuário: uma função que tira as letras e os números impressos em volta dos
+diagramas.
+
+- **Achar** (`abbychess/coordenadas.py`, sem Qt e sem ler nada): em cada lado do tabuleiro, uma
+  marca por casa, centrada nela, numa linha só; a legenda e a prosa têm várias por casa, e o lado
+  que não é assim fica como está. Um retângulo por lado, para o `projeto.json` não crescer.
+- **Tirar** (`ControladorDaSequencia.tirar_as_coordenadas`): as áreas vão à `Entrada.borrachas`,
+  e o Ctrl+Z, o corte, o giro, o PDF pesquisável e o Tirar a borracha… vêm de graça; os glifos
+  lidos nelas saem. A procura roda em tarefa (um render por página), fora da thread da interface.
+- **Não perder a orientação**: é das coordenadas que ela sai, e a leitura seguinte não as vê. O
+  `mesclar` fica com a confirmada antes e gira as casas; o diagrama por ler não é tocado.
+- **A janela**: Página › Tirar as coordenadas… e a gaveta, com a seleção das outras operações.
+
+A medida, nos projetos do D: (até 18 páginas com tabuleiro por livro, sem gravar nada), em
+tabuleiros com as duas linhas achadas: Yusupov 4/4 e 45/47, Odds & Ends 29/32, A Matter of Endgame
+Technique 54/56, Strategic Play 41/41, Ding Liren 20/20; Karolyi 0/12 e Mirkovic 0/17, que não
+imprimem coordenadas, sem nenhuma falsa com legenda e prosa coladas. Conferidas a olho, nas folhas
+de contato: Odds & Ends (os 3 sem linha não têm coordenada ou não são tabuleiro), A Matter of
+Endgame Technique (o de 1 linha é um tabuleiro impresso torto), Karolyi e Mirkovic; os outros, só
+pela contagem. O erro de um tabuleiro torto é não apagar. Falta usar num livro do começo ao fim.
+
 ---
 
 ## Antipadrões

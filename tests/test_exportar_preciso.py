@@ -257,6 +257,39 @@ def test_o_epub_leva_o_idioma_do_livro(tmp_path):
     assert "1 página(s) lida(s) da camada de texto do PDF" in resumo
 
 
+#: Prosa nos idiomas que o projeto oferece fora do português e do inglês (SPEC-qualidade §13.7).
+PROSA = {
+    "es": "El rey de las blancas se mueve y las negras no tienen jugada, pero el peón que está "
+          "en la columna del alfil es más fuerte y lo que importa es la casilla de al lado",
+    "de": "Der König und der Turm stehen auf dem Feld, aber Schwarz ist nicht am Zug und auch "
+          "die Dame wird nach dem Tausch mit einer Figur von der Grundreihe nicht besser",
+    "fr": "Le roi et les pions des blancs sont dans une position qui est forte, mais les noirs "
+          "ont pour eux le coup du cavalier avec une menace sur la case et pas plus",
+}
+
+
+@pytest.mark.parametrize("codigo", PROSA)
+def test_o_epub_leva_o_idioma_do_livro_fora_do_portugues_e_do_ingles(tmp_path, codigo):
+    """O detector do core só conhece pt e en: sem resposta dele, valia o "pt" com que o projeto
+    nasce, e o livro saía `pt-BR` (SPEC-qualidade §13.7)."""
+    import fitz
+
+    doc = fitz.open()
+    pagina = doc.new_page(width=600, height=800)
+    for k in range(6):
+        pagina.insert_textbox((40, 40 + 100 * k, 560, 130 + 100 * k), PROSA[codigo],
+                              fontname="helv", fontsize=10)
+    doc.save(tmp_path / "livro.pdf")
+    doc.close()
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Digital", tmp_path / "livro.pdf")
+    projeto.salvar_pagina(0, _linha("lixo do ocr", 300))
+    destino = tmp_path / "livro.epub"
+    ex.exportar(projeto, destino)
+    with zipfile.ZipFile(destino) as z:
+        opf = z.read("OEBPS/content.opf").decode("utf-8")
+    assert f"<dc:language>{codigo}</dc:language>" in opf
+
+
 #: O diagrama 1-7 do Dvoretsky, e onde ele fica na página do PDF (em pontos).
 FEN_DO_DIAGRAMA = "8/1k6/1p6/1K6/P1P5/8/8/8"
 X_DO_DIAGRAMA, Y_DO_DIAGRAMA, CASA = 220, 200, 20

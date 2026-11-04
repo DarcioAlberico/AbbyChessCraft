@@ -332,9 +332,8 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
   DOCX (a prévia usa a do EPUB); `tests/test_regras_unicas.py` é o teste de arquitetura. As
   quatro regex de lance ficam: cada uma é uma regra diferente (o SAN do PGN, a palavra que
   parece lance, a linha de lances sem espaços, o lance colado), e só as letras eram a mesma.
-  Ficam: os dois detectores de idioma (o do core na exportação, o de `idioma.py` no projeto
-  novo), que é decisão do usuário; o lado do PGN (suspeita, não investigada); a `Estrutura`
-  por `id()`, sem caminho de hoje que a quebre.
+  Ficam: o lado do PGN (suspeita, não investigada); a `Estrutura` por `id()`, sem caminho de
+  hoje que a quebre. Os dois detectores de idioma viraram um em 2026-11-04 (§13.7).
 
 ### Q-E6 (Melhoria) — um adaptador do Documento para a exportação
 
@@ -601,8 +600,12 @@ teste usa como o usuário; senão saem. Os 3 F401 de `camada.py` saem já (o por
 6. ~~**CA-Q-A1 no fim do Q7:** fechar com o que sobra preso na catraca ou seguir cortando?~~
    **Decidido** (2026-10-31): fechar; os tetos de `tests/test_tamanho_dos_modulos.py` só
    descem.
-7. **Idioma do livro:** a exportação usa o detector do core (pt e en) e o projeto novo o de
-   `idioma.py` (cinco idiomas); escolher um só muda o `dc:language` do EPUB. Qual vale?
+7. ~~**Idioma do livro:** a exportação usa o detector do core (pt e en) e o projeto novo o de
+   `idioma.py` (cinco idiomas); escolher um só muda o `dc:language` do EPUB. Qual vale?~~
+   **Escolhido** (2026-11-04, pela sessão, quando o usuário mandou continuar; a conferir): o de
+   `idioma.py`. Nos 14 PDFs de `PyBoxEditor_Tkinter\PDF` os dois dão a mesma resposta (10 en, 1
+   pt, 3 sem resposta), e o `dc:language` deles não muda; o do core deixava sair `pt-BR` o livro
+   em espanhol, alemão ou francês. A camada continua valendo sobre o idioma do projeto.
 8. ~~**O espaço digitado dentro de uma ligadura** (achado no Q9, defeito B): "afib" → "af ib",
    com o box "fi", deixa a página "a fib". Corrigir mexe no plano da sessão (um item por pedaço
    da divisão), e, sem tinta para cortar (a imagem indisponível ou as letras coladas), a sessão

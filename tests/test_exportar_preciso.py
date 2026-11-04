@@ -345,12 +345,12 @@ def test_o_lado_conferido_na_revisao_vai_ao_diagrama_da_camada(tmp_path, conferi
 def test_o_idioma_do_livro_e_lido_uma_vez_por_exportacao(tmp_path, monkeypatch):
     """O idioma pela camada do PDF abre o livro: a exportação e a prévia o pedem uma vez, e a
     camada de texto e os metadados levam o mesmo (SPEC-qualidade Q-E5, Q-E6)."""
-    from core import pdf_nativo
+    from abbychess import idioma as idm
 
     projeto = _projeto_digital(tmp_path)
     pedidos = []
-    original = pdf_nativo.idioma_do_pdf
-    monkeypatch.setattr(pdf_nativo, "idioma_do_pdf",
+    original = idm.da_camada_do_pdf
+    monkeypatch.setattr(idm, "da_camada_do_pdf",
                         lambda *a, **k: pedidos.append(1) or original(*a, **k))
     ex.exportar(projeto, tmp_path / "livro.epub")
     assert len(pedidos) == 1

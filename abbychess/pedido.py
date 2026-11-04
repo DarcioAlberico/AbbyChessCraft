@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Callable, Iterable, List, Optional, Tuple
 
+from abbychess import idioma as idm
 from abbychess import links_de_analise
 from abbychess.projeto import ProjetoDeLivro
 
@@ -120,16 +121,11 @@ def idioma_do_livro(projeto: ProjetoDeLivro) -> str:
     O idioma do texto do livro: o que a camada de texto do PDF diz, ou o do projeto.
 
     O projeto nasce com "pt" quando ninguém escolhe, e o Odds & Ends, em inglês,
-    saía com `dc:language` `pt-BR`. A camada responde por centenas de palavras
-    (`pdf_nativo.idioma_do_pdf`); sem camada (a digitalização), vale o do projeto.
+    saía com `dc:language` `pt-BR`. A camada responde pelas palavras comuns dela
+    (`idioma.da_camada_do_pdf`); sem camada (a digitalização), vale o do projeto.
     """
     if projeto.origem.e_pdf:
-        from core import pdf_nativo
-
-        try:
-            lido = pdf_nativo.idioma_do_pdf(str(projeto.fonte))
-        except (OSError, RuntimeError, ValueError):
-            lido = None
+        lido = idm.da_camada_do_pdf(projeto.fonte)
         if lido:
             return lido
     return projeto.dados.idioma or "pt"

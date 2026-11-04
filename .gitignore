@@ -21,3 +21,6 @@ projetos/
 .rotulagem/
 *.prof
 capturas/
+
+# A cobertura por teste que o mutador guarda entre as partes de uma medida (refeita por ele)
+docs/medidas/mutacao/*.contextos

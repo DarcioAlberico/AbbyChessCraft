@@ -615,9 +615,11 @@ def _com_os_lances(jogo: chess.pgn.Game, sans: Sequence[str], juizos: Sequence[s
 
 
 def _comentar(jogo: chess.pgn.Game, no, validacao: Optional[Validacao], conferido: bool):
-    """O aviso do lance que não passou, no último nó, e a posição não conferida, no jogo."""
-    if validacao is not None and not validacao.confiavel:
-        no.comment = f"[{validacao.aviso}]"
+    """O aviso do lance que não passou, no último nó, e a posição não conferida, no jogo. Sem
+    lance nenhum, o último nó é o jogo: os dois vão nele, a posição antes."""
+    aviso = f"[{validacao.aviso}]" if validacao is not None and not validacao.confiavel else ""
     if not conferido:
         jogo.comment = ("posição lida, não conferida; " + NOMES[CONFIAVEL]
                         if validacao and validacao.confiavel else "posição lida, não conferida")
+    if aviso:
+        no.comment = "; ".join(c for c in (no.comment, aviso) if c)

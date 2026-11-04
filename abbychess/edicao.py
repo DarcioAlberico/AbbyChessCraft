@@ -100,16 +100,7 @@ def dividir_em(pagina: Pagina, imagem, gid: int, chars: str, leitor=None) -> Dif
         raise ValueError("A divisão estrutural exige mais de um caractere.")
     i = pagina.indice_de(gid)
     antigo = pagina.boxes[i]
-    entries = [copia(antigo.entry)]
-    if imagem is not None:
-        try:
-            while len(entries) < len(chars):
-                # O maior pedaço ainda é o candidato mais provável a conter outro vão.
-                k = max(range(len(entries)), key=lambda n: ((entries[n].x2 - entries[n].x1)
-                                                             * (entries[n].y2 - entries[n].y1)))
-                eb.dividir(imagem, entries, k, None, x=eb.corte_entre_letras(imagem, entries[k]))
-        except ValueError:
-            entries = [copia(antigo.entry)]
+    entries = partes_pela_tinta(imagem, antigo.entry, len(chars))
     if len(entries) == len(chars):
         for k, char in enumerate(chars):
             pg.confirmar(entries, k, char)
@@ -122,6 +113,23 @@ def dividir_em(pagina: Pagina, imagem, gid: int, chars: str, leitor=None) -> Dif
     novo = Box(pagina.alocar(), entries[0], estilo=antigo.estilo, revisado=True)
     dif = Diferenca(removidos={gid}, novos=[novo], sucessores={gid: [novo.gid]})
     return pagina.aplicar(dif, pagina.boxes[:i] + [novo] + pagina.boxes[i + 1:])
+
+
+def partes_pela_tinta(imagem, entry: BoxEntry, n: int) -> List[BoxEntry]:
+    """As `n` partes do box cortado pela tinta, em cópias (a página não muda); só a cópia do
+    box, uma parte, se não há imagem ou se um corte deixa um lado sem tinta."""
+    entries = [copia(entry)]
+    if imagem is None:
+        return entries
+    try:
+        while len(entries) < n:
+            # O maior pedaço ainda é o candidato mais provável a conter outro vão.
+            k = max(range(len(entries)), key=lambda m: ((entries[m].x2 - entries[m].x1)
+                                                         * (entries[m].y2 - entries[m].y1)))
+            eb.dividir(imagem, entries, k, None, x=eb.corte_entre_letras(imagem, entries[k]))
+    except ValueError:
+        return [copia(entry)]
+    return entries
 
 
 def estilizar(pagina: Pagina, gids: Sequence[int], campo: str) -> Diferenca:

@@ -110,10 +110,13 @@ class ControladorDaSessao:
         vivos_antes = set(pagina.vivos)
         try:
             ss.aplicar(pagina, plano, self._p.imagem if aberta else None, self._p.leitor)
-        except Exception:
+        except Exception as erro:
             # Nada da sessão fica pela metade: a página volta ao instantâneo (os gids já
             # alocados não voltam: um gid nunca se repete).
             pagina.boxes, pagina.decisoes = list(antes.pagina.boxes), antes.pagina.decisoes
+            if isinstance(erro, ss.Recusa):     # o espaço num glifo que a tinta não corta
+                self._p.eventos.emitir("sessao_recusada", str(erro))
+                return None
             log.exception("a sessão do Documento falhou ao aplicar")
             self._p.eventos.emitir("sessao_recusada", "a edição falhou e foi desfeita")
             return None
@@ -254,7 +257,7 @@ class ControladorDaSessao:
         if self._p.matriz is None:
             return False
         caixas = {b.gid: b.entry for b in pagina.boxes}
-        for letras, (lado, ancora), _nova in plano.virtuais:
+        for letras, (lado, ancora) in plano.virtuais:
             e = caixas.get(ancora)
             if e is None:
                 continue

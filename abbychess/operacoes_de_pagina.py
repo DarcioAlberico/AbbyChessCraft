@@ -1,7 +1,7 @@
 """As operações de página (§12.4): mover, apagar, restaurar, inserir, girar, cortar, dividir,
-endireitar e a borracha (CA-12.17), à parte do `ControladorDePagina` (SPEC-qualidade Q-A1). Cada uma grava a sequência
-nova, registra a transação do desfazer e leva a janela junto (`aplicar_sequencia`, que o
-desfazer também usa)."""
+endireitar e a borracha (CA-12.17), à parte do `ControladorDePagina` (SPEC-qualidade Q-A1).
+Cada uma grava a sequência nova, registra a transação do desfazer e leva a janela junto
+(`aplicar_sequencia`, que o desfazer também usa)."""
 
 from __future__ import annotations
 

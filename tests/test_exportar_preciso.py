@@ -25,13 +25,13 @@ from abbychess import exportar as ex
 from abbychess import margens as mg
 from abbychess import montagem as mo
 from abbychess import texto as tx
-from abbychess.leitor import FONTE_MANUAL
+from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL, FONTE_NATIVA
 from abbychess.modelo import Box, Pagina
 from abbychess.projeto import ProjetoDeLivro
 from tests.ajudantes import _pdf_digital  # noqa: E402,F401,F811
 
 
-def _linha(texto, y, x=300, altura=50, largura=30, alturas=None):
+def _linha(texto, y, x=300, altura=50, largura=30, alturas=None, fonte=FONTE_MANUAL):
     """Uma linha de boxes; `alturas` dá a altura de cada letra (senão, `altura`)."""
     saida = []
     for i, c in enumerate(texto):
@@ -39,7 +39,7 @@ def _linha(texto, y, x=300, altura=50, largura=30, alturas=None):
             continue
         h = (alturas or {}).get(c, altura)
         saida.append(BoxEntry(c, x + largura * i, y + altura - h, x + largura * i + largura - 5,
-                              y + altura, 1.0, FONTE_MANUAL))
+                              y + altura, 1.0, fonte))
     return saida
 
 
@@ -56,17 +56,55 @@ ALTURAS = {**{c: 19 for c in "aemnruocsvwxzOCSVWXZ"}, **{c: 31 for c in "bdfhklA
 
 
 def test_o_maiusculo_da_altura_do_x_vira_minusculo():
-    assert _texto(_linha("hOnestly abOut LOndOn", 100, alturas=ALTURAS)) == \
+    assert _texto(_linha("hOnestly abOut LOndOn", 100, alturas=ALTURAS, fonte=FONTE_LIVRO)) == \
         "honestly about London"
 
 
 def test_a_maiuscula_de_verdade_fica():
     alturas = {**ALTURAS, "C": 31, "O": 31}
-    assert _texto(_linha("Chess Open", 100, alturas=alturas)) == "Chess Open"
+    assert _texto(_linha("Chess Open", 100, alturas=alturas, fonte=FONTE_LIVRO)) == "Chess Open"
 
 
 def test_sem_regua_de_maiuscula_so_a_minuscula_se_prova():
-    assert _texto(_linha("tO sOme", 100, alturas={**ALTURAS, "t": 21})) == "to some"
+    assert _texto(_linha("tO sOme", 100, alturas={**ALTURAS, "t": 21},
+                         fonte=FONTE_LIVRO)) == "to some"
+
+
+#: A caixa que engoliu tinta: o `v` e o `x` da altura das maiúsculas (Xadrez Vitorioso p. 26).
+CAIXAS_ALTAS = {**ALTURAS, **{c: 31 for c in "cvwx"}}
+
+
+def test_a_letra_alta_no_meio_da_palavra_nao_sobe():
+    """`eVitar`, `ObViamente`, `próXimo`: 15 das 23 subidas medidas erram, todas no meio."""
+    assert _texto(_linha("evitar existir bad", 100, alturas=CAIXAS_ALTAS, fonte=FONTE_LIVRO)) == \
+        "evitar existir bad"
+
+
+@pytest.mark.parametrize("lida, certa", [("white bad", "White bad"), ("(white bad", "(White bad")])
+def test_a_primeira_letra_alta_sobe(lida, certa):
+    assert _texto(_linha(lida, 100, alturas=CAIXAS_ALTAS, fonte=FONTE_LIVRO)) == certa
+
+
+@pytest.mark.parametrize("lance", ["1.c4", "♖c4"])
+def test_depois_do_numero_ou_da_figurina_nao_sobe(lance):
+    assert _texto(_linha(f"{lance} bad", 100, alturas=CAIXAS_ALTAS, fonte=FONTE_LIVRO)) == \
+        f"{lance} bad"
+
+
+@pytest.mark.parametrize("fonte", [FONTE_MANUAL, FONTE_NATIVA])
+def test_a_altura_nao_troca_a_letra_confirmada_nem_a_nativa(fonte):
+    assert _texto(_linha("abOut bad", 100, alturas=ALTURAS, fonte=fonte)) == "abOut bad"
+
+
+def test_a_altura_nao_troca_a_letra_revisada():
+    """Visto e aceito no Documento: o `O` de `abOut` fica; o outro, que ninguém viu, desce."""
+    boxes = _linha("abOut hOnest bad", 100, alturas=ALTURAS, fonte=FONTE_LIVRO)
+    revisado = next(i for i, b in enumerate(boxes) if b.char == "O")
+    pagina = Pagina(1, 0, boxes=[Box(i, e, revisado=i == revisado) for i, e in enumerate(boxes)],
+                    proximo_n=len(boxes))
+    entries, estrutura = mo.Estrutura.da_pagina(pagina)
+    [paragrafo] = mo.pagina_extraida(0, entries, estrutura=estrutura).blocos
+    assert paragrafo.texto == "abOut honest bad"
 
 
 # ----------------------------------------------------------------------
@@ -257,6 +295,39 @@ def test_o_epub_leva_o_idioma_do_livro(tmp_path):
     assert "1 página(s) lida(s) da camada de texto do PDF" in resumo
 
 
+#: Prosa nos idiomas que o projeto oferece fora do português e do inglês (SPEC-qualidade §13.7).
+PROSA = {
+    "es": "El rey de las blancas se mueve y las negras no tienen jugada, pero el peón que está "
+          "en la columna del alfil es más fuerte y lo que importa es la casilla de al lado",
+    "de": "Der König und der Turm stehen auf dem Feld, aber Schwarz ist nicht am Zug und auch "
+          "die Dame wird nach dem Tausch mit einer Figur von der Grundreihe nicht besser",
+    "fr": "Le roi et les pions des blancs sont dans une position qui est forte, mais les noirs "
+          "ont pour eux le coup du cavalier avec une menace sur la case et pas plus",
+}
+
+
+@pytest.mark.parametrize("codigo", PROSA)
+def test_o_epub_leva_o_idioma_do_livro_fora_do_portugues_e_do_ingles(tmp_path, codigo):
+    """O detector do core só conhece pt e en: sem resposta dele, valia o "pt" com que o projeto
+    nasce, e o livro saía `pt-BR` (SPEC-qualidade §13.7)."""
+    import fitz
+
+    doc = fitz.open()
+    pagina = doc.new_page(width=600, height=800)
+    for k in range(6):
+        pagina.insert_textbox((40, 40 + 100 * k, 560, 130 + 100 * k), PROSA[codigo],
+                              fontname="helv", fontsize=10)
+    doc.save(tmp_path / "livro.pdf")
+    doc.close()
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Digital", tmp_path / "livro.pdf")
+    projeto.salvar_pagina(0, _linha("lixo do ocr", 300))
+    destino = tmp_path / "livro.epub"
+    ex.exportar(projeto, destino)
+    with zipfile.ZipFile(destino) as z:
+        opf = z.read("OEBPS/content.opf").decode("utf-8")
+    assert f"<dc:language>{codigo}</dc:language>" in opf
+
+
 #: O diagrama 1-7 do Dvoretsky, e onde ele fica na página do PDF (em pontos).
 FEN_DO_DIAGRAMA = "8/1k6/1p6/1K6/P1P5/8/8/8"
 X_DO_DIAGRAMA, Y_DO_DIAGRAMA, CASA = 220, 200, 20
@@ -312,12 +383,12 @@ def test_o_lado_conferido_na_revisao_vai_ao_diagrama_da_camada(tmp_path, conferi
 def test_o_idioma_do_livro_e_lido_uma_vez_por_exportacao(tmp_path, monkeypatch):
     """O idioma pela camada do PDF abre o livro: a exportação e a prévia o pedem uma vez, e a
     camada de texto e os metadados levam o mesmo (SPEC-qualidade Q-E5, Q-E6)."""
-    from core import pdf_nativo
+    from abbychess import idioma as idm
 
     projeto = _projeto_digital(tmp_path)
     pedidos = []
-    original = pdf_nativo.idioma_do_pdf
-    monkeypatch.setattr(pdf_nativo, "idioma_do_pdf",
+    original = idm.da_camada_do_pdf
+    monkeypatch.setattr(idm, "da_camada_do_pdf",
                         lambda *a, **k: pedidos.append(1) or original(*a, **k))
     ex.exportar(projeto, tmp_path / "livro.epub")
     assert len(pedidos) == 1

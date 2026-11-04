@@ -172,11 +172,12 @@ class ControladorDaSequencia:
         """A borracha (CA-12.17): as `caixas` `(x1, y1, x2, y2)`, marcadas na imagem que se vê
         da página na `posicao` (aparadas nela), ficam brancas. Elas vão à entrada da sequência,
         na página da fonte antes de endireitar (`geometria.borracha_na_fonte`), e seguem o
-        corte, o giro e o ângulo; a leitura não muda (o glifo lido na área fica até o F5 ou o
-        Del, e o aviso diz quantos são)."""
+        corte, o giro e o ângulo. O glifo lido com o centro na área sai junto, e o só tocado
+        fica (a letra vizinha que a borracha raspou); o aviso diz quantos são, e o Ctrl+Z
+        devolve tudo."""
         from abbychess import geometria as geo
 
-        nota = []
+        nota, troca = [], {}
 
         def fazer(s):
             e = s.entrada_em(posicao)
@@ -187,13 +188,11 @@ class ControladorDaSequencia:
                 raise ValueError("a área marcada fica fora da página")
             angulo = self._p.fonte.inclinacao_da_entrada(e)
             novas = tuple(geo.borracha_na_fonte(c, e.geometria, tamanho, angulo) for c in vistas)
-            lidos = self._glifos_nas_caixas(posicao, vistas)
-            if lidos:
-                nota.append(f"{lidos} glifo{' lido fica' if lidos == 1 else 's lidos ficam'} "
-                            "na área; F5 lê de novo, ou Del o apaga")
+            self._tirar_os_glifos(posicao, e.pid, vistas, troca, nota)
             return s.com_entrada(replace(e, tamanho=tamanho, borrachas=e.borrachas + novas))
 
-        return self._mudar_sequencia(fazer, f"Borracha na página {posicao + 1}", nota=nota)
+        return self._mudar_sequencia(fazer, f"Borracha na página {posicao + 1}", troca=troca,
+                                     nota=nota)
 
     def tirar_as_borrachas(self, posicoes: Sequence[int]) -> bool:
         """As áreas apagadas das páginas voltam como eram na fonte."""
@@ -206,14 +205,22 @@ class ControladorDaSequencia:
         return self._mudar_sequencia(
             fazer, f"Tirar a borracha de {sq.quantas_paginas(len(set(posicoes)))}")
 
-    def _glifos_nas_caixas(self, posicao: int, caixas) -> int:
-        """Quantos glifos lidos da página tocam as caixas (na imagem que se vê)."""
-        pagina = self._p.projeto.carregar_modelo(posicao)
+    def _tirar_os_glifos(self, posicao: int, pid: int, caixas, troca: dict, nota: list) -> None:
+        """A página sem os glifos das `caixas` (na imagem que se vê) na `troca`, gravada com a
+        sequência; o que saiu e o que só foi tocado na `nota`."""
+        from abbychess import geometria_do_modelo as gm
+
+        projeto = self._p.projeto
+        pagina = projeto.carregar_modelo(posicao)
         if pagina is None:
-            return 0
-        return sum(any(b.entry.x1 < x2 and x1 < b.entry.x2 and b.entry.y1 < y2
-                       and y1 < b.entry.y2 for x1, y1, x2, y2 in caixas)
-                   for b in pagina.boxes)
+            return
+        nova = gm.sem_os_glifos(pagina, caixas)
+        saidos = len(pagina.boxes) - len(nova.boxes)
+        if saidos:
+            projeto.paginas_em_memoria.descarregar()         # nada do gravador chega depois
+            movidos = dict(projeto.dados.gids_movidos)
+            troca.update(paginas={pid: (pagina.instantaneo(), nova)}, movidos=(movidos, movidos))
+        nota.extend(_notas_dos_glifos(saidos, _tocados(nova.boxes, caixas)))
 
     def dividir_paginas(self, posicoes: Sequence[int], fracao: float = 0.5) -> bool:
         """Divide as páginas espelhadas (§12.4) na `fracao` da largura do que se vê: a metade
@@ -488,6 +495,25 @@ def _aparada(caixa, largura: int, altura: int):
     x1, y1, x2, y2 = (int(v) for v in caixa)
     x1, y1, x2, y2 = max(x1, 0), max(y1, 0), min(x2, largura), min(y2, altura)
     return (x1, y1, x2, y2) if x2 > x1 and y2 > y1 else None
+
+
+def _tocados(boxes, caixas) -> int:
+    """Quantos glifos encostam nas caixas."""
+    return sum(any(b.entry.x1 < x2 and x1 < b.entry.x2 and b.entry.y1 < y2 and y1 < b.entry.y2
+                   for x1, y1, x2, y2 in caixas)
+               for b in boxes)
+
+
+def _notas_dos_glifos(saidos: int, tocados: int) -> list:
+    """As notas do aviso da borracha: os glifos que saíram e os que só foram tocados."""
+    notas = []
+    if saidos:
+        notas.append(f"{saidos} glifo{' lido saiu' if saidos == 1 else 's lidos saíram'} "
+                     "com a área")
+    if tocados:
+        notas.append(f"{tocados} glifo{' tocado fica' if tocados == 1 else 's tocados ficam'}; "
+                     "F5 lê de novo, ou Del o apaga")
+    return notas
 
 
 def _nota_das_metades(metades: int) -> str:

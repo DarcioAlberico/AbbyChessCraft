@@ -43,9 +43,12 @@ def test_nenhuma_regex_escreve_a_mao_as_letras_das_pecas_de_varios_idiomas():
     assert achadas == []
 
 
-def test_o_idioma_do_livro_pela_camada_do_pdf_e_perguntado_num_lugar():
-    chamadas = [c for c, fonte in _modulos() if "pdf_nativo.idioma_do_pdf(" in fonte]
-    assert chamadas == ["abbychess/pedido.py"]
+def test_o_idioma_do_livro_pela_camada_do_pdf_tem_um_detector_so():
+    """O de `idioma.py`, com os cinco idiomas do projeto; o do core só conhece pt e en (§13.7)."""
+    chamadas = [c for c, fonte in _modulos() if "idioma_do_pdf(" in fonte]
+    assert chamadas == []
+    definicoes = [c for c, fonte in _modulos() if "def da_camada_do_pdf(" in fonte]
+    assert definicoes == ["abbychess/idioma.py"]
 
 
 def test_os_trechos_marcados_sao_calculados_num_lugar():

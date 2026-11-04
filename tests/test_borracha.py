@@ -18,10 +18,12 @@ from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from abbychess import geometria as geo  # noqa: E402
+from abbychess import geometria_do_modelo as gm  # noqa: E402
 from abbychess import pagina as pg  # noqa: E402
 from abbychess import sequencia as sq  # noqa: E402
 from abbychess.controlador import ControladorDePagina  # noqa: E402
 from abbychess.leitor import LeitorDoLivro  # noqa: E402
+from abbychess.modelo import GLIFOS_MARCADOS, NAO_RECONHECIDA, Box, Decisoes, Pagina  # noqa: E402
 from abbychess.projeto import ProjetoDeLivro  # noqa: E402
 
 from tests.fixturas_paginas_na_janela import janela  # noqa: E402,F401,F811
@@ -197,15 +199,70 @@ def test_a_borracha_vai_ao_pdf_pesquisavel(projeto, ctl, tmp_path):
     assert (exportada[exportada.shape[0] // 3:] >= 128).all()
 
 
-def test_a_mancha_lida_como_glifo_avisa_que_o_glifo_fica(projeto, ctl):
+def _glifo(char, x1, y1, x2, y2):
+    return BoxEntry(char=char, x1=x1, y1=y1, x2=x2, y2=y2, source="manual", confidence=1.0)
+
+
+def _chars(projeto, posicao=0):
+    pagina = projeto.carregar_modelo(posicao)
+    return [] if pagina is None else [b.entry.char for b in pagina.boxes]
+
+
+def test_ca_12_17_o_glifo_lido_na_mancha_sai_com_ela(projeto, ctl):
     caixa = _mancha(_imagem(ctl))
     x1, y1, x2, y2 = caixa
-    projeto.salvar_pagina(0, [BoxEntry(char=".", x1=x1 + FOLGA, y1=y1 + FOLGA, x2=x2 - FOLGA,
-                                       y2=y2 - FOLGA, source="manual", confidence=1.0)])
+    projeto.salvar_pagina(0, [_glifo("P", 80, 120, 100, 170),
+                              _glifo(".", x1 + FOLGA, y1 + FOLGA, x2 - FOLGA, y2 - FOLGA)])
+    ctl.ir_para(0)
+    gids = [b.gid for b in projeto.carregar_modelo(0).boxes]
+    assert ctl.operacoes.apagar_manchas(0, [caixa])
+    assert _chars(projeto) == ["P"]
+    assert "1 glifo lido saiu" in ctl.mensagens[-1]
+    reaberto = ProjetoDeLivro.abrir(projeto.pasta)           # só leitura: o lock é do ctl
+    assert [b.entry.char for b in reaberto.carregar_modelo(0).boxes] == ["P"]
+    reaberto.fechar()
+    ctl.desfazedor.desfazer()                                # o mesmo Ctrl+Z da área devolve
+    assert projeto.sequencia.entrada_em(0).borrachas == ()
+    assert [b.gid for b in projeto.carregar_modelo(0).boxes] == gids
+    ctl.desfazedor.refazer()
+    assert _chars(projeto) == ["P"]
+
+
+def test_o_glifo_so_tocado_pela_area_fica_e_o_aviso_diz(projeto, ctl):
+    """O centro fora da área: é a letra vizinha que a borracha pegou de raspão, e o texto dela
+    não sai sem o usuário pedir."""
+    caixa = _mancha(_imagem(ctl))
+    x1, y1, x2, y2 = caixa
+    projeto.salvar_pagina(0, [_glifo("r", x2 - 2, y1, x2 + 40, y2)])
     ctl.ir_para(0)
     assert ctl.operacoes.apagar_manchas(0, [caixa])
-    assert "1 glifo lido" in ctl.mensagens[-1]
-    assert projeto.carregar_modelo(0).boxes                    # o glifo fica até o F5 ou o Del
+    assert _chars(projeto) == ["r"]
+    assert "1 glifo tocado fica" in ctl.mensagens[-1]
+
+
+def test_a_area_sem_glifo_lido_nao_troca_a_pagina(projeto, ctl):
+    caixa = _mancha(_imagem(ctl))
+    projeto.salvar_pagina(0, [_glifo("P", 80, 120, 100, 170)])
+    ctl.ir_para(0)
+    antes = projeto.carregar_modelo(0).boxes[0].gid
+    assert ctl.operacoes.apagar_manchas(0, [caixa])
+    assert projeto.carregar_modelo(0).boxes[0].gid == antes
+    assert "glifo" not in ctl.mensagens[-1]
+
+
+def test_sem_os_glifos_tira_as_decisoes_deles_e_a_leitura_vazia():
+    a, b = Box(1, BoxEntry(char="a", x1=0, y1=0, x2=10, y2=10)), \
+        Box(2, BoxEntry(char="b", x1=50, y1=0, x2=60, y2=10))
+    pagina = Pagina(pid=0, indice=0, boxes=[a, b], estado=GLIFOS_MARCADOS,
+                    decisoes=Decisoes(quebras=frozenset({1, 2}), juncoes=frozenset({(1, 2)})))
+    nova = gm.sem_os_glifos(pagina, [(45, 0, 70, 20)])
+    assert [x.gid for x in nova.boxes] == [1]
+    assert nova.decisoes.quebras == {1} and not nova.decisoes.juncoes
+    assert nova.estado == GLIFOS_MARCADOS
+    assert [x.gid for x in pagina.boxes] == [1, 2]            # a de entrada não muda
+    assert gm.sem_os_glifos(pagina, [(200, 200, 210, 210)]) is pagina
+    vazia = gm.sem_os_glifos(pagina, [(0, 0, 70, 20)])
+    assert vazia.boxes == [] and vazia.estado == NAO_RECONHECIDA
 
 
 def test_a_caixa_vazia_ou_fora_da_pagina_e_recusada(projeto, ctl):

@@ -77,13 +77,12 @@ def da_camada_do_pdf(caminho, paginas: int = 8) -> Optional[str]:
     import fitz
 
     try:
-        documento = fitz.open(str(caminho))
+        with fitz.open(str(caminho)) as documento:
+            total = documento.page_count
+            if total == 0:
+                return None
+            passo = max(1, total // (paginas + 1))
+            indices = sorted({min(total - 1, passo * (k + 1)) for k in range(paginas)})
+            return provavel(documento[i].get_text() for i in indices)
     except (RuntimeError, ValueError, OSError):
         return None
-    with documento:
-        total = documento.page_count
-        if total == 0:
-            return None
-        passo = max(1, total // (paginas + 1))
-        indices = sorted({min(total - 1, passo * (k + 1)) for k in range(paginas)})
-        return provavel(documento[i].get_text() for i in indices)

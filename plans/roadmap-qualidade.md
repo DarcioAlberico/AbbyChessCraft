@@ -274,6 +274,10 @@ com pedido e contrato. Achados e corrigidos em TDD: o aviso do PGN que sumia, o 
 `montar`, o hífen que saía com a letra, a palavra nova que subia de linha. Fica o espaço dentro
 da ligadura, à espera da decisão (§13.8). Com o Q9, o roadmap de qualidade está feito.
 
+**Depois do Q9** (2026-11-04): a §13.7, um detector de idioma só, o de `idioma.py` (escolha da
+sessão, a conferir); o fim do Q-E6 medido e não feito, porque pioraria o texto exportado
+(`docs/SPEC-qualidade.md`, Q-E6).
+
 ## Antipadrões
 
 - Corrigir sem o teste que falhou antes (e sem registrar por que falhou).

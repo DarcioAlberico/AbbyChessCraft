@@ -332,9 +332,8 @@ Os módulos com menos cobertura na suíte rápida: `render.py` 36 %, `app/princi
   DOCX (a prévia usa a do EPUB); `tests/test_regras_unicas.py` é o teste de arquitetura. As
   quatro regex de lance ficam: cada uma é uma regra diferente (o SAN do PGN, a palavra que
   parece lance, a linha de lances sem espaços, o lance colado), e só as letras eram a mesma.
-  Ficam: os dois detectores de idioma (o do core na exportação, o de `idioma.py` no projeto
-  novo), que é decisão do usuário; o lado do PGN (suspeita, não investigada); a `Estrutura`
-  por `id()`, sem caminho de hoje que a quebre.
+  Ficam: o lado do PGN (suspeita, não investigada); a `Estrutura` por `id()`, sem caminho de
+  hoje que a quebre. Os dois detectores de idioma viraram um em 2026-11-04 (§13.7).
 
 ### Q-E6 (Melhoria) — um adaptador do Documento para a exportação
 
@@ -349,6 +348,43 @@ vez). Os metadados continuam montados pela porta de entrada, e os números impre
 margens, no caminho das páginas: o `Pedido` os levaria sem mudar nada que se veja. A
 exportação consumindo `texto.montar` inteira fica: muda o texto exportado (não é estrutura) e
 pede o seu passo, com o golden de cada formato.
+
+**Medido em 2026-11-04, e não feito:** na fatia do Xadrez Vitorioso (snapshot inicial, sete
+páginas, com as margens, sem a camada), `texto.montar` e a exportação têm 95,0 % das palavras em
+comum (2 053 de 2 160), em 81 trechos diferentes. Nos 40 que li, a exportação sai melhor: corrige
+a caixa pela altura (`eSse` → `esse`, `CC6` → `Cc6`) e junta o hífen de quebra (`van- tagem` →
+`vantagem`). Ler `montar` inteira perderia isso no livro exportado. Antes do Q-E6, é preciso
+decidir se a correção da caixa vai para o Documento, e o hífen pede a junção na exportação de
+qualquer jeito.
+
+**A caixa no Documento, medida em 2026-11-04 (só leitura; a decisão continua em aberto).** A
+regra atual (`montagem._caixa_pela_altura`) levada ao Documento, na fatia: troca 62 de 10 204
+glifos, e as 62 já estão na fila de revisão, 61 com a mesma sugestão (`contexto`). Os improváveis
+vão de 209 a 149, os pendentes de 1 965 a 1 954, as desconhecidas de 244 a 216. A validação dos
+diagramas fica igual nos 14 medidos (a fatia, Yusupov, Darcy e as pp. i000 e i007 do Vitorioso).
+O CER oficial não muda, porque `medir.py` já lê as linhas da exportação: 385 erros sem a regra,
+338 com ela, 334 só descendo, em 12 008 caracteres.
+
+Contra o gabarito (a fatia) e a camada do PDF (Yusupov, Aagaard, Nunn, Dvoretsky, Odds & Ends):
+
+| Direção | Certas | Erradas | Sem como comparar |
+|---|---|---|---|
+| Desce para minúscula | 102 | 0 | 9 |
+| Sobe para maiúscula | 8 | 15 | 6 |
+
+As 15 erradas sobem no meio da palavra (`eVitar`, `eXistirá`, `anyWhere`), numa caixa mais alta
+que a letra; 7 são capturas que `_captura_minuscula` conserta na saída, e as outras 8 saem no
+arquivo. As 8 certas sobem na primeira letra (`white` → `White`). A amostra é pequena e veio
+depois da regra, sem conferência à parte. **A regra também desfaz o glifo confirmado:** ela não
+olha a fonte do glifo, e o `v` de "evitar" marcado como manual continua saindo `eVitar`, sem que
+o usuário possa corrigi-lo.
+
+**Corrigido na exportação em 2026-11-04** (`de06353`, `1c12c16`): a letra só sobe na primeira
+posição da palavra, e a altura não troca o glifo manual, o nativo nem o revisado. Medida de novo
+nas mesmas páginas, pelo caminho real da exportação: 110 trocas certas (102 descendo, 8 subindo) e
+nenhuma errada, com 10 sem como comparar; na fatia, 333 erros em 12 008 caracteres (2,77 %). A
+regra foi desenhada olhando estas páginas, então a medida não é independente. Levar a correção ao
+Documento continua em aberto, e o impacto da tabela acima não foi refeito com a regra nova.
 
 ### Q-E7 (Média) — privados do core
 
@@ -601,8 +637,12 @@ teste usa como o usuário; senão saem. Os 3 F401 de `camada.py` saem já (o por
 6. ~~**CA-Q-A1 no fim do Q7:** fechar com o que sobra preso na catraca ou seguir cortando?~~
    **Decidido** (2026-10-31): fechar; os tetos de `tests/test_tamanho_dos_modulos.py` só
    descem.
-7. **Idioma do livro:** a exportação usa o detector do core (pt e en) e o projeto novo o de
-   `idioma.py` (cinco idiomas); escolher um só muda o `dc:language` do EPUB. Qual vale?
+7. ~~**Idioma do livro:** a exportação usa o detector do core (pt e en) e o projeto novo o de
+   `idioma.py` (cinco idiomas); escolher um só muda o `dc:language` do EPUB. Qual vale?~~
+   **Escolhido** (2026-11-04, pela sessão, quando o usuário mandou continuar; a conferir): o de
+   `idioma.py`. Nos 14 PDFs de `PyBoxEditor_Tkinter\PDF` os dois dão a mesma resposta (10 en, 1
+   pt, 3 sem resposta), e o `dc:language` deles não muda; o do core deixava sair `pt-BR` o livro
+   em espanhol, alemão ou francês. A camada continua valendo sobre o idioma do projeto.
 8. ~~**O espaço digitado dentro de uma ligadura** (achado no Q9, defeito B): "afib" → "af ib",
    com o box "fi", deixa a página "a fib". Corrigir mexe no plano da sessão (um item por pedaço
    da divisão), e, sem tinta para cortar (a imagem indisponível ou as letras coladas), a sessão

@@ -354,8 +354,37 @@ páginas, com as margens, sem a camada), `texto.montar` e a exportação têm 95
 comum (2 053 de 2 160), em 81 trechos diferentes. Nos 40 que li, a exportação sai melhor: corrige
 a caixa pela altura (`eSse` → `esse`, `CC6` → `Cc6`) e junta o hífen de quebra (`van- tagem` →
 `vantagem`). Ler `montar` inteira perderia isso no livro exportado. Antes do Q-E6, é preciso
-decidir se a correção da caixa vai para o Documento (mudaria a tela, a verificação e o CER), e
-o hífen pede a junção na exportação de qualquer jeito.
+decidir se a correção da caixa vai para o Documento, e o hífen pede a junção na exportação de
+qualquer jeito.
+
+**A caixa no Documento, medida em 2026-11-04 (só leitura; a decisão continua em aberto).** A
+regra atual (`montagem._caixa_pela_altura`) levada ao Documento, na fatia: troca 62 de 10 204
+glifos, e as 62 já estão na fila de revisão, 61 com a mesma sugestão (`contexto`). Os improváveis
+vão de 209 a 149, os pendentes de 1 965 a 1 954, as desconhecidas de 244 a 216. A validação dos
+diagramas fica igual nos 14 medidos (a fatia, Yusupov, Darcy e as pp. i000 e i007 do Vitorioso).
+O CER oficial não muda, porque `medir.py` já lê as linhas da exportação: 385 erros sem a regra,
+338 com ela, 334 só descendo, em 12 008 caracteres.
+
+Contra o gabarito (a fatia) e a camada do PDF (Yusupov, Aagaard, Nunn, Dvoretsky, Odds & Ends):
+
+| Direção | Certas | Erradas | Sem como comparar |
+|---|---|---|---|
+| Desce para minúscula | 102 | 0 | 9 |
+| Sobe para maiúscula | 8 | 15 | 6 |
+
+As 15 erradas sobem no meio da palavra (`eVitar`, `eXistirá`, `anyWhere`), numa caixa mais alta
+que a letra; 7 são capturas que `_captura_minuscula` conserta na saída, e as outras 8 saem no
+arquivo. As 8 certas sobem na primeira letra (`white` → `White`). A amostra é pequena e veio
+depois da regra, sem conferência à parte. **A regra também desfaz o glifo confirmado:** ela não
+olha a fonte do glifo, e o `v` de "evitar" marcado como manual continua saindo `eVitar`, sem que
+o usuário possa corrigi-lo.
+
+**Corrigido na exportação em 2026-11-04** (`de06353`, `1c12c16`): a letra só sobe na primeira
+posição da palavra, e a altura não troca o glifo manual, o nativo nem o revisado. Medida de novo
+nas mesmas páginas, pelo caminho real da exportação: 110 trocas certas (102 descendo, 8 subindo) e
+nenhuma errada, com 10 sem como comparar; na fatia, 333 erros em 12 008 caracteres (2,77 %). A
+regra foi desenhada olhando estas páginas, então a medida não é independente. Levar a correção ao
+Documento continua em aberto, e o impacto da tabela acima não foi refeito com a regra nova.
 
 ### Q-E7 (Média) — privados do core
 

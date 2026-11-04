@@ -25,13 +25,13 @@ from abbychess import exportar as ex
 from abbychess import margens as mg
 from abbychess import montagem as mo
 from abbychess import texto as tx
-from abbychess.leitor import FONTE_MANUAL
+from abbychess.leitor import FONTE_LIVRO, FONTE_MANUAL, FONTE_NATIVA
 from abbychess.modelo import Box, Pagina
 from abbychess.projeto import ProjetoDeLivro
 from tests.ajudantes import _pdf_digital  # noqa: E402,F401,F811
 
 
-def _linha(texto, y, x=300, altura=50, largura=30, alturas=None):
+def _linha(texto, y, x=300, altura=50, largura=30, alturas=None, fonte=FONTE_MANUAL):
     """Uma linha de boxes; `alturas` dá a altura de cada letra (senão, `altura`)."""
     saida = []
     for i, c in enumerate(texto):
@@ -39,7 +39,7 @@ def _linha(texto, y, x=300, altura=50, largura=30, alturas=None):
             continue
         h = (alturas or {}).get(c, altura)
         saida.append(BoxEntry(c, x + largura * i, y + altura - h, x + largura * i + largura - 5,
-                              y + altura, 1.0, FONTE_MANUAL))
+                              y + altura, 1.0, fonte))
     return saida
 
 
@@ -56,17 +56,55 @@ ALTURAS = {**{c: 19 for c in "aemnruocsvwxzOCSVWXZ"}, **{c: 31 for c in "bdfhklA
 
 
 def test_o_maiusculo_da_altura_do_x_vira_minusculo():
-    assert _texto(_linha("hOnestly abOut LOndOn", 100, alturas=ALTURAS)) == \
+    assert _texto(_linha("hOnestly abOut LOndOn", 100, alturas=ALTURAS, fonte=FONTE_LIVRO)) == \
         "honestly about London"
 
 
 def test_a_maiuscula_de_verdade_fica():
     alturas = {**ALTURAS, "C": 31, "O": 31}
-    assert _texto(_linha("Chess Open", 100, alturas=alturas)) == "Chess Open"
+    assert _texto(_linha("Chess Open", 100, alturas=alturas, fonte=FONTE_LIVRO)) == "Chess Open"
 
 
 def test_sem_regua_de_maiuscula_so_a_minuscula_se_prova():
-    assert _texto(_linha("tO sOme", 100, alturas={**ALTURAS, "t": 21})) == "to some"
+    assert _texto(_linha("tO sOme", 100, alturas={**ALTURAS, "t": 21},
+                         fonte=FONTE_LIVRO)) == "to some"
+
+
+#: A caixa que engoliu tinta: o `v` e o `x` da altura das maiúsculas (Xadrez Vitorioso p. 26).
+CAIXAS_ALTAS = {**ALTURAS, **{c: 31 for c in "cvwx"}}
+
+
+def test_a_letra_alta_no_meio_da_palavra_nao_sobe():
+    """`eVitar`, `ObViamente`, `próXimo`: 15 das 23 subidas medidas erram, todas no meio."""
+    assert _texto(_linha("evitar existir bad", 100, alturas=CAIXAS_ALTAS, fonte=FONTE_LIVRO)) == \
+        "evitar existir bad"
+
+
+@pytest.mark.parametrize("lida, certa", [("white bad", "White bad"), ("(white bad", "(White bad")])
+def test_a_primeira_letra_alta_sobe(lida, certa):
+    assert _texto(_linha(lida, 100, alturas=CAIXAS_ALTAS, fonte=FONTE_LIVRO)) == certa
+
+
+@pytest.mark.parametrize("lance", ["1.c4", "♖c4"])
+def test_depois_do_numero_ou_da_figurina_nao_sobe(lance):
+    assert _texto(_linha(f"{lance} bad", 100, alturas=CAIXAS_ALTAS, fonte=FONTE_LIVRO)) == \
+        f"{lance} bad"
+
+
+@pytest.mark.parametrize("fonte", [FONTE_MANUAL, FONTE_NATIVA])
+def test_a_altura_nao_troca_a_letra_confirmada_nem_a_nativa(fonte):
+    assert _texto(_linha("abOut bad", 100, alturas=ALTURAS, fonte=fonte)) == "abOut bad"
+
+
+def test_a_altura_nao_troca_a_letra_revisada():
+    """Visto e aceito no Documento: o `O` de `abOut` fica; o outro, que ninguém viu, desce."""
+    boxes = _linha("abOut hOnest bad", 100, alturas=ALTURAS, fonte=FONTE_LIVRO)
+    revisado = next(i for i, b in enumerate(boxes) if b.char == "O")
+    pagina = Pagina(1, 0, boxes=[Box(i, e, revisado=i == revisado) for i, e in enumerate(boxes)],
+                    proximo_n=len(boxes))
+    entries, estrutura = mo.Estrutura.da_pagina(pagina)
+    [paragrafo] = mo.pagina_extraida(0, entries, estrutura=estrutura).blocos
+    assert paragrafo.texto == "abOut honest bad"
 
 
 # ----------------------------------------------------------------------

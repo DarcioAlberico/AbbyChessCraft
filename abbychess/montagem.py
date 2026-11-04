@@ -9,7 +9,7 @@ import io
 import re
 import statistics
 from dataclasses import dataclass, field
-from typing import AbstractSet, Dict, List, Optional, Sequence, Tuple
+from typing import AbstractSet, Collection, Dict, List, Optional, Sequence, Tuple
 
 from PIL import Image
 
@@ -45,6 +45,8 @@ _ALTURA_DE_MAIUSCULA = frozenset("ABDEFGHIJKLMNPRTUYbdfhkl")
 FOLGA_DA_ALTURA_X = 1.15
 #: Entre a altura-x e a da maiúscula, onde a letra passa de uma caixa à outra.
 CORTE_DA_CAIXA = 0.5
+#: O que vem antes da primeira letra de uma palavra: só ela sobe para maiúscula pela altura.
+_ABRE_PALAVRA = frozenset("([{\"'“‘«¿¡")
 
 
 #: As funções de área que não são o texto do livro: saem da exportação, salvo com a opção
@@ -77,6 +79,8 @@ class Estrutura:
     #: Os boxes numa área desenhada pelo usuário com função de texto (não de margem): a
     #: regra das margens corridas (`margens_corridas`) não os tira.
     protegidos: set = field(default_factory=set)
+    #: Os boxes vistos e aceitos no Documento (§6.3): a caixa pela altura não os troca.
+    revisados: set = field(default_factory=set)
     #: Os `BoxEntry` da estrutura, vivos enquanto ela viver: as chaves são `id()`.
     vivos: list = field(default_factory=list)
     #: As palavras do texto do Documento em ordem de leitura (`texto.linhas_dos_gids` sem
@@ -137,6 +141,8 @@ class Estrutura:
                 self.paragrafo_antes.add(chave)
             if b.gid in decisoes.hifen_de_quebra:
                 self.hifen_de_quebra.add(chave)
+            if b.revisado:
+                self.revisados.add(chave)
 
     def _dos_duvidosos(self, pagina, lidos, limiares) -> None:
         """Os glifos que a fila de revisão pede: pela confiança, ou pelo contexto."""
@@ -248,7 +254,8 @@ def _palavras_da_linha(linha, trecho, boxes: Sequence[BoxEntry], documento: Opti
     """As palavras de uma linha do trecho: as do Documento, quando ele as tem todas; senão,
     as da geometria. A letra de cada glifo já com a caixa pela altura."""
     indices = [trecho[s.indice] for p in linha for s in p.simbolos]
-    caixa = _caixa_pela_altura(boxes, indices)
+    caixa = _caixa_pela_altura(boxes, indices, _primeiras_letras(linha, trecho, boxes),
+                               documento.revisados if documento is not None else ())
 
     def letra(i: int) -> str:
         return normalizar_saida(caixa.get(i, boxes[i].char))
@@ -317,7 +324,20 @@ def _captura_minuscula(palavra: str) -> str:
     return _CAPTURA_MAIUSCULA.sub("x", palavra)
 
 
-def _caixa_pela_altura(boxes: Sequence[BoxEntry], indices: Sequence[int]) -> Dict[int, str]:
+def _primeiras_letras(linha, trecho, boxes: Sequence[BoxEntry]) -> AbstractSet[int]:
+    """O índice do primeiro glifo de cada palavra da linha, depois do que abre a palavra."""
+    primeiras = set()
+    for palavra in linha:
+        for simbolo in palavra.simbolos:
+            i = trecho[simbolo.indice]
+            if boxes[i].char not in _ABRE_PALAVRA:
+                primeiras.add(i)
+                break
+    return primeiras
+
+
+def _caixa_pela_altura(boxes: Sequence[BoxEntry], indices: Sequence[int],
+                       primeiras: AbstractSet[int], revisados: Collection[int]) -> Dict[int, str]:
     """
     `{índice: letra}` das letras de caixa ambígua cuja altura desmente a caixa lida.
 
@@ -326,6 +346,10 @@ def _caixa_pela_altura(boxes: Sequence[BoxEntry], indices: Sequence[int]) -> Dic
     ou com elas perto demais (um título em versal), nada muda. No Odds & Ends o `O`
     lido pelo padrão do livro tinha 19 px, a altura do `c` e do `s`, e o `C`
     maiúsculo 31.
+
+    A letra só sobe nas `primeiras`: a caixa que engoliu tinta é alta sem a letra ser
+    (`eVitar`), e no meio da palavra as subidas medidas erram todas. O que o usuário
+    confirmou (manual, ou nos `revisados`) e o nativo ficam como estão, mas medem a régua.
     """
     baixas = _alturas(boxes, indices, _ALTURA_X)
     altas = _alturas(boxes, indices, _ALTURA_DE_MAIUSCULA)
@@ -335,7 +359,17 @@ def _caixa_pela_altura(boxes: Sequence[BoxEntry], indices: Sequence[int]) -> Dic
     maiuscula = statistics.median(altas) if altas else None
     if maiuscula is not None and maiuscula < 1.25 * x:
         return {}
-    return _trocas_de_caixa(boxes, indices, x, maiuscula)
+    trocas = _trocas_de_caixa(boxes, _trocaveis(boxes, indices, revisados), x, maiuscula)
+    return {i: certa for i, certa in trocas.items() if certa.islower() or i in primeiras}
+
+
+def _trocaveis(boxes: Sequence[BoxEntry], indices: Sequence[int],
+               revisados: Collection[int]) -> List[int]:
+    """Os `indices` que a altura pode trocar: menos os `revisados`, o manual e o nativo."""
+    from abbychess import contexto
+
+    return [i for i in indices if id(boxes[i]) not in revisados
+            and contexto.volta_pelo_contexto(boxes[i].source)]
 
 
 def _alturas(boxes: Sequence[BoxEntry], indices: Sequence[int], letras) -> List[int]:

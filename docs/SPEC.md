@@ -774,7 +774,8 @@ A partir do L:
   inteiro `[x0, y0, x1, y1]` em pixels da página da fonte renderizada no DPI do projeto
   (nulo: a página inteira); `giro`, 0, 90, 180 ou 270 graus no sentido horário, aplicado
   depois do quadro; `metade`, só um rótulo (`"esquerda"`, `"direita"` ou nulo) de quem veio
-  de uma divisão; `angulo`, o endireitar à mão, ou nulo para o medido. Cortar e dividir só
+  de uma divisão; `angulo`, o endireitar à mão, ou nulo para o medido (desde 2026-11-02,
+  também `borrachas`, as áreas apagadas, CA-12.17). Cortar e dividir só
   mudam o `quadro`: a composição fica fechada sob qualquer operação seguinte. **A posição no
   livro é o índice na sequência**, e é ela que a interface mostra e as exportações seguem.
   Todo dado de página (JSON, zonas, diagramas, inclinação, busca, `janela.json`,
@@ -927,6 +928,14 @@ livro sem quadro nem giro continua do original, vetorial, com a camada levada ao
 página torta pelo ângulo, medido ou à mão; com uma página de imagem no meio, o sumário do
 original sai e os marcadores vêm dos títulos); a camada de texto nativa (§12.1) só vale nas
 entradas `fonte="livro"` com `giro` 0, sem `quadro` e com ângulo efetivo 0.
+**CA-12.17** (borracha, 2026-11-02) Ferramentas › Borracha (Ctrl+Shift+E): o arraste sobre a
+página marca uma área (a mancha ou a sujeira do scanner), que fica branca na imagem, na
+leitura, nas amostras e nas exportações; a página com borracha sai como imagem no PDF
+pesquisável. A área vai à entrada da sequência (`borrachas`: os quatro cantos de cada uma, na
+página da fonte antes de endireitar), pintada depois de medir o ângulo e antes de endireitar:
+ela segue o corte, o giro e o ângulo. Cada área é um passo do Ctrl+Z; Página › Tirar a
+borracha… (e a gaveta) devolve a página como era. A leitura não muda: o glifo lido na área
+fica até o F5 ou o Del, e o aviso diz quantos são.
 **CA-4.6** vale também depois de dividir, de apagar e restaurar, e de inserir na posição 1.
 
 **CA-12.1** Golden normalizado: DOCX = `word/document.xml` em C14N sem `w:rsid*`, texto por

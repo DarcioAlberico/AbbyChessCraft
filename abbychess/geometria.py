@@ -12,6 +12,7 @@ aqui é a página endireitada inteira, de `tamanho = (largura, altura)`. Tudo é
 
 from __future__ import annotations
 
+import math
 from typing import Optional, Tuple
 
 Caixa = Tuple[int, int, int, int]
@@ -92,3 +93,20 @@ def quadro_da_vista(caixa: Caixa, geometria: Geometria, tamanho: Tuple[int, int]
     """O quadro novo (na página endireitada) de um retângulo marcado na imagem que se vê agora:
     cortar de novo uma página já cortada e girada corta dentro do que se vê."""
     return para_a_fonte(caixa, geometria, tamanho)
+
+
+def borracha_na_fonte(caixa: Caixa, geometria: Geometria, tamanho: Tuple[int, int],
+                      angulo: float) -> Tuple[float, ...]:
+    """O retângulo marcado na imagem que se vê agora, levado à página da fonte **antes** de
+    endireitar (a borracha, CA-12.17): os quatro cantos `(x1, y1, …, x4, y4)`, no sentido
+    horário a partir do de cima à esquerda. Endireitar `angulo` graus (anti-horário, em volta
+    do centro, como `cv2.getRotationMatrix2D`) é desfeito canto a canto: guardada assim, a
+    área segue a mancha se o ângulo da página mudar depois."""
+    a, b, c, d = para_a_fonte(caixa, geometria, tamanho)
+    cx, cy = tamanho[0] / 2, tamanho[1] / 2
+    cosseno, seno = math.cos(math.radians(angulo)), math.sin(math.radians(angulo))
+    cantos = []
+    for x, y in ((a, b), (c, b), (c, d), (a, d)):
+        cantos += [round(cosseno * (x - cx) - seno * (y - cy) + cx, 2),
+                   round(seno * (x - cx) + cosseno * (y - cy) + cy, 2)]
+    return tuple(cantos)

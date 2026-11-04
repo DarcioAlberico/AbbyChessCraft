@@ -1,8 +1,9 @@
 """As operações de página vistas da janela (SPEC §12.4, passo L): os diálogos do menu Página e
 da gaveta, que perguntam e chamam os comandos do controlador (`mover_paginas`,
 `apagar_paginas`, `inserir_paginas`, `restaurar_paginas`, `girar_paginas`, `cortar_paginas`,
-`tirar_o_corte`, `dividir_paginas`, `endireitar_paginas`). Um mixin da `JanelaPrincipal`,
-como `EspacoDeTrabalho`.
+`tirar_o_corte`, `tirar_as_borrachas`, `dividir_paginas`, `endireitar_paginas`), e o modo
+da borracha (CA-12.17), com os outros modos do arraste que ela exclui. Um mixin da
+`JanelaPrincipal`, como `EspacoDeTrabalho`.
 """
 
 from __future__ import annotations
@@ -16,6 +17,8 @@ from abbychess import sequencia as sq
 from abbychess.app import dialogo_paginas as dp
 from abbychess.app import imagens
 from abbychess.app import previa_da_pagina as pp
+from abbychess.app import teclado
+from abbychess.avisos import AVISO_LONGO_MS
 
 
 class PaginasNaJanela:
@@ -57,9 +60,38 @@ class PaginasNaJanela:
                      "girar_a_esquerda": self.girar_a_esquerda,
                      "girar_paginas": self.girar_paginas, "cortar_paginas": self.cortar_paginas,
                      "tirar_o_corte": self.tirar_o_corte,
+                     "tirar_as_borrachas": self.tirar_as_borrachas,
                      "dividir_paginas": self.dividir_paginas,
                      "endireitar_paginas": self.endireitar_paginas}
         operacoes[metodo](posicoes)
+
+    def _so_um_modo(self, ligada) -> None:
+        """Os modos do arraste (marcar glifo, áreas, borracha) se excluem: os outros saem."""
+        for q in (self.acao_modo_treino, self.acao_areas, self.acao_borracha):
+            if q is not ligada and q.isChecked():
+                q.setChecked(False)
+                if q is self.acao_areas:
+                    self.modo_areas(False)
+                else:
+                    self.visor.definir_modo_do_quadro(None)
+
+    def modo_borracha(self, sim: bool) -> None:
+        """A borracha (CA-12.17): o arraste apaga a área da imagem (a mancha do scanner)."""
+        if sim:
+            self._so_um_modo(self.acao_borracha)
+        self.visor.definir_modo_do_quadro("borracha" if sim else None)
+        self.statusBar().showMessage(teclado.com_teclas(
+            "Borracha: arraste em volta da mancha para apagá-la da imagem; {desfazer} a "
+            "devolve.") if sim else "Borracha: desligada.", AVISO_LONGO_MS)
+
+    def _apagar_mancha(self, x1: int, y1: int, x2: int, y2: int) -> None:
+        """A área da borracha apagada na página aberta; a vista fica onde estava (a página
+        apagada é mostrada de novo, e começaria no topo)."""
+        barras = (self.visor.horizontalScrollBar(), self.visor.verticalScrollBar())
+        lugar = [b.value() for b in barras]
+        if self.pagina.operacoes.apagar_manchas(self.pagina.indice, [(x1, y1, x2, y2)]):
+            for barra, valor in zip(barras, lugar):
+                barra.setValue(valor)
 
     def girar_a_direita(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         """Um gesto (o menu, a gaveta): 90° à direita, sem diálogo."""
@@ -163,6 +195,16 @@ class PaginasNaJanela:
                              "divisão junta as metades.")
         if escolha is not None:
             self.pagina.operacoes.tirar_o_corte(escolha[0])
+
+    def tirar_as_borrachas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
+        escolha = self._perguntar_pela_selecao(
+            "Tirar a borracha", selecionadas,
+            ("1 página volta como era na fonte: {PAGINAS}.",
+             "{N} páginas voltam como eram na fonte: {PAGINAS}."),
+            "Tirar a borracha", "As áreas que a borracha apagou voltam à imagem; o corte, o "
+                                "giro e a leitura ficam. {desfazer} desfaz.")
+        if escolha is not None:
+            self.pagina.operacoes.tirar_as_borrachas(escolha[0])
 
     def dividir_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         onde = dp.campo_de_porcentagem(50.0, 5.0, 95.0, " % da largura")

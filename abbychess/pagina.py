@@ -31,6 +31,7 @@ from abbychess import contexto
 from abbychess import gravacao as gv
 from abbychess import procedencia
 from abbychess import sequencia as sq
+from abbychess.borracha import com_borrachas
 
 from abbychess.leitor import (FONTE_AGUARDANDO, FONTE_MANUAL, FONTE_NENHUMA, LeitorDoLivro,
                               nome_de_origem, precisa_revisao)
@@ -179,6 +180,7 @@ class FonteDePaginas:
         renderizada no processo dele, sem segurar o GIL desta."""
         imagem = self._da_fonte(entrada, renderizador)
         angulo = self.inclinacao_da_entrada(entrada, imagem)
+        imagem = com_borrachas(imagem, entrada.borrachas)     # CA-12.17: medida sem a borracha
         if abs(angulo) >= INCLINACAO_MINIMA:
             imagem = Image.fromarray(girar(np.asarray(imagem.convert("L")), angulo))
         return com_geometria(imagem, entrada.quadro, entrada.giro)
@@ -190,7 +192,7 @@ class FonteDePaginas:
 
     def original_da_entrada(self, entrada: "sq.Entrada") -> Image.Image:
         if entrada.quadro is None and not entrada.giro:
-            return self._da_fonte(entrada)
+            return com_borrachas(self._da_fonte(entrada), entrada.borrachas)
         return self.pagina_da_entrada(entrada)
 
     def _da_fonte(self, entrada: "sq.Entrada", renderizador=None) -> Image.Image:

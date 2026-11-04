@@ -31,6 +31,7 @@ DA_JANELA: Dict[str, str] = {
     "acao_reconhecer": "scan-text", "acao_reler": "refresh-cw", "acao_lote": "book-open-check",
     "acao_ajustar": "maximize", "acao_zoom_mais": "zoom-in", "acao_zoom_menos": "zoom-out",
     "acao_modo_treino": "square-dashed-mouse-pointer", "acao_areas": "layout-dashboard",
+    "acao_borracha": "eraser",
     "acao_diagramas": "grid-3x3", "acao_realce": "highlighter", "acao_margens": "panel-top",
 }
 #: Os lados rasterizados: o Qt escolhe o mais perto do pedido vezes a densidade da tela.

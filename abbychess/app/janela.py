@@ -122,6 +122,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.visor.dividir_em.connect(p.dividir_em)
         self.visor.juntar_com.connect(p.juntar_com)
         self.visor.area_desenhada.connect(p.marcar)
+        self.visor.borracha_desenhada.connect(self._apagar_mancha)
         self.visor.box_alternado.connect(p.alternar_na_selecao)
         self.visor.diagrama_clicado.connect(self.conferencia.clicado)
         self.visor.zona_desenhada.connect(self.areas.desenhar)
@@ -422,19 +423,17 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
                 self.livro.exportar(destino, escolha.opcoes, meta, escolha.capa)
 
     def modo_treino(self, sim: bool) -> None:
-        if sim and self.acao_areas.isChecked():
-            self.acao_areas.setChecked(False)
-            self.modo_areas(False)
-        self.visor.definir_modo_treino(sim)
+        if sim:
+            self._so_um_modo(self.acao_modo_treino)
+        self.visor.definir_modo_do_quadro("treino" if sim else None)
         self.statusBar().showMessage(
             "Marcar glifo à mão: arraste em volta de um glifo para marcá-lo; Ctrl+clique junta "
             "boxes na seleção." if sim else "Marcar glifo à mão: desligado.", AVISO_LONGO_MS)
 
     def modo_areas(self, sim: bool) -> None:
-        """Liga o editor de áreas, que desliga o modo de treino: os dois usam o arraste."""
-        if sim and self.acao_modo_treino.isChecked():
-            self.acao_modo_treino.setChecked(False)
-            self.visor.definir_modo_treino(False)
+        """Liga o editor de áreas; os outros modos do arraste saem (`_so_um_modo`)."""
+        if sim:
+            self._so_um_modo(self.acao_areas)
         self.visor.definir_modo_areas(sim)
         self._layout_mudou()
         acoes.atualizar(self)

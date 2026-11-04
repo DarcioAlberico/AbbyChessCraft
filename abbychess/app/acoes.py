@@ -93,6 +93,8 @@ def montar(janela) -> None:
     j.acao_girar_paginas = teclado.sem_atalho(j, "Girar páginas…", lambda: j.girar_paginas())
     j.acao_cortar_paginas = teclado.sem_atalho(j, "Cortar páginas…", lambda: j.cortar_paginas())
     j.acao_tirar_o_corte = teclado.sem_atalho(j, "Tirar o corte…", lambda: j.tirar_o_corte())
+    j.acao_tirar_as_borrachas = teclado.sem_atalho(j, "Tirar a borracha…",
+                                                   lambda: j.tirar_as_borrachas())
     j.acao_dividir_paginas = teclado.sem_atalho(j, "Dividir páginas…",
                                                 lambda: j.dividir_paginas())
     j.acao_endireitar_paginas = teclado.sem_atalho(j, "Endireitar páginas…",
@@ -100,7 +102,8 @@ def montar(janela) -> None:
     j.acoes_de_paginas = (j.acao_mover_paginas, j.acao_apagar_paginas, j.acao_inserir_paginas,
                           j.acao_paginas_apagadas, j.acao_girar_a_direita,
                           j.acao_girar_a_esquerda, j.acao_girar_paginas, j.acao_cortar_paginas,
-                          j.acao_tirar_o_corte, j.acao_dividir_paginas,
+                          j.acao_tirar_o_corte, j.acao_tirar_as_borrachas,
+                          j.acao_dividir_paginas,
                           j.acao_endireitar_paginas)
     barra.addSeparator()
 
@@ -203,6 +206,11 @@ def montar(janela) -> None:
                                "arraste dentro dela para mover e na borda para esticar. A "
                                "letra da função a troca (T, H, C, R, P, N, L, D, I, X; o botão "
                                "direito mostra a lista), Del apaga.")
+    j.acao_borracha = acao(j, "borracha", j.modo_borracha, texto="Borracha", barra=barra,
+                           marcavel=True)
+    teclado.dica(j.acao_borracha, "Borracha ({borracha}): arraste em volta de uma mancha do "
+                                  "scanner para apagá-la da imagem; {desfazer} a devolve, e "
+                                  "Página › Tirar a borracha… volta a página como era.")
     j.acao_areas_auto = acao(j, "areas_automaticas", j.areas.automaticas,
                              texto="Refazer as áreas automáticas")
     j.acao_reconhecer_zona = acao(j, "reconhecer_zona", j.areas.reconhecer_atual,
@@ -333,7 +341,7 @@ def _menus(j) -> None:
              j.acao_zoom_mais, j.acao_zoom_menos, j.acao_origem, j.acao_seguir))
     j.menu_ferramentas = j.menuBar().addMenu("&Ferramentas")
     _encher(j.menu_ferramentas,
-            (j.acao_modo_treino, j.acao_areas, j.acao_areas_auto,
+            (j.acao_modo_treino, j.acao_areas, j.acao_borracha, j.acao_areas_auto,
              j.acao_reconhecer_zona, j.acao_ordenar_areas,
              j.acao_salvar_modelo_areas, j.acao_aplicar_modelo_areas,
              j.acao_verificar, None,

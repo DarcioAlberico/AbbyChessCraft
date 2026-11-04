@@ -225,6 +225,8 @@ acoes:
   # --- Ferramentas ---------------------------------------------------------------
   - {id: marcar_glifo, descricao: Marcar glifo à mão (quadro), escopo: [global], padrao: Ctrl+M, desde_passo: A2}
   - {id: modo_areas, descricao: Editor de áreas, escopo: [global], padrao: Ctrl+Shift+A, desde_passo: A2}
+  - {id: borracha, descricao: Borracha (apagar uma mancha da imagem), escopo: [global],
+     padrao: Ctrl+Shift+E, desde_passo: L}
   - {id: areas_automaticas, descricao: Refazer as áreas automáticas, escopo: [global],
      sem_atalho: [padrao, finereader], desde_passo: A2}
   - {id: ordenar_areas, descricao: Ordenar áreas, escopo: [imagem_areas],

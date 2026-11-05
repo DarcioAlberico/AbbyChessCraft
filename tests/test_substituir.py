@@ -399,3 +399,46 @@ def test_o_caso_estrutural_se_aplica_na_copia_da_pagina(padrao, modelo, depois):
     sb.aplicar_na_pagina(copia, _casos(pagina, padrao, modelo))
     assert ss.texto_e_unidades(copia)[0] == depois
     assert not any(b.revisado for b in copia.boxes)
+
+
+def _imagem_com_duas_partes(pagina, char: str):
+    """A página em branco, com a tinta do glifo `char` em duas partes, com um vão no meio."""
+    from PIL import Image, ImageDraw
+
+    box = next(b.entry for b in pagina.boxes if b.entry.char == char)
+    imagem = Image.new("RGB", (max(b.entry.x2 for b in pagina.boxes) + 40,
+                               max(b.entry.y2 for b in pagina.boxes) + 40), "white")
+    meio = (box.x1 + box.x2) // 2
+    desenho = ImageDraw.Draw(imagem)
+    desenho.rectangle((box.x1 + 1, box.y1, meio - 3, box.y2 - 1), fill="black")
+    desenho.rectangle((meio + 3, box.y1, box.x2 - 2, box.y2 - 1), fill="black")
+    return imagem
+
+
+def test_substituir_uma_letra_por_duas_divide_pela_tinta():
+    """§7.2 com a §6.3: m → rn divide o box em dois, cada um com a sua letra."""
+    p = _pagina("uma casa")
+    imagem = _imagem_com_duas_partes(p, "m")
+    copia = p.instantaneo()
+    sb.aplicar_na_pagina(copia, _casos(p, "m", "rn"), imagem_de=lambda: imagem)
+    assert ss.texto_e_unidades(copia)[0] == "urna casa"
+    assert [b.entry.char for b in copia.boxes][:3] == ["u", "r", "n"]
+
+
+def test_sem_imagem_fica_um_box_de_duas_letras():
+    p = _pagina("uma casa")
+    copia = p.instantaneo()
+    sb.aplicar_na_pagina(copia, _casos(p, "m", "rn"))
+    assert [b.entry.char for b in copia.boxes][:2] == ["u", "rn"]
+
+
+def test_so_a_substituicao_que_divide_pede_a_imagem():
+    """A imagem custa um render: a troca de letra por letra não a pede."""
+    p = _pagina("uma casa")
+
+    def imagem_de():
+        raise AssertionError("não devia renderizar")
+
+    copia = p.instantaneo()
+    sb.aplicar_na_pagina(copia, _casos(p, "c", "x"), imagem_de=imagem_de)
+    assert ss.texto_e_unidades(copia)[0] == "uma xasa"

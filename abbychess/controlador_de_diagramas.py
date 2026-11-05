@@ -143,7 +143,7 @@ class ControladorDeDiagramas:
                         if d.caixa == lido.caixa and not d.lido:
                             novos[i] = lido
                 pagina.diagramas = dg.com_ids(novos)
-                pagina.diagramas = lc.validar_pagina(pagina, p.projeto.dados.idioma)
+                pagina.diagramas = lc.validar_pagina(pagina, p.projeto.dados.chave_das_pecas)
                 p._gravar(pagina)
                 if pagina is p.modelo:
                     self.eventos.emitir("glifos_mudaram", None)

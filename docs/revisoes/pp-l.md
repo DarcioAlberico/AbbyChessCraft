@@ -30,7 +30,7 @@ A SPEC pede tarefa leve, 500 ms depois da última edição. Aqui ela é calculad
 
 - **Ponto de parada, pela regra:** teto de 32,4 % ≥ 30 %, alarme de 0,3 % < 5 %. X-1 entra.
 - **Mas isto é fraco, e o registro precisa dizer:** o teto só passa no único livro com diagramas no gabarito, e por pouco. **Dos 107 tokens errados, X-1 marcou 0.** O alarme baixo é de quem quase nunca tem posição. Sem rebobinar, a marca de ilegal vale pouco nestes livros; o ganho, se houver, é da fila Lances e do olho. PP7 é quem pode mudar isso.
-- **CA-F4.11:** 6 dos 107 errados (5,6 %) ficam em linha fora da fila, acima dos 5 %. A regra manda incluir a vizinha, e `COM_AS_VIZINHAS` a inclui. Custa linhas de prosa a mais; o ponto de parada de M2 revê.
+- **CA-F4.11:** 6 dos 107 errados (5,6 %) ficavam em linha fora da fila, acima dos 5 %. A regra manda incluir a vizinha, e `COM_AS_VIZINHAS` a inclui: ficam 4 de 107 (3,7 %). Custa linhas de prosa a mais; o ponto de parada de M2 revê. O JSON gravado é o de depois da vizinha; a tabela acima, de antes dela, na coluna de fora da fila.
 
 ## O que falta, e é do usuário
 

@@ -85,3 +85,50 @@ def test_o_que_nao_tem_area_ordenada_fica_no_lugar():
 
 def test_a_area_de_diagrama_sem_tabuleiro_nao_atrapalha():
     assert _documento(_pagina(alto=1, diagrama=2, baixo=0, com_diagrama=False)) == ["baixo", "alto"]
+
+
+# ----------------------------------------------------------------------
+# O número de cada área é o da leitura (§5.2)
+# ----------------------------------------------------------------------
+
+def test_sem_ordenar_o_numero_e_a_ordem_em_que_o_documento_le():
+    """A lista das áreas está ao contrário da leitura: o número segue a leitura."""
+    pagina = _pagina()
+    pagina.zonas = list(reversed(pagina.zonas))
+    assert tx.numeros_das_areas(pagina) == {"alto": 1, "tabuleiro": 2, "baixo": 3}
+
+
+def test_ordenada_o_numero_e_a_ordem_dela():
+    assert tx.numeros_das_areas(_pagina(alto=2, diagrama=1, baixo=0)) == {
+        "baixo": 1, "tabuleiro": 2, "alto": 3}
+
+
+def test_a_area_que_nao_le_nada_vem_depois_e_nenhum_numero_se_repete():
+    """A área vazia desenhada depois de ordenar: antes, "2" em duas áreas."""
+    pagina = _pagina(alto=1, diagrama=0)
+    pagina.zonas = pagina.zonas + [zn.Zona(zn.TEXTO, 600, 300, 800, 400, id="vazia")]
+    numeros = tx.numeros_das_areas(pagina)
+    assert numeros["vazia"] == 4 and len(set(numeros.values())) == 4
+
+
+def test_a_pagina_sem_leitura_numera_pela_lista():
+    pagina = tx.pagina_avulsa([], [], [zn.Zona(zn.TEXTO, 0, 0, 100, 100, id="a"),
+                                       zn.Zona(zn.TEXTO, 0, 200, 100, 300, id="b")])
+    assert tx.numeros_das_areas(pagina) == {"a": 1, "b": 2}
+
+
+def test_o_rotulo_do_visor_mostra_o_numero_da_leitura(app, tmp_path):  # noqa: F811
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+
+    from abbychess.app.visor import VisorDePagina
+
+    visor = VisorDePagina()
+    visor.modo_areas = True
+    zonas = [zn.Zona(zn.TEXTO, 50, 50, 300, 200, id="z0"), zn.Zona(zn.TEXTO, 50, 300, 300, 500, id="z1")]
+    visor.mostrar_zonas(zonas, numeros={"z0": 2, "z1": 1})
+    textos = {i.text() for i in visor.scene().items() if isinstance(i, QGraphicsSimpleTextItem)}
+    assert {"2 Texto", "1 Texto"} <= textos
+    visor.mostrar_zonas(zonas, ordem_clicada=[1], numeros={"z0": 2, "z1": 1})
+    textos = {i.text() for i in visor.scene().items() if isinstance(i, QGraphicsSimpleTextItem)}
+    assert {"? Texto", "1 Texto"} <= textos
+    visor.deleteLater()

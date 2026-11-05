@@ -71,14 +71,15 @@ mal lido; eram 30 falsos). O JSON oficial sai no portão do fechamento dos passo
 
 ## Limitações conhecidas
 
-- Não há o editor "Área" no Inspetor (a função se troca pela letra ou pelo botão direito), e
-  o vínculo da legenda não se edita à mão.
+- ~~Não há o editor "Área" no Inspetor (a função se troca pela letra ou pelo botão direito).~~
+  Feito em 2026-11-05 (`app/editor_de_area.py`). O vínculo da legenda segue sem edição à mão.
 - ~~Os diagramas não seguem o Ordenar no Documento (ficam onde a leitura os pôs), e a
   exportação não usa a ordem das áreas.~~ Corrigido em 2026-11-05 (`zonas.na_ordem_das_areas`).
 - ~~O FEN do diagrama de uma página de duas colunas (o Yusupov) cai pela altura, entre as linhas
   da outra coluna.~~ Era o CA-5.2 reprovando; corrigido em 2026-11-04 (roadmap, "A coluna só de
   tabuleiros").
-- Fora do Ordenar, o número da área é a posição na lista, não a ordem de leitura.
+- ~~Fora do Ordenar, o número da área é a posição na lista, não a ordem de leitura.~~ Corrigido
+  em 2026-11-05 (`texto.numeros_das_areas`).
 - Na página densa (o Yusupov), o ornamento vira áreas minúsculas e os rótulos se sobrepõem.
 - `_aprender_margens` varre as páginas lidas na thread da interface ao ligar o modo Áreas numa
   página sem zonas (~26 ms por página); o cabeçalho corrido não é aprendido de novo no F5 das

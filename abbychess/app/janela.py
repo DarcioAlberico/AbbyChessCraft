@@ -35,7 +35,7 @@ from PySide6.QtCore import QSettings, QTimer, Signal
 from PySide6.QtWidgets import QApplication, QInputDialog, QMainWindow
 
 from abbychess import avisos as av
-from abbychess.app import acessibilidade, acoes, dialogo_exportacao, dialogos, teclado
+from abbychess.app import acessibilidade, acoes, dialogos, teclado
 from abbychess.app.imagens import qimage_da_pagina
 from abbychess.app.paginas_na_janela import PaginasNaJanela
 from abbychess.app.busca_na_janela import BuscaNaJanela
@@ -414,13 +414,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
             self.areas.aplicar_modelo(indices)
 
     def exportar(self) -> None:
-        """O arquivo, as opções e os metadados (§12.1), e a exportação em segundo plano."""
-        if self.projeto is not None:
-            destino = dialogos.destino_da_exportacao(self, self.projeto)
-            escolha = dialogo_exportacao.perguntar(self, self.projeto, destino) if destino else None
-            if escolha is not None:
-                meta = escolha.metadados if destino.suffix.lower() in (".epub", ".docx") else None
-                self.livro.exportar(destino, escolha.opcoes, meta, escolha.capa)
+        """O livro inteiro: o arquivo, as opções e os metadados (§12.1)."""
+        self.exportar_as_selecionadas(())
 
     def modo_treino(self, sim: bool) -> None:
         if sim:

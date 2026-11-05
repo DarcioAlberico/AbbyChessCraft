@@ -41,7 +41,6 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
-import numpy as np
 
 from core import diagrama_modelo as modelo
 from core import lado_a_jogar
@@ -49,6 +48,7 @@ from core.box_model import BoxEntry
 from core.tabuleiro_edicao import TabuleiroEdicao
 
 from abbychess import lances
+from abbychess.geometria import cinza as _cinza
 from abbychess.lances import Validacao
 
 Caixa = Tuple[int, int, int, int]
@@ -592,13 +592,6 @@ def texto_da_pagina(boxes: Sequence[BoxEntry], diagramas: Sequence[DiagramaLido]
 
 
 # ----------------------------------------------------------------------
-
-def _cinza(imagem) -> np.ndarray:
-    if hasattr(imagem, "convert"):
-        return np.asarray(imagem.convert("L"))
-    arr = np.asarray(imagem)
-    return arr if arr.ndim == 2 else arr.mean(axis=2).astype(np.uint8)
-
 
 def _sobreposicao(a: Sequence[int], b: Sequence[int]) -> float:
     """Interseção sobre a menor das duas áreas."""

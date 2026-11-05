@@ -39,6 +39,7 @@ from abbychess.modelo import LIDAS
 from abbychess.app import visor as vs
 from abbychess.app.confirmacao import BarraDeConfirmacao
 from abbychess.app import acessibilidade, estilo, icones, teclado, vazios
+from abbychess.app.editor_de_area import EditorDeArea
 from abbychess.app.inspetor import PainelDoInspetor
 from abbychess.app.linha import FaixaDaLinha
 from abbychess.app.painel_paginas import NOMES_DOS_ESTADOS, PainelDePaginas
@@ -159,9 +160,14 @@ class EspacoDeTrabalho:
         self.setCentralWidget(centro)
         self.arranjo = "lado_a_lado"
 
+        self.editor_de_area = EditorDeArea()
+        self.editor_de_area.funcao_escolhida.connect(self.areas.trocar_funcao_atual)
+        self.editor_de_area.ordem_escolhida.connect(self.areas.levar_a_atual_ao_numero)
+        self.visor.zona_escolhida.connect(self._area_escolhida)   # depois do `areas.escolher`
         self.inspetor = PainelDoInspetor(ControladorDaFila.MODOS,
                                          {"glifo": self.treino, "palavra": self.verificacao,
-                                          "diagrama": self.editor_diagrama},
+                                          "diagrama": self.editor_diagrama,
+                                          "area": self.editor_de_area},
                                          escopos=ControladorDaFila.ESCOPOS)
         self.inspetor.modo_escolhido.connect(self.fila.definir)
         self.inspetor.escopo_escolhido.connect(self.fila.definir_escopo)
@@ -176,6 +182,8 @@ class EspacoDeTrabalho:
         self.paginas.mover.connect(self.mover_paginas)
         self.paginas.apagar.connect(self.apagar_paginas)
         self.paginas.operacao.connect(self.operacao_da_gaveta)
+        self.paginas.exportar.connect(self.exportar_as_selecionadas)
+        self.paginas.aplicar_modelo.connect(self.modelo_nas_selecionadas)
         self.doca_paginas = _doca(self, "Páginas", "doca_paginas", self.paginas,
                                   Qt.DockWidgetArea.LeftDockWidgetArea)
         self.doca_paginas.hide()

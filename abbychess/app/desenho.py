@@ -96,6 +96,15 @@ class DesenhoDaJanela:
         if p.cache is not None and p.cache.tem(p.navegador.proxima_provavel):
             self._pixmap(p.navegador.proxima_provavel, p.cache.pagina(p.navegador.proxima_provavel)[0])
 
+    def zoom_de_pagina(self, zoom) -> None:
+        """Ctrl+7/8/9: `zoom()` na Imagem e no Glifo; no Documento, o corpo é do Ctrl++ e Ctrl+−, e
+        a barra diz onde vale (§3.3)."""
+        if self._no_documento():
+            self.statusBar().showMessage(
+                teclado.com_teclas("Zoom de página: foco na Imagem ({foco_imagem})"), 6000)
+        else:
+            zoom()
+
     def _zoom_mudou(self, escala: float, limite: str) -> None:
         self.caixa_de_zoom.blockSignals(True)
         self.caixa_de_zoom.setValue(round(escala * 100))
@@ -251,7 +260,26 @@ class DesenhoDaJanela:
             self.ir_a_origem(self.projeto.sequencia.posicao_de(pid), gid)
 
     def _layout_mudou(self) -> None:
-        self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual, self.areas.ordem_clicada)
+        numeros = self.areas.numeros()
+        self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual, self.areas.ordem_clicada,
+                                 numeros)
+        self._editor_de_area_em_dia(numeros)
+
+    def _editor_de_area_em_dia(self, numeros: dict) -> None:
+        """O editor Área com a área escolhida; fora do editor de áreas, ele volta ao Glifo."""
+        if not self.visor.modo_areas and self.inspetor.atual() == "area":
+            self.inspetor.mostrar("glifo")
+        a = self.areas
+        if a.atual is None or not 0 <= a.atual < len(a.zonas):
+            self.editor_de_area.mostrar(None, 0, "")
+            return
+        zona = a.zonas[a.atual]
+        self.editor_de_area.mostrar(numeros.get(zona.id, a.atual + 1), len(a.zonas), zona.funcao)
+
+    def _area_escolhida(self, _indice: int) -> None:
+        """O clique numa área abre o editor dela; no Ordenar, o clique diz a ordem (§3.1)."""
+        if not self.areas.ordenando and self.areas.atual is not None:
+            self.inspetor.mostrar("area")
 
     def _palavra_mudou(self) -> None:
         v, p = self.verificador, self.pagina

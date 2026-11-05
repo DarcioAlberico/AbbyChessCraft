@@ -1155,6 +1155,23 @@ O portão no `872dd16`, arquivo por arquivo por falta de RAM, aprovou tudo menos
 reprova na base (2,63 s para a meta de 2,4 s), com a máquina carregada e sem medida gravada. Depois
 dos PRs, só a parte `livro_real` rodou de novo (`a64cd6c`), aprovada; a de desempenho, não.
 
+## As lacunas contra a SPEC (2026-11-05, ramo `lacunas-da-spec`)
+
+O que a SPEC pede e faltava, conferido no código:
+
+- **Feitas:** o editor Área no Inspetor, com a função e a ordem (§3.1); o número da área pela ordem
+  de leitura (§5.2); dividir pela tinta na substituição, m → rn (§7.2 com a §6.3); exportar e
+  aplicar o modelo de áreas nas selecionadas da gaveta (§3.1); Ctrl+7/8/9 no Documento dizem onde
+  valem (§3.3).
+- **Em parte:** o relatório da exportação (§12.2, CA-12.5) avisa que não lista as margens tiradas
+  das páginas da camada nativa; a lista depende de um pedido ao core
+  (`docs/pedidos-ao-pyboxeditor.md`, item 5).
+- **Dependem do usuário:** os parágrafos refluídos no Documento (§6.1), que hoje mostra uma linha
+  impressa por bloco, e a nota do passo A3 só valia até o passo F: refluir muda a edição e a Linha,
+  e o desenho precisa de decisão. A rolagem contínua do livro (§18.4) segue em aberto.
+- **Não feitas:** o menu de contexto em todo painel (§3.2: Galeria, Padrões, Diagramas e Linha não
+  têm), aprender o cabeçalho pelos confirmados (§5.1), e as limitações opcionais dos registros.
+
 ---
 
 ## Antipadrões

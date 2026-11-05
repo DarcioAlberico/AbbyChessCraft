@@ -51,6 +51,9 @@ class Opcoes:
     #: As páginas `(primeira, última)`, índices a partir de 0, as duas incluídas; `None`, o
     #: livro todo. Não é lembrada entre exportações.
     intervalo: Optional[Tuple[int, int]] = None
+    #: As páginas escolhidas na gaveta, em índices (§3.1), que um intervalo não diz quando são
+    #: salteadas; vazia, todas. Também não é lembrada.
+    selecao: Tuple[int, ...] = ()
 
     def __post_init__(self) -> None:
         links_de_analise.validar(self.links_de_analise)
@@ -60,7 +63,9 @@ class Opcoes:
                 raise ValueError(f"intervalo inválido: {self.intervalo!r}")
 
     def indices(self, indices: Optional[Iterable[int]]) -> Optional[Iterable[int]]:
-        """Os `indices` pedidos, cortados pelo `intervalo`."""
+        """Os `indices` pedidos, cortados pelo `intervalo` e pela `selecao`."""
+        if self.selecao:
+            indices = self.selecao if indices is None else [i for i in indices if i in self.selecao]
         if self.intervalo is None:
             return indices
         dentro = range(self.intervalo[0], self.intervalo[1] + 1)

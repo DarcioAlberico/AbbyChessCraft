@@ -75,7 +75,8 @@ Os commits: `46ef90d`, `a823ae5`, `976cafa`, `acd4de9`, `4558a53` e o deste regi
 - O EPUB é conferido (`epub.conferir`) depois de trocar o arquivo; o DOCX, antes.
 - O número impresso só vem das páginas lidas pelos boxes: num PDF nascido digital todo da
   camada nativa, a `page-list` usa a posição no PDF.
-- As páginas da camada nativa não contam os cabeçalhos tirados no relatório.
+- As páginas da camada nativa não contam os cabeçalhos tirados no relatório: desde 2026-11-05
+  ele avisa, e a lista depende de um pedido ao core (`docs/pedidos-ao-pyboxeditor.md`, item 5).
 - "Páginas não verificadas" é uma linha só, sem página para o duplo clique.
 - O PDF guarda os metadados do original (o formulário é do EPUB e do DOCX).
 - ~~O primeiro capítulo (as páginas antes do primeiro título) não tem item no `nav`; só o marco

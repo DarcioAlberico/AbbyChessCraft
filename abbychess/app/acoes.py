@@ -172,11 +172,12 @@ def montar(janela) -> None:
                             widgets=com_o_documento)
     j.acao_zoom_menos = acao(j, "zoom_menos", j.afastar, texto="Afastar",
                              widgets=com_o_documento)
-    j.acao_zoom_largura = acao(j, "zoom_largura", j.visor.zoom_largura,
-                               texto="Largura da página", widgets=imagem_e_glifo)
-    j.acao_zoom_100 = acao(j, "zoom_100", j.visor.zoom_100, texto="100%", widgets=imagem_e_glifo)
-    j.acao_zoom_item = acao(j, "zoom_item", j.visor.zoom_item, texto="Zoom no item atual",
-                            widgets=imagem_e_glifo)
+    j.acao_zoom_largura = acao(j, "zoom_largura", lambda: j.zoom_de_pagina(j.visor.zoom_largura),
+                               texto="Largura da página", widgets=com_o_documento)
+    j.acao_zoom_100 = acao(j, "zoom_100", lambda: j.zoom_de_pagina(j.visor.zoom_100),
+                           texto="100%", widgets=com_o_documento)
+    j.acao_zoom_item = acao(j, "zoom_item", lambda: j.zoom_de_pagina(j.visor.zoom_item),
+                            texto="Zoom no item atual", widgets=com_o_documento)
     j.acao_origem = acao(j, "mostrar_origem", j.visor.definir_origem,
                          texto="Mostrar a origem das leituras", widgets=[j.visor],
                          marcavel=True)

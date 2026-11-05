@@ -79,6 +79,12 @@ links_de_analise:
     acrescenta:
       - '<figure class="diagrama"><img alt="Diagrama: FEN .*</img><figcaption><a class="analise" href="https://lichess\.org/analysis/standard/r3k2r/pp3ppp/2n5/3q4/3P4/2N2N2/PP3PPP/R3K2R_w_-_-_0_1">Analisar no Lichess</a></figcaption></figure>$'
 
+selecao:
+  escopo: livro
+  testes:
+    - test_a_selecao_leva_so_as_paginas_dela
+    - test_o_dialogo_devolve_a_selecao_e_nao_a_lembra
+
 intervalo:
   escopo: livro
   testes:

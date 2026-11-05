@@ -252,10 +252,15 @@ def na_ordem_das_areas(itens: Sequence, ordem_de) -> list:
     return saida
 
 
-def ordem_do_tabuleiro(zonas: Sequence[Zona], caixa) -> Optional[int]:
-    """A ordem da área de diagrama que vale no centro da caixa do tabuleiro."""
-    area = zona_que_vale([z for z in zonas if z.tipo == DIAGRAMA],
+def area_do_tabuleiro(zonas: Sequence[Zona], caixa) -> Optional[Zona]:
+    """A área de diagrama que vale no centro da caixa do tabuleiro."""
+    return zona_que_vale([z for z in zonas if z.tipo == DIAGRAMA],
                          (caixa[0] + caixa[2]) / 2, (caixa[1] + caixa[3]) / 2)
+
+
+def ordem_do_tabuleiro(zonas: Sequence[Zona], caixa) -> Optional[int]:
+    """A ordem da área de diagrama do tabuleiro."""
+    area = area_do_tabuleiro(zonas, caixa)
     return None if area is None else area.ordem
 
 

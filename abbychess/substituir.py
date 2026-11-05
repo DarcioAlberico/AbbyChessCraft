@@ -236,9 +236,10 @@ def _trocado(texto: str, de: int, ate: int, grupo) -> str:
     return "".join(partes)
 
 
-def aplicar_na_pagina(pagina: Pagina, casos: Sequence[Caso]) -> ss.Plano:
+def aplicar_na_pagina(pagina: Pagina, casos: Sequence[Caso], imagem_de=lambda: None) -> ss.Plano:
     """Os casos aceitos na página, numa sessão só (ver o docstring do módulo). Levanta
-    `sessao.Recusa` sem mudar nada se o conjunto não tem tradução."""
+    `sessao.Recusa` sem mudar nada se o conjunto não tem tradução. `imagem_de()` dá a imagem
+    da página, pedida só quando um caso divide um glifo pela tinta (m → rn, §6.3)."""
     texto, unidades = ss.texto_e_unidades(pagina)
     novo, fixos = _texto_com_os_casos(texto, unidades, casos)
     plano = ss.planejar(unidades, novo, fixos)
@@ -247,7 +248,7 @@ def aplicar_na_pagina(pagina: Pagina, casos: Sequence[Caso]) -> ss.Plano:
     # monta a lista nova somando pedaços dela (antes, TypeError em todo caso estrutural).
     pagina.boxes = list(pagina.boxes)
     antes = {b.gid for b in pagina.boxes}
-    ss.aplicar(pagina, plano)
+    ss.aplicar(pagina, plano, imagem_de() if plano.dividir_boxes else None)
     # Os boxes que nascem de juntar ou dividir também ficam por revisar (o substituir não
     # revisa nada; a edição pelo Documento é que os marca revisados).
     pagina.boxes = [replace(b, revisado=False) if b.gid not in antes and b.revisado else b

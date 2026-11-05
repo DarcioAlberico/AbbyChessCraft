@@ -122,6 +122,7 @@ class VisorDePagina(QGraphicsView):
         self._zona_sel: Optional[int] = None
         #: O que cada área desenha, no índice dela: (o retângulo, o fundo do rótulo, o rótulo).
         self._zonas_itens: List[tuple] = []
+        self._numeros_das_zonas: dict = {}
         #: O arraste de uma área em curso: (índice, bordas, ponto inicial).
         self._arraste = None
         self._palavra: Optional[QGraphicsRectItem] = None
@@ -372,7 +373,7 @@ class VisorDePagina(QGraphicsView):
         self._arraste, self._inicio = None, None
         self.viewport().setMouseTracking(sim)
         self._cursor_do_modo()
-        self.mostrar_zonas(self._zonas, self._zona_sel)
+        self.mostrar_zonas(self._zonas, self._zona_sel, numeros=self._numeros_das_zonas)
 
     def _cursor_do_modo(self) -> None:
         livre = not (self.modo_treino or self.modo_areas or self.modo_borracha)
@@ -382,11 +383,14 @@ class VisorDePagina(QGraphicsView):
                                   else Qt.CursorShape.CrossCursor)
 
     def mostrar_zonas(self, zonas, selecionada: Optional[int] = None,
-                      ordem_clicada: Optional[list] = None) -> None:
-        """Desenha as áreas, com o número da ordem e a função no canto, sobre um fundo de
-        papel (o texto colorido solto sumia sobre o impresso). Só no editor de áreas. No
-        Ordenar (`ordem_clicada`), as clicadas mostram a ordem nova e as outras um "?"."""
+                      ordem_clicada: Optional[list] = None,
+                      numeros: Optional[dict] = None) -> None:
+        """Desenha as áreas, com o número da ordem (`numeros`, por id: a de leitura) e a função
+        no canto, sobre um fundo de papel (o texto colorido solto sumia sobre o impresso). Só no
+        editor de áreas. No Ordenar (`ordem_clicada`), as clicadas mostram a ordem nova e as
+        outras um "?"."""
         self.ordenando = ordem_clicada is not None
+        self._numeros_das_zonas = numeros or {}
         cena = self.scene()
         for item in (item for itens in self._zonas_itens for item in itens):
             cena.removeItem(item)
@@ -398,7 +402,8 @@ class VisorDePagina(QGraphicsView):
             return
         for i, z in enumerate(self._zonas):
             self._zonas_itens.append(_desenhar_zona(cena, z, i == self._zona_sel,
-                                                    _numero_da_zona(i, z, ordem_clicada)))
+                                                    _numero_da_zona(i, z, ordem_clicada,
+                                                                    self._numeros_das_zonas)))
 
     def menu_da_zona(self, indice: int) -> QMenu:
         """A função da área e apagá-la, pelo botão direito."""
@@ -761,11 +766,13 @@ def _desenhar_tabuleiros(cena: QGraphicsScene, tabuleiros, cores) -> List[QGraph
     return itens
 
 
-def _numero_da_zona(i: int, zona, ordem_clicada: Optional[list]):
-    """O número do rótulo da área `i`: a ordem de leitura dela (ou a posição, sem ordem); no
-    Ordenar, a ordem nova das clicadas e um "?" nas outras."""
+def _numero_da_zona(i: int, zona, ordem_clicada: Optional[list], numeros: dict):
+    """O número do rótulo da área `i`: o da leitura (`numeros`), ou, sem ele, a ordem dela ou a
+    posição; no Ordenar, a ordem nova das clicadas e um "?" nas outras."""
     if ordem_clicada is not None:
         return ordem_clicada.index(i) + 1 if i in ordem_clicada else "?"
+    if zona.id in numeros:
+        return numeros[zona.id]
     return zona.ordem + 1 if zona.ordem is not None else i + 1
 
 

@@ -217,9 +217,9 @@ acoes:
      padrao: Ctrl+-, desde_passo: A1}
   - {id: zoom_pagina, descricao: Página inteira (Imagem) ou corpo padrão (Documento), escopo: [imagem, documento, glifo],
      padrao: Ctrl+0, desde_passo: A1}
-  - {id: zoom_largura, descricao: Largura da página, escopo: [imagem, glifo], padrao: Ctrl+9, desde_passo: A1}
-  - {id: zoom_100, descricao: 100%, escopo: [imagem, glifo], padrao: Ctrl+8, desde_passo: A1}
-  - {id: zoom_item, descricao: Zoom no item atual, escopo: [imagem, glifo], padrao: Ctrl+7, desde_passo: A1}
+  - {id: zoom_largura, descricao: Largura da página, escopo: [imagem, glifo, documento], padrao: Ctrl+9, desde_passo: A1}
+  - {id: zoom_100, descricao: 100%, escopo: [imagem, glifo, documento], padrao: Ctrl+8, desde_passo: A1}
+  - {id: zoom_item, descricao: Zoom no item atual, escopo: [imagem, glifo, documento], padrao: Ctrl+7, desde_passo: A1}
   - {id: mostrar_origem, descricao: Mostrar a origem das leituras nos boxes, escopo: [imagem], padrao: V, desde_passo: A1}
 
   # --- Ferramentas ---------------------------------------------------------------

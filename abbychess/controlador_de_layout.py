@@ -11,6 +11,7 @@ from typing import List, Optional, Sequence
 from abbychess import historico as hs
 from abbychess import margens as mg
 from abbychess import servidor_de_leitura as sl
+from abbychess import texto as tx
 from abbychess import zonas as zn
 from abbychess.controlador import AVISO_LONGO_MS, ControladorDePagina
 
@@ -40,6 +41,11 @@ class ControladorDeLayout:
     def ordenando(self) -> bool:
         """Se o Ordenar está em curso (o Esc o cancela antes de qualquer outra coisa)."""
         return self._ordenacao is not None
+
+    def numeros(self) -> dict:
+        """O número de cada área, pelo id: o da ordem de leitura (§5.2)."""
+        modelo = self.pagina.modelo
+        return tx.numeros_das_areas(modelo) if modelo is not None else {}
 
     def _parar_a_ordenacao(self) -> None:
         """Uma área que nasce, sai ou muda no meio do Ordenar invalida os cliques dados."""
@@ -197,6 +203,21 @@ class ControladorDeLayout:
     def trocar_funcao_atual(self, funcao: str) -> None:
         if self.atual is not None:
             self.trocar_funcao(self.atual, funcao)
+
+    def levar_a_atual_ao_numero(self, numero: int) -> None:
+        """A área escolhida passa a ter o `numero` na ordem de leitura; as outras andam, e a
+        ordem de todas fica gravada, como no Ordenar. Um passo do desfazer."""
+        zonas, atual = self.zonas, self.atual
+        if atual is None or not 0 <= atual < len(zonas):
+            return
+        numeros = self.numeros()
+        ordem = sorted(range(len(zonas)), key=lambda i: numeros.get(zonas[i].id, i + 1))
+        if ordem.index(atual) == numero - 1:
+            return
+        ordem.remove(atual)
+        ordem.insert(numero - 1, atual)
+        self._parar_a_ordenacao()
+        self._trocar(zn.ordenar(zonas, ordem), atual, "Mudar a ordem da área")
 
     def iniciar_ordenacao(self) -> None:
         if not self.zonas:

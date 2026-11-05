@@ -275,7 +275,7 @@ class ControladorDaSubstituicao:
                     progresso(n, len(aceitos))
                     copia = fontes[i].instantaneo()
                     try:
-                        sb.aplicar_na_pagina(copia, casos)
+                        sb.aplicar_na_pagina(copia, casos, _imagem_de(pc.fonte, i))
                         depois_de_editar(copia, fontes[i], idioma)
                         feitas[i] = (copia, hs.mudanca(fontes[i], copia.instantaneo()),
                                      projeto.resumo.do_modelo(copia))
@@ -309,7 +309,8 @@ class ControladorDaSubstituicao:
             if viva is fonte or _mesma_pagina(viva, fonte):
                 _com_a_copia(viva, copia)
             else:                               # mudou desde a leitura: na de agora
-                mudanca, falha = _na_de_agora(viva, aceitos[i], projeto)
+                mudanca, falha = _na_de_agora(viva, aceitos[i], projeto,
+                                              _imagem_de(self.pagina.fonte, i))
                 if falha is not None:
                     falhas[i] = falha
                     continue
@@ -365,7 +366,19 @@ def _com_a_copia(viva, copia) -> None:
     viva.diagramas, viva.zonas = list(copia.diagramas), list(copia.zonas)
 
 
-def _na_de_agora(viva, casos, projeto):
+def _imagem_de(fonte, indice: int):
+    """A imagem da página, para quando a substituição dividir um glifo pela tinta. Sem ela, a
+    divisão vira um box de várias letras (§6.3), e a substituição não falha por isso."""
+    def imagem():
+        try:
+            return fonte.pagina(indice)
+        except (OSError, RuntimeError, ValueError) as erro:
+            log.warning("sem a imagem da página %d para dividir: %s", indice, erro)
+            return None
+    return imagem
+
+
+def _na_de_agora(viva, casos, projeto, imagem_de=lambda: None):
     """Os casos aplicados na página de agora, que mudou desde a leitura: `(mudança, None)`,
     ou `(None, motivo)` com os glifos e as decisões como estavam (o motivo vai à lista de
     falhas)."""
@@ -375,7 +388,7 @@ def _na_de_agora(viva, casos, projeto):
 
     antes = viva.instantaneo()
     try:
-        sb.aplicar_na_pagina(viva, casos)
+        sb.aplicar_na_pagina(viva, casos, imagem_de)
     except Exception as erro:
         viva.boxes, viva.decisoes = list(antes.boxes), antes.decisoes
         return None, (str(erro) if isinstance(erro, ss.Recusa)

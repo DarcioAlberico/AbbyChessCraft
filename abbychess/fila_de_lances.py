@@ -143,7 +143,7 @@ class FilaDeLances:
         unidades = self._unidades(linha)
         original = "".join(u.texto for u in unidades)
         novo = " ".join(texto.split())
-        inicio, fim = _trecho_mudado(novo, original)
+        inicio, fim = tk.trecho_mudado(novo, original)
         a, b = ss.palavras_em(unidades, inicio, len(original) - fim)
         trecho = novo[a:b + len(novo) - len(original)]
         chars_antes = {g: p.box(g).char for g in linha.gids if p.indice_de(g) is not None}
@@ -194,17 +194,6 @@ def _palavras_da_linha(documento, gids: Sequence[int]):
             if tuple(g for p in linha.palavras for g in p.gids) == alvo:
                 return linha.palavras
     return ()
-
-
-def _trecho_mudado(atual: str, antes: str) -> tuple:
-    """(iguais no começo, iguais no fim) entre o texto novo e o de antes."""
-    inicio, limite = 0, min(len(atual), len(antes))
-    while inicio < limite and atual[inicio] == antes[inicio]:
-        inicio += 1
-    fim = 0
-    while fim < limite - inicio and atual[-1 - fim] == antes[-1 - fim]:
-        fim += 1
-    return inicio, fim
 
 
 class EvidenciaNaPagina:

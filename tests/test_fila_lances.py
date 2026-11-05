@@ -296,6 +296,79 @@ def test_a_linha_longa_diminui_a_letra(app):
     assert faixa.corpo_do_texto() == CORPO_MAXIMO
 
 
+def test_ctrl_enter_ensina_so_os_que_mudaram(app, janela, monkeypatch):
+    _escrever(janela, "1.e4 e6")
+    p = janela.pagina
+    pedidos = []
+    monkeypatch.setattr(p.leitura, "ensinar_gids", lambda por_char, *a, **k: pedidos.append(por_char))
+    janela.fila.ir_aos_lances()
+    janela.verificacao.campo.setText("1.e4 e5")
+    janela.verificacao.pedir_ensinar()
+    janela.executor.esperar()
+    app.processEvents()
+    assert list(pedidos[0]) == ["5"] and len(pedidos[0]["5"]) == 1
+
+
+def test_ctrl_enter_sem_mudanca_nao_ensina(app, janela, monkeypatch):
+    _escrever(janela, "1.e4")
+    p = janela.pagina
+    monkeypatch.setattr(p.leitura, "ensinar_gids", lambda *a, **k: pytest.fail("ensinou"))
+    janela.fila.ir_aos_lances()
+    janela.verificacao.pedir_ensinar()
+    janela.executor.esperar()
+    assert all(b.revisado for b in p.modelo.boxes)
+
+
+class _Pagina:
+    def __init__(self, indice, resumo):
+        self.indice = indice
+        self.projeto = type("P", (), {"resumo": type("R", (), {"do_livro": lambda s: resumo})()})
+
+
+def test_a_vizinha_no_escopo_livro():
+    from abbychess.controladores import _vizinha_com_lances
+
+    resumo = {0: {"lances_por_conferir": 2}, 1: {"lances_por_conferir": 0}, 2: {},
+              3: {"lances_por_conferir": 1, "estado": "nao_reconhecida"}, 4: {"lances_por_conferir": 1}}
+    assert _vizinha_com_lances(_Pagina(0, resumo), +1) == 2       # sem a chave: desconhecida, abre
+    assert _vizinha_com_lances(_Pagina(2, resumo), +1) == 4
+    assert _vizinha_com_lances(_Pagina(4, resumo), +1) is None
+    assert _vizinha_com_lances(_Pagina(2, resumo), -1) == 0
+    assert _vizinha_com_lances(_Pagina(0, resumo), -1) is None
+    sem_projeto = _Pagina(0, resumo)
+    sem_projeto.projeto = None
+    assert _vizinha_com_lances(sem_projeto, +1) is None
+
+
+def test_os_itens_do_relatorio_por_tipo(app, janela):
+    _com_diagrama(janela, "1.e4 e5 2.Bf3")
+    p = janela.pagina
+    itens = ev.itens_da_pagina(0, p.modelo, p.documento(), p.diagramas_com_ids(), "KQRBN")
+    assert {i.tipo for i in itens} == {"ilegal", "não conferido"}
+    ilegal = next(i for i in itens if i.tipo == "ilegal")
+    assert ilegal.pagina == 0 and "p. 1: ilegal" in ilegal.texto
+
+
+def test_o_item_sem_posicao_e_o_aceito(app, janela):
+    _escrever(janela, "14.Qh8")
+    p = janela.pagina
+    itens = ev.itens_da_pagina(0, p.modelo, p.documento(), [], "KQRBN")
+    assert [i.tipo for i in itens] == ["sem posição"]
+    _com_diagrama(janela, "1.e4 e5 2.Bf3")
+    janela.fila.ir_aos_lances()
+    janela.verificacao.pedir_corrigir()
+    janela.executor.esperar()
+    itens = ev.itens_da_pagina(0, p.modelo, p.documento(), p.diagramas_com_ids(), "KQRBN")
+    assert [i.tipo for i in itens] == ["aceito como impresso"]
+
+
+def test_o_relatorio_sem_x1_nao_lista_os_nao_conferidos(app, janela, monkeypatch):
+    monkeypatch.setattr(ev, "X1_LIGADO", False)
+    _escrever(janela, "1.e4")
+    p = janela.pagina
+    assert ev.itens_da_pagina(0, p.modelo, p.documento(), [], "KQRBN") == []
+
+
 # ------------------------------------------------------------------
 # X-3
 # ------------------------------------------------------------------

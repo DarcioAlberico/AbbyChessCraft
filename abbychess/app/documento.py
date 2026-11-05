@@ -48,6 +48,7 @@ from PySide6.QtWidgets import QTextEdit
 from abbychess import grade as gd
 from abbychess import sessao as ss
 from abbychess import texto as tx
+from abbychess import tokens as tk
 from abbychess.app import estilo, teclado
 from abbychess.app.formatos_do_documento import escrever_as_linhas, formato_novo
 from abbychess.app.imagens import FONTE, imagem_do_diagrama
@@ -708,7 +709,7 @@ class VistaDoDocumento(QTextEdit):
             self._origem = list(range(len(antes)))
             self._avisar_da_sessao()
             return
-        inicio, fim = _trecho_mudado(atual, antes)
+        inicio, fim = tk.trecho_mudado(atual, antes)
         a, b = ss.palavras_em(self._unidades, inicio, len(antes) - fim)
         if self._sessao is None:
             self._numero_da_sessao += 1
@@ -928,17 +929,6 @@ def _lugares_dos_gids(doc: QTextDocument) -> Dict[int, tuple]:
                     lugar[gid] = (inicio, n + 1)
         bloco = bloco.next()
     return lugar
-
-
-def _trecho_mudado(atual: str, antes: str) -> tuple:
-    """(quantos caracteres iguais no começo, quantos no fim) entre o texto e o da montagem."""
-    inicio, limite = 0, min(len(atual), len(antes))
-    while inicio < limite and atual[inicio] == antes[inicio]:
-        inicio += 1
-    fim = 0
-    while fim < limite - inicio and atual[-1 - fim] == antes[-1 - fim]:
-        fim += 1
-    return inicio, fim
 
 
 def _ultimo_glifo(unidades) -> Optional[int]:

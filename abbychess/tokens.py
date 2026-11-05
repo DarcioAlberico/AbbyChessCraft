@@ -123,6 +123,17 @@ def _letra_da_figurina(c: str, pecas: str) -> str:
     return "" if peca == "P" else pecas[_ORDEM_DAS_LETRAS.index(peca)]
 
 
+def trecho_mudado(atual: str, antes: str) -> tuple:
+    """(quantos caracteres iguais no começo, quantos no fim) entre o texto de agora e o de antes."""
+    inicio, limite = 0, min(len(atual), len(antes))
+    while inicio < limite and atual[inicio] == antes[inicio]:
+        inicio += 1
+    fim = 0
+    while fim < limite - inicio and atual[-1 - fim] == antes[-1 - fim]:
+        fim += 1
+    return inicio, fim
+
+
 def alinhar(verdade: Sequence, lida: Sequence) -> List[Tuple[Optional[int], Optional[int]]]:
     """O alinhamento de edição mínima: pares `(i, j)`, `(i, None)` (falta na lida) e `(None, j)`
     (sobra na lida), na ordem. No empate: troca, depois falta, depois sobra."""

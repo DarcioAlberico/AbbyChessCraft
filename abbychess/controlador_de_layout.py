@@ -11,6 +11,7 @@ from typing import List, Optional, Sequence
 from abbychess import historico as hs
 from abbychess import margens as mg
 from abbychess import servidor_de_leitura as sl
+from abbychess import texto as tx
 from abbychess import zonas as zn
 from abbychess.controlador import AVISO_LONGO_MS, ControladorDePagina
 
@@ -40,6 +41,11 @@ class ControladorDeLayout:
     def ordenando(self) -> bool:
         """Se o Ordenar está em curso (o Esc o cancela antes de qualquer outra coisa)."""
         return self._ordenacao is not None
+
+    def numeros(self) -> dict:
+        """O número de cada área, pelo id: o da ordem de leitura (§5.2)."""
+        modelo = self.pagina.modelo
+        return tx.numeros_das_areas(modelo) if modelo is not None else {}
 
     def _parar_a_ordenacao(self) -> None:
         """Uma área que nasce, sai ou muda no meio do Ordenar invalida os cliques dados."""

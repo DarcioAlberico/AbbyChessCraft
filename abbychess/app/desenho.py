@@ -251,7 +251,8 @@ class DesenhoDaJanela:
             self.ir_a_origem(self.projeto.sequencia.posicao_de(pid), gid)
 
     def _layout_mudou(self) -> None:
-        self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual, self.areas.ordem_clicada)
+        self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual, self.areas.ordem_clicada,
+                                 self.areas.numeros())
 
     def _palavra_mudou(self) -> None:
         v, p = self.verificador, self.pagina

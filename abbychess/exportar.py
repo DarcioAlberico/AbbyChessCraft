@@ -122,7 +122,8 @@ class Relatorio:
         partes.append(f"{self.desenhados} diagrama(s) desenhado(s) do FEN e "
                       f"{len(self.recortados)} como recorte")
         if self.da_camada:
-            partes.append(f"{len(self.da_camada)} página(s) lida(s) da camada de texto do PDF")
+            partes.append(f"{len(self.da_camada)} página(s) lida(s) da camada de texto do PDF "
+                          "(as margens que o core tira delas não são listadas)")
         tiradas = sum(len(v) for v in self.margens.values())
         if tiradas:
             partes.append(f"{tiradas} linha(s) de cabeçalho/rodapé tirada(s)")

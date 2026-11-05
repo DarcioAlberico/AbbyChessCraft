@@ -293,6 +293,7 @@ def test_o_epub_leva_o_idioma_do_livro(tmp_path):
         opf = z.read("OEBPS/content.opf").decode("utf-8")
     assert "<dc:language>en</dc:language>" in opf
     assert "1 página(s) lida(s) da camada de texto do PDF" in resumo
+    assert "as margens que o core tira delas não são listadas" in resumo
 
 
 #: Prosa nos idiomas que o projeto oferece fora do português e do inglês (SPEC-qualidade §13.7).

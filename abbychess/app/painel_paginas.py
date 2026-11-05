@@ -43,7 +43,7 @@ OPERACOES_DA_GAVETA = (
     ("Girar à direita", "girar_a_direita"), ("Girar à esquerda", "girar_a_esquerda"),
     ("Girar…", "girar_paginas"), ("Cortar…", "cortar_paginas"),
     ("Tirar o corte…", "tirar_o_corte"), ("Tirar a borracha…", "tirar_as_borrachas"),
-    ("Dividir…", "dividir_paginas"),
+    ("Tirar as coordenadas…", "tirar_as_coordenadas"), ("Dividir…", "dividir_paginas"),
     ("Endireitar…", "endireitar_paginas"))
 
 

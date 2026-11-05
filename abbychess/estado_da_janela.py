@@ -41,6 +41,7 @@ DICAS_DAS_PAGINAS = (
     "Corta as margens das páginas; os glifos de fora ficam guardados",
     "Devolve as páginas cortadas inteiras",
     "Devolve as áreas que a borracha apagou",
+    "Tira da imagem as letras e os números impressos em volta dos diagramas lidos",
     "Divide a página espelhada em duas",
     "Endireita as páginas por um ângulo à mão; a leitura delas se desfaz",
 )

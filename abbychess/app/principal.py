@@ -53,6 +53,7 @@ def main(argv=None) -> int:
     app.setApplicationName("AbbyChessCraft")
     app.setOrganizationName("AbbyChessCraft")
     traduzir_o_qt(app)
+    estilo.registrar_os_simbolos()
     # O tema do sistema (§13), e de novo quando ele muda, sem reiniciar (CA-13.3).
     estilo.aplicar(app)
     estilo.acompanhar_o_sistema(app)

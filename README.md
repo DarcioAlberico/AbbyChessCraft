@@ -84,7 +84,9 @@ letra solta em campo de texto, Ctrl+Alt e ligação nativa encoberta sem exceç�
      de cima (desde o A2; antes, Alt+seta, que agora é das páginas visitadas). Valem no campo
      do caractere e com o foco na página. O box é relido a cada passo.
    - O botão direito sobre um box, na página, também divide no ponto e junta.
-   - A paleta insere figurinas e símbolos de avaliação.
+   - A paleta insere figurinas e os símbolos de avaliação do padrão PGN e do Informator
+     (⯹ compensação, ⇄ contrajogo, ⟳ desenvolvimento, ⨀ zugzwang…); a dica de cada botão diz
+     o nome.
    - **Ctrl+Z** desfaz e **Ctrl+Y** (ou Ctrl+Shift+Z) refaz, também com o foco no campo do
      caractere: ensinar, corrigir, descartar, dividir, juntar, ajustar as bordas, marcar um
      glifo, corrigir uma palavra na verificação, conferir um diagrama, o próprio F5, as
@@ -278,7 +280,7 @@ você digita:
 - **Aa** separa maiúsculas e minúsculas; **ab|** acha só a palavra inteira; **.\*** liga a
   expressão regular, com as classes de xadrez **`\L`** (lance: Cf3, exd5, O-O, e8=D+),
   **`\P`** (peça: as figurinas e as letras do idioma do livro), **`\C`** (casa: a1 a h8) e
-  **`\V`** (valoração: ± ∓ ⩲ ⩱ +- -+ += =+ = ∞ ! ? !! ?? !? ?! □); a expansão delas aparece na
+  **`\V`** (valoração: ± ∓ ⩲ ⩱ +- -+ += =+ = ∞ ⯹ ⇄ ↑ → ⟳ ○ ⨀ ⨁ ! ? !! ?? !? ?! □); a expansão delas aparece na
   dica do campo. As classes valem com qualquer **Aa** (B, o bispo, não é b, a coluna), e
   `^` e `$` valem em cada linha impressa. **♘=C** (figurina = letra) faz "Cf3" achar também
   "♘f3" e "Nf3" (a letra conta como peça quando vem seguida de uma casa).
@@ -824,6 +826,12 @@ livro: `3-7, 12`, `ímpares`, `pares`, `todas` ou uma paridade num intervalo (`�
   livro espelhado antes de ler: é instantâneo (nada a gravar). O livro já lido leva uns
   segundos, com o cursor de espera, porque as duas metades de cada página são gravadas
   (os números estão em "As medidas do roadmap", linhas "Dividir o livro").
+- **Tirar as coordenadas** apaga da imagem as letras e os números impressos em volta dos
+  diagramas lidos (uma borracha automática): a tela e o PDF pesquisável saem sem eles, e os
+  glifos lidos ali saem do texto. Só apaga o que tem a forma de coordenada, uma marca centrada em
+  cada casa; a legenda e o texto em volta ficam. O diagrama por ler fica como está, porque é
+  delas que sai a orientação; o lido segue na orientação dele quando o F5 lê a página de novo.
+  **Tirar a borracha…** as devolve.
 
 Cada operação é um passo do **Ctrl+Z**. Elas ficam desligadas, com o motivo na dica, no
 projeto só para leitura, com o lote rodando, com uma tarefa em curso ou com o servidor lendo

@@ -90,7 +90,7 @@ def test_trocar_uma_letra_por_outra_nao_refaz_a_ordem_de_leitura(paginas, monkey
     chamadas = []
     original = OrdemDeLeitura.da_pagina
     monkeypatch.setattr(OrdemDeLeitura, "da_pagina",
-                        classmethod(lambda cls, e: chamadas.append(1) or original(e)))
+                        classmethod(lambda cls, *a: chamadas.append(1) or original(*a)))
     assert tx.montar(de_letra) == esperados[0]
     assert chamadas == []
     assert tx.montar(de_numero) == esperados[1]         # o algarismo: as palavras mudam

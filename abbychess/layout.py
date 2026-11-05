@@ -7,9 +7,10 @@ topo da seguinte. Faixas que atravessam a calha, como títulos, ficam entre os t
 
 from __future__ import annotations
 
+import re
 import statistics
 from dataclasses import dataclass, field
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from core.box_model import BoxEntry
 
@@ -26,7 +27,22 @@ FILAS_DE_COLUNA = 6
 #: da calha. No Mirkovic (calha de 48 px), as linhas de largura total têm de -10 a 21 px ali
 #: e o título centrado 13; entre as duas colunas o vão é a calha inteira ou mais.
 VAO_DA_LINHA_NA_CALHA = 0.6
+#: Quantos tabuleiros empilhados fazem uma coluna (`_coluna_dos_tabuleiros`). Um só é o que o
+#: parágrafo contorna, e o lugar dele é decidido pelo fim de frase (`texto._lugar_do_diagrama`).
+TABULEIROS_DA_COLUNA = 2
+#: Quanto da altura da pilha de tabuleiros o texto ao lado precisa acompanhar para ser coluna.
+COBERTURA_DA_PILHA = 0.5
+#: O título do comentário de um diagrama ("Diagram 1-10"), tolerando o OCR no meio da palavra
+#: ("Di ram 23–4", "Dia am l-5", "Diagram 19-1o"; Yusupov completo).
+TITULO_DO_DIAGRAMA = re.compile(r"^\s*Di[a-zà-ú ]{0,9}\s*[\dlIoO—–-][\dlIoO—–\- ]*[\s.]*$",
+                                re.IGNORECASE)
+FIM_DE_FRASE = re.compile(r"[.:!?]\s*$")
 ChaveDeLeitura = Tuple[int, int]
+Caixa = Tuple[int, int, int, int]
+#: Uma linha lida: o trecho, o topo e o texto.
+LinhaLida = Tuple[ChaveDeLeitura, float, str]
+#: Um lugar na leitura: o trecho e o topo da linha diante da qual se entra.
+Lugar = Tuple[ChaveDeLeitura, float]
 
 
 def _coluna_de(x: float, colunas: Sequence[Tuple[int, int]]) -> int:
@@ -52,7 +68,10 @@ class OrdemDeLeitura:
     O que atravessa a calha (o título centrado sobre as duas colunas) é uma faixa sozinha,
     na altura dele; entre duas dessas, as colunas da esquerda para a direita. Página de uma
     coluna é um trecho só. A mesma chave ordena as figuras da exportação (`chave` de um
-    ponto): o diagrama da coluna da esquerda fica entre os parágrafos dela."""
+    ponto): o diagrama da coluna da esquerda fica entre os parágrafos dela.
+
+    Os glifos não veem a coluna feita só de tabuleiros (a p. 12 do Yusupov, três diagramas de um
+    lado e o comentário do outro): `tabuleiros`, as caixas deles, a mostram."""
 
     colunas: Tuple[Tuple[int, int], ...] = ()
     faixas: Tuple[Tuple[float, float], ...] = ()
@@ -60,24 +79,30 @@ class OrdemDeLeitura:
     #: reaproveita (`deteccao_do_trecho`) em vez de refazê-la: ela é a parte mais cara de
     #: montar o texto, e o índice da busca monta o de todas as páginas.
     deteccao: object = field(default=None, compare=False, repr=False)
+    #: A coluna feita só de tabuleiros (`_coluna_dos_tabuleiros`), se houver: quem a lê é
+    #: `lugares_da_pilha`.
+    coluna_da_pilha: Optional[int] = None
 
     @classmethod
-    def da_pagina(cls, boxes: Sequence[BoxEntry]) -> "OrdemDeLeitura":
+    def da_pagina(cls, boxes: Sequence[BoxEntry], tabuleiros: Sequence[Caixa] = ()
+                  ) -> "OrdemDeLeitura":
         from core.services.box_service import BoxService
 
         if len(boxes) < 2:
             return cls()
         deteccao = BoxService.detectar_colunas_e_transversais(list(boxes))
         colunas = deteccao[0]
-        if len(colunas) < 2:
-            return cls(deteccao=deteccao)
         altura = statistics.median(b.y2 - b.y1 for b in boxes)
-        if _filas_de_cada_coluna(boxes, colunas, altura) < FILAS_DE_COLUNA:
+        pilha = None
+        if len(colunas) < 2 or _filas_de_cada_coluna(boxes, colunas, altura) < FILAS_DE_COLUNA:
+            colunas = _coluna_dos_tabuleiros(boxes, tabuleiros, altura)
+            pilha = _coluna_de((tabuleiros[0][0] + tabuleiros[0][2]) / 2, colunas) if colunas else None
+        if len(colunas) < 2:
             return cls(deteccao=deteccao)
         grupos = _grupos_pela_altura(_na_calha(boxes, _calhas(colunas), altura))
         faixas = _faixas_dos_grupos(grupos, altura)
         faixas += _linhas_que_atravessam(boxes, colunas, altura)
-        return cls(tuple(tuple(c) for c in colunas), _unidas(faixas))
+        return cls(tuple(tuple(c) for c in colunas), _unidas(faixas), coluna_da_pilha=pilha)
 
     def chave(self, x: float, y: float) -> ChaveDeLeitura:
         if not self.colunas:
@@ -120,9 +145,111 @@ class OrdemDeLeitura:
 
 def _filas_de_cada_coluna(boxes: Sequence[BoxEntry], colunas, altura: float) -> int:
     """Quantas filas de texto (alturas de glifo) tem a coluna que tem menos."""
-    filas = [{round(((b.y1 + b.y2) / 2) / max(1.0, altura)) for b in boxes
-              if inicio <= (b.x1 + b.x2) / 2 <= fim} for inicio, fim in colunas]
-    return min(len(fila) for fila in filas)
+    return min(_filas_do_lado([b for b in boxes if inicio <= (b.x1 + b.x2) / 2 <= fim], altura)
+               for inicio, fim in colunas)
+
+
+def _coluna_dos_tabuleiros(boxes: Sequence[BoxEntry], tabuleiros: Sequence[Caixa], altura: float
+                           ) -> Tuple[Tuple[int, int], ...]:
+    """As duas colunas (a dos tabuleiros e a do texto) da página cujos tabuleiros, todos
+    empilhados, têm o texto de um lado só, em `FILAS_DE_COLUNA` filas ou mais, sem nada que
+    atravesse a calha na altura deles; `()` se não for assim."""
+    pilha = sorted(tabuleiros, key=lambda c: c[1])
+    if not _empilhados(pilha):
+        return ()
+    topo, pe = pilha[0][1], pilha[-1][3]
+    na_altura = [b for b in boxes if b.y1 < pe and b.y2 > topo]
+    return _colunas_dos_lados(na_altura, min(c[0] for c in pilha), max(c[2] for c in pilha),
+                              altura, pe - topo)
+
+
+def _colunas_dos_lados(na_altura: Sequence[BoxEntry], inicio: int, fim: int, altura: float,
+                       altura_da_pilha: int) -> Tuple[Tuple[int, int], ...]:
+    """A pilha em x (`inicio`, `fim`) e o texto do único lado que é coluna; `()` se nenhum
+    lado for, se os dois forem ou se algum glifo cruzar a borda da pilha."""
+    if _cruza_a_borda(na_altura, inicio, fim):
+        return ()
+    antes = [b for b in na_altura if b.x2 <= inicio]
+    depois = [b for b in na_altura if b.x1 >= fim]
+    coluna_antes = _e_coluna_ao_lado(antes, altura, altura_da_pilha)
+    coluna_depois = _e_coluna_ao_lado(depois, altura, altura_da_pilha)
+    if coluna_antes == coluna_depois:
+        return ()
+    if coluna_depois:
+        return (inicio, fim), _extensao_em_x(depois)
+    return _extensao_em_x(antes), (inicio, fim)
+
+
+def _cruza_a_borda(boxes: Sequence[BoxEntry], inicio: int, fim: int) -> bool:
+    return any(b.x1 < fim < b.x2 or b.x1 < inicio < b.x2 for b in boxes)
+
+
+def _empilhados(pilha: Sequence[Caixa]) -> bool:
+    """Os tabuleiros (de cima para baixo) bastam para uma coluna, um sobre o outro."""
+    return (len(pilha) >= TABULEIROS_DA_COLUNA
+            and all(a[3] <= b[1] for a, b in zip(pilha, pilha[1:])))
+
+
+def _extensao_em_x(boxes: Sequence[BoxEntry]) -> Tuple[int, int]:
+    return min(b.x1 for b in boxes), max(b.x2 for b in boxes)
+
+
+def _e_coluna_ao_lado(boxes: Sequence[BoxEntry], altura: float, altura_da_pilha: int) -> bool:
+    """O texto ao lado da pilha é uma coluna: tem as filas e acompanha a altura dela. As poucas
+    linhas entre dois tabuleiros centrados não são (Odds & Ends, i177)."""
+    if _filas_do_lado(boxes, altura) < FILAS_DE_COLUNA:
+        return False
+    extensao = max(b.y2 for b in boxes) - min(b.y1 for b in boxes)
+    return extensao >= COBERTURA_DA_PILHA * altura_da_pilha
+
+
+def _filas_do_lado(boxes: Sequence[BoxEntry], altura: float) -> int:
+    """Quantas filas de texto (alturas de glifo) os glifos ocupam."""
+    return len({round(((b.y1 + b.y2) / 2) / max(1.0, altura)) for b in boxes})
+
+
+def lugares_da_pilha(ordem: OrdemDeLeitura, tabuleiros: Sequence[Caixa],
+                     linhas: Sequence[LinhaLida], altura: float
+                     ) -> Tuple[List[Lugar], Dict[Lugar, Lugar]]:
+    """Onde a coluna só de tabuleiros entra no texto: o lugar de cada tabuleiro, de cima para
+    baixo, e o de cada legenda lida na coluna deles, pelo lugar dela.
+
+    O comentário fica ao lado do tabuleiro, e lê-los por colunas agruparia os diagramas longe
+    dele: com um título por tabuleiro, cada um entra antes do seu. Sem isso (o OCR perdeu um),
+    na altura dele, depois de um fim de frase. A legenda acompanha o tabuleiro mais perto."""
+    pilha = sorted(tabuleiros, key=lambda c: (c[1], c[0]))
+    # A faixa ímpar atravessa a calha: não é de coluna nenhuma.
+    na_pilha = [ln for ln in linhas if ln[0][0] % 2 == 0 and ln[0][1] == ordem.coluna_da_pilha]
+    do_texto = [ln for ln in linhas if ln[0][0] % 2 == 1 or ln[0][1] != ordem.coluna_da_pilha]
+    lugares = _lugares_dos_tabuleiros(pilha, do_texto, altura)
+    legendas = {ln[:2]: lugares[_tabuleiro_mais_perto(ln[1], pilha)] for ln in na_pilha
+                if TITULO_DO_DIAGRAMA.match(ln[2])}
+    return lugares, legendas
+
+
+def _lugares_dos_tabuleiros(pilha: Sequence[Caixa], do_texto: Sequence[LinhaLida], altura: float
+                            ) -> List[Lugar]:
+    titulos = [ln[:2] for ln in do_texto if TITULO_DO_DIAGRAMA.match(ln[2])]
+    if len(titulos) == len(pilha):
+        return titulos
+    return [_lugar_pela_altura(c, do_texto, altura) for c in pilha]
+
+
+def _lugar_pela_altura(caixa: Caixa, do_texto: Sequence[LinhaLida], altura: float) -> Lugar:
+    """A primeira linha do texto na altura do tabuleiro ou abaixo, ou a primeira depois dela que
+    segue um fim de frase, para não partir o parágrafo; depois da última, se não houver."""
+    k = next((k for k, ln in enumerate(do_texto) if ln[1] >= caixa[1] - altura), None)
+    if k is None:
+        return do_texto[-1][0], do_texto[-1][1] + 1
+    depois = next((j for j in range(k, len(do_texto))
+                   if j == 0 or FIM_DE_FRASE.search(do_texto[j - 1][2])), k)
+    return do_texto[depois][:2]
+
+
+def _tabuleiro_mais_perto(topo: float, pilha: Sequence[Caixa]) -> int:
+    """O índice do tabuleiro cuja caixa fica mais perto da altura `topo`."""
+    return min(range(len(pilha)),
+               key=lambda k: max(pilha[k][1] - topo, topo - pilha[k][3], 0))
 
 
 def _calhas(colunas) -> List[Tuple[float, float, float]]:

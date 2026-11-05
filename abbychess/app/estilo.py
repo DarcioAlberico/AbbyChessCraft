@@ -24,13 +24,16 @@ revisar.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
 from PySide6.QtCore import QObject, Qt, Signal
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette
 
 from abbychess import grade as gd
+
+log = logging.getLogger(__name__)
 
 # ----------------------------------------------------------------------
 # A paleta Okabe-Ito, escurecida até 3:1 contra o papel (CA-13.2)
@@ -192,6 +195,23 @@ CORPO_DA_INTERFACE = 9
 FONTE_DOS_SIMBOLOS = "Segoe UI Symbol"
 #: O menor alvo de clique (§13: ≥ 24 px).
 ALVO_MINIMO = 24
+
+
+def registrar_os_simbolos() -> None:
+    """Dá às fontes da tela os símbolos que nenhuma fonte do Windows desenha: o bloco U+2BF0–
+    U+2BFD (⯹, ⯺, ⯻, ⯼, ⯽) só existe na fonte que o core embute nas exportações, e sem ela o
+    Qt pinta um quadradinho. Registrar não basta (o Qt não a procura por conta própria): ela
+    entra como substituta das duas famílias, e só recebe o caractere que elas não têm. A da
+    interface passa antes pela dos símbolos: a Segoe UI sozinha não alcança ⟪, ⟫ e ⨁."""
+    from core.chess_pdf_processor import FONTES_DE_SIMBOLO
+
+    for caminho in FONTES_DE_SIMBOLO:
+        familias = QFontDatabase.applicationFontFamilies(QFontDatabase.addApplicationFont(caminho))
+        if not familias:
+            log.warning("a fonte dos símbolos não foi carregada: %s", caminho)
+        for familia in familias:
+            QFont.insertSubstitution(FONTE_DOS_SIMBOLOS, familia)
+            QFont.insertSubstitutions(FONTE_DA_INTERFACE, [FONTE_DOS_SIMBOLOS, familia])
 
 
 # ----------------------------------------------------------------------

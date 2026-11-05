@@ -40,13 +40,23 @@ from core.box_model import BoxEntry
 from abbychess.app import estilo, teclado
 from abbychess.app.imagens import ampliado, pixmap_de_cinza
 
-#: Figurinas e símbolos que os livros de xadrez imprimem e o teclado não tem.
+#: Figurinas e símbolos que os livros de xadrez imprimem e o teclado não tem. Os de avaliação
+#: são os de `core.nags`, nos pontos de código de lá (⇄ e não ⇆, Δ e não ∆): duas formas do
+#: mesmo desenho ensinariam duas classes. `!!` e `+-` entram como dois caracteres, como os
+#: livros os compõem. Uma linha da lista é uma linha da grade.
 PALETA = [
     "♔", "♕", "♖", "♗", "♘", "♙",
     "♚", "♛", "♜", "♝", "♞", "♟",
-    "+", "#", "!", "?", "±", "∓",
-    "⩲", "⩱", "=", "∞", "□", "–",
+    "+", "#", "!", "?", "!!", "??",
+    "!?", "?!", "□", "–", "Δ", "⌓",
+    "±", "∓", "⩲", "⩱", "+-", "-+",
+    "=", "∞", "⯹", "⇄", "↑", "→",
+    "⟳", "○", "⨀", "⨁", "N", "∇",
+    "⇔", "⇗", "⊞", "⟪", "⟫", "✕",
+    "⊥", "⯺", "⯻", "⯼", "⯽", "∟",
+    "△", "▼",
 ]
+COLUNAS_DA_PALETA = 6
 
 #: O nome de cada símbolo, na dica do botão: ⩲ e ⩱ se parecem com ± e ∓ em
 #: várias fontes, e a dica tira a dúvida antes de ensinar o padrão errado.
@@ -55,9 +65,24 @@ NOMES_DOS_SIMBOLOS = {
     "♘": "cavalo branco", "♙": "peão branco", "♚": "rei preto", "♛": "dama preta",
     "♜": "torre preta", "♝": "bispo preto", "♞": "cavalo preto", "♟": "peão preto",
     "+": "xeque", "#": "mate", "!": "bom lance", "?": "lance ruim",
+    "!!": "lance excelente", "??": "erro grave",
+    "!?": "lance interessante", "?!": "lance duvidoso",
+    "□": "lance único", "–": "travessão",
+    "Δ": "com a ideia de (U+0394)", "⌓": "melhor é (U+2313)",
     "±": "brancas estão melhor (U+00B1)", "∓": "negras estão melhor (U+2213)",
     "⩲": "brancas um pouco melhor (U+2A72)", "⩱": "negras um pouco melhor (U+2A71)",
-    "=": "igualdade", "∞": "posição obscura", "□": "lance único", "–": "travessão",
+    "+-": "brancas vencem", "-+": "negras vencem",
+    "=": "igualdade", "∞": "posição obscura",
+    "⯹": "compensação pelo material (U+2BF9)", "⇄": "contrajogo (U+21C4)",
+    "↑": "iniciativa", "→": "ataque",
+    "⟳": "vantagem de desenvolvimento (U+27F3)", "○": "vantagem de espaço (U+25CB)",
+    "⨀": "zugzwang (U+2A00)", "⨁": "apuro de tempo (U+2A01)",
+    "N": "novidade teórica", "∇": "contra (U+2207)",
+    "⇔": "coluna", "⇗": "diagonal", "⊞": "centro",
+    "⟪": "flanco da dama", "⟫": "flanco do rei", "✕": "ponto fraco", "⊥": "final",
+    "⯺": "peões ligados (U+2BFA)", "⯻": "peões isolados (U+2BFB)",
+    "⯼": "peões dobrados (U+2BFC)", "⯽": "peão passado (U+2BFD)", "∟": "com",
+    "△": "brancas jogam", "▼": "negras jogam",
 }
 
 FONTE_DE_SIMBOLOS = "Segoe UI Symbol"
@@ -65,10 +90,12 @@ FONTE_DE_SIMBOLOS = "Segoe UI Symbol"
 
 def menu_da_paleta(pai, inserir) -> QMenu:
     """A paleta (F2) como menu: o símbolo escolhido vai a `inserir` (o campo do treino, o
-    cursor do Documento)."""
+    cursor do Documento). Os separadores são as linhas da grade."""
     menu = QMenu(pai)
     menu.setFont(QFont(FONTE_DE_SIMBOLOS, 12))
-    for simbolo in PALETA:
+    for i, simbolo in enumerate(PALETA):
+        if i and i % COLUNAS_DA_PALETA == 0:
+            menu.addSeparator()
         menu.addAction(f"{simbolo}   {NOMES_DOS_SIMBOLOS.get(simbolo, '')}",
                        lambda s=simbolo: inserir(s))
     return menu
@@ -264,7 +291,7 @@ class PainelDeTreino(QWidget):
             botao.setFixedSize(34, 34)
             botao.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             botao.clicked.connect(lambda _=False, s=simbolo: self._inserir(s))
-            grade.addWidget(botao, i // 6, i % 6)
+            grade.addWidget(botao, i // COLUNAS_DA_PALETA, i % COLUNAS_DA_PALETA)
             self._botoes.append(botao)
 
         self.selecao = QLabel("")
@@ -306,9 +333,9 @@ class PainelDeTreino(QWidget):
         caixa.addLayout(navegar)
         caixa.addLayout(editar)
         caixa.addWidget(dica_das_bordas)
-        caixa.addWidget(paleta)
-        caixa.addWidget(self.fila)
+        caixa.addWidget(self.fila)              # antes da paleta, que é alta: a 768 px ficam à vista
         caixa.addWidget(self.padroes)
+        caixa.addWidget(paleta)
         caixa.addWidget(legenda)
         caixa.addStretch(1)
 

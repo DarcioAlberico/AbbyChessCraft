@@ -42,7 +42,7 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple
 import numpy as np
 
 from abbychess import zonas as zn
-from abbychess.layout import OrdemDeLeitura
+from abbychess.layout import FIM_DE_FRASE, OrdemDeLeitura, lugares_da_pilha
 from abbychess.modelo import Decisoes, Pagina
 
 IMPRESSO = "impresso"
@@ -53,7 +53,6 @@ MODOS = (IMPRESSO, SAN)
 #: O Documento repete o gid do box para cada letra resultante.
 LIGADURAS = {"ﬀ": "ff", "ﬁ": "fi", "ﬂ": "fl", "ﬃ": "ffi", "ﬄ": "ffl"}
 
-_FIM_DE_FRASE = re.compile(r"[.:!?]\s*$")
 
 
 @dataclass(frozen=True)
@@ -125,9 +124,7 @@ def linhas_dos_gids(pagina: Pagina, *, com_os_nao_lidos: bool = True) -> List[Li
     lidos, as do texto e da exportação (`montar`): o glifo que ninguém leu não junta a
     palavra em volta do buraco dele."""
     lidos, entries = _lidos(pagina, com_os_nao_lidos)
-    linhas = _linhas_da_pagina(lidos, entries)[0]
-    return _aplicar_decisoes(partir_lances_colados(linhas, chars_dos_gids(pagina, lidos, entries)),
-                             pagina.decisoes)
+    return _linhas_na_ordem(pagina, lidos, entries, chars_dos_gids(pagina, lidos, entries))[0]
 
 
 def chars_dos_gids(pagina: Pagina, lidos, entries) -> Dict[int, str]:
@@ -186,15 +183,57 @@ def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
     ninguém leu, como `NAO_LIDO`, para o realce deles (§6.1)."""
     lidos, entries = _lidos(pagina, com_os_nao_lidos)
     chars = chars_dos_gids(pagina, lidos, entries)
-    linhas, topos, trechos, ordem = _linhas_da_pagina(lidos, entries)
-    linhas = _aplicar_decisoes(partir_lances_colados(linhas, chars), pagina.decisoes)
+    linhas, topos, trechos, ordem = _linhas_na_ordem(pagina, lidos, entries, chars)
     por_gid = {b.gid: e for b, e in zip(lidos, entries)}
-    antes_da_linha = _diagramas_antes_da_linha(pagina.diagramas, ordem, linhas, topos, trechos,
-                                               chars, por_gid, entries)
+    if ordem.coluna_da_pilha is None:
+        antes_da_linha = _diagramas_antes_da_linha(pagina.diagramas, ordem, linhas, topos, trechos,
+                                                   chars, por_gid, entries)
+    else:
+        antes_da_linha = _diagramas_da_pilha(pagina, ordem, linhas, topos, trechos, chars, entries)
     blocos = _blocos(linhas, _zonas_das_linhas(linhas, pagina.zonas, por_gid),
                      _paragrafos_novos(linhas, pagina.decisoes), antes_da_linha)
     return Documento(tuple(_na_ordem_das_zonas(blocos, pagina.zonas)), chars,
                      {b.gid: b.estilo for b in lidos})
+
+
+def _linhas_na_ordem(pagina: Pagina, lidos, entries, chars: Dict[int, str]) -> tuple:
+    """As linhas com as decisões da página, o topo e o trecho de cada uma, e a ordem de leitura;
+    a legenda lida na coluna só de tabuleiros, junto do tabuleiro dela."""
+    linhas, topos, trechos, ordem = _linhas_da_pagina(lidos, entries, _caixas_dos_diagramas(pagina))
+    linhas = _aplicar_decisoes(partir_lances_colados(linhas, chars), pagina.decisoes)
+    if ordem.coluna_da_pilha is None:
+        return linhas, topos, trechos, ordem
+    _, legendas = _lugares_da_pilha(pagina, ordem, linhas, topos, trechos, chars, entries)
+    posicao = {lugar: j for j, lugar in reversed(list(enumerate(zip(trechos, topos))))}
+
+    def chave(j: int) -> float:
+        destino = legendas.get((trechos[j], topos[j]))
+        return j if destino is None else posicao.get(destino, len(linhas)) - 0.5
+
+    novos = sorted(range(len(linhas)), key=chave)
+    return ([linhas[j] for j in novos], [topos[j] for j in novos], [trechos[j] for j in novos],
+            ordem)
+
+
+def _lugares_da_pilha(pagina: Pagina, ordem: OrdemDeLeitura, linhas, topos, trechos,
+                      chars: Dict[int, str], entries) -> tuple:
+    """`layout.lugares_da_pilha` com as linhas da página."""
+    return lugares_da_pilha(ordem, _caixas_dos_diagramas(pagina),
+                            list(zip(trechos, topos, _textos_das_linhas(linhas, chars))),
+                            _altura_mediana(entries))
+
+
+def _textos_das_linhas(linhas, chars: Dict[int, str]) -> List[str]:
+    return [" ".join("".join(chars[g] for g in p) for p in ln) for ln in linhas]
+
+
+def _altura_mediana(entries) -> float:
+    return float(np.median([e.y2 - e.y1 for e in entries])) if entries else 0.0
+
+
+def _caixas_dos_diagramas(pagina: Pagina) -> tuple:
+    """As caixas dos tabuleiros da página: uma coluna só deles é da ordem de leitura."""
+    return tuple(tuple(d.caixa) for d in pagina.diagramas)
 
 
 def _zonas_das_linhas(linhas, zonas: Sequence, por_gid) -> list:
@@ -213,13 +252,25 @@ def _diagramas_antes_da_linha(diagramas, ordem: OrdemDeLeitura, linhas, topos, t
                               chars: Dict[int, str], por_gid, entries) -> Dict[int, List[str]]:
     """Onde cada diagrama entra: `{lugar: [ids]}`, antes da linha `lugar` (len(linhas) = no
     fim), de cima para baixo."""
-    texto_das_linhas = [" ".join("".join(chars[g] for g in p) for p in ln) for ln in linhas]
-    altura = float(np.median([e.y2 - e.y1 for e in entries])) if entries else 0.0
+    texto_das_linhas = _textos_das_linhas(linhas, chars)
+    altura = _altura_mediana(entries)
     antes_da_linha: Dict[int, List[str]] = {}
     for d in sorted(diagramas, key=lambda d: (d.caixa[1], d.caixa[0])):
         lugar = _lugar_do_diagrama(d.caixa, ordem, linhas, topos, trechos, texto_das_linhas,
                                    por_gid, altura)
         antes_da_linha.setdefault(lugar, []).append(d.id)
+    return antes_da_linha
+
+
+def _diagramas_da_pilha(pagina: Pagina, ordem: OrdemDeLeitura, linhas, topos, trechos,
+                        chars: Dict[int, str], entries) -> Dict[int, List[str]]:
+    """`{lugar: [ids]}` da coluna só de tabuleiros (`layout.lugares_da_pilha`)."""
+    lugares, _ = _lugares_da_pilha(pagina, ordem, linhas, topos, trechos, chars, entries)
+    posicao = {lugar: j for j, lugar in reversed(list(enumerate(zip(trechos, topos))))}
+    antes_da_linha: Dict[int, List[str]] = {}
+    por_altura = sorted(pagina.diagramas, key=lambda d: (d.caixa[1], d.caixa[0]))
+    for d, lugar in zip(por_altura, lugares):
+        antes_da_linha.setdefault(posicao.get(lugar, len(linhas)), []).append(d.id)
     return antes_da_linha
 
 
@@ -287,7 +338,7 @@ def _depois_do_fim_de_frase(j: int, texto_das_linhas: Sequence[str]) -> int:
     """A primeira linha de `j` em diante (nunca a primeira da página) que vem depois de um
     fim de frase; sem fim de frase, o fim."""
     return next((k for k in range(max(j, 1), len(texto_das_linhas))
-                 if _FIM_DE_FRASE.search(texto_das_linhas[k - 1])), len(texto_das_linhas))
+                 if FIM_DE_FRASE.search(texto_das_linhas[k - 1])), len(texto_das_linhas))
 
 
 def _caixas_da_linha(linha, por_gid) -> list:
@@ -344,17 +395,18 @@ def _chave_das_linhas(lidos, entries) -> Optional[tuple]:
     return chave
 
 
-def _linhas_da_pagina(lidos, entries) -> Tuple[List[List[List[int]]], List[int],
-                                               List[tuple], OrdemDeLeitura]:
+def _linhas_da_pagina(lidos, entries, tabuleiros: tuple = ()
+                      ) -> Tuple[List[List[List[int]]], List[int], List[tuple], OrdemDeLeitura]:
     """As palavras (gids) de cada linha na ordem de leitura, o topo e o trecho de cada linha,
     e a ordem de leitura (os diagramas entram no trecho deles). A ordem de leitura e as
     linhas são ~85% do `montar` (~15–20 ms numa página do livro): guardadas pela chave,
     corrigir um caractere não as refaz."""
     chave = _chave_das_linhas(lidos, entries)
+    chave = None if chave is None else (tabuleiros, chave)
     vistas = _linhas_guardadas(chave)
     if vistas is not None:
         return vistas
-    linhas, topos, trechos, ordem = _linhas_novas(lidos, entries)
+    linhas, topos, trechos, ordem = _linhas_novas(lidos, entries, tabuleiros)
     _guardar_as_linhas(chave, linhas, topos, trechos, ordem)
     return linhas, topos, trechos, ordem
 
@@ -374,13 +426,13 @@ def _linhas_guardadas(chave: Optional[tuple]):
     return [[list(p) for p in ln] for ln in linhas], list(topos), list(trechos), ordem
 
 
-def _linhas_novas(lidos, entries):
+def _linhas_novas(lidos, entries, tabuleiros: tuple = ()):
     """As linhas de palavras (gids) montadas pela ordem de leitura, trecho a trecho, com o
     topo e o trecho de cada uma, e a ordem."""
     linhas: List[List[List[int]]] = []
     topos: List[int] = []
     trechos: List[tuple] = []
-    ordem = OrdemDeLeitura.da_pagina(entries)
+    ordem = OrdemDeLeitura.da_pagina(entries, tabuleiros)
     for chave_do_trecho, indices in ordem.trechos(entries):
         trecho = [entries[i] for i in indices]
         for linha in ordem.linhas_do_trecho(indices, entries):

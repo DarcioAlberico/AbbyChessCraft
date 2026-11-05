@@ -1,7 +1,7 @@
 """As operações de página (§12.4): mover, apagar, restaurar, inserir, girar, cortar, dividir,
-endireitar e a borracha (CA-12.17), à parte do `ControladorDePagina` (SPEC-qualidade Q-A1).
-Cada uma grava a sequência nova, registra a transação do desfazer e leva a janela junto
-(`aplicar_sequencia`, que o desfazer também usa)."""
+endireitar, a borracha (CA-12.17) e tirar as coordenadas dos diagramas (CA-10.4), à parte do
+`ControladorDePagina` (SPEC-qualidade Q-A1). Cada uma grava a sequência nova, registra a
+transação do desfazer e leva a janela junto (`aplicar_sequencia`, que o desfazer também usa)."""
 
 from __future__ import annotations
 
@@ -186,13 +186,67 @@ class ControladorDaSequencia:
             vistas = [c for c in (_aparada(c, largura, altura) for c in caixas) if c]
             if not vistas:
                 raise ValueError("a área marcada fica fora da página")
-            angulo = self._p.fonte.inclinacao_da_entrada(e)
-            novas = tuple(geo.borracha_na_fonte(c, e.geometria, tamanho, angulo) for c in vistas)
-            self._tirar_os_glifos(posicao, e.pid, vistas, troca, nota)
-            return s.com_entrada(replace(e, tamanho=tamanho, borrachas=e.borrachas + novas))
+            nota.extend(_notas_dos_glifos(*self._tirar_os_glifos(posicao, e.pid, vistas, troca)))
+            return s.com_entrada(self._com_as_areas(e, tamanho, vistas))
 
         return self._mudar_sequencia(fazer, f"Borracha na página {posicao + 1}", troca=troca,
                                      nota=nota)
+
+    def tirar_as_coordenadas(self, posicoes: Sequence[int]) -> None:
+        """As coordenadas impressas em volta dos diagramas lidos das páginas saem da imagem
+        (§10, CA-10.4), como áreas da borracha, com os glifos lidos nelas. A procura renderiza
+        cada página, e por isso roda numa tarefa; o que ela acha é um passo só do Ctrl+Z."""
+        motivo = self.motivo_para_nao_mudar_as_paginas()
+        if motivo is not None:
+            self._p._avisar(motivo, AVISO_LONGO_MS)
+            return
+        projeto, fonte = self._p.projeto, self._p.fonte
+        entradas = [(i, projeto.sequencia.entrada_em(i)) for i in sorted(set(posicoes))]
+
+        def preparar():
+            def trabalho(progresso):
+                return _coordenadas_das_paginas(projeto, fonte, entradas, progresso)
+
+            def pronto(achadas):
+                self._tirar_as_achadas(*achadas, len(entradas))
+            return trabalho, pronto
+
+        self._p.tarefa("Procurando as coordenadas", preparar,
+                       falhou=self._p._falhou("Tirar as coordenadas"))
+
+    def _tirar_as_achadas(self, areas: dict, lidos: int, por_ler: int, paginas: int) -> bool:
+        """As `areas` (pid -> as caixas na imagem que se vê) apagadas, numa transação só."""
+        nota, troca = [], {}
+
+        def fazer(s):
+            if not areas:
+                raise ValueError("nenhuma coordenada nos diagramas lidos" if lidos else
+                                 "nenhum diagrama lido nelas (é preciso ler antes)")
+            nova, saidos, tocados = s, 0, 0
+            for pid, vistas in areas.items():
+                e = nova.entrada_de(pid)
+                tamanho = e.tamanho or self._tamanho(e)
+                nova = nova.com_entrada(self._com_as_areas(e, tamanho, vistas))
+                de_agora = self._tirar_os_glifos(nova.posicao_de(pid), pid, vistas, troca)
+                saidos, tocados = saidos + de_agora[0], tocados + de_agora[1]
+            nota.extend(_notas_dos_glifos(saidos, tocados))
+            if por_ler:
+                ficam = " por ler fica" if por_ler == 1 else "s por ler ficam"
+                nota.append(f"{por_ler} diagrama{ficam} com as coordenadas: é delas que sai a "
+                            "orientação")
+            return nova
+
+        return self._mudar_sequencia(
+            fazer, f"Tirar as coordenadas de {sq.quantas_paginas(paginas)}", troca=troca, nota=nota)
+
+    def _com_as_areas(self, e, tamanho: tuple, vistas):
+        """A entrada com as `vistas` (caixas na imagem que se vê) entre as borrachas dela, na
+        página da fonte antes de endireitar."""
+        from abbychess import geometria as geo
+
+        angulo = self._p.fonte.inclinacao_da_entrada(e)
+        novas = tuple(geo.borracha_na_fonte(c, e.geometria, tamanho, angulo) for c in vistas)
+        return replace(e, tamanho=tamanho, borrachas=e.borrachas + novas)
 
     def tirar_as_borrachas(self, posicoes: Sequence[int]) -> bool:
         """As áreas apagadas das páginas voltam como eram na fonte."""
@@ -205,22 +259,23 @@ class ControladorDaSequencia:
         return self._mudar_sequencia(
             fazer, f"Tirar a borracha de {sq.quantas_paginas(len(set(posicoes)))}")
 
-    def _tirar_os_glifos(self, posicao: int, pid: int, caixas, troca: dict, nota: list) -> None:
+    def _tirar_os_glifos(self, posicao: int, pid: int, caixas, troca: dict) -> tuple:
         """A página sem os glifos das `caixas` (na imagem que se vê) na `troca`, gravada com a
-        sequência; o que saiu e o que só foi tocado na `nota`."""
+        sequência. Devolve quantos saíram e quantos só foram tocados."""
         from abbychess import geometria_do_modelo as gm
 
         projeto = self._p.projeto
         pagina = projeto.carregar_modelo(posicao)
         if pagina is None:
-            return
+            return 0, 0
         nova = gm.sem_os_glifos(pagina, caixas)
         saidos = len(pagina.boxes) - len(nova.boxes)
         if saidos:
             projeto.paginas_em_memoria.descarregar()         # nada do gravador chega depois
             movidos = dict(projeto.dados.gids_movidos)
-            troca.update(paginas={pid: (pagina.instantaneo(), nova)}, movidos=(movidos, movidos))
-        nota.extend(_notas_dos_glifos(saidos, _tocados(nova.boxes, caixas)))
+            troca.setdefault("paginas", {})[pid] = (pagina.instantaneo(), nova)
+            troca["movidos"] = (movidos, movidos)
+        return saidos, _tocados(nova.boxes, caixas)
 
     def dividir_paginas(self, posicoes: Sequence[int], fracao: float = 0.5) -> bool:
         """Divide as páginas espelhadas (§12.4) na `fracao` da largura do que se vê: a metade
@@ -487,6 +542,28 @@ class ControladorDaSequencia:
                 self._p.ir_para(alvo, visita=False)    # a página aberta mudou de lugar ou saiu
         self.mudancas_da_sequencia += 1
         self._p.eventos.emitir("sequencia_mudou")
+
+
+def _coordenadas_das_paginas(projeto, fonte, entradas, progresso) -> tuple:
+    """Fora da interface: (pid -> as caixas das coordenadas nos diagramas lidos, quantos
+    diagramas lidos, quantos por ler). Só renderiza a página com diagrama lido."""
+    from abbychess import diagramas as dg
+    from abbychess.coordenadas import caixas_das_coordenadas
+
+    areas, lidos, por_ler = {}, 0, 0
+    for feitas, (posicao, entrada) in enumerate(entradas, start=1):
+        pagina = projeto.ler_sem_guardar(posicao)
+        diagramas = dg.para_caixas(pagina.tabuleiros, pagina.diagramas) if pagina else []
+        com_leitura = [d for d in diagramas if d.lido]
+        lidos += len(com_leitura)
+        por_ler += len(diagramas) - len(com_leitura)
+        if com_leitura:
+            imagem = fonte.pagina_da_entrada(entrada)
+            caixas = [c for d in com_leitura for c in caixas_das_coordenadas(imagem, d.caixa)]
+            if caixas:
+                areas[entrada.pid] = caixas
+        progresso(feitas, len(entradas))
+    return areas, lidos, por_ler
 
 
 def _aparada(caixa, largura: int, altura: int):

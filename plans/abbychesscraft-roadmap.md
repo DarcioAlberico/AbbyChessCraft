@@ -1085,6 +1085,51 @@ gabarito novo (`docs/revisoes/pendencias.md`, com as medidas):
 Continuam: a conferência cega da fatia. A página pedida na hora renderiza
 na thread da interface por decisão (o registro diz por quê).
 
+## Tirar as coordenadas dos diagramas (2026-11-04, ramo `tirar-coordenadas`; §10, CA-10.4)
+
+Com o pedido do usuário: uma função que tira as letras e os números impressos em volta dos
+diagramas.
+
+- **Achar** (`abbychess/coordenadas.py`, sem Qt e sem ler nada): em cada lado do tabuleiro, uma
+  marca por casa, centrada nela, numa linha só; a legenda e a prosa têm várias por casa, e o lado
+  que não é assim fica como está. Um retângulo por lado, para o `projeto.json` não crescer.
+- **Tirar** (`ControladorDaSequencia.tirar_as_coordenadas`): as áreas vão à `Entrada.borrachas`,
+  e o Ctrl+Z, o corte, o giro, o PDF pesquisável e o Tirar a borracha… vêm de graça; os glifos
+  lidos nelas saem. A procura roda em tarefa (um render por página), fora da thread da interface.
+- **Não perder a orientação**: é das coordenadas que ela sai, e a leitura seguinte não as vê. O
+  `mesclar` fica com a confirmada antes e gira as casas; o diagrama por ler não é tocado.
+- **A janela**: Página › Tirar as coordenadas… e a gaveta, com a seleção das outras operações.
+
+A medida, nos projetos do D: (até 18 páginas com tabuleiro por livro, sem gravar nada), em
+tabuleiros com as duas linhas achadas: Yusupov 4/4 e 45/47, Odds & Ends 29/32, A Matter of Endgame
+Technique 54/56, Strategic Play 41/41, Ding Liren 20/20; Karolyi 0/12 e Mirkovic 0/17, que não
+imprimem coordenadas, sem nenhuma falsa com legenda e prosa coladas. Conferidas a olho, nas folhas
+de contato: Odds & Ends (os 3 sem linha não têm coordenada ou não são tabuleiro), A Matter of
+Endgame Technique (o de 1 linha é um tabuleiro impresso torto), Karolyi e Mirkovic; os outros, só
+pela contagem. O erro de um tabuleiro torto é não apagar. Falta usar num livro do começo ao fim.
+
+## A coluna só de tabuleiros (2026-11-04, ramo `fen-na-coluna`; §5, CA-5.2)
+
+O CA-5.2 estava na verificação do passo F sem teste, e a limitação do registro do passo
+(`docs/revisoes/passo-f.md`) era ele reprovando: na p. 12 do Yusupov os três diagramas enchem a
+coluna da esquerda e, só pelos glifos, a página tem uma coluna.
+
+- **Achar:** `OrdemDeLeitura.da_pagina` recebe as caixas dos tabuleiros. Dois ou mais empilhados,
+  com o texto de um lado só, em 6 filas ou mais e acompanhando ao menos metade da altura da pilha,
+  fazem as colunas (`coluna_da_pilha`).
+- **Onde o diagrama entra (decisão do usuário, 2026-11-04):** junto do comentário, e não todos no
+  começo da página (`layout.lugares_da_pilha`). Com um título por tabuleiro ("Diagram 1-10", com a
+  tolerância ao OCR), cada um entra logo antes do seu; sem isso, na altura dele, depois de um fim
+  de frase. A legenda lida na coluna dos tabuleiros vai com o mais perto. O Documento e a
+  exportação usam a mesma regra. O CA e a ordem do gabarito da p. 12 mudaram com ela
+  (`verdade_versao` 2); o gabarito do Yusupov segue sem revisão do usuário.
+
+Nos projetos do D: (só lendo os JSON), a regra vale em 198 de 2.201 páginas com dois tabuleiros ou
+mais, todas do Yusupov completo: 191 pelo título e 7 pela altura. Medido com a exportação real na
+p. 12; as outras páginas só pela sequência dos blocos de uma amostra de 8. Sobra: na p. 12, um
+cisco do ornamento lido "=" cola em "met by…"; as coordenadas lidas e o ornamento ficam no alto,
+como antes.
+
 ---
 
 ## Antipadrões

@@ -123,7 +123,8 @@ def test_o_glifo_nao_lido_recebe_a_letra():
 
 @pytest.mark.parametrize("token, idioma, figurinha", [
     ("Cf3", "pt", "♘f3"), ("Nf3", "en", "♘f3"), ("14.Dxe5+", "pt", "14.♕xe5+"),
-    ("e8=D", "pt", "e8=D"), ("Te8=D", "pt", "♖e8=♕"), ("Casa", "pt", "Casa"), ("Rf1", "en", "♖f1")])
+    ("e8=D", "pt", "e8=D"), ("Te8=D", "pt", "♖e8=♕"), ("Casa", "pt", "Casa"), ("Rf1", "en", "♖f1"),
+    ("Cf3⯹", "pt", "♘f3⯹"), ("Dxe5+⇄", "pt", "♕xe5+⇄"), ("Bb5⨀", "en", "♗b5⨀")])
 def test_ca_6_7_figurinas_no_token_de_lance(token, idioma, figurinha):
     assert ss.figurinas(token, idioma) == figurinha
 

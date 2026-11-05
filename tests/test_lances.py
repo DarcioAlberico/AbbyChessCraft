@@ -64,6 +64,13 @@ def test_lance_solto_na_prosa_nao_comeca_linha():
     assert _sans(lc.primeira_linha("O peão de e4 avança: 1.e5 Cd5", "pt")) == ["e5", "Nd5"]
 
 
+def test_os_sinais_da_paleta_nao_separam_o_lance_da_resposta():
+    for sinal in "⯹⇄⟳○⨀⨁⇔⇗⊞⟪⟫✕⊥⯺⯻⯼⯽":
+        assert _sans(lc.primeira_linha(f"1.e4 {sinal} e5", "pt")) == ["e4", "e5"], sinal
+    # O Δ anuncia outro lance, que não é a resposta das pretas.
+    assert _sans(lc.primeira_linha("1.e4 Δ Cf3", "pt")) == ["e4"]
+
+
 def test_ingles_e_roque_com_zeros():
     linha = lc.primeira_linha("12.0-0 Qd7 13.Rfe1 O-O-O", "en")
     assert _sans(linha) == ["O-O", "Qd7", "Rfe1", "O-O-O"]

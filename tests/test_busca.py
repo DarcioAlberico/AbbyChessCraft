@@ -61,7 +61,8 @@ def test_ca_7_4_a_classe_de_lance(idioma, positivos, negativos):
     (r"\P", "pt", ["C", "D", "♘", "♛"], ["N", "x", "a"]),
     (r"\P", "en", ["N", "Q", "♘"], ["C", "D", "x"]),
     (r"\C", "pt", ["e4", "h8", "a1"], ["i9", "e9", "z1"]),
-    (r"\V", "pt", ["±", "∓", "⩲", "!?", "?!", "+-", "!", "∞"], ["a", "*"])])
+    (r"\V", "pt", ["±", "∓", "⩲", "!?", "?!", "+-", "!", "∞", "⯹", "⇄", "⟳", "⨀", "⨁"],
+     ["a", "*"])])
 def test_ca_7_4_as_classes_de_peca_casa_e_valoracao(classe, idioma, positivos, negativos):
     for token in positivos:
         assert _achados(_indice(token, idioma=idioma), rf"^{classe}$", regex=True,

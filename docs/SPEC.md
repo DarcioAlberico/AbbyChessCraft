@@ -418,8 +418,11 @@ Na ordem, cada etapa gravando zonas, funções e decisões:
 gabarito (IoU ≥ 0,5) sai como `cabecalho`; cada legenda ligada ao diagrama do gabarito
 (100%).
 **CA-5.2** [livro_real] Na página de duas colunas do Yusupov fixada no gabarito (arquivo por
-`pdf_sha256`, lido **só como imagem** a 250 dpi, `usar_texto_nativo=False`): ordem de
-leitura com Kendall = 0 e cada linha de FEN no bloco da coluna do diagrama.
+`pdf_sha256`, lido **só como imagem**, à resolução do programa e do gabarito, 300 dpi): ordem de
+leitura com Kendall = 0 e, com uma coluna só de tabuleiros, cada linha de FEN logo antes do título
+do comentário dela ("Diagram 1-10") na coluna do texto, onde o gabarito a põe (decisão do usuário,
+2026-11-04: o diagrama junto do comentário). Sem um título por tabuleiro, o diagrama entra na
+altura dele, depois de um fim de frase.
 **CA-5.3** Mudar a função de uma zona atualiza o Documento sem reconhecer de novo e se
 desfaz com um Ctrl+Z; a partir do passo J, a exportação reflete a mudança (verificado no J).
 **CA-5.4** O modelo de áreas aplicado às ímpares de um intervalo sintético cria as zonas só
@@ -682,6 +685,14 @@ OCR (o servidor não recebe pedido de leitura).
 - **Roque**: rei e torre nas casas iniciais sugerem o roque, marcado "inferido", nunca
   afirmado sem conferência; en passant fica `-`.
 - **PGN**: a posição e os lances seguintes de cada diagrama (`core.pgn`, `core.nags`).
+- **Tirar as coordenadas** (2026-11-04, Página › Tirar as coordenadas…, para as páginas
+  escolhidas): as letras e os números impressos em volta dos tabuleiros lidos saem da imagem,
+  pela borracha (CA-12.17): da vista, das amostras, da leitura seguinte e das exportações. Elas
+  são achadas pela geometria, sem ler nada (`abbychess/coordenadas.py`): uma marca por casa,
+  centrada nela, numa linha só, colada ao tabuleiro; o que não é assim (a legenda, a prosa da
+  coluna vizinha) fica. O diagrama por ler fica com as dele: é delas que sai a orientação.
+  **A orientação não se perde**: a releitura que não acha rótulo fica com a orientação que eles
+  confirmaram antes, e as casas vão com ela (`diagramas.mesclar`).
 
 **CA-10.1** [livro_real] Sobre os FEN do gabarito (p. 21–27) e sobre 100 versões perturbadas
 deles (uma peça trocada, tirada ou movida, semente 1234, só posições legais): a precisão de
@@ -693,6 +704,14 @@ perturbação que nenhum lance toca não muda nenhum deles e nenhuma validação
 no Xadrez Vitorioso, 73 de 100 saíam confiáveis assim.)
 **CA-10.2** Com a conferência aberta, a Imagem aceita zoom e rolagem.
 **CA-10.3** O roque inferido nunca sai afirmado no FEN exportado sem conferência.
+**CA-10.4** (tirar as coordenadas) Numa página com um diagrama lido, com `a`–`h` embaixo e
+`8`–`1` à esquerda, e com legenda e prosa em volta: as marcas ficam brancas, e o tabuleiro, a
+legenda e a prosa não mudam um pixel. Os glifos lidos nelas saem (`gm.sem_os_glifos`). O
+tabuleiro sem coordenadas e o diagrama por ler não mudam; sem nada a tirar, o aviso diz e a
+sequência fica. Num só passo do Ctrl+Z, com todas as páginas escolhidas; Tirar a borracha…
+também as devolve. A releitura de um diagrama impresso com as pretas embaixo, sem as coordenadas
+na imagem, dá o mesmo FEN e a orientação confirmada. As áreas seguem o corte, o giro e o ângulo
+(CA-12.17), e o PDF pesquisável sai sem elas.
 
 ## 11. O servidor de leitura
 

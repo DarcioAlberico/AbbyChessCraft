@@ -75,8 +75,9 @@ mal lido; eram 30 falsos). O JSON oficial sai no portão do fechamento dos passo
   o vínculo da legenda não se edita à mão.
 - Os diagramas não seguem o Ordenar no Documento (ficam onde a leitura os pôs), e a
   exportação não usa a ordem das áreas.
-- O FEN do diagrama de uma página de duas colunas (o Yusupov) cai pela altura, entre as linhas
-  da outra coluna.
+- ~~O FEN do diagrama de uma página de duas colunas (o Yusupov) cai pela altura, entre as linhas
+  da outra coluna.~~ Era o CA-5.2 reprovando; corrigido em 2026-11-04 (roadmap, "A coluna só de
+  tabuleiros").
 - Fora do Ordenar, o número da área é a posição na lista, não a ordem de leitura.
 - Na página densa (o Yusupov), o ornamento vira áreas minúsculas e os rótulos se sobrepõem.
 - `_aprender_margens` varre as páginas lidas na thread da interface ao ligar o modo Áreas numa

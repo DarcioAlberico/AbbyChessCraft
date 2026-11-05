@@ -129,7 +129,7 @@ def test_alt_3_de_novo_cicla_as_abas_da_vista(app, janela):  # noqa: F811
     janela.focar(3)
     assert janela.vista.currentWidget() is janela.painel_do_documento
     QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_3, Qt.KeyboardModifier.AltModifier)
-    assert janela.vista.currentWidget() is janela.padroes and _dentro(janela.vista)
+    assert janela.vista.currentWidget() is janela.galeria and _dentro(janela.vista)
 
 
 # ----------------------------------------------------------------------

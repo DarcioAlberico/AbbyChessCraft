@@ -18,6 +18,7 @@ manter_margens:
     # O cabeçalho vem antes do título: fica num capítulo antes do capítulo do título.
     acrescenta:
       - '<p>XADREZ VITORIOSO 23</p>'
+      - 'Início do texto'
       - 'capitulo-002\.xhtml'
       - 'idref="c1"></ns0:itemref><ns0:itemref idref="c2">'
       - '<title>Golden</title>'

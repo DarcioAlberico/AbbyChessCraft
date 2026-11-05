@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 class GaleriaNaJanela:
     def _montar_galeria(self) -> None:
         self.galeria = PainelDaGaleria()
-        self.vista.addTab(self.galeria, "Galeria")
+        self.vista.insertTab(1, self.galeria, "Galeria")   # a ordem da §3.1
         g = self.galeria
         g.vista.aplicar.connect(self._galeria_aplicar)
         g.vista.ensinar.connect(lambda: self._galeria_confirmar(ensinar=True))

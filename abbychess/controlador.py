@@ -443,10 +443,6 @@ class ControladorDePagina:
             return
         if self.antes_de_sair_da_pagina is not None:   # a sessão aberta entra antes
             self.antes_de_sair_da_pagina()
-        if self.sessoes.na_fila:
-            self._avisar("A edição do texto ainda espera a vez dela na fila: marque a página "
-                         "como verificada depois que ela entrar.", AVISO_LONGO_MS)
-            return
         if self.modelo is None or self.modelo.estado not in LIDAS:
             self._avisar("Reconheça a página antes de marcá-la como verificada "
                          "({reconhecer_pagina}).", 6000)
@@ -464,6 +460,7 @@ class ControladorDePagina:
             verificada = self.indice + 1
             self.ir_para(proxima)
             self._avisar(f"Página {verificada} verificada; abrindo a {proxima + 1}.", 6000)
+        # Na fila, depois da sessão que já espera lá: a edição não a devolve a em revisão.
         self._editar("Verificando a página", corpo, precisa_de_glifos=False)
 
     def _proxima_nao_verificada(self) -> Optional[int]:

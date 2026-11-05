@@ -598,6 +598,10 @@ def test_o_ctrl_t_espera_a_sessao_na_fila_e_fechar_aplica_na_hora(dois_projetos)
     executor.em_voo = None
     executor.tudo()
     assert not ctl.sessoes.na_fila
+    assert a.resumo.estado_da_pagina(0) == "verificada"     # na vez dele, depois da edição
+    assert a.carregar_modelo(0) is not None and ss.texto_e_unidades(a.carregar_modelo(0))[0].startswith("x")
+    ctl.ir_para(0)
+    executor.tudo()
     executor.em_voo = False
     texto, unidades = ss.texto_e_unidades(ctl.modelo)
     ctl.sessoes.confirmar_sessao(unidades[inicio:fim + 1], "y" + texto[inicio:fim + 1], agora=True)

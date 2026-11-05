@@ -46,7 +46,7 @@ class DiagramasNaJanela:
         """A página mudou (desfazer, F5, áreas, a legenda): o editor acompanha, ou fecha se
         os diagramas não são mais os mesmos (nunca grava no diagrama errado)."""
         if self.editor_diagrama.aberto and not self.editor_diagrama.sincronizar(
-                self.pagina.diagramas):
+                self.pagina.diagramas, self.pagina.linhas_dos_diagramas()):
             self.statusBar().showMessage("A conferência fechou: os diagramas da página "
                                          "mudaram.", 6000)
             if self.inspetor.atual() == "diagrama":

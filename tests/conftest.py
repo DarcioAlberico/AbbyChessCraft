@@ -14,6 +14,7 @@ Fora do portão, pular é aceito, para a suíte rodar numa máquina sem os livro
 
 from __future__ import annotations
 
+import logging
 import os
 import weakref
 
@@ -51,6 +52,8 @@ def pytest_configure(config):
     config._abby_qsettings = pasta
     QSettings.setDefaultFormat(QSettings.Format.IniFormat)
     QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, pasta)
+    # Os logs e o registro dos filhos da suíte, longe dos do programa de quem a roda (C-2).
+    os.environ.setdefault("ABBY_PASTA_DE_LOG", os.path.join(pasta, "logs"))
     _anotar_os_gravadores()
 
 
@@ -94,6 +97,36 @@ def app():
     from PySide6.QtWidgets import QApplication
 
     return QApplication.instance() or QApplication([])
+
+
+class _ErrosLogados(logging.Handler):
+    """Guarda os registros de ERROR e CRITICAL, de qualquer thread."""
+
+    def __init__(self):
+        super().__init__(logging.ERROR)
+        self.erros: list = []
+
+    def emit(self, record):
+        self.erros.append(record)
+
+
+def reprovar_os_erros_logados(erros, marca) -> None:
+    """CA-C5: quem loga ERROR sem a marca `erro_esperado` reprova."""
+    if erros and marca is None:
+        pytest.fail("o teste logou erro sem a marca erro_esperado: "
+                    + "; ".join(f"{r.name}: {r.getMessage()}" for r in erros[:3]), pytrace=False)
+
+
+@pytest.fixture(autouse=True)
+def sem_erro_logado(request):
+    """A suíte reprova o erro logado (C-5): `log.exception` no meio de um caminho que "passa" é
+    falha engolida. O teste que provoca o erro de propósito leva `@pytest.mark.erro_esperado`."""
+    guarda = _ErrosLogados()
+    raiz = logging.getLogger()
+    raiz.addHandler(guarda)
+    yield guarda
+    raiz.removeHandler(guarda)
+    reprovar_os_erros_logados(guarda.erros, request.node.get_closest_marker("erro_esperado"))
 
 
 @pytest.fixture(autouse=True)

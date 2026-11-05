@@ -84,6 +84,7 @@ def test_sem_descarregar_grava_sozinho_depois_do_atraso():
         gravador.fechar()
 
 
+@pytest.mark.erro_esperado
 def test_falha_permanente_avisa_uma_vez_e_a_pagina_continua_suja():
     disco = _Disco()
     disco.falhar = -1
@@ -103,6 +104,7 @@ def test_falha_permanente_avisa_uma_vez_e_a_pagina_continua_suja():
         gravador.fechar()
 
 
+@pytest.mark.erro_esperado
 def test_tres_falhas_e_depois_sucesso_grava_o_mesmo_instantaneo():
     disco = _Disco()
     disco.falhar = 3
@@ -171,6 +173,7 @@ def test_fechar_com_a_pagina_suja_grava_antes_de_voltar(projeto):
         reaberto.fechar()
 
 
+@pytest.mark.erro_esperado
 def test_falha_de_gravacao_avisa_pelo_projeto_e_a_pagina_fica_suja(projeto, monkeypatch):
     avisos = []
     projeto.ao_falhar_gravacao = lambda indice, erro: avisos.append((indice, str(erro)))
@@ -323,6 +326,7 @@ def test_a_interface_nao_espera_o_disco_do_gravador(projeto, monkeypatch):
     assert projeto.paginas_em_memoria.descarregar(5)
 
 
+@pytest.mark.erro_esperado
 def test_aviso_que_falha_nao_para_o_gravador():
     disco = _Disco()
     gravador = Gravador(disco, atraso=0.01, ao_gravar=lambda pid: 1 / 0)
@@ -336,6 +340,7 @@ def test_aviso_que_falha_nao_para_o_gravador():
         gravador.fechar()
 
 
+@pytest.mark.erro_esperado
 def test_pagina_falhando_nao_tenta_a_cada_edicao():
     disco = _Disco()
     disco.falhar = -1

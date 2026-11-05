@@ -8,6 +8,8 @@ leitura da página toda, e o palpite entra no campo quando chega, se o campo ain
 
 from __future__ import annotations
 
+import pytest
+
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 
@@ -130,6 +132,7 @@ def test_com_o_servidor_um_pedido_leva_a_pagina_e_o_palpite_chega_ao_campo(app, 
     servidor.fechar()
 
 
+@pytest.mark.erro_esperado
 def test_a_rede_que_falha_nao_prende_o_painel(app, janela, caplog):
     campo = _com_rede(app, janela)
 

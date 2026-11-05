@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 import logging
 import os
 import threading
@@ -14,6 +16,7 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 from abbychess.app.trabalho import Executor  # noqa: E402
 
 
+@pytest.mark.erro_esperado
 def test_o_pronto_que_falha_vai_ao_log_e_ao_aviso_e_a_fila_segue(qtbot, caplog):
     """SPEC-qualidade CA-Q-C1: o `pronto` (na interface) que levanta no meio não some no laço
     do Qt: o rastro vai ao log, o `falhou` da tarefa avisa (a barra de status), e a tarefa

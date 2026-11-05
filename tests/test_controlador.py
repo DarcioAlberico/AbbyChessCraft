@@ -23,6 +23,7 @@ from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 from tests.ajudantes import ExecutorManual, _controlador  # noqa: E402,F401,F811
 
 
+@pytest.mark.erro_esperado
 def test_um_ouvinte_que_falha_nao_cala_os_seguintes_nem_o_comando(caplog):
     """SPEC-qualidade Q-C4: `glifos_mudaram` tem três ouvintes ou mais; o que levanta vai ao
     log com o rastro, os outros ouvem, e a exceção não sobe para o comando que emitiu (ele
@@ -193,7 +194,7 @@ def test_comando_guarda_o_glifo_da_hora_em_que_foi_pedido(dois_projetos):
 def test_diagramas_lidos_entram_na_pagina_que_pediu(tmp_path, monkeypatch):
     from abbychess import diagramas as dg
     from abbychess.controlador_de_diagramas import ControladorDeDiagramas
-    from tests.ajudantes import pdf_sintetico  # noqa: E402,F401,F811
+    from tests.ajudantes import _lido, pdf_sintetico  # noqa: E402,F401,F811
 
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Duas", pdf_sintetico(tmp_path))
     try:
@@ -206,7 +207,7 @@ def test_diagramas_lidos_entram_na_pagina_que_pediu(tmp_path, monkeypatch):
         ctl.eventos.ligar("conferir", abertas.append)
         conferencia = ControladorDeDiagramas(ctl)
         monkeypatch.setattr(dg, "ler_diagramas", lambda _img, caixas, **_k: [
-            dg.DiagramaLido(c, casas=[None] * 64) for c in caixas])
+            _lido(caixa=c) for c in caixas])
         conferencia.conferir(0)
         fim = executor.comecar()
         ctl.ir_para(1)                                  # o usuário foi adiante
@@ -315,6 +316,7 @@ def test_o_projeto_so_para_leitura_nao_grava_a_conferencia(livro_com_diagramas):
         so_leitura.fechar()
 
 
+@pytest.mark.erro_esperado
 def test_as_amostras_que_nao_gravam_nao_desfazem_a_conferencia(livro_com_diagramas, monkeypatch):
     from abbychess import diagramas as dg
     from core.tabuleiro_edicao import TabuleiroEdicao
@@ -489,6 +491,7 @@ def test_a_sessao_de_glifos_que_sairam_da_pagina_e_recusada(dois_projetos):
     assert ss.texto_e_unidades(ctl.modelo)[0] == depois
 
 
+@pytest.mark.erro_esperado
 def test_a_sessao_que_falha_ao_aplicar_volta_a_pagina(dois_projetos, monkeypatch):
     from abbychess import sessao as ss
 

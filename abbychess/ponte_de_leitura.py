@@ -163,24 +163,18 @@ class PonteDeLeitura:
         imagem = self._p.imagem
         leitor, limiares = self._p.leitor, self._p.leitor.limiares
         antes = tuple(pagina.boxes)
-        pendentes = None
-        if tudo:
-            lidos = ed.copias_para_ler(antes, lambda e: e.source != FONTE_MANUAL)
-        else:
-            pendentes = contexto.pendentes_da_pagina(pagina, limiares, com_os_revisados=True)
-            copiar = {id(b.entry) for b, p in zip(antes, pendentes) if p}
-            lidos = ed.copias_para_ler(antes, lambda e: id(e) in copiar)
-
+        lidos, pendentes, nao_ler = _quem_reler(pagina, antes, limiares, tudo)
         servidor = self.servidor_para_pedir()
 
         def trabalho(progresso):
             if servidor is None:
                 resumo = pg.ler_boxes(imagem, lidos, leitor, so_pendentes=not tudo,
-                                      progresso=progresso, pendentes=pendentes)
+                                      progresso=progresso, pendentes=pendentes, nao_ler=nao_ler)
                 return lidos, resumo
             try:
                 relidos, amostras, resumo = servidor.chamar(
-                    "reler_boxes", (imagem, lidos, not tudo), timeout=sl.TEMPO_DO_PEDIDO)
+                    "reler_boxes", (imagem, lidos, not tudo, nao_ler),
+                    timeout=sl.TEMPO_DO_PEDIDO)
             except sl.Cancelado:                # o projeto fechou: nada a pôr
                 return None
             sl.registrar_procedencia(relidos, amostras)
@@ -351,8 +345,7 @@ class PonteDeLeitura:
             if transacao.invalidada:
                 return None
             antes = tuple(pagina.boxes)
-            pendentes = contexto.pendentes_da_pagina(pagina, foto_do_leitor.limiares,
-                                                     com_os_revisados=True)
+            pendentes = contexto.pendentes_da_pagina(pagina, foto_do_leitor.limiares)
             copiar = {id(b.entry) for b, p in zip(antes, pendentes) if p}
             lidos = ed.copias_para_ler(antes, lambda e: id(e) in copiar)
 
@@ -603,6 +596,19 @@ def _ha_quem_sugira(servidor, leitor) -> bool:
 def _so_os_da_pagina(sugestoes: dict, pid: int) -> dict:
     """Os palpites guardados dos glifos da página `pid`."""
     return {g: v for g, v in sugestoes.items() if pid_de(g) == pid}
+
+
+def _quem_reler(pagina, antes, limiares, tudo: bool) -> tuple:
+    """(as cópias a ler, os pendentes, ou None com `tudo`, as posições a não ler). O revisado não
+    é relido, nem com `tudo`: decidido não volta (D-5)."""
+    nao_ler = [i for i, b in enumerate(antes) if b.revisado]
+    if tudo:
+        fora = {id(antes[i].entry) for i in nao_ler}
+        return (ed.copias_para_ler(antes, lambda e: e.source != FONTE_MANUAL
+                                   and id(e) not in fora), None, nao_ler)
+    pendentes = contexto.pendentes_da_pagina(pagina, limiares)
+    copiar = {id(b.entry) for b, p in zip(antes, pendentes) if p}
+    return ed.copias_para_ler(antes, lambda e: id(e) in copiar), pendentes, nao_ler
 
 
 def _pode_pedir_a_leitura(servidor, p, pagina: Pagina, indice: int) -> bool:

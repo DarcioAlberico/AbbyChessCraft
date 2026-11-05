@@ -45,3 +45,9 @@ Sem resposta, vale o roteiro: PP1b e PPT seguem, e a fila Lances fica no F4, sem
 - Teclado e foco à mão: o agente só tem o `offscreen`.
 - A viabilidade a 1366 px da linha de 70 caracteres foi resolvida por conta (`corpo_do_texto`), não olhada numa tela.
 - Os glifos `revisado` por linha conferida saem da fila de hoje. Ninguém mediu o efeito no treino (SPEC §12).
+
+## A medida de fim de marco
+
+- `qualidade.py`, depois da correção do par do dryer e dos caminhos sem teste: rápida e `processo` saída 0, cobertura 95,1 %, nada fora da lista.
+- Portão: 16 de 17 arquivos. **`test_ca_7_1` reprovou de novo** (2.461 ms contra 2.400), como em M1 e no PP0; a meta oscila (C-6, fora dos marcos). O índice da busca não mudou neste passo.
+- CA-F.1 e a catraca passaram: a fila nova não subiu os gestos da fatia, nem mudou a leitura.

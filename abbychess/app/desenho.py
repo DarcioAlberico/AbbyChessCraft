@@ -17,6 +17,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from abbychess import avisos as av
 from abbychess import grade as gd
 from abbychess import livro as lv
+from abbychess import tipo_de_pagina
 from abbychess import verificacao as vf
 from abbychess.app import acoes
 from abbychess.app.imagens import pixmap_da_pagina
@@ -138,7 +139,8 @@ class DesenhoDaJanela:
             self.visor.selecionar(None)
             self.treino.limpar(vazios.pagina_nao_reconhecida()
                                if not p.boxes else
-                               _sem_pendentes(self.fila.lances.resumo_da_pagina()))
+                               _sem_pendentes(self.fila.lances.resumo_da_pagina(),
+                                              _faltam_ler(p)))
             return
         self.treino.mostrar(p.matriz, p.box_atual(), p.fila_da_pagina.posicao_do_atual(),
                             tomar_o_foco=QApplication.focusWidget() is not self.texto)
@@ -163,7 +165,7 @@ class DesenhoDaJanela:
         na_fila = set(p.fila_da_pagina.fila())
         da_fila = p.fila_da_pagina.margens_da_fila()  # a conta que a fila usou, talvez de antes
         estados = _estados_dos_glifos(p.modelo, na_fila)
-        estados.update(dict.fromkeys(p.evidencia.agora().ilegais, gd.FORTE))
+        estados.update(dict.fromkeys(p.evidencia.agora().fortes, gd.FORTE))
         aviso = _aviso_do_documento(p)
         # A palavra fora do léxico que o usuário aceitou (Enter: revisada) não é mais duvidosa.
         revisados = {b.gid for b in p.modelo.boxes if b.revisado} if p.modelo is not None else set()
@@ -428,10 +430,20 @@ def _mostrar_as_contagens(treino, leitor, pendentes: int, glifos: int) -> None:
                              len(por_char))
 
 
-def _sem_pendentes(resumo: dict) -> str:
-    """A tela da fila de glifos vazia: com lance por conferir, nunca "nada a revisar" (F-4)."""
+def _faltam_ler(p) -> int:
+    """Quantas páginas do livro ainda não foram lidas."""
+    if p.projeto is None or p.fonte is None:
+        return 0
+    return max(0, p.fonte.total - len(p.projeto.resumo.paginas_lidas()))
+
+
+def _sem_pendentes(resumo: dict, faltam_ler: int = 0) -> str:
+    """A tela da fila de glifos vazia: com lance por conferir, nunca "nada a revisar" (F-4); com
+    página por ler, a tecla do lote (U-3)."""
     resto = teclado.com_teclas("Clique num glifo para corrigi-lo, ou vá para o próximo pendente do "
                                "livro ({proxima_pagina_pendente}).")
+    if faltam_ler:
+        resto += teclado.com_teclas(f" Faltam ler {faltam_ler} página(s): {{reconhecer_livro}}.")
     if resumo["nao_conferidos"]:
         return teclado.com_teclas(f"Sem glifos na fila. {resumo['nao_conferidos']} lances não "
                                   "conferidos: {fila_lances} confere. ") + resto
@@ -446,6 +458,8 @@ def _estados_dos_glifos(modelo, na_fila: set) -> dict:
 
 def _aviso_do_documento(p) -> str:
     """O texto do Documento vazio: na página não reconhecida, com a saúde do livro."""
+    if p.modelo is not None and tipo_de_pagina.tratada_como_imagem(p.modelo):
+        return vazios.tratada_como_imagem()
     aviso = vazios.nada_reconhecido() if p.reconhecida else vazios.pagina_nao_reconhecida()
     if not p.reconhecida and p.projeto is not None:
         saude = lv.saude(p.projeto, p.leitor.arquivos_de_padrao() if p.leitor else 0)

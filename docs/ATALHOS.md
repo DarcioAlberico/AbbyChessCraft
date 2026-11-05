@@ -10,6 +10,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | A Galeria do caractere do glifo atual | Ctrl+Shift+G | Ctrl+Shift+G | global | T1 |
 | Abrir projeto | Ctrl+O | Ctrl+O | global | A2 |
 | Alternar o escopo da fila (página ou livro) | Shift+F7 | Ctrl+Shift+F8 | global | C |
+| As páginas tratadas como imagem, em Resultados | — | — | global | PPT |
 | Borracha (apagar uma mancha da imagem) | Ctrl+Shift+E | Ctrl+Shift+E | global | L |
 | Cancelar o lote (também o ✕ da barra de status) | — | — | global | A2 |
 | Ciclar o modo da fila | F7 | Ctrl+Shift+F7 | global | A2 |
@@ -30,6 +31,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Imagem e vista direita lado a lado | Ctrl+F7 | F7 | global | A2 |
 | Ir para a página | Ctrl+G | Ctrl+G | global | A1 |
 | Item anterior da fila | Alt+Up | Alt+Up | global | A2 |
+| Ler como texto a página tratada como imagem | Ctrl+Shift+T | Ctrl+Shift+T | global | PPT |
 | Localizar | Ctrl+F | Ctrl+F | global | B |
 | Marcar a página verificada e abrir a próxima | Ctrl+T | Ctrl+T | global | A2 |
 | Marcar glifo à mão (quadro) | Ctrl+M | Ctrl+M | global | A2 |

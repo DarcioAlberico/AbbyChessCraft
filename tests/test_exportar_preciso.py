@@ -256,7 +256,7 @@ def _projeto_digital(tmp_path):
     pdf = _pdf_digital(tmp_path / "livro.pdf")
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Digital", pdf)
     # Os boxes que o OCR gravou dizem outra coisa: é a camada que tem de sair.
-    projeto.salvar_pagina(0, _linha("lixo do ocr", 300))
+    projeto.salvar_pagina(0, _linha("lixo do ocr", 300, fonte=FONTE_LIVRO))
     return projeto
 
 

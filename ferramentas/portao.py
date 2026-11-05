@@ -31,6 +31,7 @@ ARQUIVOS = (
     "tests/test_coluna_de_tabuleiros.py", "tests/test_diagramas.py", "tests/test_documento.py",
     "tests/test_espaco.py", "tests/test_servidor_livro_real.py",
     "tests/test_treino_por_livro.py", "tests/test_visor.py", "tests/test_catraca_do_livro.py",
+    "tests/test_tipo_de_pagina.py",
     "tests/desempenho/test_busca.py", "tests/desempenho/test_carregar_modelos.py",
     "tests/desempenho/test_linha_de_base.py", "tests/desempenho/test_paginas.py",
     "tests/desempenho/test_revisao.py", "tests/desempenho/test_servidor.py",

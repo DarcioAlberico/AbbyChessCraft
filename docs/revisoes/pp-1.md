@@ -27,3 +27,8 @@
 ## O que não foi verificado
 
 A confirmação à mão que a SPEC pede antes de U-1 não foi feita: o agente não tem foco de verdade. O teste roda no `offscreen`.
+
+## A medida de fim de marco
+
+- `qualidade.py`: a rápida passou; a camada `processo` acusou 2 testes que provocam a queda do filho, e eles ganharam a marca. Medida de novo só no fim de M2 e de M3.
+- Portão: 16 de 17 arquivos. **`test_ca_7_1` reprovou** (2.487 ms contra 2.400), como no PP0. A catraca passou, com duas rodadas iguais (CA-R3.5).

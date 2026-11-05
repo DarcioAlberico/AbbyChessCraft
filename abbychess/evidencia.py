@@ -41,9 +41,10 @@ class EvidenciaDaPagina:
 
 
 def conferidos(pagina) -> FrozenSet[int]:
-    """Os gids decididos: `revisado`, `manual` ou `nativa`."""
+    """Os gids decididos: `revisado`, `manual`, `nativa`, e a letra que o usuário inseriu."""
     return frozenset(b.gid for b in pagina.boxes
-                     if b.revisado or b.entry.source in (FONTE_MANUAL, FONTE_NATIVA))
+                     if b.revisado or b.entry.source in (FONTE_MANUAL, FONTE_NATIVA)
+                     ) | {v.gid for v in pagina.decisoes.virtuais}
 
 
 def rejeitados(documento, diagramas, chave: str) -> List[Tuple[Tuple[int, ...], str]]:
@@ -54,13 +55,13 @@ def rejeitados(documento, diagramas, chave: str) -> List[Tuple[Tuple[int, ...], 
     for d in diagramas:
         gids = lc.gids_do_rejeitado(documento, d, chave)
         if gids:
-            vistos.add(gids)
+            vistos.update(gids)
             saida.append((gids, motivo_do_ilegal(_impresso(documento, gids),
                                                   _sem_rotulo(d.validacao.aviso))))
     if X1_LIGADO:
         for t in dl.decodificar(documento, diagramas, chave).ilegais:
-            if t.gids not in vistos:
-                vistos.add(t.gids)
+            if not vistos.intersection(t.gids):  # o de F-3 não leva o `!`; o de X-1 leva
+                vistos.update(t.gids)
                 motivo = t.motivo[len(t.impresso) + 1:] if t.motivo.startswith(t.impresso) else ""
                 saida.append((t.gids, motivo_do_ilegal(t.impresso, motivo or "não se joga aqui")))
     return saida
@@ -83,7 +84,8 @@ def _dos_glifos(pagina, feitos) -> Dict[int, Tuple[str, str]]:
         if b.gid in feitos:
             continue
         if not b.entry.char:
-            motivos[b.gid] = (NINGUEM_LEU, "")
+            if b.entry.source:                  # sem fonte: ainda aguarda a leitura
+                motivos[b.gid] = (NINGUEM_LEU, "")
         elif b.gid in sugestoes and contexto.volta_pelo_contexto(b.entry.source):
             motivos[b.gid] = (A_PALAVRA_DESMENTE, sugestoes[b.gid] or "")
     return motivos
@@ -139,9 +141,10 @@ def itens_da_pagina(indice: int, pagina, documento, diagramas, chave: str) -> Li
 def _os_nao_conferidos(indice, documento, diagramas, chave, rejeitos, feitos) -> List[ItemDeLance]:
     if not X1_LIGADO:
         return []
+    fora = {g for gids in rejeitos for g in gids}
     itens = []
     for t in dl.decodificar(documento, diagramas, chave).lances:
-        if t.gids not in rejeitos and not all(g in feitos for g in t.gids):
+        if not fora.intersection(t.gids) and not all(g in feitos for g in t.gids):
             tipo = "sem posição" if t.estado == dl.SEM_POSICAO else "não conferido"
             itens.append(ItemDeLance(indice, t.gids, tipo, f"p. {indice + 1}: {tipo}: {t.impresso}"))
     return itens

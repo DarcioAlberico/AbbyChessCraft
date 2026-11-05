@@ -451,6 +451,7 @@ class ControladorDoLivro:
         """Os lances do livro, por página, fora da interface (F-4): `pronto` recebe os itens."""
         from abbychess import diagramas as dg
         from abbychess import evidencia as ev
+        from abbychess import lances as lc
         from abbychess import texto as tx
 
         p = self.pagina
@@ -466,7 +467,7 @@ class ControladorDoLivro:
                 for feitas, indice in enumerate(lidas, 1):
                     modelo = projeto.ler_sem_migrar(indice)
                     if modelo is not None:
-                        diagramas = dg.com_ids(list(modelo.diagramas))
+                        diagramas = dg.com_ids(lc.validar_pagina(modelo, chave))
                         itens += ev.itens_da_pagina(indice, modelo, tx.montar(modelo, com_os_nao_lidos=True),
                                                     diagramas, chave)
                     progresso(feitas, len(lidas))

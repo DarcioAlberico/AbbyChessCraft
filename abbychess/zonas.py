@@ -822,6 +822,8 @@ def segmentar_com_zonas(imagem, zonas: Sequence[Zona], leitor=None):
 
     from abbychess.pagina import PaginaSegmentada, segmentar_tudo
 
+    if not any(z.tipo in (TEXTO, DIAGRAMA) for z in zonas):     # só figura e ignorar: nada a ler
+        return PaginaSegmentada([], [])
     bruta = segmentar_tudo(imagem, leitor)
     boxes, tabuleiros = filtrar(bruta.boxes, bruta.tabuleiros, zonas)
     return PaginaSegmentada(BoxService.sort_boxes_reading_order(boxes), tabuleiros)

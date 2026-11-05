@@ -48,6 +48,7 @@ from abbychess import pagina as pg
 from abbychess import sequencia as sq
 from abbychess.diagramas import DiagramaLido, para_caixas
 from abbychess.layout import OrdemDeLeitura
+from abbychess.leitor import FONTE_MANUAL
 from abbychess.projeto import ProjetoDeLivro
 from abbychess.metadados import metadados_do_projeto
 from abbychess.montagem import (
@@ -106,6 +107,8 @@ class Relatorio:
     camada_falhou: List[Tuple[int, str]] = field(default_factory=list)
     #: As contagens da fila Lances no livro (F-4), e as páginas dos diagramas de lado presumido.
     lances: Dict[str, int] = field(default_factory=dict)
+    #: (página, o que não se aplicou) das edições por cima da camada (D-3).
+    nao_aplicadas: List[Tuple[int, str]] = field(default_factory=list)
     lado_presumido: Dict[int, int] = field(default_factory=dict)
 
     def resumo(self) -> str:
@@ -190,6 +193,8 @@ class Relatorio:
         itens = self._itens_por_pagina()
         for pagina, motivo in self.camada_falhou:
             itens.setdefault(pagina, []).insert(0, f"a camada de texto falhou: {motivo}")
+        for pagina, aviso in self.nao_aplicadas:
+            itens.setdefault(pagina, []).insert(0, aviso)
         linhas = [self.resumo()]
         linhas += [f"{self.pagina(p)}: " + "; ".join(itens[p]) for p in sorted(itens)]
         if self.nao_verificadas:
@@ -281,7 +286,26 @@ def _caminhos_das_paginas(projeto: ProjetoDeLivro, pedido: Pedido, camada: str,
     alvo = pedido.alvo()
     estados = {i: r.get("estado") for i, r in projeto.resumo.do_livro().items()}
     nativas = paginas_da_camada(projeto, alvo, pedido, relatorio) if camada == "auto" else {}
+    _com_as_edicoes(projeto, nativas, relatorio)
     return alvo, estados, nativas, [i for i in alvo if i not in nativas]
+
+
+def _com_as_edicoes(projeto: ProjetoDeLivro, nativas: Dict[int, PaginaExtraida],
+                    relatorio: Relatorio) -> None:
+    """As edições das páginas que saem da camada (D-3): a importada leva as edições por cima, e
+    a lida por OCR com glifo decidido sai dos boxes, onde o que o usuário decidiu está."""
+    from abbychess import nativo
+
+    importadas = set(nativo.paginas_importadas(projeto))
+    for posicao in list(nativas):
+        modelo = projeto.ler_sem_migrar(posicao)
+        if modelo is None:
+            continue
+        if posicao in importadas:
+            relatorio.nao_aplicadas.extend((posicao, aviso) for aviso in
+                                           nativo.remendar(nativas[posicao], modelo))
+        elif any(b.revisado or b.entry.source == FONTE_MANUAL for b in modelo.boxes):
+            del nativas[posicao]
 
 
 def _boxes_e_margens(projeto: ProjetoDeLivro, pelos_boxes: Sequence[int], alvo: Sequence[int],
@@ -309,6 +333,9 @@ def _pagina_pelos_boxes(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagin
                         tirar: set, opcoes: Opcoes, relatorio: Relatorio) -> PaginaExtraida:
     """A página pelos boxes, sem as margens que a regra tirou (salvo as que o usuário marcou
     como texto), com os diagramas dela."""
+    como_imagem = _da_pagina_de_imagem(projeto, fonte, indice)
+    if como_imagem is not None:
+        return como_imagem
     tabuleiros = projeto.carregar_tabuleiros(indice)
     imagem = fonte.pagina(indice) if fonte is not None and tabuleiros else None
     fora = {k for k in tirar if id(boxes[k]) not in estrutura.protegidos}
@@ -318,6 +345,21 @@ def _pagina_pelos_boxes(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagin
                            estrutura=estrutura, manter_margens=opcoes.manter_margens,
                            desenhar_diagramas=opcoes.desenhar_diagramas,
                            manter_quebras=opcoes.manter_quebras)
+
+
+def _da_pagina_de_imagem(projeto: ProjetoDeLivro, fonte, indice: int) -> Optional[PaginaExtraida]:
+    """A página tratada como imagem (L-9) sai inteira, como figura; None nas outras."""
+    from abbychess import montagem as mo
+    from abbychess import tipo_de_pagina as tp
+
+    if fonte is None:
+        return None
+    modelo = projeto.ler_sem_migrar(indice)
+    if modelo is None or not tp.tratada_como_imagem(modelo):
+        return None
+    imagem = fonte.pagina(indice)
+    figura = mo._figura(imagem, (0, 0, *imagem.size), "página tratada como imagem")
+    return PaginaExtraida(indice, [figura], diagramas=1, largura=imagem.width, altura=imagem.height)
 
 
 def _passadas_do_livro(paginas: List[PaginaExtraida], nativas: Dict[int, PaginaExtraida],
@@ -362,14 +404,16 @@ def _lances_no_relatorio(relatorio: Relatorio, projeto: ProjetoDeLivro, indice: 
     """As contagens da fila Lances (F-4) e os diagramas sem lado dito pelo livro (X-3)."""
     from abbychess import diagramas as dg
     from abbychess import evidencia as ev
+    from abbychess import lances as lc
     from abbychess import texto as tx
 
     modelo = projeto.ler_sem_migrar(indice)
     if modelo is None or not modelo.boxes:
         return
-    diagramas = dg.com_ids(list(modelo.diagramas))
+    chave = projeto.dados.chave_das_pecas
+    diagramas = dg.com_ids(lc.validar_pagina(modelo, chave))   # as letras podem ter mudado
     contagens = ev.contagens_dos_lances(modelo, tx.montar(modelo, com_os_nao_lidos=True), diagramas,
-                                        projeto.dados.chave_das_pecas)
+                                        chave)
     for chave, n in contagens.items():
         relatorio.lances[chave] = relatorio.lances.get(chave, 0) + n
     presumidos = sum(d.lido and not d.lado for d in diagramas)

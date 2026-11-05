@@ -68,7 +68,7 @@ from abbychess import servidor_de_leitura as sl
 from abbychess.fila_de_lances import EvidenciaNaPagina
 from abbychess.sessao_do_documento import ControladorDaSessao
 from abbychess import texto as tx
-from abbychess.modelo import (LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
+from abbychess.modelo import (LIDAS, NAO_RECONHECIDA, PaginaDeOutraVersao, RECONHECIDA, VERIFICADA,
                               Diferenca, Pagina, proximo_estado)
 from abbychess.navegador import Navegador
 from abbychess.operacoes_de_pagina import ControladorDaSequencia
@@ -367,12 +367,18 @@ class ControladorDePagina:
         except OSError as erro:
             self.eventos.emitir("aviso", "Página", str(erro))
             return False
+        try:
+            modelo = self.projeto.carregar_modelo(indice)
+        except PaginaDeOutraVersao as erro:     # D-1: nada mudou aqui, e o arquivo fica como está
+            self.eventos.emitir("aviso", "Página", f"A página {indice + 1} foi gravada por uma "
+                                f"versão mais nova do programa: atualize-o para abri-la ({erro}).")
+            return False
         de = self.indice
         self.indice, self.imagem, self.matriz = indice, imagem, matriz
         self._matriz_da_imagem = imagem
         self._letra_que_faltava = None
         self.navegador.chegou(de, indice, visita=visita)
-        self.modelo = self.projeto.carregar_modelo(indice)
+        self.modelo = modelo
         self.atual, self.pulados, self.selecao = None, set(), set()
         self.eventos.emitir("pagina_trocou")
         self.eventos.emitir("glifos_mudaram", None)

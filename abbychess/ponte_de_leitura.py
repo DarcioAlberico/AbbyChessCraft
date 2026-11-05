@@ -24,6 +24,7 @@ from abbychess import historico as hs
 from abbychess import pagina as pg
 from abbychess import editar_boxes as eb
 from abbychess import servidor_de_leitura as sl
+from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.modelo import LIDAS, Pagina, pid_de
 
@@ -84,7 +85,32 @@ class PonteDeLeitura:
 
         self._p.tarefa(titulo, lambda: self._preparar_reconhecer(indice, zona), falhou=falhou)
 
-    def _preparar_reconhecer(self, indice: int, zona=None):
+    def ler_como_texto(self) -> None:
+        """Ctrl+Shift+T na página tratada como imagem (L-9): a área vira texto e ela é relida,
+        num passo só do desfazer."""
+        from abbychess import tipo_de_pagina as tp
+
+        p = self._p
+        if p.modelo is None or not tp.tratada_como_imagem(p.modelo):
+            p._avisar("Esta página não está tratada como imagem.", 5000)
+            return
+        if not p._pode_ler() or self.servidor_parado():
+            return
+        indice = p.indice
+        p.tarefa("Lendo como texto", lambda: self._preparar_como_texto(indice),
+                 falhou=p._falhou("Ler como texto"))
+
+    def _preparar_como_texto(self, indice: int):
+        if indice != self._p.indice or not self._p._pode_ler():
+            return None
+        pagina = self._p._pagina_para_editar()
+        antes = self._p._instantaneo()
+        z = pagina.zonas[0]
+        pagina.zonas = [zn.Zona(zn.TEXTO, z.x1, z.y1, z.x2, z.y2)]
+        return self._preparar_reconhecer(indice, antes=antes)
+
+    def _preparar_reconhecer(self, indice: int, zona=None, antes=None):
+        """`antes`: o instantâneo que o desfazer volta, se quem chama já mudou a página."""
         if indice != self._p.indice or not self._p._pode_ler():
             return None
         pagina = self._p._pagina_para_editar()
@@ -93,7 +119,7 @@ class PonteDeLeitura:
         self.lendo_no_f5.add(pagina.pid)
         imagem, leitor = self._p.imagem, self._p.leitor
         zonas = [zona] if zona is not None else list(pagina.zonas)
-        antes = self._p._instantaneo()
+        antes = self._p._instantaneo() if antes is None else antes
         marcados = eb.a_manter_na_releitura(pagina.boxes, pagina.estado in LIDAS)   # §4.6
         if zona is not None:
             marcados = [b for b in marcados if zona.contem_o_centro(b)]

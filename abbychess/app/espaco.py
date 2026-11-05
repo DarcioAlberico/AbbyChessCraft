@@ -212,6 +212,8 @@ class EspacoDeTrabalho:
         barra = self.statusBar()
         self.rotulo_da_pagina = QLabel("")
         self.rotulo_da_fila = QLabel("")
+        self.rotulo_do_progresso = QLabel("")
+        self.rotulo_do_progresso.setAccessibleName("O progresso do livro")
         self.caixa_de_zoom = QSpinBox()
         self.caixa_de_zoom.setRange(int(vs.VisorDePagina.ESCALA_MINIMA * 100),
                                     int(vs.VisorDePagina.ESCALA_MAXIMA * 100))
@@ -245,8 +247,8 @@ class EspacoDeTrabalho:
         self.botao_avisos.setToolTip("Os avisos e erros do projeto (Resultados / Avisos)")
         self.botao_avisos.clicked.connect(self.abrir_avisos)
         self.botao_avisos.setFocusPolicy(Qt.FocusPolicy.NoFocus)    # o Tab do campo não para aqui
-        for widget in (self.rotulo_da_pagina, self.rotulo_da_fila, self.caixa_de_zoom,
-                       self.rotulo_do_lote, self.botao_cancelar, self.progresso,
+        for widget in (self.rotulo_do_progresso, self.rotulo_da_pagina, self.rotulo_da_fila,
+                       self.caixa_de_zoom, self.rotulo_do_lote, self.botao_cancelar, self.progresso,
                        self.carregando,
                        self.botao_avisos):
             barra.addPermanentWidget(widget)
@@ -580,6 +582,9 @@ class EspacoDeTrabalho:
         """A gaveta com o `livro.json` de agora; `seguir`: a página aberta mudou, e a gaveta
         a escolhe (as outras atualizações não mexem na seleção nem na rolagem)."""
         p = self.pagina
+        if p.projeto is not None and p.fonte is not None:
+            self.rotulo_do_progresso.setText(lv.progresso(
+                p.projeto.resumo.do_livro_com_a_aberta(p.indice, p.modelo), p.fonte.total))
         if not self.doca_paginas.isVisible() or p.projeto is None or p.fonte is None:
             return
         self.paginas.mostrar(p.fonte.total, p.projeto.resumo.do_livro(),
@@ -685,11 +690,11 @@ class EspacoDeTrabalho:
 
     def _espaco_padrao(self) -> None:
         """O espaço de um projeto sem `janela.json`: o arranjo da largura, a fila por
-        confiança, o Glifo, o Documento e a página inteira (nada do projeto anterior fica)."""
+        confiança, o Glifo, o Documento e a largura da mancha (nada do projeto anterior fica)."""
         self.fila.definir("confianca")
         self.inspetor.mostrar("glifo")
         self.vista.setCurrentIndex(0)
-        self.visor.zoom_pagina()
+        self.visor.zoom_largura()               # a mancha, e não a folha (U-14)
         self.arranjo_padrao()
 
     def abrir_avisos_do_projeto(self, projeto) -> None:

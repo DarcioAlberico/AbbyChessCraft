@@ -384,8 +384,8 @@ class ControladorDaFila:
         if alvo is None:
             p._avisar("Não há mais lance por conferir no livro.", 5000)
             return
-        p.ir_para(alvo)
-        self.lances.recontar(0 if passo > 0 else -1)
+        if p.ir_para(alvo):
+            self.lances.recontar(0 if passo > 0 else -1)
 
     def ir_aos_lances(self) -> None:
         """F4: a fila Lances, fixa até fechar o projeto ou escolher outra."""

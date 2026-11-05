@@ -27,6 +27,7 @@ setas das bordas ficam com o campo (a exceção 6 de §3.4), que dispara a açã
 from __future__ import annotations
 
 import html
+from collections import Counter
 from typing import Optional
 
 import numpy as np
@@ -57,6 +58,8 @@ PALETA = [
     "△", "▼",
 ]
 COLUNAS_DA_PALETA = 6
+#: Abaixo desta altura de janela, a grade da paleta sai do Inspetor (U-10).
+ALTURA_DA_GRADE_DA_PALETA = 900
 
 #: O nome de cada símbolo, na dica do botão: ⩲ e ⩱ se parecem com ± e ∓ em
 #: várias fontes, e a dica tira a dúvida antes de ensinar o padrão errado.
@@ -88,17 +91,90 @@ NOMES_DOS_SIMBOLOS = {
 FONTE_DE_SIMBOLOS = "Segoe UI Symbol"
 
 
-def menu_da_paleta(pai, inserir) -> QMenu:
+#: O que se digita para achar o símbolo na paleta, além do nome: o que ele parece. ± em 3 teclas:
+#: F2, `+`, `=` (CA-U10), porque o filtro com um resultado só já o escolhe.
+APELIDOS_DOS_SIMBOLOS = {"±": "+=", "∓": "=+", "⩲": "+/=", "⩱": "=/+", "+-": "+-", "-+": "-+",
+                         "∞": "inf", "□": "[]", "⇄": "<>", "○": "o"}
+#: Quantos dos mais usados vêm primeiro, nas teclas de 1 a 9 e 0.
+QUANTOS_MAIS_USADOS = 10
+#: Quantas vezes cada símbolo foi escolhido na paleta, nesta sessão.
+_USO_DA_PALETA: Counter = Counter()
+
+
+def _casa_com_o_filtro(simbolo: str, filtro: str) -> bool:
+    filtro = filtro.casefold()
+    return (simbolo.casefold().startswith(filtro)
+            or APELIDOS_DOS_SIMBOLOS.get(simbolo, "").startswith(filtro)
+            or filtro in NOMES_DOS_SIMBOLOS.get(simbolo, "").casefold())
+
+
+class MenuDaPaleta(QMenu):
+    """A paleta com filtro: digitar estreita a lista pelo símbolo, pelo apelido ou pelo nome, e
+    um resultado só já é a escolha. Com o filtro vazio, 1 a 9 e 0 escolhem os mais usados."""
+
+    def __init__(self, pai, inserir):
+        super().__init__(pai)
+        self.setFont(QFont(FONTE_DE_SIMBOLOS, 12))
+        self._inserir = inserir
+        self._escolhido = False
+        self.filtro = ""
+        self._mais_usados = [s for s, _n in _USO_DA_PALETA.most_common(QUANTOS_MAIS_USADOS)]
+        self.acoes_dos_simbolos = {}
+        for n, simbolo in enumerate(self._mais_usados):
+            self.addAction(f"{(n + 1) % 10}  {simbolo}   {NOMES_DOS_SIMBOLOS.get(simbolo, '')}",
+                           lambda s=simbolo: self.escolher(s))
+        if self._mais_usados:
+            self.addSeparator()
+        for i, simbolo in enumerate(PALETA):
+            if i and i % COLUNAS_DA_PALETA == 0:
+                self.addSeparator()
+            self.acoes_dos_simbolos[simbolo] = self.addAction(
+                f"{simbolo}   {NOMES_DOS_SIMBOLOS.get(simbolo, '')}",
+                lambda s=simbolo: self.escolher(s))
+
+    def escolher(self, simbolo: str) -> None:
+        self._escolhido = True
+        _USO_DA_PALETA[simbolo] += 1
+        self._inserir(simbolo)
+
+    def keyPressEvent(self, evento):
+        texto = evento.text()
+        if self._escolhido:
+            return
+        if evento.key() == Qt.Key.Key_Backspace and self.filtro:
+            self._filtrar(self.filtro[:-1])
+        elif not texto or not texto.isprintable() or evento.key() == Qt.Key.Key_Space:
+            super().keyPressEvent(evento)
+        elif not self.filtro and texto.isdigit():
+            self._do_digito(texto)
+        else:
+            self._filtrar(self.filtro + texto)
+
+    def _do_digito(self, digito: str) -> None:
+        k = (int(digito) - 1) % 10
+        if k < len(self._mais_usados):
+            self.close()
+            self.escolher(self._mais_usados[k])
+
+    def _filtrar(self, filtro: str) -> None:
+        self.filtro = filtro
+        achados = [s for s in PALETA if _casa_com_o_filtro(s, filtro)]
+        for simbolo, acao in self.acoes_dos_simbolos.items():
+            acao.setVisible(simbolo in achados)
+        for acao in self.actions():
+            if acao.isSeparator() or acao not in self.acoes_dos_simbolos.values():
+                acao.setVisible(not filtro)
+        if len(achados) == 1:
+            self.close()
+            self.escolher(achados[0])
+        elif achados:
+            self.setActiveAction(self.acoes_dos_simbolos[achados[0]])
+
+
+def menu_da_paleta(pai, inserir) -> MenuDaPaleta:
     """A paleta (F2) como menu: o símbolo escolhido vai a `inserir` (o campo do treino, o
-    cursor do Documento). Os separadores são as linhas da grade."""
-    menu = QMenu(pai)
-    menu.setFont(QFont(FONTE_DE_SIMBOLOS, 12))
-    for i, simbolo in enumerate(PALETA):
-        if i and i % COLUNAS_DA_PALETA == 0:
-            menu.addSeparator()
-        menu.addAction(f"{simbolo}   {NOMES_DOS_SIMBOLOS.get(simbolo, '')}",
-                       lambda s=simbolo: inserir(s))
-    return menu
+    cursor do Documento, a seleção da Galeria)."""
+    return MenuDaPaleta(pai, inserir)
 
 NOMES_DAS_FONTES = {
     "manual": "confirmado por você",
@@ -336,6 +412,7 @@ class PainelDeTreino(QWidget):
         caixa.addWidget(self.fila)              # antes da paleta, que é alta: a 768 px ficam à vista
         caixa.addWidget(self.padroes)
         caixa.addWidget(paleta)
+        self.grade_da_paleta = paleta
         caixa.addWidget(legenda)
         caixa.addStretch(1)
 
@@ -491,6 +568,18 @@ class PainelDeTreino(QWidget):
     def pedir_descartar(self) -> None:
         if self._ativo:
             self.descartar.emit()
+
+    def showEvent(self, evento):
+        super().showEvent(evento)
+        self.ajustar_a_paleta()
+
+    def resizeEvent(self, evento):
+        super().resizeEvent(evento)
+        self.ajustar_a_paleta()
+
+    def ajustar_a_paleta(self) -> None:
+        """A grade é alta: abaixo de 900 px de janela ela sai, e o F2 fica (U-10)."""
+        self.grade_da_paleta.setVisible(self.window().height() >= ALTURA_DA_GRADE_DA_PALETA)
 
     def abrir_paleta(self) -> None:
         """F2: a paleta como menu, no campo; o símbolo escolhido entra no cursor."""

@@ -533,7 +533,7 @@ def test_o_projeto_seguinte_sem_espaco_comeca_do_padrao(app, tmp_path, sim):
         j.usar(dois, pg.FonteDePaginas(dois.fonte),
                LeitorDoLivro(dois.pasta_de_padroes, limiares=dois.dados.limiares))
         assert j.fila.modo == "confianca" and j.inspetor.atual() == "glifo"
-        assert j.vista.currentIndex() == 0 and j.visor.modo_zoom == "pagina"
+        assert j.vista.currentIndex() == 0 and j.visor.modo_zoom == "largura"     # U-14
         j.registrar_aviso(av.AVISO, "Teste", "vai para o Dois")
         um_log = Path(um.pasta) / av.ARQUIVO
         assert not um_log.exists() or "vai para o Dois" not in um_log.read_text(encoding="utf-8")

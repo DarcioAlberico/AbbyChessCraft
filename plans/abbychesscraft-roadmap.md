@@ -1108,6 +1108,22 @@ de contato: Odds & Ends (os 3 sem linha não têm coordenada ou não são tabule
 Endgame Technique (o de 1 linha é um tabuleiro impresso torto), Karolyi e Mirkovic; os outros, só
 pela contagem. O erro de um tabuleiro torto é não apagar. Falta usar num livro do começo ao fim.
 
+## A coluna só de tabuleiros (2026-11-04, ramo `fen-na-coluna`; §5, CA-5.2)
+
+O CA-5.2 estava na verificação do passo F sem teste, e a limitação do registro do passo
+(`docs/revisoes/passo-f.md`) era ele reprovando: na p. 12 do Yusupov os três diagramas enchem a
+coluna da esquerda e, só pelos glifos, a página tem uma coluna. `OrdemDeLeitura.da_pagina` recebe
+as caixas dos tabuleiros: dois ou mais empilhados, com o texto de um lado só, em 6 filas ou mais e
+acompanhando ao menos metade da altura da pilha, fazem as colunas. O Documento e a exportação usam
+a mesma regra. O teste do livro lê à resolução do programa e do gabarito (300 dpi), não aos 250 do
+CA, e o gabarito do Yusupov não foi revisado pelo usuário.
+
+Nos projetos do D: (só lendo os JSON), a regra muda 198 de 2.201 páginas com dois tabuleiros ou
+mais, todas do Yusupov completo; a conferência a olho foi de 9 páginas, antes da guarda da altura,
+que tirou o único falso visto (Odds & Ends, i177). **Em aberto, à espera do usuário:** nesse formato,
+o comentário fica na altura do diagrama, e a ordem por colunas do CA-5.2 afasta um do outro. Sobra:
+na p. 12, um cisco do ornamento lido "=" cola em "met by…".
+
 ---
 
 ## Antipadrões

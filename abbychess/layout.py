@@ -26,7 +26,13 @@ FILAS_DE_COLUNA = 6
 #: da calha. No Mirkovic (calha de 48 px), as linhas de largura total têm de -10 a 21 px ali
 #: e o título centrado 13; entre as duas colunas o vão é a calha inteira ou mais.
 VAO_DA_LINHA_NA_CALHA = 0.6
+#: Quantos tabuleiros empilhados fazem uma coluna (`_coluna_dos_tabuleiros`). Um só é o que o
+#: parágrafo contorna, e o lugar dele é decidido pelo fim de frase (`texto._lugar_do_diagrama`).
+TABULEIROS_DA_COLUNA = 2
+#: Quanto da altura da pilha de tabuleiros o texto ao lado precisa acompanhar para ser coluna.
+COBERTURA_DA_PILHA = 0.5
 ChaveDeLeitura = Tuple[int, int]
+Caixa = Tuple[int, int, int, int]
 
 
 def _coluna_de(x: float, colunas: Sequence[Tuple[int, int]]) -> int:
@@ -52,7 +58,10 @@ class OrdemDeLeitura:
     O que atravessa a calha (o título centrado sobre as duas colunas) é uma faixa sozinha,
     na altura dele; entre duas dessas, as colunas da esquerda para a direita. Página de uma
     coluna é um trecho só. A mesma chave ordena as figuras da exportação (`chave` de um
-    ponto): o diagrama da coluna da esquerda fica entre os parágrafos dela."""
+    ponto): o diagrama da coluna da esquerda fica entre os parágrafos dela.
+
+    Os glifos não veem a coluna feita só de tabuleiros (a p. 12 do Yusupov, três diagramas de um
+    lado e o comentário do outro): `tabuleiros`, as caixas deles, a mostram."""
 
     colunas: Tuple[Tuple[int, int], ...] = ()
     faixas: Tuple[Tuple[float, float], ...] = ()
@@ -62,17 +71,18 @@ class OrdemDeLeitura:
     deteccao: object = field(default=None, compare=False, repr=False)
 
     @classmethod
-    def da_pagina(cls, boxes: Sequence[BoxEntry]) -> "OrdemDeLeitura":
+    def da_pagina(cls, boxes: Sequence[BoxEntry], tabuleiros: Sequence[Caixa] = ()
+                  ) -> "OrdemDeLeitura":
         from core.services.box_service import BoxService
 
         if len(boxes) < 2:
             return cls()
         deteccao = BoxService.detectar_colunas_e_transversais(list(boxes))
         colunas = deteccao[0]
-        if len(colunas) < 2:
-            return cls(deteccao=deteccao)
         altura = statistics.median(b.y2 - b.y1 for b in boxes)
-        if _filas_de_cada_coluna(boxes, colunas, altura) < FILAS_DE_COLUNA:
+        if len(colunas) < 2 or _filas_de_cada_coluna(boxes, colunas, altura) < FILAS_DE_COLUNA:
+            colunas = _coluna_dos_tabuleiros(boxes, tabuleiros, altura)
+        if len(colunas) < 2:
             return cls(deteccao=deteccao)
         grupos = _grupos_pela_altura(_na_calha(boxes, _calhas(colunas), altura))
         faixas = _faixas_dos_grupos(grupos, altura)
@@ -120,9 +130,67 @@ class OrdemDeLeitura:
 
 def _filas_de_cada_coluna(boxes: Sequence[BoxEntry], colunas, altura: float) -> int:
     """Quantas filas de texto (alturas de glifo) tem a coluna que tem menos."""
-    filas = [{round(((b.y1 + b.y2) / 2) / max(1.0, altura)) for b in boxes
-              if inicio <= (b.x1 + b.x2) / 2 <= fim} for inicio, fim in colunas]
-    return min(len(fila) for fila in filas)
+    return min(_filas_do_lado([b for b in boxes if inicio <= (b.x1 + b.x2) / 2 <= fim], altura)
+               for inicio, fim in colunas)
+
+
+def _coluna_dos_tabuleiros(boxes: Sequence[BoxEntry], tabuleiros: Sequence[Caixa], altura: float
+                           ) -> Tuple[Tuple[int, int], ...]:
+    """As duas colunas (a dos tabuleiros e a do texto) da página cujos tabuleiros, todos
+    empilhados, têm o texto de um lado só, em `FILAS_DE_COLUNA` filas ou mais, sem nada que
+    atravesse a calha na altura deles; `()` se não for assim."""
+    pilha = sorted(tabuleiros, key=lambda c: c[1])
+    if not _empilhados(pilha):
+        return ()
+    topo, pe = pilha[0][1], pilha[-1][3]
+    na_altura = [b for b in boxes if b.y1 < pe and b.y2 > topo]
+    return _colunas_dos_lados(na_altura, min(c[0] for c in pilha), max(c[2] for c in pilha),
+                              altura, pe - topo)
+
+
+def _colunas_dos_lados(na_altura: Sequence[BoxEntry], inicio: int, fim: int, altura: float,
+                       altura_da_pilha: int) -> Tuple[Tuple[int, int], ...]:
+    """A pilha em x (`inicio`, `fim`) e o texto do único lado que é coluna; `()` se nenhum
+    lado for, se os dois forem ou se algum glifo cruzar a borda da pilha."""
+    if _cruza_a_borda(na_altura, inicio, fim):
+        return ()
+    antes = [b for b in na_altura if b.x2 <= inicio]
+    depois = [b for b in na_altura if b.x1 >= fim]
+    coluna_antes = _e_coluna_ao_lado(antes, altura, altura_da_pilha)
+    coluna_depois = _e_coluna_ao_lado(depois, altura, altura_da_pilha)
+    if coluna_antes == coluna_depois:
+        return ()
+    if coluna_depois:
+        return (inicio, fim), _extensao_em_x(depois)
+    return _extensao_em_x(antes), (inicio, fim)
+
+
+def _cruza_a_borda(boxes: Sequence[BoxEntry], inicio: int, fim: int) -> bool:
+    return any(b.x1 < fim < b.x2 or b.x1 < inicio < b.x2 for b in boxes)
+
+
+def _empilhados(pilha: Sequence[Caixa]) -> bool:
+    """Os tabuleiros (de cima para baixo) bastam para uma coluna, um sobre o outro."""
+    return (len(pilha) >= TABULEIROS_DA_COLUNA
+            and all(a[3] <= b[1] for a, b in zip(pilha, pilha[1:])))
+
+
+def _extensao_em_x(boxes: Sequence[BoxEntry]) -> Tuple[int, int]:
+    return min(b.x1 for b in boxes), max(b.x2 for b in boxes)
+
+
+def _e_coluna_ao_lado(boxes: Sequence[BoxEntry], altura: float, altura_da_pilha: int) -> bool:
+    """O texto ao lado da pilha é uma coluna: tem as filas e acompanha a altura dela. As poucas
+    linhas entre dois tabuleiros centrados não são (Odds & Ends, i177)."""
+    if _filas_do_lado(boxes, altura) < FILAS_DE_COLUNA:
+        return False
+    extensao = max(b.y2 for b in boxes) - min(b.y1 for b in boxes)
+    return extensao >= COBERTURA_DA_PILHA * altura_da_pilha
+
+
+def _filas_do_lado(boxes: Sequence[BoxEntry], altura: float) -> int:
+    """Quantas filas de texto (alturas de glifo) os glifos ocupam."""
+    return len({round(((b.y1 + b.y2) / 2) / max(1.0, altura)) for b in boxes})
 
 
 def _calhas(colunas) -> List[Tuple[float, float, float]]:

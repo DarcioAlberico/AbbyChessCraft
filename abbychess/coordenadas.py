@@ -170,8 +170,8 @@ def _componentes(arr: np.ndarray, caixa: Caixa) -> List[Caixa]:
         return []
     _limiar, binaria = cv2.threshold(recorte, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     quantos, _rotulos, medidas, _centros = cv2.connectedComponentsWithStats(binaria, 8)
-    return [(x1 + int(x), y1 + int(y), x1 + int(x + l), y1 + int(y + a))
-            for x, y, l, a, _area in medidas[1:quantos]]
+    return [(x1 + int(x), y1 + int(y), x1 + int(x + largura), y1 + int(y + a))
+            for x, y, largura, a, _area in medidas[1:quantos]]
 
 
 def _cinza(imagem) -> np.ndarray:

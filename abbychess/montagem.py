@@ -796,7 +796,7 @@ def pagina_extraida(indice: int, boxes: Sequence[BoxEntry],
     """
     cortes = [t[1] for t in tabuleiros] if imagem is not None else []
     texto = _texto_da_pagina(boxes, tabuleiros, estrutura, manter_margens)
-    leitura = OrdemDeLeitura.da_pagina(texto)
+    leitura = OrdemDeLeitura.da_pagina(texto, tabuleiros)
     com_trecho = _paragrafos_por_trecho(texto, cortes, leitura, estrutura, manter_quebras)
     blocos: list = [p for _trecho, p in com_trecho]
     figuras = []

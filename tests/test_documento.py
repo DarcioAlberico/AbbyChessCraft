@@ -379,6 +379,29 @@ def test_o_zoom_no_documento_muda_o_corpo_e_nao_a_imagem(app, lida_a_mao):
     assert j.texto.corpo == padrao
 
 
+@pytest.mark.parametrize("tecla", [Qt.Key.Key_7, Qt.Key.Key_8, Qt.Key.Key_9])
+def test_o_zoom_de_pagina_no_documento_diz_onde_vale(app, lida_a_mao, tecla):
+    """§3.3: Ctrl+7/8/9 não fazem nada no Documento, e a barra diz para ir à Imagem."""
+    j = lida_a_mao
+    escala = j.visor.escala()
+    j.vista.setCurrentWidget(j.painel_do_documento)
+    j.texto.setFocus()
+    app.processEvents()
+    QTest.keyClick(j.texto, tecla, Qt.KeyboardModifier.ControlModifier)
+    assert abs(j.visor.escala() - escala) < 1e-9
+    assert "foco na Imagem (Alt+2)" in j.statusBar().currentMessage()
+
+
+def test_o_zoom_de_pagina_na_imagem_segue_valendo(app, lida_a_mao):
+    j = lida_a_mao
+    j.visor.setFocus()
+    app.processEvents()
+    j.statusBar().clearMessage()
+    QTest.keyClick(j.visor, Qt.Key.Key_8, Qt.KeyboardModifier.ControlModifier)
+    assert abs(j.visor.escala() - 1.0) < 1e-6
+    assert "foco na Imagem" not in j.statusBar().currentMessage()
+
+
 def test_ctrl_shift_h_na_janela(app, lida_a_mao):
     j = lida_a_mao
     j.texto.setFocus()

@@ -746,21 +746,3 @@ def test_reabrir_em_1366_com_a_gaveta_aberta_mantem_a_imagem(app, tmp_path, pdf_
         assert abs(k.doca_resultados.height() - 130) <= 6
     finally:
         k.close()
-
-
-@pytest.mark.parametrize("tecla", [Qt.Key.Key_7, Qt.Key.Key_8, Qt.Key.Key_9])
-def test_o_zoom_de_pagina_no_documento_diz_onde_vale(app, janela, tecla):  # noqa: F811
-    """§3.3: Ctrl+7/8/9 não fazem nada no Documento, e a barra diz para ir à Imagem."""
-    janela.focar(3)
-    escala = janela.visor.escala()
-    QTest.keyClick(QApplication.focusWidget(), tecla, Qt.KeyboardModifier.ControlModifier)
-    assert janela.visor.escala() == escala
-    assert "foco na Imagem (Alt+2)" in janela.statusBar().currentMessage()
-
-
-def test_o_zoom_de_pagina_na_imagem_segue_valendo(app, janela):  # noqa: F811
-    janela.focar(2)
-    janela.statusBar().clearMessage()
-    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_8, Qt.KeyboardModifier.ControlModifier)
-    assert abs(janela.visor.escala() - 1.0) < 1e-6
-    assert "foco na Imagem" not in janela.statusBar().currentMessage()

@@ -96,6 +96,15 @@ class DesenhoDaJanela:
         if p.cache is not None and p.cache.tem(p.navegador.proxima_provavel):
             self._pixmap(p.navegador.proxima_provavel, p.cache.pagina(p.navegador.proxima_provavel)[0])
 
+    def zoom_de_pagina(self, zoom) -> None:
+        """Ctrl+7/8/9: `zoom()` na Imagem e no Glifo; no Documento, o corpo é do Ctrl++ e Ctrl+−, e
+        a barra diz onde vale (§3.3)."""
+        if self._no_documento():
+            self.statusBar().showMessage(
+                teclado.com_teclas("Zoom de página: foco na Imagem ({foco_imagem})"), 6000)
+        else:
+            zoom()
+
     def _zoom_mudou(self, escala: float, limite: str) -> None:
         self.caixa_de_zoom.blockSignals(True)
         self.caixa_de_zoom.setValue(round(escala * 100))

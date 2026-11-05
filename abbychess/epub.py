@@ -211,25 +211,29 @@ def xhtml_do_texto(paragrafo: Paragrafo, simbolos: str,
     texto = aspas_curvas(sem_proibidos(texto))
     duvidosos = getattr(paragrafo, "duvidosos", ()) if realce else ()
     saida = []
-    for cru, (negrito, italico, simbolo, link, duvidoso) in trechos_marcados(
-            texto, simbolos, paragrafo.negrito, paragrafo.italico, duvidosos, links):
+    for cru, (negrito, italico, simbolo, link, duvidoso, sublinhado) in trechos_marcados(
+            texto, simbolos, paragrafo.negrito, paragrafo.italico, duvidosos, links,
+            getattr(paragrafo, "sublinhado", ())):
         pedaco = html.escape(cru, quote=False)
         if quebras:
             pedaco = pedaco.replace("\n", "<br/>")
-        pedaco = _com_estilo(pedaco, negrito, italico, simbolo, duvidoso)
+        pedaco = _com_estilo(pedaco, negrito, italico, simbolo, duvidoso, sublinhado)
         if link >= 0:
             pedaco = f'<a href="{html.escape(links[link][2], quote=True)}">{pedaco}</a>'
         saida.append(pedaco)
     return "".join(saida)
 
 
-def _com_estilo(pedaco: str, negrito: bool, italico: bool, simbolo: bool, duvidoso: bool) -> str:
+def _com_estilo(pedaco: str, negrito: bool, italico: bool, simbolo: bool, duvidoso: bool,
+                sublinhado: bool = False) -> str:
     """O trecho dentro da marcação do estilo dele, de dentro para fora: o realce, os
-    símbolos, o itálico e o negrito."""
+    símbolos, o sublinhado, o itálico e o negrito."""
     if duvidoso:
         pedaco = f"<mark>{pedaco}</mark>"
     if simbolo:
         pedaco = f'<span class="s">{pedaco}</span>'
+    if sublinhado:
+        pedaco = f"<u>{pedaco}</u>"
     if italico:
         pedaco = f"<em>{pedaco}</em>"
     if negrito:

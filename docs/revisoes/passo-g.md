@@ -64,5 +64,6 @@ Os commits: `cfdfdd2` e `849ccde`.
 - Nada impede ensinar uma caixa de várias letras.
 - ~~A releitura (F5) troca o negrito e o itálico decididos pelo usuário pelos medidos (o
   sublinhado fica).~~ Corrigido em 2026-11-05 (`Estilo.decidido`).
-- O sublinhado fica só no Documento (a exportação leva negrito e itálico).
+- ~~O sublinhado fica só no Documento (a exportação leva negrito e itálico).~~ Corrigido em
+  2026-11-05: sai no EPUB e no DOCX.
 - O parágrafo novo aparece no Documento como um espaço um pouco maior entre as linhas.

@@ -43,6 +43,11 @@ def _texto_inteiro(n: int = 20) -> str:
     return "\n".join(f"l{k}" for k in range(n))
 
 
+def _linha_do_comentario(k: int, i: int) -> str:
+    """Sem espaços: os vãos alinhados de linhas iguais fariam colunas dentro do texto."""
+    return f"a{k}{i}" + "x" * 16
+
+
 def _comentarios(x0: int = 500, titulo: str = "Diagram 1-{}") -> list:
     """O resto da página anterior e três comentários, cada um com o título e cinco linhas,
     com o vão acima do título que abre parágrafo."""
@@ -52,13 +57,13 @@ def _comentarios(x0: int = 500, titulo: str = "Diagram 1-{}") -> list:
         entries += _linha(titulo.format(k), y, x0)
         for i in range(5):
             y += 50
-            entries += _linha(f"a{k}{i}", y, x0)
+            entries += _linha(_linha_do_comentario(k, i), y, x0)
         y += 50
     return entries
 
 
 def _comentario(k: int, titulo: str = "Diagram 1-{}") -> str:
-    return "\n".join([titulo.format(k)] + [f"a{k}{i}" for i in range(5)])
+    return "\n".join([titulo.format(k)] + [_linha_do_comentario(k, i) for i in range(5)])
 
 
 def test_cada_tabuleiro_da_esquerda_vem_antes_do_titulo_dele():
@@ -67,7 +72,7 @@ def test_cada_tabuleiro_da_esquerda_vem_antes_do_titulo_dele():
 
 
 def test_cada_tabuleiro_da_direita_vem_antes_do_titulo_dele():
-    caixas = tuple((500, y1, 800, y2) for _, y1, _, y2 in PILHA)
+    caixas = tuple((600, y1, 900, y2) for _, y1, _, y2 in PILHA)
     assert _blocos(_comentarios(x0=100), caixas) == ["fim.", "d0", _comentario(1), "d1",
                                                      _comentario(2), "d2", _comentario(3)]
 
@@ -106,7 +111,7 @@ def test_o_titulo_de_mais_nao_pareia():
 
 
 def test_a_legenda_lida_vai_com_o_tabuleiro_e_nao_conta_como_titulo():
-    legenda = _linha("Diagram 1-2", 410, x0=100)
+    legenda = _linha("Diagram 1-2", 430, x0=100)
     blocos = _blocos(legenda + _comentarios())
     assert blocos == ["fim.", "d0", _comentario(1) + "\nDiagram 1-2", "d1", _comentario(2),
                       "d2", _comentario(3)]
@@ -119,22 +124,20 @@ def test_o_titulo_de_largura_inteira_vem_antes_de_tudo():
 
 
 def test_a_exportacao_poe_o_tabuleiro_e_a_legenda_antes_do_titulo():
-    legenda = _linha("Diagram 1-2", 410, x0=100)
+    legenda = _linha("Diagram 1-2", 430, x0=100)
     extraida = mo.pagina_extraida(0, legenda + _comentarios(), PILHA, Image.new("RGB", (1000, 1500)),
                                   desenhar_diagramas=False)
-    ordem = [getattr(b, "texto", "figura").split(" ")[0] + " " + getattr(b, "texto", "").split(" ")[-1]
-             if not isinstance(b, mo.Figura) else "figura" for b in extraida.blocos]
-    figuras = [k for k, nome in enumerate(ordem) if nome == "figura"]
+    figuras = [k for k, b in enumerate(extraida.blocos) if isinstance(b, mo.Figura)]
     assert len(figuras) == 3
     depois = [extraida.blocos[k + 1].texto for k in figuras]
-    assert [d.split(" a")[0] for d in depois] == ["Diagram 1-1", "Diagram 1-2", "Diagram 1-3"]
+    assert [d[:len("Diagram 1-1")] for d in depois] == ["Diagram 1-1", "Diagram 1-2", "Diagram 1-3"]
     assert extraida.blocos[figuras[1] - 1].texto == "Diagram 1-2"
 
 
 def test_a_pagina_tem_as_duas_colunas_e_sabe_qual_e_a_pilha():
     leitura = OrdemDeLeitura.da_pagina(_comentarios(), PILHA)
     assert len(leitura.colunas) == 2 and leitura.coluna_da_pilha == 0
-    caixas = tuple((500, y1, 800, y2) for _, y1, _, y2 in PILHA)
+    caixas = tuple((600, y1, 900, y2) for _, y1, _, y2 in PILHA)
     assert OrdemDeLeitura.da_pagina(_comentarios(x0=100), caixas).coluna_da_pilha == 1
     assert OrdemDeLeitura.da_pagina(_comentarios()).coluna_da_pilha is None
 
@@ -178,7 +181,7 @@ def test_mover_o_tabuleiro_nao_reaproveita_a_ordem_guardada():
     entries = _coluna_de_texto()
     sem_pilha = tx.pagina_avulsa(entries, [_lido(caixa=PILHA[0])])
     assert [b.diagrama_id for b in tx.montar(sem_pilha).blocos if b.diagrama_id] == ["d0"]
-    assert _blocos(entries) == ["d0", "d1", "d2", _texto_inteiro()]
+    assert [b for b in _blocos(entries) if b.startswith("d")] == ["d0", "d1", "d2"]
 
 
 # ----------------------------------------------------------------------

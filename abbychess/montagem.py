@@ -17,7 +17,7 @@ from core.box_model import BoxEntry
 from core.pagina import Figura, PaginaExtraida, Paragrafo
 
 from abbychess.diagramas import DiagramaLido, para_caixas
-from abbychess.layout import OrdemDeLeitura
+from abbychess.layout import OrdemDeLeitura, lugares_da_pilha
 from abbychess.projeto import ProjetoDeLivro
 
 
@@ -802,7 +802,9 @@ def pagina_extraida(indice: int, boxes: Sequence[BoxEntry],
     figuras = []
     if imagem is not None:
         figuras = _figuras_da_pagina(imagem, leitura, tabuleiros, diagramas, desenhar_diagramas)
-        blocos = _na_ordem_de_leitura(com_trecho, figuras)
+        figuras, com_trecho_e_topo = _com_a_pilha(texto, leitura, estrutura, tabuleiros, figuras,
+                                                  com_trecho)
+        blocos = _na_ordem_de_leitura(com_trecho_e_topo, figuras)
     largura, altura = imagem.size if imagem is not None else (0, 0)
     return PaginaExtraida(numero=indice, blocos=blocos,
                           caracteres=sum(len(b.char) for b in boxes if b.char),
@@ -832,8 +834,28 @@ def _figuras_da_pagina(imagem: Image.Image, leitura: OrdemDeLeitura, tabuleiros,
             for d in para_caixas(tabuleiros, diagramas)]
 
 
-def _na_ordem_de_leitura(com_trecho, figuras) -> list:
-    ordem = [(trecho, p.topo or 0, p) for trecho, p in com_trecho] + figuras
+def _com_a_pilha(texto: Sequence[BoxEntry], leitura: OrdemDeLeitura, estrutura, tabuleiros,
+                 figuras: list, com_trecho: list) -> Tuple[list, list]:
+    """As figuras e os parágrafos como (trecho, topo, bloco) para ordenar: na coluna só de
+    tabuleiros, cada figura e a legenda dela antes do comentário (`layout.lugares_da_pilha`)."""
+    paragrafos = [(trecho, p.topo or 0, p) for trecho, p in com_trecho]
+    if leitura.coluna_da_pilha is None:
+        return figuras, paragrafos
+    altura = statistics.median(b.y2 - b.y1 for b in texto)
+    linhas = [(ln.trecho, ln.topo, ln.texto) for ln in _linhas(texto, leitura, estrutura)]
+    lugares, legendas = lugares_da_pilha(leitura, tabuleiros, linhas, altura)
+    novas = [(lugar[0], lugar[1] - 0.5, figura[2]) for lugar, figura in zip(lugares, figuras)]
+    return novas, [_no_lugar(item, legendas) for item in paragrafos]
+
+
+def _no_lugar(item: tuple, legendas: dict) -> tuple:
+    """(trecho, topo, parágrafo), com o parágrafo da legenda antes da figura dela."""
+    destino = legendas.get(item[:2])
+    return item if destino is None else (destino[0], destino[1] - 0.6, item[2])
+
+
+def _na_ordem_de_leitura(paragrafos, figuras) -> list:
+    ordem = list(paragrafos) + figuras
     return [b for _t, _y, b in sorted(ordem, key=lambda item: (item[0], item[1]))]
 
 

@@ -46,6 +46,11 @@ def formato_novo(base: QTextCharFormat, estado: Optional[str], desconhecido: boo
                               else QFont.Weight.Normal)
         formato.setFontItalic(bool(estilo_do_glifo.italico))   # None: não medido
         formato.setFontUnderline(estilo_do_glifo.sublinhado)
+    if estado == gd.FORTE:                      # o estado não depende só da cor: há traço (CA-F2.2)
+        formato.setBackground(estilo.FUNDO_FORTE)
+        formato.setUnderlineStyle(QTextCharFormat.UnderlineStyle.SingleUnderline)
+        formato.setUnderlineColor(estilo.TINTA)
+        return formato
     if estado in (gd.PENDENTE, gd.SEM_LEITURA):
         formato.setBackground(estilo.FUNDO_DE_BAIXA_CONFIANCA)
     elif estado == gd.AGUARDANDO:

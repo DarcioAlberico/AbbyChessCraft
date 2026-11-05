@@ -21,7 +21,7 @@ from abbychess import verificacao as vf
 from abbychess.app import acoes
 from abbychess.app.imagens import pixmap_da_pagina
 from abbychess.app import estilo
-from abbychess.app import teclado, vazios
+from abbychess.app import registro_de_eventos, teclado, vazios
 from abbychess.controlador import AVISO_LONGO_MS
 
 
@@ -47,12 +47,16 @@ class DesenhoDaJanela:
         self._pre_carga.start()
         self._pre_pixmap.start()                # e o pixmap dela, quando a pré-carga a tiver
         self._fechar_conferencia()              # os diagramas em edição eram da outra
+        registro_de_eventos.anotar_pagina(p.modelo.pid if p.modelo is not None else None,
+                                          self.fila.modo)
         self.verificacao.limpar(vazios.escolha_a_fila_de_palavras())
         self._layout_mudou()
         if self.visor.modo_areas and not p.zonas:
             self.areas.automaticas()
         if self.fila.modo == "palavras":        # a página nova também é verificada
             self.verificar_texto()
+        elif self.fila.modo == "lances":
+            self.fila.lances.recontar(0)
         self.atualizar_barra()
         self.atualizar_paginas(seguir=True)
 
@@ -134,9 +138,7 @@ class DesenhoDaJanela:
             self.visor.selecionar(None)
             self.treino.limpar(vazios.pagina_nao_reconhecida()
                                if not p.boxes else
-                               "Nada a revisar nesta página. Clique num glifo para corrigi-lo, "
-                               + teclado.com_teclas("ou vá para o próximo pendente do livro "
-                                                    "({proxima_pagina_pendente})."))
+                               _sem_pendentes(self.fila.lances.resumo_da_pagina()))
             return
         self.treino.mostrar(p.matriz, p.box_atual(), p.fila_da_pagina.posicao_do_atual(),
                             tomar_o_foco=QApplication.focusWidget() is not self.texto)
@@ -161,6 +163,7 @@ class DesenhoDaJanela:
         na_fila = set(p.fila_da_pagina.fila())
         da_fila = p.fila_da_pagina.margens_da_fila()  # a conta que a fila usou, talvez de antes
         estados = _estados_dos_glifos(p.modelo, na_fila)
+        estados.update(dict.fromkeys(p.evidencia.agora().ilegais, gd.FORTE))
         aviso = _aviso_do_documento(p)
         # A palavra fora do léxico que o usuário aceitou (Enter: revisada) não é mais duvidosa.
         revisados = {b.gid for b in p.modelo.boxes if b.revisado} if p.modelo is not None else set()
@@ -292,6 +295,27 @@ class DesenhoDaJanela:
         self.verificacao.mostrar(p.matriz, p.boxes, palavra, v.posicao, len(v.desconhecidas))
         self.visor.marcar_palavra(vf.caixa_da_palavra(p.boxes, palavra.indices))
 
+    def _linha_de_lance_mudou(self) -> None:
+        """A fila Lances (F-4): a linha no editor Palavra, na Imagem, na Linha e no Documento."""
+        if self.fila.modo != "lances":
+            return
+        p, lances = self.pagina, self.fila.lances
+        linha = lances.atual()
+        self.atualizar_fila()
+        if linha is None:
+            self.visor.marcar_palavra(None)
+            self.verificacao.limpar(lances.mensagem_vazia())
+            return
+        palavra = lances.como_palavra(linha)
+        self.verificacao.mostrar(p.matriz, p.boxes, palavra, lances.posicao, len(lances.linhas))
+        self.visor.marcar_palavra(vf.caixa_da_palavra(p.boxes, palavra.indices))
+        self.visor.mostrar_caixa(vf.caixa_da_palavra(p.boxes, palavra.indices))
+        self.texto.ir_ao_gid(linha.gids[0])
+        de_lance = set(linha.linha.gids_de_lance)
+        self.linha.mostrar(p.matriz, [p.box(g) for g in linha.gids], None,
+                           sublinhados={k for k, g in enumerate(linha.gids) if g in de_lance},
+                           fortes={k for k, g in enumerate(linha.gids) if g in linha.ilegais})
+
     def _acoes_mudaram(self) -> None:
         acoes.atualizar(self)
 
@@ -402,6 +426,16 @@ def _mostrar_as_contagens(treino, leitor, pendentes: int, glifos: int) -> None:
     por_char = leitor.padroes_por_caractere()
     treino.mostrar_contagens(pendentes, glifos, sum(len(v) for v in por_char.values()),
                              len(por_char))
+
+
+def _sem_pendentes(resumo: dict) -> str:
+    """A tela da fila de glifos vazia: com lance por conferir, nunca "nada a revisar" (F-4)."""
+    resto = teclado.com_teclas("Clique num glifo para corrigi-lo, ou vá para o próximo pendente do "
+                               "livro ({proxima_pagina_pendente}).")
+    if resumo["nao_conferidos"]:
+        return teclado.com_teclas(f"Sem glifos na fila. {resumo['nao_conferidos']} lances não "
+                                  "conferidos: {fila_lances} confere. ") + resto
+    return f"Nada a revisar nesta página. {resto}"
 
 
 def _estados_dos_glifos(modelo, na_fila: set) -> dict:

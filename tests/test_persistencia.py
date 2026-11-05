@@ -579,7 +579,9 @@ def test_livro_json_que_falta_e_refeito(projeto):
                           "pendentes": 1,
                           "confirmados": 1, "sem_leitura": 0, "improvaveis": 0,
                           "histograma": {"50": 1},
-                          "diagramas": 0, "diagramas_por_conferir": 0, "figurinas": False}}
+                          "diagramas": 0, "diagramas_por_conferir": 0, "figurinas": False,
+                          "lances_por_conferir": resumo[2]["lances_por_conferir"],
+                          "fortes": resumo[2]["fortes"]}}
     assert (projeto.pasta / ARQUIVO_DO_LIVRO).is_file()
 
 

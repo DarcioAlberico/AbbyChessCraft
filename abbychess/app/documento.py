@@ -102,11 +102,13 @@ def estado_do_diagrama(diagrama) -> str:
     validacao = getattr(diagrama, "validacao", None)
     if diagrama.conferido:
         return "conferido"
-    if diagrama.lido and validacao is not None:
-        return "confiável pelos lances" if validacao.confiavel else validacao.aviso
-    if diagrama.lido:
-        return "lido, não conferido"
-    return "não lido"
+    if not diagrama.lido:
+        return "não lido"
+    if validacao is not None and not validacao.confiavel:
+        return validacao.aviso
+    if not diagrama.lado:                       # sem o livro dizer, não afirmar (X-3)
+        return "lado não dito"
+    return "confiável pelos lances" if validacao is not None else "lido, não conferido"
 
 
 class VistaDoDocumento(QTextEdit):
@@ -419,7 +421,7 @@ class VistaDoDocumento(QTextEdit):
                                                           estilo_do_glifo.italico,
                                                           estilo_do_glifo.sublinhado))
         if not tem_estilo and (not self.realce or not (desconhecido or virtual
-                or estado in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO))):
+                or estado in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO, gd.FORTE))):
             return base
         chave = (id(base), estado, desconhecido, virtual, estilo_do_glifo)
         if chave in self._formatos:
@@ -909,7 +911,7 @@ def _unidades_do_bloco(unidades: list, texto: str, mapa, virtuais) -> None:
 def _duvidosos(estados, desconhecidos) -> Set[int]:
     """Os glifos aonde o Enter leva: pendentes, sem leitura, aguardando e fora do léxico."""
     duvidosos = {g for g, e in (estados or {}).items()
-                 if e in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO)}
+                 if e in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO, gd.FORTE)}
     return duvidosos | set(desconhecidos)
 
 

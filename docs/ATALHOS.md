@@ -6,6 +6,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 
 | Ação | Padrão | FineReader | Escopo | Desde |
 |---|---|---|---|---|
+| A fila Lances | F4 | F4 | global | PPL |
 | A Galeria do caractere do glifo atual | Ctrl+Shift+G | Ctrl+Shift+G | global | T1 |
 | Abrir projeto | Ctrl+O | Ctrl+O | global | A2 |
 | Alternar o escopo da fila (página ou livro) | Shift+F7 | Ctrl+Shift+F8 | global | C |
@@ -35,6 +36,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Mostrar ou esconder a Linha | Ctrl+F5 | Ctrl+F5 | global | A3 |
 | Mostrar ou esconder Páginas | F9 | F5 | global | A2 |
 | Novo projeto | Ctrl+N | Ctrl+N | global | A2 |
+| O relatório de lances do livro, em Resultados | — | — | global | PPL |
 | Ocorrência anterior | Shift+F3 | Shift+F3 | global | B |
 | Opções do livro | Ctrl+, | Ctrl+, | global | A2 |
 | Painel anterior | — | Ctrl+Shift+Tab | global | K |
@@ -160,6 +162,8 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Ação | Padrão | FineReader | Escopo | Desde |
 |---|---|---|---|---|
 | Diagrama conferido (grava e vai ao próximo por conferir) | Ctrl+Enter | Ctrl+Enter | diagrama | H |
+| No editor Diagrama: brancas a jogar | Ctrl+W | Ctrl+W | diagrama | PPL |
+| No editor Diagrama: pretas a jogar | Ctrl+B | Ctrl+B | diagrama | PPL |
 | O diagrama anterior do livro | PgUp | PgUp | diagrama | H |
 | O diagrama seguinte do livro | PgDn | PgDn | diagrama | H |
 

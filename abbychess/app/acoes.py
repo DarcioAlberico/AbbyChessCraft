@@ -115,6 +115,9 @@ def montar(janela) -> None:
                                   texto="Próximo da fila")
     j.acao_anterior_da_fila = acao(j, "anterior_da_fila", lambda: j.fila.andar(-1),
                                    texto="Anterior da fila")
+    j.acao_fila_lances = acao(j, "fila_lances", j.fila.ir_aos_lances, texto="Fila Lances")
+    j.acao_relatorio_de_lances = acao(j, "relatorio_de_lances", j.relatorio_de_lances,
+                                      texto="Relatório de lances")
     j.acao_ciclar_fila = acao(j, "ciclar_modo_da_fila", j.fila.ciclar,
                               texto="Modo seguinte da fila")
     j.acao_escopo_da_fila = acao(j, "alternar_escopo_da_fila", j.fila.alternar_escopo,
@@ -129,6 +132,10 @@ def montar(janela) -> None:
                                     widgets=editor)
     j.acao_diagrama_anterior = acao(j, "diagrama_anterior", lambda: j.editor_diagrama.ir(-1),
                                     widgets=editor)
+    j.acao_lado_brancas = acao(j, "lado_brancas", lambda: j.editor_diagrama.definir_lado("w"),
+                               widgets=editor)
+    j.acao_lado_pretas = acao(j, "lado_pretas", lambda: j.editor_diagrama.definir_lado("b"),
+                              widgets=editor)
     j.acao_diagrama_seguinte = acao(j, "diagrama_seguinte", lambda: j.editor_diagrama.ir(+1),
                                     widgets=editor)
     j.acao_verificar = acao(j, "fila_em_palavras", lambda: j.fila.definir("palavras"),
@@ -339,7 +346,8 @@ def _menus(j) -> None:
              j.acao_ir_para, j.acao_voltar_visita, j.acao_avancar_visita, None,
              j.acao_reconhecer, j.acao_reler, j.acao_verificada, j.acao_antes_do_lote,
              None, *j.acoes_de_paginas[:4], None, *j.acoes_de_paginas[4:], None,
-             j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
+             j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_fila_lances,
+             j.acao_ciclar_fila,
              j.acao_escopo_da_fila, j.acao_proximo_do_livro, j.acao_diagramas))
     _encher(j.menuBar().addMenu("E&xibir"),
             (j.acao_lado_a_lado, j.acao_empilhado, j.acao_so_imagem, j.acao_so_vista,
@@ -353,7 +361,7 @@ def _menus(j) -> None:
             (j.acao_modo_treino, j.acao_areas, j.acao_borracha, j.acao_areas_auto,
              j.acao_reconhecer_zona, j.acao_ordenar_areas,
              j.acao_salvar_modelo_areas, j.acao_aplicar_modelo_areas,
-             j.acao_verificar, None,
+             j.acao_verificar, j.acao_relatorio_de_lances, None,
              j.acao_lote, None,
              j.acao_opcoes, j.acao_teclado))
     menu = j.menuBar().addMenu("Aj&uda")

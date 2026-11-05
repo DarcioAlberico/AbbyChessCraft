@@ -85,12 +85,13 @@ class GaleriaNaJanela:
         """Ctrl+T: com glifos a revisar, pergunta na barra (§8.4: Enter aceita, Esc não
         marca e fecha só a pergunta) antes de marcar a página como verificada."""
         pendentes = len(self.pagina.fila_da_pagina.fila()) if self.pagina.modelo is not None else 0
-        if pendentes:
+        lances = self.fila.lances.resumo_da_pagina()["nao_conferidos"]
+        if pendentes or lances:
             indice = self.pagina.indice           # só a página da pergunta (§8.4)
-            self.confirmacao.perguntar(
-                f"Aceitar {pendentes} pendente(s) da página {indice + 1} como estão e marcá-la "
-                "como verificada? Enter aceita · Esc não marca",
-                functools.partial(self.pagina.verificar, indice))
+            duvidas = f"Aceitar {pendentes} dúvidas como estão? " if pendentes else "Marcar verificada? "
+            conferir = f"{lances} lances não conferidos. " if lances else ""
+            self.confirmacao.perguntar(f"{duvidas}{conferir}Enter aceita · Esc não marca",
+                                       functools.partial(self.pagina.verificar, indice))
             return
         self.pagina.verificar()
 

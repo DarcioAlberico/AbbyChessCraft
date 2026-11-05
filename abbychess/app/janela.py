@@ -36,7 +36,7 @@ from PySide6.QtCore import QByteArray, QSettings, QTimer, Signal
 from PySide6.QtWidgets import QApplication, QInputDialog, QMainWindow
 
 from abbychess import avisos as av
-from abbychess.app import acessibilidade, acoes, dialogos, recentes, teclado
+from abbychess.app import acessibilidade, acoes, dialogos, opcoes, recentes, teclado
 from abbychess.app.imagens import qimage_da_pagina
 from abbychess.app.paginas_na_janela import PaginasNaJanela
 from abbychess.app.busca_na_janela import BuscaNaJanela
@@ -165,10 +165,10 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.treino.campo.textChanged.connect(self._aviso_de_ensino)
 
         self.verificacao = PainelDeVerificacao()
-        self.verificacao.corrigir.connect(v.corrigir)
-        self.verificacao.ensinar.connect(lambda t: self.verificador.corrigir(t, ensinar=True))
-        self.verificacao.pular.connect(lambda: self.verificador.andar(+1))
-        self.verificacao.anterior.connect(lambda: self.verificador.andar(-1))
+        self.verificacao.corrigir.connect(lambda t: self.fila.corrigir_no_painel(t))
+        self.verificacao.ensinar.connect(lambda t: self.fila.corrigir_no_painel(t, ensinar=True))
+        self.verificacao.pular.connect(lambda: self.fila.andar_no_painel(+1))
+        self.verificacao.anterior.connect(lambda: self.fila.andar_no_painel(-1))
         self.verificacao.ignorar_todas.connect(v.ignorar_todas)
         self.verificacao.adicionar.connect(self._adicionar_palavra)
         self.verificacao.glifo_escolhido.connect(self._glifo_da_palavra)
@@ -202,6 +202,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
                              ("padroes_mudaram", self._padroes_mudaram),
                              ("layout_mudou", self._layout_mudou),
                              ("palavra_mudou", self._palavra_mudou),
+                             ("linha_de_lance_mudou", self._linha_de_lance_mudou),
                              ("verificacao_pronta", self.verificar_texto),
                              ("conferir", self._abrir_conferencia),
                              ("atual_resolvido", self._atual_resolvido),
@@ -416,9 +417,14 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
             return
         dialogo = DialogoDeOpcoes(self.projeto.dados.limiares, self,
                                   notacao=self.projeto.dados.notacao,
-                                  idioma=self.projeto.dados.idioma)
+                                  idioma=self.projeto.dados.idioma,
+                                  letras=self.projeto.dados.letras_das_pecas,
+                                  registro=opcoes.registro_ligado(self.config))
         if dialogo.exec() == DialogoDeOpcoes.DialogCode.Accepted:
             self.pagina.padroes_do_livro.definir_notacao(dialogo.notacao())
+            self.pagina.padroes_do_livro.definir_letras(dialogo.letras())
+            self.config.setValue(opcoes.CHAVE_DO_REGISTRO,
+                                 "sim" if dialogo.campo_registro.isChecked() else "nao")
             if self.pagina.padroes_do_livro.definir_idioma(dialogo.idioma()):
                 self.verificador.esquecer_projeto()     # o léxico do idioma novo, no próximo F7
             self.pagina.padroes_do_livro.aplicar_limiares(dialogo.limiares())

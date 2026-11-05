@@ -64,6 +64,10 @@ class RegistroDeEventos(QObject):
             self._escrever({"evento": gesto, "widget": type(objeto).__name__})
         return False
 
+    def pagina(self, pid, fila: str) -> None:
+        """A troca de página ou de fila (PPL): só o número e o modo, sem texto de livro."""
+        self._escrever({"evento": "pagina", "pid": pid, "fila": fila})
+
     def fechar(self) -> None:
         if self._arquivo is None:
             return
@@ -72,12 +76,24 @@ class RegistroDeEventos(QObject):
         self._arquivo = None
 
 
-def instalar(app) -> Optional[RegistroDeEventos]:
-    """Liga o registro na aplicação se a variável estiver definida; senão, nada."""
-    caminho = os.environ.get(VARIAVEL)
+#: O registro da aplicação, para quem anota a troca de página.
+atual: Optional[RegistroDeEventos] = None
+
+
+def instalar(app, padrao: Optional[str] = None) -> Optional[RegistroDeEventos]:
+    """Liga o registro na aplicação: no arquivo da variável, ou no `padrao` (o programa o passa,
+    com a opção ligada); senão, nada. Grava só instantes e tipos, sem texto de livro."""
+    global atual
+    caminho = os.environ.get(VARIAVEL) or padrao
     if not caminho:
         return None
     registro = RegistroDeEventos(caminho)
     app.installEventFilter(registro)
     app.aboutToQuit.connect(registro.fechar)
+    atual = registro
     return registro
+
+
+def anotar_pagina(pid, fila: str) -> None:
+    if atual is not None:
+        atual.pagina(pid, fila)

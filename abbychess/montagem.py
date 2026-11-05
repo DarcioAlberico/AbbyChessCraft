@@ -385,6 +385,34 @@ def _trocaveis(boxes: Sequence[BoxEntry], indices: Sequence[int],
             and contexto.volta_pelo_contexto(boxes[i].source)]
 
 
+def corrigir_a_caixa_na_leitura(boxes: Sequence[BoxEntry], tabuleiros: Sequence = ()) -> None:
+    """A caixa pela altura nos glifos recém-lidos, para o Documento (SPEC-qualidade §13.9): só
+    nas palavras sem número nem figurina, porque no lance a medida achou o "W" que era a dama mal
+    lida. Esse fica como foi lido, na fila de revisão, e a exportação segue com a regra inteira."""
+    lidos = [b for b in boxes if b.char]
+    leitura = OrdemDeLeitura.da_pagina(lidos, tabuleiros)
+    for _chave, trecho in leitura.trechos(lidos):
+        for linha in leitura.linhas_do_trecho(trecho, lidos):
+            _corrigir_a_linha(linha, trecho, lidos)
+
+
+def _corrigir_a_linha(linha, trecho, lidos: Sequence[BoxEntry]) -> None:
+    indices = [trecho[s.indice] for p in linha for s in p.simbolos]
+    trocas = _caixa_pela_altura(lidos, indices, _primeiras_letras(linha, trecho, lidos), ())
+    for palavra in linha:
+        dela = [trecho[s.indice] for s in palavra.simbolos]
+        if trocas and not any(_e_de_lance(lidos[i].char) for i in dela):
+            for i in dela:
+                lidos[i].char = trocas.get(i, lidos[i].char)
+
+
+def _e_de_lance(char: str) -> bool:
+    """O caractere que faz da palavra um lance: o algarismo ou a figurina."""
+    from core.notacao import FIGURINAS
+
+    return any(c.isdigit() or c in FIGURINAS for c in char)
+
+
 def _alturas(boxes: Sequence[BoxEntry], indices: Sequence[int], letras) -> List[int]:
     """A altura de cada glifo da linha cuja letra está em `letras`."""
     return [boxes[i].y2 - boxes[i].y1 for i in indices if boxes[i].char in letras]

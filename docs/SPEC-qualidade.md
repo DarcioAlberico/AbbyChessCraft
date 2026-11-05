@@ -383,8 +383,11 @@ o usuário possa corrigi-lo.
 posição da palavra, e a altura não troca o glifo manual, o nativo nem o revisado. Medida de novo
 nas mesmas páginas, pelo caminho real da exportação: 110 trocas certas (102 descendo, 8 subindo) e
 nenhuma errada, com 10 sem como comparar; na fatia, 333 erros em 12 008 caracteres (2,77 %). A
-regra foi desenhada olhando estas páginas, então a medida não é independente. Levar a correção ao
-Documento continua em aberto, e o impacto da tabela acima não foi refeito com a regra nova.
+regra foi desenhada olhando estas páginas, então a medida não é independente.
+
+**Levada ao Documento em 2026-11-05, só fora dos lances (§13.9).** A leitura corrige a caixa nas
+palavras sem número nem figurina (`montagem.corrigir_a_caixa_na_leitura`); a exportação segue com a
+regra inteira, e ler `montar` inteira continua sem ser feito, pelo hífen de quebra.
 
 ### Q-E7 (Média) — privados do core
 
@@ -651,6 +654,21 @@ teste usa como o usuário; senão saem. Os 3 F401 de `camada.py` saem já (o por
    `ligadura-com-espaco` (`1bb99f5` vermelho, `bc4611c`): a ligadura com espaço dentro se
    divide pela tinta e a palavra parte entre os pedaços; a página sem imagem, ou a tinta que
    não dá duas partes, recusa (o core corta até as letras coladas, no meio da largura).
+
+9. ~~**A caixa pela altura vai ao Documento?**~~ **Decidido** (2026-11-05, o usuário pediu
+   "medir e decidir"): sim, na leitura, só nas palavras sem número nem figurina.
+
+   Com a regra inteira, em 30 páginas que ela nunca viu (Yusupov, Aagaard, Nunn, Dvoretsky, Odds &
+   Ends, contra a camada do PDF): 87 trocas, todas já na fila com a mesma sugestão. As 9 do Aagaard
+   são todas o "W" da dama mal lida ("15.We2!?"): nenhuma certa, e sair da fila esconderia o erro
+   num lance. Daí a exclusão.
+
+   Com a regra de agora, as mesmas páginas lidas pelo caminho real, antes e depois (o Xadrez
+   Vitorioso 20–26 e 6 páginas do Aagaard, do Nunn, do Dvoretsky e do Odds & Ends; 42 336 glifos): 114
+   palavras mudam; os improváveis vão de 421 a 300, os pendentes de 4 170 a 4 146, as desconhecidas
+   de 4 131 a 4 092; o Aagaard não muda, e a validação dos 43 diagramas também não. Na fatia, com a
+   regra inteira, nenhuma piora contra o gabarito. As palavras foram lidas, e as suspeitas conferidas
+   no contexto; só parte tem veredito de gabarito ou camada. As páginas já lidas só mudam ao reler.
 
 ## Apêndice — registro da análise
 

@@ -9,6 +9,7 @@ from typing import List, Optional, Tuple
 
 from abbychess import diagramas as dg
 from abbychess import lances as lc
+from abbychess import montagem as mo
 from abbychess import procedencia
 from abbychess import zonas as zn
 from abbychess.modelo import IOU_DA_RELEITURA, Pagina, descrever_caidas, proximo_estado, reconciliar
@@ -37,6 +38,7 @@ def aplicar_lida(pagina: Pagina, lida, idioma: str, *,
         pagina.regua_do_negrito = dict(lida.regua_do_negrito)
     depois = list(lida.boxes)
     tabuleiros = [tuple(int(v) for v in t) for t in lida.tabuleiros]
+    mo.corrigir_a_caixa_na_leitura(depois, tabuleiros)
     if zona is not None:
         depois, tabuleiros = _com_o_de_fora_da_zona(pagina, zona, depois, tabuleiros)
     novos, dif = reconciliar(pagina.boxes, depois, pagina.alocar, procedencia.amostra_de,

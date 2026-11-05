@@ -11,7 +11,8 @@
   posição (`edicao`, `conferir`), também.
 
 O lance da linha que só vale com a casa de *en passant* não entra: o diagrama não diz qual
-foi o último lance, e a posição dele não tem a casa (o FEN sai com `-`).
+foi o último lance, e a posição dele não tem a casa, salvo no primeiro lance
+(`tests/test_lances.py`).
 """
 
 from __future__ import annotations

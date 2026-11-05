@@ -555,18 +555,6 @@ def test_o_roque_com_qualquer_traco(impresso, san):
     assert lc.primeira_linha(f"1.{impresso}", "pt")[0].san == san
 
 
-def test_o_lance_entre_parenteses_antes_da_linha_nao_a_comeca():
-    """A linha hipotética da prosa, entre parênteses, não é a principal."""
-    linha = lc.primeira_linha("(depois de 1.e4 e5) o jogo seguiu 2.Cf3 Cc6", "pt")
-    assert [(lance.numero, lance.san) for lance in linha] == [(2, "Nf3"), (2, "Nc6")]
-    assert [x.san for x in lc.primeira_linha("(1.e4) 1.d4 d5", "pt")] == ["d4", "d5"]
-    assert [x.san for x in lc.primeira_linha("Ver [1.e4 (1.c4) e5] 1.d4", "pt")] == ["d4"]
-
-
-def test_o_parentese_que_fecha_sem_abrir_nao_esconde_a_linha():
-    assert [x.san for x in lc.primeira_linha("fim) 1.d4 d5", "pt")] == ["d4", "d5"]
-
-
 EN_PASSANT = "4k3/8/8/3pP3/8/8/8/4K3"
 
 

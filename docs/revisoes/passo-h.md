@@ -65,9 +65,11 @@ Os commits: `55e5e65`, `1221a77`, `28760a1` e o deste registro.
 
 ## Limitações conhecidas
 
-- O extrator da linha perde o lance com sinal colado (`±`, `+-`, `†`) ou o roque com traço en,
-  e pode pegar uma linha hipotética da prosa como a principal.
-- O `e.p.` como primeiro lance é recusado.
+- ~~O extrator da linha perde o lance com sinal colado (`±`, `+-`, `†`) ou o roque com traço en.~~
+  Corrigido em 2026-11-05. A linha hipotética da prosa ainda pode virar a principal: ignorar o que
+  vem entre parênteses antes da linha foi medido e piorou (o ")" que o OCR perde esconde a linha
+  toda; 45 lances confiáveis sumiram numa página do Aagaard).
+- ~~O `e.p.` como primeiro lance é recusado.~~ Corrigido em 2026-11-05.
 - O editor mostra a validação com as linhas de quando abriu (corrigir o texto com ele aberto
   não atualiza o aviso até reabrir).
 - A aba Diagramas não se atualiza com edições da página (o botão Atualizar a refaz) e guarda a

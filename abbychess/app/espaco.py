@@ -135,6 +135,7 @@ class EspacoDeTrabalho:
         caixa.setSpacing(0)
         caixa.addWidget(self.barra_do_documento)
         caixa.addWidget(self.texto, 1)
+        self.painel_do_documento.setFocusProxy(self.texto)     # Alt+3 chega ao texto (U-1)
         self.vista = QTabWidget()
         self.vista.setObjectName("vista_direita")
         self.vista.setDocumentMode(True)

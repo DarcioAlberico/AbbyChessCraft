@@ -81,6 +81,9 @@ class Projeto:
     #: Os glifos que mudaram de página ao dividi-la (§12.4): gid velho -> gid novo (as chaves
     #: em texto, como no JSON). A amostra ensinada antes acha o glifo de origem por aqui.
     gids_movidos: Dict[str, int] = field(default_factory=dict)
+    #: O maior `len(fields(BoxEntry))` que já gravou aqui (D-1): mais que o deste core, as
+    #: páginas não se leem, e o projeto abre só para leitura, sem abrir nenhuma delas.
+    campos_do_box: int = 0
 
 
 _NADA = type(None)
@@ -90,7 +93,7 @@ TIPOS_DO_PROJETO = {
     "nome": str, "fonte": str, "criado": str, "limiares": (dict, _NADA), "idioma": str,
     "notacao": str, "versao": int, "fonte_sha256": str, "fonte_tamanho": int,
     "proximo_pid": int, "extras": (dict, _NADA), "endireitar": bool, "sequencia": (dict, _NADA),
-    "gids_movidos": dict,
+    "gids_movidos": dict, "campos_do_box": int,
 }
 TIPOS_DOS_LIMIARES = {f.name: (int, float) for f in fields(Limiares)}
 #: Os campos de texto que só aceitam alguns valores.

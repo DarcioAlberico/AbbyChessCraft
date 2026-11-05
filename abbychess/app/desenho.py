@@ -134,11 +134,12 @@ class DesenhoDaJanela:
             self.visor.selecionar(None)
             self.treino.limpar(vazios.pagina_nao_reconhecida()
                                if not p.boxes else
-                               "Nada a revisar nesta página. Clique num box para corrigi-lo, "
+                               "Nada a revisar nesta página. Clique num glifo para corrigi-lo, "
                                + teclado.com_teclas("ou vá para o próximo pendente do livro "
                                                     "({proxima_pagina_pendente})."))
             return
-        self.treino.mostrar(p.matriz, p.box_atual(), p.fila_da_pagina.posicao_do_atual())
+        self.treino.mostrar(p.matriz, p.box_atual(), p.fila_da_pagina.posicao_do_atual(),
+                            tomar_o_foco=QApplication.focusWidget() is not self.texto)
         if (sugestao := p.leitura.sugestao_do_atual()) is not None:    # §9.2: o palpite da rede
             self.treino.sugerir(*sugestao)
         elif (troca := p.leitura.sugestao_do_contexto()) is not None:  # a palavra ou a linha desmente
@@ -341,8 +342,8 @@ class DesenhoDaJanela:
         aviso diz qual e onde ficou o arquivo de antes."""
         onde = (f" O arquivo dela foi guardado em paginas/{guardado}." if guardado else "")
         self._avisar_da_pagina("Página ilegível", indice, (
-            f"estava com o arquivo ilegível e ficou como não reconhecida.{onde} Reconheça-a de "
-            "novo (F5)."))
+            f"estava com o arquivo ilegível e ficou como não reconhecida.{onde} "
+            + teclado.com_teclas("Reconheça-a de novo ({reconhecer_pagina}).")))
 
     def _ocupado_mudou(self, ocupado: bool, titulo: str) -> None:
         self.progresso.setVisible(ocupado)
@@ -362,13 +363,11 @@ class DesenhoDaJanela:
 
     def _devolver_o_painel(self) -> None:
         """A tarefa acabou com um glifo atual: o painel de treino volta, e o campo pega o foco
-        de ninguém ou do painel de texto."""
+        de ninguém. Quem o tem por escolha fica com ele, o Documento também (U-1)."""
         self.treino.habilitar(True)
         foco = QApplication.focusWidget()
-        # O próximo caractere vai para o campo, mas sem tirar o foco de quem o tem por
-        # escolha (o seletor de página, por exemplo): só de ninguém ou do painel de texto.
         if (self.inspetor.atual() == "glifo" and self.isActiveWindow()
-                and (foco is None or foco is self.texto or self.treino.isAncestorOf(foco))):
+                and (foco is None or self.treino.isAncestorOf(foco))):
             self.treino.campo.setFocus()
 
     def _limpar_a_mensagem_da_tarefa(self) -> None:

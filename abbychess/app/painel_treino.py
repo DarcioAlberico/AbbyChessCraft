@@ -202,7 +202,7 @@ class PainelDeTreino(QWidget):
 
         self.glifo = _GlifoAmpliado()
         teclado.texto_vivo(self.glifo, "setToolTip",
-                           "Clique onde dividir o box e aperte {dividir}.")
+                           "Clique onde dividir o glifo e aperte {dividir}.")
         self.glifo.clicado.connect(self._clicar_no_glifo)
         self.glifo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.glifo.setMinimumHeight(150)
@@ -249,16 +249,16 @@ class PainelDeTreino(QWidget):
         botao_pular.clicked.connect(self.pular.emit)
         botao_dividir = QPushButton("Dividir")
         teclado.texto_vivo(botao_dividir, "setToolTip",
-                           "Divide o box em dois glifos, na linha vermelha do recorte ou, sem "
+                           "Divide o glifo em dois, na linha amarela do recorte ou, sem "
                            "ela, no vão da tinta ({dividir}).")
         botao_dividir.clicked.connect(self.pedir_dividir)
         botao_juntar_antes = QPushButton("◀ Juntar")
         teclado.texto_vivo(botao_juntar_antes, "setToolTip",
-                           "Junta com o box anterior da linha ({juntar_anterior}).")
+                           "Junta com o glifo anterior da linha ({juntar_anterior}).")
         botao_juntar_antes.clicked.connect(lambda: self.pedir_juntar(-1))
         botao_juntar_depois = QPushButton("Juntar ▶")
         teclado.texto_vivo(botao_juntar_depois, "setToolTip",
-                           "Junta com o box seguinte da linha ({juntar_seguinte}).")
+                           "Junta com o glifo seguinte da linha ({juntar_seguinte}).")
         botao_juntar_depois.clicked.connect(lambda: self.pedir_juntar(+1))
         self._botoes = [botao_ensinar, botao_corrigir, botao_descartar, botao_anterior, botao_pular,
                         botao_dividir, botao_juntar_antes, botao_juntar_depois]
@@ -301,7 +301,7 @@ class PainelDeTreino(QWidget):
         self.padroes = QLabel("")
         self.padroes.setWordWrap(True)
 
-        legenda = QGroupBox("Os boxes na página")
+        legenda = QGroupBox("Os glifos na página")
         caixa_legenda = QVBoxLayout(legenda)
         amostras = [(estilo.traco(estado, origem), texto)
                     for estado, origem, texto in estilo.LEGENDA]
@@ -358,8 +358,10 @@ class PainelDeTreino(QWidget):
         if any(self._aviso):
             self.mostrar_aviso_de_ensino(*self._aviso)
 
-    def mostrar(self, pagina: np.ndarray, box: BoxEntry, posicao: str) -> None:
-        """Mostra o box em revisão e põe a leitura atual no campo, selecionada."""
+    def mostrar(self, pagina: np.ndarray, box: BoxEntry, posicao: str,
+                tomar_o_foco: bool = True) -> None:
+        """Mostra o glifo em revisão e põe a leitura atual no campo, selecionada. Sem
+        `tomar_o_foco`, o foco fica onde está: quem digita no Documento continua nele (U-1)."""
         self._pagina, self._box = pagina, box
         self._definir_corte(None)
         fonte = NOMES_DAS_FONTES.get(box.source, box.source or "sem leitura")
@@ -371,7 +373,8 @@ class PainelDeTreino(QWidget):
         self.campo.setText(box.char)
         self.campo.selectAll()
         self.habilitar(True)                    # antes do foco: num campo desligado o Qt o
-        self.campo.setFocus()                   # ignora, e a próxima tecla iria para outro lugar
+        if tomar_o_foco:                        # ignora, e a próxima tecla iria para outro lugar
+            self.campo.setFocus()
 
     def sugerir(self, char: str, confianca: float) -> None:
         """O palpite da rede para o glifo que ninguém leu (§9.2), no campo ainda vazio e

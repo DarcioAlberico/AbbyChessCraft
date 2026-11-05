@@ -237,5 +237,12 @@ class PainelDaGaleria(QWidget):
         if indice.isValid():
             self.escolhido.emit(self.modelo.itens[indice.row()])
 
+    def abrir_paleta(self, aplicar) -> None:
+        """F2 na Galeria: o símbolo escolhido vale para a seleção."""
+        from abbychess.app.painel_treino import menu_da_paleta
+
+        self.menu_da_paleta = menu_da_paleta(self, aplicar)      # os testes escolhem sem abrir
+        self.menu_da_paleta.popup(self.vista.mapToGlobal(self.vista.rect().center()))
+
     def focar(self) -> None:
         self.vista.setFocus(Qt.FocusReason.ShortcutFocusReason)

@@ -316,6 +316,7 @@ def test_a_previa_so_le_as_paginas_que_o_indice_diz(sub, monkeypatch):
     assert lidas == [1]
 
 
+@pytest.mark.erro_esperado
 def test_a_previa_que_falha_ao_ler_uma_pagina_avisa_o_erro(sub, monkeypatch):
     projeto, ctl, s, escrever, eventos = sub
     ler = projeto.ler_sem_migrar

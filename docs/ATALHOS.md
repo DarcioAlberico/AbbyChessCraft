@@ -6,6 +6,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 
 | Ação | Padrão | FineReader | Escopo | Desde |
 |---|---|---|---|---|
+| A Galeria do caractere do glifo atual | Ctrl+Shift+G | Ctrl+Shift+G | global | T1 |
 | Abrir projeto | Ctrl+O | Ctrl+O | global | A2 |
 | Alternar o escopo da fila (página ou livro) | Shift+F7 | Ctrl+Shift+F8 | global | C |
 | Borracha (apagar uma mancha da imagem) | Ctrl+Shift+E | Ctrl+Shift+E | global | L |

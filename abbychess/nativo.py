@@ -90,6 +90,11 @@ def importar(projeto: ProjetoDeLivro, indices: Optional[Sequence[int]] = None, *
     return Resultado(tuple(importadas), tuple(recusadas))
 
 
+def paginas_importadas(projeto: ProjetoDeLivro) -> list[int]:
+    """As posições no livro das páginas que `importar` criou da camada."""
+    return projeto.ordem.posicoes_das_gravadas(projeto.dados.extras.get(CHAVE_DAS_PAGINAS, ()))
+
+
 def _boxes(pagina: Pagina, extraida) -> list[Box]:
     from core.pagina import Paragrafo, Tabela
 

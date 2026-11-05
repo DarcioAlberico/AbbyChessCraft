@@ -33,7 +33,8 @@ def montar(janela) -> None:
     j.acao_todas_em_resultados = acao(j, "todas_em_resultados", j.todas_em_resultados)
     j.acao_buscar_glifo = teclado.sem_atalho(j, "Buscar glifo…", j.buscar_glifo)
     j.acao_substituir = acao(j, "substituir", j.substituir, texto="Substituir…")
-    j.acao_galeria = teclado.sem_atalho(j, "Galeria do caractere", lambda: j.abrir_galeria())
+    j.acao_galeria = acao(j, "galeria_do_caractere", lambda: j.abrir_galeria(),
+                          texto="Galeria do caractere")
     j.acao_opcoes = acao(j, "opcoes", j.opcoes, texto="Opções…")
     j.acao_sair = acao(j, "sair", j.close, texto="Sair")
     j.acao_cancelar_lote = acao(j, "cancelar_lote", livro.cancelar, texto="Cancelar o lote")
@@ -202,7 +203,7 @@ def montar(janela) -> None:
     j.acao_modo_treino = acao(j, "marcar_glifo", j.modo_treino,
                               texto="Marcar glifo à mão", barra=barra, marcavel=True)
     teclado.dica(j.acao_modo_treino, "Marcar glifo à mão ({marcar_glifo}): arraste na página "
-                                     "para marcar um glifo; Ctrl+clique junta boxes na seleção.")
+                                     "para marcar um glifo; Ctrl+clique junta glifos na seleção.")
     j.acao_areas = acao(j, "modo_areas", j.modo_areas, texto="Editor de áreas",
                         barra=barra, marcavel=True)
     teclado.dica(j.acao_areas, "Editor de áreas ({modo_areas}): arraste para desenhar uma área; "
@@ -248,7 +249,7 @@ def montar(janela) -> None:
     t.ensinar_em_lote.connect(p.leitura.ensinar_em_lote)
     j.acao_descartar = acao(j, "descartar_box", t.pedir_descartar, texto="Não é caractere",
                             widgets=[t])
-    j.acao_dividir = acao(j, "dividir", t.pedir_dividir, texto="Dividir o box", widgets=[t])
+    j.acao_dividir = acao(j, "dividir", t.pedir_dividir, texto="Dividir o glifo", widgets=[t])
     j.acao_juntar_seguinte = acao(j, "juntar_seguinte", lambda: j.treino.pedir_juntar(+1),
                                   widgets=[t])
     j.acao_juntar_anterior = acao(j, "juntar_anterior", lambda: j.treino.pedir_juntar(-1),
@@ -262,7 +263,8 @@ def montar(janela) -> None:
     for q in (j.acao_ensinar, j.acao_so_corrigir, j.acao_ensinar_em_lote, j.acao_descartar,
               *j.acoes_das_bordas):
         campo.teclas.ligar(q)                   # no campo, a tecla é dele (exceção 6, §3.4)
-    j.acao_paleta = acao(j, "paleta", j.abrir_paleta, texto="Símbolos…", widgets=[t, j.texto])
+    j.acao_paleta = acao(j, "paleta", j.abrir_paleta, texto="Símbolos…",
+                         widgets=[t, j.texto, j.galeria])
     _documento(j)
     palavra = j.verificacao.campo
     j.acao_corrigir_palavra = acao(j, "corrigir_palavra", j.verificacao.pedir_corrigir,
@@ -296,7 +298,7 @@ def _documento(j) -> None:
     j.acao_sublinhado = acao(j, "sublinhado", lambda: j.alternar_estilo("sublinhado"),
                              widgets=[d])
     j.acoes_das_figurinas = [acao(j, id_, lambda _=False, f=f: j.inserir_figurina(f),
-                                  widgets=[d, j.treino])
+                                  widgets=[d, j.treino, j.galeria])
                              for id_, f in (("figurina_rei", "♔"), ("figurina_dama", "♕"),
                                             ("figurina_torre", "♖"), ("figurina_bispo", "♗"),
                                             ("figurina_cavalo", "♘"), ("figurina_peao", "♙"))]
@@ -313,9 +315,12 @@ def _encher(menu, acoes) -> None:
 
 
 def _menus(j) -> None:
-    _encher(j.menuBar().addMenu("&Projeto"),
-            (j.acao_novo, j.acao_abrir, None, j.acao_exportar, None, j.acao_lote,
-             j.acao_cancelar_lote, j.acao_retomar_lote, None, j.acao_sair))
+    menu = j.menuBar().addMenu("&Projeto")
+    _encher(menu, (j.acao_novo, j.acao_abrir))
+    j.menu_recentes = menu.addMenu("Recentes")
+    j.menu_recentes.aboutToShow.connect(j.encher_os_recentes)
+    _encher(menu, (None, j.acao_exportar, None, j.acao_lote, j.acao_cancelar_lote,
+                   j.acao_retomar_lote, None, j.acao_sair))
     menu = j.menuBar().addMenu("&Editar")
     _encher(menu, (j.acao_desfazer, j.acao_refazer,
                    None,                        # localizar (§7.1)

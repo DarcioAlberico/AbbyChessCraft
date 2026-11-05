@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import pytest
+
 import logging
 import sys
 import threading
 
 
+@pytest.mark.erro_esperado
 def test_o_erro_que_ninguem_pegou_vai_ao_log_com_o_rastro(caplog, monkeypatch):
     """SPEC-qualidade CA-Q-C1: o erro que escapa de um slot do Qt (o `sys.excepthook`) ou de
     uma thread (o `threading.excepthook`) não vai só ao stderr, que a janela não tem."""

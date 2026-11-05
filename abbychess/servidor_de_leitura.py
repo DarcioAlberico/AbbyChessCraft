@@ -126,12 +126,13 @@ def ler_pagina(imagem, zonas, marcados, leitor, *, regua_do_livro: Optional[dict
                       efeitos.italicos, efeitos.regua)
 
 
-def reler_boxes(imagem, boxes, leitor, *, so_pendentes: bool, progresso=None):
-    """Lê de novo os boxes (cópias) e devolve `(boxes, amostras, resumo)`."""
+def reler_boxes(imagem, boxes, leitor, *, so_pendentes: bool, progresso=None, nao_ler=()):
+    """Lê de novo os boxes (cópias), menos os de `nao_ler`, e devolve `(boxes, amostras, resumo)`."""
     from abbychess import pagina as pg
     from abbychess import procedencia
 
-    resumo = pg.ler_boxes(imagem, boxes, leitor, so_pendentes=so_pendentes, progresso=progresso)
+    resumo = pg.ler_boxes(imagem, boxes, leitor, so_pendentes=so_pendentes, progresso=progresso,
+                          nao_ler=nao_ler)
     return boxes, [procedencia.amostra_de(b) for b in boxes], resumo
 
 
@@ -386,8 +387,8 @@ class _Laco:
             return ler_pagina(imagem, zonas, marcados, leitor,
                               regua_do_livro=regua[0] if regua else None)
         if operacao == "reler_boxes":
-            imagem, boxes, so_pendentes = argumentos
-            return reler_boxes(imagem, boxes, leitor, so_pendentes=so_pendentes)
+            imagem, boxes, so_pendentes, nao_ler = argumentos
+            return reler_boxes(imagem, boxes, leitor, so_pendentes=so_pendentes, nao_ler=nao_ler)
         if operacao == "ler_recortes":
             return ler_recortes(argumentos, leitor)
         if operacao == "sugerir_recortes":
@@ -413,6 +414,9 @@ class _Laco:
 def _principal(entrada, saida, fabrica, pasta_de_padroes, limiares) -> None:
     """A entrada do filho (`spawn`)."""
     logging.basicConfig(level=logging.WARNING)
+    from abbychess import log_em_arquivo
+
+    log_em_arquivo.ligar("leitura", logging.WARNING)
     try:
         _Laco(entrada, saida, fabrica, pasta_de_padroes, limiares).rodar()
     except Exception:  # a queda vira resposta: a interface reabre ou desiste

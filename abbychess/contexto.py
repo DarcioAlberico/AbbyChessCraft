@@ -515,12 +515,10 @@ def pendentes(boxes, limiares, revisados: Optional[Sequence[bool]] = None) -> Li
                       revisados or [False] * len(boxes))
 
 
-def pendentes_da_pagina(pagina, limiares, *, com_os_revisados: bool = False) -> List[bool]:
+def pendentes_da_pagina(pagina, limiares) -> List[bool]:
     """`pendentes` para os `Box` da página do modelo, pelos gids dela (as linhas guardadas
-    do Documento servem). Com `com_os_revisados`, o revisado também conta, como na leitura
-    dos pendentes, que relê pela confiança sem olhar a revisão; sem, ele sai, como na fila."""
-    revisados = [False if com_os_revisados else b.revisado for b in pagina.boxes]
-    return _pendentes(pagina, limiares, revisados)
+    do Documento servem). O revisado nunca conta: decidido não volta (D-5)."""
+    return _pendentes(pagina, limiares, [b.revisado for b in pagina.boxes])
 
 
 def _do_lote(pagina, lidas: Collection[str], novo: str, fora: Collection[int]) -> List[bool]:

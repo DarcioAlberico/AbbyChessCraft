@@ -812,26 +812,30 @@ def recorte(imagem, box: BoxEntry) -> np.ndarray:
 def ler_boxes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorDoLivro, *,
               so_pendentes: bool = False, progresso: Optional[Progresso] = None,
               cancelado: Callable[[], bool] = lambda: False,
-              pendentes: Optional[Sequence[bool]] = None) -> ResumoDaLeitura:
+              pendentes: Optional[Sequence[bool]] = None,
+              nao_ler: Collection[int] = ()) -> ResumoDaLeitura:
     """Lê os boxes no lugar. Com `so_pendentes`, não toca no que já foi confirmado.
 
-    Box manual nunca é relido: a correção do usuário tem precedência até ele
-    pedir outra coisa (invariante 2 do PyBoxEditor). Os pendentes são os de
-    `contexto.pendentes`, ou os `pendentes` de quem lê cópias (`propagar_padroes`).
+    Box manual nunca é relido (invariante 2 do PyBoxEditor), nem as posições de `nao_ler`, os
+    revisados da página (D-5). Os pendentes são os de `contexto.pendentes`, ou os `pendentes`
+    de quem lê cópias (`propagar_padroes`).
     """
     pagina = cinza(imagem)
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None
     if so_pendentes and pendentes is None:
         pendentes = contexto.pendentes(boxes, leitor.limiares)
-    _ler_os_alvos(pagina, _alvos_da_leitura(boxes, so_pendentes, pendentes), leitor, referencia,
-                  progresso, cancelado)
+    _ler_os_alvos(pagina, _alvos_da_leitura(boxes, so_pendentes, pendentes, nao_ler), leitor,
+                  referencia, progresso, cancelado)
     return resumir(boxes, leitor)
 
 
 def _alvos_da_leitura(boxes: List[BoxEntry], so_pendentes: bool,
-                      pendentes: Optional[Sequence[bool]]) -> List[BoxEntry]:
-    """Os boxes a ler: nunca os manuais; com `so_pendentes`, só os pendentes."""
-    return [b for i, b in enumerate(boxes) if b.source != FONTE_MANUAL and (
+                      pendentes: Optional[Sequence[bool]],
+                      nao_ler: Collection[int] = ()) -> List[BoxEntry]:
+    """Os boxes a ler: nunca os manuais nem os de `nao_ler`; com `so_pendentes`, só os
+    pendentes."""
+    fora = set(nao_ler)
+    return [b for i, b in enumerate(boxes) if b.source != FONTE_MANUAL and i not in fora and (
         not so_pendentes or pendentes[i])]
 
 
@@ -948,13 +952,9 @@ def propagar_padroes(imagem: Image.Image, boxes: List[BoxEntry], leitor: LeitorD
                      pendentes: Optional[Sequence[bool]] = None) -> int:
     """Aplica os padrões do livro aos boxes pendentes, sem a cadeia global.
 
-    Um padrão novo só muda o que o k-NN do livro responde; a rede e a base
-    global dariam a mesma leitura de antes. Por isso basta consultar o livro,
-    o que custa milissegundos, em vez de reler a página inteira, que custava
-    oito segundos no Darcy Lima. Devolve quantos pendentes foram resolvidos.
-
-    Os pendentes são os de `contexto.pendentes`; quem lê cópias fora da interface passa
-    `pendentes`, os mesmos com que escolheu o que copiar.
+    Um padrão novo só muda o que o k-NN do livro responde: basta o livro, em milissegundos.
+    Devolve quantos pendentes foram resolvidos. Os pendentes são os de `contexto.pendentes`;
+    quem lê cópias fora da interface passa `pendentes`, os com que escolheu o que copiar.
     """
     pagina = cinza(imagem)
     referencia = proporcao.altura_de_referencia(boxes) if boxes else None

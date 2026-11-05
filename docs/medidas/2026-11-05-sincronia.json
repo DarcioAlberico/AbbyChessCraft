@@ -1,0 +1,180 @@
+{
+ "por_livro": {
+  "seirawan": {
+   "paginas": 7,
+   "gabarito_auditado": false,
+   "teto": {
+    "tokens_de_lance": 136,
+    "com_posicao_por_pagina": 44,
+    "com_posicao_por_seguimento": 44,
+    "cobertura_por_pagina": 0.3235,
+    "cobertura_por_seguimento": 0.3235,
+    "lances_longos": 1
+   },
+   "leitura": {
+    "lances": 136,
+    "errados": 28,
+    "errados_de_forma_valida": 7,
+    "certos_marcados": 0,
+    "errados_marcados": 0,
+    "fora_da_fila": 1,
+    "errados_fora_da_fila": 1,
+    "tokens_lidos": 119,
+    "ilegais_lidos": 0,
+    "por_semente": {
+     "inicial": 9,
+     "diagrama": 11
+    },
+    "cobertura_da_leitura": 0.1681
+   }
+  },
+  "aagaard": {
+   "paginas": 1,
+   "gabarito_auditado": false,
+   "teto": {
+    "tokens_de_lance": 77,
+    "com_posicao_por_pagina": 0,
+    "com_posicao_por_seguimento": 0,
+    "cobertura_por_pagina": 0.0,
+    "cobertura_por_seguimento": 0.0,
+    "lances_longos": 0
+   },
+   "teto_e_piso": "a referência não traz os diagramas",
+   "leitura": {
+    "lances": 77,
+    "errados": 31,
+    "errados_de_forma_valida": 10,
+    "certos_marcados": 0,
+    "errados_marcados": 0,
+    "fora_da_fila": 2,
+    "errados_fora_da_fila": 2,
+    "tokens_lidos": 68,
+    "ilegais_lidos": 0,
+    "por_semente": {},
+    "cobertura_da_leitura": 0.0
+   }
+  },
+  "nunn": {
+   "paginas": 1,
+   "gabarito_auditado": false,
+   "teto": {
+    "tokens_de_lance": 55,
+    "com_posicao_por_pagina": 0,
+    "com_posicao_por_seguimento": 0,
+    "cobertura_por_pagina": 0.0,
+    "cobertura_por_seguimento": 0.0,
+    "lances_longos": 0
+   },
+   "teto_e_piso": "a referência não traz os diagramas",
+   "leitura": {
+    "lances": 55,
+    "errados": 24,
+    "errados_de_forma_valida": 15,
+    "certos_marcados": 1,
+    "errados_marcados": 0,
+    "fora_da_fila": 2,
+    "errados_fora_da_fila": 2,
+    "tokens_lidos": 48,
+    "ilegais_lidos": 1,
+    "por_semente": {
+     "diagrama": 1
+    },
+    "cobertura_da_leitura": 0.0208
+   }
+  },
+  "yusupov": {
+   "paginas": 2,
+   "gabarito_auditado": false,
+   "teto": {
+    "tokens_de_lance": 154,
+    "com_posicao_por_pagina": 0,
+    "com_posicao_por_seguimento": 0,
+    "cobertura_por_pagina": 0.0,
+    "cobertura_por_seguimento": 0.0,
+    "lances_longos": 0
+   },
+   "teto_e_piso": "a referência não traz os diagramas",
+   "leitura": {
+    "lances": 154,
+    "errados": 24,
+    "errados_de_forma_valida": 16,
+    "certos_marcados": 0,
+    "errados_marcados": 0,
+    "fora_da_fila": 1,
+    "errados_fora_da_fila": 1,
+    "tokens_lidos": 145,
+    "ilegais_lidos": 0,
+    "por_semente": {},
+    "cobertura_da_leitura": 0.0
+   }
+  }
+ },
+ "ponto_de_parada": {
+  "teto_maximo": 0.3235,
+  "alarme": 0.0032,
+  "metas": {
+   "teto": 0.3,
+   "alarme": 0.05
+  },
+  "x1_liberado": true
+ },
+ "data": "2026-11-05",
+ "commit": "fafbe03",
+ "arvore_suja": true,
+ "arquivos_sujos": [
+  "M abbychess/app/acoes.py",
+  "M abbychess/app/busca_na_janela.py",
+  "M abbychess/app/desenho.py",
+  "M abbychess/app/documento.py",
+  "M abbychess/app/editor_diagrama.py",
+  "M abbychess/app/espaco.py",
+  "M abbychess/app/estilo.py",
+  "M abbychess/app/formatos_do_documento.py",
+  "M abbychess/app/galeria_na_janela.py",
+  "M abbychess/app/janela.py",
+  "M abbychess/app/linha.py",
+  "M abbychess/app/lote_na_janela.py",
+  "M abbychess/app/opcoes.py",
+  "M abbychess/app/painel_resultados.py",
+  "M abbychess/app/painel_verificacao.py",
+  "M abbychess/app/principal.py",
+  "M abbychess/app/registro_de_eventos.py",
+  "M abbychess/controlador.py",
+  "M abbychess/controlador_da_substituicao.py",
+  "M abbychess/controlador_de_diagramas.py",
+  "M abbychess/controlador_do_livro.py",
+  "M abbychess/controladores.py",
+  "M abbychess/dados_do_projeto.py",
+  "M abbychess/exportar.py",
+  "M abbychess/grade.py",
+  "M abbychess/lances.py",
+  "M abbychess/lote.py",
+  "M abbychess/modelo.py",
+  "M abbychess/padroes_do_livro.py",
+  "M abbychess/ponte_de_leitura.py",
+  "M abbychess/resumo_do_livro.py",
+  "M abbychess/sessao.py",
+  "M abbychess/sessao_do_documento.py",
+  "M abbychess/verificacao.py",
+  "M docs/ATALHOS.md",
+  "M docs/atalhos.yaml",
+  "M ferramentas/tempo_da_fatia.py",
+  "M tests/conftest.py",
+  "M tests/test_espaco.py",
+  "M tests/test_modelo_estados.py",
+  "M tests/test_persistencia.py",
+  "M tests/test_revisao_janela.py",
+  "M tests/test_tamanho_dos_modulos.py",
+  "?? abbychess/decodificador_de_lances.py",
+  "?? abbychess/evidencia.py",
+  "?? abbychess/fila_de_lances.py",
+  "?? abbychess/tokens.py",
+  "?? ferramentas/medir_sincronia.py",
+  "?? tests/dados/tokens_rotulados.yaml",
+  "?? tests/test_decodificador_de_lances.py",
+  "?? tests/test_fila_lances.py",
+  "?? tests/test_medir_sincronia.py",
+  "?? tests/test_tokens.py"
+ ],
+ "exploratorio": "Seirawan já visto; corpus_v2 sem auditoria: não aprova alvo"
+}

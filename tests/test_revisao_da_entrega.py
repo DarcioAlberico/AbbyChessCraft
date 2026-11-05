@@ -169,3 +169,58 @@ def test_a_paleta_apaga_o_filtro_e_o_digito_sem_uso_nao_esvazia(app):
         menu.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Backspace,
                                      Qt.KeyboardModifier.NoModifier, "\b"))
     assert not menu.filtro and menu.acoes_dos_simbolos["♔"].isVisible()
+
+
+@pytest.fixture
+def fila_em_duas_paginas(tmp_path):
+    from abbychess.controlador_de_diagramas import ControladorDeDiagramas
+    from abbychess.controladores import ControladorDaFila, ControladorDeVerificacao
+    from tests.ajudantes import _pdf_digital
+
+    projeto = ProjetoDeLivro.criar(tmp_path / "x", "Duas", _pdf_digital(tmp_path / "d.pdf", paginas=2))
+    projeto.dados.letras_das_pecas = "KQRBN"
+    for indice in (0, 1):
+        projeto.salvar_pagina(indice, [BoxEntry(c, 10 + 20 * k, 10, 28 + 20 * k, 40, 0.9, "net")
+                                       for k, c in enumerate("1.e4")])
+    executor = ExecutorManual()
+    ctl = _controlador(projeto, executor)
+    executor.tudo()
+    fila = ControladorDaFila(ctl, ControladorDeVerificacao(ctl), ControladorDeDiagramas(ctl))
+    fila.definir("lances")
+    fila.lances.recontar(0)
+    yield fila, ctl
+    projeto.fechar()
+
+
+def test_no_escopo_livro_o_fim_da_pagina_leva_a_seguinte_e_a_anterior(fila_em_duas_paginas):
+    fila, ctl = fila_em_duas_paginas
+    fila.definir_escopo("livro")
+    fila.andar(+1)
+    assert ctl.indice == 1 and fila.lances.atual() is not None
+    fila.andar(-1)
+    assert ctl.indice == 0
+
+
+def test_no_escopo_livro_sem_mais_paginas_avisa_e_fica(fila_em_duas_paginas):
+    fila, ctl = fila_em_duas_paginas
+    fila.definir_escopo("livro")
+    avisos = []
+    ctl.eventos.ligar("mensagem", lambda texto, _ms: avisos.append(texto))
+    fila.andar(-1)
+    assert ctl.indice == 0 and "Não há mais lance" in avisos[-1]
+
+
+def test_a_pagina_que_nao_abre_nao_reconta(fila_em_duas_paginas, monkeypatch):
+    fila, ctl = fila_em_duas_paginas
+    fila.definir_escopo("livro")
+    contas = []
+    monkeypatch.setattr(ctl, "ir_para", lambda _i: False)
+    monkeypatch.setattr(fila.lances, "recontar", lambda *a: contas.append(a))
+    fila.andar(+1)
+    assert contas == []
+
+
+def test_na_pagina_o_passo_anda_nas_linhas_do_painel(fila_em_duas_paginas):
+    fila, ctl = fila_em_duas_paginas
+    fila.andar_no_painel(+1)
+    assert ctl.indice == 0 and fila.contador() == "1/1"

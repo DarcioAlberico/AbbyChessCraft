@@ -163,9 +163,9 @@ def test_a_paleta_apaga_o_filtro_e_o_digito_sem_uso_nao_esvazia(app):
     menu = pt.menu_da_paleta(None, [].append)
     QTest.keyClicks(menu, "1")
     assert not menu.filtro and menu.acoes_dos_simbolos["♔"].isVisible()
-    QTest.keyClicks(menu, "ata")
+    QTest.keyClicks(menu, "pre")                         # os pretos: mais de um resultado
     assert not menu.acoes_dos_simbolos["♔"].isVisible()
-    for _ in "ata":     # direto: no teste, uma janela aberta tomaria a tecla como atalho dela
+    for _ in "pre":     # direto: no teste, uma janela aberta tomaria a tecla como atalho dela
         menu.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Backspace,
                                      Qt.KeyboardModifier.NoModifier, "\b"))
     assert not menu.filtro and menu.acoes_dos_simbolos["♔"].isVisible()

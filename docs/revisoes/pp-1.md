@@ -17,7 +17,7 @@
 
 ## C-5: os vermelhos do primeiro dia
 
-18, abaixo do limite de 20. **17 provocam o erro de propósito** e levam `erro_esperado`. **1 achou defeito no próprio teste:** `test_diagramas_lidos_entram_na_pagina_que_pediu` gravava um diagrama com `casas=[None]`, e o gravador falhava em silêncio numa thread.
+20 no total, 18 na rápida e 2 na camada `processo`, no limite de 20. **19 provocam o erro de propósito** e levam `erro_esperado`. **1 achou defeito no próprio teste:** `test_diagramas_lidos_entram_na_pagina_que_pediu` gravava um diagrama com `casas=[None]`, e o gravador falhava em silêncio numa thread.
 
 ## O que mudou de comportamento
 

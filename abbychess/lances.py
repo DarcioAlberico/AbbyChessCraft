@@ -169,13 +169,18 @@ class Validacao:
 # Ler a linha
 # ----------------------------------------------------------------------
 
+def tabela_do_projeto(projeto) -> str:
+    """A chave das letras do livro para `_tabela`: `Projeto.letras_das_pecas`, ou o idioma."""
+    return projeto.dados.chave_das_pecas
+
+
 def _tabela(idioma: str) -> Dict[str, str]:
-    """Letra do idioma -> letra inglesa; as figurinas -> letra inglesa."""
+    """Letra do idioma (ou das 5 letras dadas) -> letra inglesa; as figurinas -> letra inglesa."""
     from core.notacao import FIGURINAS
 
-    from abbychess.modelo import PECAS
+    from abbychess.modelo import letras_das_pecas
 
-    tabela = dict(zip(PECAS.get(idioma, _INGLES), _INGLES))
+    tabela = dict(zip(letras_das_pecas(idioma), _INGLES))
     tabela.update(FIGURINAS)
     tabela.update({"✝": "+", "†": "+", "‡": "+"})
     return tabela
@@ -523,6 +528,65 @@ def validar_pagina(pagina, idioma: str = "pt") -> list:
         copia.diagramas = dg.com_ids(dg.para_caixas(pagina.tabuleiros, pagina.diagramas))
     textos = _textos_da_pagina(copia)
     return [_validado(d, textos, idioma) for d in pagina.diagramas]
+
+
+def gids_do_rejeitado(documento, diagrama, chave: str = "pt") -> Tuple[int, ...]:
+    """Os gids do primeiro lance que a validação do diagrama rejeitou (F-3), sem os do número:
+    anda nas palavras do texto que segue o diagrama, com a mesma regra de `primeira_linha`, até o
+    índice `Validacao.legais`. Vazio sem rejeitado, ou se o texto já não tem aquele lance."""
+    validacao = diagrama.validacao
+    if validacao is None or validacao.estado != ILEGAL or not validacao.total:
+        return ()
+    return _gids_do_lance_da_linha(documento, diagrama.id, validacao.legais, chave)
+
+
+def _gids_do_lance_da_linha(documento, diagrama_id: str, k: int, chave: str) -> Tuple[int, ...]:
+    """Os gids do lance `k` da primeira linha do texto que segue o diagrama."""
+    linha = _Linha()
+    for palavra in _palavras_depois_do_diagrama(documento, diagrama_id):
+        impressa, gids = _palavra_impressa(palavra, documento)
+        for tipo, valor in _tokens(impressa, chave):
+            antes = len(linha.lances)
+            if linha.lance(valor) if tipo == "lance" else linha.outro(tipo, valor):
+                return ()
+            if len(linha.lances) > antes and antes == k:
+                return _gids_do_impresso(gids, impressa, valor.impresso)
+    return ()
+
+
+def _palavra_impressa(palavra, documento) -> Tuple[str, List[int]]:
+    """O texto da palavra no modo impresso, e o gid de cada caractere dele."""
+    from abbychess import texto as tx
+
+    normal = tx.normalizador(tx.IMPRESSO)
+    letras, gids = [], []
+    for g in palavra.gids:
+        char = documento.chars.get(g, "")
+        texto = tx.NAO_LIDO if char == tx.NAO_LIDO else (normal(char) or tx.NAO_LIDO)
+        letras.append(texto)
+        gids.extend([g] * len(texto))
+    return "".join(letras), gids
+
+
+def _gids_do_impresso(gids: Sequence[int], palavra: str, impresso: str) -> Tuple[int, ...]:
+    """Os gids do lance dentro da palavra, sem os do número."""
+    inicio = palavra.find(impresso)
+    fim = inicio + len(impresso) if inicio >= 0 else len(palavra)
+    return tuple(dict.fromkeys(gids[max(0, inicio):fim]))
+
+
+def _palavras_depois_do_diagrama(documento, diagrama_id: str):
+    """As palavras do texto que segue o diagrama, até o próximo diagrama ou título."""
+    dentro = False
+    for bloco in documento.blocos:
+        if bloco.diagrama_id is not None or bloco.funcao in FIM_DO_TEXTO:
+            if dentro:
+                return
+            dentro = bloco.diagrama_id == diagrama_id
+            continue
+        if dentro and bloco.funcao not in FORA_DO_TEXTO:
+            for linha_impressa in bloco.linhas:
+                yield from linha_impressa.palavras
 
 
 def _sem_validacao(diagramas) -> list:

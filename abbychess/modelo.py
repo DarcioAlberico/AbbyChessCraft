@@ -129,6 +129,13 @@ FIGURINAS = frozenset("♔♕♖♗♘♙♚♛♜♝♞♟")
 #: As letras das peças em cada idioma, na ordem rei, dama, torre, bispo, cavalo: as do lance
 #: na prosa do livro (a sessão, a busca, o PGN). Uma definição só (SPEC-qualidade Q-E5).
 PECAS = {"pt": "RDTBC", "en": "KQRBN", "es": "RDTAC", "de": "KDTLS", "fr": "RDTFC"}
+
+
+def letras_das_pecas(chave: str) -> str:
+    """As 5 letras, da `chave`: elas mesmas (`Projeto.letras_das_pecas`), ou o idioma."""
+    return chave if len(chave) == 5 and chave.isupper() else PECAS.get(chave, PECAS["en"])
+
+
 #: As letras das peças de todos os idiomas: as que dizem lance sem saber o idioma do livro.
 LETRAS_DAS_PECAS = "".join(sorted(set("".join(PECAS.values()))))
 

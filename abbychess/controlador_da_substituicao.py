@@ -259,7 +259,7 @@ class ControladorDaSubstituicao:
         fontes = {i: previas[i].lida for i in aceitos}
         carimbos = {i: previas[i].carimbo for i in aceitos}
 
-        idioma = pc.projeto.dados.idioma
+        idioma = pc.projeto.dados.chave_das_pecas
 
         def preparar():
             projeto = pc.projeto
@@ -393,7 +393,7 @@ def _na_de_agora(viva, casos, projeto, imagem_de=lambda: None):
         viva.boxes, viva.decisoes = list(antes.boxes), antes.decisoes
         return None, (str(erro) if isinstance(erro, ss.Recusa)
                       else f"a substituição falhou: {erro}")
-    depois_de_editar(viva, antes, projeto.dados.idioma)
+    depois_de_editar(viva, antes, projeto.dados.chave_das_pecas)
     return hs.mudanca(antes, viva.instantaneo()), None
 
 

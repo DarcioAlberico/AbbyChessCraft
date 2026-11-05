@@ -384,7 +384,7 @@ class CondutorDoLote:
         if (self.refazer or indice in self.forcar) and pagina.estado in LIDAS \
                 and not projeto.somente_leitura:
             projeto.antes_do_lote.guardar(pagina)                         # §4.6
-        caidas = arrumacao.aplicar_lida(pagina, lida, projeto.dados.idioma,
+        caidas = arrumacao.aplicar_lida(pagina, lida, projeto.dados.chave_das_pecas,
                                         tamanho=_tamanho_da_imagem(p, indice))
         if caidas:
             self.resultado.caidas[indice] = caidas

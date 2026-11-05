@@ -6,6 +6,8 @@ import logging
 import sys
 import threading
 
+from abbychess import log_em_arquivo
+
 log = logging.getLogger(__name__)
 
 
@@ -41,6 +43,7 @@ def traduzir_o_qt(app) -> None:
 def main(argv=None) -> int:
     argv = list(sys.argv if argv is None else argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    log_em_arquivo.ligar("app")
     registrar_os_erros_soltos()
 
     # Importados aqui para `--help` e os testes não pagarem a carga do Qt.

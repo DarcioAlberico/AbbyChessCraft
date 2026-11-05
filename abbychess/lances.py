@@ -81,11 +81,18 @@ _NUMERO_SEPARADO = re.compile(r"(?<!\S)([(\[{]?[1-9lI|][0-9lI|Oo]{0,2})\s+"
                               r"(?=(?:\.{2,}|…)[^\s.…])")
 #: O `1` da casa lido como `l` ("♕el", "♖adl", "♔hl"): só no lance de peça ou de captura,
 #: senão o "el" de um livro em espanhol viraria e1.
-_FILEIRA_1_DO_OCR = re.compile(r"(?<=[a-h])[lI|](?=[+#!?‼⁇⁈⁉]*$)")
+#: A avaliação que o livro cola no lance ("♗c4–+", "Cf3±"): não é xeque nem juízo.
+_AVALIACAO = r"(?:[±∓⩱⩲=∞⯹□→↑⇆⇄⟳○⨀⨁⇔⇗⊞⟪⟫✕⊥⯺⯻⯼⯽]|\+[-–—]|[-–—]\+)*"
+_FILEIRA_1_DO_OCR = re.compile(rf"(?<=[a-h])[lI|](?=[+#!?‼⁇⁈⁉]*{_AVALIACAO}$)")
 _LANCE = re.compile(r"^(?P<lance>O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?[x:×]?[a-h][1-8](?:=?[QRBN])?)"
-                    r"(?P<marca>[+#]*)(?P<juizo>[!?‼⁇⁈⁉]*)(?:e\.?p\.?)?$")
+                    rf"(?P<marca>[+#]*)(?P<juizo>[!?‼⁇⁈⁉]*)(?P<avaliacao>{_AVALIACAO})"
+                    r"(?:e\.?p\.?)?$")
+#: O roque com qualquer traço e com o zero ou o O ("O–O", "0—0—0").
+_ROQUE_IMPRESSO = re.compile(r"^[O0][-–—][O0](?:[-–—][O0])?")
+#: A captura de peão que só o en passant pode explicar, na casa de destino certa.
+_CAPTURA_DE_PEAO = re.compile(r"^[a-h]x[a-h][36]$")
 #: Δ, ∇, ⌓ e ∟ ficam de fora: eles anunciam outro lance ("Δ Cf3"), que não é a resposta.
-_SINAL = re.compile(r"^[+#!?‼⁇⁈⁉±∓⩱⩲=∞⯹□■△▼→↑⇆⇄⟳○⨀⨁⇔⇗⊞⟪⟫✕⊥⯺⯻⯼⯽–—-]+$")
+_SINAL = re.compile(r"^(?:[+#!?‼⁇⁈⁉±∓⩱⩲=∞⯹□■△▼→↑⇆⇄⟳○⨀⨁⇔⇗⊞⟪⟫✕⊥⯺⯻⯼⯽–—-]+|e\.?p\.?)$")
 
 #: Os sinais de juízo que viram NAG no PGN.
 _NAGS = {"!": chess.pgn.NAG_GOOD_MOVE, "?": chess.pgn.NAG_MISTAKE,
@@ -170,14 +177,14 @@ def _tabela(idioma: str) -> Dict[str, str]:
 
     tabela = dict(zip(PECAS.get(idioma, _INGLES), _INGLES))
     tabela.update(FIGURINAS)
-    tabela["✝"] = "+"
+    tabela.update({"✝": "+", "†": "+", "‡": "+"})
     return tabela
 
 
 def _em_san(nucleo: str, tabela: Dict[str, str]) -> Optional[re.Match]:
     """O lance do token em SAN inglês, ou `None` se o token não for lance."""
     convertido = "".join(tabela.get(c, c) for c in nucleo if c not in _PEOES)
-    convertido = convertido.replace("0-0-0", "O-O-O").replace("0-0", "O-O")
+    convertido = _ROQUE_IMPRESSO.sub(lambda m: "O-O-O" if len(m[0]) > 3 else "O-O", convertido)
     achado = _LANCE.match(convertido)
     if achado is None and (convertido[:1] in _INGLES or "x" in convertido):
         achado = _LANCE.match(_FILEIRA_1_DO_OCR.sub("1", convertido))
@@ -231,7 +238,8 @@ def _token_do_nucleo(nucleo: str, tabela: Dict[str, str]):
     achado = _em_san(nucleo, tabela)
     if achado:
         san = achado.group("lance").replace(":", "x").replace("×", "x")
-        impresso = nucleo.rstrip("!?‼⁇⁈⁉")
+        sem_avaliacao = nucleo[:len(nucleo) - len(achado.group("avaliacao"))]
+        impresso = sem_avaliacao.rstrip("!?‼⁇⁈⁉")
         yield "lance", Lance(impresso, san, marca=achado.group("marca"),
                              juizo=achado.group("juizo"))
     elif _SINAL.match(nucleo):
@@ -320,6 +328,21 @@ def _tabuleiro(pecas: str, vez: str, roque: str, numero: int) -> chess.Board:
     return board
 
 
+def _com_en_passant(board: chess.Board, san: str) -> None:
+    """A casa de en passant do primeiro lance, se só ela explica a captura de peão: o diagrama
+    não diz qual foi o último lance. Com o peão que acabou de andar duas casas ao lado."""
+    if _CAPTURA_DE_PEAO.match(san) is None:
+        return
+    alvo = chess.parse_square(san[2:])
+    passo = -8 if board.turn == chess.WHITE else 8
+    if chess.square_rank(alvo) != (5 if board.turn == chess.WHITE else 2):
+        return
+    peao = board.piece_at(alvo + passo)
+    if (peao == chess.Piece(chess.PAWN, not board.turn) and board.piece_at(alvo) is None
+            and board.piece_at(alvo - passo) is None):
+        board.ep_square = alvo
+
+
 def _contradiz(board: chess.Board, movimento: chess.Move, lance: Lance) -> str:
     """O que o lance diz e não faz aqui: vazio quando nada."""
     if "x" in lance.san and not board.is_capture(movimento):
@@ -393,6 +416,7 @@ def _validar_os_lances(board: chess.Board, linha: Sequence[Lance], vez: str,
     """Joga a linha no tabuleiro até o primeiro lance que não é legal ou diz o que não faz."""
     total = len(linha)
     sans, juizos = [], []
+    _com_en_passant(board, linha[0].san)
     for lance in linha:
         try:
             movimento = board.parse_san(lance.san)
@@ -549,6 +573,7 @@ def _roque_usado(pecas: str, vez: str, numero: int, sans: Sequence[str]) -> str:
     """Os direitos de roque que a própria linha exerceu (o `O-O` do texto é prova)."""
     board = _tabuleiro(pecas, vez, roque_inferido(pecas), numero)
     usados = ""
+    _com_en_passant(board, sans[0] if sans else "")
     for san in sans:
         try:
             movimento = board.parse_san(san)
@@ -576,6 +601,7 @@ def pgn_do_diagrama(diagrama, cabecalhos: Optional[Dict[str, str]] = None) -> st
     roque = "".join(sorted(conferido | set(_roque_usado(pecas, vez, numero, sans)),
                            key="KQkq".index))
     board = _tabuleiro(pecas, vez, roque, numero)
+    _com_en_passant(board, sans[0] if sans else "")
     jogo = _jogo_vazio(cabecalhos)
     jogo.setup(board)
     no = _com_os_lances(jogo, sans, juizos)

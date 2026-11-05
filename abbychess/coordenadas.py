@@ -17,6 +17,7 @@ from typing import List, Optional, Sequence, Tuple
 import cv2
 import numpy as np
 
+from abbychess.geometria import cinza as _cinza
 from abbychess.montagem import ALCANCE_DAS_COORDENADAS
 
 Caixa = Tuple[int, int, int, int]
@@ -172,10 +173,3 @@ def _componentes(arr: np.ndarray, caixa: Caixa) -> List[Caixa]:
     quantos, _rotulos, medidas, _centros = cv2.connectedComponentsWithStats(binaria, 8)
     return [(x1 + int(x), y1 + int(y), x1 + int(x + largura), y1 + int(y + a))
             for x, y, largura, a, _area in medidas[1:quantos]]
-
-
-def _cinza(imagem) -> np.ndarray:
-    if hasattr(imagem, "convert"):
-        return np.asarray(imagem.convert("L"))
-    arr = np.asarray(imagem)
-    return arr if arr.ndim == 2 else arr.mean(axis=2).astype(np.uint8)

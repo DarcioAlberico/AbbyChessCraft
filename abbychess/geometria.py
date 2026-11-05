@@ -15,12 +15,22 @@ from __future__ import annotations
 import math
 from typing import Optional, Tuple
 
+import numpy as np
+
 Caixa = Tuple[int, int, int, int]
 Quadro = Tuple[int, int, int, int]
 #: (quadro ou None = a página inteira, giro em graus no sentido horário).
 Geometria = Tuple[Optional[Quadro], int]
 IDENTIDADE: Geometria = (None, 0)
 GIROS = (0, 90, 180, 270)
+
+
+def cinza(imagem) -> np.ndarray:
+    """A imagem PIL ou a matriz, em tons de cinza (matriz `uint8` de duas dimensões)."""
+    if hasattr(imagem, "convert"):
+        return np.asarray(imagem.convert("L"))
+    arr = np.asarray(imagem)
+    return arr if arr.ndim == 2 else arr.mean(axis=2).astype(np.uint8)
 
 
 def normalizar(geometria) -> Geometria:

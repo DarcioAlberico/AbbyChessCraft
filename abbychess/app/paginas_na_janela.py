@@ -102,9 +102,11 @@ class PaginasNaJanela:
         self.pagina.operacoes.girar_paginas(self._posicoes_de_agora(selecionadas), 270)
 
     def exportar_as_selecionadas(self, selecionadas: Sequence[int]) -> None:
-        """A exportação só das páginas selecionadas na gaveta (§3.1)."""
+        """A exportação em segundo plano; `selecionadas` limita às páginas da gaveta (§3.1)."""
         from abbychess.app import dialogo_exportacao, dialogos
 
+        if self.projeto is None:
+            return
         destino = dialogos.destino_da_exportacao(self, self.projeto)
         escolha = (dialogo_exportacao.perguntar(self, self.projeto, destino, selecao=selecionadas)
                    if destino else None)

@@ -25,14 +25,12 @@ py -3.13 -m venv --system-site-packages .venv
 ```
 
 Os testes vêm em camadas (SPEC §15.1). A suíte rápida roda sempre e fica abaixo de 60 s em
-paralelo (`-n auto`, do pytest-xdist: ~57 s com 3 workers; em série, ~100 s). O `-n auto` abre
-no máximo 4 workers, e menos se a memória livre não couber 1,5 GB para cada um
-(`tests/conftest.py`): sem o teto, suítes e medidas ao mesmo tempo esgotavam os 16 GB e
-travavam a máquina. Uma carga pesada por vez (suíte, medidas, replay, Ace); as outras rodam
-com `-m`, em série, porque as de desempenho medem tempo:
+paralelo (`-n 4`, do pytest-xdist: ~57 s; em série, ~100 s). Nunca `-n auto`: suítes e medidas
+ao mesmo tempo esgotavam os 16 GB e travavam a máquina. Uma carga pesada por vez (suíte, medidas,
+replay, Ace); as outras rodam com `-m`, em série, porque as de desempenho medem tempo:
 
 ```text
-.venv\Scripts\python.exe -m pytest -q -n auto
+.venv\Scripts\python.exe -m pytest -q -n 4
 .venv\Scripts\python.exe -m pytest -q -m livro_real
 $env:ABBY_ROTULO_DA_MEDIDA = "linha-de-base"; .venv\Scripts\python.exe -m pytest -q -m desempenho tests\desempenho
 ```
@@ -40,10 +38,11 @@ $env:ABBY_ROTULO_DA_MEDIDA = "linha-de-base"; .venv\Scripts\python.exe -m pytest
 `livro_real` usa os PDFs da pasta do PyBoxEditor e os modelos globais; com
 `ABBY_PORTAO=1`, um teste desses que pularia por falta do livro **falha** (é o portão de
 fechamento de cada passo do roadmap). O portão só vale com as camadas selecionadas, porque
-o `addopts` as tira da suíte rápida:
+o `addopts` as tira da suíte rápida. O caminho indicado é arquivo por arquivo, sob o vigia da
+RAM (`ferramentas/portao.py`, ~17 min, nada mais rodando):
 
 ```text
-$env:ABBY_PORTAO = "1"; .venv\Scripts\python.exe -m pytest -q -m "livro_real or desempenho"
+.venv\Scripts\python.exe ferramentas\portao.py
 ```
 
 `desempenho` mede as metas de §2 da spec e grava o resultado em `docs/medidas/`.
@@ -1708,7 +1707,7 @@ Grava `docs\medidas\qualidade\crap-<commit>.txt`, `duplicacao-<commit>.txt` e
   2,6 ms). **O Enter** que
   confirma a leitura ficou em ~25 ms na mediana (três rodadas do `9c98367`); o que corrige um
   caractere ainda paga ~25 ms a mais, da validação pelos lances, que monta o texto da página.
-  **A suíte rápida** leva ~57 s em paralelo (`-n auto`, com o teto de 4 workers desde
+  **A suíte rápida** leva ~57 s em paralelo (`-n 4`, o teto desde
   2026-10-28; eram ~32 s sem ele), no limite dos 60 s da §15.1; em série, ~100 s. Manter as quebras
   numa página da camada nativa não devolve a quebra onde a camada tirou o hífen da palavra
   partida.

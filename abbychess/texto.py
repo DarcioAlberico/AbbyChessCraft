@@ -192,7 +192,7 @@ def montar(pagina: Pagina, *, com_os_nao_lidos: bool = False) -> Documento:
         antes_da_linha = _diagramas_da_pilha(pagina, ordem, linhas, topos, trechos, chars, entries)
     blocos = _blocos(linhas, _zonas_das_linhas(linhas, pagina.zonas, por_gid),
                      _paragrafos_novos(linhas, pagina.decisoes), antes_da_linha)
-    return Documento(tuple(_na_ordem_das_zonas(blocos, pagina.zonas)), chars,
+    return Documento(tuple(_na_ordem_das_zonas(blocos, pagina)), chars,
                      {b.gid: b.estilo for b in lidos})
 
 
@@ -578,17 +578,16 @@ def _zona_da_linha(linha, por_gid, zonas):
     return zn.zona_da_maioria(zonas, entries)
 
 
-def _na_ordem_das_zonas(blocos: List[Bloco], zonas: Sequence) -> List[Bloco]:
-    """Com `ordem` nas áreas, os blocos delas seguem essa ordem; o resto fica no lugar."""
-    ordem = {z.id: z.ordem for z in zonas if z.id and z.ordem is not None}
+def _na_ordem_das_zonas(blocos: List[Bloco], pagina: Pagina) -> List[Bloco]:
+    """Com `ordem` nas áreas, os blocos delas seguem essa ordem, o diagrama pela área de
+    diagrama dele; o resto fica no lugar."""
+    ordem = {z.id: z.ordem for z in pagina.zonas if z.id and z.ordem is not None}
     if not ordem:
         return blocos
-    posicoes = [i for i, b in enumerate(blocos) if b.zona_id in ordem]
-    ordenados = sorted((blocos[i] for i in posicoes), key=lambda b: ordem[b.zona_id])
-    saida = list(blocos)
-    for i, b in zip(posicoes, ordenados):
-        saida[i] = b
-    return saida
+    do_diagrama = {d.id: zn.ordem_do_tabuleiro(pagina.zonas, d.caixa) for d in pagina.diagramas}
+    return zn.na_ordem_das_areas(blocos, lambda b: (ordem.get(b.zona_id)
+                                                    if b.diagrama_id is None
+                                                    else do_diagrama.get(b.diagrama_id)))
 
 
 # ----------------------------------------------------------------------

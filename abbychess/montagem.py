@@ -16,7 +16,7 @@ from PIL import Image
 from core.box_model import BoxEntry
 from core.pagina import Figura, PaginaExtraida, Paragrafo
 
-from abbychess.diagramas import DiagramaLido, para_caixas
+from abbychess.diagramas import DiagramaLido, em_ordem, para_caixas
 from abbychess.layout import OrdemDeLeitura, lugares_da_pilha
 from abbychess.projeto import ProjetoDeLivro
 
@@ -79,6 +79,10 @@ class Estrutura:
     #: Os boxes numa área desenhada pelo usuário com função de texto (não de margem): a
     #: regra das margens corridas (`margens_corridas`) não os tira.
     protegidos: set = field(default_factory=set)
+    #: A ordem da área de texto de cada box, quando o usuário as ordenou (Ordenar).
+    ordens: Dict[int, int] = field(default_factory=dict)
+    #: As áreas da página, para a ordem da figura de cada tabuleiro.
+    zonas: Sequence = ()
     #: Os boxes vistos e aceitos no Documento (§6.3): a caixa pela altura não os troca.
     revisados: set = field(default_factory=set)
     #: Os `BoxEntry` da estrutura, vivos enquanto ela viver: as chaves são `id()`.
@@ -119,6 +123,7 @@ class Estrutura:
         função de texto."""
         from abbychess import zonas as zn
 
+        self.zonas = zonas
         areas = [z for z in zonas if z.tipo in (zn.TEXTO, zn.IGNORAR)]
         funcao_da, protege = _funcoes_das_areas(areas)
         for b in lidos:
@@ -127,6 +132,8 @@ class Estrutura:
             if area is None:
                 continue
             self.funcoes[id(e)] = funcao_da[id(area)]
+            if area.ordem is not None:
+                self.ordens[id(e)] = area.ordem
             if protege[id(area)]:
                 self.protegidos.add(id(e))
 
@@ -203,6 +210,8 @@ class _Linha:
     indices: List[int] = field(default_factory=list)
     #: O trecho de leitura (faixa, coluna) da linha; ver `layout.OrdemDeLeitura`.
     trecho: Tuple[int, int] = (0, 0)
+    #: Da `Estrutura`: a ordem da área da linha (`None`: sem ordem).
+    ordem: Optional[int] = None
     #: Da `Estrutura`: a função da área da linha, se ela pede parágrafo, se termina num
     #: hífen de quebra decidido, e os trechos `(início, fim)` em negrito e em itálico.
     funcao: str = "texto"
@@ -425,6 +434,8 @@ def _com_a_estrutura(linha: _Linha, palavras_da_linha, boxes: Sequence[BoxEntry]
     entradas = [boxes[i] for i in linha.indices]
     funcoes = [estrutura.funcao(b) for b in entradas]
     linha.funcao = max(dict.fromkeys(funcoes), key=funcoes.count)   # o empate: a primeira
+    ordens = [estrutura.ordens.get(id(b)) for b in entradas]
+    linha.ordem = max(dict.fromkeys(ordens), key=ordens.count)
     linha.paragrafo = id(entradas[0]) in estrutura.paragrafo_antes
     linha.hifen = id(entradas[-1]) in estrutura.hifen_de_quebra and linha.texto.endswith("-")
     linha.primeiro, linha.ultimo = id(entradas[0]), id(entradas[-1])
@@ -529,6 +540,8 @@ class ParagrafoExportado(Paragrafo):
     dos glifos duvidosos, para o realce do DOCX (`Opcoes.realcar_duvidosos`)."""
 
     duvidosos: List[Tuple[int, int]] = field(default_factory=list)
+    #: A ordem da área de onde ele veio, quando o usuário as ordenou.
+    ordem_da_area: Optional[int] = None
 
 
 def _juntar_entre_paginas(paginas: Sequence[PaginaExtraida]) -> None:
@@ -663,7 +676,7 @@ def _abre_paragrafo(anterior: _Linha, linha: _Linha, passo: float, cortes: Seque
     return (salto <= 0 or linha.trecho != anterior.trecho
             or (passo and salto > SALTO_DE_PARAGRAFO * passo)
             or any(anterior.pe <= y < linha.topo for y in cortes)
-            or linha.funcao != anterior.funcao or linha.paragrafo)
+            or linha.funcao != anterior.funcao or linha.paragrafo or linha.ordem != anterior.ordem)
 
 
 def _paragrafo_do_grupo(g: List[_Linha], manter_quebras: bool
@@ -672,7 +685,7 @@ def _paragrafo_do_grupo(g: List[_Linha], manter_quebras: bool
     titulo = g[0].funcao == "titulo"
     return (g[0].trecho, ParagrafoExportado(
         texto, titulo=titulo, nivel=1 if titulo else 2, negrito=negrito, italico=italico,
-        topo=g[0].topo, pe=g[-1].pe, duvidosos=duvidosos))
+        topo=g[0].topo, pe=g[-1].pe, duvidosos=duvidosos, ordem_da_area=g[0].ordem))
 
 
 def _figura(imagem: Image.Image, caixa: Tuple[int, int, int, int],
@@ -805,11 +818,25 @@ def pagina_extraida(indice: int, boxes: Sequence[BoxEntry],
         figuras, com_trecho_e_topo = _com_a_pilha(texto, leitura, estrutura, tabuleiros, figuras,
                                                   com_trecho)
         blocos = _na_ordem_de_leitura(com_trecho_e_topo, figuras)
+    blocos = _na_ordem_das_areas(blocos, figuras, tabuleiros, estrutura)
     largura, altura = imagem.size if imagem is not None else (0, 0)
     return PaginaExtraida(numero=indice, blocos=blocos,
                           caracteres=sum(len(b.char) for b in boxes if b.char),
                           diagramas=len(figuras), altura=altura, largura=largura,
                           dpi=DPI_DA_LEITURA)
+
+
+def _na_ordem_das_areas(blocos: list, figuras: list, tabuleiros, estrutura: Optional[Estrutura]
+                        ) -> list:
+    """Os blocos pela ordem das áreas (`zonas.na_ordem_das_areas`), como no Documento."""
+    if estrutura is None or not any(z.ordem is not None for z in estrutura.zonas):
+        return blocos
+    from abbychess import zonas as zn
+
+    da_figura = {id(figura[2]): zn.ordem_do_tabuleiro(estrutura.zonas, caixa)
+                 for figura, caixa in zip(figuras, em_ordem(tabuleiros))}
+    return zn.na_ordem_das_areas(blocos, lambda b: da_figura.get(id(b),
+                                                                 getattr(b, "ordem_da_area", None)))
 
 
 def _texto_da_pagina(boxes: Sequence[BoxEntry], tabuleiros, estrutura: Optional[Estrutura],

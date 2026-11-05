@@ -101,6 +101,25 @@ class PaginasNaJanela:
     def girar_a_esquerda(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         self.pagina.operacoes.girar_paginas(self._posicoes_de_agora(selecionadas), 270)
 
+    def exportar_as_selecionadas(self, selecionadas: Sequence[int]) -> None:
+        """A exportação só das páginas selecionadas na gaveta (§3.1)."""
+        from abbychess.app import dialogo_exportacao, dialogos
+
+        destino = dialogos.destino_da_exportacao(self, self.projeto)
+        escolha = (dialogo_exportacao.perguntar(self, self.projeto, destino, selecao=selecionadas)
+                   if destino else None)
+        if escolha is not None:
+            meta = escolha.metadados if destino.suffix.lower() in (".epub", ".docx") else None
+            self.livro.exportar(destino, escolha.opcoes, meta, escolha.capa)
+
+    def modelo_nas_selecionadas(self, selecionadas: Sequence[int]) -> None:
+        """O modelo de áreas salvo nas páginas selecionadas na gaveta (§3.1)."""
+        if self.areas.modelo is None:
+            self.statusBar().showMessage(
+                "Salve um modelo de áreas antes, numa página com as áreas certas.", 6000)
+            return
+        self.areas.aplicar_modelo(list(selecionadas))
+
     def mover_paginas(self, selecionadas: Optional[Sequence[int]] = None) -> None:
         escolha = self._perguntar_pela_selecao(
             "Mover páginas", selecionadas, ("1 página muda de lugar: {PAGINAS}.",

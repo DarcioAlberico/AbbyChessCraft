@@ -61,6 +61,9 @@ class PainelDePaginas(QWidget):
     apagar = Signal(list)
     #: (o método da janela, as posições escolhidas): girar, cortar, dividir, endireitar.
     operacao = Signal(str, list)
+    #: Exportar e aplicar o modelo de áreas às selecionadas (§3.1).
+    exportar = Signal(list)
+    aplicar_modelo = Signal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -264,6 +267,12 @@ class PainelDePaginas(QWidget):
         lote = menu.addAction(f"Reconhecer as selecionadas ({len(selecionadas)})")
         lote.setEnabled(bool(selecionadas))
         lote.triggered.connect(lambda: self.reconhecer.emit(self.selecionadas()))
+        exportar = menu.addAction(f"Exportar as selecionadas ({len(selecionadas)})…")
+        exportar.setEnabled(bool(selecionadas))
+        exportar.triggered.connect(lambda: self.exportar.emit(self.selecionadas()))
+        modelo = menu.addAction(f"Aplicar o modelo de áreas às selecionadas ({len(selecionadas)})")
+        modelo.setEnabled(bool(selecionadas) and self.paginas_mudam)
+        modelo.triggered.connect(lambda: self.aplicar_modelo.emit(self.selecionadas()))
         menu.addSeparator()
         mover = menu.addAction(f"Mover as selecionadas ({len(selecionadas)})…")
         mover.setEnabled(bool(selecionadas) and self.paginas_mudam)

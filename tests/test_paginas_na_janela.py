@@ -201,19 +201,15 @@ def test_o_angulo_medido_nao_e_arredondado_no_dialogo(app):
     campo.deleteLater()
 
 
-def _acao(janela, comeco: str):
+def _acao(janela, comeco: str):  # noqa: F811
     return next(a for a in janela.paginas.menu_de_contexto().actions()
                 if a.text().startswith(comeco))
 
 
-def _selecionar(janela, indices) -> None:
-    janela.paginas.lista.clearSelection()
-    for i in indices:
-        janela.paginas.lista.topLevelItem(i).setSelected(True)
-
-
 def test_a_gaveta_exporta_as_selecionadas(app, janela, monkeypatch):  # noqa: F811
     """§3.1: as selecionadas vão ao diálogo, que não pergunta o intervalo."""
+    from pathlib import Path
+
     from abbychess import exportar as ex
     from abbychess.app import dialogo_exportacao as de
     from abbychess.app import dialogos
@@ -223,7 +219,7 @@ def test_a_gaveta_exporta_as_selecionadas(app, janela, monkeypatch):  # noqa: F8
     monkeypatch.setattr(de, "perguntar", lambda _j, _p, _d, **k: pedidos.append(k["selecao"]) or de.Escolha(
         ex.Opcoes(selecao=tuple(k["selecao"])), {}, None))
     monkeypatch.setattr(janela.livro, "exportar", lambda _d, opcoes, _m, _c: exportados.append(opcoes))
-    _selecionar(janela, [1, 4])
+    monkeypatch.setattr(janela.paginas, "selecionadas", lambda: [1, 4])
     _acao(janela, "Exportar as selecionadas (2)").trigger()
     assert pedidos == [[1, 4]] and exportados[0].selecao == (1, 4)
 
@@ -232,7 +228,7 @@ def test_a_gaveta_aplica_o_modelo_de_areas_nas_selecionadas(app, janela, monkeyp
     aplicados = []
     janela.areas.modelo = object()
     monkeypatch.setattr(janela.areas, "aplicar_modelo", aplicados.append)
-    _selecionar(janela, [2, 5])
+    monkeypatch.setattr(janela.paginas, "selecionadas", lambda: [2, 5])
     _acao(janela, "Aplicar o modelo de áreas às selecionadas (2)").trigger()
     assert aplicados == [[2, 5]]
 
@@ -241,6 +237,6 @@ def test_sem_modelo_salvo_a_gaveta_diz_o_que_falta(app, janela, monkeypatch):  #
     aplicados = []
     janela.areas.modelo = None
     monkeypatch.setattr(janela.areas, "aplicar_modelo", aplicados.append)
-    _selecionar(janela, [2])
+    monkeypatch.setattr(janela.paginas, "selecionadas", lambda: [2])
     _acao(janela, "Aplicar o modelo de áreas às selecionadas (1)").trigger()
     assert not aplicados and "Salve um modelo" in janela.statusBar().currentMessage()

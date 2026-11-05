@@ -1,0 +1,1835 @@
+{
+ "ambiente": {
+  "commit": "262d897",
+  "commit_do_core": "70e6a86",
+  "modelo_sha256_inicio": "6b613d072843194d",
+  "data": "2026-11-05",
+  "versoes": {
+   "torch": "2.14.0",
+   "easyocr": "1.7.2",
+   "paddleocr": "3.7.0",
+   "paddlepaddle": "3.3.1",
+   "pytesseract": "0.3.13",
+   "opencv-python": "4.12.0.88"
+  },
+  "tesseract": "5.5.0.20241111, por/eng, --psm 7, sem treino",
+  "paddle": "PP-OCRv6_medium_rec, CPU, sem treino; recorte da linha do programa",
+  "easyocr": "latin_g2 (pt) / english_g2 (en), CPU, sem treino",
+  "programa": "modelos globais, padrões do livro vazios"
+ },
+ "tempo_e_memoria": {
+  "programa_s_por_pagina": {
+   "seirawan": 9.56,
+   "aagaard": 10.5,
+   "nunn": 5.0,
+   "yusupov": 10.4,
+   "dvoretsky": 5.6
+  },
+  "tesseract_s_por_linha": 0.149,
+  "easyocr_s_por_linha": 0.153,
+  "paddle_s_por_linha": 0.388,
+  "paddle_ram_do_processo_mb": 2055
+ },
+ "motores": {
+  "seirawan": {
+   "motores": {
+    "programa": {
+     "cer": 0.0276,
+     "n": 12008,
+     "erros": 331,
+     "sobras": 28,
+     "cer_prosa": 0.0234,
+     "cer_lance": 0.0499,
+     "classes": {
+      "letra": [
+       239,
+       9278
+      ],
+      "espaco": [
+       8,
+       1864
+      ],
+      "digito": [
+       9,
+       298
+      ],
+      "simbolo": [
+       7,
+       71
+      ],
+      "pontuacao": [
+       40,
+       497
+      ]
+     },
+     "unidades_perfeitas": 72,
+     "tokens_lance": 135,
+     "tokens_lance_errados": 26,
+     "lidos_forma_de_lance_falsos": 8
+    },
+    "tesseract": {
+     "cer": 0.0124,
+     "n": 12008,
+     "erros": 149,
+     "sobras": 19,
+     "cer_prosa": 0.0067,
+     "cer_lance": 0.0653,
+     "classes": {
+      "letra": [
+       78,
+       9278
+      ],
+      "espaco": [
+       10,
+       1864
+      ],
+      "digito": [
+       23,
+       298
+      ],
+      "simbolo": [
+       8,
+       71
+      ],
+      "pontuacao": [
+       11,
+       497
+      ]
+     },
+     "unidades_perfeitas": 160,
+     "tokens_lance": 135,
+     "tokens_lance_errados": 44,
+     "lidos_forma_de_lance_falsos": 10
+    },
+    "easyocr": {
+     "cer": 0.0217,
+     "n": 12008,
+     "erros": 261,
+     "sobras": 32,
+     "cer_prosa": 0.0143,
+     "cer_lance": 0.0819,
+     "classes": {
+      "letra": [
+       129,
+       9278
+      ],
+      "espaco": [
+       9,
+       1864
+      ],
+      "digito": [
+       16,
+       298
+      ],
+      "simbolo": [
+       10,
+       71
+      ],
+      "pontuacao": [
+       65,
+       497
+      ]
+     },
+     "unidades_perfeitas": 84,
+     "tokens_lance": 135,
+     "tokens_lance_errados": 49,
+     "lidos_forma_de_lance_falsos": 31
+    },
+    "paddle": {
+     "cer": 0.0074,
+     "n": 12008,
+     "erros": 89,
+     "sobras": 8,
+     "cer_prosa": 0.006,
+     "cer_lance": 0.0166,
+     "classes": {
+      "letra": [
+       51,
+       9278
+      ],
+      "espaco": [
+       9,
+       1864
+      ],
+      "digito": [
+       4,
+       298
+      ],
+      "simbolo": [
+       7,
+       71
+      ],
+      "pontuacao": [
+       10,
+       497
+      ]
+     },
+     "unidades_perfeitas": 183,
+     "tokens_lance": 135,
+     "tokens_lance_errados": 8,
+     "lidos_forma_de_lance_falsos": 7
+    },
+    "consenso_pte": {
+     "cer": 0.0065,
+     "n": 12008,
+     "erros": 78,
+     "sobras": 19,
+     "cer_prosa": 0.0033,
+     "cer_lance": 0.0261,
+     "classes": {
+      "letra": [
+       29,
+       9278
+      ],
+      "espaco": [
+       4,
+       1864
+      ],
+      "digito": [
+       6,
+       298
+      ],
+      "simbolo": [
+       8,
+       71
+      ],
+      "pontuacao": [
+       12,
+       497
+      ]
+     },
+     "unidades_perfeitas": 163,
+     "tokens_lance": 135,
+     "tokens_lance_errados": 16,
+     "lidos_forma_de_lance_falsos": 10
+    },
+    "consenso_ptd": {
+     "cer": 0.0045,
+     "n": 12008,
+     "erros": 54,
+     "sobras": 17,
+     "cer_prosa": 0.0021,
+     "cer_lance": 0.0166,
+     "classes": {
+      "letra": [
+       20,
+       9278
+      ],
+      "espaco": [
+       2,
+       1864
+      ],
+      "digito": [
+       4,
+       298
+      ],
+      "simbolo": [
+       7,
+       71
+      ],
+      "pontuacao": [
+       4,
+       497
+      ]
+     },
+     "unidades_perfeitas": 177,
+     "tokens_lance": 135,
+     "tokens_lance_errados": 11,
+     "lidos_forma_de_lance_falsos": 8
+    }
+   },
+   "discordancia": {
+    "tesseract": {
+     "marca": 282,
+     "de": 11896,
+     "fracao": 0.0237,
+     "erros": 242,
+     "pegos": 234,
+     "revocacao": 0.9669,
+     "precisao": 0.8298
+    },
+    "easyocr": {
+     "marca": 431,
+     "de": 11956,
+     "fracao": 0.036,
+     "erros": 251,
+     "pegos": 239,
+     "revocacao": 0.9522,
+     "precisao": 0.5545
+    },
+    "paddle": {
+     "marca": 274,
+     "de": 11926,
+     "fracao": 0.023,
+     "erros": 246,
+     "pegos": 242,
+     "revocacao": 0.9837,
+     "precisao": 0.8832
+    }
+   },
+   "unidades": 213,
+   "tipo": "escaneado"
+  },
+  "aagaard-calculation": {
+   "motores": {
+    "programa": {
+     "cer": 0.1386,
+     "n": 1753,
+     "erros": 243,
+     "sobras": 35,
+     "cer_prosa": 0.1426,
+     "cer_lance": 0.0532,
+     "classes": {
+      "digito": [
+       14,
+       211
+      ],
+      "pontuacao": [
+       11,
+       121
+      ],
+      "espaco": [
+       4,
+       294
+      ],
+      "letra": [
+       176,
+       1031
+      ],
+      "figurina": [
+       1,
+       64
+      ],
+      "simbolo": [
+       2,
+       32
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 74,
+     "tokens_lance_errados": 15,
+     "lidos_forma_de_lance_falsos": 5
+    },
+    "tesseract": {
+     "cer": 0.0827,
+     "n": 1753,
+     "erros": 145,
+     "sobras": 15,
+     "cer_prosa": 0.0086,
+     "cer_lance": 0.2532,
+     "classes": {
+      "digito": [
+       11,
+       211
+      ],
+      "pontuacao": [
+       9,
+       121
+      ],
+      "espaco": [
+       0,
+       294
+      ],
+      "letra": [
+       27,
+       1031
+      ],
+      "figurina": [
+       64,
+       64
+      ],
+      "simbolo": [
+       19,
+       32
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 74,
+     "tokens_lance_errados": 69,
+     "lidos_forma_de_lance_falsos": 13
+    },
+    "easyocr": {
+     "cer": 0.1055,
+     "n": 1753,
+     "erros": 185,
+     "sobras": 6,
+     "cer_prosa": 0.0366,
+     "cer_lance": 0.2809,
+     "classes": {
+      "digito": [
+       13,
+       211
+      ],
+      "pontuacao": [
+       56,
+       121
+      ],
+      "espaco": [
+       2,
+       294
+      ],
+      "letra": [
+       26,
+       1031
+      ],
+      "figurina": [
+       64,
+       64
+      ],
+      "simbolo": [
+       18,
+       32
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 74,
+     "tokens_lance_errados": 68,
+     "lidos_forma_de_lance_falsos": 26
+    },
+    "paddle": {
+     "cer": 0.057,
+     "n": 1753,
+     "erros": 100,
+     "sobras": 0,
+     "cer_prosa": 0.0062,
+     "cer_lance": 0.1957,
+     "classes": {
+      "digito": [
+       2,
+       211
+      ],
+      "pontuacao": [
+       9,
+       121
+      ],
+      "espaco": [
+       4,
+       294
+      ],
+      "letra": [
+       5,
+       1031
+      ],
+      "figurina": [
+       64,
+       64
+      ],
+      "simbolo": [
+       16,
+       32
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 74,
+     "tokens_lance_errados": 64,
+     "lidos_forma_de_lance_falsos": 39
+    },
+    "consenso_pte": {
+     "cer": 0.0291,
+     "n": 1753,
+     "erros": 51,
+     "sobras": 4,
+     "cer_prosa": 0.0195,
+     "cer_lance": 0.0468,
+     "classes": {
+      "digito": [
+       5,
+       211
+      ],
+      "pontuacao": [
+       9,
+       121
+      ],
+      "espaco": [
+       4,
+       294
+      ],
+      "letra": [
+       24,
+       1031
+      ],
+      "figurina": [
+       1,
+       64
+      ],
+      "simbolo": [
+       4,
+       32
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 74,
+     "tokens_lance_errados": 15,
+     "lidos_forma_de_lance_falsos": 3
+    },
+    "consenso_ptd": {
+     "cer": 0.0217,
+     "n": 1753,
+     "erros": 38,
+     "sobras": 5,
+     "cer_prosa": 0.0109,
+     "cer_lance": 0.0404,
+     "classes": {
+      "digito": [
+       5,
+       211
+      ],
+      "pontuacao": [
+       7,
+       121
+      ],
+      "espaco": [
+       4,
+       294
+      ],
+      "letra": [
+       15,
+       1031
+      ],
+      "figurina": [
+       1,
+       64
+      ],
+      "simbolo": [
+       1,
+       32
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 74,
+     "tokens_lance_errados": 12,
+     "lidos_forma_de_lance_falsos": 3
+    }
+   },
+   "discordancia": {
+    "tesseract": {
+     "marca": 204,
+     "de": 1742,
+     "fracao": 0.1171,
+     "erros": 197,
+     "pegos": 187,
+     "revocacao": 0.9492,
+     "precisao": 0.9167
+    },
+    "easyocr": {
+     "marca": 225,
+     "de": 1742,
+     "fracao": 0.1292,
+     "erros": 197,
+     "pegos": 179,
+     "revocacao": 0.9086,
+     "precisao": 0.7956
+    },
+    "paddle": {
+     "marca": 196,
+     "de": 1742,
+     "fracao": 0.1125,
+     "erros": 197,
+     "pegos": 190,
+     "revocacao": 0.9645,
+     "precisao": 0.9694
+    }
+   },
+   "unidades": 1,
+   "tipo": "escaneado"
+  },
+  "nunn-rook-endings": {
+   "motores": {
+    "programa": {
+     "cer": 0.1622,
+     "n": 1202,
+     "erros": 195,
+     "sobras": 69,
+     "cer_prosa": 0.0937,
+     "cer_lance": 0.1262,
+     "classes": {
+      "digito": [
+       12,
+       144
+      ],
+      "espaco": [
+       17,
+       237
+      ],
+      "letra": [
+       62,
+       546
+      ],
+      "figurina": [
+       8,
+       73
+      ],
+      "pontuacao": [
+       25,
+       172
+      ],
+      "simbolo": [
+       2,
+       30
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 44,
+     "tokens_lance_errados": 10,
+     "lidos_forma_de_lance_falsos": 12
+    },
+    "tesseract": {
+     "cer": 0.223,
+     "n": 1202,
+     "erros": 268,
+     "sobras": 58,
+     "cer_prosa": 0.1,
+     "cer_lance": 0.318,
+     "classes": {
+      "digito": [
+       22,
+       144
+      ],
+      "espaco": [
+       14,
+       237
+      ],
+      "letra": [
+       63,
+       546
+      ],
+      "figurina": [
+       73,
+       73
+      ],
+      "pontuacao": [
+       32,
+       172
+      ],
+      "simbolo": [
+       6,
+       30
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 44,
+     "tokens_lance_errados": 42,
+     "lidos_forma_de_lance_falsos": 5
+    },
+    "easyocr": {
+     "cer": 0.2854,
+     "n": 1202,
+     "erros": 343,
+     "sobras": 54,
+     "cer_prosa": 0.1304,
+     "cer_lance": 0.4515,
+     "classes": {
+      "digito": [
+       34,
+       144
+      ],
+      "espaco": [
+       19,
+       237
+      ],
+      "letra": [
+       74,
+       546
+      ],
+      "figurina": [
+       73,
+       73
+      ],
+      "pontuacao": [
+       79,
+       172
+      ],
+      "simbolo": [
+       10,
+       30
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 44,
+     "tokens_lance_errados": 42,
+     "lidos_forma_de_lance_falsos": 9
+    },
+    "paddle": {
+     "cer": 0.2146,
+     "n": 1202,
+     "erros": 258,
+     "sobras": 10,
+     "cer_prosa": 0.1494,
+     "cer_lance": 0.3155,
+     "classes": {
+      "digito": [
+       22,
+       144
+      ],
+      "espaco": [
+       40,
+       237
+      ],
+      "letra": [
+       76,
+       546
+      ],
+      "figurina": [
+       73,
+       73
+      ],
+      "pontuacao": [
+       31,
+       172
+      ],
+      "simbolo": [
+       6,
+       30
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 44,
+     "tokens_lance_errados": 42,
+     "lidos_forma_de_lance_falsos": 26
+    },
+    "consenso_pte": {
+     "cer": 0.1481,
+     "n": 1202,
+     "erros": 178,
+     "sobras": 46,
+     "cer_prosa": 0.0975,
+     "cer_lance": 0.1335,
+     "classes": {
+      "digito": [
+       12,
+       144
+      ],
+      "espaco": [
+       17,
+       237
+      ],
+      "letra": [
+       64,
+       546
+      ],
+      "figurina": [
+       9,
+       73
+      ],
+      "pontuacao": [
+       28,
+       172
+      ],
+      "simbolo": [
+       2,
+       30
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 44,
+     "tokens_lance_errados": 10,
+     "lidos_forma_de_lance_falsos": 8
+    },
+    "consenso_ptd": {
+     "cer": 0.1456,
+     "n": 1202,
+     "erros": 175,
+     "sobras": 44,
+     "cer_prosa": 0.0975,
+     "cer_lance": 0.1311,
+     "classes": {
+      "digito": [
+       12,
+       144
+      ],
+      "espaco": [
+       18,
+       237
+      ],
+      "letra": [
+       63,
+       546
+      ],
+      "figurina": [
+       8,
+       73
+      ],
+      "pontuacao": [
+       27,
+       172
+      ],
+      "simbolo": [
+       3,
+       30
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 44,
+     "tokens_lance_errados": 7,
+     "lidos_forma_de_lance_falsos": 7
+    }
+   },
+   "discordancia": {
+    "tesseract": {
+     "marca": 128,
+     "de": 1222,
+     "fracao": 0.1047,
+     "erros": 146,
+     "pegos": 77,
+     "revocacao": 0.5274,
+     "precisao": 0.6016
+    },
+    "easyocr": {
+     "marca": 152,
+     "de": 1222,
+     "fracao": 0.1244,
+     "erros": 146,
+     "pegos": 78,
+     "revocacao": 0.5342,
+     "precisao": 0.5132
+    },
+    "paddle": {
+     "marca": 167,
+     "de": 1222,
+     "fracao": 0.1367,
+     "erros": 146,
+     "pegos": 85,
+     "revocacao": 0.5822,
+     "precisao": 0.509
+    }
+   },
+   "unidades": 1,
+   "tipo": "escaneado"
+  },
+  "yusupov-evolution-1": {
+   "motores": {
+    "programa": {
+     "cer": 0.1349,
+     "n": 3298,
+     "erros": 445,
+     "sobras": 220,
+     "cer_prosa": 0.0863,
+     "cer_lance": 0.0182,
+     "classes": {
+      "letra": [
+       181,
+       1955
+      ],
+      "espaco": [
+       5,
+       552
+      ],
+      "pontuacao": [
+       35,
+       262
+      ],
+      "digito": [
+       4,
+       323
+      ],
+      "figurina": [
+       0,
+       133
+      ],
+      "simbolo": [
+       0,
+       73
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 142,
+     "tokens_lance_errados": 3,
+     "lidos_forma_de_lance_falsos": 4
+    },
+    "tesseract": {
+     "cer": 0.2574,
+     "n": 3298,
+     "erros": 849,
+     "sobras": 471,
+     "cer_prosa": 0.0694,
+     "cer_lance": 0.2395,
+     "classes": {
+      "letra": [
+       141,
+       1955
+      ],
+      "espaco": [
+       19,
+       552
+      ],
+      "pontuacao": [
+       41,
+       262
+      ],
+      "digito": [
+       15,
+       323
+      ],
+      "figurina": [
+       133,
+       133
+      ],
+      "simbolo": [
+       29,
+       73
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 142,
+     "tokens_lance_errados": 128,
+     "lidos_forma_de_lance_falsos": 43
+    },
+    "easyocr": {
+     "cer": 0.1737,
+     "n": 3298,
+     "erros": 573,
+     "sobras": 225,
+     "cer_prosa": 0.0355,
+     "cer_lance": 0.2987,
+     "classes": {
+      "letra": [
+       29,
+       1955
+      ],
+      "espaco": [
+       11,
+       552
+      ],
+      "pontuacao": [
+       108,
+       262
+      ],
+      "digito": [
+       25,
+       323
+      ],
+      "figurina": [
+       133,
+       133
+      ],
+      "simbolo": [
+       42,
+       73
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 142,
+     "tokens_lance_errados": 132,
+     "lidos_forma_de_lance_falsos": 50
+    },
+    "paddle": {
+     "cer": 0.0767,
+     "n": 3298,
+     "erros": 253,
+     "sobras": 49,
+     "cer_prosa": 0.0178,
+     "cer_lance": 0.1836,
+     "classes": {
+      "letra": [
+       24,
+       1955
+      ],
+      "espaco": [
+       9,
+       552
+      ],
+      "pontuacao": [
+       10,
+       262
+      ],
+      "digito": [
+       5,
+       323
+      ],
+      "figurina": [
+       133,
+       133
+      ],
+      "simbolo": [
+       23,
+       73
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 142,
+     "tokens_lance_errados": 123,
+     "lidos_forma_de_lance_falsos": 75
+    },
+    "consenso_pte": {
+     "cer": 0.0855,
+     "n": 3298,
+     "erros": 282,
+     "sobras": 168,
+     "cer_prosa": 0.0401,
+     "cer_lance": 0.0194,
+     "classes": {
+      "letra": [
+       70,
+       1955
+      ],
+      "espaco": [
+       3,
+       552
+      ],
+      "pontuacao": [
+       35,
+       262
+      ],
+      "digito": [
+       3,
+       323
+      ],
+      "figurina": [
+       0,
+       133
+      ],
+      "simbolo": [
+       3,
+       73
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 142,
+     "tokens_lance_errados": 6,
+     "lidos_forma_de_lance_falsos": 4
+    },
+    "consenso_ptd": {
+     "cer": 0.0816,
+     "n": 3298,
+     "erros": 269,
+     "sobras": 168,
+     "cer_prosa": 0.0372,
+     "cer_lance": 0.0125,
+     "classes": {
+      "letra": [
+       70,
+       1955
+      ],
+      "espaco": [
+       2,
+       552
+      ],
+      "pontuacao": [
+       24,
+       262
+      ],
+      "digito": [
+       3,
+       323
+      ],
+      "figurina": [
+       0,
+       133
+      ],
+      "simbolo": [
+       2,
+       73
+      ]
+     },
+     "unidades_perfeitas": 0,
+     "tokens_lance": 142,
+     "tokens_lance_errados": 3,
+     "lidos_forma_de_lance_falsos": 1
+    }
+   },
+   "discordancia": {
+    "tesseract": {
+     "marca": 433,
+     "de": 3477,
+     "fracao": 0.1245,
+     "erros": 404,
+     "pegos": 297,
+     "revocacao": 0.7351,
+     "precisao": 0.6859
+    },
+    "easyocr": {
+     "marca": 367,
+     "de": 3477,
+     "fracao": 0.1056,
+     "erros": 404,
+     "pegos": 295,
+     "revocacao": 0.7302,
+     "precisao": 0.8038
+    },
+    "paddle": {
+     "marca": 359,
+     "de": 3477,
+     "fracao": 0.1032,
+     "erros": 404,
+     "pegos": 336,
+     "revocacao": 0.8317,
+     "precisao": 0.9359
+    }
+   },
+   "unidades": 2,
+   "tipo": "escaneado"
+  },
+  "dvoretsky": {
+   "motores": {
+    "programa": {
+     "cer": 0.0209,
+     "n": 5885,
+     "erros": 123,
+     "sobras": 7,
+     "cer_prosa": 0.0206,
+     "cer_lance": 0.0175,
+     "classes": {
+      "letra": [
+       48,
+       3604
+      ],
+      "pontuacao": [
+       42,
+       463
+      ],
+      "digito": [
+       1,
+       639
+      ],
+      "figurina": [
+       0,
+       228
+      ],
+      "simbolo": [
+       11,
+       112
+      ],
+      "espaco": [
+       14,
+       839
+      ]
+     },
+     "unidades_perfeitas": 144,
+     "tokens_lance": 294,
+     "tokens_lance_errados": 7,
+     "lidos_forma_de_lance_falsos": 3
+    },
+    "tesseract": {
+     "cer": 0.0588,
+     "n": 5885,
+     "erros": 346,
+     "sobras": 22,
+     "cer_prosa": 0.0043,
+     "cer_lance": 0.185,
+     "classes": {
+      "letra": [
+       63,
+       3604
+      ],
+      "pontuacao": [
+       16,
+       463
+      ],
+      "digito": [
+       15,
+       639
+      ],
+      "figurina": [
+       228,
+       228
+      ],
+      "simbolo": [
+       1,
+       112
+      ],
+      "espaco": [
+       1,
+       839
+      ]
+     },
+     "unidades_perfeitas": 124,
+     "tokens_lance": 294,
+     "tokens_lance_errados": 222,
+     "lidos_forma_de_lance_falsos": 88
+    },
+    "easyocr": {
+     "cer": 0.071,
+     "n": 5885,
+     "erros": 418,
+     "sobras": 11,
+     "cer_prosa": 0.0111,
+     "cer_lance": 0.2177,
+     "classes": {
+      "letra": [
+       23,
+       3604
+      ],
+      "pontuacao": [
+       96,
+       463
+      ],
+      "digito": [
+       25,
+       639
+      ],
+      "figurina": [
+       228,
+       228
+      ],
+      "simbolo": [
+       33,
+       112
+      ],
+      "espaco": [
+       2,
+       839
+      ]
+     },
+     "unidades_perfeitas": 98,
+     "tokens_lance": 294,
+     "tokens_lance_errados": 211,
+     "lidos_forma_de_lance_falsos": 104
+    },
+    "paddle": {
+     "cer": 0.0438,
+     "n": 5885,
+     "erros": 258,
+     "sobras": 0,
+     "cer_prosa": 0.0035,
+     "cer_lance": 0.1469,
+     "classes": {
+      "letra": [
+       13,
+       3604
+      ],
+      "pontuacao": [
+       15,
+       463
+      ],
+      "digito": [
+       1,
+       639
+      ],
+      "figurina": [
+       228,
+       228
+      ],
+      "simbolo": [
+       0,
+       112
+      ],
+      "espaco": [
+       1,
+       839
+      ]
+     },
+     "unidades_perfeitas": 134,
+     "tokens_lance": 294,
+     "tokens_lance_errados": 199,
+     "lidos_forma_de_lance_falsos": 110
+    },
+    "consenso_pte": {
+     "cer": 0.0093,
+     "n": 5885,
+     "erros": 55,
+     "sobras": 3,
+     "cer_prosa": 0.0059,
+     "cer_lance": 0.0163,
+     "classes": {
+      "letra": [
+       15,
+       3604
+      ],
+      "pontuacao": [
+       21,
+       463
+      ],
+      "digito": [
+       3,
+       639
+      ],
+      "figurina": [
+       0,
+       228
+      ],
+      "simbolo": [
+       10,
+       112
+      ],
+      "espaco": [
+       3,
+       839
+      ]
+     },
+     "unidades_perfeitas": 184,
+     "tokens_lance": 294,
+     "tokens_lance_errados": 7,
+     "lidos_forma_de_lance_falsos": 2
+    },
+    "consenso_ptd": {
+     "cer": 0.0076,
+     "n": 5885,
+     "erros": 45,
+     "sobras": 0,
+     "cer_prosa": 0.0052,
+     "cer_lance": 0.0139,
+     "classes": {
+      "letra": [
+       13,
+       3604
+      ],
+      "pontuacao": [
+       21,
+       463
+      ],
+      "digito": [
+       1,
+       639
+      ],
+      "figurina": [
+       0,
+       228
+      ],
+      "simbolo": [
+       8,
+       112
+      ],
+      "espaco": [
+       2,
+       839
+      ]
+     },
+     "unidades_perfeitas": 191,
+     "tokens_lance": 294,
+     "tokens_lance_errados": 4,
+     "lidos_forma_de_lance_falsos": 0
+    }
+   },
+   "discordancia": {
+    "tesseract": {
+     "marca": 89,
+     "de": 5857,
+     "fracao": 0.0152,
+     "erros": 88,
+     "pegos": 60,
+     "revocacao": 0.6818,
+     "precisao": 0.6742
+    },
+    "easyocr": {
+     "marca": 114,
+     "de": 5857,
+     "fracao": 0.0195,
+     "erros": 88,
+     "pegos": 66,
+     "revocacao": 0.75,
+     "precisao": 0.5789
+    },
+    "paddle": {
+     "marca": 67,
+     "de": 5857,
+     "fracao": 0.0114,
+     "erros": 88,
+     "pegos": 66,
+     "revocacao": 0.75,
+     "precisao": 0.9851
+    }
+   },
+   "unidades": 223,
+   "tipo": "digital"
+  },
+  "livros com figurinas": {
+   "motores": {
+    "programa": {
+     "cer": 0.0829,
+     "n": 12138,
+     "erros": 1006,
+     "sobras": 331,
+     "cer_prosa": 0.0634,
+     "cer_lance": 0.0357,
+     "classes": {
+      "digito": [
+       31,
+       1317
+      ],
+      "pontuacao": [
+       113,
+       1018
+      ],
+      "espaco": [
+       40,
+       1922
+      ],
+      "letra": [
+       467,
+       7136
+      ],
+      "figurina": [
+       9,
+       498
+      ],
+      "simbolo": [
+       15,
+       247
+      ]
+     },
+     "unidades_perfeitas": 144,
+     "tokens_lance": 554,
+     "tokens_lance_errados": 35,
+     "lidos_forma_de_lance_falsos": 24
+    },
+    "tesseract": {
+     "cer": 0.1325,
+     "n": 12138,
+     "erros": 1608,
+     "sobras": 566,
+     "cer_prosa": 0.0316,
+     "cer_lance": 0.2244,
+     "classes": {
+      "digito": [
+       63,
+       1317
+      ],
+      "pontuacao": [
+       98,
+       1018
+      ],
+      "espaco": [
+       34,
+       1922
+      ],
+      "letra": [
+       294,
+       7136
+      ],
+      "figurina": [
+       498,
+       498
+      ],
+      "simbolo": [
+       55,
+       247
+      ]
+     },
+     "unidades_perfeitas": 124,
+     "tokens_lance": 554,
+     "tokens_lance_errados": 461,
+     "lidos_forma_de_lance_falsos": 149
+    },
+    "easyocr": {
+     "cer": 0.1251,
+     "n": 12138,
+     "erros": 1519,
+     "sobras": 296,
+     "cer_prosa": 0.0324,
+     "cer_lance": 0.2754,
+     "classes": {
+      "digito": [
+       97,
+       1317
+      ],
+      "pontuacao": [
+       339,
+       1018
+      ],
+      "espaco": [
+       34,
+       1922
+      ],
+      "letra": [
+       152,
+       7136
+      ],
+      "figurina": [
+       498,
+       498
+      ],
+      "simbolo": [
+       103,
+       247
+      ]
+     },
+     "unidades_perfeitas": 98,
+     "tokens_lance": 554,
+     "tokens_lance_errados": 453,
+     "lidos_forma_de_lance_falsos": 189
+    },
+    "paddle": {
+     "cer": 0.0716,
+     "n": 12138,
+     "erros": 869,
+     "sobras": 59,
+     "cer_prosa": 0.0211,
+     "cer_lance": 0.1834,
+     "classes": {
+      "digito": [
+       30,
+       1317
+      ],
+      "pontuacao": [
+       65,
+       1018
+      ],
+      "espaco": [
+       54,
+       1922
+      ],
+      "letra": [
+       118,
+       7136
+      ],
+      "figurina": [
+       498,
+       498
+      ],
+      "simbolo": [
+       45,
+       247
+      ]
+     },
+     "unidades_perfeitas": 134,
+     "tokens_lance": 554,
+     "tokens_lance_errados": 428,
+     "lidos_forma_de_lance_falsos": 250
+    },
+    "consenso_pte": {
+     "cer": 0.0466,
+     "n": 12138,
+     "erros": 566,
+     "sobras": 221,
+     "cer_prosa": 0.0257,
+     "cer_lance": 0.0355,
+     "classes": {
+      "digito": [
+       23,
+       1317
+      ],
+      "pontuacao": [
+       93,
+       1018
+      ],
+      "espaco": [
+       27,
+       1922
+      ],
+      "letra": [
+       173,
+       7136
+      ],
+      "figurina": [
+       10,
+       498
+      ],
+      "simbolo": [
+       19,
+       247
+      ]
+     },
+     "unidades_perfeitas": 184,
+     "tokens_lance": 554,
+     "tokens_lance_errados": 38,
+     "lidos_forma_de_lance_falsos": 17
+    },
+    "consenso_ptd": {
+     "cer": 0.0434,
+     "n": 12138,
+     "erros": 527,
+     "sobras": 217,
+     "cer_prosa": 0.0233,
+     "cer_lance": 0.0314,
+     "classes": {
+      "digito": [
+       21,
+       1317
+      ],
+      "pontuacao": [
+       79,
+       1018
+      ],
+      "espaco": [
+       26,
+       1922
+      ],
+      "letra": [
+       161,
+       7136
+      ],
+      "figurina": [
+       9,
+       498
+      ],
+      "simbolo": [
+       14,
+       247
+      ]
+     },
+     "unidades_perfeitas": 191,
+     "tokens_lance": 554,
+     "tokens_lance_errados": 26,
+     "lidos_forma_de_lance_falsos": 11
+    }
+   },
+   "discordancia": {
+    "tesseract": {
+     "marca": 854,
+     "de": 12298,
+     "fracao": 0.0694,
+     "erros": 835,
+     "pegos": 621,
+     "revocacao": 0.7437,
+     "precisao": 0.7272
+    },
+    "easyocr": {
+     "marca": 858,
+     "de": 12298,
+     "fracao": 0.0698,
+     "erros": 835,
+     "pegos": 618,
+     "revocacao": 0.7401,
+     "precisao": 0.7203
+    },
+    "paddle": {
+     "marca": 789,
+     "de": 12298,
+     "fracao": 0.0642,
+     "erros": 835,
+     "pegos": 677,
+     "revocacao": 0.8108,
+     "precisao": 0.858
+    }
+   },
+   "unidades": 227,
+   "tipo": "escaneado"
+  },
+  "_nota": "Sem padrões do livro nem treino; figurinas contra os outros motores protegidas. Escaneados com referência de página têm ordem e cabeçalhos do programa; o Dvoretsky usa a camada digital renderizada a 300 dpi."
+ },
+ "efeito_do_consenso_ptd": {
+  "seirawan": {
+   "mudou": 298,
+   "tirou": 277,
+   "criou": 5,
+   "erros_antes": 305,
+   "erros_depois": 28
+  },
+  "aagaard-calculation": {
+   "mudou": 205,
+   "tirou": 205,
+   "criou": 0,
+   "erros_antes": 243,
+   "erros_depois": 38
+  },
+  "nunn-rook-endings": {
+   "mudou": 56,
+   "tirou": 20,
+   "criou": 14,
+   "erros_antes": 195,
+   "erros_depois": 175
+  },
+  "yusupov-evolution-1": {
+   "mudou": 182,
+   "tirou": 176,
+   "criou": 3,
+   "erros_antes": 445,
+   "erros_depois": 269
+  },
+  "dvoretsky": {
+   "mudou": 78,
+   "tirou": 78,
+   "criou": 0,
+   "erros_antes": 84,
+   "erros_depois": 6
+  }
+ },
+ "core_livro_e0_seirawan": {
+  "nota": "página a página, sem as sobras (o core traz linhas não verificadas), hifenização desfeita",
+  "resumo": [
+   "core       troca   63 falta   55 sobra  342 | (troca+falta)/n = 0.0097",
+   "programa   troca  214 falta   81 sobra   32 | (troca+falta)/n = 0.0243",
+   "tesseract  troca   58 falta   75 sobra   19 | (troca+falta)/n = 0.0109",
+   "easyocr    troca  129 falta  101 sobra   45 | (troca+falta)/n = 0.0189"
+  ]
+ },
+ "pericia_seirawan": [
+  "linhas 213  chars verdade 12008  erros 331  CER 0.0276",
+  "ops Counter({'troca': 223, 'falta': 80, 'sobra': 28})",
+  "linhas perfeitas 72 de 213",
+  "linhas não achadas 1",
+  "",
+  "-- por classe do caractere da verdade (troca+falta / total)",
+  "  letra        9278 erros   239  0.0258",
+  "  espaco       1864 erros     8  0.0043",
+  "  digito        298 erros     9  0.0302",
+  "  pontuacao     535 erros    47  0.0879",
+  "  simbolo        33 erros     0  0.0000",
+  "  sobras (char inventado): Counter({'pontuacao': 8, 'espaco': 8, 'letra': 8, 'digito': 4})",
+  "",
+  "-- lance x prosa",
+  "  prosa: 11232 erros 269 CER 0.0239",
+  "  lance: 776 erros 34 CER 0.0438",
+  "",
+  "-- por motor (box lido alinhado)",
+  "  neural           chars   8897 erros    95  0.0107  fatia dos erros 47.74%",
+  "  learner          chars   1151 erros   104  0.0904  fatia dos erros 52.26%",
+  "",
+  "-- erro silencioso (char lido errado cujo box a fila NÃO pediu)",
+  "  lidos errados com box: 199  na fila: 167  silenciosos: 32",
+  "  em lance: 11  silenciosos 2",
+  "  faltas (char não lido; a fila não tem como ver): 74  em lance 14",
+  "  espaços errados: 60",
+  "",
+  "-- fila: boxes 10005  na fila 1799 (18.0%)  com erro 199 (1.99%)  fila&erro 167",
+  "  precisão da fila 9.28%  revocação 83.92%",
+  "",
+  "-- calibração por motor (conf → acerto)",
+  "  learner (n=1151, ECE=0.391)",
+  "      [0.00,0.50) n=416 conf=0.42 acerto=0.925",
+  "      [0.50,0.70) n=702 conf=0.57 acerto=0.910",
+  "      [0.70,0.80) n=25 conf=0.73 acerto=0.760",
+  "      [0.80,0.90) n=5 conf=0.85 acerto=0.800",
+  "      [0.90,0.95) n=2 conf=0.91 acerto=0.000",
+  "      [0.95,0.99) n=1 conf=0.96 acerto=0.000",
+  "  neural (n=8854, ECE=0.008)",
+  "      [0.80,0.90) n=606 conf=0.85 acerto=0.932",
+  "      [0.90,0.95) n=406 conf=0.93 acerto=0.956",
+  "      [0.95,0.99) n=743 conf=0.98 acerto=0.972",
+  "      [0.99,1.00) n=7099 conf=1.00 acerto=0.998",
+  "",
+  "-- curva: fila só por confiança < x (boxes), o que pegaria",
+  "  x=0.3   fila      0 (0.0%)  erros pegos 0/199 (0.0%)",
+  "  x=0.5   fila    416 (4.2%)  erros pegos 31/199 (15.6%)",
+  "  x=0.7   fila   1118 (11.2%)  erros pegos 94/199 (47.2%)",
+  "  x=0.8   fila   1143 (11.4%)  erros pegos 100/199 (50.3%)",
+  "  x=0.9   fila   1754 (17.5%)  erros pegos 142/199 (71.4%)",
+  "  x=0.95  fila   2162 (21.6%)  erros pegos 162/199 (81.4%)",
+  "  x=0.99  fila   2906 (29.0%)  erros pegos 184/199 (92.5%)",
+  "  x=0.999 fila   4729 (47.3%)  erros pegos 194/199 (97.5%)",
+  "",
+  "-- confusões mais frequentes (lido → verdade)",
+  "   ['1→l:58', '0→o:37', '—→-:12', '9→g:8', ' →s:7', 'p→P:5', ' →í:5', ' →g:5', '1→i:4', 'D→p:4', '1→u:4', 'r→v:4', ' →c:3', ' →0:3', '/→,:3', ',→-:3', 'I→l:3', '.→-:3', 'C→c:3', '1→m:2', 'l→I:2', ' →h:2', ' →l:2', '–→-:2', '1→n:2', ' →\":1', ',→\":1', '.→::1', ' →7:1', ' →C:1']",
+  "  faltas: [\"',':11\", \"'s':10\", \"'r':8\", \"' ':6\", \"'!':5\", \"'i':5\", \"'p':4\", \"'P':2\", \"'f':2\", \"'R':2\", \"'q':2\", \"'l':2\", \"'?':2\", \"'t':2\", \"'A':2\"]",
+  "  sobras: [\"' ':8\", \"'.':5\", \"'I':4\", \"'1':4\", \"'r':2\", '\"\\'\":1', \"',':1\", \"'-':1\", \"'s':1\", \"'t':1\"]",
+  ""
+ ],
+ "saidas_lidas": {
+  "suite_rapida_com_cobertura": "2429 passed, 3 skipped in 99.39s",
+  "camada_processo": "40 passed, 2475 deselected in 250.45s",
+  "suite_rapida_sem_cobertura": "2429 passed, 3 skipped, 64 s (rodada do ramo, antes dos commits só de docs)",
+  "portao": "34 passed em 16:28, no 8f8eccf, com a folga mínima de 5,49 GB (vigia); CA-7.1 aprovado: 2.380 ms contra corte de 2.400",
+  "motores_resumo_seirawan": [
+   "linhas 213 motores ['programa', 'tesseract', 'easyocr', 'paddle']",
+   "programa                   CER 0.0276  CER-tipogr 0.0264  prosa 0.0262  lance 0.0474  linhas perfeitas 72/213  tokens de lance errados 27/148",
+   "tesseract                  CER 0.0124  CER-tipogr 0.0122  prosa 0.0085  lance 0.0691  linhas perfeitas 160/213  tokens de lance errados 46/148",
+   "easyocr                    CER 0.0219  CER-tipogr 0.0219  prosa 0.0175  lance 0.0858  linhas perfeitas 83/213  tokens de lance errados 53/148",
+   "paddle                     CER 0.0074  CER-tipogr 0.0072  prosa 0.0067  lance 0.0179  linhas perfeitas 183/213  tokens de lance errados 10/148",
+   "oráculo de linha p+t       CER 0.0056  CER-tipogr 0.0054  prosa 0.0035  lance 0.0359  linhas perfeitas 170/213  tokens de lance errados 23/148",
+   "oráculo de linha p+t+e     CER 0.0051  CER-tipogr 0.0049  prosa 0.0032  lance 0.0320  linhas perfeitas 173/213  tokens de lance errados 20/148",
+   "oráculo de linha p+t+e+p   CER 0.0032  CER-tipogr 0.0030  prosa 0.0025  lance 0.0128  linhas perfeitas 188/213  tokens de lance errados 8/148",
+   "",
+   "programa + léxico díg→letra CER 0.0204  CER-tipogr 0.0192  prosa 0.0183  lance 0.0512  linhas perfeitas 111/213  tokens de lance errados 27/148",
+   "   linhas mudadas 75, pioradas 6",
+   "consenso sobre a espinha   CER 0.0076  CER-tipogr 0.0076  prosa 0.0064  lance 0.0243  linhas perfeitas 165/213  tokens de lance errados 15/148",
+   "consenso + léxico          CER 0.0078  CER-tipogr 0.0078  prosa 0.0067  lance 0.0243  linhas perfeitas 162/213  tokens de lance errados 15/148",
+   "",
+   "-- discordância como sinal de revisão (por caractere do programa)",
+   "  tesseract: marca 282/11896 (2.4%); erros pegos 234/242 (96.7%); precisão 83.0%",
+   "  easyocr: marca 431/11956 (3.6%); erros pegos 239/251 (95.2%); precisão 55.5%",
+   "  paddle: marca 274/11926 (2.3%); erros pegos 242/246 (98.4%); precisão 88.3%",
+   "  tesseract: linhas idênticas ao programa 64/213; dessas, erradas: 2",
+   "  tesseract (tipografia à parte): idênticas 67/213; erradas 2",
+   "  easyocr: linhas idênticas ao programa 37/213; dessas, erradas: 1",
+   "  easyocr (tipografia à parte): idênticas 38/213; erradas 1"
+  ],
+  "vazios_nas_linhas_verificadas": 78,
+  "diag_altura_mediana_aagaard_px": 20,
+  "diag_altura_mediana_seirawan_px": 27,
+  "treino_da_cnn": "500961 amostras, 314 classes (relatorio_treino.txt e model_meta.json do core); não se sabe se os 5 livros estão entre elas"
+ },
+ "por_token_exploratorio": {
+  "nota": "Conta refeita depois, sobre as mesmas saídas, por token, com gramática provisória e antes de auditar o gabarito (experimentos/por_token_a.py e por_token_b.py). Dimensiona; não aprova. Em Aagaard, Nunn e Yusupov a unidade é a página.",
+  "seirawan_sinais": {
+   "fila_de_hoje": {
+    "tokens_marcados": 0.587,
+    "lance_errado_pego": "18 de 26",
+    "silencioso_em_lance": "5,8 % (IC 2,6 a 11,2), N = 137",
+    "prosa_errada_pega": "202 de 232"
+   },
+   "discordancia_tesseract": {
+    "tokens_marcados": 0.115,
+    "lance_errado_pego": "17 de 26",
+    "silencioso_em_lance": "6,6 % (IC 3,0 a 12,1)",
+    "prosa_errada_pega": "188 de 232"
+   },
+   "discordancia_ppocrv6": {
+    "tokens_marcados": 0.103,
+    "lance_errado_pego": "14 de 26",
+    "silencioso_em_lance": "8,8 % (IC 4,6 a 14,8)",
+    "prosa_errada_pega": "190 de 232"
+   }
+  },
+  "lances_errados_por_livro": {
+   "seirawan": {
+    "tokens": 137,
+    "errados": 26,
+    "com_figurina": 0,
+    "ppocrv6": 14,
+    "tesseract": 17
+   },
+   "aagaard": {
+    "tokens": 76,
+    "errados": 16,
+    "com_figurina": 13,
+    "ppocrv6": 2,
+    "tesseract": 4
+   },
+   "nunn": {
+    "tokens": 54,
+    "errados": 17,
+    "com_figurina": 17,
+    "ppocrv6": 8,
+    "tesseract": 8
+   },
+   "yusupov": {
+    "tokens": 142,
+    "errados": 3,
+    "com_figurina": 1,
+    "ppocrv6": 2,
+    "tesseract": 2
+   },
+   "dvoretsky": {
+    "tokens": 313,
+    "errados": 16,
+    "com_figurina": 12,
+    "ppocrv6": 4,
+    "tesseract": 5
+   },
+   "quatro_com_figurinas": {
+    "tokens": 585,
+    "errados": 52,
+    "com_figurina": 43,
+    "ppocrv6": 16,
+    "tesseract": 19
+   }
+  },
+  "precisao_em_lance": {
+   "tesseract": {
+    "seirawan": 0.378,
+    "dvoretsky": 0.185,
+    "quatro_livros": 0.459
+   },
+   "ppocrv6": {
+    "seirawan": 1.0,
+    "dvoretsky": 1.0,
+    "quatro_livros": 0.885
+   }
+  },
+  "deff": {
+   "tokens_dentro_do_livro": "1,0 a 1,1",
+   "caracteres_dentro_do_livro": "3,5 a 4,6",
+   "entre_livros": 15
+  },
+  "p_erro_dado_concorda_com_ppocrv6": {
+   "seirawan": 0.0003,
+   "aagaard": 0.0045,
+   "nunn": 0.0578,
+   "yusupov": 0.0218,
+   "dvoretsky": 0.0038
+  },
+  "gabarito": {
+   "erros_achados": 8,
+   "tokens": 2077,
+   "fracao": 0.0039,
+   "ic95": [
+    0.0017,
+    0.0076
+   ]
+  },
+  "fila_lances": {
+   "linhas_com_lance_por_pagina": "mediana 12, de 0 a 40, em 21 páginas",
+   "linhas_fora_da_fila": "4 de 149; 5 de 42 tokens errados (12 %, IC 4 a 26), Seirawan e Dvoretsky"
+  }
+ }
+}

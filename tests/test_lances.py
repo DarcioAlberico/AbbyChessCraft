@@ -518,3 +518,92 @@ def test_o_aviso_do_primeiro_lance_ilegal_fica_no_pgn_da_posicao_nao_conferida()
     assert list(jogo.mainline_moves()) == []
     assert jogo.comment == "posição lida, não conferida; [1.Cd2 do texto não é legal aqui]"
     assert _jogo(d.conferir(d.edicao())).comment == "[1.Cd2 do texto não é legal aqui]"
+
+
+# ----------------------------------------------------------------------
+# O que o livro cola no lance (passo H, as limitações do extrator)
+# ----------------------------------------------------------------------
+
+@pytest.mark.parametrize("sinal", ["±", "∓", "⩱", "⩲", "=", "∞", "+-", "-+", "+–", "–+", "+—", "—+"])
+def test_a_avaliacao_colada_nao_tira_o_lance_da_linha(sinal):
+    linha = lc.primeira_linha(f"1.Cf3{sinal} Cc6 2.d4", "pt")
+    assert [(lance.san, lance.marca, lance.impresso) for lance in linha] == [
+        ("Nf3", "", "Cf3"), ("Nc6", "", "Cc6"), ("d4", "", "d4")]
+
+
+def test_a_avaliacao_depois_do_xeque_e_do_juizo_fica_fora_do_lance():
+    lance = lc.primeira_linha("1.Cf3+!±", "pt")[0]
+    assert (lance.san, lance.marca, lance.juizo, lance.impresso) == ("Nf3", "+", "!", "Cf3+")
+    assert lc.primeira_linha("1.Cf3++-", "pt")[0].marca == "+"
+
+
+def test_o_1_da_casa_lido_como_l_com_a_avaliacao_colada():
+    assert lc.primeira_linha("1.♕el±", "pt")[0].san == "Qe1"
+
+
+@pytest.mark.parametrize("cruz", ["†", "‡", "✝"])
+def test_a_cruz_impressa_e_xeque(cruz):
+    lance = lc.primeira_linha(f"1.Dh5{cruz} g6", "pt")[0]
+    assert (lance.san, lance.marca) == ("Qh5", "+")
+
+
+@pytest.mark.parametrize("impresso, san", [
+    ("O–O", "O-O"), ("O—O", "O-O"), ("0–0", "O-O"), ("0—0", "O-O"), ("O-O", "O-O"),
+    ("O–O–O", "O-O-O"), ("0—0—0", "O-O-O"), ("0-0-0", "O-O-O"), ("O–O±", "O-O")])
+def test_o_roque_com_qualquer_traco(impresso, san):
+    assert lc.primeira_linha(f"1.{impresso}", "pt")[0].san == san
+
+
+def test_o_lance_entre_parenteses_antes_da_linha_nao_a_comeca():
+    """A linha hipotética da prosa, entre parênteses, não é a principal."""
+    linha = lc.primeira_linha("(depois de 1.e4 e5) o jogo seguiu 2.Cf3 Cc6", "pt")
+    assert [(lance.numero, lance.san) for lance in linha] == [(2, "Nf3"), (2, "Nc6")]
+    assert [x.san for x in lc.primeira_linha("(1.e4) 1.d4 d5", "pt")] == ["d4", "d5"]
+    assert [x.san for x in lc.primeira_linha("Ver [1.e4 (1.c4) e5] 1.d4", "pt")] == ["d4"]
+
+
+def test_o_parentese_que_fecha_sem_abrir_nao_esconde_a_linha():
+    assert [x.san for x in lc.primeira_linha("fim) 1.d4 d5", "pt")] == ["d4", "d5"]
+
+
+EN_PASSANT = "4k3/8/8/3pP3/8/8/8/4K3"
+
+
+def test_o_en_passant_como_primeiro_lance_e_legal():
+    """O diagrama não diz o último lance; só a casa de en passant explica a captura."""
+    linha = lc.primeira_linha("1.exd6 e.p. Rd7", "pt")
+    assert [x.san for x in linha] == ["exd6", "Kd7"]
+    validacao = lc.validar(EN_PASSANT, linha)
+    assert validacao.confiavel and validacao.lances == ("exd6", "Kd7")
+
+
+def test_o_en_passant_das_pretas_como_primeiro_lance():
+    validacao = lc.validar("4k3/8/8/8/3pP3/8/8/4K3", lc.primeira_linha("1...dxe3 2.Rd1", "pt"))
+    assert validacao.confiavel
+
+
+@pytest.mark.parametrize("fen", [
+    "4k3/8/8/4P3/8/8/8/4K3",            # nenhum peão ao lado
+    "4k3/3p4/8/3pP3/8/8/8/4K3",         # d7 ocupada: o peão não veio de lá
+    "4k3/8/3n4/3pP3/8/8/8/4K3"])        # d6 ocupada e a captura é outra... do cavalo
+def test_a_captura_sem_en_passant_possivel_segue_como_era(fen):
+    validacao = lc.validar(fen, lc.primeira_linha("1.exd6 Rd7", "pt"))
+    assert validacao.confiavel == (fen == "4k3/8/3n4/3pP3/8/8/8/4K3")
+
+
+def test_o_en_passant_so_vale_no_primeiro_lance():
+    fen = "4k3/8/8/3pP3/8/8/8/4K3"
+    validacao = lc.validar(fen, lc.primeira_linha("1.Rd2 Rd7 2.exd6", "pt"))
+    assert not validacao.confiavel and validacao.legais == 2
+
+
+def test_o_pgn_do_en_passant_tem_a_casa_no_fen():
+    from abbychess import diagramas as dg
+    from dataclasses import replace
+    from tests.ajudantes import _lido
+
+    diagrama = _lido(EN_PASSANT + " w - - 0 1")
+    validacao = lc.validar(EN_PASSANT, lc.primeira_linha("1.exd6 e.p. Rd7", "pt"))
+    pgn = lc.pgn_do_diagrama(replace(diagrama, validacao=validacao))
+    assert 'FEN "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1"' in pgn and "1. exd6 Kd7" in pgn
+    assert dg is not None

@@ -194,7 +194,8 @@ class ResumoDoLivro:
     def do_modelo(self, pagina: Pagina) -> dict:
         """O resumo da página no `livro.json` (sem mudar nada: vale numa thread)."""
         tabuleiros = len(pagina.tabuleiros)
-        conferidos = sum(1 for d in pagina.diagramas if d.conferido)
+        # O que falhou na leitura não tem posição a conferir, e o contador chega a zero (U-5a).
+        conferidos = sum(1 for d in pagina.diagramas if d.conferido or d.erro)
         # A régua do negrito dela, para a do livro (`regua_do_negrito`), quando foi medida.
         regua = {"regua_do_negrito": pagina.regua_do_negrito} if pagina.regua_do_negrito else {}
         return {"pid": pagina.pid, "pagina_da_fonte": self._p.ordem.pagina_da_fonte(pagina),

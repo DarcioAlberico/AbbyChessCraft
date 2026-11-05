@@ -250,7 +250,7 @@ def _esperado_do_yaml():
 def _widgets_do_escopo(janela):
     return {"imagem": {janela.visor}, "imagem_areas": {janela.visor}, "glifo": {janela.treino},
             "campo_glifo": {janela.treino.campo}, "palavra": {janela.verificacao},
-            "documento": {janela.texto}, "galeria": set(), "diagrama": {janela.editor_diagrama}}
+            "documento": {janela.texto}, "galeria": {janela.galeria}, "diagrama": {janela.editor_diagrama}}
 
 
 #: (ação, escopo) que só passam a valer depois (nenhum, desde que o Documento ficou editável

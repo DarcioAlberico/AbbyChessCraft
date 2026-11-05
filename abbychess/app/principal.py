@@ -62,9 +62,12 @@ def main(argv=None) -> int:
     estilo.acompanhar_o_sistema(app)
     registro = registro_de_eventos.instalar(app)    # noqa: F841 (vive enquanto o app vive)
     janela = JanelaPrincipal()
+    janela.restaurar_a_geometria()
     janela.show()
     if len(argv) > 1:
         janela.abrir_caminho(argv[1])
+    else:
+        janela.reabrir_o_ultimo()
     return app.exec()
 
 

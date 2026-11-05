@@ -20,7 +20,7 @@
 
 versao: 1
 perfis: [padrao, finereader]
-passos: ["0", 1a, 1b, 2a, 2b, A1, A2, A3, E, D1, B, D2, C, I, F, G, H, J, K, L]
+passos: ["0", 1a, 1b, 2a, 2b, A1, A2, A3, E, D1, B, D2, C, I, F, G, H, J, K, L, T1, PPL, PPT]
 
 escopos:
   global:       {widgets: [], editavel: false}
@@ -298,6 +298,7 @@ acoes:
       - {tecla: Ctrl+Shift+Right, widget: lineedit, tipo: redireciona, motivo: "campo de 1 caractere (regra 6 de §3.4)"}
   - {id: borda_topo_cima, descricao: Mover a borda de cima para cima, escopo: [imagem, campo_glifo], padrao: Ctrl+Shift+Up, desde_passo: A2}
   - {id: borda_topo_baixo, descricao: Mover a borda de cima para baixo, escopo: [imagem, campo_glifo], padrao: Ctrl+Shift+Down, desde_passo: A2}
+  - {id: galeria_do_caractere, descricao: "A Galeria do caractere do glifo atual", escopo: [global], padrao: Ctrl+Shift+G, desde_passo: T1}
   - {id: paleta, descricao: Paleta de símbolos no cursor, escopo: [documento, glifo, galeria], padrao: F2, desde_passo: A2}
 
   # --- Inspetor: Palavra (a verificação) ---------------------------------------------

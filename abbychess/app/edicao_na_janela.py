@@ -87,10 +87,17 @@ class EdicaoNoDocumento:
         else:
             self.pagina.desfazedor.refazer()
 
+    def _foco_na_galeria(self) -> bool:
+        foco = self.focusWidget()
+        return foco is not None and (foco is self.galeria or self.galeria.isAncestorOf(foco))
+
     def abrir_paleta(self) -> None:
-        """F2: a paleta no Documento (o cursor de texto) ou no campo do Glifo."""
+        """F2: a paleta no Documento (o cursor de texto), na Galeria (o símbolo vale para a
+        seleção) ou no campo do Glifo."""
         if self.texto.hasFocus():
             self.texto.abrir_paleta()
+        elif self._foco_na_galeria():
+            self.galeria.abrir_paleta(self._galeria_aplicar)
         else:
             self.treino.abrir_paleta()
 
@@ -99,9 +106,11 @@ class EdicaoNoDocumento:
         self.texto.confirmar(avancar=avancar, ensinar=ensinar)
 
     def inserir_figurina(self, figurina: str) -> None:
-        """Ctrl+Shift+K/Q/R/B/N/P: no Documento ou no campo do Glifo, onde estiver o foco."""
+        """Ctrl+Shift+K/Q/R/B/N/P: no Documento, no campo do Glifo ou, na Galeria, na seleção."""
         if self.treino.campo.hasFocus():
             self.treino.inserir_figurina(figurina)
+        elif self._foco_na_galeria():
+            self._galeria_aplicar(figurina)
         else:
             self.texto.inserir_figurina(figurina)
 

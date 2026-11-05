@@ -55,28 +55,32 @@ def n_de(gid: int) -> int:
 @dataclass(frozen=True, slots=True)
 class Estilo:
     """O negrito e o itálico (`None`: não medido, o efeito desconhecido que o k-NN compara com
-    todas as amostras; `False`: medido e reto) e o sublinhado, que é só do usuário (§9.3)."""
+    todas as amostras; `False`: medido e reto) e o sublinhado, que é só do usuário (§9.3).
+    `decidido` diz qual dos dois o usuário escolheu (1: o negrito, 2: o itálico): a releitura
+    mede de novo o resto e deixa esses."""
 
     negrito: Optional[bool] = None
     italico: Optional[bool] = None
     sublinhado: bool = False
+    decidido: int = 0
 
     def para_json(self) -> list:
         """[negrito, itálico, sublinhado], e um quarto item com o que foi medido como reto
         (1: o negrito, 2: o itálico) quando há: o JSON de antes do fechamento do passo I não
-        o tem, e lá o 0 é "não medido"."""
+        o tem, e lá o 0 é "não medido". Um quinto item, `decidido`, quando há."""
         retos = (self.negrito is False) | (self.italico is False) << 1
         base = [int(bool(self.negrito)), int(bool(self.italico)), int(self.sublinhado)]
+        if self.decidido:
+            return base + [retos, self.decidido]
         return base + [retos] if retos else base
 
     @classmethod
     def de_json(cls, bruto) -> "Estilo":
-        negrito, italico, sublinhado, retos = (list(bruto or []) + [0, 0, 0, 0])[:4]
+        negrito, italico, sublinhado, retos, decidido = (list(bruto or []) + [0] * 5)[:5]
         negrito = True if negrito else (False if retos & 1 else None)
         italico = True if italico else (False if retos & 2 else None)
-        if negrito is None and italico is None and not sublinhado:
-            return SEM_ESTILO
-        return cls(negrito, italico, bool(sublinhado))
+        estilo = cls(negrito, italico, bool(sublinhado), int(decidido))
+        return SEM_ESTILO if estilo == SEM_ESTILO else estilo
 
 
 #: O estilo de quase todo glifo, um objeto só: uma página tem milhares de glifos, e cada
@@ -517,10 +521,12 @@ class _Reconciliacao:
         estilo = self.estilo_de(entry)
         if estilo is None:
             return velho.estilo
-        if velho.estilo.sublinhado != estilo.sublinhado:
-            # A medida diz o negrito e o itálico; o sublinhado é do usuário (Ctrl+U) e fica.
-            return replace(estilo, sublinhado=velho.estilo.sublinhado)
-        return estilo
+        # A medida diz o negrito e o itálico, salvo o que o usuário decidiu (Ctrl+B, Ctrl+I);
+        # o sublinhado é só dele (Ctrl+U) e fica.
+        antes = velho.estilo
+        return replace(estilo, sublinhado=antes.sublinhado, decidido=antes.decidido,
+                       negrito=antes.negrito if antes.decidido & 1 else estilo.negrito,
+                       italico=antes.italico if antes.decidido & 2 else estilo.italico)
 
     def pelo_objeto(self) -> None:
         por_objeto = {id(b.entry): b for b in self.antes}

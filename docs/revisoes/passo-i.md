@@ -78,8 +78,9 @@ cartão em 150 px, os plurais).
 
 ## Limitações conhecidas
 
-- A releitura (F5, lote com refazer) troca o negrito e o itálico que o usuário decidiu
-  (Ctrl+B, Ctrl+I) pelos medidos; o sublinhado fica. O F5 se desfaz.
+- ~~A releitura (F5, lote com refazer) troca o negrito e o itálico que o usuário decidiu
+  (Ctrl+B, Ctrl+I) pelos medidos; o sublinhado fica. O F5 se desfaz.~~ Corrigido em 2026-11-05
+  (`Estilo.decidido`); vale para as decisões daí em diante.
 - Amostras ensinadas antes do fechamento com o efeito `[0, 0]` continuam lidas como retas
   (o glifo podia não ter sido medido).
 - A camada nativa não traz as figuras do PDF, e os boxes dela (geometria aproximada,

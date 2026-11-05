@@ -141,8 +141,10 @@ def estilizar(pagina: Pagina, gids: Sequence[int], campo: str) -> Diferenca:
         raise ValueError("Selecione ao menos um glifo.")
     valor = not all(getattr(pagina.box(g).estilo, campo) for g in gids)
     alvo = set(gids)
-    boxes = [replace(b, estilo=replace(b.estilo, **{campo: valor})) if b.gid in alvo else b
-             for b in pagina.boxes]
+    decisao = {"negrito": 1, "italico": 2}.get(campo, 0)
+    boxes = [replace(b, estilo=replace(b.estilo, **{campo: valor,
+                                                    "decidido": b.estilo.decidido | decisao}))
+             if b.gid in alvo else b for b in pagina.boxes]
     return pagina.aplicar(Diferenca(mudados=alvo), boxes)
 
 

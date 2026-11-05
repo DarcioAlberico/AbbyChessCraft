@@ -62,7 +62,7 @@ Os commits: `cfdfdd2` e `849ccde`.
 - A divisão em que o core corta no eixo y não é recusada.
 - A edição combinada com um espaço movido pode descartar o box e criar virtuais.
 - Nada impede ensinar uma caixa de várias letras.
-- A releitura (F5) troca o negrito e o itálico decididos pelo usuário pelos medidos (o
-  sublinhado fica).
+- ~~A releitura (F5) troca o negrito e o itálico decididos pelo usuário pelos medidos (o
+  sublinhado fica).~~ Corrigido em 2026-11-05 (`Estilo.decidido`).
 - O sublinhado fica só no Documento (a exportação leva negrito e itálico).
 - O parágrafo novo aparece no Documento como um espaço um pouco maior entre as linhas.

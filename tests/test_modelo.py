@@ -7,6 +7,7 @@ import copy
 import pytest
 from core.box_model import BoxEntry
 
+from abbychess import edicao as ed
 from abbychess import modelo, procedencia
 from abbychess import texto as tx
 from abbychess.modelo import (EM_REVISAO, GLIFOS_MARCADOS, NAO_RECONHECIDA, RECONHECIDA,
@@ -637,3 +638,67 @@ def test_o_pedaco_de_um_pixel_tambem_e_sucessor():
     for fino in (_box(0, 39, 20, 40, "_"), _box(19, 10, 20, 40, "|"), _box(5, 20, 6, 21, ".")):
         assert _sucessores([_box(0, 10, 20, 40, "v")], [fino]) == {"v": [fino.char]}
     assert _sucessores([_box(5, 20, 6, 21, ".")], [_box(0, 10, 20, 40, "v")]) == {".": ["v"]}
+
+
+# ----------------------------------------------------------------------
+# O estilo que o usuário decidiu (Ctrl+B, Ctrl+I) e a releitura
+# ----------------------------------------------------------------------
+
+def _relido(estilo_antes: Estilo, medido: Estilo) -> Estilo:
+    """O estilo do glifo depois de a releitura medir `medido` nele."""
+    entry = _e(0)
+    antes = [Box(gid_de(1, 0), entry, estilo=estilo_antes)]
+    novos, _ = modelo.reconciliar(antes, [entry], lambda: gid_de(1, 9),
+                                  estilo_de=lambda e: medido)
+    return novos[0].estilo
+
+
+def test_a_releitura_nao_desfaz_o_negrito_que_o_usuario_tirou():
+    pagina = _pagina(_e(0))
+    gid = pagina.boxes[0].gid
+    pagina.boxes[0] = modelo.replace(pagina.boxes[0], estilo=Estilo(negrito=True))
+    ed.estilizar(pagina, [gid], "negrito")
+    decidido = pagina.box(gid).estilo
+    assert decidido.negrito is False
+    assert _relido(decidido, Estilo(negrito=True, italico=True)) == modelo.replace(
+        decidido, italico=True)
+
+
+def test_a_releitura_nao_desfaz_o_italico_que_o_usuario_pos():
+    pagina = _pagina(_e(0))
+    gid = pagina.boxes[0].gid
+    ed.estilizar(pagina, [gid], "italico")
+    decidido = pagina.box(gid).estilo
+    relido = _relido(decidido, Estilo(negrito=True, italico=False))
+    assert (relido.italico, relido.negrito) == (True, True)
+
+
+def test_a_releitura_troca_o_que_ninguem_decidiu():
+    assert _relido(Estilo(negrito=True), Estilo(negrito=False, italico=True)) == Estilo(
+        negrito=False, italico=True)
+
+
+def test_o_sublinhado_nao_marca_decisao_de_negrito_e_segue_ficando():
+    pagina = _pagina(_e(0))
+    gid = pagina.boxes[0].gid
+    ed.estilizar(pagina, [gid], "sublinhado")
+    relido = _relido(pagina.box(gid).estilo, Estilo(negrito=True))
+    assert relido.sublinhado and relido.negrito is True
+
+
+def test_a_decisao_volta_do_json_e_o_json_antigo_nao_tem_decisao():
+    pagina = _pagina(_e(0))
+    gid = pagina.boxes[0].gid
+    ed.estilizar(pagina, [gid], "negrito")
+    ed.estilizar(pagina, [gid], "italico")
+    decidido = pagina.box(gid).estilo
+    volta = Estilo.de_json(decidido.para_json())
+    assert volta == decidido
+    assert _relido(volta, Estilo(negrito=False, italico=False)) == decidido
+    assert Estilo.de_json([1, 0, 0, 2]) == Estilo(negrito=True, italico=False)
+    assert Estilo(negrito=True).para_json() == [1, 0, 0]
+
+
+def test_tirar_a_decisao_de_quem_nunca_decidiu_nao_muda_o_json():
+    assert Estilo().para_json() == [0, 0, 0]
+    assert Estilo.de_json([0, 0, 0]) is modelo.SEM_ESTILO

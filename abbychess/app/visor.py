@@ -41,6 +41,10 @@ from abbychess.app import estilo
 from abbychess.app.item_dos_boxes import ItemDosBoxes
 
 
+#: Com menos glifos que isto, a página não tem mancha a medir (U-14).
+MINIMO_DA_MANCHA = 20
+
+
 class VisorDePagina(QGraphicsView):
     """Mostra a página e os boxes. Clique escolhe um box; Ctrl+roda aproxima."""
 
@@ -182,7 +186,7 @@ class VisorDePagina(QGraphicsView):
         if self._destaque is not None:
             cena.removeItem(self._destaque)
             self._destaque = None
-        self._boxes = boxes
+        self._trocar_os_boxes(boxes)
         self._tabuleiros = [tuple(t) for t in tabuleiros]
         self._itens = _desenhar_tabuleiros(cena, self._tabuleiros, cores_dos_tabuleiros)
         if self.item_dos_boxes is not None:
@@ -277,18 +281,45 @@ class VisorDePagina(QGraphicsView):
         vista = self.viewport().rect()
         if cena.isEmpty() or vista.width() < 40 or vista.height() < 40:
             return                              # sem tamanho útil (a doca recolhida): nada
-        if self.modo_zoom == "largura":
-            nova = (vista.width() - 4) / cena.width()
-        else:
-            nova = min((vista.width() - 4) / cena.width(), (vista.height() - 4) / cena.height())
+        mancha = self._mancha() if self.modo_zoom == "largura" else None
+        nova = self._escala_do_modo(cena, vista, mancha)
         modo = self.modo_zoom
         barra = self.verticalScrollBar()
         fracao = barra.value() / barra.maximum() if barra.maximum() > 0 else 0.0
         self._escalar(nova, modo, avisar=False)
         if modo == "largura":                   # a mesma altura da página, na escala nova
             barra.setValue(round(fracao * barra.maximum()))
+            if mancha is not None:
+                meio = self.mapToScene(self.viewport().rect().center()).y()
+                self.centerOn((mancha[0] + mancha[1]) / 2, meio)
         else:
             self.centerOn(cena.center())
+
+    def _trocar_os_boxes(self, boxes) -> None:
+        """Os boxes novos; na largura, a página que acabou de ser lida tem mancha agora."""
+        antes = self._mancha()
+        self._boxes = boxes
+        if self.modo_zoom == "largura" and self._mancha() != antes:
+            self._aplicar_modo()
+
+    def _escala_do_modo(self, cena, vista, mancha) -> float:
+        if mancha is not None:
+            return (vista.width() - 4) / (mancha[1] - mancha[0])
+        if self.modo_zoom == "largura":
+            return (vista.width() - 4) / cena.width()
+        return min((vista.width() - 4) / cena.width(), (vista.height() - 4) / cena.height())
+
+    def _mancha(self) -> Optional[tuple]:
+        """A largura do texto impresso, sem os 1 % de glifos mais à margem (a poeira): é ela, e
+        não a folha, que a largura mede (U-14). None sem glifos, ou com a mancha quase vazia."""
+        if len(self._boxes) < MINIMO_DA_MANCHA:
+            return None
+        esquerdas = sorted(b.x1 for b in self._boxes)
+        direitas = sorted(b.x2 for b in self._boxes)
+        corte = len(self._boxes) // 100
+        x1, x2 = esquerdas[corte], direitas[-1 - corte]
+        folga = (x2 - x1) * 0.03
+        return (x1 - folga, x2 + folga) if x2 > x1 else None
 
     def resizeEvent(self, evento):
         super().resizeEvent(evento)

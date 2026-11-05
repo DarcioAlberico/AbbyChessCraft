@@ -147,6 +147,9 @@ acoes:
      finereader: Ctrl+Shift+B, desde_passo: F}
   - {id: proxima_pagina_pendente, descricao: Próxima página com pendentes, escopo: [global], padrao: F6,
      finereader: Alt+PgDn, desde_passo: A2}
+  - {id: ler_como_texto, descricao: "Ler como texto a página tratada como imagem", escopo: [global], padrao: Ctrl+Shift+T, desde_passo: PPT}
+  - {id: listar_as_imagens, descricao: "As páginas tratadas como imagem, em Resultados", escopo: [global],
+     sem_atalho: [padrao, finereader], desde_passo: PPT}
   - {id: relatorio_de_lances, descricao: "O relatório de lances do livro, em Resultados", escopo: [global],
      sem_atalho: [padrao, finereader], desde_passo: PPL}
   - {id: pagina_verificada, descricao: Marcar a página verificada e abrir a próxima, escopo: [global], padrao: Ctrl+T, desde_passo: A2}

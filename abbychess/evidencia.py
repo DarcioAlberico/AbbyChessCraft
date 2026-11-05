@@ -83,7 +83,8 @@ def _dos_glifos(pagina, feitos) -> Dict[int, Tuple[str, str]]:
         if b.gid in feitos:
             continue
         if not b.entry.char:
-            motivos[b.gid] = (NINGUEM_LEU, "")
+            if b.entry.source:                  # sem fonte: ainda aguarda a leitura
+                motivos[b.gid] = (NINGUEM_LEU, "")
         elif b.gid in sugestoes and contexto.volta_pelo_contexto(b.entry.source):
             motivos[b.gid] = (A_PALAVRA_DESMENTE, sugestoes[b.gid] or "")
     return motivos

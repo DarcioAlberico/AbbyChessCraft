@@ -118,6 +118,10 @@ def montar(janela) -> None:
     j.acao_fila_lances = acao(j, "fila_lances", j.fila.ir_aos_lances, texto="Fila Lances")
     j.acao_relatorio_de_lances = acao(j, "relatorio_de_lances", j.relatorio_de_lances,
                                       texto="Relatório de lances")
+    j.acao_ler_como_texto = acao(j, "ler_como_texto", lambda: p.leitura.ler_como_texto(),
+                                 texto="Ler como texto")
+    j.acao_listar_as_imagens = acao(j, "listar_as_imagens", j.listar_as_tratadas_como_imagem,
+                                    texto="Páginas tratadas como imagem")
     j.acao_ciclar_fila = acao(j, "ciclar_modo_da_fila", j.fila.ciclar,
                               texto="Modo seguinte da fila")
     j.acao_escopo_da_fila = acao(j, "alternar_escopo_da_fila", j.fila.alternar_escopo,
@@ -344,7 +348,8 @@ def _menus(j) -> None:
     _encher(j.menuBar().addMenu("P&ágina"),
             (j.acao_anterior, j.acao_seguinte, j.acao_primeira, j.acao_ultima,
              j.acao_ir_para, j.acao_voltar_visita, j.acao_avancar_visita, None,
-             j.acao_reconhecer, j.acao_reler, j.acao_verificada, j.acao_antes_do_lote,
+             j.acao_reconhecer, j.acao_reler, j.acao_ler_como_texto, j.acao_verificada,
+             j.acao_antes_do_lote,
              None, *j.acoes_de_paginas[:4], None, *j.acoes_de_paginas[4:], None,
              j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_fila_lances,
              j.acao_ciclar_fila,
@@ -361,7 +366,7 @@ def _menus(j) -> None:
             (j.acao_modo_treino, j.acao_areas, j.acao_borracha, j.acao_areas_auto,
              j.acao_reconhecer_zona, j.acao_ordenar_areas,
              j.acao_salvar_modelo_areas, j.acao_aplicar_modelo_areas,
-             j.acao_verificar, j.acao_relatorio_de_lances, None,
+             j.acao_verificar, j.acao_relatorio_de_lances, j.acao_listar_as_imagens, None,
              j.acao_lote, None,
              j.acao_opcoes, j.acao_teclado))
     menu = j.menuBar().addMenu("Aj&uda")

@@ -12,7 +12,7 @@ import json
 from datetime import datetime, timezone
 from typing import Optional
 
-from abbychess.modelo import RECONHECIDA, Box, Decisoes, Estado, Pagina
+from abbychess.modelo import RECONHECIDA, Box, Decisoes, Estado, Pagina, PaginaDeOutraVersao
 from abbychess.zonas import Zona
 
 #: A versão do formato de cada `paginas/p<pid>.json`. 3 (passo L): a geometria dos boxes,
@@ -57,8 +57,7 @@ def pagina_para_json(pagina: Pagina, pagina_da_fonte: Optional[int] = None) -> d
 def pagina_de_json(bruto: dict) -> Pagina:
     from abbychess.diagramas import DiagramaLido
 
-    if bruto.get("versao") not in VERSOES_DA_PAGINA:
-        raise ValueError(f"página de versão {bruto.get('versao')!r}")
+    _conferir_a_versao(bruto.get("versao"))
     return Pagina(pid=int(bruto["pid"]), indice=int(bruto["indice"]),
                   boxes=[Box.de_json(b) for b in bruto.get("boxes", [])],
                   tabuleiros=[tuple(int(v) for v in t) for t in bruto.get("tabuleiros", [])],
@@ -72,6 +71,15 @@ def pagina_de_json(bruto: dict) -> Pagina:
                   fora=tuple((int(lugar), Box.de_json(b)) for lugar, b in bruto.get("fora", [])),
                   areas_fora=_areas_fora_de_json(bruto.get("areas_fora", [])),
                   regua_do_negrito=dict(bruto.get("regua_do_negrito") or {}))
+
+
+def _conferir_a_versao(versao) -> None:
+    """Mais nova não é ilegível (D-1): `PaginaDeOutraVersao`. O resto que não é da lista, sim."""
+    if isinstance(versao, int) and versao > VERSAO_DA_PAGINA:
+        raise PaginaDeOutraVersao(f"página de versão {versao}; esta versão lê até a "
+                                  f"{VERSAO_DA_PAGINA}")
+    if versao not in VERSOES_DA_PAGINA:
+        raise ValueError(f"página de versão {versao!r}")
 
 
 def vazia(pagina: Pagina) -> bool:

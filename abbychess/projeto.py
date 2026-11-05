@@ -91,7 +91,7 @@ from abbychess.resumo_do_livro import ResumoDoLivro
 from abbychess.sequencia_do_livro import SequenciaDoLivro
 from abbychess import zonas as zn
 from abbychess.geometria_do_modelo import reenquadrar
-from abbychess.modelo import (GLIFOS_MARCADOS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
+from abbychess.modelo import (CAMPOS_DO_BOX, GLIFOS_MARCADOS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
                               Pagina, proximo_estado, reconciliar)
 from abbychess.pagina_em_json import (com_ids_de_diagramas, comparavel, inteiro, pagina_de_json,
                                       pagina_para_json, vazia)
@@ -235,6 +235,11 @@ class ProjetoDeLivro:
         dados, gravada, bytes_do_projeto, regravar = _projeto_lido(arquivo)
         if dados.versao > VERSAO:
             return cls._abrir_so_para_leitura(pasta, dados, gravada, v1_vence=False)
+        if dados.campos_do_box > CAMPOS_DO_BOX:
+            return cls._abrir_so_para_leitura(
+                pasta, dados, gravada, v1_vence=False,
+                motivo="O projeto foi gravado por uma versão mais nova do programa: abre só para "
+                       "leitura, e nenhuma página é tocada. Atualize o programa para editá-lo.")
         if not gv.tomar_a_pasta(pasta):
             # Outro processo o tem aberto (Q-P5, decisão §13.3): nada aqui grava, nem limpa
             # os temporários das gravações dele.
@@ -285,7 +290,7 @@ class ProjetoDeLivro:
         projeto = cls(pasta, dados, gravada)
         # A fonte antes da migração: a sequência da v3 tem uma entrada por página do PDF, e
         # sem o PDF o número de páginas não se sabe.
-        mudou = _achar_a_fonte(projeto) or mudou
+        mudou = _achar_a_fonte(projeto) or dados.campos_do_box < CAMPOS_DO_BOX or mudou
         versao_de_antes = dados.versao
         if dados.versao < VERSAO or projeto.migracoes.indices_v1():
             try:
@@ -342,6 +347,7 @@ class ProjetoDeLivro:
         # `projeto.json`, e o temporário dele é um só.
         with self._trava_do_livro:
             bruta, contador = self.ordem.para_o_arquivo(sequencia, proximo)
+            self.dados.campos_do_box = max(self.dados.campos_do_box, CAMPOS_DO_BOX)
             gv.gravar_json(self.pasta / ARQUIVO_DO_PROJETO,
                            {**asdict(self.dados), "sequencia": bruta, "proximo_pid": contador})
             self.ordem.gravou(bruta, contador)

@@ -73,8 +73,8 @@ mal lido; eram 30 falsos). O JSON oficial sai no portão do fechamento dos passo
 
 - Não há o editor "Área" no Inspetor (a função se troca pela letra ou pelo botão direito), e
   o vínculo da legenda não se edita à mão.
-- Os diagramas não seguem o Ordenar no Documento (ficam onde a leitura os pôs), e a
-  exportação não usa a ordem das áreas.
+- ~~Os diagramas não seguem o Ordenar no Documento (ficam onde a leitura os pôs), e a
+  exportação não usa a ordem das áreas.~~ Corrigido em 2026-11-05 (`zonas.na_ordem_das_areas`).
 - ~~O FEN do diagrama de uma página de duas colunas (o Yusupov) cai pela altura, entre as linhas
   da outra coluna.~~ Era o CA-5.2 reprovando; corrigido em 2026-11-04 (roadmap, "A coluna só de
   tabuleiros").

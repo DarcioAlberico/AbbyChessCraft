@@ -241,6 +241,24 @@ def zona_que_vale(zonas: Sequence[Zona], x: float, y: float) -> Optional[Zona]:
     return min(achadas, key=lambda z: (z.automatica, (z.x2 - z.x1) * (z.y2 - z.y1)))
 
 
+def na_ordem_das_areas(itens: Sequence, ordem_de) -> list:
+    """Os itens de área ordenada (`ordem_de(item)` não é `None`) seguem a ordem dela, nos lugares
+    que já ocupavam; o resto fica onde está. A mesma regra no Documento e na exportação."""
+    posicoes = [i for i, item in enumerate(itens) if ordem_de(item) is not None]
+    ordenados = sorted((itens[i] for i in posicoes), key=ordem_de)
+    saida = list(itens)
+    for i, item in zip(posicoes, ordenados):
+        saida[i] = item
+    return saida
+
+
+def ordem_do_tabuleiro(zonas: Sequence[Zona], caixa) -> Optional[int]:
+    """A ordem da área de diagrama que vale no centro da caixa do tabuleiro."""
+    area = zona_que_vale([z for z in zonas if z.tipo == DIAGRAMA],
+                         (caixa[0] + caixa[2]) / 2, (caixa[1] + caixa[3]) / 2)
+    return None if area is None else area.ordem
+
+
 def zona_da_maioria(zonas: Sequence[Zona], boxes: Sequence[BoxEntry]) -> Optional[Zona]:
     """A área que vale para a maioria dos glifos de uma linha (pelo centro de cada um). O
     centro da linha inteira engana: uma linha que pega as coordenadas do tabuleiro (a-h)

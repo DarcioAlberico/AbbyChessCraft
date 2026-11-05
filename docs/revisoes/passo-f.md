@@ -71,8 +71,8 @@ mal lido; eram 30 falsos). O JSON oficial sai no portão do fechamento dos passo
 
 ## Limitações conhecidas
 
-- Não há o editor "Área" no Inspetor (a função se troca pela letra ou pelo botão direito), e
-  o vínculo da legenda não se edita à mão.
+- ~~Não há o editor "Área" no Inspetor (a função se troca pela letra ou pelo botão direito).~~
+  Feito em 2026-11-05 (`app/editor_de_area.py`). O vínculo da legenda segue sem edição à mão.
 - ~~Os diagramas não seguem o Ordenar no Documento (ficam onde a leitura os pôs), e a
   exportação não usa a ordem das áreas.~~ Corrigido em 2026-11-05 (`zonas.na_ordem_das_areas`).
 - ~~O FEN do diagrama de uma página de duas colunas (o Yusupov) cai pela altura, entre as linhas

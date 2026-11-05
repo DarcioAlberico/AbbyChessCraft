@@ -586,7 +586,7 @@ def _cabe(app, editor, rolagem):
     return fora
 
 
-@pytest.mark.parametrize("editor", ["glifo", "palavra"])
+@pytest.mark.parametrize("editor", ["glifo", "palavra", "area"])
 def test_os_editores_cabem_no_inspetor_de_296_px(app, lida, editor):
     from core import lexico
 

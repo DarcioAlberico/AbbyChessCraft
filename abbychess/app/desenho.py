@@ -260,8 +260,26 @@ class DesenhoDaJanela:
             self.ir_a_origem(self.projeto.sequencia.posicao_de(pid), gid)
 
     def _layout_mudou(self) -> None:
+        numeros = self.areas.numeros()
         self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual, self.areas.ordem_clicada,
-                                 self.areas.numeros())
+                                 numeros)
+        self._editor_de_area_em_dia(numeros)
+
+    def _editor_de_area_em_dia(self, numeros: dict) -> None:
+        """O editor Área com a área escolhida; fora do editor de áreas, ele volta ao Glifo."""
+        if not self.visor.modo_areas and self.inspetor.atual() == "area":
+            self.inspetor.mostrar("glifo")
+        a = self.areas
+        if a.atual is None or not 0 <= a.atual < len(a.zonas):
+            self.editor_de_area.mostrar(None, 0, "")
+            return
+        zona = a.zonas[a.atual]
+        self.editor_de_area.mostrar(numeros.get(zona.id, a.atual + 1), len(a.zonas), zona.funcao)
+
+    def _area_escolhida(self, _indice: int) -> None:
+        """O clique numa área abre o editor dela; no Ordenar, o clique diz a ordem (§3.1)."""
+        if not self.areas.ordenando and self.areas.atual is not None:
+            self.inspetor.mostrar("area")
 
     def _palavra_mudou(self) -> None:
         v, p = self.verificador, self.pagina

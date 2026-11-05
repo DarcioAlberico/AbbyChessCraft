@@ -204,6 +204,21 @@ class ControladorDeLayout:
         if self.atual is not None:
             self.trocar_funcao(self.atual, funcao)
 
+    def levar_a_atual_ao_numero(self, numero: int) -> None:
+        """A área escolhida passa a ter o `numero` na ordem de leitura; as outras andam, e a
+        ordem de todas fica gravada, como no Ordenar. Um passo do desfazer."""
+        zonas, atual = self.zonas, self.atual
+        if atual is None or not 0 <= atual < len(zonas):
+            return
+        numeros = self.numeros()
+        ordem = sorted(range(len(zonas)), key=lambda i: numeros.get(zonas[i].id, i + 1))
+        if ordem.index(atual) == numero - 1:
+            return
+        ordem.remove(atual)
+        ordem.insert(numero - 1, atual)
+        self._parar_a_ordenacao()
+        self._trocar(zn.ordenar(zonas, ordem), atual, "Mudar a ordem da área")
+
     def iniciar_ordenacao(self) -> None:
         if not self.zonas:
             return

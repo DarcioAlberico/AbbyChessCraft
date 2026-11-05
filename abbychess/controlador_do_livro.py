@@ -447,6 +447,34 @@ class ControladorDoLivro:
 
         p.tarefa(f"Pré-visualizando {formato.upper()}", preparar, falhou=falha)
 
+    def relatorio_de_lances(self, pronto) -> None:
+        """Os lances do livro, por página, fora da interface (F-4): `pronto` recebe os itens."""
+        from abbychess import diagramas as dg
+        from abbychess import evidencia as ev
+        from abbychess import texto as tx
+
+        p = self.pagina
+        if p.projeto is None:
+            return
+        projeto = p.projeto
+        lidas = sorted(projeto.resumo.paginas_lidas())
+        chave = projeto.dados.chave_das_pecas
+
+        def preparar():
+            def trabalho(progresso):
+                itens = []
+                for feitas, indice in enumerate(lidas, 1):
+                    modelo = projeto.ler_sem_migrar(indice)
+                    if modelo is not None:
+                        diagramas = dg.com_ids(list(modelo.diagramas))
+                        itens += ev.itens_da_pagina(indice, modelo, tx.montar(modelo, com_os_nao_lidos=True),
+                                                    diagramas, chave)
+                    progresso(feitas, len(lidas))
+                return itens
+            return trabalho, pronto
+
+        p.tarefa("Relatório de lances", preparar, falhou=p._falhou("Relatório de lances"))
+
     def exportar(self, destino: Path, opcoes: Optional["ex.Opcoes"] = None,
                  metadados: Optional[dict] = None, capa: Optional[Path] = None) -> None:
         """Escreve as páginas reconhecidas em PDF pesquisável, DOCX, EPUB, TXT ou PGN (pelo

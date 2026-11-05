@@ -45,6 +45,7 @@ MOTIVOS = {
     "fora-do-dicionario": "fora do dicionário",
     "caixa-estranha": "maiúsculas no meio da palavra",
     "camada": "a camada de texto do PDF lê outra palavra",
+    "lance": "os lances da linha",
 }
 
 
@@ -108,8 +109,11 @@ class Desconhecida:
     palavra: str
     indices: List[int]
     motivo: str = "fora-do-dicionario"
-    #: O que a camada de texto do PDF lê no lugar (`camada.opinioes`), vazio sem opinião.
+    #: O que a camada de texto do PDF lê no lugar (`camada.opinioes`), vazio sem opinião; na fila
+    #: Lances, o texto da linha.
     sugestao: str = ""
+    #: Na fila Lances, por que a linha pede atenção (o lance ilegal).
+    aviso: str = ""
 
     @property
     def explicacao(self) -> str:

@@ -197,6 +197,11 @@ class ControladorDosPadroes:
         if self._p.projeto is not None:
             self._p.projeto.dados.notacao = notacao
 
+    def definir_letras(self, letras: str) -> None:
+        """As letras das peças nos lances; vazio são as do idioma (gravadas com os limiares)."""
+        if self._p.projeto is not None:
+            self._p.projeto.dados.letras_das_pecas = letras
+
     def definir_idioma(self, idioma: str) -> bool:
         """O idioma da prosa do livro (o léxico da verificação, as letras das peças), no
         projeto, gravado junto com os limiares; devolve se mudou."""

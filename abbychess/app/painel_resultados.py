@@ -220,6 +220,19 @@ class PainelDeResultados(QTabWidget):
     def na_previa(self) -> bool:
         return self.modelo_da_previa.rowCount() > 0 and not self.previa.isHidden()
 
+    def mostrar_itens(self, itens: Sequence, cabecalho: str) -> None:
+        """Uma lista de (texto, alvo), com `cabecalho` em cima: Enter vai ao alvo."""
+        self._limpar()
+        self.resultados.addItem(cabecalho)
+        for texto, alvo in itens[:LIMITE_DE_LINHAS]:
+            item = QListWidgetItem(texto)
+            item.setData(PAPEL_DO_HTML, html.escape(texto))
+            item.setData(PAPEL_DO_ALVO, alvo)
+            self.resultados.addItem(item)
+        if len(itens) > LIMITE_DE_LINHAS:
+            self.resultados.addItem(f"… e mais {len(itens) - LIMITE_DE_LINHAS}")
+        self.setCurrentWidget(self.aba_de_resultados)
+
     def mostrar_ocorrencias(self, ocorrencias: Sequence, cabecalho: str) -> None:
         """As ocorrências da busca, uma por linha: "p. 12, l. 3: …trecho…", o casamento em
         negrito; `cabecalho` em cima (a contagem, as páginas que ficaram fora)."""

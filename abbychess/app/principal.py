@@ -49,8 +49,8 @@ def main(argv=None) -> int:
     # Importados aqui para `--help` e os testes não pagarem a carga do Qt.
     from PySide6.QtWidgets import QApplication
 
-    from abbychess.app import estilo, registro_de_eventos
-    from abbychess.app.janela import JanelaPrincipal
+    from abbychess.app import estilo, opcoes, registro_de_eventos
+    from abbychess.app.janela import JanelaPrincipal, configuracao
 
     app = QApplication(argv)
     app.setApplicationName("AbbyChessCraft")
@@ -60,7 +60,9 @@ def main(argv=None) -> int:
     # O tema do sistema (§13), e de novo quando ele muda, sem reiniciar (CA-13.3).
     estilo.aplicar(app)
     estilo.acompanhar_o_sistema(app)
-    registro = registro_de_eventos.instalar(app)    # noqa: F841 (vive enquanto o app vive)
+    registro = registro_de_eventos.instalar(   # noqa: F841 (vive enquanto o app vive)
+        app, str(log_em_arquivo.pasta_de_dados() / "eventos.jsonl")
+        if opcoes.registro_ligado(configuracao()) else None)
     janela = JanelaPrincipal()
     janela.restaurar_a_geometria()
     janela.show()

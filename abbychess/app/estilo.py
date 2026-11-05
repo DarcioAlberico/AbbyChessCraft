@@ -155,6 +155,8 @@ FUNDO_DE_BAIXA_CONFIANCA = QColor(255, 226, 184)
 FUNDO_DO_ATUAL = QColor(150, 200, 255)
 FUNDO_DA_SESSAO = QColor(255, 246, 200)
 FUNDO_DA_BUSCA = QColor(255, 232, 130)
+#: A marca forte (F-2): mais de 3:1 contra o papel e contra o fundo da busca (CA-F2.1).
+FUNDO_FORTE = QColor(214, 90, 40)
 FUNDO_DA_OCORRENCIA = QColor(255, 170, 70)
 
 #: A faixa Linha: o glifo atual em destaque e a tinta dele.

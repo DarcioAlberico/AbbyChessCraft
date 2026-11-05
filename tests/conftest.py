@@ -140,6 +140,8 @@ def avisos_que_nao_param(monkeypatch):
     for nome in ("warning", "information", "critical"):
         monkeypatch.setattr(QMessageBox, nome,
                             staticmethod(lambda *a, **k: QMessageBox.StandardButton.Ok))
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **k: QMessageBox.StandardButton.Yes))
 
 
 @pytest.fixture(autouse=True)

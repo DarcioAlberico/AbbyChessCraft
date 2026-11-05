@@ -497,6 +497,10 @@ class EditorDeDiagrama(QWidget):
             afirmar_lado(self.tabuleiro(), lado)
         self._mostrar()
 
+    def definir_lado(self, lado: str) -> None:
+        """Ctrl+W e Ctrl+B: o lado a jogar, sem passar pelos rádios (X-3)."""
+        self._mudar_lado(lado)
+
     def _mudar_roque(self, letra: str) -> None:
         if self.aberto:
             self.tabuleiro().alternar_roque(letra)
@@ -593,6 +597,8 @@ class EditorDeDiagrama(QWidget):
             partes.append("conferido")
         if tabuleiro.pode_desfazer:
             partes.append("alterado, sem gravar")
+        if tabuleiro.lado_origem == "convencao" or not tabuleiro.lado_origem:
+            partes.append("lado não dito")
         self.cabecalho.setText("  —  ".join(partes))
         self.fen.setText(tabuleiro.fen())
         self.avisos.setText("\n".join(self.avisos_do_diagrama()))

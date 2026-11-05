@@ -205,7 +205,21 @@ class ResumoDoLivro:
                 "diagramas": tabuleiros,
                 "diagramas_por_conferir": max(0, tabuleiros - conferidos),
                 # Alguma figurina lida (o modo "livro" das peças, §6.4, sem abrir as páginas).
-                "figurinas": any(b.entry.char in FIGURINAS for b in pagina.boxes), **regua}
+                "figurinas": any(b.entry.char in FIGURINAS for b in pagina.boxes),
+                **self._dos_lances(pagina), **regua}
+
+    def _dos_lances(self, pagina: Pagina) -> dict:
+        """`lances_por_conferir` e `fortes`, as contagens da fila Lances (F-4) e da marca forte."""
+        from abbychess import decodificador_de_lances as dl
+        from abbychess import evidencia as ev
+        from abbychess import texto as tx
+
+        if not pagina.boxes:
+            return {"lances_por_conferir": 0, "fortes": 0}
+        chave = self._p.dados.chave_das_pecas
+        documento = tx.montar(pagina, com_os_nao_lidos=True)
+        return {"lances_por_conferir": dl.lances_por_conferir(documento, ev.conferidos(pagina), chave),
+                "fortes": len(ev.da_pagina(pagina, documento, pagina.diagramas, chave).fortes)}
 
 
 def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares,

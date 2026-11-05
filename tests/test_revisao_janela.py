@@ -211,7 +211,7 @@ def test_trocar_de_pagina_fecha_a_pergunta_do_ctrl_t(jb, monkeypatch):  # noqa: 
     monkeypatch.setattr(jb.pagina.fila_da_pagina, "fila", lambda: [1, 2])  # com pendentes: a pergunta
     jb.pagina.verificar = lambda indice=None: marcadas.append(indice)
     jb.verificar_pagina()
-    assert jb.confirmacao.aberta and "página 1" in jb.confirmacao.pergunta.text()
+    assert jb.confirmacao.aberta and "dúvidas" in jb.confirmacao.pergunta.text()
     jb.eventos.emitir("pagina_trocou")                   # foi a outra página antes de responder
     assert not jb.confirmacao.aberta
     del jb.pagina.verificar

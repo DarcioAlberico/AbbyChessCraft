@@ -104,6 +104,9 @@ class Relatorio:
     site_de_analise: str = ""
     #: (página, motivo) das que a camada de texto não conseguiu dar e saíram dos glifos (D-4).
     camada_falhou: List[Tuple[int, str]] = field(default_factory=list)
+    #: As contagens da fila Lances no livro (F-4), e as páginas dos diagramas de lado presumido.
+    lances: Dict[str, int] = field(default_factory=dict)
+    lado_presumido: Dict[int, int] = field(default_factory=dict)
 
     def resumo(self) -> str:
         """Uma linha, para a barra de status."""
@@ -132,10 +135,25 @@ class Relatorio:
         tiradas = sum(len(v) for v in self.margens.values())
         if tiradas:
             partes.append(f"{tiradas} linha(s) de cabeçalho/rodapé tirada(s)")
+        partes += self._partes_dos_lances()
         if self.nao_verificadas:
             partes.append(f"{len(self.nao_verificadas)} página(s) não verificada(s)")
         if self.sinalizadas:
             partes.append(f"{sum(self.sinalizadas.values())} palavra(s) sinalizada(s)")
+        return partes
+
+    def _partes_dos_lances(self) -> List[str]:
+        """As quatro contagens do relatório de lances e os lados presumidos: "conferidos", e
+        nunca "certos"."""
+        lances = self.lances
+        partes = []
+        if any(lances.values()):
+            partes.append(f"lances: {lances.get('ilegais', 0)} ilegal(is), "
+                          f"{lances.get('sem_posicao', 0)} sem posição, "
+                          f"{lances.get('nao_conferidos', 0)} não conferido(s), "
+                          f"{lances.get('aceitos', 0)} aceito(s) como impresso(s)")
+        if self.lado_presumido:
+            partes.append(f"{sum(self.lado_presumido.values())} diagrama(s) com o lado presumido")
         return partes
 
     def _partes_do_arquivo(self) -> List[str]:
@@ -336,6 +354,27 @@ def _paginas_no_relatorio(relatorio: Relatorio, projeto: ProjetoDeLivro,
     for pagina in paginas:
         _pagina_no_relatorio(relatorio, pagina, resumo, estados, nativas)
         _blocos_no_relatorio(relatorio, pagina.numero, pagina.blocos)
+        if pagina.numero not in nativas:
+            _lances_no_relatorio(relatorio, projeto, pagina.numero)
+
+
+def _lances_no_relatorio(relatorio: Relatorio, projeto: ProjetoDeLivro, indice: int) -> None:
+    """As contagens da fila Lances (F-4) e os diagramas sem lado dito pelo livro (X-3)."""
+    from abbychess import diagramas as dg
+    from abbychess import evidencia as ev
+    from abbychess import texto as tx
+
+    modelo = projeto.ler_sem_migrar(indice)
+    if modelo is None or not modelo.boxes:
+        return
+    diagramas = dg.com_ids(list(modelo.diagramas))
+    contagens = ev.contagens_dos_lances(modelo, tx.montar(modelo, com_os_nao_lidos=True), diagramas,
+                                        projeto.dados.chave_das_pecas)
+    for chave, n in contagens.items():
+        relatorio.lances[chave] = relatorio.lances.get(chave, 0) + n
+    presumidos = sum(d.lido and not d.lado for d in diagramas)
+    if presumidos:
+        relatorio.lado_presumido[indice] = presumidos
 
 
 def _pagina_no_relatorio(relatorio: Relatorio, pagina: PaginaExtraida, resumo: dict,

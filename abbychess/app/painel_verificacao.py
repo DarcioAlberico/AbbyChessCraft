@@ -166,7 +166,9 @@ class PainelDeVerificacao(QWidget):
                 posicao: int, total: int) -> None:
         """Mostra a palavra com os glifos contornados e põe o texto lido no campo."""
         self._ativo = True
-        self.posicao.setText(f"Palavra {posicao + 1} de {total} — {palavra.explicacao}")
+        de_lance = palavra.motivo == "lance"
+        self.posicao.setText(f"{'Linha' if de_lance else 'Palavra'} {posicao + 1} de {total} — "
+                             f"{palavra.explicacao}")
         recorte, (ox, oy) = vf.recorte_da_palavra(pagina, boxes, palavra.indices)
         pixmap = pixmap_de_cinza(recorte)
         fator = ALTURA_DO_RECORTE / max(pixmap.height(), 1)
@@ -191,19 +193,27 @@ class PainelDeVerificacao(QWidget):
             self._glifos.append((i, x1, x2))
         pintor.end()
         self.recorte.setPixmap(pixmap)
+        self.campo.setText(self._lido_e_texto(boxes, palavra))
+        self.campo.selectAll()
+        self.habilitar(True)
+        self.botao_todas.setEnabled(not de_lance)
+        self.botao_adicionar.setEnabled(not de_lance)
+        self.campo.setFocus()
+
+    def _lido_e_texto(self, boxes, palavra: vf.Desconhecida) -> str:
+        """O rótulo dos glifos, e o texto do campo."""
+        if palavra.motivo == "lance":           # a fila Lances: o texto da linha, com os espaços
+            self.lido.setText(palavra.aviso)
+            return palavra.sugestao
         lidos = " ".join(boxes[i].char or "□" for i in palavra.indices)
-        self.lido.setText(f"Glifos: {lidos}")
-        # O glifo sem leitura não ganha letra inventada: falta digitá-la.
-        texto = "".join(boxes[i].char for i in palavra.indices)
         if palavra.sugestao:
             # A leitura da camada de texto do PDF (`camada.opinioes`): o espaço dela parte a
             # palavra, como o digitado.
             self.lido.setText(f"Glifos: {lidos}   ·   a camada do PDF lê: {palavra.sugestao}")
-            texto = palavra.sugestao
-        self.campo.setText(texto)
-        self.campo.selectAll()
-        self.habilitar(True)
-        self.campo.setFocus()
+            return palavra.sugestao
+        self.lido.setText(f"Glifos: {lidos}")
+        # O glifo sem leitura não ganha letra inventada: falta digitá-la.
+        return "".join(boxes[i].char for i in palavra.indices)
 
     def limpar(self, mensagem: str) -> None:
         self._ativo = False

@@ -259,6 +259,8 @@ def test_f7_cicla_o_modo_e_o_editor_do_inspetor(app, lida, monkeypatch):
     assert "Palavras" in j.inspetor.seletor.text()
     QTest.keyClick(j.visor, Qt.Key.Key_F7)
     QTest.keyClick(j.visor, Qt.Key.Key_F7)
+    assert j.fila.modo == "lances" and j.inspetor.atual() == "palavra"       # F-4
+    QTest.keyClick(j.visor, Qt.Key.Key_F7)
     assert j.fila.modo == "confianca" and j.inspetor.atual() == "glifo"
 
 
@@ -608,7 +610,7 @@ def test_ctrl_t_com_pendentes_pergunta_e_o_nao_deixa_a_pagina(app, lida, monkeyp
     assert fila(j)
     j.localizar()                                        # a busca aberta
     QTest.keyClick(j.visor, Qt.Key.Key_T, Qt.KeyboardModifier.ControlModifier)
-    assert j.confirmacao.aberta and f"Aceitar {len(fila(j))} pendente" in j.confirmacao.pergunta.text()
+    assert j.confirmacao.aberta and f"Aceitar {len(fila(j))} dúvidas" in j.confirmacao.pergunta.text()
     QTest.keyClick(QApplication.focusWidget() or j.confirmacao, Qt.Key.Key_Escape)
     assert not j.confirmacao.aberta and not j.barra_de_busca.isHidden()
     assert j.pagina.modelo.estado != md.VERIFICADA

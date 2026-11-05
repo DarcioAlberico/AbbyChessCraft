@@ -1,0 +1,128 @@
+{
+ "por_livro": {
+  "seirawan": {
+   "paginas": 7,
+   "gabarito_auditado": false,
+   "teto": {
+    "tokens_de_lance": 136,
+    "com_posicao_por_pagina": 44,
+    "com_posicao_por_seguimento": 44,
+    "cobertura_por_pagina": 0.3235,
+    "cobertura_por_seguimento": 0.3235,
+    "lances_longos": 1
+   },
+   "leitura": {
+    "lances": 136,
+    "errados": 28,
+    "errados_de_forma_valida": 7,
+    "certos_marcados": 0,
+    "errados_marcados": 0,
+    "fora_da_fila": 0,
+    "errados_fora_da_fila": 0,
+    "tokens_lidos": 119,
+    "ilegais_lidos": 0,
+    "por_semente": {
+     "inicial": 9,
+     "diagrama": 11
+    },
+    "cobertura_da_leitura": 0.1681
+   }
+  },
+  "aagaard": {
+   "paginas": 1,
+   "gabarito_auditado": false,
+   "teto": {
+    "tokens_de_lance": 77,
+    "com_posicao_por_pagina": 0,
+    "com_posicao_por_seguimento": 0,
+    "cobertura_por_pagina": 0.0,
+    "cobertura_por_seguimento": 0.0,
+    "lances_longos": 0
+   },
+   "teto_e_piso": "a referência não traz os diagramas",
+   "leitura": {
+    "lances": 77,
+    "errados": 31,
+    "errados_de_forma_valida": 10,
+    "certos_marcados": 0,
+    "errados_marcados": 0,
+    "fora_da_fila": 2,
+    "errados_fora_da_fila": 2,
+    "tokens_lidos": 68,
+    "ilegais_lidos": 0,
+    "por_semente": {},
+    "cobertura_da_leitura": 0.0
+   }
+  },
+  "nunn": {
+   "paginas": 1,
+   "gabarito_auditado": false,
+   "teto": {
+    "tokens_de_lance": 55,
+    "com_posicao_por_pagina": 0,
+    "com_posicao_por_seguimento": 0,
+    "cobertura_por_pagina": 0.0,
+    "cobertura_por_seguimento": 0.0,
+    "lances_longos": 0
+   },
+   "teto_e_piso": "a referência não traz os diagramas",
+   "leitura": {
+    "lances": 55,
+    "errados": 24,
+    "errados_de_forma_valida": 15,
+    "certos_marcados": 1,
+    "errados_marcados": 0,
+    "fora_da_fila": 1,
+    "errados_fora_da_fila": 1,
+    "tokens_lidos": 48,
+    "ilegais_lidos": 1,
+    "por_semente": {
+     "diagrama": 1
+    },
+    "cobertura_da_leitura": 0.0208
+   }
+  },
+  "yusupov": {
+   "paginas": 2,
+   "gabarito_auditado": false,
+   "teto": {
+    "tokens_de_lance": 154,
+    "com_posicao_por_pagina": 0,
+    "com_posicao_por_seguimento": 0,
+    "cobertura_por_pagina": 0.0,
+    "cobertura_por_seguimento": 0.0,
+    "lances_longos": 0
+   },
+   "teto_e_piso": "a referência não traz os diagramas",
+   "leitura": {
+    "lances": 154,
+    "errados": 24,
+    "errados_de_forma_valida": 16,
+    "certos_marcados": 0,
+    "errados_marcados": 0,
+    "fora_da_fila": 1,
+    "errados_fora_da_fila": 1,
+    "tokens_lidos": 145,
+    "ilegais_lidos": 0,
+    "por_semente": {},
+    "cobertura_da_leitura": 0.0
+   }
+  }
+ },
+ "ponto_de_parada": {
+  "teto_maximo": 0.3235,
+  "alarme": 0.0032,
+  "metas": {
+   "teto": 0.3,
+   "alarme": 0.05
+  },
+  "x1_liberado": true
+ },
+ "data": "2026-11-05",
+ "commit": "55b96f0",
+ "arvore_suja": true,
+ "arquivos_sujos": [
+  "M abbychess/controlador_de_diagramas.py"
+ ],
+ "exploratorio": "Seirawan já visto; corpus_v2 sem auditoria: não aprova alvo"
+}

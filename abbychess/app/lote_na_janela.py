@@ -81,6 +81,19 @@ class LoteNaJanela:
     def _pagina_do_lote(self, _indice: int) -> None:
         self.relogio_das_paginas.start()        # a gaveta, depois de uma rajada de páginas
 
+    def relatorio_de_lances(self) -> None:
+        """Ferramentas ▸ Relatório de lances: em Resultados, por página; Enter vai ao lance."""
+        self.livro.relatorio_de_lances(self._mostrar_o_relatorio_de_lances)
+
+    def _mostrar_o_relatorio_de_lances(self, itens) -> None:
+        por_tipo = {}
+        for item in itens:
+            por_tipo[item.tipo] = por_tipo.get(item.tipo, 0) + 1
+        cabecalho = "Relatório de lances: " + (", ".join(f"{n} {t}" for t, n in sorted(por_tipo.items()))
+                                               or "nenhum lance lido")
+        self.resultados.mostrar_itens([(i.texto, i) for i in itens], cabecalho)
+        self.mostrar_resultados()
+
     def _resultado(self, titulo: str, texto: str) -> None:
         """O que um comando deixou para conferir (Resultados / Avisos), sem diálogo."""
         self.registrar_aviso(av.AVISO, titulo, texto)

@@ -48,6 +48,7 @@ from PySide6.QtWidgets import QTextEdit
 from abbychess import grade as gd
 from abbychess import sessao as ss
 from abbychess import texto as tx
+from abbychess import tokens as tk
 from abbychess.app import estilo, teclado
 from abbychess.app.formatos_do_documento import escrever_as_linhas, formato_novo
 from abbychess.app.imagens import FONTE, imagem_do_diagrama
@@ -102,11 +103,13 @@ def estado_do_diagrama(diagrama) -> str:
     validacao = getattr(diagrama, "validacao", None)
     if diagrama.conferido:
         return "conferido"
-    if diagrama.lido and validacao is not None:
-        return "confiável pelos lances" if validacao.confiavel else validacao.aviso
-    if diagrama.lido:
-        return "lido, não conferido"
-    return "não lido"
+    if not diagrama.lido:
+        return "não lido"
+    if validacao is not None and not validacao.confiavel:
+        return validacao.aviso
+    if not diagrama.lado:                       # sem o livro dizer, não afirmar (X-3)
+        return "lado não dito"
+    return "confiável pelos lances" if validacao is not None else "lido, não conferido"
 
 
 class VistaDoDocumento(QTextEdit):
@@ -419,7 +422,7 @@ class VistaDoDocumento(QTextEdit):
                                                           estilo_do_glifo.italico,
                                                           estilo_do_glifo.sublinhado))
         if not tem_estilo and (not self.realce or not (desconhecido or virtual
-                or estado in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO))):
+                or estado in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO, gd.FORTE))):
             return base
         chave = (id(base), estado, desconhecido, virtual, estilo_do_glifo)
         if chave in self._formatos:
@@ -706,7 +709,7 @@ class VistaDoDocumento(QTextEdit):
             self._origem = list(range(len(antes)))
             self._avisar_da_sessao()
             return
-        inicio, fim = _trecho_mudado(atual, antes)
+        inicio, fim = tk.trecho_mudado(atual, antes)
         a, b = ss.palavras_em(self._unidades, inicio, len(antes) - fim)
         if self._sessao is None:
             self._numero_da_sessao += 1
@@ -909,7 +912,7 @@ def _unidades_do_bloco(unidades: list, texto: str, mapa, virtuais) -> None:
 def _duvidosos(estados, desconhecidos) -> Set[int]:
     """Os glifos aonde o Enter leva: pendentes, sem leitura, aguardando e fora do léxico."""
     duvidosos = {g for g, e in (estados or {}).items()
-                 if e in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO)}
+                 if e in (gd.PENDENTE, gd.SEM_LEITURA, gd.AGUARDANDO, gd.FORTE)}
     return duvidosos | set(desconhecidos)
 
 
@@ -926,17 +929,6 @@ def _lugares_dos_gids(doc: QTextDocument) -> Dict[int, tuple]:
                     lugar[gid] = (inicio, n + 1)
         bloco = bloco.next()
     return lugar
-
-
-def _trecho_mudado(atual: str, antes: str) -> tuple:
-    """(quantos caracteres iguais no começo, quantos no fim) entre o texto e o da montagem."""
-    inicio, limite = 0, min(len(atual), len(antes))
-    while inicio < limite and atual[inicio] == antes[inicio]:
-        inicio += 1
-    fim = 0
-    while fim < limite - inicio and atual[-1 - fim] == antes[-1 - fim]:
-        fim += 1
-    return inicio, fim
 
 
 def _ultimo_glifo(unidades) -> Optional[int]:

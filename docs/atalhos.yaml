@@ -147,6 +147,8 @@ acoes:
      finereader: Ctrl+Shift+B, desde_passo: F}
   - {id: proxima_pagina_pendente, descricao: Próxima página com pendentes, escopo: [global], padrao: F6,
      finereader: Alt+PgDn, desde_passo: A2}
+  - {id: relatorio_de_lances, descricao: "O relatório de lances do livro, em Resultados", escopo: [global],
+     sem_atalho: [padrao, finereader], desde_passo: PPL}
   - {id: pagina_verificada, descricao: Marcar a página verificada e abrir a próxima, escopo: [global], padrao: Ctrl+T, desde_passo: A2}
   - {id: voltar_antes_do_lote, descricao: Voltar a página ao estado antes do lote, escopo: [global],
      sem_atalho: [padrao, finereader], desde_passo: E}
@@ -158,7 +160,7 @@ acoes:
     padrao: Alt+Down
     desde_passo: A2
     excecoes:
-      - {tecla: Alt+Down, widget: combobox, tipo: substitui, motivo: "o filtro da gaveta de Páginas abre a lista com F4 ou clique; Alt+↓ é da fila em qualquer painel (§8.1)"}
+      - {tecla: Alt+Down, widget: combobox, tipo: substitui, motivo: "o filtro da gaveta de Páginas abre a lista com espaço ou clique; Alt+↓ é da fila em qualquer painel (§8.1)"}
   - id: anterior_da_fila
     descricao: Item anterior da fila
     escopo: [global]
@@ -166,6 +168,13 @@ acoes:
     desde_passo: A2
     excecoes:
       - {tecla: Alt+Up, widget: combobox, tipo: substitui, motivo: "o filtro da gaveta de Páginas fecha a lista com Esc ou clique; Alt+↑ é da fila (§8.1)"}
+  - id: fila_lances
+    descricao: A fila Lances
+    escopo: [global]
+    padrao: F4
+    desde_passo: PPL
+    excecoes:
+      - {tecla: F4, widget: combobox, tipo: substitui, motivo: "F4 é da fila Lances; o filtro da gaveta abre com espaço ou clique"}
   - {id: ciclar_modo_da_fila, descricao: Ciclar o modo da fila, escopo: [global], padrao: F7,
      finereader: Ctrl+Shift+F7, desde_passo: A2}
   - {id: alternar_escopo_da_fila, descricao: Alternar o escopo da fila (página ou livro), escopo: [global],
@@ -178,6 +187,8 @@ acoes:
      escopo: [diagrama], padrao: Ctrl+Enter, desde_passo: H}
   - {id: diagrama_anterior, descricao: O diagrama anterior do livro, escopo: [diagrama], padrao: PgUp, desde_passo: H}
   - {id: diagrama_seguinte, descricao: O diagrama seguinte do livro, escopo: [diagrama], padrao: PgDn, desde_passo: H}
+  - {id: lado_brancas, descricao: "No editor Diagrama: brancas a jogar", escopo: [diagrama], padrao: Ctrl+W, desde_passo: PPL}
+  - {id: lado_pretas, descricao: "No editor Diagrama: pretas a jogar", escopo: [diagrama], padrao: Ctrl+B, desde_passo: PPL}
 
   # --- Exibir: arranjos, painéis, zoom -------------------------------------------
   - {id: arranjo_so_imagem, descricao: Só a Imagem, escopo: [global], padrao: Ctrl+F6, finereader: F6, desde_passo: A2}

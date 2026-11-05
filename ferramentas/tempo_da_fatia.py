@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import statistics
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -61,15 +62,51 @@ def tempo_ativo(linhas) -> dict:
             "pausas_descontadas": pausas, "sessoes": len(sessoes)}
 
 
+def por_pagina(linhas, fila=None) -> dict:
+    """Os segundos ativos de cada `pid` (só na `fila`, se dada), sem pausa longa, e a mediana. O
+    tempo entre dois gestos conta para a página aberta no segundo (CA-F4.8)."""
+    tempos: dict = {}
+    pid, modo, anterior = None, None, None
+    for linha in linhas:
+        try:
+            dados = json.loads(linha)
+        except ValueError:
+            continue
+        if not isinstance(dados, dict):
+            continue
+        evento = dados.get("evento")
+        if evento == "inicio":
+            anterior = None
+        elif evento == "pagina":
+            pid, modo = dados.get("pid"), dados.get("fila")
+        elif evento in GESTOS and isinstance(dados.get("t"), (int, float)):
+            agora = float(dados["t"])
+            if (anterior is not None and 0 <= agora - anterior <= OCIOSO_S and pid is not None
+                    and (fila is None or modo == fila)):
+                tempos[pid] = tempos.get(pid, 0.0) + agora - anterior
+            anterior = agora
+    valores = sorted(tempos.values())
+    return {"paginas": len(valores), "por_pagina": {str(k): round(v, 1) for k, v in tempos.items()},
+            "mediana_s": round(statistics.median(valores), 1) if valores else None}
+
+
 def main(argv=None) -> int:
     analisador = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     analisador.add_argument("registro", type=Path)
-    analisador.add_argument("--erros", type=int, required=True,
-                            help="as diferenças do bloco contra o gabarito")
-    analisador.add_argument("--por", required=True, help="quem fez a sessão")
-    analisador.add_argument("--passo", required=True, help="o passo do programa usado")
-    analisador.add_argument("--bloco", required=True, help="as páginas, ex.: i020-i022")
+    analisador.add_argument("--erros", type=int, help="as diferenças do bloco contra o gabarito")
+    analisador.add_argument("--por", help="quem fez a sessão")
+    analisador.add_argument("--passo", help="o passo do programa usado")
+    analisador.add_argument("--bloco", help="as páginas, ex.: i020-i022")
+    analisador.add_argument("--por-pagina", action="store_true",
+                            help="só soma o tempo por página, e não grava nada (CA-F4.8)")
+    analisador.add_argument("--fila", help="com --por-pagina, só o tempo nesta fila (lances…)")
     args = analisador.parse_args(argv)
+    if args.por_pagina:
+        print(json.dumps(por_pagina(args.registro.read_text(encoding="utf-8").splitlines(), args.fila),
+                         ensure_ascii=False))
+        return 0
+    if args.erros is None or not (args.por and args.passo and args.bloco):
+        analisador.error("--erros, --por, --passo e --bloco são obrigatórios sem --por-pagina")
     sessao = tempo_ativo(args.registro.read_text(encoding="utf-8").splitlines())
     sessao.update({"por": args.por, "passo": args.passo, "bloco": args.bloco,
                    "erros": args.erros,

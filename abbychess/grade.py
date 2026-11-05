@@ -32,6 +32,8 @@ REDE = "rede"
 ESTADOS = (PENDENTE, SEM_LEITURA, AGUARDANDO, MANUAL, LIVRO, REDE)
 #: Os aceitos: discretos, a não ser com "mostrar origem".
 ACEITOS = (MANUAL, LIVRO, REDE)
+#: A marca forte (F-2, F-3): só no Documento, por cima do estado de origem.
+FORTE = "forte"
 
 #: O lado da célula da grade, em pixels da página (um glifo a 300 dpi tem ~20–60).
 LADO = 64

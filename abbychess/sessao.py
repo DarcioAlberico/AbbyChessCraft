@@ -31,7 +31,7 @@ from collections import Counter
 from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
-from abbychess.modelo import FIGURINAS, PECAS, Pagina
+from abbychess.modelo import FIGURINAS, Pagina, letras_das_pecas
 
 GLIFO, VIRTUAL, ESPACO, LINHA, OUTRO = "glifo", "virtual", "espaco", "linha", "outro"
 #: O que a vista põe no lugar da quebra de parágrafo; o colar de várias linhas também a traz
@@ -940,7 +940,7 @@ PONTUACAO_DE_BORDA = ",;:.)(\"'“”‘’[]"
 
 
 def _lance(idioma: str):
-    pecas = PECAS.get(idioma, PECAS["en"])
+    pecas = letras_das_pecas(idioma)
     return re.compile(rf"^(\d{{1,3}}\.(?:\.\.)?)?([{pecas}])([a-h]?[1-8]?x?[a-h][1-8])"
                       rf"(=[{pecas}])?([+#]?[!?]{{0,2}}[±∓⩱⩲=∞⯹⇄⇆↑→⟳○⨀⨁]?)$")
 
@@ -948,7 +948,7 @@ def _lance(idioma: str):
 def figurinas(token: str, idioma: str) -> str:
     """O token de lance com a letra da peça (e a da promoção) como figurina; os outros
     tokens como vieram. A pontuação de borda fica onde estava."""
-    pecas = PECAS.get(idioma, PECAS["en"])
+    pecas = letras_das_pecas(idioma)
     nucleo = token.lstrip(PONTUACAO_DE_BORDA)
     antes = token[:len(token) - len(nucleo)]
     nucleo = nucleo.rstrip(PONTUACAO_DE_BORDA)

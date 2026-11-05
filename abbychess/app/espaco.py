@@ -38,7 +38,7 @@ from abbychess import verificacao as vf
 from abbychess.modelo import LIDAS
 from abbychess.app import visor as vs
 from abbychess.app.confirmacao import BarraDeConfirmacao
-from abbychess.app import acessibilidade, estilo, icones, teclado, vazios
+from abbychess.app import acessibilidade, estilo, icones, registro_de_eventos, teclado, vazios
 from abbychess.app.editor_de_area import EditorDeArea
 from abbychess.app.inspetor import PainelDoInspetor
 from abbychess.app.linha import FaixaDaLinha
@@ -541,10 +541,16 @@ class EspacoDeTrabalho:
         icones.aplicar(self)
 
     def _modo_da_fila_mudou(self, modo: str) -> None:
-        """O modo da fila escolhe o editor do Inspetor: Palavra nas palavras, Diagrama nos
-        diagramas (aberto pelo F8 ou por um clique), Glifo no resto."""
+        """O modo da fila escolhe o editor do Inspetor: Palavra nas palavras e nos lances,
+        Diagrama nos diagramas (aberto pelo F8 ou por um clique), Glifo no resto."""
+        p = self.pagina
+        registro_de_eventos.anotar_pagina(p.modelo.pid if p.modelo is not None else None, modo)
         if modo == "palavras":
             self.verificar_texto()
+        elif modo == "lances":
+            self.inspetor.mostrar("palavra")
+            self.alternar_linha(True)
+            self.fila.lances.recontar(0)
         elif modo == "diagramas" and self.editor_diagrama.aberto:
             self.inspetor.mostrar("diagrama")
         else:

@@ -1,7 +1,7 @@
 """A sessão do Documento confirmada (§6.3), à parte do `ControladorDePagina` (SPEC-qualidade
 Q-A1): as unidades e o texto de agora viram as operações da tabela num passo do desfazer, na
-hora ou na vez dela na fila de tarefas (`na_fila`, que o Ctrl+T e o fechar do projeto
-consultam); o Ctrl+Enter ensina o glifo sob o cursor no mesmo passo; o novo parágrafo e os
+hora ou na vez dela na fila de tarefas (`na_fila`, que o fechar do projeto consulta); o
+Ctrl+Enter ensina o glifo sob o cursor no mesmo passo; o novo parágrafo e os
 estilos (Ctrl+Shift+Enter, Ctrl+B/I/U). Aqui também o modo das peças nos lances (§6.4), que
 lembra, por projeto, se o livro tem figurinas. A edição em si (`_editar`, `_mudou`) e a letra
 virtual que faltava continuam do controlador."""

@@ -75,6 +75,7 @@ o `ensinar_varios`/`esquecer_varios` com o efeito do passo I), `c01cf97`, `cb1f9
 - Com o índice da busca ainda montando, a Galeria do livro avisa e mostra só o que já está
   indexado, em vez de esperar.
 - "N iguais nesta página", no aviso de ensino, conta os glifos com a mesma leitura.
-- A ordem das abas (Documento, Padrões, Diagramas, Galeria) não é a da §3.1.
+- ~~A ordem das abas (Documento, Padrões, Diagramas, Galeria) não é a da §3.1.~~ Corrigido em
+  2026-11-05.
 - O custo de uma correção pela Galeria em dezenas de páginas (o JSON de cada uma lido na
   thread da interface) não está medido.

@@ -253,10 +253,12 @@ class EditorDeDiagrama(QWidget):
         if self.diagramas:
             self.diagrama_mostrado.emit(self.diagrama.caixa)
 
-    def sincronizar(self, diagramas: List[DiagramaLido]) -> bool:
-        """A página mudou por baixo (um desfazer, o lado pela legenda, a releitura). Com os
-        mesmos diagramas no mesmo lugar, o editor passa a mostrar os de agora (o tabuleiro
-        sem edição é refeito); com outros, fecha. Devolve se continuou aberto."""
+    def sincronizar(self, diagramas: List[DiagramaLido],
+                    linhas: Optional[List[List[lances.Lance]]] = None) -> bool:
+        """A página mudou por baixo (um desfazer, o lado pela legenda, a releitura, o texto
+        corrigido). Com os mesmos diagramas no mesmo lugar, o editor passa a mostrar os de agora
+        (o tabuleiro sem edição é refeito, e a validação usa `linhas`, se vierem); com outros,
+        fecha. Devolve se continuou aberto."""
         if not self.aberto:
             return False
         if _chaves(diagramas) != _chaves(self.diagramas):
@@ -267,6 +269,8 @@ class EditorDeDiagrama(QWidget):
                                                and self.tabuleiros[i].pode_desfazer):
                 self.tabuleiros.pop(i, None)
         self.diagramas = list(diagramas)
+        if linhas is not None:
+            self.linhas = list(linhas)
         self.posicao.trocar(self.tabuleiro(), self.diagrama.orientacao)
         self._mostrar()
         return True

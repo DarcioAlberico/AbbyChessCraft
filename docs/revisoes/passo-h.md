@@ -70,8 +70,8 @@ Os commits: `55e5e65`, `1221a77`, `28760a1` e o deste registro.
   vem entre parênteses antes da linha foi medido e piorou (o ")" que o OCR perde esconde a linha
   toda; 45 lances confiáveis sumiram numa página do Aagaard).
 - ~~O `e.p.` como primeiro lance é recusado.~~ Corrigido em 2026-11-05.
-- O editor mostra a validação com as linhas de quando abriu (corrigir o texto com ele aberto
-  não atualiza o aviso até reabrir).
+- ~~O editor mostra a validação com as linhas de quando abriu (corrigir o texto com ele aberto
+  não atualiza o aviso até reabrir).~~ Corrigido em 2026-11-05.
 - A aba Diagramas não se atualiza com edições da página (o botão Atualizar a refaz) e guarda a
   posição da página, não o `pid`.
 - O aviso do lance ilegal aparece em texto corrido, entre os outros; no tema escuro, os rádios

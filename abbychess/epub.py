@@ -469,6 +469,8 @@ def _nav(capitulos: Sequence[_Capitulo], msg: Dict[str, str], idioma: str,
          tem_capa: bool) -> str:
     titulos = [(c.nome, n, a, t) for c in capitulos for n, a, t in c.titulos]
     lista = lista_do_sumario(titulos) if titulos else _sumario_pelas_paginas(capitulos, msg)
+    if titulos and not capitulos[0].titulos:    # as páginas antes do primeiro título
+        lista = f'<li><a href="texto/{capitulos[0].nome}">{msg["inicio"]}</a></li>' + lista
     paginas = "".join(f'<li><a href="texto/{c.nome}#{a}">{n}</a></li>'
                       for c in capitulos for n, a in c.paginas)
     marcos = _marcos(capitulos, msg, tem_capa)

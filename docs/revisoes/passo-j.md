@@ -78,6 +78,6 @@ Os commits: `46ef90d`, `a823ae5`, `976cafa`, `acd4de9`, `4558a53` e o deste regi
 - As páginas da camada nativa não contam os cabeçalhos tirados no relatório.
 - "Páginas não verificadas" é uma linha só, sem página para o duplo clique.
 - O PDF guarda os metadados do original (o formulário é do EPUB e do DOCX).
-- O primeiro capítulo (as páginas antes do primeiro título) não tem item no `nav`; só o marco
-  "Início do texto" leva a ele.
+- ~~O primeiro capítulo (as páginas antes do primeiro título) não tem item no `nav`; só o marco
+  "Início do texto" leva a ele.~~ Corrigido em 2026-11-05.
 - O Thorium e o leitor do celular continuam sem teste (com o usuário).

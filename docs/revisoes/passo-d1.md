@@ -130,7 +130,8 @@ da §15.2. A tag `passo-d1` vai no `a9428bf`, o commit aprovado pelas duas revis
 
 - O que é do passo G (juntar e dividir glifos, o parágrafo, os estilos, juntar linhas) é
   recusado com aviso.
-- O Ctrl+T com uma sessão na fila recusa e pede para tentar de novo (não espera sozinho).
+- ~~O Ctrl+T com uma sessão na fila recusa e pede para tentar de novo (não espera sozinho).~~
+  Corrigido em 2026-11-05: entra na fila depois dela.
 - Uma página gravada antes do D1 não tem o campo "figurinas" no resumo e só conta no modo
   "como o livro" quando for gravada de novo; uma figurina lida por engano liga o modo.
 - A suíte rápida está perto do limite de 60 s.

@@ -1,0 +1,74 @@
+# A tabela de 60 tokens rotulados à mão (CA-R1.6): `token`, `classe` e, nos lances, `peca` com as
+# letras dadas. `letras` diz com quais a linha vale; sem o campo, com as duas: RDTBC e KQRBN.
+# As letras em inglês valem também em português (`lances._tabela`): `Nf3` é lance nos dois.
+tokens:
+  # Lances com figurina
+  - {token: "♘f3", classe: lance, peca: N}
+  - {token: "♞f6", classe: lance, peca: N}
+  - {token: "♖e1", classe: lance, peca: R}
+  - {token: "♕d2+", classe: lance, peca: Q}
+  - {token: "♗xc6", classe: lance, peca: B}
+  - {token: "♔h1", classe: lance, peca: K}
+  - {token: "♖ad1", classe: lance, peca: R}
+  - {token: "♘1d2", classe: lance, peca: N}
+  - {token: "♖e1#", classe: lance, peca: R}
+  - {token: "♙e4", classe: lance, peca: ""}
+  # A letra que muda de peça com o alfabeto
+  - {token: "Rf1", letras: RDTBC, classe: lance, peca: K}
+  - {token: "Rf1", letras: KQRBN, classe: lance, peca: R}
+  - {token: "Tf1", letras: RDTBC, classe: lance, peca: R}
+  - {token: "Cf3", letras: RDTBC, classe: lance, peca: N}
+  - {token: "Dd2", letras: RDTBC, classe: lance, peca: Q}
+  - {token: "Bb5", classe: lance, peca: B}
+  - {token: "Qd2", letras: KQRBN, classe: lance, peca: Q}
+  - {token: "Nf3", letras: KQRBN, classe: lance, peca: N}
+  # Peão, captura, promoção, roque
+  - {token: "e4", classe: lance, peca: ""}
+  - {token: "exd5", classe: lance, peca: ""}
+  - {token: "h3", classe: lance, peca: ""}
+  - {token: "a8=D", letras: RDTBC, classe: lance, peca: ""}
+  - {token: "a8=Q", letras: KQRBN, classe: lance, peca: ""}
+  - {token: "O-O", classe: lance, peca: ""}
+  - {token: "O-O-O", classe: lance, peca: ""}
+  - {token: "0-0", classe: lance, peca: ""}
+  # Com número
+  - {token: "1.e4", classe: lance, peca: ""}
+  - {token: "12...♘f6", classe: lance, peca: N}
+  - {token: "12…♘f6", classe: lance, peca: N}
+  - {token: "7.Bxf7+", classe: lance, peca: B}
+  # Pontuação em volta e variante entre parênteses
+  - {token: "(12.♘f3", classe: lance, peca: N}
+  - {token: "e5)", classe: lance, peca: ""}
+  - {token: "♖e1,", classe: lance, peca: R}
+  - {token: "♘f3;", classe: lance, peca: N}
+  - {token: "h3.", classe: lance, peca: ""}
+  # Sinal colado
+  - {token: "♕d2!", classe: lance, peca: Q}
+  - {token: "♘f3?!", classe: lance, peca: N}
+  - {token: "♗c4±", classe: lance, peca: B}
+  - {token: "e4!!", classe: lance, peca: ""}
+  - {token: "♖d1+-", classe: lance, peca: R}
+  # Número sozinho
+  - {token: "1.", classe: numero}
+  - {token: "12...", classe: numero}
+  - {token: "12…", classe: numero}
+  # Sinal sozinho
+  - {token: "±", classe: sinal}
+  - {token: "∓", classe: sinal}
+  - {token: "⩲", classe: sinal}
+  - {token: "!?", classe: sinal}
+  - {token: "=", classe: sinal}
+  - {token: "∞", classe: sinal}
+  # Figurina sem casa
+  - {token: "♘", classe: figurina}
+  - {token: "♖", classe: figurina}
+  # Prosa, com o que parece lance
+  - {token: "de", classe: prosa}
+  - {token: "peão", classe: prosa}
+  - {token: "Xadrez", classe: prosa}
+  - {token: "página,", classe: prosa}
+  - {token: "f", classe: prosa}
+  - {token: "e2-e4", classe: prosa}
+  - {token: "Tabela", classe: prosa}
+  - {token: "1980", classe: prosa}
+  - {token: "2:1", classe: prosa}

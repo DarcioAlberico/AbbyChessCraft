@@ -47,6 +47,10 @@ OPERACOES_DA_GAVETA = (
     ("Endireitar…", "endireitar_paginas"))
 
 
+#: O item do filtro da gaveta: a página tratada como imagem (L-9), que não é um estado.
+FILTRO_DE_IMAGEM = "imagem"
+
+
 class PainelDePaginas(QWidget):
     #: O índice da página a abrir (Enter, duplo clique, "Abrir").
     abrir = Signal(int)
@@ -74,6 +78,7 @@ class PainelDePaginas(QWidget):
         self.filtro.addItem("Todas as páginas", None)
         for estado, nome in NOMES_DOS_ESTADOS.items():
             self.filtro.addItem(nome.capitalize(), estado)
+        self.filtro.addItem("Tratadas como imagem", FILTRO_DE_IMAGEM)
         self.filtro.currentIndexChanged.connect(self._filtrar)
         # A largura pelo começo do texto, não pelo item mais longo: a gaveta tem 150 px (§3.1).
         self.filtro.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
@@ -247,7 +252,10 @@ class PainelDePaginas(QWidget):
         estado = self.filtro.currentData()
         for n in range(self.lista.topLevelItemCount()):
             item = self.lista.topLevelItem(n)
-            item.setHidden(estado is not None and item.data(1, Qt.ItemDataRole.UserRole) != estado)
+            if estado == FILTRO_DE_IMAGEM:
+                item.setHidden(not item.data(2, Qt.ItemDataRole.UserRole))
+            else:
+                item.setHidden(estado is not None and item.data(1, Qt.ItemDataRole.UserRole) != estado)
 
     def _abrir_item(self, item, _coluna=0) -> None:
         if item is not None:
@@ -315,6 +323,7 @@ def _atualizar_a_linha(item: QTreeWidgetItem, i: int, r: dict) -> None:
                                     str(diagramas) if diagramas else "")):
         if item.text(coluna) != texto:
             item.setText(coluna, texto)
+    item.setData(2, Qt.ItemDataRole.UserRole, bool(r.get("imagem")))
     if item.data(1, Qt.ItemDataRole.UserRole) != estado:
         item.setData(1, Qt.ItemDataRole.UserRole, estado)
         item.setToolTip(1, NOMES_DOS_ESTADOS.get(estado, estado))

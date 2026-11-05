@@ -206,7 +206,7 @@ class ResumoDoLivro:
                 "diagramas_por_conferir": max(0, tabuleiros - conferidos),
                 # Alguma figurina lida (o modo "livro" das peças, §6.4, sem abrir as páginas).
                 "figurinas": any(b.entry.char in FIGURINAS for b in pagina.boxes),
-                **self._dos_lances(pagina), **regua}
+                **self._dos_lances(pagina), **_da_imagem(pagina), **regua}
 
     def _dos_lances(self, pagina: Pagina) -> dict:
         """`lances_por_conferir` e `fortes`, as contagens da fila Lances (F-4) e da marca forte."""
@@ -220,6 +220,13 @@ class ResumoDoLivro:
         documento = tx.montar(pagina, com_os_nao_lidos=True)
         return {"lances_por_conferir": dl.lances_por_conferir(documento, ev.conferidos(pagina), chave),
                 "fortes": len(ev.da_pagina(pagina, documento, pagina.diagramas, chave).fortes)}
+
+
+def _da_imagem(pagina: Pagina) -> dict:
+    """`imagem`, só na página tratada como imagem (L-9): a gaveta filtra por ela."""
+    from abbychess import tipo_de_pagina as tp
+
+    return {"imagem": True} if tp.tratada_como_imagem(pagina) else {}
 
 
 def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares,

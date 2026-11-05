@@ -49,13 +49,20 @@ def aplicar_lida(pagina: Pagina, lida, idioma: str, *,
     pagina.diagramas = dg.com_ids(dg.mesclar(lida.diagramas,
                                              dg.para_caixas(pagina.tabuleiros, pagina.diagramas)))
     if tamanho is not None:
-        # A página sem áreas ganha as automáticas; as automáticas feitas antes de ler (o
-        # modelo aplicado ao livro antes do lote), a função pelo texto lido.
-        pagina.zonas = zn.depois_de_ler(pagina.zonas, pagina.entries(), pagina.tabuleiros,
-                                        pagina.diagramas, *tamanho)
+        pagina.zonas = _zonas_depois_de_ler(pagina, lida, tamanho)
     arrumar(pagina, idioma)
     pagina.estado = proximo_estado(pagina.estado, "reconhecer")
     return descrever_caidas(dif.caidas, de_antes) if dif.caidas else []
+
+
+def _zonas_depois_de_ler(pagina: Pagina, lida, tamanho: Tuple[int, int]) -> list:
+    """A página de imagem (L-9) ganha uma área só, de figura: nenhum estado novo. A sem áreas ganha
+    as automáticas; as automáticas feitas antes de ler (o modelo aplicado ao livro antes do lote),
+    a função pelo texto lido."""
+    if lida.imagem:
+        return [zn.Zona(zn.IMAGEM, 0, 0, tamanho[0], tamanho[1], funcao="figura")]
+    return zn.depois_de_ler(pagina.zonas, pagina.entries(), pagina.tabuleiros, pagina.diagramas,
+                            *tamanho)
 
 
 def _com_o_de_fora_da_zona(pagina: Pagina, zona, depois: list, tabuleiros: list) -> tuple:

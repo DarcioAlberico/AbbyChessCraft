@@ -47,6 +47,7 @@
 <meta charset="UTF-8"></meta><title>Sumário</title></head><body>
 <nav xmlns:epub="http://www.idpf.org/2007/ops" id="toc" role="doc-toc" epub:type="toc">
 <h1>Sumário</h1><ol>
+<li><a href="texto/capitulo-001.xhtml">Início do texto</a></li>
 <li><a href="texto/capitulo-002.xhtml#t1">Capitulo um</a></li></ol></nav>
 <nav xmlns:epub="http://www.idpf.org/2007/ops" hidden="hidden" id="paginas" epub:type="page-list">
 <h1>Páginas</h1><ol>

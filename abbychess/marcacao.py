@@ -15,22 +15,26 @@ class Marca(NamedTuple):
     #: O índice do link em `links`, ou -1.
     link: int
     duvidoso: bool
+    sublinhado: bool = False
 
 
 def trechos_marcados(texto: str, simbolos: str, negrito: Sequence[Tuple[int, int]],
                      italico: Sequence[Tuple[int, int]], duvidosos: Sequence[Tuple[int, int]],
-                     links: Sequence[Tuple[int, int, str]]) -> List[Tuple[str, Marca]]:
+                     links: Sequence[Tuple[int, int, str]],
+                     sublinhado: Sequence[Tuple[int, int]] = ()) -> List[Tuple[str, Marca]]:
     """Os pedaços seguidos de `texto` com a mesma `Marca`, em ordem. Os trechos são
     `(início, fim)` em `texto` (os de fora dele, cortados); os `links`, `(início, fim, alvo)`."""
-    return _agrupadas(texto, _marcas(texto, simbolos, negrito, italico, duvidosos, links))
+    return _agrupadas(texto, _marcas(texto, simbolos, negrito, italico, duvidosos, links,
+                                     sublinhado))
 
 
 def _marcas(texto: str, simbolos: str, negrito: Sequence[Tuple[int, int]],
             italico: Sequence[Tuple[int, int]], duvidosos: Sequence[Tuple[int, int]],
-            links: Sequence[Tuple[int, int, str]]) -> List[list]:
+            links: Sequence[Tuple[int, int, str]],
+            sublinhado: Sequence[Tuple[int, int]] = ()) -> List[list]:
     """A marca de cada caractere, como lista (os campos de `Marca`)."""
-    marcas = [[False, False, c in simbolos, -1, False] for c in texto]
-    for k, trechos in ((0, negrito), (1, italico), (4, duvidosos)):
+    marcas = [[False, False, c in simbolos, -1, False, False] for c in texto]
+    for k, trechos in ((0, negrito), (1, italico), (4, duvidosos), (5, sublinhado)):
         for inicio, fim in trechos or ():
             for i in range(max(0, inicio), min(fim, len(texto))):
                 marcas[i][k] = True

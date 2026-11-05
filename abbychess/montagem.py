@@ -68,6 +68,7 @@ class Estrutura:
     funcoes: Dict[int, str] = field(default_factory=dict)
     negrito: set = field(default_factory=set)
     italico: set = field(default_factory=set)
+    sublinhado: set = field(default_factory=set)
     paragrafo_antes: set = field(default_factory=set)
     hifen_de_quebra: set = field(default_factory=set)
     #: (id do último glifo de uma linha, id do primeiro da seguinte) que o Documento juntou
@@ -144,6 +145,8 @@ class Estrutura:
                 self.negrito.add(chave)
             if b.estilo.italico:
                 self.italico.add(chave)
+            if b.estilo.sublinhado:
+                self.sublinhado.add(chave)
             if b.gid in decisoes.paragrafo_antes:
                 self.paragrafo_antes.add(chave)
             if b.gid in decisoes.hifen_de_quebra:
@@ -226,6 +229,7 @@ class _Linha:
     italico: List[Tuple[int, int]] = field(default_factory=list)
     #: Os trechos dos glifos duvidosos (`Estrutura.duvidosos`).
     duvidosos: List[Tuple[int, int]] = field(default_factory=list)
+    sublinhado: List[Tuple[int, int]] = field(default_factory=list)
 
 
 def palavras(boxes: Sequence[BoxEntry]) -> List[List[Tuple[str, List[int]]]]:
@@ -441,7 +445,8 @@ def _com_a_estrutura(linha: _Linha, palavras_da_linha, boxes: Sequence[BoxEntry]
     linha.primeiro, linha.ultimo = id(entradas[0]), id(entradas[-1])
     linha.juncoes = estrutura.juncoes
     for nome, marcados in (("negrito", estrutura.negrito), ("italico", estrutura.italico),
-                           ("duvidosos", estrutura.duvidosos)):
+                           ("duvidosos", estrutura.duvidosos),
+                           ("sublinhado", estrutura.sublinhado)):
         # O estilo cobre o glifo de vários caracteres só se todos o têm; a dúvida, se um
         # só a tem (a palavra inteira é onde olhar).
         trechos = _trechos_da_linha(palavras_da_linha, boxes, marcados, nome == "duvidosos")
@@ -486,15 +491,16 @@ def _unir_trechos(trechos: Sequence[Tuple[int, int]], texto: str = "") -> List[T
 
 def _juntar(linhas: Sequence[_Linha], manter_quebras: bool = False
             ) -> Tuple[str, List[Tuple[int, int]], List[Tuple[int, int]],
-                       List[Tuple[int, int]]]:
-    """O texto do parágrafo e os trechos em negrito, em itálico e duvidosos, já no texto
-    juntado.
+                       List[Tuple[int, int]], List[Tuple[int, int]]]:
+    """O texto do parágrafo e os trechos em negrito, em itálico, duvidosos e sublinhados, já no
+    texto juntado.
 
     O hífen de quebra decidido no Documento (§6.3) sai sempre; o não decidido sai pela
     regra da letra antes e da minúscula depois. Com `manter_quebras`, as
     linhas se juntam por `\\n` e todo hífen fica, como impresso."""
     texto = ""
-    trechos: Tuple[list, list, list] = ([], [], [])          # o negrito, o itálico, a dúvida
+    # O negrito, o itálico, a dúvida e o sublinhado.
+    trechos: Tuple[list, list, list, list] = ([], [], [], [])
     anterior: Optional[_Linha] = None
     for linha in linhas:
         texto, base, cortou = _emenda(texto, anterior, linha, manter_quebras)
@@ -502,15 +508,15 @@ def _juntar(linhas: Sequence[_Linha], manter_quebras: bool = False
             # O trecho que acabava no hífen não pode cobrir a letra da linha seguinte.
             trechos = tuple([(a, min(b, base)) for a, b in t if a < base] for t in trechos)
         texto += linha.texto
-        for juntos, da_linha in zip(trechos, (linha.negrito, linha.italico, linha.duvidosos)):
+        for juntos, da_linha in zip(trechos, (linha.negrito, linha.italico, linha.duvidosos,
+                                              linha.sublinhado)):
             juntos += [(base + a, base + b) for a, b in da_linha]
         anterior = linha
 
     def cortados(trechos):
         return _unir_trechos([(a, min(b, len(texto))) for a, b in trechos if a < len(texto)],
                              texto)
-    negrito, italico, duvidosos = trechos
-    return texto, cortados(negrito), cortados(italico), cortados(duvidosos)
+    return (texto, *(cortados(t) for t in trechos))
 
 
 def _emenda(texto: str, anterior: Optional[_Linha], linha: _Linha, manter_quebras: bool
@@ -540,13 +546,15 @@ class ParagrafoExportado(Paragrafo):
     dos glifos duvidosos, para o realce do DOCX (`Opcoes.realcar_duvidosos`)."""
 
     duvidosos: List[Tuple[int, int]] = field(default_factory=list)
+    #: Os trechos sublinhados (Ctrl+U), que o `Paragrafo` do core não tem.
+    sublinhado: List[Tuple[int, int]] = field(default_factory=list)
     #: A ordem da área de onde ele veio, quando o usuário as ordenou.
     ordem_da_area: Optional[int] = None
 
 
 def _juntar_entre_paginas(paginas: Sequence[PaginaExtraida]) -> None:
-    """`core.pdf_nativo.juntar_entre_paginas`, levando os duvidosos do parágrafo que
-    volta para a página de antes (o core leva só o negrito e o itálico)."""
+    """`core.pdf_nativo.juntar_entre_paginas`, levando os duvidosos e o sublinhado do parágrafo
+    que volta para a página de antes (o core leva só o negrito e o itálico)."""
     from core import pdf_nativo
 
     primeiros = [p.blocos[0] if p.blocos else None for p in paginas]
@@ -554,18 +562,19 @@ def _juntar_entre_paginas(paginas: Sequence[PaginaExtraida]) -> None:
     for atual, seguinte, primeiro in zip(paginas, paginas[1:], primeiros[1:]):
         if primeiro is None or (seguinte.blocos and seguinte.blocos[0] is primeiro):
             continue
-        _levar_os_duvidosos(atual.blocos[-1], primeiro)
+        _levar_os_trechos(atual.blocos[-1], primeiro)
 
 
-def _levar_os_duvidosos(antes, primeiro) -> None:
-    """Os duvidosos do parágrafo `primeiro`, que voltou para o fim de `antes`."""
-    trechos = getattr(primeiro, "duvidosos", None)
-    if trechos and isinstance(antes, ParagrafoExportado):
-        # O core escreve `fim + " " + começo`: o texto de depois acaba no fim do novo.
-        deslocamento = len(antes.texto) - len(primeiro.texto)
-        antes.duvidosos = list(antes.duvidosos) + [
-            (a + deslocamento, z + deslocamento) for a, z in trechos
-            if a + deslocamento >= 0]
+def _levar_os_trechos(antes, primeiro) -> None:
+    """Os duvidosos e o sublinhado do parágrafo `primeiro`, que voltou para o fim de `antes`."""
+    if not isinstance(antes, ParagrafoExportado):
+        return
+    # O core escreve `fim + " " + começo`: o texto de depois acaba no fim do novo.
+    deslocamento = len(antes.texto) - len(primeiro.texto)
+    for nome in ("duvidosos", "sublinhado"):
+        setattr(antes, nome, list(getattr(antes, nome)) + [
+            (a + deslocamento, z + deslocamento) for a, z in getattr(primeiro, nome, ())
+            if a + deslocamento >= 0])
 
 
 def _quebras_da_camada(pagina: PaginaExtraida) -> None:
@@ -681,11 +690,12 @@ def _abre_paragrafo(anterior: _Linha, linha: _Linha, passo: float, cortes: Seque
 
 def _paragrafo_do_grupo(g: List[_Linha], manter_quebras: bool
                         ) -> Tuple[Tuple[int, int], Paragrafo]:
-    texto, negrito, italico, duvidosos = _juntar(g, manter_quebras)
+    texto, negrito, italico, duvidosos, sublinhado = _juntar(g, manter_quebras)
     titulo = g[0].funcao == "titulo"
     return (g[0].trecho, ParagrafoExportado(
         texto, titulo=titulo, nivel=1 if titulo else 2, negrito=negrito, italico=italico,
-        topo=g[0].topo, pe=g[-1].pe, duvidosos=duvidosos, ordem_da_area=g[0].ordem))
+        topo=g[0].topo, pe=g[-1].pe, duvidosos=duvidosos, sublinhado=sublinhado,
+        ordem_da_area=g[0].ordem))
 
 
 def _figura(imagem: Image.Image, caixa: Tuple[int, int, int, int],

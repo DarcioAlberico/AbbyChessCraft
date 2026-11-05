@@ -144,9 +144,12 @@ def _texto_com_estilo(paragrafo, bloco: Paragrafo, simbolos: str, familia: str,
         texto = texto.replace("\n", " ")
     duvidosos = getattr(bloco, "duvidosos", ()) if realce else ()
     hiperlink, do_hiperlink = None, -1
-    for pedaco, (negrito, italico, simbolo, link, duvidoso) in marcacao.trechos_marcados(
-            texto, simbolos, bloco.negrito, bloco.italico, duvidosos, links):
+    for pedaco, marca in marcacao.trechos_marcados(
+            texto, simbolos, bloco.negrito, bloco.italico, duvidosos, links,
+            getattr(bloco, "sublinhado", ())):
+        negrito, italico, simbolo, link, duvidoso, sublinhado = marca
         run = paragrafo.add_run(pedaco)
+        run.underline = sublinhado or None
         _estilo_do_run(run, negrito, italico, duvidoso, simbolo, familia)
         if link >= 0:
             if hiperlink is None or do_hiperlink != link:

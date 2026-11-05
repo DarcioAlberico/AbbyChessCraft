@@ -49,6 +49,7 @@ from abbychess import grade as gd
 from abbychess import sessao as ss
 from abbychess import texto as tx
 from abbychess.app import estilo, teclado
+from abbychess.app.formatos_do_documento import escrever_as_linhas, formato_novo
 from abbychess.app.imagens import FONTE, imagem_do_diagrama
 from abbychess.app import vazios
 
@@ -314,8 +315,8 @@ class VistaDoDocumento(QTextEdit):
                 self._por_diagrama(doc, cursor, self._diagramas.get(bloco.diagrama_id),
                                    numero.get(bloco.diagrama_id, 0), matriz)
                 continue
-            primeiro = _escrever_as_linhas(self, cursor, bloco, primeiro, documento, normal,
-                                           estados, desconhecidos, virtuais, margens)
+            primeiro = escrever_as_linhas(self, cursor, bloco, primeiro, documento, normal,
+                                          estados, desconhecidos, virtuais, margens)
 
     @staticmethod
     def _de_margem(gids, documento, margens, virtuais) -> bool:
@@ -423,8 +424,8 @@ class VistaDoDocumento(QTextEdit):
         chave = (id(base), estado, desconhecido, virtual, estilo_do_glifo)
         if chave in self._formatos:
             return self._formatos[chave]
-        formato = _formato_novo(base, estado, desconhecido, virtual,
-                                estilo_do_glifo if tem_estilo else None)
+        formato = formato_novo(base, estado, desconhecido, virtual,
+                               estilo_do_glifo if tem_estilo else None)
         self._formatos[chave] = formato
         return formato
 
@@ -890,54 +891,6 @@ class VistaDoDocumento(QTextEdit):
 # ----------------------------------------------------------------------
 # As partes da vista (funções: a classe não cresce)
 # ----------------------------------------------------------------------
-def _escrever_as_linhas(vista: VistaDoDocumento, cursor, bloco, primeiro: bool, documento,
-                        normal, estados, desconhecidos, virtuais, margens) -> bool:
-    """As linhas de um bloco de texto, um parágrafo cada; a de margem, oculta, só no mapa da
-    Linha. Devolve se ainda não houve parágrafo (o `primeiro` de `_preencher`)."""
-    base = vista._formato_do_caractere(bloco.funcao)
-    de_margem = vista._formato_do_caractere("cabecalho")
-    escritas = 0
-    for linha in bloco.linhas:
-        gids = [g for p in linha.palavras for g in p.gids]
-        margem = vista._de_margem(gids, documento, margens, virtuais)
-        if margem and not vista.mostrar_margens:
-            vista._linha_do_gid.update(dict.fromkeys(gids, gids))  # a Linha ainda a acha
-            continue
-        # O parágrafo abre só aqui: um bloco todo de margem, oculto, não deixa um vazio.
-        if not primeiro:
-            cursor.insertBlock(vista._formato_do_bloco(bloco.funcao, continua=bool(escritas)))
-        else:
-            cursor.setBlockFormat(vista._formato_do_bloco(bloco.funcao))
-        primeiro = False
-        escritas += 1
-        vista._linha(cursor, linha, gids, documento, de_margem if margem else base, normal,
-                     estados, desconhecidos, virtuais)
-    return primeiro
-
-
-def _formato_novo(base: QTextCharFormat, estado: Optional[str], desconhecido: bool,
-                  virtual: bool, estilo_do_glifo) -> QTextCharFormat:
-    """O realce sobre o `base`: o negrito, o itálico e o sublinhado do glifo (None: sem
-    estilo), o fundo da baixa confiança, o cinza do aguardando, o ondulado e o pontilhado."""
-    formato = QTextCharFormat(base)
-    if estilo_do_glifo is not None:
-        formato.setFontWeight(QFont.Weight.Bold if estilo_do_glifo.negrito
-                              else QFont.Weight.Normal)
-        formato.setFontItalic(bool(estilo_do_glifo.italico))   # None: não medido
-        formato.setFontUnderline(estilo_do_glifo.sublinhado)
-    if estado in (gd.PENDENTE, gd.SEM_LEITURA):
-        formato.setBackground(FUNDO_DE_BAIXA_CONFIANCA)
-    elif estado == gd.AGUARDANDO:
-        formato.setForeground(estilo.CINZA)
-    if desconhecido:
-        formato.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
-        formato.setUnderlineColor(estilo.VERMELHAO)
-    elif virtual:
-        formato.setUnderlineStyle(QTextCharFormat.UnderlineStyle.DotLine)
-        formato.setUnderlineColor(estilo.AZUL)
-    return formato
-
-
 def _unidades_do_bloco(unidades: list, texto: str, mapa, virtuais) -> None:
     """A unidade de cada caractere do parágrafo, no fim de `unidades`: no diagrama e no
     parágrafo sem mapa, OUTRO; senão o glifo (ou o virtual) e o espaço."""

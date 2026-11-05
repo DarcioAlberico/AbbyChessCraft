@@ -116,7 +116,7 @@ class PonteDeLeitura:
             self.lendo_no_f5.discard(pagina.pid)
             if lida is None:
                 return
-            caidas = arrumacao.aplicar_lida(pagina, lida, self._p.projeto.dados.idioma, zona=zona,
+            caidas = arrumacao.aplicar_lida(pagina, lida, self._p.projeto.dados.chave_das_pecas, zona=zona,
                                             tamanho=None if imagem is None else imagem.size)
             if caidas:                          # §4.6: o que não pôde seguir os glifos novos
                 self._p.eventos.emitir("resultado", "Reconhecer a página", (

@@ -66,4 +66,4 @@ Uma leitura do diff inteiro, só de leitura, sem rodar nada, achou 10 pontos. Co
 
 - `qualidade.py` no `27bded1`: rápida e `processo` saída 0, cobertura 95,2 %, nada fora da lista. O que veio depois é só a interface: suíte rápida, 2.889 passaram, e `ruff`.
 - Portão no `ee61677`, com as correções da revisão: 17 de 18 arquivos. A catraca não mudou: CER 2,76 %, duas rodadas iguais; a capa e as páginas com gabarito passam em L-9.
-- **`test_ca_7_1` reprovou em todas as rodadas do dia:** 2.498, 2.487, 2.461, 2.433 e 2.464 ms contra o limite de 2.400, nas duas primeiras antes de qualquer código de M1 entrar no índice. A meta é o C-6, fora dos marcos, e passou em 05/11 de manhã por 20 ms. **Não é regressão provada, nem foi investigado.**
+- **`test_ca_7_1` reprovou em todas as rodadas do dia:** no PP0, antes de M1, 2.498 ms e de novo reprovado; depois 2.487, 2.461, 2.433 e 2.464 ms, contra o limite de 2.400. A meta é o C-6, fora dos marcos, e passou em 05/11 de manhã por 20 ms. **Não é regressão provada, nem foi investigado.**

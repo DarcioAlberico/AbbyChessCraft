@@ -1130,6 +1130,31 @@ p. 12; as outras páginas só pela sequência dos blocos de uma amostra de 8. So
 cisco do ornamento lido "=" cola em "met by…"; as coordenadas lidas e o ornamento ficam no alto,
 como antes.
 
+## As limitações dos passos, revistas (2026-11-05, PRs #13 a #18)
+
+Das "Limitações conhecidas" de `docs/revisoes/passo-*.md`, conferidas contra o código:
+
+- **Feitas:** a avaliação colada, a cruz e o roque com traço longo no extrator de lances, e o en
+  passant como primeiro lance (H); o negrito e o itálico decididos não saem no F5 (G, I); o Ordenar
+  vale para o diagrama e para a exportação (F); o sublinhado na exportação (G); a Galeria na ordem
+  da §3.1 (C); o item do começo do livro no sumário do EPUB (J); o editor de diagrama com as linhas
+  de agora (H); o Ctrl+T que espera a edição na fila (D1).
+- **Medida e não feita:** ignorar o que vem entre parênteses antes da linha de lances. O ")" que o
+  OCR perde esconde a linha toda; a linha hipotética da prosa segue podendo virar a principal.
+- **Não feitas, de propósito:** uma linha por página para "Páginas não verificadas" (J): num livro
+  por revisar, lotaria os Avisos, que é o que a linha única evita; a aba Diagramas relendo o livro a
+  cada glifo editado (H): o custo por Enter não foi medido, e o botão Atualizar e a troca de aba
+  cobrem o caso.
+- **Dependem do usuário:** a conferência cega da fatia; levar a caixa pela altura ao Documento
+  (`docs/SPEC-qualidade.md`, Q-E6); conferir a §13.7; a revisão do gabarito do Yusupov; usar as
+  coordenadas, a Borracha e a coluna de tabuleiros num livro do começo ao fim.
+
+As outras limitações dos registros seguem como estão: não foram revistas uma a uma.
+
+O portão no `872dd16`, arquivo por arquivo por falta de RAM, aprovou tudo menos o CA-7.1, que já
+reprova na base (2,63 s para a meta de 2,4 s), com a máquina carregada e sem medida gravada. Depois
+dos PRs, só a parte `livro_real` rodou de novo (`a64cd6c`), aprovada; a de desempenho, não.
+
 ---
 
 ## Antipadrões

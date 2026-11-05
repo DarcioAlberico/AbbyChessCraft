@@ -326,7 +326,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         de mexer nas tarefas: falso quando o usuário prefere não fechar (e perder as
         mudanças dela), e aí nada mudou."""
         projeto = self.projeto
-        if not self._gravou_ou_perder(projeto):
+        if not self._edicoes_resolvidas() or not self._gravou_ou_perder(projeto):
             return False
         self._parar_tarefas()                   # o fim da tarefa em voo ainda entra
         # A sessão aberta do Documento entra agora, depois da tarefa em voo (um F5 dela que

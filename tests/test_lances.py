@@ -10,6 +10,7 @@ from pathlib import Path
 
 import chess
 import chess.pgn
+import pytest
 
 from core.box_model import BoxEntry
 

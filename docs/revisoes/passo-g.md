@@ -58,7 +58,7 @@ Os commits: `cfdfdd2` e `849ccde`.
 
 ## Limitações conhecidas
 
-- A substituição não divide pela tinta (caixa de duas letras).
+- ~~A substituição não divide pela tinta (caixa de duas letras).~~ Corrigido em 2026-11-05.
 - A divisão em que o core corta no eixo y não é recusada.
 - A edição combinada com um espaço movido pode descartar o box e criar virtuais.
 - Nada impede ensinar uma caixa de várias letras.

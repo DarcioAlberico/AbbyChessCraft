@@ -92,6 +92,8 @@ Vale o de `plans/abbychesscraft-roadmap.md` (português, UTF-8 sem BOM, LF, nunc
 
 ## Passo PP0 — Fechar o que está aberto (M1)
 
+**Feito** em 2026-11-05, ramo checkup-geral (docs/revisoes/pp-0.md): Dec-6 a; a medida passa; sem push (Dec-1 em aberto).
+
 **Contexto.** O ramo `lacunas-da-spec` tem 13 commits sem mesclar. `qualidade.py` reprova nele por duplicação. O repositório é público (Dec-1).
 
 **Fazer.**
@@ -110,6 +112,8 @@ Vale o de `plans/abbychesscraft-roadmap.md` (português, UTF-8 sem BOM, LF, nunc
 
 ## Passo PPE — Abrir espaço (M1)
 
+**Feito** em 2026-11-05, ramo pp-e (docs/revisoes/pp-e.md): a régua nova, com os tetos de hoje.
+
 **Contexto.** As cinco classes da lista de tetos estão no limite (`VistaDoDocumento` 58, `EspacoDeTrabalho` 53, `VisorDePagina` 55, `ControladorDePagina` 61, `ProjetoDeLivro` 43), e `app/documento.py` tem 6 linhas de folga, pela conta do teste. Sem isto, o primeiro método de M1 reprova a rápida.
 
 **Fazer, mecânico, um commit por item, com o golden como pino:**
@@ -119,6 +123,8 @@ Vale o de `plans/abbychesscraft-roadmap.md` (português, UTF-8 sem BOM, LF, nunc
 **CA:** CA-A3. **Pronto quando:** golden e suíte iguais, e `VistaDoDocumento` aceita método novo. **Custo:** 1 sessão. **Carga:** portão uma vez, no fim. **Risco:** nenhum de dado.
 
 ## Passo PP1 — Não perder dado, não perder rastro (M1)
+
+**Feito** em 2026-11-05, ramo pp-1 (docs/revisoes/pp-1.md): D-5 confirmado no teste, Dec-7 a pelo padrão; catraca em CER 2,76 %.
 
 **Contexto.** Quatro falhas de dado confirmadas no código, e nenhum log em arquivo.
 
@@ -140,6 +146,8 @@ Vale o de `plans/abbychesscraft-roadmap.md` (português, UTF-8 sem BOM, LF, nunc
 **Custo:** 4 sessões. **Carga:** suíte rápida; portão no fim.
 
 ## Passo PPL — Ver o lance (M2)
+
+**Feito** em 2026-11-05, ramo pp-l (docs/revisoes/pp-l.md): teto 32,4 %, alarme 0,3 %, X-1 marcou 0 de 107 errados. **Falta o ponto de parada, do usuário: CA-F4.8, CA-F4.10 e os 8 erros do gabarito.**
 
 **Contexto.** O revisor confere lance no meio da prosa, em corpo 10 a 11. A faixa Linha já mostra imagem sobre texto, alinhados por glifo. Nada disso pede OCR novo nem memória. Estimativa: de 10 a 15 linhas por página, cerca de 1 min, **de 3 a 6 horas em 300 páginas, com cobertura dos lances cuja linha a leitura reconhece.** Hipótese: CA-F4.8 e CA-F4.10 podem derrubá-la.
 
@@ -167,6 +175,8 @@ Vale o de `plans/abbychesscraft-roadmap.md` (português, UTF-8 sem BOM, LF, nunc
 
 ## Passo PP1b — Página nativa e servidor órfão
 
+**Feito** em 2026-11-05, ramo pp-1b (docs/revisoes/pp-t.md): D-3 e C-1.
+
 **Quando:** logo depois de M2; **antes de PPL, se o próximo livro for PDF digital.**
 
 **Fazer:** D-3, `nativo.remendar`; C-1, `vigiar_o_pai` no começo de `_principal`, antes de carregar os modelos.
@@ -174,6 +184,8 @@ Vale o de `plans/abbychesscraft-roadmap.md` (português, UTF-8 sem BOM, LF, nunc
 **CA:** CA-D3, CA-C1. **Risco:** D-3 é o item mais difícil: `difflib` e relatório do que não se aplica. **Pronto quando:** os CA passam, e o golden muda só com motivo. **Custo:** 2 sessões. **Carga:** portão no fim.
 
 ## Passo PPT — A tela mostra o que importa (M3)
+
+**Feito** em 2026-11-05, ramo pp-1b (docs/revisoes/pp-t.md): só capas tratadas como imagem na varredura. **Falta CA-F2.3 e a captura de CA-U13.**
 
 **Contexto.** A 1366 px, a linha impressa quebra e a Imagem abre em 22 %. O realce satura. A capa do Seirawan inventa 1.442 linhas. Nada aqui usa 2.ª opinião.
 

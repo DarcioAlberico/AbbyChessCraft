@@ -199,8 +199,16 @@ class ControladorDosPadroes:
 
     def definir_letras(self, letras: str) -> None:
         """As letras das peças nos lances; vazio são as do idioma (gravadas com os limiares)."""
-        if self._p.projeto is not None:
-            self._p.projeto.dados.letras_das_pecas = letras
+        p = self._p
+        if p.projeto is None or p.projeto.dados.letras_das_pecas == letras:
+            return
+        p.projeto.dados.letras_das_pecas = letras
+        if p.modelo is not None:                # a validação gravada era das letras de antes
+            from abbychess import arrumacao
+
+            arrumacao.arrumar(p.modelo, p.projeto.dados.chave_das_pecas)
+            p._gravar(p.modelo)
+            p.eventos.emitir("glifos_mudaram", None)
 
     def definir_idioma(self, idioma: str) -> bool:
         """O idioma da prosa do livro (o léxico da verificação, as letras das peças), no

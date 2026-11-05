@@ -123,6 +123,8 @@ class _Posicao:
         self.hipotese: Optional[List[int]] = None
         #: O primeiro lance depois do diagrama: só ele pode ser en passant sem o lance anterior.
         self.recem_do_diagrama = False
+        #: Veio um diagrama, lido ou não: a posição é dele, e não a inicial por hipótese.
+        self.sem_hipotese = False
         if semente is not None:
             self.board = chess.Board(semente[0])
             self.esperado, self.origem = semente[1], ANTERIOR
@@ -155,6 +157,7 @@ def decodificar(documento, diagramas: Sequence, chave: str = "pt",
 def _no_diagrama(estado: _Posicao, saida: Decodificada, diagrama) -> None:
     _desfazer_a_hipotese(estado, saida)
     estado.perder()
+    estado.sem_hipotese = True                  # depois de um diagrama, `1.` não é o início do jogo
     if diagrama is not None and getattr(diagrama, "lido", False) and diagrama.fen:
         estado.fen_do_diagrama = diagrama.fen.split()[0]
 
@@ -205,7 +208,7 @@ def _semear(estado: _Posicao, visto: Tuple[int, bool]) -> None:
         estado.recem_do_diagrama = achou
         estado.esperado = visto if achou else None
         estado.fen_do_diagrama = estado.fen_do_diagrama if achou else None
-    elif visto == (1, False):
+    elif visto == (1, False) and not estado.sem_hipotese:
         estado.board, estado.esperado = chess.Board(), visto
         estado.origem, estado.hipotese = INICIAL, []
 

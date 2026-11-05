@@ -141,20 +141,20 @@ class MenuDaPaleta(QMenu):
         texto = evento.text()
         if self._escolhido:
             return
-        if not texto or not texto.isprintable() or evento.key() == Qt.Key.Key_Space:
+        if evento.key() == Qt.Key.Key_Backspace and self.filtro:
+            self._filtrar(self.filtro[:-1])
+        elif not texto or not texto.isprintable() or evento.key() == Qt.Key.Key_Space:
             super().keyPressEvent(evento)
-        elif not self.filtro and texto.isdigit() and self._do_digito(texto):
-            pass
+        elif not self.filtro and texto.isdigit():
+            self._do_digito(texto)
         else:
             self._filtrar(self.filtro + texto)
 
-    def _do_digito(self, digito: str) -> bool:
+    def _do_digito(self, digito: str) -> None:
         k = (int(digito) - 1) % 10
-        if k >= len(self._mais_usados):
-            return False
-        self.close()
-        self.escolher(self._mais_usados[k])
-        return True
+        if k < len(self._mais_usados):
+            self.close()
+            self.escolher(self._mais_usados[k])
 
     def _filtrar(self, filtro: str) -> None:
         self.filtro = filtro
@@ -163,7 +163,7 @@ class MenuDaPaleta(QMenu):
             acao.setVisible(simbolo in achados)
         for acao in self.actions():
             if acao.isSeparator() or acao not in self.acoes_dos_simbolos.values():
-                acao.setVisible(False)
+                acao.setVisible(not filtro)
         if len(achados) == 1:
             self.close()
             self.escolher(achados[0])

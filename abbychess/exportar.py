@@ -404,14 +404,16 @@ def _lances_no_relatorio(relatorio: Relatorio, projeto: ProjetoDeLivro, indice: 
     """As contagens da fila Lances (F-4) e os diagramas sem lado dito pelo livro (X-3)."""
     from abbychess import diagramas as dg
     from abbychess import evidencia as ev
+    from abbychess import lances as lc
     from abbychess import texto as tx
 
     modelo = projeto.ler_sem_migrar(indice)
     if modelo is None or not modelo.boxes:
         return
-    diagramas = dg.com_ids(list(modelo.diagramas))
+    chave = projeto.dados.chave_das_pecas
+    diagramas = dg.com_ids(lc.validar_pagina(modelo, chave))   # as letras podem ter mudado
     contagens = ev.contagens_dos_lances(modelo, tx.montar(modelo, com_os_nao_lidos=True), diagramas,
-                                        projeto.dados.chave_das_pecas)
+                                        chave)
     for chave, n in contagens.items():
         relatorio.lances[chave] = relatorio.lances.get(chave, 0) + n
     presumidos = sum(d.lido and not d.lado for d in diagramas)

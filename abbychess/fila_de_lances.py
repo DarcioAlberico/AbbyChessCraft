@@ -210,7 +210,8 @@ class EvidenciaNaPagina:
         if p.modelo is None or p.projeto is None:
             return ev.EvidenciaDaPagina()
         chave = (p.modelo.pid, tuple(id(b) for b in p.modelo.boxes),
-                 tuple(id(d) for d in p.modelo.diagramas), p.projeto.dados.chave_das_pecas)
+                 tuple(id(d) for d in p.modelo.diagramas), id(p.modelo.decisoes),
+                 tuple(id(z) for z in p.modelo.zonas), p.projeto.dados.chave_das_pecas)
         if chave != self._chave_atual:
             documento = p.documento()
             self._evidencia = (ev.da_pagina(p.modelo, documento, p.diagramas_com_ids(), chave[-1])

@@ -119,6 +119,12 @@ def _decisoes_que_nao_cabem(pagina: Pagina) -> list[str]:
     return [f"{len(v)} {nome}(s) decidida(s) não se aplica(m) à camada" for nome, v in nomes if v]
 
 
+def _sem_edicao(pagina: Pagina) -> bool:
+    """Nenhum glifo mudou de fonte, e nenhum saiu desde a importação (a que alocou todos os gids)."""
+    return (all(b.entry.source == FONTE_NATIVA for b in pagina.boxes)
+            and len(pagina.boxes) == pagina.proximo_n)
+
+
 def remendar(extraida, pagina: Pagina) -> list[str]:
     """As edições da página importada por cima da página da camada (D-3): sair dos boxes apagaria
     os diagramas e embaralharia as colunas, porque o x deles é fictício. Compara as palavras da
@@ -126,6 +132,8 @@ def remendar(extraida, pagina: Pagina) -> list[str]:
     inserir; as figuras, as colunas e as tabelas ficam. Devolve o que não se aplicou, para o
     relatório. Abaixo de `SIMILARIDADE_MINIMA`, nada se aplica."""
     avisos = _decisoes_que_nao_cabem(pagina)
+    if _sem_edicao(pagina):                     # a camada de agora vale, mesmo que o core tenha mudado
+        return avisos
     lugares = _lugares_da_extraida(extraida)
     base = [lugar[0] for lugar in lugares]
     atual = [b.entry.char for b in pagina.boxes]

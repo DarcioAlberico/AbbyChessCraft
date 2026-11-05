@@ -33,13 +33,15 @@ def _extraida() -> PaginaExtraida:
                               Tabela([["a b", "c"], ["d", "e f"]])])
 
 
-def _pagina(*palavras) -> Pagina:
-    boxes = [Box(k, BoxEntry(p, 10 * k, 0, 10 * k + 8, 8, 1.0, FONTE_NATIVA), revisado=True)
-             for k, p in enumerate(palavras)]
-    return Pagina(1, 0, boxes=boxes, proximo_n=len(boxes))
-
-
 TODAS = "uma frase de teste outra coluna aqui a b c d e f".split()
+
+
+def _pagina(*palavras) -> Pagina:
+    """A página importada com estas palavras: a que não é da camada foi editada à mão."""
+    boxes = [Box(k, BoxEntry(p, 10 * k, 0, 10 * k + 8, 8, 1.0,
+                             FONTE_NATIVA if p in TODAS else FONTE_MANUAL), revisado=True)
+             for k, p in enumerate(palavras)]
+    return Pagina(1, 0, boxes=boxes, proximo_n=max(len(boxes), len(TODAS)))
 
 
 def _textos(extraida):
@@ -108,6 +110,18 @@ def test_a_decisao_de_quebra_nao_se_aplica_e_o_relatorio_diz():
     pagina.decisoes = Decisoes(quebras=frozenset({1}))
     avisos = nativo.remendar(_extraida(), pagina)
     assert len(avisos) == 1 and "quebra" in avisos[0]
+
+
+def test_a_camada_que_mudou_sem_edicao_do_usuario_nao_e_desfeita():
+    """O core leu diferente desde a importação, e ninguém editou: vale a camada de agora."""
+    extraida = _extraida()
+    antes = _textos(extraida)
+    palavras = list(TODAS)
+    palavras[0] = "uma-de-antes"
+    pagina = _pagina(*palavras)
+    pagina.boxes = [replace(b, entry=replace(b.entry, source=FONTE_NATIVA)) for b in pagina.boxes]
+    assert nativo.remendar(extraida, pagina) == []
+    assert _textos(extraida) == antes
 
 
 def test_abaixo_da_similaridade_nada_se_aplica():

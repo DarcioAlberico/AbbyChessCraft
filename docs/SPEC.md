@@ -418,8 +418,11 @@ Na ordem, cada etapa gravando zonas, funções e decisões:
 gabarito (IoU ≥ 0,5) sai como `cabecalho`; cada legenda ligada ao diagrama do gabarito
 (100%).
 **CA-5.2** [livro_real] Na página de duas colunas do Yusupov fixada no gabarito (arquivo por
-`pdf_sha256`, lido **só como imagem** a 250 dpi, `usar_texto_nativo=False`): ordem de
-leitura com Kendall = 0 e cada linha de FEN no bloco da coluna do diagrama.
+`pdf_sha256`, lido **só como imagem**, à resolução do programa e do gabarito, 300 dpi): ordem de
+leitura com Kendall = 0 e, com uma coluna só de tabuleiros, cada linha de FEN logo antes do título
+do comentário dela ("Diagram 1-10") na coluna do texto, onde o gabarito a põe (decisão do usuário,
+2026-11-04: o diagrama junto do comentário). Sem um título por tabuleiro, o diagrama entra na
+altura dele, depois de um fim de frase.
 **CA-5.3** Mudar a função de uma zona atualiza o Documento sem reconhecer de novo e se
 desfaz com um Ctrl+Z; a partir do passo J, a exportação reflete a mudança (verificado no J).
 **CA-5.4** O modelo de áreas aplicado às ímpares de um intervalo sintético cria as zonas só

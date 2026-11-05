@@ -583,7 +583,8 @@ class EspacoDeTrabalho:
         a escolhe (as outras atualizações não mexem na seleção nem na rolagem)."""
         p = self.pagina
         if p.projeto is not None and p.fonte is not None:
-            self.rotulo_do_progresso.setText(lv.progresso(p.projeto.resumo.do_livro(), p.fonte.total))
+            self.rotulo_do_progresso.setText(lv.progresso(
+                p.projeto.resumo.do_livro_com_a_aberta(p.indice, p.modelo), p.fonte.total))
         if not self.doca_paginas.isVisible() or p.projeto is None or p.fonte is None:
             return
         self.paginas.mostrar(p.fonte.total, p.projeto.resumo.do_livro(),

@@ -220,6 +220,14 @@ class ResumoDoLivro:
         guardado = ((self._livro or {}).get("paginas") or {}).get(str(pagina.pid)) or {}
         return {k: guardado[k] for k in ("lances_por_conferir", "fortes") if k in guardado}
 
+    def do_livro_com_a_aberta(self, indice: int, pagina: Optional[Pagina]) -> dict:
+        """O resumo do livro com as contagens de agora da página aberta (a gravação delas vem
+        depois): a etiqueta do progresso, fora do Enter."""
+        resumo = dict(self.do_livro())
+        if pagina is not None:
+            resumo[indice] = {**resumo.get(indice, {}), **self._dos_lances(pagina)}
+        return resumo
+
     def _dos_lances(self, pagina: Pagina) -> dict:
         """`lances_por_conferir` e `fortes`, as contagens da fila Lances (F-4) e da marca forte."""
         from abbychess import decodificador_de_lances as dl

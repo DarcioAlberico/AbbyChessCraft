@@ -149,6 +149,31 @@ def test_conferir_nao_troca_a_fonte_nem_o_caractere(app, janela):
     assert all(b.revisado for b in p.modelo.boxes)
 
 
+def test_a_linha_nao_entra_selecionada_e_a_palavra_entra(app, janela):
+    from abbychess.app.painel_verificacao import CORPO_DA_LINHA, CORPO_DA_PALAVRA
+    from abbychess.verificacao import Desconhecida
+
+    _escrever(janela, "1.e4 e5")
+    janela.fila.ir_aos_lances()
+    campo = janela.verificacao.campo
+    assert not campo.hasSelectedText() and campo.cursorPosition() == 0
+    assert campo.font().pointSize() == CORPO_DA_LINHA
+    p = janela.pagina
+    janela.verificacao.mostrar(p.matriz, p.boxes, Desconhecida("1.e4", [0, 1, 2, 3]), 0, 1)
+    assert campo.hasSelectedText() and campo.font().pointSize() == CORPO_DA_PALAVRA
+
+
+def test_a_etiqueta_conta_a_pagina_aberta_antes_da_gravacao(app, janela):
+    _escrever(janela, "1.e4 e5")
+    janela.atualizar_paginas()
+    assert "lances por conferir 2" in janela.rotulo_do_progresso.text()
+    janela.fila.ir_aos_lances()
+    janela.verificacao.pedir_corrigir()
+    janela.executor.esperar()
+    janela.atualizar_paginas()
+    assert "lances por conferir 0" in janela.rotulo_do_progresso.text()
+
+
 def test_alt_baixo_pula_sem_conferir(app, janela):
     _escrever(janela, "1.e4", "2.Nf3")
     janela.fila.ir_aos_lances()

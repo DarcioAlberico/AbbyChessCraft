@@ -22,9 +22,26 @@ As grandezas, na capa e nas 13 páginas com gabarito de texto de três livros, a
 
 O corte: tinta ≥ 15 %, menos de 15 % dela em letras, e menos de 400 letras. **Varredura à parte, 1 página em 4 de 10 PDFs a 200 dpi:** só a página 0 de cada PDF e a 472 de um de 475 páginas caíram nele. Olhei três das miniaturas (a 472, que é uma imagem pequena sem texto, e duas capas). As outras são a primeira página de cada PDF, e não as abri. É amostra; o fim do lote lista e o Ctrl+Shift+T desfaz, porque o erro aqui esconde página.
 
+## A tela real
+
+O programa inteiro, no `offscreen`, com a rede e sem padrões ensinados, a 1366×768, Seirawan:
+
+| Medida | Resultado |
+|---|---|
+| CA-U13, p. 26 | nenhuma linha impressa em duas; só os 3 blocos de diagrama têm mais de uma linha visual; corpo 9 de 10, sem rolagem |
+| CA-U14, p. 26 | zoom de 0,268 contra 0,166 da folha: 61 % maior |
+| CA-L9.1, capa | 0,1 s, área `figura`, 0 glifo |
+| Fila Lances, por página (i020 a i026) | 5, 36, 14, 31, 13, 0 e 15 linhas com as vizinhas; 3, 22, 6, 17, 7, 0 e 9 sem elas |
+
+**A vizinha dobra a fila:** mediana de 14 linhas, contra 7. Fica dentro da estimativa (de 10 a 15), mas o pior caso é quase a página inteira (36 de 40). Se CA-F4.8 passar de 2 min, é a primeira coisa a desligar: `decodificador_de_lances.COM_AS_VIZINHAS`.
+
+**O que a tela achou e os testes não:** o campo abria a linha toda selecionada, e uma tecla sem querer apagaria a linha; agora começa sem seleção, em letra menor. A etiqueta do progresso ficava para trás até a próxima mudança; agora conta a página aberta. **O campo do Inspetor continua estreito para uma linha de 70 caracteres:** a comparação é na faixa Linha.
+
+**Não é captura num livro treinado:** CA-F2.3 continua por fazer. Sem padrões, os fortes são muitos (29 na p. 26).
+
 ## O que não foi verificado
 
-- As capturas de CA-F2.3 e CA-U13, que pedem a tela real.
+- CA-F2.3, a captura num livro já treinado.
 - Foco e teclado à mão: o agente só tem o `offscreen`.
 - O teclado da paleta num menu de verdade: o teste manda as teclas ao `QMenu` direto.
 
@@ -44,3 +61,9 @@ Uma leitura do diff inteiro, só de leitura, sem rodar nada, achou 10 pontos. Co
 | 8 | `1.` depois de diagrama não lido abria a posição inicial | Não abre mais |
 | 9 | Backspace e dígito na paleta | Tratados |
 | 10 | Mudança do core desfazia a camada nova, em silêncio | Página importada sem edição não é remendada. **Com edição, o risco fica:** uma diferença do core vira edição. Guardar as palavras da importação pediria gravar mais no projeto |
+
+## A medida de fim de marco
+
+- `qualidade.py` no `27bded1`: rápida e `processo` saída 0, cobertura 95,2 %, nada fora da lista. O que veio depois é só a interface: suíte rápida, 2.889 passaram, e `ruff`.
+- Portão no `ee61677`, com as correções da revisão: 17 de 18 arquivos. A catraca não mudou: CER 2,76 %, duas rodadas iguais; a capa e as páginas com gabarito passam em L-9.
+- **`test_ca_7_1` reprovou em todas as rodadas do dia:** 2.498, 2.487, 2.461, 2.433 e 2.464 ms contra o limite de 2.400, nas duas primeiras antes de qualquer código de M1 entrar no índice. A meta é o C-6, fora dos marcos, e passou em 05/11 de manhã por 20 ms. **Não é regressão provada, nem foi investigado.**

@@ -35,6 +35,8 @@ from abbychess.app import estilo
 
 #: Altura do recorte da palavra no painel, em pixels de tela.
 ALTURA_DO_RECORTE = 110
+#: O corpo do campo: a palavra, e a linha da fila Lances, que é mais longa.
+CORPO_DA_PALAVRA, CORPO_DA_LINHA = 18, 11
 
 
 class _Campo(QLineEdit):
@@ -100,7 +102,7 @@ class PainelDeVerificacao(QWidget):
         self.lido = QLabel("")
         self.lido.setFont(QFont(FONTE_DE_SIMBOLOS, 16))
         self.campo = _Campo()
-        self.campo.setFont(QFont(FONTE_DE_SIMBOLOS, 18))
+        self.campo.setFont(QFont(FONTE_DE_SIMBOLOS, CORPO_DA_PALAVRA))
 
         # Em grade de duas colunas, com o rótulo curto e a tecla na dica: cabe no Inspetor de
         # 296 px (§3.1). Os botões não pegam o foco pelo Tab: o teclado é o do campo.
@@ -194,11 +196,21 @@ class PainelDeVerificacao(QWidget):
         pintor.end()
         self.recorte.setPixmap(pixmap)
         self.campo.setText(self._lido_e_texto(boxes, palavra))
-        self.campo.selectAll()
+        self._selecionar_o_campo(de_lance)
         self.habilitar(True)
         self.botao_todas.setEnabled(not de_lance)
         self.botao_adicionar.setEnabled(not de_lance)
         self.campo.setFocus()
+
+    def _selecionar_o_campo(self, de_lance: bool) -> None:
+        """A palavra entra selecionada; a linha de lances não: uma tecla sem querer apagaria a
+        linha inteira. Ela começa do começo, em letra menor, para caber mais no Inspetor."""
+        self.campo.setFont(QFont(FONTE_DE_SIMBOLOS, CORPO_DA_LINHA if de_lance else CORPO_DA_PALAVRA))
+        if de_lance:
+            self.campo.deselect()
+            self.campo.setCursorPosition(0)
+        else:
+            self.campo.selectAll()
 
     def _lido_e_texto(self, boxes, palavra: vf.Desconhecida) -> str:
         """O rótulo dos glifos, e o texto do campo."""

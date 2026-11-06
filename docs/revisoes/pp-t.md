@@ -8,7 +8,7 @@
 | U-14 | "Largura" mede a mancha, sem o 1 % de glifos da margem; o zoom inicial é o da largura | CA-U14 sobre página fabricada | Em página sem leitura, vale a folha. Numa página real, a captura não foi olhada |
 | F-2 | Os fortes (□, palavra desmentida, ilegal) com fundo de 3,9:1 sobre o papel e traço, por cima do realce de hoje | CA-F2.1, CA-F2.2, CA-F4.6 | **CA-F2.3, as capturas num livro treinado, não foi feito** |
 | U-3 | `verificadas 123/300 · lances por conferir 410 · diagramas 14`, na barra; a fila vazia diz a tecla do lote | CA-U3 | — |
-| U-10 | Filtro ao digitar; um resultado só já escolhe; 1 a 0 nos mais usados; a grade sai abaixo de 900 px | CA-U10: F2, `+`, `=` | **Os mais usados são da sessão, não do livro:** não há onde contar sem gravar nada novo no projeto |
+| U-10 | Filtro ao digitar; um resultado só já escolhe; 1 a 0 nos mais usados; a grade saía abaixo de 900 px, e voltou em 06/11 a pedido do usuário: a 768 px ela nunca aparecia | CA-U10: F2, `+`, `=` | **Os mais usados são da sessão, não do livro:** não há onde contar sem gravar nada novo no projeto |
 | L-9 | `abbychess/tipo_de_pagina.py`, `PaginaLida.imagem`, a área `figura`, a exportação, o resumo, o fim do lote, a gaveta, o Documento, Ctrl+Shift+T | CA-L9.1 a CA-L9.4 | Abaixo |
 
 ## L-9, a medida

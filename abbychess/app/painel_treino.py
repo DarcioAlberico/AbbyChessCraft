@@ -58,8 +58,6 @@ PALETA = [
     "△", "▼",
 ]
 COLUNAS_DA_PALETA = 6
-#: Abaixo desta altura de janela, a grade da paleta sai do Inspetor (U-10).
-ALTURA_DA_GRADE_DA_PALETA = 900
 
 #: O nome de cada símbolo, na dica do botão: ⩲ e ⩱ se parecem com ± e ∓ em
 #: várias fontes, e a dica tira a dúvida antes de ensinar o padrão errado.
@@ -568,18 +566,6 @@ class PainelDeTreino(QWidget):
     def pedir_descartar(self) -> None:
         if self._ativo:
             self.descartar.emit()
-
-    def showEvent(self, evento):
-        super().showEvent(evento)
-        self.ajustar_a_paleta()
-
-    def resizeEvent(self, evento):
-        super().resizeEvent(evento)
-        self.ajustar_a_paleta()
-
-    def ajustar_a_paleta(self) -> None:
-        """A grade é alta: abaixo de 900 px de janela ela sai, e o F2 fica (U-10)."""
-        self.grade_da_paleta.setVisible(self.window().height() >= ALTURA_DA_GRADE_DA_PALETA)
 
     def abrir_paleta(self) -> None:
         """F2: a paleta como menu, no campo; o símbolo escolhido entra no cursor."""

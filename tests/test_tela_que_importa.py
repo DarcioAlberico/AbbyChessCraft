@@ -265,14 +265,9 @@ def test_escolher_conta_o_uso(app):
     assert pt._USO_DA_PALETA["∞"] == 1
 
 
-def test_a_grade_sai_abaixo_de_900(app, janela):
+def test_a_grade_fica_em_768(app, janela):
+    """A grade é o caminho das correções com o mouse: não depende da altura da tela."""
     janela.inspetor.mostrar("glifo")
     janela.resize(1366, 768)
     app.processEvents()
-    janela.treino.ajustar_a_paleta()
-    assert janela.treino.grade_da_paleta.isHidden()
-    janela.resize(1366, 1000)
-    app.processEvents()
-    janela.treino.ajustar_a_paleta()
-    if janela.height() >= pt.ALTURA_DA_GRADE_DA_PALETA:   # o offscreen pode limitar a altura
-        assert not janela.treino.grade_da_paleta.isHidden()
+    assert not janela.treino.grade_da_paleta.isHidden()

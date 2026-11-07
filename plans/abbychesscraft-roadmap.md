@@ -1169,8 +1169,30 @@ O que a SPEC pede e faltava, conferido no código:
 - **Dependem do usuário:** os parágrafos refluídos no Documento (§6.1), que hoje mostra uma linha
   impressa por bloco, e a nota do passo A3 só valia até o passo F: refluir muda a edição e a Linha,
   e o desenho precisa de decisão. A rolagem contínua do livro (§18.4) segue em aberto.
-- **Não feitas:** o menu de contexto em todo painel (§3.2: Galeria, Padrões, Diagramas e Linha não
-  têm), aprender o cabeçalho pelos confirmados (§5.1), e as limitações opcionais dos registros.
+- **Não feitas:** as limitações opcionais dos registros. O menu de contexto em todo painel (§3.2)
+  e o cabeçalho pelos confirmados (§5.1) foram feitos em 2026-11-07 (a seção seguinte).
+
+## As duas lacunas que sobravam (2026-11-07, ramo `lacunas-da-spec-2`)
+
+- **O menu de contexto em todo painel (§3.2).** A Galeria, os Padrões, os Diagramas e a Linha
+  ganharam o menu, e Shift+F10 e a tecla Menu o abrem neles (`tests/test_menus_de_contexto.py`;
+  o teste da janela inteira, `test_espaco.py`, passa pelos quatro). Cada menu repete o que o
+  painel já fazia pelo teclado ou por um botão: a Galeria vai ao glifo, ensina, só corrige, abre os
+  símbolos, seleciona tudo e troca o escopo; os Padrões vão à origem e esquecem as selecionadas ou
+  todas as de um caractere (um passo do desfazer); os Diagramas abrem, atualizam e filtram; a
+  Linha copia o texto (□ no glifo sem leitura) e traz o Ctrl+F5.
+- **O cabeçalho pelos confirmados (§5.1, etapa 5).** A área de cabeçalho ou de rodapé que o
+  usuário desenhou ou cuja função trocou é um título corrido confirmado
+  (`margens.confirmados_das_areas`: as letras, o lugar, a paridade da página). Nas páginas da
+  mesma paridade ele vale como a repetição (a página sozinha, sem número, sai) e, com semelhança
+  de 0,8 (`SEMELHANCA_DO_CONFIRMADO`), também tira o título colado no texto, sem o vão que a regra
+  pede. Vale na exportação e nas áreas automáticas do modo Áreas
+  (`tests/test_cabecalho_confirmado.py`). Sem área marcada, a regra é a de antes.
+- **Limites.** A exportação aprende só com as páginas que exporta: exportar uma página não vê o
+  cabeçalho marcado noutra. A fila de revisão (`margens_da_pagina`) não usa os confirmados: ela
+  conta uma página só, e as áreas de margem dela já vão para o fim. O `tem_lance` do core lê só a
+  notação inglesa: uma linha de lances em português no alto da página não é protegida, aqui como
+  na regra de antes.
 
 ---
 

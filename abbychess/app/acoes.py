@@ -200,6 +200,7 @@ def montar(janela) -> None:
                          texto="Fechar o que está por cima")
     j.acao_linha = acao(j, "mostrar_linha", j.alternar_linha, texto="Linha", marcavel=True)
     j.acao_linha.setChecked(True)
+    j.linha.acoes_do_menu.append(j.acao_linha)        # o menu de contexto da Linha (§3.2)
     j.acao_margens = acao(j, "ocultar_cabecalhos", j.texto.alternar_margens,
                           texto="Cabeçalhos e rodapés", widgets=[j.texto], marcavel=True)
     j.acao_margens.setChecked(True)

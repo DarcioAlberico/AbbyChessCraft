@@ -16,7 +16,7 @@ from typing import Dict, List, Optional
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QFont, QIcon, QPixmap
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-                               QPushButton, QSplitter, QVBoxLayout, QWidget)
+                               QMenu, QPushButton, QSplitter, QVBoxLayout, QWidget)
 
 from abbychess.app.painel_treino import FONTE_DE_SIMBOLOS
 from abbychess.app import teclado, vazios
@@ -86,6 +86,12 @@ class PainelDePadroes(QWidget):
         self.amostras.setWordWrap(True)
         self.amostras.itemActivated.connect(self._ir_a_origem)
         self.amostras.itemSelectionChanged.connect(self._mostrar_detalhe)
+        for lista, menu in ((self.caracteres, self.menu_dos_caracteres),
+                            (self.amostras, self.menu_das_amostras)):
+            lista.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            lista.customContextMenuRequested.connect(
+                lambda ponto, lista=lista, menu=menu: menu().exec(
+                    lista.viewport().mapToGlobal(ponto)))
 
         self.detalhe = QLabel("")
         self.detalhe.setWordWrap(True)
@@ -213,6 +219,31 @@ class PainelDePadroes(QWidget):
         origem = self._detalhes.get(item.data(Qt.ItemDataRole.UserRole), {}).get("origem")
         if origem:
             self.ir_para.emit(origem[0], origem[1])
+
+    def menu_das_amostras(self) -> QMenu:
+        """Os dois botões (§3.2): ir à origem da amostra atual e esquecer as selecionadas."""
+        menu = QMenu(self)
+        selecionadas = self.amostras.selectedItems()
+        ir = menu.addAction("Ir à origem")
+        ir.setEnabled(self.botao_ir.isEnabled() and self.amostras.currentItem() is not None)
+        ir.triggered.connect(lambda: self._ir_a_origem(self.amostras.currentItem()))
+        esquecer = menu.addAction(f"Esquecer as selecionadas ({len(selecionadas)})")
+        esquecer.setEnabled(bool(selecionadas))
+        esquecer.triggered.connect(self._esquecer)
+        return menu
+
+    def menu_dos_caracteres(self) -> QMenu:
+        """Esquecer todas as amostras do caractere escolhido (um passo do desfazer)."""
+        menu = QMenu(self)
+        atual = self.caracteres.currentItem()
+        char = atual.data(Qt.ItemDataRole.UserRole) if atual is not None else None
+        caminhos = [str(a) for a in self._padroes.get(char, [])]
+        quantas = "a amostra" if len(caminhos) == 1 else f"as {len(caminhos)} amostras"
+        esquecer = menu.addAction(f"Esquecer {quantas} de '{char}'"
+                                  if char is not None else "Esquecer as amostras do caractere")
+        esquecer.setEnabled(bool(caminhos))
+        esquecer.triggered.connect(lambda: self.esquecer.emit(caminhos))
+        return menu
 
     def _esquecer(self) -> None:
         caminhos = [i.data(Qt.ItemDataRole.UserRole) for i in self.amostras.selectedItems()]

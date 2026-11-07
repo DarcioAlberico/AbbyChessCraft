@@ -536,6 +536,9 @@ class ControladorDaBusca:
         # A ordem do livro mudou (§12.4): o índice, chaveado pela posição e com threads em voo,
         # é montado de novo (em segundo plano, como ao abrir o projeto).
         self.eventos.ligar("sequencia_mudou", self._sequencia_mudou)
+        # O índice do projeto novo não espera a interface montar o espaço nem abrir a página
+        # (CA-7.1): ele trabalha em outros processos, e essa espera custava ~0,3 s.
+        self.eventos.ligar("projeto_ligado", self.abrir)
 
     def _sequencia_mudou(self) -> None:
         if self.pagina.projeto is not None:

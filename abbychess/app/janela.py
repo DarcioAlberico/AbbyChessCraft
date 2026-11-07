@@ -38,6 +38,7 @@ from PySide6.QtWidgets import QApplication, QInputDialog, QMainWindow
 from abbychess import avisos as av
 from abbychess.app import acessibilidade, acoes, dialogos, opcoes, recentes, teclado
 from abbychess.app.imagens import qimage_da_pagina
+from abbychess.app.indicador_do_foco import IndicadorDoFoco
 from abbychess.app.paginas_na_janela import PaginasNaJanela
 from abbychess.app.busca_na_janela import BuscaNaJanela
 from abbychess.app.galeria_na_janela import GaleriaNaJanela
@@ -98,6 +99,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self._montar_galeria()
         acoes.montar(self)
         self._ligar_eventos()
+        self.indicador_do_foco = IndicadorDoFoco(self)     # a borda e o nome (CA-U1b)
         self.textos_do_teclado()                # §13: a Imagem e o Glifo sem livro
         teclado.quando_mudar(self.textos_do_teclado)
         acoes.atualizar(self)

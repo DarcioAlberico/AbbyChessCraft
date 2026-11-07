@@ -355,6 +355,18 @@ De PP6 a PP9, os campos se escrevem quando o usuário pedir o passo.
 1. **Em M1, uma sessão:** U-4, U-8, U-5a, U-11, foco de U-1.
 2. **Em M3:** progresso (U-3), U-10, U-13, U-14.
 3. **Duas sessões:** indicador de foco e de modo (U-1, U-2), falha (U-6).
+   **Feito** em 2026-11-07, um ramo por item (`u-1b`, `u-2`, `u-6`), suíte rápida em série,
+   arquivo por arquivo, em cada um; foco e teclado só no `offscreen`, sem a conferência à mão:
+   - **CA-U1b** (`indicador_do_foco.py`): o painel com o foco tem a borda em `destaque`, e a
+     barra diz o nome dele e o que o Enter faz ("Documento · Enter confirma", "Inspetor · Enter
+     confere" na fila Lances), com a tecla do perfil.
+   - **CA-U2** (`modo_do_arraste.py`, `icones.cursor`): marcar glifo, o editor de áreas e a
+     borracha mostram "Borracha · Esc sai" enquanto ligados; cada um tem o seu cursor (a mira e
+     o ícone da ação); o Esc sai do modo depois da seleção, pela ordem da §3.4.
+   - **CA-U6** (`faixa_de_gravacao.py`): a falha de gravação abre uma faixa fixa acima da página,
+     que sai sozinha quando a página grava; o botão abre Avisos; o ⚠ fica na cor de erro com
+     erro novo e na de aviso com aviso novo. "O relatório abre Avisos" ficou como o botão da
+     faixa: a exportação já manda o relatório a Avisos.
 4. **Depois:** U-5b, U-5c, U-7, U-9.
 
 ## Trilha T2 — Confiabilidade

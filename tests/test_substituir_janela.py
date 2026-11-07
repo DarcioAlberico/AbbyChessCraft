@@ -257,3 +257,24 @@ def test_substituir_pula_o_ja_trocado_tambem_noutra_pagina(jb, monkeypatch):  # 
     monkeypatch.setattr(jb, "_ir_a_ocorrencia", idas.append)
     jb.substituir_atual()
     assert idas == [] and "Nada mais a substituir" in jb.statusBar().currentMessage()
+
+
+def test_a_substituicao_no_livro_divide_com_a_imagem_da_pagina(jb, monkeypatch):  # noqa: F811
+    from abbychess import sessao as ss
+
+    imagens = []
+    original = ss.aplicar
+
+    def aplicar(pagina, plano, imagem=None, leitor=None):
+        imagens.append(imagem)
+        original(pagina, plano, imagem, leitor)
+
+    monkeypatch.setattr(ss, "aplicar", aplicar)
+    _pagina_lida(jb, "uma velha")
+    _buscar(jb, "m")
+    _substituir_por(jb, "rn")
+    jb.substituir_todas()
+    _ate(lambda: jb.resultados.na_previa)
+    jb.resultados.botao_aplicar.click()
+    _ate(lambda: _texto(jb).startswith("urna") or _texto(jb).startswith("u rn"))
+    assert imagens and imagens[-1] is not None

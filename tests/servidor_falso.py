@@ -62,8 +62,9 @@ class ServidorFalso:
                 resultado = sl.ler_pagina(imagem, zonas, marcados, self.leitor,
                                           regua_do_livro=regua[0] if regua else None)
             elif pedido.operacao == "reler_boxes":
-                imagem, boxes, so_pendentes = argumentos
-                resultado = sl.reler_boxes(imagem, boxes, self.leitor, so_pendentes=so_pendentes)
+                imagem, boxes, so_pendentes, nao_ler = argumentos
+                resultado = sl.reler_boxes(imagem, boxes, self.leitor, so_pendentes=so_pendentes,
+                                           nao_ler=nao_ler)
             elif pedido.operacao == "ler_recortes":
                 resultado = sl.ler_recortes(argumentos, self.leitor)
             elif pedido.operacao == "sugerir_recortes":

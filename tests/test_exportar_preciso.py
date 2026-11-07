@@ -256,7 +256,7 @@ def _projeto_digital(tmp_path):
     pdf = _pdf_digital(tmp_path / "livro.pdf")
     projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Digital", pdf)
     # Os boxes que o OCR gravou dizem outra coisa: é a camada que tem de sair.
-    projeto.salvar_pagina(0, _linha("lixo do ocr", 300))
+    projeto.salvar_pagina(0, _linha("lixo do ocr", 300, fonte=FONTE_LIVRO))
     return projeto
 
 
@@ -293,6 +293,7 @@ def test_o_epub_leva_o_idioma_do_livro(tmp_path):
         opf = z.read("OEBPS/content.opf").decode("utf-8")
     assert "<dc:language>en</dc:language>" in opf
     assert "1 página(s) lida(s) da camada de texto do PDF" in resumo
+    assert "as margens que o core tira delas não são listadas" in resumo
 
 
 #: Prosa nos idiomas que o projeto oferece fora do português e do inglês (SPEC-qualidade §13.7).

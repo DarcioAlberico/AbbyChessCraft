@@ -48,12 +48,13 @@ from abbychess import pagina as pg
 from abbychess import sequencia as sq
 from abbychess.diagramas import DiagramaLido, para_caixas
 from abbychess.layout import OrdemDeLeitura
+from abbychess.leitor import FONTE_MANUAL
 from abbychess.projeto import ProjetoDeLivro
 from abbychess.metadados import metadados_do_projeto
 from abbychess.montagem import (
     DPI_DA_LEITURA, Estrutura, FUNCOES_DE_MARGEM, _juntar_entre_paginas, _linhas,
     _quebras_da_camada, pagina_extraida)
-from abbychess.margens import _funcoes_das_margens, numeros_impressos
+from abbychess.margens import _funcoes_das_margens, confirmados_das_areas, numeros_impressos
 from abbychess.pedido import (
     NadaParaExportar, Opcoes, Pedido, Progresso, _alvo)
 from abbychess.pdf_pesquisavel import CAMADA, exportar_pdf_pesquisavel
@@ -102,6 +103,13 @@ class Relatorio:
     #: No EPUB e no DOCX, os diagramas com link de análise e o site dele (`Opcoes`).
     analises: int = 0
     site_de_analise: str = ""
+    #: (página, motivo) das que a camada de texto não conseguiu dar e saíram dos glifos (D-4).
+    camada_falhou: List[Tuple[int, str]] = field(default_factory=list)
+    #: As contagens da fila Lances no livro (F-4), e as páginas dos diagramas de lado presumido.
+    lances: Dict[str, int] = field(default_factory=dict)
+    #: (página, o que não se aplicou) das edições por cima da camada (D-3).
+    nao_aplicadas: List[Tuple[int, str]] = field(default_factory=list)
+    lado_presumido: Dict[int, int] = field(default_factory=dict)
 
     def resumo(self) -> str:
         """Uma linha, para a barra de status."""
@@ -122,14 +130,33 @@ class Relatorio:
         partes.append(f"{self.desenhados} diagrama(s) desenhado(s) do FEN e "
                       f"{len(self.recortados)} como recorte")
         if self.da_camada:
-            partes.append(f"{len(self.da_camada)} página(s) lida(s) da camada de texto do PDF")
+            partes.append(f"{len(self.da_camada)} página(s) lida(s) da camada de texto do PDF "
+                          "(as margens que o core tira delas não são listadas)")
+        if self.camada_falhou:
+            partes.append(f"{len(self.camada_falhou)} página(s) em que a camada de texto falhou "
+                          "(ver Avisos)")
         tiradas = sum(len(v) for v in self.margens.values())
         if tiradas:
             partes.append(f"{tiradas} linha(s) de cabeçalho/rodapé tirada(s)")
+        partes += self._partes_dos_lances()
         if self.nao_verificadas:
             partes.append(f"{len(self.nao_verificadas)} página(s) não verificada(s)")
         if self.sinalizadas:
             partes.append(f"{sum(self.sinalizadas.values())} palavra(s) sinalizada(s)")
+        return partes
+
+    def _partes_dos_lances(self) -> List[str]:
+        """As quatro contagens do relatório de lances e os lados presumidos: "conferidos", e
+        nunca "certos"."""
+        lances = self.lances
+        partes = []
+        if any(lances.values()):
+            partes.append(f"lances: {lances.get('ilegais', 0)} ilegal(is), "
+                          f"{lances.get('sem_posicao', 0)} sem posição, "
+                          f"{lances.get('nao_conferidos', 0)} não conferido(s), "
+                          f"{lances.get('aceitos', 0)} aceito(s) como impresso(s)")
+        if self.lado_presumido:
+            partes.append(f"{sum(self.lado_presumido.values())} diagrama(s) com o lado presumido")
         return partes
 
     def _partes_do_arquivo(self) -> List[str]:
@@ -164,6 +191,10 @@ class Relatorio:
         ";"): em Avisos, cada linha é um aviso, e o duplo clique abre a página. Uma por
         página, e não por item, para o livro inteiro não lotar os Avisos."""
         itens = self._itens_por_pagina()
+        for pagina, motivo in self.camada_falhou:
+            itens.setdefault(pagina, []).insert(0, f"a camada de texto falhou: {motivo}")
+        for pagina, aviso in self.nao_aplicadas:
+            itens.setdefault(pagina, []).insert(0, aviso)
         linhas = [self.resumo()]
         linhas += [f"{self.pagina(p)}: " + "; ".join(itens[p]) for p in sorted(itens)]
         if self.nao_verificadas:
@@ -228,7 +259,7 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
     pedido = pedido or Pedido(projeto, opcoes or Opcoes(), indices)
     opcoes = pedido.opcoes
     relatorio = relatorio if relatorio is not None else Relatorio()
-    alvo, estados, nativas, pelos_boxes = _caminhos_das_paginas(projeto, pedido, camada)
+    alvo, estados, nativas, pelos_boxes = _caminhos_das_paginas(projeto, pedido, camada, relatorio)
     lidos, estruturas, tirar = _boxes_e_margens(projeto, pelos_boxes, alvo, opcoes, relatorio)
     paginas = []
     for feitas, indice in enumerate(alvo, start=1):
@@ -245,7 +276,8 @@ def paginas_do_projeto(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagina
     return paginas
 
 
-def _caminhos_das_paginas(projeto: ProjetoDeLivro, pedido: Pedido, camada: str
+def _caminhos_das_paginas(projeto: ProjetoDeLivro, pedido: Pedido, camada: str,
+                          relatorio: Relatorio
                           ) -> Tuple[List[int], dict, Dict[int, PaginaExtraida], List[int]]:
     """(as páginas do pedido, o estado de cada uma, as que saem da camada de texto, as que
     saem dos boxes)."""
@@ -253,8 +285,27 @@ def _caminhos_das_paginas(projeto: ProjetoDeLivro, pedido: Pedido, camada: str
         raise ValueError(f"camada inválida: {camada!r} (use um de {CAMADA})")
     alvo = pedido.alvo()
     estados = {i: r.get("estado") for i, r in projeto.resumo.do_livro().items()}
-    nativas = paginas_da_camada(projeto, alvo, pedido) if camada == "auto" else {}
+    nativas = paginas_da_camada(projeto, alvo, pedido, relatorio) if camada == "auto" else {}
+    _com_as_edicoes(projeto, nativas, relatorio)
     return alvo, estados, nativas, [i for i in alvo if i not in nativas]
+
+
+def _com_as_edicoes(projeto: ProjetoDeLivro, nativas: Dict[int, PaginaExtraida],
+                    relatorio: Relatorio) -> None:
+    """As edições das páginas que saem da camada (D-3): a importada leva as edições por cima, e
+    a lida por OCR com glifo decidido sai dos boxes, onde o que o usuário decidiu está."""
+    from abbychess import nativo
+
+    importadas = set(nativo.paginas_importadas(projeto))
+    for posicao in list(nativas):
+        modelo = projeto.ler_sem_migrar(posicao)
+        if modelo is None:
+            continue
+        if posicao in importadas:
+            relatorio.nao_aplicadas.extend((posicao, aviso) for aviso in
+                                           nativo.remendar(nativas[posicao], modelo))
+        elif any(b.revisado or b.entry.source == FONTE_MANUAL for b in modelo.boxes):
+            del nativas[posicao]
 
 
 def _boxes_e_margens(projeto: ProjetoDeLivro, pelos_boxes: Sequence[int], alvo: Sequence[int],
@@ -268,8 +319,10 @@ def _boxes_e_margens(projeto: ProjetoDeLivro, pelos_boxes: Sequence[int], alvo: 
     # A regra das margens corridas olha o livro inteiro, como sempre (o título corrido das
     # pares casa com o das ímpares); só não tira o que o usuário marcou como texto. As
     # mesmas margens dão o número impresso de cada página (os rótulos e os links do EPUB).
+    # Os títulos corridos que o usuário marcou numa página valem nas da mesma paridade (§5.1).
+    confirmados = confirmados_das_areas({i: (lidos[i], estruturas[i].zonas) for i in pelos_boxes})
     funcoes, margens = _funcoes_das_margens(
-        {i: (lidos[i], _altura_da_pagina(projeto, i)) for i in pelos_boxes})
+        {i: (lidos[i], _altura_da_pagina(projeto, i)) for i in pelos_boxes}, confirmados)
     tirar = {} if opcoes.manter_margens else {
         i: set(margens[i].poeira) | set(funcoes[i]) for i in pelos_boxes}
     relatorio.numeros_impressos = numeros_impressos(
@@ -282,6 +335,9 @@ def _pagina_pelos_boxes(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagin
                         tirar: set, opcoes: Opcoes, relatorio: Relatorio) -> PaginaExtraida:
     """A página pelos boxes, sem as margens que a regra tirou (salvo as que o usuário marcou
     como texto), com os diagramas dela."""
+    como_imagem = _da_pagina_de_imagem(projeto, fonte, indice)
+    if como_imagem is not None:
+        return como_imagem
     tabuleiros = projeto.carregar_tabuleiros(indice)
     imagem = fonte.pagina(indice) if fonte is not None and tabuleiros else None
     fora = {k for k in tirar if id(boxes[k]) not in estrutura.protegidos}
@@ -291,6 +347,21 @@ def _pagina_pelos_boxes(projeto: ProjetoDeLivro, fonte: Optional[pg.FonteDePagin
                            estrutura=estrutura, manter_margens=opcoes.manter_margens,
                            desenhar_diagramas=opcoes.desenhar_diagramas,
                            manter_quebras=opcoes.manter_quebras)
+
+
+def _da_pagina_de_imagem(projeto: ProjetoDeLivro, fonte, indice: int) -> Optional[PaginaExtraida]:
+    """A página tratada como imagem (L-9) sai inteira, como figura; None nas outras."""
+    from abbychess import montagem as mo
+    from abbychess import tipo_de_pagina as tp
+
+    if fonte is None:
+        return None
+    modelo = projeto.ler_sem_migrar(indice)
+    if modelo is None or not tp.tratada_como_imagem(modelo):
+        return None
+    imagem = fonte.pagina(indice)
+    figura = mo._figura(imagem, (0, 0, *imagem.size), "página tratada como imagem")
+    return PaginaExtraida(indice, [figura], diagramas=1, largura=imagem.width, altura=imagem.height)
 
 
 def _passadas_do_livro(paginas: List[PaginaExtraida], nativas: Dict[int, PaginaExtraida],
@@ -327,6 +398,29 @@ def _paginas_no_relatorio(relatorio: Relatorio, projeto: ProjetoDeLivro,
     for pagina in paginas:
         _pagina_no_relatorio(relatorio, pagina, resumo, estados, nativas)
         _blocos_no_relatorio(relatorio, pagina.numero, pagina.blocos)
+        if pagina.numero not in nativas:
+            _lances_no_relatorio(relatorio, projeto, pagina.numero)
+
+
+def _lances_no_relatorio(relatorio: Relatorio, projeto: ProjetoDeLivro, indice: int) -> None:
+    """As contagens da fila Lances (F-4) e os diagramas sem lado dito pelo livro (X-3)."""
+    from abbychess import diagramas as dg
+    from abbychess import evidencia as ev
+    from abbychess import lances as lc
+    from abbychess import texto as tx
+
+    modelo = projeto.ler_sem_migrar(indice)
+    if modelo is None or not modelo.boxes:
+        return
+    chave = projeto.dados.chave_das_pecas
+    diagramas = dg.com_ids(lc.validar_pagina(modelo, chave))   # as letras podem ter mudado
+    contagens = ev.contagens_dos_lances(modelo, tx.montar(modelo, com_os_nao_lidos=True), diagramas,
+                                        chave)
+    for chave, n in contagens.items():
+        relatorio.lances[chave] = relatorio.lances.get(chave, 0) + n
+    presumidos = sum(d.lido and not d.lado for d in diagramas)
+    if presumidos:
+        relatorio.lado_presumido[indice] = presumidos
 
 
 def _pagina_no_relatorio(relatorio: Relatorio, pagina: PaginaExtraida, resumo: dict,
@@ -364,19 +458,19 @@ def _blocos_no_relatorio(relatorio: Relatorio, i: int, blocos: Sequence) -> None
 
 
 def paginas_da_camada(projeto: ProjetoDeLivro, indices: Sequence[int],
-                      pedido: Optional[Pedido] = None) -> Dict[int, PaginaExtraida]:
+                      pedido: Optional[Pedido] = None,
+                      relatorio: Optional[Relatorio] = None) -> Dict[int, PaginaExtraida]:
     """
     `{índice: página}` das páginas que saem da camada de texto do PDF.
 
     Só as que a régua do `core.pdf_nativo` aceita: a camada tem de ser a tipografia
     do livro, e não um OCR de fábrica nem uma página com a figurina em imagem. O
     lado a jogar que o usuário conferiu num diagrama do projeto passa para o
-    diagrama da camada no mesmo lugar. Um PDF que não abre, ou uma página que a
-    leitura não monta, fica com os boxes — o log diz por quê.
+    diagrama da camada no mesmo lugar. Um trecho que falha fica com os boxes, e os outros
+    continuam da camada (D-4): o `relatorio` diz qual, e o log, por quê.
     """
     if not projeto.origem.e_pdf or not indices:
         return {}
-    from core import pdf_nativo
 
     # A posição no livro -> a página do PDF (§12.4): a camada só vale na página do livro sem
     # quadro, giro nem ângulo à mão (as inseridas, cortadas e giradas saem dos boxes), e é
@@ -389,13 +483,7 @@ def paginas_da_camada(projeto: ProjetoDeLivro, indices: Sequence[int],
     paginas = {}
     for trecho in trechos:
         do_pdf = dict(trecho)
-        try:
-            extracao = pdf_nativo.extrair(str(projeto.fonte), sorted(do_pdf), idioma=idioma)
-        except Exception as erro:  # noqa: BLE001 — o livro sai dos boxes, e não falha
-            log.warning("A camada de texto do PDF não foi lida (%s: %s); as páginas saem dos "
-                        "boxes.", type(erro).__name__, erro, exc_info=True)
-            return {}
-        for pagina in extracao.paginas:
+        for pagina in _extrair_o_trecho(projeto, do_pdf, idioma, relatorio):
             posicao = do_pdf.get(pagina.numero)
             if posicao is None:
                 continue
@@ -403,6 +491,36 @@ def paginas_da_camada(projeto: ProjetoDeLivro, indices: Sequence[int],
             _lado_da_revisao(pagina, projeto.carregar_diagramas(posicao))
             paginas[posicao] = pagina
     return paginas
+
+
+def _extrair_o_trecho(projeto: ProjetoDeLivro, do_pdf: dict, idioma: str,
+                      relatorio: Optional[Relatorio]) -> list:
+    """As páginas da camada num trecho; um trecho que falha não leva os outros (D-4)."""
+    from core import pdf_nativo
+
+    try:
+        return pdf_nativo.extrair(str(projeto.fonte), sorted(do_pdf), idioma=idioma).paginas
+    except Exception as erro:  # noqa: BLE001 — o trecho sai dos boxes, e o livro não falha
+        log.warning("A camada de texto do PDF não foi lida (%s: %s); as páginas %s saem dos "
+                    "boxes.", type(erro).__name__, erro, sorted(do_pdf.values()), exc_info=True)
+        if relatorio is not None:
+            relatorio.camada_falhou.extend(_falhas_da_camada(projeto, do_pdf.values(), erro))
+        return []
+
+
+def _falhas_da_camada(projeto: ProjetoDeLivro, posicoes, erro: Exception) -> List[Tuple[int, str]]:
+    """(página, motivo) do trecho que a camada não deu. A página importada que cai nos boxes não
+    tem os diagramas da camada, e o x dos glifos dela é fictício: o motivo o diz (D-3, D-4)."""
+    from abbychess import nativo
+
+    importadas = set(nativo.paginas_importadas(projeto))
+    saida = []
+    for posicao in sorted(posicoes):
+        motivo = f"{type(erro).__name__}: {erro}; saiu dos glifos"
+        if posicao in importadas:
+            motivo += ", sem os diagramas da camada e com as colunas e as tabelas pela ordem lida"
+        saida.append((posicao, motivo))
+    return saida
 
 
 def _lado_da_revisao(pagina: PaginaExtraida, diagramas: Sequence[DiagramaLido]) -> None:

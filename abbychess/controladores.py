@@ -24,6 +24,7 @@ from abbychess import edicao as ed
 from abbychess import verificacao as vf
 from abbychess.controlador import AVISO_LONGO_MS, ControladorDePagina
 from abbychess.controlador_de_diagramas import ControladorDeDiagramas
+from abbychess.fila_de_lances import FilaDeLances
 
 log = logging.getLogger(__name__)
 
@@ -250,6 +251,22 @@ class ControladorDeVerificacao:
         return None
 
 
+def _paginas_com_lances(resumo: dict) -> List[int]:
+    """As páginas lidas com lance por conferir; sem a chave no resumo, conta como desconhecida."""
+    return sorted(i for i, r in resumo.items()
+                  if r.get("lances_por_conferir", 1) and r.get("estado") != "nao_reconhecida")
+
+
+def _vizinha_com_lances(p, passo: int) -> Optional[int]:
+    """A página seguinte (ou a anterior) com lance por conferir; None na ponta, ou sem projeto."""
+    if p.projeto is None:
+        return None
+    com = _paginas_com_lances(p.projeto.resumo.do_livro())
+    if passo > 0:
+        return next((i for i in com if i > p.indice), None)
+    return next((i for i in reversed(com) if i < p.indice), None)
+
+
 def _gravar_a_correcao(modelo, gids: List[int], entries, mudados, espacos) -> List[int]:
     """Troca na página os glifos que a correção mudou e quebra a palavra nos espaços que a
     leitura não viu; devolve esses espaços, sem os que já eram quebra decidida."""
@@ -280,7 +297,7 @@ class ControladorDaFila:
     palavras, à página seguinte; os diagramas são sempre os do livro."""
 
     #: (modo, nome no seletor do Inspetor), na ordem do F7.
-    MODOS = (("confianca", "Confiança"), ("leitura", "Ordem de leitura"),
+    MODOS = (("lances", "Lances"), ("confianca", "Confiança"), ("leitura", "Ordem de leitura"),
              ("caractere", "Por caractere"), ("palavras", "Palavras desconhecidas"),
              ("diagramas", "Diagramas por conferir"))
     #: Os modos que andam pelos glifos (o Inspetor mostra o Glifo).
@@ -294,6 +311,8 @@ class ControladorDaFila:
         self.eventos = pagina.eventos
         self.modo = "confianca"
         self.escopo = "pagina"
+        #: A fila Lances (F-4): a linha, e não o glifo.
+        self.lances = FilaDeLances(pagina)
 
     def nome(self, modo: Optional[str] = None) -> str:
         return dict(self.MODOS)[modo or self.modo]
@@ -331,20 +350,60 @@ class ControladorDaFila:
         da fila, e não há "anterior" a que voltar. No escopo livro, passar do fim (ou do
         começo) da página leva à próxima (ou à anterior) com o que revisar."""
         if self.modo in self.DE_GLIFOS:
-            if self.escopo == "livro" and self._na_ponta(passo):
-                self._outra_pagina(passo)
-            else:
-                self.pagina.fila_da_pagina.andar(passo)
-        elif self.modo == "palavras":
-            v = self.verificador
-            total = len(v.desconhecidas)
-            na_ponta = not total or (v.posicao == total - 1 if passo > 0 else v.posicao == 0)
-            if self.escopo == "livro" and na_ponta:
-                self._outra_pagina_das_palavras(passo)
-            else:
-                v.andar(passo)
+            self._andar_nos_glifos(passo)
         else:
-            self.conferencia.proximo_do_livro()
+            {"palavras": self._andar_nas_palavras, "lances": self._andar_nos_lances,
+             "diagramas": lambda _passo: self.conferencia.proximo_do_livro()}[self.modo](passo)
+
+    def _andar_nos_glifos(self, passo: int) -> None:
+        if self.escopo == "livro" and self._na_ponta(passo):
+            self._outra_pagina(passo)
+        else:
+            self.pagina.fila_da_pagina.andar(passo)
+
+    def _andar_nas_palavras(self, passo: int) -> None:
+        v = self.verificador
+        total = len(v.desconhecidas)
+        na_ponta = not total or (v.posicao == total - 1 if passo > 0 else v.posicao == 0)
+        if self.escopo == "livro" and na_ponta:
+            self._outra_pagina_das_palavras(passo)
+        else:
+            v.andar(passo)
+
+    def _andar_nos_lances(self, passo: int) -> None:
+        if self.escopo == "livro" and self.lances.na_ponta(passo):
+            self._outra_pagina_dos_lances(passo)
+        else:
+            self.lances.andar(passo)
+
+    def _outra_pagina_dos_lances(self, passo: int) -> None:
+        """A próxima página (ou a anterior) com lance por conferir, pelo resumo do livro. Página
+        sem a chave no resumo conta como desconhecida: abre e conta."""
+        p = self.pagina
+        alvo = _vizinha_com_lances(p, passo)
+        if alvo is None:
+            p._avisar("Não há mais lance por conferir no livro.", 5000)
+            return
+        if p.ir_para(alvo):
+            self.lances.recontar(0 if passo > 0 else -1)
+
+    def ir_aos_lances(self) -> None:
+        """F4: a fila Lances, fixa até fechar o projeto ou escolher outra."""
+        self.definir("lances")
+
+    def andar_no_painel(self, passo: int) -> None:
+        """Os botões Pular e Anterior do editor Palavra, com o sentido da fila ativa."""
+        if self.modo == "lances":
+            self._andar_nos_lances(passo)
+        else:
+            self.verificador.andar(passo)
+
+    def corrigir_no_painel(self, texto: str, ensinar: bool = False) -> None:
+        """Enter e Ctrl+Enter do editor Palavra, com o sentido da fila ativa."""
+        if self.modo == "lances":
+            self.lances.confirmar(texto, ensinar)
+        else:
+            self.verificador.corrigir(texto, ensinar=ensinar)
 
     def _na_ponta(self, passo: int) -> bool:
         """O atual é o último da fila da página (Alt+↓) ou o primeiro (Alt+↑), ou ela está
@@ -396,6 +455,9 @@ class ControladorDaFila:
         p = self.pagina
         if self.modo in self.DE_GLIFOS:
             return self._contador_dos_glifos()
+        if self.modo == "lances":
+            total = len(self.lances.linhas)
+            return f"{self.lances.posicao + 1 if total else 0}/{total}"
         if self.modo == "palavras":
             total = len(self.verificador.desconhecidas)
             return f"{self.verificador.posicao + 1 if total else 0}/{total}"
@@ -474,6 +536,9 @@ class ControladorDaBusca:
         # A ordem do livro mudou (§12.4): o índice, chaveado pela posição e com threads em voo,
         # é montado de novo (em segundo plano, como ao abrir o projeto).
         self.eventos.ligar("sequencia_mudou", self._sequencia_mudou)
+        # O índice do projeto novo não espera a interface montar o espaço nem abrir a página
+        # (CA-7.1): ele trabalha em outros processos, e essa espera custava ~0,3 s.
+        self.eventos.ligar("projeto_ligado", self.abrir)
 
     def _sequencia_mudou(self) -> None:
         if self.pagina.projeto is not None:

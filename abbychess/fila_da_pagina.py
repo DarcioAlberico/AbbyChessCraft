@@ -98,7 +98,7 @@ class FilaDaPagina:
         a mostra); "fora da fila", se não."""
         if self._p.atual in self.fila():
             return ""
-        return "Box fora da fila (já confirmado ou confiável)"
+        return "Glifo fora da fila (já confirmado ou confiável)"
 
     def gids_de_margem(self) -> frozenset:
         """Os glifos do cabeçalho e do rodapé corridos da página, pela regra da exportação

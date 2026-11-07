@@ -17,11 +17,12 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from abbychess import avisos as av
 from abbychess import grade as gd
 from abbychess import livro as lv
+from abbychess import tipo_de_pagina
 from abbychess import verificacao as vf
 from abbychess.app import acoes
 from abbychess.app.imagens import pixmap_da_pagina
 from abbychess.app import estilo
-from abbychess.app import teclado, vazios
+from abbychess.app import registro_de_eventos, teclado, vazios
 from abbychess.controlador import AVISO_LONGO_MS
 
 
@@ -47,12 +48,16 @@ class DesenhoDaJanela:
         self._pre_carga.start()
         self._pre_pixmap.start()                # e o pixmap dela, quando a pré-carga a tiver
         self._fechar_conferencia()              # os diagramas em edição eram da outra
+        registro_de_eventos.anotar_pagina(p.modelo.pid if p.modelo is not None else None,
+                                          self.fila.modo)
         self.verificacao.limpar(vazios.escolha_a_fila_de_palavras())
         self._layout_mudou()
         if self.visor.modo_areas and not p.zonas:
             self.areas.automaticas()
         if self.fila.modo == "palavras":        # a página nova também é verificada
             self.verificar_texto()
+        elif self.fila.modo == "lances":
+            self.fila.lances.recontar(0)
         self.atualizar_barra()
         self.atualizar_paginas(seguir=True)
 
@@ -96,6 +101,15 @@ class DesenhoDaJanela:
         if p.cache is not None and p.cache.tem(p.navegador.proxima_provavel):
             self._pixmap(p.navegador.proxima_provavel, p.cache.pagina(p.navegador.proxima_provavel)[0])
 
+    def zoom_de_pagina(self, zoom) -> None:
+        """Ctrl+7/8/9: `zoom()` na Imagem e no Glifo; no Documento, o corpo é do Ctrl++ e Ctrl+−, e
+        a barra diz onde vale (§3.3)."""
+        if self._no_documento():
+            self.statusBar().showMessage(
+                teclado.com_teclas("Zoom de página: foco na Imagem ({foco_imagem})"), 6000)
+        else:
+            zoom()
+
     def _zoom_mudou(self, escala: float, limite: str) -> None:
         self.caixa_de_zoom.blockSignals(True)
         self.caixa_de_zoom.setValue(round(escala * 100))
@@ -125,11 +139,11 @@ class DesenhoDaJanela:
             self.visor.selecionar(None)
             self.treino.limpar(vazios.pagina_nao_reconhecida()
                                if not p.boxes else
-                               "Nada a revisar nesta página. Clique num box para corrigi-lo, "
-                               + teclado.com_teclas("ou vá para o próximo pendente do livro "
-                                                    "({proxima_pagina_pendente})."))
+                               _sem_pendentes(self.fila.lances.resumo_da_pagina(),
+                                              _faltam_ler(p)))
             return
-        self.treino.mostrar(p.matriz, p.box_atual(), p.fila_da_pagina.posicao_do_atual())
+        self.treino.mostrar(p.matriz, p.box_atual(), p.fila_da_pagina.posicao_do_atual(),
+                            tomar_o_foco=QApplication.focusWidget() is not self.texto)
         if (sugestao := p.leitura.sugestao_do_atual()) is not None:    # §9.2: o palpite da rede
             self.treino.sugerir(*sugestao)
         elif (troca := p.leitura.sugestao_do_contexto()) is not None:  # a palavra ou a linha desmente
@@ -151,6 +165,7 @@ class DesenhoDaJanela:
         na_fila = set(p.fila_da_pagina.fila())
         da_fila = p.fila_da_pagina.margens_da_fila()  # a conta que a fila usou, talvez de antes
         estados = _estados_dos_glifos(p.modelo, na_fila)
+        estados.update(dict.fromkeys(p.evidencia.agora().fortes, gd.FORTE))
         aviso = _aviso_do_documento(p)
         # A palavra fora do léxico que o usuário aceitou (Enter: revisada) não é mais duvidosa.
         revisados = {b.gid for b in p.modelo.boxes if b.revisado} if p.modelo is not None else set()
@@ -251,7 +266,26 @@ class DesenhoDaJanela:
             self.ir_a_origem(self.projeto.sequencia.posicao_de(pid), gid)
 
     def _layout_mudou(self) -> None:
-        self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual, self.areas.ordem_clicada)
+        numeros = self.areas.numeros()
+        self.visor.mostrar_zonas(self.areas.zonas, self.areas.atual, self.areas.ordem_clicada,
+                                 numeros)
+        self._editor_de_area_em_dia(numeros)
+
+    def _editor_de_area_em_dia(self, numeros: dict) -> None:
+        """O editor Área com a área escolhida; fora do editor de áreas, ele volta ao Glifo."""
+        if not self.visor.modo_areas and self.inspetor.atual() == "area":
+            self.inspetor.mostrar("glifo")
+        a = self.areas
+        if a.atual is None or not 0 <= a.atual < len(a.zonas):
+            self.editor_de_area.mostrar(None, 0, "")
+            return
+        zona = a.zonas[a.atual]
+        self.editor_de_area.mostrar(numeros.get(zona.id, a.atual + 1), len(a.zonas), zona.funcao)
+
+    def _area_escolhida(self, _indice: int) -> None:
+        """O clique numa área abre o editor dela; no Ordenar, o clique diz a ordem (§3.1)."""
+        if not self.areas.ordenando and self.areas.atual is not None:
+            self.inspetor.mostrar("area")
 
     def _palavra_mudou(self) -> None:
         v, p = self.verificador, self.pagina
@@ -262,6 +296,27 @@ class DesenhoDaJanela:
             return
         self.verificacao.mostrar(p.matriz, p.boxes, palavra, v.posicao, len(v.desconhecidas))
         self.visor.marcar_palavra(vf.caixa_da_palavra(p.boxes, palavra.indices))
+
+    def _linha_de_lance_mudou(self) -> None:
+        """A fila Lances (F-4): a linha no editor Palavra, na Imagem, na Linha e no Documento."""
+        if self.fila.modo != "lances":
+            return
+        p, lances = self.pagina, self.fila.lances
+        linha = lances.atual()
+        self.atualizar_fila()
+        if linha is None:
+            self.visor.marcar_palavra(None)
+            self.verificacao.limpar(lances.mensagem_vazia())
+            return
+        palavra = lances.como_palavra(linha)
+        self.verificacao.mostrar(p.matriz, p.boxes, palavra, lances.posicao, len(lances.linhas))
+        self.visor.marcar_palavra(vf.caixa_da_palavra(p.boxes, palavra.indices))
+        self.visor.mostrar_caixa(vf.caixa_da_palavra(p.boxes, palavra.indices))
+        self.texto.ir_ao_gid(linha.gids[0])
+        de_lance = set(linha.linha.gids_de_lance)
+        self.linha.mostrar(p.matriz, [p.box(g) for g in linha.gids], None,
+                           sublinhados={k for k, g in enumerate(linha.gids) if g in de_lance},
+                           fortes={k for k, g in enumerate(linha.gids) if g in linha.ilegais})
 
     def _acoes_mudaram(self) -> None:
         acoes.atualizar(self)
@@ -313,8 +368,8 @@ class DesenhoDaJanela:
         aviso diz qual e onde ficou o arquivo de antes."""
         onde = (f" O arquivo dela foi guardado em paginas/{guardado}." if guardado else "")
         self._avisar_da_pagina("Página ilegível", indice, (
-            f"estava com o arquivo ilegível e ficou como não reconhecida.{onde} Reconheça-a de "
-            "novo (F5)."))
+            f"estava com o arquivo ilegível e ficou como não reconhecida.{onde} "
+            + teclado.com_teclas("Reconheça-a de novo ({reconhecer_pagina}).")))
 
     def _ocupado_mudou(self, ocupado: bool, titulo: str) -> None:
         self.progresso.setVisible(ocupado)
@@ -334,13 +389,11 @@ class DesenhoDaJanela:
 
     def _devolver_o_painel(self) -> None:
         """A tarefa acabou com um glifo atual: o painel de treino volta, e o campo pega o foco
-        de ninguém ou do painel de texto."""
+        de ninguém. Quem o tem por escolha fica com ele, o Documento também (U-1)."""
         self.treino.habilitar(True)
         foco = QApplication.focusWidget()
-        # O próximo caractere vai para o campo, mas sem tirar o foco de quem o tem por
-        # escolha (o seletor de página, por exemplo): só de ninguém ou do painel de texto.
         if (self.inspetor.atual() == "glifo" and self.isActiveWindow()
-                and (foco is None or foco is self.texto or self.treino.isAncestorOf(foco))):
+                and (foco is None or self.treino.isAncestorOf(foco))):
             self.treino.campo.setFocus()
 
     def _limpar_a_mensagem_da_tarefa(self) -> None:
@@ -377,6 +430,26 @@ def _mostrar_as_contagens(treino, leitor, pendentes: int, glifos: int) -> None:
                              len(por_char))
 
 
+def _faltam_ler(p) -> int:
+    """Quantas páginas do livro ainda não foram lidas."""
+    if p.projeto is None or p.fonte is None:
+        return 0
+    return max(0, p.fonte.total - len(p.projeto.resumo.paginas_lidas()))
+
+
+def _sem_pendentes(resumo: dict, faltam_ler: int = 0) -> str:
+    """A tela da fila de glifos vazia: com lance por conferir, nunca "nada a revisar" (F-4); com
+    página por ler, a tecla do lote (U-3)."""
+    resto = teclado.com_teclas("Clique num glifo para corrigi-lo, ou vá para o próximo pendente do "
+                               "livro ({proxima_pagina_pendente}).")
+    if faltam_ler:
+        resto += teclado.com_teclas(f" Faltam ler {faltam_ler} página(s): {{reconhecer_livro}}.")
+    if resumo["nao_conferidos"]:
+        return teclado.com_teclas(f"Sem glifos na fila. {resumo['nao_conferidos']} lances não "
+                                  "conferidos: {fila_lances} confere. ") + resto
+    return f"Nada a revisar nesta página. {resto}"
+
+
 def _estados_dos_glifos(modelo, na_fila: set) -> dict:
     """gid → o estado do realce no Documento (§6.1); vazio sem modelo."""
     return {b.gid: gd.estado(b.entry, b.gid in na_fila) for b in modelo.boxes} \
@@ -385,6 +458,8 @@ def _estados_dos_glifos(modelo, na_fila: set) -> dict:
 
 def _aviso_do_documento(p) -> str:
     """O texto do Documento vazio: na página não reconhecida, com a saúde do livro."""
+    if p.modelo is not None and tipo_de_pagina.tratada_como_imagem(p.modelo):
+        return vazios.tratada_como_imagem()
     aviso = vazios.nada_reconhecido() if p.reconhecida else vazios.pagina_nao_reconhecida()
     if not p.reconhecida and p.projeto is not None:
         saude = lv.saude(p.projeto, p.leitor.arquivos_de_padrao() if p.leitor else 0)

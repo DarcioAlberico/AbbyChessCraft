@@ -449,6 +449,40 @@ def test_o_intervalo_leva_so_as_paginas_dele(projeto, fonte, leitor, tmp_path): 
         ex.Opcoes(intervalo=(3, 1))
 
 
+def test_a_selecao_leva_so_as_paginas_dela(projeto, fonte, leitor, tmp_path):  # noqa: F811
+    """§3.1: as páginas salteadas da gaveta, que um intervalo não diz."""
+    _ensinar_e_ler(projeto, fonte, leitor)
+    _, relatorio = ex.exportar_com_relatorio(projeto, tmp_path / "salteadas.txt",
+                                             opcoes=ex.Opcoes(selecao=(0, 2)))
+    assert relatorio.paginas == [0, 2]
+
+
+def test_o_dialogo_devolve_a_selecao_e_nao_a_lembra():
+    import os
+    from pathlib import Path
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+
+    from abbychess.app import dialogo_exportacao as de
+
+    QApplication.instance() or QApplication([])
+    dialogo = de.DialogoDeExportacao(None, "epub", ex.Opcoes(), {}, Path("."), "T", 0, selecao=[4, 9])
+    assert dialogo.opcoes().selecao == (4, 9) and dialogo.caixa_paginas.isHidden()
+    assert "2 páginas" in dialogo.windowTitle()
+
+    class _Config(dict):
+        def setValue(self, chave, valor):
+            self[chave] = valor
+
+        def value(self, chave, padrao=None, **_k):
+            return self.get(chave, padrao)
+
+    config = _Config()
+    de.lembrar_opcoes(config, ex.Opcoes(selecao=(4, 9)))
+    assert de.opcoes_lembradas(config).selecao == ()
+
+
 def test_o_dialogo_devolve_o_intervalo():
     import os
     from pathlib import Path

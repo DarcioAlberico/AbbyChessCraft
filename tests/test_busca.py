@@ -312,6 +312,7 @@ def test_a_pagina_que_deixou_de_ser_reconhecida_sai_do_indice(livro_escrito, mon
     assert 1 not in busca.indice and busca.nao_reconhecidas() >= 1
 
 
+@pytest.mark.erro_esperado
 def test_os_erros_nas_threads_nao_penduram_a_busca(livro_escrito, monkeypatch):
     projeto, ctl, busca, escrever, eventos = livro_escrito
     monkeypatch.setattr(bs, "buscar", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("disco")))

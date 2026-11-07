@@ -368,6 +368,7 @@ def test_editar_nao_grava_na_hora_e_fechar_grava(app, janela):  # noqa: F811
         reaberto.fechar()
 
 
+@pytest.mark.erro_esperado
 def test_falha_de_gravacao_aparece_na_barra(app, janela, monkeypatch):  # noqa: F811
     from abbychess import gravacao as gv
 
@@ -409,6 +410,7 @@ def test_tarefa_pedida_dentro_de_outra_espera_a_vez_e_o_executor_continua_certo(
     assert not janela.executor.ocupado
 
 
+@pytest.mark.erro_esperado
 def test_fechar_com_pagina_que_nao_grava_pergunta_e_pode_ficar_aberta(app, janela, monkeypatch):  # noqa: F811
     from PySide6.QtGui import QCloseEvent
 

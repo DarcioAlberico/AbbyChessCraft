@@ -55,7 +55,7 @@ class ControladorDaSessao:
         dados = self._p.projeto.dados if self._p.projeto is not None else None
         indice, pagina = self._p.indice, self._p.modelo
         if dados is not None:
-            novo = ss.com_figurinas(novo, original, dados.idioma,
+            novo = ss.com_figurinas(novo, original, dados.chave_das_pecas,
                                     self._modo_das_pecas(dados.notacao, pagina))
 
         def corpo():

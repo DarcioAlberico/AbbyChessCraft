@@ -35,6 +35,8 @@ from abbychess.app import estilo
 
 #: Altura do recorte da palavra no painel, em pixels de tela.
 ALTURA_DO_RECORTE = 110
+#: O corpo do campo: a palavra, e a linha da fila Lances, que é mais longa.
+CORPO_DA_PALAVRA, CORPO_DA_LINHA = 18, 11
 
 
 class _Campo(QLineEdit):
@@ -100,7 +102,7 @@ class PainelDeVerificacao(QWidget):
         self.lido = QLabel("")
         self.lido.setFont(QFont(FONTE_DE_SIMBOLOS, 16))
         self.campo = _Campo()
-        self.campo.setFont(QFont(FONTE_DE_SIMBOLOS, 18))
+        self.campo.setFont(QFont(FONTE_DE_SIMBOLOS, CORPO_DA_PALAVRA))
 
         # Em grade de duas colunas, com o rótulo curto e a tecla na dica: cabe no Inspetor de
         # 296 px (§3.1). Os botões não pegam o foco pelo Tab: o teclado é o do campo.
@@ -166,7 +168,9 @@ class PainelDeVerificacao(QWidget):
                 posicao: int, total: int) -> None:
         """Mostra a palavra com os glifos contornados e põe o texto lido no campo."""
         self._ativo = True
-        self.posicao.setText(f"Palavra {posicao + 1} de {total} — {palavra.explicacao}")
+        de_lance = palavra.motivo == "lance"
+        self.posicao.setText(f"{'Linha' if de_lance else 'Palavra'} {posicao + 1} de {total} — "
+                             f"{palavra.explicacao}")
         recorte, (ox, oy) = vf.recorte_da_palavra(pagina, boxes, palavra.indices)
         pixmap = pixmap_de_cinza(recorte)
         fator = ALTURA_DO_RECORTE / max(pixmap.height(), 1)
@@ -191,19 +195,37 @@ class PainelDeVerificacao(QWidget):
             self._glifos.append((i, x1, x2))
         pintor.end()
         self.recorte.setPixmap(pixmap)
+        self.campo.setText(self._lido_e_texto(boxes, palavra))
+        self._selecionar_o_campo(de_lance)
+        self.habilitar(True)
+        self.botao_todas.setEnabled(not de_lance)
+        self.botao_adicionar.setEnabled(not de_lance)
+        self.campo.setFocus()
+
+    def _selecionar_o_campo(self, de_lance: bool) -> None:
+        """A palavra entra selecionada; a linha de lances não: uma tecla sem querer apagaria a
+        linha inteira. Ela começa do começo, em letra menor, para caber mais no Inspetor."""
+        self.campo.setFont(QFont(FONTE_DE_SIMBOLOS, CORPO_DA_LINHA if de_lance else CORPO_DA_PALAVRA))
+        if de_lance:
+            self.campo.deselect()
+            self.campo.setCursorPosition(0)
+        else:
+            self.campo.selectAll()
+
+    def _lido_e_texto(self, boxes, palavra: vf.Desconhecida) -> str:
+        """O rótulo dos glifos, e o texto do campo."""
+        if palavra.motivo == "lance":           # a fila Lances: o texto da linha, com os espaços
+            self.lido.setText(palavra.aviso)
+            return palavra.sugestao
         lidos = " ".join(boxes[i].char or "□" for i in palavra.indices)
-        self.lido.setText(f"Glifos: {lidos}")
-        # O glifo sem leitura não ganha letra inventada: falta digitá-la.
-        texto = "".join(boxes[i].char for i in palavra.indices)
         if palavra.sugestao:
             # A leitura da camada de texto do PDF (`camada.opinioes`): o espaço dela parte a
             # palavra, como o digitado.
             self.lido.setText(f"Glifos: {lidos}   ·   a camada do PDF lê: {palavra.sugestao}")
-            texto = palavra.sugestao
-        self.campo.setText(texto)
-        self.campo.selectAll()
-        self.habilitar(True)
-        self.campo.setFocus()
+            return palavra.sugestao
+        self.lido.setText(f"Glifos: {lidos}")
+        # O glifo sem leitura não ganha letra inventada: falta digitá-la.
+        return "".join(boxes[i].char for i in palavra.indices)
 
     def limpar(self, mensagem: str) -> None:
         self._ativo = False

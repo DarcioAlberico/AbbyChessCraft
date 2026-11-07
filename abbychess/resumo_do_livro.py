@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
 from core.box_model import BoxEntry
 
 from abbychess import gravacao as gv
-from abbychess.modelo import FIGURINAS, LIDAS, NAO_RECONHECIDA, Pagina
+from abbychess.modelo import FIGURINAS, LIDAS, NAO_RECONHECIDA, Pagina, PaginaDeOutraVersao
 from abbychess.pagina_em_json import pagina_de_json
 from abbychess.pasta_do_projeto import ARQUIVO_DO_LIVRO, PASTA_DE_PAGINAS
 
@@ -115,6 +115,9 @@ class ResumoDoLivro:
             try:
                 bruto = json.loads(arquivo.read_text(encoding="utf-8"))
                 pagina = pagina_de_json(bruto)
+            except PaginaDeOutraVersao as erro:
+                log.warning("%s fica fora do resumo: %s", arquivo.name, erro)
+                continue
             except (OSError, ValueError, TypeError, KeyError):
                 continue                # página ilegível: fica fora do resumo
             ordem = (bruto.get("gravado_em", ""), pagina.pid)
@@ -191,10 +194,13 @@ class ResumoDoLivro:
             gv.gravar_json(self._p.pasta / ARQUIVO_DO_LIVRO, novo)
             self._livro = novo                  # o cache só muda depois de gravado
 
-    def do_modelo(self, pagina: Pagina) -> dict:
-        """O resumo da página no `livro.json` (sem mudar nada: vale numa thread)."""
+    def do_modelo(self, pagina: Pagina, *, leve: bool = False) -> dict:
+        """O resumo da página no `livro.json` (sem mudar nada: vale numa thread). `leve`, na
+        thread da interface: as contagens dos lances ficam as da última gravação, que o gravador
+        refaz logo depois, para o Enter não montar o texto da página duas vezes."""
         tabuleiros = len(pagina.tabuleiros)
-        conferidos = sum(1 for d in pagina.diagramas if d.conferido)
+        # O que falhou na leitura não tem posição a conferir, e o contador chega a zero (U-5a).
+        conferidos = sum(1 for d in pagina.diagramas if d.conferido or d.erro)
         # A régua do negrito dela, para a do livro (`regua_do_negrito`), quando foi medida.
         regua = {"regua_do_negrito": pagina.regua_do_negrito} if pagina.regua_do_negrito else {}
         return {"pid": pagina.pid, "pagina_da_fonte": self._p.ordem.pagina_da_fonte(pagina),
@@ -204,7 +210,43 @@ class ResumoDoLivro:
                 "diagramas": tabuleiros,
                 "diagramas_por_conferir": max(0, tabuleiros - conferidos),
                 # Alguma figurina lida (o modo "livro" das peças, §6.4, sem abrir as páginas).
-                "figurinas": any(b.entry.char in FIGURINAS for b in pagina.boxes), **regua}
+                "figurinas": any(b.entry.char in FIGURINAS for b in pagina.boxes),
+                **(self._dos_lances_guardados(pagina) if leve else self._dos_lances(pagina)),
+                **_da_imagem(pagina), **regua}
+
+    def _dos_lances_guardados(self, pagina: Pagina) -> dict:
+        """As contagens da última gravação; sem nenhuma, a chave falta, e a página conta como
+        desconhecida. Sem a trava do livro: quem chama não pode esperar o disco."""
+        guardado = ((self._livro or {}).get("paginas") or {}).get(str(pagina.pid)) or {}
+        return {k: guardado[k] for k in ("lances_por_conferir", "fortes") if k in guardado}
+
+    def do_livro_com_a_aberta(self, indice: int, pagina: Optional[Pagina]) -> dict:
+        """O resumo do livro com as contagens de agora da página aberta (a gravação delas vem
+        depois): a etiqueta do progresso, fora do Enter."""
+        resumo = dict(self.do_livro())
+        if pagina is not None:
+            resumo[indice] = {**resumo.get(indice, {}), **self._dos_lances(pagina)}
+        return resumo
+
+    def _dos_lances(self, pagina: Pagina) -> dict:
+        """`lances_por_conferir` e `fortes`, as contagens da fila Lances (F-4) e da marca forte."""
+        from abbychess import decodificador_de_lances as dl
+        from abbychess import evidencia as ev
+        from abbychess import texto as tx
+
+        if not pagina.boxes:
+            return {"lances_por_conferir": 0, "fortes": 0}
+        chave = self._p.dados.chave_das_pecas
+        documento = tx.montar(pagina, com_os_nao_lidos=True)
+        return {"lances_por_conferir": dl.lances_por_conferir(documento, ev.conferidos(pagina), chave),
+                "fortes": len(ev.da_pagina(pagina, documento, pagina.diagramas, chave).fortes)}
+
+
+def _da_imagem(pagina: Pagina) -> dict:
+    """`imagem`, só na página tratada como imagem (L-9): a gaveta filtra por ela."""
+    from abbychess import tipo_de_pagina as tp
+
+    return {"imagem": True} if tp.tratada_como_imagem(pagina) else {}
 
 
 def resumo_das_confiancas(boxes: Sequence[BoxEntry], limiares: Limiares,

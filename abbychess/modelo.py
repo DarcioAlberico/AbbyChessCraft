@@ -24,7 +24,7 @@ em `abbychess.texto`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from enum import StrEnum
 from typing import Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
 
@@ -88,6 +88,15 @@ class Estilo:
 SEM_ESTILO = Estilo()
 
 
+#: Quantos campos o `BoxEntry` deste core tem (`as_state` grava todos): `Projeto.campos_do_box`.
+CAMPOS_DO_BOX = len(fields(BoxEntry))
+
+
+class PaginaDeOutraVersao(OSError):
+    """A página foi gravada por uma versão mais nova do programa ou do core (D-1): não é
+    corrompida, e por ser `OSError` não vai ao isolamento das ilegíveis. Quem lê decide."""
+
+
 @dataclass(frozen=True, eq=False, slots=True)
 class Box:
     """Um glifo da página: o `BoxEntry` do core mais a identidade e a procedência dele."""
@@ -108,6 +117,9 @@ class Box:
     @classmethod
     def de_json(cls, bruto) -> "Box":
         gid, estado, amostra, estilo, revisado = bruto
+        if len(estado) > CAMPOS_DO_BOX:
+            raise PaginaDeOutraVersao(f"glifo com {len(estado)} campos; este core tem "
+                                      f"{CAMPOS_DO_BOX}")
         return cls(int(gid), BoxEntry.from_state(tuple(estado)), amostra,
                    Estilo.de_json(estilo), bool(revisado))
 
@@ -117,6 +129,13 @@ FIGURINAS = frozenset("♔♕♖♗♘♙♚♛♜♝♞♟")
 #: As letras das peças em cada idioma, na ordem rei, dama, torre, bispo, cavalo: as do lance
 #: na prosa do livro (a sessão, a busca, o PGN). Uma definição só (SPEC-qualidade Q-E5).
 PECAS = {"pt": "RDTBC", "en": "KQRBN", "es": "RDTAC", "de": "KDTLS", "fr": "RDTFC"}
+
+
+def letras_das_pecas(chave: str) -> str:
+    """As 5 letras, da `chave`: elas mesmas (`Projeto.letras_das_pecas`), ou o idioma."""
+    return chave if len(chave) == 5 and chave.isupper() else PECAS.get(chave, PECAS["en"])
+
+
 #: As letras das peças de todos os idiomas: as que dizem lance sem saber o idioma do livro.
 LETRAS_DAS_PECAS = "".join(sorted(set("".join(PECAS.values()))))
 

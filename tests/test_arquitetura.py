@@ -1,6 +1,6 @@
 """A arquitetura da janela (SPEC §14.1, CA-14.1), conferida no código-fonte.
 
-- `app/janela.py` tem menos de 500 linhas.
+- O tamanho da janela é o total da MRO dela (`test_tamanho_dos_modulos`, A-3).
 - Dentro de `JanelaPrincipal`, toda função aninhada ou `lambda` só chama comandos de
   controlador (`self.pagina.…`, `self.areas.…`, `self.verificador.…`, `self.conferencia.…`,
   `self.livro.…`): a lógica não volta a crescer em closures da janela.
@@ -56,11 +56,6 @@ def violacoes(fonte: str, classe_nome: str = "JanelaPrincipal"):
             if isinstance(no, ast.Call) and not _chamada_de_controlador(no):
                 saida.append((funcao.lineno, ast.unparse(no.func)))
     return saida
-
-
-def test_janela_tem_menos_de_500_linhas():
-    linhas = JANELA.read_text(encoding="utf-8").count("\n")
-    assert linhas < 500, linhas
 
 
 def test_closures_da_janela_so_chamam_comandos_de_controlador():

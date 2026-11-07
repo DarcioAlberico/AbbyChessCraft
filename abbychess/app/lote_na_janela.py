@@ -6,8 +6,9 @@ lote". Um mixin da `JanelaPrincipal`, como `EspacoDeTrabalho`.
 from __future__ import annotations
 
 from abbychess import avisos as av
+from abbychess import evidencia as ev
 from abbychess import lote as lt
-from abbychess.app import dialogos
+from abbychess.app import dialogos, teclado
 
 
 class LoteNaJanela:
@@ -81,6 +82,30 @@ class LoteNaJanela:
     def _pagina_do_lote(self, _indice: int) -> None:
         self.relogio_das_paginas.start()        # a gaveta, depois de uma rajada de páginas
 
+    def listar_as_tratadas_como_imagem(self) -> None:
+        """L-9: a lista em Resultados; Enter abre a página."""
+        p = self.pagina
+        if p.projeto is None:
+            return
+        indices = sorted(i for i, r in p.projeto.resumo.do_livro().items() if r.get("imagem"))
+        itens = [(f"p. {i + 1}", ev.ItemDeLance(i, (), "imagem", f"p. {i + 1}")) for i in indices]
+        self.resultados.mostrar_itens(itens, f"{len(itens)} página(s) tratada(s) como imagem; "
+                                      + teclado.com_teclas("{ler_como_texto} lê como texto."))
+        self.mostrar_resultados()
+
+    def relatorio_de_lances(self) -> None:
+        """Ferramentas ▸ Relatório de lances: em Resultados, por página; Enter vai ao lance."""
+        self.livro.relatorio_de_lances(self._mostrar_o_relatorio_de_lances)
+
+    def _mostrar_o_relatorio_de_lances(self, itens) -> None:
+        por_tipo = {}
+        for item in itens:
+            por_tipo[item.tipo] = por_tipo.get(item.tipo, 0) + 1
+        cabecalho = "Relatório de lances: " + (", ".join(f"{n} {t}" for t, n in sorted(por_tipo.items()))
+                                               or "nenhum lance lido")
+        self.resultados.mostrar_itens([(i.texto, i) for i in itens], cabecalho)
+        self.mostrar_resultados()
+
     def _resultado(self, titulo: str, texto: str) -> None:
         """O que um comando deixou para conferir (Resultados / Avisos), sem diálogo."""
         self.registrar_aviso(av.AVISO, titulo, texto)
@@ -93,6 +118,8 @@ class LoteNaJanela:
                                  "Reconhecer o livro", lt.detalhe_do_fim(resultado))
         if self.pagina.indice in resultado.lidas:
             self.pintar_texto()
+        if resultado.como_imagem:
+            self.listar_as_tratadas_como_imagem()
 
 
     def retomar_lote(self) -> None:

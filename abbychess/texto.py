@@ -590,6 +590,28 @@ def _na_ordem_das_zonas(blocos: List[Bloco], pagina: Pagina) -> List[Bloco]:
                                                     else do_diagrama.get(b.diagrama_id)))
 
 
+def numeros_das_areas(pagina: Pagina) -> Dict[str, int]:
+    """O número de cada área (§5.2), pelo id: a ordem em que o Documento a lê; depois, a que não
+    lê nada, pela ordem dela e pela lista. Nenhum número se repete."""
+    do_diagrama = {d.id: zn.area_do_tabuleiro(pagina.zonas, d.caixa) for d in pagina.diagramas}
+    numeros: Dict[str, int] = {}
+    lidas = [_id_da_area(bloco, do_diagrama) for bloco in montar(pagina).blocos]
+    # `sorted` é estável: sem ordem, fica a da lista.
+    resto = [z.id for z in sorted(pagina.zonas, key=lambda z: (z.ordem is None, z.ordem or 0))]
+    for zona_id in lidas + resto:
+        if zona_id and zona_id not in numeros:
+            numeros[zona_id] = len(numeros) + 1
+    return numeros
+
+
+def _id_da_area(bloco: Bloco, do_diagrama: dict) -> Optional[str]:
+    """O id da área do bloco: a do tabuleiro, no bloco de diagrama."""
+    if bloco.diagrama_id is None:
+        return bloco.zona_id
+    area = do_diagrama.get(bloco.diagrama_id)
+    return area.id if area is not None else None
+
+
 # ----------------------------------------------------------------------
 # O texto
 # ----------------------------------------------------------------------

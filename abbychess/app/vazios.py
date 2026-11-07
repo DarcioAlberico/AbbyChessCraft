@@ -41,6 +41,11 @@ def saude_do_livro(saude) -> str:
     return "\n".join(linhas)
 
 
+def tratada_como_imagem() -> str:
+    return (f"Página tratada como imagem. {_tecla('ler_como_texto', 'Página › Ler como texto')} "
+            "lê como texto.")
+
+
 def nada_reconhecido() -> str:
     return (f"Nada reconhecido nesta página. {_tecla('marcar_glifo', 'O menu da Imagem')} marca "
             f"glifos à mão; {_tecla('reconhecer_pagina', 'Página › Reconhecer')} lê de novo.")

@@ -33,7 +33,8 @@ def montar(janela) -> None:
     j.acao_todas_em_resultados = acao(j, "todas_em_resultados", j.todas_em_resultados)
     j.acao_buscar_glifo = teclado.sem_atalho(j, "Buscar glifo…", j.buscar_glifo)
     j.acao_substituir = acao(j, "substituir", j.substituir, texto="Substituir…")
-    j.acao_galeria = teclado.sem_atalho(j, "Galeria do caractere", lambda: j.abrir_galeria())
+    j.acao_galeria = acao(j, "galeria_do_caractere", lambda: j.abrir_galeria(),
+                          texto="Galeria do caractere")
     j.acao_opcoes = acao(j, "opcoes", j.opcoes, texto="Opções…")
     j.acao_sair = acao(j, "sair", j.close, texto="Sair")
     j.acao_cancelar_lote = acao(j, "cancelar_lote", livro.cancelar, texto="Cancelar o lote")
@@ -114,6 +115,13 @@ def montar(janela) -> None:
                                   texto="Próximo da fila")
     j.acao_anterior_da_fila = acao(j, "anterior_da_fila", lambda: j.fila.andar(-1),
                                    texto="Anterior da fila")
+    j.acao_fila_lances = acao(j, "fila_lances", j.fila.ir_aos_lances, texto="Fila Lances")
+    j.acao_relatorio_de_lances = acao(j, "relatorio_de_lances", j.relatorio_de_lances,
+                                      texto="Relatório de lances")
+    j.acao_ler_como_texto = acao(j, "ler_como_texto", lambda: p.leitura.ler_como_texto(),
+                                 texto="Ler como texto")
+    j.acao_listar_as_imagens = acao(j, "listar_as_imagens", j.listar_as_tratadas_como_imagem,
+                                    texto="Páginas tratadas como imagem")
     j.acao_ciclar_fila = acao(j, "ciclar_modo_da_fila", j.fila.ciclar,
                               texto="Modo seguinte da fila")
     j.acao_escopo_da_fila = acao(j, "alternar_escopo_da_fila", j.fila.alternar_escopo,
@@ -128,6 +136,10 @@ def montar(janela) -> None:
                                     widgets=editor)
     j.acao_diagrama_anterior = acao(j, "diagrama_anterior", lambda: j.editor_diagrama.ir(-1),
                                     widgets=editor)
+    j.acao_lado_brancas = acao(j, "lado_brancas", lambda: j.editor_diagrama.definir_lado("w"),
+                               widgets=editor)
+    j.acao_lado_pretas = acao(j, "lado_pretas", lambda: j.editor_diagrama.definir_lado("b"),
+                              widgets=editor)
     j.acao_diagrama_seguinte = acao(j, "diagrama_seguinte", lambda: j.editor_diagrama.ir(+1),
                                     widgets=editor)
     j.acao_verificar = acao(j, "fila_em_palavras", lambda: j.fila.definir("palavras"),
@@ -172,11 +184,12 @@ def montar(janela) -> None:
                             widgets=com_o_documento)
     j.acao_zoom_menos = acao(j, "zoom_menos", j.afastar, texto="Afastar",
                              widgets=com_o_documento)
-    j.acao_zoom_largura = acao(j, "zoom_largura", j.visor.zoom_largura,
-                               texto="Largura da página", widgets=imagem_e_glifo)
-    j.acao_zoom_100 = acao(j, "zoom_100", j.visor.zoom_100, texto="100%", widgets=imagem_e_glifo)
-    j.acao_zoom_item = acao(j, "zoom_item", j.visor.zoom_item, texto="Zoom no item atual",
-                            widgets=imagem_e_glifo)
+    j.acao_zoom_largura = acao(j, "zoom_largura", lambda: j.zoom_de_pagina(j.visor.zoom_largura),
+                               texto="Largura da página", widgets=com_o_documento)
+    j.acao_zoom_100 = acao(j, "zoom_100", lambda: j.zoom_de_pagina(j.visor.zoom_100),
+                           texto="100%", widgets=com_o_documento)
+    j.acao_zoom_item = acao(j, "zoom_item", lambda: j.zoom_de_pagina(j.visor.zoom_item),
+                            texto="Zoom no item atual", widgets=com_o_documento)
     j.acao_origem = acao(j, "mostrar_origem", j.visor.definir_origem,
                          texto="Mostrar a origem das leituras", widgets=[j.visor],
                          marcavel=True)
@@ -187,6 +200,7 @@ def montar(janela) -> None:
                          texto="Fechar o que está por cima")
     j.acao_linha = acao(j, "mostrar_linha", j.alternar_linha, texto="Linha", marcavel=True)
     j.acao_linha.setChecked(True)
+    j.linha.acoes_do_menu.append(j.acao_linha)        # o menu de contexto da Linha (§3.2)
     j.acao_margens = acao(j, "ocultar_cabecalhos", j.texto.alternar_margens,
                           texto="Cabeçalhos e rodapés", widgets=[j.texto], marcavel=True)
     j.acao_margens.setChecked(True)
@@ -201,7 +215,7 @@ def montar(janela) -> None:
     j.acao_modo_treino = acao(j, "marcar_glifo", j.modo_treino,
                               texto="Marcar glifo à mão", barra=barra, marcavel=True)
     teclado.dica(j.acao_modo_treino, "Marcar glifo à mão ({marcar_glifo}): arraste na página "
-                                     "para marcar um glifo; Ctrl+clique junta boxes na seleção.")
+                                     "para marcar um glifo; Ctrl+clique junta glifos na seleção.")
     j.acao_areas = acao(j, "modo_areas", j.modo_areas, texto="Editor de áreas",
                         barra=barra, marcavel=True)
     teclado.dica(j.acao_areas, "Editor de áreas ({modo_areas}): arraste para desenhar uma área; "
@@ -247,7 +261,7 @@ def montar(janela) -> None:
     t.ensinar_em_lote.connect(p.leitura.ensinar_em_lote)
     j.acao_descartar = acao(j, "descartar_box", t.pedir_descartar, texto="Não é caractere",
                             widgets=[t])
-    j.acao_dividir = acao(j, "dividir", t.pedir_dividir, texto="Dividir o box", widgets=[t])
+    j.acao_dividir = acao(j, "dividir", t.pedir_dividir, texto="Dividir o glifo", widgets=[t])
     j.acao_juntar_seguinte = acao(j, "juntar_seguinte", lambda: j.treino.pedir_juntar(+1),
                                   widgets=[t])
     j.acao_juntar_anterior = acao(j, "juntar_anterior", lambda: j.treino.pedir_juntar(-1),
@@ -261,7 +275,8 @@ def montar(janela) -> None:
     for q in (j.acao_ensinar, j.acao_so_corrigir, j.acao_ensinar_em_lote, j.acao_descartar,
               *j.acoes_das_bordas):
         campo.teclas.ligar(q)                   # no campo, a tecla é dele (exceção 6, §3.4)
-    j.acao_paleta = acao(j, "paleta", j.abrir_paleta, texto="Símbolos…", widgets=[t, j.texto])
+    j.acao_paleta = acao(j, "paleta", j.abrir_paleta, texto="Símbolos…",
+                         widgets=[t, j.texto, j.galeria])
     _documento(j)
     palavra = j.verificacao.campo
     j.acao_corrigir_palavra = acao(j, "corrigir_palavra", j.verificacao.pedir_corrigir,
@@ -295,7 +310,7 @@ def _documento(j) -> None:
     j.acao_sublinhado = acao(j, "sublinhado", lambda: j.alternar_estilo("sublinhado"),
                              widgets=[d])
     j.acoes_das_figurinas = [acao(j, id_, lambda _=False, f=f: j.inserir_figurina(f),
-                                  widgets=[d, j.treino])
+                                  widgets=[d, j.treino, j.galeria])
                              for id_, f in (("figurina_rei", "♔"), ("figurina_dama", "♕"),
                                             ("figurina_torre", "♖"), ("figurina_bispo", "♗"),
                                             ("figurina_cavalo", "♘"), ("figurina_peao", "♙"))]
@@ -312,9 +327,12 @@ def _encher(menu, acoes) -> None:
 
 
 def _menus(j) -> None:
-    _encher(j.menuBar().addMenu("&Projeto"),
-            (j.acao_novo, j.acao_abrir, None, j.acao_exportar, None, j.acao_lote,
-             j.acao_cancelar_lote, j.acao_retomar_lote, None, j.acao_sair))
+    menu = j.menuBar().addMenu("&Projeto")
+    _encher(menu, (j.acao_novo, j.acao_abrir))
+    j.menu_recentes = menu.addMenu("Recentes")
+    j.menu_recentes.aboutToShow.connect(j.encher_os_recentes)
+    _encher(menu, (None, j.acao_exportar, None, j.acao_lote, j.acao_cancelar_lote,
+                   j.acao_retomar_lote, None, j.acao_sair))
     menu = j.menuBar().addMenu("&Editar")
     _encher(menu, (j.acao_desfazer, j.acao_refazer,
                    None,                        # localizar (§7.1)
@@ -331,9 +349,11 @@ def _menus(j) -> None:
     _encher(j.menuBar().addMenu("P&ágina"),
             (j.acao_anterior, j.acao_seguinte, j.acao_primeira, j.acao_ultima,
              j.acao_ir_para, j.acao_voltar_visita, j.acao_avancar_visita, None,
-             j.acao_reconhecer, j.acao_reler, j.acao_verificada, j.acao_antes_do_lote,
+             j.acao_reconhecer, j.acao_reler, j.acao_ler_como_texto, j.acao_verificada,
+             j.acao_antes_do_lote,
              None, *j.acoes_de_paginas[:4], None, *j.acoes_de_paginas[4:], None,
-             j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_ciclar_fila,
+             j.acao_proximo_da_fila, j.acao_anterior_da_fila, j.acao_fila_lances,
+             j.acao_ciclar_fila,
              j.acao_escopo_da_fila, j.acao_proximo_do_livro, j.acao_diagramas))
     _encher(j.menuBar().addMenu("E&xibir"),
             (j.acao_lado_a_lado, j.acao_empilhado, j.acao_so_imagem, j.acao_so_vista,
@@ -347,7 +367,7 @@ def _menus(j) -> None:
             (j.acao_modo_treino, j.acao_areas, j.acao_borracha, j.acao_areas_auto,
              j.acao_reconhecer_zona, j.acao_ordenar_areas,
              j.acao_salvar_modelo_areas, j.acao_aplicar_modelo_areas,
-             j.acao_verificar, None,
+             j.acao_verificar, j.acao_relatorio_de_lances, j.acao_listar_as_imagens, None,
              j.acao_lote, None,
              j.acao_opcoes, j.acao_teclado))
     menu = j.menuBar().addMenu("Aj&uda")

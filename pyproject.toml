@@ -42,4 +42,5 @@ markers = [
     "desempenho: mede tempo ou memória (p95, máquina cadastrada em docs/medidas/maquina.json)",
     "processo: abre processos filhos (spawn) ou mata processos; só correção",
     "noturno: propriedades com muitos exemplos e matanças repetidas",
+    "erro_esperado: o teste provoca um erro logado de propósito (C-5); sem a marca, ele reprova",
 ]

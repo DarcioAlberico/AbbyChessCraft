@@ -10,7 +10,8 @@ from typing import Optional
 from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QImage
 
-from abbychess.app import acoes
+from abbychess import avisos as av
+from abbychess.app import acoes, dialogos
 from abbychess.app.imagens import imagem_do_diagrama
 from abbychess.app.editor_diagrama import EditorDeDiagrama
 from abbychess.app.painel_diagramas import PainelDeDiagramas
@@ -27,6 +28,7 @@ class DiagramasNaJanela:
         self.editor_diagrama.terminou.connect(c.proximo_do_livro)
         self.editor_diagrama.diagrama_mostrado.connect(self.visor.enquadrar)
         self.editor_diagrama.fora_da_pagina.connect(c.vizinho_do_livro)
+        self.editor_diagrama.edicao_descartada.connect(self._edicao_descartada)
         self.painel_diagramas = PainelDeDiagramas()
         self.painel_diagramas.abrir.connect(self.abrir_diagrama_do_livro)
         self.painel_diagramas.atualizar_pedido.connect(self.atualizar_diagramas)
@@ -37,10 +39,26 @@ class DiagramasNaJanela:
         editor = self.editor_diagrama
         self.doca_inspetor.show()
         self.inspetor.mostrar("diagrama")
-        editor.abrir(self.pagina.diagramas, indice, self.pagina.linhas_dos_diagramas())
+        editor.abrir(self.pagina.diagramas, indice, self.pagina.linhas_dos_diagramas(),
+                     pid=self.pagina.modelo.pid if self.pagina.modelo is not None else None)
         editor.posicao.setFocus(Qt.FocusReason.OtherFocusReason)
         acoes.atualizar(self)
         return editor
+
+    def _edicao_descartada(self) -> None:
+        self.registrar_aviso(av.AVISO, "Diagramas", "A leitura de um diagrama mudou desde que "
+                             "você saiu da página: a edição guardada dele foi descartada.")
+
+    def _edicoes_resolvidas(self) -> bool:
+        """Ao fechar o projeto: as casas alteradas e não conferidas se perdem. Falso, se o
+        usuário prefere não fechar."""
+        alterados = self.editor_diagrama.alterados()
+        if alterados and not dialogos.confirmar(
+                self, "Fechar o projeto", f"{alterados} diagrama(s) com casas alteradas e não "
+                "conferidas. Fechar assim perde essas alterações. Fechar mesmo assim?"):
+            return False
+        self.editor_diagrama.esquecer()
+        return True
 
     def _sincronizar_conferencia(self, *_mudados) -> None:
         """A página mudou (desfazer, F5, áreas, a legenda): o editor acompanha, ou fecha se

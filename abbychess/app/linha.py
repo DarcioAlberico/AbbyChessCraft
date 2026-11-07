@@ -11,9 +11,9 @@ from __future__ import annotations
 from typing import List, Optional, Sequence
 
 import numpy as np
-from PySide6.QtCore import QRectF, Qt, QTimer
+from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import QFont, QPainter, QPen, QPixmap
-from PySide6.QtWidgets import QSizePolicy, QWidget
+from PySide6.QtWidgets import QApplication, QMenu, QSizePolicy, QWidget
 
 from abbychess.app.imagens import pixmap_de_cinza
 from abbychess.app import estilo, teclado
@@ -24,6 +24,9 @@ ALTURA_DO_TEXTO = 24
 MARGEM = 4
 #: A faixa do aviso, em cima da imagem, quando há aviso.
 ALTURA_DO_AVISO = 20
+#: O corpo das letras embaixo da imagem, e quantos pixels de largura cada ponto de corpo pede.
+CORPO_MAXIMO, CORPO_MINIMO = 12, 7
+LARGURA_POR_PONTO = 0.75
 
 
 class FaixaDaLinha(QWidget):
@@ -36,12 +39,16 @@ class FaixaDaLinha(QWidget):
         self._origem = (0, 0)
         self._boxes: List = []
         self._atual: Optional[int] = None
+        self._sublinhados = frozenset()
+        self._fortes = frozenset()
         self.escala = 0.0
         #: O aviso não modal de uma edição que mudou a estrutura (§6.3), por alguns segundos.
         self.aviso = ""
         self._relogio_do_aviso = QTimer(self)
         self._relogio_do_aviso.setSingleShot(True)
         self._relogio_do_aviso.timeout.connect(lambda: self.avisar(""))
+        #: As ações da janela que o menu de contexto também mostra (o Ctrl+F5 da Linha).
+        self.acoes_do_menu: List = []
 
     @property
     def glifos(self) -> List:
@@ -56,8 +63,11 @@ class FaixaDaLinha(QWidget):
             self._relogio_do_aviso.start(ms)
         self.update()
 
-    def mostrar(self, matriz: Optional[np.ndarray], boxes: Sequence, atual: Optional[int]) -> None:
-        """Os `boxes` da linha (BoxEntry, na ordem dela) e o índice do atual entre eles."""
+    def mostrar(self, matriz: Optional[np.ndarray], boxes: Sequence, atual: Optional[int], *,
+                sublinhados=frozenset(), fortes=frozenset()) -> None:
+        """Os `boxes` da linha (BoxEntry, na ordem dela) e o índice do atual entre eles; na fila
+        Lances, os índices dos tokens de lance (`sublinhados`) e os do ilegal (`fortes`)."""
+        self._sublinhados, self._fortes = frozenset(sublinhados), frozenset(fortes)
         if matriz is None or not boxes:
             self.limpar()
             return
@@ -74,9 +84,36 @@ class FaixaDaLinha(QWidget):
         self._atual = atual
         self.update()
 
+    def texto(self) -> str:
+        """As letras da linha como a faixa as mostra (□ no glifo sem leitura)."""
+        return "".join(b.char or "□" for b in self._boxes)
+
+    def menu_de_contexto(self) -> QMenu:
+        """Copiar o texto da linha e as ações da janela (§3.2)."""
+        menu = QMenu(self)
+        copiar = menu.addAction("Copiar o texto da linha")
+        copiar.setEnabled(bool(self._boxes))
+        copiar.triggered.connect(lambda: QApplication.clipboard().setText(self.texto()))
+        if self.acoes_do_menu:
+            menu.addSeparator()
+            menu.addActions(self.acoes_do_menu)
+        return menu
+
+    def contextMenuEvent(self, evento):
+        self.menu_de_contexto().exec(evento.globalPos())
+
     def limpar(self) -> None:
         self._recorte, self._boxes, self._atual, self.escala = None, [], None, 0.0
         self.update()
+
+    def corpo_do_texto(self) -> int:
+        """O corpo das letras embaixo da imagem: 12, ou menos numa linha longa, para letra não
+        cair sobre letra (70 caracteres a 1366 px); nunca menos que `CORPO_MINIMO`."""
+        if not self._boxes or not self.escala:
+            return CORPO_MAXIMO
+        larguras = sorted((b.x2 - b.x1) * self.escala for b in self._boxes)
+        mediana = larguras[len(larguras) // 2]
+        return max(CORPO_MINIMO, min(CORPO_MAXIMO, int(mediana / LARGURA_POR_PONTO)))
 
     def paintEvent(self, _evento):
         pintor = QPainter(self)
@@ -100,7 +137,7 @@ class FaixaDaLinha(QWidget):
         pintor.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         pintor.drawPixmap(alvo, self._recorte, QRectF(self._recorte.rect()))
         ox, oy = self._origem
-        pintor.setFont(QFont(FONTE, 12))
+        pintor.setFont(QFont(FONTE, self.corpo_do_texto()))
         base = alvo.bottom() + 2
         for n, b in enumerate(self._boxes):
             gx1 = esquerda + (b.x1 - ox) * self.escala
@@ -111,12 +148,22 @@ class FaixaDaLinha(QWidget):
                 pintor.setPen(caneta)
                 pintor.drawRect(QRectF(gx1 - 1, topo + (b.y1 - oy) * self.escala - 1,
                                        gx2 - gx1 + 2, (b.y2 - b.y1) * self.escala + 2))
-            pintor.setPen(estilo.TINTA if b.char else estilo.VERMELHAO)
-            pintor.drawText(QRectF(gx1 - 8, base, gx2 - gx1 + 16, ALTURA_DO_TEXTO),
-                            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
-                            b.char or "□")
+            self._pintar_a_letra(pintor, n, b, gx1, gx2, base)
         self._pintar_o_aviso(pintor)
         pintor.end()
+
+    def _pintar_a_letra(self, pintor, n: int, b, gx1: float, gx2: float, base: float) -> None:
+        """A letra embaixo do glifo, com o traço do lance (azul) e o do ilegal (forte)."""
+        forte = n in self._fortes
+        pintor.setPen(estilo.TINTA if b.char and not forte else estilo.VERMELHAO)
+        pintor.drawText(QRectF(gx1 - 8, base, gx2 - gx1 + 16, ALTURA_DO_TEXTO),
+                        Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, b.char or "□")
+        if n in self._sublinhados or forte:
+            caneta = QPen(estilo.VERMELHAO if forte else estilo.AZUL)
+            caneta.setWidthF(2.5 if forte else 1)
+            pintor.setPen(caneta)
+            pintor.drawLine(QPointF(gx1, base + ALTURA_DO_TEXTO - 3),
+                            QPointF(gx2, base + ALTURA_DO_TEXTO - 3))
 
     def _pintar_o_aviso(self, pintor) -> None:
         if not self.aviso:

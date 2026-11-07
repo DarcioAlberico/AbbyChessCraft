@@ -20,7 +20,7 @@ import numpy as np
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QSize, Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QHBoxLayout, QLabel, QListView,
-                               QVBoxLayout, QWidget)
+                               QMenu, QVBoxLayout, QWidget)
 
 from abbychess.app.imagens import pixmap_de_cinza
 from abbychess.app import estilo, teclado
@@ -198,6 +198,9 @@ class PainelDaGaleria(QWidget):
         self.vista = VistaDaGaleria()
         self.vista.setModel(self.modelo)
         self.vista.doubleClicked.connect(self._escolhido)
+        self.vista.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.vista.customContextMenuRequested.connect(
+            lambda ponto: self.menu_de_contexto().exec(self.vista.viewport().mapToGlobal(ponto)))
         self.dica = QLabel(DICA)
         self.dica.setWordWrap(True)
         estilo.papel(self.dica, "dica")
@@ -236,6 +239,38 @@ class PainelDaGaleria(QWidget):
     def _escolhido(self, indice) -> None:
         if indice.isValid():
             self.escolhido.emit(self.modelo.itens[indice.row()])
+
+    def menu_de_contexto(self) -> QMenu:
+        """O que as teclas da grade fazem (§3.2), para o mouse: ir, ensinar, só corrigir, os
+        símbolos, selecionar tudo e o outro escopo."""
+        menu = QMenu(self)
+        n = len(self.selecionados())
+        ir = menu.addAction("Ir ao glifo")
+        ir.setEnabled(self.vista.currentIndex().isValid())
+        ir.triggered.connect(lambda: self._escolhido(self.vista.currentIndex()))
+        menu.addSeparator()
+        for texto, sinal in ((f"Ensinar as selecionadas ({n})", self.vista.ensinar),
+                             (f"Só corrigir as selecionadas ({n})", self.vista.so_corrigir)):
+            acao = menu.addAction(texto)
+            acao.setEnabled(bool(n))
+            acao.triggered.connect(sinal.emit)
+        simbolos = menu.addAction("Símbolos…")
+        simbolos.setEnabled(bool(n))
+        simbolos.triggered.connect(lambda: self.abrir_paleta(self.vista.aplicar.emit))
+        menu.addAction("Selecionar tudo", self.vista.selectAll)
+        menu.addSeparator()
+        no_livro = self.escopo.currentData() == "livro"
+        outro = self.escopo.findData("pagina" if no_livro else "livro")
+        menu.addAction("Ver só a página" if no_livro else "Ver o livro inteiro",
+                       lambda: self.escopo.setCurrentIndex(outro))
+        return menu
+
+    def abrir_paleta(self, aplicar) -> None:
+        """F2 na Galeria: o símbolo escolhido vale para a seleção."""
+        from abbychess.app.painel_treino import menu_da_paleta
+
+        self.menu_da_paleta = menu_da_paleta(self, aplicar)      # os testes escolhem sem abrir
+        self.menu_da_paleta.popup(self.vista.mapToGlobal(self.vista.rect().center()))
 
     def focar(self) -> None:
         self.vista.setFocus(Qt.FocusReason.ShortcutFocusReason)

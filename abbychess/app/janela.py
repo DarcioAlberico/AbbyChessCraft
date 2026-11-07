@@ -28,14 +28,15 @@ em `app/espaco.py`; os diálogos, em `app/dialogos.py`.
 from __future__ import annotations
 
 import logging
+from functools import partial
 
 from collections import OrderedDict
 
-from PySide6.QtCore import QSettings, QTimer, Signal
+from PySide6.QtCore import QByteArray, QSettings, QTimer, Signal
 from PySide6.QtWidgets import QApplication, QInputDialog, QMainWindow
 
 from abbychess import avisos as av
-from abbychess.app import acessibilidade, acoes, dialogo_exportacao, dialogos, teclado
+from abbychess.app import acessibilidade, acoes, dialogos, opcoes, recentes, teclado
 from abbychess.app.imagens import qimage_da_pagina
 from abbychess.app.paginas_na_janela import PaginasNaJanela
 from abbychess.app.busca_na_janela import BuscaNaJanela
@@ -164,10 +165,10 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.treino.campo.textChanged.connect(self._aviso_de_ensino)
 
         self.verificacao = PainelDeVerificacao()
-        self.verificacao.corrigir.connect(v.corrigir)
-        self.verificacao.ensinar.connect(lambda t: self.verificador.corrigir(t, ensinar=True))
-        self.verificacao.pular.connect(lambda: self.verificador.andar(+1))
-        self.verificacao.anterior.connect(lambda: self.verificador.andar(-1))
+        self.verificacao.corrigir.connect(lambda t: self.fila.corrigir_no_painel(t))
+        self.verificacao.ensinar.connect(lambda t: self.fila.corrigir_no_painel(t, ensinar=True))
+        self.verificacao.pular.connect(lambda: self.fila.andar_no_painel(+1))
+        self.verificacao.anterior.connect(lambda: self.fila.andar_no_painel(-1))
         self.verificacao.ignorar_todas.connect(v.ignorar_todas)
         self.verificacao.adicionar.connect(self._adicionar_palavra)
         self.verificacao.glifo_escolhido.connect(self._glifo_da_palavra)
@@ -201,6 +202,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
                              ("padroes_mudaram", self._padroes_mudaram),
                              ("layout_mudou", self._layout_mudou),
                              ("palavra_mudou", self._palavra_mudou),
+                             ("linha_de_lance_mudou", self._linha_de_lance_mudou),
                              ("verificacao_pronta", self.verificar_texto),
                              ("conferir", self._abrir_conferencia),
                              ("atual_resolvido", self._atual_resolvido),
@@ -251,6 +253,30 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         if projeto is not None:
             self.abrir(projeto)
 
+    def restaurar_a_geometria(self) -> None:
+        """O tamanho e a posição do fim da última vez (U-4). Só na entrada do programa: a janela
+        dos testes e das medidas nasce sempre igual."""
+        dados = self.config.value("geometria")
+        if isinstance(dados, QByteArray):
+            self.restoreGeometry(dados)
+
+    def reabrir_o_ultimo(self) -> bool:
+        """O último projeto, se ele ainda existe (U-4); sem ele, a janela vazia, sem aviso."""
+        pasta = recentes.ultimo_que_existe(self.config)
+        if pasta is None:
+            return False
+        self.abrir_caminho(pasta)
+        return self.projeto is not None
+
+    def encher_os_recentes(self) -> None:
+        """O submenu Projeto › Recentes, com as pastas de agora."""
+        self.menu_recentes.clear()
+        pastas = recentes.lista(self.config)
+        for pasta in pastas:
+            self.menu_recentes.addAction(pasta, partial(self.abrir_caminho, pasta))
+        if not pastas:
+            self.menu_recentes.addAction("Nenhum projeto recente").setEnabled(False)
+
     def abrir(self, projeto) -> None:
         try:
             fonte = dialogos.preparar_abertura(self, projeto)
@@ -270,6 +296,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self._pixmaps.clear()                   # as páginas do projeto anterior saem
         self.ligar_os_avisos_do_projeto(projeto)
         self.verificador.esquecer_projeto()
+        recentes.lembrar(self.config, projeto.pasta)
         so_leitura = " (só leitura)" if projeto.somente_leitura else ""
         self.setWindowTitle(f"{projeto.dados.nome}{so_leitura} — {TITULO}")
         self.livro.abrir(projeto, fonte)
@@ -288,7 +315,6 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
     def _projeto_aberto(self, leitor) -> None:
         self.fechar_busca()
         self._limpar_previa()
-        self.busca.abrir()                      # o índice da busca, em segundo plano (§7.3)
         self._padroes_mudaram()
         if getattr(self, "_espaco_ja_de", None) is self.projeto:
             self.atualizar_paginas(seguir=True)  # o espaço já veio no trocar_projeto
@@ -326,7 +352,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         de mexer nas tarefas: falso quando o usuário prefere não fechar (e perder as
         mudanças dela), e aí nada mudou."""
         projeto = self.projeto
-        if not self._gravou_ou_perder(projeto):
+        if not self._edicoes_resolvidas() or not self._gravou_ou_perder(projeto):
             return False
         self._parar_tarefas()                   # o fim da tarefa em voo ainda entra
         # A sessão aberta do Documento entra agora, depois da tarefa em voo (um F5 dela que
@@ -380,8 +406,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         p = self.pagina
         if p.reconhecida and p.boxes and not dialogos.confirmar(
                 self, "Reconhecer página",
-                "A página já foi reconhecida. Reconhecer de novo descarta os boxes e as "
-                "correções só desta ocorrência. Os padrões ensinados ficam. Continuar?"):
+                "A página já foi reconhecida. Reconhecer de novo lê os glifos outra vez: os "
+                "corrigidos e os revisados ficam, e os padrões ensinados também. Continuar?"):
             return
         p.leitura.reconhecer()
 
@@ -390,9 +416,14 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
             return
         dialogo = DialogoDeOpcoes(self.projeto.dados.limiares, self,
                                   notacao=self.projeto.dados.notacao,
-                                  idioma=self.projeto.dados.idioma)
+                                  idioma=self.projeto.dados.idioma,
+                                  letras=self.projeto.dados.letras_das_pecas,
+                                  registro=opcoes.registro_ligado(self.config))
         if dialogo.exec() == DialogoDeOpcoes.DialogCode.Accepted:
             self.pagina.padroes_do_livro.definir_notacao(dialogo.notacao())
+            self.pagina.padroes_do_livro.definir_letras(dialogo.letras())
+            self.config.setValue(opcoes.CHAVE_DO_REGISTRO,
+                                 "sim" if dialogo.campo_registro.isChecked() else "nao")
             if self.pagina.padroes_do_livro.definir_idioma(dialogo.idioma()):
                 self.verificador.esquecer_projeto()     # o léxico do idioma novo, no próximo F7
             self.pagina.padroes_do_livro.aplicar_limiares(dialogo.limiares())
@@ -414,13 +445,8 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
             self.areas.aplicar_modelo(indices)
 
     def exportar(self) -> None:
-        """O arquivo, as opções e os metadados (§12.1), e a exportação em segundo plano."""
-        if self.projeto is not None:
-            destino = dialogos.destino_da_exportacao(self, self.projeto)
-            escolha = dialogo_exportacao.perguntar(self, self.projeto, destino) if destino else None
-            if escolha is not None:
-                meta = escolha.metadados if destino.suffix.lower() in (".epub", ".docx") else None
-                self.livro.exportar(destino, escolha.opcoes, meta, escolha.capa)
+        """O livro inteiro: o arquivo, as opções e os metadados (§12.1)."""
+        self.exportar_as_selecionadas(())
 
     def modo_treino(self, sim: bool) -> None:
         if sim:
@@ -428,7 +454,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.visor.definir_modo_do_quadro("treino" if sim else None)
         self.statusBar().showMessage(
             "Marcar glifo à mão: arraste em volta de um glifo para marcá-lo; Ctrl+clique junta "
-            "boxes na seleção." if sim else "Marcar glifo à mão: desligado.", AVISO_LONGO_MS)
+            "glifos na seleção." if sim else "Marcar glifo à mão: desligado.", AVISO_LONGO_MS)
 
     def modo_areas(self, sim: bool) -> None:
         """Liga o editor de áreas; os outros modos do arraste saem (`_so_um_modo`)."""
@@ -466,7 +492,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
             self.pagina.escolher(gid)
 
     def _box_clicado(self, indice: int) -> None:
-        """O clique num box é ação explícita: o Inspetor mostra o Glifo dele."""
+        """O clique num glifo é ação explícita: o Inspetor mostra o Glifo dele."""
         self.inspetor.mostrar("glifo")
         self.pagina.clicar(indice)
 

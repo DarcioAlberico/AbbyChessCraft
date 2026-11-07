@@ -86,6 +86,8 @@ class PaginaLida:
     #: A régua do negrito da página (`regua_do_negrito.regua_da_pagina`), que a interface
     #: grava com ela (vazia: não medida).
     regua_do_negrito: dict = field(default_factory=dict)
+    #: A página é imagem, e não texto (L-9): nada foi segmentado nem lido.
+    imagem: bool = False
 
     def estilos(self) -> dict:
         """`{id(entry): Estilo}` dos boxes com o negrito ou o itálico medido; o eixo sem
@@ -109,8 +111,11 @@ def ler_pagina(imagem, zonas, marcados, leitor, *, regua_do_livro: Optional[dict
     from abbychess import editar_boxes as eb
     from abbychess import efeitos as ef
     from abbychess import procedencia
+    from abbychess import tipo_de_pagina as tp
     from abbychess import zonas as zn
 
+    if not zonas and not marcados and tp.e_imagem(imagem):
+        return PaginaLida([], [], [], None, imagem=True)
     segmentada = zn.segmentar(imagem, zonas, leitor)
     if marcados:
         segmentada.boxes = eb.manter_marcados(segmentada.boxes, marcados)
@@ -126,12 +131,13 @@ def ler_pagina(imagem, zonas, marcados, leitor, *, regua_do_livro: Optional[dict
                       efeitos.italicos, efeitos.regua)
 
 
-def reler_boxes(imagem, boxes, leitor, *, so_pendentes: bool, progresso=None):
-    """Lê de novo os boxes (cópias) e devolve `(boxes, amostras, resumo)`."""
+def reler_boxes(imagem, boxes, leitor, *, so_pendentes: bool, progresso=None, nao_ler=()):
+    """Lê de novo os boxes (cópias), menos os de `nao_ler`, e devolve `(boxes, amostras, resumo)`."""
     from abbychess import pagina as pg
     from abbychess import procedencia
 
-    resumo = pg.ler_boxes(imagem, boxes, leitor, so_pendentes=so_pendentes, progresso=progresso)
+    resumo = pg.ler_boxes(imagem, boxes, leitor, so_pendentes=so_pendentes, progresso=progresso,
+                          nao_ler=nao_ler)
     return boxes, [procedencia.amostra_de(b) for b in boxes], resumo
 
 
@@ -386,8 +392,8 @@ class _Laco:
             return ler_pagina(imagem, zonas, marcados, leitor,
                               regua_do_livro=regua[0] if regua else None)
         if operacao == "reler_boxes":
-            imagem, boxes, so_pendentes = argumentos
-            return reler_boxes(imagem, boxes, leitor, so_pendentes=so_pendentes)
+            imagem, boxes, so_pendentes, nao_ler = argumentos
+            return reler_boxes(imagem, boxes, leitor, so_pendentes=so_pendentes, nao_ler=nao_ler)
         if operacao == "ler_recortes":
             return ler_recortes(argumentos, leitor)
         if operacao == "sugerir_recortes":
@@ -411,8 +417,14 @@ class _Laco:
 
 
 def _principal(entrada, saida, fabrica, pasta_de_padroes, limiares) -> None:
-    """A entrada do filho (`spawn`)."""
+    """A entrada do filho (`spawn`). O vigia do pai vem antes de carregar os modelos: morta a
+    interface à força, ele não fica órfão com gigabytes na memória (C-1)."""
+    from abbychess import log_em_arquivo
+    from abbychess.render import vigiar_o_pai
+
+    vigiar_o_pai()
     logging.basicConfig(level=logging.WARNING)
+    log_em_arquivo.ligar("leitura", logging.WARNING)
     try:
         _Laco(entrada, saida, fabrica, pasta_de_padroes, limiares).rodar()
     except Exception:  # a queda vira resposta: a interface reabre ou desiste

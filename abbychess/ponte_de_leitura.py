@@ -24,6 +24,7 @@ from abbychess import historico as hs
 from abbychess import pagina as pg
 from abbychess import editar_boxes as eb
 from abbychess import servidor_de_leitura as sl
+from abbychess import zonas as zn
 from abbychess.leitor import FONTE_MANUAL
 from abbychess.modelo import LIDAS, Pagina, pid_de
 
@@ -84,7 +85,32 @@ class PonteDeLeitura:
 
         self._p.tarefa(titulo, lambda: self._preparar_reconhecer(indice, zona), falhou=falhou)
 
-    def _preparar_reconhecer(self, indice: int, zona=None):
+    def ler_como_texto(self) -> None:
+        """Ctrl+Shift+T na página tratada como imagem (L-9): a área vira texto e ela é relida,
+        num passo só do desfazer."""
+        from abbychess import tipo_de_pagina as tp
+
+        p = self._p
+        if p.modelo is None or not tp.tratada_como_imagem(p.modelo):
+            p._avisar("Esta página não está tratada como imagem.", 5000)
+            return
+        if not p._pode_ler() or self.servidor_parado():
+            return
+        indice = p.indice
+        p.tarefa("Lendo como texto", lambda: self._preparar_como_texto(indice),
+                 falhou=p._falhou("Ler como texto"))
+
+    def _preparar_como_texto(self, indice: int):
+        if indice != self._p.indice or not self._p._pode_ler():
+            return None
+        pagina = self._p._pagina_para_editar()
+        antes = self._p._instantaneo()
+        z = pagina.zonas[0]
+        pagina.zonas = [zn.Zona(zn.TEXTO, z.x1, z.y1, z.x2, z.y2)]
+        return self._preparar_reconhecer(indice, antes=antes)
+
+    def _preparar_reconhecer(self, indice: int, zona=None, antes=None):
+        """`antes`: o instantâneo que o desfazer volta, se quem chama já mudou a página."""
         if indice != self._p.indice or not self._p._pode_ler():
             return None
         pagina = self._p._pagina_para_editar()
@@ -93,7 +119,7 @@ class PonteDeLeitura:
         self.lendo_no_f5.add(pagina.pid)
         imagem, leitor = self._p.imagem, self._p.leitor
         zonas = [zona] if zona is not None else list(pagina.zonas)
-        antes = self._p._instantaneo()
+        antes = self._p._instantaneo() if antes is None else antes
         marcados = eb.a_manter_na_releitura(pagina.boxes, pagina.estado in LIDAS)   # §4.6
         if zona is not None:
             marcados = [b for b in marcados if zona.contem_o_centro(b)]
@@ -116,7 +142,7 @@ class PonteDeLeitura:
             self.lendo_no_f5.discard(pagina.pid)
             if lida is None:
                 return
-            caidas = arrumacao.aplicar_lida(pagina, lida, self._p.projeto.dados.idioma, zona=zona,
+            caidas = arrumacao.aplicar_lida(pagina, lida, self._p.projeto.dados.chave_das_pecas, zona=zona,
                                             tamanho=None if imagem is None else imagem.size)
             if caidas:                          # §4.6: o que não pôde seguir os glifos novos
                 self._p.eventos.emitir("resultado", "Reconhecer a página", (
@@ -163,24 +189,18 @@ class PonteDeLeitura:
         imagem = self._p.imagem
         leitor, limiares = self._p.leitor, self._p.leitor.limiares
         antes = tuple(pagina.boxes)
-        pendentes = None
-        if tudo:
-            lidos = ed.copias_para_ler(antes, lambda e: e.source != FONTE_MANUAL)
-        else:
-            pendentes = contexto.pendentes_da_pagina(pagina, limiares, com_os_revisados=True)
-            copiar = {id(b.entry) for b, p in zip(antes, pendentes) if p}
-            lidos = ed.copias_para_ler(antes, lambda e: id(e) in copiar)
-
+        lidos, pendentes, nao_ler = _quem_reler(pagina, antes, limiares, tudo)
         servidor = self.servidor_para_pedir()
 
         def trabalho(progresso):
             if servidor is None:
                 resumo = pg.ler_boxes(imagem, lidos, leitor, so_pendentes=not tudo,
-                                      progresso=progresso, pendentes=pendentes)
+                                      progresso=progresso, pendentes=pendentes, nao_ler=nao_ler)
                 return lidos, resumo
             try:
                 relidos, amostras, resumo = servidor.chamar(
-                    "reler_boxes", (imagem, lidos, not tudo), timeout=sl.TEMPO_DO_PEDIDO)
+                    "reler_boxes", (imagem, lidos, not tudo, nao_ler),
+                    timeout=sl.TEMPO_DO_PEDIDO)
             except sl.Cancelado:                # o projeto fechou: nada a pôr
                 return None
             sl.registrar_procedencia(relidos, amostras)
@@ -351,8 +371,7 @@ class PonteDeLeitura:
             if transacao.invalidada:
                 return None
             antes = tuple(pagina.boxes)
-            pendentes = contexto.pendentes_da_pagina(pagina, foto_do_leitor.limiares,
-                                                     com_os_revisados=True)
+            pendentes = contexto.pendentes_da_pagina(pagina, foto_do_leitor.limiares)
             copiar = {id(b.entry) for b, p in zip(antes, pendentes) if p}
             lidos = ed.copias_para_ler(antes, lambda e: id(e) in copiar)
 
@@ -603,6 +622,19 @@ def _ha_quem_sugira(servidor, leitor) -> bool:
 def _so_os_da_pagina(sugestoes: dict, pid: int) -> dict:
     """Os palpites guardados dos glifos da página `pid`."""
     return {g: v for g, v in sugestoes.items() if pid_de(g) == pid}
+
+
+def _quem_reler(pagina, antes, limiares, tudo: bool) -> tuple:
+    """(as cópias a ler, os pendentes, ou None com `tudo`, as posições a não ler). O revisado não
+    é relido, nem com `tudo`: decidido não volta (D-5)."""
+    nao_ler = [i for i, b in enumerate(antes) if b.revisado]
+    if tudo:
+        fora = {id(antes[i].entry) for i in nao_ler}
+        return (ed.copias_para_ler(antes, lambda e: e.source != FONTE_MANUAL
+                                   and id(e) not in fora), None, nao_ler)
+    pendentes = contexto.pendentes_da_pagina(pagina, limiares)
+    copiar = {id(b.entry) for b, p in zip(antes, pendentes) if p}
+    return ed.copias_para_ler(antes, lambda e: id(e) in copiar), pendentes, nao_ler
 
 
 def _pode_pedir_a_leitura(servidor, p, pagina: Pagina, indice: int) -> bool:

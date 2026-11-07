@@ -27,6 +27,7 @@ setas das bordas ficam com o campo (a exceção 6 de §3.4), que dispara a açã
 from __future__ import annotations
 
 import html
+from collections import Counter
 from typing import Optional
 
 import numpy as np
@@ -88,17 +89,90 @@ NOMES_DOS_SIMBOLOS = {
 FONTE_DE_SIMBOLOS = "Segoe UI Symbol"
 
 
-def menu_da_paleta(pai, inserir) -> QMenu:
+#: O que se digita para achar o símbolo na paleta, além do nome: o que ele parece. ± em 3 teclas:
+#: F2, `+`, `=` (CA-U10), porque o filtro com um resultado só já o escolhe.
+APELIDOS_DOS_SIMBOLOS = {"±": "+=", "∓": "=+", "⩲": "+/=", "⩱": "=/+", "+-": "+-", "-+": "-+",
+                         "∞": "inf", "□": "[]", "⇄": "<>", "○": "o"}
+#: Quantos dos mais usados vêm primeiro, nas teclas de 1 a 9 e 0.
+QUANTOS_MAIS_USADOS = 10
+#: Quantas vezes cada símbolo foi escolhido na paleta, nesta sessão.
+_USO_DA_PALETA: Counter = Counter()
+
+
+def _casa_com_o_filtro(simbolo: str, filtro: str) -> bool:
+    filtro = filtro.casefold()
+    return (simbolo.casefold().startswith(filtro)
+            or APELIDOS_DOS_SIMBOLOS.get(simbolo, "").startswith(filtro)
+            or filtro in NOMES_DOS_SIMBOLOS.get(simbolo, "").casefold())
+
+
+class MenuDaPaleta(QMenu):
+    """A paleta com filtro: digitar estreita a lista pelo símbolo, pelo apelido ou pelo nome, e
+    um resultado só já é a escolha. Com o filtro vazio, 1 a 9 e 0 escolhem os mais usados."""
+
+    def __init__(self, pai, inserir):
+        super().__init__(pai)
+        self.setFont(QFont(FONTE_DE_SIMBOLOS, 12))
+        self._inserir = inserir
+        self._escolhido = False
+        self.filtro = ""
+        self._mais_usados = [s for s, _n in _USO_DA_PALETA.most_common(QUANTOS_MAIS_USADOS)]
+        self.acoes_dos_simbolos = {}
+        for n, simbolo in enumerate(self._mais_usados):
+            self.addAction(f"{(n + 1) % 10}  {simbolo}   {NOMES_DOS_SIMBOLOS.get(simbolo, '')}",
+                           lambda s=simbolo: self.escolher(s))
+        if self._mais_usados:
+            self.addSeparator()
+        for i, simbolo in enumerate(PALETA):
+            if i and i % COLUNAS_DA_PALETA == 0:
+                self.addSeparator()
+            self.acoes_dos_simbolos[simbolo] = self.addAction(
+                f"{simbolo}   {NOMES_DOS_SIMBOLOS.get(simbolo, '')}",
+                lambda s=simbolo: self.escolher(s))
+
+    def escolher(self, simbolo: str) -> None:
+        self._escolhido = True
+        _USO_DA_PALETA[simbolo] += 1
+        self._inserir(simbolo)
+
+    def keyPressEvent(self, evento):
+        texto = evento.text()
+        if self._escolhido:
+            return
+        if evento.key() == Qt.Key.Key_Backspace and self.filtro:
+            self._filtrar(self.filtro[:-1])
+        elif not texto or not texto.isprintable() or evento.key() == Qt.Key.Key_Space:
+            super().keyPressEvent(evento)
+        elif not self.filtro and texto.isdigit():
+            self._do_digito(texto)
+        else:
+            self._filtrar(self.filtro + texto)
+
+    def _do_digito(self, digito: str) -> None:
+        k = (int(digito) - 1) % 10
+        if k < len(self._mais_usados):
+            self.close()
+            self.escolher(self._mais_usados[k])
+
+    def _filtrar(self, filtro: str) -> None:
+        self.filtro = filtro
+        achados = [s for s in PALETA if _casa_com_o_filtro(s, filtro)]
+        for simbolo, acao in self.acoes_dos_simbolos.items():
+            acao.setVisible(simbolo in achados)
+        for acao in self.actions():
+            if acao.isSeparator() or acao not in self.acoes_dos_simbolos.values():
+                acao.setVisible(not filtro)
+        if len(achados) == 1:
+            self.close()
+            self.escolher(achados[0])
+        elif achados:
+            self.setActiveAction(self.acoes_dos_simbolos[achados[0]])
+
+
+def menu_da_paleta(pai, inserir) -> MenuDaPaleta:
     """A paleta (F2) como menu: o símbolo escolhido vai a `inserir` (o campo do treino, o
-    cursor do Documento). Os separadores são as linhas da grade."""
-    menu = QMenu(pai)
-    menu.setFont(QFont(FONTE_DE_SIMBOLOS, 12))
-    for i, simbolo in enumerate(PALETA):
-        if i and i % COLUNAS_DA_PALETA == 0:
-            menu.addSeparator()
-        menu.addAction(f"{simbolo}   {NOMES_DOS_SIMBOLOS.get(simbolo, '')}",
-                       lambda s=simbolo: inserir(s))
-    return menu
+    cursor do Documento, a seleção da Galeria)."""
+    return MenuDaPaleta(pai, inserir)
 
 NOMES_DAS_FONTES = {
     "manual": "confirmado por você",
@@ -202,7 +276,7 @@ class PainelDeTreino(QWidget):
 
         self.glifo = _GlifoAmpliado()
         teclado.texto_vivo(self.glifo, "setToolTip",
-                           "Clique onde dividir o box e aperte {dividir}.")
+                           "Clique onde dividir o glifo e aperte {dividir}.")
         self.glifo.clicado.connect(self._clicar_no_glifo)
         self.glifo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.glifo.setMinimumHeight(150)
@@ -249,16 +323,16 @@ class PainelDeTreino(QWidget):
         botao_pular.clicked.connect(self.pular.emit)
         botao_dividir = QPushButton("Dividir")
         teclado.texto_vivo(botao_dividir, "setToolTip",
-                           "Divide o box em dois glifos, na linha vermelha do recorte ou, sem "
+                           "Divide o glifo em dois, na linha amarela do recorte ou, sem "
                            "ela, no vão da tinta ({dividir}).")
         botao_dividir.clicked.connect(self.pedir_dividir)
         botao_juntar_antes = QPushButton("◀ Juntar")
         teclado.texto_vivo(botao_juntar_antes, "setToolTip",
-                           "Junta com o box anterior da linha ({juntar_anterior}).")
+                           "Junta com o glifo anterior da linha ({juntar_anterior}).")
         botao_juntar_antes.clicked.connect(lambda: self.pedir_juntar(-1))
         botao_juntar_depois = QPushButton("Juntar ▶")
         teclado.texto_vivo(botao_juntar_depois, "setToolTip",
-                           "Junta com o box seguinte da linha ({juntar_seguinte}).")
+                           "Junta com o glifo seguinte da linha ({juntar_seguinte}).")
         botao_juntar_depois.clicked.connect(lambda: self.pedir_juntar(+1))
         self._botoes = [botao_ensinar, botao_corrigir, botao_descartar, botao_anterior, botao_pular,
                         botao_dividir, botao_juntar_antes, botao_juntar_depois]
@@ -301,7 +375,7 @@ class PainelDeTreino(QWidget):
         self.padroes = QLabel("")
         self.padroes.setWordWrap(True)
 
-        legenda = QGroupBox("Os boxes na página")
+        legenda = QGroupBox("Os glifos na página")
         caixa_legenda = QVBoxLayout(legenda)
         amostras = [(estilo.traco(estado, origem), texto)
                     for estado, origem, texto in estilo.LEGENDA]
@@ -336,6 +410,7 @@ class PainelDeTreino(QWidget):
         caixa.addWidget(self.fila)              # antes da paleta, que é alta: a 768 px ficam à vista
         caixa.addWidget(self.padroes)
         caixa.addWidget(paleta)
+        self.grade_da_paleta = paleta
         caixa.addWidget(legenda)
         caixa.addStretch(1)
 
@@ -358,8 +433,10 @@ class PainelDeTreino(QWidget):
         if any(self._aviso):
             self.mostrar_aviso_de_ensino(*self._aviso)
 
-    def mostrar(self, pagina: np.ndarray, box: BoxEntry, posicao: str) -> None:
-        """Mostra o box em revisão e põe a leitura atual no campo, selecionada."""
+    def mostrar(self, pagina: np.ndarray, box: BoxEntry, posicao: str,
+                tomar_o_foco: bool = True) -> None:
+        """Mostra o glifo em revisão e põe a leitura atual no campo, selecionada. Sem
+        `tomar_o_foco`, o foco fica onde está: quem digita no Documento continua nele (U-1)."""
         self._pagina, self._box = pagina, box
         self._definir_corte(None)
         fonte = NOMES_DAS_FONTES.get(box.source, box.source or "sem leitura")
@@ -371,7 +448,8 @@ class PainelDeTreino(QWidget):
         self.campo.setText(box.char)
         self.campo.selectAll()
         self.habilitar(True)                    # antes do foco: num campo desligado o Qt o
-        self.campo.setFocus()                   # ignora, e a próxima tecla iria para outro lugar
+        if tomar_o_foco:                        # ignora, e a próxima tecla iria para outro lugar
+            self.campo.setFocus()
 
     def sugerir(self, char: str, confianca: float) -> None:
         """O palpite da rede para o glifo que ninguém leu (§9.2), no campo ainda vazio e

@@ -6,11 +6,12 @@ acrescenta `layout_mudou`. Sem Qt.
 
 from __future__ import annotations
 
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Tuple
 
 from abbychess import historico as hs
 from abbychess import margens as mg
 from abbychess import servidor_de_leitura as sl
+from abbychess import texto as tx
 from abbychess import zonas as zn
 from abbychess.controlador import AVISO_LONGO_MS, ControladorDePagina
 
@@ -40,6 +41,11 @@ class ControladorDeLayout:
     def ordenando(self) -> bool:
         """Se o Ordenar está em curso (o Esc o cancela antes de qualquer outra coisa)."""
         return self._ordenacao is not None
+
+    def numeros(self) -> dict:
+        """O número de cada área, pelo id: o da ordem de leitura (§5.2)."""
+        modelo = self.pagina.modelo
+        return tx.numeros_das_areas(modelo) if modelo is not None else {}
 
     def _parar_a_ordenacao(self) -> None:
         """Uma área que nasce, sai ou muda no meio do Ordenar invalida os cliques dados."""
@@ -113,12 +119,15 @@ class ControladorDeLayout:
                             "{reconhecer_pagina}.", 10000)
 
     def _aprender_margens(self, zonas):
-        """Dá função às margens atuais pelas repetições das páginas reconhecidas."""
+        """Dá função às margens atuais pelas repetições das páginas reconhecidas e pelos
+        títulos corridos que o usuário marcou nelas (§5.1)."""
         p = self.pagina
         if p.projeto is None or p.imagem is None:
             return zonas
-        paginas = _lidas_e_a_aberta(p)
-        funcoes = mg.funcoes_das_margens(paginas).get(p.indice, {})
+        paginas, areas = _lidas_e_a_aberta(p)
+        confirmados = mg.confirmados_das_areas(
+            {i: (paginas[i][0], areas.get(i, ())) for i in paginas})
+        funcoes = mg.funcoes_das_margens(paginas, confirmados).get(p.indice, {})
         return zn.aplicar_funcoes_de_margem(zonas, paginas[p.indice][0], funcoes)
 
     def desenhar(self, x1: int, y1: int, x2: int, y2: int) -> None:
@@ -198,6 +207,21 @@ class ControladorDeLayout:
         if self.atual is not None:
             self.trocar_funcao(self.atual, funcao)
 
+    def levar_a_atual_ao_numero(self, numero: int) -> None:
+        """A área escolhida passa a ter o `numero` na ordem de leitura; as outras andam, e a
+        ordem de todas fica gravada, como no Ordenar. Um passo do desfazer."""
+        zonas, atual = self.zonas, self.atual
+        if atual is None or not 0 <= atual < len(zonas):
+            return
+        numeros = self.numeros()
+        ordem = sorted(range(len(zonas)), key=lambda i: numeros.get(zonas[i].id, i + 1))
+        if ordem.index(atual) == numero - 1:
+            return
+        ordem.remove(atual)
+        ordem.insert(numero - 1, atual)
+        self._parar_a_ordenacao()
+        self._trocar(zn.ordenar(zonas, ordem), atual, "Mudar a ordem da área")
+
     def iniciar_ordenacao(self) -> None:
         if not self.zonas:
             return
@@ -262,20 +286,23 @@ def _lidos(modelo) -> list:
     return [b.entry for b in (modelo.boxes if modelo else []) if b.entry.char]
 
 
-def _lidas_e_a_aberta(p: ControladorDePagina) -> dict:
-    """{índice: (glifos lidos, altura)} das páginas reconhecidas e da aberta, para aprender
-    as margens (`margens.funcoes_das_margens`)."""
-    paginas = {}
+def _lidas_e_a_aberta(p: ControladorDePagina) -> Tuple[dict, dict]:
+    """({índice: (glifos lidos, altura)}, {índice: áreas}) das páginas reconhecidas e da
+    aberta, para aprender as margens (`margens.funcoes_das_margens`) e os títulos corridos
+    confirmados (`margens.confirmados_das_areas`)."""
+    paginas, areas = {}, {}
     for indice in p.projeto.resumo.paginas_lidas():
         modelo = p.modelo if indice == p.indice else p.projeto.carregar_modelo(indice)
         if modelo is None:
             continue
+        areas[indice] = list(modelo.zonas)
         # Todas as páginas do livro são renderizadas no mesmo DPI. A altura aberta
         # evita renderizar as demais só para aprender a margem; pequenas variações de
         # mídia não atravessam as faixas conservadoras de 10% e 3%.
         paginas[indice] = (_lidos(modelo), p.imagem.height)
     paginas.setdefault(p.indice, (_lidos(p.modelo), p.imagem.height))
-    return paginas
+    areas.setdefault(p.indice, list(p.modelo.zonas) if p.modelo is not None else [])
+    return paginas, areas
 
 
 def _aplicar_nas_paginas(p: ControladorDePagina, modelo: zn.ModeloDeAreas,

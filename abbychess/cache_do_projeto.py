@@ -70,7 +70,7 @@ class CacheDoProjeto:
             instantaneo = pagina.instantaneo()
             # O resumo vale já para quem pergunta (F6, o lote, "lidas"), antes da gravação.
             self._a_gravar[pagina.pid] = (instantaneo, resumo if resumo is not None
-                                          else self._p.resumo.do_modelo(instantaneo))
+                                          else self._p.resumo.do_modelo(instantaneo, leve=True))
             self.gravador.agendar(pagina.pid, (next(self._p._bilhetes), instantaneo))
         return True
 

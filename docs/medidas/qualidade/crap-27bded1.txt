@@ -1,0 +1,11 @@
+funções: 3152; CRAP >= 10: 9
+    25.8  cc=  7  cob=  27%  abbychess/validacao_do_epub.py:259  ace
+    25.6  cc=  5  cob=   6%  abbychess/validacao_do_epub.py:307  _no_calibre
+    18.0  cc=  4  cob=   4%  abbychess/app/principal.py:43  main
+    17.2  cc= 15  cob=  79%  abbychess/servidor_de_leitura.py:387  _Laco._operar
+    15.7  cc=  4  cob=  10%  abbychess/app/estilo.py:269  tema_do_sistema
+    13.0  cc= 13  cob= 100%  abbychess/app/visor.py:569  VisorDePagina.mousePressEvent
+    12.1  cc= 12  cob=  92%  abbychess/montagem.py:815  _sem_coordenadas.fora
+    12.0  cc= 12  cob= 100%  abbychess/resumo_do_livro.py:244  resumo_das_confiancas
+    12.0  cc= 12  cob= 100%  abbychess/padroes.py:291  PadroesDoLivro.ler
+fora da lista de aceitos: 0; aceitos que não existem mais: 0

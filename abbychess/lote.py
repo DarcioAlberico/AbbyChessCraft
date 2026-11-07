@@ -53,6 +53,8 @@ VOLTA_DA_ESPERA, PRAZO_DO_CANCELAMENTO = 0.5, 30.0
 class ResultadoDoLote:
     #: As páginas lidas e gravadas neste lote, em ordem.
     lidas: List[int] = field(default_factory=list)
+    #: As tratadas como imagem (L-9): sem leitura, e nunca em silêncio.
+    como_imagem: List[int] = field(default_factory=list)
     #: As que já estavam lidas e ficaram como estavam.
     puladas: List[int] = field(default_factory=list)
     #: As verificadas, puladas mesmo com "refazer" (CA-8.5).
@@ -384,10 +386,12 @@ class CondutorDoLote:
         if (self.refazer or indice in self.forcar) and pagina.estado in LIDAS \
                 and not projeto.somente_leitura:
             projeto.antes_do_lote.guardar(pagina)                         # §4.6
-        caidas = arrumacao.aplicar_lida(pagina, lida, projeto.dados.idioma,
+        caidas = arrumacao.aplicar_lida(pagina, lida, projeto.dados.chave_das_pecas,
                                         tamanho=_tamanho_da_imagem(p, indice))
         if caidas:
             self.resultado.caidas[indice] = caidas
+        if lida.imagem:
+            self.resultado.como_imagem.append(indice)
         p._gravar(pagina)
         self._contar_a_lida(indice, pagina)
         _mostrar_se_aberta(p, indice, pagina)
@@ -436,6 +440,8 @@ def resumo_do_fim(resultado: ResultadoDoLote) -> str:
     else:
         inicio = "Lote concluído"
     partes = [f"{len(resultado.lidas)} lida(s)", f"{resultado.total_de_pendentes} a revisar"]
+    if resultado.como_imagem:
+        partes.append(f"{len(resultado.como_imagem)} tratada(s) como imagem")
     if resultado.reler_depois:
         partes.append(f"{len(resultado.reler_depois)} para reler depois")
     if resultado.falhas:
@@ -452,6 +458,7 @@ def detalhe_do_fim(resultado: ResultadoDoLote) -> str:
               f"{sum(resultado.diagramas.values())} diagrama(s) lido(s) em FEN."]
     for paginas, frase in ((resultado.puladas, "Já lidas, puladas: {}."),
                            (resultado.verificadas, "Verificadas, puladas: {}."),
+                           (resultado.como_imagem, "Tratadas como imagem, sem leitura: {}."),
                            (resultado.reler_depois, "Para reler depois (mudadas por você "
                             "nesta sessão, ou enquanto o lote as lia): {}.")):
         if paginas:

@@ -1,0 +1,7 @@
+funções com >= 60 nós: 1828; pares com rank >= 0.8: 3
+1.00    10 linhas  abbychess/coordenadas.py:177 _cinza  <->  abbychess/diagramas.py:596 _cinza
+0.88    18 linhas  abbychess/app/janela.py:416 exportar  <->  abbychess/app/paginas_na_janela.py:104 exportar_as_selecionadas
+0.84    17 linhas  abbychess/app/barra_de_busca.py:144 _botao  <->  abbychess/app/barra_de_busca.py:153 _acao_simples
+fora da lista de aceitos: 2; aceitos que não existem mais: 0
+novo     abbychess/app/janela.py exportar  <->  abbychess/app/paginas_na_janela.py exportar_as_selecionadas
+novo     abbychess/coordenadas.py _cinza  <->  abbychess/diagramas.py _cinza

@@ -27,6 +27,7 @@ from core.box_model import BoxEntry
 
 from abbychess import pagina as pg
 from abbychess import servidor_de_leitura as sl
+from abbychess.modelo import VERIFICADA
 from abbychess.leitor import LeitorDoLivro
 from abbychess.lote import ResultadoDoLote  # noqa: F401 (o resultado do lote mora lá)
 from abbychess.projeto import Limiares, ProjetoDeLivro
@@ -193,6 +194,15 @@ def reconhecer_paginas(projeto: ProjetoDeLivro, fonte: pg.FonteDePaginas,
 # ----------------------------------------------------------------------
 # A revisão do livro todo
 # ----------------------------------------------------------------------
+
+def progresso(resumo: dict, total: int) -> str:
+    """A etiqueta fixa da barra (U-3): `verificadas 123/300 · lances por conferir 410 · diagramas
+    14`. A página sem a chave no resumo não soma: `recalcular` a preenche."""
+    verificadas = sum(r.get("estado") == VERIFICADA for r in resumo.values())
+    lances = sum(r.get("lances_por_conferir", 0) for r in resumo.values())
+    diagramas = sum(r.get("diagramas_por_conferir", 0) for r in resumo.values())
+    return f"verificadas {verificadas}/{total} · lances por conferir {lances} · diagramas {diagramas}"
+
 
 def pendentes_da_pagina(boxes: List[BoxEntry], limiares: Limiares) -> int:
     from abbychess import contexto

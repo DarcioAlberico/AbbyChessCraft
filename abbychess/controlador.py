@@ -65,9 +65,10 @@ from abbychess.fila_da_pagina import FilaDaPagina
 from abbychess.padroes_do_livro import ControladorDosPadroes
 from abbychess.ponte_de_leitura import PonteDeLeitura
 from abbychess import servidor_de_leitura as sl
+from abbychess.fila_de_lances import EvidenciaNaPagina
 from abbychess.sessao_do_documento import ControladorDaSessao
 from abbychess import texto as tx
-from abbychess.modelo import (LIDAS, NAO_RECONHECIDA, RECONHECIDA, VERIFICADA,
+from abbychess.modelo import (LIDAS, NAO_RECONHECIDA, PaginaDeOutraVersao, RECONHECIDA, VERIFICADA,
                               Diferenca, Pagina, proximo_estado)
 from abbychess.navegador import Navegador
 from abbychess.operacoes_de_pagina import ControladorDaSequencia
@@ -159,6 +160,8 @@ class ControladorDePagina:
         self.pulados: set = set()
         #: A sessão do Documento confirmada (§6.3), o parágrafo, os estilos e o modo das peças.
         self.sessoes = ControladorDaSessao(self)
+        #: A evidência da página aberta (F-1, F-3, X-1), calculada quando o texto é pintado.
+        self.evidencia = EvidenciaNaPagina(self)
         #: Chamado antes de sair da página aberta (outra página, o Ctrl+T): a janela confirma
         #: ali a sessão aberta do Documento (§6.3), que não pode ficar para depois.
         self.antes_de_sair_da_pagina: Optional[Callable[[], None]] = None
@@ -263,6 +266,9 @@ class ControladorDePagina:
         return "" if pagina is None else tx.texto(tx.montar(pagina), pagina.diagramas,
                                                    modo=tx.SAN)
 
+    def diagramas_com_ids(self) -> list:
+        return dg.com_ids(self.diagramas)
+
     def documento(self):
         """O documento derivado da página (§4.2), para o painel Documento, com os glifos que
         ninguém leu (o realce os mostra); None sem página reconhecida."""
@@ -284,7 +290,7 @@ class ControladorDePagina:
             return []
         pagina = self.modelo.instantaneo()
         pagina.diagramas = dg.com_ids(self.diagramas)
-        idioma = self.projeto.dados.idioma if self.projeto is not None else "pt"
+        idioma = self.projeto.dados.chave_das_pecas if self.projeto is not None else "pt"
         textos = lc.textos_depois(tx.montar(pagina))
         return [lc.primeira_linha(textos.get(d.id, ""), idioma) for d in pagina.diagramas]
 
@@ -361,12 +367,18 @@ class ControladorDePagina:
         except OSError as erro:
             self.eventos.emitir("aviso", "Página", str(erro))
             return False
+        try:
+            modelo = self.projeto.carregar_modelo(indice)
+        except PaginaDeOutraVersao as erro:     # D-1: nada mudou aqui, e o arquivo fica como está
+            self.eventos.emitir("aviso", "Página", f"A página {indice + 1} foi gravada por uma "
+                                f"versão mais nova do programa: atualize-o para abri-la ({erro}).")
+            return False
         de = self.indice
         self.indice, self.imagem, self.matriz = indice, imagem, matriz
         self._matriz_da_imagem = imagem
         self._letra_que_faltava = None
         self.navegador.chegou(de, indice, visita=visita)
-        self.modelo = self.projeto.carregar_modelo(indice)
+        self.modelo = modelo
         self.atual, self.pulados, self.selecao = None, set(), set()
         self.eventos.emitir("pagina_trocou")
         self.eventos.emitir("glifos_mudaram", None)
@@ -819,7 +831,7 @@ class ControladorDePagina:
         entra no mesmo passo do desfazer (`diagramas.rederivar_lados`). O F5 já leu tudo."""
         _com_o_estado_e_os_lados(pagina, antes, evento)
         criados = _amostras_novas(self, antes)
-        arrumacao.arrumar(pagina, self.projeto.dados.idioma)
+        arrumacao.arrumar(pagina, self.projeto.dados.chave_das_pecas)
         transacao = self.historico.registrar(hs.Transacao(
             descricao, {pagina.pid: hs.mudanca(antes.pagina, pagina.instantaneo())},
             amostras_criadas=criados, juntar=juntar))
@@ -901,7 +913,7 @@ def _corrigir_nas_paginas(p: ControladorDePagina, alvos: dict, char_de, recortes
         feitos += _corrigir_os_glifos(p, pagina, indice, gids, char_de, recortes, pedidos)
         # Como toda edição: o estado, o lado dos diagramas pela legenda corrigida e a
         # validação pelos lances (um lance do texto pode ter mudado).
-        depois_de_editar(pagina, antes, p.projeto.dados.idioma)
+        depois_de_editar(pagina, antes, p.projeto.dados.chave_das_pecas)
         mudadas.append((pagina, antes))
     return aberta, feitos, mudadas, pedidos
 

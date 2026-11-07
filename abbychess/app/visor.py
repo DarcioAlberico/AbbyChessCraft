@@ -41,6 +41,10 @@ from abbychess.app import estilo
 from abbychess.app.item_dos_boxes import ItemDosBoxes
 
 
+#: Com menos glifos que isto, a página não tem mancha a medir (U-14).
+MINIMO_DA_MANCHA = 20
+
+
 class VisorDePagina(QGraphicsView):
     """Mostra a página e os boxes. Clique escolhe um box; Ctrl+roda aproxima."""
 
@@ -122,6 +126,7 @@ class VisorDePagina(QGraphicsView):
         self._zona_sel: Optional[int] = None
         #: O que cada área desenha, no índice dela: (o retângulo, o fundo do rótulo, o rótulo).
         self._zonas_itens: List[tuple] = []
+        self._numeros_das_zonas: dict = {}
         #: O arraste de uma área em curso: (índice, bordas, ponto inicial).
         self._arraste = None
         self._palavra: Optional[QGraphicsRectItem] = None
@@ -181,7 +186,7 @@ class VisorDePagina(QGraphicsView):
         if self._destaque is not None:
             cena.removeItem(self._destaque)
             self._destaque = None
-        self._boxes = boxes
+        self._trocar_os_boxes(boxes)
         self._tabuleiros = [tuple(t) for t in tabuleiros]
         self._itens = _desenhar_tabuleiros(cena, self._tabuleiros, cores_dos_tabuleiros)
         if self.item_dos_boxes is not None:
@@ -276,18 +281,45 @@ class VisorDePagina(QGraphicsView):
         vista = self.viewport().rect()
         if cena.isEmpty() or vista.width() < 40 or vista.height() < 40:
             return                              # sem tamanho útil (a doca recolhida): nada
-        if self.modo_zoom == "largura":
-            nova = (vista.width() - 4) / cena.width()
-        else:
-            nova = min((vista.width() - 4) / cena.width(), (vista.height() - 4) / cena.height())
+        mancha = self._mancha() if self.modo_zoom == "largura" else None
+        nova = self._escala_do_modo(cena, vista, mancha)
         modo = self.modo_zoom
         barra = self.verticalScrollBar()
         fracao = barra.value() / barra.maximum() if barra.maximum() > 0 else 0.0
         self._escalar(nova, modo, avisar=False)
         if modo == "largura":                   # a mesma altura da página, na escala nova
             barra.setValue(round(fracao * barra.maximum()))
+            if mancha is not None:
+                meio = self.mapToScene(self.viewport().rect().center()).y()
+                self.centerOn((mancha[0] + mancha[1]) / 2, meio)
         else:
             self.centerOn(cena.center())
+
+    def _trocar_os_boxes(self, boxes) -> None:
+        """Os boxes novos; na largura, a página que acabou de ser lida tem mancha agora."""
+        antes = self._mancha()
+        self._boxes = boxes
+        if self.modo_zoom == "largura" and self._mancha() != antes:
+            self._aplicar_modo()
+
+    def _escala_do_modo(self, cena, vista, mancha) -> float:
+        if mancha is not None:
+            return (vista.width() - 4) / (mancha[1] - mancha[0])
+        if self.modo_zoom == "largura":
+            return (vista.width() - 4) / cena.width()
+        return min((vista.width() - 4) / cena.width(), (vista.height() - 4) / cena.height())
+
+    def _mancha(self) -> Optional[tuple]:
+        """A largura do texto impresso, sem os 1 % de glifos mais à margem (a poeira): é ela, e
+        não a folha, que a largura mede (U-14). None sem glifos, ou com a mancha quase vazia."""
+        if len(self._boxes) < MINIMO_DA_MANCHA:
+            return None
+        esquerdas = sorted(b.x1 for b in self._boxes)
+        direitas = sorted(b.x2 for b in self._boxes)
+        corte = len(self._boxes) // 100
+        x1, x2 = esquerdas[corte], direitas[-1 - corte]
+        folga = (x2 - x1) * 0.03
+        return (x1 - folga, x2 + folga) if x2 > x1 else None
 
     def resizeEvent(self, evento):
         super().resizeEvent(evento)
@@ -372,7 +404,7 @@ class VisorDePagina(QGraphicsView):
         self._arraste, self._inicio = None, None
         self.viewport().setMouseTracking(sim)
         self._cursor_do_modo()
-        self.mostrar_zonas(self._zonas, self._zona_sel)
+        self.mostrar_zonas(self._zonas, self._zona_sel, numeros=self._numeros_das_zonas)
 
     def _cursor_do_modo(self) -> None:
         livre = not (self.modo_treino or self.modo_areas or self.modo_borracha)
@@ -382,11 +414,14 @@ class VisorDePagina(QGraphicsView):
                                   else Qt.CursorShape.CrossCursor)
 
     def mostrar_zonas(self, zonas, selecionada: Optional[int] = None,
-                      ordem_clicada: Optional[list] = None) -> None:
-        """Desenha as áreas, com o número da ordem e a função no canto, sobre um fundo de
-        papel (o texto colorido solto sumia sobre o impresso). Só no editor de áreas. No
-        Ordenar (`ordem_clicada`), as clicadas mostram a ordem nova e as outras um "?"."""
+                      ordem_clicada: Optional[list] = None,
+                      numeros: Optional[dict] = None) -> None:
+        """Desenha as áreas, com o número da ordem (`numeros`, por id: a de leitura) e a função
+        no canto, sobre um fundo de papel (o texto colorido solto sumia sobre o impresso). Só no
+        editor de áreas. No Ordenar (`ordem_clicada`), as clicadas mostram a ordem nova e as
+        outras um "?"."""
         self.ordenando = ordem_clicada is not None
+        self._numeros_das_zonas = numeros or {}
         cena = self.scene()
         for item in (item for itens in self._zonas_itens for item in itens):
             cena.removeItem(item)
@@ -398,7 +433,8 @@ class VisorDePagina(QGraphicsView):
             return
         for i, z in enumerate(self._zonas):
             self._zonas_itens.append(_desenhar_zona(cena, z, i == self._zona_sel,
-                                                    _numero_da_zona(i, z, ordem_clicada)))
+                                                    _numero_da_zona(i, z, ordem_clicada,
+                                                                    self._numeros_das_zonas)))
 
     def menu_da_zona(self, indice: int) -> QMenu:
         """A função da área e apagá-la, pelo botão direito."""
@@ -761,11 +797,13 @@ def _desenhar_tabuleiros(cena: QGraphicsScene, tabuleiros, cores) -> List[QGraph
     return itens
 
 
-def _numero_da_zona(i: int, zona, ordem_clicada: Optional[list]):
-    """O número do rótulo da área `i`: a ordem de leitura dela (ou a posição, sem ordem); no
-    Ordenar, a ordem nova das clicadas e um "?" nas outras."""
+def _numero_da_zona(i: int, zona, ordem_clicada: Optional[list], numeros: dict):
+    """O número do rótulo da área `i`: o da leitura (`numeros`), ou, sem ele, a ordem dela ou a
+    posição; no Ordenar, a ordem nova das clicadas e um "?" nas outras."""
     if ordem_clicada is not None:
         return ordem_clicada.index(i) + 1 if i in ordem_clicada else "?"
+    if zona.id in numeros:
+        return numeros[zona.id]
     return zona.ordem + 1 if zona.ordem is not None else i + 1
 
 

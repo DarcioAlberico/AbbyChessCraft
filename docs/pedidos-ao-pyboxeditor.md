@@ -48,3 +48,10 @@ O AbbyChessCraft não edita o PyBoxEditor: os pedidos são para quem o mantém.
   linha vazia, o `.gz`, o byte torto trocado).
 - **Pedido:** um `lexico.ler(caminho)` público.
 - **Contrato:** `tests/test_contrato_do_core.py::test_contrato_da_lista_de_palavras`.
+
+## 5. O que a camada tirou de cada página
+
+- **Falta:** `pdf_nativo.extrair` chama `retirar_mobilia` e descarta o que ela devolve (um
+  `Counter` do livro inteiro, sem a página). O relatório da exportação (§12.2, CA-12.5) lista as
+  margens tiradas das páginas lidas pelos boxes; nas da camada, só avisa que não as lista.
+- **Pedido:** `Extracao.retiradas`, `{página: [linhas tiradas]}`.

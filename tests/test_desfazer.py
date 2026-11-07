@@ -240,6 +240,7 @@ def test_ctrl_z_desfaz_o_ensinar_e_apaga_o_padrao(app, janela):
     assert sum(b.source == FONTE_LIVRO for b in boxes(janela)) == 4
 
 
+@pytest.mark.erro_esperado
 def test_o_desfazer_que_falha_nos_padroes_ja_moveu_o_historico(app, janela, monkeypatch):
     """SPEC-qualidade Q-C5: as páginas voltam e o histórico anda junto com elas; um padrão
     que não sai do disco é avisado, e não deixa a transação para trás, já aplicada."""
@@ -469,6 +470,7 @@ def test_desfazer_depois_de_a_pagina_sair_da_memoria(app, tmp_path, monkeypatch)
         j.close()
 
 
+@pytest.mark.erro_esperado
 def test_enter_que_nao_grava_a_amostra_nao_deixa_nada(app, janela, monkeypatch):
     from PySide6.QtWidgets import QMessageBox
 

@@ -379,6 +379,29 @@ def test_o_zoom_no_documento_muda_o_corpo_e_nao_a_imagem(app, lida_a_mao):
     assert j.texto.corpo == padrao
 
 
+@pytest.mark.parametrize("tecla", [Qt.Key.Key_7, Qt.Key.Key_8, Qt.Key.Key_9])
+def test_o_zoom_de_pagina_no_documento_diz_onde_vale(app, lida_a_mao, tecla):
+    """§3.3: Ctrl+7/8/9 não fazem nada no Documento, e a barra diz para ir à Imagem."""
+    j = lida_a_mao
+    escala = j.visor.escala()
+    j.vista.setCurrentWidget(j.painel_do_documento)
+    j.texto.setFocus()
+    app.processEvents()
+    QTest.keyClick(j.texto, tecla, Qt.KeyboardModifier.ControlModifier)
+    assert abs(j.visor.escala() - escala) < 1e-9
+    assert "foco na Imagem (Alt+2)" in j.statusBar().currentMessage()
+
+
+def test_o_zoom_de_pagina_na_imagem_segue_valendo(app, lida_a_mao):
+    j = lida_a_mao
+    j.visor.setFocus()
+    app.processEvents()
+    j.statusBar().clearMessage()
+    QTest.keyClick(j.visor, Qt.Key.Key_8, Qt.KeyboardModifier.ControlModifier)
+    assert abs(j.visor.escala() - 1.0) < 1e-6
+    assert "foco na Imagem" not in j.statusBar().currentMessage()
+
+
 def test_ctrl_shift_h_na_janela(app, lida_a_mao):
     j = lida_a_mao
     j.texto.setFocus()
@@ -437,30 +460,23 @@ def test_x_height_na_linha(app, tmp_path, sim, largura, altura):  # noqa: F811
         j.close()
 
 
-def test_o_ultimo_glifo_de_uma_linha_visual_quebrada_e_clicavel(app):
-    """Uma palavra longa sem espaço quebra no meio: o glifo do fim de cada linha visual também
-    se acha pelo clique."""
+def test_a_palavra_longa_nao_quebra_e_a_barra_a_alcanca(app):
+    """U-13: a linha impressa nunca quebra; o que não cabe, nem no corpo mínimo, a rolagem mostra."""
     gids = list(range(100, 220))
     chars = {g: "m" for g in gids}
     v = _vista(app, _doc(_bloco("b0", "texto", [gids]), chars=chars))
     v.resize(260, 400)
     v.show()
     app.processEvents()
-    fins = []
-    for g in gids:
-        cursor = v.textCursor()
-        cursor.setPosition(v.posicao_do_gid(g))
-        depois = v.textCursor()
-        depois.setPosition(v.posicao_do_gid(g) + 1)
-        if v.cursorRect(depois).y() != v.cursorRect(cursor).y():
-            fins.append(g)
-    assert fins                                            # a palavra quebrou
-    for g in fins:
-        cursor = v.textCursor()
-        cursor.setPosition(v.posicao_do_gid(g))
-        ponto = v.cursorRect(cursor).center() + QPoint(3, 0)
-        assert v.gid_no_ponto(ponto) == g
-    v.close()
+    assert v.document().begin().layout().lineCount() == 1
+    assert v.horizontalScrollBar().maximum() > 0
+    v.ir_ao_gid(gids[-1])
+    app.processEvents()
+    assert v.horizontalScrollBar().value() > 0
+    cursor = v.textCursor()
+    cursor.setPosition(v.posicao_do_gid(gids[-1]))
+    ponto = v.cursorRect(cursor).center() + QPoint(3, 0)
+    assert v.gid_no_ponto(ponto) == gids[-1]
 
 
 def test_o_cabecalho_corrido_sai_em_cinza_e_ctrl_shift_h_o_oculta(app):

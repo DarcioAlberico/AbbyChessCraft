@@ -30,16 +30,18 @@ class ControladorDeDiagramas:
         p = self.pagina
         if not p.pronto:
             return
-        if any(not d.conferido for d in p.diagramas):
+        if _tem_por_conferir(p.diagramas):
             self.conferir()
             return
         com = _paginas_com(p.projeto.resumo.do_livro(), "diagramas_por_conferir")
-        proxima = _seguinte_dando_a_volta(com, p.indice)
-        if proxima is None or proxima == p.indice:
-            p._avisar("Não há diagrama por conferir no livro.", 6000)
-            return
-        if p.ir_para(proxima):
-            self.conferir()
+        for proxima in _em_volta(com, p.indice):
+            if not p.ir_para(proxima):
+                return
+            # O `livro.json` de antes conta o que falhou na leitura: esta só se vê aberta.
+            if _tem_por_conferir(p.diagramas):
+                self.conferir()
+                return
+        p._avisar("Não há diagrama por conferir no livro.", 6000)
 
     def vizinho_do_livro(self, passo: int) -> None:
         """PgDn (+1) na ponta da página: o primeiro diagrama da próxima página que tem algum;
@@ -141,7 +143,7 @@ class ControladorDeDiagramas:
                         if d.caixa == lido.caixa and not d.lido:
                             novos[i] = lido
                 pagina.diagramas = dg.com_ids(novos)
-                pagina.diagramas = lc.validar_pagina(pagina, p.projeto.dados.idioma)
+                pagina.diagramas = lc.validar_pagina(pagina, p.projeto.dados.chave_das_pecas)
                 p._gravar(pagina)
                 if pagina is p.modelo:
                     self.eventos.emitir("glifos_mudaram", None)
@@ -198,10 +200,14 @@ def _paginas_com(resumo: dict, chave: str) -> List[int]:
     return sorted(i for i, r in resumo.items() if r.get(chave, 0) > 0)
 
 
-def _seguinte_dando_a_volta(paginas: List[int], indice: int) -> Optional[int]:
-    """A primeira de `paginas` depois de `indice`; na ponta, a primeira do livro (None sem
-    nenhuma)."""
-    return next((i for i in paginas if i > indice), paginas[0] if paginas else None)
+def _em_volta(paginas: List[int], indice: int) -> List[int]:
+    """As `paginas` depois de `indice` e, dando a volta no livro, as de antes, sem ela."""
+    return [i for i in paginas if i > indice] + [i for i in paginas if i < indice]
+
+
+def _tem_por_conferir(diagramas) -> bool:
+    """Há algo a conferir: o que falhou na leitura não tem posição, e não prende o F8 (U-5a)."""
+    return any(not d.conferido and not d.erro for d in diagramas)
 
 
 def _vizinha(paginas: List[int], indice: int, passo: int) -> Optional[int]:

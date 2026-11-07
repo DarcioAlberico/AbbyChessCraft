@@ -6,8 +6,11 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 
 | Ação | Padrão | FineReader | Escopo | Desde |
 |---|---|---|---|---|
+| A fila Lances | F4 | F4 | global | PPL |
+| A Galeria do caractere do glifo atual | Ctrl+Shift+G | Ctrl+Shift+G | global | T1 |
 | Abrir projeto | Ctrl+O | Ctrl+O | global | A2 |
 | Alternar o escopo da fila (página ou livro) | Shift+F7 | Ctrl+Shift+F8 | global | C |
+| As páginas tratadas como imagem, em Resultados | — | — | global | PPT |
 | Borracha (apagar uma mancha da imagem) | Ctrl+Shift+E | Ctrl+Shift+E | global | L |
 | Cancelar o lote (também o ✕ da barra de status) | — | — | global | A2 |
 | Ciclar o modo da fila | F7 | Ctrl+Shift+F7 | global | A2 |
@@ -28,12 +31,14 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Imagem e vista direita lado a lado | Ctrl+F7 | F7 | global | A2 |
 | Ir para a página | Ctrl+G | Ctrl+G | global | A1 |
 | Item anterior da fila | Alt+Up | Alt+Up | global | A2 |
+| Ler como texto a página tratada como imagem | Ctrl+Shift+T | Ctrl+Shift+T | global | PPT |
 | Localizar | Ctrl+F | Ctrl+F | global | B |
 | Marcar a página verificada e abrir a próxima | Ctrl+T | Ctrl+T | global | A2 |
 | Marcar glifo à mão (quadro) | Ctrl+M | Ctrl+M | global | A2 |
 | Mostrar ou esconder a Linha | Ctrl+F5 | Ctrl+F5 | global | A3 |
 | Mostrar ou esconder Páginas | F9 | F5 | global | A2 |
 | Novo projeto | Ctrl+N | Ctrl+N | global | A2 |
+| O relatório de lances do livro, em Resultados | — | — | global | PPL |
 | Ocorrência anterior | Shift+F3 | Shift+F3 | global | B |
 | Opções do livro | Ctrl+, | Ctrl+, | global | A2 |
 | Painel anterior | — | Ctrl+Shift+Tab | global | K |
@@ -66,10 +71,10 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 
 | Ação | Padrão | FineReader | Escopo | Desde |
 |---|---|---|---|---|
-| 100% | Ctrl+8 | Ctrl+8 | imagem, glifo | A1 |
+| 100% | Ctrl+8 | Ctrl+8 | imagem, glifo, documento | A1 |
 | Afastar (Imagem) ou diminuir o corpo (Documento) | Ctrl+- | Ctrl+- | imagem, documento, glifo | A1 |
 | Aproximar (Imagem) ou aumentar o corpo (Documento) | Ctrl+= / Ctrl++ | Ctrl+= / Ctrl++ | imagem, documento, glifo | A1 |
-| Largura da página | Ctrl+9 | Ctrl+9 | imagem, glifo | A1 |
+| Largura da página | Ctrl+9 | Ctrl+9 | imagem, glifo, documento | A1 |
 | Mostrar a origem das leituras nos boxes | V | V | imagem | A1 |
 | Mover a borda de baixo para baixo | Shift+Down | Shift+Down | imagem, campo_glifo | A2 |
 | Mover a borda de baixo para cima | Shift+Up | Shift+Up | imagem, campo_glifo | A2 |
@@ -82,7 +87,7 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Página inteira (Imagem) ou corpo padrão (Documento) | Ctrl+0 | Ctrl+0 | imagem, documento, glifo | A1 |
 | Rolar uma tela (e virar para a página anterior no topo) | PgUp | PgUp | imagem | A1 |
 | Rolar uma tela (e virar para a página seguinte no fim) | PgDn | PgDn | imagem | A1 |
-| Zoom no item atual | Ctrl+7 | Ctrl+7 | imagem, glifo | A1 |
+| Zoom no item atual | Ctrl+7 | Ctrl+7 | imagem, glifo, documento | A1 |
 
 ## imagem_areas
 
@@ -159,6 +164,8 @@ Gerado de `docs/atalhos.yaml` por `ferramentas/atalhos.py`; não edite à mão.
 | Ação | Padrão | FineReader | Escopo | Desde |
 |---|---|---|---|---|
 | Diagrama conferido (grava e vai ao próximo por conferir) | Ctrl+Enter | Ctrl+Enter | diagrama | H |
+| No editor Diagrama: brancas a jogar | Ctrl+W | Ctrl+W | diagrama | PPL |
+| No editor Diagrama: pretas a jogar | Ctrl+B | Ctrl+B | diagrama | PPL |
 | O diagrama anterior do livro | PgUp | PgUp | diagrama | H |
 | O diagrama seguinte do livro | PgDn | PgDn | diagrama | H |
 

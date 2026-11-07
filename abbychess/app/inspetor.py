@@ -27,6 +27,7 @@ DICAS = {
     "diagrama": "letra da peça escreve · Delete esvazia · {conferir_diagrama} conferido · "
                 "{diagrama_anterior}/{diagrama_seguinte} diagrama anterior/seguinte do livro · "
                 "{proximo_diagrama} próximo por conferir",
+    "area": "letra da função, com o foco na Imagem · Del apaga a área · {desfazer} desfaz",
 }
 
 
@@ -103,7 +104,7 @@ class PainelDoInspetor(QWidget):
 
     # ------------------------------------------------------------------
     def mostrar(self, nome: str) -> None:
-        """Mostra o editor `nome` ("glifo", "palavra", "diagrama")."""
+        """Mostra o editor `nome` ("glifo", "palavra", "diagrama", "area")."""
         self.pilha.setCurrentWidget(self._rolagens[nome])
         self._refazer_a_dica()
 

@@ -215,10 +215,16 @@ class EditorDeDiagrama(QWidget):
     diagrama_mostrado = Signal(object)
     #: PgUp (−1) ou PgDn (+1) na ponta da página: o diagrama vizinho é de outra página.
     fora_da_pagina = Signal(int)
+    #: A leitura do diagrama mudou enquanto a edição dele estava guardada (D-2).
+    edicao_descartada = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.diagramas: List[DiagramaLido] = []
+        #: A página dos diagramas abertos, e os tabuleiros alterados das páginas de que se saiu:
+        #: (pid, caixa) -> (o FEN da leitura ao sair, o tabuleiro).
+        self.pid: Optional[int] = None
+        self._guardados: Dict[tuple, tuple] = {}
         #: A primeira linha de lances do texto depois de cada diagrama (§10).
         self.linhas: List[List[lances.Lance]] = []
         self.atual = 0
@@ -237,14 +243,17 @@ class EditorDeDiagrama(QWidget):
         return bool(self.diagramas)
 
     def abrir(self, diagramas: List[DiagramaLido], indice: int = 0,
-              linhas: Optional[List[List[lances.Lance]]] = None) -> None:
-        """Os diagramas da página, no `indice`. Os mesmos diagramas de antes (outro clique
-        na mesma página, o F8, a aba) mantêm o que estava em edição; outros o descartam."""
-        mesmos = self.aberto and _chaves(diagramas) == _chaves(self.diagramas)
+              linhas: Optional[List[List[lances.Lance]]] = None, pid: Optional[int] = None) -> None:
+        """Os diagramas da página `pid`, no `indice`. Os mesmos diagramas de antes (outro clique
+        na mesma página, o F8, a aba) mantêm o que estava em edição; outros o guardam, e o
+        tabuleiro alterado volta ao voltar à página (D-2), se o diagrama não mudou."""
+        mesmos = self.aberto and pid == self.pid and _chaves(diagramas) == _chaves(self.diagramas)
+        if not mesmos:
+            self._guardar_os_alterados()
+            self.tabuleiros = {}
+        self.pid = pid
         self.diagramas = list(diagramas)
         self.linhas = list(linhas or [])
-        if not mesmos:
-            self.tabuleiros = {}
         self.atual = max(0, min(indice, len(self.diagramas) - 1))
         self.check_inteiro.setChecked(False)
         if self.diagramas:
@@ -276,15 +285,44 @@ class EditorDeDiagrama(QWidget):
         return True
 
     def fechar(self) -> None:
-        """Sem diagramas (a página trocou): nada em edição."""
+        """Sem diagramas (a página trocou): o que estava alterado fica guardado (D-2)."""
+        self._guardar_os_alterados()
         self.diagramas, self.linhas, self.tabuleiros, self.atual = [], [], {}, 0
         self._mostrar()
+
+    def _guardar_os_alterados(self) -> None:
+        for indice, tabuleiro in self.tabuleiros.items():
+            if tabuleiro.pode_desfazer and indice < len(self.diagramas):
+                d = self.diagramas[indice]
+                self._guardados[(self.pid, tuple(d.caixa))] = (d.fen, tabuleiro)
+
+    def alterados(self) -> int:
+        """Quantos diagramas têm casas alteradas e ainda não conferidas, guardados ou abertos."""
+        abertos = sum(t.pode_desfazer for t in self.tabuleiros.values())
+        return len(self._guardados) + abertos
+
+    def esquecer(self) -> None:
+        """O projeto fechou: as edições guardadas eram dele."""
+        self._guardados.clear()
+        self.tabuleiros = {}
 
     def tabuleiro(self, indice: Optional[int] = None) -> TabuleiroEdicao:
         indice = self.atual if indice is None else indice
         if indice not in self.tabuleiros:
-            self.tabuleiros[indice] = self.diagramas[indice].edicao()
+            self.tabuleiros[indice] = (self._guardado(self.diagramas[indice])
+                                       or self.diagramas[indice].edicao())
         return self.tabuleiros[indice]
+
+    def _guardado(self, diagrama: DiagramaLido) -> Optional[TabuleiroEdicao]:
+        """O tabuleiro guardado deste diagrama, se a leitura dele não mudou desde então; se
+        mudou, a edição é descartada, e o editor avisa."""
+        fen_base, tabuleiro = self._guardados.pop((self.pid, tuple(diagrama.caixa)), (None, None))
+        if tabuleiro is None:
+            return None
+        if fen_base != diagrama.fen:
+            self.edicao_descartada.emit()
+            return None
+        return tabuleiro
 
     @property
     def diagrama(self) -> DiagramaLido:
@@ -459,6 +497,10 @@ class EditorDeDiagrama(QWidget):
             afirmar_lado(self.tabuleiro(), lado)
         self._mostrar()
 
+    def definir_lado(self, lado: str) -> None:
+        """Ctrl+W e Ctrl+B: o lado a jogar, sem passar pelos rádios (X-3)."""
+        self._mudar_lado(lado)
+
     def _mudar_roque(self, letra: str) -> None:
         if self.aberto:
             self.tabuleiro().alternar_roque(letra)
@@ -553,6 +595,10 @@ class EditorDeDiagrama(QWidget):
         partes = [f"Diagrama {self.atual + 1} de {len(self.diagramas)}", tabuleiro.resumo()]
         if d.conferido:
             partes.append("conferido")
+        if tabuleiro.pode_desfazer:
+            partes.append("alterado, sem gravar")
+        if tabuleiro.lado_origem == "convencao" or not tabuleiro.lado_origem:
+            partes.append("lado não dito")
         self.cabecalho.setText("  —  ".join(partes))
         self.fen.setText(tabuleiro.fen())
         self.avisos.setText("\n".join(self.avisos_do_diagrama()))

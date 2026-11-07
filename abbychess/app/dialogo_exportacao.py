@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
@@ -44,9 +44,12 @@ class Escolha:
 
 class DialogoDeExportacao(QDialog):
     def __init__(self, parent, formato: str, opcoes: ex.Opcoes, metadados: dict,
-                 pasta_do_projeto: Path, titulo_padrao: str, total_de_paginas: int = 0):
+                 pasta_do_projeto: Path, titulo_padrao: str, total_de_paginas: int = 0,
+                 selecao: Sequence[int] = ()):
         super().__init__(parent)
-        self.setWindowTitle(f"Exportar {formato.upper()}")
+        self.selecao = tuple(selecao)
+        escolhidas = f" ({len(self.selecao)} páginas selecionadas)" if self.selecao else ""
+        self.setWindowTitle(f"Exportar {formato.upper()}{escolhidas}")
         self.formato = formato
         self.pasta = Path(pasta_do_projeto)
         self.capa_escolhida: Optional[Path] = None
@@ -246,7 +249,7 @@ class DialogoDeExportacao(QDialog):
                          realcar_duvidosos=marcada("realcar_duvidosos", self.realcar),
                          links_de_analise=(self.analise.currentData() if self.analise.isEnabled()
                                            else padrao.links_de_analise),
-                         intervalo=self._intervalo())
+                         intervalo=self._intervalo(), selecao=self.selecao)
 
     def _intervalo(self):
         """`(primeira, última)` em índices, ou `None` para todas; a ordem trocada se acerta."""
@@ -403,16 +406,18 @@ def _campos_lembrados(padrao: ex.Opcoes, marcadas: set) -> dict:
 def lembrar_opcoes(config, opcoes: ex.Opcoes) -> None:
     config.setValue(CHAVE, ",".join(c if v is True else f"{c}={v}"
                                     for c, v in vars(opcoes).items()
-                                    if c != "intervalo"           # o intervalo não se lembra
+                                    if c not in ("intervalo", "selecao")   # não se lembram
                                     and (v is True or not isinstance(v, bool))) or "nenhuma")
 
 
-def perguntar(janela, projeto, destino: Path) -> Optional[Escolha]:
-    """O diálogo para o `destino`; `None` se o usuário cancelar."""
+def perguntar(janela, projeto, destino: Path, selecao: Sequence[int] = ()) -> Optional[Escolha]:
+    """O diálogo para o `destino`; `None` se o usuário cancelar. Com a `selecao` da gaveta, o
+    intervalo não se pergunta."""
     formato = ex.formato_do_caminho(destino)
     dialogo = DialogoDeExportacao(janela, formato, opcoes_lembradas(janela.config),
                                   mtd.ler_metadados(projeto), projeto.pasta, projeto.dados.nome,
-                                  len(projeto.sequencia))     # as páginas do livro, não do PDF
+                                  0 if selecao else len(projeto.sequencia),     # as páginas do livro, não do PDF
+                                  selecao=selecao)
 
     def previsualizar(formato_, opcoes, metadados):
         janela.livro.previa(formato_, opcoes, metadados, dialogo.mostrar_previa,

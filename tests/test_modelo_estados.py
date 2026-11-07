@@ -310,6 +310,7 @@ class _ProjetoNaMemoria:
     somente_leitura = False
 
     class dados:
+        chave_das_pecas = "pt"
         nome = "Maquina"
         idioma = "pt"
         notacao = "letras"

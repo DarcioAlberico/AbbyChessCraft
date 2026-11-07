@@ -145,6 +145,7 @@ def test_o_filho_de_um_pai_com_qt_nao_carrega_o_qt(tmp_path):
     assert saida.stdout.strip() == "[]", saida.stderr
 
 
+@pytest.mark.erro_esperado
 def test_o_aviso_de_pronto_que_falha_nao_para_o_servidor(pasta):
     vistos = []
 
@@ -160,6 +161,7 @@ def test_o_aviso_de_pronto_que_falha_nao_para_o_servidor(pasta):
         s.fechar()
 
 
+@pytest.mark.erro_esperado
 def test_o_filho_que_cai_ao_comecar_e_reaberto_uma_vez_e_depois_desiste(pasta):
     from tests.ajudantes import esperar
 

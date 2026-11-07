@@ -259,6 +259,8 @@ def test_f7_cicla_o_modo_e_o_editor_do_inspetor(app, lida, monkeypatch):
     assert "Palavras" in j.inspetor.seletor.text()
     QTest.keyClick(j.visor, Qt.Key.Key_F7)
     QTest.keyClick(j.visor, Qt.Key.Key_F7)
+    assert j.fila.modo == "lances" and j.inspetor.atual() == "palavra"       # F-4
+    QTest.keyClick(j.visor, Qt.Key.Key_F7)
     assert j.fila.modo == "confianca" and j.inspetor.atual() == "glifo"
 
 
@@ -410,7 +412,9 @@ def test_shift_f10_e_a_tecla_menu_abrem_o_menu_de_contexto_em_todo_painel(app, l
     j.doca_paginas.show()
     j.doca_resultados.show()
     app.processEvents()
-    for widget in (j.paginas.lista, j.visor, j.texto, j.treino.campo, j.resultados.avisos):
+    for widget in (j.paginas.lista, j.visor, j.texto, j.treino.campo, j.resultados.avisos,
+                   j.galeria.vista, j.padroes.amostras, j.padroes.caracteres,
+                   j.painel_diagramas.grade, j.linha):
         alvo = widget.viewport() if hasattr(widget, "viewport") and widget is not j.visor else widget
         assert _menu_pelo_teclado(app, alvo) is not None, widget
 
@@ -531,7 +535,7 @@ def test_o_projeto_seguinte_sem_espaco_comeca_do_padrao(app, tmp_path, sim):
         j.usar(dois, pg.FonteDePaginas(dois.fonte),
                LeitorDoLivro(dois.pasta_de_padroes, limiares=dois.dados.limiares))
         assert j.fila.modo == "confianca" and j.inspetor.atual() == "glifo"
-        assert j.vista.currentIndex() == 0 and j.visor.modo_zoom == "pagina"
+        assert j.vista.currentIndex() == 0 and j.visor.modo_zoom == "largura"     # U-14
         j.registrar_aviso(av.AVISO, "Teste", "vai para o Dois")
         um_log = Path(um.pasta) / av.ARQUIVO
         assert not um_log.exists() or "vai para o Dois" not in um_log.read_text(encoding="utf-8")
@@ -586,7 +590,7 @@ def _cabe(app, editor, rolagem):
     return fora
 
 
-@pytest.mark.parametrize("editor", ["glifo", "palavra"])
+@pytest.mark.parametrize("editor", ["glifo", "palavra", "area"])
 def test_os_editores_cabem_no_inspetor_de_296_px(app, lida, editor):
     from core import lexico
 
@@ -608,7 +612,7 @@ def test_ctrl_t_com_pendentes_pergunta_e_o_nao_deixa_a_pagina(app, lida, monkeyp
     assert fila(j)
     j.localizar()                                        # a busca aberta
     QTest.keyClick(j.visor, Qt.Key.Key_T, Qt.KeyboardModifier.ControlModifier)
-    assert j.confirmacao.aberta and f"Aceitar {len(fila(j))} pendente" in j.confirmacao.pergunta.text()
+    assert j.confirmacao.aberta and f"Aceitar {len(fila(j))} dúvidas" in j.confirmacao.pergunta.text()
     QTest.keyClick(QApplication.focusWidget() or j.confirmacao, Qt.Key.Key_Escape)
     assert not j.confirmacao.aberta and not j.barra_de_busca.isHidden()
     assert j.pagina.modelo.estado != md.VERIFICADA

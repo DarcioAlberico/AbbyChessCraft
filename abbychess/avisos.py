@@ -48,11 +48,13 @@ class RegistroDeAvisos:
         self._arquivo: Optional[Path] = None
         #: Quantos chegaram desde que o usuário olhou (o ⚠N da barra de status).
         self.novos = 0
+        #: Quantos dos `novos` são erros: o ⚠ fica na cor de erro (CA-U6).
+        self.erros_novos = 0
 
     def abrir(self, pasta: Optional[Path], *, gravar: bool = True) -> None:
         """Os avisos do projeto em `pasta` (os que o arquivo tem); `gravar` falso no projeto
         só de leitura."""
-        self.itens, self.novos = [], 0
+        self.itens, self.novos, self.erros_novos = [], 0, 0
         self._arquivo = Path(pasta) / ARQUIVO if pasta is not None and gravar else None
         caminho = Path(pasta) / ARQUIVO if pasta is not None else None
         if caminho is None or not caminho.exists():
@@ -68,6 +70,7 @@ class RegistroDeAvisos:
         aviso = Aviso(time.strftime("%Y-%m-%d %H:%M:%S"), tipo, titulo, texto)
         self.itens.append(aviso)
         self.novos += 1
+        self.erros_novos += tipo == ERRO
         if self._arquivo is not None:
             try:
                 self._gravar(aviso)
@@ -84,4 +87,4 @@ class RegistroDeAvisos:
                                                   + "\n" for a in self.itens))
 
     def visto(self) -> None:
-        self.novos = 0
+        self.novos = self.erros_novos = 0

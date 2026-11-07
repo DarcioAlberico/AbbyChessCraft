@@ -38,6 +38,7 @@ from abbychess import verificacao as vf
 from abbychess.modelo import LIDAS
 from abbychess.app import visor as vs
 from abbychess.app.confirmacao import BarraDeConfirmacao
+from abbychess.app.faixa_de_gravacao import FaixaDeGravacao
 from abbychess.app import acessibilidade, estilo, icones, registro_de_eventos, teclado, vazios
 from abbychess.app.editor_de_area import EditorDeArea
 from abbychess.app.inspetor import PainelDoInspetor
@@ -151,10 +152,13 @@ class EspacoDeTrabalho:
         self.divisor.addWidget(self.vista)
         self.linha = FaixaDaLinha()
         self.confirmacao = BarraDeConfirmacao()      # a pergunta do Ctrl+T (§8.4)
+        self.faixa_de_gravacao = FaixaDeGravacao()   # a página que não grava (CA-U6)
+        self.faixa_de_gravacao.ver_os_avisos.connect(self.abrir_avisos)
         centro = QWidget()
         caixa = QVBoxLayout(centro)
         caixa.setContentsMargins(0, 0, 0, 0)
         caixa.setSpacing(4)
+        caixa.addWidget(self.faixa_de_gravacao)
         caixa.addWidget(self.divisor, 1)
         caixa.addWidget(self.confirmacao)
         caixa.addWidget(self.linha)
@@ -613,8 +617,11 @@ class EspacoDeTrabalho:
         self.atualizar_avisos()
 
     def atualizar_avisos(self) -> None:
+        """O ⚠N da barra, na cor de erro se algum dos novos é erro (CA-U6)."""
         novos = self.avisos.novos
         self.botao_avisos.setText(f"⚠{novos}" if novos else "⚠")
+        estilo.papel(self.botao_avisos, "erro" if self.avisos.erros_novos
+                     else "aviso" if novos else "")
 
     def mostrar_resultados(self) -> None:
         """Abre Resultados / Avisos com a altura padrão (200 px, §3.1)."""

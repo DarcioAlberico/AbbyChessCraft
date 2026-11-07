@@ -94,6 +94,11 @@ class CacheDoProjeto:
         """Os pids com mudança ainda não gravada."""
         return self._gravador.sujas if self._gravador is not None else set()
 
+    @property
+    def falhando(self) -> set:
+        """Os pids cuja última gravação falhou e que o gravador ainda tenta (CA-U6)."""
+        return self._gravador.falhando if self._gravador is not None else set()
+
     def paginas_sujas(self) -> List[int]:
         """As posições das páginas entregues ao gravador e ainda não gravadas."""
         sequencia = self._p.sequencia

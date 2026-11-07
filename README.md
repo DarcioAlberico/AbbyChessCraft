@@ -1622,7 +1622,7 @@ Grava `docs\medidas\qualidade\crap-<commit>.txt`, `duplicacao-<commit>.txt` e
   por ele (a barra de status mostra o progresso). O índice de 230 páginas cumpre os 2 s só
   com os processos já abertos (o primeiro projeto, aberto um pouco depois do programa); o
   projeto aberto junto com o programa, e o segundo da sessão, levam 2,0–2,9 s, e pela janela
-  o índice chega a 2,4 s (CA-7.1, uma limitação conhecida).
+  o índice leva ~2,3 s (CA-7.1, uma limitação conhecida: `docs/revisoes/ca-7-1.md`).
 - **Substituir, desde o passo D2**: o "m" → "rn" faz uma caixa de duas letras, e não divide
   pela tinta (a substituição não tem a imagem da página). As figurinas não
   entram sozinhas no texto substituído (o §6.4 é da digitação). Uma troca no livro inteiro

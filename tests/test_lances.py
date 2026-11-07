@@ -304,8 +304,10 @@ def test_ca_10_1_no_gabarito_do_xadrez_vitorioso():
     sys.path.insert(0, str(RAIZ / "ferramentas"))
     import medir
 
+    from tests.livros import gabaritos_do_livro
+
     gabaritos = {f.stem: json.loads(f.read_text(encoding="utf-8"))
-                 for f in (RAIZ / "tests" / "verdade" / "xv").glob("i*.json")}
+                 for f in gabaritos_do_livro("xv")}
     r = medir.validacao_pelos_lances(gabaritos)
     assert r["verdadeiros"] >= 2 and r["verdadeiros_confiaveis"] == r["verdadeiros"]
     assert r["perturbadas"] == 100 and r["afetadas"] > 0

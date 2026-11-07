@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import time
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -27,7 +26,6 @@ from abbychess.modelo import Box, Pagina
 from abbychess.projeto import ProjetoDeLivro
 from tests.ajudantes import _esperar
 
-VERDADE = Path(__file__).parent / "verdade"
 
 
 def _capa(largura=800, altura=1100) -> Image.Image:
@@ -201,10 +199,12 @@ def test_a_tecla_fora_da_pagina_de_imagem_avisa(app, janela):
 @pytest.mark.livro_real
 @pytest.mark.timeout(600)
 def test_ca_l9_2_nenhuma_pagina_com_gabarito_de_texto_cai_nele():
-    from tests.livros import PASTA_DOS_PDFS
+    from tests.livros import PASTA_DOS_PDFS, VERDADE
 
     import fitz
 
+    if not VERDADE.is_dir():
+        pytest.skip(f"os gabaritos não estão em {VERDADE}")
     caidas = []
     for livro in ("xv", "darcy", "yusupov"):
         for arquivo in sorted((VERDADE / livro).glob("i*.json")):

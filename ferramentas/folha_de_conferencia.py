@@ -436,7 +436,7 @@ def montar(livro: str, paginas=None, pdf: Path | None = None) -> Path:
 <main>{"".join(secoes)}
 <section><h2>Depois de assinar todas</h2>
 <pre><code>.venv\\Scripts\\python.exe ferramentas\\rotular.py validar --livro {_e(livro)}</code></pre>
-<p>A folha não grava nada: corrija o JSON em <code>tests\\verdade\\{_e(livro)}\\</code>, rode
+<p>A folha não grava nada: corrija o JSON em <code>{_e(str(VERDADE / livro))}</code>, rode
 <code>folha_de_conferencia.py</code> de novo para ver a correção e assine pelo comando.</p></section>
 </main><script>{SCRIPT}</script></body></html>
 """

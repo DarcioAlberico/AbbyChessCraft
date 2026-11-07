@@ -24,3 +24,8 @@ capturas/
 
 # A cobertura por teste que o mutador guarda entre as partes de uma medida (refeita por ele)
 docs/medidas/mutacao/*.contextos
+
+# O texto dos livros fica fora do git, por direito autoral: os gabaritos e as fatias lidas
+# estão em %LOCALAPPDATA%\AbbyChessCraft\ (ABBY_VERDADE e ABBY_FATIAS, ferramentas/comum.py).
+tests/verdade/
+tests/dados/fatia/

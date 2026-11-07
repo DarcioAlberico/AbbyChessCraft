@@ -41,9 +41,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / "ferramentas"))
 
-from comum import PASTA_DOS_PDFS  # noqa: E402,F401 (as outras ferramentas a importam daqui)
-
-VERDADE = RAIZ / "tests" / "verdade"
+from comum import PASTA_DOS_PDFS, VERDADE  # noqa: E402,F401 (as outras ferramentas a importam daqui)
 FAIXAS = RAIZ / ".rotulagem"
 LINHAS_POR_FAIXA = 7
 #: A concordância mínima da conferência cega do texto (SPEC §15.2).

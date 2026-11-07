@@ -4,7 +4,6 @@ troca sem reiniciar; nenhuma cor literal em `app/` fora de `estilo.py`)."""
 from __future__ import annotations
 
 import ast
-import json
 import os
 from pathlib import Path
 
@@ -42,7 +41,9 @@ def tema_claro_no_fim(app):
 
 def _papel_de_referencia() -> QColor:
     """O fundo do índice 25 do livro de referência, gravado no gabarito (CA-13.2)."""
-    g = json.loads((RAIZ / "tests" / "verdade" / "xv" / "i025.json").read_text(encoding="utf-8"))
+    from tests.livros import gabarito
+
+    g = gabarito("xv", 25)
     return QColor(g["papel"], g["papel"], g["papel"])
 
 

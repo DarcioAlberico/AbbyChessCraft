@@ -30,6 +30,11 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / "ferramentas"))
 
+try:
+    from comum import VERDADE  # noqa: E402
+except ImportError:  # copiada num commit de antes de 07/11/2026 (`remedir`): tests/verdade
+    VERDADE = RAIZ / "tests" / "verdade"
+
 REFERENCIA = RAIZ / "docs" / "medidas" / "catraca-xv.json"
 LIVRO = "xv"
 INDICES = tuple(range(20, 27))
@@ -98,7 +103,7 @@ def _raiz_do_core() -> Path:
     return Path(core.__file__).resolve().parent.parent
 
 
-def chave(raiz_da_verdade: Path = RAIZ / "tests" / "verdade") -> dict:
+def chave(raiz_da_verdade: Path = VERDADE) -> dict:
     """O que torna duas medidas comparáveis."""
     gabaritos = hashlib.sha256()
     for indice in INDICES:
@@ -150,7 +155,8 @@ def remedir(referencia: dict) -> dict:
     subprocess.run(["git", "worktree", "add", "--detach", str(arvore), referencia["commit"]],
                    cwd=RAIZ, check=True, capture_output=True)
     try:
-        shutil.copytree(RAIZ / "tests" / "verdade", arvore / "tests" / "verdade",
+        # Os commits de antes de 07/11/2026 leem os gabaritos de `tests/verdade`.
+        shutil.copytree(VERDADE, arvore / "tests" / "verdade",
                         dirs_exist_ok=True)
         shutil.copy2(Path(__file__), arvore / "ferramentas" / "catraca.py")
         saida = pasta / "medida.json"

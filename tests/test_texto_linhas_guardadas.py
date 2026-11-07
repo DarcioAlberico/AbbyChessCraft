@@ -8,14 +8,12 @@ from __future__ import annotations
 import copy
 import random
 import zipfile
-from pathlib import Path
 
 import pytest
 
 from abbychess import texto as tx
 from abbychess.layout import OrdemDeLeitura
 
-FATIA = Path(__file__).resolve().parent / "dados" / "fatia" / "xv-i020-026-inicial.zip"
 
 #: As trocas: letra por letra (a mais comum), e as que mudam as palavras do core (algarismo,
 #: ponto, o vazio) ou as linhas (o box que some do texto).
@@ -26,8 +24,11 @@ TROCAS = ["e", "a", "c", "♘", "fi", "1", "0", ".", "", ",", "-", "²"]
 def paginas(tmp_path_factory):
     from abbychess.projeto import ProjetoDeLivro
 
+    from tests.livros import fatia
+
+    zip_da_fatia = fatia()
     pasta = tmp_path_factory.mktemp("fatia")
-    with zipfile.ZipFile(FATIA) as z:
+    with zipfile.ZipFile(zip_da_fatia) as z:
         z.extractall(pasta)
     projeto = ProjetoDeLivro.abrir(next(p.parent for p in pasta.rglob("projeto.json")))
     try:

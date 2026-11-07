@@ -427,8 +427,6 @@ def test_andar_na_fila_nao_muda_o_texto_do_documento(app, lida):  # noqa: F811
 @pytest.mark.livro_real
 @pytest.mark.parametrize("largura, altura", [(1366, 768), (1280, 720)])
 def test_x_height_na_linha(app, tmp_path, sim, largura, altura):  # noqa: F811
-    import json
-    from pathlib import Path
 
     import numpy as np
 
@@ -437,8 +435,9 @@ def test_x_height_na_linha(app, tmp_path, sim, largura, altura):  # noqa: F811
     from tests.livros import PASTA_DOS_PDFS
     from tests.ajudantes import _x_height_do_gabarito  # noqa: E402,F401,F811
 
-    raiz = Path(__file__).resolve().parent.parent
-    verdade = json.loads((raiz / "tests" / "verdade" / "xv" / "i025.json").read_text(encoding="utf-8"))
+    from tests.livros import gabarito
+
+    verdade = gabarito("xv", 25)
     pdf = next(PASTA_DOS_PDFS.rglob(verdade["pdf"]), None)
     if pdf is None:
         pytest.skip("o PDF do livro de referência não está na pasta dos PDFs")

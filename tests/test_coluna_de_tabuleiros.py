@@ -5,7 +5,6 @@ os diagramas caíam pela altura no meio do comentário. Cada um entra logo antes
 
 from __future__ import annotations
 
-import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -18,9 +17,9 @@ from abbychess import texto as tx
 from abbychess.layout import OrdemDeLeitura, _coluna_dos_tabuleiros
 from tests.ajudantes import _lido
 from tests.livros import PASTA_DOS_PDFS
+from tests.livros import gabarito as ler_gabarito
 
 PILHA = ((100, 100, 400, 400), (100, 450, 400, 750), (100, 800, 400, 1100))
-VERDADE = Path(__file__).resolve().parent / "verdade" / "yusupov"
 
 
 def _linha(texto: str, y: int, x0: int = 500) -> list:
@@ -235,7 +234,7 @@ def test_ca_5_2_a_ordem_das_paginas_de_duas_colunas_do_yusupov(tmp_path, indice)
     da esquerda, e cada um vem antes do título do comentário dele, na da direita)."""
     from medir import casar, discordancia
 
-    gabarito = json.loads((VERDADE / f"i{indice:03d}.json").read_text(encoding="utf-8"))
+    gabarito = ler_gabarito("yusupov", indice)
     projeto, fonte = _ler_as_paginas(tmp_path, [indice])
     try:
         itens = _o_que_o_documento_le(projeto, fonte, indice)

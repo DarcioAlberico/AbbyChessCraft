@@ -26,11 +26,12 @@ import pytest
 from abbychess import busca as bs
 
 from tests.desempenho.conftest import cronometrar, na_maquina_cadastrada, percentil
+from tests.livros import FATIAS, fatia
 
 pytestmark = [pytest.mark.desempenho, pytest.mark.timeout(900)]
 
 RAIZ = Path(__file__).resolve().parent.parent.parent
-SNAPSHOT = RAIZ / "tests" / "dados" / "fatia" / "xv-i020-026-inicial.zip"
+SNAPSHOT = FATIAS / "xv-i020-026-inicial.zip"
 PAGINAS = 230
 PADRAO = r"(?<=\w)1(?=\w)"
 
@@ -41,6 +42,7 @@ def livro_de_230(tmp_path_factory):
     numa pasta que o pytest apaga."""
     from abbychess.projeto import ProjetoDeLivro
 
+    fatia()
     pasta = tmp_path_factory.mktemp("livro_de_230")
     with zipfile.ZipFile(SNAPSHOT) as z:
         z.extractall(pasta / "fatia")
@@ -220,6 +222,7 @@ def _projeto_de_230(pasta: Path) -> Path:
     from abbychess.modelo import Box, Decisoes, gid_de
     from abbychess.projeto import ProjetoDeLivro
 
+    fatia()
     with zipfile.ZipFile(SNAPSHOT) as z:
         z.extractall(pasta)
     projeto = ProjetoDeLivro.abrir(next(p.parent for p in pasta.rglob("projeto.json")))

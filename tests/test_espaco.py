@@ -412,7 +412,9 @@ def test_shift_f10_e_a_tecla_menu_abrem_o_menu_de_contexto_em_todo_painel(app, l
     j.doca_paginas.show()
     j.doca_resultados.show()
     app.processEvents()
-    for widget in (j.paginas.lista, j.visor, j.texto, j.treino.campo, j.resultados.avisos):
+    for widget in (j.paginas.lista, j.visor, j.texto, j.treino.campo, j.resultados.avisos,
+                   j.galeria.vista, j.padroes.amostras, j.padroes.caracteres,
+                   j.painel_diagramas.grade, j.linha):
         alvo = widget.viewport() if hasattr(widget, "viewport") and widget is not j.visor else widget
         assert _menu_pelo_teclado(app, alvo) is not None, widget
 

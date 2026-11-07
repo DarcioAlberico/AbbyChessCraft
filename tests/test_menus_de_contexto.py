@@ -99,7 +99,7 @@ def test_o_menu_da_galeria_faz_o_que_o_teclado_faz(galeria):
     _acao(menu, "Só corrigir").trigger()
     _acao(menu, "Ir ao glifo").trigger()
     assert ensinou == [1] and corrigiu == [1]
-    assert [(i.pagina, i.gid) for i in foi] == [(0, 2)]              # o glifo do cursor
+    assert [(i.pagina, i.gid) for i in foi] == [(3, 7)]    # o do cursor, na ordem da confiança
     _acao(menu, "Ver o livro inteiro").trigger()
     assert escopos == ["livro"]
     assert "Ver só a página" in _textos(galeria.menu_de_contexto())

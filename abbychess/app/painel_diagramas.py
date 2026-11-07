@@ -14,9 +14,9 @@ from __future__ import annotations
 from typing import Callable, List, Optional, Sequence, Tuple
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QIcon, QImage, QPainter, QPixmap
+from PySide6.QtGui import QActionGroup, QIcon, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QListView, QListWidget,
-                               QListWidgetItem, QPushButton, QVBoxLayout, QWidget)
+                               QListWidgetItem, QMenu, QPushButton, QVBoxLayout, QWidget)
 
 from abbychess.app import estilo
 
@@ -103,6 +103,9 @@ class PainelDeDiagramas(QWidget):
         self.grade.setWordWrap(True)
         self.grade.setAccessibleName("Diagramas do livro (Enter abre na conferência)")
         self.grade.itemActivated.connect(self._ativado)
+        self.grade.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.grade.customContextMenuRequested.connect(
+            lambda ponto: self.menu_de_contexto().exec(self.grade.viewport().mapToGlobal(ponto)))
 
         caixa = QVBoxLayout(self)
         caixa.setContentsMargins(4, 4, 4, 4)
@@ -175,6 +178,24 @@ class PainelDeDiagramas(QWidget):
                 Qt.TransformationMode.SmoothTransformation))
         pintor.end()
         return QIcon(tela)
+
+    def menu_de_contexto(self) -> QMenu:
+        """Abrir o diagrama atual, o Atualizar e os filtros do seletor (§3.2)."""
+        menu = QMenu(self)
+        abrir = menu.addAction("Abrir na conferência")
+        abrir.setEnabled(self.grade.currentItem() is not None)
+        abrir.triggered.connect(lambda: self._ativado(self.grade.currentItem()))
+        menu.addAction("Atualizar", self.atualizar_pedido.emit)
+        menu.addSeparator()
+        filtros = QMenu("Mostrar", menu)        # com pai: o de `addMenu(texto)` o PySide apaga
+        menu.addMenu(filtros)
+        grupo = QActionGroup(filtros)
+        for chave, nome in FILTROS:
+            acao = filtros.addAction(nome, lambda c=chave: self.definir_filtro(c))
+            acao.setCheckable(True)
+            acao.setChecked(chave == self.filtro_atual())
+            grupo.addAction(acao)
+        return menu
 
     def _ativado(self, item: QListWidgetItem) -> None:
         pagina, indice = item.data(Qt.ItemDataRole.UserRole)

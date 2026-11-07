@@ -39,6 +39,7 @@ from abbychess import avisos as av
 from abbychess.app import acessibilidade, acoes, dialogos, opcoes, recentes, teclado
 from abbychess.app.imagens import qimage_da_pagina
 from abbychess.app.indicador_do_foco import IndicadorDoFoco
+from abbychess.app.modo_do_arraste import ModoDoArraste
 from abbychess.app.paginas_na_janela import PaginasNaJanela
 from abbychess.app.busca_na_janela import BuscaNaJanela
 from abbychess.app.galeria_na_janela import GaleriaNaJanela
@@ -103,6 +104,7 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
         self.textos_do_teclado()                # §13: a Imagem e o Glifo sem livro
         teclado.quando_mudar(self.textos_do_teclado)
         acoes.atualizar(self)
+        self.modo_do_arraste = ModoDoArraste(self)         # o rótulo e o Esc (CA-U2)
         self.arranjo_padrao()
         self.atualizar_fila()
         acessibilidade.nomear_os_controles_do_qt(self)     # CA-13.1

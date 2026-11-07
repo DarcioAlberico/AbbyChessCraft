@@ -18,7 +18,7 @@ from abbychess import gravacao as gv
 from abbychess.app.janela import JanelaPrincipal
 from abbychess.projeto import ProjetoDeLivro
 
-from tests.ajudantes import _esperar  # noqa: E402,F401,F811
+from tests.ajudantes import _esperar, esperar  # noqa: E402,F401,F811
 from tests.ajudantes import _pagina_sintetica  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar, pulados, selecao  # noqa: E402,F401
 
@@ -34,6 +34,34 @@ def _abrir(app, pasta):  # noqa: F811
     janela.abrir_caminho(str(pasta))
     _esperar(app, janela)
     return janela
+
+
+def test_o_indice_nao_espera_a_interface_montar_o_espaco(app, projeto_lido, sem_dialogos,  # noqa: F811
+                                                         monkeypatch):
+    """CA-7.1 (`docs/revisoes/ca-7-1.md`): o índice começa antes do espaço, e uma vez só. Ele
+    trabalha em outros processos, e esperar a interface era a maior parte do que ele atrasou."""
+    from abbychess.controladores import ControladorDaBusca
+
+    ordem = []
+    abrir, espaco = ControladorDaBusca.abrir, JanelaPrincipal._espaco_do_projeto_aberto
+
+    def abrir_o_indice(self):
+        ordem.append("indice")
+        abrir(self)
+
+    def montar_o_espaco(self):
+        ordem.append("espaco")
+        espaco(self)
+
+    monkeypatch.setattr(ControladorDaBusca, "abrir", abrir_o_indice)
+    monkeypatch.setattr(JanelaPrincipal, "_espaco_do_projeto_aberto", montar_o_espaco)
+    janela = _abrir(app, projeto_lido.pasta)
+    try:
+        assert ordem[:2] == ["indice", "espaco"] and ordem.count("indice") == 1
+        assert esperar(janela.busca.pronto.is_set)
+        assert sorted(janela.busca.indice) == janela.projeto.resumo.paginas_lidas()
+    finally:
+        janela.close()
 
 
 def test_versao_mais_nova_abre_so_para_leitura_e_nada_e_gravado(app, projeto_lido,  # noqa: F811

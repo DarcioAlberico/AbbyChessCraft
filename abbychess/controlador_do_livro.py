@@ -2,7 +2,7 @@
 entre páginas e a exportação.
 
 Trabalha sobre a página aberta do `ControladorDePagina` e fala pelos mesmos `Eventos`;
-acrescenta `projeto_aberto` e `lote_mudou`. Sem Qt: os diálogos (que intervalo ler, onde
+acrescenta `projeto_ligado`, `projeto_aberto` e `lote_mudou`. Sem Qt: os diálogos (que intervalo ler, onde
 exportar) são da janela; aqui chegam as respostas.
 """
 
@@ -114,6 +114,7 @@ class ControladorDoLivro:
         p = self.pagina
         self._largar_lote()
         p.ligar(projeto, fonte, None)
+        self.eventos.emitir("projeto_ligado")   # o que trabalha fora da interface já começa
         com_servidor = not self.sem_servidor and os.environ.get("ABBY_SERVIDOR", "1") != "0"
 
         def preparar():

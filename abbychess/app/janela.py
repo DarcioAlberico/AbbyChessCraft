@@ -315,7 +315,6 @@ class JanelaPrincipal(DesenhoDaJanela, EspacoDeTrabalho, DiagramasNaJanela, Lote
     def _projeto_aberto(self, leitor) -> None:
         self.fechar_busca()
         self._limpar_previa()
-        self.busca.abrir()                      # o índice da busca, em segundo plano (§7.3)
         self._padroes_mudaram()
         if getattr(self, "_espaco_ja_de", None) is self.projeto:
             self.atualizar_paginas(seguir=True)  # o espaço já veio no trocar_projeto

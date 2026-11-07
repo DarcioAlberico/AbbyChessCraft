@@ -344,10 +344,13 @@ class DesenhoDaJanela:
             self.registrar_aviso(av.AVISO, titulo, linha)
 
     def _gravacao_falhou(self, indice, erro) -> None:
-        """CA-4.2 (A2): a falha de gravação vai para Avisos, além da barra."""
+        """CA-4.2 (A2): a falha de gravação vai para Avisos, além da barra; e a faixa fica à
+        vista até a página gravar (CA-U6)."""
         self._avisar_da_pagina("Gravação", indice, (
             f"não foi gravada ({erro}). Ela continua com as mudanças em memória e o programa "
             "tenta de novo; não feche antes de liberar o disco."))
+        self.faixa_de_gravacao.mostrar(indice, erro, lambda: (
+            self.projeto is not None and self.projeto.paginas_em_memoria.falhando))
 
     def _avisar_da_pagina(self, titulo: str, indice, resto: str) -> None:
         """O aviso de uma página na barra e em Avisos: "A página N " + `resto`."""

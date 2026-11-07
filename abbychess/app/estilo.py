@@ -300,8 +300,9 @@ def paleta(t: Tema) -> QPalette:
 
 def folha_de_estilo(t: Tema) -> str:
     """A folha de estilo do tema: os papéis dos rótulos, o foco visível e as dicas."""
-    linhas = [f'QLabel[papel="{nome}"] {{ color: {getattr(t, campo).name()}; }}'
-              for nome, campo in PAPEIS.items()]
+    # O papel vale no rótulo e no botão da barra (o ⚠ na cor de erro, CA-U6).
+    linhas = [f'QLabel[papel="{nome}"], QToolButton[papel="{nome}"] '
+              f'{{ color: {getattr(t, campo).name()}; }}' for nome, campo in PAPEIS.items()]
     linhas.append(f"QToolTip {{ color: {t.texto.name()}; background: {t.dica_fundo.name()}; "
                   f"border: 1px solid {t.borda.name()}; padding: {ESPACOS[0]}px; }}")
     # O botão que já vale apertar (o "Reconhecer o livro" do cartão Saúde, §9.1).

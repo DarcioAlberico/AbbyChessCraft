@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Dict
 
 from PySide6.QtCore import QByteArray
-from PySide6.QtGui import QIcon, QPainter, QPixmap
+from PySide6.QtGui import QCursor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 from abbychess.app import estilo
@@ -50,6 +50,36 @@ def _pixmap(svg: bytes, lado: int) -> QPixmap:
     QSvgRenderer(QByteArray(svg)).render(pintor)
     pintor.end()
     return pixmap
+
+
+#: O modo do arraste do visor -> o ícone da ação dele (o cursor de cada modo, CA-U2).
+DOS_MODOS = {"treino": DA_JANELA["acao_modo_treino"], "areas": DA_JANELA["acao_areas"],
+             "borracha": DA_JANELA["acao_borracha"]}
+#: O cursor do modo: 32 px, a mira no canto de cima (o ponto quente) e o ícone embaixo.
+LADO_DO_CURSOR, MIRA = 32, 7
+
+
+@lru_cache(maxsize=None)
+def cursor(modo: str) -> QCursor:
+    """O cursor do modo do arraste `modo` ("treino", "areas", "borracha"): a mira, onde o
+    arraste começa, e o ícone da ação ao lado, em preto sobre um quadro branco: a página é
+    papel nos dois temas."""
+    tela = QPixmap(LADO_DO_CURSOR, LADO_DO_CURSOR)
+    tela.fill(estilo.TRANSPARENTE)
+    pintor = QPainter(tela)
+    for cor, largura in ((estilo.BRANCO, 3), (estilo.PRETO, 1)):
+        caneta = QPen(cor)
+        caneta.setWidth(largura)
+        pintor.setPen(caneta)
+        pintor.drawLine(MIRA, 1, MIRA, 2 * MIRA - 1)
+        pintor.drawLine(1, MIRA, 2 * MIRA - 1, MIRA)
+    lado = LADO_DO_CURSOR - 2 * MIRA
+    canto = 2 * MIRA
+    pintor.fillRect(canto - 1, canto - 1, lado, lado, estilo.BRANCO)
+    svg = _svg(DOS_MODOS[modo]).replace(b"currentColor", estilo.PRETO.name().encode("ascii"))
+    pintor.drawPixmap(canto, canto, _pixmap(svg, lado - 2))
+    pintor.end()
+    return QCursor(tela, MIRA, MIRA)
 
 
 def icone(nome: str) -> QIcon:

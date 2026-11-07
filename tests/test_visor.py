@@ -463,7 +463,8 @@ def _cursor_em(visor, x, y):
 
 def test_o_cursor_sobre_a_area_diz_o_que_o_arraste_vai_fazer(app, janela):
     """No editor de áreas, o cursor sobre a área escolhida: nos cantos, a seta diagonal; nas
-    bordas, a horizontal ou a vertical; no miolo, a de mover; fora, a cruz de desenhar."""
+    bordas, a horizontal ou a vertical; no miolo, a de mover; fora, o do modo, que desenha
+    (a mira com o ícone do editor de áreas, CA-U2)."""
     _no_editor_de_areas_com_uma_area(app, janela)
     visor = janela.visor
     forma = Qt.CursorShape
@@ -476,11 +477,11 @@ def test_o_cursor_sobre_a_area_diz_o_que_o_arraste_vai_fazer(app, janela):
     assert _cursor_em(visor, 300, 50) == forma.SizeVerCursor
     assert _cursor_em(visor, 300, 200) == forma.SizeVerCursor
     assert _cursor_em(visor, 300, 120) == forma.SizeAllCursor         # o miolo move
-    assert _cursor_em(visor, 800, 240) == forma.CrossCursor           # fora: área nova
+    assert _cursor_em(visor, 800, 240) == forma.BitmapCursor          # fora: área nova
     janela.areas.escolher(-1)                     # sem área escolhida, a borda não estica
     app.processEvents()
     assert _cursor_em(visor, 100, 120) == forma.SizeAllCursor
-    assert _cursor_em(visor, 800, 240) == forma.CrossCursor
+    assert _cursor_em(visor, 800, 240) == forma.BitmapCursor
 
 
 def _botao_direito(app, visor, x, y, *, escolher=None, razao=None):

@@ -37,7 +37,7 @@ from core.box_model import BoxEntry
 
 from abbychess import grade as gd
 from abbychess import zonas as zn
-from abbychess.app import estilo
+from abbychess.app import estilo, icones
 from abbychess.app.item_dos_boxes import ItemDosBoxes
 
 
@@ -410,8 +410,13 @@ class VisorDePagina(QGraphicsView):
         livre = not (self.modo_treino or self.modo_areas or self.modo_borracha)
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag if livre
                          else QGraphicsView.DragMode.NoDrag)
+        # Cada modo do arraste com o seu cursor (CA-U2): a mira e o ícone da ação.
         self.viewport().setCursor(Qt.CursorShape.OpenHandCursor if livre
-                                  else Qt.CursorShape.CrossCursor)
+                                  else icones.cursor(self._modo_do_arraste()))
+
+    def _modo_do_arraste(self) -> str:
+        """O modo ligado: "areas", "borracha" ou "treino"."""
+        return "areas" if self.modo_areas else "borracha" if self.modo_borracha else "treino"
 
     def mostrar_zonas(self, zonas, selecionada: Optional[int] = None,
                       ordem_clicada: Optional[list] = None,
@@ -563,7 +568,8 @@ class VisorDePagina(QGraphicsView):
         elif zn.zona_em(self._zonas, ponto.x(), ponto.y()) is not None:
             forma = Qt.CursorShape.SizeAllCursor
         else:
-            forma = Qt.CursorShape.CrossCursor
+            self.viewport().setCursor(icones.cursor("areas"))      # o cursor do modo (CA-U2)
+            return
         self.viewport().setCursor(forma)
 
     def mousePressEvent(self, evento):

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import os
 
+import pytest
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication  # noqa: E402
@@ -26,26 +28,25 @@ def _visivel(widget) -> bool:
     return widget.isVisible()
 
 
+@pytest.mark.erro_esperado                 # o gravador loga a falha de propósito
 def test_a_faixa_fica_ate_a_pagina_gravar(app, janela, monkeypatch):  # noqa: F811
     j = janela
     _ler_a_mao(app, j)
     assert j.projeto.paginas_em_memoria.descarregar(10)       # a leitura gravada antes
     faixa = j.faixa_de_gravacao
     assert not faixa.isVisible()
-    original = gv._trocar
 
-    def falhar(*_a):
+    def falhar(*_a, **_k):
         raise PermissionError("disco bloqueado")
-    monkeypatch.setattr(gv, "_trocar", falhar)
-    j.pagina.modelo.boxes[0].entry.char = "x"
-    j._glifos_mudaram()                                       # agenda a gravação
+    monkeypatch.setattr(gv, "gravar_json", falhar)        # como em test_gravador.py
+    j.projeto.paginas_em_memoria.agendar(j.pagina.modelo)
     assert esperar(lambda: _visivel(faixa), 10)
     assert "não foi gravada" in faixa.texto.text() and "disco bloqueado" in faixa.texto.text()
     j.statusBar().showMessage("outra coisa")                  # a barra muda; a faixa fica
     for _ in range(5):
         QApplication.processEvents()
     assert faixa.isVisible()
-    monkeypatch.setattr(gv, "_trocar", original)              # o disco volta
+    monkeypatch.undo()                                        # o disco volta
     assert esperar(lambda: not _visivel(faixa), 10)
     assert not j.projeto.paginas_em_memoria.falhando
 

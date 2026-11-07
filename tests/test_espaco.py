@@ -552,13 +552,12 @@ def test_o_projeto_seguinte_sem_espaco_comeca_do_padrao(app, tmp_path, sim):
 @pytest.mark.parametrize("largura, altura, arranjo", [(1366, 768, "lado_a_lado"),
                                                       (1280, 720, "empilhado")])
 def test_x_height_na_imagem_no_zoom_largura(app, tmp_path, sim, largura, altura, arranjo):
-    import json
 
     import numpy as np
 
-    from tests.livros import PASTA_DOS_PDFS
+    from tests.livros import PASTA_DOS_PDFS, gabarito
 
-    verdade = json.loads((RAIZ / "tests" / "verdade" / "xv" / "i025.json").read_text(encoding="utf-8"))
+    verdade = gabarito("xv", 25)
     pdf = next(PASTA_DOS_PDFS.rglob(verdade["pdf"]), None)
     if pdf is None:
         pytest.skip("o PDF do livro de referência não está na pasta dos PDFs")

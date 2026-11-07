@@ -16,6 +16,11 @@ MEDIDAS = RAIZ / "docs" / "medidas"
 #: Onde estão os PDFs dos livros de referência (os do PyBoxEditor, por padrão).
 PASTA_DOS_PDFS = Path(os.environ.get("ABBY_PASTA_DOS_PDFS",
                                      "C:/Python-Chess2/PyBoxEditor_Tkinter/PDF"))
+#: O que sai do texto dos livros fica fora do git, por direito autoral: os gabaritos
+#: (`verdade/<livro>/iNNN.json`) e as fatias lidas (`fatia/<livro>-iAAA-BBB-inicial.zip`).
+DADOS_DOS_LIVROS = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "AbbyChessCraft"
+VERDADE = Path(os.environ.get("ABBY_VERDADE", str(DADOS_DOS_LIVROS / "verdade")))
+FATIAS = Path(os.environ.get("ABBY_FATIAS", str(DADOS_DOS_LIVROS / "fatia")))
 #: Com "1", uma medida do mesmo dia e nome é sobrescrita; sem, a nova ganha a hora no nome.
 SOBRESCREVER = "ABBY_SOBRESCREVER_MEDIDA"
 

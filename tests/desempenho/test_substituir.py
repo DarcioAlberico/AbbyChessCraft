@@ -22,6 +22,7 @@ from abbychess import historico as hs
 from abbychess import substituir as sb
 
 from tests.desempenho.test_busca import PAGINAS, SNAPSHOT
+from tests.livros import fatia as exigir_fatia
 
 pytestmark = [pytest.mark.desempenho, pytest.mark.timeout(900)]
 
@@ -35,6 +36,7 @@ def _livro_de_230(pasta, pdf_do_tamanho_da_fatia: bool = False):
     from abbychess.projeto import ProjetoDeLivro
     from tests.ajudantes import PAGINAS as LINHAS, pdf_sintetico  # noqa: E402,F401,F811
 
+    exigir_fatia()
     with zipfile.ZipFile(SNAPSHOT) as z:
         z.extractall(pasta / "fatia")
     fatia = ProjetoDeLivro.abrir(next(p.parent for p in (pasta / "fatia").rglob("projeto.json")))

@@ -31,7 +31,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / "ferramentas"))
 
-from comum import MEDIDAS, PASTA_DOS_PDFS, destino_da_medida, estado_do_git  # noqa: E402
+from comum import MEDIDAS, PASTA_DOS_PDFS, VERDADE, destino_da_medida, estado_do_git  # noqa: E402
 
 FORMATOS = ("epub", "docx", "txt", "pgn", "pdf")
 AQUECIMENTOS = 5
@@ -44,7 +44,7 @@ FATIA = {"xv": range(20, 27)}
 
 
 def _indices_e_pdf(livro: str):
-    gabarito = RAIZ / "tests" / "verdade" / livro / f"i{FATIA[livro][0]:03d}.json"
+    gabarito = VERDADE / livro / f"i{FATIA[livro][0]:03d}.json"
     nome = json.loads(gabarito.read_text(encoding="utf-8"))["pdf"]
     pdf = next(PASTA_DOS_PDFS.rglob(nome), None)
     if pdf is None:

@@ -36,7 +36,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / "ferramentas"))
 
-from comum import PASTA_DOS_PDFS  # noqa: E402
+from comum import PASTA_DOS_PDFS, VERDADE  # noqa: E402
 
 CENARIOS = [
     # (nome, largura, altura, arranjo ou None para o padrão, docas a abrir)
@@ -55,7 +55,7 @@ SEM_LEITURA = [("1366-padrao-sem-leitura", 1366, 768, None, ()),
 def _pdf(args) -> Path:
     if args.pdf:
         return Path(args.pdf)
-    verdade = json.loads((RAIZ / "tests" / "verdade" / args.livro / f"i{args.indice:03d}.json")
+    verdade = json.loads((VERDADE / args.livro / f"i{args.indice:03d}.json")
                          .read_text(encoding="utf-8"))
     pdf = next(PASTA_DOS_PDFS.rglob(verdade["pdf"]), None)
     if pdf is None:

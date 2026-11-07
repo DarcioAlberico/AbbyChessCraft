@@ -32,13 +32,12 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / "ferramentas"))
 
-from comum import destino_da_medida, estado_do_git  # noqa: E402
+from comum import VERDADE, destino_da_medida, estado_do_git  # noqa: E402
 
 from abbychess import decodificador_de_lances as dl  # noqa: E402
 from abbychess import texto as tx  # noqa: E402
 from abbychess import tokens as tk  # noqa: E402
 
-VERDADE = RAIZ / "tests" / "verdade"
 CORPUS = {"aagaard": (("aagaard_calculation_p030",), "KQRBN"),
           "nunn": (("nunn_rook_endings_p237",), "KQRBN"),
           "yusupov": (("yusupov_evolution_1_p034", "yusupov_evolution_1_p047"), "KQRBN")}

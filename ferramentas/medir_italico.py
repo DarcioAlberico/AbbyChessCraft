@@ -33,7 +33,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / "ferramentas"))
 
-from comum import destino_da_medida, estado_do_git  # noqa: E402
+from comum import FATIAS, destino_da_medida, estado_do_git  # noqa: E402
 
 AJUSTE = "5-20,74-85,264,281,586,588,601,642,643,669"
 VALIDACAO = ("21-40,241,242,256,258,259,266,282,286,287,306,312,329,335,340,347,360,456,461,"
@@ -187,7 +187,7 @@ def main(argv=None) -> int:
     analisador.add_argument("--ajuste", default=AJUSTE)
     analisador.add_argument("--validacao", default=VALIDACAO)
     analisador.add_argument("--fatia", type=Path,
-                            default=RAIZ / "tests" / "dados" / "fatia" / "xv-i020-026-inicial.zip")
+                            default=FATIAS / "xv-i020-026-inicial.zip")
     analisador.add_argument("--folha", type=Path, help="a imagem com as palavras marcadas na fatia")
     args = analisador.parse_args(argv)
 

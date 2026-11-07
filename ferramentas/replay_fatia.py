@@ -67,11 +67,11 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / "ferramentas"))
 
-from comum import destino_da_medida, estado_do_git  # noqa: E402
+from comum import FATIAS, destino_da_medida, estado_do_git  # noqa: E402
 from medir import casar, casas, fen_conferido_as_cegas  # noqa: E402
 from rotular import PASTA_DOS_PDFS, VERDADE, _caixa_relativa, _indices, sha256_do_arquivo  # noqa: E402
 
-FATIA = RAIZ / "tests" / "dados" / "fatia"
+FATIA = FATIAS
 CATALOGO = RAIZ / "ferramentas" / "replay" / "comandos.yaml"
 MEDIDAS = RAIZ / "docs" / "medidas"
 SEM_LEITURA = "□"

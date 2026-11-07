@@ -471,19 +471,21 @@ class EspacoDeTrabalho:
         Esc). Nunca cancela tarefa. Com uma sessão de edição aberta no Documento, o Esc a
         restaura (§6.3). A pergunta do Ctrl+T, se aberta, fecha antes de tudo (só ela). O modo
         do arraste ligado (marcar glifo, áreas, borracha) sai depois da seleção (CA-U2)."""
-        # (o que está aberto, como fecha), do que está mais por cima ao que está mais embaixo:
-        # só o primeiro aberto fecha.
-        por_cima = ((lambda: self.confirmacao.aberta, self.confirmacao.recusar),
-                    (lambda: self.areas.ordenando, self.areas.cancelar_ordenacao),   # §5
-                    (self._barra_de_busca_com_o_foco, self.fechar_busca),
-                    (lambda: self.texto.tem_sessao, self.texto.restaurar),
-                    (lambda: bool(self.pagina.selecao), self.pagina.limpar_selecao),
-                    (lambda: self.modo_do_arraste.ligado() is not None,
-                     self.modo_do_arraste.sair),
-                    (self.doca_resultados.isVisible, self._fechar_os_resultados))
-        aberto = next((fechar for esta_aberto, fechar in por_cima if esta_aberto()), None)
-        if aberto is not None:
-            aberto()
+        # (dono, o atributo que diz se está aberto, como fecha), do que está mais por cima ao
+        # que está mais embaixo: só o primeiro aberto fecha. O atributo é lido na hora do Esc
+        # (um método é chamado), sem closure (a regra de CA-14.1).
+        por_cima = ((self.confirmacao, "aberta", self.confirmacao.recusar),
+                    (self.areas, "ordenando", self.areas.cancelar_ordenacao),        # §5
+                    (self, "_barra_de_busca_com_o_foco", self.fechar_busca),
+                    (self.texto, "tem_sessao", self.texto.restaurar),
+                    (self.pagina, "selecao", self.pagina.limpar_selecao),
+                    (self.modo_do_arraste, "ligado", self.modo_do_arraste.sair),
+                    (self.doca_resultados, "isVisible", self._fechar_os_resultados))
+        for dono, atributo, fechar in por_cima:
+            valor = getattr(dono, atributo)
+            if valor() if callable(valor) else valor:
+                fechar()
+                return
 
     def _fechar_os_resultados(self) -> None:
         foco = QApplication.focusWidget()           # antes do hide, que já move o foco

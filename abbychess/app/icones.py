@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Dict
 
 from PySide6.QtCore import QByteArray
-from PySide6.QtGui import QColor, QCursor, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtGui import QCursor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 from abbychess.app import estilo
@@ -67,7 +67,7 @@ def cursor(modo: str) -> QCursor:
     tela = QPixmap(LADO_DO_CURSOR, LADO_DO_CURSOR)
     tela.fill(estilo.TRANSPARENTE)
     pintor = QPainter(tela)
-    for cor, largura in ((QColor(255, 255, 255), 3), (QColor(0, 0, 0), 1)):
+    for cor, largura in ((estilo.BRANCO, 3), (estilo.PRETO, 1)):
         caneta = QPen(cor)
         caneta.setWidth(largura)
         pintor.setPen(caneta)
@@ -75,8 +75,8 @@ def cursor(modo: str) -> QCursor:
         pintor.drawLine(1, MIRA, 2 * MIRA - 1, MIRA)
     lado = LADO_DO_CURSOR - 2 * MIRA
     canto = 2 * MIRA
-    pintor.fillRect(canto - 1, canto - 1, lado, lado, QColor(255, 255, 255))
-    svg = _svg(DOS_MODOS[modo]).replace(b"currentColor", b"#000000")
+    pintor.fillRect(canto - 1, canto - 1, lado, lado, estilo.BRANCO)
+    svg = _svg(DOS_MODOS[modo]).replace(b"currentColor", estilo.PRETO.name().encode("ascii"))
     pintor.drawPixmap(canto, canto, _pixmap(svg, lado - 2))
     pintor.end()
     return QCursor(tela, MIRA, MIRA)

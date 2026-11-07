@@ -4,6 +4,9 @@ cursor, e o Esc sai do modo.
 
 Antes, o aviso de cada modo sumia da barra em alguns segundos, os três tinham a mesma cruz, e
 o Esc não desligava nenhum: não se via que o arraste ia apagar a imagem em vez de rolar.
+
+A borracha é operação de página: só vale num PDF, e não enquanto uma tarefa lê a página (o
+editor de áreas pede as automáticas ao ligar). Por isso ela vem antes dele.
 """
 
 from __future__ import annotations
@@ -15,12 +18,12 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
-from tests.fixturas_espaco import janela  # noqa: E402,F401,F811
+from tests.fixturas_paginas_na_janela import janela  # noqa: E402,F401,F811
 
 
 def _modos(j):
-    return (("Marcar glifo", j.acao_modo_treino), ("Editor de áreas", j.acao_areas),
-            ("Borracha", j.acao_borracha))
+    return (("Marcar glifo", j.acao_modo_treino), ("Borracha", j.acao_borracha),
+            ("Editor de áreas", j.acao_areas))
 
 
 def _cursor(j):

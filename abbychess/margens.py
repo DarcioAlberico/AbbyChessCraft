@@ -30,6 +30,12 @@ TAMANHO_DA_MARGEM = 80
 #: em páginas diferentes. Baixo de propósito: o OCR de uma página lê "SElRAWAN"
 #: e o da outra "SElRA AN".
 SEMELHANCA_DA_MARGEM = 0.6
+#: Quanto a linha colada no texto (sem o vão de `VAO_DA_MARGEM`) precisa se parecer com um
+#: título corrido confirmado para sair como ele. Mais alto que o da repetição: sem o vão, a
+#: posição diz menos, e "XADREZ BRASILEIRO" (0,69 contra "xadrezvitorioso") é outro título.
+SEMELHANCA_DO_CONFIRMADO = 0.8
+#: As funções de área que dizem título corrido; o número de página sozinho não tem letras.
+LUGARES_CONFIRMAVEIS = ("cabecalho", "rodape")
 #: A borda extrema da página, onde uma linha de um ou dois caracteres é poeira
 #: da digitalização, não texto ("l" em y=1, "." em y=3.480).
 FAIXA_DA_POEIRA = 0.03
@@ -46,12 +52,66 @@ class _Margem:
     candidatos: List[Tuple[_Linha, str]] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class Confirmado:
+    """Um título corrido que o usuário confirmou (§5.1): as letras da área de cabeçalho ou de
+    rodapé que ele desenhou ou cuja função trocou, e a paridade da página, porque o livro
+    alterna o nome dos autores nas pares e o título nas ímpares."""
+
+    paridade: int
+    lugar: str
+    letras: str
+
+
+def confirmados_das_areas(paginas: Dict[int, Tuple[Sequence[BoxEntry], Sequence]]
+                          ) -> List[Confirmado]:
+    """Os títulos corridos confirmados do livro, de `{página: (boxes lidos, áreas)}`, sem
+    repetição e na ordem das páginas. Vale a área de cabeçalho ou de rodapé que não é
+    automática (a que a regra achou sozinha não confirma nada) e tem letras."""
+    saida: List[Confirmado] = []
+    for indice in sorted(paginas):
+        boxes, areas = paginas[indice]
+        for area in areas:
+            confirmado = _confirmado_da_area(indice, boxes, area)
+            if confirmado is not None and confirmado not in saida:
+                saida.append(confirmado)
+    return saida
+
+
+def _confirmado_da_area(indice: int, boxes: Sequence[BoxEntry], area) -> Optional[Confirmado]:
+    """O título corrido da área da página, se o usuário a marcou como cabeçalho ou rodapé e
+    há letras nela; senão, None."""
+    if area.automatica or area.funcao not in LUGARES_CONFIRMAVEIS:
+        return None
+    dentro = [b for b in boxes if b.char and area.contem_o_centro(b)]
+    if not dentro:
+        return None
+    letras = _so_letras(" ".join(linha.texto for linha in _linhas(dentro, OrdemDeLeitura())))
+    return Confirmado(indice % 2, area.funcao, letras) if letras else None
+
+
+def _aprendidos(confirmados: Sequence[Confirmado], indice: int) -> Dict[str, List[str]]:
+    """As letras dos confirmados da paridade da página, por lugar."""
+    saida: Dict[str, List[str]] = {lugar: [] for lugar in LUGARES_CONFIRMAVEIS}
+    for c in confirmados:
+        if c.paridade == indice % 2:
+            saida[c.lugar].append(c.letras)
+    return saida
+
+
+def _parece(letras: str, modelos: Sequence[str], limiar: float) -> bool:
+    """As letras se parecem, ao menos `limiar`, com as de algum dos `modelos`."""
+    return bool(letras) and any(
+        difflib.SequenceMatcher(None, letras, modelo).ratio() >= limiar for modelo in modelos)
+
+
 def _so_letras(texto: str) -> str:
     sem_acento = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
     return re.sub(r"[^a-z]", "", sem_acento.lower())
 
 
-def _margem_da_pagina(boxes: Sequence[BoxEntry], altura: int) -> _Margem:
+def _margem_da_pagina(boxes: Sequence[BoxEntry], altura: int,
+                      aprendidos: Optional[Dict[str, List[str]]] = None) -> _Margem:
     margem = _Margem()
     # De cima para baixo, sem os trechos de coluna: o cabeçalho `Games 7`, com o
     # título numa coluna e o número na outra, é uma linha só, a primeira.
@@ -64,7 +124,7 @@ def _margem_da_pagina(boxes: Sequence[BoxEntry], altura: int) -> _Margem:
     passo = _passo_mediano(linhas)
     if not passo:
         return margem
-    margem.candidatos += _candidatos_da_margem(linhas, altura, passo)
+    margem.candidatos += _candidatos_da_margem(linhas, altura, passo, aprendidos or {})
     return margem
 
 
@@ -82,23 +142,33 @@ def _e_poeira(linha: _Linha, altura: int) -> bool:
         linha.pe < FAIXA_DA_POEIRA * altura or linha.topo > (1 - FAIXA_DA_POEIRA) * altura)
 
 
-def _candidatos_da_margem(linhas: List[_Linha], altura: int, passo: float
-                          ) -> List[Tuple[_Linha, str]]:
+def _candidatos_da_margem(linhas: List[_Linha], altura: int, passo: float,
+                          aprendidos: Dict[str, List[str]]) -> List[Tuple[_Linha, str]]:
     """A primeira linha na faixa de cima e a última na de baixo, curtas e separadas do texto
-    por um vão maior que o das linhas."""
+    por um vão maior que o das linhas; sem o vão, a que se parece muito com um título corrido
+    confirmado do mesmo lugar (`aprendidos`, §5.1)."""
     candidatos = []
     primeira, segunda = linhas[0], linhas[1]
     if (primeira.pe < FAIXA_DA_MARGEM * altura and len(primeira.texto) <= TAMANHO_DA_MARGEM
-            and segunda.topo - primeira.topo > VAO_DA_MARGEM * passo):
+            and _separada(primeira, segunda.topo - primeira.topo, passo,
+                          aprendidos.get("cabecalho", ()))):
         candidatos.append((primeira, "cabecalho"))
     penultima, ultima = linhas[-2], linhas[-1]
     if (ultima.topo > (1 - FAIXA_DA_MARGEM) * altura and len(ultima.texto) <= TAMANHO_DA_MARGEM
-            and ultima.topo - penultima.topo > VAO_DA_MARGEM * passo):
+            and _separada(ultima, ultima.topo - penultima.topo, passo,
+                          aprendidos.get("rodape", ()))):
         candidatos.append((ultima, "rodape"))
     return candidatos
 
 
-def margens_corridas(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]) -> Dict[int, set]:
+def _separada(linha: _Linha, vao: float, passo: float, confirmados: Sequence[str]) -> bool:
+    """A linha tem o vão das margens, ou é um título corrido confirmado colado no texto."""
+    return vao > VAO_DA_MARGEM * passo or _parece(_so_letras(linha.texto), confirmados,
+                                                  SEMELHANCA_DO_CONFIRMADO)
+
+
+def margens_corridas(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]],
+                     confirmados: Sequence[Confirmado] = ()) -> Dict[int, set]:
     """Os boxes de cabeçalho, rodapé e poeira de cada página, para sair do texto.
 
     `paginas` é `{índice: (boxes lidos, altura da página)}`. Uma linha é título
@@ -106,9 +176,10 @@ def margens_corridas(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]) -> Dict
     vão maior que o das linhas, é curta e, além disso, ou tem o número da página
     ou se repete, só nas letras, no mesmo lugar de outra página: o livro alterna
     o nome dos autores nas pares e o título nas ímpares. A primeira linha de um
-    capítulo novo não tem número nem se repete, e fica.
+    capítulo novo não tem número nem se repete, e fica. Os `confirmados` (§5.1) valem como
+    repetição na paridade deles, e também sem o vão quando a linha se parece muito com um.
     """
-    funcoes, margens = _funcoes_das_margens(paginas)
+    funcoes, margens = _funcoes_das_margens(paginas, confirmados)
     return {i: set(margens[i].poeira) | set(funcoes[i]) for i in paginas}
 
 
@@ -149,31 +220,38 @@ def _na_faixa_da_margem(b: BoxEntry, boxes: Sequence[BoxEntry], de_margem: List[
     return min(m.x1 for m in na_altura) - folga <= x <= max(m.x2 for m in na_altura) + folga
 
 
-def funcoes_das_margens(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]) -> Dict[int, dict]:
-    """`{página: {indice_do_box: função}}` aprendido no conjunto do livro.
+def funcoes_das_margens(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]],
+                        confirmados: Sequence[Confirmado] = ()) -> Dict[int, dict]:
+    """`{página: {indice_do_box: função}}` aprendido no conjunto do livro e nos títulos
+    corridos `confirmados`.
 
     Ao contrário de :func:`margens_corridas`, poeira não aparece: ela não é cabeçalho
     nem rodapé e requer uma zona `ignorar`, de outro tipo.
     """
-    funcoes, _margens = _funcoes_das_margens(paginas)
+    funcoes, _margens = _funcoes_das_margens(paginas, confirmados)
     return funcoes
 
 
-def _funcoes_das_margens(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]]
-                          ) -> Tuple[Dict[int, dict], Dict[int, _Margem]]:
-    margens = {i: _margem_da_pagina(boxes, altura) for i, (boxes, altura) in paginas.items()}
+def _funcoes_das_margens(paginas: Dict[int, Tuple[Sequence[BoxEntry], int]],
+                         confirmados: Sequence[Confirmado] = ()
+                         ) -> Tuple[Dict[int, dict], Dict[int, _Margem]]:
+    aprendidos = {i: _aprendidos(confirmados, i) for i in paginas}
+    margens = {i: _margem_da_pagina(boxes, altura, aprendidos[i])
+               for i, (boxes, altura) in paginas.items()}
     saida = {i: {} for i in paginas}
     for i, margem in margens.items():
         for linha, lugar in margem.candidatos:
-            funcao = _funcao_da_margem(i, linha, lugar, margens)
+            funcao = _funcao_da_margem(i, linha, lugar, margens, aprendidos[i])
             if funcao:
                 saida[i].update({indice: funcao for indice in linha.indices})
     return saida, margens
 
 
-def _funcao_da_margem(i: int, linha: _Linha, lugar: str, margens: Dict[int, _Margem]) -> str:
+def _funcao_da_margem(i: int, linha: _Linha, lugar: str, margens: Dict[int, _Margem],
+                      aprendidos: Optional[Dict[str, List[str]]] = None) -> str:
     """A função da linha candidata da página `i`: o número de página, o cabeçalho ou o rodapé
-    (o `lugar`), se ela tem o número da página ou se repete noutra; vazia se fica no texto."""
+    (o `lugar`), se ela tem o número da página, se repete noutra ou se parece com um título
+    corrido confirmado do mesmo lugar (`aprendidos`); vazia se fica no texto."""
     from core import lado_a_jogar
 
     # "13.♕b3 0–0–0" no pé da coluna tem o "13" de um número de página,
@@ -182,7 +260,8 @@ def _funcao_da_margem(i: int, linha: _Linha, lugar: str, margens: Dict[int, _Mar
         return ""
     letras = _so_letras(linha.texto)
     numero = bool(_NUMERO_DE_PAGINA.search(linha.texto))
-    repete = _repete(i, letras, lugar, margens)
+    repete = (_repete(i, letras, lugar, margens)
+              or _parece(letras, (aprendidos or {}).get(lugar, ()), SEMELHANCA_DA_MARGEM))
     if not (numero or (repete and letras)):
         return ""
     texto = linha.texto.strip()

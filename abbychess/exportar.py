@@ -54,7 +54,7 @@ from abbychess.metadados import metadados_do_projeto
 from abbychess.montagem import (
     DPI_DA_LEITURA, Estrutura, FUNCOES_DE_MARGEM, _juntar_entre_paginas, _linhas,
     _quebras_da_camada, pagina_extraida)
-from abbychess.margens import _funcoes_das_margens, numeros_impressos
+from abbychess.margens import _funcoes_das_margens, confirmados_das_areas, numeros_impressos
 from abbychess.pedido import (
     NadaParaExportar, Opcoes, Pedido, Progresso, _alvo)
 from abbychess.pdf_pesquisavel import CAMADA, exportar_pdf_pesquisavel
@@ -319,8 +319,10 @@ def _boxes_e_margens(projeto: ProjetoDeLivro, pelos_boxes: Sequence[int], alvo: 
     # A regra das margens corridas olha o livro inteiro, como sempre (o título corrido das
     # pares casa com o das ímpares); só não tira o que o usuário marcou como texto. As
     # mesmas margens dão o número impresso de cada página (os rótulos e os links do EPUB).
+    # Os títulos corridos que o usuário marcou numa página valem nas da mesma paridade (§5.1).
+    confirmados = confirmados_das_areas({i: (lidos[i], estruturas[i].zonas) for i in pelos_boxes})
     funcoes, margens = _funcoes_das_margens(
-        {i: (lidos[i], _altura_da_pagina(projeto, i)) for i in pelos_boxes})
+        {i: (lidos[i], _altura_da_pagina(projeto, i)) for i in pelos_boxes}, confirmados)
     tirar = {} if opcoes.manter_margens else {
         i: set(margens[i].poeira) | set(funcoes[i]) for i in pelos_boxes}
     relatorio.numeros_impressos = numeros_impressos(

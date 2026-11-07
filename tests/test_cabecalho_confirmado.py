@@ -89,8 +89,8 @@ def test_a_linha_colada_so_um_pouco_parecida_fica():
 
 
 def test_o_lance_colado_no_texto_nunca_e_cabecalho():
-    boxes = _linha("13.Cf3 Cf6", 260) + _corpo(320)
-    lance = mg.Confirmado(paridade=0, lugar="cabecalho", letras="cfcf")
+    boxes = _linha("13.Nf3 Nf6", 260) + _corpo(320)      # o `tem_lance` do core lê o inglês
+    lance = mg.Confirmado(paridade=0, lugar="cabecalho", letras="nfnf")
     assert mg.margens_corridas({22: (boxes, ALTURA)}, [lance]) == {22: set()}
 
 
@@ -108,6 +108,32 @@ def test_os_confirmados_saem_das_areas_do_usuario():
              [_zona_do_usuario("rodape", (250, 3330, 1000, 3410))])})
     assert confirmados == [mg.Confirmado(0, "cabecalho", "xadrezvitorioso"),
                            mg.Confirmado(1, "rodape", "yasserseirawan")]
+
+
+def test_as_areas_automaticas_aprendem_com_o_cabecalho_marcado_noutra_pagina():
+    """O modo Áreas (`_aprender_margens`): a área automática do título colado da página aberta
+    vira cabeçalho porque o usuário marcou o mesmo título noutra página par."""
+    from types import SimpleNamespace
+
+    from abbychess.controlador_de_layout import ControladorDeLayout
+
+    def modelo(zonas=()):
+        return SimpleNamespace(boxes=[SimpleNamespace(entry=b) for b in _colada()],
+                               zonas=list(zonas))
+
+    modelos = {0: modelo([_zona_do_usuario("cabecalho")]), 1: modelo(), 2: modelo()}
+    eventos = SimpleNamespace(ligar=lambda *_a: None)
+
+    def aberta(indice):
+        projeto = SimpleNamespace(resumo=SimpleNamespace(paginas_lidas=lambda: sorted(modelos)),
+                                  carregar_modelo=modelos.get)
+        return SimpleNamespace(eventos=eventos, projeto=projeto, indice=indice,
+                               modelo=modelos[indice], imagem=SimpleNamespace(height=ALTURA))
+
+    automatica = replace(_zona_do_usuario("texto"), automatica=True)
+    [par] = ControladorDeLayout(aberta(2))._aprender_margens([automatica])
+    [impar] = ControladorDeLayout(aberta(1))._aprender_margens([automatica])
+    assert (par.funcao, impar.funcao) == ("cabecalho", "texto")
 
 
 def _livro(tmp_path, paginas: int):
@@ -128,10 +154,12 @@ def test_a_exportacao_aprende_o_cabecalho_marcado_numa_pagina(tmp_path):
             projeto.salvar_pagina(i, _colada())
         projeto.salvar_zonas(0, [_zona_do_usuario("cabecalho")])
         paginas = ex.paginas_do_projeto(projeto, None)
-        textos = {i: " ".join(b.texto for b in p.blocos) for i, p in enumerate(paginas)}
-        assert "XADREZ" not in textos[0]                # a área marcada
-        assert "XADREZ" not in textos[2]                # a par, que aprendeu com ela
-        assert "XADREZ" in textos[1]                    # a ímpar, que ninguém confirmou
-        assert all(t.startswith("as brancas jogam") for i, t in textos.items() if i != 1)
+        textos = [" ".join(b.texto for b in p.blocos) for p in paginas]
+        # O parágrafo que a paginação partiu volta a ser um: o texto da página 2 entra no da
+        # 1. Por isso a conta é no livro: só o título da ímpar, que ninguém confirmou, fica;
+        # sem o confirmado, o da par 2 também ficava.
+        assert " ".join(textos).count("XADREZ") == 1
+        assert textos[0].startswith("as brancas jogam")       # a área marcada
+        assert textos[1].startswith("XADREZ VITORIOSO")       # a ímpar
     finally:
         projeto.fechar()

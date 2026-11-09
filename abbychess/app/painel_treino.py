@@ -513,10 +513,9 @@ class PainelDeTreino(QWidget):
             pixmap = pixmap.copy()
             coluna = (self.corte - box.x1) * pixmap.width() / max(box.x2 - box.x1, 1)
             pintor = QPainter(pixmap)
-            caneta = QPen(estilo.SELECIONADO)
-            caneta.setWidth(2)
-            pintor.setPen(caneta)
-            pintor.drawLine(round(coluna), 0, round(coluna), pixmap.height())
+            for caneta in estilo.canetas_da_selecao(2):      # o contorno duplo (CA-U7)
+                pintor.setPen(caneta)
+                pintor.drawLine(round(coluna), 0, round(coluna), pixmap.height())
             pintor.end()
         self.glifo.setPixmap(pixmap)
 

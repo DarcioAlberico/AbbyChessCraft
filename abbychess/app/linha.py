@@ -142,12 +142,12 @@ class FaixaDaLinha(QWidget):
         for n, b in enumerate(self._boxes):
             gx1 = esquerda + (b.x1 - ox) * self.escala
             gx2 = esquerda + (b.x2 - ox) * self.escala
-            if n == self._atual:
-                caneta = QPen(estilo.SELECIONADO)
-                caneta.setWidthF(2)
-                pintor.setPen(caneta)
-                pintor.drawRect(QRectF(gx1 - 1, topo + (b.y1 - oy) * self.escala - 1,
-                                       gx2 - gx1 + 2, (b.y2 - b.y1) * self.escala + 2))
+            if n == self._atual:                # o contorno duplo (CA-U7)
+                retangulo = QRectF(gx1 - 1, topo + (b.y1 - oy) * self.escala - 1,
+                                   gx2 - gx1 + 2, (b.y2 - b.y1) * self.escala + 2)
+                for caneta in estilo.canetas_da_selecao(2):
+                    pintor.setPen(caneta)
+                    pintor.drawRect(retangulo)
             self._pintar_a_letra(pintor, n, b, gx1, gx2, base)
         self._pintar_o_aviso(pintor)
         pintor.end()

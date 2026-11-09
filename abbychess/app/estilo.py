@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from typing import Dict, Tuple
 
 from PySide6.QtCore import QObject, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette, QPen
 
 from abbychess import grade as gd
 
@@ -177,6 +177,17 @@ CASA_ARBITRADA = QColor(192, 57, 43, 90)
 CASA_DUVIDOSA = QColor(230, 126, 34, 90)
 
 
+def canetas_da_selecao(largura: float = 2) -> Tuple[QPen, QPen]:
+    """(a de fora, a de dentro) do contorno duplo da seleção (CA-U7): o escuro por fora, mais
+    largo, e o amarelo por dentro. O amarelo sozinho dá 1,66:1 no papel; desenhe com as duas,
+    nessa ordem, como o visor (§3.3)."""
+    fora = QPen(CONTORNO_DA_SELECAO)
+    fora.setWidthF(largura + 2)
+    dentro = QPen(SELECIONADO)
+    dentro.setWidthF(largura)
+    return fora, dentro
+
+
 def cor_do_diagrama(diagrama) -> QColor:
     """Tracejado do tabuleiro: cinza por ler, laranja a conferir, azul confiável, roxo conferido."""
     if diagrama.conferido:
@@ -242,14 +253,14 @@ class Tema:
 CLARO = Tema("claro", janela=QColor(240, 240, 240), base=QColor(255, 255, 255),
              base_alternada=QColor(246, 246, 246), texto=QColor(20, 20, 20),
              texto_secundario=QColor(85, 85, 85), botao=QColor(240, 240, 240),
-             borda=QColor(190, 190, 190), destaque=QColor(0, 114, 178),
+             borda=QColor(135, 135, 135), destaque=QColor(0, 114, 178),     # 3,15:1 (CA-U7)
              texto_do_destaque=QColor(255, 255, 255), dica_fundo=QColor(255, 255, 225),
              erro=QColor(176, 40, 30), aviso=QColor(160, 85, 0), acerto=QColor(0, 110, 70),
              link=QColor(0, 90, 160))
 ESCURO = Tema("escuro", janela=QColor(37, 37, 38), base=QColor(30, 30, 30),
               base_alternada=QColor(45, 45, 48), texto=QColor(230, 230, 230),
               texto_secundario=QColor(170, 170, 170), botao=QColor(55, 55, 58),
-              borda=QColor(80, 80, 85), destaque=QColor(86, 156, 214),
+              borda=QColor(130, 130, 135), destaque=QColor(86, 156, 214),    # 3,10:1 (CA-U7)
               texto_do_destaque=QColor(0, 0, 0), dica_fundo=QColor(60, 60, 64),
               erro=QColor(255, 120, 110), aviso=QColor(240, 175, 80),
               acerto=QColor(110, 210, 150), link=QColor(120, 180, 255))

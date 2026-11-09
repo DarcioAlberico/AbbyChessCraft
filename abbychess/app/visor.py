@@ -178,8 +178,9 @@ class VisorDePagina(QGraphicsView):
         self.ir_ao_topo()
 
     def mostrar_boxes(self, boxes: List[BoxEntry], pendentes: set, tabuleiros=(),
-                      cores_dos_tabuleiros=None) -> None:
-        """`cores_dos_tabuleiros`, uma cor por tabuleiro, diz o estado da leitura."""
+                      tracos_dos_tabuleiros=None) -> None:
+        """`tracos_dos_tabuleiros`, um `estilo.Traco` por tabuleiro, diz o estado da leitura
+        pela cor e pelo traço (CA-U5c)."""
         cena = self.scene()
         for item in self._itens:
             cena.removeItem(item)
@@ -188,7 +189,7 @@ class VisorDePagina(QGraphicsView):
             self._destaque = None
         self._trocar_os_boxes(boxes)
         self._tabuleiros = [tuple(t) for t in tabuleiros]
-        self._itens = _desenhar_tabuleiros(cena, self._tabuleiros, cores_dos_tabuleiros)
+        self._itens = _desenhar_tabuleiros(cena, self._tabuleiros, tracos_dos_tabuleiros)
         if self.item_dos_boxes is not None:
             self.item_dos_boxes.trocar(boxes, [gd.estado(b, i in pendentes)
                                                for i, b in enumerate(boxes)])
@@ -782,14 +783,15 @@ class VisorDePagina(QGraphicsView):
 # ----------------------------------------------------------------------
 # As partes do visor (funções: a classe não cresce)
 # ----------------------------------------------------------------------
-def _desenhar_tabuleiros(cena: QGraphicsScene, tabuleiros, cores) -> List[QGraphicsRectItem]:
-    """O contorno tracejado de cada tabuleiro, na cor do estado da leitura dele."""
+def _desenhar_tabuleiros(cena: QGraphicsScene, tabuleiros, tracos) -> List[QGraphicsRectItem]:
+    """O contorno de cada tabuleiro, na cor e no traço do estado da leitura dele."""
     itens = []
     for i, (x1, y1, x2, y2) in enumerate(tabuleiros):
-        caneta = QPen(cores[i] if cores else estilo.DIAGRAMA_POR_LER)
+        traco = tracos[i] if tracos else estilo.legenda_dos_diagramas()[0][0]    # por ler
+        caneta = QPen(traco.cor)
         caneta.setCosmetic(True)
-        caneta.setWidthF(2.5)
-        caneta.setStyle(Qt.PenStyle.DashLine)
+        caneta.setWidthF(traco.largura)
+        caneta.setStyle(traco.estilo)
         item = QGraphicsRectItem(x1, y1, x2 - x1, y2 - y1)
         item.setPen(caneta)
         cena.addItem(item)

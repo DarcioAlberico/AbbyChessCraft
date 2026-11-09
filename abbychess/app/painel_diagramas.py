@@ -11,7 +11,7 @@ desenha e filtra (`estado`, `passa` são puros, testados sem Qt).
 
 from __future__ import annotations
 
-from typing import Callable, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QActionGroup, QIcon, QImage, QPainter, QPixmap
@@ -114,6 +114,8 @@ class PainelDeDiagramas(QWidget):
         caixa.addWidget(self.grade, 1)
 
         self._paginas: List[Tuple[int, list]] = []
+        #: (página, caixa) -> o impresso que chegou da thread da janela (CA-U5c).
+        self._recortes: Dict[Tuple[int, tuple], QImage] = {}
         self._recorte: Optional[Callable] = None
         self._desenho: Optional[Callable] = None
 
@@ -125,6 +127,33 @@ class PainelDeDiagramas(QWidget):
         self._paginas = [(i, list(ds)) for i, ds in paginas]
         self._recorte, self._desenho = recorte, desenho
         self._preencher()
+
+    def mostrar_recorte(self, pagina: int, indice: int, imagem: QImage) -> None:
+        """O impresso do diagrama `indice` da `pagina`, tirado numa thread: o item dele passa
+        a mostrá-lo. Um diagrama que não está mais na aba fica de fora."""
+        diagrama = self._diagrama(pagina, indice)
+        if diagrama is None:
+            return
+        self._recortes[(pagina, tuple(diagrama.caixa))] = imagem
+        for k in range(self.grade.count()):
+            item = self.grade.item(k)
+            if item.data(Qt.ItemDataRole.UserRole) == (pagina, indice):
+                item.setIcon(self._icone(pagina, diagrama))
+
+    def tem_recorte(self, pagina: int, indice: int) -> bool:
+        """O diagrama tem o impresso: o da memória da janela, ou o que chegou da thread."""
+        diagrama = self._diagrama(pagina, indice)
+        return diagrama is not None and self._impresso(pagina, diagrama) is not None
+
+    def _diagrama(self, pagina: int, indice: int):
+        return next((ds[indice] for i, ds in self._paginas
+                     if i == pagina and 0 <= indice < len(ds)), None)
+
+    def _impresso(self, pagina: int, d) -> Optional[QImage]:
+        guardado = self._recortes.get((pagina, tuple(d.caixa)))
+        if guardado is not None:
+            return guardado
+        return self._recorte(pagina, d.caixa) if self._recorte is not None else None
 
     def filtro_atual(self) -> str:
         return self.filtro.currentData()
@@ -164,7 +193,7 @@ class PainelDeDiagramas(QWidget):
         tela = QPixmap(2 * lado + 4, lado)
         tela.fill(estilo.PAPEL)
         pintor = QPainter(tela)
-        recorte = self._recorte(pagina, d.caixa) if self._recorte is not None else None
+        recorte = self._impresso(pagina, d)
         if recorte is not None and not recorte.isNull():
             pintor.drawImage(0, 0, recorte.scaled(lado, lado, Qt.AspectRatioMode.KeepAspectRatio,
                                                   Qt.TransformationMode.SmoothTransformation))

@@ -177,13 +177,41 @@ CASA_ARBITRADA = QColor(192, 57, 43, 90)
 CASA_DUVIDOSA = QColor(230, 126, 34, 90)
 
 
+#: Cada estado do tabuleiro na Imagem: a cor, o traço e o nome da legenda (CA-U5c). O traço
+#: também muda, e não só a cor (a regra do topo deste arquivo).
+ESTADOS_DO_DIAGRAMA = {
+    "por_ler": (DIAGRAMA_POR_LER, Qt.PenStyle.DotLine, "Diagrama por ler"),
+    "a_conferir": (DIAGRAMA_A_CONFERIR, Qt.PenStyle.DashLine, "Diagrama a conferir"),
+    "confiavel": (DIAGRAMA_CONFIAVEL, Qt.PenStyle.DashDotLine, "Diagrama confiável"),
+    "conferido": (DIAGRAMA_CONFERIDO, Qt.PenStyle.SolidLine, "Diagrama conferido"),
+}
+LARGURA_DO_TABULEIRO = 2.5
+
+
+def estado_do_diagrama(diagrama) -> str:
+    """Um de `ESTADOS_DO_DIAGRAMA`."""
+    if diagrama.conferido:
+        return "conferido"
+    if not diagrama.lido:
+        return "por_ler"
+    return "confiavel" if diagrama.confiavel else "a_conferir"
+
+
 def cor_do_diagrama(diagrama) -> QColor:
     """Tracejado do tabuleiro: cinza por ler, laranja a conferir, azul confiável, roxo conferido."""
-    if diagrama.conferido:
-        return DIAGRAMA_CONFERIDO
-    if not diagrama.lido:
-        return DIAGRAMA_POR_LER
-    return DIAGRAMA_CONFIAVEL if diagrama.confiavel else DIAGRAMA_A_CONFERIR
+    return ESTADOS_DO_DIAGRAMA[estado_do_diagrama(diagrama)][0]
+
+
+def traco_do_diagrama(diagrama) -> Traco:
+    """O traço do tabuleiro na Imagem: a cor e o estilo do estado (CA-U5c)."""
+    cor, estilo_do_traco, _nome = ESTADOS_DO_DIAGRAMA[estado_do_diagrama(diagrama)]
+    return Traco(cor, LARGURA_DO_TABULEIRO, estilo_do_traco)
+
+
+def legenda_dos_diagramas():
+    """[(Traco, nome)] dos quatro estados, na ordem da legenda do Glifo."""
+    return [(Traco(cor, LARGURA_DO_TABULEIRO, traco), nome)
+            for cor, traco, nome in ESTADOS_DO_DIAGRAMA.values()]
 
 
 # ----------------------------------------------------------------------

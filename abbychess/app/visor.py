@@ -461,10 +461,11 @@ class VisorDePagina(QGraphicsView):
         if coluna is None or indice is None or not 0 <= indice < len(self._boxes):
             return
         b = self._boxes[indice]
-        caneta = QPen(estilo.SELECIONADO)
-        caneta.setCosmetic(True)
-        caneta.setWidthF(2)
-        self._corte = self.scene().addLine(coluna, b.y1 - 4, coluna, b.y2 + 4, caneta)
+        fora, dentro = estilo.canetas_da_selecao(2)      # o contorno duplo (CA-U7)
+        for caneta in (fora, dentro):
+            caneta.setCosmetic(True)
+        self._corte = self.scene().addLine(coluna, b.y1 - 4, coluna, b.y2 + 4, fora)
+        QGraphicsLineItem(self._corte.line(), self._corte).setPen(dentro)   # sai junto
         self._corte.setZValue(11)
 
     def marcar_palavra(self, caixa) -> None:

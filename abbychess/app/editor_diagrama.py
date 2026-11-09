@@ -26,8 +26,8 @@ import logging
 from dataclasses import replace
 from typing import Dict, List, Optional, Tuple
 
-from PySide6.QtCore import QRect, QRectF, Qt, Signal
-from PySide6.QtGui import QFont, QPainter, QPen, QPixmap
+from PySide6.QtCore import QPoint, QRect, QRectF, Qt, Signal
+from PySide6.QtGui import QFont, QPainter, QPen, QPixmap, QPolygon
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QGridLayout, QGroupBox,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton, QRadioButton,
                                QSizePolicy, QToolButton, QVBoxLayout, QWidget)
@@ -54,7 +54,40 @@ CASA_CLARA, CASA_ESCURA = estilo.CASA_CLARA, estilo.CASA_ESCURA
 COR_CORRIGIDA = estilo.CASA_CORRIGIDA      # verde: corrigida por você
 COR_ARBITRADA = estilo.CASA_ARBITRADA      # vermelho: trocada pela legalidade
 COR_DUVIDA = estilo.CASA_DUVIDOSA          # laranja: leitura duvidosa
-COR_SELECAO = estilo.SELECIONADO           # amarelo: a casa selecionada
+#: O canto de cada estado da casa (CA-U7): a corrigida e a duvidosa têm a mesma luminância, e
+#: só a cor não as separa para quem não distingue verde de laranja.
+CANTO_DO_ESTADO = {"corrigida": "topo_esquerdo", "arbitrada": "topo_direito",
+                   "duvida": "baixo_esquerdo"}
+#: A cor do triângulo do canto: escura, contra a casa clara e a escura.
+CONTORNO_DO_CANTO = estilo.TINTA
+
+
+COR_DO_ESTADO = {"corrigida": COR_CORRIGIDA, "arbitrada": COR_ARBITRADA, "duvida": COR_DUVIDA}
+
+
+def _estado_da_casa(casa) -> Optional[str]:
+    """O estado marcado da casa ("corrigida", "arbitrada", "duvida"), ou None."""
+    if casa.corrigida:
+        return "corrigida"
+    if casa.arbitrada:
+        return "arbitrada"
+    if casa.simbolo and casa.confianca < CONFIANCA_BAIXA:
+        return "duvida"
+    return None
+
+
+def _pintar_o_canto(pintor: QPainter, retangulo, canto: str) -> None:
+    """O triângulo escuro no `canto` da casa, de um terço do lado: o estado sem depender da cor."""
+    lado = max(6, retangulo.width() // 3)
+    x = retangulo.left() if canto.endswith("esquerdo") else retangulo.right() + 1
+    y = retangulo.top() if canto.startswith("topo") else retangulo.bottom() + 1
+    dx = lado if canto.endswith("esquerdo") else -lado
+    dy = lado if canto.startswith("topo") else -lado
+    pintor.save()
+    pintor.setPen(Qt.PenStyle.NoPen)
+    pintor.setBrush(CONTORNO_DO_CANTO)
+    pintor.drawPolygon(QPolygon([QPoint(x, y), QPoint(x + dx, y), QPoint(x, y + dy)]))
+    pintor.restore()
 
 
 class TabuleiroConferivel(QWidget):
@@ -113,20 +146,15 @@ class TabuleiroConferivel(QWidget):
         else:
             self._pintar_com_glifos(pintor)
         for casa in self.tabuleiro.casas:
-            cor = None
-            if casa.corrigida:
-                cor = COR_CORRIGIDA
-            elif casa.arbitrada:
-                cor = COR_ARBITRADA
-            elif casa.simbolo and casa.confianca < CONFIANCA_BAIXA:
-                cor = COR_DUVIDA
-            if cor is not None:
-                pintor.fillRect(self.retangulo(casa.linha, casa.coluna), cor)
+            estado = _estado_da_casa(casa)
+            if estado is not None:
+                retangulo = self.retangulo(casa.linha, casa.coluna)
+                pintor.fillRect(retangulo, COR_DO_ESTADO[estado])
+                _pintar_o_canto(pintor, retangulo, CANTO_DO_ESTADO[estado])
         if self.selecionada is not None:
-            caneta = QPen(COR_SELECAO)
-            caneta.setWidth(3)
-            pintor.setPen(caneta)
-            pintor.drawRect(self.retangulo(*self.selecionada).adjusted(1, 1, -2, -2))
+            for caneta in estilo.canetas_da_selecao(2):     # o contorno duplo (CA-U7)
+                pintor.setPen(caneta)
+                pintor.drawRect(self.retangulo(*self.selecionada).adjusted(2, 2, -3, -3))
         pintor.end()
 
     def _pintar_com_glifos(self, pintor: QPainter) -> None:

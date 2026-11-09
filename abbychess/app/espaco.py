@@ -445,6 +445,15 @@ class EspacoDeTrabalho:
         self.linha.mostrar(p.matriz, [boxes[indice[g]] for g in linha],
                            linha.index(gid) if gid in linha else None)
 
+    def boxes_da_linha(self, gid) -> list:
+        """Os boxes da linha do glifo `gid` (a do Documento, ou a da geometria), da esquerda
+        para a direita; nenhum sem glifo. O Glifo os usa para a escala comum (CA-U9)."""
+        p = self.pagina
+        if gid is None or not p.boxes:
+            return []
+        indice = self._indice_por_gid()
+        return [p.boxes[indice[g]] for g in _linha_do_glifo(self, gid, indice)]
+
     def _linha_pela_geometria(self, gid, indice_por_gid: dict) -> list:
         """Os glifos da altura do glifo (o centro de cada um dentro da faixa dele), da
         esquerda para a direita: a linha quando o Documento ainda não a tem."""

@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import html
 from collections import Counter
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 from PySide6.QtCore import QEvent, Qt, Signal
@@ -231,6 +231,19 @@ class _CampoDoCaractere(QLineEdit):
         super().keyPressEvent(evento)
 
 
+def _com_a_linha_de_base(pixmap: QPixmap, y: float) -> QPixmap:
+    """O recorte com o traço da linha de base, tracejado e em cinza, na altura `y`."""
+    pixmap = pixmap.copy()
+    pintor = QPainter(pixmap)
+    pintor.setCompositionMode(QPainter.CompositionMode.CompositionMode_Darken)  # sob a tinta
+    caneta = QPen(estilo.TINTA_SECUNDARIA)
+    caneta.setStyle(Qt.PenStyle.DashLine)
+    pintor.setPen(caneta)
+    pintor.drawLine(0, round(y), pixmap.width(), round(y))
+    pintor.end()
+    return pixmap
+
+
 class _GlifoAmpliado(QLabel):
     """O recorte ampliado; o clique escolhe a coluna onde dividir o box."""
 
@@ -248,6 +261,14 @@ class _GlifoAmpliado(QLabel):
 
 #: Altura do recorte ampliado no painel, em pixels de tela.
 ALTURA_DO_GLIFO = 140
+
+
+def faixa_da_linha(boxes) -> Tuple[int, int, int]:
+    """(topo, base, pé) da linha dos `boxes`: o topo do mais alto, a linha de base (a mediana
+    dos pés: as descendentes são poucas) e o pé do que mais desce. O recorte do Glifo usa a
+    altura do topo ao pé, a mesma escala para todos os glifos da linha (CA-U9)."""
+    pes = sorted(b.y2 for b in boxes)
+    return min(b.y1 for b in boxes), pes[(len(pes) - 1) // 2], pes[-1]
 
 
 class PainelDeTreino(QWidget):
@@ -272,6 +293,8 @@ class PainelDeTreino(QWidget):
         self._ativo = False
         self._pagina: Optional[np.ndarray] = None
         self._box: Optional[BoxEntry] = None
+        #: (topo, base, pé) da linha do glifo mostrado, ou None (CA-U9).
+        self._faixa: Optional[Tuple[int, int, int]] = None
         self.corte: Optional[int] = None
 
         self.glifo = _GlifoAmpliado()
@@ -434,10 +457,13 @@ class PainelDeTreino(QWidget):
             self.mostrar_aviso_de_ensino(*self._aviso)
 
     def mostrar(self, pagina: np.ndarray, box: BoxEntry, posicao: str,
-                tomar_o_foco: bool = True) -> None:
+                tomar_o_foco: bool = True, linha=None) -> None:
         """Mostra o glifo em revisão e põe a leitura atual no campo, selecionada. Sem
-        `tomar_o_foco`, o foco fica onde está: quem digita no Documento continua nele (U-1)."""
+        `tomar_o_foco`, o foco fica onde está: quem digita no Documento continua nele (U-1).
+        Com a `linha` (os boxes da linha do glifo), o recorte vai do topo ao pé dela, na
+        escala comum, com o traço da linha de base (CA-U9); sem ela, o glifo ocupa a altura."""
         self._pagina, self._box = pagina, box
+        self._faixa = faixa_da_linha(list(linha) + [box]) if linha else None
         self._definir_corte(None)
         fonte = NOMES_DAS_FONTES.get(box.source, box.source or "sem leitura")
         lido = box.char if box.char else "—"
@@ -507,8 +533,13 @@ class PainelDeTreino(QWidget):
     # ------------------------------------------------------------------
     def _desenhar_glifo(self) -> None:
         box = self._box
-        recorte = self._pagina[box.y1:box.y2, box.x1:box.x2]
+        faixa = self._faixa
+        topo, pe = (faixa[0], faixa[2]) if faixa else (box.y1, box.y2)
+        recorte = self._pagina[topo:pe, box.x1:box.x2]
         pixmap = ampliado(pixmap_de_cinza(recorte), ALTURA_DO_GLIFO)
+        if faixa and not pixmap.isNull():
+            pixmap = _com_a_linha_de_base(pixmap, (faixa[1] - topo) * pixmap.height()
+                                          / max(pe - topo, 1))
         if self.corte is not None and not pixmap.isNull():
             pixmap = pixmap.copy()
             coluna = (self.corte - box.x1) * pixmap.width() / max(box.x2 - box.x1, 1)

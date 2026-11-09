@@ -88,3 +88,22 @@ def test_o_corte_continua_na_coluna_clicada(painel):
     painel.mostrar(matriz, box, "", tomar_o_foco=False, linha=boxes)
     painel._clicar_no_glifo(0.5)
     assert painel.corte == box.x1 + 10
+
+
+def test_a_janela_passa_a_linha_do_glifo_atual(app, tmp_path, sim):
+    """O Glifo da janela recebe a linha do glifo atual: a faixa vai do topo ao pé dela."""
+    from abbychess.projeto import ProjetoDeLivro
+    from tests.ajudantes import _abrir, _ler_a_mao, _pagina_sintetica
+
+    projeto = ProjetoDeLivro.criar(tmp_path / "livros", "Linha",
+                                   _pagina_sintetica(tmp_path / "pagina.png"))
+    j = _abrir(projeto)
+    try:
+        _ler_a_mao(app, j)
+        p = j.pagina
+        j._atual_mudou()
+        linha = j.boxes_da_linha(p.atual)
+        assert len(linha) > 1 and p.box_atual() in linha
+        assert j.treino._faixa == faixa_da_linha(linha)
+    finally:
+        j.close()

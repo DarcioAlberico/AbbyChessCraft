@@ -143,7 +143,8 @@ class DesenhoDaJanela:
                                               _faltam_ler(p)))
             return
         self.treino.mostrar(p.matriz, p.box_atual(), p.fila_da_pagina.posicao_do_atual(),
-                            tomar_o_foco=QApplication.focusWidget() is not self.texto)
+                            tomar_o_foco=QApplication.focusWidget() is not self.texto,
+                            linha=self.boxes_da_linha(p.atual))     # a escala da linha (CA-U9)
         if (sugestao := p.leitura.sugestao_do_atual()) is not None:    # §9.2: o palpite da rede
             self.treino.sugerir(*sugestao)
         elif (troca := p.leitura.sugestao_do_contexto()) is not None:  # a palavra ou a linha desmente

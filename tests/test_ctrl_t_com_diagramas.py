@@ -42,13 +42,12 @@ def test_o_ctrl_t_so_com_diagrama_pergunta(app, janela, monkeypatch):  # noqa: F
     assert j.pagina.modelo is None or j.pagina.modelo.estado != "verificada"
 
 
-def test_o_ctrl_t_soma_os_diagramas_as_duvidas_e_aos_lances(app, janela, monkeypatch):  # noqa: F811
+def test_o_ctrl_t_cita_os_lances_e_os_diagramas(app, janela, monkeypatch):  # noqa: F811
+    """As dúvidas dos glifos na mesma frase já são de `test_fila_lances.py` (CA-F4.9)."""
     j = janela
-    monkeypatch.setattr(j.pagina.fila_da_pagina, "fila", lambda: [1, 2, 3])
     monkeypatch.setattr(j.fila.lances, "resumo_da_pagina", lambda: {"nao_conferidos": 2})
     monkeypatch.setattr(j.conferencia, "por_conferir_na_pagina", lambda: 2)
     j.verificar_pagina()
-    texto = j.confirmacao.pergunta.text()
-    assert texto.startswith("Aceitar 3 dúvidas como estão? 2 lances não conferidos. ")
-    assert "2 diagramas por conferir. " in texto
+    assert j.confirmacao.pergunta.text() == ("Marcar verificada? 2 lances não conferidos. "
+                                             "2 diagramas por conferir. Enter aceita · Esc não marca")
     j.confirmacao._fechar()

@@ -24,6 +24,11 @@ class ControladorDeDiagramas:
         self.pagina = pagina
         self.eventos = pagina.eventos
 
+    def por_conferir_na_pagina(self) -> int:
+        """Quantos diagramas da página aberta ainda estão por conferir: o que falhou na leitura
+        não tem posição, e não conta (U-5a). A pergunta do Ctrl+T os cita (CA-U5b)."""
+        return sum(1 for d in self.pagina.diagramas if _por_conferir(d))
+
     def proximo_do_livro(self) -> None:
         """F8: o primeiro diagrama ainda não conferido desta página, ou a próxima página do
         livro que tem um (dando a volta no livro), aberta já na conferência."""
@@ -207,7 +212,11 @@ def _em_volta(paginas: List[int], indice: int) -> List[int]:
 
 def _tem_por_conferir(diagramas) -> bool:
     """Há algo a conferir: o que falhou na leitura não tem posição, e não prende o F8 (U-5a)."""
-    return any(not d.conferido and not d.erro for d in diagramas)
+    return any(_por_conferir(d) for d in diagramas)
+
+
+def _por_conferir(d) -> bool:
+    return not d.conferido and not d.erro
 
 
 def _vizinha(paginas: List[int], indice: int, passo: int) -> Optional[int]:

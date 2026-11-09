@@ -356,6 +356,22 @@ De PP6 a PP9, os campos se escrevem quando o usuário pedir o passo.
 2. **Em M3:** progresso (U-3), U-10, U-13, U-14.
 3. **Duas sessões:** indicador de foco e de modo (U-1, U-2), falha (U-6).
 4. **Depois:** U-5b, U-5c, U-7, U-9.
+   **Feito** em 2026-11-09, um ramo por item (`u-5b`, `u-5c`, `u-7`, `u-9`), cada um a partir
+   da `main`, suíte rápida em série, arquivo por arquivo, em cada um; tudo no `offscreen`:
+   - **CA-U5b** (`ControladorDeDiagramas.por_conferir_na_pagina`): a pergunta do Ctrl+T diz
+     "1 diagrama por conferir"; o que falhou na leitura não conta, como no F8 (U-5a).
+   - **CA-U5c** (`diagramas_na_janela._carregar_os_impressos`, `estilo.ESTADOS_DO_DIAGRAMA`): a
+     grade busca numa thread o impresso das páginas fora da memória; na Imagem, cada estado do
+     tabuleiro tem o seu traço (pontilhado, tracejado, traço-ponto, contínuo), com a legenda de
+     quatro linhas no Glifo.
+   - **CA-U7** (`estilo.canetas_da_selecao`, `editor_diagrama.CANTO_DO_ESTADO`): a borda passa a
+     3,15:1 (claro) e 3,10:1 (escuro); o amarelo da seleção ganha o escuro por fora na Linha, no
+     corte do Glifo e da Imagem e na casa do Diagrama; cada estado da casa ganha um triângulo
+     escuro num canto próprio. Os fundos de realce do Documento (baixa confiança e busca quase
+     iguais, a sessão quase invisível) ficaram de fora: a SPEC pede o CA-U7 pelos tokens da
+     borda, da seleção e das casas.
+   - **CA-U9** (`painel_treino.faixa_da_linha`): o recorte do Glifo vai do topo ao pé da linha,
+     na mesma escala para os glifos dela, com o traço da linha de base.
 
 ## Trilha T2 — Confiabilidade
 

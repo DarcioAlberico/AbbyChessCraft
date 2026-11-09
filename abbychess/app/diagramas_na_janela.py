@@ -5,7 +5,11 @@ dos diagramas do livro são do `ControladorDeDiagramas`; aqui só se monta e se 
 
 from __future__ import annotations
 
+import logging
+import threading
 from typing import Optional
+
+import numpy as np
 
 from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QImage
@@ -15,6 +19,8 @@ from abbychess.app import acoes, dialogos
 from abbychess.app.imagens import imagem_do_diagrama
 from abbychess.app.editor_diagrama import EditorDeDiagrama
 from abbychess.app.painel_diagramas import PainelDeDiagramas
+
+log = logging.getLogger(__name__)
 
 
 class DiagramasNaJanela:
@@ -32,6 +38,7 @@ class DiagramasNaJanela:
         self.painel_diagramas = PainelDeDiagramas()
         self.painel_diagramas.abrir.connect(self.abrir_diagrama_do_livro)
         self.painel_diagramas.atualizar_pedido.connect(self.atualizar_diagramas)
+        self._carga_dos_diagramas = 0
 
     def _abrir_conferencia(self, indice: int) -> EditorDeDiagrama:
         """O editor Diagrama no Inspetor, no diagrama `indice` da página; a Imagem dá zoom
@@ -87,6 +94,36 @@ class DiagramasNaJanela:
 
     def _mostrar_diagramas(self, paginas) -> None:
         self.painel_diagramas.mostrar(paginas, self._recorte_na_memoria, _desenho)
+        self._carregar_os_impressos(paginas)
+
+    def _carregar_os_impressos(self, paginas) -> None:
+        """O impresso dos diagramas das páginas fora da memória, numa thread (como a Galeria):
+        cada página pela fonte, recortada em cada caixa; chegam pela fila da interface (CA-U5c).
+        Uma carga nova, ou outro projeto, para a anterior."""
+        self._carga_dos_diagramas += 1
+        carga, p, painel = self._carga_dos_diagramas, self.pagina, self.painel_diagramas
+        fonte, geracao = p.fonte, p.geracao
+        faltam = [(i, ds) for i, ds in paginas
+                  if ds and i not in self._pixmaps
+                  and not all(painel.tem_recorte(i, k) for k in range(len(ds)))]
+        if fonte is None or not faltam:
+            return
+
+        def vale() -> bool:
+            return carga == self._carga_dos_diagramas and geracao == p.geracao
+
+        def rodar():
+            for indice, diagramas in faltam:
+                if not vale():
+                    return
+                try:
+                    impressos = _impressos_da_pagina(fonte, indice, diagramas)
+                except Exception:
+                    log.exception("os impressos dos diagramas da página %d falharam", indice + 1)
+                    continue
+                p.executar.na_interface(lambda i=indice, r=impressos: _entregar(vale, painel, i, r))
+
+        threading.Thread(target=rodar, name="impressos-dos-diagramas", daemon=True).start()
 
     def _aba_mudou(self, _indice: int) -> None:
         if self.vista.currentWidget() is self.painel_diagramas:
@@ -110,6 +147,29 @@ class DiagramasNaJanela:
         if indice != self.pagina.indice and not self.pagina.ir_para(indice):
             return
         self.conferencia.conferir(diagrama)
+
+
+def _impressos_da_pagina(fonte, indice: int, diagramas) -> list:
+    """[(k, QImage)] do impresso de cada diagrama da página (na thread): a `QImage`, ao
+    contrário do `QPixmap`, pode nascer fora da interface."""
+    cinza = np.asarray(fonte.pagina(indice).convert("L"))
+    altura, largura = cinza.shape
+    saida = []
+    for k, d in enumerate(diagramas):
+        x1, y1, x2, y2 = (int(v) for v in d.caixa)
+        x1, y1, x2, y2 = max(0, x1), max(0, y1), min(largura, x2), min(altura, y2)
+        if x2 <= x1 or y2 <= y1:
+            continue
+        recorte = np.ascontiguousarray(cinza[y1:y2, x1:x2])
+        imagem = QImage(recorte.data, x2 - x1, y2 - y1, x2 - x1, QImage.Format.Format_Grayscale8)
+        saida.append((k, imagem.copy()))           # a cópia não depende do array
+    return saida
+
+
+def _entregar(vale, painel, indice: int, impressos) -> None:
+    if vale():
+        for k, imagem in impressos:
+            painel.mostrar_recorte(indice, k, imagem)
 
 
 def _desenho(diagrama) -> QImage:

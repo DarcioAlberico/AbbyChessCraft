@@ -420,7 +420,7 @@ def _pintar_os_boxes(visor, p, pendentes: set, mudados) -> None:
     if mudados is None or not visor.repintar_boxes(p.boxes, pendentes, mudados):
         diagramas = p.diagramas
         visor.mostrar_boxes(p.boxes, pendentes, [d.caixa for d in diagramas],
-                            [estilo.cor_do_diagrama(d) for d in diagramas])
+                            [estilo.traco_do_diagrama(d) for d in diagramas])
 
 
 def _mostrar_as_contagens(treino, leitor, pendentes: int, glifos: int) -> None:

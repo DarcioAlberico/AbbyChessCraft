@@ -379,9 +379,8 @@ class PainelDeTreino(QWidget):
         caixa_legenda = QVBoxLayout(legenda)
         amostras = [(estilo.traco(estado, origem), texto)
                     for estado, origem, texto in estilo.LEGENDA]
-        amostras += [(estilo.Traco(estilo.DIAGRAMA_POR_LER, 2.5, Qt.PenStyle.DashLine),
-                      "Diagrama (fora do texto)"),
-                     (estilo.Traco(estilo.MARCADO, 2.5, Qt.PenStyle.SolidLine),
+        amostras += estilo.legenda_dos_diagramas()       # os quatro estados (CA-U5c)
+        amostras += [(estilo.Traco(estilo.MARCADO, 2.5, Qt.PenStyle.SolidLine),
                       "Na seleção (Ctrl+clique)")]
         for traco, texto in amostras:
             linha = QHBoxLayout()

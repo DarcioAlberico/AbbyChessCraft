@@ -25,7 +25,8 @@ import pytest
 
 from abbychess import busca as bs
 
-from tests.desempenho.conftest import cronometrar, na_maquina_cadastrada, percentil
+from tests.desempenho.conftest import (RODADAS_DA_META_QUE_OSCILA, cronometrar, percentil,
+                                       portao)
 from tests.livros import FATIAS, fatia
 
 pytestmark = [pytest.mark.desempenho, pytest.mark.timeout(900)]
@@ -66,11 +67,6 @@ def livro_de_230(tmp_path_factory):
     return arquivos
 
 
-def _portao(valor: float, alvo: float) -> None:
-    if na_maquina_cadastrada():
-        assert valor <= alvo * 1.2, f"{valor} > {alvo} × 1,2"
-
-
 def test_ca_7_1_montar_o_indice(livro_de_230, medidas):
     pool = bs.PoolDoIndice()
     pool.obter()                                        # aberto com o programa
@@ -89,7 +85,7 @@ def test_ca_7_1_montar_o_indice(livro_de_230, medidas):
                 "`busca.construir` nos processos já abertos (o programa os abre ao começar, "
                 "`PoolDoIndice.aquecer`); à parte, abrindo os processos a cada vez (o projeto "
                 "aberto logo ao abrir o programa)"}
-    _portao(resultado["p95_ms"], 2000)
+    portao(resultado["p95_ms"], 2000)
 
 
 def test_ca_7_1_buscar_no_livro(livro_de_230, medidas):
@@ -114,7 +110,7 @@ def test_ca_7_1_buscar_no_livro(livro_de_230, medidas):
         **resultado, "paginas": PAGINAS, "ocorrencias": len(achadas), "alvo_p95_ms": 1000,
         "como": f"`busca.buscar` de {PADRAO!r} no índice de {PAGINAS} páginas, na thread do "
                 "teste; o resultado igual ao do `re` no texto concatenado"}
-    _portao(resultado["p95_ms"], 1000)
+    portao(resultado["p95_ms"], 1000)
 
 
 def test_ca_7_3_a_janela_responde_durante_a_busca(livro_de_230, medidas):
@@ -158,7 +154,7 @@ def test_ca_7_3_a_janela_responde_durante_a_busca(livro_de_230, medidas):
         "duracao_s": round(voltas[0], 2), "alvo_p99_ms": 100,
         "como": "um QTimer de 16 ms na thread da interface enquanto outra thread busca "
                 f"{opcoes.texto!r} 40 vezes seguidas no índice de {PAGINAS} páginas"}
-    _portao(p99, 100)
+    portao(p99, 100)
 
 
 def test_ca_7_3_a_janela_responde_durante_o_aborto(medidas):
@@ -211,7 +207,7 @@ def test_ca_7_3_a_janela_responde_durante_o_aborto(medidas):
         "abortou_em_s": round(duracao, 2), "alvo_p99_ms": 100,
         "como": "(\\w+)+$ numa página de uma palavra de 2.999 letras e um '!', com o tempo-limite real "
                 "(0,5 s); um QTimer de 16 ms na thread da interface"}
-    _portao(p99, 100)
+    portao(p99, 100)
 
 
 def _projeto_de_230(pasta: Path) -> Path:
@@ -266,7 +262,7 @@ def test_ca_7_1_o_indice_pela_janela_com_o_servidor(tmp_path, medidas, monkeypat
     app = QApplication.instance() or QApplication([])
     pasta = _projeto_de_230(tmp_path)
     tempos = []
-    for _rodada in range(3):
+    for _rodada in range(RODADAS_DA_META_QUE_OSCILA):   # a meta oscila: a mediana (CA-C6)
         janela = JanelaPrincipal()
         try:
             fim = time.monotonic() + 30                 # o programa aberto: o pool aquecido
@@ -293,5 +289,5 @@ def test_ca_7_1_o_indice_pela_janela_com_o_servidor(tmp_path, medidas, monkeypat
                   "fica nas limitações do CA-7.1)",
         "como": "JanelaPrincipal com o servidor (a fábrica de verdade, carregando os modelos "
                 "ao mesmo tempo) e os processos do índice já abertos: do abrir_caminho ao "
-                "busca.pronto, 3 vezes (uma janela nova por vez)"}
-    _portao(mediana, 2000)
+                f"busca.pronto, {RODADAS_DA_META_QUE_OSCILA} vezes (uma janela nova por vez)"}
+    portao(mediana, 2000)

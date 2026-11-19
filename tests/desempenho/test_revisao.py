@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from tests.desempenho.conftest import na_maquina_cadastrada, percentil
+from tests.desempenho.conftest import percentil, portao
 from tests.desempenho.test_busca import PAGINAS
 from tests.desempenho.test_substituir import _livro_de_230
 
@@ -23,11 +23,6 @@ pytestmark = [pytest.mark.desempenho, pytest.mark.timeout(900)]
 
 #: As rodadas descartadas antes das 30 medidas (§15.3).
 AQUECIMENTOS = 5
-
-
-def _portao(valor: float, alvo: float) -> None:
-    if na_maquina_cadastrada():
-        assert valor <= alvo * 1.2, f"{valor} > {alvo} × 1,2"
 
 
 def test_ca_8_3_do_abrir_ao_painel_de_paginas(tmp_path, medidas, monkeypatch):
@@ -105,7 +100,7 @@ def test_ca_8_3_do_abrir_ao_painel_de_paginas(tmp_path, medidas, monkeypatch):
                 "linhas no painel de Páginas (o leitor da interface carregando), 30 vezes depois "
                 f"de {AQUECIMENTOS} que aquecem, cada uma com o fundo da anterior já assentado; e mudar o "
                 "limiar de revisão (sem abrir as páginas)"}
-    _portao(p95, 300)
+    portao(p95, 300)
 
 
 def test_ensinar_e_esquecer_muitos_com_uma_base_grande(tmp_path, medidas):

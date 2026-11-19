@@ -44,9 +44,19 @@ def laco(tmp_path, monkeypatch):
 
 
 def _respostas(laco, quantas: int) -> dict:
+    """As respostas do laço, por id. O "comecou" e o "vivo" do vigia (CA-C3, CA-C4) ficam de
+    fora, mas o "comecou" de cada pedido vem antes da resposta dele."""
     respostas = {}
+    comecados = laco.__dict__.setdefault("comecados_no_teste", set())   # entre as chamadas
     while len(respostas) < quantas:
-        _, id_, ok, resultado = laco.saida.get(timeout=20)
+        mensagem = laco.saida.get(timeout=20)
+        if mensagem[0] == "comecou":
+            comecados.add(mensagem[1])
+            continue
+        if mensagem[0] == "vivo":
+            continue
+        _, id_, ok, resultado = mensagem
+        assert id_ in comecados or resultado == sl.CANCELADO, f"a resposta {id_} sem o comecou"
         respostas[id_] = (ok, resultado)
     return respostas
 

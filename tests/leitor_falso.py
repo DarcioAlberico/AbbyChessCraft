@@ -7,6 +7,11 @@ página sintética). Assim o teste sabe que a leitura veio do servidor e o lote 
 O palpite do glifo que ninguém leu (§9.2) é fixo ("y", 0,4, `RedeFalsa`); o leitor
 falso não tem rede, e o estado dos modelos continua "sem rede".
 `ABBY_FALSO_ATRASO_AO_ABRIR` faz o filho demorar a ficar pronto, como os modelos de verdade.
+
+Os dois defeitos do filho que o vigia trata (CA-C3, CA-C4), contados desde que o filho abriu:
+`ABBY_FALSO_DORME_NO_GLIFO=N` dorme para sempre no N-ésimo glifo (o filho travado, mas vivo), e
+`ABBY_FALSO_CAI_NO_GLIFO=N` derruba o processo nele (a página que derruba o filho). Reaberto, o
+filho conta de novo: a mesma página dorme ou cai outra vez.
 """
 
 from __future__ import annotations
@@ -36,13 +41,25 @@ class RedeFalsa:
 
 
 class LeitorFalso(LeitorDoLivro):
+    glifos_lidos = 0
+
     def _ler_global(self, recorte, altura_de_referencia) -> Leitura:
+        LeitorFalso.glifos_lidos += 1
+        _defeito_no_glifo(LeitorFalso.glifos_lidos)
         time.sleep(float(os.environ.get("ABBY_FALSO_MS_POR_GLIFO", "10")) / 1000)
         return Leitura(LETRA, FONTE, CONFIANCA)
 
     def sugerir(self, recorte, altura_de_referencia=None):
         # O palpite da rede falsa sem a rede: o estado dos modelos continua "sem rede".
         return RedeFalsa().predict(recorte)
+
+
+def _defeito_no_glifo(n: int) -> None:
+    if n == int(os.environ.get("ABBY_FALSO_CAI_NO_GLIFO", "0")):
+        os._exit(3)                                 # a queda: sem resposta, sem "caiu"
+    if n == int(os.environ.get("ABBY_FALSO_DORME_NO_GLIFO", "0")):
+        while True:                                 # travado, mas vivo
+            time.sleep(1)
 
 
 def criar(pasta_de_padroes, limiares):

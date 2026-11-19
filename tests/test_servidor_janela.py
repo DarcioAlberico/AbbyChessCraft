@@ -94,7 +94,11 @@ def test_o_padrao_ensinado_vai_ao_servidor_antes_do_pedido_seguinte(app, janela)
 
 
 def test_a_primeira_queda_vai_aos_avisos_e_a_segunda_oferece_reabrir(app, janela,  # noqa: F811
-                                                                    sem_dialogos):  # noqa: F811
+                                                                    sem_dialogos,  # noqa: F811
+                                                                    monkeypatch):
+    """A queda reabre o filho, e o reaberto lê. Duas quedas seguidas, sem nada concluído
+    entre elas, desistem e oferecem reabrir; com um pedido concluído no meio, `reinicios` zera
+    e a queda seguinte só reabre de novo (CA-C4)."""
     p = janela.pagina
     primeiro = p.servidor
     primeiro.processo.kill()
@@ -104,9 +108,15 @@ def test_a_primeira_queda_vai_aos_avisos_e_a_segunda_oferece_reabrir(app, janela
     janela.reconhecer()                                        # o reaberto lê
     _esperar(app, janela)
     assert {b.char for b in boxes(janela)} == {leitor_falso.LETRA}
+    assert primeiro.reinicios == 0                             # zerou no pedido concluído
 
     janela.prontos.clear()
-    primeiro.processo.kill()                                   # a segunda: desiste
+    monkeypatch.setenv("ABBY_FALSO_ATRASO_AO_ABRIR", "30")     # o reaberto demora a ler
+    primeiro.processo.kill()                                   # depois de concluir: reabre
+    _ate(app, lambda: primeiro.reinicios == 1 and primeiro.processo.is_alive())
+    assert not primeiro.desistiu
+    primeiro.processo.kill()                                   # a segunda seguida: desiste
+    monkeypatch.delenv("ABBY_FALSO_ATRASO_AO_ABRIR")           # o projeto reaberto lê logo
     _ate(app, lambda: p.servidor is not primeiro and p.servidor is not None)
     _ate(app, lambda: janela.prontos)                          # "Sim" reabriu o projeto
     assert primeiro.desistiu and not p.servidor.desistiu
@@ -245,6 +255,12 @@ def test_o_lote_para_quando_o_servidor_desiste(app, janela_do_livro, monkeypatch
     servidor.processo.kill()
     _ate(app, lambda: servidor.reinicios == 1 and servidor.pronto.is_set())
     _ate(app, lambda: len(p.projeto.resumo.paginas_lidas()) >= 3)        # o lote seguiu no reaberto
+    # Duas quedas seguidas, sem página concluída entre elas (CA-C4: uma página concluída zera
+    # `reinicios`): o reaberto demora a ficar pronto, e cai antes de ler.
+    monkeypatch.setenv("ABBY_FALSO_ATRASO_AO_ABRIR", "30")
+    servidor.processo.kill()
+    _ate(app, lambda: servidor.reinicios == 1 and servidor.processo.is_alive()
+         and not servidor.pronto.is_set())
     servidor.processo.kill()
     _ate(app, lambda: not j.livro.lote_rodando, 60)
     resultado = j.fins[-1]

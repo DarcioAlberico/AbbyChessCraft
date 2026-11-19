@@ -47,6 +47,7 @@ def test_ca_c3_o_prazo_sem_sinal_cabe_nos_70_s():
     assert sl.SINAL_A_CADA == 50
 
 
+@pytest.mark.erro_esperado                 # o vigia loga o filho travado
 def test_ca_c3_o_filho_travado_e_morto_e_o_pedido_segue_a_regra_da_queda(tmp_path, monkeypatch):
     monkeypatch.setenv("ABBY_FALSO_DORME_NO_GLIFO", "10")
     s = _servidor(tmp_path, prazo_sem_sinal=3)

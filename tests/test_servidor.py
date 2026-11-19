@@ -93,13 +93,18 @@ def test_cancelar_para_a_pagina_do_lote_no_glifo_seguinte(servidor, imagem):
         servidor.esperar(pedido, 30)
 
 
-def test_o_filho_que_morre_volta_uma_vez_e_na_segunda_desiste(servidor, imagem):
+def test_o_filho_que_morre_volta_uma_vez_e_na_segunda_seguida_desiste(servidor, imagem):
+    """Duas quedas seguidas, sem nada concluído entre elas: desiste. Com um pedido concluído
+    no meio, `reinicios` zera e a queda seguinte reabre de novo (CA-C4,
+    `test_servidor_vigia.py`)."""
+    from tests.ajudantes import esperar
+
     primeiro = servidor.pid
     servidor.processo.kill()
-    pedido = servidor.pedir("pid")
-    assert servidor.esperar(pedido, 60) != primeiro          # reaberto, e o pedido reenviado
-    assert servidor.reinicios == 1 and servidor.avisos
-    servidor.processo.kill()
+    assert esperar(lambda: servidor.reinicios == 1 and servidor.pid != primeiro
+                   and servidor.processo.is_alive(), 30)        # reaberto
+    assert servidor.avisos
+    servidor.processo.kill()                                   # a segunda, seguida
     pedido = servidor.pedir("pid")
     with pytest.raises(sl.ErroDoServidor):
         servidor.esperar(pedido, 60)

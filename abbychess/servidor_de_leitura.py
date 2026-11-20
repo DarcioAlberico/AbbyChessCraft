@@ -28,6 +28,13 @@ Do lado da interface, `ServidorDeLeitura` abre o filho, manda os pedidos e receb
 respostas numa thread ouvinte, que chama o `ao_terminar` de cada pedido (quem usa leva o
 resultado para a thread da interface). Se o filho morre, ele é aberto de novo uma vez e os
 pedidos pendentes são reenviados; na segunda queda, os pedidos falham e `ao_avisar` diz.
+
+**O vigia** (CA-C3, CA-C4). O filho diz `("comecou", id)` ao começar um pedido e `("vivo", id)`
+a cada `SINAL_A_CADA` glifos. Com um pedido em curso e nada do filho por `PRAZO_SEM_SINAL`
+segundos, ele está travado: é morto, e vale a regra da queda. O pedido em curso numa queda leva
+a culpa; com a segunda, ele falha e não volta ao filho, e o resto segue (a página que derruba o
+filho não prende mais o lote). `reinicios` zera a cada resposta: só duas quedas seguidas, sem
+nada concluído nem culpado, fazem o servidor desistir.
 """
 
 from __future__ import annotations
@@ -55,6 +62,16 @@ CANCELADO = "cancelado"
 #: O máximo que um pedido da janela ou do lote espera o servidor (o F5 com os modelos ainda
 #: carregando cabe com folga): um servidor travado sem morrer não prende a fila para sempre.
 TEMPO_DO_PEDIDO = 600.0
+#: O filho diz que está vivo a cada tantos glifos lidos num pedido (CA-C3).
+SINAL_A_CADA = 50
+#: Com um pedido em curso, quantos segundos sem nada do filho o fazem ser dado por travado.
+#: Um glifo leva ~0,1 s com os modelos de verdade: 50 deles, ~5 s; a segmentação da página
+#: cheia, ~0,5 s. Com a volta do vigia, o travado é morto em até 70 s (CA-C3).
+PRAZO_SEM_SINAL = 60.0
+#: De quanto em quanto tempo o ouvinte olha a fila do filho (e o vigia, o prazo).
+VOLTA_DO_VIGIA = 0.3
+#: Quantas quedas com um pedido em curso fazem dele uma falha, e não um reenvio (CA-C4).
+QUEDAS_POR_PEDIDO = 2
 
 
 class Cancelado(Exception):
@@ -247,6 +264,8 @@ class _Laco:
         self._livre.set()
         self._acordar = threading.Event()          # a página do lote terminou
         self._trabalhador: Optional[threading.Thread] = None
+        #: Os glifos lidos em cada pedido em curso, para o "vivo" (CA-C3).
+        self._glifos: Dict[int, int] = {}
 
     def rodar(self) -> None:
         self.leitor = _fabrica(self.fabrica)(self.pasta, self.limiares)
@@ -333,13 +352,25 @@ class _Laco:
     def _ler_com_vez(self, ler, recorte, **k):
         """Um glifo. O do lote espera os interativos em curso e para se foi cancelado (ou se
         o servidor vai sair); o interativo só espera o glifo do lote que está sendo lido."""
-        if threading.current_thread() is self._trabalhador:
+        do_lote = threading.current_thread() is self._trabalhador
+        if do_lote:
             while not self._livre.wait(0.1) and not self.sair:
                 pass
             if self.no_lote in self.cancelados or self.sair:
                 raise Cancelado
         with self._trava:
-            return ler(recorte, **k)
+            leitura = ler(recorte, **k)
+        self._contar_o_glifo(self.no_lote if do_lote else self.interativo)
+        return leitura
+
+    def _contar_o_glifo(self, id_) -> None:
+        """Mais um glifo lido no pedido `id_`; a cada `SINAL_A_CADA`, o "vivo" (CA-C3)."""
+        if id_ is None:
+            return
+        lidos = self._glifos.get(id_, 0) + 1
+        self._glifos[id_] = lidos
+        if lidos % SINAL_A_CADA == 0:
+            self.saida.put(("vivo", id_))
 
     def _atender_interativo(self, mensagem) -> None:
         self.interativo = mensagem[1]
@@ -371,6 +402,7 @@ class _Laco:
             self.saida.put(("resposta", id_, False, CANCELADO))
             return
         self.ordem.append(id_)
+        self.saida.put(("comecou", id_))       # a culpa de uma queda agora é dele (CA-C4)
         try:
             resultado = self._operar(operacao, argumentos)
         except Cancelado:
@@ -383,6 +415,7 @@ class _Laco:
         finally:
             self.fins.append(id_)
             self.cancelados.discard(id_)
+            self._glifos.pop(id_, None)
 
     def _operar(self, operacao: str, argumentos):
         leitor = self.leitor
@@ -448,6 +481,10 @@ class Pedido:
     enviado_em: float = field(default_factory=time.perf_counter)
     #: O cancelar foi pedido: o filho reaberto depois de uma queda o recebe de novo.
     cancelar_pedido: bool = False
+    #: O filho disse que começou (CA-C4): numa queda, a culpa é dele.
+    em_curso: bool = False
+    #: As quedas do filho com este pedido em curso; com `QUEDAS_POR_PEDIDO`, ele falha.
+    quedas: int = 0
 
     @property
     def cancelado(self) -> bool:
@@ -459,8 +496,12 @@ class ServidorDeLeitura:
 
     def __init__(self, pasta_de_padroes, limiares, *, fabrica: Optional[str] = None,
                  ao_avisar: Optional[Callable[[str, str, bool], None]] = None,
-                 ao_ficar_pronto: Optional[Callable[[dict], None]] = None):
+                 ao_ficar_pronto: Optional[Callable[[dict], None]] = None,
+                 prazo_sem_sinal: float = PRAZO_SEM_SINAL):
         self.pasta, self.limiares = pasta_de_padroes, limiares
+        #: Com um pedido em curso, os segundos sem nada do filho que o dão por travado.
+        self.prazo_sem_sinal = prazo_sem_sinal
+        self._ultimo_sinal = time.monotonic()
         self.fabrica = fabrica or os.environ.get("ABBY_FABRICA_DE_LEITOR") or FABRICA_PADRAO
         #: `ao_avisar(titulo, texto, desistiu)`, na thread ouvinte, com o `desistiu` da hora
         #: do aviso (duas quedas seguidas não chegam as duas como a segunda).
@@ -501,6 +542,7 @@ class ServidorDeLeitura:
             target=_principal, name="abbychess-servidor-de-leitura", daemon=True,
             args=(self._entrada, self._saida, self.fabrica, self.pasta, self.limiares))
         self.processo.start()
+        self._ultimo_sinal = time.monotonic()
 
     @property
     def pid(self) -> Optional[int]:
@@ -581,14 +623,34 @@ class ServidorDeLeitura:
         """A mensagem seguinte do filho, ou None (nenhuma em 0,3 s, ou a queda dele, já
         tratada)."""
         try:
-            return self._saida.get(timeout=0.3)
+            mensagem = self._saida.get(timeout=VOLTA_DO_VIGIA)
         except queue.Empty:
             if not self._fechando and not self.processo.is_alive():
                 self._caiu("o processo terminou")
+            elif not self._fechando and self._travado():
+                self._matar_o_travado()
         except (EOFError, OSError):
             if not self._fechando:
                 self._caiu("a fila do processo fechou")
+        else:
+            self._ultimo_sinal = time.monotonic()
+            return mensagem
         return None
+
+    def _travado(self) -> bool:
+        """Há um pedido em curso e o filho não diz nada há `prazo_sem_sinal` s (CA-C3)."""
+        with self._trava:
+            em_curso = any(p.em_curso for p in self._pendentes.values())
+        return em_curso and time.monotonic() - self._ultimo_sinal > self.prazo_sem_sinal
+
+    def _matar_o_travado(self) -> None:
+        log.error("o servidor de leitura não deu sinal em %.0f s com um pedido em curso",
+                  self.prazo_sem_sinal)
+        try:
+            self.processo.kill()
+        except Exception:                       # já morto entre o olhar e o matar
+            log.debug("matar o filho travado falhou", exc_info=True)
+        self._caiu(f"não deu sinal em {self.prazo_sem_sinal:.0f} s")
 
     def _tratar(self, mensagem) -> None:
         tipo = mensagem[0]
@@ -598,8 +660,14 @@ class ServidorDeLeitura:
             _, id_, ok, resultado = mensagem
             with self._trava:
                 pedido = self._pendentes.pop(id_, None)
+                self.reinicios = 0                  # o filho concluiu um pedido (CA-C4)
             if pedido is not None:
                 self._concluir(pedido, ok, resultado)
+        elif tipo == "comecou":
+            with self._trava:
+                pedido = self._pendentes.get(mensagem[1])
+                if pedido is not None:
+                    pedido.em_curso = True
         elif tipo == "caiu":
             log.error("o servidor de leitura caiu:\n%s", mensagem[1])
             self._caiu(mensagem[1].strip().splitlines()[-1] if mensagem[1].strip() else "")
@@ -624,33 +692,66 @@ class ServidorDeLeitura:
                 log.exception("o fim do pedido %r falhou", pedido.operacao)
 
     def _caiu(self, motivo: str) -> None:
-        """Reabre uma vez e reenvia os pendentes; na segunda queda, desiste."""
+        """Reabre e reenvia os pendentes. O pedido em curso leva a culpa: com a segunda queda
+        nele, ele falha e não volta (CA-C4). Duas quedas seguidas sem nada concluído nem
+        culpado: desiste."""
         with self._trava:
             if self._fechando or self.desistiu:
                 return
-            try:
-                self.processo.join(0.1)
-            except Exception:                   # o filho que caiu pode nem ter começado
-                log.debug("a espera do filho que caiu falhou", exc_info=True)
-            if self.reinicios >= 1:
+            self._esperar_o_que_caiu()
+            culpados = self._culpar()
+            desiste = not culpados and self.reinicios >= 1
+            if desiste:
                 self.desistiu = True
                 pendentes, self._pendentes = list(self._pendentes.values()), {}
             else:
-                self.reinicios += 1
-                pendentes = None
-                self._abrir()
-                for pedido in self._pendentes.values():
-                    self._entrada.put(pedido.mensagem)
-                    if pedido.cancelar_pedido:     # o cancelar foi ao filho que caiu
-                        self._entrada.put(("cancelar", pedido.id))
-        if pendentes is None:
-            self._avisar(f"O servidor de leitura parou ({motivo}) e foi aberto de novo; os "
-                         "pedidos em curso foram reenviados.", False)
-            return
+                self.reinicios = 0 if culpados else self.reinicios + 1
+                self._reabrir_e_reenviar()
+        if desiste:
+            self._desistir(motivo, pendentes)
+        else:
+            self._reaberto(motivo, culpados)
+
+    def _esperar_o_que_caiu(self) -> None:
+        try:
+            self.processo.join(0.1)
+        except Exception:                       # o filho que caiu pode nem ter começado
+            log.debug("a espera do filho que caiu falhou", exc_info=True)
+
+    def _reabrir_e_reenviar(self) -> None:
+        """O filho novo, com os pendentes de novo (sob a trava)."""
+        self._abrir()
+        for pedido in self._pendentes.values():
+            self._entrada.put(pedido.mensagem)
+            if pedido.cancelar_pedido:          # o cancelar foi ao filho que caiu
+                self._entrada.put(("cancelar", pedido.id))
+
+    def _reaberto(self, motivo: str, culpados: list) -> None:
+        for pedido in culpados:
+            self._concluir(pedido, False, f"o pedido {pedido.operacao!r} derrubou o servidor "
+                           f"de leitura duas vezes ({motivo})")
+        fora = (f" O pedido que o derrubou duas vezes ({culpados[0].operacao}) ficou de fora."
+                if culpados else "")
+        self._avisar(f"O servidor de leitura parou ({motivo}) e foi aberto de novo; os pedidos "
+                     f"em curso foram reenviados.{fora}", False)
+
+    def _desistir(self, motivo: str, pendentes: list) -> None:
         for pedido in pendentes:
             self._concluir(pedido, False, "o servidor de leitura caiu duas vezes")
         self._avisar(f"O servidor de leitura parou de novo ({motivo}). Reabra o projeto para "
                      "voltar a ler as páginas.", True)
+
+    def _culpar(self) -> list:
+        """Uma queda a mais em cada pedido em curso (sob a trava); os que chegam a
+        `QUEDAS_POR_PEDIDO` saem dos pendentes e são devolvidos, para falhar."""
+        culpados = []
+        for pedido in list(self._pendentes.values()):
+            if pedido.em_curso:
+                pedido.quedas += 1
+                pedido.em_curso = False
+                if pedido.quedas >= QUEDAS_POR_PEDIDO:
+                    culpados.append(self._pendentes.pop(pedido.id))
+        return culpados
 
     def _avisar(self, texto: str, desistiu: bool) -> None:
         try:

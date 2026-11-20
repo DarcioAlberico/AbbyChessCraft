@@ -7,7 +7,9 @@ todo o tempo na interface: a cada gravação, `agendar` calculava o resumo da p�
 interface, e o pedido ao servidor só saía depois dele. Agora:
 
 - o resumo de quem espera gravação é calculado quando alguém o pede, uma vez;
-- o recorte vai ao servidor antes da gravação, e o filho lê enquanto a interface grava.
+- o recorte vai ao servidor antes da gravação, e o filho lê enquanto a interface grava;
+- o Alt+seta e o pedido recortam da matriz que a janela já tem, sem converter a página
+  inteira de novo (~7 ms cada).
 """
 
 from __future__ import annotations
@@ -94,5 +96,47 @@ def test_o_recorte_vai_ao_servidor_antes_da_gravacao(tmp_path, monkeypatch):
                             lambda *a, **k: (ordem.append("gravar"), agendar(*a, **k))[1])
         ctl.ajustar(0, 0, 1, 0)
         assert ordem == ["pedido", "gravar"]
+    finally:
+        projeto.fechar()
+
+
+def test_o_ajustar_le_da_matriz_como_da_imagem(tmp_path):
+    """O Alt+seta recorta da matriz da página, que a janela já tem: o mesmo box e a mesma
+    leitura que pela imagem."""
+    import numpy as np
+    from PIL import Image
+
+    from abbychess import editar_boxes as eb
+
+    imagem = Image.open(_pagina_sintetica(tmp_path / "pagina.png")).convert("L")
+    leitor = LeitorDoLivro(tmp_path / "padroes")
+    pela_imagem = [BoxEntry("a", 40, 40, 70, 100, 0.99, "neural")]
+    pela_matriz = list(pela_imagem)
+    eb.ajustar(imagem, pela_imagem, 0, leitor, direita=1)
+    eb.ajustar(np.asarray(imagem), pela_matriz, 0, leitor, direita=1)
+    assert pela_imagem == pela_matriz
+
+
+def test_a_edicao_e_o_pedido_nao_convertem_a_pagina_inteira(tmp_path, monkeypatch):
+    import numpy as np
+
+    projeto = _projeto(tmp_path)
+    try:
+        ctl = ControladorDePagina()
+        ctl.ligar(projeto, pg.FonteDePaginas(projeto.fonte),
+                  LeitorDoLivro(projeto.pasta_de_padroes, limiares=projeto.dados.limiares,
+                                aguardar=True))
+        ctl.ir_para(0)
+        ctl.escolher(ctl.gids[0])
+        if ctl.matriz is None:                     # a matriz é a do cache de páginas
+            ctl.matriz, ctl._matriz_da_imagem = np.asarray(ctl.imagem.convert("L")), ctl.imagem
+        convertidas = []
+        original = pg.cinza
+        monkeypatch.setattr(pg, "cinza", lambda imagem: (convertidas.append(
+            not isinstance(imagem, np.ndarray)), original(imagem))[1])
+        from abbychess import editar_boxes as eb
+        monkeypatch.setattr(eb, "cinza", pg.cinza)
+        ctl.ajustar(0, 0, 1, 0)
+        assert convertidas and not any(convertidas)
     finally:
         projeto.fechar()

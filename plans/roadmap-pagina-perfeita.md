@@ -361,6 +361,29 @@ De PP6 a PP9, os campos se escrevem quando o usuário pedir o passo.
 
 Fora dos marcos, como T1 fora do bloco 1. C-3 e C-4 (lote), depois C-7 e C-6: meta que oscila passa à mediana de 5 rodadas. **CA:** CA-C3, CA-C4, CA-C6, CA-C7.
 
+**Feito** em 2026-11-19, a partir da `main`, um ramo por PR (`c-3-c-4`, `c-7`, `c-6`):
+
+- **CA-C3 e CA-C4** (`servidor_de_leitura.py`, juntos: os dois mudam o protocolo do filho). O
+  filho diz `("comecou", id)` e `("vivo", id)` a cada 50 glifos. Sem sinal por 60 s com um pedido
+  em curso, ele é morto; o pedido em curso leva a culpa da queda e, na segunda, falha sem voltar
+  ao filho, e o resto segue (a página que derruba o filho vai às falhas do lote). `reinicios`
+  zera a cada resposta: duas quedas só desistem seguidas, sem nada concluído. Três testes que
+  fixavam a regra antiga (uma queda depois de pedidos concluídos desistia) passam a provocar
+  duas quedas seguidas. Suíte rápida e camada `processo` em série.
+- **CA-C7** (`tests/test_ponta_a_ponta.py`): PDF, lote, matar até o servidor desistir, reabrir
+  numa janela nova, retomar, exportar, conferir glifo a glifo. Passa na `main`; dois mutantes do
+  retomar reprovam.
+- **CA-C6** (`tests/desempenho/`): o portão `alvo × 1,2` nas sete metas da §2 que não o tinham;
+  a que oscila, na mediana de 5 rodadas. Medido em 19/11 na máquina cadastrada: troca no cache
+  64 ms, fora do cache 198 ms, Enter 47 ms, desfazer 8,6 MB, atraso com o lote 2,7 ms (p99),
+  memória com o lote 1.723 MB; o CA-7.1 pela janela 2.294 ms de mediana (corte 2.400). **A
+  releitura de um glifo com o lote reprova:** 243 a 293 ms nas 5 rodadas, mediana 262, corte
+  180. Não oscila: está acima. Rever o alvo (150 ms) ou baixar o tempo é decisão do usuário.
+
+Em 19/11, `test_espaco.py` (4 testes de largura de painel, 553 contra 560 px), `test_estilo.py`
+(o contraste do tema escuro pelo Fusion) e `test_editar_boxes.py` (o Ctrl+D do core `97e3d98`)
+reprovam também na `main` pura: mudou o ambiente ou o core, não estes ramos.
+
 ## Trilha T3 — Entrega
 
 Fora dos marcos, como T1 fora do bloco 1. E-1 (dependências, um OpenCV, YAML no pacote, lock, venv limpo), depois E-2, E-4 e E-5, independentes do resto do plano. E-6 está em PP5. **CA:** CA-E1, CA-E2, CA-E4, CA-E5.

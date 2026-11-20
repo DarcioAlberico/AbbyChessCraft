@@ -18,7 +18,8 @@ import time
 
 import pytest
 
-from tests.desempenho.conftest import cronometrar, p95, percentil
+from tests.desempenho.conftest import (RODADAS_DA_META_QUE_OSCILA, cronometrar, mediana, p95,
+                                       percentil, portao)
 from tests.livros import PASTA_DOS_PDFS
 
 pytestmark = [pytest.mark.desempenho, pytest.mark.livro_real, pytest.mark.timeout(1800)]
@@ -177,6 +178,9 @@ def test_atraso_e_memoria_durante_o_lote(ambiente, medidas):
         "servidor_no_fim_mb": round(_rss_mb(processos[1:])),
         "como": f"pico da soma do RSS da interface e do servidor durante um lote de "
                 f"{len(LOTE)} páginas (desde o E, dois processos)"}
+    portao(percentil(atrasos, 0.99), 50)                 # CA-C6: o atraso, em p99
+    assert rss, "nenhuma medida de memória durante o lote"
+    portao(max(rss), 2560)                               # CA-C6: a memória total
 
 
 def test_releitura_de_um_glifo_com_o_lote_rodando(ambiente, medidas):
@@ -187,9 +191,6 @@ def test_releitura_de_um_glifo_com_o_lote_rodando(ambiente, medidas):
     app, janela = ambiente
     p = janela.pagina
     gid = next(b.gid for b in p.modelo.boxes if b.entry.x2 - b.entry.x1 >= 8)
-    janela.livro.reconhecer(LOTE_DA_RELEITURA, refazer=True)
-    _ate(app, lambda: janela.livro._condutor is not None
-         and janela.livro._condutor.em_leitura is not None, 60)
     sentido = [1]
 
     def preparar(_i):
@@ -200,15 +201,28 @@ def test_releitura_de_um_glifo_com_o_lote_rodando(ambiente, medidas):
         p.ajustar(0, 0, sentido[0], 0)                   # a borda direita, ±1 px
         _ate(app, lambda: not pg.aguardando(p.box(gid)), 30)
 
-    resultado = cronometrar(reler, antes=preparar)
-    ainda_no_lote = janela.livro.lote_rodando
-    janela.livro.cancelar()
-    _ate(app, lambda: not janela.livro.lote_rodando, 600)
+    # A meta oscila em volta do corte (de 144 a 241 ms entre medidas): o portão vale na
+    # mediana das rodadas (CA-C6), cada uma com o lote lendo de novo as mesmas páginas.
+    rodadas, ainda_no_lote = [], []
+    for _rodada in range(RODADAS_DA_META_QUE_OSCILA):
+        janela.livro.reconhecer(LOTE_DA_RELEITURA, refazer=True)
+        _ate(app, lambda: janela.livro._condutor is not None
+             and janela.livro._condutor.em_leitura is not None, 60)
+        rodadas.append(cronometrar(reler, antes=preparar))
+        ainda_no_lote.append(janela.livro.lote_rodando)
+        janela.livro.cancelar()
+        _ate(app, lambda: not janela.livro.lote_rodando, 600)
+    p95_das_rodadas = [r["p95_ms"] for r in rodadas]
     medidas["releitura_com_o_lote"] = {
-        **resultado, "alvo_p95_ms": 150, "lote_rodando_no_fim": ainda_no_lote,
+        **rodadas[len(rodadas) // 2], "p95_das_rodadas_ms": p95_das_rodadas,
+        "mediana_dos_p95_ms": round(mediana(p95_das_rodadas), 2), "alvo_p95_ms": 150,
+        "lote_rodando_no_fim": ainda_no_lote,
+        "portao": "na mediana dos p95 das rodadas (CA-C6)",
         "como": "Alt+→/← alternados num glifo da página aberta: a interface o deixa "
                 "aguardando e o servidor o lê entre um glifo e outro do lote (de outras "
-                "páginas); do comando ao glifo lido, com o laço de eventos girando"}
+                "páginas); do comando ao glifo lido, com o laço de eventos girando; "
+                f"{RODADAS_DA_META_QUE_OSCILA} rodadas, o lote recomeçado em cada uma"}
+    portao(mediana(p95_das_rodadas), 150)
 
 
 def test_lote_com_e_sem_servidor(ambiente, medidas):

@@ -17,7 +17,8 @@ import time
 
 import pytest
 
-from tests.desempenho.conftest import AQUECIMENTOS, REPETICOES, cronometrar, p95, percentil
+from tests.desempenho.conftest import (AQUECIMENTOS, REPETICOES, cronometrar, p95, percentil,
+                                       portao)
 from tests.livros import PASTA_DOS_PDFS
 from tests.ajudantes import _esperar  # noqa: E402,F401,F811
 from tests.janela_util import atual, boxes, fila, mostrar
@@ -93,6 +94,7 @@ def test_troca_de_pagina(ambiente, medidas):
     medidas["troca_de_pagina"] = {
         **resultado, "alvo_no_cache_ms": 150,
         "como": "mesmo processo, alternando 2 páginas lidas, as duas no cache (desde o A1)"}
+    portao(resultado["p95_ms"], 150)                     # CA-C6
 
 
 def test_troca_de_pagina_fora_do_cache(ambiente, medidas):
@@ -122,6 +124,7 @@ def test_troca_de_pagina_fora_do_cache(ambiente, medidas):
                 "troca (o processo novo, com a primeira carga do PDF, não está nesta medida); "
                 "2 aquecimentos e 12 repetições, não os 5 e 30 da §15.3: cada troca renderiza "
                 "e endireita a página de novo, e a medida inteira segue em poucos segundos"}
+    portao(resultado["p95_ms"], 600)                     # CA-C6
 
 
 #: A primeira das páginas nunca vistas que quem folheia atravessa (longe das lidas).
@@ -239,6 +242,7 @@ def test_enter_ensinar(ambiente, medidas):
     medidas["enter_ate_o_fim_da_propagacao"] = {
         **resumo(totais),
         "como": "o mesmo Enter, até a propagação acabar (o que o 2a media como Enter)"}
+    portao(resultado["p95_ms"], 100)                     # CA-C6: o Enter, a parte síncrona
 
 
 def test_enter_com_uma_propagacao_lenta_em_curso(ambiente, medidas):
@@ -320,10 +324,11 @@ def test_releitura_de_um_glifo(ambiente, medidas):
 def test_memoria_do_desfazer(ambiente, medidas):
     """A memória que o histórico prende (tracemalloc), por ação, extrapolada para 300 × 20."""
     app, janela = ambiente
-    medidas["memoria_do_desfazer"] = {
+    medida = medidas["memoria_do_desfazer"] = {
         "boxes_por_pagina": round(sum(len(janela.projeto.carregar_pagina(i)) for i in PAGINAS)
                                   / len(PAGINAS)),
         "alvo_mb": 50, **_memoria_do_historico(app, janela)}
+    portao(medida["estimado_300x20_mb"], 50)             # CA-C6
 
 
 def _memoria_do_historico(app, janela) -> dict:

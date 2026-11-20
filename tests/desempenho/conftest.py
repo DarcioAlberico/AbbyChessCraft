@@ -2,9 +2,10 @@
 
 Roda só com `-m desempenho`. Cada teste mede uma meta de §2 e registra o número em
 `medidas`; ao fim da sessão, `docs/medidas/AAAA-MM-DD-<rótulo>.json` recebe os números
-e o ambiente (CPU, RAM, versões, threads do torch, commit). Na linha de base (passo 0)
-os testes só reportam; os passos que perseguem uma meta acrescentam o portão
-`alvo × 1,2`, que só reprova na máquina de `docs/medidas/maquina.json`.
+e o ambiente (CPU, RAM, versões, threads do torch, commit). Toda meta da §2 tem o portão
+`alvo × 1,2` (`portao`, CA-C6), que só reprova na máquina de `docs/medidas/maquina.json`; a
+meta que oscila em volta do corte é medida em `RODADAS_DA_META_QUE_OSCILA` rodadas, e o portão
+vale na mediana delas.
 """
 
 from __future__ import annotations
@@ -74,6 +75,21 @@ def cronometrar(funcao, *, aquecimentos: int = AQUECIMENTOS, repeticoes: int = R
 @pytest.fixture(scope="session")
 def medidas():
     return _coletadas
+
+
+#: As rodadas da meta que oscila em volta do corte (CA-C6): o portão vale na mediana delas,
+#: e uma rodada ruim de uma máquina carregada não pinta de vermelho uma meta cumprida.
+RODADAS_DA_META_QUE_OSCILA = 5
+
+
+def portao(valor: float, alvo: float) -> None:
+    """O corte da §2: `valor` ≤ `alvo` × 1,2, só na máquina cadastrada (CA-C6)."""
+    if na_maquina_cadastrada():
+        assert valor <= alvo * 1.2, f"{valor} > {alvo} × 1,2"
+
+
+def mediana(valores) -> float:
+    return statistics.median(valores)
 
 
 def na_maquina_cadastrada() -> bool:

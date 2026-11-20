@@ -54,7 +54,7 @@ def test_agendar_nao_calcula_o_resumo_e_quem_pede_o_tem_uma_vez(tmp_path, monkey
         assert cache.resumos_pendentes() == {pagina.pid: esperado}
         assert cache.resumos_pendentes() == {pagina.pid: esperado}
         assert chamadas == [True]                       # uma vez, leve, e guardado
-        pagina.boxes[0].entry.char = "z"
+        pagina.boxes[0].entry.confidence = 0.1          # agora a revisar
         assert cache.agendar(pagina)                    # outra versão: outro resumo
         assert cache.resumos_pendentes()[pagina.pid] != esperado
         assert chamadas == [True, True]

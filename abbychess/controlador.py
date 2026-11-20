@@ -716,7 +716,7 @@ class ControladorDePagina:
                 return
             antes = self._instantaneo()
             try:
-                ed.ajustar(self.modelo, self.imagem, gid, self.leitor, esquerda=esquerda,
+                ed.ajustar(self.modelo, self._cinza(), gid, self.leitor, esquerda=esquerda,
                            cima=cima, direita=direita, baixo=baixo)
             except ValueError as erro:
                 self._avisar(f"Não ajustou: {erro}", 6000)
@@ -835,8 +835,10 @@ class ControladorDePagina:
         transacao = self.historico.registrar(hs.Transacao(
             descricao, {pagina.pid: hs.mudanca(antes.pagina, pagina.instantaneo())},
             amostras_criadas=criados, juntar=juntar))
-        self._gravar(pagina)
+        # O recorte vai ao servidor antes da gravação: o filho lê enquanto a interface grava
+        # e repinta (CA-11.7, a releitura com o lote).
         self.leitura.ler_os_aguardando_de(pagina, indice, transacao)
+        self._gravar(pagina)
         if pagina is self.modelo:
             m = transacao.paginas.get(pagina.pid)
             self.eventos.emitir("glifos_mudaram", set(m.antes) if _so_a_leitura(m) else None)

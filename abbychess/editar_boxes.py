@@ -8,7 +8,7 @@ de um box (`_ler_um`): cada edição relê na hora os boxes que criou ou mudou (
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 from PIL import Image
@@ -270,6 +270,14 @@ def juntar(imagem: Image.Image, boxes: List[BoxEntry], i: int, j: int,
     return i
 
 
+def _tamanho(imagem) -> Tuple[int, int]:
+    """(largura, altura) da página: a da imagem PIL, ou a da matriz (`cinza`)."""
+    if isinstance(imagem, Image.Image):
+        return imagem.size
+    altura, largura = imagem.shape[:2]
+    return largura, altura
+
+
 def ajustar(imagem: Image.Image, boxes: List[BoxEntry], indice: int,
             leitor: Optional[LeitorDoLivro] = None, *,
             esquerda: int = 0, cima: int = 0, direita: int = 0, baixo: int = 0) -> BoxEntry:
@@ -278,10 +286,11 @@ def ajustar(imagem: Image.Image, boxes: List[BoxEntry], indice: int,
     Positivo move a borda para a direita ou para baixo, como as coordenadas.
     O box fica dentro da página (`BoxService.clamp_box`) e com pelo menos um
     pixel de cada lado; a leitura antiga, mesmo a manual, vale para o desenho
-    antigo e sai.
+    antigo e sai. A `imagem` pode ser a matriz da página (`cinza`): a janela passa a que já
+    tem, e o Alt+seta não converte a página inteira de novo.
     """
     box = boxes[indice]
-    largura, altura = imagem.size
+    largura, altura = _tamanho(imagem)
     novo = BoxService.clamp_box(replace(box, x1=box.x1 + esquerda, y1=box.y1 + cima,
                                         x2=box.x2 + direita, y2=box.y2 + baixo),
                                 largura, altura)

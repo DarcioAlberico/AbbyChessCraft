@@ -68,9 +68,10 @@ class CacheDoProjeto:
             pagina.zonas = zn.com_ids(pagina.zonas)
             self.guardar(pagina, foto=False)
             instantaneo = pagina.instantaneo()
-            # O resumo vale já para quem pergunta (F6, o lote, "lidas"), antes da gravação.
-            self._a_gravar[pagina.pid] = (instantaneo, resumo if resumo is not None
-                                          else self._p.resumo.do_modelo(instantaneo, leve=True))
+            # O resumo vale já para quem pergunta (F6, o lote, "lidas"), antes da gravação,
+            # mas é calculado quando alguém pergunta (`resumos_pendentes`): ele julga a página
+            # inteira pelo contexto, e a edição não o espera (CA-11.7, a releitura com o lote).
+            self._a_gravar[pagina.pid] = (instantaneo, resumo)
             self.gravador.agendar(pagina.pid, (next(self._p._bilhetes), instantaneo))
         return True
 
@@ -102,8 +103,14 @@ class CacheDoProjeto:
         return sorted(p for p in map(sequencia.posicao_de, pids) if p is not None)
 
     def resumos_pendentes(self) -> Dict[int, dict]:
-        """pid -> o resumo de cada página entregue e ainda não gravada (`agendar`)."""
+        """pid -> o resumo de cada página entregue e ainda não gravada (`agendar`). O que
+        ainda não foi calculado é calculado agora (leve, sem a trava do livro) e guardado até
+        a página ser gravada ou mudar de novo."""
         with self._trava_do_cache:
+            for pid, (instantaneo, resumo) in list(self._a_gravar.items()):
+                if resumo is None:
+                    self._a_gravar[pid] = (instantaneo,
+                                           self._p.resumo.do_modelo(instantaneo, leve=True))
             return {pid: r for pid, (_, r) in self._a_gravar.items()}
 
     def gravada(self, pagina: Pagina) -> None:

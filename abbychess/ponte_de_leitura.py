@@ -427,7 +427,7 @@ class PonteDeLeitura:
         gids = {antes[i].gid for i in indices}
         self._em_leitura |= gids
         geracao = self._p.geracao
-        recortes = pg.recortes_para_ler(self._p.imagem, entradas, indices)
+        recortes = pg.recortes_para_ler(self._p._cinza(), entradas, indices)
         self.sincronizar_padroes()
 
         def chegou(pedido: sl.Pedido) -> None:

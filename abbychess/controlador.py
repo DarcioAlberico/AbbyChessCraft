@@ -716,7 +716,7 @@ class ControladorDePagina:
                 return
             antes = self._instantaneo()
             try:
-                ed.ajustar(self.modelo, self.imagem, gid, self.leitor, esquerda=esquerda,
+                ed.ajustar(self.modelo, self._cinza(), gid, self.leitor, esquerda=esquerda,
                            cima=cima, direita=direita, baixo=baixo)
             except ValueError as erro:
                 self._avisar(f"Não ajustou: {erro}", 6000)
